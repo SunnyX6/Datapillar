@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 6000
 
 spring:
   application:
@@ -37,7 +37,7 @@ spring:
         # 1. 认证服务 (datapillar-auth)
         # Controller: /api/auth/**, 不需要重写
         - id: auth-service
-          uri: http://localhost:7000
+          uri: http://localhost:6001
           predicates:
             - Path=/api/auth/**
 
@@ -45,7 +45,7 @@ spring:
         # Controller: /users, /projects, /roles 等纯业务路径
         # 重写: /api/admin/users → /users
         - id: admin-service
-          uri: http://localhost:8081
+          uri: http://localhost:6002
           predicates:
             - Path=/api/admin/**
           filters:
@@ -55,7 +55,7 @@ spring:
         # Controller: 纯业务路径
         # 重写: /api/ai/** → /**
         - id: ai-service
-          uri: http://localhost:5000
+          uri: http://localhost:6003
           predicates:
             - Path=/api/ai/**
           filters:
@@ -75,7 +75,7 @@ spring:
         # Controller: /workflow, /log, /debug 等纯业务路径
         # 重写: /api/job/workflow → /workflow
         - id: job-service
-          uri: http://localhost:9080
+          uri: http://localhost:6004
           predicates:
             - Path=/api/job/**
           filters:
