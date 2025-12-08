@@ -1,0 +1,50 @@
+{
+  "top": {
+    "org": "爱科姆公司",
+    "language": {
+      "zh": "简体中文",
+      "en": "English"
+    },
+    "tabs": {
+      "dashboard": "数据驾驶舱",
+      "governance": "数据治理",
+      "projects": "项目",
+      "team": "团队协作"
+    },
+    "dropdown": {
+      "metadata": "元数据",
+      "knowledge": "知识图谱RAG"
+    },
+    "actions": {
+      "search": "搜索..."
+    },
+    "profile": {
+      "profile": "个人中心",
+      "billing": "账单",
+      "logout": "退出登录"
+    }
+  },
+  "side": {
+    "sections": {
+      "build": "构建与设计",
+      "compute": "计算与连接",
+      "observe": "观测"
+    },
+    "items": {
+      "workflow": "工作流构建",
+      "sql": "SQL 编辑器",
+      "catalog": "数据目录",
+      "warehouses": "计算仓",
+      "jobs": "任务与集群",
+      "config": "配置中心",
+      "deployments": "发布",
+      "logs": "日志",
+      "history": "版本历史",
+      "git": "Git 运维"
+    },
+    "cta": {
+      "credits": "AI 点数",
+      "upgrade": "升级方案"
+    }
+  }
+}

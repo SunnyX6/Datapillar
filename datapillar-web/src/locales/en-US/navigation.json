@@ -1,0 +1,50 @@
+{
+  "top": {
+    "org": "Acme Corp",
+    "language": {
+      "zh": "简体中文",
+      "en": "English"
+    },
+    "tabs": {
+      "dashboard": "Dashboard",
+      "governance": "Governance",
+      "projects": "Projects",
+      "team": "Team"
+    },
+    "dropdown": {
+      "metadata": "Metadata",
+      "knowledge": "Knowledge Graph"
+    },
+    "actions": {
+      "search": "Search..."
+    },
+    "profile": {
+      "profile": "Profile",
+      "billing": "Billing",
+      "logout": "Log out"
+    }
+  },
+  "side": {
+    "sections": {
+      "build": "Build & Design",
+      "compute": "Compute & Connect",
+      "observe": "Observe"
+    },
+    "items": {
+      "workflow": "Workflow Studio",
+      "sql": "SQL Editor",
+      "catalog": "Data Catalog",
+      "warehouses": "Warehouses",
+      "jobs": "Jobs & Clusters",
+      "config": "Configurations",
+      "deployments": "Deployments",
+      "logs": "Logs",
+      "history": "Version History",
+      "git": "Git Ops"
+    },
+    "cta": {
+      "credits": "AI Credits",
+      "upgrade": "Upgrade Plan"
+    }
+  }
+}

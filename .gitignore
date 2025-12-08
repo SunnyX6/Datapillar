@@ -1,0 +1,242 @@
+# ============================================
+# 依赖目录
+# ============================================
+node_modules/
+**/node_modules/
+.venv/
+**/.venv/
+venv/
+**/venv/
+__pycache__/
+**/__pycache__/
+*.egg-info/
+**/*.egg-info/
+site-packages/
+**/site-packages/
+
+# ============================================
+# 构建产物
+# ============================================
+target/
+**/target/
+dist/
+**/dist/
+build/
+**/build/
+out/
+**/out/
+.next/
+**/.next/
+
+# ============================================
+# Gradle 构建 (Gravitino)
+# ============================================
+.gradle/
+**/.gradle/
+**/gradlew
+**/gradlew.bat
+gradle/wrapper/
+
+# ============================================
+# 分发目录 (Gravitino/XXL-Job)
+# ============================================
+distribution/
+**/distribution/
+
+# ============================================
+# IDE 和编辑器
+# ============================================
+.idea/
+**/.idea/
+.vscode/
+**/.vscode/
+*.iml
+**/*.iml
+*.swp
+*.swo
+*~
+.node/
+**/.node/
+
+# ============================================
+# 日志文件
+# ============================================
+logs/
+**/logs/
+*.log
+**/*.log
+nohup.out
+
+# ============================================
+# 缓存目录
+# ============================================
+.cache/
+**/.cache/
+.pytest_cache/
+**/.pytest_cache/
+.nyc_output/
+**/.nyc_output/
+.trae/
+**/.trae/
+.checkpoints/
+**/.checkpoints/
+graphrag_cache/
+**/graphrag_cache/
+.mtj.tmp/
+.mypy_cache/
+**/.mypy_cache/
+.ruff_cache/
+**/.ruff_cache/
+
+# ============================================
+# Java 编译产物
+# ============================================
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.ctxt
+hs_err_pid*
+replay_pid*
+
+# ============================================
+# Python 编译产物
+# ============================================
+*.pyc
+*.pyo
+*.pyd
+.coverage
+htmlcov/
+.hypothesis/
+*.egg
+.Python
+
+# ============================================
+# 压缩文件
+# ============================================
+*.zip
+*.tar.gz
+*.tar
+*.rar
+*.7z
+*.gz
+
+# ============================================
+# 数据文件
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+*.parquet
+*.index
+
+# ============================================
+# Flink 运行时
+# ============================================
+flink/
+
+# ============================================
+# 安全相关文件
+# ============================================
+*.pem
+*.key
+*.crt
+*.cer
+.env
+.env.*
+!.env.example
+cookies.txt
+login_response.json
+application-prod.yml
+application-dev.yml
+
+# ============================================
+# 测试覆盖率
+# ============================================
+coverage/
+**/coverage/
+*.lcov
+**/*.lcov
+
+# ============================================
+# 系统文件
+# ============================================
+.DS_Store
+**/.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ============================================
+# Maven
+# ============================================
+mvnw
+mvnw.cmd
+.mvn/
+
+# ============================================
+# 锁文件
+# ============================================
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+uv.lock
+poetry.lock
+Pipfile.lock
+Cargo.lock
+
+# ============================================
+# 媒体和资源文件 (大文件)
+# ============================================
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.webp
+*.mp4
+*.mov
+*.avi
+*.pdf
+*.woff
+*.woff2
+*.ttf
+*.eot
+
+# ============================================
+# 其他
+# ============================================
+data-storage/
+demo-ui/
+code_review_report.md
+quick_check.sh.log
+code_review.sh.log
+.python-version
+*.tmp
+*.temp
+*.bak
+*.orig
+
+# ============================================
+# Gravitino 特定忽略 (仅忽略构建产物，保留所有源码)
+# ============================================
+# Gradle 构建缓存
+datapillar-gravitino/.gradle/
+datapillar-gravitino/**/build/
+# 分发包 (构建产物)
+datapillar-gravitino/distribution/
+# 数据目录 (运行时数据)
+datapillar-gravitino/data/
+# IDE 配置
+datapillar-gravitino/.idea/
+datapillar-gravitino/.vscode/
+datapillar-gravitino/.node/
+# 测试输出文件
+*.out
+# 临时数据文件
+*.dat

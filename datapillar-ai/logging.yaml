@@ -1,0 +1,65 @@
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  standard:
+    format: "%(asctime)s | %(levelname)-8s | %(name)s:%(funcName)s:%(lineno)d - %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+  simple:
+    format: "%(asctime)s | %(levelname)-8s | %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: DEBUG
+    formatter: standard
+    stream: ext://sys.stdout
+
+  file:
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG
+    formatter: standard
+    filename: /tmp/datapillar-logs/datapillar-ai.log
+    maxBytes: 10485760  # 10MB
+    backupCount: 5
+    encoding: utf-8
+
+filters:
+  # 过滤第三方库的噪音日志
+  exclude_noisy:
+    (): src.core.logging.ExcludeNoisyFilter
+
+root:
+  level: INFO
+  handlers: [console, file]
+
+loggers:
+  # 应用日志
+  src:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+
+  # 第三方库日志级别
+  uvicorn:
+    level: INFO
+    propagate: false
+  uvicorn.access:
+    level: WARNING
+    propagate: false
+  httpx:
+    level: WARNING
+    propagate: false
+  httpcore:
+    level: WARNING
+    propagate: false
+  neo4j:
+    level: WARNING
+    propagate: false
+  langchain:
+    level: WARNING
+    propagate: false
+  langgraph:
+    level: WARNING
+    propagate: false

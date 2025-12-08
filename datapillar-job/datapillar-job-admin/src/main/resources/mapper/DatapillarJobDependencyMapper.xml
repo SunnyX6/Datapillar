@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.job.admin.mapper.DatapillarJobDependencyMapper">
+
+	<resultMap id="DatapillarJobDependency" type="com.sunny.job.admin.model.DatapillarJobDependency" >
+		<result column="id" property="id" />
+		<result column="workflow_id" property="workflowId" />
+		<result column="from_job_id" property="fromJobId" />
+		<result column="to_job_id" property="toJobId" />
+		<result column="dependency_type" property="dependencyType" />
+		<result column="create_time" property="createTime" />
+		<result column="update_time" property="updateTime" />
+	</resultMap>
+
+	<sql id="Base_Column_List">
+		t.id,
+		t.workflow_id,
+		t.from_job_id,
+		t.to_job_id,
+		t.dependency_type,
+		t.create_time,
+		t.update_time
+	</sql>
+
+	<insert id="insert" parameterType="com.sunny.job.admin.model.DatapillarJobDependency" useGeneratedKeys="true" keyProperty="id" >
+		INSERT INTO job_dependency ( `workflow_id`, `from_job_id`, `to_job_id`, `dependency_type`)
+		values ( #{workflowId}, #{fromJobId}, #{toJobId}, #{dependencyType} );
+	</insert>
+
+	<delete id="deleteById" parameterType="java.lang.Integer" >
+		DELETE FROM job_dependency
+		WHERE id = #{id}
+	</delete>
+
+	<select id="findByFromJobId" parameterType="java.lang.Integer" resultMap="DatapillarJobDependency">
+		SELECT <include refid="Base_Column_List" />
+		FROM job_dependency AS t
+		WHERE t.from_job_id = #{fromJobId}
+		ORDER BY t.id ASC
+	</select>
+
+	<select id="findByToJobId" parameterType="java.lang.Integer" resultMap="DatapillarJobDependency">
+		SELECT <include refid="Base_Column_List" />
+		FROM job_dependency AS t
+		WHERE t.to_job_id = #{toJobId}
+		ORDER BY t.id ASC
+	</select>
+
+	<select id="findAll" resultMap="DatapillarJobDependency">
+		SELECT <include refid="Base_Column_List" />
+		FROM job_dependency AS t
+		ORDER BY t.id ASC
+	</select>
+
+	<select id="findByWorkflowId" parameterType="java.lang.Long" resultMap="DatapillarJobDependency">
+		SELECT <include refid="Base_Column_List" />
+		FROM job_dependency AS t
+		WHERE t.workflow_id = #{workflowId}
+		ORDER BY t.id ASC
+	</select>
+
+	<delete id="deleteByJobId" parameterType="java.lang.Integer" >
+		DELETE FROM job_dependency
+		WHERE from_job_id = #{jobId} OR to_job_id = #{jobId}
+	</delete>
+
+	<select id="findByFromAndToJobId" resultMap="DatapillarJobDependency">
+		SELECT <include refid="Base_Column_List" />
+		FROM job_dependency AS t
+		WHERE t.from_job_id = #{fromJobId} AND t.to_job_id = #{toJobId}
+		LIMIT 1
+	</select>
+
+	<update id="updateDependencyType" parameterType="java.util.HashMap">
+		UPDATE job_dependency
+		SET dependency_type = #{dependencyType}
+		WHERE id = #{id}
+	</update>
+
+	<insert id="batchInsert" parameterType="java.util.List">
+		INSERT INTO job_dependency (workflow_id, from_job_id, to_job_id, dependency_type)
+		VALUES
+		<foreach collection="dependencies" item="item" separator=",">
+			(#{item.workflowId}, #{item.fromJobId}, #{item.toJobId}, #{item.dependencyType})
+		</foreach>
+	</insert>
+
+</mapper>

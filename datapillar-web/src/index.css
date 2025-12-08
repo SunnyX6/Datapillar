@@ -1,0 +1,249 @@
+/**
+ * Tailwind CSS 入口文件
+ *
+ * 样式优先级配置（通过 @layer）：
+ * 1. theme: Tailwind 主题变量
+ * 2. antd: Ant Design 组件样式（低优先级，方便覆盖）
+ * 3. components: 自定义组件样式
+ * 4. utilities: Tailwind 原子类（最高优先级）
+ */
+@import "tailwindcss";
+
+/* Tailwind v4 Dark Mode 配置：使用 class 策略 */
+@variant dark (.dark &);
+
+/* PC 专用断点与容器断点（1080 / 1440 / 1920 / 2560 / 3840） */
+@theme {
+  --breakpoint-md: 1080px;
+  --breakpoint-lg: 1440px;
+  --breakpoint-xl: 1920px;
+  --breakpoint-2xl: 2560px;
+  --breakpoint-3xl: 3840px;
+
+  /* 容器查询断点与屏幕保持一致，便于 @md/@xl 容器写法 */
+  --container-md: 1080px;
+  --container-lg: 1440px;
+  --container-xl: 1920px;
+  --container-2xl: 2560px;
+  --container-3xl: 3840px;
+}
+
+/* 配置样式层级顺序 */
+@layer theme, antd, components, utilities;
+
+@layer theme {
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    min-height: 100dvh;
+    background-color: #020617;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  #root {
+    min-height: inherit;
+  }
+
+  :root {
+    --font-family-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-display: 700 28px/34px var(--font-family-sans);
+    --font-title: 700 22px/28px var(--font-family-sans);
+    --font-heading: 600 18px/24px var(--font-family-sans);
+    --font-subtitle: 600 16px/22px var(--font-family-sans);
+    --font-body: 500 14px/20px var(--font-family-sans);
+    --font-body-sm: 500 13px/18px var(--font-family-sans);
+    --font-caption: 500 12px/16px var(--font-family-sans);
+    --font-micro: 600 10px/14px var(--font-family-sans);
+  }
+}
+
+@layer components {
+  body {
+    cursor: default;
+  }
+
+  button,
+  a,
+  summary,
+  [role='button'],
+  [type='button'],
+  [type='submit'],
+  [type='reset'] {
+    cursor: pointer;
+  }
+
+  input,
+  textarea,
+  select,
+  [contenteditable='true'] {
+    cursor: text;
+  }
+
+  input::selection,
+  textarea::selection,
+  select::selection,
+  [contenteditable='true']::selection {
+    background: rgba(99, 102, 241, 0.25);
+    color: #0f172a;
+  }
+
+  .dark input::selection,
+  .dark textarea::selection,
+  .dark select::selection,
+  .dark [contenteditable='true']::selection {
+    background: rgba(129, 140, 248, 0.35);
+    color: #f8fafc;
+  }
+
+  button:disabled,
+  [aria-disabled='true'],
+  [data-disabled='true'] {
+    cursor: not-allowed;
+  }
+
+  .scrollbar-invisible {
+    scrollbar-width: none;
+  }
+
+  .scrollbar-invisible::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5f5 transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(99, 102, 241, 0.35);
+    border-radius: 999px;
+  }
+
+  .dark .custom-scrollbar {
+    scrollbar-color: #1b1e28 transparent;
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #1b1e28;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+
+  /* Typography Tokens */
+  .text-display {
+    font: var(--font-display);
+  }
+
+  .text-title {
+    font: var(--font-title);
+  }
+
+  .text-heading {
+    font: var(--font-heading);
+  }
+
+  .text-subtitle {
+    font: var(--font-subtitle);
+  }
+
+  .text-body {
+    font: var(--font-body);
+  }
+
+  .text-body-sm {
+    font: var(--font-body-sm);
+  }
+
+  .text-caption {
+    font: var(--font-caption);
+  }
+
+  .text-micro {
+    font: var(--font-micro);
+  }
+
+  /* 扩展字体刻度 */
+  .text-legal {
+    font: 600 11px/14px var(--font-family-sans);
+  }
+
+  .text-nano {
+    font: 600 9px/12px var(--font-family-sans);
+  }
+
+  .text-tiny {
+    font: 600 8px/10px var(--font-family-sans);
+  }
+
+  .text-mini {
+    font: 600 7px/9px var(--font-family-sans);
+  }
+
+  .text-display-sm {
+    font: 700 26px/32px var(--font-family-sans);
+  }
+
+  @keyframes orbit-clockwise {
+    from {
+      transform: rotate(0deg) translateX(48px) rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg) translateX(48px) rotate(-360deg);
+    }
+  }
+
+  @keyframes orbit-counterclockwise {
+    from {
+      transform: rotate(0deg) translateX(48px) rotate(0deg);
+    }
+    to {
+      transform: rotate(-360deg) translateX(48px) rotate(360deg);
+    }
+  }
+
+  .animate-orbit-clockwise {
+    animation: orbit-clockwise 4s linear infinite;
+  }
+
+  .animate-orbit-counterclockwise {
+    animation: orbit-counterclockwise 4s linear infinite;
+  }
+}
+
+/* 覆盖浏览器 autofill 样式 */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px transparent inset !important;
+  box-shadow: 0 0 0 30px transparent inset !important;
+  -webkit-text-fill-color: inherit !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* 深色主题下的 autofill 样式 */
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #1f2937 inset !important;
+  box-shadow: 0 0 0 30px #1f2937 inset !important;
+  -webkit-text-fill-color: #f3f4f6 !important;
+}
