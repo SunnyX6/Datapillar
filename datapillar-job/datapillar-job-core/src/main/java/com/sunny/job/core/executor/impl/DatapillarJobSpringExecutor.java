@@ -1,0 +1,163 @@
+package com.sunny.job.core.executor.impl;
+
+import com.sunny.job.core.executor.DatapillarJobExecutor;
+import com.sunny.job.core.glue.GlueFactory;
+import com.sunny.job.core.handler.annotation.DatapillarJob;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.core.MethodIntrospector;
+import org.springframework.core.annotation.AnnotatedElementUtils;
+
+import java.lang.reflect.Method;
+import java.util.Map;
+
+
+/**
+ * datapillar-job executor (for spring)
+ *
+ * @author Sunny
+ * @version 1.0.0
+ * @since 2025-12-08
+ */
+public class DatapillarJobSpringExecutor extends DatapillarJobExecutor implements ApplicationContextAware, SmartInitializingSingleton, DisposableBean {
+    private static final Logger logger = LoggerFactory.getLogger(DatapillarJobSpringExecutor.class);
+
+
+    // ---------------------- start / stop ----------------------
+
+    // start
+    @Override
+    public void afterSingletonsInstantiated() {
+
+        // init JobHandler Repository
+        /*initJobHandlerRepository(applicationContext);*/
+
+        // init JobHandler Repository (for method)
+        initJobHandlerMethodRepository(applicationContext);
+
+        // refresh GlueFactory
+        GlueFactory.refreshInstance(1);
+
+        // super start
+        try {
+            super.start();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // destroy
+    @Override
+    public void destroy() {
+        super.destroy();
+    }
+
+
+    /*private void initJobHandlerRepository(ApplicationContext applicationContext) {
+        if (applicationContext == null) {
+            return;
+        }
+
+        // init job handler action
+        Map<String, Object> serviceBeanMap = applicationContext.getBeansWithAnnotation(JobHandler.class);
+
+        if (serviceBeanMap != null && serviceBeanMap.size() > 0) {
+            for (Object serviceBean : serviceBeanMap.values()) {
+                if (serviceBean instanceof IJobHandler) {
+                    String name = serviceBean.getClass().getAnnotation(JobHandler.class).value();
+                    IJobHandler handler = (IJobHandler) serviceBean;
+                    if (loadJobHandler(name) != null) {
+                        throw new RuntimeException("datapillar-job jobhandler[" + name + "] naming conflicts.");
+                    }
+                    registJobHandler(name, handler);
+                }
+            }
+        }
+    }*/
+
+    private void initJobHandlerMethodRepository(ApplicationContext applicationContext) {
+        if (applicationContext == null) {
+            return;
+        }
+        // init job handler from method
+        String[] beanDefinitionNames = applicationContext.getBeanNamesForType(Object.class, false, false);  // allowEagerInit=false, avoid early initialization
+        for (String beanDefinitionName : beanDefinitionNames) {
+
+            // filter system bean
+            if (isSystemBean(beanDefinitionName)) {
+                continue;
+            }
+
+            // get bean
+            Object bean = null;
+            Lazy onBean = applicationContext.findAnnotationOnBean(beanDefinitionName, Lazy.class);
+            if (onBean!=null){
+                logger.debug("datapillar-job annotation scan, skip @Lazy Bean:{}", beanDefinitionName);
+                continue;
+            }else {
+                bean = applicationContext.getBean(beanDefinitionName);
+            }
+
+            // filter method
+            Map<Method, DatapillarJob> annotatedMethods = null;   // referred to ：org.springframework.context.event.EventListenerMethodProcessor.processBean
+            try {
+                annotatedMethods = MethodIntrospector.selectMethods(bean.getClass(),
+                        new MethodIntrospector.MetadataLookup<DatapillarJob>() {
+                            @Override
+                            public DatapillarJob inspect(Method method) {
+                                return AnnotatedElementUtils.findMergedAnnotation(method, DatapillarJob.class);
+                            }
+                        });
+            } catch (Throwable ex) {
+                logger.error("datapillar-job method-jobhandler resolve error for bean[" + beanDefinitionName + "].", ex);
+            }
+            if (annotatedMethods==null || annotatedMethods.isEmpty()) {
+                continue;
+            }
+
+            // generate and regist method job handler
+            for (Map.Entry<Method, DatapillarJob> methodDatapillarJobEntry : annotatedMethods.entrySet()) {
+                Method executeMethod = methodDatapillarJobEntry.getKey();
+                DatapillarJob datapillarJob = methodDatapillarJobEntry.getValue();
+                // regist
+                registJobHandler(datapillarJob, bean, executeMethod);
+            }
+
+        }
+    }
+
+    // check if system bean, not job bean
+    private boolean isSystemBean(String beanClassName) {
+        return beanClassName.startsWith("org.springframework")
+                || beanClassName.startsWith("spring.");
+    }
+
+
+    // ---------------------- applicationContext ----------------------
+    private static ApplicationContext applicationContext;
+
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+        DatapillarJobSpringExecutor.applicationContext = applicationContext;
+    }
+
+    public static ApplicationContext getApplicationContext() {
+        return applicationContext;
+    }
+
+    /*
+    BeanDefinitionRegistryPostProcessor
+    registry.getBeanDefine()
+    @Override
+    public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
+        this.registry = registry;
+    }
+    * */
+
+}

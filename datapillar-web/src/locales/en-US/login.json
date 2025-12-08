@@ -1,0 +1,35 @@
+{
+  "brand": {
+    "name": "Datapillar",
+    "tagline": "Raw Leaves In, Golden Wings Out",
+    "slogan": "Let AI spin the cocoon"
+  },
+  "title": "Welcome Back",
+  "demo": {
+    "agentWorking": "AGENT WORKING",
+    "workflowStudio": "Workflow Studio",
+    "buildingETL": "ETL Running...",
+    "aiAgent": "AI-Powered Data Engineering Agent",
+    "realtime": "Live"
+  },
+  "form": {
+    "username": {
+      "label": "Username",
+      "placeholder": "Enter your username",
+      "required": "Please enter your username"
+    },
+    "password": {
+      "label": "Password",
+      "placeholder": "Enter your password",
+      "required": "Please enter your password"
+    },
+    "remember": "Remember me",
+    "forgot": "Forgot password?",
+    "submit": "Sign In",
+    "success": "Signed in successfully"
+  },
+  "footer": {
+    "noAccount": "Don't have an account?",
+    "register": "Request Trial"
+  }
+}

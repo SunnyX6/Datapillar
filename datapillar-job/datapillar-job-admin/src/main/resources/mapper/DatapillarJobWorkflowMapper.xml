@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.job.admin.mapper.DatapillarJobWorkflowMapper">
+
+	<resultMap id="DatapillarJobWorkflow" type="com.sunny.job.admin.model.DatapillarJobWorkflow" >
+		<result column="workflow_id" property="workflowId" />
+		<result column="project_id" property="projectId" />
+		<result column="folder_id" property="folderId" />
+		<result column="name" property="name" />
+		<result column="description" property="description" />
+		<result column="version" property="version" />
+		<result column="created_by" property="createdBy" />
+		<result column="status" property="status" />
+		<result column="workflow_data" property="workflowData" />
+		<result column="start_time" property="startTime" />
+		<result column="end_time" property="endTime" />
+		<result column="create_time" property="createTime" />
+		<result column="update_time" property="updateTime" />
+		<result column="folder_name" property="folderName" />
+		<result column="created_by_name" property="createdByName" />
+	</resultMap>
+
+	<sql id="Base_Column_List">
+		t.workflow_id,
+		t.project_id,
+		t.folder_id,
+		t.name,
+		t.description,
+		t.version,
+		t.created_by,
+		t.status,
+		t.workflow_data,
+		t.start_time,
+		t.end_time,
+		t.create_time,
+		t.update_time
+	</sql>
+
+	<insert id="insert" parameterType="com.sunny.job.admin.model.DatapillarJobWorkflow" useGeneratedKeys="true" keyProperty="workflowId" >
+		INSERT INTO job_workflow (
+			`project_id`, `folder_id`, `name`, `description`, `version`, `created_by`, `status`, `workflow_data`
+		) VALUES (
+			#{projectId}, #{folderId}, #{name}, #{description}, #{version}, #{createdBy}, #{status}, #{workflowData}
+		);
+	</insert>
+
+	<select id="loadById" parameterType="java.lang.Long" resultMap="DatapillarJobWorkflow">
+		SELECT <include refid="Base_Column_List" />
+		FROM job_workflow AS t
+		WHERE t.workflow_id = #{workflowId}
+	</select>
+
+	<update id="updateStatus" parameterType="com.sunny.job.admin.model.DatapillarJobWorkflow">
+		UPDATE job_workflow
+		SET status = #{status},
+			start_time = #{startTime},
+			end_time = #{endTime}
+		WHERE workflow_id = #{workflowId}
+	</update>
+
+	<update id="updateEndTime" parameterType="java.util.HashMap">
+		UPDATE job_workflow
+		SET end_time = #{endTime}
+		WHERE workflow_id = #{workflowId}
+	</update>
+
+	<select id="findAll" resultMap="DatapillarJobWorkflow">
+		SELECT <include refid="Base_Column_List" />
+		FROM job_workflow AS t
+		ORDER BY t.create_time DESC
+	</select>
+
+	<select id="findByStatus" parameterType="java.lang.String" resultMap="DatapillarJobWorkflow">
+		SELECT <include refid="Base_Column_List" />
+		FROM job_workflow AS t
+		WHERE t.status = #{status}
+		ORDER BY t.create_time DESC
+	</select>
+
+	<select id="pageList" parameterType="java.util.HashMap" resultMap="DatapillarJobWorkflow">
+		SELECT <include refid="Base_Column_List" />
+		FROM job_workflow AS t
+		<trim prefix="WHERE" prefixOverrides="AND | OR" >
+			<if test="status != null and status != ''">
+				AND t.status = #{status}
+			</if>
+			<if test="startTimeStart != null and startTimeStart != ''">
+				AND t.start_time &gt;= #{startTimeStart}
+			</if>
+			<if test="startTimeEnd != null and startTimeEnd != ''">
+				AND t.start_time &lt;= #{startTimeEnd}
+			</if>
+		</trim>
+		ORDER BY t.create_time DESC
+		LIMIT #{offset}, #{pagesize}
+	</select>
+
+	<select id="pageListCount" parameterType="java.util.HashMap" resultType="int">
+		SELECT count(1)
+		FROM job_workflow AS t
+		<trim prefix="WHERE" prefixOverrides="AND | OR" >
+			<if test="status != null and status != ''">
+				AND t.status = #{status}
+			</if>
+			<if test="startTimeStart != null and startTimeStart != ''">
+				AND t.start_time &gt;= #{startTimeStart}
+			</if>
+			<if test="startTimeEnd != null and startTimeEnd != ''">
+				AND t.start_time &lt;= #{startTimeEnd}
+			</if>
+		</trim>
+	</select>
+
+	<delete id="delete" parameterType="java.lang.Long" >
+		DELETE FROM job_workflow
+		WHERE workflow_id = #{workflowId}
+	</delete>
+
+	<update id="update" parameterType="com.sunny.job.admin.model.DatapillarJobWorkflow">
+		UPDATE job_workflow
+		<set>
+			<if test="name != null">name = #{name},</if>
+			<if test="description != null">description = #{description},</if>
+			<if test="folderId != null">folder_id = #{folderId},</if>
+			<if test="version != null">version = #{version},</if>
+			<if test="status != null">status = #{status},</if>
+			<if test="workflowData != null">workflow_data = #{workflowData},</if>
+		</set>
+		WHERE workflow_id = #{workflowId}
+	</update>
+
+	<select id="findByProjectId" resultMap="DatapillarJobWorkflow">
+		SELECT <include refid="Base_Column_List" />,
+			   f.name AS folder_name,
+			   u.username AS created_by_name
+		FROM job_workflow AS t
+		LEFT JOIN job_workflow_folder AS f ON t.folder_id = f.id
+		LEFT JOIN users AS u ON t.created_by = u.id
+		WHERE t.project_id = #{projectId}
+		ORDER BY t.create_time DESC
+	</select>
+
+	<select id="findByFolderId" resultMap="DatapillarJobWorkflow">
+		SELECT <include refid="Base_Column_List" />
+		FROM job_workflow AS t
+		WHERE t.folder_id = #{folderId}
+		ORDER BY t.create_time DESC
+	</select>
+
+	<select id="searchByName" resultMap="DatapillarJobWorkflow">
+		SELECT <include refid="Base_Column_List" />
+		FROM job_workflow AS t
+		WHERE t.project_id = #{projectId}
+		  AND t.name LIKE CONCAT('%', #{name}, '%')
+		ORDER BY t.create_time DESC
+	</select>
+
+	<select id="findByProjectIdAndFolderIdAndName" resultMap="DatapillarJobWorkflow">
+		SELECT <include refid="Base_Column_List" />
+		FROM job_workflow AS t
+		WHERE t.project_id = #{projectId}
+		  AND t.name = #{name}
+		  AND (
+		    (#{folderId} IS NULL AND t.folder_id IS NULL) OR
+		    (#{folderId} IS NOT NULL AND t.folder_id = #{folderId})
+		  )
+		LIMIT 1
+	</select>
+
+	<select id="getUserProjectsSummary" resultType="com.sunny.job.admin.dto.ProjectWorkflowSummaryDTO">
+		SELECT
+			p.id AS projectId,
+			p.name AS projectName,
+			p.description AS description,
+			p.status AS status,
+			p.tags AS tags,
+			COALESCE(wf_stats.totalWorkflows, 0) AS totalWorkflows,
+			COALESCE(wf_stats.todayNew, 0) AS todayNew,
+			COALESCE(log_stats.todaySuccess, 0) AS todaySuccess,
+			COALESCE(log_stats.todayFailed, 0) AS todayFailed,
+			COALESCE(log_stats.running, 0) AS running,
+			CASE
+				WHEN COALESCE(log_stats.totalCompleted, 0) = 0 THEN 0
+				ELSE ROUND((COALESCE(log_stats.todaySuccess, 0) * 100.0) / COALESCE(log_stats.totalCompleted, 1), 0)
+			END AS successRate
+		FROM projects p
+		LEFT JOIN (
+			SELECT
+				w.project_id,
+				COUNT(*) AS totalWorkflows,
+				SUM(CASE WHEN DATE(w.create_time) = CURDATE() THEN 1 ELSE 0 END) AS todayNew
+			FROM job_workflow w
+			GROUP BY w.project_id
+		) wf_stats ON p.id = wf_stats.project_id
+		LEFT JOIN (
+			SELECT
+				w.project_id,
+				SUM(CASE WHEN DATE(l.trigger_time) = CURDATE() AND l.handle_code = 200 THEN 1 ELSE 0 END) AS todaySuccess,
+				SUM(CASE WHEN DATE(l.trigger_time) = CURDATE() AND l.handle_code != 200 AND l.handle_code != 0 THEN 1 ELSE 0 END) AS todayFailed,
+				SUM(CASE WHEN l.handle_code = 0 THEN 1 ELSE 0 END) AS running,
+				SUM(CASE WHEN DATE(l.trigger_time) = CURDATE() AND l.handle_code != 0 THEN 1 ELSE 0 END) AS totalCompleted
+			FROM job_log l
+			INNER JOIN job_workflow w ON l.workflow_id = w.workflow_id
+			WHERE DATE(l.trigger_time) = CURDATE()
+			GROUP BY w.project_id
+		) log_stats ON p.id = log_stats.project_id
+		WHERE p.owner_id = #{userId}
+		  AND p.deleted = 0
+		ORDER BY p.created_at DESC
+	</select>
+
+</mapper>

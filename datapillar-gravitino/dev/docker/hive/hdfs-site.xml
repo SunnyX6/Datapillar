@@ -1,0 +1,21 @@
+<configuration>
+  <property>
+    <name>dfs.replication</name>
+    <value>1</value>
+  </property>
+
+  <property>
+    <name>dfs.webhdfs.enabled</name>
+    <value>true</value>
+  </property>
+
+  <property>
+    <name>dfs.datanode.address</name>
+    <value>__REPLACE__HOST_NAME:50010</value>
+  </property>
+
+  <property>
+    <name>dfs.permissions.superusergroup</name>
+    <value>hdfs</value>
+  </property>
+</configuration>

@@ -1,0 +1,63 @@
+server:
+  port: 7000
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: datapillar-auth
+  datasource:
+    # 使用与业务系统相同的数据库
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:datapillar}?useSSL=false&serverTimezone=UTC&characterEncoding=utf8&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:Sunny.123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      auto-commit: true
+      idle-timeout: 30000
+      pool-name: AuthHikariCP
+      max-lifetime: 900000
+      connection-timeout: 10000
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    map-underscore-to-camel-case: true
+  # 认证服务只扫描 users 表的 Mapper
+  mapper-locations: classpath*:/mapper/*Mapper.xml
+
+# JWT 配置
+jwt:
+  # 对称密钥
+  secret: ${JWT_SECRET:DatapillarJwtSecretKey123456789012345678901234567890}
+  # Access Token 过期时间 (秒)
+  # 开发环境：可通过环境变量 JWT_ACCESS_EXPIRATION=60 设置为60秒来测试自动刷新
+  # 生产环境：604800秒（7天），真正实现7天免登录
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:604800}     # 7 天
+  # Refresh Token 过期时间 (秒)
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:2592000}  # 30 天
+  # 颁发者
+  issuer: datapillar-auth
+
+# Cookie 配置
+cookie:
+  secure: ${COOKIE_SECURE:false}  # 生产环境设为true，开发环境false
+  max-age: ${COOKIE_MAX_AGE:2592000}  # 30天，单位秒（与 Refresh Token 一致）
+
+logging:
+  level:
+    com.sunny.auth: INFO
+    org.springframework.security: WARN
+    org.mybatis: WARN
+    com.zaxxer.hikari: WARN
+    root: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: ${LOG_HOME:/tmp/datapillar-logs}/datapillar-auth.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30

@@ -1,0 +1,63 @@
+[project]
+name = "data-builder-ai"
+version = "1.0.0"
+description = "数仓工作流Agent - GraphRAG + Neo4j知识库"
+requires-python = ">=3.11"
+dependencies = [
+    # FastAPI框架
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.1.0",
+    # Neo4j图数据库
+    "neo4j>=5.17.0",
+    # Neo4j官方GraphRAG库
+    "neo4j-graphrag>=1.0.0",
+    # MySQL数据库（读取AI模型配置）
+    "pymysql>=1.1.0",
+    # Redis（Checkpoint & Memory）
+    "redis>=5.2.1",
+    "redisvl>=0.5.1",
+    # LangGraph (Agent工作流编排)
+    "langgraph>=1.0.3",
+    "langgraph-checkpoint>=2.0.4",
+    "langgraph-checkpoint-redis>=0.2.1",
+    "litellm>=1.0.0",
+    # LangChain - ChatModel包装器（支持结构化输出）
+    "langchain-core>=1.0.5",
+    "langchain-openai>=0.2.0",
+    "langchain-anthropic>=0.2.0",
+    "langchain-community>=0.3.0",
+    # SSE 响应
+    "sse-starlette>=1.6.5",
+    # 二进制序列化
+    "msgpack>=1.0.8",
+    # 多LLM原生SDK
+    "openai>=1.54.0",
+    "anthropic>=0.39.0",
+    "zai-sdk>=0.0.4",
+    # 工具库
+    "python-dotenv>=1.0.0",
+    "httpx>=0.26.0",
+    "pyyaml>=6.0.1",
+    "tenacity>=8.2.3",
+    # JWT认证
+    "pyjwt>=2.8.0",
+    "sqlalchemy>=2.0.0",
+    # 测试框架
+    "pytest>=7.4.4",
+    "pytest-asyncio>=0.23.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.4",
+    "pytest-asyncio>=0.23.4",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]

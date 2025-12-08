@@ -1,0 +1,39 @@
+# Python虚拟环境
+venv/
+*.pyc
+__pycache__/
+*.egg-info/
+dist/
+build/
+
+# 环境变量
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# 日志
+*.log
+logs/
+
+# 数据库文件
+*.db
+sessions.db
+
+# GraphRAG缓存
+graphrag_cache/
+*.parquet
+*.index
+
+# 测试
+.pytest_cache/
+.coverage
+
+# macOS
+.DS_Store
+
+# uv
+.python-version
