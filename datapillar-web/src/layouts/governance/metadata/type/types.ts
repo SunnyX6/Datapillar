@@ -30,6 +30,8 @@ export type SchemaAsset = {
 export type CatalogAsset = {
   id: string
   name: string
+  icon?: string
+  provider?: string
   schemas: SchemaAsset[]
 }
 

@@ -7,10 +7,10 @@
  */
 
 import { useEffect, useState, useRef } from 'react'
-import { AppLayout, SplitGrid } from '@/layouts/responsive'
+import { AppLayout, SplitGrid, useLayout } from '@/layouts/responsive'
 import { ThemeToggle } from '@/components'
 import { DemoCanvas } from './DemoCanvas'
-import { LoginForm } from './LoginForm'
+import { LoginForm, LOGIN_FORM_BASE_HEIGHT, LOGIN_FORM_BASE_WIDTH } from './LoginForm'
 import { ChevronDown, Check } from 'lucide-react'
 import { useI18nStore, type Language } from '@/stores'
 
@@ -26,6 +26,14 @@ export function LoginPage() {
       document.body.style.overflow = originalOverflow
     }
   }, [])
+
+  const { ref: rightPaneRef, scale: formScale, ready: formReady } = useLayout<HTMLDivElement>({
+    baseWidth: LOGIN_FORM_BASE_WIDTH,
+    baseHeight: LOGIN_FORM_BASE_HEIGHT,
+    scaleFactor: 1.0,
+    minScale: 0.5,
+    maxScale: 1.5
+  })
 
   return (
     <AppLayout
@@ -51,14 +59,17 @@ export function LoginPage() {
           </div>
         }
         right={
-          <>
+          <div
+            ref={rightPaneRef}
+            className="relative flex h-dvh max-h-dvh w-full items-center justify-center overflow-hidden bg-white dark:bg-[#020617]"
+          >
             {/* 语言和主题切换按钮 - 固定在右上角 */}
             <div className="absolute top-4 right-0.5 z-30 flex items-center gap-1">
               <ThemeToggle />
               <LoginLanguageDropdown />
             </div>
-            <LoginForm />
-          </>
+            <LoginForm scale={formScale} ready={formReady} />
+          </div>
         }
       />
     </AppLayout>

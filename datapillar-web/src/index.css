@@ -200,6 +200,20 @@
     font: 700 26px/32px var(--font-family-sans);
   }
 
+  /* 面板宽度（响应式侧边栏） */
+  .w-panel-responsive {
+    width: 320px;
+    @media (width >= 1440px) {
+      width: 400px;
+    }
+    @media (width >= 1920px) {
+      width: 420px;
+    }
+    @media (width >= 2560px) {
+      width: 480px;
+    }
+  }
+
   @keyframes orbit-clockwise {
     from {
       transform: rotate(0deg) translateX(48px) rotate(0deg);
@@ -224,6 +238,21 @@
 
   .animate-orbit-counterclockwise {
     animation: orbit-counterclockwise 4s linear infinite;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out;
   }
 }
 

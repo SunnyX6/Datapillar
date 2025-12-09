@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { contentMaxWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
-import { type TableAsset } from './types'
+import { type TableAsset } from '../type/types'
 
 const QUALITY_RULES = [
   { name: 'unique_region_id', type: 'Uniqueness', status: 'PASS', value: '100%' },

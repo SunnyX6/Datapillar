@@ -2,7 +2,7 @@ import { type ReactNode } from 'react'
 import { BarChart3, Database, Layers, Table as TableIcon } from 'lucide-react'
 import { contentMaxWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
-import { type CatalogAsset, type SchemaAsset } from './types'
+import { type CatalogAsset, type SchemaAsset } from '../type/types'
 
 type SchemaOverviewProps = {
   schema: SchemaAsset

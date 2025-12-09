@@ -171,20 +171,23 @@ export const iconSizeToken = {
  * ✅  直接使用固定宽度 + 最大高度限制
  */
 export const modalWidthClassMap = {
-  /** 小模态框：400px */
-  small: 'w-96',
+  /** 紧凑模态：560px（元数据等表单弹窗默认）*/
+  small: 'max-w-[560px]',
 
-  /** 标准模态框：500px */
-  normal: 'w-[500px]',
+  /** 标准模态：640px */
+  normal: 'max-w-[640px]',
 
-  /** 大模态框：600px */
-  large: 'w-[600px]',
+  /** 大模态：720px */
+  large: 'max-w-[720px]',
 
-  /** 超大模态框：800px */
-  extraLarge: 'w-[800px]',
+  /** 超大模态：840px */
+  extraLarge: 'max-w-[840px]',
 
-  /** 特大模态框：1000px（适合复杂表单）*/
-  huge: 'w-[1000px]'
+  /** 特大模态：1000px（适合复杂表单）*/
+  huge: 'max-w-[1000px]',
+
+  /** 响应式模态：大屏幕自动变宽（560px → 680px → 800px）*/
+  responsive: 'max-w-[560px] @xl:max-w-[680px] @2xl:max-w-[800px]'
 } as const
 
 /**
@@ -358,7 +361,12 @@ export const panelWidthClassMap = {
   narrow: 'w-80 max-w-80',
 
   /** 标准面板：384px */
-  normal: 'w-96 max-w-96'
+  normal: 'w-96 max-w-96',
+
+  /** 响应式面板：大屏幕自动变宽（320px → 400px → 480px → 560px）
+   * 定义在 index.css 中的 .w-panel-responsive
+   */
+  responsive: 'w-panel-responsive'
 } as const
 
 /**
@@ -380,9 +388,36 @@ export const messageWidthClassMap = {
   default: 'max-w-[80%]'
 } as const
 
+/**
+ * 输入框容器宽度 ClassMap（PC 端）
+ * 适用场景：页面底部输入框、搜索框容器、AI 对话输入区
+ *
+ * ⚠️ 禁止用 modalWidthClassMap 设置输入框宽度（语义不符）
+ * ✅ 使用此 ClassMap 设置输入框容器的固定宽度
+ *
+ * 参考现有实现：
+ * - TopNav 搜索框：w-56 (224px)
+ * - 登录页演示输入框：500px
+ * - 知识图谱底部输入框：600px
+ */
+export const inputContainerWidthClassMap = {
+  /** 紧凑：224px（适合顶部导航搜索框，参考 TopNav.tsx）*/
+  compact: 'w-56',
+
+  /** 标准：500px（适合登录页演示输入框）*/
+  normal: 'w-[500px]',
+
+  /** 宽：600px（适合知识图谱底部输入框）*/
+  wide: 'w-[600px]',
+
+  /** 全宽：撑满父容器（适合聊天面板，参考 Chat.tsx）*/
+  full: 'w-full'
+} as const
+
 export type PanelWidth = keyof typeof panelWidthClassMap
 export type PanelHeight = keyof typeof panelHeightClassMap
 export type MessageWidth = keyof typeof messageWidthClassMap
+export type InputContainerWidth = keyof typeof inputContainerWidthClassMap
 
 /**
  * 网格列数 ClassMap（PC 端）

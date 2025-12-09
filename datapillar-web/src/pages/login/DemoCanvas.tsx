@@ -29,7 +29,7 @@ import {
 } from '@/hooks'
 import * as LucideIcons from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { modalWidthClassMap } from '@/design-tokens/dimensions'
+import { inputContainerWidthClassMap } from '@/design-tokens/dimensions'
 import { useLayout } from '@/layouts/responsive'
 
 const STAGE_BASE_WIDTH = 1200
@@ -1181,7 +1181,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
          <div
             className={cn(
               'bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-full p-1.5 pl-4 md:pl-6 pr-2 flex items-center gap-2 md:gap-4 shadow-2xl ring-1 ring-indigo-500/20',
-              modalWidthClassMap.normal
+              inputContainerWidthClassMap.normal
             )}
          >
              <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shrink-0">

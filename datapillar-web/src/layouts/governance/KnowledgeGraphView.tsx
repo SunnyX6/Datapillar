@@ -35,7 +35,7 @@ import {
   Zap
 } from 'lucide-react'
 import { KnowledgeImportMenu } from './KnowledgeImportMenu'
-import { panelWidthClassMap, panelHeightClassMap, modalWidthClassMap } from '@/design-tokens/dimensions'
+import { panelWidthClassMap, panelHeightClassMap, inputContainerWidthClassMap } from '@/design-tokens/dimensions'
 import { useIsDark } from '@/stores'
 import { fetchInitialGraph, searchGraph, type GraphData, type GraphLink, type GraphNode } from '@/services/knowledgeGraph'
 
@@ -1165,7 +1165,7 @@ export function KnowledgeGraphView() {
             </div>
         )}
 
-        <div className={`absolute bottom-8 left-1/2 -translate-x-1/2 z-40 px-4 pointer-events-auto ${modalWidthClassMap.large}`}>
+        <div className={`absolute bottom-8 left-1/2 -translate-x-1/2 z-40 px-4 pointer-events-auto ${inputContainerWidthClassMap.wide}`}>
           <KnowledgeImportMenu open={isSourcesOpen} onClose={() => setIsSourcesOpen(false)} isDark={isDark} />
 
           <div

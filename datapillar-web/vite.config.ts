@@ -83,7 +83,9 @@ export default defineConfig(({ mode }) => {
         'react-dom',
         'react-router-dom',
         'axios',
-        'lodash-es'
+        'lodash-es',
+        'dt-sql-parser',
+        'antlr4ng'
       ],
       exclude: ['monaco-editor'] // Monaco 按需加载，不预构建
     }
