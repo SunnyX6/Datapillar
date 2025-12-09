@@ -1,16 +1,34 @@
 import { useMemo, useRef, useState } from 'react'
-import { Database, FolderTree, Menu, Search, Server, Table as TableIcon } from 'lucide-react'
-import { CatalogOverview } from './metadata/CatalogOverview'
-import { Overview } from './metadata/Overview'
-import { SchemaOverview } from './metadata/SchemaOverview'
-import { TableOverview } from './metadata/TableOverview'
-import { type CatalogAsset, type NodeType, type SchemaAsset, type TableAsset } from './metadata/types'
-import { panelWidthClassMap } from '@/design-tokens/dimensions'
+import { Database, FolderTree, Menu, MoreVertical, Search, Server, Table as TableIcon } from 'lucide-react'
+import {
+  SiApachehive,
+  SiApachespark,
+  SiApachekafka,
+  SiApacheflink,
+  SiApachehadoop,
+  SiClickhouse,
+  SiSnowflake,
+  SiDatabricks,
+  SiElasticsearch,
+  SiMongodb,
+  SiPostgresql,
+  SiMysql,
+  SiRedis
+} from 'react-icons/si'
+import { CatalogOverview } from './metadata/overview/CatalogOverview'
+import { Overview } from './metadata/overview/Overview'
+import { SchemaOverview } from './metadata/overview/SchemaOverview'
+import { TableOverview } from './metadata/overview/TableOverview'
+import { CreateCatalogForm, CreateSchemaForm, CreateTableForm } from './metadata/form'
+import { type CatalogAsset, type NodeType, type SchemaAsset, type TableAsset } from './metadata/type/types'
+import { Modal } from '@/components/Modal'
 
 const MOCK_CATALOGS: CatalogAsset[] = [
   {
     id: 'catalog-prod-hive',
     name: 'prod_hive_dw',
+    icon: 'hive',
+    provider: 'hive',
     schemas: [
       {
         id: 'schema-finance',
@@ -97,6 +115,8 @@ const MOCK_CATALOGS: CatalogAsset[] = [
   {
     id: 'catalog-iceberg',
     name: 'iceberg_marketing',
+    icon: 'iceberg',
+    provider: 'lakehouse-iceberg',
     schemas: [
       {
         id: 'schema-ads',
@@ -148,7 +168,22 @@ export function MetadataView() {
   const [searchValue, setSearchValue] = useState('')
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
-  const [isSideCollapsed, setIsSideCollapsed] = useState(false)
+  const [isSideCollapsed, setIsSideCollapsed] = useState(true)
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean
+    nodeId: string
+    nodeType: NodeType
+    nodeName: string
+    provider?: string
+  }>({
+    isOpen: false,
+    nodeId: '',
+    nodeType: 'ROOT',
+    nodeName: '',
+    provider: undefined
+  })
+  const [footerLeft, setFooterLeft] = useState<React.ReactNode>(null)
+  const [contentOverlay, setContentOverlay] = useState<React.ReactNode>(null)
 
   const tableLookup = useMemo(() => {
     const map = new Map<string, { table: TableAsset; schema: SchemaAsset; catalog: CatalogAsset }>()
@@ -217,6 +252,36 @@ export function MetadataView() {
     })
   }
 
+  const handleCreateChild = (parentId: string, parentType: NodeType, parentName: string) => {
+    const schemaInfo = schemaLookup.get(parentId)
+    const catalogInfo = catalogLookup.get(parentId)
+    const provider =
+      parentType === 'SCHEMA'
+        ? schemaInfo?.catalog.provider
+        : parentType === 'CATALOG'
+          ? catalogInfo?.provider
+          : undefined
+
+    setModalState({
+      isOpen: true,
+      nodeId: parentId,
+      nodeType: parentType,
+      nodeName: parentName,
+      provider
+    })
+  }
+
+  const closeModal = () => {
+    setModalState({
+      isOpen: false,
+      nodeId: '',
+      nodeType: 'ROOT',
+      nodeName: ''
+    })
+    setFooterLeft(null)
+    setContentOverlay(null)
+  }
+
   return (
     <div className="relative flex w-full h-full bg-white dark:bg-slate-900 @container">
       <section className="flex-1 min-w-0 flex flex-col overflow-hidden">
@@ -253,7 +318,7 @@ export function MetadataView() {
 
       <aside
         className={`flex-shrink-0 h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden transition-[width,opacity] duration-300 ${
-          isSideCollapsed ? 'w-0 min-w-0 opacity-0 pointer-events-none' : `${panelWidthClassMap.normal} opacity-100`
+          isSideCollapsed ? 'w-0 min-w-0 opacity-0 pointer-events-none' : 'w-panel-responsive opacity-100'
         }`}
       >
         <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3 bg-slate-50 dark:bg-slate-900">
@@ -305,9 +370,57 @@ export function MetadataView() {
             selectedNodeId={selectedNodeId}
             onToggle={toggleNode}
             onSelect={handleSelect}
+            onCreateChild={handleCreateChild}
           />
         </div>
       </aside>
+
+      {/* 统一的模态弹窗 */}
+      <Modal
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        title={
+          modalState.nodeType === 'ROOT'
+            ? '创建 Catalog'
+            : modalState.nodeType === 'CATALOG'
+              ? '创建 Schema'
+              : modalState.nodeType === 'SCHEMA'
+                ? '创建 Table'
+                : '管理表'
+        }
+        footerLeft={footerLeft}
+        footerRight={
+          modalState.nodeType !== 'TABLE' ? (
+            <>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors shadow-sm"
+              >
+                创建
+              </button>
+            </>
+          ) : undefined
+        }
+        contentOverlay={contentOverlay}
+      >
+        {modalState.nodeType === 'ROOT' && <CreateCatalogForm parentName={modalState.nodeName} />}
+        {modalState.nodeType === 'CATALOG' && <CreateSchemaForm parentName={modalState.nodeName} />}
+        {modalState.nodeType === 'SCHEMA' && (
+          <CreateTableForm
+            parentName={modalState.nodeName}
+            provider={modalState.provider}
+            onDDLButtonRender={setFooterLeft}
+            onOverlayRender={setContentOverlay}
+          />
+        )}
+      </Modal>
     </div>
   )
 }
@@ -317,13 +430,15 @@ function Tree({
   expandedNodes,
   selectedNodeId,
   onToggle,
-  onSelect
+  onSelect,
+  onCreateChild
 }: {
   catalogs: CatalogAsset[]
   expandedNodes: Set<string>
   selectedNodeId: string
   onToggle: (id: string) => void
   onSelect: (id: string, type: NodeType) => void
+  onCreateChild: (parentId: string, parentType: NodeType, parentName: string) => void
 }) {
   return (
     <div className="flex flex-col">
@@ -337,6 +452,7 @@ function Tree({
         hasChildren
         onClick={() => onSelect('ROOT', 'ROOT')}
         onToggle={() => onToggle('ROOT')}
+        onMoreClick={() => onCreateChild('ROOT', 'ROOT', 'One Meta (Enterprise)')}
       />
       {expandedNodes.has('ROOT') &&
         catalogs.map((catalog) => (
@@ -345,12 +461,14 @@ function Tree({
               id={catalog.id}
               label={catalog.name}
               type="CATALOG"
+              catalogIcon={catalog.icon}
               level={1}
               isActive={selectedNodeId === catalog.id}
               isOpen={expandedNodes.has(catalog.id)}
               hasChildren={catalog.schemas.length > 0}
               onClick={() => onSelect(catalog.id, 'CATALOG')}
               onToggle={() => onToggle(catalog.id)}
+              onMoreClick={() => onCreateChild(catalog.id, 'CATALOG', catalog.name)}
             />
             {expandedNodes.has(catalog.id) &&
               catalog.schemas.map((schema) => (
@@ -365,6 +483,7 @@ function Tree({
                     hasChildren={schema.tables.length > 0}
                     onClick={() => onSelect(schema.id, 'SCHEMA')}
                     onToggle={() => onToggle(schema.id)}
+                    onMoreClick={() => onCreateChild(schema.id, 'SCHEMA', schema.name)}
                   />
                   {expandedNodes.has(schema.id) &&
                     schema.tables.map((table) => (
@@ -379,6 +498,8 @@ function Tree({
                         hasChildren={false}
                         onClick={() => onSelect(table.id, 'TABLE')}
                         onToggle={() => {}}
+                        onMoreClick={() => onCreateChild(table.id, 'TABLE', table.name)}
+                        showMore={false}
                       />
                     ))}
                 </div>
@@ -390,30 +511,73 @@ function Tree({
 }
 
 function TreeNode({
+  id: _id,
   label,
   type,
+  catalogIcon,
   level,
   isOpen,
   isActive,
   hasChildren,
   onClick,
-  onToggle
+  onToggle,
+  onMoreClick,
+  showMore = true
 }: {
   id: string
   label: string
   type: NodeType
+  catalogIcon?: string
   level: number
   isOpen: boolean
   isActive: boolean
   hasChildren: boolean
   onClick: () => void
   onToggle: () => void
+  onMoreClick: () => void
+  showMore?: boolean
 }) {
   const paddingLeft = level * INDENT_PX + 12
 
+  const getCatalogIcon = (iconName?: string) => {
+    const iconProps = { size: 14, className: 'text-blue-600 dark:text-blue-400' }
+    switch (iconName) {
+      case 'hive':
+        return <SiApachehive {...iconProps} />
+      case 'spark':
+        return <SiApachespark {...iconProps} />
+      case 'kafka':
+        return <SiApachekafka {...iconProps} />
+      case 'flink':
+        return <SiApacheflink {...iconProps} />
+      case 'hadoop':
+        return <SiApachehadoop {...iconProps} />
+      case 'clickhouse':
+        return <SiClickhouse {...iconProps} />
+      case 'snowflake':
+        return <SiSnowflake {...iconProps} />
+      case 'databricks':
+        return <SiDatabricks {...iconProps} />
+      case 'elasticsearch':
+        return <SiElasticsearch {...iconProps} />
+      case 'mongodb':
+        return <SiMongodb {...iconProps} />
+      case 'postgresql':
+        return <SiPostgresql {...iconProps} />
+      case 'mysql':
+        return <SiMysql {...iconProps} />
+      case 'redis':
+        return <SiRedis {...iconProps} />
+      case 'iceberg':
+        return <Database size={14} className="text-cyan-600 dark:text-cyan-400" />
+      default:
+        return <Database size={14} className="text-blue-600" />
+    }
+  }
+
   const icon = (() => {
     if (type === 'ROOT') return <Server size={14} className="text-indigo-500" />
-    if (type === 'CATALOG') return <Database size={14} className="text-blue-600" />
+    if (type === 'CATALOG') return getCatalogIcon(catalogIcon)
     if (type === 'SCHEMA') return <FolderTree size={14} className="text-amber-500" />
     return <TableIcon size={14} className="text-slate-400" />
   })()
@@ -449,6 +613,20 @@ function TreeNode({
         </div>
         {icon}
         <span className="truncate flex-1">{label}</span>
+
+        {showMore && (
+          <button
+            type="button"
+            className="p-1 rounded hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-colors opacity-0 group-hover:opacity-100"
+            onClick={(e) => {
+              e.stopPropagation()
+              onMoreClick()
+            }}
+            aria-label="更多操作"
+          >
+            <MoreVertical size={14} />
+          </button>
+        )}
       </div>
     </div>
   )

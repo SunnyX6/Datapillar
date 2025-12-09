@@ -8,13 +8,12 @@
  * 4. 错误处理
  */
 
-import { useState, FormEvent } from 'react'
+import { useState, FormEvent, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, UserRound, Lock, Loader2, Eye, EyeOff, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { useThemeMode, useAuthStore } from '@/stores'
-import { useLayout } from '@/layouts/responsive'
 import { BrandLogo } from '@/components'
 import { paddingClassMap } from '@/design-tokens/dimensions'
 import { cn } from '@/lib/utils'
@@ -27,9 +26,9 @@ import { cn } from '@/lib/utils'
 const SCALE = 1.3 // 调整这个值来放大或缩小所有组件
 
 // 表单基础尺寸（用于自适应缩放）
-const FORM_BASE_WIDTH = 400
-const FORM_BASE_HEIGHT = 700
-const FORM_WIDTH_CLASS = 'w-[400px] max-w-[400px]'
+export const LOGIN_FORM_BASE_WIDTH = 400
+export const LOGIN_FORM_BASE_HEIGHT = 700
+export const LOGIN_FORM_WIDTH_CLASS = 'w-[400px] max-w-[400px]'
 
 const SIZES = {
   // 输入框
@@ -65,22 +64,18 @@ const SIZES = {
 /**
  * 登录表单组件
  */
-export function LoginForm() {
+interface LoginFormProps {
+  scale: number
+  ready: boolean
+}
+
+export function LoginForm({ scale, ready }: LoginFormProps) {
   const { t } = useTranslation('login')
   const mode = useThemeMode()
   const navigate = useNavigate()
 
   const login = useAuthStore((state) => state.login)
   const loading = useAuthStore((state) => state.loading)
-
-  // 自适应缩放
-  const { ref: formContainerRef, scale: formScale, ready: formReady } = useLayout<HTMLDivElement>({
-    baseWidth: FORM_BASE_WIDTH,
-    baseHeight: FORM_BASE_HEIGHT,
-    scaleFactor: 1.0,
-    minScale: 0.5,
-    maxScale: 1.5
-  })
 
   // 表单状态（默认填充测试账号）
   const [username, setUsername] = useState('sunny')
@@ -133,19 +128,19 @@ export function LoginForm() {
 
   return (
     <div
-      ref={formContainerRef}
-      className="relative z-20 flex w-full h-full justify-center pt-20 md:pt-24 lg:pt-0 lg:items-center lg:translate-y-4 xl:translate-y-6"
+      className="relative z-20 flex w-full h-full items-center justify-center translate-y-6 md:translate-y-8"
+      style={{ '--login-form-base-height': `${LOGIN_FORM_BASE_HEIGHT}px` } as CSSProperties}
     >
       <div
         className={cn(
           'flex flex-col gap-3 md:gap-4 lg:gap-5 rounded-none w-full',
           paddingClassMap.md,
-          FORM_WIDTH_CLASS
+          LOGIN_FORM_WIDTH_CLASS
         )}
         style={{
-          transform: `scale(${formScale})`,
+          transform: `scale(${scale})`,
           transformOrigin: 'center center',
-          opacity: formReady ? 1 : 0,
+          opacity: ready ? 1 : 0,
           transition: 'opacity 0.3s ease'
         }}
       >
@@ -154,8 +149,8 @@ export function LoginForm() {
           <h2 className={`${SIZES.title.text} font-semibold text-slate-900 dark:text-white text-center`}>{t('title')}</h2>
         </div> */}
 
-      {/* 品牌区域 */}
-        <div className="flex flex-col gap-1 md:gap-1.5 select-none mb-2 md:mb-3 -ml-2">
+      {/* 品牌区域 - 固定高度防止中英文切换时布局抖动 */}
+        <div className="flex flex-col gap-1 md:gap-1.5 select-none mb-2 md:mb-3 -ml-2 min-h-[60px]">
           <BrandLogo
             size={Math.round(38 * SCALE)}
             showText
@@ -272,7 +267,8 @@ export function LoginForm() {
           </form>
         </div>
 
-        <div className="text-legal text-slate-400 dark:text-slate-500 text-center mt-3 select-none">
+        {/* 底部版权区域 - 固定高度防止中英文切换时布局抖动 */}
+        <div className="text-legal text-slate-400 dark:text-slate-500 text-center mt-3 select-none min-h-[48px]">
           <p className="font-mono tracking-wide">© {new Date().getFullYear()} {t('brand.name')} {t('brand.tagline')}</p>
           <p className="mt-1 text-slate-500 dark:text-slate-400">{t('brand.slogan')}</p>
         </div>

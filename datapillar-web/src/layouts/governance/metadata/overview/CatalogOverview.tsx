@@ -1,7 +1,7 @@
 import { BarChart3, Database, Layers, ShieldCheck, Table as TableIcon } from 'lucide-react'
 import { contentMaxWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
-import { type CatalogAsset } from './types'
+import { type CatalogAsset } from '../type/types'
 
 const INGESTION_BARS = [
   { name: 'Hive', width: 'w-3/4', tone: 'bg-blue-500', rows: '148k rows' },

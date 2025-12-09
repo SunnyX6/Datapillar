@@ -32,7 +32,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.19",
-    "dt-sql-parser": "^4.3.1",
+    "dt-sql-parser": "^4.4.0",
     "framer-motion": "^12.23.25",
     "i18next": "^25.7.0",
     "lodash-es": "^4.17.21",
