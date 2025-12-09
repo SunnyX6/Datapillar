@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-FastAPI 应用入口
+FastAPI 应用入口（使用 Repository 模式）
 """
 
 from __future__ import annotations
@@ -12,16 +12,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
 
-from src.core.logging import setup_logging
+from src.config.logging import setup_logging
 
 logger = logging.getLogger(__name__)
 
 from src.agent.orchestrator import Orchestrator, create_orchestrator
-from src.core.exceptions import BaseError, AuthenticationError, AuthorizationError
+from src.config.exceptions import BaseError, AuthenticationError, AuthorizationError
 from src.api.router import api_router
-from src.core.config import settings
-from src.core.database import Neo4jClient, RedisClient, MySQLClient
-from src.tools.agent_tools import init_tools
+from src.config import settings
+from src.config.connection import Neo4jClient, AsyncNeo4jClient, RedisClient, MySQLClient
 from src.auth.middleware import AuthMiddleware
 
 
@@ -32,42 +31,45 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         logger.info("=" * 60)
-        logger.info("Data Builder AI - 启动中...")
+        logger.info("Datapillar AI - 启动中...")
+        logger.info(f"环境: {settings.get('ENV_FOR_DYNACONF', 'development')}")
         logger.info(f"Neo4j URI: {settings.neo4j_uri}")
-        logger.info(f"Neo4j Database: {settings.neo4j_database}")
+        logger.info(f"MySQL: {settings.mysql_host}:{settings.mysql_port}/{settings.mysql_database}")
         logger.info("=" * 60)
 
-        neo4j_client = Neo4jClient()
-        mysql_client = MySQLClient()
-        redis_client: RedisClient | None = None
         orchestrator: Orchestrator | None = None
         try:
-            neo4j_client.connect()
-            mysql_client.connect()
-            redis_client = RedisClient()
-            await redis_client.connect()
+            # 初始化连接池（全局单例，自动管理）
+            logger.info("初始化 MySQL 连接池...")
+            MySQLClient.get_engine()  # 触发连接池初始化
 
-            # 初始化工具层依赖
-            init_tools(neo4j_client, mysql_client)
+            logger.info("初始化 Neo4j 连接池...")
+            Neo4jClient.get_driver()  # 触发连接池初始化
 
+            logger.info("初始化 Redis 连接池...")
+            redis_client = await RedisClient.get_instance()
+
+            # 创建 Orchestrator
             orchestrator = await create_orchestrator(redis_client)
-            app.state.neo4j_client = neo4j_client
-            app.state.mysql_client = mysql_client
-            app.state.redis_client = redis_client
             app.state.orchestrator = orchestrator
+
             logger.info("FastAPI 应用启动完成")
             yield
+
         finally:
-            logger.info("Data Builder AI - 关闭中...")
+            logger.info("Datapillar AI - 关闭中...")
             if orchestrator:
                 logger.info("Orchestrator 已释放")
-            if redis_client:
-                await redis_client.close()
-            mysql_client.close()
-            neo4j_client.close()
+
+            # 关闭连接池
+            await RedisClient.close()
+            await AsyncNeo4jClient.close()
+            Neo4jClient.close()
+            MySQLClient.close()
+            logger.info("所有连接池已关闭")
 
     app = FastAPI(
-        title="Data Builder AI",
+        title="Datapillar AI",
         description="AI 工作流生成服务",
         version="3.0.0",
         lifespan=lifespan,
@@ -109,19 +111,37 @@ def create_app() -> FastAPI:
     # 健康检查
     @app.get("/health")
     async def health_check():
-        neo4j_client = getattr(app.state, "neo4j_client", None)
-        connected = False
-        if neo4j_client:
-            try:
-                neo4j_client.execute_query("RETURN 1 AS test")
-                connected = True
-            except Exception as e:
-                logger.warning(f"Neo4j 健康检查失败: {e}")
+        """健康检查（使用连接池）"""
+        neo4j_connected = False
+        mysql_connected = False
+
+        # 检查 Neo4j 连接
+        try:
+            driver = Neo4jClient.get_driver()
+            driver.verify_connectivity()
+            neo4j_connected = True
+        except Exception as e:
+            logger.warning(f"Neo4j 健康检查失败: {e}")
+
+        # 检查 MySQL 连接
+        try:
+            from sqlalchemy import text
+            with MySQLClient.get_engine().connect() as conn:
+                conn.execute(text("SELECT 1"))
+            mysql_connected = True
+        except Exception as e:
+            logger.warning(f"MySQL 健康检查失败: {e}")
+
+        all_ok = neo4j_connected and mysql_connected
 
         return {
-            "status": "ok" if connected else "degraded",
-            "service": "data-builder-ai",
-            "neo4jConnected": connected,
+            "status": "ok" if all_ok else "degraded",
+            "service": "datapillar-ai",
+            "environment": settings.get("ENV_FOR_DYNACONF", "development"),
+            "connections": {
+                "neo4j": neo4j_connected,
+                "mysql": mysql_connected,
+            }
         }
 
     return app

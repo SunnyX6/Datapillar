@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from neo4j_graphrag.embeddings.base import Embedder
-from src.core.config import model_manager
+from src.config import model_manager
 
 
 class UnifiedEmbedder(Embedder):

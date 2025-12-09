@@ -1,5 +1,5 @@
 [project]
-name = "data-builder-ai"
+name = "datapillar-ai"
 version = "1.0.0"
 description = "数仓工作流Agent - GraphRAG + Neo4j知识库"
 requires-python = ">=3.11"
@@ -8,7 +8,6 @@ dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic>=2.6.0",
-    "pydantic-settings>=2.1.0",
     # Neo4j图数据库
     "neo4j>=5.17.0",
     # Neo4j官方GraphRAG库
@@ -37,7 +36,7 @@ dependencies = [
     "anthropic>=0.39.0",
     "zai-sdk>=0.0.4",
     # 工具库
-    "python-dotenv>=1.0.0",
+    "dynaconf>=3.2.0",
     "httpx>=0.26.0",
     "pyyaml>=6.0.1",
     "tenacity>=8.2.3",
