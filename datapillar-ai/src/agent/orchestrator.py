@@ -19,8 +19,8 @@ from src.agent.state import OrchestratorState
 from src.agent.planner_agent import build_planner_subgraph
 from src.agent.coder_agent import CoderAgent
 from src.agent.context_manager import ContextManager
-from src.core.config import settings
-from src.core.database import RedisClient
+from src.config import settings
+from src.config.connection import RedisClient
 from src.agent.schemas import (
     AgentEventPayload,
     AgentResponse,

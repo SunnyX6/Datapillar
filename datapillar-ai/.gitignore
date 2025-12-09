@@ -6,9 +6,10 @@ __pycache__/
 dist/
 build/
 
-# 环境变量
-.env
-.env.local
+# Dynaconf 敏感配置（不提交）
+config/.secrets.toml
+config/settings.local.toml
+.secrets.*
 
 # IDE
 .vscode/

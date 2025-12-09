@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 from pydantic import BaseModel
 
-from src.core.config import model_manager, ModelConfig
+from src.config import model_manager, ModelConfig
 from langchain_core.language_models.base import LanguageModelInput
 from src.integrations.glm import GlmNativeChatModel
 from langchain_core.language_models.chat_models import BaseChatModel
