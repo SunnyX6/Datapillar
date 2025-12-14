@@ -2,7 +2,9 @@
  * Catalog 表单组件
  */
 
-import { useState } from 'react'
+import { forwardRef, useImperativeHandle, useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
+import { testCatalogConnection } from '@/services/oneMetaService'
 
 type CatalogType = 'RELATIONAL' | 'FILESET' | 'MESSAGING' | 'MODEL' | 'METRIC'
 
@@ -32,16 +34,89 @@ const PROVIDER_BY_TYPE: Record<CatalogType, ProviderOption[]> = {
 
 interface CreateCatalogFormProps {
   parentName: string
+  onFooterLeftRender?: (node: React.ReactNode) => void
 }
 
-export function CreateCatalogForm({ parentName: _parentName }: CreateCatalogFormProps) {
-  const [catalogType, setCatalogType] = useState<CatalogType>('RELATIONAL')
-  const [provider, setProvider] = useState<string>('hive')
-  const [formData, setFormData] = useState({
-    name: '',
-    comment: '',
-    properties: {} as Record<string, string>
-  })
+export interface CatalogFormData {
+  name: string
+  type: CatalogType
+  provider: string
+  comment: string
+  properties: Record<string, string>
+}
+
+export interface CatalogFormHandle {
+  getData: () => CatalogFormData
+  validate: () => boolean
+}
+
+export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogFormProps>(
+  ({ parentName: _parentName, onFooterLeftRender }, ref) => {
+    const [catalogType, setCatalogType] = useState<CatalogType>('RELATIONAL')
+    const [provider, setProvider] = useState<string>('hive')
+    const [formData, setFormData] = useState({
+      name: '',
+      comment: '',
+      properties: {} as Record<string, string>
+    })
+    const [isTesting, setIsTesting] = useState(false)
+
+    // 测试连接
+    const handleTestConnection = useCallback(async () => {
+      if (!formData.name.trim()) {
+        toast.error('请先输入 Catalog 名称')
+        return
+      }
+      setIsTesting(true)
+      try {
+        await testCatalogConnection({
+          name: formData.name,
+          type: catalogType,
+          provider,
+          comment: formData.comment,
+          properties: formData.properties
+        })
+        toast.success('连接测试成功')
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '连接测试失败'
+        toast.error(message)
+      } finally {
+        setIsTesting(false)
+      }
+    }, [formData, catalogType, provider])
+
+    // 渲染测试连接按钮到 footer
+    useEffect(() => {
+      if (onFooterLeftRender) {
+        onFooterLeftRender(
+          <button
+            type="button"
+            onClick={handleTestConnection}
+            disabled={isTesting}
+            className="px-3 py-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isTesting ? '测试中...' : '测试连接'}
+          </button>
+        )
+      }
+    }, [onFooterLeftRender, handleTestConnection, isTesting])
+
+    useImperativeHandle(ref, () => ({
+      getData: () => ({
+        name: formData.name,
+        type: catalogType,
+        provider,
+        comment: formData.comment,
+        properties: formData.properties
+      }),
+      validate: () => {
+        if (!formData.name.trim()) {
+          toast.error('请输入 Catalog 名称')
+          return false
+        }
+        return true
+      }
+    }))
 
   const handleTypeChange = (newType: CatalogType) => {
     setCatalogType(newType)
@@ -113,9 +188,11 @@ export function CreateCatalogForm({ parentName: _parentName }: CreateCatalogForm
       </div>
 
       {/* 动态配置项 */}
-      <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-        <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">连接配置</h4>
-        <ProviderConfigFields provider={provider} onChange={handlePropertyChange} values={formData.properties} />
+      <div className="space-y-2">
+        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">连接配置</label>
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 space-y-2.5">
+          <ProviderConfigFields provider={provider} onChange={handlePropertyChange} values={formData.properties} />
+        </div>
       </div>
 
       <div>
@@ -130,7 +207,9 @@ export function CreateCatalogForm({ parentName: _parentName }: CreateCatalogForm
       </div>
     </div>
   )
-}
+})
+
+CreateCatalogForm.displayName = 'CreateCatalogForm'
 
 // Provider 配置字段组件
 function ProviderConfigFields({
@@ -164,55 +243,62 @@ function ProviderConfigFields({
     onChange(newKey, oldValue) // 设置新 key
   }
 
-  // 渲染固定字段（key 和 value 都在输入框中）
+  // 渲染固定字段
   const renderField = (
     key: string,
     label: string,
-    placeholder: string,
+    defaultValue: string,
     required = true,
     type: 'text' | 'password' | 'number' | 'select' = 'text',
     options?: { value: string; label: string }[]
-  ) => (
-    <div key={key} className="flex items-center gap-2">
-      <div className="w-1/3 flex-shrink-0">
-        <input
-          type="text"
-          value={label}
-          disabled
-          className="w-full px-3 py-1.5 text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-md cursor-not-allowed"
-        />
-      </div>
-      <div className="flex-1">
-        {type === 'select' && options ? (
-          <select
-            value={values[key] || options[0]?.value || ''}
-            onChange={(e) => onChange(key, e.target.value)}
-            className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-          >
-            {options.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        ) : (
+  ) => {
+    // 首次渲染时写入默认值
+    if (values[key] === undefined) {
+      onChange(key, defaultValue)
+    }
+
+    return (
+      <div key={key} className="flex items-center gap-2">
+        <div className="w-1/3 flex-shrink-0">
           <input
-            type={type}
-            placeholder={placeholder}
-            value={values[key] || ''}
-            onChange={(e) => onChange(key, e.target.value)}
-            className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            type="text"
+            value={label}
+            disabled
+            className="w-full px-3 py-1.5 text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-md cursor-not-allowed"
           />
-        )}
-      </div>
-      {required && (
-        <div className="w-4 flex-shrink-0 text-center">
-          <span className="text-red-500 text-sm">*</span>
         </div>
-      )}
-      {!required && <div className="w-4 flex-shrink-0" />}
-    </div>
-  )
+        <div className="flex-1">
+          {type === 'select' && options ? (
+            <select
+              value={values[key] ?? options[0]?.value ?? ''}
+              onChange={(e) => onChange(key, e.target.value)}
+              className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            >
+              {options.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type={type}
+              placeholder={defaultValue}
+              value={values[key] ?? ''}
+              onChange={(e) => onChange(key, e.target.value)}
+              className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            />
+          )}
+        </div>
+        {required && (
+          <div className="w-4 flex-shrink-0 text-center">
+            <span className="text-red-500 text-sm">*</span>
+          </div>
+        )}
+        {!required && <div className="w-4 flex-shrink-0" />}
+      </div>
+    )
+  }
 
   // 渲染自定义字段（可编辑 key 和 value）
   const renderCustomField = (tempKey: string) => {
@@ -344,7 +430,7 @@ function ProviderConfigFields({
   }
 
   return (
-    <div className="space-y-2.5">
+    <>
       {/* 预定义字段 */}
       {getFields()}
 
@@ -359,6 +445,6 @@ function ProviderConfigFields({
       >
         + 添加自定义配置
       </button>
-    </div>
+    </>
   )
 }

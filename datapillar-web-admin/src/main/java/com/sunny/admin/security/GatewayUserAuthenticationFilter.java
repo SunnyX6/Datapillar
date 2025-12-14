@@ -1,7 +1,7 @@
 package com.sunny.admin.security;
 
 import com.sunny.admin.module.user.service.UserService;
-import com.sunny.common.util.UserContextUtil;
+import com.sunny.admin.util.UserContextUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

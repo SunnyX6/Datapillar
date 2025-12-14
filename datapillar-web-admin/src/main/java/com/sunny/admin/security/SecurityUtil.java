@@ -1,7 +1,7 @@
 package com.sunny.admin.security;
 
-import com.sunny.common.enums.GlobalSystemCode;
-import com.sunny.common.exception.GlobalException;
+import com.sunny.admin.response.WebAdminErrorCode;
+import com.sunny.admin.response.WebAdminException;
 import com.sunny.admin.module.user.entity.User;
 import com.sunny.admin.module.user.service.UserService;
 import lombok.extern.slf4j.Slf4j;
@@ -48,12 +48,12 @@ public class SecurityUtil {
     public Long getCurrentUserId() {
         String username = getCurrentUsername();
         if (username == null) {
-            throw new GlobalException(GlobalSystemCode.USER_NOT_LOGGED_IN);
+            throw new WebAdminException(WebAdminErrorCode.USER_NOT_LOGGED_IN);
         }
 
         User user = userService.findByUsername(username);
         if (user == null) {
-            throw new GlobalException(GlobalSystemCode.USER_NOT_FOUND, username);
+            throw new WebAdminException(WebAdminErrorCode.USER_NOT_FOUND, username);
         }
 
         return user.getId();
@@ -67,12 +67,12 @@ public class SecurityUtil {
     public User getCurrentUser() {
         String username = getCurrentUsername();
         if (username == null) {
-            throw new GlobalException(GlobalSystemCode.USER_NOT_LOGGED_IN);
+            throw new WebAdminException(WebAdminErrorCode.USER_NOT_LOGGED_IN);
         }
 
         User user = userService.findByUsername(username);
         if (user == null) {
-            throw new GlobalException(GlobalSystemCode.USER_NOT_FOUND, username);
+            throw new WebAdminException(WebAdminErrorCode.USER_NOT_FOUND, username);
         }
 
         return user;

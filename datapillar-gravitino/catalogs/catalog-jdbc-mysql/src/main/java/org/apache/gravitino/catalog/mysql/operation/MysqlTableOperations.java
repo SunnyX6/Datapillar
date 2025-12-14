@@ -182,6 +182,17 @@ public class MysqlTableOperations extends JdbcTableOperations {
                     if (StringUtils.isNotEmpty(autoIncrement)) {
                       put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
                     }
+
+                    // MySQL 统计字段: numRows, totalSize, rawDataSize, indexSize
+                    // 注意: MySQL 没有 type, format, numFiles 等 Hive 特有字段
+                    long rows = resultSet.getLong("Rows");
+                    long dataLength = resultSet.getLong("Data_length");
+                    long indexLength = resultSet.getLong("Index_length");
+
+                    put("numRows", String.valueOf(rows));
+                    put("totalSize", String.valueOf(dataLength + indexLength));
+                    put("rawDataSize", String.valueOf(dataLength));
+                    put("indexSize", String.valueOf(indexLength));
                   }
                 });
           }

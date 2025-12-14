@@ -63,13 +63,13 @@ spring:
 
         # 4. 元数据服务 (datapillar-gravitino)
         # Gravitino 原生 REST API
-        # 重写: /api/metadata/** → /**
-        - id: metadata-service
+        # 重写: /api/metadata/** → /api/**
+        - id: onemeta-service
           uri: http://localhost:8090
           predicates:
-            - Path=/api/metadata/**
+            - Path=/api/onemeta/**
           filters:
-            - RewritePath=/api/metadata(?<segment>/?.*), ${segment}
+            - RewritePath=/api/onemeta(?<segment>/?.*), /api${segment}
 
         # 5. 调度服务 (datapillar-job-admin)
         # Controller: /workflow, /log, /debug 等纯业务路径

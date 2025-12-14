@@ -1,44 +1,48 @@
 package com.sunny.admin.config;
 
-import com.sunny.common.exception.GlobalException;
-import com.sunny.common.response.ApiResponse;
+import com.sunny.admin.response.WebAdminException;
+import com.sunny.admin.response.WebAdminResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.HttpStatus;
+import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
- * API 模块异常处理器
- * 继承 common 的 GlobalExceptionHandler 基类
- *
- * @author sunny
- * @since 2024-01-01
+ * Web Admin 异常处理器
  */
 @Slf4j
 @RestControllerAdvice
-public class ApiExceptionHandler extends com.sunny.common.handler.GlobalExceptionHandler {
+public class ApiExceptionHandler {
 
-    @Override
-    protected Logger getLogger() {
-        return log;
+    /**
+     * 处理业务异常
+     */
+    @ExceptionHandler(WebAdminException.class)
+    public WebAdminResponse<Object> handleWebAdminException(WebAdminException e) {
+        log.warn("WebAdmin exception: code={}, message={}", e.getCode(), e.getMessage());
+        return WebAdminResponse.error(e.getCode(), e.getMessage());
     }
 
-    @Override
-    @ExceptionHandler(GlobalException.class)
-    public ApiResponse<Object> handleGlobalException(GlobalException e) {
-        return super.handleGlobalException(e);
-    }
-
+    /**
+     * 处理唯一键冲突异常
+     */
     @ExceptionHandler(DuplicateKeyException.class)
-    public ApiResponse<Object> handleDuplicateKeyException(DuplicateKeyException e) {
-        log.warn("Duplicate key exception occurred: {}", e.getMessage());
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public WebAdminResponse<Object> handleDuplicateKeyException(DuplicateKeyException e) {
+        log.warn("Duplicate key exception: {}", e.getMessage());
 
         String message = e.getMessage();
         String errorCode;
         String errorMessage;
 
-        // 检查是否是模板参数的唯一约束违反
         if (message != null && message.contains("template_parameters.uk_template_param")) {
             errorCode = "DUPLICATE_PARAM_KEY";
             errorMessage = "该模板中已存在相同的参数键，请使用不同的参数键名称";
@@ -47,12 +51,54 @@ public class ApiExceptionHandler extends com.sunny.common.handler.GlobalExceptio
             errorMessage = "数据已存在，请检查输入内容";
         }
 
-        return ApiResponse.error(errorCode, errorMessage);
+        return WebAdminResponse.error(errorCode, errorMessage);
     }
 
-    @Override
+    /**
+     * 处理参数验证异常
+     */
+    @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public WebAdminResponse<Object> handleValidationException(Exception e) {
+        log.warn("Validation exception: {}", e.getMessage());
+
+        Map<String, String> errors = new HashMap<>();
+
+        if (e instanceof MethodArgumentNotValidException ex) {
+            ex.getBindingResult().getAllErrors().forEach((error) -> {
+                String fieldName = ((FieldError) error).getField();
+                String errorMessage = error.getDefaultMessage();
+                errors.put(fieldName, errorMessage);
+            });
+        } else if (e instanceof BindException ex) {
+            ex.getBindingResult().getAllErrors().forEach((error) -> {
+                String fieldName = ((FieldError) error).getField();
+                String errorMessage = error.getDefaultMessage();
+                errors.put(fieldName, errorMessage);
+            });
+        }
+
+        return WebAdminResponse.validationError(
+            errors.isEmpty() ? "参数验证失败" : errors.toString());
+    }
+
+    /**
+     * 处理非法参数异常
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public WebAdminResponse<Object> handleIllegalArgumentException(IllegalArgumentException e) {
+        log.warn("Illegal argument: {}", e.getMessage());
+        return WebAdminResponse.error("INVALID_ARGUMENT", e.getMessage());
+    }
+
+    /**
+     * 处理其他未捕获异常
+     */
     @ExceptionHandler(Exception.class)
-    public ApiResponse<Object> handleException(Exception e) {
-        return super.handleException(e);
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public WebAdminResponse<Object> handleException(Exception e) {
+        log.error("Unexpected error: ", e);
+        return WebAdminResponse.error("INTERNAL_ERROR", "服务器内部错误");
     }
 }

@@ -4,8 +4,8 @@ import com.sunny.auth.dto.*;
 import com.sunny.auth.entity.User;
 import com.sunny.auth.mapper.UserMapper;
 import com.sunny.auth.security.JwtTokenUtil;
-import com.sunny.common.enums.GlobalSystemCode;
-import com.sunny.common.exception.GlobalException;
+import com.sunny.auth.response.AuthErrorCode;
+import com.sunny.auth.response.AuthException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,19 +30,19 @@ public class AuthService {
         User user = userMapper.selectByUsername(request.getUsername());
         if (user == null) {
             log.warn("Login failed: user not found, username={}", request.getUsername());
-            throw new GlobalException(GlobalSystemCode.INVALID_CREDENTIALS);
+            throw new AuthException(AuthErrorCode.INVALID_CREDENTIALS);
         }
 
         // 2. 验证密码
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             log.warn("Login failed: incorrect password, username={}", request.getUsername());
-            throw new GlobalException(GlobalSystemCode.INVALID_CREDENTIALS);
+            throw new AuthException(AuthErrorCode.INVALID_CREDENTIALS);
         }
 
         // 3. 检查用户状态
         if (user.getStatus() == null || user.getStatus() != 1) {
             log.warn("Login failed: user disabled, username={}", request.getUsername());
-            throw new GlobalException(GlobalSystemCode.USER_DISABLED);
+            throw new AuthException(AuthErrorCode.USER_DISABLED);
         }
 
         // 4. 生成双 Token（将 rememberMe 编码到 Refresh Token 中）
@@ -87,13 +87,13 @@ public class AuthService {
             // 1. 验证 Refresh Token
             String refreshToken = request.getRefreshToken();
             if (!jwtTokenUtil.validateToken(refreshToken)) {
-                throw new GlobalException(GlobalSystemCode.TOKEN_EXPIRED);
+                throw new AuthException(AuthErrorCode.TOKEN_EXPIRED);
             }
 
             // 2. 检查 Token 类型
             String tokenType = jwtTokenUtil.getTokenType(refreshToken);
             if (!"refresh".equals(tokenType)) {
-                throw new GlobalException(GlobalSystemCode.TOKEN_TYPE_ERROR);
+                throw new AuthException(AuthErrorCode.TOKEN_TYPE_ERROR);
             }
 
             // 3. 提取 userId
@@ -102,12 +102,12 @@ public class AuthService {
             // 4. 查询用户信息
             User user = userMapper.selectById(userId);
             if (user == null) {
-                throw new GlobalException(GlobalSystemCode.USER_NOT_FOUND, userId);
+                throw new AuthException(AuthErrorCode.USER_NOT_FOUND);
             }
 
             // 5. 检查用户状态
             if (user.getStatus() == null || user.getStatus() != 1) {
-                throw new GlobalException(GlobalSystemCode.USER_DISABLED);
+                throw new AuthException(AuthErrorCode.USER_DISABLED);
             }
 
             // 6. 生成新的 Access Token (Refresh Token 保持不变)
@@ -130,11 +130,11 @@ public class AuthService {
 
             return response;
 
-        } catch (GlobalException e) {
+        } catch (AuthException e) {
             throw e;
         } catch (Exception e) {
             log.error("Token refresh failed: {}", e.getMessage());
-            throw new GlobalException(GlobalSystemCode.REFRESH_TOKEN_FAILED, e.getMessage());
+            throw new AuthException(AuthErrorCode.REFRESH_TOKEN_FAILED, e.getMessage());
         }
     }
 

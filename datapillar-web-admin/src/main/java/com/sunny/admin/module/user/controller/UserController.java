@@ -1,6 +1,6 @@
 package com.sunny.admin.module.user.controller;
 
-import com.sunny.common.response.ApiResponse;
+import com.sunny.admin.response.WebAdminResponse;
 import com.sunny.admin.module.user.dto.UserReqDto;
 import com.sunny.admin.module.user.dto.UserRespDto;
 import com.sunny.admin.module.user.dto.UpdateProfileReqDto;
@@ -32,65 +32,65 @@ public class UserController {
     
     @Operation(summary = "获取当前登录用户信息")
     @GetMapping("/me")
-    public ApiResponse<UserRespDto> getCurrentUser() {
+    public WebAdminResponse<UserRespDto> getCurrentUser() {
         Long currentUserId = securityUtil.getCurrentUserId();
         UserRespDto user = userService.getUserById(currentUserId);
-        return ApiResponse.ok(user);
+        return WebAdminResponse.ok(user);
     }
 
     @Operation(summary = "获取用户列表")
     @GetMapping
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<UserRespDto>> getUserList() {
+    public WebAdminResponse<List<UserRespDto>> getUserList() {
         List<UserRespDto> users = userService.getUserList();
-        return ApiResponse.ok(users);
+        return WebAdminResponse.ok(users);
     }
 
     @Operation(summary = "根据ID获取用户详情")
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<UserRespDto> getUserById(@PathVariable Long id) {
+    public WebAdminResponse<UserRespDto> getUserById(@PathVariable Long id) {
         UserRespDto user = userService.getUserById(id);
-        return ApiResponse.ok(user);
+        return WebAdminResponse.ok(user);
     }
 
     @Operation(summary = "创建用户")
     @PostMapping
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<UserRespDto> createUser(@Valid @RequestBody UserReqDto request) {
+    public WebAdminResponse<UserRespDto> createUser(@Valid @RequestBody UserReqDto request) {
         UserRespDto user = userService.createUser(request);
-        return ApiResponse.ok(user);
+        return WebAdminResponse.ok(user);
     }
 
     @Operation(summary = "更新用户")
     @PostMapping("/update/{id}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<UserRespDto> updateUser(@PathVariable Long id, @Valid @RequestBody UserReqDto request) {
+    public WebAdminResponse<UserRespDto> updateUser(@PathVariable Long id, @Valid @RequestBody UserReqDto request) {
         UserRespDto user = userService.updateUser(id, request);
-        return ApiResponse.ok(user);
+        return WebAdminResponse.ok(user);
     }
 
     @Operation(summary = "删除用户")
     @PostMapping("/delete/{id}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> deleteUser(@PathVariable Long id) {
+    public WebAdminResponse<Void> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
-        return ApiResponse.ok(null);
+        return WebAdminResponse.ok(null);
     }
 
     @Operation(summary = "为用户分配角色")
     @PostMapping("/assign-roles/{id}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> assignRoles(@PathVariable Long id, @RequestBody List<Long> roleIds) {
+    public WebAdminResponse<Void> assignRoles(@PathVariable Long id, @RequestBody List<Long> roleIds) {
         userService.assignRoles(id, roleIds);
-        return ApiResponse.ok(null);
+        return WebAdminResponse.ok(null);
     }
 
     @Operation(summary = "更新当前用户个人信息")
     @PostMapping("/update-profile")
-    public ApiResponse<UserRespDto> updateProfile(@Valid @RequestBody UpdateProfileReqDto request) {
+    public WebAdminResponse<UserRespDto> updateProfile(@Valid @RequestBody UpdateProfileReqDto request) {
         Long currentUserId = securityUtil.getCurrentUserId();
         UserRespDto user = userService.updateProfile(currentUserId, request);
-        return ApiResponse.ok(user);
+        return WebAdminResponse.ok(user);
     }
 }

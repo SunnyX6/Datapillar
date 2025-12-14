@@ -466,42 +466,28 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         LockType.WRITE,
         () -> {
           checkMetalake(metalakeIdent, store);
-          boolean needClean = true;
+
+          // 先验证属性，避免写入脏数据（验证失败直接抛异常，不会写入数据库）
+          CatalogWrapper wrapper = createCatalogWrapper(e, mergedConfig);
+
           try {
             store.put(e, false /* overwrite */);
-            CatalogWrapper wrapper =
-                catalogCache.get(ident, id -> createCatalogWrapper(e, mergedConfig));
-
-            needClean = false;
+            catalogCache.put(ident, wrapper);
             return wrapper.catalog;
 
           } catch (EntityAlreadyExistsException e1) {
-            needClean = false;
+            wrapper.close();
             LOG.warn("Catalog {} already exists", ident, e1);
             throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
 
-          } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
-            throw e2;
-
           } catch (Exception e3) {
+            wrapper.close();
             catalogCache.invalidate(ident);
             LOG.error("Failed to create catalog {}", ident, e3);
             if (e3 instanceof RuntimeException) {
               throw (RuntimeException) e3;
             }
             throw new RuntimeException(e3);
-
-          } finally {
-            if (needClean) {
-              // since we put the catalog entity into the store but failed to create the catalog
-              // instance,
-              // we need to clean up the entity stored.
-              try {
-                store.delete(ident, EntityType.CATALOG, true);
-              } catch (IOException e4) {
-                LOG.error("Failed to clean up catalog {}", ident, e4);
-              }
-            }
           }
         });
   }

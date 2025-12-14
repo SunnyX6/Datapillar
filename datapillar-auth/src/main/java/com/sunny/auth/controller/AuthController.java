@@ -12,9 +12,9 @@ import com.sunny.auth.dto.TokenInfoRespDto;
 import com.sunny.auth.dto.TokenReqDto;
 import com.sunny.auth.dto.TokenRespDto;
 import com.sunny.auth.service.AuthService;
-import com.sunny.common.enums.GlobalSystemCode;
-import com.sunny.common.exception.GlobalException;
-import com.sunny.common.response.ApiResponse;
+import com.sunny.auth.response.AuthErrorCode;
+import com.sunny.auth.response.AuthException;
+import com.sunny.auth.response.AuthResponse;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
@@ -49,7 +49,7 @@ public class AuthController {
      * 设置HttpOnly Cookie来传递accessToken，响应体中不再包含敏感token
      */
     @PostMapping("/login")
-    public ApiResponse<LoginRespDto> login(@Valid @RequestBody LoginReqDto request, HttpServletResponse response) {
+    public AuthResponse<LoginRespDto> login(@Valid @RequestBody LoginReqDto request, HttpServletResponse response) {
         try {
             LoginRespDto loginResponse = authService.login(request);
 
@@ -83,11 +83,11 @@ public class AuthController {
             safeResponse.setPermissions(loginResponse.getPermissions());
             safeResponse.setMenus(loginResponse.getMenus());
 
-            return ApiResponse.success(safeResponse);
-        } catch (GlobalException e) {
-            return ApiResponse.error(e.getGlobalSystemCode());
+            return AuthResponse.success(safeResponse);
+        } catch (AuthException e) {
+            return AuthResponse.error(e.getErrorCode());
         } catch (Exception e) {
-            return ApiResponse.error(GlobalSystemCode.INTERNAL_SERVER_ERROR, e.getMessage());
+            return AuthResponse.error(AuthErrorCode.INTERNAL_ERROR, e.getMessage());
         }
     }
 
@@ -96,7 +96,7 @@ public class AuthController {
      * 使用 Refresh Token 获取新的 Access Token
      */
     @PostMapping("/refresh")
-    public ApiResponse<LoginRespDto> refresh(
+    public AuthResponse<LoginRespDto> refresh(
             @CookieValue(name = "refresh-token", required = false) String refreshToken,
             HttpServletResponse response) {
         try {
@@ -126,9 +126,9 @@ public class AuthController {
             safeResponse.setUsername(loginResponse.getUsername());
             safeResponse.setEmail(loginResponse.getEmail());
 
-            return ApiResponse.success(safeResponse);
+            return AuthResponse.success(safeResponse);
         } catch (Exception e) {
-            return ApiResponse.error(e.getMessage(), "REFRESH_TOKEN_EXPIRED");
+            return AuthResponse.error("REFRESH_TOKEN_EXPIRED", e.getMessage());
         }
     }
 
@@ -136,9 +136,9 @@ public class AuthController {
      * 验证 Token 接口
      */
     @PostMapping("/validate")
-    public ApiResponse<TokenRespDto> validate(@Valid @RequestBody TokenReqDto request) {
+    public AuthResponse<TokenRespDto> validate(@Valid @RequestBody TokenReqDto request) {
         TokenRespDto response = authService.validateToken(request);
-        return ApiResponse.success(response);
+        return AuthResponse.success(response);
     }
 
     /**
@@ -146,12 +146,12 @@ public class AuthController {
      * POST /api/auth/sso/validate
      */
     @PostMapping("/sso/validate")
-    public ApiResponse<SsoValidateRespDto> validateSsoToken(@Valid @RequestBody SsoValidateReqDto request) {
+    public AuthResponse<SsoValidateRespDto> validateSsoToken(@Valid @RequestBody SsoValidateReqDto request) {
         SsoValidateRespDto response = authService.validateSsoToken(request);
         if (response.getValid()) {
-            return ApiResponse.success(response);
+            return AuthResponse.success(response);
         } else {
-            return ApiResponse.error(response.getMessage(), "SSO_VALIDATION_FAILED");
+            return AuthResponse.error("SSO_VALIDATION_FAILED", response.getMessage());
         }
     }
 
@@ -160,7 +160,7 @@ public class AuthController {
      * 清除认证相关的 Cookie 并撤销数据库中的 Token
      */
     @PostMapping("/logout")
-    public ApiResponse<String> logout(@CookieValue(name = "auth-token", required = false) String accessToken,
+    public AuthResponse<String> logout(@CookieValue(name = "auth-token", required = false) String accessToken,
             HttpServletResponse response) {
         try {
             // 如果有 accessToken，提取 userId 并清空数据库中的 token_sign
@@ -188,7 +188,7 @@ public class AuthController {
         refreshTokenCookie.setMaxAge(0); // 立即过期
         response.addCookie(refreshTokenCookie);
 
-        return ApiResponse.success("登出成功");
+        return AuthResponse.success("登出成功");
     }
 
     /**
@@ -232,11 +232,11 @@ public class AuthController {
      * 不返回 Token 本身，只返回 Token 的元信息
      */
     @GetMapping("/token-info")
-    public ApiResponse<TokenInfoRespDto> getTokenInfo(
+    public AuthResponse<TokenInfoRespDto> getTokenInfo(
             @CookieValue(name = "auth-token", required = false) String accessToken) {
         try {
             if (accessToken == null || accessToken.isEmpty()) {
-                return ApiResponse.success(TokenInfoRespDto.builder()
+                return AuthResponse.success(TokenInfoRespDto.builder()
                         .valid(false)
                         .remainingSeconds(0L)
                         .build());
@@ -260,10 +260,10 @@ public class AuthController {
                     .username(claims.get("username", String.class))
                     .build();
 
-            return ApiResponse.success(response);
+            return AuthResponse.success(response);
         } catch (Exception e) {
             // Token 无效或已过期
-            return ApiResponse.success(TokenInfoRespDto.builder()
+            return AuthResponse.success(TokenInfoRespDto.builder()
                     .valid(false)
                     .remainingSeconds(0L)
                     .build());
@@ -274,7 +274,7 @@ public class AuthController {
      * 健康检查接口
      */
     @GetMapping("/health")
-    public ApiResponse<String> health() {
-        return ApiResponse.success("OK");
+    public AuthResponse<String> health() {
+        return AuthResponse.success("OK");
     }
 }

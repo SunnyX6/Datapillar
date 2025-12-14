@@ -1,7 +1,7 @@
 package com.sunny.admin.module.user.service.impl;
 
-import com.sunny.common.enums.GlobalSystemCode;
-import com.sunny.common.exception.GlobalException;
+import com.sunny.admin.response.WebAdminErrorCode;
+import com.sunny.admin.response.WebAdminException;
 import com.sunny.admin.module.user.dto.UserReqDto;
 import com.sunny.admin.module.user.dto.UserRespDto;
 import com.sunny.admin.module.user.dto.UpdateProfileReqDto;
@@ -44,7 +44,7 @@ public class UserServiceImpl implements UserService {
     public UserRespDto getUserById(Long id) {
         User user = userMapper.selectById(id);
         if (user == null) {
-            throw new GlobalException(GlobalSystemCode.USER_NOT_FOUND, id);
+            throw new WebAdminException(WebAdminErrorCode.USER_NOT_FOUND, id);
         }
         
         UserRespDto response = new UserRespDto();
@@ -59,7 +59,7 @@ public class UserServiceImpl implements UserService {
     public UserRespDto createUser(UserReqDto request) {
         // 检查用户名是否已存在
         if (userMapper.findByUsername(request.getUsername()) != null) {
-            throw new GlobalException(GlobalSystemCode.USER_ALREADY_EXISTS, request.getUsername());
+            throw new WebAdminException(WebAdminErrorCode.USER_ALREADY_EXISTS, request.getUsername());
         }
         
         User user = new User();
@@ -89,13 +89,13 @@ public class UserServiceImpl implements UserService {
     public UserRespDto updateUser(Long id, UserReqDto request) {
         User existingUser = userMapper.selectById(id);
         if (existingUser == null) {
-            throw new GlobalException(GlobalSystemCode.USER_NOT_FOUND, id);
+            throw new WebAdminException(WebAdminErrorCode.USER_NOT_FOUND, id);
         }
 
         // 检查用户名是否被其他用户使用
         User userWithSameName = userMapper.findByUsername(request.getUsername());
         if (userWithSameName != null && !userWithSameName.getId().equals(id)) {
-            throw new GlobalException(GlobalSystemCode.USERNAME_IN_USE, request.getUsername());
+            throw new WebAdminException(WebAdminErrorCode.USERNAME_IN_USE, request.getUsername());
         }
         
         BeanUtils.copyProperties(request, existingUser, "id", "password", "createdAt");
@@ -121,7 +121,7 @@ public class UserServiceImpl implements UserService {
     public void deleteUser(Long id) {
         User user = userMapper.selectById(id);
         if (user == null) {
-            throw new GlobalException(GlobalSystemCode.USER_NOT_FOUND, id);
+            throw new WebAdminException(WebAdminErrorCode.USER_NOT_FOUND, id);
         }
         
         // 软删除
@@ -181,7 +181,7 @@ public class UserServiceImpl implements UserService {
     public UserRespDto updateProfile(Long userId, UpdateProfileReqDto request) {
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new GlobalException(GlobalSystemCode.USER_NOT_FOUND, userId);
+            throw new WebAdminException(WebAdminErrorCode.USER_NOT_FOUND, userId);
         }
         
         // 更新个人信息

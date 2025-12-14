@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
-import { Database, FolderTree, Menu, MoreVertical, Search, Server, Table as TableIcon } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Database, FolderTree, Menu, MoreVertical, Search, Server, Table as TableIcon, Folder, Activity, Box } from 'lucide-react'
 import {
   SiApachehive,
   SiApachespark,
@@ -15,153 +15,38 @@ import {
   SiMysql,
   SiRedis
 } from 'react-icons/si'
+import { toast } from 'sonner'
 import { CatalogOverview } from './metadata/overview/CatalogOverview'
 import { Overview } from './metadata/overview/Overview'
 import { SchemaOverview } from './metadata/overview/SchemaOverview'
 import { TableOverview } from './metadata/overview/TableOverview'
 import { CreateCatalogForm, CreateSchemaForm, CreateTableForm } from './metadata/form'
+import { type CatalogFormHandle } from './metadata/form/CatalogForm'
+import { type SchemaFormHandle } from './metadata/form/SchemaForm'
 import { type CatalogAsset, type NodeType, type SchemaAsset, type TableAsset } from './metadata/type/types'
 import { Modal } from '@/components/Modal'
-
-const MOCK_CATALOGS: CatalogAsset[] = [
-  {
-    id: 'catalog-prod-hive',
-    name: 'prod_hive_dw',
-    icon: 'hive',
-    provider: 'hive',
-    schemas: [
-      {
-        id: 'schema-finance',
-        name: 'finance_mart',
-        catalogId: 'catalog-prod-hive',
-        tables: [
-          {
-            id: 'table-fact-revenue',
-            name: 'fact_monthly_revenue',
-            description:
-              'Consolidated monthly revenue facts aggregated from regional marts; primary source for executive QBR reporting.',
-            certification: 'GOLD',
-            qualityScore: 94,
-            rowCount: 25340000,
-            size: '420 GB',
-            owner: 'Hugo Liang',
-            updatedAt: '2024-12-10',
-            domains: ['Finance', 'Revenue', 'Executive'],
-            columns: [
-              { name: 'month_id', type: 'STRING', isPrimaryKey: true, comment: 'YYYYMM partition key' },
-              { name: 'region_id', type: 'STRING', comment: 'Region identifier aligned to sales hierarchy' },
-              { name: 'product_sku', type: 'STRING', comment: 'Standardized SKU code' },
-              { name: 'gross_revenue', type: 'DECIMAL(18,2)', comment: 'Gross revenue before returns' },
-              {
-                name: 'net_revenue',
-                type: 'DECIMAL(18,2)',
-                comment: 'Net revenue after returns',
-                piiTag: 'FINANCE_SENSITIVE'
-              },
-              { name: 'currency', type: 'STRING', comment: '3-letter ISO currency code' },
-              { name: 'updated_at', type: 'TIMESTAMP', comment: 'Last successful ingestion timestamp' }
-            ]
-          },
-          {
-            id: 'table-dim-region',
-            name: 'dim_region',
-            description:
-              'Reference dimension for region hierarchy used across finance mart; includes geo + sales alignment.',
-            certification: 'SILVER',
-            qualityScore: 87,
-            rowCount: 2400,
-            size: '12 MB',
-            owner: 'Ada Qi',
-            updatedAt: '2024-12-06',
-            domains: ['Finance', 'Sales'],
-            columns: [
-              { name: 'region_id', type: 'STRING', isPrimaryKey: true, comment: 'Region code' },
-              { name: 'region_name', type: 'STRING', comment: 'Readable region name' },
-              { name: 'country', type: 'STRING' },
-              { name: 'director', type: 'STRING', comment: 'Regional leader' }
-            ]
-          }
-        ]
-      },
-      {
-        id: 'schema_growth',
-        name: 'growth_ops',
-        catalogId: 'catalog-prod-hive',
-        tables: [
-          {
-            id: 'table-fact-events',
-            name: 'fact_product_events',
-            description: 'Unified product interaction events used by growth experiments and attribution models.',
-            certification: 'BRONZE',
-            qualityScore: 72,
-            rowCount: 188000000,
-            size: '1.8 TB',
-            owner: 'Wei Sun',
-            updatedAt: '2024-12-08',
-            domains: ['Growth', 'Product'],
-            columns: [
-              { name: 'event_id', type: 'BIGINT', isPrimaryKey: true },
-              { name: 'user_id', type: 'BIGINT', comment: 'Anonymized user id', piiTag: 'PII_HASH' },
-              { name: 'event_name', type: 'STRING' },
-              { name: 'event_ts', type: 'TIMESTAMP' },
-              { name: 'device', type: 'STRING' },
-              { name: 'country', type: 'STRING' }
-            ]
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'catalog-iceberg',
-    name: 'iceberg_marketing',
-    icon: 'iceberg',
-    provider: 'lakehouse-iceberg',
-    schemas: [
-      {
-        id: 'schema-ads',
-        name: 'ads_reporting',
-        catalogId: 'catalog-iceberg',
-        tables: [
-          {
-            id: 'table-fact-ads',
-            name: 'fact_ads_spend',
-            description: 'Daily ad spend facts aggregated by campaign and channel.',
-            certification: 'SILVER',
-            qualityScore: 90,
-            rowCount: 9200000,
-            size: '210 GB',
-            owner: 'Sara Chen',
-            updatedAt: '2024-12-09',
-            domains: ['Marketing', 'Spend'],
-            columns: [
-              { name: 'date', type: 'DATE', isPrimaryKey: true },
-              { name: 'campaign_id', type: 'STRING', isPrimaryKey: true },
-              { name: 'channel', type: 'STRING' },
-              { name: 'spend', type: 'DECIMAL(18,2)' },
-              { name: 'impressions', type: 'BIGINT' },
-              { name: 'clicks', type: 'BIGINT' }
-            ]
-          }
-        ]
-      }
-    ]
-  }
-]
+import {
+  fetchCatalogs,
+  fetchSchemas,
+  fetchTables,
+  createCatalog,
+  createSchema,
+  getSchema,
+  getTable,
+  mapProviderToIcon,
+  type CatalogItem,
+  type SchemaItem,
+  type TableItem
+} from '@/services/oneMetaService'
 
 const INDENT_PX = 18
 
 export function MetadataView() {
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
-    const initial = new Set<string>(['ROOT'])
-    const firstCatalog = MOCK_CATALOGS[0]
-    if (firstCatalog) {
-      initial.add(firstCatalog.id)
-      const firstSchema = firstCatalog.schemas[0]
-      if (firstSchema) initial.add(firstSchema.id)
-    }
-    return initial
-  })
+  const [catalogs, setCatalogs] = useState<CatalogItem[]>([])
+  const [schemasMap, setSchemasMap] = useState<Map<string, SchemaItem[]>>(new Map())
+  const [tablesMap, setTablesMap] = useState<Map<string, TableItem[]>>(new Map())
+  const [isLoading, setIsLoading] = useState(false)
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => new Set<string>(['ROOT']))
   const [selectedNodeId, setSelectedNodeId] = useState<string>('ROOT')
   const [selectedNodeType, setSelectedNodeType] = useState<NodeType>('ROOT')
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'COLUMNS' | 'QUALITY' | 'LINEAGE'>('OVERVIEW')
@@ -169,6 +54,103 @@ export function MetadataView() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [isSideCollapsed, setIsSideCollapsed] = useState(true)
+  const catalogFormRef = useRef<CatalogFormHandle>(null)
+  const schemaFormRef = useRef<SchemaFormHandle>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loadedMetadata, setLoadedMetadata] = useState<Set<string>>(() => new Set<string>())
+
+  useEffect(() => {
+    loadCatalogs()
+  }, [])
+
+  async function loadCatalogs() {
+    try {
+      setIsLoading(true)
+      const catalogsData = await fetchCatalogs()
+      setCatalogs(catalogsData)
+    } catch (error) {
+      console.error('加载 Catalog 列表失败:', error)
+      toast.error(error instanceof Error ? error.message : '加载 Catalog 列表失败')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function loadSchemas(catalogId: string) {
+    if (schemasMap.has(catalogId)) return
+
+    try {
+      const schemas = await fetchSchemas(catalogId)
+      setSchemasMap((prev) => new Map(prev).set(catalogId, schemas))
+    } catch (error) {
+      console.error(`加载 Schema 列表失败 (catalog=${catalogId}):`, error)
+      toast.error(error instanceof Error ? error.message : `加载 Schema 列表失败`)
+    }
+  }
+
+  async function loadTables(catalogId: string, schemaId: string) {
+    const fullSchemaId = `${catalogId}.${schemaId}`
+    if (tablesMap.has(fullSchemaId)) return
+
+    try {
+      const tables = await fetchTables(catalogId, schemaId)
+      setTablesMap((prev) => new Map(prev).set(fullSchemaId, tables))
+    } catch (error) {
+      console.error(`加载 Table 列表失败 (catalog=${catalogId}, schema=${schemaId}):`, error)
+      toast.error(error instanceof Error ? error.message : `加载 Table 列表失败`)
+    }
+  }
+
+  async function handleSubmit() {
+    if (isSubmitting) return
+
+    try {
+      setIsSubmitting(true)
+
+      if (modalState.nodeType === 'ROOT') {
+        if (!catalogFormRef.current?.validate()) return
+
+        const formData = catalogFormRef.current.getData()
+        await createCatalog({
+          name: formData.name,
+          type: formData.type,
+          provider: formData.provider,
+          comment: formData.comment,
+          properties: formData.properties
+        })
+
+        await loadCatalogs()
+
+        const newCatalogId = formData.name
+        setExpandedNodes((prev) => new Set(prev).add(newCatalogId))
+        await loadSchemas(newCatalogId)
+
+        closeModal()
+      } else if (modalState.nodeType === 'CATALOG') {
+        if (!schemaFormRef.current?.validate()) return
+
+        const formData = schemaFormRef.current.getData()
+        await createSchema(modalState.nodeId, {
+          name: formData.name,
+          comment: formData.comment
+        })
+
+        setSchemasMap((prev) => {
+          const next = new Map(prev)
+          next.delete(modalState.nodeId)
+          return next
+        })
+        await loadSchemas(modalState.nodeId)
+        closeModal()
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : '创建失败'
+      toast.error(errorMessage)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const [modalState, setModalState] = useState<{
     isOpen: boolean
     nodeId: string
@@ -185,71 +167,137 @@ export function MetadataView() {
   const [footerLeft, setFooterLeft] = useState<React.ReactNode>(null)
   const [contentOverlay, setContentOverlay] = useState<React.ReactNode>(null)
 
+  const catalogsWithSchemas = useMemo<CatalogAsset[]>(() => {
+    return catalogs.map((catalog) => {
+      const schemas = schemasMap.get(catalog.id) || []
+      return {
+        id: catalog.id,
+        name: catalog.name,
+        icon: mapProviderToIcon(catalog.provider), // 前端动态计算图标
+        provider: catalog.provider,
+        schemas: schemas.map((schema) => {
+          const tables = tablesMap.get(schema.id) || []
+          return {
+            id: schema.id,
+            name: schema.name,
+            catalogId: schema.catalogId,
+            tables: tables.map((table) => ({
+              id: table.id,
+              name: table.name,
+              description: table.comment || '',
+              certification: undefined,
+              qualityScore: 0,
+              rowCount: 0,
+              size: '',
+              owner: '',
+              updatedAt: '',
+              domains: [],
+              columns: table.columns || []
+            }))
+          }
+        })
+      }
+    })
+  }, [catalogs, schemasMap, tablesMap])
+
+  const filteredCatalogs = useMemo(() => {
+    const query = searchValue.trim().toLowerCase()
+    if (!query) return catalogsWithSchemas
+
+    return catalogsWithSchemas.filter((catalog) => {
+      const matchCatalog = catalog.name.toLowerCase().includes(query)
+      const hasMatchingSchema = catalog.schemas.some((schema) => {
+        const matchSchema = schema.name.toLowerCase().includes(query)
+        const hasMatchingTable = schema.tables.some((table) => table.name.toLowerCase().includes(query))
+        return matchSchema || hasMatchingTable
+      })
+      return matchCatalog || hasMatchingSchema
+    })
+  }, [catalogsWithSchemas, searchValue])
+
+  const catalogLookup = useMemo(() => {
+    const map = new Map<string, CatalogAsset>()
+    catalogsWithSchemas.forEach((catalog) => map.set(catalog.id, catalog))
+    return map
+  }, [catalogsWithSchemas])
+
+  const schemaLookup = useMemo(() => {
+    const map = new Map<string, { schema: SchemaAsset; catalog: CatalogAsset }>()
+    catalogsWithSchemas.forEach((catalog) => {
+      catalog.schemas.forEach((schema) => map.set(schema.id, { schema, catalog }))
+    })
+    return map
+  }, [catalogsWithSchemas])
+
   const tableLookup = useMemo(() => {
     const map = new Map<string, { table: TableAsset; schema: SchemaAsset; catalog: CatalogAsset }>()
-    MOCK_CATALOGS.forEach((catalog) => {
+    catalogsWithSchemas.forEach((catalog) => {
       catalog.schemas.forEach((schema) => {
         schema.tables.forEach((table) => map.set(table.id, { table, schema, catalog }))
       })
     })
     return map
-  }, [])
-
-  const catalogLookup = useMemo(() => {
-    const map = new Map<string, CatalogAsset>()
-    MOCK_CATALOGS.forEach((catalog) => map.set(catalog.id, catalog))
-    return map
-  }, [])
-
-  const schemaLookup = useMemo(() => {
-    const map = new Map<string, { schema: SchemaAsset; catalog: CatalogAsset }>()
-    MOCK_CATALOGS.forEach((catalog) => {
-      catalog.schemas.forEach((schema) => map.set(schema.id, { schema, catalog }))
-    })
-    return map
-  }, [])
-
-  const filteredCatalogs = useMemo(() => {
-    const query = searchValue.trim().toLowerCase()
-    if (!query) return MOCK_CATALOGS
-
-    return MOCK_CATALOGS.map((catalog) => {
-      const filteredSchemas = catalog.schemas
-        .map((schema) => {
-          const filteredTables = schema.tables.filter((table) => table.name.toLowerCase().includes(query))
-          const matchSchema = schema.name.toLowerCase().includes(query)
-          const matchCatalog = catalog.name.toLowerCase().includes(query)
-          if (filteredTables.length || matchSchema || matchCatalog) {
-            return { ...schema, tables: filteredTables.length ? filteredTables : schema.tables }
-          }
-          return null
-        })
-        .filter(Boolean) as SchemaAsset[]
-
-      if (filteredSchemas.length) {
-        return { ...catalog, schemas: filteredSchemas }
-      }
-      return null
-    }).filter(Boolean) as CatalogAsset[]
-  }, [searchValue])
+  }, [catalogsWithSchemas])
 
   const selectedTable = selectedNodeType === 'TABLE' ? tableLookup.get(selectedNodeId) : null
   const selectedSchema = selectedNodeType === 'SCHEMA' ? schemaLookup.get(selectedNodeId) : null
   const selectedCatalog = selectedNodeType === 'CATALOG' ? catalogLookup.get(selectedNodeId) : null
 
-  const handleSelect = (id: string, type: NodeType) => {
+  const handleSelect = async (id: string, type: NodeType) => {
     setSelectedNodeId(id)
     setSelectedNodeType(type)
     setActiveTab('OVERVIEW')
+
+    // 触发元数据加载（导入到 gravitino 数据库）
+    if (loadedMetadata.has(id)) {
+      return
+    }
+
+    try {
+      if (type === 'SCHEMA') {
+        const parts = id.split('.')
+        if (parts.length === 2) {
+          const [catalogId, schemaName] = parts
+          await getSchema(catalogId, schemaName)
+          setLoadedMetadata((prev) => new Set(prev).add(id))
+        }
+      } else if (type === 'TABLE') {
+        const parts = id.split('.')
+        if (parts.length === 3) {
+          const [catalogId, schemaName, tableName] = parts
+          await getTable(catalogId, schemaName, tableName)
+          setLoadedMetadata((prev) => new Set(prev).add(id))
+        }
+      }
+    } catch (error) {
+      console.error(`加载元数据失败 (${type}=${id}):`, error)
+    }
   }
 
-  const toggleNode = (id: string) => {
+  const toggleNode = async (id: string, type: NodeType) => {
+    const isExpanding = !expandedNodes.has(id)
+
     setExpandedNodes((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
       return next
     })
+
+    if (isExpanding) {
+      if (type === 'CATALOG') {
+        await loadSchemas(id)
+      } else if (type === 'SCHEMA') {
+        const parts = id.split('.')
+        if (parts.length === 2) {
+          const [catalogId, schemaName] = parts
+          await loadTables(catalogId, schemaName)
+        }
+      }
+    }
   }
 
   const handleCreateChild = (parentId: string, parentType: NodeType, parentName: string) => {
@@ -290,6 +338,7 @@ export function MetadataView() {
             activeTab={activeTab}
             onTabChange={setActiveTab}
             table={selectedTable.table}
+            provider={selectedTable.catalog.provider}
             breadcrumb={[
               selectedTable.catalog.name,
               selectedTable.schema.name,
@@ -395,23 +444,28 @@ export function MetadataView() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors"
+                disabled={isSubmitting}
+                className="px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 取消
               </button>
               <button
                 type="button"
-                className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors shadow-sm"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                创建
+                {isSubmitting ? '创建中...' : '创建'}
               </button>
             </>
           ) : undefined
         }
         contentOverlay={contentOverlay}
       >
-        {modalState.nodeType === 'ROOT' && <CreateCatalogForm parentName={modalState.nodeName} />}
-        {modalState.nodeType === 'CATALOG' && <CreateSchemaForm parentName={modalState.nodeName} />}
+        {modalState.nodeType === 'ROOT' && (
+          <CreateCatalogForm ref={catalogFormRef} parentName={modalState.nodeName} onFooterLeftRender={setFooterLeft} />
+        )}
+        {modalState.nodeType === 'CATALOG' && <CreateSchemaForm ref={schemaFormRef} parentName={modalState.nodeName} />}
         {modalState.nodeType === 'SCHEMA' && (
           <CreateTableForm
             parentName={modalState.nodeName}
@@ -436,7 +490,7 @@ function Tree({
   catalogs: CatalogAsset[]
   expandedNodes: Set<string>
   selectedNodeId: string
-  onToggle: (id: string) => void
+  onToggle: (id: string, type: NodeType) => void
   onSelect: (id: string, type: NodeType) => void
   onCreateChild: (parentId: string, parentType: NodeType, parentName: string) => void
 }) {
@@ -444,15 +498,15 @@ function Tree({
     <div className="flex flex-col">
       <TreeNode
         id="ROOT"
-        label="One Meta (Enterprise)"
+        label="One Meta"
         type="ROOT"
         level={0}
         isActive={selectedNodeId === 'ROOT'}
         isOpen={expandedNodes.has('ROOT')}
         hasChildren
         onClick={() => onSelect('ROOT', 'ROOT')}
-        onToggle={() => onToggle('ROOT')}
-        onMoreClick={() => onCreateChild('ROOT', 'ROOT', 'One Meta (Enterprise)')}
+        onToggle={() => onToggle('ROOT', 'ROOT')}
+        onMoreClick={() => onCreateChild('ROOT', 'ROOT', 'One Meta')}
       />
       {expandedNodes.has('ROOT') &&
         catalogs.map((catalog) => (
@@ -465,9 +519,9 @@ function Tree({
               level={1}
               isActive={selectedNodeId === catalog.id}
               isOpen={expandedNodes.has(catalog.id)}
-              hasChildren={catalog.schemas.length > 0}
+              hasChildren
               onClick={() => onSelect(catalog.id, 'CATALOG')}
-              onToggle={() => onToggle(catalog.id)}
+              onToggle={() => onToggle(catalog.id, 'CATALOG')}
               onMoreClick={() => onCreateChild(catalog.id, 'CATALOG', catalog.name)}
             />
             {expandedNodes.has(catalog.id) &&
@@ -480,9 +534,9 @@ function Tree({
                     level={2}
                     isActive={selectedNodeId === schema.id}
                     isOpen={expandedNodes.has(schema.id)}
-                    hasChildren={schema.tables.length > 0}
+                    hasChildren
                     onClick={() => onSelect(schema.id, 'SCHEMA')}
-                    onToggle={() => onToggle(schema.id)}
+                    onToggle={() => onToggle(schema.id, 'SCHEMA')}
                     onMoreClick={() => onCreateChild(schema.id, 'SCHEMA', schema.name)}
                   />
                   {expandedNodes.has(schema.id) &&
@@ -570,6 +624,12 @@ function TreeNode({
         return <SiRedis {...iconProps} />
       case 'iceberg':
         return <Database size={14} className="text-cyan-600 dark:text-cyan-400" />
+      case 'folder':
+        return <Folder size={14} className="text-amber-600 dark:text-amber-400" />
+      case 'metric':
+        return <Activity size={14} className="text-green-600 dark:text-green-400" />
+      case 'model':
+        return <Box size={14} className="text-purple-600 dark:text-purple-400" />
       default:
         return <Database size={14} className="text-blue-600" />
     }

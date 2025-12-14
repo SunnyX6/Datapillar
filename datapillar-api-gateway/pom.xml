@@ -23,12 +23,6 @@
     </properties>
 
     <dependencies>
-        <!-- Datapillar Common -->
-        <dependency>
-            <groupId>com.sunny</groupId>
-            <artifactId>datapillar-common</artifactId>
-        </dependency>
-
         <!-- Spring Cloud Gateway -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>

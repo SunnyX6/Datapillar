@@ -14,11 +14,11 @@
     <description>Datapillar SaaS Data Platform</description>
 
     <modules>
-        <module>datapillar-common</module>
         <module>datapillar-auth</module>
         <module>datapillar-web-admin</module>
         <module>datapillar-job</module>
         <module>datapillar-api-gateway</module>
+        <module>datapillar-knowledge-sdk</module>
     </modules>
 
     <parent>
@@ -43,13 +43,6 @@
 
     <dependencyManagement>
         <dependencies>
-            <!-- Internal Modules -->
-            <dependency>
-                <groupId>com.sunny</groupId>
-                <artifactId>datapillar-common</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
             <!-- MyBatis-Plus -->
             <dependency>
                 <groupId>com.baomidou</groupId>

@@ -129,10 +129,21 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
             properties.forEach(
                 (key, value) -> {
                   if (mysqlConfigToGravitino.containsKey(key)) {
+                    // 转换 MySQL 原生 key 为 Gravitino key (如 ENGINE -> engine)
                     put(mysqlConfigToGravitino.get(key), value);
+                  } else if (isMysqlStatisticsKey(key)) {
+                    // 保留 MySQL 统计字段: numRows, totalSize, rawDataSize, indexSize
+                    put(key, value);
                   }
                 });
           }
         });
+  }
+
+  private static boolean isMysqlStatisticsKey(String key) {
+    return "numRows".equals(key)
+        || "totalSize".equals(key)
+        || "rawDataSize".equals(key)
+        || "indexSize".equals(key);
   }
 }

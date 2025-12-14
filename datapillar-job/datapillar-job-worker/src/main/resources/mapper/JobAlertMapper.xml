@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.job.worker.domain.mapper.JobAlertMapper">
+
+    <!-- 查询任务的告警规则（单渠道，等值 JOIN 使用索引） -->
+    <select id="selectRulesByJobId" resultType="com.sunny.job.worker.domain.entity.JobAlertRule">
+        SELECT
+            r.id AS ruleId,
+            r.workflow_id AS workflowId,
+            r.job_id AS jobId,
+            r.trigger_event AS triggerEvent,
+            c.id AS alertChannelId,
+            c.channel_type AS channelType,
+            c.channel_config AS channelConfig
+        FROM job_alarm_rule r
+        INNER JOIN job_alarm_channel c ON r.channel_id = c.id
+        WHERE (r.job_id = #{jobId} OR r.job_id IS NULL)
+        AND r.rule_status = 1
+        AND c.channel_status = 1
+        AND r.is_deleted = 0
+        AND c.is_deleted = 0
+    </select>
+
+    <!-- 插入告警记录（发送完成后插入） -->
+    <insert id="insertAlertLog">
+        INSERT INTO job_alarm_log (
+            namespace_id, workflow_run_id, job_run_id, rule_id, channel_id,
+            alarm_type, alarm_title, alarm_content, send_status, send_result, send_time
+        ) VALUES (
+            #{namespaceId}, #{workflowRunId}, #{jobRunId}, #{ruleId}, #{channelId},
+            #{alarmType}, #{title}, #{content}, #{status}, #{sendResult}, NOW()
+        )
+    </insert>
+
+</mapper>

@@ -10,53 +10,80 @@
 	<packaging>jar</packaging>
 
 	<name>${project.artifactId}</name>
-	<description>Datapillar job scheduling core module.</description>
+	<description>Datapillar Job 调度平台核心模块 - Protobuf 协议、通用工具、DAG 引擎</description>
 
 	<dependencies>
-
-		<!-- ********************** embed server: netty + gson ********************** -->
+		<!-- Protobuf (消息序列化) -->
 		<dependency>
-			<groupId>io.netty</groupId>
-			<artifactId>netty-codec-http</artifactId>
-			<version>${netty.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>com.google.code.gson</groupId>
-			<artifactId>gson</artifactId>
-			<version>${gson.version}</version>
+			<groupId>com.google.protobuf</groupId>
+			<artifactId>protobuf-java</artifactId>
 		</dependency>
 
-		<!-- ********************** plugin ********************** -->
-		<!-- groovy-all -->
+		<!-- Guava (DAG Graph) -->
 		<dependency>
-			<groupId>org.apache.groovy</groupId>
-			<artifactId>groovy</artifactId>
-			<version>${groovy.version}</version>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
 		</dependency>
 
-		<!-- spring-context -->
+		<!-- Pekko Typed (消息中 ActorRef 类型需要) -->
 		<dependency>
-			<groupId>org.springframework</groupId>
-			<artifactId>spring-context</artifactId>
-			<version>${spring.version}</version>
+			<groupId>org.apache.pekko</groupId>
+			<artifactId>pekko-actor-typed_2.13</artifactId>
 			<scope>provided</scope>
 		</dependency>
 
-		<!-- ********************** base ********************** -->
-		<!-- slf4j -->
+		<!-- SLF4J -->
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
-			<version>${slf4j-api.version}</version>
 		</dependency>
 
-		<!-- jakarta.annotation-api -->
+		<!-- Spring Context (用于 @DatapillarJob 扫描、CronExpression) -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context</artifactId>
+			<scope>provided</scope>
+		</dependency>
+
+		<!-- Jakarta Annotation -->
 		<dependency>
 			<groupId>jakarta.annotation</groupId>
 			<artifactId>jakarta.annotation-api</artifactId>
-			<version>${jakarta.annotation-api.version}</version>
 			<scope>provided</scope>
 		</dependency>
+
+		<!-- PF4J 插件框架 -->
+		<dependency>
+			<groupId>org.pf4j</groupId>
+			<artifactId>pf4j</artifactId>
+		</dependency>
+
+		<!-- Test -->
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
+
+	<build>
+		<plugins>
+			<!-- Protobuf 编译插件（只编译 proto，不生成 gRPC 代码）-->
+			<plugin>
+				<groupId>org.xolstice.maven.plugins</groupId>
+				<artifactId>protobuf-maven-plugin</artifactId>
+				<configuration>
+					<protoSourceRoot>${project.basedir}/src/main/proto</protoSourceRoot>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>compile</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
 
 </project>

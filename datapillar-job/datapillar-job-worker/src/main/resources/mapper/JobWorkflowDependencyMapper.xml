@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.job.worker.domain.mapper.JobWorkflowDependencyMapper">
+
+    <!-- 查询工作流的跨工作流依赖 -->
+    <select id="selectByWorkflowId" resultType="com.sunny.job.worker.domain.entity.JobWorkflowDependency">
+        SELECT
+            workflow_id AS workflowId,
+            depend_workflow_id AS dependWorkflowId,
+            depend_job_id AS dependJobId
+        FROM job_workflow_dependency
+        WHERE workflow_id = #{workflowId}
+    </select>
+
+    <!-- 查询依赖工作流的最新成功 workflow_run -->
+    <select id="selectLatestSuccessWorkflowRunId" resultType="java.lang.Long">
+        SELECT id
+        FROM job_workflow_run
+        WHERE workflow_id = #{workflowId} AND status = 2
+        ORDER BY trigger_time DESC
+        LIMIT 1
+    </select>
+
+    <!-- 根据 workflow_run_id 和 job_id 查询对应的 job_run_id -->
+    <select id="selectJobRunId" resultType="java.lang.Long">
+        SELECT id
+        FROM job_run
+        WHERE workflow_run_id = #{workflowRunId} AND job_id = #{jobId}
+    </select>
+
+</mapper>

@@ -37,7 +37,7 @@ import {
 import { KnowledgeImportMenu } from './KnowledgeImportMenu'
 import { panelWidthClassMap, panelHeightClassMap, inputContainerWidthClassMap } from '@/design-tokens/dimensions'
 import { useIsDark } from '@/stores'
-import { fetchInitialGraph, searchGraph, type GraphData, type GraphLink, type GraphNode } from '@/services/knowledgeGraph'
+import { fetchInitialGraph, searchGraph, type GraphData, type GraphLink, type GraphNode } from '@/services/knowledgeGraphService'
 
 type NvlNodeWithMeta = NvlNode & { raw: GraphNode }
 type NvlRelWithMeta = NvlRelationship & { raw: GraphLink }

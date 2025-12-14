@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => {
       // 统一代理到 Gateway，由 Gateway 负责路由
       proxy: {
         '/api': {
-          target: env.VITE_GATEWAY_URL || 'http://localhost:6000',
+          target: env.VITE_GATEWAY_URL ,
           changeOrigin: true,
           secure: false
         }

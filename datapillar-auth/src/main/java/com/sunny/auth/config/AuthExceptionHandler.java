@@ -1,9 +1,8 @@
 package com.sunny.auth.config;
 
-import com.sunny.common.exception.GlobalException;
-import com.sunny.common.response.ApiResponse;
+import com.sunny.auth.response.AuthException;
+import com.sunny.auth.response.AuthResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindException;
@@ -18,39 +17,31 @@ import java.util.Map;
 
 /**
  * 认证服务异常处理器
- * 继承 common 的 GlobalExceptionHandler 基类
- *
- * @author sunny
- * @since 2024-11-08
  */
 @Slf4j
 @RestControllerAdvice
-public class AuthExceptionHandler extends com.sunny.common.handler.GlobalExceptionHandler {
+public class AuthExceptionHandler {
 
-    @Override
-    protected Logger getLogger() {
-        return log;
-    }
-
-    @Override
-    @ExceptionHandler(GlobalException.class)
-    public ApiResponse<Object> handleGlobalException(GlobalException e) {
-        return super.handleGlobalException(e);
+    /**
+     * 处理认证异常
+     */
+    @ExceptionHandler(AuthException.class)
+    public AuthResponse<Object> handleAuthException(AuthException e) {
+        log.warn("Auth exception: code={}, message={}", e.getCode(), e.getMessage());
+        return AuthResponse.error(e.getCode(), e.getMessage());
     }
 
     /**
      * 处理唯一键冲突异常
-     * 如：用户名已存在、邮箱已注册等
      */
     @ExceptionHandler(DuplicateKeyException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public ApiResponse<Object> handleDuplicateKeyException(DuplicateKeyException e) {
+    public AuthResponse<Object> handleDuplicateKeyException(DuplicateKeyException e) {
         log.warn("Duplicate key exception: {}", e.getMessage());
 
         String message = e.getMessage();
         String errorMessage;
 
-        // 根据具体的唯一键冲突提供更友好的错误信息
         if (message != null) {
             if (message.contains("username")) {
                 errorMessage = "用户名已存在";
@@ -63,29 +54,26 @@ public class AuthExceptionHandler extends com.sunny.common.handler.GlobalExcepti
             errorMessage = "数据已存在";
         }
 
-        return ApiResponse.error("DUPLICATE_KEY", errorMessage);
+        return AuthResponse.error("DUPLICATE_KEY", errorMessage);
     }
 
     /**
-     * 处理参数验证异常 (400)
-     * 如：@Valid注解验证失败
+     * 处理参数验证异常
      */
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiResponse<Object> handleMethodValidationException(Exception e) {
+    public AuthResponse<Object> handleValidationException(Exception e) {
         log.warn("Validation exception: {}", e.getMessage());
 
         Map<String, String> errors = new HashMap<>();
 
-        if (e instanceof MethodArgumentNotValidException) {
-            MethodArgumentNotValidException ex = (MethodArgumentNotValidException) e;
+        if (e instanceof MethodArgumentNotValidException ex) {
             ex.getBindingResult().getAllErrors().forEach((error) -> {
                 String fieldName = ((FieldError) error).getField();
                 String errorMessage = error.getDefaultMessage();
                 errors.put(fieldName, errorMessage);
             });
-        } else if (e instanceof BindException) {
-            BindException ex = (BindException) e;
+        } else if (e instanceof BindException ex) {
             ex.getBindingResult().getAllErrors().forEach((error) -> {
                 String fieldName = ((FieldError) error).getField();
                 String errorMessage = error.getDefaultMessage();
@@ -93,24 +81,27 @@ public class AuthExceptionHandler extends com.sunny.common.handler.GlobalExcepti
             });
         }
 
-        return ApiResponse.validationError(
-            errors.isEmpty() ? "参数验证失败" : errors.toString()
-        );
+        return AuthResponse.error("VALIDATION_ERROR",
+            errors.isEmpty() ? "参数验证失败" : errors.toString());
     }
 
     /**
-     * 处理非法参数异常 (400)
+     * 处理非法参数异常
      */
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiResponse<Object> handleIllegalArgumentException(IllegalArgumentException e) {
+    public AuthResponse<Object> handleIllegalArgumentException(IllegalArgumentException e) {
         log.warn("Illegal argument: {}", e.getMessage());
-        return ApiResponse.error("INVALID_ARGUMENT", e.getMessage());
+        return AuthResponse.error("INVALID_ARGUMENT", e.getMessage());
     }
 
-    @Override
+    /**
+     * 处理其他未捕获异常
+     */
     @ExceptionHandler(Exception.class)
-    public ApiResponse<Object> handleException(Exception e) {
-        return super.handleException(e);
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public AuthResponse<Object> handleException(Exception e) {
+        log.error("Unexpected error: ", e);
+        return AuthResponse.error("INTERNAL_ERROR", "服务器内部错误");
     }
 }
