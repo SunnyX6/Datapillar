@@ -1,8 +1,10 @@
+import { useEffect, useState, useMemo } from 'react'
 import {
   Activity,
   Book,
   CheckCircle2,
   Clock,
+  Fingerprint,
   Key,
   Lock,
   Medal,
@@ -12,6 +14,8 @@ import {
 import { contentMaxWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { type TableAsset } from '../type/types'
+import { getTable } from '@/services/oneMetaService'
+import type { GravitinoIndexDTO } from '@/types/oneMeta'
 
 const QUALITY_RULES = [
   { name: 'unique_region_id', type: 'Uniqueness', status: 'PASS', value: '100%' },
@@ -28,14 +32,163 @@ const QUALITY_SCORE_COLOR = (score: number) => {
   return 'bg-emerald-100 text-emerald-700 border-emerald-200'
 }
 
+// 格式化字节大小
+const formatBytes = (bytes: number): string => {
+  if (isNaN(bytes) || bytes === 0) return '0 B'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
 type TableOverviewProps = {
   table: TableAsset
+  provider?: string
   breadcrumb: string[]
   activeTab: 'OVERVIEW' | 'COLUMNS' | 'QUALITY' | 'LINEAGE'
   onTabChange: (tab: 'OVERVIEW' | 'COLUMNS' | 'QUALITY' | 'LINEAGE') => void
 }
 
-export function TableOverview({ table, breadcrumb, activeTab, onTabChange }: TableOverviewProps) {
+/**
+ * 判断是否为支持索引的 JDBC 类型 catalog
+ */
+function isJdbcProvider(provider?: string): boolean {
+  if (!provider) return false
+  return provider.startsWith('jdbc-')
+}
+
+export function TableOverview({ table, provider, breadcrumb, activeTab, onTabChange }: TableOverviewProps) {
+  const [owner, setOwner] = useState<string>(table.owner)
+  const [updatedAt, setUpdatedAt] = useState<string>(table.updatedAt)
+  const [description, setDescription] = useState<string>(table.description)
+  const [columns, setColumns] = useState(table.columns)
+  const [indexes, setIndexes] = useState<GravitinoIndexDTO[]>([])
+  // 动态展示的属性，根据不同 catalog 返回的 properties 动态生成
+  const [tableSpecs, setTableSpecs] = useState<{ label: string; value: string }[]>([])
+
+  // 构建列名到索引类型的映射（仅对 JDBC 类型的 catalog 有效）
+  const columnIndexMap = useMemo(() => {
+    const map = new Map<string, Set<'PRIMARY_KEY' | 'UNIQUE_KEY'>>()
+    if (!isJdbcProvider(provider)) return map
+
+    indexes.forEach((index) => {
+      index.fieldNames.forEach((fieldNamePath) => {
+        // fieldNames 是二维数组，取第一个元素作为列名
+        const columnName = fieldNamePath[0]
+        if (!map.has(columnName)) {
+          map.set(columnName, new Set())
+        }
+        map.get(columnName)!.add(index.indexType)
+      })
+    })
+    return map
+  }, [indexes, provider])
+
+  useEffect(() => {
+    // 从table.id解析catalogName, schemaName, tableName
+    const parts = table.id.split('.')
+    if (parts.length === 3) {
+      const [catalogName, schemaName, tableName] = parts
+
+      // 调用 getTable 获取完整数据
+      getTable(catalogName, schemaName, tableName)
+        .then((detail) => {
+          // 更新description
+          if (detail.comment) {
+            setDescription(detail.comment)
+          }
+
+          // 更新columns
+          if (detail.columns) {
+            setColumns(detail.columns)
+          }
+
+          // 更新indexes（仅对 JDBC 类型有效）
+          if (detail.indexes) {
+            setIndexes(detail.indexes)
+          }
+
+          // 从audit中提取owner和updatedAt
+          if (detail.audit) {
+            if (detail.audit.creator) {
+              setOwner(detail.audit.creator)
+            }
+            if (detail.audit.lastModifiedTime) {
+              const date = new Date(detail.audit.lastModifiedTime)
+              setUpdatedAt(date.toLocaleDateString())
+            }
+          }
+
+          // 根据 properties 动态构建展示字段
+          if (detail.properties) {
+            const props = detail.properties
+            const specs: { label: string; value: string }[] = []
+
+            // Hive 特有: table-type
+            if (props['table-type']) {
+              specs.push({ label: 'Type', value: props['table-type'] })
+            }
+
+            // Hive 特有: format (从 input-format 推断)
+            const inputFormat = props['input-format'] || ''
+            if (inputFormat) {
+              let format = '-'
+              if (inputFormat.toLowerCase().includes('parquet')) {
+                format = 'PARQUET'
+              } else if (inputFormat.toLowerCase().includes('orc')) {
+                format = 'ORC'
+              } else if (inputFormat.toLowerCase().includes('text')) {
+                format = 'TEXT'
+              } else if (inputFormat.toLowerCase().includes('avro')) {
+                format = 'AVRO'
+              } else {
+                const parts = inputFormat.split('.')
+                format = parts[parts.length - 1].replace('InputFormat', '').toUpperCase()
+              }
+              specs.push({ label: 'Format', value: format })
+            }
+
+            // MySQL 特有: engine
+            if (props['engine']) {
+              specs.push({ label: 'Engine', value: props['engine'] })
+            }
+
+            // 通用: numRows
+            if (props.numRows) {
+              const rows = parseInt(props.numRows, 10)
+              specs.push({ label: 'Rows', value: isNaN(rows) ? '-' : rows.toLocaleString() })
+            }
+
+            // 通用: rawDataSize (数据大小)
+            if (props.rawDataSize) {
+              specs.push({ label: 'Data Size', value: formatBytes(parseInt(props.rawDataSize, 10)) })
+            }
+
+            // MySQL 特有: indexSize
+            if (props.indexSize && props.indexSize !== '0') {
+              specs.push({ label: 'Index Size', value: formatBytes(parseInt(props.indexSize, 10)) })
+            }
+
+            // 通用: totalSize
+            if (props.totalSize) {
+              specs.push({ label: 'Total Size', value: formatBytes(parseInt(props.totalSize, 10)) })
+            }
+
+            // Hive 特有: numFiles
+            if (props.numFiles) {
+              const files = parseInt(props.numFiles, 10)
+              specs.push({ label: 'Files', value: isNaN(files) ? '-' : files.toLocaleString() })
+            }
+
+            setTableSpecs(specs)
+          }
+        })
+        .catch((error) => {
+          console.error('获取table详情失败:', error)
+        })
+    }
+  }, [table.id])
+
   return (
     <div className="flex flex-col h-full">
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 @md:px-8 py-4 shadow-sm">
@@ -64,18 +217,18 @@ export function TableOverview({ table, breadcrumb, activeTab, onTabChange }: Tab
                 )}
               </div>
               <p className="text-sm text-slate-500 dark:text-slate-400 max-w-3xl leading-relaxed">
-                {table.description}
+                {description}
               </p>
               <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600 dark:text-slate-300">
                 <QualityBadge score={table.qualityScore} />
                 <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
                 <div className="flex items-center gap-2">
                   <User size={12} className="text-slate-400" />
-                  <span>Owner: <span className="font-semibold text-slate-800 dark:text-slate-200">{table.owner}</span></span>
+                  <span>Owner: <span className="font-semibold text-slate-800 dark:text-slate-200">{owner || '-'}</span></span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock size={12} className="text-slate-400" />
-                  <span>Updated: <span className="font-semibold text-slate-800 dark:text-slate-200">{table.updatedAt}</span></span>
+                  <span>Updated: <span className="font-semibold text-slate-800 dark:text-slate-200">{updatedAt || '-'}</span></span>
                 </div>
               </div>
               <div className="flex items-center flex-wrap gap-2">
@@ -128,10 +281,13 @@ export function TableOverview({ table, breadcrumb, activeTab, onTabChange }: Tab
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
                   <h4 className={`${TYPOGRAPHY.legal} font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-4`}>Technical Specs</h4>
                   <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
-                    <SpecRow label="Type" value="HIVE_EXTERNAL" />
-                    <SpecRow label="Format" value="PARQUET" />
-                    <SpecRow label="Rows" value={table.rowCount.toLocaleString()} />
-                    <SpecRow label="Size" value={table.size} />
+                    {tableSpecs.length > 0 ? (
+                      tableSpecs.map((spec) => (
+                        <SpecRow key={spec.label} label={spec.label} value={spec.value} />
+                      ))
+                    ) : (
+                      <span className="text-slate-400">Loading...</span>
+                    )}
                   </div>
                 </div>
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm @md:col-span-2">
@@ -180,26 +336,41 @@ export function TableOverview({ table, breadcrumb, activeTab, onTabChange }: Tab
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {table.columns.map((col) => (
-                    <tr key={col.name} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
-                      <td className="px-6 py-3 font-mono text-xs text-slate-800 dark:text-slate-100">
-                        <div className="flex items-center gap-2">
-                          {col.name}
-                          {col.isPrimaryKey && <Key size={12} className="text-amber-500" />}
-                        </div>
-                      </td>
-                      <td className="px-6 py-3 font-mono text-xs text-slate-500 dark:text-slate-300">{col.type}</td>
-                      <td className="px-6 py-3 text-slate-600 dark:text-slate-300">{col.comment ?? '-'}</td>
-                      <td className="px-6 py-3">
-                        {col.piiTag && (
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded ${TYPOGRAPHY.micro} font-bold bg-rose-50 text-rose-600 border border-rose-100`}>
-                            <Lock size={10} />
-                            {col.piiTag}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {columns.map((col) => {
+                    const indexTypes = columnIndexMap.get(col.name)
+                    const isPrimaryKey = indexTypes?.has('PRIMARY_KEY') ?? false
+                    const isUniqueKey = indexTypes?.has('UNIQUE_KEY') ?? false
+
+                    return (
+                      <tr key={col.name} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                        <td className="px-6 py-3 font-mono text-xs text-slate-800 dark:text-slate-100">
+                          <div className="flex items-center gap-2">
+                            {col.name}
+                            {isPrimaryKey && (
+                              <span title="Primary Key">
+                                <Key size={12} className="text-amber-500" />
+                              </span>
+                            )}
+                            {isUniqueKey && !isPrimaryKey && (
+                              <span title="Unique Key">
+                                <Fingerprint size={12} className="text-blue-500" />
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-3 font-mono text-xs text-slate-500 dark:text-slate-300">{col.type}</td>
+                        <td className="px-6 py-3 text-slate-600 dark:text-slate-300">{col.comment ?? '-'}</td>
+                        <td className="px-6 py-3">
+                          {col.piiTag && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded ${TYPOGRAPHY.micro} font-bold bg-rose-50 text-rose-600 border border-rose-100`}>
+                              <Lock size={10} />
+                              {col.piiTag}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.job.worker.domain.mapper.JobWorkflowRunMapper">
+
+    <!-- 插入工作流执行实例 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO job_workflow_run (namespace_id, workflow_id, trigger_type, trigger_time, status)
+        VALUES (#{namespaceId}, #{workflowId}, #{triggerType}, #{triggerTime}, #{status})
+    </insert>
+
+    <!-- 更新工作流执行实例状态 -->
+    <update id="updateStatus">
+        UPDATE job_workflow_run
+        SET status = #{status},
+            end_time = #{endTime},
+            result_message = #{message},
+            updated_at = NOW(3)
+        WHERE id = #{workflowRunId}
+    </update>
+
+    <!-- 查询工作流执行实例的工作流ID -->
+    <select id="selectWorkflowIdByRunId" resultType="java.lang.Long">
+        SELECT workflow_id FROM job_workflow_run WHERE id = #{workflowRunId}
+    </select>
+
+</mapper>

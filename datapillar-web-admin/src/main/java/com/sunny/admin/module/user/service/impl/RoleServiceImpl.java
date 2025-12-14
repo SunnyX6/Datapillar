@@ -1,7 +1,7 @@
 package com.sunny.admin.module.user.service.impl;
 
-import com.sunny.common.enums.GlobalSystemCode;
-import com.sunny.common.exception.GlobalException;
+import com.sunny.admin.response.WebAdminErrorCode;
+import com.sunny.admin.response.WebAdminException;
 import com.sunny.admin.module.user.dto.RoleReqDto;
 import com.sunny.admin.module.user.dto.RoleRespDto;
 import com.sunny.admin.module.user.entity.Role;
@@ -39,7 +39,7 @@ public class RoleServiceImpl implements RoleService {
     public RoleRespDto getRoleById(Long id) {
         Role role = roleMapper.selectById(id);
         if (role == null) {
-            throw new GlobalException(GlobalSystemCode.ROLE_NOT_FOUND, id);
+            throw new WebAdminException(WebAdminErrorCode.ROLE_NOT_FOUND, id);
         }
 
         RoleRespDto response = new RoleRespDto();
@@ -52,7 +52,7 @@ public class RoleServiceImpl implements RoleService {
     public RoleRespDto createRole(RoleReqDto request) {
         // 检查角色代码是否已存在
         if (roleMapper.findByCode(request.getCode()) != null) {
-            throw new GlobalException(GlobalSystemCode.ROLE_ALREADY_EXISTS, request.getCode());
+            throw new WebAdminException(WebAdminErrorCode.ROLE_ALREADY_EXISTS, request.getCode());
         }
         
         Role role = new Role();
@@ -75,13 +75,13 @@ public class RoleServiceImpl implements RoleService {
     public RoleRespDto updateRole(Long id, RoleReqDto request) {
         Role existingRole = roleMapper.selectById(id);
         if (existingRole == null) {
-            throw new GlobalException(GlobalSystemCode.ROLE_NOT_FOUND, id);
+            throw new WebAdminException(WebAdminErrorCode.ROLE_NOT_FOUND, id);
         }
 
         // 检查角色代码是否被其他角色使用
         Role roleWithSameCode = roleMapper.findByCode(request.getCode());
         if (roleWithSameCode != null && !roleWithSameCode.getId().equals(id)) {
-            throw new GlobalException(GlobalSystemCode.ROLE_ALREADY_EXISTS, request.getCode());
+            throw new WebAdminException(WebAdminErrorCode.ROLE_ALREADY_EXISTS, request.getCode());
         }
         
         BeanUtils.copyProperties(request, existingRole, "id", "createdAt");
@@ -101,7 +101,7 @@ public class RoleServiceImpl implements RoleService {
     public void deleteRole(Long id) {
         Role role = roleMapper.selectById(id);
         if (role == null) {
-            throw new GlobalException(GlobalSystemCode.ROLE_NOT_FOUND, id);
+            throw new WebAdminException(WebAdminErrorCode.ROLE_NOT_FOUND, id);
         }
         
         // 删除角色

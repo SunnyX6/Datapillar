@@ -1,0 +1,117 @@
+package com.sunny.job.worker.alert.sender;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
+import com.sunny.job.worker.alert.AlertResult;
+import com.sunny.job.worker.alert.AlertSender;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Map;
+
+/**
+ * 通用 Webhook 告警发送器
+ * <p>
+ * Webhook 配置格式：
+ * {"url": "https://example.com/alert", "method": "POST", "headers": {"Authorization": "Bearer xxx"}}
+ *
+ * @author SunnyX6
+ * @date 2025-12-13
+ */
+@Component("webhookAlertSender")
+public class WebhookAlertSender implements AlertSender {
+
+    private static final Logger log = LoggerFactory.getLogger(WebhookAlertSender.class);
+    private static final Gson GSON = new Gson();
+    private static final int TIMEOUT_SECONDS = 30;
+
+    private final HttpClient httpClient;
+
+    public WebhookAlertSender() {
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(TIMEOUT_SECONDS))
+                .build();
+    }
+
+    @Override
+    public AlertResult send(String channelConfig, String title, String content) {
+        try {
+            JsonObject config = GSON.fromJson(channelConfig, JsonObject.class);
+            String url = config.get("url").getAsString();
+            String method = config.has("method") ? config.get("method").getAsString().toUpperCase() : "POST";
+
+            // 构建请求体
+            JsonObject requestBody = buildRequestBody(title, content);
+
+            // 构建请求
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Content-Type", "application/json; charset=utf-8")
+                    .timeout(Duration.ofSeconds(TIMEOUT_SECONDS));
+
+            // 添加自定义请求头
+            if (config.has("headers") && config.get("headers").isJsonObject()) {
+                Map<String, String> headers = GSON.fromJson(
+                        config.get("headers"),
+                        new TypeToken<Map<String, String>>() {}.getType()
+                );
+                headers.forEach(requestBuilder::header);
+            }
+
+            // 设置请求方法和请求体
+            String bodyStr = GSON.toJson(requestBody);
+            if ("POST".equals(method)) {
+                requestBuilder.POST(HttpRequest.BodyPublishers.ofString(bodyStr, StandardCharsets.UTF_8));
+            } else if ("PUT".equals(method)) {
+                requestBuilder.PUT(HttpRequest.BodyPublishers.ofString(bodyStr, StandardCharsets.UTF_8));
+            } else {
+                requestBuilder.method(method, HttpRequest.BodyPublishers.ofString(bodyStr, StandardCharsets.UTF_8));
+            }
+
+            HttpRequest request = requestBuilder.build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            // 判断响应状态
+            int statusCode = response.statusCode();
+            if (statusCode >= 200 && statusCode < 300) {
+                log.info("Webhook告警发送成功: url={}, statusCode={}", url, statusCode);
+                return AlertResult.ok();
+            } else {
+                log.warn("Webhook告警发送失败: url={}, statusCode={}, body={}",
+                        url, statusCode, response.body());
+                return AlertResult.fail("HTTP状态码: " + statusCode);
+            }
+        } catch (IOException e) {
+            log.error("Webhook告警发送IO异常", e);
+            return AlertResult.fail("网络异常: " + e.getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Webhook告警发送被中断", e);
+            return AlertResult.fail("请求被中断");
+        } catch (Exception e) {
+            log.error("Webhook告警发送异常", e);
+            return AlertResult.fail("发送异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 构建请求体
+     */
+    private JsonObject buildRequestBody(String title, String content) {
+        JsonObject body = new JsonObject();
+        body.addProperty("title", title);
+        body.addProperty("content", content);
+        body.addProperty("timestamp", System.currentTimeMillis());
+        body.addProperty("source", "datapillar-job");
+        return body;
+    }
+}

@@ -1,0 +1,59 @@
+pipeline:
+    name: ods_to_dwd_user_behavior
+    mode: batch
+    schedule_ref: airflow://dag/ods_to_dwd_user_behavior_daily
+    env: prod
+
+  nodes:
+    - id: src_user_log
+      type: source
+      op: source
+      params:
+        table_ref: catalog://hms/ods.user_log
+        partition: dt=${biz_date}
+
+    - id: src_device
+      type: source
+      op: source
+      params:
+        table_ref: catalog://hms/dim.device
+
+    - id: tf_join_filter
+      type: transform
+      depends_on: [src_user_log, src_device]
+      op: join_filter_project
+      params:
+        join_type: left
+        join_keys:
+          - left: device_id
+            right: device_id
+        filters:
+          - "event_type != 'spam'"
+          - "event_time >= date_sub('${biz_date}', 7)"
+        select:
+          - user_id
+          - event_time
+          - event_type
+          - device.vendor as device_vendor
+        partition: dt=${biz_date}
+
+    - id: dq_basic
+      type: dq
+      depends_on: [tf_join_filter]
+      op: dq_basic
+      params:
+        rules:
+          - not_null: event_time
+          - unique: [user_id, event_time]
+          - rowcount_compare:
+              compare_ref: catalog://hms/ods.user_log
+              threshold: 0.98
+
+    - id: sink_dwd
+      type: sink
+      depends_on: [dq_basic]
+      op: upsert_sink
+      params:
+        table_ref: catalog://hms/dwd.user_behavior
+        partition: dt=${biz_date}
+        primary_keys: [user_id, event_time]

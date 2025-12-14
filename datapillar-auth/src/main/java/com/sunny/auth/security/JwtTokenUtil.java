@@ -1,7 +1,7 @@
 package com.sunny.auth.security;
 
-import com.sunny.common.enums.GlobalSystemCode;
-import com.sunny.common.exception.GlobalException;
+import com.sunny.auth.response.AuthErrorCode;
+import com.sunny.auth.response.AuthException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -95,7 +95,7 @@ public class JwtTokenUtil {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (JwtException | IllegalArgumentException e) {
-            throw new GlobalException(GlobalSystemCode.TOKEN_INVALID, e.getMessage());
+            throw new AuthException(AuthErrorCode.TOKEN_INVALID, e.getMessage());
         }
     }
 
@@ -170,7 +170,7 @@ public class JwtTokenUtil {
 
         String[] parts = token.split("\\.");
         if (parts.length != 3) {
-            throw new GlobalException(GlobalSystemCode.TOKEN_INVALID, "Invalid JWT format");
+            throw new AuthException(AuthErrorCode.TOKEN_INVALID, "Invalid JWT format");
         }
 
         // 返回签名部分（第三部分）

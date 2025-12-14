@@ -10,7 +10,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { login as apiLogin, logout as apiLogout } from '@/lib/auth'
-import { startTokenRefresh, stopTokenRefresh, isAuthenticated } from '@/lib/token'
+import { startTokenRefresh, stopTokenRefresh, getTokenInfo } from '@/lib/token'
 import type { User } from '@/types/auth'
 
 /**
@@ -116,14 +116,15 @@ export const useAuthStore = create<AuthStore>()(
         set({ loading: true })
 
         try {
-          const authenticated = await isAuthenticated()
+          const tokenInfo = await getTokenInfo()
 
-          if (authenticated) {
+          if (tokenInfo.valid) {
             set({ isAuthenticated: true, loading: false })
 
+            // 传入剩余时间，避免重复请求
             startTokenRefresh(() => {
               get().logout()
-            })
+            }, tokenInfo.remainingSeconds)
           } else {
             // Token 无效，清除用户信息
             set({

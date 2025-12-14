@@ -137,6 +137,36 @@ public class HiveTable extends BaseTable {
                     (k, v) ->
                         properties.put(HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX + k, v)));
 
+    // 统一统计字段名称，与 MySQL 保持一致: numRows, totalSize, rawDataSize, indexSize, numFiles
+    // ORC/Parquet 表在数据写入时会自动更新这些统计信息，无需手动执行 ANALYZE TABLE
+    Map<String, String> params = table.getParameters();
+    if (params != null) {
+      // numRows: 优先使用 Hive 原生字段，兼容 Spark 前缀字段
+      if (!properties.containsKey("numRows")
+          && params.containsKey("spark.sql.statistics.numRows")) {
+        properties.put("numRows", params.get("spark.sql.statistics.numRows"));
+      }
+      // totalSize
+      if (!properties.containsKey("totalSize")
+          && params.containsKey("spark.sql.statistics.totalSize")) {
+        properties.put("totalSize", params.get("spark.sql.statistics.totalSize"));
+      }
+      // rawDataSize
+      if (!properties.containsKey("rawDataSize")
+          && params.containsKey("spark.sql.statistics.rawDataSize")) {
+        properties.put("rawDataSize", params.get("spark.sql.statistics.rawDataSize"));
+      }
+      // numFiles
+      if (!properties.containsKey("numFiles")
+          && params.containsKey("spark.sql.statistics.numFiles")) {
+        properties.put("numFiles", params.get("spark.sql.statistics.numFiles"));
+      }
+    }
+    // indexSize: Hive 是文件系统型数据仓库，没有索引概念，设置为 0（与 MySQL 保持统一字段）
+    if (!properties.containsKey("indexSize")) {
+      properties.put("indexSize", "0");
+    }
+
     return properties;
   }
 

@@ -4,7 +4,7 @@ import { RouterProvider } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { router } from './router'
-import { useThemeStore, useI18nStore, useAuthStore } from '@/stores'
+import { useThemeStore, useI18nStore } from '@/stores'
 import '@/lib/i18n' // 初始化 i18n
 import './index.css' // Tailwind CSS
 
@@ -20,8 +20,6 @@ export function App() {
     useThemeStore.getState().initialize()
     // 初始化国际化系统
     useI18nStore.getState().initialize()
-    // 初始化认证状态（验证 token 有效性）
-    useAuthStore.getState().initializeAuth()
   }, [])
 
   // 监听语言变化，动态更新网站标题

@@ -6,8 +6,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sunny.common.enums.GlobalSystemCode;
-import com.sunny.common.exception.GlobalException;
+import com.sunny.admin.response.WebAdminErrorCode;
+import com.sunny.admin.response.WebAdminException;
 import com.sunny.admin.module.projects.dto.*;
 import com.sunny.admin.module.projects.entity.Project;
 import com.sunny.admin.module.projects.enums.ProjectStatus;
@@ -49,7 +49,7 @@ public class ProjectServiceImpl implements ProjectService {
     public ProjectRespDto getProjectById(Long id, Long userId) {
         ProjectRespDto project = projectMapper.selectProjectById(id, userId);
         if (project == null) {
-            throw new GlobalException(GlobalSystemCode.PROJECT_ACCESS_DENIED, id);
+            throw new WebAdminException(WebAdminErrorCode.PROJECT_ACCESS_DENIED, id);
         }
         return project;
     }
@@ -94,7 +94,7 @@ public class ProjectServiceImpl implements ProjectService {
         );
 
         if (existingProject == null) {
-            throw new GlobalException(GlobalSystemCode.PROJECT_ACCESS_DENIED, id);
+            throw new WebAdminException(WebAdminErrorCode.PROJECT_ACCESS_DENIED, id);
         }
         
         // 更新项目信息
@@ -141,7 +141,7 @@ public class ProjectServiceImpl implements ProjectService {
         );
 
         if (existingProject == null) {
-            throw new GlobalException(GlobalSystemCode.PROJECT_ACCESS_DENIED, id);
+            throw new WebAdminException(WebAdminErrorCode.PROJECT_ACCESS_DENIED, id);
         }
         
         // 逻辑删除

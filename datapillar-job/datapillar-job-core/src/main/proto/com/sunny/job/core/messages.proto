@@ -1,0 +1,146 @@
+syntax = "proto3";
+
+package com.sunny.job.core;
+
+option java_package = "com.sunny.job.core.message.proto";
+option java_outer_classname = "JobMessageProtos";
+option java_multiple_files = true;
+
+// ==================== 任务运行信息 ====================
+// 枚举类型统一用 int32 存储 code 值，保持扩展性
+
+message JobRunInfoProto {
+    int64 job_run_id = 1;
+    int64 workflow_run_id = 2;
+    int64 job_id = 3;
+    int32 bucket_id = 4;
+    int64 namespace_id = 5;
+    string job_name = 6;
+    string job_type = 7;          // 任务类型（支持用户扩展）
+    string job_params = 8;
+    int32 route_strategy = 9;     // RouteStrategy.code
+    int32 block_strategy = 10;    // BlockStrategy.code
+    int32 timeout_seconds = 11;
+    int32 max_retry_times = 12;
+    int32 retry_interval = 13;
+    int32 priority = 14;
+    int64 trigger_time = 15;
+    int32 status = 16;            // JobStatus.code
+    int32 retry_count = 17;
+    repeated int64 parent_job_run_ids = 18;
+}
+
+// ==================== 调度器消息 ====================
+
+message RegisterJobProto {
+    int64 job_run_id = 1;
+    int64 trigger_time = 2;
+    int32 priority = 3;
+}
+
+message JobCompletedProto {
+    int64 job_run_id = 1;
+    int64 workflow_run_id = 2;
+    int32 status = 3;
+    string message = 4;
+}
+
+message TimerFiredProto {}
+
+message StartScanProto {}
+
+message WorkflowCompletedProto {
+    int64 workflow_run_id = 1;
+    int32 status = 2;
+    string message = 3;
+}
+
+message BucketAcquiredProto {
+    int32 bucket_id = 1;
+}
+
+message BucketLostProto {
+    int32 bucket_id = 1;
+}
+
+message RenewBucketsProto {}
+
+message SplitCompletedProto {
+    int64 job_run_id = 1;
+    int64 split_start = 2;
+    int64 split_end = 3;
+    int32 status = 4;
+    string message = 5;
+    string worker_address = 6;
+}
+
+message JobsLoadedProto {
+    repeated JobRunInfoProto jobs = 1;
+    int64 new_max_id = 2;
+    string source = 3;
+}
+
+message JobsLoadFailedProto {
+    string reason = 1;
+    string source = 2;
+}
+
+// 调度器消息包装器
+message SchedulerMessageProto {
+    oneof message {
+        RegisterJobProto register_job = 1;
+        JobCompletedProto job_completed = 2;
+        TimerFiredProto timer_fired = 3;
+        StartScanProto start_scan = 4;
+        WorkflowCompletedProto workflow_completed = 5;
+        BucketAcquiredProto bucket_acquired = 6;
+        BucketLostProto bucket_lost = 7;
+        RenewBucketsProto renew_buckets = 8;
+        SplitCompletedProto split_completed = 9;
+        JobsLoadedProto jobs_loaded = 10;
+        JobsLoadFailedProto jobs_load_failed = 11;
+    }
+}
+
+// ==================== 执行器消息 ====================
+
+message ExecuteJobProto {
+    int64 job_run_id = 1;
+    int64 workflow_run_id = 2;
+    int64 job_id = 3;
+    int64 namespace_id = 4;
+    string job_name = 5;
+    string job_type = 6;          // 任务类型（支持用户扩展）
+    string job_params = 7;
+    int32 route_strategy = 8;     // RouteStrategy.code
+    int32 timeout_seconds = 9;
+    int32 max_retry_times = 10;
+    int32 retry_interval = 11;
+    int32 retry_count = 12;
+    int64 split_start = 13;
+    int64 split_end = 14;
+    string scheduler_ref_path = 15;  // ActorRef 序列化为路径
+}
+
+message CancelJobProto {
+    int64 job_run_id = 1;
+    string reason = 2;
+}
+
+message QueryStatusProto {
+    int64 job_run_id = 1;
+}
+
+message ExecutionTimeoutProto {
+    int64 job_run_id = 1;
+}
+
+// 执行器消息包装器
+message ExecutorMessageProto {
+    oneof message {
+        ExecuteJobProto execute_job = 1;
+        CancelJobProto cancel_job = 2;
+        QueryStatusProto query_status = 3;
+        ExecutionTimeoutProto execution_timeout = 4;
+    }
+}

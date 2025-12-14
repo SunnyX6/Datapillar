@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.job.worker.domain.mapper.JobWorkflowMapper">
+
+    <!-- 根据ID查询工作流定义 -->
+    <select id="selectById" resultType="com.sunny.job.worker.domain.entity.JobWorkflow">
+        SELECT
+            id,
+            namespace_id AS namespaceId,
+            workflow_name AS workflowName,
+            workflow_status AS workflowStatus,
+            trigger_type AS triggerType,
+            trigger_value AS triggerValue,
+            timeout_seconds AS timeoutSeconds,
+            max_retry_times AS maxRetryTimes,
+            priority
+        FROM job_workflow
+        WHERE id = #{workflowId} AND is_deleted = 0
+    </select>
+
+</mapper>

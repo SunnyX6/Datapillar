@@ -1,0 +1,111 @@
+# Datapillar Job Worker 配置
+# @author SunnyX6
+# @date 2025-12-13
+
+server:
+  port: 8081
+
+spring:
+  application:
+    name: datapillar-job-worker
+  datasource:
+    # JDBC URL 优化参数：
+    # - rewriteBatchedStatements=true: 批量写入优化，提升 10-50 倍
+    # - cachePrepStmts=true: 缓存预编译语句
+    # - prepStmtCacheSize=250: 预编译语句缓存大小
+    # - prepStmtCacheSqlLimit=2048: 单条 SQL 最大长度
+    # - useServerPrepStmts=true: 使用服务端预编译
+    url: jdbc:mysql://localhost:3306/datapillar?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048&useServerPrepStmts=true
+    username: root
+    password: Sunny.123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      # 连接池名称（便于监控识别）
+      pool-name: datapillar-job-worker-pool
+      # 最小空闲连接数（保持预热，减少冷启动延迟）
+      minimum-idle: ${HIKARI_MIN_IDLE:10}
+      # 最大连接数（匹配高并发场景：分片调度 + 预加载 + 批量写入）
+      # 建议值：CPU 核心数 * 4 ~ CPU 核心数 * 8
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:50}
+      # 空闲连接超时（毫秒，超过此时间的空闲连接将被回收）
+      idle-timeout: 60000
+      # 连接获取超时（毫秒，获取连接的最大等待时间）
+      connection-timeout: 10000
+      # 连接最大存活时间（毫秒，30 分钟，防止数据库端超时断开）
+      max-lifetime: 1800000
+      # 连接泄漏检测阈值（毫秒，连接被借出超过此时间未归还则告警）
+      leak-detection-threshold: 60000
+      # 连接有效性检测（使用 MySQL 的 ping 命令，比 SELECT 1 更高效）
+      connection-test-query: SELECT 1
+      # 验证超时（毫秒）
+      validation-timeout: 5000
+      # 注册 JMX MBean（便于监控）
+      register-mbeans: true
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.sunny.job.worker.entity
+  type-handlers-package: com.sunny.job.worker.config
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# Worker 配置
+datapillar:
+  job:
+    worker:
+      # 插件目录（PF4J 插件 jar 存放位置）
+      plugins-dir: ${PLUGINS_DIR:plugins}
+      # Worker 地址（用于 DB 记录执行节点）
+      address: ${WORKER_ADDRESS:localhost}
+      # 最大并发任务数（Semaphore 限流）
+      max-concurrent-tasks: ${MAX_CONCURRENT_TASKS:500}
+      # 最大待调度任务数（内存保护）
+      max-pending-tasks: ${MAX_PENDING_TASKS:10000}
+      # Bucket 总数（任务分片粒度，建议 1024）
+      bucket-count: ${BUCKET_COUNT:1024}
+      # 调度器分片数（0 = 自动使用 CPU 核心数，提升 N 倍调度吞吐量）
+      scheduler-shard-count: ${SCHEDULER_SHARD_COUNT:0}
+      # 预加载时间窗口（毫秒，加载未来 N 毫秒内要触发的任务）
+      preload-window-ms: ${PRELOAD_WINDOW_MS:5000}
+      # 每次预加载的最大任务数
+      preload-batch-size: ${PRELOAD_BATCH_SIZE:1000}
+      # 批量写入大小（每次批量更新的最大任务数，提升写入吞吐）
+      batch-write-size: ${BATCH_WRITE_SIZE:2000}
+      # 批量写入阈值（队列满时强制刷新）
+      batch-write-threshold: ${BATCH_WRITE_THRESHOLD:5000}
+      # Pekko 集群配置
+      pekko:
+        host: ${PEKKO_HOST:127.0.0.1}
+        port: ${PEKKO_PORT:2551}
+        seed-nodes: ${PEKKO_SEED_NODES:pekko://datapillar-job@127.0.0.1:2551}
+      # 任务日志配置
+      log:
+        base-path: ${LOG_HOME:/tmp/logs}/job
+        retention-days: ${LOG_RETENTION_DAYS:7}
+      # 执行器配置
+      executor:
+        max-concurrency: ${EXECUTOR_MAX_CONCURRENCY:100}
+      # Semaphore 超时配置（秒）
+      semaphore-timeout-seconds: ${SEMAPHORE_TIMEOUT_SECONDS:30}
+      # Caffeine 缓存配置（自动过期清理，替代手动定时清理）
+      cache:
+        # JobRunState 缓存配置
+        job-run-state:
+          max-size: ${CACHE_JOB_RUN_STATE_MAX_SIZE:100000}
+          expire-after-write-minutes: ${CACHE_JOB_RUN_STATE_EXPIRE_MINUTES:30}
+        # ShardState 缓存配置
+        shard-state:
+          max-size: ${CACHE_SHARD_STATE_MAX_SIZE:10000}
+          expire-after-write-minutes: ${CACHE_SHARD_STATE_EXPIRE_MINUTES:60}
+        # SplitState 缓存配置
+        split-state:
+          max-size: ${CACHE_SPLIT_STATE_MAX_SIZE:50000}
+          expire-after-write-minutes: ${CACHE_SPLIT_STATE_EXPIRE_MINUTES:60}
+        # WorkerState 缓存配置
+        worker-state:
+          max-size: ${CACHE_WORKER_STATE_MAX_SIZE:1000}
+          expire-after-write-minutes: ${CACHE_WORKER_STATE_EXPIRE_MINUTES:5}
+
+logging:
+  config: classpath:logback-worker.xml

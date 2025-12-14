@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.job.worker.domain.mapper.JobInfoMapper">
+
+    <!-- 公共查询列 -->
+    <sql id="baseColumns">
+        id,
+        workflow_id AS workflowId,
+        job_name AS jobName,
+        job_status AS jobStatus,
+        job_type AS jobType,
+        job_params AS jobParams,
+        route_strategy AS routeStrategy,
+        block_strategy AS blockStrategy,
+        timeout_seconds AS timeoutSeconds,
+        max_retry_times AS maxRetryTimes,
+        retry_interval AS retryInterval,
+        priority
+    </sql>
+
+    <!-- 根据 ID 查询任务定义 -->
+    <select id="selectById" resultType="com.sunny.job.worker.domain.entity.JobInfo">
+        SELECT <include refid="baseColumns"/>
+        FROM job_info
+        WHERE id = #{jobId} AND is_deleted = 0
+    </select>
+
+    <!-- 查询工作流下所有任务定义 -->
+    <select id="selectByWorkflowId" resultType="com.sunny.job.worker.domain.entity.JobInfo">
+        SELECT <include refid="baseColumns"/>
+        FROM job_info
+        WHERE workflow_id = #{workflowId} AND job_status = 1 AND is_deleted = 0
+    </select>
+
+</mapper>
