@@ -42,7 +42,7 @@ public class JobLogServiceImpl implements JobLogService {
      */
     private static final Pattern LOG_FILE_PATTERN = Pattern.compile("(\\d+)_(\\d+)\\.log");
 
-    @Value("${datapillar.job.worker.log.base-path:./logs/job}")
+    @Value("${datapillar.job.log.base-path}")
     private String basePath;
 
     @Override

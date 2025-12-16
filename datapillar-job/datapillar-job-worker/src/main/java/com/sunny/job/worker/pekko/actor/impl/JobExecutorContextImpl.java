@@ -4,18 +4,24 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.sunny.job.core.cron.CronUtils;
 import com.sunny.job.core.enums.AlarmTriggerEvent;
+import com.sunny.job.core.enums.BlockStrategy;
 import com.sunny.job.core.enums.JobStatus;
 import com.sunny.job.core.enums.RouteStrategy;
 import com.sunny.job.core.enums.TriggerType;
+import com.sunny.job.core.enums.WorkflowStatus;
 import com.sunny.job.core.handler.JobContext;
 import com.sunny.job.core.handler.JobHandlerExecutor;
+import com.sunny.job.core.id.IdGenerator;
 import com.sunny.job.core.message.ExecutorMessage.ExecuteJob;
+import com.sunny.job.core.message.JobRunInfo;
 import com.sunny.job.worker.alert.AlertResult;
 import com.sunny.job.worker.alert.AlertSenderService;
 import com.sunny.job.worker.domain.entity.*;
 import com.sunny.job.worker.domain.mapper.*;
 import com.sunny.job.worker.pekko.actor.JobExecutorContext;
-import com.sunny.job.worker.pekko.ddata.JobRunStateManager;
+import com.sunny.job.worker.pekko.ddata.JobRunLocalCache;
+import com.sunny.job.worker.pekko.ddata.MaxJobRunIdState;
+import com.sunny.job.worker.service.JobComponentCacheService;
 import com.sunny.job.worker.service.JobLogService;
 import org.apache.pekko.actor.typed.ActorSystem;
 import org.apache.pekko.cluster.typed.Cluster;
@@ -64,7 +70,10 @@ public class JobExecutorContextImpl implements JobExecutorContext {
     private final AlertSenderService alertSenderService;
     private final JobHandlerExecutor handlerExecutor;
     private final JobLogService jobLogService;
-    private final JobRunStateManager jobRunStateManager;
+    private final JobRunLocalCache jobRunLocalCache;
+    private final MaxJobRunIdState maxJobRunIdManager;
+    private final IdGenerator idGenerator;
+    private final JobComponentCacheService componentCacheService;
 
     /**
      * 最大并发任务数
@@ -77,6 +86,12 @@ public class JobExecutorContextImpl implements JobExecutorContext {
      */
     @Value("${datapillar.job.worker.semaphore-timeout-seconds:30}")
     private int semaphoreTimeoutSeconds;
+
+    /**
+     * Bucket 总数
+     */
+    @Value("${datapillar.job.worker.bucket-count:1024}")
+    private int bucketCount;
 
     /**
      * 并发控制信号量
@@ -116,8 +131,11 @@ public class JobExecutorContextImpl implements JobExecutorContext {
                                   AlertSenderService alertSenderService,
                                   JobHandlerExecutor handlerExecutor,
                                   JobLogService jobLogService,
-                                  JobRunStateManager jobRunStateManager,
-                                  ActorSystem<Void> actorSystem) {
+                                  JobRunLocalCache jobRunLocalCache,
+                                  MaxJobRunIdState maxJobRunIdManager,
+                                  ActorSystem<Void> actorSystem,
+                                  IdGenerator idGenerator,
+                                  JobComponentCacheService componentCacheService) {
         this.jobRunMapper = jobRunMapper;
         this.workflowRunMapper = workflowRunMapper;
         this.workflowMapper = workflowMapper;
@@ -128,8 +146,11 @@ public class JobExecutorContextImpl implements JobExecutorContext {
         this.alertSenderService = alertSenderService;
         this.handlerExecutor = handlerExecutor;
         this.jobLogService = jobLogService;
-        this.jobRunStateManager = jobRunStateManager;
+        this.jobRunLocalCache = jobRunLocalCache;
+        this.maxJobRunIdManager = maxJobRunIdManager;
         this.actorSystem = actorSystem;
+        this.idGenerator = idGenerator;
+        this.componentCacheService = componentCacheService;
     }
 
     /**
@@ -252,21 +273,72 @@ public class JobExecutorContextImpl implements JobExecutorContext {
         }
 
         // 1. 写入 DB（持久化）
-        jobRunMapper.updateStatus(jobRunId, status.getCode(), workerAddress, startTime, endTime, null);
+        jobRunMapper.updateStatus(jobRunId, status.getCode(), null, workerAddress, startTime, endTime, null);
 
         // 2. 同步到 CRDT（广播）
-        jobRunStateManager.updateStatus(jobRunId, status);
+        jobRunLocalCache.updateStatus(jobRunId, status);
+    }
+
+    @Override
+    public void updateNextTriggerTimeIfNeeded(long workflowRunId) {
+        log.debug("检查是否需要更新 nextTriggerTime: workflowRunId={}", workflowRunId);
+
+        // 1. 使用 CAS 更新 workflow_run 状态为 RUNNING，同时获取 workflow 信息
+        // 只有状态从 WAITING 变为 RUNNING 时才执行
+        JobWorkflowRun workflowRun = workflowRunMapper.selectById(workflowRunId);
+        if (workflowRun == null) {
+            log.warn("workflow_run 不存在: workflowRunId={}", workflowRunId);
+            return;
+        }
+
+        // 如果已经不是 WAITING 状态，说明已经被其他任务更新过了
+        if (workflowRun.getStatus() != JobStatus.WAITING.getCode()) {
+            log.debug("workflow_run 状态不是 WAITING，跳过 nextTriggerTime 更新: workflowRunId={}, status={}",
+                    workflowRunId, workflowRun.getStatus());
+            return;
+        }
+
+        // 2. 获取 workflow 定义，计算 nextTriggerTime
+        JobWorkflow workflow = workflowMapper.selectById(workflowRun.getWorkflowId());
+        if (workflow == null) {
+            log.warn("workflow 不存在: workflowId={}", workflowRun.getWorkflowId());
+            return;
+        }
+
+        // 3. 计算 nextTriggerTime
+        TriggerType triggerType = TriggerType.of(workflow.getTriggerType());
+        long nextTriggerTime = -1;
+        if (triggerType != TriggerType.MANUAL && triggerType != TriggerType.API) {
+            long now = System.currentTimeMillis();
+            nextTriggerTime = CronUtils.calculateNextTriggerTime(triggerType, workflow.getTriggerValue(), now);
+        }
+
+        // 4. CAS 更新 workflow_run 状态和 nextTriggerTime
+        int updated = workflowRunMapper.updateStatusAndNextTriggerTime(
+                workflowRunId,
+                JobStatus.WAITING.getCode(),
+                JobStatus.RUNNING.getCode(),
+                System.currentTimeMillis(),
+                nextTriggerTime > 0 ? nextTriggerTime : null
+        );
+
+        if (updated > 0) {
+            log.info("更新 workflow_run 状态为 RUNNING 并设置 nextTriggerTime: workflowRunId={}, nextTriggerTime={}",
+                    workflowRunId, nextTriggerTime > 0 ? CronUtils.formatTimestamp(nextTriggerTime) : "null");
+        } else {
+            log.debug("workflow_run 状态已被其他任务更新: workflowRunId={}", workflowRunId);
+        }
     }
 
     @Override
     public void updateJobRunForRetry(long jobRunId, int retryCount) {
         log.info("更新任务为重试状态: jobRunId={}, retryCount={}", jobRunId, retryCount);
 
-        // 1. 写入 DB
-        jobRunMapper.updateForRetry(jobRunId, retryCount);
+        // 1. 写入 DB（系统自动重试，op 保持不变）
+        jobRunMapper.updateForRetry(jobRunId, null, retryCount);
 
         // 2. 同步到 CRDT（重试状态回到 WAITING）
-        jobRunStateManager.updateStatus(jobRunId, JobStatus.WAITING);
+        jobRunLocalCache.updateStatus(jobRunId, JobStatus.WAITING);
     }
 
     @Override
@@ -274,10 +346,10 @@ public class JobExecutorContextImpl implements JobExecutorContext {
         log.info("更新任务最终状态: jobRunId={}, status={}", jobRunId, status);
 
         // 1. 写入 DB
-        jobRunMapper.updateStatus(jobRunId, status.getCode(), workerAddress, null, System.currentTimeMillis(), null);
+        jobRunMapper.updateStatus(jobRunId, status.getCode(), null, workerAddress, null, System.currentTimeMillis(), null);
 
         // 2. 同步到 CRDT
-        jobRunStateManager.updateStatus(jobRunId, status);
+        jobRunLocalCache.updateStatus(jobRunId, status);
     }
 
     /**
@@ -338,7 +410,7 @@ public class JobExecutorContextImpl implements JobExecutorContext {
     @Override
     public void updateWorkflowRunStatus(long workflowRunId, JobStatus status, String message) {
         log.info("更新工作流状态: workflowRunId={}, status={}", workflowRunId, status);
-        workflowRunMapper.updateStatus(workflowRunId, status.getCode(), System.currentTimeMillis(), message);
+        workflowRunMapper.updateStatus(workflowRunId, status.getCode(), null, System.currentTimeMillis(), message);
     }
 
     @Override
@@ -346,12 +418,14 @@ public class JobExecutorContextImpl implements JobExecutorContext {
     public GenerateNextResult generateNextWorkflowRun(long workflowRunId) {
         log.info("检查是否需要生成下一个工作流执行实例: workflowRunId={}", workflowRunId);
 
-        // 1. 获取当前 workflow_run 对应的 workflow_id
-        Long workflowId = workflowRunMapper.selectWorkflowIdByRunId(workflowRunId);
-        if (workflowId == null) {
+        // 1. 获取当前 workflow_run
+        JobWorkflowRun currentWorkflowRun = workflowRunMapper.selectById(workflowRunId);
+        if (currentWorkflowRun == null) {
             log.warn("工作流执行实例不存在: workflowRunId={}", workflowRunId);
             return GenerateNextResult.empty();
         }
+
+        Long workflowId = currentWorkflowRun.getWorkflowId();
 
         // 2. 查询工作流定义，检查是否仍然上线
         JobWorkflow workflow = workflowMapper.selectById(workflowId);
@@ -360,8 +434,10 @@ public class JobExecutorContextImpl implements JobExecutorContext {
             return GenerateNextResult.empty();
         }
 
-        if (!workflow.isOnline()) {
-            log.info("工作流已下线，不生成下一次执行: workflowId={}", workflowId);
+        // 2.1 检查工作流状态，已下线则不生成下一次
+        WorkflowStatus workflowStatus = WorkflowStatus.of(workflow.getStatus());
+        if (!workflowStatus.isOnline()) {
+            log.info("工作流已下线，不生成下一次: workflowId={}, status={}", workflowId, workflowStatus);
             return GenerateNextResult.empty();
         }
 
@@ -372,9 +448,15 @@ public class JobExecutorContextImpl implements JobExecutorContext {
             return GenerateNextResult.empty();
         }
 
-        // 4. 计算下次触发时间
-        long now = System.currentTimeMillis();
-        long nextTriggerTime = CronUtils.calculateNextTriggerTime(triggerType, workflow.getTriggerValue(), now);
+        // 4. 使用预计算的 nextTriggerTime（任务开始执行时已计算）
+        Long nextTriggerTime = currentWorkflowRun.getNextTriggerTime();
+        if (nextTriggerTime == null || nextTriggerTime <= 0) {
+            // 兜底：如果没有预计算，重新计算
+            log.warn("nextTriggerTime 未预计算，重新计算: workflowRunId={}", workflowRunId);
+            long now = System.currentTimeMillis();
+            nextTriggerTime = CronUtils.calculateNextTriggerTime(triggerType, workflow.getTriggerValue(), now);
+        }
+
         if (nextTriggerTime <= 0) {
             log.warn("无法计算下次触发时间: workflowId={}, triggerType={}, triggerValue={}",
                     workflowId, triggerType, workflow.getTriggerValue());
@@ -384,15 +466,16 @@ public class JobExecutorContextImpl implements JobExecutorContext {
         log.info("生成下一个工作流执行实例: workflowId={}, nextTriggerTime={}",
                 workflowId, CronUtils.formatTimestamp(nextTriggerTime));
 
-        // 5. 创建 workflow_run
+        // 5. 创建 workflow_run（使用 IdGenerator 生成 ID）
+        long newWorkflowRunId = idGenerator.nextId();
         JobWorkflowRun workflowRun = new JobWorkflowRun();
+        workflowRun.setId(newWorkflowRunId);
         workflowRun.setNamespaceId(workflow.getNamespaceId());
         workflowRun.setWorkflowId(workflowId);
         workflowRun.setTriggerType(workflow.getTriggerType());
         workflowRun.setTriggerTime(nextTriggerTime);
         workflowRun.setStatus(JobStatus.WAITING.getCode());
         workflowRunMapper.insert(workflowRun);
-        long newWorkflowRunId = workflowRun.getId();
 
         // 6. 查询工作流下所有任务定义
         List<JobInfo> jobDefinitions = jobInfoMapper.selectByWorkflowId(workflowId);
@@ -401,36 +484,57 @@ public class JobExecutorContextImpl implements JobExecutorContext {
             return GenerateNextResult.empty();
         }
 
-        // 7. 创建 job_run 记录
+        // 7. 查询依赖关系，确定哪些 job 有依赖（非入口 job）
+        List<JobDependency> dependencies = dependencyMapper.selectByWorkflowId(workflowId);
+        Set<Long> jobsWithDependency = new HashSet<>();
+        for (JobDependency dep : dependencies) {
+            jobsWithDependency.add(dep.getJobId());
+        }
+
+        // 8. 创建 job_run 记录（根据 job_info.triggerType 计算 triggerTime）
         List<JobRun> jobRuns = new ArrayList<>();
         Map<Long, JobRun> jobIdToRunMap = new HashMap<>();
 
         for (JobInfo job : jobDefinitions) {
             JobRun jobRun = new JobRun();
+            jobRun.setId(idGenerator.nextId());
             jobRun.setNamespaceId(workflow.getNamespaceId());
             jobRun.setWorkflowRunId(newWorkflowRunId);
+            jobRun.setWorkflowId(workflowId);
             jobRun.setJobId(job.getId());
-            jobRun.setTriggerType(workflow.getTriggerType());
-            jobRun.setTriggerTime(nextTriggerTime);
+            jobRun.setBucketId((int) (job.getId() % bucketCount));
             jobRun.setStatus(JobStatus.WAITING.getCode());
             jobRun.setPriority(job.getPriority());
+            jobRun.setRetryCount(0);
+
+            // 计算 job_run.triggerTime
+            long jobTriggerTime = calculateJobTriggerTime(job, workflow, nextTriggerTime, jobsWithDependency.contains(job.getId()));
+            jobRun.setTriggerTime(jobTriggerTime);
+
+            // 设置 triggerType（使用 job 自己的，如果有；否则继承 workflow）
+            if (job.getTriggerType() != null) {
+                jobRun.setTriggerType(job.getTriggerType());
+            } else {
+                jobRun.setTriggerType(workflow.getTriggerType());
+            }
+
             jobRuns.add(jobRun);
             jobIdToRunMap.put(job.getId(), jobRun);
         }
 
         jobRunMapper.batchInsert(jobRuns);
 
-        // 8. 查询工作流内依赖关系并创建 job_run_dependency
-        List<JobDependency> dependencies = dependencyMapper.selectByWorkflowId(workflowId);
+        // 9. 查询工作流内依赖关系并创建 job_run_dependency
         List<JobRunDependency> runDependencies = new ArrayList<>();
 
-        // 8.1 处理工作流内依赖
+        // 9.1 处理工作流内依赖
         for (JobDependency dep : dependencies) {
             JobRun childRun = jobIdToRunMap.get(dep.getJobId());
             JobRun parentRun = jobIdToRunMap.get(dep.getParentJobId());
 
             if (childRun != null && parentRun != null) {
                 JobRunDependency runDep = new JobRunDependency();
+                runDep.setId(idGenerator.nextId());
                 runDep.setWorkflowRunId(newWorkflowRunId);
                 runDep.setJobRunId(childRun.getId());
                 runDep.setParentRunId(parentRun.getId());
@@ -438,7 +542,7 @@ public class JobExecutorContextImpl implements JobExecutorContext {
             }
         }
 
-        // 8.2 处理跨工作流依赖
+        // 9.2 处理跨工作流依赖
         List<JobWorkflowDependency> crossDependencies = workflowDependencyMapper.selectByWorkflowId(workflowId);
         for (JobWorkflowDependency crossDep : crossDependencies) {
             // 查询依赖工作流的最新成功 workflow_run
@@ -462,6 +566,7 @@ public class JobExecutorContextImpl implements JobExecutorContext {
                 JobRun entryJobRun = jobIdToRunMap.get(entryJobId);
                 if (entryJobRun != null) {
                     JobRunDependency runDep = new JobRunDependency();
+                    runDep.setId(idGenerator.nextId());
                     runDep.setWorkflowRunId(newWorkflowRunId);
                     runDep.setJobRunId(entryJobRun.getId());
                     runDep.setParentRunId(dependJobRunId);
@@ -471,17 +576,88 @@ public class JobExecutorContextImpl implements JobExecutorContext {
             }
         }
 
-        // 8.3 批量插入依赖关系
+        // 9.3 批量插入依赖关系
         if (!runDependencies.isEmpty()) {
             dependencyMapper.batchInsertRunDependencies(runDependencies);
         }
 
-        // 9. 收集生成的 job_run ID 列表
-        List<Long> jobRunIds = jobRuns.stream().map(JobRun::getId).toList();
+        // 10. 构造 JobRunInfo 列表，用于本地注册到 Scheduler
+        Map<Long, JobInfo> jobIdToInfoMap = jobDefinitions.stream()
+                .collect(java.util.stream.Collectors.toMap(JobInfo::getId, j -> j));
 
-        log.info("成功生成下一个工作流执行实例: workflowRunId={}, jobRunCount={}", newWorkflowRunId, jobRunIds.size());
+        List<JobRunInfo> jobRunInfoList = new ArrayList<>();
+        for (JobRun jr : jobRuns) {
+            JobInfo jobInfo = jobIdToInfoMap.get(jr.getJobId());
+            if (jobInfo == null) continue;
 
-        return new GenerateNextResult(true, newWorkflowRunId, nextTriggerTime, jobRunIds);
+            JobRunInfo info = new JobRunInfo();
+            info.setJobRunId(jr.getId());
+            info.setWorkflowRunId(newWorkflowRunId);
+            info.setWorkflowId(workflowId);
+            info.setJobId(jr.getJobId());
+            info.setBucketId(jr.getBucketId());
+            info.setNamespaceId(jr.getNamespaceId());
+            info.setJobName(jobInfo.getJobName());
+            info.setJobType(componentCacheService.getComponentCode(jobInfo.getJobType()));
+            info.setJobParams(jobInfo.getJobParams());
+            info.setRouteStrategy(RouteStrategy.of(jobInfo.getRouteStrategy()));
+            info.setBlockStrategy(BlockStrategy.of(jobInfo.getBlockStrategy()));
+            info.setTimeoutSeconds(jobInfo.getTimeoutSeconds());
+            info.setMaxRetryTimes(jobInfo.getMaxRetryTimes() != null ? jobInfo.getMaxRetryTimes() : 0);
+            info.setRetryInterval(jobInfo.getRetryInterval() != null ? jobInfo.getRetryInterval() : 0);
+            info.setPriority(jr.getPriority());
+            info.setTriggerType(jr.getTriggerType());
+            info.setTriggerTime(jr.getTriggerTime());
+            info.setStatus(JobStatus.WAITING);
+            info.setRetryCount(0);
+            jobRunInfoList.add(info);
+        }
+
+        // 11. 通过 CRDT 广播 maxJobRunId，触发其他 Worker 增量加载
+        if (!jobRunInfoList.isEmpty()) {
+            long maxJobRunId = jobRunInfoList.stream().mapToLong(JobRunInfo::getJobRunId).max().orElse(0);
+            if (maxJobRunId > 0) {
+                maxJobRunIdManager.updateMaxId(maxJobRunId);
+                log.info("广播 maxJobRunId: {}", maxJobRunId);
+            }
+        }
+
+        log.info("成功生成下一个工作流执行实例: workflowRunId={}, jobRunCount={}", newWorkflowRunId, jobRunInfoList.size());
+
+        return new GenerateNextResult(true, newWorkflowRunId, nextTriggerTime, jobRunInfoList);
+    }
+
+    /**
+     * 计算 job_run 的 triggerTime
+     * <p>
+     * 规则：
+     * - job_info.triggerType = NULL（继承）：
+     *   - 入口 job（无依赖）：triggerTime = workflow.triggerTime
+     *   - 非入口 job（有依赖）：triggerTime = 0（依赖满足即执行）
+     * - job_info.triggerType 有值（独立触发）：
+     *   - 根据 job 自己的 triggerType/triggerValue 计算
+     *
+     * @param job                 任务定义
+     * @param workflow            工作流定义
+     * @param workflowTriggerTime 工作流触发时间
+     * @param hasDependency       是否有依赖
+     * @return triggerTime（毫秒），0 表示依赖满足即执行
+     */
+    private long calculateJobTriggerTime(JobInfo job, JobWorkflow workflow, long workflowTriggerTime, boolean hasDependency) {
+        // job 有独立触发配置
+        if (job.getTriggerType() != null && job.getTriggerValue() != null) {
+            TriggerType jobTriggerType = TriggerType.of(job.getTriggerType());
+            return CronUtils.calculateNextTriggerTime(jobTriggerType, job.getTriggerValue(), workflowTriggerTime);
+        }
+
+        // 继承工作流触发配置
+        if (hasDependency) {
+            // 有依赖：triggerTime = 0，依赖满足即执行
+            return 0;
+        } else {
+            // 无依赖（入口 job）：triggerTime = workflow.triggerTime
+            return workflowTriggerTime;
+        }
     }
 
     /**

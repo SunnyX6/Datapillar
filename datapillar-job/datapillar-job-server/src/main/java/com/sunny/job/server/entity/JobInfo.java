@@ -2,12 +2,11 @@ package com.sunny.job.server.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 
-import java.time.LocalDateTime;
-
 /**
  * 任务定义实体
  * <p>
  * 任务必须属于某个工作流
+ * 纯配置表，无状态字段
  *
  * @author SunnyX6
  * @date 2025-12-13
@@ -15,7 +14,7 @@ import java.time.LocalDateTime;
 @TableName("job_info")
 public class JobInfo {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private Long namespaceId;
@@ -25,14 +24,9 @@ public class JobInfo {
     private String jobName;
 
     /**
-     * 状态: 0-禁用 1-启用
+     * 任务类型: 关联 job_component.id
      */
-    private Integer jobStatus;
-
-    /**
-     * 任务类型: 1-Shell 2-Python 3-Spark 4-Flink 5-HiveSQL 6-DataX 7-HTTP
-     */
-    private Integer jobType;
+    private Long jobType;
 
     /**
      * 任务配置（JSON格式，不同类型结构不同）
@@ -69,16 +63,30 @@ public class JobInfo {
      */
     private Integer priority;
 
+    /**
+     * 触发类型（NULL 继承工作流）: 1-CRON 2-固定频率 3-固定延迟
+     */
+    private Integer triggerType;
+
+    /**
+     * 触发值（CRON表达式或秒数）
+     */
+    private String triggerValue;
+
     private String description;
+
+    /**
+     * 画布中的 X 坐标
+     */
+    private Double positionX;
+
+    /**
+     * 画布中的 Y 坐标
+     */
+    private Double positionY;
 
     @TableLogic
     private Integer isDeleted;
-
-    @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
-
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
 
     public Long getId() {
         return id;
@@ -112,19 +120,11 @@ public class JobInfo {
         this.jobName = jobName;
     }
 
-    public Integer getJobStatus() {
-        return jobStatus;
-    }
-
-    public void setJobStatus(Integer jobStatus) {
-        this.jobStatus = jobStatus;
-    }
-
-    public Integer getJobType() {
+    public Long getJobType() {
         return jobType;
     }
 
-    public void setJobType(Integer jobType) {
+    public void setJobType(Long jobType) {
         this.jobType = jobType;
     }
 
@@ -184,6 +184,22 @@ public class JobInfo {
         this.priority = priority;
     }
 
+    public Integer getTriggerType() {
+        return triggerType;
+    }
+
+    public void setTriggerType(Integer triggerType) {
+        this.triggerType = triggerType;
+    }
+
+    public String getTriggerValue() {
+        return triggerValue;
+    }
+
+    public void setTriggerValue(String triggerValue) {
+        this.triggerValue = triggerValue;
+    }
+
     public String getDescription() {
         return description;
     }
@@ -192,34 +208,27 @@ public class JobInfo {
         this.description = description;
     }
 
+    public Double getPositionX() {
+        return positionX;
+    }
+
+    public void setPositionX(Double positionX) {
+        this.positionX = positionX;
+    }
+
+    public Double getPositionY() {
+        return positionY;
+    }
+
+    public void setPositionY(Double positionY) {
+        this.positionY = positionY;
+    }
+
     public Integer getIsDeleted() {
         return isDeleted;
     }
 
     public void setIsDeleted(Integer isDeleted) {
         this.isDeleted = isDeleted;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    /**
-     * 是否已启用
-     */
-    public boolean isEnabled() {
-        return jobStatus != null && jobStatus == 1;
     }
 }

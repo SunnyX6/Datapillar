@@ -1,7 +1,8 @@
 package com.sunny.job.worker.alert.sender;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sunny.job.worker.alert.AlertResult;
 import com.sunny.job.worker.alert.AlertSender;
 import org.slf4j.Logger;
@@ -33,7 +34,7 @@ import java.util.Base64;
 public class DingTalkAlertSender implements AlertSender {
 
     private static final Logger log = LoggerFactory.getLogger(DingTalkAlertSender.class);
-    private static final Gson GSON = new Gson();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final int TIMEOUT_SECONDS = 30;
 
     private final HttpClient httpClient;
@@ -47,21 +48,21 @@ public class DingTalkAlertSender implements AlertSender {
     @Override
     public AlertResult send(String channelConfig, String title, String content) {
         try {
-            JsonObject config = GSON.fromJson(channelConfig, JsonObject.class);
-            String webhook = config.get("webhook").getAsString();
-            String secret = config.has("secret") ? config.get("secret").getAsString() : null;
+            JsonNode config = MAPPER.readTree(channelConfig);
+            String webhook = config.get("webhook").asText();
+            String secret = config.has("secret") ? config.get("secret").asText() : null;
 
             // 如果配置了签名密钥，需要在URL中添加签名参数
             String url = buildUrl(webhook, secret);
 
             // 构建请求体（使用 Markdown 格式）
-            JsonObject requestBody = buildRequestBody(title, content);
+            ObjectNode requestBody = buildRequestBody(title, content);
 
             // 发送请求
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("Content-Type", "application/json; charset=utf-8")
-                    .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(requestBody), StandardCharsets.UTF_8))
+                    .POST(HttpRequest.BodyPublishers.ofString(MAPPER.writeValueAsString(requestBody), StandardCharsets.UTF_8))
                     .timeout(Duration.ofSeconds(TIMEOUT_SECONDS))
                     .build();
 
@@ -110,15 +111,15 @@ public class DingTalkAlertSender implements AlertSender {
     /**
      * 构建请求体
      */
-    private JsonObject buildRequestBody(String title, String content) {
-        JsonObject body = new JsonObject();
-        body.addProperty("msgtype", "markdown");
+    private ObjectNode buildRequestBody(String title, String content) {
+        ObjectNode body = MAPPER.createObjectNode();
+        body.put("msgtype", "markdown");
 
-        JsonObject markdown = new JsonObject();
-        markdown.addProperty("title", title);
-        markdown.addProperty("text", formatMarkdown(title, content));
+        ObjectNode markdown = MAPPER.createObjectNode();
+        markdown.put("title", title);
+        markdown.put("text", formatMarkdown(title, content));
 
-        body.add("markdown", markdown);
+        body.set("markdown", markdown);
         return body;
     }
 
@@ -134,14 +135,14 @@ public class DingTalkAlertSender implements AlertSender {
      */
     private AlertResult parseResponse(String responseBody) {
         try {
-            JsonObject response = GSON.fromJson(responseBody, JsonObject.class);
-            int errcode = response.has("errcode") ? response.get("errcode").getAsInt() : -1;
+            JsonNode response = MAPPER.readTree(responseBody);
+            int errcode = response.has("errcode") ? response.get("errcode").asInt() : -1;
 
             if (errcode == 0) {
                 log.info("钉钉告警发送成功");
                 return AlertResult.ok();
             } else {
-                String errmsg = response.has("errmsg") ? response.get("errmsg").getAsString() : "未知错误";
+                String errmsg = response.has("errmsg") ? response.get("errmsg").asText() : "未知错误";
                 log.warn("钉钉告警发送失败: errcode={}, errmsg={}", errcode, errmsg);
                 return AlertResult.fail("errcode=" + errcode + ", errmsg=" + errmsg);
             }

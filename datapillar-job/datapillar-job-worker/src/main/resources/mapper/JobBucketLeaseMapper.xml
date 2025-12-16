@@ -7,6 +7,7 @@
         SELECT bucket_id
         FROM job_bucket_lease
         WHERE worker_address = #{workerAddress}
+        AND is_deleted=0
         ORDER BY bucket_id ASC
     </select>
 

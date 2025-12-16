@@ -2,8 +2,6 @@ package com.sunny.job.server.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 
-import java.time.LocalDateTime;
-
 /**
  * 命名空间实体
  * <p>
@@ -15,7 +13,7 @@ import java.time.LocalDateTime;
 @TableName("job_namespace")
 public class JobNamespace {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private String namespaceName;
@@ -26,12 +24,6 @@ public class JobNamespace {
 
     @TableLogic
     private Integer isDeleted;
-
-    @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
-
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
 
     public Long getId() {
         return id;
@@ -71,21 +63,5 @@ public class JobNamespace {
 
     public void setIsDeleted(Integer isDeleted) {
         this.isDeleted = isDeleted;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
     }
 }

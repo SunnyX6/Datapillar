@@ -1,5 +1,5 @@
 server:
-  port: 6004
+  port: ${SERVER_PORT:6004}
 
 spring:
   application:
@@ -35,11 +35,16 @@ logging:
     root: INFO
     com.sunny.job: DEBUG
 
-# worker日志 配置
+# Server 配置
 datapillar:
   job:
-    worker:
-      # 任务日志配置
-      log:
-        # 日志存储根目录（与 Worker 配置相同路径，共享存储）
-        base-path: ${LOG_HOME:/tmp/logs}/job
+    server:
+      # Pekko 集群配置（支持多实例部署）
+      pekko:
+        host: ${PEKKO_HOST:127.0.0.1}
+        port: ${PEKKO_PORT:2550}
+        # seed-nodes 应指向 Worker 节点（Worker 是集群的种子节点）
+        seed-nodes: ${PEKKO_SEED_NODES:pekko://datapillar-job@127.0.0.1:2551}
+    # 任务日志配置（Server 和 Worker 共用）
+    log:
+      base-path: ${LOG_HOME:/tmp/logs}/job

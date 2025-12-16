@@ -5,7 +5,7 @@ import java.io.Serializable;
 /**
  * Bucket 租约
  * <p>
- * 记录 Bucket 的所有权信息，用于 CRDT 同步
+ * 记录 Bucket 的所有权信息
  *
  * @param bucketId      Bucket ID (0 ~ BUCKET_COUNT-1)
  * @param workerAddress 当前 Owner 的地址

@@ -13,12 +13,12 @@ public class JobWorkflow {
     private Long id;
     private Long namespaceId;
     private String workflowName;
-    private Integer workflowStatus;
     private Integer triggerType;
     private String triggerValue;
     private Integer timeoutSeconds;
     private Integer maxRetryTimes;
     private Integer priority;
+    private Integer status;
 
     public Long getId() {
         return id;
@@ -42,14 +42,6 @@ public class JobWorkflow {
 
     public void setWorkflowName(String workflowName) {
         this.workflowName = workflowName;
-    }
-
-    public Integer getWorkflowStatus() {
-        return workflowStatus;
-    }
-
-    public void setWorkflowStatus(Integer workflowStatus) {
-        this.workflowStatus = workflowStatus;
     }
 
     public Integer getTriggerType() {
@@ -92,10 +84,11 @@ public class JobWorkflow {
         this.priority = priority;
     }
 
-    /**
-     * 是否已上线
-     */
-    public boolean isOnline() {
-        return workflowStatus != null && workflowStatus == 1;
+    public Integer getStatus() {
+        return status;
+    }
+
+    public void setStatus(Integer status) {
+        this.status = status;
     }
 }

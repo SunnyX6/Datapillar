@@ -2,8 +2,6 @@ package com.sunny.job.server.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 
-import java.time.LocalDateTime;
-
 /**
  * 跨工作流依赖关系实体
  * <p>
@@ -15,7 +13,7 @@ import java.time.LocalDateTime;
 @TableName("job_workflow_dependency")
 public class JobWorkflowDependency {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     /**
@@ -33,8 +31,8 @@ public class JobWorkflowDependency {
      */
     private Long dependJobId;
 
-    @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
+    @TableLogic
+    private Integer isDeleted;
 
     public Long getId() {
         return id;
@@ -68,11 +66,11 @@ public class JobWorkflowDependency {
         this.dependJobId = dependJobId;
     }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
+    public Integer getIsDeleted() {
+        return isDeleted;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
+    public void setIsDeleted(Integer isDeleted) {
+        this.isDeleted = isDeleted;
     }
 }

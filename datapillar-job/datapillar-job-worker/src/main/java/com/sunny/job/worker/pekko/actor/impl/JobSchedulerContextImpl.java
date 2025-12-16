@@ -1,20 +1,24 @@
 package com.sunny.job.worker.pekko.actor.impl;
 
 import com.sunny.job.core.enums.BlockStrategy;
+import com.sunny.job.core.enums.JobStatus;
 import com.sunny.job.core.enums.RouteStrategy;
 import com.sunny.job.core.message.JobRunInfo;
 import com.sunny.job.core.strategy.route.WorkerInfo;
 import com.sunny.job.worker.domain.entity.JobInfo;
+import com.sunny.job.worker.domain.entity.JobRun;
 import com.sunny.job.worker.domain.mapper.JobDependencyMapper;
 import com.sunny.job.worker.domain.mapper.JobRunMapper;
 import com.sunny.job.worker.pekko.actor.JobSchedulerContext;
-import com.sunny.job.worker.pekko.ddata.WorkerStateManager;
+import com.sunny.job.worker.pekko.ddata.WorkerManager;
+import com.sunny.job.worker.service.JobComponentCacheService;
 import com.sunny.job.worker.service.JobInfoCacheService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -53,8 +57,9 @@ public class JobSchedulerContextImpl implements JobSchedulerContext {
 
     private final JobRunMapper jobRunMapper;
     private final JobDependencyMapper dependencyMapper;
-    private final WorkerStateManager workerStateManager;
+    private final WorkerManager workerManager;
     private final JobInfoCacheService jobInfoCache;
+    private final JobComponentCacheService componentCache;
 
     @Value("${datapillar.job.worker.address:localhost:8081}")
     private String localWorkerAddress;
@@ -64,12 +69,14 @@ public class JobSchedulerContextImpl implements JobSchedulerContext {
 
     public JobSchedulerContextImpl(JobRunMapper jobRunMapper,
                                     JobDependencyMapper dependencyMapper,
-                                    WorkerStateManager workerStateManager,
-                                    JobInfoCacheService jobInfoCache) {
+                                    WorkerManager workerManager,
+                                    JobInfoCacheService jobInfoCache,
+                                    JobComponentCacheService componentCache) {
         this.jobRunMapper = jobRunMapper;
         this.dependencyMapper = dependencyMapper;
-        this.workerStateManager = workerStateManager;
+        this.workerManager = workerManager;
         this.jobInfoCache = jobInfoCache;
+        this.componentCache = componentCache;
     }
 
     @Override
@@ -172,7 +179,7 @@ public class JobSchedulerContextImpl implements JobSchedulerContext {
     @Override
     public List<WorkerInfo> getAvailableWorkers() {
         // 从 CRDT 获取存活的 Worker
-        List<WorkerInfo> aliveWorkers = workerStateManager.getAliveWorkers();
+        List<WorkerInfo> aliveWorkers = workerManager.getAliveWorkers();
 
         // 如果没有存活的 Worker，返回本地 Worker
         if (aliveWorkers.isEmpty()) {
@@ -185,7 +192,7 @@ public class JobSchedulerContextImpl implements JobSchedulerContext {
 
     @Override
     public List<WorkerCapacity> getAllWorkerCapacities() {
-        List<WorkerStateManager.WorkerState> states = workerStateManager.getAllWorkerStates();
+        List<WorkerManager.WorkerState> states = workerManager.getAllWorkerStates();
         return states.stream()
                 .map(s -> new WorkerCapacity(s.address(), s.maxConcurrency(), s.currentRunning()))
                 .toList();
@@ -194,7 +201,7 @@ public class JobSchedulerContextImpl implements JobSchedulerContext {
     @Override
     public void updateWorkerInfo(WorkerInfo workerInfo) {
         log.debug("更新 Worker 信息: {}", workerInfo.address());
-        workerStateManager.updateWorkerState(
+        workerManager.updateWorkerState(
                 workerInfo.address(),
                 workerInfo.maxConcurrency(),
                 workerInfo.currentRunning()
@@ -204,6 +211,50 @@ public class JobSchedulerContextImpl implements JobSchedulerContext {
     @Override
     public int getMaxPendingTasks() {
         return maxPendingTasks;
+    }
+
+    @Override
+    public CompletableFuture<List<Long>> persistJobRunsAsync(List<JobRunInfo> jobs) {
+        if (jobs == null || jobs.isEmpty()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // 转换 JobRunInfo → JobRun
+                List<JobRun> jobRuns = new ArrayList<>(jobs.size());
+                for (JobRunInfo job : jobs) {
+                    JobRun jobRun = new JobRun();
+                    jobRun.setId(job.getJobRunId());
+                    jobRun.setNamespaceId(job.getNamespaceId());
+                    jobRun.setWorkflowRunId(job.getWorkflowRunId());
+                    jobRun.setJobId(job.getJobId());
+                    jobRun.setBucketId(job.getBucketId());
+                    jobRun.setTriggerType(job.getTriggerType());
+                    jobRun.setTriggerTime(job.getTriggerTime());
+                    jobRun.setJobParams(job.getJobParams());
+                    jobRun.setStatus(job.getStatus().getCode());
+                    jobRun.setPriority(job.getPriority());
+                    jobRun.setRetryCount(job.getRetryCount());
+                    jobRuns.add(jobRun);
+                }
+
+                // 批量插入
+                jobRunMapper.batchInsert(jobRuns);
+
+                // 返回成功的 ID 列表
+                List<Long> ids = new ArrayList<>(jobs.size());
+                for (JobRunInfo job : jobs) {
+                    ids.add(job.getJobRunId());
+                }
+
+                log.info("异步持久化 {} 个 job_run 成功", jobs.size());
+                return ids;
+            } catch (Exception e) {
+                log.error("异步持久化 job_run 失败", e);
+                throw new RuntimeException("持久化失败: " + e.getMessage(), e);
+            }
+        }, dbExecutor);
     }
 
     /**
@@ -225,7 +276,8 @@ public class JobSchedulerContextImpl implements JobSchedulerContext {
      * <p>
      * SQL 查询只返回 job_run 表字段，job_info 数据从 LRU 缓存获取
      */
-    private void enrichJobInfo(JobRunInfo jobRun) {
+    @Override
+    public void enrichJobInfo(JobRunInfo jobRun) {
         JobInfo jobInfo = jobInfoCache.get(jobRun.getJobId());
         if (jobInfo == null) {
             log.warn("任务定义不存在: jobId={}", jobRun.getJobId());
@@ -233,12 +285,19 @@ public class JobSchedulerContextImpl implements JobSchedulerContext {
         }
 
         jobRun.setJobName(jobInfo.getJobName());
-        jobRun.setJobType(jobInfo.getJobType());
+        jobRun.setJobType(componentCache.getComponentCode(jobInfo.getJobType()));
         jobRun.setJobParams(jobInfo.getJobParams());
         jobRun.setRouteStrategy(RouteStrategy.of(jobInfo.getRouteStrategy()));
         jobRun.setBlockStrategy(BlockStrategy.of(jobInfo.getBlockStrategy()));
         jobRun.setTimeoutSeconds(jobInfo.getTimeoutSeconds());
         jobRun.setMaxRetryTimes(jobInfo.getMaxRetryTimes());
         jobRun.setRetryInterval(jobInfo.getRetryInterval());
+    }
+
+    @Override
+    public void updateJobRunStatus(long jobRunId, JobStatus status, String message) {
+        long now = System.currentTimeMillis();
+        jobRunMapper.updateStatus(jobRunId, status.getCode(), null, null, null, now, message);
+        log.info("更新任务状态: jobRunId={}, status={}, message={}", jobRunId, status, message);
     }
 }

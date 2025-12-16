@@ -7,13 +7,14 @@
         SELECT parent_run_id
         FROM job_run_dependency
         WHERE job_run_id = #{jobRunId}
+        AND is_deleted=0
     </select>
 
     <!-- 批量查询多个任务的上游依赖（优化 N+1 查询） -->
     <select id="selectParentRunIdsBatch" resultType="com.sunny.job.worker.domain.entity.JobRunDependency">
         SELECT job_run_id AS jobRunId, parent_run_id AS parentRunId
         FROM job_run_dependency
-        WHERE job_run_id IN
+        WHERE  is_deleted=0 and job_run_id IN
         <foreach collection="jobRunIds" item="id" open="(" separator="," close=")">
             #{id}
         </foreach>
@@ -26,15 +27,22 @@
             parent_job_id AS parentJobId
         FROM job_dependency
         WHERE workflow_id = #{workflowId}
+        AND is_deleted=0
     </select>
 
     <!-- 批量插入任务执行依赖关系 -->
     <insert id="batchInsertRunDependencies">
-        INSERT INTO job_run_dependency (workflow_run_id, job_run_id, parent_run_id)
+        INSERT INTO job_run_dependency (id, workflow_run_id, job_run_id, parent_run_id)
         VALUES
         <foreach collection="list" item="item" separator=",">
-            (#{item.workflowRunId}, #{item.jobRunId}, #{item.parentRunId})
+            (#{item.id}, #{item.workflowRunId}, #{item.jobRunId}, #{item.parentRunId})
         </foreach>
+    </insert>
+
+    <!-- 插入单条任务执行依赖关系 -->
+    <insert id="insertRunDependency">
+        INSERT INTO job_run_dependency (id, workflow_run_id, job_run_id, parent_run_id)
+        VALUES (#{id}, #{workflowRunId}, #{jobRunId}, #{parentRunId})
     </insert>
 
 </mapper>

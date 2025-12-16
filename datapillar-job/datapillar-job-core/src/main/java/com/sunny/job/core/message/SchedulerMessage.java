@@ -20,14 +20,25 @@ public sealed interface SchedulerMessage extends Serializable {
      * 来源：Entity 完成任务后创建下一个 job_run，通知本地 Scheduler 注册定时事件
      *
      * @param jobRunId    任务执行实例 ID
+     * @param jobId       任务定义 ID（用于从缓存获取 job_params）
      * @param triggerTime 计划触发时间（毫秒）
      * @param priority    优先级
+     * @param jobRunInfo  完整的任务信息（新创建时传递，避免从 DB 加载）
      */
     record RegisterJob(
             long jobRunId,
+            long jobId,
             long triggerTime,
-            int priority
-    ) implements SchedulerMessage {}
+            int priority,
+            JobRunInfo jobRunInfo
+    ) implements SchedulerMessage {
+        /**
+         * 简化构造器（用于已在内存中的任务）
+         */
+        public RegisterJob(long jobRunId, long jobId, long triggerTime, int priority) {
+            this(jobRunId, jobId, triggerTime, priority, null);
+        }
+    }
 
     /**
      * 任务完成通知
@@ -80,7 +91,7 @@ public sealed interface SchedulerMessage extends Serializable {
     /**
      * Bucket 获得通知
      * <p>
-     * 来源：BucketStateManager 检测到获得新 Bucket
+     * 来源：BucketManager 检测到获得新 Bucket
      *
      * @param bucketId Bucket ID
      */
@@ -89,7 +100,7 @@ public sealed interface SchedulerMessage extends Serializable {
     /**
      * Bucket 丢失通知
      * <p>
-     * 来源：BucketStateManager 检测到丢失 Bucket
+     * 来源：BucketManager 检测到丢失 Bucket
      *
      * @param bucketId Bucket ID
      */
@@ -177,5 +188,66 @@ public sealed interface SchedulerMessage extends Serializable {
             long jobRunId,
             int retryCount,
             long backoffMs
+    ) implements SchedulerMessage {}
+
+    /**
+     * 全局 maxJobRunId 变化通知
+     * <p>
+     * 来源：MaxJobRunIdState 检测到 CRDT 中全局 maxJobRunId 变化
+     * Scheduler 收到后触发增量加载
+     *
+     * @param newMaxId 新的全局最大 jobRunId
+     */
+    record GlobalMaxIdChanged(long newMaxId) implements SchedulerMessage {}
+
+    /**
+     * 取消工作流下所有任务
+     * <p>
+     * 来源：工作流下线时通知 Scheduler 取消所有相关任务
+     *
+     * @param workflowId 工作流 ID
+     */
+    record CancelWorkflow(long workflowId) implements SchedulerMessage {}
+
+    /**
+     * 取消单个任务
+     * <p>
+     * 来源：任务终止/取消时通知 Scheduler
+     *
+     * @param jobRunId 任务执行实例 ID
+     */
+    record CancelJob(long jobRunId) implements SchedulerMessage {}
+
+    /**
+     * 新任务创建通知
+     * <p>
+     * 来源：工作流执行完成后，创建下一批 job_run
+     * Scheduler 收到后：
+     * 1. 加载到内存（jobRunMap + triggerQueue）
+     * 2. 异步写入 DB 持久化
+     * 3. 更新 CRDT maxJobRunId 通知其他 Worker
+     *
+     * @param workflowRunId 工作流执行实例 ID
+     * @param jobs          新创建的任务列表（完整的 JobRunInfo）
+     */
+    record NewJobsCreated(
+            long workflowRunId,
+            java.util.List<JobRunInfo> jobs
+    ) implements SchedulerMessage {}
+
+    /**
+     * 刷新任务定义信息
+     * <p>
+     * 来源：Server 修改 job_info 后广播通知
+     * Scheduler 收到后：
+     * 1. 失效本地缓存
+     * 2. 遍历 jobRunMap，对 jobId 匹配的任务重新 enrichJobInfo
+     *
+     * @param jobId 任务定义 ID
+     * @param op    操作类型（UPDATE/DELETE）
+     */
+    record RefreshJobInfo(
+            long jobId,
+            String op
     ) implements SchedulerMessage {}
 }

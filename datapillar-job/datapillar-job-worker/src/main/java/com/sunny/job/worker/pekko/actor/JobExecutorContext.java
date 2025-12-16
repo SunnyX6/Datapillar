@@ -2,6 +2,7 @@ package com.sunny.job.worker.pekko.actor;
 
 import com.sunny.job.core.enums.JobStatus;
 import com.sunny.job.core.message.ExecutorMessage.ExecuteJob;
+import com.sunny.job.core.message.JobRunInfo;
 
 /**
  * JobExecutor 上下文接口
@@ -66,6 +67,16 @@ public interface JobExecutorContext {
      * @param splitStart 分片起点（-1 表示非分片任务）
      */
     void updateJobRunStatus(long jobRunId, JobStatus status, long splitStart);
+
+    /**
+     * 更新 workflow_run 的 nextTriggerTime（任务开始执行时调用）
+     * <p>
+     * 在 workflow_run 的第一个任务开始执行时，计算并更新 nextTriggerTime
+     * 通过 CAS 确保只更新一次（workflow_run.status 从 WAITING 变为 RUNNING）
+     *
+     * @param workflowRunId 工作流执行实例 ID
+     */
+    void updateNextTriggerTimeIfNeeded(long workflowRunId);
 
     /**
      * 更新任务状态（重试）
@@ -150,7 +161,7 @@ public interface JobExecutorContext {
             boolean generated,
             long nextWorkflowRunId,
             long nextTriggerTime,
-            java.util.List<Long> jobRunIds
+            java.util.List<JobRunInfo> jobRunInfoList
     ) {
         public static GenerateNextResult empty() {
             return new GenerateNextResult(false, 0, 0, java.util.List.of());

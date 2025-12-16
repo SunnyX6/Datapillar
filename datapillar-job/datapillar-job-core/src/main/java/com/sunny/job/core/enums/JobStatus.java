@@ -25,7 +25,8 @@ public enum JobStatus {
     SUCCESS(2, "成功"),
     FAIL(3, "失败"),
     CANCEL(4, "取消"),
-    TIMEOUT(5, "超时");
+    TIMEOUT(5, "超时"),
+    SKIPPED(6, "跳过");
 
     private final int code;
     private final String desc;
@@ -47,7 +48,7 @@ public enum JobStatus {
      * 是否为终态
      */
     public boolean isTerminal() {
-        return this == SUCCESS || this == FAIL || this == CANCEL || this == TIMEOUT;
+        return this == SUCCESS || this == FAIL || this == CANCEL || this == TIMEOUT || this == SKIPPED;
     }
 
     /**

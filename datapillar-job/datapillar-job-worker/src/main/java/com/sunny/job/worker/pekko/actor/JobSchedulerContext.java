@@ -1,5 +1,6 @@
 package com.sunny.job.worker.pekko.actor;
 
+import com.sunny.job.core.enums.JobStatus;
 import com.sunny.job.core.message.JobRunInfo;
 import com.sunny.job.core.strategy.route.WorkerInfo;
 
@@ -121,4 +122,34 @@ public interface JobSchedulerContext {
      * @return 最大待调度任务数
      */
     int getMaxPendingTasks();
+
+    /**
+     * 异步批量写入 job_run 记录
+     * <p>
+     * 用于持久化新创建的任务
+     *
+     * @param jobs 任务列表
+     * @return 异步结果（写入成功的任务 ID 列表）
+     */
+    CompletableFuture<List<Long>> persistJobRunsAsync(List<JobRunInfo> jobs);
+
+    /**
+     * 更新任务状态（同步）
+     * <p>
+     * 用于下线工作流时取消等待中的任务
+     *
+     * @param jobRunId 任务 ID
+     * @param status   新状态
+     * @param message  状态消息
+     */
+    void updateJobRunStatus(long jobRunId, JobStatus status, String message);
+
+    /**
+     * 从缓存补全 job_info 数据
+     * <p>
+     * 根据 jobId 从 Caffeine 缓存获取 job_info，补全 jobParams 等字段
+     *
+     * @param jobRun 任务运行信息（需要包含 jobId）
+     */
+    void enrichJobInfo(JobRunInfo jobRun);
 }

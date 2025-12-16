@@ -15,7 +15,23 @@ public class JobWorkflowRun {
     private Long workflowId;
     private Integer triggerType;
     private Long triggerTime;
+
+    /**
+     * 下一次触发时间（毫秒，任务开始执行时预计算）
+     */
+    private Long nextTriggerTime;
+
     private Integer status;
+
+    /**
+     * 操作类型：ONLINE/TRIGGER/RERUN 等
+     */
+    private String op;
+
+    /**
+     * 逻辑删除: 0-正常 1-删除
+     */
+    private Integer isDeleted;
 
     public Long getId() {
         return id;
@@ -57,11 +73,35 @@ public class JobWorkflowRun {
         this.triggerTime = triggerTime;
     }
 
+    public Long getNextTriggerTime() {
+        return nextTriggerTime;
+    }
+
+    public void setNextTriggerTime(Long nextTriggerTime) {
+        this.nextTriggerTime = nextTriggerTime;
+    }
+
     public Integer getStatus() {
         return status;
     }
 
     public void setStatus(Integer status) {
         this.status = status;
+    }
+
+    public String getOp() {
+        return op;
+    }
+
+    public void setOp(String op) {
+        this.op = op;
+    }
+
+    public Integer getIsDeleted() {
+        return isDeleted;
+    }
+
+    public void setIsDeleted(Integer isDeleted) {
+        this.isDeleted = isDeleted;
     }
 }

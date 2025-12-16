@@ -2,8 +2,6 @@ package com.sunny.job.server.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 
-import java.time.LocalDateTime;
-
 /**
  * 任务依赖关系实体（设计阶段）
  * <p>
@@ -15,7 +13,7 @@ import java.time.LocalDateTime;
 @TableName("job_dependency")
 public class JobDependency {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private Long workflowId;
@@ -30,8 +28,8 @@ public class JobDependency {
      */
     private Long parentJobId;
 
-    @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
+    @TableLogic
+    private Integer isDeleted;
 
     public Long getId() {
         return id;
@@ -65,11 +63,11 @@ public class JobDependency {
         this.parentJobId = parentJobId;
     }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
+    public Integer getIsDeleted() {
+        return isDeleted;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
+    public void setIsDeleted(Integer isDeleted) {
+        this.isDeleted = isDeleted;
     }
 }

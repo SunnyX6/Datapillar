@@ -21,19 +21,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 任务预加载服务
  * <p>
- * 核心优化：
- * - 定时批量从 DB 预加载未来 N 秒内要触发的任务
- * - Actor 从内存缓存读取，避免每次定时触发都查 DB
- * - 减少 DB 查询频率，提升调度吞吐量
+ * 核心设计：
+ * - Bucket 获得时：加载该 Bucket 的所有 WAITING 任务到内存
+ * - 事件驱动：通过 CRDT 广播 maxJobRunId 变化，触发增量加载
+ * - 无轮询：完全事件驱动，不依赖定时轮询 DB
  * <p>
- * 设计要点：
- * - 预加载窗口：默认 5 秒（可配置）
- * - 预加载频率：每秒一次
- * - 线程安全：使用 ConcurrentHashMap 存储缓存
+ * 线程安全：使用 ConcurrentHashMap 存储缓存
  *
  * @author SunnyX6
  * @date 2025-12-14
@@ -45,8 +43,6 @@ public class JobPreloadService {
 
     /**
      * 预加载缓存：bucketId → Set<JobRunInfo>
-     * <p>
-     * 按 Bucket 分组存储，方便 Scheduler 按 Bucket 获取
      */
     private final Map<Integer, Set<JobRunInfo>> preloadCache = new ConcurrentHashMap<>();
 
@@ -56,25 +52,22 @@ public class JobPreloadService {
     private final Set<Long> loadedJobRunIds = ConcurrentHashMap.newKeySet();
 
     /**
-     * 当前持有的 Bucket 集合（由 BucketStateManager 更新）
-     * <p>
-     * 使用 ConcurrentHashMap.newKeySet() 替代 CopyOnWriteArraySet
-     * 避免写操作时的数组复制开销
+     * 当前持有的 Bucket 集合
      */
     private final Set<Integer> myBuckets = ConcurrentHashMap.newKeySet();
+
+    /**
+     * 本地已知的最大 jobRunId（用于增量加载）
+     */
+    private final AtomicLong localMaxId = new AtomicLong(0);
 
     private final JobRunMapper jobRunMapper;
     private final JobDependencyMapper dependencyMapper;
     private final JobInfoCacheService jobInfoCache;
+    private final JobComponentCacheService componentCache;
 
     /**
-     * 预加载时间窗口（毫秒）
-     */
-    @Value("${datapillar.job.worker.preload-window-ms:5000}")
-    private long preloadWindowMs;
-
-    /**
-     * 每次预加载的最大任务数
+     * 每次加载的最大任务数
      */
     @Value("${datapillar.job.worker.preload-batch-size:1000}")
     private int preloadBatchSize;
@@ -87,89 +80,104 @@ public class JobPreloadService {
 
     public JobPreloadService(JobRunMapper jobRunMapper,
                               JobDependencyMapper dependencyMapper,
-                              JobInfoCacheService jobInfoCache) {
+                              JobInfoCacheService jobInfoCache,
+                              JobComponentCacheService componentCache) {
         this.jobRunMapper = jobRunMapper;
         this.dependencyMapper = dependencyMapper;
         this.jobInfoCache = jobInfoCache;
+        this.componentCache = componentCache;
     }
 
     /**
-     * 定时预加载任务
-     * <p>
-     * 每秒执行一次，加载未来 preloadWindowMs 内要触发的任务
+     * Bucket 获得时加载该 Bucket 的所有 WAITING 任务
+     *
+     * @param bucketId Bucket ID
      */
-    @Scheduled(fixedRate = 1000)
-    public void preloadJobs() {
-        if (myBuckets.isEmpty()) {
+    public void onBucketAcquired(int bucketId) {
+        myBuckets.add(bucketId);
+
+        try {
+            List<JobRunInfo> jobs = jobRunMapper.selectWaitingJobsByBucket(bucketId, preloadBatchSize);
+            if (!jobs.isEmpty()) {
+                addJobsToCache(jobs);
+                log.info("Bucket {} 获得，加载 {} 个任务", bucketId, jobs.size());
+
+                // 更新 localMaxId
+                for (JobRunInfo job : jobs) {
+                    long jobRunId = job.getJobRunId();
+                    if (jobRunId > localMaxId.get()) {
+                        localMaxId.set(jobRunId);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("加载 Bucket {} 任务失败", bucketId, e);
+        }
+    }
+
+    /**
+     * Bucket 丢失时清理缓存
+     *
+     * @param bucketId Bucket ID
+     */
+    public void onBucketLost(int bucketId) {
+        myBuckets.remove(bucketId);
+        Set<JobRunInfo> removed = preloadCache.remove(bucketId);
+        if (removed != null) {
+            for (JobRunInfo job : removed) {
+                loadedJobRunIds.remove(job.getJobRunId());
+            }
+            log.info("Bucket {} 丢失，清理 {} 个任务缓存", bucketId, removed.size());
+        }
+    }
+
+    /**
+     * 将任务添加到缓存
+     */
+    private void addJobsToCache(List<JobRunInfo> jobs) {
+        // 筛选需要加载的任务（去重 + 内存保护）
+        List<JobRunInfo> newJobs = new ArrayList<>();
+        List<Long> newJobRunIds = new ArrayList<>();
+        for (JobRunInfo job : jobs) {
+            if (loadedJobRunIds.contains(job.getJobRunId())) {
+                continue;
+            }
+            if (!canAddNewId()) {
+                log.warn("预加载缓存已达上限 {}，跳过剩余任务", maxCachedIds);
+                break;
+            }
+            newJobs.add(job);
+            newJobRunIds.add(job.getJobRunId());
+        }
+
+        if (newJobs.isEmpty()) {
             return;
         }
 
-        long now = System.currentTimeMillis();
-        long windowEnd = now + preloadWindowMs;
-
-        try {
-            // 查询未来窗口内要触发的任务
-            List<JobRunInfo> jobs = jobRunMapper.selectJobsInTimeWindow(
-                    myBuckets, now, windowEnd, JobStatus.WAITING.getCode(), preloadBatchSize);
-
-            if (jobs.isEmpty()) {
-                return;
+        // 批量查询依赖关系
+        Map<Long, List<Long>> dependencyMap = new HashMap<>();
+        if (!newJobRunIds.isEmpty()) {
+            List<JobRunDependency> dependencies = dependencyMapper.selectParentRunIdsBatch(newJobRunIds);
+            for (JobRunDependency dep : dependencies) {
+                dependencyMap.computeIfAbsent(dep.getJobRunId(), k -> new ArrayList<>())
+                        .add(dep.getParentRunId());
             }
+        }
 
-            // 1. 筛选需要加载的任务（去重 + 内存保护）
-            List<JobRunInfo> newJobs = new ArrayList<>();
-            List<Long> newJobRunIds = new ArrayList<>();
-            for (JobRunInfo job : jobs) {
-                if (loadedJobRunIds.contains(job.getJobRunId())) {
-                    continue;
-                }
-                if (!canAddNewId()) {
-                    log.warn("预加载缓存已达上限 {}，跳过剩余任务", maxCachedIds);
-                    break;
-                }
-                newJobs.add(job);
-                newJobRunIds.add(job.getJobRunId());
-            }
+        // 组装数据并加入缓存
+        for (JobRunInfo job : newJobs) {
+            enrichJobInfo(job);
+            List<Long> parentIds = dependencyMap.getOrDefault(job.getJobRunId(), List.of());
+            job.setParentJobRunIds(parentIds);
 
-            if (newJobs.isEmpty()) {
-                return;
-            }
-
-            // 2. 批量查询依赖关系（优化 N+1 问题）
-            Map<Long, List<Long>> dependencyMap = new HashMap<>();
-            if (!newJobRunIds.isEmpty()) {
-                List<JobRunDependency> dependencies = dependencyMapper.selectParentRunIdsBatch(newJobRunIds);
-                for (JobRunDependency dep : dependencies) {
-                    dependencyMap.computeIfAbsent(dep.getJobRunId(), k -> new ArrayList<>())
-                            .add(dep.getParentRunId());
-                }
-            }
-
-            // 3. 组装数据并加入缓存
-            for (JobRunInfo job : newJobs) {
-                // 补全 job_info 数据
-                enrichJobInfo(job);
-
-                // 设置依赖关系
-                List<Long> parentIds = dependencyMap.getOrDefault(job.getJobRunId(), List.of());
-                job.setParentJobRunIds(parentIds);
-
-                // 加入缓存
-                preloadCache.computeIfAbsent(job.getBucketId(), k -> ConcurrentHashMap.newKeySet())
-                        .add(job);
-                loadedJobRunIds.add(job.getJobRunId());
-            }
-
-            if (!newJobs.isEmpty()) {
-                log.debug("预加载 {} 个任务，窗口=[{}, {}]", newJobs.size(), now, windowEnd);
-            }
-        } catch (Exception e) {
-            log.error("预加载任务失败", e);
+            preloadCache.computeIfAbsent(job.getBucketId(), k -> ConcurrentHashMap.newKeySet())
+                    .add(job);
+            loadedJobRunIds.add(job.getJobRunId());
         }
     }
 
     /**
-     * 获取指定 Bucket 的预加载任务（已到期的）
+     * 获取指定 Bucket 的到期任务
      *
      * @param bucketId Bucket ID
      * @param now      当前时间
@@ -188,7 +196,6 @@ public class JobPreloadService {
             }
         }
 
-        // 从缓存移除已取出的任务
         for (JobRunInfo job : expired) {
             cached.remove(job);
             loadedJobRunIds.remove(job.getJobRunId());
@@ -198,7 +205,7 @@ public class JobPreloadService {
     }
 
     /**
-     * 获取指定 Bucket 集合的所有预加载任务（已到期的）
+     * 获取指定 Bucket 集合的所有到期任务
      *
      * @param bucketIds Bucket ID 集合
      * @param now       当前时间
@@ -213,30 +220,18 @@ public class JobPreloadService {
     }
 
     /**
-     * 更新持有的 Bucket 集合
-     *
-     * @param bucketId Bucket ID
-     * @param acquired true=获得，false=丢失
+     * 更新持有的 Bucket 集合（兼容旧接口）
      */
     public void updateBucket(int bucketId, boolean acquired) {
         if (acquired) {
-            myBuckets.add(bucketId);
+            onBucketAcquired(bucketId);
         } else {
-            myBuckets.remove(bucketId);
-            // 清理该 Bucket 的缓存
-            Set<JobRunInfo> removed = preloadCache.remove(bucketId);
-            if (removed != null) {
-                for (JobRunInfo job : removed) {
-                    loadedJobRunIds.remove(job.getJobRunId());
-                }
-            }
+            onBucketLost(bucketId);
         }
     }
 
     /**
      * 设置持有的 Bucket 集合
-     *
-     * @param buckets Bucket 集合
      */
     public void setBuckets(Set<Integer> buckets) {
         myBuckets.clear();
@@ -244,10 +239,7 @@ public class JobPreloadService {
     }
 
     /**
-     * 从缓存移除指定任务（任务状态变更时调用）
-     *
-     * @param jobRunId 任务 ID
-     * @param bucketId Bucket ID
+     * 从缓存移除指定任务
      */
     public void removeFromCache(long jobRunId, int bucketId) {
         Set<JobRunInfo> cached = preloadCache.get(bucketId);
@@ -258,29 +250,28 @@ public class JobPreloadService {
     }
 
     /**
-     * 检查任务是否在预加载缓存中
-     *
-     * @param jobRunId 任务 ID
-     * @return true 如果在缓存中
+     * 检查任务是否在缓存中
      */
     public boolean isInCache(long jobRunId) {
         return loadedJobRunIds.contains(jobRunId);
     }
 
     /**
-     * 获取缓存统计信息
-     *
-     * @return 缓存中的任务总数
+     * 获取缓存中的任务总数
      */
     public int getCacheSize() {
         return loadedJobRunIds.size();
     }
 
     /**
-     * 定时清理过期的任务 ID
-     * <p>
-     * 每 30 秒执行一次，清理 loadedJobRunIds 中不在 preloadCache 的条目
-     * 防止内存泄漏
+     * 获取本地已知的最大 jobRunId
+     */
+    public long getLocalMaxId() {
+        return localMaxId.get();
+    }
+
+    /**
+     * 定时清理过期的任务 ID（内存保护）
      */
     @Scheduled(fixedRate = 30000, initialDelay = 30000)
     public void cleanupStaleIds() {
@@ -288,7 +279,6 @@ public class JobPreloadService {
             return;
         }
 
-        // 收集所有在 preloadCache 中的任务 ID
         Set<Long> validIds = ConcurrentHashMap.newKeySet();
         for (Set<JobRunInfo> jobs : preloadCache.values()) {
             for (JobRunInfo job : jobs) {
@@ -296,7 +286,6 @@ public class JobPreloadService {
             }
         }
 
-        // 清理不在 preloadCache 中的任务 ID
         int beforeSize = loadedJobRunIds.size();
         loadedJobRunIds.retainAll(validIds);
         int cleaned = beforeSize - loadedJobRunIds.size();
@@ -306,18 +295,10 @@ public class JobPreloadService {
         }
     }
 
-    /**
-     * 检查是否可以添加新任务 ID（内存保护）
-     *
-     * @return true 如果可以添加
-     */
     private boolean canAddNewId() {
         return loadedJobRunIds.size() < maxCachedIds;
     }
 
-    /**
-     * 从缓存补全 job_info 数据
-     */
     private void enrichJobInfo(JobRunInfo jobRun) {
         JobInfo jobInfo = jobInfoCache.get(jobRun.getJobId());
         if (jobInfo == null) {
@@ -326,7 +307,7 @@ public class JobPreloadService {
         }
 
         jobRun.setJobName(jobInfo.getJobName());
-        jobRun.setJobType(jobInfo.getJobType());
+        jobRun.setJobType(componentCache.getComponentCode(jobInfo.getJobType()));
         jobRun.setJobParams(jobInfo.getJobParams());
         jobRun.setRouteStrategy(RouteStrategy.of(jobInfo.getRouteStrategy()));
         jobRun.setBlockStrategy(BlockStrategy.of(jobInfo.getBlockStrategy()));

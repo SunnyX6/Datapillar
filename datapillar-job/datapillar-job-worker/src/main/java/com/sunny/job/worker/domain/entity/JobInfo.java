@@ -13,8 +13,7 @@ public class JobInfo {
     private Long id;
     private Long workflowId;
     private String jobName;
-    private Integer jobStatus;
-    private String jobType;
+    private Long jobType;
     private String jobParams;
     private Integer routeStrategy;
     private Integer blockStrategy;
@@ -22,6 +21,16 @@ public class JobInfo {
     private Integer maxRetryTimes;
     private Integer retryInterval;
     private Integer priority;
+
+    /**
+     * 触发类型（NULL 继承工作流）: 1-CRON 2-固定频率 3-固定延迟
+     */
+    private Integer triggerType;
+
+    /**
+     * 触发值（CRON表达式或秒数）
+     */
+    private String triggerValue;
 
     public Long getId() {
         return id;
@@ -47,19 +56,11 @@ public class JobInfo {
         this.jobName = jobName;
     }
 
-    public Integer getJobStatus() {
-        return jobStatus;
-    }
-
-    public void setJobStatus(Integer jobStatus) {
-        this.jobStatus = jobStatus;
-    }
-
-    public String getJobType() {
+    public Long getJobType() {
         return jobType;
     }
 
-    public void setJobType(String jobType) {
+    public void setJobType(Long jobType) {
         this.jobType = jobType;
     }
 
@@ -119,10 +120,19 @@ public class JobInfo {
         this.priority = priority;
     }
 
-    /**
-     * 是否已启用
-     */
-    public boolean isEnabled() {
-        return jobStatus != null && jobStatus == 1;
+    public Integer getTriggerType() {
+        return triggerType;
+    }
+
+    public void setTriggerType(Integer triggerType) {
+        this.triggerType = triggerType;
+    }
+
+    public String getTriggerValue() {
+        return triggerValue;
+    }
+
+    public void setTriggerValue(String triggerValue) {
+        this.triggerValue = triggerValue;
     }
 }

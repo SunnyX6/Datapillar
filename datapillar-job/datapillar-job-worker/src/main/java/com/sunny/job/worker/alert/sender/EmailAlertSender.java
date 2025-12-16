@@ -1,8 +1,7 @@
 package com.sunny.job.worker.alert.sender;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sunny.job.worker.alert.AlertResult;
 import com.sunny.job.worker.alert.AlertSender;
 import jakarta.mail.Authenticator;
@@ -33,20 +32,20 @@ import java.util.Properties;
 public class EmailAlertSender implements AlertSender {
 
     private static final Logger log = LoggerFactory.getLogger(EmailAlertSender.class);
-    private static final Gson GSON = new Gson();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final int TIMEOUT_MS = 30000;
 
     @Override
     public AlertResult send(String channelConfig, String title, String content) {
         try {
-            JsonObject config = GSON.fromJson(channelConfig, JsonObject.class);
+            JsonNode config = MAPPER.readTree(channelConfig);
 
-            String smtp = config.get("smtp").getAsString();
-            int port = config.has("port") ? config.get("port").getAsInt() : 465;
-            boolean ssl = !config.has("ssl") || config.get("ssl").getAsBoolean();
-            String username = config.get("username").getAsString();
-            String password = config.get("password").getAsString();
-            String from = config.has("from") ? config.get("from").getAsString() : username;
+            String smtp = config.get("smtp").asText();
+            int port = config.has("port") ? config.get("port").asInt() : 465;
+            boolean ssl = !config.has("ssl") || config.get("ssl").asBoolean();
+            String username = config.get("username").asText();
+            String password = config.get("password").asText();
+            String from = config.has("from") ? config.get("from").asText() : username;
             List<String> toList = parseRecipients(config);
 
             if (toList.isEmpty()) {
@@ -103,17 +102,17 @@ public class EmailAlertSender implements AlertSender {
     /**
      * 解析收件人列表
      */
-    private List<String> parseRecipients(JsonObject config) {
+    private List<String> parseRecipients(JsonNode config) {
         List<String> recipients = new ArrayList<>();
 
         if (config.has("to")) {
-            if (config.get("to").isJsonArray()) {
-                JsonArray toArray = config.getAsJsonArray("to");
-                for (int i = 0; i < toArray.size(); i++) {
-                    recipients.add(toArray.get(i).getAsString());
+            JsonNode toNode = config.get("to");
+            if (toNode.isArray()) {
+                for (JsonNode item : toNode) {
+                    recipients.add(item.asText());
                 }
             } else {
-                recipients.add(config.get("to").getAsString());
+                recipients.add(toNode.asText());
             }
         }
 

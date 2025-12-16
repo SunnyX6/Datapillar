@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.job.worker.domain.mapper.JobComponentMapper">
+
+    <!-- 公共查询列 -->
+    <sql id="baseColumns">
+        id,
+        component_code AS componentCode,
+        component_name AS componentName,
+        component_type AS componentType,
+        job_params AS jobParams,
+        status
+    </sql>
+
+    <!-- 查询所有启用的组件 -->
+    <select id="selectAllEnabled" resultType="com.sunny.job.worker.domain.entity.JobComponent">
+        SELECT <include refid="baseColumns"/>
+        FROM job_component
+        WHERE status = 1 AND is_deleted = 0
+    </select>
+
+</mapper>

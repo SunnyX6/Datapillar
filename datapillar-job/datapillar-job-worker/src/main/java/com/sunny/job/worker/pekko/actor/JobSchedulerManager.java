@@ -1,9 +1,10 @@
 package com.sunny.job.worker.pekko.actor;
 
 import com.sunny.job.core.message.SchedulerMessage;
-import com.sunny.job.worker.pekko.ddata.BucketStateManager;
-import com.sunny.job.worker.pekko.ddata.JobRunStateManager;
-import com.sunny.job.worker.pekko.ddata.SplitStateManager;
+import com.sunny.job.worker.pekko.ddata.BucketManager;
+import com.sunny.job.worker.pekko.ddata.JobRunLocalCache;
+import com.sunny.job.worker.pekko.ddata.MaxJobRunIdState;
+import com.sunny.job.worker.pekko.ddata.SplitLocalCache;
 import com.sunny.job.worker.service.JobPreloadService;
 import org.apache.pekko.actor.typed.ActorRef;
 import org.apache.pekko.actor.typed.ActorSystem;
@@ -37,34 +38,38 @@ public class JobSchedulerManager {
 
     private final int shardCount;
     private final List<ActorRef<SchedulerMessage>> schedulers;
-    private final BucketStateManager bucketStateManager;
+    private final BucketManager bucketManager;
+    private final MaxJobRunIdState maxJobRunIdManager;
     private final JobPreloadService preloadService;
 
     /**
      * 创建分片调度管理器
      *
-     * @param actorSystem        Actor 系统
-     * @param shardCount         分片数量（建议 = CPU 核心数）
-     * @param schedulerContext   调度上下文
-     * @param executorContext    执行上下文
-     * @param bucketStateManager Bucket 状态管理器
-     * @param splitStateManager  分片状态管理器
-     * @param jobRunStateManager 任务运行状态管理器
-     * @param preloadService     预加载服务
-     * @param workerAddress      Worker 地址
+     * @param actorSystem         Actor 系统
+     * @param shardCount          分片数量（建议 = CPU 核心数）
+     * @param schedulerContext    调度上下文
+     * @param executorContext     执行上下文
+     * @param bucketManager  Bucket 状态管理器
+     * @param splitLocalCache   分片状态管理器
+     * @param jobRunLocalCache  任务运行状态管理器
+     * @param maxJobRunIdManager  最大 JobRunId 管理器
+     * @param preloadService      预加载服务
+     * @param workerAddress       Worker 地址
      */
     public JobSchedulerManager(ActorSystem<Void> actorSystem,
                                 int shardCount,
                                 JobSchedulerContext schedulerContext,
                                 JobExecutorContext executorContext,
-                                BucketStateManager bucketStateManager,
-                                SplitStateManager splitStateManager,
-                                JobRunStateManager jobRunStateManager,
+                                BucketManager bucketManager,
+                                SplitLocalCache splitLocalCache,
+                                JobRunLocalCache jobRunLocalCache,
+                                MaxJobRunIdState maxJobRunIdManager,
                                 JobPreloadService preloadService,
                                 String workerAddress) {
         this.shardCount = shardCount;
         this.schedulers = new ArrayList<>(shardCount);
-        this.bucketStateManager = bucketStateManager;
+        this.bucketManager = bucketManager;
+        this.maxJobRunIdManager = maxJobRunIdManager;
         this.preloadService = preloadService;
 
         log.info("初始化分片调度管理器，shardCount={}", shardCount);
@@ -75,9 +80,10 @@ public class JobSchedulerManager {
                     JobScheduler.create(
                             schedulerContext,
                             executorContext,
-                            bucketStateManager,
-                            splitStateManager,
-                            jobRunStateManager,
+                            bucketManager,
+                            splitLocalCache,
+                            jobRunLocalCache,
+                            maxJobRunIdManager,
                             workerAddress,
                             i,           // shardId
                             shardCount   // 总分片数
@@ -92,6 +98,9 @@ public class JobSchedulerManager {
         // 订阅 Bucket 变更，路由到对应 Scheduler
         setupBucketRouting();
 
+        // 订阅 maxJobRunId 变化，广播给所有 Scheduler
+        setupMaxJobRunIdListener();
+
         log.info("分片调度管理器初始化完成，共 {} 个 Scheduler", shardCount);
     }
 
@@ -102,7 +111,7 @@ public class JobSchedulerManager {
      * 同时同步给预加载服务
      */
     private void setupBucketRouting() {
-        bucketStateManager.subscribe(
+        bucketManager.subscribe(
                 bucketId -> {
                     // Bucket 获得 → 路由到对应 Scheduler
                     ActorRef<SchedulerMessage> scheduler = getSchedulerForBucket(bucketId);
@@ -122,6 +131,18 @@ public class JobSchedulerManager {
                     }
                 }
         );
+    }
+
+    /**
+     * 设置 maxJobRunId 变化监听
+     * <p>
+     * 当全局 maxJobRunId 变化时，广播给所有 Scheduler 触发增量加载
+     */
+    private void setupMaxJobRunIdListener() {
+        maxJobRunIdManager.subscribe(newMaxId -> {
+            log.info("检测到全局 maxJobRunId 变化: {}，广播给所有 Scheduler", newMaxId);
+            broadcast(new SchedulerMessage.GlobalMaxIdChanged(newMaxId));
+        });
     }
 
     /**

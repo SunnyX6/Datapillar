@@ -1,8 +1,9 @@
 package com.sunny.job.worker.alert.sender;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sunny.job.worker.alert.AlertResult;
 import com.sunny.job.worker.alert.AlertSender;
 import org.slf4j.Logger;
@@ -33,7 +34,7 @@ import java.util.Base64;
 public class FeishuAlertSender implements AlertSender {
 
     private static final Logger log = LoggerFactory.getLogger(FeishuAlertSender.class);
-    private static final Gson GSON = new Gson();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final int TIMEOUT_SECONDS = 30;
 
     private final HttpClient httpClient;
@@ -47,18 +48,18 @@ public class FeishuAlertSender implements AlertSender {
     @Override
     public AlertResult send(String channelConfig, String title, String content) {
         try {
-            JsonObject config = GSON.fromJson(channelConfig, JsonObject.class);
-            String webhook = config.get("webhook").getAsString();
-            String secret = config.has("secret") ? config.get("secret").getAsString() : null;
+            JsonNode config = MAPPER.readTree(channelConfig);
+            String webhook = config.get("webhook").asText();
+            String secret = config.has("secret") ? config.get("secret").asText() : null;
 
             // 构建请求体（使用富文本格式）
-            JsonObject requestBody = buildRequestBody(title, content, secret);
+            ObjectNode requestBody = buildRequestBody(title, content, secret);
 
             // 发送请求
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(webhook))
                     .header("Content-Type", "application/json; charset=utf-8")
-                    .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(requestBody), StandardCharsets.UTF_8))
+                    .POST(HttpRequest.BodyPublishers.ofString(MAPPER.writeValueAsString(requestBody), StandardCharsets.UTF_8))
                     .timeout(Duration.ofSeconds(TIMEOUT_SECONDS))
                     .build();
 
@@ -82,29 +83,29 @@ public class FeishuAlertSender implements AlertSender {
     /**
      * 构建请求体
      */
-    private JsonObject buildRequestBody(String title, String content, String secret) {
-        JsonObject body = new JsonObject();
-        body.addProperty("msg_type", "post");
+    private ObjectNode buildRequestBody(String title, String content, String secret) {
+        ObjectNode body = MAPPER.createObjectNode();
+        body.put("msg_type", "post");
 
         // 如果配置了签名密钥，添加签名
         if (secret != null && !secret.isBlank()) {
             long timestamp = System.currentTimeMillis() / 1000;
             String sign = generateSign(timestamp, secret);
-            body.addProperty("timestamp", String.valueOf(timestamp));
-            body.addProperty("sign", sign);
+            body.put("timestamp", String.valueOf(timestamp));
+            body.put("sign", sign);
         }
 
         // 构建富文本内容
-        JsonObject contentObj = new JsonObject();
-        JsonObject post = new JsonObject();
-        JsonObject zhCn = new JsonObject();
+        ObjectNode contentObj = MAPPER.createObjectNode();
+        ObjectNode post = MAPPER.createObjectNode();
+        ObjectNode zhCn = MAPPER.createObjectNode();
 
-        zhCn.addProperty("title", title);
-        zhCn.add("content", buildRichTextContent(content));
+        zhCn.put("title", title);
+        zhCn.set("content", buildRichTextContent(content));
 
-        post.add("zh_cn", zhCn);
-        contentObj.add("post", post);
-        body.add("content", contentObj);
+        post.set("zh_cn", zhCn);
+        contentObj.set("post", post);
+        body.set("content", contentObj);
 
         return body;
     }
@@ -133,17 +134,17 @@ public class FeishuAlertSender implements AlertSender {
     /**
      * 构建富文本内容
      */
-    private JsonArray buildRichTextContent(String content) {
-        JsonArray contentArray = new JsonArray();
+    private ArrayNode buildRichTextContent(String content) {
+        ArrayNode contentArray = MAPPER.createArrayNode();
 
         // 将内容按行分割，每行作为一个段落
         String[] lines = content.split("\n");
         for (String line : lines) {
-            JsonArray lineArray = new JsonArray();
+            ArrayNode lineArray = MAPPER.createArrayNode();
 
-            JsonObject textObj = new JsonObject();
-            textObj.addProperty("tag", "text");
-            textObj.addProperty("text", line);
+            ObjectNode textObj = MAPPER.createObjectNode();
+            textObj.put("tag", "text");
+            textObj.put("text", line);
             lineArray.add(textObj);
 
             contentArray.add(lineArray);
@@ -157,14 +158,14 @@ public class FeishuAlertSender implements AlertSender {
      */
     private AlertResult parseResponse(String responseBody) {
         try {
-            JsonObject response = GSON.fromJson(responseBody, JsonObject.class);
-            int code = response.has("code") ? response.get("code").getAsInt() : -1;
+            JsonNode response = MAPPER.readTree(responseBody);
+            int code = response.has("code") ? response.get("code").asInt() : -1;
 
             if (code == 0) {
                 log.info("飞书告警发送成功");
                 return AlertResult.ok();
             } else {
-                String msg = response.has("msg") ? response.get("msg").getAsString() : "未知错误";
+                String msg = response.has("msg") ? response.get("msg").asText() : "未知错误";
                 log.warn("飞书告警发送失败: code={}, msg={}", code, msg);
                 return AlertResult.fail("code=" + code + ", msg=" + msg);
             }
