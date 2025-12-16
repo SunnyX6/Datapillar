@@ -10,9 +10,18 @@ package com.sunny.job.worker.domain.entity;
  */
 public class JobRunDependency {
 
+    private Long id;
     private Long workflowRunId;
     private Long jobRunId;
     private Long parentRunId;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
 
     public Long getWorkflowRunId() {
         return workflowRunId;

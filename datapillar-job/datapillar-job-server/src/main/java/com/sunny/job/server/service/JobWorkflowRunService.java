@@ -1,22 +1,32 @@
 package com.sunny.job.server.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
-import com.sunny.job.server.entity.JobWorkflowRun;
+import java.util.Map;
 
 /**
- * 工作流执行实例 Service
+ * 工作流运行实例 Service
+ * <p>
+ * 处理运行实例级别的操作：kill、rerun
  *
  * @author SunnyX6
- * @date 2025-12-13
+ * @date 2025-12-15
  */
-public interface JobWorkflowRunService extends IService<JobWorkflowRun> {
+public interface JobWorkflowRunService {
 
     /**
-     * 重跑工作流实例
-     * <p>
-     * 重置失败的 job_run 状态为 WAITING
+     * 终止工作流运行实例
      *
-     * @param workflowRunId 工作流执行实例ID
+     * @param workflowRunId 工作流运行实例ID
      */
-    void rerun(Long workflowRunId);
+    void kill(Long workflowRunId);
+
+    /**
+     * 重跑工作流运行实例
+     * <p>
+     * 重置失败的任务状态为 WAITING，重新执行
+     *
+     * @param workflowId          工作流ID
+     * @param workflowRunId       工作流运行实例ID
+     * @param jobRunIdToJobIdMap  需要重跑的任务映射（jobRunId -> jobId）
+     */
+    void rerun(Long workflowId, Long workflowRunId, Map<Long, Long> jobRunIdToJobIdMap);
 }

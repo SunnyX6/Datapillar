@@ -1,16 +1,19 @@
 package com.sunny.job.worker.config;
 
+import com.sunny.job.core.id.IdGenerator;
 import com.sunny.job.core.message.ExecutorMessage;
 import com.sunny.job.worker.domain.mapper.JobBucketLeaseMapper;
 import com.sunny.job.worker.pekko.actor.JobSchedulerContext;
 import com.sunny.job.worker.pekko.actor.JobSchedulerManager;
 import com.sunny.job.worker.pekko.actor.JobExecutorContext;
 import com.sunny.job.worker.pekko.actor.ShardingTaskReceiver;
-import com.sunny.job.worker.pekko.ddata.BucketStateManager;
-import com.sunny.job.worker.pekko.ddata.JobRunStateManager;
-import com.sunny.job.worker.pekko.ddata.ShardStateManager;
-import com.sunny.job.worker.pekko.ddata.SplitStateManager;
-import com.sunny.job.worker.pekko.ddata.WorkerStateManager;
+import com.sunny.job.worker.pekko.ddata.BucketManager;
+import com.sunny.job.worker.pekko.ddata.JobRunLocalCache;
+import com.sunny.job.worker.pekko.ddata.MaxJobRunIdState;
+import com.sunny.job.worker.pekko.ddata.SplitLocalCache;
+import com.sunny.job.worker.pekko.ddata.WorkerManager;
+import com.sunny.job.worker.pekko.ddata.JobRunBroadcastState;
+import com.sunny.job.worker.pekko.ddata.WorkflowBroadcastState;
 import com.sunny.job.worker.service.JobPreloadService;
 import org.apache.pekko.actor.typed.ActorRef;
 import org.apache.pekko.actor.typed.ActorSystem;
@@ -38,8 +41,8 @@ import org.springframework.context.annotation.DependsOn;
  * - JobSchedulerManager: 分片调度管理器，管理多个 JobScheduler
  * - JobScheduler: 本地调度器，负责调度决策
  * - ShardingTaskReceiver: 分片任务接收器，接收来自其他 Worker 的分片任务
- * - BucketStateManager: CRDT 管理 Bucket 所有权
- * - WorkerStateManager: CRDT 同步 Worker 负载信息
+ * - BucketManager: CRDT 管理 Bucket 所有权
+ * - WorkerManager: CRDT 同步 Worker 负载信息
  *
  * @author SunnyX6
  * @date 2025-12-13
@@ -56,21 +59,20 @@ public class ClusterConfig {
     private int schedulerShardCount;
 
     /**
-     * WorkerStateManager Bean
+     * WorkerManager Bean
      * <p>
-     * 使用 CRDT 在集群中同步 Worker 负载信息
-     * 用于路由策略选择目标 Worker（本地化架构下主要用于状态监控）
+     * 使用 Pekko Cluster 成员列表获取存活 Worker
+     * 本地缓存负载信息，不使用 CRDT（避免序列化问题）
      */
     @Bean
     @DependsOn("actorSystem")
-    public WorkerStateManager workerStateManager(ActorSystem<Void> actorSystem, CacheConfig cacheConfig) {
-        log.info("初始化 WorkerStateManager...");
-        CacheConfig.WorkerStateCacheConfig config = cacheConfig.getWorkerState();
-        return new WorkerStateManager(actorSystem, config.getMaxSize(), config.getExpireAfterWrite());
+    public WorkerManager workerManager(ActorSystem<Void> actorSystem) {
+        log.info("初始化 WorkerManager...");
+        return new WorkerManager(actorSystem);
     }
 
     /**
-     * BucketStateManager Bean
+     * BucketManager Bean
      * <p>
      * 使用 CRDT 管理 Bucket 所有权
      * 同时通过 DB 持久化租约信息，用于 Worker 重启时恢复
@@ -81,59 +83,96 @@ public class ClusterConfig {
      * - 虚拟节点（160 个）保证分布均匀
      */
     @Bean
-    @DependsOn({"actorSystem", "workerStateManager"})
-    public BucketStateManager bucketStateManager(ActorSystem<Void> actorSystem,
-                                                  WorkerStateManager workerStateManager,
+    @DependsOn({"actorSystem", "workerManager"})
+    public BucketManager bucketManager(ActorSystem<Void> actorSystem,
+                                                  WorkerManager workerManager,
                                                   JobBucketLeaseMapper jobBucketLeaseMapper) {
-        log.info("初始化 BucketStateManager，bucketCount={}...", bucketCount);
-        return new BucketStateManager(actorSystem, bucketCount, workerStateManager, jobBucketLeaseMapper);
+        log.info("初始化 BucketManager，bucketCount={}...", bucketCount);
+        return new BucketManager(actorSystem, bucketCount, workerManager, jobBucketLeaseMapper);
     }
 
     /**
-     * JobRunStateManager Bean
+     * JobRunLocalCache Bean
      * <p>
-     * 使用 CRDT 缓存任务运行状态，实现读写分离：
-     * - 写路径: Worker → DB（持久化）→ CRDT（广播同步）
-     * - 读路径: Worker → 本地 CRDT 副本（零网络开销）
+     * 使用本地缓存管理任务运行状态
+     * 不使用 CRDT（避免序列化问题，任务状态已在 DB 持久化）
      */
     @Bean
-    @DependsOn("actorSystem")
-    public JobRunStateManager jobRunStateManager(ActorSystem<Void> actorSystem, CacheConfig cacheConfig) {
-        log.info("初始化 JobRunStateManager...");
-        CacheConfig.JobRunStateCacheConfig config = cacheConfig.getJobRunState();
-        return new JobRunStateManager(actorSystem, config.getMaxSize(), config.getExpireAfterWrite());
+    public JobRunLocalCache jobRunLocalCache(CacheConfig cacheConfig) {
+        log.info("初始化 JobRunLocalCache...");
+        CacheConfig.JobRunLocalCacheConfig config = cacheConfig.getJobRunState();
+        return new JobRunLocalCache(config.getMaxSize(), config.getExpireAfterWrite());
     }
 
     /**
-     * SplitStateManager Bean
+     * SplitLocalCache Bean
      * <p>
-     * 使用 CRDT 管理分片任务状态：
-     * - 协调多个 Worker 的分片处理，避免重复
-     * - 跟踪每个分片范围的处理状态
+     * 使用本地缓存管理分片任务状态
+     * 不使用 CRDT（每个 Worker 独占自己 Bucket 的任务）
      */
     @Bean
     @DependsOn("actorSystem")
-    public SplitStateManager splitStateManager(ActorSystem<Void> actorSystem, CacheConfig cacheConfig) {
-        log.info("初始化 SplitStateManager...");
-        CacheConfig.SplitStateCacheConfig config = cacheConfig.getSplitState();
-        // 使用 Pekko Cluster 地址
+    public SplitLocalCache splitLocalCache(ActorSystem<Void> actorSystem, CacheConfig cacheConfig) {
+        log.info("初始化 SplitLocalCache...");
+        CacheConfig.SplitLocalCacheConfig config = cacheConfig.getSplitState();
         String pekkoAddress = Cluster.get(actorSystem).selfMember().address().toString();
-        return new SplitStateManager(actorSystem, pekkoAddress, config.getMaxSize(), config.getExpireAfterWrite());
+        return new SplitLocalCache(pekkoAddress, config.getMaxSize(), config.getExpireAfterWrite());
     }
 
     /**
-     * ShardStateManager Bean
+     * MaxJobRunIdState Bean
      * <p>
-     * 使用 CRDT 管理分片任务状态：
-     * - 记录每个分片的执行状态
-     * - 支持分片结果汇聚
+     * 使用 CRDT 在集群中同步全局最大 jobRunId
+     * 用于事件驱动的增量任务加载：
+     * - Worker 加载新任务后，更新 CRDT 中的 maxJobRunId
+     * - 其他 Worker 检测到变化，触发增量加载
      */
     @Bean
     @DependsOn("actorSystem")
-    public ShardStateManager shardStateManager(ActorSystem<Void> actorSystem, CacheConfig cacheConfig) {
-        log.info("初始化 ShardStateManager...");
-        CacheConfig.ShardStateCacheConfig config = cacheConfig.getShardState();
-        return new ShardStateManager(actorSystem, config.getMaxSize(), config.getExpireAfterWrite());
+    public MaxJobRunIdState maxJobRunIdManager(ActorSystem<Void> actorSystem) {
+        log.info("初始化 MaxJobRunIdState...");
+        return new MaxJobRunIdState(actorSystem);
+    }
+
+    /**
+     * 分布式 ID 生成器
+     * <p>
+     * 基于 Pekko Cluster 地址生成节点 ID
+     * 用于生成 workflow_run.id 和 job_run.id
+     */
+    @Bean
+    @DependsOn("actorSystem")
+    public IdGenerator idGenerator(ActorSystem<Void> actorSystem) {
+        String address = Cluster.get(actorSystem).selfMember().address().toString();
+        IdGenerator generator = IdGenerator.fromAddress(address);
+        log.info("初始化 IdGenerator: nodeId={}, address={}", generator.getNodeId(), address);
+        return generator;
+    }
+
+    /**
+     * 工作流广播监听器
+     * <p>
+     * 监听 Server 通过 CRDT 广播的工作流事件
+     * 收到事件后触发 run 创建逻辑
+     */
+    @Bean
+    @DependsOn("actorSystem")
+    public WorkflowBroadcastState workflowBroadcastListener(ActorSystem<Void> actorSystem) {
+        log.info("初始化 WorkflowBroadcastState...");
+        return new WorkflowBroadcastState(actorSystem);
+    }
+
+    /**
+     * 任务级广播监听器
+     * <p>
+     * 监听 Server 通过 CRDT 广播的任务级事件
+     * 支持手动执行、重试、终止等操作
+     */
+    @Bean
+    @DependsOn("actorSystem")
+    public JobRunBroadcastState jobRunBroadcastState(ActorSystem<Void> actorSystem) {
+        log.info("初始化 JobRunBroadcastState...");
+        return new JobRunBroadcastState(actorSystem);
     }
 
     /**
@@ -173,14 +212,15 @@ public class ClusterConfig {
      * - 吞吐量提升 N 倍
      */
     @Bean
-    @DependsOn({"bucketStateManager", "splitStateManager", "jobRunStateManager", "shardingTaskReceiverRef"})
+    @DependsOn({"bucketManager", "splitLocalCache", "jobRunLocalCache", "maxJobRunIdManager", "shardingTaskReceiverRef"})
     public JobSchedulerManager jobSchedulerManager(
             ActorSystem<Void> actorSystem,
             JobSchedulerContext schedulerContext,
             JobExecutorContext executorContext,
-            BucketStateManager bucketStateManager,
-            SplitStateManager splitStateManager,
-            JobRunStateManager jobRunStateManager,
+            BucketManager bucketManager,
+            SplitLocalCache splitLocalCache,
+            JobRunLocalCache jobRunLocalCache,
+            MaxJobRunIdState maxJobRunIdManager,
             JobPreloadService preloadService) {
 
         // 计算分片数量：配置值 > 0 则使用配置值，否则使用 CPU 核心数
@@ -198,9 +238,10 @@ public class ClusterConfig {
                 shardCount,
                 schedulerContext,
                 executorContext,
-                bucketStateManager,
-                splitStateManager,
-                jobRunStateManager,
+                bucketManager,
+                splitLocalCache,
+                jobRunLocalCache,
+                maxJobRunIdManager,
                 preloadService,
                 pekkoAddress
         );

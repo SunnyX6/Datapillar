@@ -2,12 +2,11 @@ package com.sunny.job.server.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 
-import java.time.LocalDateTime;
-
 /**
  * 工作流定义实体
  * <p>
  * 工作流是调度的最小单位，定义触发策略
+ * status 字段记录工作流上线/下线状态
  *
  * @author SunnyX6
  * @date 2025-12-13
@@ -15,17 +14,12 @@ import java.time.LocalDateTime;
 @TableName("job_workflow")
 public class JobWorkflow {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private Long namespaceId;
 
     private String workflowName;
-
-    /**
-     * 状态: 0-下线 1-上线
-     */
-    private Integer workflowStatus;
 
     /**
      * 触发类型: 1-CRON 2-固定频率 3-固定延迟 4-手动 5-API
@@ -52,16 +46,15 @@ public class JobWorkflow {
      */
     private Integer priority;
 
+    /**
+     * 状态: 0-草稿 1-已上线 2-已下线
+     */
+    private Integer status;
+
     private String description;
 
     @TableLogic
     private Integer isDeleted;
-
-    @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
-
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
 
     public Long getId() {
         return id;
@@ -85,14 +78,6 @@ public class JobWorkflow {
 
     public void setWorkflowName(String workflowName) {
         this.workflowName = workflowName;
-    }
-
-    public Integer getWorkflowStatus() {
-        return workflowStatus;
-    }
-
-    public void setWorkflowStatus(Integer workflowStatus) {
-        this.workflowStatus = workflowStatus;
     }
 
     public Integer getTriggerType() {
@@ -135,6 +120,14 @@ public class JobWorkflow {
         this.priority = priority;
     }
 
+    public Integer getStatus() {
+        return status;
+    }
+
+    public void setStatus(Integer status) {
+        this.status = status;
+    }
+
     public String getDescription() {
         return description;
     }
@@ -149,28 +142,5 @@ public class JobWorkflow {
 
     public void setIsDeleted(Integer isDeleted) {
         this.isDeleted = isDeleted;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    /**
-     * 是否已上线
-     */
-    public boolean isOnline() {
-        return workflowStatus != null && workflowStatus == 1;
     }
 }

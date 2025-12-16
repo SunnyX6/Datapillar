@@ -7,8 +7,8 @@
 <configuration scan="true" scanPeriod="30 seconds">
 
     <!-- 从 Spring 配置读取日志路径 -->
-    <springProperty scope="context" name="LOG_HOME" source="datapillar.job.worker.log.base-path" defaultValue="./logs/job"/>
-    <springProperty scope="context" name="LOG_RETENTION_DAYS" source="datapillar.job.worker.log.retention-days" defaultValue="7"/>
+    <springProperty scope="context" name="LOG_HOME" source="datapillar.job.log.base-path" defaultValue="./logs/job"/>
+    <springProperty scope="context" name="LOG_RETENTION_DAYS" source="datapillar.job.log.retention-days" defaultValue="7"/>
 
     <!-- ==================== 应用日志 ==================== -->
 

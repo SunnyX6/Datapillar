@@ -13,12 +13,39 @@ public class JobRun {
     private Long id;
     private Long namespaceId;
     private Long workflowRunId;
+    private Long workflowId;
     private Long jobId;
     private Integer bucketId;
     private Integer triggerType;
     private Long triggerTime;
+
+    /**
+     * 下一次触发时间（毫秒，任务开始执行时预计算）
+     */
+    private Long nextTriggerTime;
+
     private Integer status;
     private Integer priority;
+
+    /**
+     * 任务参数（JSON）
+     */
+    private String jobParams;
+
+    /**
+     * 已重试次数
+     */
+    private Integer retryCount;
+
+    /**
+     * 操作类型：ONLINE/TRIGGER/RERUN 等
+     */
+    private String op;
+
+    /**
+     * 逻辑删除: 0-正常 1-删除
+     */
+    private Integer isDeleted;
 
     public Long getId() {
         return id;
@@ -42,6 +69,14 @@ public class JobRun {
 
     public void setWorkflowRunId(Long workflowRunId) {
         this.workflowRunId = workflowRunId;
+    }
+
+    public Long getWorkflowId() {
+        return workflowId;
+    }
+
+    public void setWorkflowId(Long workflowId) {
+        this.workflowId = workflowId;
     }
 
     public Long getJobId() {
@@ -76,6 +111,14 @@ public class JobRun {
         this.triggerTime = triggerTime;
     }
 
+    public Long getNextTriggerTime() {
+        return nextTriggerTime;
+    }
+
+    public void setNextTriggerTime(Long nextTriggerTime) {
+        this.nextTriggerTime = nextTriggerTime;
+    }
+
     public Integer getStatus() {
         return status;
     }
@@ -90,5 +133,37 @@ public class JobRun {
 
     public void setPriority(Integer priority) {
         this.priority = priority;
+    }
+
+    public String getJobParams() {
+        return jobParams;
+    }
+
+    public void setJobParams(String jobParams) {
+        this.jobParams = jobParams;
+    }
+
+    public Integer getRetryCount() {
+        return retryCount;
+    }
+
+    public void setRetryCount(Integer retryCount) {
+        this.retryCount = retryCount;
+    }
+
+    public String getOp() {
+        return op;
+    }
+
+    public void setOp(String op) {
+        this.op = op;
+    }
+
+    public Integer getIsDeleted() {
+        return isDeleted;
+    }
+
+    public void setIsDeleted(Integer isDeleted) {
+        this.isDeleted = isDeleted;
     }
 }

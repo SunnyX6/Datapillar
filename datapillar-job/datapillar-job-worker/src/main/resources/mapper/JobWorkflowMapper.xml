@@ -8,12 +8,12 @@
             id,
             namespace_id AS namespaceId,
             workflow_name AS workflowName,
-            workflow_status AS workflowStatus,
             trigger_type AS triggerType,
             trigger_value AS triggerValue,
             timeout_seconds AS timeoutSeconds,
             max_retry_times AS maxRetryTimes,
-            priority
+            priority,
+            status
         FROM job_workflow
         WHERE id = #{workflowId} AND is_deleted = 0
     </select>

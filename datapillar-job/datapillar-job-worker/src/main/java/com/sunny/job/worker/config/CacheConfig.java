@@ -8,7 +8,7 @@ import java.time.Duration;
 /**
  * 缓存配置
  * <p>
- * 集中管理各个 StateManager 的 Caffeine Cache 参数
+ * 集中管理各个本地缓存的 Caffeine Cache 参数
  *
  * @author SunnyX6
  * @date 2025-12-14
@@ -20,44 +20,31 @@ public class CacheConfig {
     /**
      * JobRunState 缓存配置
      */
-    private JobRunStateCacheConfig jobRunState = new JobRunStateCacheConfig();
+    private JobRunLocalCacheConfig jobRunState = new JobRunLocalCacheConfig();
 
     /**
-     * ShardState 缓存配置
+     * SplitLocalCache 缓存配置
      */
-    private ShardStateCacheConfig shardState = new ShardStateCacheConfig();
-
-    /**
-     * SplitState 缓存配置
-     */
-    private SplitStateCacheConfig splitState = new SplitStateCacheConfig();
+    private SplitLocalCacheConfig splitState = new SplitLocalCacheConfig();
 
     /**
      * WorkerState 缓存配置
      */
     private WorkerStateCacheConfig workerState = new WorkerStateCacheConfig();
 
-    public JobRunStateCacheConfig getJobRunState() {
+    public JobRunLocalCacheConfig getJobRunState() {
         return jobRunState;
     }
 
-    public void setJobRunState(JobRunStateCacheConfig jobRunState) {
+    public void setJobRunState(JobRunLocalCacheConfig jobRunState) {
         this.jobRunState = jobRunState;
     }
 
-    public ShardStateCacheConfig getShardState() {
-        return shardState;
-    }
-
-    public void setShardState(ShardStateCacheConfig shardState) {
-        this.shardState = shardState;
-    }
-
-    public SplitStateCacheConfig getSplitState() {
+    public SplitLocalCacheConfig getSplitState() {
         return splitState;
     }
 
-    public void setSplitState(SplitStateCacheConfig splitState) {
+    public void setSplitState(SplitLocalCacheConfig splitState) {
         this.splitState = splitState;
     }
 
@@ -72,7 +59,7 @@ public class CacheConfig {
     /**
      * JobRunState 缓存配置
      */
-    public static class JobRunStateCacheConfig {
+    public static class JobRunLocalCacheConfig {
         /**
          * 最大缓存条目数
          */
@@ -105,44 +92,9 @@ public class CacheConfig {
     }
 
     /**
-     * ShardState 缓存配置
+     * SplitLocalCache 缓存配置
      */
-    public static class ShardStateCacheConfig {
-        /**
-         * 最大缓存条目数
-         */
-        private long maxSize = 10_000;
-
-        /**
-         * 写入后过期时间（分钟）
-         */
-        private long expireAfterWriteMinutes = 60;
-
-        public long getMaxSize() {
-            return maxSize;
-        }
-
-        public void setMaxSize(long maxSize) {
-            this.maxSize = maxSize;
-        }
-
-        public long getExpireAfterWriteMinutes() {
-            return expireAfterWriteMinutes;
-        }
-
-        public void setExpireAfterWriteMinutes(long expireAfterWriteMinutes) {
-            this.expireAfterWriteMinutes = expireAfterWriteMinutes;
-        }
-
-        public Duration getExpireAfterWrite() {
-            return Duration.ofMinutes(expireAfterWriteMinutes);
-        }
-    }
-
-    /**
-     * SplitState 缓存配置
-     */
-    public static class SplitStateCacheConfig {
+    public static class SplitLocalCacheConfig {
         /**
          * 最大缓存条目数
          */

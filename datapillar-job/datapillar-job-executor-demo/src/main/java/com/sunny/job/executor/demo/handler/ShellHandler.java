@@ -25,14 +25,14 @@ import java.util.concurrent.TimeUnit;
 public class ShellHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ShellHandler.class);
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public void execute(JobContext context) {
         String params = context.getParams();
         log.info("SHELL 任务开始执行，jobRunId={}", context.getInstanceId());
 
         try {
-            JsonNode json = objectMapper.readTree(params);
+            JsonNode json = MAPPER.readTree(params);
             String script = json.has("script") ? json.get("script").asText() : "";
             int timeout = json.has("timeout") ? json.get("timeout").asInt() : 60;
 

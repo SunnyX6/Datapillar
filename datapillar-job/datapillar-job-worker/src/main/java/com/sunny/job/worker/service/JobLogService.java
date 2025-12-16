@@ -41,7 +41,7 @@ public class JobLogService {
      */
     private static final String MDC_KEY_JOB_LOG_FILE = "jobLogFile";
 
-    @Value("${datapillar.job.worker.log.base-path:./logs/job}")
+    @Value("${datapillar.job.log.base-path:./logs/job}")
     private String basePath;
 
     @PostConstruct

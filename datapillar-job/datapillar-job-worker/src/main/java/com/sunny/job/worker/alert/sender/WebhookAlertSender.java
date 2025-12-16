@@ -1,8 +1,9 @@
 package com.sunny.job.worker.alert.sender;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.reflect.TypeToken;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sunny.job.worker.alert.AlertResult;
 import com.sunny.job.worker.alert.AlertSender;
 import org.slf4j.Logger;
@@ -31,7 +32,7 @@ import java.util.Map;
 public class WebhookAlertSender implements AlertSender {
 
     private static final Logger log = LoggerFactory.getLogger(WebhookAlertSender.class);
-    private static final Gson GSON = new Gson();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final int TIMEOUT_SECONDS = 30;
 
     private final HttpClient httpClient;
@@ -45,12 +46,12 @@ public class WebhookAlertSender implements AlertSender {
     @Override
     public AlertResult send(String channelConfig, String title, String content) {
         try {
-            JsonObject config = GSON.fromJson(channelConfig, JsonObject.class);
-            String url = config.get("url").getAsString();
-            String method = config.has("method") ? config.get("method").getAsString().toUpperCase() : "POST";
+            JsonNode config = MAPPER.readTree(channelConfig);
+            String url = config.get("url").asText();
+            String method = config.has("method") ? config.get("method").asText().toUpperCase() : "POST";
 
             // 构建请求体
-            JsonObject requestBody = buildRequestBody(title, content);
+            ObjectNode requestBody = buildRequestBody(title, content);
 
             // 构建请求
             HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
@@ -59,16 +60,16 @@ public class WebhookAlertSender implements AlertSender {
                     .timeout(Duration.ofSeconds(TIMEOUT_SECONDS));
 
             // 添加自定义请求头
-            if (config.has("headers") && config.get("headers").isJsonObject()) {
-                Map<String, String> headers = GSON.fromJson(
+            if (config.has("headers") && config.get("headers").isObject()) {
+                Map<String, String> headers = MAPPER.convertValue(
                         config.get("headers"),
-                        new TypeToken<Map<String, String>>() {}.getType()
+                        new TypeReference<Map<String, String>>() {}
                 );
                 headers.forEach(requestBuilder::header);
             }
 
             // 设置请求方法和请求体
-            String bodyStr = GSON.toJson(requestBody);
+            String bodyStr = MAPPER.writeValueAsString(requestBody);
             if ("POST".equals(method)) {
                 requestBuilder.POST(HttpRequest.BodyPublishers.ofString(bodyStr, StandardCharsets.UTF_8));
             } else if ("PUT".equals(method)) {
@@ -106,12 +107,12 @@ public class WebhookAlertSender implements AlertSender {
     /**
      * 构建请求体
      */
-    private JsonObject buildRequestBody(String title, String content) {
-        JsonObject body = new JsonObject();
-        body.addProperty("title", title);
-        body.addProperty("content", content);
-        body.addProperty("timestamp", System.currentTimeMillis());
-        body.addProperty("source", "datapillar-job");
+    private ObjectNode buildRequestBody(String title, String content) {
+        ObjectNode body = MAPPER.createObjectNode();
+        body.put("title", title);
+        body.put("content", content);
+        body.put("timestamp", System.currentTimeMillis());
+        body.put("source", "datapillar-job");
         return body;
     }
 }

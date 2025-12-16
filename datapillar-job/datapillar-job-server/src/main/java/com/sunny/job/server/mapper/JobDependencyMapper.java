@@ -8,7 +8,7 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 
 /**
- * 任务依赖关系 Mapper（设计阶段）
+ * 任务依赖关系 Mapper
  *
  * @author SunnyX6
  * @date 2025-12-13
@@ -17,18 +17,31 @@ import java.util.List;
 public interface JobDependencyMapper extends BaseMapper<JobDependency> {
 
     /**
-     * 查询任务的所有上游依赖
-     *
-     * @param jobId 任务ID
-     * @return 上游任务ID列表
+     * 查询工作流下所有依赖
      */
-    List<Long> selectParentJobIds(@Param("jobId") Long jobId);
+    List<JobDependency> selectByWorkflowId(@Param("workflowId") Long workflowId);
 
     /**
-     * 查询任务的所有下游依赖
-     *
-     * @param jobId 任务ID
-     * @return 下游任务ID列表
+     * 逻辑删除工作流下所有依赖
      */
-    List<Long> selectChildJobIds(@Param("jobId") Long jobId);
+    int softDeleteByWorkflowId(@Param("workflowId") Long workflowId);
+
+    /**
+     * 删除任务相关的所有依赖
+     */
+    int deleteByJobId(@Param("workflowId") Long workflowId, @Param("jobId") Long jobId);
+
+    /**
+     * 统计依赖数量
+     */
+    long countDependency(@Param("workflowId") Long workflowId,
+                         @Param("jobId") Long jobId,
+                         @Param("parentJobId") Long parentJobId);
+
+    /**
+     * 删除依赖
+     */
+    int deleteDependency(@Param("workflowId") Long workflowId,
+                         @Param("jobId") Long jobId,
+                         @Param("parentJobId") Long parentJobId);
 }

@@ -35,6 +35,33 @@
 			<artifactId>datapillar-job-core</artifactId>
 		</dependency>
 
+		<!-- Pekko 集群/CRDT（Server 只做广播） -->
+		<dependency>
+			<groupId>org.apache.pekko</groupId>
+			<artifactId>pekko-actor-typed_${scala.binary.version}</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.pekko</groupId>
+			<artifactId>pekko-cluster-typed_${scala.binary.version}</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.pekko</groupId>
+			<artifactId>pekko-distributed-data_${scala.binary.version}</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.pekko</groupId>
+			<artifactId>pekko-serialization-jackson_${scala.binary.version}</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.pekko</groupId>
+			<artifactId>pekko-slf4j_${scala.binary.version}</artifactId>
+		</dependency>
+		<!-- 与 Worker 保持相同的 Pekko 模块集合，确保集群配置兼容性检查通过 -->
+		<dependency>
+			<groupId>org.apache.pekko</groupId>
+			<artifactId>pekko-cluster-sharding-typed_${scala.binary.version}</artifactId>
+		</dependency>
+
 		<!-- Spring Boot -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -75,13 +102,6 @@
 			<optional>true</optional>
 		</dependency>
 
-		<!-- FastJSON2 -->
-		<dependency>
-			<groupId>com.alibaba.fastjson2</groupId>
-			<artifactId>fastjson2</artifactId>
-			<version>2.0.43</version>
-		</dependency>
-
 	</dependencies>
 
 	<build>
@@ -89,13 +109,9 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
-				<executions>
-					<execution>
-						<goals>
-							<goal>repackage</goal>
-						</goals>
-					</execution>
-				</executions>
+				<configuration>
+					<skip>false</skip>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>

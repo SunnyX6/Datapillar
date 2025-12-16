@@ -23,6 +23,7 @@ public class JobRunInfo implements Serializable {
 
     private long jobRunId;
     private long workflowRunId;
+    private long workflowId;
     private long jobId;
     private int bucketId;
     private long namespaceId;
@@ -35,6 +36,7 @@ public class JobRunInfo implements Serializable {
     private int maxRetryTimes;
     private int retryInterval;
     private int priority;
+    private int triggerType;
     private long triggerTime;
     private JobStatus status;
     private int retryCount;
@@ -68,6 +70,14 @@ public class JobRunInfo implements Serializable {
 
     public void setWorkflowRunId(long workflowRunId) {
         this.workflowRunId = workflowRunId;
+    }
+
+    public long getWorkflowId() {
+        return workflowId;
+    }
+
+    public void setWorkflowId(long workflowId) {
+        this.workflowId = workflowId;
     }
 
     public long getJobId() {
@@ -164,6 +174,14 @@ public class JobRunInfo implements Serializable {
 
     public void setPriority(int priority) {
         this.priority = priority;
+    }
+
+    public int getTriggerType() {
+        return triggerType;
+    }
+
+    public void setTriggerType(int triggerType) {
+        this.triggerType = triggerType;
     }
 
     public long getTriggerTime() {

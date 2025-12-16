@@ -86,6 +86,7 @@ public interface JobRunMapper {
      *
      * @param jobRunId  任务执行实例ID
      * @param status    新状态
+     * @param op        操作类型
      * @param workerId  执行者
      * @param startTime 开始时间（毫秒）
      * @param endTime   结束时间（毫秒）
@@ -94,6 +95,7 @@ public interface JobRunMapper {
      */
     int updateStatus(@Param("jobRunId") Long jobRunId,
                      @Param("status") Integer status,
+                     @Param("op") String op,
                      @Param("workerId") String workerId,
                      @Param("startTime") Long startTime,
                      @Param("endTime") Long endTime,
@@ -103,10 +105,12 @@ public interface JobRunMapper {
      * 更新任务为重试状态
      *
      * @param jobRunId   任务执行实例ID
+     * @param op         操作类型
      * @param retryCount 新的重试次数
      * @return 影响行数
      */
     int updateForRetry(@Param("jobRunId") Long jobRunId,
+                       @Param("op") String op,
                        @Param("retryCount") Integer retryCount);
 
     /**
@@ -116,6 +120,50 @@ public interface JobRunMapper {
      * @return 影响行数
      */
     int batchInsert(@Param("list") List<JobRun> jobRuns);
+
+    /**
+     * 根据 jobRunId 查询 bucketId
+     *
+     * @param jobRunId 任务执行实例ID
+     * @return bucketId，不存在返回 null
+     */
+    Integer selectBucketIdById(@Param("jobRunId") Long jobRunId);
+
+    /**
+     * 根据 ID 查询单个任务
+     *
+     * @param jobRunId 任务执行实例ID
+     * @return 任务信息，不存在返回 null
+     */
+    JobRunInfo selectById(@Param("jobRunId") Long jobRunId);
+
+    /**
+     * 按 workflowRunId 和 bucketIds 查询 job_run
+     *
+     * @param workflowRunId 工作流执行实例ID
+     * @param bucketIds     Bucket ID 集合
+     * @return job_run 列表
+     */
+    List<JobRunInfo> selectByWorkflowRunIdAndBuckets(@Param("workflowRunId") Long workflowRunId,
+                                                      @Param("bucketIds") Collection<Integer> bucketIds);
+
+    /**
+     * 批量更新状态为 WAITING（重跑用）
+     *
+     * @param jobRunIds 任务ID列表
+     * @param op        操作类型
+     * @return 影响行数
+     */
+    int batchUpdateStatusToWaiting(@Param("jobRunIds") List<Long> jobRunIds, @Param("op") String op);
+
+    /**
+     * 批量更新状态为 CANCELLED（下线/取消用）
+     *
+     * @param jobRunIds 任务ID列表
+     * @param op        操作类型
+     * @return 影响行数
+     */
+    int batchUpdateStatusToCancelled(@Param("jobRunIds") List<Long> jobRunIds, @Param("op") String op);
 
     /**
      * 按时间窗口查询任务（预加载优化）
@@ -135,24 +183,4 @@ public interface JobRunMapper {
                                              @Param("windowEnd") Long windowEnd,
                                              @Param("status") Integer status,
                                              @Param("limit") int limit);
-
-    /**
-     * 批量更新任务状态（异步批量写入优化）
-     *
-     * @param updates 状态更新列表
-     * @return 影响行数
-     */
-    int batchUpdateStatus(@Param("list") List<StatusUpdate> updates);
-
-    /**
-     * 状态更新记录
-     */
-    record StatusUpdate(
-            long jobRunId,
-            int status,
-            String workerId,
-            Long startTime,
-            Long endTime,
-            String message
-    ) {}
 }

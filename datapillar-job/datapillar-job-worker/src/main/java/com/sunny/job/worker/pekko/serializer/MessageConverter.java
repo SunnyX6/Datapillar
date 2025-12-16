@@ -34,6 +34,7 @@ public final class MessageConverter {
             case SchedulerMessage.RegisterJob m -> builder.setRegisterJob(
                     RegisterJobProto.newBuilder()
                             .setJobRunId(m.jobRunId())
+                            .setJobId(m.jobId())
                             .setTriggerTime(m.triggerTime())
                             .setPriority(m.priority())
                             .build()
@@ -99,6 +100,16 @@ public final class MessageConverter {
                     throw new IllegalArgumentException("ShardingReceiversUpdated 包含 ActorRef Set，不支持跨节点序列化");
             case SchedulerMessage.RetrySplit ignored ->
                     throw new IllegalArgumentException("RetrySplit 是本地 Timer 消息，不支持跨节点序列化");
+            case SchedulerMessage.GlobalMaxIdChanged ignored ->
+                    throw new IllegalArgumentException("GlobalMaxIdChanged 是本地消息，不支持跨节点序列化");
+            case SchedulerMessage.CancelWorkflow ignored ->
+                    throw new IllegalArgumentException("CancelWorkflow 是本地消息，不支持跨节点序列化");
+            case SchedulerMessage.CancelJob ignored ->
+                    throw new IllegalArgumentException("CancelJob 是本地消息，不支持跨节点序列化");
+            case SchedulerMessage.NewJobsCreated ignored ->
+                    throw new IllegalArgumentException("NewJobsCreated 是本地消息，不支持跨节点序列化");
+            case SchedulerMessage.RefreshJobInfo ignored ->
+                    throw new IllegalArgumentException("RefreshJobInfo 是本地消息，不支持跨节点序列化");
         }
 
         return builder.build();
@@ -108,7 +119,7 @@ public final class MessageConverter {
         return switch (proto.getMessageCase()) {
             case REGISTER_JOB -> {
                 RegisterJobProto p = proto.getRegisterJob();
-                yield new SchedulerMessage.RegisterJob(p.getJobRunId(), p.getTriggerTime(), p.getPriority());
+                yield new SchedulerMessage.RegisterJob(p.getJobRunId(), p.getJobId(), p.getTriggerTime(), p.getPriority());
             }
             case JOB_COMPLETED -> {
                 JobCompletedProto p = proto.getJobCompleted();

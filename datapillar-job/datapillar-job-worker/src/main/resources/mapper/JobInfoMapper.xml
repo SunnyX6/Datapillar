@@ -7,7 +7,6 @@
         id,
         workflow_id AS workflowId,
         job_name AS jobName,
-        job_status AS jobStatus,
         job_type AS jobType,
         job_params AS jobParams,
         route_strategy AS routeStrategy,
@@ -29,7 +28,7 @@
     <select id="selectByWorkflowId" resultType="com.sunny.job.worker.domain.entity.JobInfo">
         SELECT <include refid="baseColumns"/>
         FROM job_info
-        WHERE workflow_id = #{workflowId} AND job_status = 1 AND is_deleted = 0
+        WHERE workflow_id = #{workflowId} AND is_deleted = 0
     </select>
 
 </mapper>

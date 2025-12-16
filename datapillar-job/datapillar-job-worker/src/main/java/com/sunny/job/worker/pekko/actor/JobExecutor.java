@@ -2,6 +2,7 @@ package com.sunny.job.worker.pekko.actor;
 
 import com.sunny.job.core.enums.JobStatus;
 import com.sunny.job.core.enums.RouteStrategy;
+import com.sunny.job.core.message.JobRunInfo;
 import com.sunny.job.core.message.SchedulerMessage;
 import com.sunny.job.core.message.ExecutorMessage;
 import com.sunny.job.core.message.ExecutorMessage.*;
@@ -92,6 +93,9 @@ public class JobExecutor extends AbstractBehavior<ExecutorMessage> {
 
         this.currentJob = msg;
         this.cancelled = false;
+
+        // 更新 workflow_run 的 nextTriggerTime（首个任务开始执行时）
+        executorContext.updateNextTriggerTimeIfNeeded(msg.workflowRunId());
 
         // 更新 DB 状态为 RUNNING
         executorContext.updateJobRunStatus(msg.jobRunId(), JobStatus.RUNNING, msg.splitStart());
@@ -256,12 +260,14 @@ public class JobExecutor extends AbstractBehavior<ExecutorMessage> {
                 log.info("成功生成下一个工作流执行实例: workflowRunId={}, nextTriggerTime={}",
                         result.nextWorkflowRunId(), result.nextTriggerTime());
 
-                // 6. 通知 Scheduler 注册新任务
-                for (Long jobRunId : result.jobRunIds()) {
+                // 6. 通知 Scheduler 注册新任务（携带完整的 JobRunInfo）
+                for (JobRunInfo jobRunInfo : result.jobRunInfoList()) {
                     scheduler.tell(new SchedulerMessage.RegisterJob(
-                            jobRunId,
-                            result.nextTriggerTime(),
-                            0
+                            jobRunInfo.getJobRunId(),
+                            jobRunInfo.getJobId(),
+                            jobRunInfo.getTriggerTime(),
+                            jobRunInfo.getPriority(),
+                            jobRunInfo
                     ));
                 }
             }
@@ -294,6 +300,7 @@ public class JobExecutor extends AbstractBehavior<ExecutorMessage> {
         // 通知 Scheduler 重新注册
         scheduler.tell(new SchedulerMessage.RegisterJob(
                 job.jobRunId(),
+                job.jobId(),
                 nextTriggerTime,
                 0
         ));

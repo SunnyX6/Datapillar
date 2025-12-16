@@ -112,6 +112,11 @@
 			<!-- Pekko Actor -->
 			<dependency>
 				<groupId>org.apache.pekko</groupId>
+				<artifactId>pekko-actor_${scala.binary.version}</artifactId>
+				<version>${pekko.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.pekko</groupId>
 				<artifactId>pekko-actor-typed_${scala.binary.version}</artifactId>
 				<version>${pekko.version}</version>
 			</dependency>
@@ -224,11 +229,30 @@
 
 		<pluginManagement>
 			<plugins>
+				<!-- Maven Compiler 插件（保留参数名） -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<version>3.13.0</version>
+					<configuration>
+						<parameters>true</parameters>
+					</configuration>
+				</plugin>
 				<!-- Spring Boot Maven 插件 -->
 				<plugin>
 					<groupId>org.springframework.boot</groupId>
 					<artifactId>spring-boot-maven-plugin</artifactId>
 					<version>${spring-boot.version}</version>
+					<configuration>
+						<skip>true</skip>
+					</configuration>
+					<executions>
+						<execution>
+							<goals>
+								<goal>repackage</goal>
+							</goals>
+						</execution>
+					</executions>
 				</plugin>
 				<!-- Protobuf 编译插件（仅编译 proto，不生成 gRPC 代码）-->
 				<plugin>
@@ -256,44 +280,6 @@
 			<activation>
 				<activeByDefault>true</activeByDefault>
 			</activation>
-			<modules>
-				<module>datapillar-job-core</module>
-			</modules>
-			<build>
-				<plugins>
-					<!-- Source -->
-					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-source-plugin</artifactId>
-						<version>${maven-source-plugin.version}</version>
-						<executions>
-							<execution>
-								<phase>package</phase>
-								<goals>
-									<goal>jar-no-fork</goal>
-								</goals>
-							</execution>
-						</executions>
-					</plugin>
-					<!-- Javadoc -->
-					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-javadoc-plugin</artifactId>
-						<version>${maven-javadoc-plugin.version}</version>
-						<executions>
-							<execution>
-								<phase>package</phase>
-								<goals>
-									<goal>jar</goal>
-								</goals>
-								<configuration>
-									<doclint>none</doclint>
-								</configuration>
-							</execution>
-						</executions>
-					</plugin>
-				</plugins>
-			</build>
 		</profile>
 	</profiles>
 

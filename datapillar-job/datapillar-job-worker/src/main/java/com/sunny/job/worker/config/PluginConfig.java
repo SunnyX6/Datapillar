@@ -6,6 +6,7 @@ import org.pf4j.ManifestPluginDescriptorFinder;
 import org.pf4j.PluginDescriptorFinder;
 import org.pf4j.PluginLoader;
 import org.pf4j.PluginManager;
+import org.pf4j.RuntimeMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +23,8 @@ import java.nio.file.Paths;
  * <p>
  * 插件目录：${datapillar.job.worker.plugins-dir:plugins}
  * <p>
+ * 开发模式：设置 pf4j.mode=development 从 classpath 加载扩展
+ * <p>
  * 使用方式：将插件 jar 放到 plugins 目录，启动时自动加载
  *
  * @author SunnyX6
@@ -35,17 +38,27 @@ public class PluginConfig {
     @Value("${datapillar.job.worker.plugins-dir:plugins}")
     private String pluginsDir;
 
+    @Value("${pf4j.mode:deployment}")
+    private String mode;
+
     /**
      * 创建 PluginManager
      * <p>
-     * 只加载 JAR 格式插件，从 MANIFEST.MF 读取插件元数据
+     * 开发模式（pf4j.mode=development）：从 classpath 加载扩展
+     * 部署模式（pf4j.mode=deployment）：从 plugins 目录加载 JAR 插件
      */
     @Bean
     public PluginManager pluginManager() {
         Path pluginsPath = Paths.get(pluginsDir).toAbsolutePath();
-        log.info("初始化 PluginManager，插件目录: {}", pluginsPath);
+        RuntimeMode runtimeMode = RuntimeMode.byName(mode);
+        log.info("初始化 PluginManager，模式: {}, 插件目录: {}", runtimeMode, pluginsPath);
 
         PluginManager pluginManager = new DefaultPluginManager(pluginsPath) {
+            @Override
+            public RuntimeMode getRuntimeMode() {
+                return runtimeMode;
+            }
+
             @Override
             protected PluginLoader createPluginLoader() {
                 // 只加载 JAR 格式插件

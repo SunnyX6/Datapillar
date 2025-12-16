@@ -51,4 +51,16 @@ public interface JobDependencyMapper {
      * @return 影响行数
      */
     int batchInsertRunDependencies(@Param("list") List<JobRunDependency> dependencies);
+
+    /**
+     * 插入单条任务执行依赖关系
+     *
+     * @param workflowRunId 工作流执行实例ID
+     * @param jobRunId      任务执行实例ID
+     * @param parentRunId   父任务执行实例ID
+     * @return 影响行数
+     */
+    int insertRunDependency(@Param("workflowRunId") Long workflowRunId,
+                            @Param("jobRunId") Long jobRunId,
+                            @Param("parentRunId") Long parentRunId);
 }

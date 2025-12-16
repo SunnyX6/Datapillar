@@ -3,7 +3,7 @@
 # @date 2025-12-13
 
 server:
-  port: 8081
+  port: ${SERVER_PORT:6005}
 
 spring:
   application:
@@ -53,6 +53,10 @@ mybatis-plus:
 # Worker 配置
 datapillar:
   job:
+    # 任务日志配置（Server 和 Worker 共用）
+    log:
+      base-path: ${LOG_HOME:/tmp/logs}/job
+      retention-days: ${LOG_RETENTION_DAYS:7}
     worker:
       # 插件目录（PF4J 插件 jar 存放位置）
       plugins-dir: ${PLUGINS_DIR:plugins}
@@ -79,30 +83,19 @@ datapillar:
         host: ${PEKKO_HOST:127.0.0.1}
         port: ${PEKKO_PORT:2551}
         seed-nodes: ${PEKKO_SEED_NODES:pekko://datapillar-job@127.0.0.1:2551}
-      # 任务日志配置
-      log:
-        base-path: ${LOG_HOME:/tmp/logs}/job
-        retention-days: ${LOG_RETENTION_DAYS:7}
-      # 执行器配置
-      executor:
-        max-concurrency: ${EXECUTOR_MAX_CONCURRENCY:100}
       # Semaphore 超时配置（秒）
       semaphore-timeout-seconds: ${SEMAPHORE_TIMEOUT_SECONDS:30}
       # Caffeine 缓存配置（自动过期清理，替代手动定时清理）
       cache:
-        # JobRunState 缓存配置
+        # JobRunLocalCache 缓存配置
         job-run-state:
           max-size: ${CACHE_JOB_RUN_STATE_MAX_SIZE:100000}
           expire-after-write-minutes: ${CACHE_JOB_RUN_STATE_EXPIRE_MINUTES:30}
-        # ShardState 缓存配置
-        shard-state:
-          max-size: ${CACHE_SHARD_STATE_MAX_SIZE:10000}
-          expire-after-write-minutes: ${CACHE_SHARD_STATE_EXPIRE_MINUTES:60}
-        # SplitState 缓存配置
+        # SplitLocalCache 缓存配置
         split-state:
           max-size: ${CACHE_SPLIT_STATE_MAX_SIZE:50000}
           expire-after-write-minutes: ${CACHE_SPLIT_STATE_EXPIRE_MINUTES:60}
-        # WorkerState 缓存配置
+        # WorkerManager 缓存配置
         worker-state:
           max-size: ${CACHE_WORKER_STATE_MAX_SIZE:1000}
           expire-after-write-minutes: ${CACHE_WORKER_STATE_EXPIRE_MINUTES:5}

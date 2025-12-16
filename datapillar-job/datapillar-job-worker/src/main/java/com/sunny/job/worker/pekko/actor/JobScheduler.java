@@ -10,9 +10,10 @@ import com.sunny.job.core.message.JobRunInfo;
 import com.sunny.job.core.split.DefaultSplitCalculator;
 import com.sunny.job.core.split.SplitCalculator;
 import com.sunny.job.worker.pekko.ddata.BucketLease;
-import com.sunny.job.worker.pekko.ddata.BucketStateManager;
-import com.sunny.job.worker.pekko.ddata.JobRunStateManager;
-import com.sunny.job.worker.pekko.ddata.SplitStateManager;
+import com.sunny.job.worker.pekko.ddata.BucketManager;
+import com.sunny.job.worker.pekko.ddata.JobRunLocalCache;
+import com.sunny.job.worker.pekko.ddata.MaxJobRunIdState;
+import com.sunny.job.worker.pekko.ddata.SplitLocalCache;
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.Timeout;
 import org.apache.pekko.actor.typed.ActorRef;
@@ -75,9 +76,10 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
 
     private final JobSchedulerContext schedulerContext;
     private final JobExecutorContext executorContext;
-    private final BucketStateManager bucketStateManager;
-    private final SplitStateManager splitStateManager;
-    private final JobRunStateManager jobRunStateManager;
+    private final BucketManager bucketManager;
+    private final SplitLocalCache splitLocalCache;
+    private final JobRunLocalCache jobRunLocalCache;
+    private final MaxJobRunIdState maxJobRunIdManager;
     private final SplitCalculator splitCalculator;
     private final String selfAddress;
 
@@ -115,6 +117,11 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
      * bucketId → Set<jobRunId> 反向索引（用于 Bucket 丢失时快速清理）
      */
     private final Map<Integer, Set<Long>> bucketJobIndex = new HashMap<>();
+
+    /**
+     * workflowId → Set<jobRunId> 反向索引（用于工作流下线时快速取消）
+     */
+    private final Map<Long, Set<Long>> workflowJobIndex = new HashMap<>();
 
     /**
      * parent_run_id → Set<child_run_id> 反向索引（用于快速找下游任务）
@@ -169,13 +176,14 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
 
     public static Behavior<SchedulerMessage> create(JobSchedulerContext schedulerContext,
                                                      JobExecutorContext executorContext,
-                                                     BucketStateManager bucketStateManager,
-                                                     SplitStateManager splitStateManager,
-                                                     JobRunStateManager jobRunStateManager,
+                                                     BucketManager bucketManager,
+                                                     SplitLocalCache splitLocalCache,
+                                                     JobRunLocalCache jobRunLocalCache,
+                                                     MaxJobRunIdState maxJobRunIdManager,
                                                      String selfAddress) {
         // 单 Scheduler 模式（兼容旧接口）
-        return create(schedulerContext, executorContext, bucketStateManager,
-                splitStateManager, jobRunStateManager, selfAddress, 0, 1);
+        return create(schedulerContext, executorContext, bucketManager,
+                splitLocalCache, jobRunLocalCache, maxJobRunIdManager, selfAddress, 0, 1);
     }
 
     /**
@@ -186,31 +194,35 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
      */
     public static Behavior<SchedulerMessage> create(JobSchedulerContext schedulerContext,
                                                      JobExecutorContext executorContext,
-                                                     BucketStateManager bucketStateManager,
-                                                     SplitStateManager splitStateManager,
-                                                     JobRunStateManager jobRunStateManager,
+                                                     BucketManager bucketManager,
+                                                     SplitLocalCache splitLocalCache,
+                                                     JobRunLocalCache jobRunLocalCache,
+                                                     MaxJobRunIdState maxJobRunIdManager,
                                                      String selfAddress,
                                                      int shardId,
                                                      int shardCount) {
         return Behaviors.setup(ctx -> new JobScheduler(ctx, schedulerContext, executorContext,
-                bucketStateManager, splitStateManager, jobRunStateManager, selfAddress, shardId, shardCount));
+                bucketManager, splitLocalCache, jobRunLocalCache, maxJobRunIdManager,
+                selfAddress, shardId, shardCount));
     }
 
     private JobScheduler(ActorContext<SchedulerMessage> context,
                          JobSchedulerContext schedulerContext,
                          JobExecutorContext executorContext,
-                         BucketStateManager bucketStateManager,
-                         SplitStateManager splitStateManager,
-                         JobRunStateManager jobRunStateManager,
+                         BucketManager bucketManager,
+                         SplitLocalCache splitLocalCache,
+                         JobRunLocalCache jobRunLocalCache,
+                         MaxJobRunIdState maxJobRunIdManager,
                          String selfAddress,
                          int shardId,
                          int shardCount) {
         super(context);
         this.schedulerContext = schedulerContext;
         this.executorContext = executorContext;
-        this.bucketStateManager = bucketStateManager;
-        this.splitStateManager = splitStateManager;
-        this.jobRunStateManager = jobRunStateManager;
+        this.bucketManager = bucketManager;
+        this.splitLocalCache = splitLocalCache;
+        this.jobRunLocalCache = jobRunLocalCache;
+        this.maxJobRunIdManager = maxJobRunIdManager;
         this.splitCalculator = new DefaultSplitCalculator();
         this.selfAddress = selfAddress;
         this.shardId = shardId;
@@ -238,6 +250,10 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
                 .onMessage(JobsLoaded.class, this::onJobsLoaded)
                 .onMessage(JobsLoadFailed.class, this::onJobsLoadFailed)
                 .onMessage(RetrySplit.class, this::onRetrySplit)
+                .onMessage(GlobalMaxIdChanged.class, this::onGlobalMaxIdChanged)
+                .onMessage(NewJobsCreated.class, this::onNewJobsCreated)
+                .onMessage(CancelWorkflow.class, this::onCancelWorkflow)
+                .onMessage(SchedulerMessage.RefreshJobInfo.class, this::onRefreshJobInfo)
                 .onSignal(PostStop.class, this::onPostStop)
                 .build();
     }
@@ -287,6 +303,9 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
         // 更新 lastMaxId
         if (msg.newMaxId() > lastMaxId) {
             lastMaxId = msg.newMaxId();
+
+            // 更新 CRDT 中的 maxJobRunId，通知其他 Worker
+            maxJobRunIdManager.updateMaxId(lastMaxId);
         }
 
         // 根据来源执行后续操作
@@ -324,6 +343,106 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
     }
 
     /**
+     * 处理全局 maxJobRunId 变化（事件驱动增量加载）
+     * <p>
+     * 来源：MaxJobRunIdState 检测到 CRDT 中全局 maxJobRunId 变化
+     * 触发增量加载自己 Bucket 的新任务
+     */
+    private Behavior<SchedulerMessage> onGlobalMaxIdChanged(GlobalMaxIdChanged msg) {
+        long newMaxId = msg.newMaxId();
+
+        // 如果新的全局最大 ID 大于本地已知的最大 ID，说明有新任务创建
+        if (newMaxId > lastMaxId && !myBuckets.isEmpty()) {
+            log.info("JobScheduler-{} 收到全局 maxJobRunId 变化通知: {} -> {}，触发增量加载",
+                    shardId, lastMaxId, newMaxId);
+
+            // 异步加载新任务
+            var self = getContext().getSelf();
+            schedulerContext.loadNewJobsByBucketsAsync(lastMaxId, myBuckets)
+                    .whenComplete((result, error) -> {
+                        if (error != null) {
+                            self.tell(new JobsLoadFailed(error.getMessage(), SOURCE_INCREMENTAL));
+                        } else if (!result.jobs().isEmpty()) {
+                            self.tell(new JobsLoaded(result.jobs(), result.newMaxId(), SOURCE_INCREMENTAL));
+                        } else if (result.newMaxId() > lastMaxId) {
+                            // 即使没有新任务（可能不属于自己的 Bucket），也更新 lastMaxId
+                            lastMaxId = result.newMaxId();
+                        }
+                    });
+        }
+
+        return this;
+    }
+
+    /**
+     * 处理新任务创建（工作流完成后创建下一批任务）
+     * <p>
+     * 流程：
+     * 1. 过滤属于自己 Bucket 的任务
+     * 2. 加载到内存（jobRunMap + triggerQueue）
+     * 3. 异步写入 DB 持久化
+     * 4. 更新 CRDT maxJobRunId 通知其他 Worker
+     */
+    private Behavior<SchedulerMessage> onNewJobsCreated(NewJobsCreated msg) {
+        log.info("收到新任务创建通知: workflowRunId={}, count={}",
+                msg.workflowRunId(), msg.jobs().size());
+
+        // 1. 过滤属于自己 Bucket 的任务
+        List<JobRunInfo> myJobs = new ArrayList<>();
+        long maxId = lastMaxId;
+
+        for (JobRunInfo job : msg.jobs()) {
+            // 检查是否属于自己的 Bucket
+            if (myBuckets.contains(job.getBucketId()) && isMyBucket(job.getBucketId())) {
+                myJobs.add(job);
+            }
+            // 更新最大 ID
+            if (job.getJobRunId() > maxId) {
+                maxId = job.getJobRunId();
+            }
+        }
+
+        if (myJobs.isEmpty()) {
+            log.debug("没有属于自己 Bucket 的新任务");
+            // 仍然需要更新 CRDT 通知其他 Worker
+            if (maxId > lastMaxId) {
+                lastMaxId = maxId;
+                maxJobRunIdManager.updateMaxId(lastMaxId);
+            }
+            return this;
+        }
+
+        log.info("加载 {} 个属于自己 Bucket 的新任务", myJobs.size());
+
+        // 2. 加载到内存
+        for (JobRunInfo job : myJobs) {
+            loadJobRun(job);
+        }
+
+        // 3. 异步写入 DB 持久化
+        final long finalMaxId = maxId;
+        schedulerContext.persistJobRunsAsync(myJobs)
+                .whenComplete((ids, error) -> {
+                    if (error != null) {
+                        log.error("异步持久化新任务失败: {}", error.getMessage());
+                    } else {
+                        log.debug("异步持久化 {} 个新任务成功", ids.size());
+                    }
+                });
+
+        // 4. 更新 lastMaxId 和 CRDT
+        if (finalMaxId > lastMaxId) {
+            lastMaxId = finalMaxId;
+            maxJobRunIdManager.updateMaxId(lastMaxId);
+        }
+
+        // 5. 重新调度定时器
+        scheduleNextTrigger();
+
+        return this;
+    }
+
+    /**
      * 处理分片范围完成报告
      * <p>
      * Worker 执行完一个分片范围后，继续拆分执行下一个范围
@@ -336,9 +455,9 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
 
         // 更新 CRDT 状态
         if (status.isSuccess()) {
-            splitStateManager.markCompleted(msg.jobRunId(), msg.splitStart(), msg.splitEnd(), msg.message());
+            splitLocalCache.markCompleted(msg.jobRunId(), msg.splitStart(), msg.splitEnd(), msg.message());
         } else {
-            splitStateManager.markFailed(msg.jobRunId(), msg.splitStart(), msg.splitEnd(), msg.message());
+            splitLocalCache.markFailed(msg.jobRunId(), msg.splitStart(), msg.splitEnd(), msg.message());
         }
 
         // 减少正在执行的分片计数
@@ -378,17 +497,17 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
         // 单 Scheduler 模式：自己订阅 Bucket 变化
         // 分片模式：由 JobSchedulerManager 统一订阅并路由
         if (shardCount == 1) {
-            bucketStateManager.subscribe(
+            bucketManager.subscribe(
                     bucketId -> self.tell(new BucketAcquired(bucketId)),
                     bucketId -> self.tell(new BucketLost(bucketId))
             );
         }
 
         // 从 DB 恢复之前持有的 Bucket，只认领属于自己 shard 的
-        List<Integer> previousBuckets = bucketStateManager.recoverFromDb();
+        List<Integer> previousBuckets = bucketManager.recoverFromDb();
         Set<Integer> recoveredBuckets = new HashSet<>();
         for (Integer bucketId : previousBuckets) {
-            if (isMyBucket(bucketId) && bucketStateManager.tryAcquireBucket(bucketId)) {
+            if (isMyBucket(bucketId) && bucketManager.tryAcquireBucket(bucketId)) {
                 recoveredBuckets.add(bucketId);
             }
         }
@@ -397,7 +516,7 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
         }
 
         // 认领其他空闲 Bucket，只认领属于自己 shard 的
-        Set<Integer> newBuckets = bucketStateManager.acquireAvailableBucketsForShard(shardId, shardCount);
+        Set<Integer> newBuckets = bucketManager.acquireAvailableBucketsForShard(shardId, shardCount);
         newBuckets.removeAll(recoveredBuckets);
         if (!newBuckets.isEmpty()) {
             log.info("JobScheduler-{} 认领 {} 个新 Bucket", shardId, newBuckets.size());
@@ -529,7 +648,7 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
      * 处理 Bucket 续租
      */
     private Behavior<SchedulerMessage> onRenewBuckets(RenewBuckets msg) {
-        bucketStateManager.renewAllBuckets();
+        bucketManager.renewAllBuckets();
         scheduleBucketRenewal();
         return this;
     }
@@ -548,13 +667,30 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
      * 处理任务注册
      */
     private Behavior<SchedulerMessage> onRegisterJob(RegisterJob msg) {
-        log.debug("注册任务: jobRunId={}, triggerTime={}", msg.jobRunId(), msg.triggerTime());
+        log.debug("注册任务: jobRunId={}, jobId={}, triggerTime={}", msg.jobRunId(), msg.jobId(), msg.triggerTime());
 
         JobRunInfo jobRun = jobRunMap.get(msg.jobRunId());
-        if (jobRun != null && jobRun.getStatus() == JobStatus.WAITING) {
-            triggerQueue.add(jobRun);
-            scheduleNextTrigger();
+        if (jobRun == null) {
+            // 任务不在内存中，使用消息携带的 JobRunInfo
+            if (msg.jobRunInfo() != null) {
+                jobRun = msg.jobRunInfo();
+                // 使用 loadJobRun 来正确构建所有索引（包括下游依赖索引）
+                loadJobRun(jobRun);
+                log.debug("从消息添加任务到内存: jobRunId={}, hasDependencies={}",
+                        msg.jobRunId(), jobRun.hasDependencies());
+            } else {
+                log.warn("任务不在内存中且消息未携带 JobRunInfo，跳过: jobRunId={}", msg.jobRunId());
+                return this;
+            }
         }
+
+        // 补全 job_params 等字段（如果消息已携带则无需再次补全）
+        if (msg.jobRunInfo() == null) {
+            schedulerContext.enrichJobInfo(jobRun);
+        }
+
+        // 调度下一次触发（loadJobRun 已经添加到 triggerQueue，这里确保调度器启动）
+        scheduleNextTrigger();
 
         return this;
     }
@@ -616,10 +752,16 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
             bucketJobs.remove(jobRunId);
         }
 
-        // 3. 从 downstreamIndex 移除（作为父任务的索引）
+        // 3. 从 workflowJobIndex 移除
+        Set<Long> workflowJobs = workflowJobIndex.get(jobRun.getWorkflowId());
+        if (workflowJobs != null) {
+            workflowJobs.remove(jobRunId);
+        }
+
+        // 4. 从 downstreamIndex 移除（作为父任务的索引）
         downstreamIndex.remove(jobRunId);
 
-        // 4. 从 runningShardingJobs 移除（如果计数为 0）
+        // 5. 从 runningShardingJobs 移除（如果计数为 0）
         Integer shardingCount = runningShardingJobs.get(jobRunId);
         if (shardingCount != null && shardingCount <= 0) {
             runningShardingJobs.remove(jobRunId);
@@ -655,22 +797,6 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
             } else {
                 log.debug("任务依赖未满足，等待: jobRunId={}", jobRun.getJobRunId());
             }
-        }
-
-        // 异步检查新任务（按 Bucket 过滤）
-        if (!myBuckets.isEmpty()) {
-            var self = getContext().getSelf();
-            schedulerContext.loadNewJobsByBucketsAsync(lastMaxId, myBuckets)
-                    .whenComplete((result, error) -> {
-                        if (error != null) {
-                            log.warn("增量加载任务失败: {}", error.getMessage());
-                        } else if (!result.jobs().isEmpty()) {
-                            self.tell(new JobsLoaded(result.jobs(), result.newMaxId(), SOURCE_INCREMENTAL));
-                        } else if (result.newMaxId() > lastMaxId) {
-                            // 即使没有新任务，也更新 lastMaxId
-                            self.tell(new JobsLoaded(List.of(), result.newMaxId(), SOURCE_INCREMENTAL));
-                        }
-                    });
         }
 
         // 异步检测被重跑的任务
@@ -746,7 +872,7 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
             }
 
             // 2. 本地内存没有，从 CRDT 缓存读取（跨 Bucket 的任务，零网络开销）
-            JobStatus status = jobRunStateManager.getStatus(parentRunId);
+            JobStatus status = jobRunLocalCache.getStatus(parentRunId);
             if (status == null || !status.isSuccess()) {
                 return false;
             }
@@ -764,11 +890,23 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
             return;
         }
 
+        long now = System.currentTimeMillis();
         for (Long childRunId : children) {
             JobRunInfo child = jobRunMap.get(childRunId);
             if (child != null && child.getStatus() == JobStatus.WAITING) {
                 if (checkDependenciesSatisfied(child)) {
-                    dispatchJob(child);
+                    // 检查 triggerTime 是否到达
+                    // triggerTime = 0 表示依赖满足即可执行
+                    // triggerTime > 0 表示需要等待时间到达
+                    if (child.getTriggerTime() == 0 || child.getTriggerTime() <= now) {
+                        dispatchJob(child);
+                    } else {
+                        // 依赖已满足但时间未到，重新加入触发队列等待
+                        log.debug("依赖已满足但 triggerTime 未到，等待触发: jobRunId={}, triggerTime={}",
+                                child.getJobRunId(), child.getTriggerTime());
+                        triggerQueue.add(child);
+                        scheduleNextTrigger();
+                    }
                 }
             }
         }
@@ -996,7 +1134,7 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
         long splitSize = splitCalculator.calculate();
 
         // 2. 从 CRDT 获取下一个未处理的起点
-        long nextStart = splitStateManager.getNextStart(jobRunId);
+        long nextStart = splitLocalCache.getNextStart(jobRunId);
 
         // 3. 计算分片范围
         long splitStart = nextStart;
@@ -1006,9 +1144,9 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
                 jobRunId, splitStart, splitEnd, splitSize, retryCount);
 
         // 4. 尝试标记范围为 PROCESSING
-        if (splitStateManager.tryMarkProcessing(jobRunId, splitStart, splitEnd)) {
+        if (splitLocalCache.tryMarkProcessing(jobRunId, splitStart, splitEnd)) {
             // 标记成功，执行分片
-            splitStateManager.updateNextStart(jobRunId, splitEnd);
+            splitLocalCache.updateNextStart(jobRunId, splitEnd);
             runningShardingJobs.merge(jobRunId, 1, Integer::sum);
             doExecuteSplit(jobRun, splitStart, splitEnd);
             return;
@@ -1017,7 +1155,7 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
         // 标记失败，更新起点，通过 Timer 延迟重试（不阻塞 Actor 线程）
         log.info("分片范围被其他 Worker 抢占，延迟重试: jobRunId={}, range=[{}, {}), backoff={}ms",
                 jobRunId, splitStart, splitEnd, backoffMs);
-        splitStateManager.updateNextStart(jobRunId, splitEnd);
+        splitLocalCache.updateNextStart(jobRunId, splitEnd);
 
         // 使用 Timer 调度延迟消息，避免 Thread.sleep 阻塞
         var self = getContext().getSelf();
@@ -1166,6 +1304,10 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
         bucketJobIndex.computeIfAbsent(jobRun.getBucketId(), k -> new HashSet<>())
                 .add(jobRun.getJobRunId());
 
+        // 构建 Workflow → 任务索引
+        workflowJobIndex.computeIfAbsent(jobRun.getWorkflowId(), k -> new HashSet<>())
+                .add(jobRun.getJobRunId());
+
         // 构建下游索引
         if (jobRun.hasDependencies()) {
             for (Long parentRunId : jobRun.getParentJobRunIds()) {
@@ -1178,5 +1320,82 @@ public class JobScheduler extends AbstractBehavior<SchedulerMessage> {
         if (jobRun.getStatus() == JobStatus.WAITING) {
             triggerQueue.add(jobRun);
         }
+    }
+
+    /**
+     * 处理取消工作流消息（下线信号）
+     * <p>
+     * 所有 Worker 收到下线信号后，各自处理自己负责的任务：
+     * 1. 等待中的任务：从队列移除，标记为 CANCELLED
+     * 2. 运行中的任务：发送 Kill 消息给 Executor，标记为 KILLED
+     */
+    private Behavior<SchedulerMessage> onCancelWorkflow(CancelWorkflow msg) {
+        long workflowId = msg.workflowId();
+
+        // 从索引快速获取该工作流的所有任务
+        Set<Long> jobRunIds = workflowJobIndex.remove(workflowId);
+        if (jobRunIds == null || jobRunIds.isEmpty()) {
+            log.debug("本 Worker 没有该工作流的任务: workflowId={}", workflowId);
+            return this;
+        }
+
+        int cancelled = 0;
+        int killed = 0;
+
+        for (Long jobRunId : jobRunIds) {
+            JobRunInfo jobRun = jobRunMap.get(jobRunId);
+            if (jobRun == null) {
+                continue;
+            }
+
+            JobStatus status = jobRun.getStatus();
+
+            if (status == JobStatus.WAITING) {
+                // 等待中：从队列移除，更新状态
+                triggerQueue.remove(jobRun);
+                schedulerContext.updateJobRunStatus(jobRunId, JobStatus.CANCEL, "工作流下线");
+                cleanupCompletedJob(jobRunId, jobRun);
+                cancelled++;
+
+            } else if (status == JobStatus.RUNNING) {
+                // 运行中：发送取消消息
+                ActorRef<ExecutorMessage> executorRef = runningExecutors.get(jobRunId);
+                if (executorRef != null) {
+                    executorRef.tell(new ExecutorMessage.CancelJob(jobRunId, "工作流下线"));
+                }
+                killed++;
+            }
+        }
+
+        log.info("处理工作流下线: workflowId={}, cancelled={}, killed={}", workflowId, cancelled, killed);
+        return this;
+    }
+
+    /**
+     * 处理任务定义刷新
+     * <p>
+     * Server 修改 job_info 后广播通知，遍历 jobRunMap 刷新匹配的任务
+     */
+    private Behavior<SchedulerMessage> onRefreshJobInfo(SchedulerMessage.RefreshJobInfo msg) {
+        long jobId = msg.jobId();
+        String op = msg.op();
+
+        log.info("收到任务定义刷新通知: jobId={}, op={}", jobId, op);
+
+        // 遍历 jobRunMap，刷新匹配的任务
+        int refreshed = 0;
+        for (JobRunInfo jobRun : jobRunMap.values()) {
+            if (jobRun.getJobId() == jobId) {
+                // 重新从缓存获取最新的 job_info 数据
+                schedulerContext.enrichJobInfo(jobRun);
+                refreshed++;
+            }
+        }
+
+        if (refreshed > 0) {
+            log.info("刷新任务定义完成: jobId={}, refreshed={}", jobId, refreshed);
+        }
+
+        return this;
     }
 }
