@@ -129,13 +129,6 @@ start_java_service "datapillar-api-gateway" \
 # 4. 启动 AI 服务
 start_ai_service
 
-# 5. 启动 datapillar-job-admin
-start_java_service "datapillar-job-admin" \
-    "$PROJECT_ROOT/datapillar-job/datapillar-job-admin/target/datapillar-job-admin-1.0.0.jar" 6004
-
-# 6. 启动 datapillar-job-executor
-start_java_service "datapillar-job-executor" \
-    "$PROJECT_ROOT/datapillar-job/datapillar-job-executor/target/datapillar-job-executor-1.0.0.jar" 6005
 
 echo ""
 echo "=========================================="
@@ -147,8 +140,6 @@ echo "   • API 网关:           http://localhost:6000"
 echo "   • 认证服务:           http://localhost:6001"
 echo "   • 核心业务:           http://localhost:6002"
 echo "   • AI 服务:            http://localhost:6003"
-echo "   • Job Admin:          http://localhost:6004"
-echo "   • Job Executor:       http://localhost:6005"
 echo ""
 echo "📝 日志目录: $LOG_HOME"
 echo "   tail -f $LOG_HOME/datapillar-*.log"

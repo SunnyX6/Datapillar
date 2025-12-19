@@ -68,19 +68,10 @@ stop_service_by_pid "datapillar-auth"
 stop_service_by_pid "datapillar-web-admin"
 stop_service_by_pid "datapillar-api-gateway"
 stop_service_by_pid "datapillar-ai"
-stop_service_by_pid "datapillar-job-admin"
-stop_service_by_pid "datapillar-job-executor"
 
 echo ""
 echo "📋 清理残留进程（通过端口）..."
 
-# 再通过端口清理可能残留的进程
-stop_service_by_port "datapillar-auth" 7000
-stop_service_by_port "datapillar-web-admin" 8081
-stop_service_by_port "datapillar-api-gateway" 8080
-stop_service_by_port "datapillar-ai" 5000
-stop_service_by_port "datapillar-job-admin" 9080
-stop_service_by_port "datapillar-job-executor" 9081
 
 echo ""
 echo -e "${GREEN}✅ 所有服务已停止${NC}"

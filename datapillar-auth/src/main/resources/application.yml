@@ -48,7 +48,7 @@ cookie:
 
 logging:
   level:
-    com.sunny.auth: INFO
+    com.sunny.datapillar.auth: INFO
     org.springframework.security: WARN
     org.mybatis: WARN
     com.zaxxer.hikari: WARN

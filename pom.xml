@@ -16,7 +16,6 @@
     <modules>
         <module>datapillar-auth</module>
         <module>datapillar-web-admin</module>
-        <module>datapillar-job</module>
         <module>datapillar-api-gateway</module>
         <module>datapillar-knowledge-sdk</module>
     </modules>
