@@ -85,7 +85,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>com.sunny.auth.DatapillarAuthApplication</mainClass>
+                    <mainClass>com.sunny.datapillar.auth.DatapillarAuthApplication</mainClass>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>

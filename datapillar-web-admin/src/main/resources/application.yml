@@ -35,9 +35,13 @@ spring:
           max-wait: -1ms
 
 mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
   configuration:
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
     map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      update-strategy: IGNORED
 
 springdoc:
   api-docs:
@@ -48,7 +52,7 @@ springdoc:
 
 logging:
   level:
-    com.sunny.admin: INFO
+    com.sunny.datapillar.admin: INFO
     org.springframework.web: WARN
     org.springframework.security: WARN
     org.mybatis: WARN
@@ -66,3 +70,11 @@ logging:
       max-history: 30
       total-size-cap: 1GB
 
+# Airflow 配置
+airflow:
+  base-url: ${AIRFLOW_BASE_URL:http://localhost:8080}
+  plugin-path: /plugins/datapillar
+  username: ${AIRFLOW_USERNAME:datapillar}
+  password: ${AIRFLOW_PASSWORD:123456asd}
+  connect-timeout: 5000
+  read-timeout: 30000
