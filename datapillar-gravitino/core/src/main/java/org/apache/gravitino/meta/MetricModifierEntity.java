@@ -27,7 +27,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.metric.MetricModifier;
+import org.apache.gravitino.dataset.MetricModifier;
 
 /** MetricModifier 实体，表示指标修饰符 */
 @ToString

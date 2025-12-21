@@ -28,7 +28,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.metric.Metric;
+import org.apache.gravitino.dataset.Metric;
 
 @ToString
 public class MetricEntity implements Entity, Auditable, HasIdentifier {

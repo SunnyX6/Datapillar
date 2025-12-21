@@ -28,7 +28,16 @@ public enum KnowledgeErrorCode {
 
     // ==================== 系统错误 ====================
     INTERNAL_ERROR("KG_SYS_001", "内部错误: %s"),
-    UNKNOWN_ERROR("KG_SYS_999", "未知错误: %s");
+    UNKNOWN_ERROR("KG_SYS_999", "未知错误: %s"),
+
+    // ==================== 熔断/限流/幂等 ====================
+    CIRCUIT_BREAKER_OPEN("KG_CB_001", "熔断器已打开，请求被拒绝"),
+    RATE_LIMIT_EXCEEDED("KG_RL_001", "请求频率超过限制"),
+    DUPLICATE_EMIT("KG_IDEMP_001", "重复写入，幂等键: %s"),
+
+    // ==================== 校验错误 ====================
+    VALIDATION_ERROR("KG_VAL_001", "字段 [%s] 校验失败: %s"),
+    VALIDATION_ERROR_SIMPLE("KG_VAL_002", "校验失败: %s");
 
     private final String code;
     private final String messageTemplate;

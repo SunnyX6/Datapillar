@@ -452,7 +452,7 @@ CREATE TABLE IF NOT EXISTS `metric_modifier_meta` (
     KEY `idx_type` (`modifier_type`)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS `metric_root_meta` (
+CREATE TABLE IF NOT EXISTS `wordroot_meta` (
     `root_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'root word id',
     `root_code` VARCHAR(64) NOT NULL COMMENT 'root code, e.g., amt, cnt, rate',
     `root_name_cn` VARCHAR(128) NOT NULL COMMENT 'root chinese name, e.g., 金额, 数量, 比率',

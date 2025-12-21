@@ -79,7 +79,7 @@ public interface Entity extends Serializable {
     METRIC,
     METRIC_VERSION,
     METRIC_MODIFIER,
-    METRIC_ROOT,
+    WORDROOT,
     POLICY,
     TABLE_STATISTIC,
     JOB_TEMPLATE,

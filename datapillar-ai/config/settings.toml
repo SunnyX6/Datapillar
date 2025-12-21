@@ -30,6 +30,23 @@ redis_checkpoint_ttl_seconds = 604800  # 7天
 # ==================== JWT 认证配置 ====================
 jwt_issuer = "datapillar-auth"
 
+# ==================== OpenLineage Sink 配置 ====================
+# Sink 端负责接收事件并写入 Neo4j
+# retry、rate_limit、filter 等配置由 Producer 端（Flink/Spark/Airflow）在 openlineage.yml 中配置
+[default.openlineage_sink]
+graceful_shutdown_timeout = 30.0
+
+# 队列配置 - Sink 端二次保护机制
+[default.openlineage_sink.queue]
+max_size = 10000              # 最大队列大小
+batch_size = 100              # 批量处理大小
+flush_interval_seconds = 3.0  # 刷新间隔（秒）
+
+# Neo4j 写入配置
+[default.openlineage_sink.neo4j]
+batch_size = 50               # 批量写入大小
+max_concurrent = 10           # 最大并发写入数
+
 
 # ==================== 开发环境 ====================
 [development]

@@ -68,7 +68,6 @@ import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.MetricMetaService;
 import org.apache.gravitino.storage.relational.service.MetricModifierMetaService;
-import org.apache.gravitino.storage.relational.service.MetricRootMetaService;
 import org.apache.gravitino.storage.relational.service.MetricVersionMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
@@ -82,6 +81,7 @@ import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TagMetaService;
 import org.apache.gravitino.storage.relational.service.TopicMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
+import org.apache.gravitino.storage.relational.service.WordRootMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -147,8 +147,8 @@ public class JDBCBackend implements RelationalBackend {
       case METRIC_MODIFIER:
         return (List<E>)
             MetricModifierMetaService.getInstance().listModifiersByNamespace(namespace);
-      case METRIC_ROOT:
-        return (List<E>) MetricRootMetaService.getInstance().listRootsByNamespace(namespace);
+      case WORDROOT:
+        return (List<E>) WordRootMetaService.getInstance().listWordRootsByNamespace(namespace);
       case POLICY:
         return (List<E>) PolicyMetaService.getInstance().listPoliciesByNamespace(namespace);
       case JOB_TEMPLATE:
@@ -218,9 +218,9 @@ public class JDBCBackend implements RelationalBackend {
     } else if (e instanceof org.apache.gravitino.meta.MetricModifierEntity) {
       MetricModifierMetaService.getInstance()
           .insertModifier((org.apache.gravitino.meta.MetricModifierEntity) e, overwritten);
-    } else if (e instanceof org.apache.gravitino.meta.MetricRootEntity) {
-      MetricRootMetaService.getInstance()
-          .insertRoot((org.apache.gravitino.meta.MetricRootEntity) e, overwritten);
+    } else if (e instanceof org.apache.gravitino.meta.WordRootEntity) {
+      WordRootMetaService.getInstance()
+          .insertWordRoot((org.apache.gravitino.meta.WordRootEntity) e, overwritten);
     } else if (e instanceof PolicyEntity) {
       PolicyMetaService.getInstance().insertPolicy((PolicyEntity) e, overwritten);
     } else if (e instanceof JobTemplateEntity) {
@@ -270,8 +270,8 @@ public class JDBCBackend implements RelationalBackend {
             "Updating metric version through entity store is not supported");
       case METRIC_MODIFIER:
         return (E) MetricModifierMetaService.getInstance().updateModifier(ident, updater);
-      case METRIC_ROOT:
-        return (E) MetricRootMetaService.getInstance().updateRoot(ident, updater);
+      case WORDROOT:
+        return (E) WordRootMetaService.getInstance().updateWordRoot(ident, updater);
       case POLICY:
         return (E) PolicyMetaService.getInstance().updatePolicy(ident, updater);
       default:
@@ -315,8 +315,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) MetricVersionMetaService.getInstance().getMetricVersionByIdentifier(ident);
       case METRIC_MODIFIER:
         return (E) MetricModifierMetaService.getInstance().getModifierByIdentifier(ident);
-      case METRIC_ROOT:
-        return (E) MetricRootMetaService.getInstance().getRootByIdentifier(ident);
+      case WORDROOT:
+        return (E) WordRootMetaService.getInstance().getWordRootByIdentifier(ident);
       case POLICY:
         return (E) PolicyMetaService.getInstance().getPolicyByIdentifier(ident);
       case JOB_TEMPLATE:
@@ -365,8 +365,8 @@ public class JDBCBackend implements RelationalBackend {
             "Deleting metric version through entity store is not supported");
       case METRIC_MODIFIER:
         return MetricModifierMetaService.getInstance().deleteModifier(ident);
-      case METRIC_ROOT:
-        return MetricRootMetaService.getInstance().deleteRoot(ident);
+      case WORDROOT:
+        return WordRootMetaService.getInstance().deleteWordRoot(ident);
       case POLICY:
         return PolicyMetaService.getInstance().deletePolicy(ident);
       case JOB_TEMPLATE:
@@ -460,9 +460,9 @@ public class JDBCBackend implements RelationalBackend {
         return MetricModifierMetaService.getInstance()
             .deleteMetricModifierMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-      case METRIC_ROOT:
-        return MetricRootMetaService.getInstance()
-            .deleteMetricRootMetasByLegacyTimeline(
+      case WORDROOT:
+        return WordRootMetaService.getInstance()
+            .deleteWordRootMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
         return 0;
@@ -494,7 +494,7 @@ public class JDBCBackend implements RelationalBackend {
       case METRIC:
       case METRIC_VERSION:
       case METRIC_MODIFIER:
-      case METRIC_ROOT:
+      case WORDROOT:
       case TABLE_STATISTIC:
       case JOB_TEMPLATE:
       case JOB:

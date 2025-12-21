@@ -146,6 +146,11 @@ public class ExceptionHandlers {
     return MetricExceptionHandler.INSTANCE.handle(op, metric, schema, e);
   }
 
+  public static Response handleWordRootException(
+      OperationType op, String wordRoot, String schema, Exception e) {
+    return WordRootExceptionHandler.INSTANCE.handle(op, wordRoot, schema, e);
+  }
+
   public static Response handleJobTemplateException(
       OperationType op, String jobTemplate, String metalake, Exception e) {
     return JobTemplateExceptionHandler.INSTANCE.handle(op, jobTemplate, metalake, e);
@@ -877,6 +882,42 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, metric, schema, e);
+      }
+    }
+  }
+
+  private static class WordRootExceptionHandler extends BaseExceptionHandler {
+    private static final ExceptionHandler INSTANCE = new WordRootExceptionHandler();
+
+    private static String getWordRootErrorMsg(
+        String wordRoot, String operation, String schema, String reason) {
+      return String.format(
+          "操作词根失败%s，操作 [%s]，所属 schema [%s]，原因 [%s]", wordRoot, operation, schema, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String wordRoot, String schema, Exception e) {
+      String formatted = StringUtil.isBlank(wordRoot) ? "" : " [" + wordRoot + "]";
+      String errorMsg = getWordRootErrorMsg(formatted, op.name(), schema, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof org.apache.gravitino.exceptions.WordRootAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, wordRoot, schema, e);
       }
     }
   }

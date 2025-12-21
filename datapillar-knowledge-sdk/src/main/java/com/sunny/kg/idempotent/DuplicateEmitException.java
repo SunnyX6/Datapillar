@@ -1,5 +1,6 @@
 package com.sunny.kg.idempotent;
 
+import com.sunny.kg.exception.KnowledgeErrorCode;
 import com.sunny.kg.exception.KnowledgeException;
 
 /**
@@ -11,7 +12,7 @@ import com.sunny.kg.exception.KnowledgeException;
 public class DuplicateEmitException extends KnowledgeException {
 
     public DuplicateEmitException(String key) {
-        super("DUPLICATE_EMIT", String.format("重复写入，幂等键: %s", key));
+        super(KnowledgeErrorCode.DUPLICATE_EMIT, key);
     }
 
 }

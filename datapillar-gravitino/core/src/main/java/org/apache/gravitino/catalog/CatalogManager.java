@@ -209,14 +209,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           });
     }
 
-    public <R> R doWithMetricOps(ThrowableFunction<org.apache.gravitino.metric.MetricCatalog, R> fn)
-        throws Exception {
+    public <R> R doWithDatasetOps(
+        ThrowableFunction<org.apache.gravitino.dataset.DatasetCatalog, R> fn) throws Exception {
       return classLoader.withClassLoader(
           cl -> {
-            if (asMetrics() == null) {
-              throw new UnsupportedOperationException("Catalog does not support metric operations");
+            if (asDataset() == null) {
+              throw new UnsupportedOperationException(
+                  "Catalog does not support dataset operations");
             }
-            return fn.apply(asMetrics());
+            return fn.apply(asDataset());
           });
     }
 
@@ -288,9 +289,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       return catalog.ops() instanceof ModelCatalog ? (ModelCatalog) catalog.ops() : null;
     }
 
-    private org.apache.gravitino.metric.MetricCatalog asMetrics() {
-      return catalog.ops() instanceof org.apache.gravitino.metric.MetricCatalog
-          ? (org.apache.gravitino.metric.MetricCatalog) catalog.ops()
+    private org.apache.gravitino.dataset.DatasetCatalog asDataset() {
+      return catalog.ops() instanceof org.apache.gravitino.dataset.DatasetCatalog
+          ? (org.apache.gravitino.dataset.DatasetCatalog) catalog.ops()
           : null;
     }
   }
@@ -979,6 +980,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     IsolatedClassLoader classLoader = createClassLoader(provider, conf);
     BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
+
+    // 校验 catalog type 与 provider 是否匹配
+    Catalog.Type providerCatalogType = catalog.catalogType();
+    if (providerCatalogType != null && !providerCatalogType.equals(entity.getType())) {
+      classLoader.close();
+      throw new IllegalArgumentException(
+          String.format(
+              "Catalog type '%s' does not match provider '%s' which requires type '%s'",
+              entity.getType(), provider, providerCatalogType));
+    }
 
     CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
     // Validate catalog properties and initialize the config

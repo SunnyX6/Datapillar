@@ -43,7 +43,7 @@ include(
 include("catalogs:catalog-fileset")
 include("catalogs:catalog-kafka")
 include("catalogs:catalog-model")
-include("catalogs:catalog-metric")
+include("catalogs:catalog-dataset")
 include(
   "clients:client-java",
   "clients:client-java-runtime",
@@ -83,4 +83,5 @@ include(":bundles:aliyun", ":bundles:aliyun-bundle")
 include(":bundles:azure", ":bundles:azure-bundle")
 include(":catalogs:hadoop-common")
 include(":lineage")
+include(":openlineage-listener")
 include(":mcp-server")

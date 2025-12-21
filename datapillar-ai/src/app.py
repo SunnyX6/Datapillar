@@ -6,22 +6,81 @@ FastAPI 应用入口（使用 Repository 模式）
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import gzip
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 import logging
 
-from src.config.logging import setup_logging
+from src.shared.config.logging import setup_logging
 
 logger = logging.getLogger(__name__)
 
-from src.agent.orchestrator import Orchestrator, create_orchestrator
-from src.config.exceptions import BaseError, AuthenticationError, AuthorizationError
+from src.modules.etl.orchestrator import EtlOrchestrator, create_etl_orchestrator
+from src.shared.config.exceptions import BaseError, AuthenticationError, AuthorizationError
 from src.api.router import api_router
-from src.config import settings
-from src.config.connection import Neo4jClient, AsyncNeo4jClient, RedisClient, MySQLClient
-from src.auth.middleware import AuthMiddleware
+from src.shared.config import settings
+from src.infrastructure.database import Neo4jClient, AsyncNeo4jClient, RedisClient, MySQLClient
+from src.shared.auth.middleware import AuthMiddleware
+
+
+class GzipRequestMiddleware:
+    """解压 Gzip 请求体的 ASGI 中间件"""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # 检查是否是 gzip 编码
+        headers = dict(scope.get("headers", []))
+        content_encoding = headers.get(b"content-encoding", b"").decode().lower()
+
+        if content_encoding != "gzip":
+            await self.app(scope, receive, send)
+            return
+
+        # 收集请求体
+        body_parts = []
+        while True:
+            message = await receive()
+            body_parts.append(message.get("body", b""))
+            if not message.get("more_body", False):
+                break
+
+        # 解压 gzip
+        compressed_body = b"".join(body_parts)
+        try:
+            decompressed_body = gzip.decompress(compressed_body)
+        except Exception as e:
+            logger.warning(f"Gzip 解压失败: {e}")
+            decompressed_body = compressed_body
+
+        # 修改 headers，移除 content-encoding，更新 content-length
+        new_headers = [
+            (k, v) for k, v in scope["headers"]
+            if k.lower() not in (b"content-encoding", b"content-length")
+        ]
+        new_headers.append((b"content-length", str(len(decompressed_body)).encode()))
+
+        new_scope = {**scope, "headers": new_headers}
+
+        # 创建新的 receive 函数
+        body_sent = False
+
+        async def new_receive():
+            nonlocal body_sent
+            if not body_sent:
+                body_sent = True
+                return {"type": "http.request", "body": decompressed_body, "more_body": False}
+            return {"type": "http.disconnect"}
+
+        await self.app(new_scope, new_receive, send)
 
 
 def create_app() -> FastAPI:
@@ -50,7 +109,7 @@ def create_app() -> FastAPI:
             redis_client = await RedisClient.get_instance()
 
             # 创建 Orchestrator
-            orchestrator = await create_orchestrator(redis_client)
+            orchestrator = await create_etl_orchestrator(redis_client)
             app.state.orchestrator = orchestrator
 
             logger.info("FastAPI 应用启动完成")
@@ -83,6 +142,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Gzip 请求解压中间件
+    app.add_middleware(GzipRequestMiddleware)
+
     # 全局认证中间件
     app.add_middleware(AuthMiddleware)
 
@@ -106,7 +168,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=500, content={"error": "服务器内部错误"})
 
     # 注册 API 路由
-    app.include_router(api_router)
+    app.include_router(api_router, prefix="/api")
 
     # 健康检查
     @app.get("/health")
@@ -148,3 +210,13 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "src.app:app",
+        host=settings.app_host,
+        port=settings.app_port,
+        reload=settings.debug,
+    )

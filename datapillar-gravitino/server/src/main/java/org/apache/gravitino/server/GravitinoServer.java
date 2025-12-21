@@ -27,8 +27,8 @@ import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.DatasetDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
-import org.apache.gravitino.catalog.MetricDispatcher;
 import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -147,7 +147,7 @@ public class GravitinoServer extends ResourceConfig {
                 .to(CredentialOperationDispatcher.class)
                 .ranked(1);
             bind(gravitinoEnv.modelDispatcher()).to(ModelDispatcher.class).ranked(1);
-            bind(gravitinoEnv.metricDispatcher()).to(MetricDispatcher.class).ranked(1);
+            bind(gravitinoEnv.datasetDispatcher()).to(DatasetDispatcher.class).ranked(1);
             bind(lineageService).to(LineageDispatcher.class).ranked(1);
             bind(gravitinoEnv.jobOperationDispatcher()).to(JobOperationDispatcher.class).ranked(1);
             bind(gravitinoEnv.statisticManager()).to(StatisticManager.class).ranked(1);

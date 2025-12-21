@@ -61,6 +61,7 @@ import org.apache.gravitino.hook.TopicHookDispatcher;
 import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
+import org.apache.gravitino.listener.DatasetEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.FilesetEventDispatcher;
@@ -119,7 +120,7 @@ public class GravitinoEnv {
 
   private ModelDispatcher modelDispatcher;
 
-  private org.apache.gravitino.catalog.MetricDispatcher metricDispatcher;
+  private org.apache.gravitino.catalog.DatasetDispatcher datasetDispatcher;
 
   private MetalakeDispatcher metalakeDispatcher;
 
@@ -249,12 +250,12 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the MetricDispatcher associated with the Gravitino environment.
+   * Get the DatasetDispatcher associated with the Gravitino environment.
    *
-   * @return The MetricDispatcher instance.
+   * @return The DatasetDispatcher instance.
    */
-  public org.apache.gravitino.catalog.MetricDispatcher metricDispatcher() {
-    return metricDispatcher;
+  public org.apache.gravitino.catalog.DatasetDispatcher datasetDispatcher() {
+    return datasetDispatcher;
   }
 
   /**
@@ -500,7 +501,8 @@ public class GravitinoEnv {
 
     this.eventListenerManager = new EventListenerManager();
     eventListenerManager.init(
-        config.getConfigsWithPrefix(EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX));
+        config.getConfigsWithPrefix(EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX),
+        config.getAllConfig());
     this.eventBus = eventListenerManager.createEventBus();
 
     this.auditLogManager = new AuditLogManager();
@@ -583,11 +585,11 @@ public class GravitinoEnv {
         new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
     this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
 
-    // 初始化 MetricDispatcher
-    org.apache.gravitino.catalog.MetricOperationDispatcher metricOperationDispatcher =
-        new org.apache.gravitino.catalog.MetricOperationDispatcher(
+    // 初始化 DatasetDispatcher（带事件分发）
+    org.apache.gravitino.catalog.DatasetOperationDispatcher datasetOperationDispatcher =
+        new org.apache.gravitino.catalog.DatasetOperationDispatcher(
             catalogManager, entityStore, idGenerator);
-    this.metricDispatcher = metricOperationDispatcher;
+    this.datasetDispatcher = new DatasetEventDispatcher(eventBus, datasetOperationDispatcher);
 
     this.statisticManager = new StatisticManager(entityStore, idGenerator, config);
 

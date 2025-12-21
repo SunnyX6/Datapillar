@@ -1,5 +1,6 @@
 package com.sunny.kg.circuitbreaker;
 
+import com.sunny.kg.exception.KnowledgeErrorCode;
 import com.sunny.kg.exception.KnowledgeException;
 
 /**
@@ -11,7 +12,7 @@ import com.sunny.kg.exception.KnowledgeException;
 public class CircuitBreakerOpenException extends KnowledgeException {
 
     public CircuitBreakerOpenException() {
-        super("CIRCUIT_BREAKER_OPEN", "熔断器已打开，请求被拒绝");
+        super(KnowledgeErrorCode.CIRCUIT_BREAKER_OPEN);
     }
 
 }

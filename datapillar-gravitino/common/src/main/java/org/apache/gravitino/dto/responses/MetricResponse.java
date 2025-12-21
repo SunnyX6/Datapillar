@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import org.apache.gravitino.dto.metric.MetricDTO;
+import org.apache.gravitino.dto.dataset.MetricDTO;
 
 /** 指标响应 */
 @Getter

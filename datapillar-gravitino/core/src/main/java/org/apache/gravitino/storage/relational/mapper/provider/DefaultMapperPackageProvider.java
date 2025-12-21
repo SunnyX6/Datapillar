@@ -30,7 +30,6 @@ import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetricMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetricModifierMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.MetricRootMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetricVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
@@ -50,6 +49,7 @@ import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
+import org.apache.gravitino.storage.relational.mapper.WordRootMetaMapper;
 
 /** The default provider that supplies the primary mapper package for Gravitino. */
 public class DefaultMapperPackageProvider implements MapperPackageProvider {
@@ -67,7 +67,7 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         MetalakeMetaMapper.class,
         MetricMetaMapper.class,
         MetricModifierMetaMapper.class,
-        MetricRootMetaMapper.class,
+        WordRootMetaMapper.class,
         MetricVersionMetaMapper.class,
         ModelMetaMapper.class,
         ModelVersionAliasRelMapper.class,

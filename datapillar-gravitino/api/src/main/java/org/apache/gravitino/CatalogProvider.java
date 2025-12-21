@@ -60,4 +60,18 @@ public interface CatalogProvider {
    * @return The string that represents the catalog that this provider uses.
    */
   String shortName();
+
+  /**
+   * Returns the catalog type that this provider supports. This method is used to validate that the
+   * catalog type specified during catalog creation matches the provider's supported type.
+   *
+   * <p>For managed catalogs (like model, fileset, dataset), this method should return the
+   * corresponding catalog type. For external catalogs (like hive, iceberg), this method can return
+   * null to skip type validation for backward compatibility.
+   *
+   * @return The catalog type that this provider supports, or null if no type validation is needed.
+   */
+  default Catalog.Type catalogType() {
+    return null;
+  }
 }

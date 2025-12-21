@@ -29,7 +29,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.metric.MetricChange;
+import org.apache.gravitino.dataset.MetricChange;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** 更新指标的请求 */

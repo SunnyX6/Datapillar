@@ -16,6 +16,16 @@ import java.util.Map;
 public class SchemaMeta {
 
     /**
+     * 所属目录
+     */
+    private String catalog;
+
+    /**
+     * Schema 名称
+     */
+    private String name;
+
+    /**
      * 分层标识 (SRC/ODS/DWD/DWS)
      */
     private String layer;
