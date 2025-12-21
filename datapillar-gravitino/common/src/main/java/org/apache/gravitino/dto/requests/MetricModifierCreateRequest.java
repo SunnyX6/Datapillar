@@ -26,7 +26,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.metric.MetricModifier;
+import org.apache.gravitino.dataset.MetricModifier;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** 创建指标修饰符的请求 */

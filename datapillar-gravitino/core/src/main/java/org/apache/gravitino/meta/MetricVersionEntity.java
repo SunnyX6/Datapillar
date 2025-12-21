@@ -32,7 +32,7 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.metric.Metric;
+import org.apache.gravitino.dataset.Metric;
 
 @ToString
 public class MetricVersionEntity implements Entity, Auditable, HasIdentifier {

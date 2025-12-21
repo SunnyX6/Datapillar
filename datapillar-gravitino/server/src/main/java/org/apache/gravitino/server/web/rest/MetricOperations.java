@@ -40,10 +40,12 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.catalog.MetricDispatcher;
+import org.apache.gravitino.catalog.DatasetDispatcher;
+import org.apache.gravitino.dataset.Metric;
+import org.apache.gravitino.dataset.MetricChange;
+import org.apache.gravitino.dataset.MetricVersion;
 import org.apache.gravitino.dto.requests.MetricModifierCreateRequest;
 import org.apache.gravitino.dto.requests.MetricRegisterRequest;
-import org.apache.gravitino.dto.requests.MetricRootCreateRequest;
 import org.apache.gravitino.dto.requests.MetricSwitchVersionRequest;
 import org.apache.gravitino.dto.requests.MetricUpdateRequest;
 import org.apache.gravitino.dto.requests.MetricUpdatesRequest;
@@ -51,36 +53,27 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.MetricModifierResponse;
 import org.apache.gravitino.dto.responses.MetricResponse;
-import org.apache.gravitino.dto.responses.MetricRootResponse;
 import org.apache.gravitino.dto.responses.MetricVersionListResponse;
 import org.apache.gravitino.dto.responses.MetricVersionResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.metric.Metric;
-import org.apache.gravitino.metric.MetricChange;
-import org.apache.gravitino.metric.MetricVersion;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-/** REST API 端点，用于管理 catalog schema 下的指标（Metric）资源 */
-@Tag(name = "Metric Management", description = "指标管理相关API，包括指标、版本、修饰符和词根的增删改查操作")
+@Tag(name = "Metric Management", description = "指标管理相关API")
 @Path("metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/metrics")
 public class MetricOperations {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MetricOperations.class);
-
-  private final MetricDispatcher metricDispatcher;
+  private final DatasetDispatcher datasetDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public MetricOperations(MetricDispatcher metricDispatcher) {
-    this.metricDispatcher = metricDispatcher;
+  public MetricOperations(DatasetDispatcher datasetDispatcher) {
+    this.datasetDispatcher = datasetDispatcher;
   }
 
   @GET
@@ -109,14 +102,13 @@ public class MetricOperations {
           @PathParam("schema")
           @AuthorizationMetadata(type = Entity.EntityType.SCHEMA)
           String schema) {
-    LOG.info("收到列出指标请求，schema: {}.{}.{}", metalake, catalog, schema);
     Namespace metricNs = Namespace.of(metalake, catalog, schema);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier[] metricIds = metricDispatcher.listMetrics(metricNs);
+            NameIdentifier[] metricIds = datasetDispatcher.listMetrics(metricNs);
             metricIds = metricIds == null ? new NameIdentifier[0] : metricIds;
             metricIds =
                 MetadataFilterHelper.filterByExpression(
@@ -124,7 +116,6 @@ public class MetricOperations {
                     AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
                     Entity.EntityType.METRIC,
                     metricIds);
-            LOG.info("在 schema {} 下列出了 {} 个指标", metricNs, metricIds.length);
             return Utils.ok(new EntityListResponse(metricIds));
           });
 
@@ -147,16 +138,13 @@ public class MetricOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("metric") @AuthorizationMetadata(type = Entity.EntityType.METRIC) String metric) {
-    LOG.info("收到获取指标请求: {}.{}.{}.{}", metalake, catalog, schema, metric);
     NameIdentifier metricId = NameIdentifier.of(metalake, catalog, schema, metric);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            // 使用 metricDispatcher 直接调用
-            Metric m = metricDispatcher.getMetric(metricId);
-            LOG.info("获取到指标: {}", metricId);
+            Metric m = datasetDispatcher.getMetric(metricId);
             return Utils.ok(new MetricResponse(DTOConverters.toDTO(m)));
           });
 
@@ -178,7 +166,6 @@ public class MetricOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       MetricRegisterRequest request) {
-    LOG.info("收到注册指标请求: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
 
     try {
       request.validate();
@@ -187,9 +174,8 @@ public class MetricOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            // 使用 metricDispatcher 直接调用
             Metric m =
-                metricDispatcher.registerMetric(
+                datasetDispatcher.registerMetric(
                     metricId,
                     request.getCode(),
                     request.getType(),
@@ -199,7 +185,6 @@ public class MetricOperations {
                     request.getAggregationLogic(),
                     request.getParentMetricIds(),
                     request.getCalculationFormula());
-            LOG.info("指标已注册: {}", metricId);
             return Utils.ok(new MetricResponse(DTOConverters.toDTO(m)));
           });
 
@@ -223,21 +208,13 @@ public class MetricOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("metric") @AuthorizationMetadata(type = Entity.EntityType.METRIC) String metric) {
-    LOG.info("收到删除指标请求: {}.{}.{}.{}", metalake, catalog, schema, metric);
     NameIdentifier metricId = NameIdentifier.of(metalake, catalog, schema, metric);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            // 使用 metricDispatcher 直接调用
-            boolean deleted = metricDispatcher.deleteMetric(metricId);
-            if (!deleted) {
-              LOG.warn("无法找到待删除的指标 {} under schema {}", metric, schema);
-            } else {
-              LOG.info("指标已删除: {}", metricId);
-            }
-
+            boolean deleted = datasetDispatcher.deleteMetric(metricId);
             return Utils.ok(new DropResponse(deleted));
           });
 
@@ -261,7 +238,6 @@ public class MetricOperations {
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("metric") @AuthorizationMetadata(type = Entity.EntityType.METRIC) String metric,
       MetricUpdatesRequest request) {
-    LOG.info("收到修改指标请求: {}.{}.{}.{}", metalake, catalog, schema, metric);
     try {
       return Utils.doAs(
           httpRequest,
@@ -272,11 +248,8 @@ public class MetricOperations {
                 request.getUpdates().stream()
                     .map(MetricUpdateRequest::metricChange)
                     .toArray(MetricChange[]::new);
-            // 使用 metricDispatcher 直接调用
-            Metric m = metricDispatcher.alterMetric(ident, changes);
-            Response response = Utils.ok(new MetricResponse(DTOConverters.toDTO(m)));
-            LOG.info("指标已修改: {}.{}.{}.{}", metalake, catalog, schema, m.name());
-            return response;
+            Metric m = datasetDispatcher.alterMetric(ident, changes);
+            return Utils.ok(new MetricResponse(DTOConverters.toDTO(m)));
           });
 
     } catch (Exception e) {
@@ -298,17 +271,14 @@ public class MetricOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("metric") @AuthorizationMetadata(type = Entity.EntityType.METRIC) String metric) {
-    LOG.info("收到列出指标版本请求: {}.{}.{}.{}", metalake, catalog, schema, metric);
     NameIdentifier metricId = NameIdentifier.of(metalake, catalog, schema, metric);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            // 使用 metricDispatcher 直接调用
-            int[] versions = metricDispatcher.listMetricVersions(metricId);
+            int[] versions = datasetDispatcher.listMetricVersions(metricId);
             versions = versions == null ? new int[0] : versions;
-            LOG.info("列出指标 {} 的 {} 个版本", metricId, versions.length);
             return Utils.ok(new MetricVersionListResponse(versions));
           });
 
@@ -333,16 +303,13 @@ public class MetricOperations {
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("metric") @AuthorizationMetadata(type = Entity.EntityType.METRIC) String metric,
       @PathParam("version") int version) {
-    LOG.info("收到获取指标版本请求: {}.{}.{}.{}.{}", metalake, catalog, schema, metric, version);
     NameIdentifier metricId = NameIdentifier.of(metalake, catalog, schema, metric);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            // 使用 metricDispatcher 直接调用
-            MetricVersion mv = metricDispatcher.getMetricVersion(metricId, version);
-            LOG.info("获取到指标版本: {}.{}", metricId, version);
+            MetricVersion mv = datasetDispatcher.getMetricVersion(metricId, version);
             return Utils.ok(new MetricVersionResponse(DTOConverters.toDTO(mv)));
           });
 
@@ -367,21 +334,13 @@ public class MetricOperations {
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("metric") @AuthorizationMetadata(type = Entity.EntityType.METRIC) String metric,
       @PathParam("version") int version) {
-    LOG.info("收到删除指标版本请求: {}.{}.{}.{}.{}", metalake, catalog, schema, metric, version);
     NameIdentifier metricId = NameIdentifier.of(metalake, catalog, schema, metric);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            // 使用 metricDispatcher 直接调用
-            boolean deleted = metricDispatcher.deleteMetricVersion(metricId, version);
-            if (!deleted) {
-              LOG.warn("无法找到指标 {} 中待删除的版本 {}", metric, version);
-            } else {
-              LOG.info("指标版本已删除: {}.{}", metricId, version);
-            }
-
+            boolean deleted = datasetDispatcher.deleteMetricVersion(metricId, version);
             return Utils.ok(new DropResponse(deleted));
           });
 
@@ -406,13 +365,6 @@ public class MetricOperations {
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("metric") @AuthorizationMetadata(type = Entity.EntityType.METRIC) String metric,
       MetricSwitchVersionRequest request) {
-    LOG.info(
-        "收到切换指标版本请求: {}.{}.{}.{}, 目标版本: {}",
-        metalake,
-        catalog,
-        schema,
-        metric,
-        request.getVersion());
     NameIdentifier metricId = NameIdentifier.of(metalake, catalog, schema, metric);
 
     try {
@@ -422,14 +374,7 @@ public class MetricOperations {
           httpRequest,
           () -> {
             Metric updatedMetric =
-                metricDispatcher.switchMetricVersion(metricId, request.getVersion());
-            LOG.info(
-                "指标版本已切换: {}.{}.{}.{}, 当前版本: {}",
-                metalake,
-                catalog,
-                schema,
-                metric,
-                updatedMetric.currentVersion());
+                datasetDispatcher.switchMetricVersion(metricId, request.getVersion());
             return Utils.ok(new MetricResponse(DTOConverters.toDTO(updatedMetric)));
           });
 
@@ -438,8 +383,6 @@ public class MetricOperations {
           OperationType.ALTER, versionString(metric, request.getVersion()), schema, e);
     }
   }
-
-  // ============================= Modifier 管理 API =============================
 
   @GET
   @Path("modifiers")
@@ -454,16 +397,13 @@ public class MetricOperations {
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
-    LOG.info("收到列出修饰符请求，schema: {}.{}.{}", metalake, catalog, schema);
     Namespace modifierNs = Namespace.of(metalake, catalog, schema);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            // 使用 metricDispatcher 直接调用
-            NameIdentifier[] modifierIds = metricDispatcher.listMetricModifiers(modifierNs);
-            LOG.info("在 schema {} 下列出了 {} 个修饰符", modifierNs, modifierIds.length);
+            NameIdentifier[] modifierIds = datasetDispatcher.listMetricModifiers(modifierNs);
             return Utils.ok(new EntityListResponse(modifierIds));
           });
 
@@ -486,17 +426,14 @@ public class MetricOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("code") String code) {
-    LOG.info("收到获取修饰符请求: {}.{}.{}.{}", metalake, catalog, schema, code);
     NameIdentifier modifierId = NameIdentifier.of(metalake, catalog, schema, code);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            // 使用 metricDispatcher 直接调用
-            org.apache.gravitino.metric.MetricModifier modifier =
-                metricDispatcher.getMetricModifier(modifierId);
-            LOG.info("获取到修饰符: {}", modifierId);
+            org.apache.gravitino.dataset.MetricModifier modifier =
+                datasetDispatcher.getMetricModifier(modifierId);
             return Utils.ok(new MetricModifierResponse(DTOConverters.toDTO(modifier)));
           });
 
@@ -519,7 +456,6 @@ public class MetricOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       MetricModifierCreateRequest request) {
-    LOG.info("收到创建修饰符请求: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
 
     try {
       request.validate();
@@ -527,13 +463,11 @@ public class MetricOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            // 使用 metricDispatcher 直接调用
             NameIdentifier modifierId =
                 NameIdentifier.of(metalake, catalog, schema, request.getName());
-            org.apache.gravitino.metric.MetricModifier modifier =
-                metricDispatcher.createMetricModifier(
+            org.apache.gravitino.dataset.MetricModifier modifier =
+                datasetDispatcher.createMetricModifier(
                     modifierId, request.getCode(), request.getType(), request.getComment());
-            LOG.info("修饰符已创建: {}", request.getCode());
             return Utils.ok(new MetricModifierResponse(DTOConverters.toDTO(modifier)));
           });
 
@@ -557,164 +491,13 @@ public class MetricOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("code") String code) {
-    LOG.info("收到删除修饰符请求: {}.{}.{}.{}", metalake, catalog, schema, code);
     NameIdentifier modifierId = NameIdentifier.of(metalake, catalog, schema, code);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            // 使用 metricDispatcher 直接调用
-            boolean deleted = metricDispatcher.deleteMetricModifier(modifierId);
-            if (!deleted) {
-              LOG.warn("无法找到待删除的修饰符 {} under schema {}", code, schema);
-            } else {
-              LOG.info("修饰符已删除: {}", modifierId);
-            }
-
-            return Utils.ok(new DropResponse(deleted));
-          });
-
-    } catch (Exception e) {
-      return ExceptionHandlers.handleMetricException(OperationType.DELETE, code, schema, e);
-    }
-  }
-
-  // ============================= Root 管理 API =============================
-
-  @GET
-  @Path("roots")
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "list-roots." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "list-roots", absolute = true)
-  @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
-  public Response listRoots(
-      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
-          String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
-    LOG.info("收到列出词根请求，schema: {}.{}.{}", metalake, catalog, schema);
-    Namespace rootNs = Namespace.of(metalake, catalog, schema);
-
-    try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            // 使用 metricDispatcher 直接调用
-            NameIdentifier[] rootIds = metricDispatcher.listMetricRoots(rootNs);
-            LOG.info("在 schema {} 下列出了 {} 个词根", rootNs, rootIds.length);
-            return Utils.ok(new EntityListResponse(rootIds));
-          });
-
-    } catch (Exception e) {
-      return ExceptionHandlers.handleMetricException(OperationType.LIST, "", schema, e);
-    }
-  }
-
-  @GET
-  @Path("roots/{code}")
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "get-root." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "get-root", absolute = true)
-  @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
-  public Response getRoot(
-      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
-          String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("code") String code) {
-    LOG.info("收到获取词根请求: {}.{}.{}.{}", metalake, catalog, schema, code);
-    NameIdentifier rootId = NameIdentifier.of(metalake, catalog, schema, code);
-
-    try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            // 使用 metricDispatcher 直接调用
-            org.apache.gravitino.metric.MetricRoot root = metricDispatcher.getMetricRoot(rootId);
-            LOG.info("获取到词根: {}", rootId);
-            return Utils.ok(new MetricRootResponse(DTOConverters.toDTO(root)));
-          });
-
-    } catch (Exception e) {
-      return ExceptionHandlers.handleMetricException(OperationType.GET, code, schema, e);
-    }
-  }
-
-  @POST
-  @Path("roots")
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "create-root." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "create-root", absolute = true)
-  @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
-  public Response createRoot(
-      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
-          String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      MetricRootCreateRequest request) {
-    LOG.info("收到创建词根请求: {}.{}.{}.{}", metalake, catalog, schema, request.getCode());
-
-    try {
-      request.validate();
-
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            // 使用 metricDispatcher 直接调用
-            NameIdentifier rootId = NameIdentifier.of(metalake, catalog, schema, request.getCode());
-            org.apache.gravitino.metric.MetricRoot root =
-                metricDispatcher.createMetricRoot(
-                    rootId,
-                    request.getCode(),
-                    request.getNameCn(),
-                    request.getNameEn(),
-                    request.getComment());
-            LOG.info("词根已创建: {}", request.getCode());
-            return Utils.ok(new MetricRootResponse(DTOConverters.toDTO(root)));
-          });
-
-    } catch (Exception e) {
-      return ExceptionHandlers.handleMetricException(
-          OperationType.CREATE, request.getCode(), schema, e);
-    }
-  }
-
-  @DELETE
-  @Path("roots/{code}")
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "delete-root." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "delete-root", absolute = true)
-  @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
-  public Response deleteRoot(
-      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
-          String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("code") String code) {
-    LOG.info("收到删除词根请求: {}.{}.{}.{}", metalake, catalog, schema, code);
-    NameIdentifier rootId = NameIdentifier.of(metalake, catalog, schema, code);
-
-    try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            // 使用 metricDispatcher 直接调用
-            boolean deleted = metricDispatcher.deleteMetricRoot(rootId);
-            if (!deleted) {
-              LOG.warn("无法找到待删除的词根 {} under schema {}", code, schema);
-            } else {
-              LOG.info("词根已删除: {}", rootId);
-            }
-
+            boolean deleted = datasetDispatcher.deleteMetricModifier(modifierId);
             return Utils.ok(new DropResponse(deleted));
           });
 

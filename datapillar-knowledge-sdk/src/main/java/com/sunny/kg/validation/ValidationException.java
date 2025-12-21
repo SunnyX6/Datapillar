@@ -1,5 +1,6 @@
 package com.sunny.kg.validation;
 
+import com.sunny.kg.exception.KnowledgeErrorCode;
 import com.sunny.kg.exception.KnowledgeException;
 
 /**
@@ -11,11 +12,11 @@ import com.sunny.kg.exception.KnowledgeException;
 public class ValidationException extends KnowledgeException {
 
     public ValidationException(String field, String message) {
-        super("VALIDATION_ERROR", String.format("字段 [%s] 校验失败: %s", field, message));
+        super(KnowledgeErrorCode.VALIDATION_ERROR, field, message);
     }
 
     public ValidationException(String message) {
-        super("VALIDATION_ERROR", message);
+        super(KnowledgeErrorCode.VALIDATION_ERROR_SIMPLE, message);
     }
 
 }

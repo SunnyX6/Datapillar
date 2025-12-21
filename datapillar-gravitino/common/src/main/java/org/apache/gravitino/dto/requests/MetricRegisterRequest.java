@@ -27,7 +27,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.metric.Metric;
+import org.apache.gravitino.dataset.Metric;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** 表示注册指标的请求 */
@@ -72,5 +72,13 @@ public class MetricRegisterRequest implements RESTRequest {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(code), "\"code\" field is required and cannot be empty");
     Preconditions.checkArgument(type != null, "\"type\" field is required and cannot be null");
+
+    // DERIVED 和 COMPOSITE 类型必须指定 parentMetricIds
+    if (type == Metric.Type.DERIVED || type == Metric.Type.COMPOSITE) {
+      Preconditions.checkArgument(
+          parentMetricIds != null && parentMetricIds.length > 0,
+          "\"parentMetricIds\" is required for %s metric type",
+          type.name());
+    }
   }
 }

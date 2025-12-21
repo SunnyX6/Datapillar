@@ -38,6 +38,8 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialFactory;
+import org.apache.gravitino.dataset.Metric;
+import org.apache.gravitino.dataset.MetricVersion;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
@@ -49,16 +51,16 @@ import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.credential.CredentialDTO;
+import org.apache.gravitino.dto.dataset.MetricDTO;
+import org.apache.gravitino.dto.dataset.MetricModifierDTO;
+import org.apache.gravitino.dto.dataset.MetricVersionDTO;
+import org.apache.gravitino.dto.dataset.WordRootDTO;
 import org.apache.gravitino.dto.file.FileInfoDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
-import org.apache.gravitino.dto.metric.MetricDTO;
-import org.apache.gravitino.dto.metric.MetricModifierDTO;
-import org.apache.gravitino.dto.metric.MetricRootDTO;
-import org.apache.gravitino.dto.metric.MetricVersionDTO;
 import org.apache.gravitino.dto.model.ModelDTO;
 import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
@@ -96,8 +98,6 @@ import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.messaging.Topic;
-import org.apache.gravitino.metric.Metric;
-import org.apache.gravitino.metric.MetricVersion;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.policy.PolicyContent;
@@ -818,7 +818,7 @@ public class DTOConverters {
    * @param modifier 待转换的修饰符对象
    * @return 修饰符 DTO
    */
-  public static MetricModifierDTO toDTO(org.apache.gravitino.metric.MetricModifier modifier) {
+  public static MetricModifierDTO toDTO(org.apache.gravitino.dataset.MetricModifier modifier) {
     return MetricModifierDTO.builder()
         .withName(modifier.name())
         .withCode(modifier.code())
@@ -829,13 +829,13 @@ public class DTOConverters {
   }
 
   /**
-   * 将 MetricRoot 接口转换为 MetricRootDTO
+   * 将 WordRoot 接口转换为 WordRootDTO
    *
    * @param root 待转换的词根对象
    * @return 词根 DTO
    */
-  public static MetricRootDTO toDTO(org.apache.gravitino.metric.MetricRoot root) {
-    return MetricRootDTO.builder()
+  public static WordRootDTO toDTO(org.apache.gravitino.dataset.WordRoot root) {
+    return WordRootDTO.builder()
         .withCode(root.code())
         .withNameCn(root.nameCn())
         .withNameEn(root.nameEn())

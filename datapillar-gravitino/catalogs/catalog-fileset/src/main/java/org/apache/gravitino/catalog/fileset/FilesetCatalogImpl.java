@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.fileset;
 
 import java.util.Map;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -42,6 +43,11 @@ public class FilesetCatalogImpl extends BaseCatalog<FilesetCatalogImpl> {
   @Override
   public String shortName() {
     return "fileset";
+  }
+
+  @Override
+  public Catalog.Type catalogType() {
+    return Catalog.Type.FILESET;
   }
 
   @Override

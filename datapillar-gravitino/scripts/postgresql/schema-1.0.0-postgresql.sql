@@ -783,7 +783,7 @@ COMMENT ON COLUMN metric_modifier_meta.modifier_comment IS 'modifier comment';
 COMMENT ON COLUMN metric_modifier_meta.audit_info IS 'modifier audit info';
 COMMENT ON COLUMN metric_modifier_meta.deleted_at IS 'modifier deleted at';
 
-CREATE TABLE IF NOT EXISTS metric_root_meta (
+CREATE TABLE IF NOT EXISTS wordroot_meta (
     root_id BIGINT NOT NULL,
     root_code VARCHAR(64) NOT NULL,
     root_name_cn VARCHAR(128) NOT NULL,
@@ -798,19 +798,19 @@ CREATE TABLE IF NOT EXISTS metric_root_meta (
     UNIQUE (schema_id, root_code, deleted_at)
 );
 
-CREATE INDEX IF NOT EXISTS metric_root_meta_idx_mid ON metric_root_meta (metalake_id);
-CREATE INDEX IF NOT EXISTS metric_root_meta_idx_cid ON metric_root_meta (catalog_id);
-COMMENT ON TABLE metric_root_meta IS '词根元数据表';
-COMMENT ON COLUMN metric_root_meta.root_id IS 'root word id';
-COMMENT ON COLUMN metric_root_meta.root_code IS 'root code, e.g., amt, cnt, rate';
-COMMENT ON COLUMN metric_root_meta.root_name_cn IS 'root chinese name, e.g., 金额, 数量, 比率';
-COMMENT ON COLUMN metric_root_meta.root_name_en IS 'root english name, e.g., amount, count, rate';
-COMMENT ON COLUMN metric_root_meta.metalake_id IS 'metalake id';
-COMMENT ON COLUMN metric_root_meta.catalog_id IS 'catalog id';
-COMMENT ON COLUMN metric_root_meta.schema_id IS 'schema id';
-COMMENT ON COLUMN metric_root_meta.root_comment IS 'root comment';
-COMMENT ON COLUMN metric_root_meta.audit_info IS 'root audit info';
-COMMENT ON COLUMN metric_root_meta.deleted_at IS 'root deleted at';
+CREATE INDEX IF NOT EXISTS wordroot_meta_idx_mid ON wordroot_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS wordroot_meta_idx_cid ON wordroot_meta (catalog_id);
+COMMENT ON TABLE wordroot_meta IS '词根元数据表';
+COMMENT ON COLUMN wordroot_meta.root_id IS 'root word id';
+COMMENT ON COLUMN wordroot_meta.root_code IS 'root code, e.g., amt, cnt, rate';
+COMMENT ON COLUMN wordroot_meta.root_name_cn IS 'root chinese name, e.g., 金额, 数量, 比率';
+COMMENT ON COLUMN wordroot_meta.root_name_en IS 'root english name, e.g., amount, count, rate';
+COMMENT ON COLUMN wordroot_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN wordroot_meta.catalog_id IS 'catalog id';
+COMMENT ON COLUMN wordroot_meta.schema_id IS 'schema id';
+COMMENT ON COLUMN wordroot_meta.root_comment IS 'root comment';
+COMMENT ON COLUMN wordroot_meta.audit_info IS 'root audit info';
+COMMENT ON COLUMN wordroot_meta.deleted_at IS 'root deleted at';
 
 CREATE TABLE IF NOT EXISTS metric_meta (
     metric_id BIGINT NOT NULL,

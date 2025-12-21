@@ -52,8 +52,8 @@ public interface Catalog extends Auditable {
     /** Catalog Type for ML model */
     MODEL(true),
 
-    /** Catalog Type for Metric Management */
-    METRIC(true),
+    /** Catalog Type for Dataset Management (Metric, WordRoot, etc.) */
+    DATASET(true),
 
     /** Catalog Type for test only. */
     UNSUPPORTED(false);
@@ -97,8 +97,8 @@ public interface Catalog extends Auditable {
           return MESSAGING;
         case "model":
           return MODEL;
-        case "metric":
-          return METRIC;
+        case "dataset":
+          return DATASET;
         default:
           throw new IllegalArgumentException("Unknown catalog type: " + type);
       }
@@ -229,11 +229,11 @@ public interface Catalog extends Auditable {
   }
 
   /**
-   * @return the {@link org.apache.gravitino.metric.MetricCatalog} if the catalog supports metric
+   * @return the {@link org.apache.gravitino.dataset.DatasetCatalog} if the catalog supports metric
    *     operations.
    * @throws UnsupportedOperationException if the catalog does not support metric operations.
    */
-  default org.apache.gravitino.metric.MetricCatalog asMetricCatalog()
+  default org.apache.gravitino.dataset.DatasetCatalog asDatasetCatalog()
       throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support metric operations");
   }

@@ -99,6 +99,19 @@ class DTOConverters {
     }
   }
 
+  /**
+   * 检查 catalog 类型是否被客户端支持
+   *
+   * @param type catalog 类型
+   * @return 是否支持
+   */
+  static boolean isSupportedCatalogType(Catalog.Type type) {
+    return type == Catalog.Type.RELATIONAL
+        || type == Catalog.Type.FILESET
+        || type == Catalog.Type.MESSAGING
+        || type == Catalog.Type.MODEL;
+  }
+
   @SuppressWarnings("unchecked")
   static Catalog toCatalog(String metalake, CatalogDTO catalog, RESTClient client) {
     Namespace namespace = Namespace.of(metalake);

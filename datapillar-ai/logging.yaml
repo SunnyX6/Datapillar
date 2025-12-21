@@ -28,7 +28,7 @@ handlers:
 filters:
   # 过滤第三方库的噪音日志
   exclude_noisy:
-    (): src.config.logging.ExcludeNoisyFilter
+    (): src.shared.config.logging.ExcludeNoisyFilter
 
 root:
   level: INFO

@@ -36,6 +36,8 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.dataset.Metric;
+import org.apache.gravitino.dataset.MetricModifier;
 import org.apache.gravitino.dto.rel.expressions.FunctionArg;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.file.Fileset;
@@ -48,7 +50,6 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.MetricEntity;
 import org.apache.gravitino.meta.MetricModifierEntity;
-import org.apache.gravitino.meta.MetricRootEntity;
 import org.apache.gravitino.meta.MetricVersionEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
@@ -60,8 +61,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
-import org.apache.gravitino.metric.Metric;
-import org.apache.gravitino.metric.MetricModifier;
+import org.apache.gravitino.meta.WordRootEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.Column;
@@ -78,7 +78,6 @@ import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.MetricModifierPO;
 import org.apache.gravitino.storage.relational.po.MetricPO;
-import org.apache.gravitino.storage.relational.po.MetricRootPO;
 import org.apache.gravitino.storage.relational.po.MetricVersionPO;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
@@ -96,6 +95,7 @@ import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
+import org.apache.gravitino.storage.relational.po.WordRootPO;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -2108,63 +2108,61 @@ public class POConverters {
     }
   }
 
-  /** 将 MetricRootPO 转换为 MetricRootEntity */
-  public static MetricRootEntity fromMetricRootPO(MetricRootPO metricRootPO, Namespace namespace) {
+  /** 将 WordRootPO 转换为 WordRootEntity */
+  public static WordRootEntity fromWordRootPO(WordRootPO wordRootPO, Namespace namespace) {
     try {
-      return MetricRootEntity.builder()
-          .withId(metricRootPO.getRootId())
-          .withCode(metricRootPO.getRootCode())
+      return WordRootEntity.builder()
+          .withId(wordRootPO.getRootId())
+          .withCode(wordRootPO.getRootCode())
           .withNamespace(namespace)
-          .withNameCn(metricRootPO.getRootNameCn())
-          .withNameEn(metricRootPO.getRootNameEn())
-          .withComment(metricRootPO.getRootComment())
+          .withNameCn(wordRootPO.getRootNameCn())
+          .withNameEn(wordRootPO.getRootNameEn())
+          .withComment(wordRootPO.getRootComment())
           .withAuditInfo(
-              JsonUtils.anyFieldMapper().readValue(metricRootPO.getAuditInfo(), AuditInfo.class))
+              JsonUtils.anyFieldMapper().readValue(wordRootPO.getAuditInfo(), AuditInfo.class))
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
     }
   }
 
-  public static List<MetricRootEntity> fromMetricRootPOs(
-      List<MetricRootPO> metricRootPOs, Namespace namespace) {
-    LOG.info("DEBUG: fromMetricRootPOs - 输入 {} 个 PO", metricRootPOs.size());
-    List<MetricRootEntity> result =
-        metricRootPOs.stream()
+  public static List<WordRootEntity> fromWordRootPOs(
+      List<WordRootPO> wordRootPOs, Namespace namespace) {
+    LOG.info("DEBUG: fromWordRootPOs - 输入 {} 个 PO", wordRootPOs.size());
+    List<WordRootEntity> result =
+        wordRootPOs.stream()
             .peek(po -> LOG.info("DEBUG: peek before filter - po is null: {}", po == null))
-            .filter(metricRootPO -> metricRootPO != null)
+            .filter(wordRootPO -> wordRootPO != null)
             .peek(po -> LOG.info("DEBUG: peek after filter - code={}", po.getRootCode()))
             .map(
-                metricRootPO -> {
+                wordRootPO -> {
                   try {
-                    LOG.info("DEBUG: map开始转换 - code={}", metricRootPO.getRootCode());
-                    MetricRootEntity entity =
-                        POConverters.fromMetricRootPO(metricRootPO, namespace);
+                    LOG.info("DEBUG: map开始转换 - code={}", wordRootPO.getRootCode());
+                    WordRootEntity entity = POConverters.fromWordRootPO(wordRootPO, namespace);
                     LOG.info("DEBUG: map转换成功 - entity code={}", entity.code());
                     return entity;
                   } catch (Exception e) {
-                    LOG.error("DEBUG: map转换失败 - code={}", metricRootPO.getRootCode(), e);
+                    LOG.error("DEBUG: map转换失败 - code={}", wordRootPO.getRootCode(), e);
                     return null;
                   }
                 })
             .filter(entity -> entity != null)
             .collect(Collectors.toList());
-    LOG.info("DEBUG: fromMetricRootPOs - 输出 {} 个 Entity", result.size());
+    LOG.info("DEBUG: fromWordRootPOs - 输出 {} 个 Entity", result.size());
     return result;
   }
 
-  /** 初始化 MetricRootPO */
-  public static MetricRootPO initializeMetricRootPO(
-      MetricRootEntity metricRootEntity, MetricRootPO.Builder builder) {
+  /** 初始化 WordRootPO */
+  public static WordRootPO initializeWordRootPO(
+      WordRootEntity wordRootEntity, WordRootPO.Builder builder) {
     try {
       return builder
-          .withRootId(metricRootEntity.id())
-          .withRootCode(metricRootEntity.code())
-          .withRootNameCn(metricRootEntity.nameCn())
-          .withRootNameEn(metricRootEntity.nameEn())
-          .withRootComment(metricRootEntity.comment())
-          .withAuditInfo(
-              JsonUtils.anyFieldMapper().writeValueAsString(metricRootEntity.auditInfo()))
+          .withRootId(wordRootEntity.id())
+          .withRootCode(wordRootEntity.code())
+          .withRootNameCn(wordRootEntity.nameCn())
+          .withRootNameEn(wordRootEntity.nameEn())
+          .withRootComment(wordRootEntity.comment())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(wordRootEntity.auditInfo()))
           .withDeletedAt(0L)
           .build();
     } catch (JsonProcessingException e) {
@@ -2172,23 +2170,23 @@ public class POConverters {
     }
   }
 
-  /** 更新 MetricRootPO */
-  public static MetricRootPO updateMetricRootPO(
-      MetricRootPO oldMetricRootPO, MetricRootEntity newMetricRootEntity) {
+  /** 更新 WordRootPO */
+  public static WordRootPO updateWordRootPO(
+      WordRootPO oldWordRootPO, WordRootEntity newWordRootEntity) {
     try {
-      MetricRootPO.Builder builder = MetricRootPO.builder();
+      WordRootPO.Builder builder = WordRootPO.builder();
       return builder
-          .withRootId(oldMetricRootPO.getRootId())
-          .withRootCode(newMetricRootEntity.code())
-          .withRootNameCn(newMetricRootEntity.nameCn())
-          .withRootNameEn(newMetricRootEntity.nameEn())
-          .withMetalakeId(oldMetricRootPO.getMetalakeId())
-          .withCatalogId(oldMetricRootPO.getCatalogId())
-          .withSchemaId(oldMetricRootPO.getSchemaId())
-          .withRootComment(newMetricRootEntity.comment())
+          .withRootId(oldWordRootPO.getRootId())
+          .withRootCode(newWordRootEntity.code())
+          .withRootNameCn(newWordRootEntity.nameCn())
+          .withRootNameEn(newWordRootEntity.nameEn())
+          .withMetalakeId(oldWordRootPO.getMetalakeId())
+          .withCatalogId(oldWordRootPO.getCatalogId())
+          .withSchemaId(oldWordRootPO.getSchemaId())
+          .withRootComment(newWordRootEntity.comment())
           .withAuditInfo(
-              JsonUtils.anyFieldMapper().writeValueAsString(newMetricRootEntity.auditInfo()))
-          .withDeletedAt(oldMetricRootPO.getDeletedAt())
+              JsonUtils.anyFieldMapper().writeValueAsString(newWordRootEntity.auditInfo()))
+          .withDeletedAt(oldWordRootPO.getDeletedAt())
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);

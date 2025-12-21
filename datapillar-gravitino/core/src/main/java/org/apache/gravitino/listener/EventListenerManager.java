@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -60,8 +61,14 @@ public class EventListenerManager {
   private int queueCapacity;
   private int dispatcherJoinSeconds;
   private List<EventListenerPlugin> eventListeners;
+  private Map<String, String> allProperties;
 
   public void init(Map<String, String> properties) {
+    init(properties, properties);
+  }
+
+  public void init(Map<String, String> properties, Map<String, String> allProperties) {
+    this.allProperties = allProperties;
     EventListenerConfig config = new EventListenerConfig(properties);
     this.queueCapacity = config.get(EventListenerConfig.QUEUE_CAPACITY);
     this.dispatcherJoinSeconds = config.get(EventListenerConfig.DISPATCHER_JOIN_SECONDS);
@@ -78,7 +85,8 @@ public class EventListenerManager {
                     listenerName ->
                         loadUserEventListenerPlugin(
                             listenerName,
-                            MapUtils.getPrefixMap(properties, DOT.join(listenerName, ""))),
+                            MapUtils.getPrefixMap(properties, DOT.join(listenerName, "")),
+                            this.allProperties),
                     (existingValue, newValue) -> {
                       throw new IllegalStateException(
                           "Duplicate event listener name detected: " + existingValue);
@@ -141,7 +149,7 @@ public class EventListenerManager {
   }
 
   private EventListenerPlugin loadUserEventListenerPlugin(
-      String listenerName, Map<String, String> config) {
+      String listenerName, Map<String, String> config, Map<String, String> allProperties) {
     LOG.info("EventListener:{}, config:{}.", listenerName, config);
     String className = config.get(GRAVITINO_EVENT_LISTENER_CLASS);
     Preconditions.checkArgument(
@@ -156,7 +164,15 @@ public class EventListenerManager {
     try {
       EventListenerPlugin listenerPlugin =
           (EventListenerPlugin) Class.forName(className).getDeclaredConstructor().newInstance();
-      listenerPlugin.init(config);
+
+      // 合并 gravitino.eventListener.{name}.* 和 gravitino.{name}.* 配置
+      // gravitino.{name}.* 配置优先级更高
+      Map<String, String> mergedConfig = new HashMap<>(config);
+      String additionalPrefix = "gravitino." + listenerName + ".";
+      Map<String, String> additionalConfig = MapUtils.getPrefixMap(allProperties, additionalPrefix);
+      mergedConfig.putAll(additionalConfig);
+
+      listenerPlugin.init(mergedConfig);
       return listenerPlugin;
     } catch (Exception e) {
       LOG.error(

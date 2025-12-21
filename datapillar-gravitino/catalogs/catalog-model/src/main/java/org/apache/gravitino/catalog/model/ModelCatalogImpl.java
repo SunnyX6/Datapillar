@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.model;
 
 import java.util.Map;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -43,6 +44,11 @@ public class ModelCatalogImpl extends BaseCatalog<ModelCatalogImpl> {
   @Override
   public String shortName() {
     return "model";
+  }
+
+  @Override
+  public Catalog.Type catalogType() {
+    return Catalog.Type.MODEL;
   }
 
   @Override

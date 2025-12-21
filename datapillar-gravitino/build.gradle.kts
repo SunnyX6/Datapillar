@@ -367,14 +367,16 @@ subprojects {
       options.compilerArgs.addAll(
         arrayOf(
           "-Xlint:cast",
-          "-Xlint:-deprecation", // Disable deprecation warnings for JDK 21
+          // Disable deprecation warnings for JDK 21
+          "-Xlint:-deprecation",
           "-Xlint:divzero",
           "-Xlint:empty",
           "-Xlint:fallthrough",
           "-Xlint:finally",
           "-Xlint:overrides",
           "-Xlint:static",
-          "-Xlint:-removal", // Disable removal warnings for JDK 21 deprecated APIs
+          // Disable removal warnings for JDK 21 deprecated APIs
+          "-Xlint:-removal",
           "-Werror",
         ),
       )
@@ -931,7 +933,7 @@ tasks {
       ":catalogs:catalog-lakehouse-hudi:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-paimon:copyLibAndConfig",
-      ":catalogs:catalog-metric:copyLibAndConfig",
+      ":catalogs:catalog-dataset:copyLibAndConfig",
       ":catalogs:catalog-model:copyLibAndConfig",
     )
   }

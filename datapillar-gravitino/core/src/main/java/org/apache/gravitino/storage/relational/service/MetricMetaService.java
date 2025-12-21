@@ -565,4 +565,34 @@ public class MetricMetaService {
     builder.withCatalogId(parentEntityIds[1]);
     builder.withSchemaId(parentEntityIds[2]);
   }
+
+  /**
+   * 根据指标 IDs 获取对应的 codes
+   *
+   * @param metricIds 指标 ID 列表
+   * @return 对应的 code 数组，顺序与输入 IDs 一致
+   */
+  public String[] getMetricCodesByIds(Long[] metricIds) {
+    if (metricIds == null || metricIds.length == 0) {
+      return new String[0];
+    }
+
+    List<Long> idList = java.util.Arrays.asList(metricIds);
+    List<MetricPO> metricPOs =
+        SessionUtils.getWithoutCommit(
+            MetricMetaMapper.class, mapper -> mapper.listMetricPOsByMetricIds(idList));
+
+    // 构建 ID -> code 的映射
+    java.util.Map<Long, String> idToCode = new java.util.HashMap<>();
+    for (MetricPO po : metricPOs) {
+      idToCode.put(po.getMetricId(), po.getMetricCode());
+    }
+
+    // 按原顺序返回 codes
+    String[] codes = new String[metricIds.length];
+    for (int i = 0; i < metricIds.length; i++) {
+      codes[i] = idToCode.get(metricIds[i]);
+    }
+    return codes;
+  }
 }

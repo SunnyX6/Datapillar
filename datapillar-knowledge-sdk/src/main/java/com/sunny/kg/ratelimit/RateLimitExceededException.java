@@ -1,5 +1,6 @@
 package com.sunny.kg.ratelimit;
 
+import com.sunny.kg.exception.KnowledgeErrorCode;
 import com.sunny.kg.exception.KnowledgeException;
 
 /**
@@ -11,7 +12,7 @@ import com.sunny.kg.exception.KnowledgeException;
 public class RateLimitExceededException extends KnowledgeException {
 
     public RateLimitExceededException() {
-        super("RATE_LIMIT_EXCEEDED", "请求频率超过限制");
+        super(KnowledgeErrorCode.RATE_LIMIT_EXCEEDED);
     }
 
 }
