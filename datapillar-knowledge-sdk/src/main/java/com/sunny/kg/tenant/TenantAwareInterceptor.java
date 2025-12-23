@@ -26,7 +26,7 @@ public class TenantAwareInterceptor implements Interceptor {
     }
 
     @Override
-    public boolean before(InterceptorContext context) {
+    public boolean beforeEmit(InterceptorContext context) {
         String tenant = TenantContext.getTenant();
         if (tenant == null) {
             tenant = defaultTenant;
@@ -41,18 +41,18 @@ public class TenantAwareInterceptor implements Interceptor {
     }
 
     @Override
-    public void after(InterceptorContext context) {
+    public void afterEmit(InterceptorContext context) {
         MDC.remove(MDC_TENANT);
     }
 
     @Override
-    public void onError(InterceptorContext context, Throwable throwable) {
+    public void onError(InterceptorContext context, Exception exception) {
         MDC.remove(MDC_TENANT);
     }
 
     @Override
     public int order() {
-        return HIGHEST_PRIORITY;
+        return Integer.MIN_VALUE;
     }
 
 }

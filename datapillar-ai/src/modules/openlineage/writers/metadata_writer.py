@@ -92,8 +92,19 @@ class MetadataWriter(BaseWriter):
 
     # 表相关的操作
     TABLE_OPERATIONS = {"create_table", "alter_table", "load_table"}
+    # Schema 相关的操作
+    SCHEMA_OPERATIONS = {"create_schema", "load_schema"}
+    # Catalog 相关的操作
+    CATALOG_OPERATIONS = {"create_catalog"}
     # 指标相关的操作
     METRIC_OPERATIONS = {"register_metric"}
+    # 删除操作
+    DROP_TABLE_OPERATIONS = {"drop_table"}
+    DROP_SCHEMA_OPERATIONS = {"drop_schema"}
+    DROP_CATALOG_OPERATIONS = {"drop_catalog"}
+    DELETE_METRIC_OPERATIONS = {"delete_metric"}
+    # Tag 操作
+    TAG_OPERATIONS = {"associate_tags"}
 
     async def write(self, session: AsyncSession, event: RunEvent) -> None:
         """写入元数据"""
@@ -104,8 +115,22 @@ class MetadataWriter(BaseWriter):
 
         if operation in self.TABLE_OPERATIONS:
             await self._write_table_metadata(session, event)
+        elif operation in self.SCHEMA_OPERATIONS:
+            await self._write_schema_metadata(session, event)
+        elif operation in self.CATALOG_OPERATIONS:
+            await self._write_catalog_metadata(session, event)
         elif operation in self.METRIC_OPERATIONS:
             await self._write_metric_from_event(session, event)
+        elif operation in self.DROP_TABLE_OPERATIONS:
+            await self._delete_table_metadata(session, event)
+        elif operation in self.DROP_SCHEMA_OPERATIONS:
+            await self._delete_schema_metadata(session, event)
+        elif operation in self.DROP_CATALOG_OPERATIONS:
+            await self._delete_catalog_metadata(session, event)
+        elif operation in self.DELETE_METRIC_OPERATIONS:
+            await self._delete_metric_metadata(session, event)
+        elif operation in self.TAG_OPERATIONS:
+            await self._update_tags(session, event)
         else:
             logger.debug("skip_unsupported_operation", job_name=job_name, operation=operation)
 
@@ -166,6 +191,347 @@ class MetadataWriter(BaseWriter):
                 )
                 if columns:
                     await self._write_columns_batch(session, columns, table_node.id)
+
+    async def _write_schema_metadata(self, session: AsyncSession, event: RunEvent) -> None:
+        """
+        写入 Schema 元数据
+
+        Schema 事件格式：
+        - namespace: gravitino://{metalake}/{catalog}
+        - name: {schema}
+        """
+        for dataset in event.get_all_datasets():
+            parsed_ns = self._parse_namespace(dataset.namespace)
+            schema_name = dataset.name  # Schema 事件的 name 直接就是 schema 名
+
+            if not parsed_ns.metalake or not parsed_ns.catalog:
+                logger.warning(
+                    "skip_schema_no_hierarchy",
+                    namespace=dataset.namespace,
+                    name=dataset.name,
+                )
+                continue
+
+            # 解析 Gravitino 自定义 facet（可能包含 description 等）
+            gravitino_facet = self._parse_gravitino_facet(dataset)
+
+            # 1. 写入 Catalog 节点
+            catalog_node = CatalogNode.create(
+                metalake=parsed_ns.metalake,
+                catalog_name=parsed_ns.catalog,
+            )
+            await self._write_catalog(session, catalog_node)
+
+            # 2. 写入 Schema 节点 + Catalog->Schema 关系
+            schema_node = SchemaNode.create(
+                metalake=parsed_ns.metalake,
+                catalog=parsed_ns.catalog,
+                schema_name=schema_name,
+            )
+            # 如果有 Gravitino facet，补充 description
+            if gravitino_facet and gravitino_facet.description:
+                schema_node.description = gravitino_facet.description
+
+            await self._write_schema(session, schema_node, catalog_node.id)
+
+    async def _write_catalog_metadata(self, session: AsyncSession, event: RunEvent) -> None:
+        """
+        写入 Catalog 元数据
+
+        Catalog 事件格式：
+        - namespace: gravitino://{metalake}
+        - name: {catalog}
+        """
+        for dataset in event.get_all_datasets():
+            parsed_ns = self._parse_namespace(dataset.namespace)
+            catalog_name = dataset.name  # Catalog 事件的 name 直接就是 catalog 名
+
+            if not parsed_ns.metalake:
+                logger.warning(
+                    "skip_catalog_no_metalake",
+                    namespace=dataset.namespace,
+                    name=dataset.name,
+                )
+                continue
+
+            # 写入 Catalog 节点
+            catalog_node = CatalogNode.create(
+                metalake=parsed_ns.metalake,
+                catalog_name=catalog_name,
+            )
+            await self._write_catalog(session, catalog_node)
+
+    async def _delete_table_metadata(self, session: AsyncSession, event: RunEvent) -> None:
+        """
+        删除表元数据
+
+        级联删除：Table + 所有 Column + 清理血缘边
+        事件格式：
+        - namespace: gravitino://{metalake}/{catalog}
+        - name: {schema}.{table}
+        """
+        for dataset in event.get_all_datasets():
+            parsed_ns = self._parse_namespace(dataset.namespace)
+            schema_name, table_name = self._parse_dataset_name(dataset.name)
+
+            if not parsed_ns.metalake or not parsed_ns.catalog or not schema_name:
+                logger.warning(
+                    "skip_delete_table_no_hierarchy",
+                    namespace=dataset.namespace,
+                    name=dataset.name,
+                )
+                continue
+
+            # 生成 Table ID
+            table_id = generate_id(
+                "table", parsed_ns.metalake, parsed_ns.catalog, schema_name, table_name
+            )
+
+            # 级联删除：Table + Column + 清理血缘边
+            # 注意：DETACH DELETE 会自动删除节点的所有关系
+            query = """
+            MATCH (t:Table {id: $tableId})
+            OPTIONAL MATCH (t)-[:HAS_COLUMN]->(c:Column)
+            DETACH DELETE t, c
+            """
+
+            await session.run(query, tableId=table_id)
+            logger.info(
+                "table_deleted",
+                table_id=table_id,
+                table_name=f"{schema_name}.{table_name}",
+            )
+
+    async def _delete_schema_metadata(self, session: AsyncSession, event: RunEvent) -> None:
+        """
+        删除 Schema 元数据
+
+        级联删除：Schema + 所有 Table/Column + 清理血缘边
+        事件格式：
+        - namespace: gravitino://{metalake}/{catalog}
+        - name: {schema}
+        """
+        for dataset in event.get_all_datasets():
+            parsed_ns = self._parse_namespace(dataset.namespace)
+            schema_name = dataset.name
+
+            if not parsed_ns.metalake or not parsed_ns.catalog:
+                logger.warning(
+                    "skip_delete_schema_no_hierarchy",
+                    namespace=dataset.namespace,
+                    name=dataset.name,
+                )
+                continue
+
+            # 生成 Schema ID
+            schema_id = generate_id(
+                "schema", parsed_ns.metalake, parsed_ns.catalog, schema_name
+            )
+
+            # 级联删除：Schema + Table + Column + Metric
+            # 注意：DETACH DELETE 会自动删除节点的所有关系
+            query = """
+            MATCH (s:Schema {id: $schemaId})
+            OPTIONAL MATCH (s)-[:HAS_TABLE]->(t:Table)
+            OPTIONAL MATCH (t)-[:HAS_COLUMN]->(c:Column)
+            OPTIONAL MATCH (s)-[:HAS_METRIC]->(m)
+            DETACH DELETE s, t, c, m
+            """
+
+            await session.run(query, schemaId=schema_id)
+            logger.info("schema_deleted", schema_id=schema_id, schema_name=schema_name)
+
+    async def _delete_catalog_metadata(self, session: AsyncSession, event: RunEvent) -> None:
+        """
+        删除 Catalog 元数据
+
+        级联删除：Catalog + 所有 Schema/Table/Column + 清理血缘边
+        事件格式：
+        - namespace: gravitino://{metalake}
+        - name: {catalog}
+        """
+        for dataset in event.get_all_datasets():
+            parsed_ns = self._parse_namespace(dataset.namespace)
+            catalog_name = dataset.name
+
+            if not parsed_ns.metalake:
+                logger.warning(
+                    "skip_delete_catalog_no_metalake",
+                    namespace=dataset.namespace,
+                    name=dataset.name,
+                )
+                continue
+
+            # 生成 Catalog ID
+            catalog_id = generate_id("catalog", parsed_ns.metalake, catalog_name)
+
+            # 级联删除：Catalog + Schema + Table + Column + Metric
+            # 注意：DETACH DELETE 会自动删除节点的所有关系
+            query = """
+            MATCH (cat:Catalog {id: $catalogId})
+            OPTIONAL MATCH (cat)-[:HAS_SCHEMA]->(s:Schema)
+            OPTIONAL MATCH (s)-[:HAS_TABLE]->(t:Table)
+            OPTIONAL MATCH (t)-[:HAS_COLUMN]->(c:Column)
+            OPTIONAL MATCH (s)-[:HAS_METRIC]->(m)
+            DETACH DELETE cat, s, t, c, m
+            """
+
+            await session.run(query, catalogId=catalog_id)
+            logger.info("catalog_deleted", catalog_id=catalog_id, catalog_name=catalog_name)
+
+    async def _delete_metric_metadata(self, session: AsyncSession, event: RunEvent) -> None:
+        """
+        删除 Metric 元数据
+
+        事件格式：
+        - namespace: gravitino://{metalake}/{catalog}
+        - name: {schema}.{metric}
+        """
+        for dataset in event.get_all_datasets():
+            parsed_ns = self._parse_namespace(dataset.namespace)
+            schema_name, metric_name = self._parse_dataset_name(dataset.name)
+
+            if not parsed_ns.metalake or not parsed_ns.catalog:
+                logger.warning(
+                    "skip_delete_metric_no_hierarchy",
+                    namespace=dataset.namespace,
+                    name=dataset.name,
+                )
+                continue
+
+            # Metric ID 基于 code 生成，需要从 facet 中获取
+            # 如果没有 code，则使用 metric_name
+            metric_code = metric_name
+            if dataset.facets and "schema" in dataset.facets:
+                schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
+                for field in schema_facet.fields:
+                    if field.name == "code" and field.description:
+                        metric_code = field.description
+                        break
+
+            metric_id = generate_id("metric", metric_code)
+
+            # 删除 Metric 节点及其关系
+            query = """
+            MATCH (m {id: $metricId})
+            WHERE m:AtomicMetric OR m:DerivedMetric OR m:CompositeMetric
+            DETACH DELETE m
+            """
+
+            await session.run(query, metricId=metric_id)
+            logger.info("metric_deleted", metric_id=metric_id, metric_name=metric_name)
+
+    async def _update_tags(self, session: AsyncSession, event: RunEvent) -> None:
+        """
+        更新节点的 Tag 标签
+
+        事件格式：
+        - namespace: gravitino://{metalake}/{catalog} 或 gravitino://{metalake}
+        - name: 根据 objectType 不同格式不同
+        - facets.gravitinoTag: {objectType, tagsToAdd, tagsToRemove, associatedTags}
+        """
+        for dataset in event.get_all_datasets():
+            # 解析 gravitinoTag facet
+            if not dataset.facets or "gravitinoTag" not in dataset.facets:
+                logger.warning("skip_tag_no_facet", name=dataset.name)
+                continue
+
+            tag_facet = dataset.facets["gravitinoTag"]
+            object_type = tag_facet.get("objectType")
+            associated_tags = tag_facet.get("associatedTags", [])
+
+            if not object_type:
+                logger.warning("skip_tag_no_object_type", name=dataset.name)
+                continue
+
+            # 解析 namespace 和 name，生成节点 ID
+            parsed_ns = self._parse_namespace(dataset.namespace)
+            node_id = self._generate_node_id_for_tag(
+                parsed_ns, dataset.name, object_type
+            )
+
+            if not node_id:
+                logger.warning(
+                    "skip_tag_cannot_generate_id",
+                    namespace=dataset.namespace,
+                    name=dataset.name,
+                    object_type=object_type,
+                )
+                continue
+
+            # 根据 objectType 确定节点标签
+            node_label = self._get_node_label_for_tag(object_type)
+
+            # 更新节点的 tags 属性
+            query = f"""
+            MATCH (n:{node_label} {{id: $nodeId}})
+            SET n.tags = $tags, n.updatedAt = datetime()
+            RETURN n.id as id
+            """
+
+            result = await session.run(query, nodeId=node_id, tags=list(associated_tags))
+            record = await result.single()
+
+            if record:
+                logger.info(
+                    "tags_updated",
+                    node_id=node_id,
+                    object_type=object_type,
+                    tags=associated_tags,
+                )
+            else:
+                logger.warning(
+                    "tags_update_node_not_found",
+                    node_id=node_id,
+                    object_type=object_type,
+                )
+
+    def _generate_node_id_for_tag(
+        self, parsed_ns: ParsedNamespace, name: str, object_type: str
+    ) -> str | None:
+        """根据对象类型生成节点 ID"""
+        if object_type == "CATALOG":
+            # name = catalog
+            if parsed_ns.metalake:
+                return generate_id("catalog", parsed_ns.metalake, name)
+        elif object_type == "SCHEMA":
+            # name = schema
+            if parsed_ns.metalake and parsed_ns.catalog:
+                return generate_id("schema", parsed_ns.metalake, parsed_ns.catalog, name)
+        elif object_type == "TABLE":
+            # name = schema.table
+            if parsed_ns.metalake and parsed_ns.catalog:
+                parts = name.split(".", 1)
+                if len(parts) == 2:
+                    schema_name, table_name = parts
+                    return generate_id(
+                        "table", parsed_ns.metalake, parsed_ns.catalog, schema_name, table_name
+                    )
+        elif object_type == "COLUMN":
+            # name = schema.table.column
+            if parsed_ns.metalake and parsed_ns.catalog:
+                parts = name.split(".", 2)
+                if len(parts) == 3:
+                    schema_name, table_name, column_name = parts
+                    return generate_id(
+                        "column",
+                        parsed_ns.metalake,
+                        parsed_ns.catalog,
+                        schema_name,
+                        table_name,
+                        column_name,
+                    )
+        return None
+
+    def _get_node_label_for_tag(self, object_type: str) -> str:
+        """根据对象类型获取 Neo4j 节点标签"""
+        label_map = {
+            "CATALOG": "Catalog",
+            "SCHEMA": "Schema",
+            "TABLE": "Table",
+            "COLUMN": "Column",
+        }
+        return label_map.get(object_type, "Knowledge")
 
     async def _write_metric_from_event(self, session: AsyncSession, event: RunEvent) -> None:
         """从 OpenLineage 事件中解析并写入指标"""
@@ -359,8 +725,10 @@ class MetadataWriter(BaseWriter):
         """
         解析 namespace
 
-        格式: gravitino://{metalake}/{catalog}
+        格式1: gravitino://{metalake}/{catalog} (用于 table/schema 事件)
+        格式2: gravitino://{metalake} (用于 catalog 事件)
         示例: gravitino://One Meta/tt -> metalake="One Meta", catalog="tt"
+        示例: gravitino://One Meta -> metalake="One Meta", catalog=None
         """
         result = ParsedNamespace(raw=namespace)
 
@@ -371,7 +739,12 @@ class MetadataWriter(BaseWriter):
             result.catalog = match.group(2)
             return result
 
-        # 其他格式暂不支持
+        # 匹配 gravitino://{metalake} (catalog 事件格式)
+        match = re.match(r"gravitino://([^/]+)$", namespace)
+        if match:
+            result.metalake = match.group(1)
+            return result
+
         return result
 
     def _parse_dataset_name(self, name: str) -> tuple[str | None, str]:
@@ -496,9 +869,11 @@ class MetadataWriter(BaseWriter):
         ON CREATE SET
             s.createdAt = datetime(),
             s.name = $name,
+            s.description = $description,
             s.createdBy = 'OPENLINEAGE'
         ON MATCH SET
-            s.updatedAt = datetime()
+            s.updatedAt = datetime(),
+            s.description = COALESCE($description, s.description)
         WITH s
         MATCH (c:Catalog {id: $catalogId})
         MERGE (c)-[:HAS_SCHEMA]->(s)
@@ -508,6 +883,7 @@ class MetadataWriter(BaseWriter):
             query,
             id=schema.id,
             name=schema.name,
+            description=schema.description,
             catalogId=catalog_id,
         )
 

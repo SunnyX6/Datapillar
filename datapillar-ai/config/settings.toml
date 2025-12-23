@@ -29,6 +29,7 @@ redis_checkpoint_ttl_seconds = 604800  # 7天
 
 # ==================== JWT 认证配置 ====================
 jwt_issuer = "datapillar-auth"
+auth_enabled = true  # 是否启用认证，开发调试时可设为 false
 
 # ==================== OpenLineage Sink 配置 ====================
 # Sink 端负责接收事件并写入 Neo4j
@@ -52,6 +53,7 @@ max_concurrent = 10           # 最大并发写入数
 [development]
 debug = true
 app_name = "Datapillar AI [DEV]"
+auth_enabled = false  # 开发环境关闭认证
 
 # 开发环境数据库（可以用不同的数据库）
 mysql_database = "datapillar"

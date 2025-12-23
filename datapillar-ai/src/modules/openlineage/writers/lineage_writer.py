@@ -21,7 +21,7 @@ from dataclasses import dataclass
 import structlog
 from neo4j import AsyncSession
 
-from src.modules.openlineage.analyzers.sql_lineage import SQLLineageAnalyzer
+from src.shared.utils.sql_lineage import SQLLineageAnalyzer
 from src.modules.openlineage.schemas.events import InputDataset, OutputDataset, RunEvent
 from src.modules.openlineage.schemas.facets import ColumnLineageDatasetFacet, SQLJobFacet
 from src.modules.openlineage.schemas.neo4j import SQLNode, generate_id

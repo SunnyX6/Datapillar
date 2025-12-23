@@ -106,10 +106,10 @@ def create_app() -> FastAPI:
             Neo4jClient.get_driver()  # 触发连接池初始化
 
             logger.info("初始化 Redis 连接池...")
-            redis_client = await RedisClient.get_instance()
+            await RedisClient.get_instance()
 
-            # 创建 Orchestrator
-            orchestrator = await create_etl_orchestrator(redis_client)
+            # 创建 Orchestrator（使用内存 checkpoint）
+            orchestrator = await create_etl_orchestrator()
             app.state.orchestrator = orchestrator
 
             logger.info("FastAPI 应用启动完成")

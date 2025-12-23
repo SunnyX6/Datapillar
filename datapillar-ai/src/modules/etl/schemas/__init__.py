@@ -3,45 +3,48 @@ ETL 多智能体系统数据结构
 """
 
 from src.modules.etl.schemas.kg_context import (
-    KnowledgeContext,
-    TableSchema,
-    ColumnInfo,
-    TableLineage,
-    JoinHint,
-    BusinessContext,
+    CatalogNav,
+    ComponentNav,
+    GlobalKGContext,
+    LineageEdge,
+    SchemaNav,
+    TableNav,
+    AgentScopedContext,
+    AgentType,
+    AGENT_TOOLS_MAP,
 )
 from src.modules.etl.schemas.requirement import (
     AnalysisResult,
     Step,
-    Stage,
     DataTarget,
     Ambiguity,
 )
 from src.modules.etl.schemas.plan import (
     Workflow,
     Job,
-    ReviewResult,
+    Stage,
     TestResult,
 )
 from src.modules.etl.schemas.dag import (
-    ReactFlowDag,
-    DagNode,
-    DagEdge,
-    DagMetadata,
-    NodeData,
-    NodePosition,
-    workflow_to_react_flow,
+    WorkflowResponse,
+    JobResponse,
+    JobDependencyResponse,
+    convert_workflow,
 )
 from src.modules.etl.schemas.state import AgentState
 
 __all__ = [
-    # Context
-    "KnowledgeContext",
-    "TableSchema",
-    "ColumnInfo",
-    "TableLineage",
-    "JoinHint",
-    "BusinessContext",
+    # KG Context - 知识图谱上下文
+    "GlobalKGContext",
+    "AgentScopedContext",
+    "AgentType",
+    "AGENT_TOOLS_MAP",
+    # Navigation - 导航模型
+    "CatalogNav",
+    "SchemaNav",
+    "TableNav",
+    "LineageEdge",
+    "ComponentNav",
     # Requirement
     "AnalysisResult",
     "Step",
@@ -51,16 +54,12 @@ __all__ = [
     # Plan
     "Workflow",
     "Job",
-    "ReviewResult",
     "TestResult",
-    # DAG
-    "ReactFlowDag",
-    "DagNode",
-    "DagEdge",
-    "DagMetadata",
-    "NodeData",
-    "NodePosition",
-    "workflow_to_react_flow",
+    # DAG / Workflow Response
+    "WorkflowResponse",
+    "JobResponse",
+    "JobDependencyResponse",
+    "convert_workflow",
     # State
     "AgentState",
 ]

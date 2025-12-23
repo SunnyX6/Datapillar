@@ -3,29 +3,406 @@
 负责所有 Neo4j 知识图谱的查询操作
 """
 
-from typing import List, Dict, Any, Optional
+import hashlib
 import logging
+from datetime import datetime
+from typing import Any
+
+from src.infrastructure.database import AsyncNeo4jClient, Neo4jClient, convert_neo4j_types
+from src.shared.config import settings
 
 logger = logging.getLogger(__name__)
-
-from src.infrastructure.database import Neo4jClient, AsyncNeo4jClient, convert_neo4j_types
-from src.shared.config import settings
-import hashlib
-from datetime import datetime
 
 
 class KnowledgeRepository:
     """知识图谱数据访问（Neo4j）"""
 
     # 按索引名缓存 VectorRetriever
-    _vector_retrievers: Dict[str, Any] = {}
+    _vector_retrievers: dict[str, Any] = {}
+
+    # ==================== 全局上下文加载（返回原始 dict）====================
+
+    @classmethod
+    async def load_catalog_hierarchy(cls) -> list[dict[str, Any]]:
+        """
+        加载 Catalog -> Schema -> Table 层级结构
+
+        Returns:
+            原始 dict 列表，结构：
+            [{
+                "name": "catalog_name",
+                "metalake": "metalake_name",
+                "schemas": [{
+                    "name": "schema_name",
+                    "description": "...",
+                    "tables": [{
+                        "name": "table_name",
+                        "schema_name": "schema_name",
+                        "catalog": "catalog_name",
+                        "tags": ["layer:ODS"],
+                        "description": "...",
+                        "column_count": 10
+                    }]
+                }]
+            }]
+        """
+        cypher = """
+        MATCH (cat:Catalog)-[:HAS_SCHEMA]->(sch:Schema)-[:HAS_TABLE]->(t:Table)
+        OPTIONAL MATCH (t)-[:HAS_COLUMN]->(col:Column)
+        WITH cat, sch, t, count(col) as column_count
+        WITH cat, sch, collect({
+            name: t.name,
+            schema_name: sch.name,
+            catalog: cat.name,
+            tags: coalesce(t.tags, []),
+            description: t.description,
+            column_count: column_count
+        }) as tables
+        WITH cat, collect({
+            name: sch.name,
+            catalog: cat.name,
+            description: sch.description,
+            tables: tables
+        }) as schemas
+        RETURN
+            cat.name as name,
+            cat.metalake as metalake,
+            schemas
+        ORDER BY cat.name
+        """
+
+        try:
+            driver = await AsyncNeo4jClient.get_driver()
+            async with driver.session(database=settings.neo4j_database) as session:
+                result = await session.run(cypher)
+                records = await result.data()
+                return [convert_neo4j_types(r) for r in records]
+        except Exception as e:
+            logger.error(f"加载 Catalog 层级结构失败: {e}")
+            return []
+
+    @classmethod
+    async def load_table_lineage(cls) -> list[dict[str, Any]]:
+        """
+        加载表级血缘图
+
+        Returns:
+            原始 dict 列表，结构：
+            [{"source_table": "schema.table", "target_table": "schema.table", "sql_id": "..."}]
+        """
+        cypher = """
+        MATCH (source:Table)-[:INPUT_OF]->(sql:SQL)-[:OUTPUT_TO]->(target:Table)
+        WITH source, target, sql
+        MATCH (source)<-[:HAS_TABLE]-(source_schema:Schema)
+        MATCH (target)<-[:HAS_TABLE]-(target_schema:Schema)
+        RETURN DISTINCT
+            source_schema.name + '.' + source.name as source_table,
+            target_schema.name + '.' + target.name as target_table,
+            sql.id as sql_id
+        ORDER BY source_table, target_table
+        """
+
+        try:
+            driver = await AsyncNeo4jClient.get_driver()
+            async with driver.session(database=settings.neo4j_database) as session:
+                result = await session.run(cypher)
+                records = await result.data()
+                return [convert_neo4j_types(r) for r in records]
+        except Exception as e:
+            logger.error(f"加载表级血缘失败: {e}")
+            return []
+
+    @classmethod
+    async def load_sql_patterns(cls, limit: int = 10) -> list[dict[str, Any]]:
+        """
+        加载热门 SQL 模式
+
+        Returns:
+            原始 dict 列表，结构：
+            [{"pattern": "...", "tables": ["t1", "t2"], "frequency": 10}]
+        """
+        cypher = """
+        MATCH (t:Table)-[:INPUT_OF]->(sql:SQL)
+        WITH sql, collect(DISTINCT t.name) as tables
+        RETURN
+            coalesce(sql.summary, sql.name, 'unknown') as pattern,
+            tables,
+            coalesce(sql.useCount, 1) as frequency
+        ORDER BY frequency DESC
+        LIMIT $limit
+        """
+
+        try:
+            driver = await AsyncNeo4jClient.get_driver()
+            async with driver.session(database=settings.neo4j_database) as session:
+                result = await session.run(cypher, limit=limit)
+                records = await result.data()
+                return [convert_neo4j_types(r) for r in records]
+        except Exception as e:
+            logger.error(f"加载 SQL 模式失败: {e}")
+            return []
+
+    # ==================== 按需查询工具方法 ====================
+
+    @classmethod
+    async def get_table_columns(cls, table_name: str) -> list[dict[str, Any]]:
+        """
+        获取表的所有列详情
+
+        Args:
+            table_name: 表名（支持 schema.table 或 table 格式）
+
+        Returns:
+            列信息列表
+        """
+        # 解析表名
+        parts = table_name.split(".", 1)
+        if len(parts) == 2:
+            schema_name, table_only = parts
+            where_clause = "t.name = $table_name AND sch.name = $schema_name"
+            params = {"table_name": table_only, "schema_name": schema_name}
+        else:
+            where_clause = "t.name = $table_name"
+            params = {"table_name": table_name}
+
+        cypher = f"""
+        MATCH (sch:Schema)-[:HAS_TABLE]->(t:Table)-[:HAS_COLUMN]->(col:Column)
+        WHERE {where_clause}
+        RETURN
+            col.name as name,
+            col.dataType as data_type,
+            col.description as description,
+            col.nullable as nullable,
+            coalesce(col.tags, []) as tags
+        ORDER BY col.name
+        """
+
+        try:
+            driver = await AsyncNeo4jClient.get_driver()
+            async with driver.session(database=settings.neo4j_database) as session:
+                result = await session.run(cypher, params)
+                records = await result.data()
+                return [convert_neo4j_types(r) for r in records]
+        except Exception as e:
+            logger.error(f"获取表列详情失败: {e}")
+            return []
+
+    @classmethod
+    async def get_column_lineage(
+        cls, source_table: str, target_table: str
+    ) -> list[dict[str, Any]]:
+        """
+        获取列级血缘
+
+        优先使用 LINEAGE_TO 关系查询显式的列级映射，
+        如果没有则降级为同名列匹配（兼容旧数据）。
+
+        Args:
+            source_table: 源表名（schema.table 格式）
+            target_table: 目标表名（schema.table 格式）
+
+        Returns:
+            列级血缘映射列表
+        """
+        # 解析表名
+        source_parts = source_table.split(".", 1)
+        target_parts = target_table.split(".", 1)
+
+        if len(source_parts) < 2 or len(target_parts) < 2:
+            logger.warning("列级血缘查询需要 schema.table 格式的表名")
+            return []
+
+        source_schema, source_name = source_parts
+        target_schema, target_name = target_parts
+
+        # 优先查询：使用 DERIVES_FROM 关系的显式列级血缘
+        cypher_derives_from = """
+        MATCH (source:Table {name: $source_name})<-[:HAS_TABLE]-(src_sch:Schema {name: $source_schema})
+        MATCH (target:Table {name: $target_name})<-[:HAS_TABLE]-(tgt_sch:Schema {name: $target_schema})
+        MATCH (source)-[:HAS_COLUMN]->(src_col:Column)<-[lineage:DERIVES_FROM]-(tgt_col:Column)<-[:HAS_COLUMN]-(target)
+        OPTIONAL MATCH (source)-[:INPUT_OF]->(sql:SQL)-[:OUTPUT_TO]->(target)
+        RETURN
+            sql.id as sql_id,
+            sql.content as sql_content,
+            collect(DISTINCT {
+                source_column: src_col.name,
+                target_column: tgt_col.name,
+                transformation: coalesce(lineage.transformationType, 'direct')
+            }) as column_mappings
+        """
+
+        try:
+            driver = await AsyncNeo4jClient.get_driver()
+            async with driver.session(database=settings.neo4j_database) as session:
+                # 先尝试 DERIVES_FROM 关系
+                result = await session.run(cypher_derives_from, {
+                    "source_name": source_name,
+                    "source_schema": source_schema,
+                    "target_name": target_name,
+                    "target_schema": target_schema,
+                })
+                records = await result.data()
+
+                # 检查是否有有效的列映射
+                has_valid_lineage = False
+                for record in records:
+                    mappings = record.get("column_mappings", [])
+                    if mappings and any(m.get("source_column") for m in mappings):
+                        has_valid_lineage = True
+                        break
+
+                if has_valid_lineage:
+                    return [convert_neo4j_types(r) for r in records]
+
+                # 降级：同名列匹配（兼容旧数据）
+                logger.info(f"未找到 DERIVES_FROM 关系，降级为同名列匹配: {source_table} → {target_table}")
+                cypher_same_name = """
+                MATCH (source:Table {name: $source_name})<-[:HAS_TABLE]-(src_sch:Schema {name: $source_schema})
+                MATCH (target:Table {name: $target_name})<-[:HAS_TABLE]-(tgt_sch:Schema {name: $target_schema})
+                MATCH (source)-[:INPUT_OF]->(sql:SQL)-[:OUTPUT_TO]->(target)
+                OPTIONAL MATCH (source)-[:HAS_COLUMN]->(src_col:Column)
+                OPTIONAL MATCH (target)-[:HAS_COLUMN]->(tgt_col:Column)
+                WHERE src_col.name = tgt_col.name
+                RETURN
+                    sql.id as sql_id,
+                    sql.content as sql_content,
+                    collect(DISTINCT {
+                        source_column: src_col.name,
+                        target_column: tgt_col.name,
+                        transformation: 'direct'
+                    }) as column_mappings
+                """
+                result = await session.run(cypher_same_name, {
+                    "source_name": source_name,
+                    "source_schema": source_schema,
+                    "target_name": target_name,
+                    "target_schema": target_schema,
+                })
+                records = await result.data()
+                return [convert_neo4j_types(r) for r in records]
+
+        except Exception as e:
+            logger.error(f"获取列级血缘失败: {e}")
+            return []
+
+    @classmethod
+    async def search_sql_by_tables(
+        cls, tables: list[str], limit: int = 5
+    ) -> list[dict[str, Any]]:
+        """
+        根据表名搜索相关 SQL
+
+        Args:
+            tables: 表名列表
+            limit: 返回数量限制
+
+        Returns:
+            相关 SQL 列表
+        """
+        cypher = """
+        MATCH (t:Table)-[:INPUT_OF]->(sql:SQL)
+        WHERE t.name IN $tables
+        WITH sql, collect(DISTINCT t.name) as related_tables
+        OPTIONAL MATCH (sql)-[:OUTPUT_TO]->(out:Table)
+        WITH sql, related_tables + collect(DISTINCT out.name) as related_tables
+        RETURN
+            sql.id as sql_id,
+            sql.name as name,
+            sql.content as content,
+            sql.summary as summary,
+            coalesce(sql.useCount, 0) as use_count,
+            coalesce(sql.confidence, 0.5) as confidence,
+            related_tables
+        ORDER BY sql.confidence DESC, sql.useCount DESC
+        LIMIT $limit
+        """
+
+        try:
+            driver = await AsyncNeo4jClient.get_driver()
+            async with driver.session(database=settings.neo4j_database) as session:
+                result = await session.run(cypher, {"tables": tables, "limit": limit})
+                records = await result.data()
+                return [convert_neo4j_types(r) for r in records]
+        except Exception as e:
+            logger.error(f"搜索相关 SQL 失败: {e}")
+            return []
+
+    @classmethod
+    async def get_sql_by_lineage(
+        cls, source_tables: list[str], target_table: str
+    ) -> dict[str, Any] | None:
+        """
+        根据血缘关系精准查找 SQL
+
+        根据 Table -[:INPUT_OF]-> SQL -[:OUTPUT_TO]-> Table 关系，
+        精准定位从源表到目标表的 SQL。
+
+        Args:
+            source_tables: 源表名列表
+            target_table: 目标表名
+
+        Returns:
+            SQL 详情（包含完整 content、JOIN 条件等）
+        """
+        # 解析目标表名
+        target_parts = target_table.split(".", 1)
+        if len(target_parts) == 2:
+            target_schema, target_name = target_parts
+            target_match = "(target:Table {name: $target_name})<-[:HAS_TABLE]-(tgt_sch:Schema {name: $target_schema})"
+        else:
+            target_name = target_table
+            target_schema = None
+            target_match = "(target:Table {name: $target_name})"
+
+        # 解析源表名（取第一个作为主要匹配）
+        source_names = []
+        for src in source_tables:
+            parts = src.split(".", 1)
+            source_names.append(parts[1] if len(parts) == 2 else src)
+
+        cypher = f"""
+        MATCH {target_match}
+        MATCH (source:Table)-[:INPUT_OF]->(sql:SQL)-[:OUTPUT_TO]->(target)
+        WHERE source.name IN $source_names
+        WITH sql, target, collect(DISTINCT source.name) as source_tables
+        RETURN
+            sql.id as sql_id,
+            sql.name as name,
+            sql.content as content,
+            sql.summary as summary,
+            sql.engine as engine,
+            sql.dialect as dialect,
+            coalesce(sql.useCount, 0) as use_count,
+            coalesce(sql.confidence, 0.5) as confidence,
+            source_tables,
+            target.name as target_table
+        ORDER BY confidence DESC, use_count DESC
+        LIMIT 1
+        """
+
+        params = {
+            "source_names": source_names,
+            "target_name": target_name,
+        }
+        if target_schema:
+            params["target_schema"] = target_schema
+
+        try:
+            driver = await AsyncNeo4jClient.get_driver()
+            async with driver.session(database=settings.neo4j_database) as session:
+                result = await session.run(cypher, params)
+                record = await result.single()
+                return convert_neo4j_types(record.data()) if record else None
+        except Exception as e:
+            logger.error(f"根据血缘查找 SQL 失败: {e}")
+            return None
 
     @classmethod
     def _get_vector_retriever(cls, index_name: str = "kg_unified_vector_index"):
         """懒加载向量检索器（按索引名缓存）"""
         if index_name not in cls._vector_retrievers:
             from neo4j_graphrag.retrievers import VectorRetriever
-            from src.integrations.embeddings import UnifiedEmbedder
+            from src.infrastructure.llm.embeddings import UnifiedEmbedder
 
             try:
                 cls._vector_retrievers[index_name] = VectorRetriever(
@@ -46,7 +423,7 @@ class KnowledgeRepository:
         query: str,
         top_k: int = 10,
         index_name: str = "kg_unified_vector_index"
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         统一向量检索接口
 
@@ -66,9 +443,9 @@ class KnowledgeRepository:
             results = retriever.search(query_text=query, top_k=top_k)
             return [
                 {
-                    "element_id": item.node.element_id,
+                    "element_id": item.metadata.get("id") if item.metadata else None,
                     "content": item.content,
-                    "score": item.score
+                    "score": item.metadata.get("score") if item.metadata else 0,
                 }
                 for item in results.items
             ] if results.items else []
@@ -83,7 +460,7 @@ class KnowledgeRepository:
         top_k: int = 10,
         vector_index: str = "kg_unified_vector_index",
         fulltext_index: str = "kg_unified_fulltext_index"
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         混合检索（向量 + 全文）
 
@@ -121,7 +498,7 @@ class KnowledgeRepository:
             return []
 
     @staticmethod
-    def get_initial_graph(limit: int = 50) -> List[Dict[str, Any]]:
+    def get_initial_graph(limit: int = 50) -> list[dict[str, Any]]:
         """
         获取初始图数据
 
@@ -153,7 +530,7 @@ class KnowledgeRepository:
             return []
 
     @classmethod
-    async def search_tables_with_context(cls, table_ids: List[str]) -> List[Dict[str, Any]]:
+    async def search_tables_with_context(cls, table_ids: list[str]) -> list[dict[str, Any]]:
         """
         基于表 ID 列表，获取表详情及业务上下文
 
@@ -206,7 +583,7 @@ class KnowledgeRepository:
             return []
 
     @classmethod
-    async def get_table_lineage_detail(cls, source_table: str, target_table: str) -> Optional[Dict[str, Any]]:
+    async def get_table_lineage_detail(cls, source_table: str, target_table: str) -> dict[str, Any] | None:
         """
         获取源表到目标表的列级血缘
 
@@ -223,7 +600,7 @@ class KnowledgeRepository:
 
         OPTIONAL MATCH (source)-[:HAS_COLUMN]->(source_col:Column)
         OPTIONAL MATCH (target)-[:HAS_COLUMN]->(target_col:Column)
-        OPTIONAL MATCH (source)-[:HAS_COLUMN]->(sc:Column)-[:LINEAGE_TO]->(tc:Column)<-[:HAS_COLUMN]-(target)
+        OPTIONAL MATCH (source)-[:HAS_COLUMN]->(sc:Column)<-[:DERIVES_FROM]-(tc:Column)<-[:HAS_COLUMN]-(target)
 
         RETURN
             source.name as source_table_name,
@@ -265,55 +642,7 @@ class KnowledgeRepository:
             return None
 
     @classmethod
-    async def get_join_hints(cls, table_name: str) -> List[Dict[str, Any]]:
-        """
-        获取指定表参与的 Join 关系（基于 Join 节点的 JOIN_LEFT / JOIN_RIGHT）
-        返回：[{join_id,left_table,left_column,right_table,right_column,join_type}]
-        """
-        cypher = """
-        MATCH (lt:Table {name:$table_name})-[:HAS_COLUMN]->(lc:Column)<-[:JOIN_LEFT]-(j:Join)-[:JOIN_RIGHT]->(rc:Column)<-[:HAS_COLUMN]-(rt:Table)
-        RETURN j.id AS join_id, j.joinType AS join_type,
-               lt.name AS left_table, lc.name AS left_column,
-               rt.name AS right_table, rc.name AS right_column
-        UNION
-        MATCH (rt:Table {name:$table_name})-[:HAS_COLUMN]->(rc:Column)<-[:JOIN_RIGHT]-(j:Join)-[:JOIN_LEFT]->(lc:Column)<-[:HAS_COLUMN]-(lt:Table)
-        RETURN j.id AS join_id, j.joinType AS join_type,
-               lt.name AS left_table, lc.name AS left_column,
-               rt.name AS right_table, rc.name AS right_column
-        """
-        try:
-            driver = await AsyncNeo4jClient.get_driver()
-            async with driver.session(database=settings.neo4j_database) as session:
-                result = await session.run(cypher, {"table_name": table_name})
-                records = await result.data()
-                return [convert_neo4j_types(r) for r in records]
-        except Exception as e:
-            logger.error(f"获取 Join 线索失败: {e}")
-            return []
-
-    @classmethod
-    async def get_quality_rules(cls, table_name: str) -> List[Dict[str, Any]]:
-        """
-        获取表的列质量规则（HAS_QUALITY_RULE）
-        返回：[{column, rule_name, rule_type, sql_exp, severity, is_required}]
-        """
-        cypher = """
-        MATCH (t:Table {name:$table_name})-[:HAS_COLUMN]->(c:Column)-[r:HAS_QUALITY_RULE]->(q:QualityRule)
-        RETURN c.name AS column, q.name AS rule_name, q.ruleType AS rule_type,
-               q.sqlExp AS sql_exp, q.severity AS severity, q.isRequired AS is_required
-        """
-        try:
-            driver = await AsyncNeo4jClient.get_driver()
-            async with driver.session(database=settings.neo4j_database) as session:
-                result = await session.run(cypher, {"table_name": table_name})
-                records = await result.data()
-                return [convert_neo4j_types(r) for r in records]
-        except Exception as e:
-            logger.error(f"获取质量规则失败: {e}")
-            return []
-
-    @classmethod
-    async def get_table_detail(cls, table_name: str) -> Optional[Dict[str, Any]]:
+    async def get_table_detail(cls, table_name: str) -> dict[str, Any] | None:
         """
         获取单表详情及下游表
 
@@ -361,12 +690,14 @@ class KnowledgeRepository:
     @classmethod
     async def persist_kg_updates(
         cls,
-        updates: List[Dict[str, Any]],
+        updates: list[dict[str, Any]],
         user_id: str,
         session_id: str,
     ) -> int:
         """
-        将用户确认过的结构化事实写回 Neo4j
+        将用户确认过的结构化事实写回 Neo4j（事务性写入）
+
+        使用显式事务确保原子性：要么全部成功，要么全部回滚。
         支持类型: table_role / lineage / col_map / join / reference_sql
         """
         if not updates:
@@ -377,11 +708,13 @@ class KnowledgeRepository:
 
         driver = await AsyncNeo4jClient.get_driver()
         async with driver.session(database=settings.neo4j_database) as session:
-            for upd in updates:
-                try:
+            # 使用显式事务确保原子性
+            tx = await session.begin_transaction()
+            try:
+                for upd in updates:
                     upd_type = upd.get("type")
                     if upd_type == "table_role":
-                        await session.run(
+                        await tx.run(
                             """
                             MERGE (t:Table {name:$table})
                             MERGE (w:WorkflowSession {session_id:$session_id})
@@ -400,7 +733,7 @@ class KnowledgeRepository:
                         )
                         saved += 1
                     elif upd_type == "lineage":
-                        await session.run(
+                        await tx.run(
                             """
                             MATCH (s:Table {name:$source_table})
                             MATCH (t:Table {name:$target_table})
@@ -417,7 +750,7 @@ class KnowledgeRepository:
                         )
                         saved += 1
                     elif upd_type == "col_map":
-                        await session.run(
+                        await tx.run(
                             """
                             MATCH (s:Table {name:$source_table})-[:HAS_COLUMN]->(sc:Column {name:$source_column})
                             MATCH (t:Table {name:$target_table})-[:HAS_COLUMN]->(tc:Column {name:$target_column})
@@ -437,7 +770,7 @@ class KnowledgeRepository:
                         )
                         saved += 1
                     elif upd_type == "join":
-                        await session.run(
+                        await tx.run(
                             """
                             MATCH (l:Table {name:$left})
                             MATCH (r:Table {name:$right})
@@ -454,294 +787,52 @@ class KnowledgeRepository:
                             },
                         )
                         saved += 1
-                    elif upd_type == "reference_sql":
-                        sql_text = upd.get("sql") or ""
-                        if not sql_text:
-                            continue
-                        fingerprint = hashlib.sha256(sql_text.encode("utf-8")).hexdigest()
-                        params = {
-                            "fp": fingerprint,
-                            "text": sql_text,
-                            "summary": upd.get("summary") or "",
-                            "tags": upd.get("tags") or [],
-                            "dialect": upd.get("dialect"),
-                            "user_id": user_id,
-                            "ts": ts,
-                        }
-                        await session.run(
-                            """
-                            MERGE (rs:ReferenceSQL {fingerprint:$fp})
-                            SET rs.text=$text, rs.summary=$summary, rs.tags=$tags, rs.dialect=$dialect,
-                                rs.by_user=$user_id, rs.ts=$ts
-                            """,
-                            params,
-                        )
-                        sources = upd.get("sources") or []
-                        targets = upd.get("targets") or []
-                        if sources:
-                            await session.run(
-                                """
-                                UNWIND $sources AS sname
-                                MATCH (s:Table {name:sname})
-                                MATCH (rs:ReferenceSQL {fingerprint:$fp})
-                                MERGE (rs)-[:READS_FROM]->(s)
-                                """,
-                                {"sources": sources, "fp": fingerprint},
-                            )
-                        if targets:
-                            await session.run(
-                                """
-                                UNWIND $targets AS tname
-                                MATCH (t:Table {name:tname})
-                                MATCH (rs:ReferenceSQL {fingerprint:$fp})
-                                MERGE (rs)-[:WRITES_TO]->(t)
-                                """,
-                                {"targets": targets, "fp": fingerprint},
-                            )
-                        saved += 1
                     else:
                         logger.warning(f"[persist_kg_updates] 忽略未知类型: {upd_type}")
-                except Exception as exc:  # noqa: BLE001
-                    logger.error(f"[persist_kg_updates] 写回失败: {exc}, 数据={upd}")
+
+                # 所有操作成功，提交事务
+                await tx.commit()
+                logger.info(f"[persist_kg_updates] 事务提交成功，写入 {saved} 条记录")
+
+            except Exception as exc:
+                # 出错时回滚事务
+                await tx.rollback()
+                logger.error(f"[persist_kg_updates] 事务回滚: {exc}")
+                raise
+
         return saved
 
-    # ==================== 参考 SQL 检索 ====================
+    # ==================== SQL 使用统计 ====================
 
     @classmethod
-    async def search_reference_sql(
-        cls,
-        query: str,
-        source_tables: Optional[List[str]] = None,
-        target_tables: Optional[List[str]] = None,
-        tags: Optional[List[str]] = None,
-        limit: int = 5,
-    ) -> List[Dict[str, Any]]:
+    async def increment_sql_use_count(cls, sql_id: str) -> bool:
         """
-        检索历史参考 SQL
+        增加 SQL 节点的使用次数
 
-        支持：
-        1. 语义相似度匹配（基于 summary）
-        2. 源表/目标表过滤
-        3. 标签过滤
+        当用户对 AI 生成的结果满意时，给 AI 参考过的历史 SQL 加分，
+        使高分 SQL 在未来的检索中排名更靠前。
 
         Args:
-            query: 用户查询
-            source_tables: 源表列表（可选过滤）
-            target_tables: 目标表列表（可选过滤）
-            tags: 标签过滤（可选）
-            limit: 返回数量
-
-        Returns:
-            参考 SQL 列表，按相关性排序
-        """
-        # 构建 Cypher 查询
-        cypher_parts = ["MATCH (rs:ReferenceSQL)"]
-        params = {"limit": limit}
-
-        # 源表过滤
-        if source_tables:
-            cypher_parts.append(
-                "MATCH (rs)-[:READS_FROM]->(src:Table) WHERE src.name IN $source_tables"
-            )
-            params["source_tables"] = source_tables
-
-        # 目标表过滤
-        if target_tables:
-            cypher_parts.append(
-                "MATCH (rs)-[:WRITES_TO]->(tgt:Table) WHERE tgt.name IN $target_tables"
-            )
-            params["target_tables"] = target_tables
-
-        # 标签过滤
-        if tags:
-            cypher_parts.append("WHERE any(tag IN rs.tags WHERE tag IN $tags)")
-            params["tags"] = tags
-
-        # 获取关联的表信息
-        cypher_parts.append("""
-        OPTIONAL MATCH (rs)-[:READS_FROM]->(src:Table)
-        OPTIONAL MATCH (rs)-[:WRITES_TO]->(tgt:Table)
-        WITH rs,
-             collect(DISTINCT src.name) as source_tables,
-             collect(DISTINCT tgt.name) as target_tables
-        RETURN
-            rs.fingerprint as fingerprint,
-            rs.text as sql_text,
-            rs.summary as summary,
-            rs.tags as tags,
-            rs.dialect as dialect,
-            rs.ts as created_at,
-            rs.confidence as confidence,
-            coalesce(rs.use_count, 0) as use_count,
-            source_tables,
-            target_tables
-        ORDER BY rs.confidence DESC, rs.use_count DESC
-        LIMIT $limit
-        """)
-
-        cypher = "\n".join(cypher_parts)
-
-        try:
-            driver = await AsyncNeo4jClient.get_driver()
-            async with driver.session(database=settings.neo4j_database) as session:
-                result = await session.run(cypher, params)
-                records = await result.data()
-                return [convert_neo4j_types(r) for r in records]
-        except Exception as e:
-            logger.error(f"检索参考 SQL 失败: {e}")
-            return []
-
-    @classmethod
-    async def increment_reference_sql_use_count(cls, fingerprint: str) -> bool:
-        """
-        增加参考 SQL 的使用次数
-
-        当 DeveloperAgent 参考某个历史 SQL 时调用，
-        用于统计哪些 SQL 最常被复用。
-
-        Args:
-            fingerprint: SQL 指纹
+            sql_id: SQL 节点的 ID
 
         Returns:
             是否更新成功
         """
         cypher = """
-        MATCH (rs:ReferenceSQL {fingerprint: $fingerprint})
-        SET rs.use_count = coalesce(rs.use_count, 0) + 1,
-            rs.last_used = datetime()
-        RETURN rs.use_count as use_count
+        MATCH (s:SQL {id: $sql_id})
+        SET s.use_count = coalesce(s.use_count, 0) + 1,
+            s.last_used = datetime()
+        RETURN s.use_count as use_count
         """
         try:
             driver = await AsyncNeo4jClient.get_driver()
             async with driver.session(database=settings.neo4j_database) as session:
-                result = await session.run(cypher, {"fingerprint": fingerprint})
+                result = await session.run(cypher, {"sql_id": sql_id})
                 record = await result.single()
                 if record:
-                    logger.info(f"参考 SQL 使用次数更新: {fingerprint} -> {record['use_count']}")
+                    logger.info(f"SQL 使用次数更新: {sql_id} -> {record['use_count']}")
                     return True
                 return False
         except Exception as e:
-            logger.error(f"更新参考 SQL 使用次数失败: {e}")
+            logger.error(f"更新 SQL 使用次数失败: {e}")
             return False
-
-    # ==================== 失败模式学习 ====================
-
-    @classmethod
-    async def persist_failure_pattern(
-        cls,
-        failure_type: str,
-        pattern: str,
-        avoidance_hint: str,
-        root_cause: Optional[str] = None,
-        involved_tables: Optional[List[str]] = None,
-        involved_columns: Optional[List[str]] = None,
-        examples: Optional[List[str]] = None,
-    ) -> bool:
-        """
-        将识别到的失败模式存入 Neo4j
-
-        用于沉淀常见错误模式，供后续 Agent 学习避免。
-
-        Args:
-            failure_type: 失败类型（syntax_error/semantic_error/logic_error 等）
-            pattern: 错误模式描述
-            avoidance_hint: 避免策略
-            root_cause: 根本原因
-            involved_tables: 涉及的表
-            involved_columns: 涉及的列
-            examples: 错误示例
-
-        Returns:
-            是否保存成功
-        """
-        # 生成模式指纹
-        pattern_fp = hashlib.sha256(f"{failure_type}:{pattern}".encode("utf-8")).hexdigest()[:16]
-        ts = datetime.utcnow().isoformat()
-
-        cypher = """
-        MERGE (fp:FailurePattern {fingerprint: $fingerprint})
-        SET fp.failure_type = $failure_type,
-            fp.pattern = $pattern,
-            fp.avoidance_hint = $avoidance_hint,
-            fp.root_cause = $root_cause,
-            fp.involved_tables = $involved_tables,
-            fp.involved_columns = $involved_columns,
-            fp.examples = $examples,
-            fp.occurrence_count = coalesce(fp.occurrence_count, 0) + 1,
-            fp.updated_at = $ts
-        RETURN fp.occurrence_count as occurrence_count
-        """
-
-        try:
-            driver = await AsyncNeo4jClient.get_driver()
-            async with driver.session(database=settings.neo4j_database) as session:
-                result = await session.run(cypher, {
-                    "fingerprint": pattern_fp,
-                    "failure_type": failure_type,
-                    "pattern": pattern,
-                    "avoidance_hint": avoidance_hint,
-                    "root_cause": root_cause,
-                    "involved_tables": involved_tables or [],
-                    "involved_columns": involved_columns or [],
-                    "examples": examples or [],
-                    "ts": ts,
-                })
-                record = await result.single()
-                if record:
-                    logger.info(
-                        f"失败模式已保存: {failure_type}, 出现次数: {record['occurrence_count']}"
-                    )
-                    return True
-                return False
-        except Exception as e:
-            logger.error(f"保存失败模式失败: {e}")
-            return False
-
-    @classmethod
-    async def get_top_failure_patterns(
-        cls,
-        failure_type: Optional[str] = None,
-        limit: int = 10,
-    ) -> List[Dict[str, Any]]:
-        """
-        获取高频失败模式
-
-        按出现次数排序，用于动态优化 Agent 提示词。
-
-        Args:
-            failure_type: 失败类型过滤（可选）
-            limit: 返回数量
-
-        Returns:
-            失败模式列表
-        """
-        where_clause = "WHERE fp.failure_type = $failure_type" if failure_type else ""
-
-        cypher = f"""
-        MATCH (fp:FailurePattern)
-        {where_clause}
-        RETURN
-            fp.fingerprint as fingerprint,
-            fp.failure_type as failure_type,
-            fp.pattern as pattern,
-            fp.avoidance_hint as avoidance_hint,
-            fp.root_cause as root_cause,
-            fp.occurrence_count as occurrence_count,
-            fp.involved_tables as involved_tables,
-            fp.updated_at as updated_at
-        ORDER BY fp.occurrence_count DESC
-        LIMIT $limit
-        """
-
-        try:
-            driver = await AsyncNeo4jClient.get_driver()
-            async with driver.session(database=settings.neo4j_database) as session:
-                result = await session.run(cypher, {
-                    "failure_type": failure_type,
-                    "limit": limit,
-                })
-                records = await result.data()
-                return [convert_neo4j_types(r) for r in records]
-        except Exception as e:
-            logger.error(f"获取高频失败模式失败: {e}")
-            return []
