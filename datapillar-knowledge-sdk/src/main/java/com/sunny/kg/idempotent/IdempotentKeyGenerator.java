@@ -53,7 +53,7 @@ public class IdempotentKeyGenerator {
      * 生成质量规则的幂等键
      */
     public static String generate(QualityRuleMeta rule) {
-        return hash("rule:" + rule.getName() + "@" + rule.getTableName());
+        return hash("rule:" + rule.getName() + "@" + rule.getBoundTable());
     }
 
     private static String hash(String input) {

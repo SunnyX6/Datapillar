@@ -25,15 +25,15 @@ class ComponentRepository:
         """
         query = text("""
             SELECT
-                component_id,
+                id,
+                component_code,
                 component_name,
                 component_type,
-                category,
-                description,
-                config_schema
+                job_params,
+                description
             FROM job_component
-            WHERE status = 'ACTIVE'
-            ORDER BY component_type, component_id
+            WHERE status = 1 AND is_deleted = 0
+            ORDER BY sort_order, id
         """)
 
         try:
@@ -50,26 +50,26 @@ class ComponentRepository:
         根据组件ID获取组件配置
 
         Args:
-            component_id: 组件ID
+            component_id: 组件ID（component_code）
 
         Returns:
             组件配置字典，不存在返回 None
         """
         query = text("""
             SELECT
-                component_id,
+                id,
+                component_code,
                 component_name,
                 component_type,
-                category,
-                description,
-                config_schema
+                job_params,
+                description
             FROM job_component
-            WHERE component_id = :component_id AND status = 'ACTIVE'
+            WHERE component_code = :component_code AND status = 1 AND is_deleted = 0
         """)
 
         try:
             with MySQLClient.get_engine().connect() as conn:
-                result = conn.execute(query, {"component_id": component_id})
+                result = conn.execute(query, {"component_code": component_id})
                 row = result.mappings().fetchone()
                 return dict(row) if row else None
         except Exception as e:
@@ -89,15 +89,15 @@ class ComponentRepository:
         """
         query = text("""
             SELECT
-                component_id,
+                id,
+                component_code,
                 component_name,
                 component_type,
-                category,
-                description,
-                config_schema
+                job_params,
+                description
             FROM job_component
-            WHERE component_type = :component_type AND status = 'ACTIVE'
-            ORDER BY component_id
+            WHERE component_type = :component_type AND status = 1 AND is_deleted = 0
+            ORDER BY sort_order, id
         """)
 
         try:

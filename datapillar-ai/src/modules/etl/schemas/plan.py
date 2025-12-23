@@ -1,23 +1,44 @@
 """
 工作流数据结构（统一三端：AI/前端/调度）
 
-统一术语：
+层级关系：
 - Workflow：工作流，由多个 Job 组成的 DAG
-- Job：作业/任务，每个 Job 是一个独立的执行单元
-- depends：Job 之间的依赖关系（直接在 Job 内部定义）
+- Job：作业/任务，每个 Job 是一个独立的执行单元（前端一个节点）
+- Stage：SQL 执行单元，一个 Job 可包含多个 Stage（架构师规划）
+
+术语：
 - type：Job 类型（hive/shell/datax/flink 等）
+- depends：Job 之间的依赖关系
 """
 
 from typing import List, Dict, Any, Optional, Literal
 from pydantic import BaseModel, Field
 
 
+class Stage(BaseModel):
+    """
+    Stage - SQL 执行单元
+
+    由架构师规划，一个 Stage 对应一个 SQL，产出一个表。
+    一个 Job 可包含多个 Stage，按顺序执行。
+    """
+    stage_id: int = Field(..., description="Stage 序号（Job 内唯一）")
+    name: str = Field(..., description="Stage 名称")
+    description: str = Field(..., description="这个 Stage 做什么")
+
+    input_tables: List[str] = Field(default_factory=list, description="读取的表")
+    output_table: str = Field(..., description="输出表")
+    is_temp_table: bool = Field(default=True, description="是否是临时表")
+
+    sql: Optional[str] = Field(None, description="SQL 语句（由 DeveloperAgent 生成）")
+
+
 class Job(BaseModel):
     """
     作业定义（统一三端命名：Job）
 
-    每个 Job 是一个独立的执行单元，由调度系统执行。
-    Job 之间通过 depends 字段定义依赖关系。
+    每个 Job 是一个独立的执行单元（前端一个节点）。
+    一个 Job 可包含多个业务步骤（step_ids）和多个执行阶段（stages）。
     """
     # 基础信息
     id: str = Field(..., description="Job 唯一标识")
@@ -30,15 +51,21 @@ class Job(BaseModel):
     # 依赖关系（统一字段：depends）
     depends: List[str] = Field(default_factory=list, description="依赖的上游 Job ID 列表")
 
-    # 数据读写声明（通过共享存储传递数据）
-    input_tables: List[str] = Field(default_factory=list, description="读取的表列表，如 ['ods.ods_order', 'ods.ods_user']")
-    output_table: Optional[str] = Field(None, description="写入的目标表，如 'dwd.dwd_order_detail'")
+    # 关联的业务步骤（来自 AnalystAgent）
+    step_ids: List[str] = Field(default_factory=list, description="包含的业务步骤 ID 列表")
 
-    # 组件配置（按 config_schema 填充，由 DeveloperAgent 生成）
-    config: Dict[str, Any] = Field(default_factory=dict, description="组件配置，结构由 component.config_schema 定义")
+    # 执行阶段（由 ArchitectAgent 规划）
+    stages: List[Stage] = Field(default_factory=list, description="执行阶段列表")
+
+    # 数据读写声明（通过共享存储传递数据）
+    input_tables: List[str] = Field(default_factory=list, description="读取的表列表")
+    output_table: Optional[str] = Field(None, description="写入的目标表")
+
+    # 组件配置（由 DeveloperAgent 生成）
+    config: Dict[str, Any] = Field(default_factory=dict, description="组件配置")
 
     # 运行时配置
-    priority: int = Field(default=0, description="优先级，数值越大优先级越高")
+    priority: int = Field(default=0, description="优先级")
     timeout: int = Field(default=3600, description="超时时间（秒）")
     retry_times: int = Field(default=3, description="失败重试次数")
     retry_interval: int = Field(default=60, description="重试间隔（秒）")
@@ -47,12 +74,17 @@ class Job(BaseModel):
     config_generated: bool = Field(default=False, description="配置是否已生成")
     config_validated: bool = Field(default=False, description="配置是否已验证")
 
+    def get_ordered_stages(self) -> List[Stage]:
+        """按执行顺序返回 Stage"""
+        return sorted(self.stages, key=lambda s: s.stage_id)
+
 
 class Workflow(BaseModel):
     """
     工作流定义（统一三端命名：Workflow）
 
-    描述完整的 ETL 工作流设计，由多个 Job 组成的 DAG。
+    描述完整的 ETL 工作流，由多个 Job 组成的 DAG。
+    由 ArchitectAgent 根据业务分析结果规划。
     """
     # 基础信息
     id: Optional[str] = Field(None, description="工作流唯一标识")
@@ -60,14 +92,11 @@ class Workflow(BaseModel):
     description: Optional[str] = Field(None, description="工作流描述")
 
     # 调度配置
-    schedule: Optional[str] = Field(None, description="调度 cron 表达式，如 '0 2 * * *'")
+    schedule: Optional[str] = Field(None, description="调度 cron 表达式")
     env: Literal["dev", "stg", "prod"] = Field(default="dev", description="运行环境")
 
-    # 作业列表（统一字段：jobs）
+    # 作业列表
     jobs: List[Job] = Field(default_factory=list, description="作业列表")
-
-    # 数据分层（用于参考）
-    layers: List[Literal["SRC", "ODS", "DWD", "DWS", "ADS"]] = Field(default_factory=list)
 
     # 风险提示
     risks: List[str] = Field(default_factory=list, description="架构风险点")
@@ -162,27 +191,132 @@ class Workflow(BaseModel):
 
         return errors
 
+    def validate_data_dependencies(self) -> tuple[List[str], List[str]]:
+        """
+        验证数据依赖是否正确声明
 
-class ReviewIssue(BaseModel):
-    """评审问题（与 ReviewerAgent 提示词保持一致）"""
-    severity: Literal["critical", "high", "medium", "low"]
-    category: Literal["completeness", "correctness", "performance", "security", "best_practice"]
-    description: str
-    suggestion: Optional[str] = None
-    affected_nodes: List[str] = Field(default_factory=list)
+        检查逻辑：
+        - 如果 Job B 的 input_tables 包含 Job A 的 output_table
+        - 则 Job B 必须声明依赖 Job A（Job B.depends 包含 Job A.id）
 
+        Returns:
+            (errors, warnings): 错误列表和警告列表
+            - errors: 缺失的关键依赖（会导致调度失败）
+            - warnings: 可能的问题（需要人工确认）
+        """
+        errors = []
+        warnings = []
 
-class ReviewResult(BaseModel):
-    """评审结果（Reviewer Agent 输出）"""
+        # 构建 output_table -> job_id 映射
+        output_to_job: Dict[str, str] = {}
+        for job in self.jobs:
+            if job.output_table:
+                output_to_job[job.output_table] = job.id
 
-    approved: bool
-    issues: List[ReviewIssue] = Field(default_factory=list)
-    improvements: List[str] = Field(default_factory=list)
-    summary: Optional[str] = None
+        # 检查每个 Job 的 input_tables
+        for job in self.jobs:
+            if not job.input_tables:
+                continue
 
-    def has_blocker(self) -> bool:
-        """是否存在关键阻断问题"""
-        return any(issue.severity in ("critical", "high") for issue in self.issues)
+            for input_table in job.input_tables:
+                # 检查这个输入表是否由其他 Job 产出
+                producer_job_id = output_to_job.get(input_table)
+                if producer_job_id and producer_job_id != job.id:
+                    # 检查是否已声明依赖
+                    if producer_job_id not in job.depends:
+                        errors.append(
+                            f"Job '{job.id}' 读取表 '{input_table}'，"
+                            f"该表由 Job '{producer_job_id}' 产出，"
+                            f"但未声明依赖关系"
+                        )
+
+        return errors, warnings
+
+    def fix_missing_dependencies(self) -> List[str]:
+        """
+        自动修复缺失的数据依赖
+
+        Returns:
+            修复记录列表
+        """
+        fixes = []
+
+        # 构建 output_table -> job_id 映射
+        output_to_job: Dict[str, str] = {}
+        for job in self.jobs:
+            if job.output_table:
+                output_to_job[job.output_table] = job.id
+
+        # 检查并修复每个 Job
+        for job in self.jobs:
+            if not job.input_tables:
+                continue
+
+            for input_table in job.input_tables:
+                producer_job_id = output_to_job.get(input_table)
+                if producer_job_id and producer_job_id != job.id:
+                    if producer_job_id not in job.depends:
+                        job.depends.append(producer_job_id)
+                        fixes.append(
+                            f"自动添加依赖: Job '{job.id}' -> Job '{producer_job_id}' "
+                            f"(因为读取表 '{input_table}')"
+                        )
+
+        return fixes
+
+    def validate_temp_table_scope(self) -> List[str]:
+        """
+        验证临时表作用域
+
+        规则：Stage 产出的临时表（is_temp_table=True）只能在当前 Job 内部使用，
+        不能被其他 Job 引用。
+
+        Returns:
+            错误列表
+        """
+        errors = []
+
+        # 收集每个 Job 内部的临时表
+        job_temp_tables: Dict[str, set] = {}  # job_id -> {temp_table1, temp_table2}
+
+        for job in self.jobs:
+            temp_tables = set()
+            for stage in job.stages:
+                if stage.is_temp_table and stage.output_table:
+                    temp_tables.add(stage.output_table)
+            job_temp_tables[job.id] = temp_tables
+
+        # 合并所有临时表
+        all_temp_tables: Dict[str, str] = {}  # temp_table -> owner_job_id
+        for job_id, temp_tables in job_temp_tables.items():
+            for temp_table in temp_tables:
+                all_temp_tables[temp_table] = job_id
+
+        # 检查每个 Job 是否引用了其他 Job 的临时表
+        for job in self.jobs:
+            # 检查 Job 级别的 input_tables
+            for input_table in job.input_tables:
+                if input_table in all_temp_tables:
+                    owner_job_id = all_temp_tables[input_table]
+                    if owner_job_id != job.id:
+                        errors.append(
+                            f"Job '{job.id}' 引用了 Job '{owner_job_id}' 的临时表 '{input_table}'，"
+                            f"临时表只能在定义它的 Job 内部使用"
+                        )
+
+            # 检查 Stage 级别的 input_tables
+            for stage in job.stages:
+                for input_table in stage.input_tables:
+                    if input_table in all_temp_tables:
+                        owner_job_id = all_temp_tables[input_table]
+                        if owner_job_id != job.id:
+                            errors.append(
+                                f"Job '{job.id}' 的 Stage '{stage.name}' 引用了 "
+                                f"Job '{owner_job_id}' 的临时表 '{input_table}'，"
+                                f"临时表只能在定义它的 Job 内部使用"
+                            )
+
+        return errors
 
 
 class TestCase(BaseModel):
@@ -207,9 +341,14 @@ class TestResult(BaseModel):
     failed_tests: int
     test_cases: List[TestCase] = Field(default_factory=list)
     validation_errors: List[str] = Field(default_factory=list)
+    validation_warnings: List[str] = Field(default_factory=list)
     coverage_summary: Dict[str, Any] = Field(default_factory=dict)
     notes: Optional[str] = None
 
     def all_passed(self) -> bool:
         """是否全部测试通过"""
         return self.passed
+
+    def has_warnings(self) -> bool:
+        """是否有警告"""
+        return len(self.validation_warnings) > 0

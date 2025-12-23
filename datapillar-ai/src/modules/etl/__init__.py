@@ -11,12 +11,11 @@ API 端点：
 - GET /api/agent/etl/status - 获取生成状态
 
 智能体角色：
+- Knowledge: 知识图谱检索
 - Analyst: 需求分析师
 - Architect: 架构设计师
 - Developer: SQL 开发者
 - Tester: 测试工程师
-- Reviewer: 代码审查者
-- Knowledge: 知识图谱检索
 """
 
 from src.modules.etl.api import router

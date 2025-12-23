@@ -40,8 +40,10 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.api.event.AlterTableEvent;
+import org.apache.gravitino.listener.api.event.AssociateTagsForMetadataObjectEvent;
 import org.apache.gravitino.listener.api.event.CreateCatalogEvent;
 import org.apache.gravitino.listener.api.event.CreateSchemaEvent;
 import org.apache.gravitino.listener.api.event.CreateTableEvent;
@@ -61,6 +63,7 @@ import org.apache.gravitino.listener.api.info.TableInfo;
 import org.apache.gravitino.listener.api.info.WordRootInfo;
 import org.apache.gravitino.listener.openlineage.facets.GravitinoDatasetFacet;
 import org.apache.gravitino.listener.openlineage.facets.GravitinoDatasetFacet.GravitinoColumnMetadata;
+import org.apache.gravitino.listener.openlineage.facets.GravitinoTagFacet;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 
@@ -119,10 +122,8 @@ public class GravitinoEventConverter {
       return convertRegisterMetric((RegisterMetricEvent) event);
     } else if (event instanceof DeleteMetricEvent) {
       return convertDeleteMetric((DeleteMetricEvent) event);
-    } else if (event instanceof CreateWordRootEvent) {
-      return convertCreateWordRoot((CreateWordRootEvent) event);
-    } else if (event instanceof DeleteWordRootEvent) {
-      return convertDeleteWordRoot((DeleteWordRootEvent) event);
+    } else if (event instanceof AssociateTagsForMetadataObjectEvent) {
+      return convertAssociateTagsForMetadataObject((AssociateTagsForMetadataObjectEvent) event);
     }
 
     log.debug("Unsupported event type: {}", event.getClass().getSimpleName());
@@ -745,5 +746,129 @@ public class GravitinoEventConverter {
         OpenLineage.RunEvent.EventType.COMPLETE,
         Collections.emptyList(),
         Collections.singletonList(outputDataset));
+  }
+
+  // ============================= Tag 事件转换 =============================
+
+  /**
+   * 转换 AssociateTagsForMetadataObjectEvent（关联 Tag 到元数据对象）。
+   *
+   * <p>将 Tag 关联信息作为自定义 facet 传递给 OpenLineage。
+   */
+  private RunEvent convertAssociateTagsForMetadataObject(
+      AssociateTagsForMetadataObjectEvent event) {
+    NameIdentifier identifier = event.identifier();
+    MetadataObject.Type objectType = event.objectType();
+
+    // 根据对象类型构建 namespace 和 name
+    String datasetNamespace = formatTagDatasetNamespace(identifier, objectType);
+    String datasetName = formatTagDatasetName(identifier, objectType);
+
+    // 构建包含 Tag 信息的 facet
+    GravitinoTagFacet tagFacet =
+        GravitinoTagFacet.builder(producerUri)
+            .objectType(objectType.name())
+            .tagsToAdd(event.tagsToAdd())
+            .tagsToRemove(event.tagsToRemove())
+            .associatedTags(event.associatedTags())
+            .build();
+
+    DatasetFacetsBuilder facetsBuilder = openLineage.newDatasetFacetsBuilder();
+    facetsBuilder.put("gravitinoTag", tagFacet);
+
+    OutputDataset outputDataset =
+        openLineage
+            .newOutputDatasetBuilder()
+            .namespace(datasetNamespace)
+            .name(datasetName)
+            .facets(facetsBuilder.build())
+            .build();
+
+    return createRunEvent(
+        event,
+        "gravitino.associate_tags",
+        OpenLineage.RunEvent.EventType.COMPLETE,
+        Collections.emptyList(),
+        Collections.singletonList(outputDataset));
+  }
+
+  /**
+   * 根据对象类型格式化 Tag 事件的 dataset namespace。
+   *
+   * <p>格式：
+   *
+   * <ul>
+   *   <li>CATALOG: gravitino://{metalake}
+   *   <li>SCHEMA: gravitino://{metalake}/{catalog}
+   *   <li>TABLE/COLUMN: gravitino://{metalake}/{catalog}
+   * </ul>
+   */
+  private String formatTagDatasetNamespace(NameIdentifier identifier, MetadataObject.Type type) {
+    String[] parts = identifier.namespace().levels();
+
+    switch (type) {
+      case CATALOG:
+        // identifier: metalake.catalog, namespace.levels = [metalake]
+        if (parts.length >= 1) {
+          return String.format("gravitino://%s", parts[0]);
+        }
+        break;
+      case SCHEMA:
+        // identifier: metalake.catalog.schema, namespace.levels = [metalake, catalog]
+        if (parts.length >= 2) {
+          return String.format("gravitino://%s/%s", parts[0], parts[1]);
+        }
+        break;
+      case TABLE:
+      case COLUMN:
+        // identifier: metalake.catalog.schema.table, namespace.levels = [metalake, catalog, schema]
+        if (parts.length >= 2) {
+          return String.format("gravitino://%s/%s", parts[0], parts[1]);
+        }
+        break;
+      default:
+        break;
+    }
+    return namespace;
+  }
+
+  /**
+   * 根据对象类型格式化 Tag 事件的 dataset name。
+   *
+   * <p>格式：
+   *
+   * <ul>
+   *   <li>CATALOG: {catalog}
+   *   <li>SCHEMA: {schema}
+   *   <li>TABLE: {schema}.{table}
+   *   <li>COLUMN: {schema}.{table}.{column}
+   * </ul>
+   */
+  private String formatTagDatasetName(NameIdentifier identifier, MetadataObject.Type type) {
+    String[] parts = identifier.namespace().levels();
+    String name = identifier.name();
+
+    switch (type) {
+      case CATALOG:
+        // identifier.name = catalog
+        return name;
+      case SCHEMA:
+        // identifier.name = schema
+        return name;
+      case TABLE:
+        // identifier.name = table, parts[2] = schema
+        if (parts.length >= 3) {
+          return parts[2] + "." + name;
+        }
+        return name;
+      case COLUMN:
+        // identifier.name = column, parts[2] = schema, parts[3] = table
+        if (parts.length >= 4) {
+          return parts[2] + "." + parts[3] + "." + name;
+        }
+        return name;
+      default:
+        return name;
+    }
   }
 }

@@ -43,6 +43,16 @@ class AuthMiddleware(BaseHTTPMiddleware):
         """拦截请求，验证认证"""
         path = request.url.path
 
+        # 检查是否禁用认证
+        if not getattr(settings, 'auth_enabled', True):
+            # 认证关闭时，注入默认用户
+            request.state.current_user = CurrentUser(
+                user_id=1,
+                username="dev_user",
+                email="dev@datapillar.io",
+            )
+            return await call_next(request)
+
         # 白名单放行
         if path in self.WHITELIST_PATHS or path.startswith("/docs") or path.startswith("/redoc") or path.startswith("/api/v1/lineage"):
             return await call_next(request)
