@@ -786,8 +786,8 @@ COMMENT ON COLUMN metric_modifier_meta.deleted_at IS 'modifier deleted at';
 CREATE TABLE IF NOT EXISTS wordroot_meta (
     root_id BIGINT NOT NULL,
     root_code VARCHAR(64) NOT NULL,
-    root_name_cn VARCHAR(128) NOT NULL,
-    root_name_en VARCHAR(128) NOT NULL,
+    root_name VARCHAR(128) NOT NULL,
+    data_type VARCHAR(128) DEFAULT NULL,
     metalake_id BIGINT NOT NULL,
     catalog_id BIGINT NOT NULL,
     schema_id BIGINT NOT NULL,
@@ -803,8 +803,8 @@ CREATE INDEX IF NOT EXISTS wordroot_meta_idx_cid ON wordroot_meta (catalog_id);
 COMMENT ON TABLE wordroot_meta IS '词根元数据表';
 COMMENT ON COLUMN wordroot_meta.root_id IS 'root word id';
 COMMENT ON COLUMN wordroot_meta.root_code IS 'root code, e.g., amt, cnt, rate';
-COMMENT ON COLUMN wordroot_meta.root_name_cn IS 'root chinese name, e.g., 金额, 数量, 比率';
-COMMENT ON COLUMN wordroot_meta.root_name_en IS 'root english name, e.g., amount, count, rate';
+COMMENT ON COLUMN wordroot_meta.root_name IS 'root name, e.g., 金额, amount';
+COMMENT ON COLUMN wordroot_meta.data_type IS 'data type, e.g., STRING, INTEGER, DECIMAL(10,2)';
 COMMENT ON COLUMN wordroot_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN wordroot_meta.catalog_id IS 'catalog id';
 COMMENT ON COLUMN wordroot_meta.schema_id IS 'schema id';
@@ -812,11 +812,75 @@ COMMENT ON COLUMN wordroot_meta.root_comment IS 'root comment';
 COMMENT ON COLUMN wordroot_meta.audit_info IS 'root audit info';
 COMMENT ON COLUMN wordroot_meta.deleted_at IS 'root deleted at';
 
+CREATE TABLE IF NOT EXISTS unit_meta (
+    unit_id BIGINT NOT NULL,
+    unit_code VARCHAR(64) NOT NULL,
+    unit_name VARCHAR(128) NOT NULL,
+    unit_symbol VARCHAR(16) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    catalog_id BIGINT NOT NULL,
+    schema_id BIGINT NOT NULL,
+    unit_comment TEXT DEFAULT NULL,
+    audit_info TEXT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (unit_id),
+    UNIQUE (schema_id, unit_code, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS unit_meta_idx_mid ON unit_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS unit_meta_idx_cid ON unit_meta (catalog_id);
+COMMENT ON TABLE unit_meta IS '单位元数据表';
+COMMENT ON COLUMN unit_meta.unit_id IS 'unit id';
+COMMENT ON COLUMN unit_meta.unit_code IS 'unit code, e.g., CURRENCY, RATIO, COUNT';
+COMMENT ON COLUMN unit_meta.unit_name IS 'unit name, e.g., 人民币, 百分比, 个数';
+COMMENT ON COLUMN unit_meta.unit_symbol IS 'unit symbol, e.g., ¥, %, 个';
+COMMENT ON COLUMN unit_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN unit_meta.catalog_id IS 'catalog id';
+COMMENT ON COLUMN unit_meta.schema_id IS 'schema id';
+COMMENT ON COLUMN unit_meta.unit_comment IS 'unit comment';
+COMMENT ON COLUMN unit_meta.audit_info IS 'unit audit info';
+COMMENT ON COLUMN unit_meta.deleted_at IS 'unit deleted at';
+
+CREATE TABLE IF NOT EXISTS value_domain_meta (
+    item_id BIGINT NOT NULL,
+    domain_code VARCHAR(64) NOT NULL,
+    domain_name VARCHAR(128) NOT NULL,
+    domain_type VARCHAR(16) NOT NULL,
+    item_value VARCHAR(512) NOT NULL,
+    item_label VARCHAR(256) DEFAULT NULL,
+    metalake_id BIGINT NOT NULL,
+    catalog_id BIGINT NOT NULL,
+    schema_id BIGINT NOT NULL,
+    domain_comment TEXT DEFAULT NULL,
+    audit_info TEXT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (item_id),
+    UNIQUE (schema_id, domain_code, item_value, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS value_domain_meta_idx_mid ON value_domain_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS value_domain_meta_idx_cid ON value_domain_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS value_domain_meta_idx_domain_code ON value_domain_meta (domain_code);
+COMMENT ON TABLE value_domain_meta IS '值域元数据表';
+COMMENT ON COLUMN value_domain_meta.item_id IS 'item id (每行唯一标识)';
+COMMENT ON COLUMN value_domain_meta.domain_code IS 'domain code, 用于分组, e.g., ORDER_STATUS';
+COMMENT ON COLUMN value_domain_meta.domain_name IS 'domain name, e.g., 订单状态值域';
+COMMENT ON COLUMN value_domain_meta.domain_type IS 'domain type: ENUM, RANGE, REGEX';
+COMMENT ON COLUMN value_domain_meta.item_value IS 'item value: 枚举值/区间表达式/正则';
+COMMENT ON COLUMN value_domain_meta.item_label IS 'item label: 显示名称';
+COMMENT ON COLUMN value_domain_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN value_domain_meta.catalog_id IS 'catalog id';
+COMMENT ON COLUMN value_domain_meta.schema_id IS 'schema id';
+COMMENT ON COLUMN value_domain_meta.domain_comment IS 'domain comment';
+COMMENT ON COLUMN value_domain_meta.audit_info IS 'audit info';
+COMMENT ON COLUMN value_domain_meta.deleted_at IS 'deleted at';
+
 CREATE TABLE IF NOT EXISTS metric_meta (
     metric_id BIGINT NOT NULL,
     metric_name VARCHAR(128) NOT NULL,
     metric_code VARCHAR(256) NOT NULL,
     metric_type VARCHAR(32) NOT NULL,
+    data_type VARCHAR(128) DEFAULT NULL,
     metalake_id BIGINT NOT NULL,
     catalog_id BIGINT NOT NULL,
     schema_id BIGINT NOT NULL,
@@ -837,6 +901,7 @@ COMMENT ON COLUMN metric_meta.metric_id IS 'metric id';
 COMMENT ON COLUMN metric_meta.metric_name IS 'metric name';
 COMMENT ON COLUMN metric_meta.metric_code IS 'metric code';
 COMMENT ON COLUMN metric_meta.metric_type IS 'metric type: ATOMIC, DERIVED, COMPOSITE';
+COMMENT ON COLUMN metric_meta.data_type IS 'data type, e.g., STRING, INTEGER, DECIMAL(10,2)';
 COMMENT ON COLUMN metric_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN metric_meta.catalog_id IS 'catalog id';
 COMMENT ON COLUMN metric_meta.schema_id IS 'schema id';
@@ -856,11 +921,17 @@ CREATE TABLE IF NOT EXISTS metric_version_info (
     metric_name VARCHAR(128) NOT NULL,
     metric_code VARCHAR(256) NOT NULL,
     metric_type VARCHAR(32) NOT NULL,
+    data_type VARCHAR(128) DEFAULT NULL,
     metric_comment TEXT DEFAULT NULL,
     metric_unit VARCHAR(64) DEFAULT NULL,
     aggregation_logic VARCHAR(64) DEFAULT NULL,
     parent_metric_ids TEXT DEFAULT NULL,
     calculation_formula TEXT DEFAULT NULL,
+    ref_catalog_name VARCHAR(128) DEFAULT NULL,
+    ref_schema_name VARCHAR(128) DEFAULT NULL,
+    ref_table_name VARCHAR(128) DEFAULT NULL,
+    measure_columns TEXT DEFAULT NULL,
+    filter_columns TEXT DEFAULT NULL,
     version_properties TEXT DEFAULT NULL,
     audit_info TEXT NOT NULL,
     deleted_at BIGINT NOT NULL DEFAULT 0,
@@ -881,10 +952,16 @@ COMMENT ON COLUMN metric_version_info.version IS 'metric version number';
 COMMENT ON COLUMN metric_version_info.metric_name IS 'metric name snapshot';
 COMMENT ON COLUMN metric_version_info.metric_code IS 'metric code snapshot';
 COMMENT ON COLUMN metric_version_info.metric_type IS 'metric type: ATOMIC, DERIVED, COMPOSITE';
+COMMENT ON COLUMN metric_version_info.data_type IS 'data type snapshot, e.g., STRING, INTEGER, DECIMAL(10,2)';
 COMMENT ON COLUMN metric_version_info.metric_comment IS 'metric comment snapshot';
 COMMENT ON COLUMN metric_version_info.metric_unit IS 'metric unit, e.g., 元, 个, %';
 COMMENT ON COLUMN metric_version_info.aggregation_logic IS 'aggregation logic: SUM, COUNT, AVG, MAX, MIN, DISTINCT_COUNT';
 COMMENT ON COLUMN metric_version_info.parent_metric_ids IS 'parent metric ids in JSON array format, e.g., [123, 456]';
 COMMENT ON COLUMN metric_version_info.calculation_formula IS 'calculation formula, e.g., metric1 / metric2 * 100';
+COMMENT ON COLUMN metric_version_info.ref_catalog_name IS 'referenced catalog name for ATOMIC metric';
+COMMENT ON COLUMN metric_version_info.ref_schema_name IS 'referenced schema name for ATOMIC metric';
+COMMENT ON COLUMN metric_version_info.ref_table_name IS 'referenced table name for ATOMIC metric';
+COMMENT ON COLUMN metric_version_info.measure_columns IS 'measure columns JSON array, e.g., [{name, type, comment}]';
+COMMENT ON COLUMN metric_version_info.filter_columns IS 'filter columns JSON array, e.g., [{name, type, values:[{key,label}]}]';
 COMMENT ON COLUMN metric_version_info.version_properties IS 'version properties in JSON format';
 COMMENT ON COLUMN metric_version_info.deleted_at IS 'version deleted at';

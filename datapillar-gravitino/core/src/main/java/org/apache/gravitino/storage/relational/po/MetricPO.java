@@ -31,6 +31,7 @@ public class MetricPO {
   private String metricName;
   private String metricCode;
   private String metricType;
+  private String dataType;
   private Long metalakeId;
   private Long catalogId;
   private Long schemaId;
@@ -71,6 +72,11 @@ public class MetricPO {
 
     public Builder withMetricType(String metricType) {
       metricPO.metricType = metricType;
+      return this;
+    }
+
+    public Builder withDataType(String dataType) {
+      metricPO.dataType = dataType;
       return this;
     }
 

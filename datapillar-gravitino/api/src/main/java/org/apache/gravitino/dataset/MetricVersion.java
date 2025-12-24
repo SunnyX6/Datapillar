@@ -35,22 +35,29 @@ public interface MetricVersion extends Auditable {
   /**
    * @return 指标名称快照
    */
-  String name();
+  String metricName();
 
   /**
    * @return 指标编码快照
    */
-  String code();
+  String metricCode();
 
   /**
    * @return 指标类型快照
    */
-  Metric.Type type();
+  Metric.Type metricType();
 
   /**
    * @return 指标注释快照，如果未设置则返回 null
    */
   default String comment() {
+    return null;
+  }
+
+  /**
+   * @return 数据类型快照，如 STRING, INTEGER, DECIMAL(10,2)，如果未设置则返回 null
+   */
+  default String dataType() {
     return null;
   }
 
@@ -79,6 +86,41 @@ public interface MetricVersion extends Auditable {
    * @return 计算公式，用于复合指标，例如：metric1 / metric2 * 100，如果未设置则返回 null
    */
   default String calculationFormula() {
+    return null;
+  }
+
+  /**
+   * @return 引用的 Catalog 名称，用于原子指标关联数据源，如果未设置则返回 null
+   */
+  default String refCatalogName() {
+    return null;
+  }
+
+  /**
+   * @return 引用的 Schema 名称，用于原子指标关联数据源，如果未设置则返回 null
+   */
+  default String refSchemaName() {
+    return null;
+  }
+
+  /**
+   * @return 引用的 Table 名称，用于原子指标关联数据源，如果未设置则返回 null
+   */
+  default String refTableName() {
+    return null;
+  }
+
+  /**
+   * @return 度量列 JSON 数组，格式：[{name, type, comment}]，如果未设置则返回 null
+   */
+  default String measureColumns() {
+    return null;
+  }
+
+  /**
+   * @return 过滤列 JSON 数组，格式：[{name, type, comment, values:[{key, label}]}]，如果未设置则返回 null
+   */
+  default String filterColumns() {
     return null;
   }
 

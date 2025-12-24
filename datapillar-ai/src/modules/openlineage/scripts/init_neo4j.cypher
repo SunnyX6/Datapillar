@@ -33,6 +33,22 @@ FOR (m:DerivedMetric) REQUIRE m.id IS UNIQUE;
 CREATE CONSTRAINT composite_metric_unique IF NOT EXISTS
 FOR (m:CompositeMetric) REQUIRE m.id IS UNIQUE;
 
+// 词根节点：id 唯一
+CREATE CONSTRAINT wordroot_unique IF NOT EXISTS
+FOR (w:WordRoot) REQUIRE w.id IS UNIQUE;
+
+// 修饰符节点：id 唯一
+CREATE CONSTRAINT modifier_unique IF NOT EXISTS
+FOR (m:Modifier) REQUIRE m.id IS UNIQUE;
+
+// 单位节点：id 唯一
+CREATE CONSTRAINT unit_unique IF NOT EXISTS
+FOR (u:Unit) REQUIRE u.id IS UNIQUE;
+
+// 值域节点：id 唯一
+CREATE CONSTRAINT valuedomain_unique IF NOT EXISTS
+FOR (v:ValueDomain) REQUIRE v.id IS UNIQUE;
+
 // ==================== 普通索引（加速查询） ====================
 
 // Catalog 索引
@@ -63,6 +79,22 @@ CREATE INDEX derived_metric_name IF NOT EXISTS FOR (m:DerivedMetric) ON (m.name)
 
 CREATE INDEX composite_metric_code IF NOT EXISTS FOR (m:CompositeMetric) ON (m.code);
 CREATE INDEX composite_metric_name IF NOT EXISTS FOR (m:CompositeMetric) ON (m.name);
+
+// 词根索引
+CREATE INDEX wordroot_code IF NOT EXISTS FOR (w:WordRoot) ON (w.code);
+CREATE INDEX wordroot_name IF NOT EXISTS FOR (w:WordRoot) ON (w.name);
+
+// 修饰符索引
+CREATE INDEX modifier_code IF NOT EXISTS FOR (m:Modifier) ON (m.code);
+CREATE INDEX modifier_type IF NOT EXISTS FOR (m:Modifier) ON (m.modifierType);
+
+// 单位索引
+CREATE INDEX unit_code IF NOT EXISTS FOR (u:Unit) ON (u.code);
+CREATE INDEX unit_name IF NOT EXISTS FOR (u:Unit) ON (u.name);
+
+// 值域索引
+CREATE INDEX valuedomain_domain_code IF NOT EXISTS FOR (v:ValueDomain) ON (v.domainCode);
+CREATE INDEX valuedomain_domain_type IF NOT EXISTS FOR (v:ValueDomain) ON (v.domainType);
 
 // ==================== 向量索引（语义搜索） ====================
 
@@ -104,6 +136,38 @@ OPTIONS {indexConfig: {
   `vector.similarity_function`: 'cosine'
 }};
 
+// 词根 embedding 向量索引
+CREATE VECTOR INDEX wordroot_embedding IF NOT EXISTS
+FOR (w:WordRoot) ON (w.embedding)
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 2048,
+  `vector.similarity_function`: 'cosine'
+}};
+
+// 修饰符 embedding 向量索引
+CREATE VECTOR INDEX modifier_embedding IF NOT EXISTS
+FOR (m:Modifier) ON (m.embedding)
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 2048,
+  `vector.similarity_function`: 'cosine'
+}};
+
+// 单位 embedding 向量索引
+CREATE VECTOR INDEX unit_embedding IF NOT EXISTS
+FOR (u:Unit) ON (u.embedding)
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 2048,
+  `vector.similarity_function`: 'cosine'
+}};
+
+// 值域 embedding 向量索引
+CREATE VECTOR INDEX valuedomain_embedding IF NOT EXISTS
+FOR (v:ValueDomain) ON (v.embedding)
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 2048,
+  `vector.similarity_function`: 'cosine'
+}};
+
 // ==================== 全文索引（文本搜索） ====================
 
 // Table 全文索引
@@ -123,6 +187,22 @@ FOR (m:DerivedMetric) ON EACH [m.name, m.description];
 
 CREATE FULLTEXT INDEX composite_metric_fulltext IF NOT EXISTS
 FOR (m:CompositeMetric) ON EACH [m.name, m.description];
+
+// 词根全文索引
+CREATE FULLTEXT INDEX wordroot_fulltext IF NOT EXISTS
+FOR (w:WordRoot) ON EACH [w.code, w.name, w.description];
+
+// 修饰符全文索引
+CREATE FULLTEXT INDEX modifier_fulltext IF NOT EXISTS
+FOR (m:Modifier) ON EACH [m.code, m.description];
+
+// 单位全文索引
+CREATE FULLTEXT INDEX unit_fulltext IF NOT EXISTS
+FOR (u:Unit) ON EACH [u.code, u.name, u.description];
+
+// 值域全文索引
+CREATE FULLTEXT INDEX valuedomain_fulltext IF NOT EXISTS
+FOR (v:ValueDomain) ON EACH [v.domainCode, v.domainName, v.description];
 
 // ==================== 验证索引创建 ====================
 SHOW INDEXES;

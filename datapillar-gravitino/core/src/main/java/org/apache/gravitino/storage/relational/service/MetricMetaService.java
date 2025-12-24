@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -29,7 +30,9 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.dataset.Metric;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.MetricEntity;
 import org.apache.gravitino.meta.MetricVersionEntity;
 import org.apache.gravitino.storage.relational.mapper.MetricMetaMapper;
@@ -41,6 +44,7 @@ import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,6 +79,43 @@ public class MetricMetaService {
   }
 
   /**
+   * 分页列出指标
+   *
+   * @param ns namespace (应该是 schema 级别)
+   * @param offset 偏移量
+   * @param limit 每页大小
+   * @return 指标实体列表
+   */
+  public List<MetricEntity> listMetricsByNamespaceWithPagination(
+      Namespace ns, int offset, int limit) {
+    NamespaceUtil.checkMetric(ns);
+
+    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ns);
+
+    List<MetricPO> metricPOs =
+        SessionUtils.getWithoutCommit(
+            MetricMetaMapper.class,
+            mapper -> mapper.listMetricPOsBySchemaIdWithPagination(schemaId, offset, limit));
+
+    return POConverters.fromMetricPOs(metricPOs, ns);
+  }
+
+  /**
+   * 统计指标总数
+   *
+   * @param ns namespace (应该是 schema 级别)
+   * @return 指标总数
+   */
+  public long countMetricsByNamespace(Namespace ns) {
+    NamespaceUtil.checkMetric(ns);
+
+    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ns);
+
+    return SessionUtils.getWithoutCommit(
+        MetricMetaMapper.class, mapper -> mapper.countMetricsBySchemaId(schemaId));
+  }
+
+  /**
    * 根据标识符获取指标
    *
    * @param ident 指标的 NameIdentifier
@@ -93,7 +134,8 @@ public class MetricMetaService {
    * @throws IOException 如果插入失败
    */
   public void insertMetric(MetricEntity metricEntity, boolean overwrite) throws IOException {
-    insertMetricWithVersion(metricEntity, overwrite, null, null, null, null);
+    insertMetricWithVersion(
+        metricEntity, overwrite, null, null, null, null, null, null, null, null, null);
   }
 
   /**
@@ -104,6 +146,11 @@ public class MetricMetaService {
    * @param aggregationLogic 聚合逻辑
    * @param parentMetricIds 父指标IDs
    * @param calculationFormula 计算公式
+   * @param refCatalogName 引用的数据源名称
+   * @param refSchemaName 引用的数据库名称
+   * @param refTableName 引用的表名称
+   * @param measureColumns 度量列JSON
+   * @param filterColumns 过滤列JSON
    * @throws IOException 如果插入失败
    */
   public void insertMetricWithVersion(
@@ -111,10 +158,25 @@ public class MetricMetaService {
       String unit,
       String aggregationLogic,
       Long[] parentMetricIds,
-      String calculationFormula)
+      String calculationFormula,
+      String refCatalogName,
+      String refSchemaName,
+      String refTableName,
+      String measureColumns,
+      String filterColumns)
       throws IOException {
     insertMetricWithVersion(
-        metricEntity, false, unit, aggregationLogic, parentMetricIds, calculationFormula);
+        metricEntity,
+        false,
+        unit,
+        aggregationLogic,
+        parentMetricIds,
+        calculationFormula,
+        refCatalogName,
+        refSchemaName,
+        refTableName,
+        measureColumns,
+        filterColumns);
   }
 
   /**
@@ -126,6 +188,11 @@ public class MetricMetaService {
    * @param aggregationLogic 聚合逻辑
    * @param parentMetricIds 父指标IDs
    * @param calculationFormula 计算公式
+   * @param refCatalogName 引用的数据源名称
+   * @param refSchemaName 引用的数据库名称
+   * @param refTableName 引用的表名称
+   * @param measureColumns 度量列JSON
+   * @param filterColumns 过滤列JSON
    * @throws IOException 如果插入失败
    */
   private void insertMetricWithVersion(
@@ -134,7 +201,12 @@ public class MetricMetaService {
       String unit,
       String aggregationLogic,
       Long[] parentMetricIds,
-      String calculationFormula)
+      String calculationFormula,
+      String refCatalogName,
+      String refSchemaName,
+      String refTableName,
+      String measureColumns,
+      String filterColumns)
       throws IOException {
     NameIdentifierUtil.checkMetric(metricEntity.nameIdentifier());
 
@@ -158,7 +230,16 @@ public class MetricMetaService {
             // 同时插入第一个版本到 metric_version_info 表，并设置版本相关属性
             MetricVersionEntity initialVersion =
                 POConverters.createInitialMetricVersion(
-                    metricEntity, unit, aggregationLogic, parentMetricIds, calculationFormula);
+                    metricEntity,
+                    unit,
+                    aggregationLogic,
+                    parentMetricIds,
+                    calculationFormula,
+                    refCatalogName,
+                    refSchemaName,
+                    refTableName,
+                    measureColumns,
+                    filterColumns);
             MetricPO metricPO = builder.build();
             MetricVersionPO versionPO =
                 POConverters.initializeMetricVersionPO(
@@ -178,7 +259,9 @@ public class MetricMetaService {
   }
 
   /**
-   * 更新指标
+   * 更新指标（只更新描述性字段：name、comment，不创建版本）
+   *
+   * <p>版本创建应通过 linkMetricVersion 显式调用
    *
    * @param identifier 指标标识符
    * @param updater 更新函数
@@ -202,45 +285,14 @@ public class MetricMetaService {
 
     Integer updateResult;
     try {
-      // 检查是否需要创建新版本
-      boolean needNewVersion =
-          POConverters.checkMetricVersionNeedUpdate(oldMetricEntity, newEntity);
-
-      if (needNewVersion) {
-        // 需要创建新版本：插入新版本记录，并更新 metric_meta 表
-        int newVersionNumber = oldMetricPO.getLastVersion() + 1;
-        MetricPO newMetricPO = POConverters.updateMetricPOWithVersion(oldMetricPO, newEntity, true);
-        MetricVersionEntity newVersion =
-            POConverters.createMetricVersionFromEntity(newEntity, newVersionNumber);
-        MetricVersionPO newVersionPO =
-            POConverters.initializeMetricVersionPO(
-                newVersion,
-                oldMetricEntity.id(),
-                oldMetricPO.getMetalakeId(),
-                oldMetricPO.getCatalogId(),
-                oldMetricPO.getSchemaId());
-
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    MetricVersionMetaMapper.class,
-                    mapper -> mapper.insertMetricVersionMeta(newVersionPO)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    MetricMetaMapper.class,
-                    mapper -> mapper.updateMetricMeta(newMetricPO, oldMetricPO)));
-
-        updateResult = 1;
-      } else {
-        // 不需要新版本：只更新 metric_meta 表
-        updateResult =
-            SessionUtils.doWithCommitAndFetchResult(
-                MetricMetaMapper.class,
-                mapper ->
-                    mapper.updateMetricMeta(
-                        POConverters.updateMetricPOWithVersion(oldMetricPO, newEntity, false),
-                        oldMetricPO));
-      }
+      // 只更新 metric_meta 表的描述性字段，不创建版本
+      updateResult =
+          SessionUtils.doWithCommitAndFetchResult(
+              MetricMetaMapper.class,
+              mapper ->
+                  mapper.updateMetricMeta(
+                      POConverters.updateMetricPOWithVersion(oldMetricPO, newEntity, false),
+                      oldMetricPO));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.METRIC, newEntity.nameIdentifier().toString());
@@ -564,6 +616,188 @@ public class MetricMetaService {
     builder.withMetalakeId(parentEntityIds[0]);
     builder.withCatalogId(parentEntityIds[1]);
     builder.withSchemaId(parentEntityIds[2]);
+  }
+
+  /**
+   * 创建新的指标版本（版本号自动递增）
+   *
+   * @param metricIdent 指标标识符
+   * @param comment 版本注释
+   * @param unit 单位
+   * @param aggregationLogic 聚合逻辑
+   * @param parentMetricIds 父指标IDs
+   * @param calculationFormula 计算公式
+   * @return 新创建的版本实体
+   * @throws IOException 如果创建失败
+   */
+  public MetricVersionEntity createNewMetricVersion(
+      NameIdentifier metricIdent,
+      String comment,
+      String unit,
+      String aggregationLogic,
+      Long[] parentMetricIds,
+      String calculationFormula)
+      throws IOException {
+    NameIdentifierUtil.checkMetric(metricIdent);
+
+    MetricPO metricPO = getMetricPOByIdentifier(metricIdent);
+    MetricEntity metricEntity = POConverters.fromMetricPO(metricPO, metricIdent.namespace());
+
+    // 创建版本实体（版本号在 SQL 层从 metric_meta.last_version 获取）
+    MetricVersionEntity newVersionEntity =
+        MetricVersionEntity.builder()
+            .withMetricIdentifier(metricIdent)
+            .withVersion(0) // 占位符，实际版本号由 SQL 层获取
+            .withMetricName(metricEntity.name())
+            .withMetricCode(metricEntity.code())
+            .withMetricType(metricEntity.metricType())
+            .withDataType(metricEntity.dataType())
+            .withComment(comment)
+            .withUnit(unit)
+            .withAggregationLogic(aggregationLogic)
+            .withParentMetricIds(parentMetricIds)
+            .withCalculationFormula(calculationFormula)
+            .withProperties(metricEntity.properties())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+
+    MetricVersionPO newVersionPO =
+        POConverters.initializeMetricVersionPO(
+            newVersionEntity,
+            metricEntity.id(),
+            metricPO.getMetalakeId(),
+            metricPO.getCatalogId(),
+            metricPO.getSchemaId());
+
+    try {
+      // 先原子递增 last_version，再插入版本记录（版本号从 metric_meta 实时获取）
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  MetricMetaMapper.class,
+                  mapper -> mapper.updateMetricLastVersion(metricEntity.id())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  MetricVersionMetaMapper.class,
+                  mapper -> mapper.insertMetricVersionMetaWithAutoVersion(newVersionPO)));
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.METRIC_VERSION, metricIdent.toString());
+      throw re;
+    }
+
+    // 重新获取指标信息以获取实际的版本号
+    MetricPO updatedMetricPO = getMetricPOByIdentifier(metricIdent);
+    return MetricVersionEntity.builder()
+        .withMetricIdentifier(metricIdent)
+        .withVersion(updatedMetricPO.getLastVersion())
+        .withMetricName(newVersionEntity.metricName())
+        .withMetricCode(newVersionEntity.metricCode())
+        .withMetricType(newVersionEntity.metricType())
+        .withDataType(newVersionEntity.dataType())
+        .withComment(newVersionEntity.comment())
+        .withUnit(newVersionEntity.unit())
+        .withAggregationLogic(newVersionEntity.aggregationLogic())
+        .withParentMetricIds(newVersionEntity.parentMetricIds())
+        .withCalculationFormula(newVersionEntity.calculationFormula())
+        .withProperties(newVersionEntity.properties())
+        .withAuditInfo(newVersionEntity.auditInfo())
+        .build();
+  }
+
+  /**
+   * 更新指定版本的信息（直接参数版本）
+   *
+   * @param metricIdent 指标标识符
+   * @param version 版本号
+   * @param comment 版本注释
+   * @param unit 单位
+   * @param aggregationLogic 聚合逻辑
+   * @param parentMetricIds 父指标IDs
+   * @param calculationFormula 计算公式
+   * @return 更新后的版本实体
+   * @throws IOException 如果更新失败
+   */
+  public MetricVersionEntity updateMetricVersion(
+      NameIdentifier metricIdent,
+      int version,
+      String comment,
+      String unit,
+      String aggregationLogic,
+      Long[] parentMetricIds,
+      String calculationFormula)
+      throws IOException {
+    NameIdentifierUtil.checkMetric(metricIdent);
+
+    MetricEntity metricEntity = getMetricByIdentifier(metricIdent);
+
+    MetricVersionPO oldVersionPO =
+        SessionUtils.getWithoutCommit(
+            MetricVersionMetaMapper.class,
+            mapper -> mapper.selectMetricVersionMeta(metricEntity.id(), version));
+
+    if (oldVersionPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METRIC_VERSION.name().toLowerCase(Locale.ROOT),
+          metricIdent + " version " + version);
+    }
+
+    // 创建更新后的版本实体
+    MetricVersionEntity newVersionEntity =
+        MetricVersionEntity.builder()
+            .withMetricIdentifier(metricIdent)
+            .withVersion(version)
+            .withMetricName(oldVersionPO.getMetricName())
+            .withMetricCode(oldVersionPO.getMetricCode())
+            .withMetricType(Metric.Type.valueOf(oldVersionPO.getMetricType()))
+            .withDataType(oldVersionPO.getDataType())
+            .withComment(comment)
+            .withUnit(unit)
+            .withAggregationLogic(aggregationLogic)
+            .withParentMetricIds(parentMetricIds)
+            .withCalculationFormula(calculationFormula)
+            .withProperties(
+                POConverters.fromMetricVersionPO(oldVersionPO, metricIdent).properties())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(
+                        POConverters.fromMetricVersionPO(oldVersionPO, metricIdent)
+                            .auditInfo()
+                            .creator())
+                    .withCreateTime(
+                        POConverters.fromMetricVersionPO(oldVersionPO, metricIdent)
+                            .auditInfo()
+                            .createTime())
+                    .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withLastModifiedTime(Instant.now())
+                    .build())
+            .build();
+
+    Integer updateResult;
+    try {
+      updateResult =
+          SessionUtils.doWithCommitAndFetchResult(
+              MetricVersionMetaMapper.class,
+              mapper ->
+                  mapper.updateMetricVersionMeta(
+                      POConverters.updateMetricVersionPO(oldVersionPO, newVersionEntity),
+                      oldVersionPO));
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.METRIC_VERSION, metricIdent + " version " + version);
+      throw re;
+    }
+
+    if (updateResult > 0) {
+      return newVersionEntity;
+    } else {
+      throw new IOException("Failed to update the metric version: " + metricIdent + " v" + version);
+    }
   }
 
   /**

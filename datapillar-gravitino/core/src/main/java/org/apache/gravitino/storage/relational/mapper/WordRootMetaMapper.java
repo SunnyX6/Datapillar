@@ -45,6 +45,15 @@ public interface WordRootMetaMapper {
 
   @SelectProvider(
       type = WordRootMetaSQLProviderFactory.class,
+      method = "listWordRootPOsBySchemaIdWithPagination")
+  List<WordRootPO> listWordRootPOsBySchemaIdWithPagination(
+      @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit);
+
+  @SelectProvider(type = WordRootMetaSQLProviderFactory.class, method = "countWordRootsBySchemaId")
+  long countWordRootsBySchemaId(@Param("schemaId") Long schemaId);
+
+  @SelectProvider(
+      type = WordRootMetaSQLProviderFactory.class,
       method = "selectWordRootMetaBySchemaIdAndRootCode")
   WordRootPO selectWordRootMetaBySchemaIdAndRootCode(
       @Param("schemaId") Long schemaId, @Param("rootCode") String rootCode);
@@ -57,7 +66,7 @@ public interface WordRootMetaMapper {
       @Param("schemaId") Long schemaId, @Param("rootCode") String rootCode);
 
   @Select(
-      "SELECT root_id, root_code, root_name_cn, root_name_en,"
+      "SELECT root_id, root_code, root_name_cn, root_name_en, data_type,"
           + " metalake_id, catalog_id, schema_id, root_comment,"
           + " audit_info, deleted_at"
           + " FROM "

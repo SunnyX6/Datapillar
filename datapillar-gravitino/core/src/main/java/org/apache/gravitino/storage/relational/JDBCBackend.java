@@ -80,7 +80,9 @@ import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TagMetaService;
 import org.apache.gravitino.storage.relational.service.TopicMetaService;
+import org.apache.gravitino.storage.relational.service.UnitMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
+import org.apache.gravitino.storage.relational.service.ValueDomainMetaService;
 import org.apache.gravitino.storage.relational.service.WordRootMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.slf4j.Logger;
@@ -149,6 +151,11 @@ public class JDBCBackend implements RelationalBackend {
             MetricModifierMetaService.getInstance().listModifiersByNamespace(namespace);
       case WORDROOT:
         return (List<E>) WordRootMetaService.getInstance().listWordRootsByNamespace(namespace);
+      case UNIT:
+        return (List<E>) UnitMetaService.getInstance().listUnitsByNamespace(namespace);
+      case VALUE_DOMAIN:
+        return (List<E>)
+            ValueDomainMetaService.getInstance().listValueDomainsByNamespace(namespace);
       case POLICY:
         return (List<E>) PolicyMetaService.getInstance().listPoliciesByNamespace(namespace);
       case JOB_TEMPLATE:
@@ -221,6 +228,12 @@ public class JDBCBackend implements RelationalBackend {
     } else if (e instanceof org.apache.gravitino.meta.WordRootEntity) {
       WordRootMetaService.getInstance()
           .insertWordRoot((org.apache.gravitino.meta.WordRootEntity) e, overwritten);
+    } else if (e instanceof org.apache.gravitino.meta.UnitEntity) {
+      UnitMetaService.getInstance()
+          .insertUnit((org.apache.gravitino.meta.UnitEntity) e, overwritten);
+    } else if (e instanceof org.apache.gravitino.meta.ValueDomainEntity) {
+      ValueDomainMetaService.getInstance()
+          .insertValueDomain((org.apache.gravitino.meta.ValueDomainEntity) e, overwritten);
     } else if (e instanceof PolicyEntity) {
       PolicyMetaService.getInstance().insertPolicy((PolicyEntity) e, overwritten);
     } else if (e instanceof JobTemplateEntity) {
@@ -272,6 +285,10 @@ public class JDBCBackend implements RelationalBackend {
         return (E) MetricModifierMetaService.getInstance().updateModifier(ident, updater);
       case WORDROOT:
         return (E) WordRootMetaService.getInstance().updateWordRoot(ident, updater);
+      case UNIT:
+        return (E) UnitMetaService.getInstance().updateUnit(ident, updater);
+      case VALUE_DOMAIN:
+        return (E) ValueDomainMetaService.getInstance().updateValueDomain(ident, updater);
       case POLICY:
         return (E) PolicyMetaService.getInstance().updatePolicy(ident, updater);
       default:
@@ -317,6 +334,10 @@ public class JDBCBackend implements RelationalBackend {
         return (E) MetricModifierMetaService.getInstance().getModifierByIdentifier(ident);
       case WORDROOT:
         return (E) WordRootMetaService.getInstance().getWordRootByIdentifier(ident);
+      case UNIT:
+        return (E) UnitMetaService.getInstance().getUnitByIdentifier(ident);
+      case VALUE_DOMAIN:
+        return (E) ValueDomainMetaService.getInstance().getValueDomainByIdentifier(ident);
       case POLICY:
         return (E) PolicyMetaService.getInstance().getPolicyByIdentifier(ident);
       case JOB_TEMPLATE:
@@ -367,6 +388,10 @@ public class JDBCBackend implements RelationalBackend {
         return MetricModifierMetaService.getInstance().deleteModifier(ident);
       case WORDROOT:
         return WordRootMetaService.getInstance().deleteWordRoot(ident);
+      case UNIT:
+        return UnitMetaService.getInstance().deleteUnit(ident);
+      case VALUE_DOMAIN:
+        return ValueDomainMetaService.getInstance().deleteValueDomain(ident);
       case POLICY:
         return PolicyMetaService.getInstance().deletePolicy(ident);
       case JOB_TEMPLATE:
@@ -464,6 +489,14 @@ public class JDBCBackend implements RelationalBackend {
         return WordRootMetaService.getInstance()
             .deleteWordRootMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case UNIT:
+        return UnitMetaService.getInstance()
+            .deleteUnitMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case VALUE_DOMAIN:
+        return ValueDomainMetaService.getInstance()
+            .deleteValueDomainMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
@@ -495,6 +528,8 @@ public class JDBCBackend implements RelationalBackend {
       case METRIC_VERSION:
       case METRIC_MODIFIER:
       case WORDROOT:
+      case UNIT:
+      case VALUE_DOMAIN:
       case TABLE_STATISTIC:
       case JOB_TEMPLATE:
       case JOB:

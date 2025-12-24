@@ -34,13 +34,18 @@ import org.apache.gravitino.dataset.Metric;
 import org.apache.gravitino.dataset.MetricChange;
 import org.apache.gravitino.dataset.MetricModifier;
 import org.apache.gravitino.dataset.MetricVersion;
+import org.apache.gravitino.dataset.Unit;
+import org.apache.gravitino.dataset.ValueDomain;
 import org.apache.gravitino.dataset.WordRoot;
 import org.apache.gravitino.exceptions.MetricAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetricException;
 import org.apache.gravitino.exceptions.NoSuchMetricVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.UnitAlreadyExistsException;
+import org.apache.gravitino.exceptions.ValueDomainAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
+import org.apache.gravitino.pagination.PagedResult;
 import org.apache.gravitino.storage.IdGenerator;
 
 /** DatasetOperationDispatcher 负责调度所有数据集相关的操作 */
@@ -52,14 +57,15 @@ public class DatasetOperationDispatcher extends OperationDispatcher implements D
   }
 
   @Override
-  public NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
+  public PagedResult<NameIdentifier> listMetrics(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(namespace.levels()),
         LockType.READ,
         () ->
             doWithCatalog(
                 getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
-                c -> c.doWithDatasetOps(m -> m.listMetrics(namespace)),
+                c -> c.doWithDatasetOps(m -> m.listMetrics(namespace, offset, limit)),
                 NoSuchSchemaException.class));
   }
 
@@ -80,12 +86,18 @@ public class DatasetOperationDispatcher extends OperationDispatcher implements D
       NameIdentifier ident,
       String code,
       Metric.Type type,
+      String dataType,
       String comment,
       Map<String, String> properties,
       String unit,
       String aggregationLogic,
       Long[] parentMetricIds,
-      String calculationFormula)
+      String calculationFormula,
+      String refCatalogName,
+      String refSchemaName,
+      String refTableName,
+      String measureColumns,
+      String filterColumns)
       throws NoSuchSchemaException, MetricAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     // 确保 properties 不为 null，以便生成 StringIdentifier
@@ -107,12 +119,18 @@ public class DatasetOperationDispatcher extends OperationDispatcher implements D
                                 ident,
                                 code,
                                 type,
+                                dataType,
                                 comment,
                                 finalProperties,
                                 unit,
                                 aggregationLogic,
                                 parentMetricIds,
-                                calculationFormula)),
+                                calculationFormula,
+                                refCatalogName,
+                                refSchemaName,
+                                refTableName,
+                                measureColumns,
+                                filterColumns)),
                 NoSuchSchemaException.class,
                 MetricAlreadyExistsException.class));
   }
@@ -207,14 +225,73 @@ public class DatasetOperationDispatcher extends OperationDispatcher implements D
   }
 
   @Override
-  public NameIdentifier[] listMetricModifiers(Namespace namespace) throws NoSuchSchemaException {
+  public MetricVersion linkMetricVersion(
+      NameIdentifier ident,
+      String comment,
+      String unit,
+      String aggregationLogic,
+      Long[] parentMetricIds,
+      String calculationFormula)
+      throws NoSuchMetricException {
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.WRITE,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c ->
+                    c.doWithDatasetOps(
+                        m ->
+                            m.linkMetricVersion(
+                                ident,
+                                comment,
+                                unit,
+                                aggregationLogic,
+                                parentMetricIds,
+                                calculationFormula)),
+                NoSuchMetricException.class));
+  }
+
+  @Override
+  public MetricVersion alterMetricVersion(
+      NameIdentifier ident,
+      int version,
+      String comment,
+      String unit,
+      String aggregationLogic,
+      Long[] parentMetricIds,
+      String calculationFormula)
+      throws NoSuchMetricVersionException {
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.WRITE,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c ->
+                    c.doWithDatasetOps(
+                        m ->
+                            m.alterMetricVersion(
+                                ident,
+                                version,
+                                comment,
+                                unit,
+                                aggregationLogic,
+                                parentMetricIds,
+                                calculationFormula)),
+                NoSuchMetricVersionException.class));
+  }
+
+  @Override
+  public PagedResult<NameIdentifier> listMetricModifiers(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(namespace.levels()),
         LockType.READ,
         () ->
             doWithCatalog(
                 getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
-                c -> c.doWithDatasetOps(m -> m.listMetricModifiers(namespace)),
+                c -> c.doWithDatasetOps(m -> m.listMetricModifiers(namespace, offset, limit)),
                 NoSuchSchemaException.class));
   }
 
@@ -257,14 +334,28 @@ public class DatasetOperationDispatcher extends OperationDispatcher implements D
   }
 
   @Override
-  public NameIdentifier[] listWordRoots(Namespace namespace) throws NoSuchSchemaException {
+  public MetricModifier alterMetricModifier(
+      NameIdentifier ident, MetricModifier.Type type, String comment) {
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.WRITE,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c -> c.doWithDatasetOps(m -> m.alterMetricModifier(ident, type, comment)),
+                RuntimeException.class));
+  }
+
+  @Override
+  public PagedResult<NameIdentifier> listWordRoots(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(namespace.levels()),
         LockType.READ,
         () ->
             doWithCatalog(
                 getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
-                c -> c.doWithDatasetOps(m -> m.listWordRoots(namespace)),
+                c -> c.doWithDatasetOps(m -> m.listWordRoots(namespace, offset, limit)),
                 NoSuchSchemaException.class));
   }
 
@@ -282,7 +373,7 @@ public class DatasetOperationDispatcher extends OperationDispatcher implements D
 
   @Override
   public WordRoot createWordRoot(
-      NameIdentifier ident, String code, String nameCn, String nameEn, String comment)
+      NameIdentifier ident, String code, String name, String dataType, String comment)
       throws NoSuchSchemaException {
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(ident.namespace().levels()),
@@ -291,7 +382,7 @@ public class DatasetOperationDispatcher extends OperationDispatcher implements D
             doWithCatalog(
                 getCatalogIdentifier(ident),
                 c ->
-                    c.doWithDatasetOps(m -> m.createWordRoot(ident, code, nameCn, nameEn, comment)),
+                    c.doWithDatasetOps(m -> m.createWordRoot(ident, code, name, dataType, comment)),
                 NoSuchSchemaException.class));
   }
 
@@ -304,6 +395,166 @@ public class DatasetOperationDispatcher extends OperationDispatcher implements D
             doWithCatalog(
                 getCatalogIdentifier(ident),
                 c -> c.doWithDatasetOps(m -> m.deleteWordRoot(ident)),
+                RuntimeException.class));
+  }
+
+  @Override
+  public WordRoot alterWordRoot(
+      NameIdentifier ident, String name, String dataType, String comment) {
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.WRITE,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c -> c.doWithDatasetOps(m -> m.alterWordRoot(ident, name, dataType, comment)),
+                RuntimeException.class));
+  }
+
+  @Override
+  public PagedResult<NameIdentifier> listUnits(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(namespace.levels()),
+        LockType.READ,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
+                c -> c.doWithDatasetOps(m -> m.listUnits(namespace, offset, limit)),
+                NoSuchSchemaException.class));
+  }
+
+  @Override
+  public Unit getUnit(NameIdentifier ident) {
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c -> c.doWithDatasetOps(m -> m.getUnit(ident)),
+                RuntimeException.class));
+  }
+
+  @Override
+  public Unit createUnit(
+      NameIdentifier ident, String code, String name, String symbol, String comment)
+      throws NoSuchSchemaException, UnitAlreadyExistsException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(ident.namespace().levels()),
+        LockType.WRITE,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c -> c.doWithDatasetOps(m -> m.createUnit(ident, code, name, symbol, comment)),
+                NoSuchSchemaException.class));
+  }
+
+  @Override
+  public boolean deleteUnit(NameIdentifier ident) {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(ident.namespace().levels()),
+        LockType.WRITE,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c -> c.doWithDatasetOps(m -> m.deleteUnit(ident)),
+                RuntimeException.class));
+  }
+
+  @Override
+  public Unit alterUnit(NameIdentifier ident, String name, String symbol, String comment) {
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.WRITE,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c -> c.doWithDatasetOps(m -> m.alterUnit(ident, name, symbol, comment)),
+                RuntimeException.class));
+  }
+
+  // ==================== ValueDomain 值域相关方法 ====================
+
+  @Override
+  public PagedResult<NameIdentifier> listValueDomains(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(namespace.levels()),
+        LockType.READ,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
+                c -> c.doWithDatasetOps(m -> m.listValueDomains(namespace, offset, limit)),
+                NoSuchSchemaException.class));
+  }
+
+  @Override
+  public ValueDomain getValueDomain(NameIdentifier ident) {
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c -> c.doWithDatasetOps(m -> m.getValueDomain(ident)),
+                RuntimeException.class));
+  }
+
+  @Override
+  public ValueDomain createValueDomain(
+      NameIdentifier ident,
+      String domainCode,
+      String domainName,
+      ValueDomain.Type domainType,
+      String itemValue,
+      String itemLabel,
+      String comment)
+      throws NoSuchSchemaException, ValueDomainAlreadyExistsException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(ident.namespace().levels()),
+        LockType.WRITE,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c ->
+                    c.doWithDatasetOps(
+                        m ->
+                            m.createValueDomain(
+                                ident,
+                                domainCode,
+                                domainName,
+                                domainType,
+                                itemValue,
+                                itemLabel,
+                                comment)),
+                NoSuchSchemaException.class));
+  }
+
+  @Override
+  public boolean deleteValueDomain(NameIdentifier ident) {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(ident.namespace().levels()),
+        LockType.WRITE,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c -> c.doWithDatasetOps(m -> m.deleteValueDomain(ident)),
+                RuntimeException.class));
+  }
+
+  @Override
+  public ValueDomain alterValueDomain(
+      NameIdentifier ident, String domainName, String itemLabel, String comment) {
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.WRITE,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c ->
+                    c.doWithDatasetOps(
+                        m -> m.alterValueDomain(ident, domainName, itemLabel, comment)),
                 RuntimeException.class));
   }
 

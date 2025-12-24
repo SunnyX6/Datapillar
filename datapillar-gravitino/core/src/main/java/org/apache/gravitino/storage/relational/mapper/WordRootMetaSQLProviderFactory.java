@@ -64,6 +64,15 @@ public class WordRootMetaSQLProviderFactory {
     return getProvider().listWordRootPOsBySchemaId(schemaId);
   }
 
+  public static String listWordRootPOsBySchemaIdWithPagination(
+      @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit) {
+    return getProvider().listWordRootPOsBySchemaIdWithPagination(schemaId, offset, limit);
+  }
+
+  public static String countWordRootsBySchemaId(@Param("schemaId") Long schemaId) {
+    return getProvider().countWordRootsBySchemaId(schemaId);
+  }
+
   public static String selectWordRootMetaBySchemaIdAndRootCode(
       @Param("schemaId") Long schemaId, @Param("rootCode") String rootCode) {
     return getProvider().selectWordRootMetaBySchemaIdAndRootCode(schemaId, rootCode);

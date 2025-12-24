@@ -60,7 +60,9 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.UnitEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.meta.ValueDomainEntity;
 import org.apache.gravitino.meta.WordRootEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
@@ -93,16 +95,15 @@ import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.storage.relational.po.UnitPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
+import org.apache.gravitino.storage.relational.po.ValueDomainPO;
 import org.apache.gravitino.storage.relational.po.WordRootPO;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** POConverters is a utility class to convert PO to Base and vice versa. */
 public class POConverters {
-  private static final Logger LOG = LoggerFactory.getLogger(POConverters.class);
   public static final long INIT_VERSION = 1L;
   public static final long DEFAULT_DELETED_AT = 0L;
 
@@ -1717,6 +1718,7 @@ public class POConverters {
           .withNamespace(namespace)
           .withCode(metricPO.getMetricCode())
           .withType(Metric.Type.valueOf(metricPO.getMetricType()))
+          .withDataType(metricPO.getDataType())
           .withComment(metricPO.getMetricComment())
           .withCurrentVersion(metricPO.getCurrentVersion())
           .withLastVersion(metricPO.getLastVersion())
@@ -1751,6 +1753,7 @@ public class POConverters {
           .withMetricName(metricEntity.name())
           .withMetricCode(metricEntity.code())
           .withMetricType(metricEntity.metricType().name())
+          .withDataType(metricEntity.dataType())
           .withMetricComment(metricEntity.comment())
           .withCurrentVersion((int) INIT_VERSION)
           .withLastVersion((int) INIT_VERSION)
@@ -1788,6 +1791,7 @@ public class POConverters {
           .withMetricName(newMetric.name())
           .withMetricCode(newMetric.code())
           .withMetricType(newMetric.metricType().name())
+          .withDataType(newMetric.dataType())
           .withMetalakeId(oldMetricPO.getMetalakeId())
           .withCatalogId(oldMetricPO.getCatalogId())
           .withSchemaId(oldMetricPO.getSchemaId())
@@ -1853,11 +1857,17 @@ public class POConverters {
           .withMetricName(metricVersionPO.getMetricName())
           .withMetricCode(metricVersionPO.getMetricCode())
           .withMetricType(Metric.Type.valueOf(metricVersionPO.getMetricType()))
+          .withDataType(metricVersionPO.getDataType())
           .withComment(metricVersionPO.getMetricComment())
           .withUnit(metricVersionPO.getMetricUnit())
           .withAggregationLogic(metricVersionPO.getAggregationLogic())
           .withParentMetricIds(parentMetricIds)
           .withCalculationFormula(metricVersionPO.getCalculationFormula())
+          .withRefCatalogName(metricVersionPO.getRefCatalogName())
+          .withRefSchemaName(metricVersionPO.getRefSchemaName())
+          .withRefTableName(metricVersionPO.getRefTableName())
+          .withMeasureColumns(metricVersionPO.getMeasureColumns())
+          .withFilterColumns(metricVersionPO.getFilterColumns())
           .withProperties(properties)
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(metricVersionPO.getAuditInfo(), AuditInfo.class))
@@ -1906,11 +1916,17 @@ public class POConverters {
           .withMetricName(versionEntity.metricName())
           .withMetricCode(versionEntity.metricCode())
           .withMetricType(versionEntity.metricType().name())
+          .withDataType(versionEntity.dataType())
           .withMetricComment(versionEntity.comment())
           .withMetricUnit(versionEntity.unit())
           .withAggregationLogic(versionEntity.aggregationLogic())
           .withParentMetricIds(parentMetricIdsJson)
           .withCalculationFormula(versionEntity.calculationFormula())
+          .withRefCatalogName(versionEntity.refCatalogName())
+          .withRefSchemaName(versionEntity.refSchemaName())
+          .withRefTableName(versionEntity.refTableName())
+          .withMeasureColumns(versionEntity.measureColumns())
+          .withFilterColumns(versionEntity.filterColumns())
           .withVersionProperties(propertiesJson)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(versionEntity.auditInfo()))
           .withDeletedAt(DEFAULT_DELETED_AT)
@@ -1952,6 +1968,7 @@ public class POConverters {
           .withMetricName(newVersion.metricName())
           .withMetricCode(newVersion.metricCode())
           .withMetricType(newVersion.metricType().name())
+          .withDataType(newVersion.dataType())
           .withMetricComment(newVersion.comment())
           .withMetricUnit(newVersion.unit())
           .withAggregationLogic(newVersion.aggregationLogic())
@@ -1973,7 +1990,8 @@ public class POConverters {
    * @return MetricVersionEntity 对象
    */
   public static MetricVersionEntity createInitialMetricVersion(MetricEntity metricEntity) {
-    return createInitialMetricVersion(metricEntity, null, null, null, null);
+    return createInitialMetricVersion(
+        metricEntity, null, null, null, null, null, null, null, null, null);
   }
 
   public static MetricVersionEntity createInitialMetricVersion(
@@ -1981,18 +1999,29 @@ public class POConverters {
       String unit,
       String aggregationLogic,
       Long[] parentMetricIds,
-      String calculationFormula) {
+      String calculationFormula,
+      String refCatalogName,
+      String refSchemaName,
+      String refTableName,
+      String measureColumns,
+      String filterColumns) {
     return MetricVersionEntity.builder()
         .withMetricIdentifier(metricEntity.nameIdentifier())
         .withVersion((int) INIT_VERSION)
         .withMetricName(metricEntity.name())
         .withMetricCode(metricEntity.code())
         .withMetricType(metricEntity.metricType())
+        .withDataType(metricEntity.dataType())
         .withComment(metricEntity.comment())
         .withUnit(unit)
         .withAggregationLogic(aggregationLogic)
         .withParentMetricIds(parentMetricIds)
         .withCalculationFormula(calculationFormula)
+        .withRefCatalogName(refCatalogName)
+        .withRefSchemaName(refSchemaName)
+        .withRefTableName(refTableName)
+        .withMeasureColumns(measureColumns)
+        .withFilterColumns(filterColumns)
         .withProperties(metricEntity.properties())
         .withAuditInfo(metricEntity.auditInfo())
         .build();
@@ -2013,6 +2042,7 @@ public class POConverters {
         .withMetricName(metricEntity.name())
         .withMetricCode(metricEntity.code())
         .withMetricType(metricEntity.metricType())
+        .withDataType(metricEntity.dataType())
         .withComment(metricEntity.comment())
         .withUnit(null)
         .withAggregationLogic(null)
@@ -2115,8 +2145,8 @@ public class POConverters {
           .withId(wordRootPO.getRootId())
           .withCode(wordRootPO.getRootCode())
           .withNamespace(namespace)
-          .withNameCn(wordRootPO.getRootNameCn())
-          .withNameEn(wordRootPO.getRootNameEn())
+          .withRootName(wordRootPO.getRootName())
+          .withDataType(wordRootPO.getDataType())
           .withComment(wordRootPO.getRootComment())
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(wordRootPO.getAuditInfo(), AuditInfo.class))
@@ -2128,28 +2158,10 @@ public class POConverters {
 
   public static List<WordRootEntity> fromWordRootPOs(
       List<WordRootPO> wordRootPOs, Namespace namespace) {
-    LOG.info("DEBUG: fromWordRootPOs - 输入 {} 个 PO", wordRootPOs.size());
-    List<WordRootEntity> result =
-        wordRootPOs.stream()
-            .peek(po -> LOG.info("DEBUG: peek before filter - po is null: {}", po == null))
-            .filter(wordRootPO -> wordRootPO != null)
-            .peek(po -> LOG.info("DEBUG: peek after filter - code={}", po.getRootCode()))
-            .map(
-                wordRootPO -> {
-                  try {
-                    LOG.info("DEBUG: map开始转换 - code={}", wordRootPO.getRootCode());
-                    WordRootEntity entity = POConverters.fromWordRootPO(wordRootPO, namespace);
-                    LOG.info("DEBUG: map转换成功 - entity code={}", entity.code());
-                    return entity;
-                  } catch (Exception e) {
-                    LOG.error("DEBUG: map转换失败 - code={}", wordRootPO.getRootCode(), e);
-                    return null;
-                  }
-                })
-            .filter(entity -> entity != null)
-            .collect(Collectors.toList());
-    LOG.info("DEBUG: fromWordRootPOs - 输出 {} 个 Entity", result.size());
-    return result;
+    return wordRootPOs.stream()
+        .filter(Objects::nonNull)
+        .map(wordRootPO -> fromWordRootPO(wordRootPO, namespace))
+        .collect(Collectors.toList());
   }
 
   /** 初始化 WordRootPO */
@@ -2159,8 +2171,8 @@ public class POConverters {
       return builder
           .withRootId(wordRootEntity.id())
           .withRootCode(wordRootEntity.code())
-          .withRootNameCn(wordRootEntity.nameCn())
-          .withRootNameEn(wordRootEntity.nameEn())
+          .withRootName(wordRootEntity.rootName())
+          .withDataType(wordRootEntity.dataType())
           .withRootComment(wordRootEntity.comment())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(wordRootEntity.auditInfo()))
           .withDeletedAt(0L)
@@ -2178,8 +2190,8 @@ public class POConverters {
       return builder
           .withRootId(oldWordRootPO.getRootId())
           .withRootCode(newWordRootEntity.code())
-          .withRootNameCn(newWordRootEntity.nameCn())
-          .withRootNameEn(newWordRootEntity.nameEn())
+          .withRootName(newWordRootEntity.rootName())
+          .withDataType(newWordRootEntity.dataType())
           .withMetalakeId(oldWordRootPO.getMetalakeId())
           .withCatalogId(oldWordRootPO.getCatalogId())
           .withSchemaId(oldWordRootPO.getSchemaId())
@@ -2187,6 +2199,145 @@ public class POConverters {
           .withAuditInfo(
               JsonUtils.anyFieldMapper().writeValueAsString(newWordRootEntity.auditInfo()))
           .withDeletedAt(oldWordRootPO.getDeletedAt())
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  // ==================== Unit 相关转换方法 ====================
+
+  /** 将 UnitPO 转换为 UnitEntity */
+  public static UnitEntity fromUnitPO(UnitPO unitPO, Namespace namespace) {
+    try {
+      return UnitEntity.builder()
+          .withId(unitPO.getUnitId())
+          .withCode(unitPO.getUnitCode())
+          .withNamespace(namespace)
+          .withUnitName(unitPO.getUnitName())
+          .withSymbol(unitPO.getUnitSymbol())
+          .withComment(unitPO.getUnitComment())
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(unitPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static List<UnitEntity> fromUnitPOs(List<UnitPO> unitPOs, Namespace namespace) {
+    return unitPOs.stream()
+        .filter(unitPO -> unitPO != null)
+        .map(unitPO -> POConverters.fromUnitPO(unitPO, namespace))
+        .collect(Collectors.toList());
+  }
+
+  /** 初始化 UnitPO */
+  public static UnitPO initializeUnitPO(UnitEntity unitEntity, UnitPO.Builder builder) {
+    try {
+      return builder
+          .withUnitId(unitEntity.id())
+          .withUnitCode(unitEntity.code())
+          .withUnitName(unitEntity.unitName())
+          .withUnitSymbol(unitEntity.symbol())
+          .withUnitComment(unitEntity.comment())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(unitEntity.auditInfo()))
+          .withDeletedAt(0L)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /** 更新 UnitPO */
+  public static UnitPO updateUnitPO(UnitPO oldUnitPO, UnitEntity newUnitEntity) {
+    try {
+      UnitPO.Builder builder = UnitPO.builder();
+      return builder
+          .withUnitId(oldUnitPO.getUnitId())
+          .withUnitCode(newUnitEntity.code())
+          .withUnitName(newUnitEntity.unitName())
+          .withUnitSymbol(newUnitEntity.symbol())
+          .withMetalakeId(oldUnitPO.getMetalakeId())
+          .withCatalogId(oldUnitPO.getCatalogId())
+          .withSchemaId(oldUnitPO.getSchemaId())
+          .withUnitComment(newUnitEntity.comment())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newUnitEntity.auditInfo()))
+          .withDeletedAt(oldUnitPO.getDeletedAt())
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  // ==================== ValueDomain 相关转换方法 ====================
+
+  /** 将 ValueDomainPO 转换为 ValueDomainEntity */
+  public static ValueDomainEntity fromValueDomainPO(ValueDomainPO domainPO, Namespace namespace) {
+    try {
+      return ValueDomainEntity.builder()
+          .withId(domainPO.getItemId())
+          .withDomainCode(domainPO.getDomainCode())
+          .withDomainName(domainPO.getDomainName())
+          .withDomainType(
+              org.apache.gravitino.dataset.ValueDomain.Type.valueOf(domainPO.getDomainType()))
+          .withItemValue(domainPO.getItemValue())
+          .withItemLabel(domainPO.getItemLabel())
+          .withComment(domainPO.getDomainComment())
+          .withNamespace(namespace)
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(domainPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static List<ValueDomainEntity> fromValueDomainPOs(
+      List<ValueDomainPO> domainPOs, Namespace namespace) {
+    return domainPOs.stream()
+        .filter(domainPO -> domainPO != null)
+        .map(domainPO -> POConverters.fromValueDomainPO(domainPO, namespace))
+        .collect(Collectors.toList());
+  }
+
+  /** 初始化 ValueDomainPO */
+  public static ValueDomainPO initializeValueDomainPO(
+      ValueDomainEntity entity, ValueDomainPO.Builder builder) {
+    try {
+      return builder
+          .withItemId(entity.id())
+          .withDomainCode(entity.domainCode())
+          .withDomainName(entity.domainName())
+          .withDomainType(entity.domainType().name())
+          .withItemValue(entity.itemValue())
+          .withItemLabel(entity.itemLabel())
+          .withDomainComment(entity.comment())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(entity.auditInfo()))
+          .withDeletedAt(0L)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /** 更新 ValueDomainPO */
+  public static ValueDomainPO updateValueDomainPO(
+      ValueDomainPO oldPO, ValueDomainEntity newEntity) {
+    try {
+      return ValueDomainPO.builder()
+          .withItemId(oldPO.getItemId())
+          .withDomainCode(newEntity.domainCode())
+          .withDomainName(newEntity.domainName())
+          .withDomainType(newEntity.domainType().name())
+          .withItemValue(newEntity.itemValue())
+          .withItemLabel(newEntity.itemLabel())
+          .withMetalakeId(oldPO.getMetalakeId())
+          .withCatalogId(oldPO.getCatalogId())
+          .withSchemaId(oldPO.getSchemaId())
+          .withDomainComment(newEntity.comment())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newEntity.auditInfo()))
+          .withDeletedAt(oldPO.getDeletedAt())
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);

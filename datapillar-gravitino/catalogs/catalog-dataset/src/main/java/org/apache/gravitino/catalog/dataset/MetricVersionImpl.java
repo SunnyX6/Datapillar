@@ -31,11 +31,17 @@ public class MetricVersionImpl implements MetricVersion, Auditable {
   private String name;
   private String code;
   private Metric.Type type;
+  private String dataType;
   private String comment;
   private String unit;
   private String aggregationLogic;
   private Long[] parentMetricIds;
   private String calculationFormula;
+  private String refCatalogName;
+  private String refSchemaName;
+  private String refTableName;
+  private String measureColumns;
+  private String filterColumns;
   private Map<String, String> properties;
   private AuditInfo auditInfo;
 
@@ -47,18 +53,23 @@ public class MetricVersionImpl implements MetricVersion, Auditable {
   }
 
   @Override
-  public String name() {
+  public String metricName() {
     return name;
   }
 
   @Override
-  public String code() {
+  public String metricCode() {
     return code;
   }
 
   @Override
-  public Metric.Type type() {
+  public Metric.Type metricType() {
     return type;
+  }
+
+  @Override
+  public String dataType() {
+    return dataType;
   }
 
   @Override
@@ -84,6 +95,31 @@ public class MetricVersionImpl implements MetricVersion, Auditable {
   @Override
   public String calculationFormula() {
     return calculationFormula;
+  }
+
+  @Override
+  public String refCatalogName() {
+    return refCatalogName;
+  }
+
+  @Override
+  public String refSchemaName() {
+    return refSchemaName;
+  }
+
+  @Override
+  public String refTableName() {
+    return refTableName;
+  }
+
+  @Override
+  public String measureColumns() {
+    return measureColumns;
+  }
+
+  @Override
+  public String filterColumns() {
+    return filterColumns;
   }
 
   @Override
@@ -124,6 +160,11 @@ public class MetricVersionImpl implements MetricVersion, Auditable {
       return this;
     }
 
+    public Builder withDataType(String dataType) {
+      metricVersion.dataType = dataType;
+      return this;
+    }
+
     public Builder withComment(String comment) {
       metricVersion.comment = comment;
       return this;
@@ -146,6 +187,31 @@ public class MetricVersionImpl implements MetricVersion, Auditable {
 
     public Builder withCalculationFormula(String calculationFormula) {
       metricVersion.calculationFormula = calculationFormula;
+      return this;
+    }
+
+    public Builder withRefCatalogName(String refCatalogName) {
+      metricVersion.refCatalogName = refCatalogName;
+      return this;
+    }
+
+    public Builder withRefSchemaName(String refSchemaName) {
+      metricVersion.refSchemaName = refSchemaName;
+      return this;
+    }
+
+    public Builder withRefTableName(String refTableName) {
+      metricVersion.refTableName = refTableName;
+      return this;
+    }
+
+    public Builder withMeasureColumns(String measureColumns) {
+      metricVersion.measureColumns = measureColumns;
+      return this;
+    }
+
+    public Builder withFilterColumns(String filterColumns) {
+      metricVersion.filterColumns = filterColumns;
       return this;
     }
 

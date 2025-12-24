@@ -35,16 +35,16 @@ public class WordRootEntity implements Entity, Auditable, HasIdentifier {
   public static final Field ID = Field.required("id", Long.class, "词根的唯一 ID");
   public static final Field CODE = Field.required("code", String.class, "词根的编码");
   public static final Field NAMESPACE = Field.required("namespace", Namespace.class, "词根的命名空间");
-  public static final Field NAME_CN = Field.required("name_cn", String.class, "词根的中文名称");
-  public static final Field NAME_EN = Field.required("name_en", String.class, "词根的英文名称");
+  public static final Field ROOT_NAME = Field.required("root_name", String.class, "词根的名称");
+  public static final Field DATA_TYPE = Field.optional("data_type", String.class, "词根的数据类型");
   public static final Field COMMENT = Field.optional("comment", String.class, "词根的注释");
   public static final Field AUDIT_INFO = Field.required("audit_info", AuditInfo.class, "词根的审计信息");
 
   private Long id;
   private String code;
   private Namespace namespace;
-  private String nameCn;
-  private String nameEn;
+  private String rootName;
+  private String dataType;
   private String comment;
   private AuditInfo auditInfo;
 
@@ -56,8 +56,8 @@ public class WordRootEntity implements Entity, Auditable, HasIdentifier {
     fields.put(ID, id);
     fields.put(CODE, code);
     fields.put(NAMESPACE, namespace);
-    fields.put(NAME_CN, nameCn);
-    fields.put(NAME_EN, nameEn);
+    fields.put(ROOT_NAME, rootName);
+    fields.put(DATA_TYPE, dataType);
     fields.put(COMMENT, comment);
     fields.put(AUDIT_INFO, auditInfo);
     return fields;
@@ -82,12 +82,12 @@ public class WordRootEntity implements Entity, Auditable, HasIdentifier {
     return code;
   }
 
-  public String nameCn() {
-    return nameCn;
+  public String rootName() {
+    return rootName;
   }
 
-  public String nameEn() {
-    return nameEn;
+  public String dataType() {
+    return dataType;
   }
 
   public String comment() {
@@ -112,15 +112,15 @@ public class WordRootEntity implements Entity, Auditable, HasIdentifier {
     return Objects.equals(id, that.id)
         && Objects.equals(code, that.code)
         && Objects.equals(namespace, that.namespace)
-        && Objects.equals(nameCn, that.nameCn)
-        && Objects.equals(nameEn, that.nameEn)
+        && Objects.equals(rootName, that.rootName)
+        && Objects.equals(dataType, that.dataType)
         && Objects.equals(comment, that.comment)
         && Objects.equals(auditInfo, that.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, code, namespace, nameCn, nameEn, comment, auditInfo);
+    return Objects.hash(id, code, namespace, rootName, dataType, comment, auditInfo);
   }
 
   public static Builder builder() {
@@ -149,13 +149,13 @@ public class WordRootEntity implements Entity, Auditable, HasIdentifier {
       return this;
     }
 
-    public Builder withNameCn(String nameCn) {
-      wordRootEntity.nameCn = nameCn;
+    public Builder withRootName(String rootName) {
+      wordRootEntity.rootName = rootName;
       return this;
     }
 
-    public Builder withNameEn(String nameEn) {
-      wordRootEntity.nameEn = nameEn;
+    public Builder withDataType(String dataType) {
+      wordRootEntity.dataType = dataType;
       return this;
     }
 

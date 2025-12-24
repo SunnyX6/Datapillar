@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Database, FolderTree, Menu, MoreVertical, Search, Server, Table as TableIcon, Folder, Activity, Box } from 'lucide-react'
+import { Database, FolderTree, Menu, MoreVertical, Server, Table as TableIcon, Folder, Activity, Box, Layers } from 'lucide-react'
 import {
   SiApachehive,
   SiApachespark,
@@ -25,6 +25,7 @@ import { type CatalogFormHandle } from './metadata/form/CatalogForm'
 import { type SchemaFormHandle } from './metadata/form/SchemaForm'
 import { type CatalogAsset, type NodeType, type SchemaAsset, type TableAsset } from './metadata/type/types'
 import { Modal } from '@/components/Modal'
+import { useSearchStore } from '@/stores'
 import {
   fetchCatalogs,
   fetchSchemas,
@@ -45,19 +46,19 @@ export function MetadataView() {
   const [catalogs, setCatalogs] = useState<CatalogItem[]>([])
   const [schemasMap, setSchemasMap] = useState<Map<string, SchemaItem[]>>(new Map())
   const [tablesMap, setTablesMap] = useState<Map<string, TableItem[]>>(new Map())
-  const [isLoading, setIsLoading] = useState(false)
+  const [_isLoading, setIsLoading] = useState(false)
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => new Set<string>(['ROOT']))
   const [selectedNodeId, setSelectedNodeId] = useState<string>('ROOT')
   const [selectedNodeType, setSelectedNodeType] = useState<NodeType>('ROOT')
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'COLUMNS' | 'QUALITY' | 'LINEAGE'>('OVERVIEW')
-  const [searchValue, setSearchValue] = useState('')
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [isSideCollapsed, setIsSideCollapsed] = useState(true)
   const catalogFormRef = useRef<CatalogFormHandle>(null)
   const schemaFormRef = useRef<SchemaFormHandle>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loadedMetadata, setLoadedMetadata] = useState<Set<string>>(() => new Set<string>())
+
+  // 使用全局搜索状态
+  const searchTerm = useSearchStore((state) => state.searchTerm)
 
   useEffect(() => {
     loadCatalogs()
@@ -200,20 +201,84 @@ export function MetadataView() {
     })
   }, [catalogs, schemasMap, tablesMap])
 
+  // 搜索时自动展开匹配项的父节点
+  useEffect(() => {
+    const query = searchTerm.trim().toLowerCase()
+    if (!query) return
+
+    const nodesToExpand = new Set<string>(['ROOT'])
+
+    catalogsWithSchemas.forEach((catalog) => {
+      const catalogMatches = catalog.name.toLowerCase().includes(query)
+
+      if (catalogMatches) {
+        nodesToExpand.add(catalog.id)
+      }
+
+      catalog.schemas.forEach((schema) => {
+        const schemaMatches = schema.name.toLowerCase().includes(query)
+
+        if (schemaMatches) {
+          nodesToExpand.add(catalog.id)
+          nodesToExpand.add(schema.id)
+        }
+
+        schema.tables.forEach((table) => {
+          const tableMatches = table.name.toLowerCase().includes(query)
+
+          if (tableMatches) {
+            nodesToExpand.add(catalog.id)
+            nodesToExpand.add(schema.id)
+          }
+        })
+      })
+    })
+
+    if (nodesToExpand.size > 1) {
+      setExpandedNodes((prev) => new Set([...prev, ...nodesToExpand]))
+    }
+  }, [searchTerm, catalogsWithSchemas])
+
   const filteredCatalogs = useMemo(() => {
-    const query = searchValue.trim().toLowerCase()
+    const query = searchTerm.trim().toLowerCase()
     if (!query) return catalogsWithSchemas
 
-    return catalogsWithSchemas.filter((catalog) => {
-      const matchCatalog = catalog.name.toLowerCase().includes(query)
-      const hasMatchingSchema = catalog.schemas.some((schema) => {
-        const matchSchema = schema.name.toLowerCase().includes(query)
-        const hasMatchingTable = schema.tables.some((table) => table.name.toLowerCase().includes(query))
-        return matchSchema || hasMatchingTable
+    return catalogsWithSchemas
+      .map((catalog) => {
+        const catalogMatches = catalog.name.toLowerCase().includes(query)
+
+        // 过滤匹配的 schema 和 table
+        const filteredSchemas = catalog.schemas
+          .map((schema) => {
+            const schemaMatches = schema.name.toLowerCase().includes(query)
+            const filteredTables = schema.tables.filter((table) =>
+              table.name.toLowerCase().includes(query)
+            )
+
+            // schema 匹配或有匹配的 table，则保留
+            if (schemaMatches || filteredTables.length > 0) {
+              return {
+                ...schema,
+                // schema 本身匹配时显示所有 table，否则只显示匹配的 table
+                tables: schemaMatches ? schema.tables : filteredTables
+              }
+            }
+            return null
+          })
+          .filter((schema): schema is NonNullable<typeof schema> => schema !== null)
+
+        // catalog 匹配或有匹配的 schema，则保留
+        if (catalogMatches || filteredSchemas.length > 0) {
+          return {
+            ...catalog,
+            // catalog 本身匹配时显示所有 schema，否则只显示匹配的 schema
+            schemas: catalogMatches ? catalog.schemas : filteredSchemas
+          }
+        }
+        return null
       })
-      return matchCatalog || hasMatchingSchema
-    })
-  }, [catalogsWithSchemas, searchValue])
+      .filter((catalog): catalog is NonNullable<typeof catalog> => catalog !== null)
+  }, [catalogsWithSchemas, searchTerm])
 
   const catalogLookup = useMemo(() => {
     const map = new Map<string, CatalogAsset>()
@@ -370,7 +435,7 @@ export function MetadataView() {
           isSideCollapsed ? 'w-0 min-w-0 opacity-0 pointer-events-none' : 'w-panel-responsive opacity-100'
         }`}
       >
-        <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3 bg-slate-50 dark:bg-slate-900">
+        <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center bg-slate-50 dark:bg-slate-900">
           <button
             type="button"
             aria-label="收起元数据侧栏"
@@ -379,37 +444,9 @@ export function MetadataView() {
           >
             <Menu size={18} />
           </button>
-          <div className="flex flex-1 justify-end">
-            <div
-              className={`relative flex items-center transition-[width] duration-300 ease-out ${
-                isSearchOpen || searchValue ? 'w-40 @md:w-52' : 'w-8 justify-end'
-              }`}
-            >
-              <input
-                value={searchValue}
-                onChange={(e) => setSearchValue(e.target.value)}
-                placeholder="搜索..."
-                ref={searchInputRef}
-                onFocus={() => setIsSearchOpen(true)}
-                onBlur={() => {
-                  if (!searchValue) setIsSearchOpen(false)
-                }}
-                className={`pr-9 pl-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-[width,opacity] duration-300 ease-out ${
-                  isSearchOpen || searchValue ? 'opacity-100 pointer-events-auto w-full' : 'opacity-0 pointer-events-none w-0'
-                }`}
-              />
-              <button
-                type="button"
-                aria-label="打开搜索"
-                className="absolute right-1 inset-y-0 flex items-center justify-center p-2 rounded-md text-slate-500 hover:text-indigo-600"
-                onClick={() => {
-                  setIsSearchOpen(true)
-                  requestAnimationFrame(() => searchInputRef.current?.focus())
-                }}
-              >
-                <Search size={18} />
-              </button>
-            </div>
+          <div className="flex-1 flex items-center justify-center gap-1.5 pr-10">
+            <Layers size={16} className="text-indigo-500" />
+            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">元数据中心</span>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar py-2">
@@ -428,6 +465,7 @@ export function MetadataView() {
       <Modal
         isOpen={modalState.isOpen}
         onClose={closeModal}
+        size="md"
         title={
           modalState.nodeType === 'ROOT'
             ? '创建 Catalog'

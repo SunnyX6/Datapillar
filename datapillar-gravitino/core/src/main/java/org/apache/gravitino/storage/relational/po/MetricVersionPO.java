@@ -35,11 +35,17 @@ public class MetricVersionPO {
   private String metricName;
   private String metricCode;
   private String metricType;
+  private String dataType;
   private String metricComment;
   private String metricUnit;
   private String aggregationLogic;
   private String parentMetricIds;
   private String calculationFormula;
+  private String refCatalogName;
+  private String refSchemaName;
+  private String refTableName;
+  private String measureColumns;
+  private String filterColumns;
   private String versionProperties;
   private String auditInfo;
   private Long deletedAt;
@@ -98,6 +104,11 @@ public class MetricVersionPO {
       return this;
     }
 
+    public Builder withDataType(String dataType) {
+      metricVersionPO.dataType = dataType;
+      return this;
+    }
+
     public Builder withMetricComment(String metricComment) {
       metricVersionPO.metricComment = metricComment;
       return this;
@@ -120,6 +131,31 @@ public class MetricVersionPO {
 
     public Builder withCalculationFormula(String calculationFormula) {
       metricVersionPO.calculationFormula = calculationFormula;
+      return this;
+    }
+
+    public Builder withRefCatalogName(String refCatalogName) {
+      metricVersionPO.refCatalogName = refCatalogName;
+      return this;
+    }
+
+    public Builder withRefSchemaName(String refSchemaName) {
+      metricVersionPO.refSchemaName = refSchemaName;
+      return this;
+    }
+
+    public Builder withRefTableName(String refTableName) {
+      metricVersionPO.refTableName = refTableName;
+      return this;
+    }
+
+    public Builder withMeasureColumns(String measureColumns) {
+      metricVersionPO.measureColumns = measureColumns;
+      return this;
+    }
+
+    public Builder withFilterColumns(String filterColumns) {
+      metricVersionPO.filterColumns = filterColumns;
       return this;
     }
 

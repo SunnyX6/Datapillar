@@ -45,10 +45,16 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.api.event.AlterTableEvent;
 import org.apache.gravitino.listener.api.event.AssociateTagsForMetadataObjectEvent;
 import org.apache.gravitino.listener.api.event.CreateCatalogEvent;
+import org.apache.gravitino.listener.api.event.CreateModifierEvent;
 import org.apache.gravitino.listener.api.event.CreateSchemaEvent;
 import org.apache.gravitino.listener.api.event.CreateTableEvent;
+import org.apache.gravitino.listener.api.event.CreateUnitEvent;
+import org.apache.gravitino.listener.api.event.CreateValueDomainEvent;
 import org.apache.gravitino.listener.api.event.CreateWordRootEvent;
 import org.apache.gravitino.listener.api.event.DeleteMetricEvent;
+import org.apache.gravitino.listener.api.event.DeleteModifierEvent;
+import org.apache.gravitino.listener.api.event.DeleteUnitEvent;
+import org.apache.gravitino.listener.api.event.DeleteValueDomainEvent;
 import org.apache.gravitino.listener.api.event.DeleteWordRootEvent;
 import org.apache.gravitino.listener.api.event.DropCatalogEvent;
 import org.apache.gravitino.listener.api.event.DropSchemaEvent;
@@ -58,8 +64,11 @@ import org.apache.gravitino.listener.api.event.LoadSchemaEvent;
 import org.apache.gravitino.listener.api.event.LoadTableEvent;
 import org.apache.gravitino.listener.api.event.RegisterMetricEvent;
 import org.apache.gravitino.listener.api.info.MetricInfo;
+import org.apache.gravitino.listener.api.info.ModifierInfo;
 import org.apache.gravitino.listener.api.info.SchemaInfo;
 import org.apache.gravitino.listener.api.info.TableInfo;
+import org.apache.gravitino.listener.api.info.UnitInfo;
+import org.apache.gravitino.listener.api.info.ValueDomainInfo;
 import org.apache.gravitino.listener.api.info.WordRootInfo;
 import org.apache.gravitino.listener.openlineage.facets.GravitinoDatasetFacet;
 import org.apache.gravitino.listener.openlineage.facets.GravitinoDatasetFacet.GravitinoColumnMetadata;
@@ -122,6 +131,22 @@ public class GravitinoEventConverter {
       return convertRegisterMetric((RegisterMetricEvent) event);
     } else if (event instanceof DeleteMetricEvent) {
       return convertDeleteMetric((DeleteMetricEvent) event);
+    } else if (event instanceof CreateWordRootEvent) {
+      return convertCreateWordRoot((CreateWordRootEvent) event);
+    } else if (event instanceof DeleteWordRootEvent) {
+      return convertDeleteWordRoot((DeleteWordRootEvent) event);
+    } else if (event instanceof CreateModifierEvent) {
+      return convertCreateModifier((CreateModifierEvent) event);
+    } else if (event instanceof DeleteModifierEvent) {
+      return convertDeleteModifier((DeleteModifierEvent) event);
+    } else if (event instanceof CreateUnitEvent) {
+      return convertCreateUnit((CreateUnitEvent) event);
+    } else if (event instanceof DeleteUnitEvent) {
+      return convertDeleteUnit((DeleteUnitEvent) event);
+    } else if (event instanceof CreateValueDomainEvent) {
+      return convertCreateValueDomain((CreateValueDomainEvent) event);
+    } else if (event instanceof DeleteValueDomainEvent) {
+      return convertDeleteValueDomain((DeleteValueDomainEvent) event);
     } else if (event instanceof AssociateTagsForMetadataObjectEvent) {
       return convertAssociateTagsForMetadataObject((AssociateTagsForMetadataObjectEvent) event);
     }
@@ -618,6 +643,38 @@ public class GravitinoEventConverter {
               "parentMetricCodes", "STRING", sb.toString(), null));
     }
 
+    // 发送原子指标的 ref 字段
+    metricInfo
+        .refCatalogName()
+        .ifPresent(
+            v ->
+                fields.add(
+                    openLineage.newSchemaDatasetFacetFields("refCatalogName", "STRING", v, null)));
+    metricInfo
+        .refSchemaName()
+        .ifPresent(
+            v ->
+                fields.add(
+                    openLineage.newSchemaDatasetFacetFields("refSchemaName", "STRING", v, null)));
+    metricInfo
+        .refTableName()
+        .ifPresent(
+            v ->
+                fields.add(
+                    openLineage.newSchemaDatasetFacetFields("refTableName", "STRING", v, null)));
+    metricInfo
+        .measureColumns()
+        .ifPresent(
+            v ->
+                fields.add(
+                    openLineage.newSchemaDatasetFacetFields("measureColumns", "JSON", v, null)));
+    metricInfo
+        .filterColumns()
+        .ifPresent(
+            v ->
+                fields.add(
+                    openLineage.newSchemaDatasetFacetFields("filterColumns", "JSON", v, null)));
+
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
 
     DatasetFacets facets =
@@ -665,7 +722,7 @@ public class GravitinoEventConverter {
 
     return createRunEvent(
         event,
-        "gravitino.delete_metric",
+        "gravitino.drop_metric",
         OpenLineage.RunEvent.EventType.COMPLETE,
         Collections.emptyList(),
         Collections.singletonList(outputDataset));
@@ -681,15 +738,16 @@ public class GravitinoEventConverter {
     fields.add(
         openLineage.newSchemaDatasetFacetFields("code", "STRING", wordRootInfo.code(), null));
     wordRootInfo
-        .nameCn()
+        .name()
         .ifPresent(
-            cn ->
-                fields.add(openLineage.newSchemaDatasetFacetFields("nameCn", "STRING", cn, null)));
+            name ->
+                fields.add(openLineage.newSchemaDatasetFacetFields("name", "STRING", name, null)));
     wordRootInfo
-        .nameEn()
+        .dataType()
         .ifPresent(
-            en ->
-                fields.add(openLineage.newSchemaDatasetFacetFields("nameEn", "STRING", en, null)));
+            dt ->
+                fields.add(
+                    openLineage.newSchemaDatasetFacetFields("dataType", "STRING", dt, null)));
     wordRootInfo
         .comment()
         .ifPresent(
@@ -742,7 +800,7 @@ public class GravitinoEventConverter {
 
     return createRunEvent(
         event,
-        "gravitino.delete_wordroot",
+        "gravitino.drop_wordroot",
         OpenLineage.RunEvent.EventType.COMPLETE,
         Collections.emptyList(),
         Collections.singletonList(outputDataset));
@@ -870,5 +928,235 @@ public class GravitinoEventConverter {
       default:
         return name;
     }
+  }
+
+  // ============================= Modifier 事件转换 =============================
+
+  private RunEvent convertCreateModifier(CreateModifierEvent event) {
+    NameIdentifier identifier = event.identifier();
+    ModifierInfo modifierInfo = event.createdModifierInfo();
+
+    List<SchemaDatasetFacetFields> fields = new ArrayList<>();
+    fields.add(
+        openLineage.newSchemaDatasetFacetFields("code", "STRING", modifierInfo.code(), null));
+    fields.add(
+        openLineage.newSchemaDatasetFacetFields(
+            "type", "STRING", modifierInfo.modifierType().name(), null));
+    modifierInfo
+        .comment()
+        .ifPresent(
+            c -> fields.add(openLineage.newSchemaDatasetFacetFields("comment", "STRING", c, null)));
+
+    SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
+
+    DatasetFacets facets =
+        openLineage
+            .newDatasetFacetsBuilder()
+            .schema(schemaFacet)
+            .lifecycleStateChange(
+                openLineage.newLifecycleStateChangeDatasetFacet(
+                    OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.CREATE, null))
+            .build();
+
+    OutputDataset outputDataset =
+        openLineage
+            .newOutputDatasetBuilder()
+            .namespace(formatDatasetNamespace(identifier))
+            .name(formatDatasetName(identifier))
+            .facets(facets)
+            .build();
+
+    return createRunEvent(
+        event,
+        "gravitino.create_modifier",
+        OpenLineage.RunEvent.EventType.COMPLETE,
+        Collections.emptyList(),
+        Collections.singletonList(outputDataset));
+  }
+
+  private RunEvent convertDeleteModifier(DeleteModifierEvent event) {
+    NameIdentifier identifier = event.identifier();
+
+    OutputDataset outputDataset =
+        openLineage
+            .newOutputDatasetBuilder()
+            .namespace(formatDatasetNamespace(identifier))
+            .name(formatDatasetName(identifier))
+            .facets(
+                openLineage
+                    .newDatasetFacetsBuilder()
+                    .lifecycleStateChange(
+                        openLineage.newLifecycleStateChangeDatasetFacet(
+                            OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.DROP,
+                            null))
+                    .build())
+            .build();
+
+    return createRunEvent(
+        event,
+        "gravitino.drop_modifier",
+        OpenLineage.RunEvent.EventType.COMPLETE,
+        Collections.emptyList(),
+        Collections.singletonList(outputDataset));
+  }
+
+  // ============================= Unit 事件转换 =============================
+
+  private RunEvent convertCreateUnit(CreateUnitEvent event) {
+    NameIdentifier identifier = event.identifier();
+    UnitInfo unitInfo = event.createdUnitInfo();
+
+    List<SchemaDatasetFacetFields> fields = new ArrayList<>();
+    fields.add(openLineage.newSchemaDatasetFacetFields("code", "STRING", unitInfo.code(), null));
+    unitInfo
+        .name()
+        .ifPresent(
+            n -> fields.add(openLineage.newSchemaDatasetFacetFields("name", "STRING", n, null)));
+    unitInfo
+        .symbol()
+        .ifPresent(
+            s -> fields.add(openLineage.newSchemaDatasetFacetFields("symbol", "STRING", s, null)));
+    unitInfo
+        .comment()
+        .ifPresent(
+            c -> fields.add(openLineage.newSchemaDatasetFacetFields("comment", "STRING", c, null)));
+
+    SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
+
+    DatasetFacets facets =
+        openLineage
+            .newDatasetFacetsBuilder()
+            .schema(schemaFacet)
+            .lifecycleStateChange(
+                openLineage.newLifecycleStateChangeDatasetFacet(
+                    OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.CREATE, null))
+            .build();
+
+    OutputDataset outputDataset =
+        openLineage
+            .newOutputDatasetBuilder()
+            .namespace(formatDatasetNamespace(identifier))
+            .name(formatDatasetName(identifier))
+            .facets(facets)
+            .build();
+
+    return createRunEvent(
+        event,
+        "gravitino.create_unit",
+        OpenLineage.RunEvent.EventType.COMPLETE,
+        Collections.emptyList(),
+        Collections.singletonList(outputDataset));
+  }
+
+  private RunEvent convertDeleteUnit(DeleteUnitEvent event) {
+    NameIdentifier identifier = event.identifier();
+
+    OutputDataset outputDataset =
+        openLineage
+            .newOutputDatasetBuilder()
+            .namespace(formatDatasetNamespace(identifier))
+            .name(formatDatasetName(identifier))
+            .facets(
+                openLineage
+                    .newDatasetFacetsBuilder()
+                    .lifecycleStateChange(
+                        openLineage.newLifecycleStateChangeDatasetFacet(
+                            OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.DROP,
+                            null))
+                    .build())
+            .build();
+
+    return createRunEvent(
+        event,
+        "gravitino.drop_unit",
+        OpenLineage.RunEvent.EventType.COMPLETE,
+        Collections.emptyList(),
+        Collections.singletonList(outputDataset));
+  }
+
+  // ============================= ValueDomain 事件转换 =============================
+
+  private RunEvent convertCreateValueDomain(CreateValueDomainEvent event) {
+    NameIdentifier identifier = event.identifier();
+    ValueDomainInfo valueDomainInfo = event.createdValueDomainInfo();
+
+    List<SchemaDatasetFacetFields> fields = new ArrayList<>();
+    fields.add(
+        openLineage.newSchemaDatasetFacetFields(
+            "domainCode", "STRING", valueDomainInfo.domainCode(), null));
+    valueDomainInfo
+        .domainName()
+        .ifPresent(
+            n ->
+                fields.add(
+                    openLineage.newSchemaDatasetFacetFields("domainName", "STRING", n, null)));
+    fields.add(
+        openLineage.newSchemaDatasetFacetFields(
+            "domainType", "STRING", valueDomainInfo.domainType().name(), null));
+    fields.add(
+        openLineage.newSchemaDatasetFacetFields(
+            "itemValue", "STRING", valueDomainInfo.itemValue(), null));
+    valueDomainInfo
+        .itemLabel()
+        .ifPresent(
+            l ->
+                fields.add(
+                    openLineage.newSchemaDatasetFacetFields("itemLabel", "STRING", l, null)));
+    valueDomainInfo
+        .comment()
+        .ifPresent(
+            c -> fields.add(openLineage.newSchemaDatasetFacetFields("comment", "STRING", c, null)));
+
+    SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
+
+    DatasetFacets facets =
+        openLineage
+            .newDatasetFacetsBuilder()
+            .schema(schemaFacet)
+            .lifecycleStateChange(
+                openLineage.newLifecycleStateChangeDatasetFacet(
+                    OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.CREATE, null))
+            .build();
+
+    OutputDataset outputDataset =
+        openLineage
+            .newOutputDatasetBuilder()
+            .namespace(formatDatasetNamespace(identifier))
+            .name(formatDatasetName(identifier))
+            .facets(facets)
+            .build();
+
+    return createRunEvent(
+        event,
+        "gravitino.create_valuedomain",
+        OpenLineage.RunEvent.EventType.COMPLETE,
+        Collections.emptyList(),
+        Collections.singletonList(outputDataset));
+  }
+
+  private RunEvent convertDeleteValueDomain(DeleteValueDomainEvent event) {
+    NameIdentifier identifier = event.identifier();
+
+    OutputDataset outputDataset =
+        openLineage
+            .newOutputDatasetBuilder()
+            .namespace(formatDatasetNamespace(identifier))
+            .name(formatDatasetName(identifier))
+            .facets(
+                openLineage
+                    .newDatasetFacetsBuilder()
+                    .lifecycleStateChange(
+                        openLineage.newLifecycleStateChangeDatasetFacet(
+                            OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.DROP,
+                            null))
+                    .build())
+            .build();
+
+    return createRunEvent(
+        event,
+        "gravitino.drop_valuedomain",
+        OpenLineage.RunEvent.EventType.COMPLETE,
+        Collections.emptyList(),
+        Collections.singletonList(outputDataset));
   }
 }

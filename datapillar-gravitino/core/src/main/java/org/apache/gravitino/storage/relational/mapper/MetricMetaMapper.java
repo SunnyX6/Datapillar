@@ -40,6 +40,15 @@ public interface MetricMetaMapper {
   @SelectProvider(type = MetricMetaSQLProviderFactory.class, method = "listMetricPOsBySchemaId")
   List<MetricPO> listMetricPOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @SelectProvider(
+      type = MetricMetaSQLProviderFactory.class,
+      method = "listMetricPOsBySchemaIdWithPagination")
+  List<MetricPO> listMetricPOsBySchemaIdWithPagination(
+      @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit);
+
+  @SelectProvider(type = MetricMetaSQLProviderFactory.class, method = "countMetricsBySchemaId")
+  long countMetricsBySchemaId(@Param("schemaId") Long schemaId);
+
   @SelectProvider(type = MetricMetaSQLProviderFactory.class, method = "listMetricPOsByMetricIds")
   List<MetricPO> listMetricPOsByMetricIds(@Param("metricIds") List<Long> metricIds);
 
@@ -88,4 +97,7 @@ public interface MetricMetaMapper {
   @UpdateProvider(type = MetricMetaSQLProviderFactory.class, method = "updateMetricMeta")
   Integer updateMetricMeta(
       @Param("newMetricMeta") MetricPO newMetricPO, @Param("oldMetricMeta") MetricPO oldMetricPO);
+
+  @UpdateProvider(type = MetricMetaSQLProviderFactory.class, method = "updateMetricLastVersion")
+  Integer updateMetricLastVersion(@Param("metricId") Long metricId);
 }

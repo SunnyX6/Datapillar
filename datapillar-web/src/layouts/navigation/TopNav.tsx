@@ -14,12 +14,14 @@ import {
   Sun,
   Users,
   ChevronDown,
-  Database,
-  User as UserIcon
+  Layers,
+  Book,
+  User as UserIcon,
+  X
 } from 'lucide-react'
 import { ExpandToggle } from './ExpandToggle'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useI18nStore, type Language } from '@/stores'
+import { useI18nStore, useSearchStore, type Language, type SearchContext } from '@/stores'
 import { useTranslation } from 'react-i18next'
 import { iconSizeToken } from '@/design-tokens/dimensions'
 
@@ -70,6 +72,56 @@ export function TopNav({
   const dropdownRef = useRef<HTMLDivElement | null>(null)
   const governanceRef = useRef<HTMLDivElement | null>(null)
   const languageRef = useRef<HTMLDivElement | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+
+  // 全局搜索状态
+  const searchTerm = useSearchStore((state) => state.searchTerm)
+  const setSearchTerm = useSearchStore((state) => state.setSearchTerm)
+  const _searchContext = useSearchStore((state) => state.context)
+  const setSearchContext = useSearchStore((state) => state.setContext)
+  const isSearchOpen = useSearchStore((state) => state.isOpen)
+  const setIsSearchOpen = useSearchStore((state) => state.setIsOpen)
+  const getContextConfig = useSearchStore((state) => state.getContextConfig)
+
+  // 根据路由自动设置搜索上下文
+  useEffect(() => {
+    const path = location.pathname
+    let context: SearchContext = 'default'
+
+    if (path.startsWith('/governance/metadata')) {
+      context = 'metadata'
+    } else if (path.includes('/governance/semantic/metrics')) {
+      context = 'semantic-metrics'
+    } else if (path.includes('/governance/semantic/glossary')) {
+      context = 'semantic-glossary'
+    } else if (path.startsWith('/governance/semantic')) {
+      context = 'semantic'
+    } else if (path.startsWith('/governance/knowledge')) {
+      context = 'knowledge'
+    } else if (path === '/' || path.startsWith('/dashboard')) {
+      context = 'dashboard'
+    }
+
+    setSearchContext(context)
+  }, [location.pathname, setSearchContext])
+
+  // 键盘快捷键 ⌘K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setIsSearchOpen(true)
+        requestAnimationFrame(() => searchInputRef.current?.focus())
+      }
+      if (e.key === 'Escape' && isSearchOpen) {
+        setIsSearchOpen(false)
+        setSearchTerm('')
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isSearchOpen, setIsSearchOpen, setSearchTerm])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -170,28 +222,58 @@ export function TopNav({
             aria-hidden
           />
           <div
-            className={`absolute left-0 top-[calc(100%+12px)] w-auto min-w-40 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg overflow-hidden z-[60] transition-all duration-150 origin-top-left ${
+            className={`absolute left-0 top-[calc(100%+12px)] w-72 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden z-[60] transition-all duration-150 origin-top-left ${
               isGovernanceOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'
             }`}
             onMouseEnter={handleGovernanceEnter}
             onMouseLeave={handleGovernanceLeave}
           >
-            <button
-              type="button"
-              className="w-full px-3 py-1.5 text-left text-body-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2"
-              onClick={() => handleNavigateGovernance('/governance/metadata')}
-            >
-              <Database size={iconSizeToken.small} className="text-purple-500 shrink-0" />
-              <span className="whitespace-nowrap">{t('top.dropdown.metadata')}</span>
-            </button>
-            <button
-              type="button"
-              className="w-full px-3 py-1.5 text-left text-body-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2"
-              onClick={() => handleNavigateGovernance('/governance/knowledge')}
-            >
-              <Share2 size={iconSizeToken.small} className="text-indigo-500 shrink-0" />
-              <span className="whitespace-nowrap">{t('top.dropdown.knowledge')}</span>
-            </button>
+            <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
+              <span className="text-micro font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                {t('top.dropdown.governanceHeader', { defaultValue: 'Governance & One Meta' })}
+              </span>
+            </div>
+            <div className="p-2">
+              <button
+                type="button"
+                className="w-full px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
+                onClick={() => handleNavigateGovernance('/governance/metadata')}
+              >
+                <div className="p-1.5 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-purple-500 shrink-0 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/50 transition-colors">
+                  <Layers size={iconSizeToken.small} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.metadata')}</div>
+                  <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.metadataDesc', { defaultValue: '统一物理资产元数据' })}</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                className="w-full px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
+                onClick={() => handleNavigateGovernance('/governance/semantic')}
+              >
+                <div className="p-1.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-500 shrink-0 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
+                  <Book size={iconSizeToken.small} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.semantic', { defaultValue: '元语义' })}</div>
+                  <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.semanticDesc', { defaultValue: '指标、词根、API等语义资产空间' })}</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                className="w-full px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
+                onClick={() => handleNavigateGovernance('/governance/knowledge')}
+              >
+                <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-500 shrink-0 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 transition-colors">
+                  <Share2 size={iconSizeToken.small} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.knowledge')}</div>
+                  <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.knowledgeDesc', { defaultValue: '知识图谱可视化与关系探索' })}</div>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
         <TabItem icon={<FolderKanban size={iconSizeToken.small} />} label={t('top.tabs.projects')} />
@@ -200,16 +282,45 @@ export function TopNav({
       </div>
 
       <div className="flex items-center gap-2.5 min-w-0 @md:min-w-40 justify-end">
-        <button
-          type="button"
-          className="hidden @md:flex items-center gap-3 px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-500 dark:text-slate-400 w-56 group hover:border-indigo-500/30 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-sm"
-        >
-          <Search size={iconSizeToken.small} className="shrink-0" />
-          <span className="text-body-sm flex-1 truncate text-left">{t('top.actions.search')}</span>
-          <span className="flex items-center gap-0.5 text-micro font-mono bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-400">
-            <span className="text-caption">⌘</span> K
-          </span>
-        </button>
+        <div className="hidden @md:flex items-center relative">
+          <div
+            className={`flex items-center gap-2 w-56 bg-slate-50 dark:bg-slate-900 border rounded-lg transition-all duration-200 shadow-sm ${
+              isSearchOpen || searchTerm
+                ? 'border-indigo-500/50 bg-white dark:bg-slate-800 ring-2 ring-indigo-500/20'
+                : 'border-slate-200 dark:border-slate-800 hover:border-indigo-500/30 hover:bg-white dark:hover:bg-slate-800'
+            }`}
+          >
+            <Search size={iconSizeToken.small} className="ml-3 shrink-0 text-slate-400" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onFocus={() => setIsSearchOpen(true)}
+              onBlur={() => {
+                if (!searchTerm) setIsSearchOpen(false)
+              }}
+              placeholder={getContextConfig().placeholder}
+              className="flex-1 min-w-0 py-1.5 bg-transparent text-body-sm text-slate-700 dark:text-slate-200 placeholder:text-caption placeholder:text-slate-400 placeholder:truncate focus:outline-none truncate"
+            />
+            {searchTerm ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('')
+                  searchInputRef.current?.focus()
+                }}
+                className="p-1.5 mr-1 shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded transition-colors"
+              >
+                <X size={iconSizeToken.small} />
+              </button>
+            ) : (
+              <span className="flex items-center gap-0.5 shrink-0 text-micro font-mono bg-white dark:bg-slate-800 px-1.5 py-0.5 mr-2 rounded border border-slate-200 dark:border-slate-700 text-slate-400">
+                <span className="text-caption">⌘</span> K
+              </span>
+            )}
+          </div>
+        </div>
 
         <button
           type="button"

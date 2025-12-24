@@ -31,3 +31,11 @@ export { useWorkflowStudioStore } from './workflowStudioStore'
 
 // Layout Store - 布局偏好
 export { useLayoutStore } from './layoutStore'
+
+// Search Store - 全局搜索状态
+export {
+  useSearchStore,
+  useSearchPlaceholder,
+  useSearchTerm,
+  type SearchContext
+} from './searchStore'

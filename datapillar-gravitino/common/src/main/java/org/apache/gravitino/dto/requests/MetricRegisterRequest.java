@@ -47,6 +47,9 @@ public class MetricRegisterRequest implements RESTRequest {
   @JsonProperty("type")
   private Metric.Type type;
 
+  @JsonProperty("dataType")
+  private String dataType;
+
   @JsonProperty("comment")
   private String comment;
 
@@ -65,6 +68,21 @@ public class MetricRegisterRequest implements RESTRequest {
   @JsonProperty("calculationFormula")
   private String calculationFormula;
 
+  @JsonProperty("refCatalogName")
+  private String refCatalogName;
+
+  @JsonProperty("refSchemaName")
+  private String refSchemaName;
+
+  @JsonProperty("refTableName")
+  private String refTableName;
+
+  @JsonProperty("measureColumns")
+  private String measureColumns;
+
+  @JsonProperty("filterColumns")
+  private String filterColumns;
+
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
@@ -72,6 +90,13 @@ public class MetricRegisterRequest implements RESTRequest {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(code), "\"code\" field is required and cannot be empty");
     Preconditions.checkArgument(type != null, "\"type\" field is required and cannot be null");
+
+    // ATOMIC 类型必须指定数据源引用
+    if (type == Metric.Type.ATOMIC) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(refTableName),
+          "\"refTableName\" is required for ATOMIC metric type");
+    }
 
     // DERIVED 和 COMPOSITE 类型必须指定 parentMetricIds
     if (type == Metric.Type.DERIVED || type == Metric.Type.COMPOSITE) {

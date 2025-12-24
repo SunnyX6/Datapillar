@@ -171,5 +171,17 @@ public enum OperationType {
   GET_WORDROOT,
   LIST_WORDROOT,
 
+  // Unit operations
+  CREATE_UNIT,
+  DELETE_UNIT,
+  GET_UNIT,
+  LIST_UNITS,
+
+  // ValueDomain operations
+  CREATE_VALUE_DOMAIN,
+  DELETE_VALUE_DOMAIN,
+  GET_VALUE_DOMAIN,
+  LIST_VALUE_DOMAINS,
+
   UNKNOWN,
 }

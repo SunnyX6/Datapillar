@@ -28,12 +28,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
@@ -45,18 +47,22 @@ import org.apache.gravitino.dataset.Metric;
 import org.apache.gravitino.dataset.MetricChange;
 import org.apache.gravitino.dataset.MetricVersion;
 import org.apache.gravitino.dto.requests.MetricModifierCreateRequest;
+import org.apache.gravitino.dto.requests.MetricModifierUpdateRequest;
 import org.apache.gravitino.dto.requests.MetricRegisterRequest;
 import org.apache.gravitino.dto.requests.MetricSwitchVersionRequest;
 import org.apache.gravitino.dto.requests.MetricUpdateRequest;
 import org.apache.gravitino.dto.requests.MetricUpdatesRequest;
+import org.apache.gravitino.dto.requests.MetricVersionLinkRequest;
+import org.apache.gravitino.dto.requests.MetricVersionUpdateRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
-import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.MetricModifierResponse;
 import org.apache.gravitino.dto.responses.MetricResponse;
 import org.apache.gravitino.dto.responses.MetricVersionListResponse;
 import org.apache.gravitino.dto.responses.MetricVersionResponse;
+import org.apache.gravitino.dto.responses.PagedEntityListResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.pagination.PagedResult;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -101,22 +107,25 @@ public class MetricOperations {
       @Parameter(description = "Schema名称", required = true)
           @PathParam("schema")
           @AuthorizationMetadata(type = Entity.EntityType.SCHEMA)
-          String schema) {
+          String schema,
+      @Parameter(description = "偏移量") @QueryParam("offset") @DefaultValue("0") int offset,
+      @Parameter(description = "每页大小") @QueryParam("limit") @DefaultValue("20") int limit) {
     Namespace metricNs = Namespace.of(metalake, catalog, schema);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier[] metricIds = datasetDispatcher.listMetrics(metricNs);
-            metricIds = metricIds == null ? new NameIdentifier[0] : metricIds;
+            PagedResult<NameIdentifier> result =
+                datasetDispatcher.listMetrics(metricNs, offset, limit);
+            NameIdentifier[] metricIds = result.items().toArray(new NameIdentifier[0]);
             metricIds =
                 MetadataFilterHelper.filterByExpression(
                     metalake,
                     AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
                     Entity.EntityType.METRIC,
                     metricIds);
-            return Utils.ok(new EntityListResponse(metricIds));
+            return Utils.ok(new PagedEntityListResponse(metricIds, result.total(), offset, limit));
           });
 
     } catch (Exception e) {
@@ -179,12 +188,18 @@ public class MetricOperations {
                     metricId,
                     request.getCode(),
                     request.getType(),
+                    request.getDataType(),
                     request.getComment(),
                     request.getProperties(),
                     request.getUnit(),
                     request.getAggregationLogic(),
                     request.getParentMetricIds(),
-                    request.getCalculationFormula());
+                    request.getCalculationFormula(),
+                    request.getRefCatalogName(),
+                    request.getRefSchemaName(),
+                    request.getRefTableName(),
+                    request.getMeasureColumns(),
+                    request.getFilterColumns());
             return Utils.ok(new MetricResponse(DTOConverters.toDTO(m)));
           });
 
@@ -350,6 +365,99 @@ public class MetricOperations {
     }
   }
 
+  @POST
+  @Path("{metric}/versions")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "link-metric-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "link-metric-version", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
+  @Operation(summary = "创建新指标版本", description = "为指定指标创建新版本（版本号自动递增）")
+  @ApiResponses(
+      value = {
+        @ApiResponse(responseCode = "200", description = "成功创建新版本"),
+        @ApiResponse(responseCode = "404", description = "指标不存在")
+      })
+  public Response linkMetricVersion(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("metric") @AuthorizationMetadata(type = Entity.EntityType.METRIC) String metric,
+      MetricVersionLinkRequest request) {
+    NameIdentifier metricId = NameIdentifier.of(metalake, catalog, schema, metric);
+
+    try {
+      request.validate();
+
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            MetricVersion mv =
+                datasetDispatcher.linkMetricVersion(
+                    metricId,
+                    request.getComment(),
+                    request.getUnit(),
+                    request.getAggregationLogic(),
+                    request.getParentMetricIds(),
+                    request.getCalculationFormula());
+            return Utils.ok(new MetricVersionResponse(DTOConverters.toDTO(mv)));
+          });
+
+    } catch (Exception e) {
+      return ExceptionHandlers.handleMetricException(OperationType.CREATE, metric, schema, e);
+    }
+  }
+
+  @PUT
+  @Path("{metric}/versions/{version}")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "alter-metric-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "alter-metric-version", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
+  @Operation(summary = "更新指标版本", description = "更新指定指标版本的信息")
+  @ApiResponses(
+      value = {
+        @ApiResponse(responseCode = "200", description = "成功更新版本"),
+        @ApiResponse(responseCode = "404", description = "指标版本不存在")
+      })
+  public Response alterMetricVersion(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("metric") @AuthorizationMetadata(type = Entity.EntityType.METRIC) String metric,
+      @PathParam("version") int version,
+      MetricVersionUpdateRequest request) {
+    NameIdentifier metricId = NameIdentifier.of(metalake, catalog, schema, metric);
+
+    try {
+      request.validate();
+
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            MetricVersion mv =
+                datasetDispatcher.alterMetricVersion(
+                    metricId,
+                    version,
+                    request.getComment(),
+                    request.getUnit(),
+                    request.getAggregationLogic(),
+                    request.getParentMetricIds(),
+                    request.getCalculationFormula());
+            return Utils.ok(new MetricVersionResponse(DTOConverters.toDTO(mv)));
+          });
+
+    } catch (Exception e) {
+      return ExceptionHandlers.handleMetricException(
+          OperationType.ALTER, versionString(metric, version), schema, e);
+    }
+  }
+
   @PUT
   @Path("{metric}/switch")
   @Produces("application/vnd.gravitino.v1+json")
@@ -396,15 +504,20 @@ public class MetricOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @QueryParam("offset") @DefaultValue("0") int offset,
+      @QueryParam("limit") @DefaultValue("20") int limit) {
     Namespace modifierNs = Namespace.of(metalake, catalog, schema);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier[] modifierIds = datasetDispatcher.listMetricModifiers(modifierNs);
-            return Utils.ok(new EntityListResponse(modifierIds));
+            PagedResult<NameIdentifier> result =
+                datasetDispatcher.listMetricModifiers(modifierNs, offset, limit);
+            NameIdentifier[] modifierIds = result.items().toArray(new NameIdentifier[0]);
+            return Utils.ok(
+                new PagedEntityListResponse(modifierIds, result.total(), offset, limit));
           });
 
     } catch (Exception e) {
@@ -503,6 +616,46 @@ public class MetricOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleMetricException(OperationType.DELETE, code, schema, e);
+    }
+  }
+
+  @PUT
+  @Path("modifiers/{code}")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "alter-modifier." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "alter-modifier", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
+  @Operation(summary = "更新修饰符", description = "更新指定修饰符的信息")
+  @ApiResponses(
+      value = {
+        @ApiResponse(responseCode = "200", description = "成功更新修饰符"),
+        @ApiResponse(responseCode = "404", description = "修饰符不存在")
+      })
+  public Response alterModifier(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("code") String code,
+      MetricModifierUpdateRequest request) {
+    NameIdentifier modifierId = NameIdentifier.of(metalake, catalog, schema, code);
+
+    try {
+      request.validate();
+
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            org.apache.gravitino.dataset.MetricModifier modifier =
+                datasetDispatcher.alterMetricModifier(
+                    modifierId, request.getType(), request.getComment());
+            return Utils.ok(new MetricModifierResponse(DTOConverters.toDTO(modifier)));
+          });
+
+    } catch (Exception e) {
+      return ExceptionHandlers.handleMetricException(OperationType.ALTER, code, schema, e);
     }
   }
 

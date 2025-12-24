@@ -54,6 +54,15 @@ public class MetricModifierMetaSQLProviderFactory {
     return getProvider().listMetricModifierPOsBySchemaId(schemaId);
   }
 
+  public static String listMetricModifierPOsBySchemaIdWithPagination(
+      @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit) {
+    return getProvider().listMetricModifierPOsBySchemaIdWithPagination(schemaId, offset, limit);
+  }
+
+  public static String countMetricModifiersBySchemaId(@Param("schemaId") Long schemaId) {
+    return getProvider().countMetricModifiersBySchemaId(schemaId);
+  }
+
   public static String selectMetricModifierMetaBySchemaIdAndModifierCode(
       @Param("schemaId") Long schemaId, @Param("modifierCode") String modifierCode) {
     return getProvider().selectMetricModifierMetaBySchemaIdAndModifierCode(schemaId, modifierCode);

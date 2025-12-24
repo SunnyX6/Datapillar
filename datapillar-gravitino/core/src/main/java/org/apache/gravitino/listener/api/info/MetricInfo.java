@@ -45,6 +45,11 @@ public class MetricInfo {
   private final Optional<String> calculationFormula;
   private final Long[] parentMetricIds;
   private final String[] parentMetricCodes;
+  private final Optional<String> refCatalogName;
+  private final Optional<String> refSchemaName;
+  private final Optional<String> refTableName;
+  private final Optional<String> measureColumns;
+  private final Optional<String> filterColumns;
 
   /**
    * Constructs a {@link MetricInfo} instance based on a given metric.
@@ -65,6 +70,11 @@ public class MetricInfo {
         null,
         null,
         null,
+        null,
+        null,
+        null,
+        null,
+        null,
         null);
   }
 
@@ -77,6 +87,11 @@ public class MetricInfo {
    * @param calculationFormula the calculation formula of the metric.
    * @param parentMetricIds the parent metric IDs for derived/composite metrics.
    * @param parentMetricCodes the parent metric codes for derived/composite metrics.
+   * @param refCatalogName the reference catalog name for atomic metrics.
+   * @param refSchemaName the reference schema name for atomic metrics.
+   * @param refTableName the reference table name for atomic metrics.
+   * @param measureColumns the measure columns JSON array for atomic metrics.
+   * @param filterColumns the filter columns JSON array for atomic metrics.
    */
   public MetricInfo(
       Metric metric,
@@ -84,7 +99,12 @@ public class MetricInfo {
       String aggregationLogic,
       String calculationFormula,
       Long[] parentMetricIds,
-      String[] parentMetricCodes) {
+      String[] parentMetricCodes,
+      String refCatalogName,
+      String refSchemaName,
+      String refTableName,
+      String measureColumns,
+      String filterColumns) {
     this(
         metric.name(),
         metric.code(),
@@ -98,7 +118,12 @@ public class MetricInfo {
         aggregationLogic,
         calculationFormula,
         parentMetricIds,
-        parentMetricCodes);
+        parentMetricCodes,
+        refCatalogName,
+        refSchemaName,
+        refTableName,
+        measureColumns,
+        filterColumns);
   }
 
   /**
@@ -117,6 +142,11 @@ public class MetricInfo {
    * @param calculationFormula the calculation formula of the metric.
    * @param parentMetricIds the parent metric IDs for derived/composite metrics.
    * @param parentMetricCodes the parent metric codes for derived/composite metrics.
+   * @param refCatalogName the reference catalog name for atomic metrics.
+   * @param refSchemaName the reference schema name for atomic metrics.
+   * @param refTableName the reference table name for atomic metrics.
+   * @param measureColumns the measure columns JSON array for atomic metrics.
+   * @param filterColumns the filter columns JSON array for atomic metrics.
    */
   public MetricInfo(
       String name,
@@ -131,7 +161,12 @@ public class MetricInfo {
       String aggregationLogic,
       String calculationFormula,
       Long[] parentMetricIds,
-      String[] parentMetricCodes) {
+      String[] parentMetricCodes,
+      String refCatalogName,
+      String refSchemaName,
+      String refTableName,
+      String measureColumns,
+      String filterColumns) {
     this.name = name;
     this.code = code;
     this.type = type;
@@ -145,6 +180,11 @@ public class MetricInfo {
     this.calculationFormula = Optional.ofNullable(calculationFormula);
     this.parentMetricIds = parentMetricIds;
     this.parentMetricCodes = parentMetricCodes;
+    this.refCatalogName = Optional.ofNullable(refCatalogName);
+    this.refSchemaName = Optional.ofNullable(refSchemaName);
+    this.refTableName = Optional.ofNullable(refTableName);
+    this.measureColumns = Optional.ofNullable(measureColumns);
+    this.filterColumns = Optional.ofNullable(filterColumns);
   }
 
   /**
@@ -262,5 +302,50 @@ public class MetricInfo {
    */
   public String[] parentMetricCodes() {
     return parentMetricCodes;
+  }
+
+  /**
+   * Returns the reference catalog name for atomic metrics.
+   *
+   * @return the reference catalog name, or empty if not set.
+   */
+  public Optional<String> refCatalogName() {
+    return refCatalogName;
+  }
+
+  /**
+   * Returns the reference schema name for atomic metrics.
+   *
+   * @return the reference schema name, or empty if not set.
+   */
+  public Optional<String> refSchemaName() {
+    return refSchemaName;
+  }
+
+  /**
+   * Returns the reference table name for atomic metrics.
+   *
+   * @return the reference table name, or empty if not set.
+   */
+  public Optional<String> refTableName() {
+    return refTableName;
+  }
+
+  /**
+   * Returns the measure columns JSON array for atomic metrics.
+   *
+   * @return the measure columns, or empty if not set.
+   */
+  public Optional<String> measureColumns() {
+    return measureColumns;
+  }
+
+  /**
+   * Returns the filter columns JSON array for atomic metrics.
+   *
+   * @return the filter columns, or empty if not set.
+   */
+  public Optional<String> filterColumns() {
+    return filterColumns;
   }
 }

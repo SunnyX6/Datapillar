@@ -54,6 +54,11 @@ public class MetricVersionMetaSQLProviderFactory {
     return getProvider().insertMetricVersionMeta(metricVersionPO);
   }
 
+  public static String insertMetricVersionMetaWithAutoVersion(
+      @Param("metricVersionMeta") MetricVersionPO metricVersionPO) {
+    return getProvider().insertMetricVersionMetaWithAutoVersion(metricVersionPO);
+  }
+
   public static String listMetricVersionMetasByMetricId(@Param("metricId") Long metricId) {
     return getProvider().listMetricVersionMetasByMetricId(metricId);
   }

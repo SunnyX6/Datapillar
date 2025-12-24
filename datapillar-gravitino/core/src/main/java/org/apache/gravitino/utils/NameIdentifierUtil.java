@@ -503,6 +503,28 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a unit identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The unit {@link NameIdentifier} to check.
+   */
+  public static void checkUnit(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Unit identifier must not be null");
+    NamespaceUtil.checkUnit(ident.namespace());
+  }
+
+  /**
+   * Check the given {@link NameIdentifier} is a value domain identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The value domain {@link NameIdentifier} to check.
+   */
+  public static void checkValueDomain(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "ValueDomain identifier must not be null");
+    NamespaceUtil.checkValueDomain(ident.namespace());
+  }
+
+  /**
    * Convert the given {@link NameIdentifier} and {@link Entity.EntityType} to {@link
    * MetadataObject}.
    *

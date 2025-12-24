@@ -49,6 +49,9 @@ public class MetricVersionDTO implements MetricVersion {
   @JsonProperty("type")
   private Metric.Type type;
 
+  @JsonProperty("dataType")
+  private String dataType;
+
   @JsonProperty("comment")
   private String comment;
 
@@ -64,6 +67,21 @@ public class MetricVersionDTO implements MetricVersion {
   @JsonProperty("calculationFormula")
   private String calculationFormula;
 
+  @JsonProperty("refCatalogName")
+  private String refCatalogName;
+
+  @JsonProperty("refSchemaName")
+  private String refSchemaName;
+
+  @JsonProperty("refTableName")
+  private String refTableName;
+
+  @JsonProperty("measureColumns")
+  private String measureColumns;
+
+  @JsonProperty("filterColumns")
+  private String filterColumns;
+
   @JsonProperty("properties")
   private Map<String, String> properties;
 
@@ -76,18 +94,23 @@ public class MetricVersionDTO implements MetricVersion {
   }
 
   @Override
-  public String name() {
+  public String metricName() {
     return name;
   }
 
   @Override
-  public String code() {
+  public String metricCode() {
     return code;
   }
 
   @Override
-  public Metric.Type type() {
+  public Metric.Type metricType() {
     return type;
+  }
+
+  @Override
+  public String dataType() {
+    return dataType;
   }
 
   @Override
@@ -116,6 +139,31 @@ public class MetricVersionDTO implements MetricVersion {
   }
 
   @Override
+  public String refCatalogName() {
+    return refCatalogName;
+  }
+
+  @Override
+  public String refSchemaName() {
+    return refSchemaName;
+  }
+
+  @Override
+  public String refTableName() {
+    return refTableName;
+  }
+
+  @Override
+  public String measureColumns() {
+    return measureColumns;
+  }
+
+  @Override
+  public String filterColumns() {
+    return filterColumns;
+  }
+
+  @Override
   public Map<String, String> properties() {
     return properties;
   }
@@ -135,11 +183,17 @@ public class MetricVersionDTO implements MetricVersion {
     private String name;
     private String code;
     private Metric.Type type;
+    private String dataType;
     private String comment;
     private String unit;
     private String aggregationLogic;
     private Long[] parentMetricIds;
     private String calculationFormula;
+    private String refCatalogName;
+    private String refSchemaName;
+    private String refTableName;
+    private String measureColumns;
+    private String filterColumns;
     private Map<String, String> properties;
     private AuditDTO audit;
 
@@ -160,6 +214,11 @@ public class MetricVersionDTO implements MetricVersion {
 
     public Builder withType(Metric.Type type) {
       this.type = type;
+      return this;
+    }
+
+    public Builder withDataType(String dataType) {
+      this.dataType = dataType;
       return this;
     }
 
@@ -188,6 +247,31 @@ public class MetricVersionDTO implements MetricVersion {
       return this;
     }
 
+    public Builder withRefCatalogName(String refCatalogName) {
+      this.refCatalogName = refCatalogName;
+      return this;
+    }
+
+    public Builder withRefSchemaName(String refSchemaName) {
+      this.refSchemaName = refSchemaName;
+      return this;
+    }
+
+    public Builder withRefTableName(String refTableName) {
+      this.refTableName = refTableName;
+      return this;
+    }
+
+    public Builder withMeasureColumns(String measureColumns) {
+      this.measureColumns = measureColumns;
+      return this;
+    }
+
+    public Builder withFilterColumns(String filterColumns) {
+      this.filterColumns = filterColumns;
+      return this;
+    }
+
     public Builder withProperties(Map<String, String> properties) {
       this.properties = properties;
       return this;
@@ -210,11 +294,17 @@ public class MetricVersionDTO implements MetricVersion {
           name,
           code,
           type,
+          dataType,
           comment,
           unit,
           aggregationLogic,
           parentMetricIds,
           calculationFormula,
+          refCatalogName,
+          refSchemaName,
+          refTableName,
+          measureColumns,
+          filterColumns,
           properties,
           audit);
     }

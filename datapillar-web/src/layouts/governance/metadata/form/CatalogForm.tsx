@@ -6,7 +6,7 @@ import { forwardRef, useImperativeHandle, useState, useEffect, useCallback } fro
 import { toast } from 'sonner'
 import { testCatalogConnection } from '@/services/oneMetaService'
 
-type CatalogType = 'RELATIONAL' | 'FILESET' | 'MESSAGING' | 'MODEL' | 'METRIC'
+type CatalogType = 'RELATIONAL' | 'FILESET' | 'MESSAGING'
 
 interface ProviderOption {
   value: string
@@ -27,9 +27,7 @@ const PROVIDER_BY_TYPE: Record<CatalogType, ProviderOption[]> = {
     { value: 'lakehouse-paimon', label: 'Apache Paimon' }
   ],
   FILESET: [{ value: 'fileset', label: 'Fileset' }],
-  MESSAGING: [{ value: 'kafka', label: 'Apache Kafka' }],
-  MODEL: [{ value: 'model', label: 'Model' }],
-  METRIC: [{ value: 'metric', label: 'Metric' }]
+  MESSAGING: [{ value: 'kafka', label: 'Apache Kafka' }]
 }
 
 interface CreateCatalogFormProps {
@@ -165,8 +163,6 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
           <option value="RELATIONAL">数据库</option>
           <option value="FILESET">文件集</option>
           <option value="MESSAGING">消息队列</option>
-          <option value="MODEL">模型</option>
-          <option value="METRIC">指标</option>
         </select>
       </div>
 
@@ -414,16 +410,6 @@ function ProviderConfigFields({
           {renderField('filesystem-providers', 'Filesystem Providers', 'builtin-hdfs,s3', false)}
         </>
       )
-    }
-
-    // Model 配置
-    if (provider === 'model') {
-      return <div className="text-xs text-slate-500 dark:text-slate-400 italic">Model catalog 暂无额外配置项</div>
-    }
-
-    // Metric 配置
-    if (provider === 'metric') {
-      return <div className="text-xs text-slate-500 dark:text-slate-400 italic">Metric catalog 暂无额外配置项</div>
     }
 
     return null

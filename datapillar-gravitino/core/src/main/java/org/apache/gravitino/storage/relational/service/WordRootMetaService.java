@@ -92,6 +92,31 @@ public class WordRootMetaService {
     return result;
   }
 
+  /** 分页列出 WordRoot */
+  public List<WordRootEntity> listWordRootsByNamespaceWithPagination(
+      Namespace namespace, int offset, int limit) {
+    NamespaceUtil.checkRoot(namespace);
+
+    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
+
+    List<WordRootPO> wordRootPOs =
+        SessionUtils.getWithoutCommit(
+            WordRootMetaMapper.class,
+            mapper -> mapper.listWordRootPOsBySchemaIdWithPagination(schemaId, offset, limit));
+
+    return POConverters.fromWordRootPOs(wordRootPOs, namespace);
+  }
+
+  /** 统计 WordRoot 总数 */
+  public long countWordRootsByNamespace(Namespace namespace) {
+    NamespaceUtil.checkRoot(namespace);
+
+    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
+
+    return SessionUtils.getWithoutCommit(
+        WordRootMetaMapper.class, mapper -> mapper.countWordRootsBySchemaId(schemaId));
+  }
+
   /** 获取 WordRoot */
   public WordRootEntity getWordRootByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkRoot(ident);

@@ -35,6 +35,24 @@ public class MetricModifierMetaBaseSQLProvider {
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
+  public String listMetricModifierPOsBySchemaIdWithPagination(
+      @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit) {
+    return "SELECT modifier_id AS modifierId, modifier_name AS modifierName, modifier_code AS modifierCode, modifier_type AS modifierType,"
+        + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, modifier_comment AS modifierComment,"
+        + " audit_info AS auditInfo, deleted_at AS deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " ORDER BY modifier_id"
+        + " LIMIT #{limit} OFFSET #{offset}";
+  }
+
+  public String countMetricModifiersBySchemaId(@Param("schemaId") Long schemaId) {
+    return "SELECT COUNT(*) FROM "
+        + TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+  }
+
   public String selectMetricModifierMetaBySchemaIdAndModifierCode(
       @Param("schemaId") Long schemaId, @Param("modifierCode") String modifierCode) {
     return "SELECT modifier_id AS modifierId, modifier_name AS modifierName, modifier_code AS modifierCode, modifier_type AS modifierType,"

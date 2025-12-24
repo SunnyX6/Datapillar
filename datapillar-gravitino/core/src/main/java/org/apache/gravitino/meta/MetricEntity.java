@@ -37,6 +37,7 @@ public class MetricEntity implements Entity, Auditable, HasIdentifier {
   public static final Field NAME = Field.required("name", String.class, "指标实体的名称");
   public static final Field CODE = Field.required("code", String.class, "指标实体的编码");
   public static final Field TYPE = Field.required("type", Metric.Type.class, "指标实体的类型");
+  public static final Field DATA_TYPE = Field.optional("data_type", String.class, "指标的数据类型");
   public static final Field COMMENT = Field.optional("comment", String.class, "指标实体的注释或描述");
   public static final Field CURRENT_VERSION =
       Field.required("current_version", Integer.class, "指标的当前版本");
@@ -49,6 +50,7 @@ public class MetricEntity implements Entity, Auditable, HasIdentifier {
   private Namespace namespace;
   private String code;
   private Metric.Type type;
+  private String dataType;
   private String comment;
   private Integer currentVersion;
   private Integer lastVersion;
@@ -64,6 +66,7 @@ public class MetricEntity implements Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(CODE, code);
     fields.put(TYPE, type);
+    fields.put(DATA_TYPE, dataType);
     fields.put(COMMENT, comment);
     fields.put(CURRENT_VERSION, currentVersion);
     fields.put(LAST_VERSION, lastVersion);
@@ -93,6 +96,10 @@ public class MetricEntity implements Entity, Auditable, HasIdentifier {
 
   public Metric.Type metricType() {
     return type;
+  }
+
+  public String dataType() {
+    return dataType;
   }
 
   public String comment() {
@@ -134,6 +141,7 @@ public class MetricEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equals(name, that.name)
         && Objects.equals(code, that.code)
         && type == that.type
+        && Objects.equals(dataType, that.dataType)
         && Objects.equals(comment, that.comment)
         && Objects.equals(currentVersion, that.currentVersion)
         && Objects.equals(lastVersion, that.lastVersion)
@@ -144,7 +152,16 @@ public class MetricEntity implements Entity, Auditable, HasIdentifier {
   @Override
   public int hashCode() {
     return Objects.hash(
-        id, name, code, type, comment, currentVersion, lastVersion, properties, auditInfo);
+        id,
+        name,
+        code,
+        type,
+        dataType,
+        comment,
+        currentVersion,
+        lastVersion,
+        properties,
+        auditInfo);
   }
 
   public static Builder builder() {
@@ -180,6 +197,11 @@ public class MetricEntity implements Entity, Auditable, HasIdentifier {
 
     public Builder withType(Metric.Type type) {
       metric.type = type;
+      return this;
+    }
+
+    public Builder withDataType(String dataType) {
+      metric.dataType = dataType;
       return this;
     }
 

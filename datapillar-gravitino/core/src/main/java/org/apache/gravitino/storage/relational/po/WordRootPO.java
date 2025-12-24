@@ -25,8 +25,8 @@ import lombok.Getter;
 public class WordRootPO {
   private Long rootId;
   private String rootCode;
-  private String rootNameCn;
-  private String rootNameEn;
+  private String rootName;
+  private String dataType;
   private Long metalakeId;
   private Long catalogId;
   private Long schemaId;
@@ -55,13 +55,13 @@ public class WordRootPO {
       return this;
     }
 
-    public Builder withRootNameCn(String rootNameCn) {
-      wordRootPO.rootNameCn = rootNameCn;
+    public Builder withRootName(String rootName) {
+      wordRootPO.rootName = rootName;
       return this;
     }
 
-    public Builder withRootNameEn(String rootNameEn) {
-      wordRootPO.rootNameEn = rootNameEn;
+    public Builder withDataType(String dataType) {
+      wordRootPO.dataType = dataType;
       return this;
     }
 

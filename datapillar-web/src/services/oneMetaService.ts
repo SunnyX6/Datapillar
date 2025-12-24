@@ -11,9 +11,12 @@ import type {
   GravitinoCatalogResponse,
   GravitinoSchemaResponse,
   GravitinoTableResponse,
-  GravitinoStatisticListResponse,
   GravitinoIndexDTO
 } from '@/types/oneMeta'
+import type { MetricType, Metric, WordRootDTO } from '@/types/metric'
+
+// 重新导出 API 类型供外部使用
+export type { MetricType, Metric, WordRootDTO }
 
 /**
  * Gravitino API 客户端
@@ -146,7 +149,7 @@ export interface TableItem {
 /**
  * Metalake 名称（硬编码，需要 URL 编码）
  */
-const METALAKE_NAME = encodeURIComponent('One Meta')
+const METALAKE_NAME = 'OneMeta'
 
 /**
  * 映射 Gravitino provider 到图标名称
@@ -189,7 +192,12 @@ export async function fetchCatalogs(): Promise<CatalogItem[]> {
 
   const catalogs = response.catalogs || []
 
-  return catalogs.map((catalog) => ({
+  // 过滤掉 dataset（二开新增）和 model（gravitino 模型管理）类型的 catalog
+  const filteredCatalogs = catalogs.filter(
+    (catalog) => catalog.provider !== 'dataset' && catalog.provider !== 'model'
+  )
+
+  return filteredCatalogs.map((catalog) => ({
     id: catalog.name,
     name: catalog.name,
     icon: catalog.provider, // 直接存储 provider，前端动态计算图标
@@ -540,4 +548,322 @@ export async function deleteTable(catalogName: string, schemaName: string, table
   await del<GravitinoBaseResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${encodeURIComponent(catalogName)}/schemas/${encodeURIComponent(schemaName)}/tables/${encodeURIComponent(tableName)}`
   )
+}
+
+// ============================================
+// WordRoot 词根管理（语义层默认使用 OneMeta catalog/schema）
+// ============================================
+
+/** 语义层默认 Catalog 和 Schema */
+const SEMANTIC_CATALOG = 'OneMeta'
+const SEMANTIC_SCHEMA = 'OneMeta'
+
+/** 词根列表响应 */
+interface WordRootListResponse extends GravitinoBaseResponse {
+  identifiers?: Array<{ namespace: string[]; name: string }>
+  total: number
+  offset: number
+  limit: number
+}
+
+/** 词根详情响应 */
+interface WordRootResponse extends GravitinoBaseResponse {
+  root: WordRootDTO
+}
+
+/** 创建词根请求 */
+export interface CreateWordRootRequest {
+  code: string
+  nameCn: string
+  nameEn: string
+  dataType?: string
+  comment?: string
+}
+
+/**
+ * 获取词根列表（分页）
+ */
+export async function fetchWordRoots(offset = 0, limit = 20): Promise<{
+  items: WordRootDTO[]
+  total: number
+  offset: number
+  limit: number
+}> {
+  const response = await get<WordRootListResponse>(
+    `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/wordroots?offset=${offset}&limit=${limit}`
+  )
+
+  // 列表接口只返回标识符，需要逐个获取详情
+  const identifiers = response.identifiers || []
+  const items: WordRootDTO[] = []
+
+  for (const identifier of identifiers) {
+    try {
+      const detail = await getWordRoot(identifier.name)
+      items.push(detail)
+    } catch {
+      // 获取详情失败时跳过
+    }
+  }
+
+  return {
+    items,
+    total: response.total,
+    offset: response.offset,
+    limit: response.limit
+  }
+}
+
+/**
+ * 获取词根详情
+ */
+export async function getWordRoot(code: string): Promise<WordRootDTO> {
+  const response = await get<WordRootResponse>(
+    `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/wordroots/${encodeURIComponent(code)}`
+  )
+  return response.root
+}
+
+/**
+ * 创建词根
+ */
+export async function createWordRoot(data: CreateWordRootRequest): Promise<WordRootDTO> {
+  const response = await post<WordRootResponse>(
+    `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/wordroots`,
+    data
+  )
+  return response.root
+}
+
+/**
+ * 删除词根
+ */
+export async function deleteWordRoot(code: string): Promise<void> {
+  await del<GravitinoBaseResponse>(
+    `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/wordroots/${encodeURIComponent(code)}`
+  )
+}
+
+/** 更新词根请求 */
+export interface UpdateWordRootRequest {
+  nameCn: string
+  nameEn: string
+  dataType?: string
+  comment?: string
+}
+
+/**
+ * 更新词根
+ */
+export async function updateWordRoot(code: string, data: UpdateWordRootRequest): Promise<WordRootDTO> {
+  const response = await put<WordRootResponse>(
+    `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/wordroots/${encodeURIComponent(code)}`,
+    data
+  )
+  return response.root
+}
+
+// ============================================
+// Metric 指标管理（语义层默认使用 OneMeta catalog/schema）
+// ============================================
+
+/** 指标列表响应 */
+interface MetricListResponse extends GravitinoBaseResponse {
+  identifiers?: Array<{ namespace: string[]; name: string }>
+  total: number
+  offset: number
+  limit: number
+}
+
+/** 指标详情响应 */
+interface MetricResponse extends GravitinoBaseResponse {
+  metric: Metric
+}
+
+/** 注册指标请求 */
+export interface RegisterMetricRequest {
+  name: string
+  code: string
+  type: MetricType
+  dataType?: string
+  comment?: string
+  properties?: Record<string, string>
+  unit?: string
+  aggregationLogic?: string
+  parentMetricIds?: number[]
+  calculationFormula?: string
+  // 原子指标数据源配置
+  refCatalogName?: string
+  refSchemaName?: string
+  refTableName?: string
+  refColumnName?: string
+}
+
+/**
+ * 获取指标列表（分页）
+ */
+export async function fetchMetrics(offset = 0, limit = 20): Promise<{
+  items: Metric[]
+  total: number
+  offset: number
+  limit: number
+}> {
+  const response = await get<MetricListResponse>(
+    `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics?offset=${offset}&limit=${limit}`
+  )
+
+  // 列表接口只返回标识符，需要逐个获取详情
+  const identifiers = response.identifiers || []
+  const items: Metric[] = []
+
+  for (const identifier of identifiers) {
+    try {
+      const detail = await getMetric(identifier.name)
+      items.push(detail)
+    } catch {
+      // 获取详情失败时跳过
+    }
+  }
+
+  return {
+    items,
+    total: response.total,
+    offset: response.offset,
+    limit: response.limit
+  }
+}
+
+/**
+ * 获取指标详情
+ */
+export async function getMetric(code: string): Promise<Metric> {
+  const response = await get<MetricResponse>(
+    `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/${encodeURIComponent(code)}`
+  )
+  return response.metric
+}
+
+/**
+ * 注册指标
+ */
+export async function registerMetric(data: RegisterMetricRequest): Promise<Metric> {
+  const response = await post<MetricResponse>(
+    `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics`,
+    data
+  )
+  return response.metric
+}
+
+/**
+ * 删除指标
+ */
+export async function deleteMetric(code: string): Promise<void> {
+  await del<GravitinoBaseResponse>(
+    `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/${encodeURIComponent(code)}`
+  )
+}
+
+/** 更新指标请求 */
+export interface UpdateMetricRequest {
+  name?: string
+  comment?: string
+}
+
+/**
+ * 更新指标
+ */
+export async function updateMetric(code: string, data: UpdateMetricRequest): Promise<Metric> {
+  // 构建 updates 数组
+  const updates: Array<{ '@type': string; newName?: string; newComment?: string }> = []
+
+  if (data.name) {
+    updates.push({ '@type': 'rename', newName: data.name })
+  }
+  if (data.comment !== undefined) {
+    updates.push({ '@type': 'updateComment', newComment: data.comment || '' })
+  }
+
+  const response = await put<MetricResponse>(
+    `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/${encodeURIComponent(code)}`,
+    { updates }
+  )
+  return response.metric
+}
+
+/** 指标版本详情 */
+export interface MetricVersionItem {
+  version: number
+  name: string
+  code: string
+  type: MetricType
+  dataType?: string
+  comment?: string
+  unit?: string
+  aggregationLogic?: string
+  calculationFormula?: string
+  refCatalogName?: string
+  refSchemaName?: string
+  refTableName?: string
+  refColumnName?: string
+  parentMetricIds?: number[]
+  properties?: Record<string, string>
+  audit?: {
+    creator?: string
+    createTime?: string
+    lastModifier?: string
+    lastModifiedTime?: string
+  }
+}
+
+/** 指标版本详情响应 */
+interface MetricVersionResponse extends GravitinoBaseResponse {
+  version: MetricVersionItem
+}
+
+/** 指标版本列表响应 */
+interface MetricVersionListResponse extends GravitinoBaseResponse {
+  versions: number[]
+}
+
+/**
+ * 获取指标版本列表
+ */
+export async function fetchMetricVersions(code: string): Promise<number[]> {
+  const response = await get<MetricVersionListResponse>(
+    `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/${encodeURIComponent(code)}/versions`
+  )
+  return response.versions || []
+}
+
+/**
+ * 获取指标版本详情
+ */
+export async function fetchMetricVersion(code: string, version: number): Promise<MetricVersionItem> {
+  const response = await get<MetricVersionResponse>(
+    `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/${encodeURIComponent(code)}/versions/${version}`
+  )
+  return response.version
+}
+
+/**
+ * 更新指标版本
+ */
+export interface AlterMetricVersionRequest {
+  comment?: string
+  unit?: string
+  aggregationLogic?: string
+  calculationFormula?: string
+  parentMetricIds?: number[]
+}
+
+export async function alterMetricVersion(
+  code: string,
+  version: number,
+  data: AlterMetricVersionRequest
+): Promise<MetricVersionItem> {
+  const response = await put<MetricVersionResponse>(
+    `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/${encodeURIComponent(code)}/versions/${version}`,
+    data
+  )
+  return response.version
 }
