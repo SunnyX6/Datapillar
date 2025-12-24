@@ -52,14 +52,11 @@ spring:
             - RewritePath=/api(?<segment>/?.*), ${segment}
 
         # 3. AI 服务 (datapillar-ai)
-        # Controller: 纯业务路径
-        # 重写: /api/ai/** → /**
+        # 路径直接转发，不重写
         - id: ai-service
           uri: http://localhost:6003
           predicates:
             - Path=/api/ai/**
-          filters:
-            - RewritePath=/api/ai(?<segment>/?.*), ${segment}
 
         # 4. 元数据服务 (datapillar-gravitino)
         # Gravitino 原生 REST API

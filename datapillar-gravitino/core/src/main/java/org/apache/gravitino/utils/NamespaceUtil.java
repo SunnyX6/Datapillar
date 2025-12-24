@@ -430,6 +430,32 @@ public class NamespaceUtil {
   }
 
   /**
+   * Check if the given unit namespace is legal, throw an {@link IllegalNamespaceException} if it's
+   * illegal.
+   *
+   * @param namespace The unit namespace
+   */
+  public static void checkUnit(Namespace namespace) {
+    check(
+        namespace != null && namespace.length() == 3,
+        "Unit namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  /**
+   * Check if the given value domain namespace is legal, throw an {@link IllegalNamespaceException}
+   * if it's illegal.
+   *
+   * @param namespace The value domain namespace
+   */
+  public static void checkValueDomain(Namespace namespace) {
+    check(
+        namespace != null && namespace.length() == 3,
+        "ValueDomain namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  /**
    * Check the given condition is true. Throw an {@link IllegalNamespaceException} if it's not.
    *
    * @param expression The expression to check.

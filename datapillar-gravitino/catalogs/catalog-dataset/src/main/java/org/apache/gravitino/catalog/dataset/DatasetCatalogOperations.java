@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -47,19 +48,26 @@ import org.apache.gravitino.exceptions.NoSuchMetricVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.MetricEntity;
+import org.apache.gravitino.meta.MetricModifierEntity;
 import org.apache.gravitino.meta.MetricVersionEntity;
+import org.apache.gravitino.meta.UnitEntity;
+import org.apache.gravitino.meta.ValueDomainEntity;
+import org.apache.gravitino.meta.WordRootEntity;
+import org.apache.gravitino.pagination.PagedResult;
 import org.apache.gravitino.storage.relational.service.MetricMetaService;
+import org.apache.gravitino.storage.relational.service.MetricModifierMetaService;
+import org.apache.gravitino.storage.relational.service.UnitMetaService;
+import org.apache.gravitino.storage.relational.service.ValueDomainMetaService;
+import org.apache.gravitino.storage.relational.service.WordRootMetaService;
+import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Dataset Catalog 操作类，实现所有 Metric 和 WordRoot 相关的 CRUD 操作 */
 public class DatasetCatalogOperations extends ManagedSchemaOperations
     implements CatalogOperations, DatasetCatalog {
 
-  private static final Logger LOG = LoggerFactory.getLogger(DatasetCatalogOperations.class);
   private static final int INIT_VERSION = 1;
 
   private final EntityStore store;
@@ -92,20 +100,25 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   }
 
   @Override
-  public NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
+  public PagedResult<NameIdentifier> listMetrics(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
     NamespaceUtil.checkMetric(namespace);
 
     try {
       List<MetricEntity> metrics =
-          store.list(namespace, MetricEntity.class, Entity.EntityType.METRIC);
-      return metrics.stream()
-          .map(m -> NameIdentifier.of(namespace, m.code()))
-          .toArray(NameIdentifier[]::new);
+          MetricMetaService.getInstance()
+              .listMetricsByNamespaceWithPagination(namespace, offset, limit);
+      long total = MetricMetaService.getInstance().countMetricsByNamespace(namespace);
+
+      List<NameIdentifier> idents =
+          metrics.stream()
+              .map(m -> NameIdentifier.of(namespace, m.code()))
+              .collect(Collectors.toList());
+
+      return new PagedResult<>(idents, total, offset, limit);
 
     } catch (NoSuchEntityException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
-    } catch (IOException ioe) {
-      throw new RuntimeException("Failed to list metrics under namespace " + namespace, ioe);
     }
   }
 
@@ -140,12 +153,18 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       NameIdentifier ident,
       String code,
       Metric.Type type,
+      String dataType,
       String comment,
       Map<String, String> properties,
       String unit,
       String aggregationLogic,
       Long[] parentMetricIds,
-      String calculationFormula)
+      String calculationFormula,
+      String refCatalogName,
+      String refSchemaName,
+      String refTableName,
+      String measureColumns,
+      String filterColumns)
       throws MetricAlreadyExistsException {
     NameIdentifierUtil.checkMetric(ident);
 
@@ -159,6 +178,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
             .withNamespace(ident.namespace())
             .withCode(code)
             .withType(type)
+            .withDataType(dataType)
             .withComment(comment)
             .withProperties(properties)
             .withCurrentVersion(INIT_VERSION)
@@ -174,7 +194,16 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       // 使用MetricMetaService插入指标，并传递版本相关字段
       MetricMetaService.getInstance()
           .insertMetricWithVersion(
-              metric, unit, aggregationLogic, parentMetricIds, calculationFormula);
+              metric,
+              unit,
+              aggregationLogic,
+              parentMetricIds,
+              calculationFormula,
+              refCatalogName,
+              refSchemaName,
+              refTableName,
+              measureColumns,
+              filterColumns);
     } catch (IOException e) {
       throw new RuntimeException("Failed to register metric " + ident, e);
     } catch (EntityAlreadyExistsException e) {
@@ -216,6 +245,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                         .withNamespace(entity.namespace())
                         .withCode(entity.code())
                         .withType(entity.metricType())
+                        .withDataType(entity.dataType())
                         .withComment(entity.comment())
                         .withCurrentVersion(entity.currentVersion())
                         .withLastVersion(entity.lastVersion())
@@ -382,12 +412,72 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
     }
   }
 
+  @Override
+  public MetricVersion linkMetricVersion(
+      NameIdentifier ident,
+      String comment,
+      String unit,
+      String aggregationLogic,
+      Long[] parentMetricIds,
+      String calculationFormula)
+      throws NoSuchMetricException {
+    NameIdentifierUtil.checkMetric(ident);
+
+    try {
+      MetricVersionEntity newVersion =
+          MetricMetaService.getInstance()
+              .createNewMetricVersion(
+                  ident, comment, unit, aggregationLogic, parentMetricIds, calculationFormula);
+      return toMetricVersionImpl(newVersion);
+
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchMetricException(e, "Metric %s does not exist", ident);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to create new version for metric " + ident, ioe);
+    }
+  }
+
+  @Override
+  public MetricVersion alterMetricVersion(
+      NameIdentifier ident,
+      int version,
+      String comment,
+      String unit,
+      String aggregationLogic,
+      Long[] parentMetricIds,
+      String calculationFormula)
+      throws NoSuchMetricVersionException {
+    NameIdentifierUtil.checkMetric(ident);
+
+    try {
+      MetricVersionEntity updatedVersion =
+          MetricMetaService.getInstance()
+              .updateMetricVersion(
+                  ident,
+                  version,
+                  comment,
+                  unit,
+                  aggregationLogic,
+                  parentMetricIds,
+                  calculationFormula);
+      return toMetricVersionImpl(updatedVersion);
+
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchMetricVersionException(
+          e, "Metric version %s (version %d) does not exist", ident, version);
+    } catch (IOException ioe) {
+      throw new RuntimeException(
+          "Failed to alter metric version " + ident + " version " + version, ioe);
+    }
+  }
+
   /** 将 MetricEntity 转换为 MetricImpl */
   private Metric toMetricImpl(MetricEntity entity) {
     return MetricImpl.builder()
         .withName(entity.name())
         .withCode(entity.code())
         .withType(entity.metricType())
+        .withDataType(entity.dataType())
         .withComment(entity.comment())
         .withProperties(entity.properties())
         .withCurrentVersion(entity.currentVersion())
@@ -403,35 +493,42 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
         .withName(entity.metricName())
         .withCode(entity.metricCode())
         .withType(entity.metricType())
+        .withDataType(entity.dataType())
         .withComment(entity.comment())
         .withUnit(entity.unit())
         .withAggregationLogic(entity.aggregationLogic())
         .withParentMetricIds(entity.parentMetricIds())
         .withCalculationFormula(entity.calculationFormula())
+        .withRefCatalogName(entity.refCatalogName())
+        .withRefSchemaName(entity.refSchemaName())
+        .withRefTableName(entity.refTableName())
+        .withMeasureColumns(entity.measureColumns())
+        .withFilterColumns(entity.filterColumns())
         .withProperties(entity.properties())
         .withAuditInfo(entity.auditInfo())
         .build();
   }
 
   @Override
-  public NameIdentifier[] listMetricModifiers(Namespace namespace) throws NoSuchSchemaException {
+  public PagedResult<NameIdentifier> listMetricModifiers(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
     NamespaceUtil.checkModifier(namespace);
 
     try {
-      List<org.apache.gravitino.meta.MetricModifierEntity> modifiers =
-          store.list(
-              namespace,
-              org.apache.gravitino.meta.MetricModifierEntity.class,
-              Entity.EntityType.METRIC_MODIFIER);
-      return modifiers.stream()
-          .map(m -> NameIdentifier.of(namespace, m.code()))
-          .toArray(NameIdentifier[]::new);
+      List<MetricModifierEntity> modifiers =
+          MetricModifierMetaService.getInstance()
+              .listModifiersByNamespaceWithPagination(namespace, offset, limit);
+      long total = MetricModifierMetaService.getInstance().countModifiersByNamespace(namespace);
+
+      List<NameIdentifier> idents =
+          modifiers.stream()
+              .map(m -> NameIdentifier.of(namespace, m.code()))
+              .collect(Collectors.toList());
+
+      return new PagedResult<>(idents, total, offset, limit);
 
     } catch (NoSuchEntityException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
-    } catch (IOException ioe) {
-      throw new RuntimeException(
-          "Failed to list metric modifiers under namespace " + namespace, ioe);
     }
   }
 
@@ -504,30 +601,64 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   }
 
   @Override
-  public NameIdentifier[] listWordRoots(Namespace namespace) throws NoSuchSchemaException {
+  public org.apache.gravitino.dataset.MetricModifier alterMetricModifier(
+      NameIdentifier ident, org.apache.gravitino.dataset.MetricModifier.Type type, String comment) {
+    NameIdentifierUtil.checkModifier(ident);
+
+    try {
+      MetricModifierEntity updatedEntity =
+          store.update(
+              ident,
+              MetricModifierEntity.class,
+              Entity.EntityType.METRIC_MODIFIER,
+              entity ->
+                  MetricModifierEntity.builder()
+                      .withId(entity.id())
+                      .withName(entity.name())
+                      .withNamespace(entity.namespace())
+                      .withCode(entity.code())
+                      .withType(type)
+                      .withComment(comment)
+                      .withAuditInfo(
+                          AuditInfo.builder()
+                              .withCreator(entity.auditInfo().creator())
+                              .withCreateTime(entity.auditInfo().createTime())
+                              .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                              .withLastModifiedTime(Instant.now())
+                              .build())
+                      .build());
+
+      return toModifierImpl(updatedEntity);
+
+    } catch (NoSuchEntityException e) {
+      throw new RuntimeException("Metric modifier " + ident + " does not exist", e);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to alter metric modifier " + ident, ioe);
+    } catch (EntityAlreadyExistsException e) {
+      throw new RuntimeException("Metric modifier " + ident + " already exists", e);
+    }
+  }
+
+  @Override
+  public PagedResult<NameIdentifier> listWordRoots(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
     NamespaceUtil.checkRoot(namespace);
 
     try {
-      List<org.apache.gravitino.meta.WordRootEntity> roots =
-          store.list(
-              namespace,
-              org.apache.gravitino.meta.WordRootEntity.class,
-              Entity.EntityType.WORDROOT);
-      LOG.info("DEBUG: listWordRoots - 从 store.list 获取到 {} 个 Entity", roots.size());
-      NameIdentifier[] result =
+      List<WordRootEntity> roots =
+          WordRootMetaService.getInstance()
+              .listWordRootsByNamespaceWithPagination(namespace, offset, limit);
+      long total = WordRootMetaService.getInstance().countWordRootsByNamespace(namespace);
+
+      List<NameIdentifier> idents =
           roots.stream()
               .map(r -> NameIdentifier.of(namespace, r.code()))
-              .toArray(NameIdentifier[]::new);
-      LOG.info("DEBUG: listWordRoots - 转换后返回 {} 个 NameIdentifier", result.length);
-      for (int i = 0; i < result.length; i++) {
-        LOG.info("DEBUG: listWordRoots - NameIdentifier[{}]: {}", i, result[i]);
-      }
-      return result;
+              .collect(Collectors.toList());
+
+      return new PagedResult<>(idents, total, offset, limit);
 
     } catch (NoSuchEntityException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
-    } catch (IOException ioe) {
-      throw new RuntimeException("Failed to list metric roots under namespace " + namespace, ioe);
     }
   }
 
@@ -550,7 +681,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
 
   @Override
   public org.apache.gravitino.dataset.WordRoot createWordRoot(
-      NameIdentifier ident, String code, String nameCn, String nameEn, String comment)
+      NameIdentifier ident, String code, String name, String dataType, String comment)
       throws NoSuchSchemaException {
     NameIdentifierUtil.checkRoot(ident);
 
@@ -559,8 +690,8 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
         org.apache.gravitino.meta.WordRootEntity.builder()
             .withId(uid)
             .withCode(code)
-            .withNameCn(nameCn)
-            .withNameEn(nameEn)
+            .withRootName(name)
+            .withDataType(dataType)
             .withComment(comment)
             .withNamespace(ident.namespace())
             .withAuditInfo(
@@ -594,6 +725,45 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
     }
   }
 
+  @Override
+  public org.apache.gravitino.dataset.WordRoot alterWordRoot(
+      NameIdentifier ident, String name, String dataType, String comment) {
+    NameIdentifierUtil.checkRoot(ident);
+
+    try {
+      WordRootEntity updatedEntity =
+          store.update(
+              ident,
+              WordRootEntity.class,
+              Entity.EntityType.WORDROOT,
+              entity ->
+                  WordRootEntity.builder()
+                      .withId(entity.id())
+                      .withCode(entity.code())
+                      .withRootName(name)
+                      .withDataType(dataType)
+                      .withComment(comment)
+                      .withNamespace(entity.namespace())
+                      .withAuditInfo(
+                          AuditInfo.builder()
+                              .withCreator(entity.auditInfo().creator())
+                              .withCreateTime(entity.auditInfo().createTime())
+                              .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                              .withLastModifiedTime(Instant.now())
+                              .build())
+                      .build());
+
+      return toRootImpl(updatedEntity);
+
+    } catch (NoSuchEntityException e) {
+      throw new RuntimeException("Word root " + ident + " does not exist", e);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to alter word root " + ident, ioe);
+    } catch (EntityAlreadyExistsException e) {
+      throw new RuntimeException("Word root " + ident + " already exists", e);
+    }
+  }
+
   /** 将 MetricModifierEntity 转换为 ModifierImpl */
   private org.apache.gravitino.dataset.MetricModifier toModifierImpl(
       org.apache.gravitino.meta.MetricModifierEntity entity) {
@@ -611,8 +781,370 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       org.apache.gravitino.meta.WordRootEntity entity) {
     return WordRootImpl.builder()
         .withCode(entity.code())
-        .withNameCn(entity.nameCn())
-        .withNameEn(entity.nameEn())
+        .withName(entity.rootName())
+        .withDataType(entity.dataType())
+        .withComment(entity.comment())
+        .withAuditInfo(entity.auditInfo())
+        .build();
+  }
+
+  // ============================= Unit 管理 =============================
+
+  @Override
+  public PagedResult<NameIdentifier> listUnits(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
+    NamespaceUtil.checkUnit(namespace);
+
+    try {
+      List<UnitEntity> entities =
+          UnitMetaService.getInstance()
+              .listUnitsByNamespaceWithPagination(namespace, offset, limit);
+      long total = UnitMetaService.getInstance().countUnitsByNamespace(namespace);
+
+      List<NameIdentifier> identifiers =
+          entities.stream()
+              .map(entity -> NameIdentifier.of(namespace, entity.code()))
+              .collect(Collectors.toList());
+
+      return new PagedResult<>(identifiers, total, offset, limit);
+
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
+    }
+  }
+
+  @Override
+  public org.apache.gravitino.dataset.Unit getUnit(NameIdentifier ident) {
+    NameIdentifierUtil.checkUnit(ident);
+
+    try {
+      UnitEntity entity = store.get(ident, Entity.EntityType.UNIT, UnitEntity.class);
+      return toUnitImpl(entity);
+
+    } catch (NoSuchEntityException e) {
+      throw new RuntimeException("Unit " + ident + " does not exist", e);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to get unit " + ident, ioe);
+    }
+  }
+
+  @Override
+  public org.apache.gravitino.dataset.Unit createUnit(
+      NameIdentifier ident, String code, String name, String symbol, String comment)
+      throws NoSuchSchemaException {
+    NameIdentifierUtil.checkUnit(ident);
+
+    long uid = GravitinoEnv.getInstance().idGenerator().nextId();
+    UnitEntity entity =
+        UnitEntity.builder()
+            .withId(uid)
+            .withCode(code)
+            .withUnitName(name)
+            .withSymbol(symbol)
+            .withComment(comment)
+            .withNamespace(ident.namespace())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+
+    try {
+      store.put(entity, false);
+    } catch (EntityAlreadyExistsException e) {
+      throw new RuntimeException("Unit " + ident + " already exists", e);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSchemaException(e, "Schema %s does not exist", ident.namespace());
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to create unit " + ident, ioe);
+    }
+
+    return toUnitImpl(entity);
+  }
+
+  @Override
+  public boolean deleteUnit(NameIdentifier ident) {
+    NameIdentifierUtil.checkUnit(ident);
+
+    try {
+      return store.delete(ident, Entity.EntityType.UNIT);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to delete unit " + ident, ioe);
+    }
+  }
+
+  @Override
+  public org.apache.gravitino.dataset.Unit alterUnit(
+      NameIdentifier ident, String name, String symbol, String comment) {
+    NameIdentifierUtil.checkUnit(ident);
+
+    try {
+      UnitEntity updatedEntity =
+          store.update(
+              ident,
+              UnitEntity.class,
+              Entity.EntityType.UNIT,
+              entity ->
+                  UnitEntity.builder()
+                      .withId(entity.id())
+                      .withCode(entity.code())
+                      .withUnitName(name)
+                      .withSymbol(symbol)
+                      .withComment(comment)
+                      .withNamespace(entity.namespace())
+                      .withAuditInfo(
+                          AuditInfo.builder()
+                              .withCreator(entity.auditInfo().creator())
+                              .withCreateTime(entity.auditInfo().createTime())
+                              .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                              .withLastModifiedTime(Instant.now())
+                              .build())
+                      .build());
+
+      return toUnitImpl(updatedEntity);
+
+    } catch (NoSuchEntityException e) {
+      throw new RuntimeException("Unit " + ident + " does not exist", e);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to alter unit " + ident, ioe);
+    } catch (EntityAlreadyExistsException e) {
+      throw new RuntimeException("Unit " + ident + " already exists", e);
+    }
+  }
+
+  /** 将 UnitEntity 转换为 UnitImpl */
+  private org.apache.gravitino.dataset.Unit toUnitImpl(UnitEntity entity) {
+    return UnitImpl.builder()
+        .withCode(entity.code())
+        .withName(entity.unitName())
+        .withSymbol(entity.symbol())
+        .withComment(entity.comment())
+        .withAuditInfo(entity.auditInfo())
+        .build();
+  }
+
+  // ==================== ValueDomain 值域相关方法 ====================
+
+  @Override
+  public PagedResult<NameIdentifier> listValueDomains(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
+    NamespaceUtil.checkValueDomain(namespace);
+
+    try {
+      List<ValueDomainEntity> entities =
+          ValueDomainMetaService.getInstance()
+              .listValueDomainsByNamespaceWithPagination(namespace, offset, limit);
+      long total = ValueDomainMetaService.getInstance().countValueDomainsByNamespace(namespace);
+
+      List<NameIdentifier> identifiers =
+          entities.stream()
+              .map(
+                  entity ->
+                      NameIdentifier.of(namespace, entity.domainCode() + ":" + entity.itemValue()))
+              .collect(Collectors.toList());
+
+      return new PagedResult<>(identifiers, total, offset, limit);
+
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
+    }
+  }
+
+  @Override
+  public org.apache.gravitino.dataset.ValueDomain getValueDomain(NameIdentifier ident) {
+    NameIdentifierUtil.checkValueDomain(ident);
+
+    try {
+      ValueDomainEntity entity =
+          store.get(ident, Entity.EntityType.VALUE_DOMAIN, ValueDomainEntity.class);
+      return toValueDomainImpl(entity);
+
+    } catch (NoSuchEntityException e) {
+      throw new RuntimeException("ValueDomain " + ident + " does not exist", e);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to get value domain " + ident, ioe);
+    }
+  }
+
+  @Override
+  public org.apache.gravitino.dataset.ValueDomain createValueDomain(
+      NameIdentifier ident,
+      String domainCode,
+      String domainName,
+      org.apache.gravitino.dataset.ValueDomain.Type domainType,
+      String itemValue,
+      String itemLabel,
+      String comment)
+      throws NoSuchSchemaException {
+    NameIdentifierUtil.checkValueDomain(ident);
+
+    long uid = GravitinoEnv.getInstance().idGenerator().nextId();
+    ValueDomainEntity entity =
+        ValueDomainEntity.builder()
+            .withId(uid)
+            .withDomainCode(domainCode)
+            .withDomainName(domainName)
+            .withDomainType(domainType)
+            .withItemValue(itemValue)
+            .withItemLabel(itemLabel)
+            .withComment(comment)
+            .withNamespace(ident.namespace())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+
+    try {
+      store.put(entity, false);
+    } catch (EntityAlreadyExistsException e) {
+      throw new RuntimeException("ValueDomain " + ident + " already exists", e);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSchemaException(e, "Schema %s does not exist", ident.namespace());
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to create value domain " + ident, ioe);
+    }
+
+    // 自动创建关联 Tag（用于 Column 引用 ValueDomain）
+    createValueDomainTag(ident, domainCode, domainName, domainType, itemValue, itemLabel, comment);
+
+    return toValueDomainImpl(entity);
+  }
+
+  @Override
+  public boolean deleteValueDomain(NameIdentifier ident) {
+    NameIdentifierUtil.checkValueDomain(ident);
+
+    // 先获取 domainCode 用于删除关联 Tag
+    String domainCode = null;
+    try {
+      ValueDomainEntity entity =
+          store.get(ident, Entity.EntityType.VALUE_DOMAIN, ValueDomainEntity.class);
+      domainCode = entity.domainCode();
+    } catch (NoSuchEntityException | IOException e) {
+      // 忽略，继续尝试删除
+    }
+
+    try {
+      boolean deleted = store.delete(ident, Entity.EntityType.VALUE_DOMAIN);
+      if (deleted && domainCode != null) {
+        // 删除关联 Tag
+        deleteValueDomainTag(ident, domainCode);
+      }
+      return deleted;
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to delete value domain " + ident, ioe);
+    }
+  }
+
+  @Override
+  public org.apache.gravitino.dataset.ValueDomain alterValueDomain(
+      NameIdentifier ident, String domainName, String itemLabel, String comment) {
+    NameIdentifierUtil.checkValueDomain(ident);
+
+    try {
+      ValueDomainEntity updatedEntity =
+          store.update(
+              ident,
+              ValueDomainEntity.class,
+              Entity.EntityType.VALUE_DOMAIN,
+              entity ->
+                  ValueDomainEntity.builder()
+                      .withId(entity.id())
+                      .withDomainCode(entity.domainCode())
+                      .withDomainName(domainName)
+                      .withDomainType(entity.domainType())
+                      .withItemValue(entity.itemValue())
+                      .withItemLabel(itemLabel)
+                      .withComment(comment)
+                      .withNamespace(entity.namespace())
+                      .withAuditInfo(
+                          AuditInfo.builder()
+                              .withCreator(entity.auditInfo().creator())
+                              .withCreateTime(entity.auditInfo().createTime())
+                              .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                              .withLastModifiedTime(Instant.now())
+                              .build())
+                      .build());
+
+      return toValueDomainImpl(updatedEntity);
+
+    } catch (NoSuchEntityException e) {
+      throw new RuntimeException("ValueDomain " + ident + " does not exist", e);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to alter value domain " + ident, ioe);
+    } catch (EntityAlreadyExistsException e) {
+      throw new RuntimeException("ValueDomain " + ident + " already exists", e);
+    }
+  }
+
+  /** ValueDomain Tag 前缀 */
+  private static final String VALUE_DOMAIN_TAG_PREFIX = "vd:";
+
+  /**
+   * 创建 ValueDomain 关联的 Tag
+   *
+   * <p>Tag 命名规则：vd:{domainCode}，用于 Column 引用 ValueDomain
+   */
+  private void createValueDomainTag(
+      NameIdentifier ident,
+      String domainCode,
+      String domainName,
+      org.apache.gravitino.dataset.ValueDomain.Type domainType,
+      String itemValue,
+      String itemLabel,
+      String comment) {
+    try {
+      String metalake = ident.namespace().level(0);
+      String tagName = VALUE_DOMAIN_TAG_PREFIX + domainCode;
+      String tagComment =
+          (domainName != null ? domainName : domainCode) + (comment != null ? ": " + comment : "");
+
+      // Tag properties 存储 ValueDomain 详细信息
+      Map<String, String> properties = Maps.newHashMap();
+      properties.put("domainCode", domainCode);
+      properties.put("domainType", domainType.name());
+      if (domainName != null) {
+        properties.put("domainName", domainName);
+      }
+      if (itemValue != null) {
+        properties.put("itemValue", itemValue);
+      }
+      if (itemLabel != null) {
+        properties.put("itemLabel", itemLabel);
+      }
+
+      TagDispatcher tagDispatcher = GravitinoEnv.getInstance().tagDispatcher();
+      tagDispatcher.createTag(metalake, tagName, tagComment, properties);
+    } catch (Exception e) {
+      // Tag 创建失败不影响 ValueDomain 创建，仅记录警告
+      // 可能是 Tag 已存在或其他原因
+    }
+  }
+
+  /** 删除 ValueDomain 关联的 Tag */
+  private void deleteValueDomainTag(NameIdentifier ident, String domainCode) {
+    try {
+      String metalake = ident.namespace().level(0);
+      String tagName = VALUE_DOMAIN_TAG_PREFIX + domainCode;
+
+      TagDispatcher tagDispatcher = GravitinoEnv.getInstance().tagDispatcher();
+      tagDispatcher.deleteTag(metalake, tagName);
+    } catch (Exception e) {
+      // Tag 删除失败不影响 ValueDomain 删除
+    }
+  }
+
+  /** 将 ValueDomainEntity 转换为 ValueDomainImpl */
+  private org.apache.gravitino.dataset.ValueDomain toValueDomainImpl(ValueDomainEntity entity) {
+    return ValueDomainImpl.builder()
+        .withDomainCode(entity.domainCode())
+        .withDomainName(entity.domainName())
+        .withDomainType(entity.domainType())
+        .withItemValue(entity.itemValue())
+        .withItemLabel(entity.itemLabel())
         .withComment(entity.comment())
         .withAuditInfo(entity.auditInfo())
         .build();

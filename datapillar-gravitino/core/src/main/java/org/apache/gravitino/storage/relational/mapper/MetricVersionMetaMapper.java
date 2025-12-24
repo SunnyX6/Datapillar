@@ -35,6 +35,12 @@ public interface MetricVersionMetaMapper {
       method = "insertMetricVersionMeta")
   void insertMetricVersionMeta(@Param("metricVersionMeta") MetricVersionPO metricVersionPO);
 
+  @InsertProvider(
+      type = MetricVersionMetaSQLProviderFactory.class,
+      method = "insertMetricVersionMetaWithAutoVersion")
+  void insertMetricVersionMetaWithAutoVersion(
+      @Param("metricVersionMeta") MetricVersionPO metricVersionPO);
+
   @SelectProvider(
       type = MetricVersionMetaSQLProviderFactory.class,
       method = "listMetricVersionMetasByMetricId")

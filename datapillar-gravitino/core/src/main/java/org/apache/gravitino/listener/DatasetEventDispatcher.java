@@ -27,17 +27,31 @@ import org.apache.gravitino.dataset.Metric;
 import org.apache.gravitino.dataset.MetricChange;
 import org.apache.gravitino.dataset.MetricModifier;
 import org.apache.gravitino.dataset.MetricVersion;
+import org.apache.gravitino.dataset.Unit;
+import org.apache.gravitino.dataset.ValueDomain;
 import org.apache.gravitino.dataset.WordRoot;
 import org.apache.gravitino.exceptions.MetricAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetricException;
 import org.apache.gravitino.exceptions.NoSuchMetricVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.UnitAlreadyExistsException;
+import org.apache.gravitino.exceptions.ValueDomainAlreadyExistsException;
+import org.apache.gravitino.listener.api.event.CreateModifierEvent;
+import org.apache.gravitino.listener.api.event.CreateUnitEvent;
+import org.apache.gravitino.listener.api.event.CreateValueDomainEvent;
 import org.apache.gravitino.listener.api.event.CreateWordRootEvent;
 import org.apache.gravitino.listener.api.event.DeleteMetricEvent;
+import org.apache.gravitino.listener.api.event.DeleteModifierEvent;
+import org.apache.gravitino.listener.api.event.DeleteUnitEvent;
+import org.apache.gravitino.listener.api.event.DeleteValueDomainEvent;
 import org.apache.gravitino.listener.api.event.DeleteWordRootEvent;
 import org.apache.gravitino.listener.api.event.RegisterMetricEvent;
 import org.apache.gravitino.listener.api.info.MetricInfo;
+import org.apache.gravitino.listener.api.info.ModifierInfo;
+import org.apache.gravitino.listener.api.info.UnitInfo;
+import org.apache.gravitino.listener.api.info.ValueDomainInfo;
 import org.apache.gravitino.listener.api.info.WordRootInfo;
+import org.apache.gravitino.pagination.PagedResult;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
@@ -64,8 +78,9 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
   }
 
   @Override
-  public NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
-    return dispatcher.listMetrics(namespace);
+  public PagedResult<NameIdentifier> listMetrics(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
+    return dispatcher.listMetrics(namespace, offset, limit);
   }
 
   @Override
@@ -78,12 +93,18 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
       NameIdentifier ident,
       String code,
       Metric.Type type,
+      String dataType,
       String comment,
       Map<String, String> properties,
       String unit,
       String aggregationLogic,
       Long[] parentMetricIds,
-      String calculationFormula)
+      String calculationFormula,
+      String refCatalogName,
+      String refSchemaName,
+      String refTableName,
+      String measureColumns,
+      String filterColumns)
       throws NoSuchSchemaException, MetricAlreadyExistsException {
     String user = PrincipalUtils.getCurrentUserName();
 
@@ -93,12 +114,18 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
               ident,
               code,
               type,
+              dataType,
               comment,
               properties,
               unit,
               aggregationLogic,
               parentMetricIds,
-              calculationFormula);
+              calculationFormula,
+              refCatalogName,
+              refSchemaName,
+              refTableName,
+              measureColumns,
+              filterColumns);
 
       // 查询父指标的 codes
       String[] parentMetricCodes =
@@ -112,7 +139,12 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
               aggregationLogic,
               calculationFormula,
               parentMetricIds,
-              parentMetricCodes);
+              parentMetricCodes,
+              refCatalogName,
+              refSchemaName,
+              refTableName,
+              measureColumns,
+              filterColumns);
       eventBus.dispatchEvent(new RegisterMetricEvent(user, ident, registeredMetricInfo));
       return metric;
     } catch (Exception e) {
@@ -167,8 +199,36 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
   }
 
   @Override
-  public NameIdentifier[] listMetricModifiers(Namespace namespace) throws NoSuchSchemaException {
-    return dispatcher.listMetricModifiers(namespace);
+  public MetricVersion linkMetricVersion(
+      NameIdentifier ident,
+      String comment,
+      String unit,
+      String aggregationLogic,
+      Long[] parentMetricIds,
+      String calculationFormula)
+      throws NoSuchMetricException {
+    return dispatcher.linkMetricVersion(
+        ident, comment, unit, aggregationLogic, parentMetricIds, calculationFormula);
+  }
+
+  @Override
+  public MetricVersion alterMetricVersion(
+      NameIdentifier ident,
+      int version,
+      String comment,
+      String unit,
+      String aggregationLogic,
+      Long[] parentMetricIds,
+      String calculationFormula)
+      throws NoSuchMetricVersionException {
+    return dispatcher.alterMetricVersion(
+        ident, version, comment, unit, aggregationLogic, parentMetricIds, calculationFormula);
+  }
+
+  @Override
+  public PagedResult<NameIdentifier> listMetricModifiers(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
+    return dispatcher.listMetricModifiers(namespace, offset, limit);
   }
 
   @Override
@@ -180,17 +240,41 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
   public MetricModifier createMetricModifier(
       NameIdentifier ident, String code, MetricModifier.Type type, String comment)
       throws NoSuchSchemaException {
-    return dispatcher.createMetricModifier(ident, code, type, comment);
+    String user = PrincipalUtils.getCurrentUserName();
+
+    try {
+      MetricModifier modifier = dispatcher.createMetricModifier(ident, code, type, comment);
+      ModifierInfo createdModifierInfo = new ModifierInfo(modifier);
+      eventBus.dispatchEvent(new CreateModifierEvent(user, ident, createdModifierInfo));
+      return modifier;
+    } catch (Exception e) {
+      throw e;
+    }
   }
 
   @Override
   public boolean deleteMetricModifier(NameIdentifier ident) {
-    return dispatcher.deleteMetricModifier(ident);
+    String user = PrincipalUtils.getCurrentUserName();
+
+    try {
+      boolean isExists = dispatcher.deleteMetricModifier(ident);
+      eventBus.dispatchEvent(new DeleteModifierEvent(user, ident, isExists));
+      return isExists;
+    } catch (Exception e) {
+      throw e;
+    }
   }
 
   @Override
-  public NameIdentifier[] listWordRoots(Namespace namespace) throws NoSuchSchemaException {
-    return dispatcher.listWordRoots(namespace);
+  public MetricModifier alterMetricModifier(
+      NameIdentifier ident, MetricModifier.Type type, String comment) {
+    return dispatcher.alterMetricModifier(ident, type, comment);
+  }
+
+  @Override
+  public PagedResult<NameIdentifier> listWordRoots(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
+    return dispatcher.listWordRoots(namespace, offset, limit);
   }
 
   @Override
@@ -200,12 +284,12 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
 
   @Override
   public WordRoot createWordRoot(
-      NameIdentifier ident, String code, String nameCn, String nameEn, String comment)
+      NameIdentifier ident, String code, String name, String dataType, String comment)
       throws NoSuchSchemaException {
     String user = PrincipalUtils.getCurrentUserName();
 
     try {
-      WordRoot wordRoot = dispatcher.createWordRoot(ident, code, nameCn, nameEn, comment);
+      WordRoot wordRoot = dispatcher.createWordRoot(ident, code, name, dataType, comment);
       WordRootInfo createdWordRootInfo = new WordRootInfo(wordRoot);
       eventBus.dispatchEvent(new CreateWordRootEvent(user, ident, createdWordRootInfo));
       return wordRoot;
@@ -225,5 +309,112 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
     } catch (Exception e) {
       throw e;
     }
+  }
+
+  @Override
+  public WordRoot alterWordRoot(
+      NameIdentifier ident, String name, String dataType, String comment) {
+    return dispatcher.alterWordRoot(ident, name, dataType, comment);
+  }
+
+  @Override
+  public PagedResult<NameIdentifier> listUnits(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
+    return dispatcher.listUnits(namespace, offset, limit);
+  }
+
+  @Override
+  public Unit getUnit(NameIdentifier ident) {
+    return dispatcher.getUnit(ident);
+  }
+
+  @Override
+  public Unit createUnit(
+      NameIdentifier ident, String code, String name, String symbol, String comment)
+      throws NoSuchSchemaException, UnitAlreadyExistsException {
+    String user = PrincipalUtils.getCurrentUserName();
+
+    try {
+      Unit unit = dispatcher.createUnit(ident, code, name, symbol, comment);
+      UnitInfo createdUnitInfo = new UnitInfo(unit);
+      eventBus.dispatchEvent(new CreateUnitEvent(user, ident, createdUnitInfo));
+      return unit;
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+
+  @Override
+  public boolean deleteUnit(NameIdentifier ident) {
+    String user = PrincipalUtils.getCurrentUserName();
+
+    try {
+      boolean isExists = dispatcher.deleteUnit(ident);
+      eventBus.dispatchEvent(new DeleteUnitEvent(user, ident, isExists));
+      return isExists;
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+
+  @Override
+  public Unit alterUnit(NameIdentifier ident, String name, String symbol, String comment) {
+    return dispatcher.alterUnit(ident, name, symbol, comment);
+  }
+
+  // ==================== ValueDomain 值域相关方法 ====================
+
+  @Override
+  public PagedResult<NameIdentifier> listValueDomains(Namespace namespace, int offset, int limit)
+      throws NoSuchSchemaException {
+    return dispatcher.listValueDomains(namespace, offset, limit);
+  }
+
+  @Override
+  public ValueDomain getValueDomain(NameIdentifier ident) {
+    return dispatcher.getValueDomain(ident);
+  }
+
+  @Override
+  public ValueDomain createValueDomain(
+      NameIdentifier ident,
+      String domainCode,
+      String domainName,
+      ValueDomain.Type domainType,
+      String itemValue,
+      String itemLabel,
+      String comment)
+      throws NoSuchSchemaException, ValueDomainAlreadyExistsException {
+    String user = PrincipalUtils.getCurrentUserName();
+
+    try {
+      ValueDomain valueDomain =
+          dispatcher.createValueDomain(
+              ident, domainCode, domainName, domainType, itemValue, itemLabel, comment);
+      ValueDomainInfo createdValueDomainInfo = new ValueDomainInfo(valueDomain);
+      eventBus.dispatchEvent(new CreateValueDomainEvent(user, ident, createdValueDomainInfo));
+      return valueDomain;
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+
+  @Override
+  public boolean deleteValueDomain(NameIdentifier ident) {
+    String user = PrincipalUtils.getCurrentUserName();
+
+    try {
+      boolean isExists = dispatcher.deleteValueDomain(ident);
+      eventBus.dispatchEvent(new DeleteValueDomainEvent(user, ident, isExists));
+      return isExists;
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+
+  @Override
+  public ValueDomain alterValueDomain(
+      NameIdentifier ident, String domainName, String itemLabel, String comment) {
+    return dispatcher.alterValueDomain(ident, domainName, itemLabel, comment);
   }
 }

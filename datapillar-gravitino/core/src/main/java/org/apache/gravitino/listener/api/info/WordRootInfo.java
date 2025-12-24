@@ -28,8 +28,8 @@ import org.apache.gravitino.dataset.WordRoot;
 @DeveloperApi
 public class WordRootInfo {
   private final String code;
-  private final Optional<String> nameCn;
-  private final Optional<String> nameEn;
+  private final Optional<String> name;
+  private final Optional<String> dataType;
   private final Optional<String> comment;
   private final Optional<Audit> audit;
 
@@ -41,8 +41,8 @@ public class WordRootInfo {
   public WordRootInfo(WordRoot wordRoot) {
     this(
         wordRoot.code(),
-        wordRoot.nameCn(),
-        wordRoot.nameEn(),
+        wordRoot.name(),
+        wordRoot.dataType(),
         wordRoot.comment(),
         wordRoot.auditInfo());
   }
@@ -51,15 +51,15 @@ public class WordRootInfo {
    * Constructs a {@link WordRootInfo} instance based on all fields.
    *
    * @param code the code of the word root.
-   * @param nameCn the Chinese name of the word root.
-   * @param nameEn the English name of the word root.
+   * @param name the name of the word root.
+   * @param dataType the data type of the word root.
    * @param comment the comment of the word root.
    * @param audit the audit information of the word root.
    */
-  public WordRootInfo(String code, String nameCn, String nameEn, String comment, Audit audit) {
+  public WordRootInfo(String code, String name, String dataType, String comment, Audit audit) {
     this.code = code;
-    this.nameCn = Optional.ofNullable(nameCn);
-    this.nameEn = Optional.ofNullable(nameEn);
+    this.name = Optional.ofNullable(name);
+    this.dataType = Optional.ofNullable(dataType);
     this.comment = Optional.ofNullable(comment);
     this.audit = Optional.ofNullable(audit);
   }
@@ -74,21 +74,21 @@ public class WordRootInfo {
   }
 
   /**
-   * Returns the Chinese name of the word root.
+   * Returns the name of the word root.
    *
-   * @return the Chinese name of the word root or empty if not set.
+   * @return the name of the word root or empty if not set.
    */
-  public Optional<String> nameCn() {
-    return nameCn;
+  public Optional<String> name() {
+    return name;
   }
 
   /**
-   * Returns the English name of the word root.
+   * Returns the data type of the word root.
    *
-   * @return the English name of the word root or empty if not set.
+   * @return the data type of the word root or empty if not set.
    */
-  public Optional<String> nameEn() {
-    return nameEn;
+  public Optional<String> dataType() {
+    return dataType;
   }
 
   /**

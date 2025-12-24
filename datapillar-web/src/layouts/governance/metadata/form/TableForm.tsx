@@ -117,7 +117,9 @@ export function CreateTableForm({ parentName, provider, onDDLButtonRender, onOve
 
   // 使用 ref 保存最新的 ddl 值，避免 overlay useEffect 依赖 userDdlInput 导致重渲染
   const ddlInputRef = useRef(userDdlInput)
-  ddlInputRef.current = userDdlInput
+  useEffect(() => {
+    ddlInputRef.current = userDdlInput
+  }, [userDdlInput])
 
   const handleDdlChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setUserDdlInput(e.target.value)
@@ -291,7 +293,7 @@ export function CreateTableForm({ parentName, provider, onDDLButtonRender, onOve
                               className="w-full px-2 py-1 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                             />
                             {column.isPartition && (
-                              <span className="absolute -top-1.5 -right-1.5 px-1 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 rounded">
+                              <span className="absolute -top-1.5 -right-1.5 px-1 py-px text-micro font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/20 border border-amber-200 dark:border-amber-500/30 rounded">
                                 分区
                               </span>
                             )}

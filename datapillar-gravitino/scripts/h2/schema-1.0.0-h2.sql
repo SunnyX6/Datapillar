@@ -455,8 +455,8 @@ CREATE TABLE IF NOT EXISTS `metric_modifier_meta` (
 CREATE TABLE IF NOT EXISTS `wordroot_meta` (
     `root_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'root word id',
     `root_code` VARCHAR(64) NOT NULL COMMENT 'root code, e.g., amt, cnt, rate',
-    `root_name_cn` VARCHAR(128) NOT NULL COMMENT 'root chinese name, e.g., 金额, 数量, 比率',
-    `root_name_en` VARCHAR(128) NOT NULL COMMENT 'root english name, e.g., amount, count, rate',
+    `root_name` VARCHAR(128) NOT NULL COMMENT 'root name, e.g., 金额, amount',
+    `data_type` VARCHAR(128) DEFAULT NULL COMMENT 'data type, e.g., STRING, INTEGER, DECIMAL(10,2)',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
@@ -469,11 +469,49 @@ CREATE TABLE IF NOT EXISTS `wordroot_meta` (
     KEY `idx_cid` (`catalog_id`)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS `unit_meta` (
+    `unit_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'unit id',
+    `unit_code` VARCHAR(64) NOT NULL COMMENT 'unit code, e.g., CURRENCY, RATIO, COUNT',
+    `unit_name` VARCHAR(128) NOT NULL COMMENT 'unit name, e.g., 人民币, 百分比, 个数',
+    `unit_symbol` VARCHAR(16) NOT NULL COMMENT 'unit symbol, e.g., ¥, %, 个',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `unit_comment` TEXT DEFAULT NULL COMMENT 'unit comment',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'unit audit info',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'unit deleted at',
+    PRIMARY KEY (`unit_id`),
+    UNIQUE KEY `uk_sid_ucode_del` (`schema_id`, `unit_code`, `deleted_at`),
+    KEY `idx_mid` (`metalake_id`),
+    KEY `idx_cid` (`catalog_id`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `value_domain_meta` (
+    `item_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'item id (每行唯一标识)',
+    `domain_code` VARCHAR(64) NOT NULL COMMENT 'domain code, 用于分组, e.g., ORDER_STATUS',
+    `domain_name` VARCHAR(128) NOT NULL COMMENT 'domain name, e.g., 订单状态值域',
+    `domain_type` VARCHAR(16) NOT NULL COMMENT 'domain type: ENUM, RANGE, REGEX',
+    `item_value` VARCHAR(512) NOT NULL COMMENT 'item value: 枚举值/区间表达式/正则',
+    `item_label` VARCHAR(256) DEFAULT NULL COMMENT 'item label: 显示名称',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `domain_comment` TEXT DEFAULT NULL COMMENT 'domain comment',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'audit info',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'deleted at',
+    PRIMARY KEY (`item_id`),
+    UNIQUE KEY `uk_sid_dcode_ival_del` (`schema_id`, `domain_code`, `item_value`, `deleted_at`),
+    KEY `idx_mid` (`metalake_id`),
+    KEY `idx_cid` (`catalog_id`),
+    KEY `idx_domain_code` (`domain_code`)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS `metric_meta` (
     `metric_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metric id',
     `metric_name` VARCHAR(128) NOT NULL COMMENT 'metric name',
     `metric_code` VARCHAR(256) NOT NULL COMMENT 'metric code',
     `metric_type` VARCHAR(32) NOT NULL COMMENT 'metric type: ATOMIC, DERIVED, COMPOSITE',
+    `data_type` VARCHAR(128) DEFAULT NULL COMMENT 'data type, e.g., STRING, INTEGER, DECIMAL(10,2)',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
@@ -499,11 +537,17 @@ CREATE TABLE IF NOT EXISTS `metric_version_info` (
     `metric_name` VARCHAR(128) NOT NULL COMMENT 'metric name snapshot',
     `metric_code` VARCHAR(256) NOT NULL COMMENT 'metric code snapshot',
     `metric_type` VARCHAR(32) NOT NULL COMMENT 'metric type: ATOMIC, DERIVED, COMPOSITE',
+    `data_type` VARCHAR(128) DEFAULT NULL COMMENT 'data type snapshot, e.g., STRING, INTEGER, DECIMAL(10,2)',
     `metric_comment` TEXT DEFAULT NULL COMMENT 'metric comment snapshot',
     `metric_unit` VARCHAR(64) DEFAULT NULL COMMENT 'metric unit, e.g., 元, 个, %',
     `aggregation_logic` VARCHAR(64) DEFAULT NULL COMMENT 'aggregation logic: SUM, COUNT, AVG, MAX, MIN, DISTINCT_COUNT',
     `parent_metric_ids` TEXT DEFAULT NULL COMMENT 'parent metric ids in JSON array format, e.g., [123, 456]',
     `calculation_formula` TEXT DEFAULT NULL COMMENT 'calculation formula, e.g., metric1 / metric2 * 100',
+    `ref_catalog_name` VARCHAR(128) DEFAULT NULL COMMENT 'referenced catalog name for ATOMIC metric',
+    `ref_schema_name` VARCHAR(128) DEFAULT NULL COMMENT 'referenced schema name for ATOMIC metric',
+    `ref_table_name` VARCHAR(128) DEFAULT NULL COMMENT 'referenced table name for ATOMIC metric',
+    `measure_columns` TEXT DEFAULT NULL COMMENT 'measure columns JSON array, e.g., [{name, type, comment}]',
+    `filter_columns` TEXT DEFAULT NULL COMMENT 'filter columns JSON array, e.g., [{name, type, values:[{key,label}]}]',
     `version_properties` MEDIUMTEXT DEFAULT NULL COMMENT 'version properties in JSON format',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'version audit info in JSON format',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',

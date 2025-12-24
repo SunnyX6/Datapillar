@@ -38,11 +38,11 @@ public class WordRootDTO implements WordRoot {
   @JsonProperty("code")
   private String code;
 
-  @JsonProperty("nameCn")
-  private String nameCn;
+  @JsonProperty("name")
+  private String name;
 
-  @JsonProperty("nameEn")
-  private String nameEn;
+  @JsonProperty("dataType")
+  private String dataType;
 
   @JsonProperty("comment")
   private String comment;
@@ -56,13 +56,13 @@ public class WordRootDTO implements WordRoot {
   }
 
   @Override
-  public String nameCn() {
-    return nameCn;
+  public String name() {
+    return name;
   }
 
   @Override
-  public String nameEn() {
-    return nameEn;
+  public String dataType() {
+    return dataType;
   }
 
   @Override
@@ -82,8 +82,8 @@ public class WordRootDTO implements WordRoot {
   /** Builder for constructing a WordRoot DTO. */
   public static class Builder {
     private String code;
-    private String nameCn;
-    private String nameEn;
+    private String name;
+    private String dataType;
     private String comment;
     private AuditDTO audit;
 
@@ -92,13 +92,13 @@ public class WordRootDTO implements WordRoot {
       return this;
     }
 
-    public Builder withNameCn(String nameCn) {
-      this.nameCn = nameCn;
+    public Builder withName(String name) {
+      this.name = name;
       return this;
     }
 
-    public Builder withNameEn(String nameEn) {
-      this.nameEn = nameEn;
+    public Builder withDataType(String dataType) {
+      this.dataType = dataType;
       return this;
     }
 
@@ -114,11 +114,9 @@ public class WordRootDTO implements WordRoot {
 
     public WordRootDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(code), "code cannot be null or empty");
-      Preconditions.checkArgument(StringUtils.isNotBlank(nameCn), "nameCn cannot be null or empty");
-      Preconditions.checkArgument(StringUtils.isNotBlank(nameEn), "nameEn cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
-      return new WordRootDTO(code, nameCn, nameEn, comment, audit);
+      return new WordRootDTO(code, name, dataType, comment, audit);
     }
   }
 }

@@ -5,16 +5,19 @@
 - SQL 节点
 - 表级血缘：Table -[:INPUT_OF]-> SQL, SQL -[:OUTPUT_TO]-> Table
 - 列级血缘：Column -[:DERIVES_FROM]-> Column
+- 指标列血缘：AtomicMetric -[:MEASURES]-> Column, AtomicMetric -[:FILTERS_BY]-> Column
 
 血缘提取策略：
 1. 优先使用 OpenLineage facets（columnLineage）
 2. 当 facets 不存在时，用 SQL 解析补充列级血缘
+3. 原子指标通过 ref 字段建立与列的血缘关系
 
 支持的数据源：
 - Gravitino: namespace 格式为 gravitino://metalake/catalog
 - Spark OpenLineage: 使用 symlinks facet 获取逻辑表名
 """
 
+import json
 import re
 from dataclasses import dataclass
 
@@ -23,7 +26,11 @@ from neo4j import AsyncSession
 
 from src.shared.utils.sql_lineage import SQLLineageAnalyzer
 from src.modules.openlineage.schemas.events import InputDataset, OutputDataset, RunEvent
-from src.modules.openlineage.schemas.facets import ColumnLineageDatasetFacet, SQLJobFacet
+from src.modules.openlineage.schemas.facets import (
+    ColumnLineageDatasetFacet,
+    SchemaDatasetFacet,
+    SQLJobFacet,
+)
 from src.modules.openlineage.schemas.neo4j import SQLNode, generate_id
 from src.modules.openlineage.writers.base import BaseWriter
 
@@ -68,13 +75,17 @@ class LineageWriter(BaseWriter):
     - SQL: SQL 语句节点
     - 表级血缘：INPUT_OF / OUTPUT_TO
     - 列级血缘：DERIVES_FROM
+    - 指标列血缘：MEASURES / FILTERS_BY
     """
+
+    METRIC_OPERATIONS = {"register_metric"}
 
     def __init__(self) -> None:
         super().__init__()
         self._sql_written = 0
         self._table_lineage_written = 0
         self._column_lineage_written = 0
+        self._metric_lineage_written = 0
         self._sql_analyzer = SQLLineageAnalyzer(dialect="hive")
 
     @property
@@ -83,10 +94,17 @@ class LineageWriter(BaseWriter):
 
     async def write(self, session: AsyncSession, event: RunEvent) -> None:
         """写入血缘"""
+        job_name = event.job.name if event.job else ""
+        operation = job_name.split(".")[-1] if "." in job_name else job_name
+
+        # 处理指标血缘
+        if operation in self.METRIC_OPERATIONS:
+            await self._write_metric_column_lineage(session, event)
+            return
+
         # 获取 SQL
         sql = self._get_sql(event)
         if not sql:
-            # 没有 SQL，跳过血缘写入
             return
 
         # 写入 SQL 节点
@@ -491,10 +509,195 @@ class LineageWriter(BaseWriter):
         if lineage_data:
             await self._write_column_lineage_batch(session, lineage_data)
 
+    async def _write_metric_column_lineage(
+        self, session: AsyncSession, event: RunEvent
+    ) -> None:
+        """
+        写入原子指标与列的血缘关系
+
+        从 schema facet 解析 ref 字段：
+        - refCatalogName, refSchemaName, refTableName: 引用的表
+        - measureColumns: JSON 数组 [{name, type, comment}, ...]
+        - filterColumns: JSON 数组 [{name, type, comment, values}, ...]
+
+        建立关系：
+        - AtomicMetric -[:MEASURES]-> Column
+        - AtomicMetric -[:FILTERS_BY]-> Column
+        """
+        for dataset in event.get_all_datasets():
+            if not dataset.facets or "schema" not in dataset.facets:
+                continue
+
+            schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
+            fields = {f.name: f for f in schema_facet.fields}
+
+            # 获取指标 code 和 type
+            code_field = fields.get("code")
+            type_field = fields.get("type")
+            if not code_field or not code_field.description:
+                continue
+
+            metric_type = type_field.description if type_field else "ATOMIC"
+            if metric_type.upper() != "ATOMIC":
+                # 只有原子指标才有列血缘
+                continue
+
+            metric_code = code_field.description
+            metric_id = generate_id("metric", metric_code)
+
+            # 解析 ref 字段
+            ref_catalog = (
+                fields.get("refCatalogName").description
+                if fields.get("refCatalogName")
+                else None
+            )
+            ref_schema = (
+                fields.get("refSchemaName").description
+                if fields.get("refSchemaName")
+                else None
+            )
+            ref_table = (
+                fields.get("refTableName").description
+                if fields.get("refTableName")
+                else None
+            )
+
+            if not ref_catalog or not ref_schema or not ref_table:
+                logger.debug(
+                    "metric_lineage_skip_no_ref",
+                    metric_code=metric_code,
+                    ref_catalog=ref_catalog,
+                    ref_schema=ref_schema,
+                    ref_table=ref_table,
+                )
+                continue
+
+            # 从 dataset.namespace 解析 metalake
+            # 格式: gravitino://metalake/catalog
+            parsed_ns = self._parse_job_namespace(dataset.namespace)
+            if not parsed_ns.metalake:
+                logger.debug(
+                    "metric_lineage_skip_no_metalake",
+                    metric_code=metric_code,
+                    namespace=dataset.namespace,
+                )
+                continue
+
+            # 解析 measureColumns
+            measure_columns_field = fields.get("measureColumns")
+            if measure_columns_field and measure_columns_field.description:
+                try:
+                    measure_columns = json.loads(measure_columns_field.description)
+                    measure_col_names = [col["name"] for col in measure_columns if "name" in col]
+                    if measure_col_names:
+                        await self._write_metric_measures_batch(
+                            session,
+                            metric_id,
+                            parsed_ns.metalake,
+                            ref_catalog,
+                            ref_schema,
+                            ref_table,
+                            measure_col_names,
+                        )
+                except json.JSONDecodeError as e:
+                    logger.warning(
+                        "metric_lineage_measure_parse_error",
+                        metric_code=metric_code,
+                        error=str(e),
+                    )
+
+            # 解析 filterColumns
+            filter_columns_field = fields.get("filterColumns")
+            if filter_columns_field and filter_columns_field.description:
+                try:
+                    filter_columns = json.loads(filter_columns_field.description)
+                    filter_col_names = [col["name"] for col in filter_columns if "name" in col]
+                    if filter_col_names:
+                        await self._write_metric_filters_batch(
+                            session,
+                            metric_id,
+                            parsed_ns.metalake,
+                            ref_catalog,
+                            ref_schema,
+                            ref_table,
+                            filter_col_names,
+                        )
+                except json.JSONDecodeError as e:
+                    logger.warning(
+                        "metric_lineage_filter_parse_error",
+                        metric_code=metric_code,
+                        error=str(e),
+                    )
+
+    async def _write_metric_measures_batch(
+        self,
+        session: AsyncSession,
+        metric_id: str,
+        metalake: str,
+        catalog: str,
+        schema: str,
+        table: str,
+        column_names: list[str],
+    ) -> None:
+        """批量写入指标度量列关系"""
+        lineage_data = [
+            {
+                "metricId": metric_id,
+                "columnId": generate_id("column", metalake, catalog, schema, table, col_name),
+            }
+            for col_name in column_names
+        ]
+
+        query = """
+        UNWIND $lineageData AS item
+        MATCH (m:AtomicMetric {id: item.metricId})
+        MATCH (c:Column {id: item.columnId})
+        MERGE (m)-[r:MEASURES]->(c)
+        ON CREATE SET r.createdAt = datetime()
+        ON MATCH SET r.updatedAt = datetime()
+        """
+
+        await session.run(query, lineageData=lineage_data)
+        self._metric_lineage_written += len(lineage_data)
+        logger.debug("metric_measures_written", metric_id=metric_id, count=len(column_names))
+
+    async def _write_metric_filters_batch(
+        self,
+        session: AsyncSession,
+        metric_id: str,
+        metalake: str,
+        catalog: str,
+        schema: str,
+        table: str,
+        column_names: list[str],
+    ) -> None:
+        """批量写入指标过滤列关系"""
+        lineage_data = [
+            {
+                "metricId": metric_id,
+                "columnId": generate_id("column", metalake, catalog, schema, table, col_name),
+            }
+            for col_name in column_names
+        ]
+
+        query = """
+        UNWIND $lineageData AS item
+        MATCH (m:AtomicMetric {id: item.metricId})
+        MATCH (c:Column {id: item.columnId})
+        MERGE (m)-[r:FILTERS_BY]->(c)
+        ON CREATE SET r.createdAt = datetime()
+        ON MATCH SET r.updatedAt = datetime()
+        """
+
+        await session.run(query, lineageData=lineage_data)
+        self._metric_lineage_written += len(lineage_data)
+        logger.debug("metric_filters_written", metric_id=metric_id, count=len(column_names))
+
     def get_detailed_stats(self) -> dict:
         """获取详细统计"""
         stats = self.get_stats().to_dict()
         stats["sql_written"] = self._sql_written
         stats["table_lineage_written"] = self._table_lineage_written
         stats["column_lineage_written"] = self._column_lineage_written
+        stats["metric_lineage_written"] = self._metric_lineage_written
         return stats

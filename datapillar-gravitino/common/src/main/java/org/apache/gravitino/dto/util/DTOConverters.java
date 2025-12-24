@@ -54,6 +54,8 @@ import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.dataset.MetricDTO;
 import org.apache.gravitino.dto.dataset.MetricModifierDTO;
 import org.apache.gravitino.dto.dataset.MetricVersionDTO;
+import org.apache.gravitino.dto.dataset.UnitDTO;
+import org.apache.gravitino.dto.dataset.ValueDomainDTO;
 import org.apache.gravitino.dto.dataset.WordRootDTO;
 import org.apache.gravitino.dto.file.FileInfoDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
@@ -756,6 +758,7 @@ public class DTOConverters {
         .withName(metric.name())
         .withCode(metric.code())
         .withType(metric.type())
+        .withDataType(metric.dataType())
         .withComment(metric.comment())
         .withProperties(metric.properties())
         .withCurrentVersion(metric.currentVersion())
@@ -773,14 +776,20 @@ public class DTOConverters {
   public static MetricVersionDTO toDTO(MetricVersion metricVersion) {
     return MetricVersionDTO.builder()
         .withVersion(metricVersion.version())
-        .withName(metricVersion.name())
-        .withCode(metricVersion.code())
-        .withType(metricVersion.type())
+        .withName(metricVersion.metricName())
+        .withCode(metricVersion.metricCode())
+        .withType(metricVersion.metricType())
+        .withDataType(metricVersion.dataType())
         .withComment(metricVersion.comment())
         .withUnit(metricVersion.unit())
         .withAggregationLogic(metricVersion.aggregationLogic())
         .withParentMetricIds(metricVersion.parentMetricIds())
         .withCalculationFormula(metricVersion.calculationFormula())
+        .withRefCatalogName(metricVersion.refCatalogName())
+        .withRefSchemaName(metricVersion.refSchemaName())
+        .withRefTableName(metricVersion.refTableName())
+        .withMeasureColumns(metricVersion.measureColumns())
+        .withFilterColumns(metricVersion.filterColumns())
         .withProperties(metricVersion.properties())
         .withAudit(toDTO(metricVersion.auditInfo()))
         .build();
@@ -837,10 +846,44 @@ public class DTOConverters {
   public static WordRootDTO toDTO(org.apache.gravitino.dataset.WordRoot root) {
     return WordRootDTO.builder()
         .withCode(root.code())
-        .withNameCn(root.nameCn())
-        .withNameEn(root.nameEn())
+        .withName(root.name())
+        .withDataType(root.dataType())
         .withComment(root.comment())
         .withAudit(toDTO(root.auditInfo()))
+        .build();
+  }
+
+  /**
+   * 将 Unit 接口转换为 UnitDTO
+   *
+   * @param unit 待转换的单位对象
+   * @return 单位 DTO
+   */
+  public static UnitDTO toDTO(org.apache.gravitino.dataset.Unit unit) {
+    return UnitDTO.builder()
+        .withCode(unit.code())
+        .withName(unit.name())
+        .withSymbol(unit.symbol())
+        .withComment(unit.comment())
+        .withAudit(toDTO(unit.auditInfo()))
+        .build();
+  }
+
+  /**
+   * 将 ValueDomain 接口转换为 ValueDomainDTO
+   *
+   * @param valueDomain 待转换的值域对象
+   * @return 值域 DTO
+   */
+  public static ValueDomainDTO toDTO(org.apache.gravitino.dataset.ValueDomain valueDomain) {
+    return ValueDomainDTO.builder()
+        .withDomainCode(valueDomain.domainCode())
+        .withDomainName(valueDomain.domainName())
+        .withDomainType(valueDomain.domainType())
+        .withItemValue(valueDomain.itemValue())
+        .withItemLabel(valueDomain.itemLabel())
+        .withComment(valueDomain.comment())
+        .withAudit(toDTO(valueDomain.auditInfo()))
         .build();
   }
 

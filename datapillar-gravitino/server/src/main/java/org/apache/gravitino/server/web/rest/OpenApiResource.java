@@ -126,6 +126,9 @@ public class OpenApiResource {
 
     // 添加Metric相关的REST资源类
     classes.add(MetricOperations.class);
+    classes.add(WordRootOperations.class);
+    classes.add(UnitOperations.class);
+    classes.add(ValueDomainOperations.class);
 
     // 可以继续添加其他REST资源类
     // classes.add(CatalogOperations.class);

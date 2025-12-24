@@ -87,6 +87,32 @@ public class MetricModifierMetaService {
     return POConverters.fromMetricModifierPOs(modifierPOs, namespace);
   }
 
+  /** 分页列出 Modifier */
+  public List<MetricModifierEntity> listModifiersByNamespaceWithPagination(
+      Namespace namespace, int offset, int limit) {
+    NamespaceUtil.checkModifier(namespace);
+
+    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
+
+    List<MetricModifierPO> modifierPOs =
+        SessionUtils.getWithoutCommit(
+            MetricModifierMetaMapper.class,
+            mapper ->
+                mapper.listMetricModifierPOsBySchemaIdWithPagination(schemaId, offset, limit));
+
+    return POConverters.fromMetricModifierPOs(modifierPOs, namespace);
+  }
+
+  /** 统计 Modifier 总数 */
+  public long countModifiersByNamespace(Namespace namespace) {
+    NamespaceUtil.checkModifier(namespace);
+
+    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
+
+    return SessionUtils.getWithoutCommit(
+        MetricModifierMetaMapper.class, mapper -> mapper.countMetricModifiersBySchemaId(schemaId));
+  }
+
   /** 获取 Modifier */
   public MetricModifierEntity getModifierByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkModifier(ident);

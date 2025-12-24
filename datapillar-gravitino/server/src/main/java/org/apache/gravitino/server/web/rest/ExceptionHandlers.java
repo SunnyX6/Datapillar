@@ -151,6 +151,16 @@ public class ExceptionHandlers {
     return WordRootExceptionHandler.INSTANCE.handle(op, wordRoot, schema, e);
   }
 
+  public static Response handleUnitException(
+      OperationType op, String unit, String schema, Exception e) {
+    return UnitExceptionHandler.INSTANCE.handle(op, unit, schema, e);
+  }
+
+  public static Response handleValueDomainException(
+      OperationType op, String valueDomain, String schema, Exception e) {
+    return ValueDomainExceptionHandler.INSTANCE.handle(op, valueDomain, schema, e);
+  }
+
   public static Response handleJobTemplateException(
       OperationType op, String jobTemplate, String metalake, Exception e) {
     return JobTemplateExceptionHandler.INSTANCE.handle(op, jobTemplate, metalake, e);
@@ -918,6 +928,78 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, wordRoot, schema, e);
+      }
+    }
+  }
+
+  private static class UnitExceptionHandler extends BaseExceptionHandler {
+    private static final ExceptionHandler INSTANCE = new UnitExceptionHandler();
+
+    private static String getUnitErrorMsg(
+        String unit, String operation, String schema, String reason) {
+      return String.format(
+          "操作单位失败%s，操作 [%s]，所属 schema [%s]，原因 [%s]", unit, operation, schema, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String unit, String schema, Exception e) {
+      String formatted = StringUtil.isBlank(unit) ? "" : " [" + unit + "]";
+      String errorMsg = getUnitErrorMsg(formatted, op.name(), schema, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof org.apache.gravitino.exceptions.UnitAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, unit, schema, e);
+      }
+    }
+  }
+
+  private static class ValueDomainExceptionHandler extends BaseExceptionHandler {
+    private static final ExceptionHandler INSTANCE = new ValueDomainExceptionHandler();
+
+    private static String getValueDomainErrorMsg(
+        String valueDomain, String operation, String schema, String reason) {
+      return String.format(
+          "操作值域失败%s，操作 [%s]，所属 schema [%s]，原因 [%s]", valueDomain, operation, schema, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String valueDomain, String schema, Exception e) {
+      String formatted = StringUtil.isBlank(valueDomain) ? "" : " [" + valueDomain + "]";
+      String errorMsg = getValueDomainErrorMsg(formatted, op.name(), schema, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof org.apache.gravitino.exceptions.ValueDomainAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, valueDomain, schema, e);
       }
     }
   }

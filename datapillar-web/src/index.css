@@ -214,6 +214,36 @@
     }
   }
 
+  /* 左侧导航栏宽度（响应式） */
+  .w-sidebar-responsive {
+    width: 240px;
+    @media (width >= 1920px) {
+      width: 280px;
+    }
+    @media (width >= 2560px) {
+      width: 320px;
+    }
+  }
+
+  /* 抽屉宽度（详情面板/侧边抽屉） */
+  .w-drawer-responsive {
+    width: 480px;
+    @media (width >= 1440px) {
+      width: 540px;
+    }
+    @media (width >= 1920px) {
+      width: 600px;
+    }
+    @media (width >= 2560px) {
+      width: 680px;
+    }
+  }
+
+  /* 表格最小宽度（横向滚动表格） */
+  .min-w-table-wide {
+    min-width: 900px;
+  }
+
   @keyframes orbit-clockwise {
     from {
       transform: rotate(0deg) translateX(48px) rotate(0deg);

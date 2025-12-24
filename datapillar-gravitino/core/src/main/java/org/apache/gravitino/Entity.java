@@ -80,6 +80,8 @@ public interface Entity extends Serializable {
     METRIC_VERSION,
     METRIC_MODIFIER,
     WORDROOT,
+    UNIT,
+    VALUE_DOMAIN,
     POLICY,
     TABLE_STATISTIC,
     JOB_TEMPLATE,

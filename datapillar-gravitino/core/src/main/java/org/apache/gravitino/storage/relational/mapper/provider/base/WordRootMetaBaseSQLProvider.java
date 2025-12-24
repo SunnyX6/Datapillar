@@ -29,11 +29,11 @@ public class WordRootMetaBaseSQLProvider {
   public String insertWordRootMeta(@Param("wordRoot") WordRootPO wordRootPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (root_id, root_code, root_name_cn, root_name_en,"
+        + " (root_id, root_code, root_name, data_type,"
         + " metalake_id, catalog_id, schema_id, root_comment,"
         + " audit_info, deleted_at)"
         + " VALUES (#{wordRoot.rootId}, #{wordRoot.rootCode},"
-        + " #{wordRoot.rootNameCn}, #{wordRoot.rootNameEn},"
+        + " #{wordRoot.rootName}, #{wordRoot.dataType},"
         + " #{wordRoot.metalakeId}, #{wordRoot.catalogId},"
         + " #{wordRoot.schemaId}, #{wordRoot.rootComment},"
         + " #{wordRoot.auditInfo}, #{wordRoot.deletedAt})";
@@ -42,18 +42,18 @@ public class WordRootMetaBaseSQLProvider {
   public String insertWordRootMetaOnDuplicateKeyUpdate(@Param("wordRoot") WordRootPO wordRootPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (root_id, root_code, root_name_cn, root_name_en,"
+        + " (root_id, root_code, root_name, data_type,"
         + " metalake_id, catalog_id, schema_id, root_comment,"
         + " audit_info, deleted_at)"
         + " VALUES (#{wordRoot.rootId}, #{wordRoot.rootCode},"
-        + " #{wordRoot.rootNameCn}, #{wordRoot.rootNameEn},"
+        + " #{wordRoot.rootName}, #{wordRoot.dataType},"
         + " #{wordRoot.metalakeId}, #{wordRoot.catalogId},"
         + " #{wordRoot.schemaId}, #{wordRoot.rootComment},"
         + " #{wordRoot.auditInfo}, #{wordRoot.deletedAt})"
         + " ON DUPLICATE KEY UPDATE"
         + " root_code = #{wordRoot.rootCode},"
-        + " root_name_cn = #{wordRoot.rootNameCn},"
-        + " root_name_en = #{wordRoot.rootNameEn},"
+        + " root_name = #{wordRoot.rootName},"
+        + " data_type = #{wordRoot.dataType},"
         + " metalake_id = #{wordRoot.metalakeId},"
         + " catalog_id = #{wordRoot.catalogId},"
         + " schema_id = #{wordRoot.schemaId},"
@@ -63,18 +63,36 @@ public class WordRootMetaBaseSQLProvider {
   }
 
   public String listWordRootPOsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "SELECT root_id AS rootId, root_code AS rootCode, root_name_cn AS rootNameCn, root_name_en AS rootNameEn,"
-        + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, root_comment AS rootComment,"
+    return "SELECT root_id AS rootId, root_code AS rootCode, root_name AS rootName,"
+        + " data_type AS dataType, metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, root_comment AS rootComment,"
         + " audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
+  public String listWordRootPOsBySchemaIdWithPagination(
+      @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit) {
+    return "SELECT root_id AS rootId, root_code AS rootCode, root_name AS rootName,"
+        + " data_type AS dataType, metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, root_comment AS rootComment,"
+        + " audit_info AS auditInfo, deleted_at AS deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " ORDER BY root_id"
+        + " LIMIT #{limit} OFFSET #{offset}";
+  }
+
+  public String countWordRootsBySchemaId(@Param("schemaId") Long schemaId) {
+    return "SELECT COUNT(*) FROM "
+        + TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+  }
+
   public String selectWordRootMetaBySchemaIdAndRootCode(
       @Param("schemaId") Long schemaId, @Param("rootCode") String rootCode) {
-    return "SELECT root_id AS rootId, root_code AS rootCode, root_name_cn AS rootNameCn, root_name_en AS rootNameEn,"
-        + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, root_comment AS rootComment,"
+    return "SELECT root_id AS rootId, root_code AS rootCode, root_name AS rootName,"
+        + " data_type AS dataType, metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, root_comment AS rootComment,"
         + " audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + TABLE_NAME
@@ -94,8 +112,8 @@ public class WordRootMetaBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET root_code = #{newWordRoot.rootCode},"
-        + " root_name_cn = #{newWordRoot.rootNameCn},"
-        + " root_name_en = #{newWordRoot.rootNameEn},"
+        + " root_name = #{newWordRoot.rootName},"
+        + " data_type = #{newWordRoot.dataType},"
         + " metalake_id = #{newWordRoot.metalakeId},"
         + " catalog_id = #{newWordRoot.catalogId},"
         + " schema_id = #{newWordRoot.schemaId},"
@@ -104,8 +122,7 @@ public class WordRootMetaBaseSQLProvider {
         + " deleted_at = #{newWordRoot.deletedAt}"
         + " WHERE root_id = #{oldWordRoot.rootId}"
         + " AND root_code = #{oldWordRoot.rootCode}"
-        + " AND root_name_cn = #{oldWordRoot.rootNameCn}"
-        + " AND root_name_en = #{oldWordRoot.rootNameEn}"
+        + " AND root_name = #{oldWordRoot.rootName}"
         + " AND metalake_id = #{oldWordRoot.metalakeId}"
         + " AND catalog_id = #{oldWordRoot.catalogId}"
         + " AND schema_id = #{oldWordRoot.schemaId}"

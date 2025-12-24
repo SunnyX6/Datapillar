@@ -39,11 +39,11 @@ public class WordRootCreateRequest implements RESTRequest {
   @JsonProperty("code")
   private String code;
 
-  @JsonProperty("nameCn")
-  private String nameCn;
+  @JsonProperty("name")
+  private String name;
 
-  @JsonProperty("nameEn")
-  private String nameEn;
+  @JsonProperty("dataType")
+  private String dataType;
 
   @JsonProperty("comment")
   private String comment;
@@ -52,9 +52,5 @@ public class WordRootCreateRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(code), "\"code\" field is required and cannot be empty");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(nameCn), "\"nameCn\" field is required and cannot be empty");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(nameEn), "\"nameEn\" field is required and cannot be empty");
   }
 }

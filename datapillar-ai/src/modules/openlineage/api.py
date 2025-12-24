@@ -8,7 +8,7 @@ OpenLineage Sink API
 transport:
   type: http
   url: http://datapillar-ai:6003
-  endpoint: /api/v1/lineage
+  endpoint: /api/ai/openlineage
 ```
 """
 

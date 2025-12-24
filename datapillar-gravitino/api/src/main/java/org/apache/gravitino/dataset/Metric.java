@@ -68,6 +68,13 @@ public interface Metric extends Auditable {
   }
 
   /**
+   * @return 数据类型，如 STRING, INTEGER, DECIMAL(10,2)，如果未设置则返回 null
+   */
+  default String dataType() {
+    return null;
+  }
+
+  /**
    * @return 指标的属性
    */
   default Map<String, String> properties() {

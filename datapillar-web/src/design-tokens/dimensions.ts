@@ -27,8 +27,8 @@ export const sidebarWidthClassMap = {
   /** 收起状态：72px（与现有 Sidebar 一致）*/
   collapsed: 'w-[72px]',
 
-  /** 标准宽度：240px（与现有 Sidebar 一致）*/
-  normal: 'w-60',
+  /** 标准宽度：响应式（240px → 280px @ 1920px → 320px @ 2560px）*/
+  normal: 'w-sidebar-responsive',
 
   /** 宽屏：320px（适合 4K 显示器）*/
   wide: 'w-80'

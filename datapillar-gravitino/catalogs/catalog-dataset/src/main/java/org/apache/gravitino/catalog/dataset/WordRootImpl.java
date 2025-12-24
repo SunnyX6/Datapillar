@@ -26,8 +26,8 @@ import org.apache.gravitino.meta.AuditInfo;
 public class WordRootImpl implements WordRoot, Auditable {
 
   private String code;
-  private String nameCn;
-  private String nameEn;
+  private String name;
+  private String dataType;
   private String comment;
   private AuditInfo auditInfo;
 
@@ -39,13 +39,13 @@ public class WordRootImpl implements WordRoot, Auditable {
   }
 
   @Override
-  public String nameCn() {
-    return nameCn;
+  public String name() {
+    return name;
   }
 
   @Override
-  public String nameEn() {
-    return nameEn;
+  public String dataType() {
+    return dataType;
   }
 
   @Override
@@ -71,13 +71,13 @@ public class WordRootImpl implements WordRoot, Auditable {
       return this;
     }
 
-    public Builder withNameCn(String nameCn) {
-      wordRoot.nameCn = nameCn;
+    public Builder withName(String name) {
+      wordRoot.name = name;
       return this;
     }
 
-    public Builder withNameEn(String nameEn) {
-      wordRoot.nameEn = nameEn;
+    public Builder withDataType(String dataType) {
+      wordRoot.dataType = dataType;
       return this;
     }
 

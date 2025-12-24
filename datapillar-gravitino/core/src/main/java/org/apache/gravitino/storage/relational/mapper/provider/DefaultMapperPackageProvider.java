@@ -47,8 +47,10 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.UnitMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
+import org.apache.gravitino.storage.relational.mapper.ValueDomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.WordRootMetaMapper;
 
 /** The default provider that supplies the primary mapper package for Gravitino. */
@@ -85,7 +87,9 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         TagMetadataObjectRelMapper.class,
         TagMetaMapper.class,
         TopicMetaMapper.class,
+        UnitMetaMapper.class,
         UserMetaMapper.class,
-        UserRoleRelMapper.class);
+        UserRoleRelMapper.class,
+        ValueDomainMetaMapper.class);
   }
 }

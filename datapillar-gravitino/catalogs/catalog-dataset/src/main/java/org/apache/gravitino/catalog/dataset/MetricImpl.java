@@ -29,6 +29,7 @@ public class MetricImpl implements Metric, Auditable {
   private String name;
   private String code;
   private Type type;
+  private String dataType;
   private String comment;
   private Map<String, String> properties;
   private int currentVersion;
@@ -50,6 +51,11 @@ public class MetricImpl implements Metric, Auditable {
   @Override
   public Type type() {
     return type;
+  }
+
+  @Override
+  public String dataType() {
+    return dataType;
   }
 
   @Override
@@ -97,6 +103,11 @@ public class MetricImpl implements Metric, Auditable {
 
     public Builder withType(Type type) {
       metric.type = type;
+      return this;
+    }
+
+    public Builder withDataType(String dataType) {
+      metric.dataType = dataType;
       return this;
     }
 

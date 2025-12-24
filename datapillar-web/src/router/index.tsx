@@ -53,6 +53,11 @@ const LazyGovernanceMetadataPage = lazy(async () => {
   return { default: module.GovernanceMetadataPage }
 })
 
+const LazyGovernanceSemanticPage = lazy(async () => {
+  const module = await import('@/pages/governance')
+  return { default: module.GovernanceSemanticPage }
+})
+
 const LazyNotFoundPage = lazy(async () => {
   const module = await import('@/pages/not-found')
   return { default: module.NotFoundPage }
@@ -84,6 +89,10 @@ export const router = createBrowserRouter([
           {
             path: '/governance/metadata',
             element: withSuspense(LazyGovernanceMetadataPage)
+          },
+          {
+            path: '/governance/semantic',
+            element: withSuspense(LazyGovernanceSemanticPage)
           },
           {
             path: '/governance/knowledge',

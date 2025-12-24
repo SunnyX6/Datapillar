@@ -76,6 +76,17 @@ public interface MetricModifierMetaMapper {
 
   @SelectProvider(
       type = MetricModifierMetaSQLProviderFactory.class,
+      method = "listMetricModifierPOsBySchemaIdWithPagination")
+  List<MetricModifierPO> listMetricModifierPOsBySchemaIdWithPagination(
+      @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit);
+
+  @SelectProvider(
+      type = MetricModifierMetaSQLProviderFactory.class,
+      method = "countMetricModifiersBySchemaId")
+  long countMetricModifiersBySchemaId(@Param("schemaId") Long schemaId);
+
+  @SelectProvider(
+      type = MetricModifierMetaSQLProviderFactory.class,
       method = "selectMetricModifierMetaBySchemaIdAndModifierCode")
   MetricModifierPO selectMetricModifierMetaBySchemaIdAndModifierCode(
       @Param("schemaId") Long schemaId, @Param("modifierCode") String modifierCode);

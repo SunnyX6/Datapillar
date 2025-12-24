@@ -27,10 +27,9 @@ import org.apache.gravitino.annotation.Evolving;
  * <p>词根是企业数仓中的通用基础设施，用于统一命名规范，例如：
  *
  * <ul>
- *   <li>amt - 金额 (amount)
- *   <li>cnt - 数量 (count)
- *   <li>rate - 比率 (rate)
- *   <li>qty - 数量 (quantity)
+ *   <li>amt - 金额
+ *   <li>cnt - 数量
+ *   <li>rate - 比率
  * </ul>
  */
 @Evolving
@@ -44,18 +43,20 @@ public interface WordRoot extends Auditable {
   String code();
 
   /**
-   * 获取词根中文名称
+   * 获取词根名称
    *
-   * @return 词根中文名称，如 金额, 数量, 比率
+   * @return 词根名称，如 金额, 数量, 比率（用户输入什么就是什么）
    */
-  String nameCn();
+  String name();
 
   /**
-   * 获取词根英文名称
+   * 获取词根数据类型
    *
-   * @return 词根英文名称，如 amount, count, rate
+   * @return 数据类型，如 STRING, INTEGER, DECIMAL(10,2)，如果未设置则返回 null
    */
-  String nameEn();
+  default String dataType() {
+    return null;
+  }
 
   /**
    * 获取词根注释

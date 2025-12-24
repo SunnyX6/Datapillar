@@ -13,17 +13,13 @@ OpenLineage Sink 模块
 - 监控统计
 
 API 端点：
-- POST /api/v1/lineage - 接收事件
-- GET /api/v1/lineage/stats - 统计信息
-- GET /api/v1/lineage/health - 健康检查
-- POST /api/v1/lineage/start - 启动服务
-- POST /api/v1/lineage/stop - 停止服务
+- POST /api/ai/openlineage - 接收事件
+- GET /api/ai/openlineage/stats - 统计信息
 
-配置示例（各系统 OpenLineage 配置）：
-```yaml
-transport:
-  type: http
-  url: http://datapillar-ai:8000/api/v1/lineage
+配置示例（Gravitino openlineage.conf）：
+```
+gravitino.openlineage.transport.url = http://datapillar-ai:6003
+gravitino.openlineage.transport.endpoint = /api/ai/openlineage
 ```
 """
 

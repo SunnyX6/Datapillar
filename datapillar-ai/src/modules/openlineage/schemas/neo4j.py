@@ -171,6 +171,83 @@ class MetricNode:
 
 
 @dataclass
+class WordRootNode:
+    """词根节点"""
+
+    id: str  # 唯一标识
+    code: str
+    name: str | None = None
+    data_type: str | None = None
+    description: str | None = None
+    embedding: list[float] | None = None
+    created_at: datetime | None = None
+
+    @classmethod
+    def create(cls, code: str, **kwargs) -> "WordRootNode":
+        """工厂方法：创建 WordRoot 节点"""
+        node_id = generate_id("wordroot", code)
+        return cls(id=node_id, code=code, **kwargs)
+
+
+@dataclass
+class ModifierNode:
+    """修饰符节点"""
+
+    id: str  # 唯一标识
+    code: str
+    modifier_type: str  # PREFIX, SUFFIX, INFIX
+    description: str | None = None
+    embedding: list[float] | None = None
+    created_at: datetime | None = None
+
+    @classmethod
+    def create(cls, code: str, modifier_type: str, **kwargs) -> "ModifierNode":
+        """工厂方法：创建 Modifier 节点"""
+        node_id = generate_id("modifier", code)
+        return cls(id=node_id, code=code, modifier_type=modifier_type, **kwargs)
+
+
+@dataclass
+class UnitNode:
+    """单位节点"""
+
+    id: str  # 唯一标识
+    code: str
+    name: str | None = None
+    symbol: str | None = None
+    description: str | None = None
+    embedding: list[float] | None = None
+    created_at: datetime | None = None
+
+    @classmethod
+    def create(cls, code: str, **kwargs) -> "UnitNode":
+        """工厂方法：创建 Unit 节点"""
+        node_id = generate_id("unit", code)
+        return cls(id=node_id, code=code, **kwargs)
+
+
+@dataclass
+class ValueDomainNode:
+    """值域节点"""
+
+    id: str  # 唯一标识
+    domain_code: str
+    domain_type: str  # ENUM, RANGE, REGEX
+    item_value: str
+    domain_name: str | None = None
+    item_label: str | None = None
+    description: str | None = None
+    embedding: list[float] | None = None
+    created_at: datetime | None = None
+
+    @classmethod
+    def create(cls, domain_code: str, item_value: str, domain_type: str, **kwargs) -> "ValueDomainNode":
+        """工厂方法：创建 ValueDomain 节点"""
+        node_id = generate_id("valuedomain", domain_code, item_value)
+        return cls(id=node_id, domain_code=domain_code, domain_type=domain_type, item_value=item_value, **kwargs)
+
+
+@dataclass
 class TableLineage:
     """表级血缘关系"""
 
@@ -188,4 +265,14 @@ class ColumnLineage:
     target_column_id: str
     transformation_description: str | None = None
     transformation_type: str | None = None
+    created_at: datetime | None = None
+
+
+@dataclass
+class MetricColumnLineage:
+    """原子指标与列的血缘关系"""
+
+    metric_id: str
+    column_id: str
+    lineage_type: str  # MEASURES, FILTERS_BY
     created_at: datetime | None = None

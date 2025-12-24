@@ -44,6 +44,9 @@ public class MetricDTO implements Metric {
   @JsonProperty("type")
   private Type type;
 
+  @JsonProperty("dataType")
+  private String dataType;
+
   @JsonProperty("comment")
   private String comment;
 
@@ -72,6 +75,11 @@ public class MetricDTO implements Metric {
   @Override
   public Type type() {
     return type;
+  }
+
+  @Override
+  public String dataType() {
+    return dataType;
   }
 
   @Override
@@ -108,6 +116,7 @@ public class MetricDTO implements Metric {
     private String name;
     private String code;
     private Type type;
+    private String dataType;
     private String comment;
     private Map<String, String> properties;
     private int currentVersion;
@@ -126,6 +135,11 @@ public class MetricDTO implements Metric {
 
     public Builder withType(Type type) {
       this.type = type;
+      return this;
+    }
+
+    public Builder withDataType(String dataType) {
+      this.dataType = dataType;
       return this;
     }
 
@@ -163,7 +177,7 @@ public class MetricDTO implements Metric {
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
       return new MetricDTO(
-          name, code, type, comment, properties, currentVersion, lastVersion, audit);
+          name, code, type, dataType, comment, properties, currentVersion, lastVersion, audit);
     }
   }
 }

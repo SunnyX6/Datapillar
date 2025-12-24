@@ -22,8 +22,12 @@ from src.modules.openlineage.schemas.neo4j import (
     CatalogNode,
     ColumnNode,
     MetricNode,
+    ModifierNode,
     SchemaNode,
     TableNode,
+    UnitNode,
+    ValueDomainNode,
+    WordRootNode,
     generate_id,
 )
 from src.modules.openlineage.writers.base import BaseWriter
@@ -98,11 +102,20 @@ class MetadataWriter(BaseWriter):
     CATALOG_OPERATIONS = {"create_catalog"}
     # 指标相关的操作
     METRIC_OPERATIONS = {"register_metric"}
-    # 删除操作
+    # 语义层操作
+    WORDROOT_OPERATIONS = {"create_wordroot"}
+    MODIFIER_OPERATIONS = {"create_modifier"}
+    UNIT_OPERATIONS = {"create_unit"}
+    VALUEDOMAIN_OPERATIONS = {"create_valuedomain"}
+    # 删除操作（统一用 drop）
     DROP_TABLE_OPERATIONS = {"drop_table"}
     DROP_SCHEMA_OPERATIONS = {"drop_schema"}
     DROP_CATALOG_OPERATIONS = {"drop_catalog"}
-    DELETE_METRIC_OPERATIONS = {"delete_metric"}
+    DROP_METRIC_OPERATIONS = {"drop_metric"}
+    DROP_WORDROOT_OPERATIONS = {"drop_wordroot"}
+    DROP_MODIFIER_OPERATIONS = {"drop_modifier"}
+    DROP_UNIT_OPERATIONS = {"drop_unit"}
+    DROP_VALUEDOMAIN_OPERATIONS = {"drop_valuedomain"}
     # Tag 操作
     TAG_OPERATIONS = {"associate_tags"}
 
@@ -121,14 +134,30 @@ class MetadataWriter(BaseWriter):
             await self._write_catalog_metadata(session, event)
         elif operation in self.METRIC_OPERATIONS:
             await self._write_metric_from_event(session, event)
+        elif operation in self.WORDROOT_OPERATIONS:
+            await self._write_wordroot_from_event(session, event)
+        elif operation in self.MODIFIER_OPERATIONS:
+            await self._write_modifier_from_event(session, event)
+        elif operation in self.UNIT_OPERATIONS:
+            await self._write_unit_from_event(session, event)
+        elif operation in self.VALUEDOMAIN_OPERATIONS:
+            await self._write_valuedomain_from_event(session, event)
         elif operation in self.DROP_TABLE_OPERATIONS:
             await self._delete_table_metadata(session, event)
         elif operation in self.DROP_SCHEMA_OPERATIONS:
             await self._delete_schema_metadata(session, event)
         elif operation in self.DROP_CATALOG_OPERATIONS:
             await self._delete_catalog_metadata(session, event)
-        elif operation in self.DELETE_METRIC_OPERATIONS:
+        elif operation in self.DROP_METRIC_OPERATIONS:
             await self._delete_metric_metadata(session, event)
+        elif operation in self.DROP_WORDROOT_OPERATIONS:
+            await self._delete_wordroot_metadata(session, event)
+        elif operation in self.DROP_MODIFIER_OPERATIONS:
+            await self._delete_modifier_metadata(session, event)
+        elif operation in self.DROP_UNIT_OPERATIONS:
+            await self._delete_unit_metadata(session, event)
+        elif operation in self.DROP_VALUEDOMAIN_OPERATIONS:
+            await self._delete_valuedomain_metadata(session, event)
         elif operation in self.TAG_OPERATIONS:
             await self._update_tags(session, event)
         else:
@@ -420,6 +449,108 @@ class MetadataWriter(BaseWriter):
 
             await session.run(query, metricId=metric_id)
             logger.info("metric_deleted", metric_id=metric_id, metric_name=metric_name)
+
+    async def _delete_wordroot_metadata(self, session: AsyncSession, event: RunEvent) -> None:
+        """删除 WordRoot 元数据"""
+        for dataset in event.get_all_datasets():
+            if not dataset.facets or "schema" not in dataset.facets:
+                continue
+
+            schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
+            code = None
+            for field in schema_facet.fields:
+                if field.name == "code" and field.description:
+                    code = field.description
+                    break
+
+            if not code:
+                code = dataset.name.split(".")[-1] if "." in dataset.name else dataset.name
+
+            wordroot_id = generate_id("wordroot", code)
+            query = """
+            MATCH (w:WordRoot {id: $id})
+            DETACH DELETE w
+            """
+            await session.run(query, id=wordroot_id)
+            logger.info("wordroot_deleted", wordroot_id=wordroot_id, code=code)
+
+    async def _delete_modifier_metadata(self, session: AsyncSession, event: RunEvent) -> None:
+        """删除 Modifier 元数据"""
+        for dataset in event.get_all_datasets():
+            if not dataset.facets or "schema" not in dataset.facets:
+                continue
+
+            schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
+            code = None
+            for field in schema_facet.fields:
+                if field.name == "code" and field.description:
+                    code = field.description
+                    break
+
+            if not code:
+                code = dataset.name.split(".")[-1] if "." in dataset.name else dataset.name
+
+            modifier_id = generate_id("modifier", code)
+            query = """
+            MATCH (m:Modifier {id: $id})
+            DETACH DELETE m
+            """
+            await session.run(query, id=modifier_id)
+            logger.info("modifier_deleted", modifier_id=modifier_id, code=code)
+
+    async def _delete_unit_metadata(self, session: AsyncSession, event: RunEvent) -> None:
+        """删除 Unit 元数据"""
+        for dataset in event.get_all_datasets():
+            if not dataset.facets or "schema" not in dataset.facets:
+                continue
+
+            schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
+            code = None
+            for field in schema_facet.fields:
+                if field.name == "code" and field.description:
+                    code = field.description
+                    break
+
+            if not code:
+                code = dataset.name.split(".")[-1] if "." in dataset.name else dataset.name
+
+            unit_id = generate_id("unit", code)
+            query = """
+            MATCH (u:Unit {id: $id})
+            DETACH DELETE u
+            """
+            await session.run(query, id=unit_id)
+            logger.info("unit_deleted", unit_id=unit_id, code=code)
+
+    async def _delete_valuedomain_metadata(self, session: AsyncSession, event: RunEvent) -> None:
+        """删除 ValueDomain 元数据"""
+        for dataset in event.get_all_datasets():
+            if not dataset.facets or "schema" not in dataset.facets:
+                continue
+
+            schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
+            domain_code = None
+            item_value = None
+            for field in schema_facet.fields:
+                if field.name == "domainCode" and field.description:
+                    domain_code = field.description
+                if field.name == "itemValue" and field.description:
+                    item_value = field.description
+
+            if not domain_code or not item_value:
+                continue
+
+            valuedomain_id = generate_id("valuedomain", domain_code, item_value)
+            query = """
+            MATCH (v:ValueDomain {id: $id})
+            DETACH DELETE v
+            """
+            await session.run(query, id=valuedomain_id)
+            logger.info(
+                "valuedomain_deleted",
+                valuedomain_id=valuedomain_id,
+                domain_code=domain_code,
+            )
 
     async def _update_tags(self, session: AsyncSession, event: RunEvent) -> None:
         """
@@ -720,6 +851,262 @@ class MetadataWriter(BaseWriter):
                 parent=parent_id,
                 rel_type=rel_type,
             )
+
+    async def _write_wordroot_from_event(self, session: AsyncSession, event: RunEvent) -> None:
+        """从 OpenLineage 事件中解析并写入词根"""
+        for dataset in event.get_all_datasets():
+            if not dataset.facets or "schema" not in dataset.facets:
+                continue
+
+            schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
+            fields = {f.name: f for f in schema_facet.fields}
+
+            code_field = fields.get("code")
+            if not code_field or not code_field.description:
+                continue
+
+            code = code_field.description
+            name = fields.get("name").description if fields.get("name") else None
+            data_type = fields.get("dataType").description if fields.get("dataType") else None
+            description = fields.get("comment").description if fields.get("comment") else None
+
+            wordroot_node = WordRootNode.create(
+                code=code,
+                name=name,
+                data_type=data_type,
+                description=description,
+            )
+
+            await self._write_wordroot(session, wordroot_node)
+
+    async def _write_wordroot(self, session: AsyncSession, wordroot: WordRootNode) -> None:
+        """写入 WordRoot 节点"""
+        embedding = await self._generate_embedding(
+            wordroot.name or wordroot.code, wordroot.description
+        )
+
+        query = """
+        MERGE (w:WordRoot:Knowledge {id: $id})
+        ON CREATE SET
+            w.createdAt = datetime(),
+            w.code = $code,
+            w.name = $name,
+            w.dataType = $dataType,
+            w.description = $description,
+            w.embedding = $embedding,
+            w.createdBy = 'OPENLINEAGE'
+        ON MATCH SET
+            w.updatedAt = datetime(),
+            w.name = COALESCE($name, w.name),
+            w.dataType = COALESCE($dataType, w.dataType),
+            w.description = COALESCE($description, w.description),
+            w.embedding = COALESCE($embedding, w.embedding)
+        """
+
+        await session.run(
+            query,
+            id=wordroot.id,
+            code=wordroot.code,
+            name=wordroot.name,
+            dataType=wordroot.data_type,
+            description=wordroot.description,
+            embedding=embedding,
+        )
+
+        logger.debug("wordroot_written", id=wordroot.id, code=wordroot.code)
+
+    async def _write_modifier_from_event(self, session: AsyncSession, event: RunEvent) -> None:
+        """从 OpenLineage 事件中解析并写入修饰符"""
+        for dataset in event.get_all_datasets():
+            if not dataset.facets or "schema" not in dataset.facets:
+                continue
+
+            schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
+            fields = {f.name: f for f in schema_facet.fields}
+
+            code_field = fields.get("code")
+            type_field = fields.get("type")
+            if not code_field or not code_field.description or not type_field:
+                continue
+
+            code = code_field.description
+            modifier_type = type_field.description or "PREFIX"
+            description = fields.get("comment").description if fields.get("comment") else None
+
+            modifier_node = ModifierNode.create(
+                code=code,
+                modifier_type=modifier_type,
+                description=description,
+            )
+
+            await self._write_modifier(session, modifier_node)
+
+    async def _write_modifier(self, session: AsyncSession, modifier: ModifierNode) -> None:
+        """写入 Modifier 节点"""
+        embedding = await self._generate_embedding(modifier.code, modifier.description)
+
+        query = """
+        MERGE (m:Modifier:Knowledge {id: $id})
+        ON CREATE SET
+            m.createdAt = datetime(),
+            m.code = $code,
+            m.modifierType = $modifierType,
+            m.description = $description,
+            m.embedding = $embedding,
+            m.createdBy = 'OPENLINEAGE'
+        ON MATCH SET
+            m.updatedAt = datetime(),
+            m.modifierType = COALESCE($modifierType, m.modifierType),
+            m.description = COALESCE($description, m.description),
+            m.embedding = COALESCE($embedding, m.embedding)
+        """
+
+        await session.run(
+            query,
+            id=modifier.id,
+            code=modifier.code,
+            modifierType=modifier.modifier_type,
+            description=modifier.description,
+            embedding=embedding,
+        )
+
+        logger.debug("modifier_written", id=modifier.id, code=modifier.code)
+
+    async def _write_unit_from_event(self, session: AsyncSession, event: RunEvent) -> None:
+        """从 OpenLineage 事件中解析并写入单位"""
+        for dataset in event.get_all_datasets():
+            if not dataset.facets or "schema" not in dataset.facets:
+                continue
+
+            schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
+            fields = {f.name: f for f in schema_facet.fields}
+
+            code_field = fields.get("code")
+            if not code_field or not code_field.description:
+                continue
+
+            code = code_field.description
+            name = fields.get("name").description if fields.get("name") else None
+            symbol = fields.get("symbol").description if fields.get("symbol") else None
+            description = fields.get("comment").description if fields.get("comment") else None
+
+            unit_node = UnitNode.create(
+                code=code,
+                name=name,
+                symbol=symbol,
+                description=description,
+            )
+
+            await self._write_unit(session, unit_node)
+
+    async def _write_unit(self, session: AsyncSession, unit: UnitNode) -> None:
+        """写入 Unit 节点"""
+        embedding = await self._generate_embedding(unit.name or unit.code, unit.description)
+
+        query = """
+        MERGE (u:Unit:Knowledge {id: $id})
+        ON CREATE SET
+            u.createdAt = datetime(),
+            u.code = $code,
+            u.name = $name,
+            u.symbol = $symbol,
+            u.description = $description,
+            u.embedding = $embedding,
+            u.createdBy = 'OPENLINEAGE'
+        ON MATCH SET
+            u.updatedAt = datetime(),
+            u.name = COALESCE($name, u.name),
+            u.symbol = COALESCE($symbol, u.symbol),
+            u.description = COALESCE($description, u.description),
+            u.embedding = COALESCE($embedding, u.embedding)
+        """
+
+        await session.run(
+            query,
+            id=unit.id,
+            code=unit.code,
+            name=unit.name,
+            symbol=unit.symbol,
+            description=unit.description,
+            embedding=embedding,
+        )
+
+        logger.debug("unit_written", id=unit.id, code=unit.code)
+
+    async def _write_valuedomain_from_event(self, session: AsyncSession, event: RunEvent) -> None:
+        """从 OpenLineage 事件中解析并写入值域"""
+        for dataset in event.get_all_datasets():
+            if not dataset.facets or "schema" not in dataset.facets:
+                continue
+
+            schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
+            fields = {f.name: f for f in schema_facet.fields}
+
+            domain_code_field = fields.get("domainCode")
+            domain_type_field = fields.get("domainType")
+            item_value_field = fields.get("itemValue")
+            if not domain_code_field or not domain_type_field or not item_value_field:
+                continue
+
+            domain_code = domain_code_field.description
+            domain_type = domain_type_field.description or "ENUM"
+            item_value = item_value_field.description
+            domain_name = (
+                fields.get("domainName").description if fields.get("domainName") else None
+            )
+            item_label = fields.get("itemLabel").description if fields.get("itemLabel") else None
+            description = fields.get("comment").description if fields.get("comment") else None
+
+            valuedomain_node = ValueDomainNode.create(
+                domain_code=domain_code,
+                item_value=item_value,
+                domain_type=domain_type,
+                domain_name=domain_name,
+                item_label=item_label,
+                description=description,
+            )
+
+            await self._write_valuedomain(session, valuedomain_node)
+
+    async def _write_valuedomain(self, session: AsyncSession, valuedomain: ValueDomainNode) -> None:
+        """写入 ValueDomain 节点"""
+        embedding = await self._generate_embedding(
+            valuedomain.domain_name or valuedomain.domain_code, valuedomain.description
+        )
+
+        query = """
+        MERGE (v:ValueDomain:Knowledge {id: $id})
+        ON CREATE SET
+            v.createdAt = datetime(),
+            v.domainCode = $domainCode,
+            v.domainName = $domainName,
+            v.domainType = $domainType,
+            v.itemValue = $itemValue,
+            v.itemLabel = $itemLabel,
+            v.description = $description,
+            v.embedding = $embedding,
+            v.createdBy = 'OPENLINEAGE'
+        ON MATCH SET
+            v.updatedAt = datetime(),
+            v.domainName = COALESCE($domainName, v.domainName),
+            v.itemLabel = COALESCE($itemLabel, v.itemLabel),
+            v.description = COALESCE($description, v.description),
+            v.embedding = COALESCE($embedding, v.embedding)
+        """
+
+        await session.run(
+            query,
+            id=valuedomain.id,
+            domainCode=valuedomain.domain_code,
+            domainName=valuedomain.domain_name,
+            domainType=valuedomain.domain_type,
+            itemValue=valuedomain.item_value,
+            itemLabel=valuedomain.item_label,
+            description=valuedomain.description,
+            embedding=embedding,
+        )
+
+        logger.debug("valuedomain_written", id=valuedomain.id, domainCode=valuedomain.domain_code)
 
     def _parse_namespace(self, namespace: str) -> ParsedNamespace:
         """
