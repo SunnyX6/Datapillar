@@ -19,7 +19,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import { Database, MoreHorizontal, Play, Share2, Shield, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { WorkflowLayoutResult } from '@/lib/workflow/formatter'
+import type { WorkflowLayoutResult } from '@/layouts/workflow/utils/formatter'
 import type { WorkflowNodeType } from '@/services/workflowStudioService'
 
 type StudioNodeData = {

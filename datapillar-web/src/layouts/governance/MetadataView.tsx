@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Database, FolderTree, Menu, MoreVertical, Server, Table as TableIcon, Folder, Activity, Box, Layers } from 'lucide-react'
 import {
   SiApachehive,
@@ -20,11 +21,11 @@ import { CatalogOverview } from './metadata/overview/CatalogOverview'
 import { Overview } from './metadata/overview/Overview'
 import { SchemaOverview } from './metadata/overview/SchemaOverview'
 import { TableOverview } from './metadata/overview/TableOverview'
-import { CreateCatalogForm, CreateSchemaForm, CreateTableForm } from './metadata/form'
+import { CreateCatalogForm, CreateSchemaForm, CreateTableForm, type TableFormHandle } from './metadata/form'
 import { type CatalogFormHandle } from './metadata/form/CatalogForm'
 import { type SchemaFormHandle } from './metadata/form/SchemaForm'
 import { type CatalogAsset, type NodeType, type SchemaAsset, type TableAsset } from './metadata/type/types'
-import { Modal } from '@/components/Modal'
+import { Modal, ModalCancelButton, ModalPrimaryButton } from '@/components/ui'
 import { useSearchStore } from '@/stores'
 import {
   fetchCatalogs,
@@ -32,17 +33,26 @@ import {
   fetchTables,
   createCatalog,
   createSchema,
-  getSchema,
-  getTable,
+  createTable,
+  updateTable,
   mapProviderToIcon,
+  associateObjectTags,
   type CatalogItem,
   type SchemaItem,
   type TableItem
 } from '@/services/oneMetaService'
 
 const INDENT_PX = 18
+const VALUE_DOMAIN_TAG_PREFIX = 'vd:'
 
 export function MetadataView() {
+  const navigate = useNavigate()
+  const { catalogName, schemaName, tableName } = useParams<{
+    catalogName?: string
+    schemaName?: string
+    tableName?: string
+  }>()
+
   const [catalogs, setCatalogs] = useState<CatalogItem[]>([])
   const [schemasMap, setSchemasMap] = useState<Map<string, SchemaItem[]>>(new Map())
   const [tablesMap, setTablesMap] = useState<Map<string, TableItem[]>>(new Map())
@@ -54,24 +64,72 @@ export function MetadataView() {
   const [isSideCollapsed, setIsSideCollapsed] = useState(true)
   const catalogFormRef = useRef<CatalogFormHandle>(null)
   const schemaFormRef = useRef<SchemaFormHandle>(null)
+  const tableFormRef = useRef<TableFormHandle>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [loadedMetadata, setLoadedMetadata] = useState<Set<string>>(() => new Set<string>())
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // 使用全局搜索状态
   const searchTerm = useSearchStore((state) => state.searchTerm)
 
+  // 响应 URL 参数变化，更新选中状态和加载数据
   useEffect(() => {
-    loadCatalogs()
-  }, [])
+    // 计算选中状态
+    let id = 'ROOT'
+    let type: NodeType = 'ROOT'
+    if (tableName && schemaName && catalogName) {
+      id = `${catalogName}.${schemaName}.${tableName}`
+      type = 'TABLE'
+    } else if (schemaName && catalogName) {
+      id = `${catalogName}.${schemaName}`
+      type = 'SCHEMA'
+    } else if (catalogName) {
+      id = catalogName
+      type = 'CATALOG'
+    }
+
+    setSelectedNodeId(id)
+    setSelectedNodeType(type)
+
+    // 展开对应节点
+    setExpandedNodes((prev) => {
+      const next = new Set(prev)
+      next.add('ROOT')
+      if (catalogName) next.add(catalogName)
+      if (catalogName && schemaName) next.add(`${catalogName}.${schemaName}`)
+      return next
+    })
+
+    // 加载数据
+    async function loadData() {
+      try {
+        setIsLoading(true)
+        const catalogsData = await fetchCatalogs()
+        setCatalogs(catalogsData)
+
+        if (catalogName) {
+          const schemas = await fetchSchemas(catalogName)
+          setSchemasMap((prev) => new Map(prev).set(catalogName, schemas))
+        }
+        if (catalogName && schemaName) {
+          const tables = await fetchTables(catalogName, schemaName)
+          setTablesMap((prev) => new Map(prev).set(`${catalogName}.${schemaName}`, tables))
+        }
+      } catch {
+        // 错误已由统一客户端通过 toast 显示
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadData()
+  }, [catalogName, schemaName, tableName])
 
   async function loadCatalogs() {
     try {
       setIsLoading(true)
       const catalogsData = await fetchCatalogs()
       setCatalogs(catalogsData)
-    } catch (error) {
-      console.error('加载 Catalog 列表失败:', error)
-      toast.error(error instanceof Error ? error.message : '加载 Catalog 列表失败')
+    } catch {
+      // 错误已由统一客户端通过 toast 显示
     } finally {
       setIsLoading(false)
     }
@@ -83,9 +141,8 @@ export function MetadataView() {
     try {
       const schemas = await fetchSchemas(catalogId)
       setSchemasMap((prev) => new Map(prev).set(catalogId, schemas))
-    } catch (error) {
-      console.error(`加载 Schema 列表失败 (catalog=${catalogId}):`, error)
-      toast.error(error instanceof Error ? error.message : `加载 Schema 列表失败`)
+    } catch {
+      // 错误已由统一客户端通过 toast 显示
     }
   }
 
@@ -96,9 +153,8 @@ export function MetadataView() {
     try {
       const tables = await fetchTables(catalogId, schemaId)
       setTablesMap((prev) => new Map(prev).set(fullSchemaId, tables))
-    } catch (error) {
-      console.error(`加载 Table 列表失败 (catalog=${catalogId}, schema=${schemaId}):`, error)
-      toast.error(error instanceof Error ? error.message : `加载 Table 列表失败`)
+    } catch {
+      // 错误已由统一客户端通过 toast 显示
     }
   }
 
@@ -143,10 +199,136 @@ export function MetadataView() {
         })
         await loadSchemas(modalState.nodeId)
         closeModal()
+      } else if (modalState.nodeType === 'SCHEMA') {
+        if (!tableFormRef.current?.validate()) return
+
+        const formData = tableFormRef.current.getData()
+        const [catalogName, schemaName] = modalState.nodeId.split('.')
+
+        if (modalState.editingTable) {
+          // 编辑模式：调用 updateTable API
+          const updates: Array<{ '@type': string; [key: string]: unknown }> = []
+
+          // 更新表注释
+          if (formData.comment !== modalState.editingTable.comment) {
+            updates.push({ '@type': 'updateComment', newComment: formData.comment || '' })
+          }
+
+          // 对比列变化
+          const oldColumns = modalState.editingTable.columns
+          const newColumns = formData.columns
+
+          // 删除的列
+          oldColumns.forEach((oldCol) => {
+            if (!newColumns.find((newCol) => newCol.name === oldCol.name)) {
+              updates.push({ '@type': 'deleteColumn', fieldName: [oldCol.name], ifExists: true })
+            }
+          })
+
+          // 新增的列
+          newColumns.forEach((newCol) => {
+            const oldCol = oldColumns.find((c) => c.name === newCol.name)
+            if (!oldCol) {
+              updates.push({
+                '@type': 'addColumn',
+                fieldName: [newCol.name],
+                type: newCol.type,
+                comment: newCol.comment || '',
+                position: 'default',
+                nullable: true
+              })
+            }
+          })
+
+          // 修改的列（类型、注释）
+          newColumns.forEach((newCol) => {
+            const oldCol = oldColumns.find((c) => c.name === newCol.name)
+            if (oldCol) {
+              if (oldCol.type.toLowerCase() !== newCol.type.toLowerCase()) {
+                updates.push({
+                  '@type': 'updateColumnType',
+                  fieldName: [newCol.name],
+                  newType: newCol.type
+                })
+              }
+              if (oldCol.comment !== newCol.comment) {
+                updates.push({
+                  '@type': 'updateColumnComment',
+                  fieldName: [newCol.name],
+                  newComment: newCol.comment || ''
+                })
+              }
+            }
+          })
+
+          if (updates.length > 0) {
+            await updateTable(catalogName, schemaName, modalState.editingTable.name, { updates })
+          }
+
+          // 处理值域 tag 变化
+          const tagPromises: Promise<void>[] = []
+          const tableName = modalState.editingTable.name
+
+          // 遍历所有列，处理值域变化
+          formData.columns.forEach((newCol) => {
+            const oldCol = modalState.editingTable!.columns.find((c) => c.name === newCol.name)
+            const oldDomainCode = oldCol?.valueDomainCode
+            const newDomainCode = newCol.valueDomainCode
+
+            const columnFullName = `${catalogName}.${schemaName}.${tableName}.${newCol.name}`
+
+            if (newDomainCode && newDomainCode !== oldDomainCode) {
+              // 新增或修改值域
+              const tagName = `${VALUE_DOMAIN_TAG_PREFIX}${newDomainCode}`
+              const tagsToRemove = oldDomainCode ? [`${VALUE_DOMAIN_TAG_PREFIX}${oldDomainCode}`] : []
+              tagPromises.push(associateObjectTags('COLUMN', columnFullName, [tagName], tagsToRemove).catch(() => {}))
+            } else if (!newDomainCode && oldDomainCode) {
+              // 移除值域
+              const tagToRemove = `${VALUE_DOMAIN_TAG_PREFIX}${oldDomainCode}`
+              tagPromises.push(associateObjectTags('COLUMN', columnFullName, [], [tagToRemove]).catch(() => {}))
+            }
+          })
+
+          if (tagPromises.length > 0) {
+            await Promise.all(tagPromises)
+          }
+
+          closeModal()
+          setRefreshKey((k) => k + 1)
+          toast.success(`表 ${modalState.editingTable.name} 更新成功`)
+        } else {
+          // 创建模式
+          await createTable(catalogName, schemaName, {
+            name: formData.name,
+            comment: formData.comment,
+            columns: formData.columns.map(({ valueDomainCode: _, ...col }) => col),
+            properties: formData.properties
+          })
+
+          // 为关联了值域的列打 tag（用于血缘追踪）
+          const columnsWithValueDomain = formData.columns.filter((col) => col.valueDomainCode)
+          if (columnsWithValueDomain.length > 0) {
+            const tagPromises = columnsWithValueDomain.map((col) => {
+              const columnFullName = `${catalogName}.${schemaName}.${formData.name}.${col.name}`
+              const tagName = `${VALUE_DOMAIN_TAG_PREFIX}${col.valueDomainCode}`
+              return associateObjectTags('COLUMN', columnFullName, [tagName], []).catch(() => {})
+            })
+            await Promise.all(tagPromises)
+          }
+
+          // 刷新表列表
+          setTablesMap((prev) => {
+            const next = new Map(prev)
+            next.delete(modalState.nodeId)
+            return next
+          })
+          await loadTables(catalogName, schemaName)
+          closeModal()
+          toast.success(`表 ${formData.name} 创建成功`)
+        }
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : '创建失败'
-      toast.error(errorMessage)
+    } catch {
+      // 错误已由统一客户端通过 toast 显示
     } finally {
       setIsSubmitting(false)
     }
@@ -158,12 +340,24 @@ export function MetadataView() {
     nodeType: NodeType
     nodeName: string
     provider?: string
+    editingTable?: {
+      name: string
+      comment?: string
+      columns: Array<{
+        name: string
+        type: string
+        comment?: string
+        nullable?: boolean
+        valueDomainCode?: string
+      }>
+    }
   }>({
     isOpen: false,
     nodeId: '',
     nodeType: 'ROOT',
     nodeName: '',
-    provider: undefined
+    provider: undefined,
+    editingTable: undefined
   })
   const [footerLeft, setFooterLeft] = useState<React.ReactNode>(null)
   const [contentOverlay, setContentOverlay] = useState<React.ReactNode>(null)
@@ -309,34 +503,25 @@ export function MetadataView() {
   const selectedCatalog = selectedNodeType === 'CATALOG' ? catalogLookup.get(selectedNodeId) : null
 
   const handleSelect = async (id: string, type: NodeType) => {
-    setSelectedNodeId(id)
-    setSelectedNodeType(type)
-    setActiveTab('OVERVIEW')
-
-    // 触发元数据加载（导入到 gravitino 数据库）
-    if (loadedMetadata.has(id)) {
-      return
-    }
-
-    try {
-      if (type === 'SCHEMA') {
-        const parts = id.split('.')
-        if (parts.length === 2) {
-          const [catalogId, schemaName] = parts
-          await getSchema(catalogId, schemaName)
-          setLoadedMetadata((prev) => new Set(prev).add(id))
-        }
-      } else if (type === 'TABLE') {
-        const parts = id.split('.')
-        if (parts.length === 3) {
-          const [catalogId, schemaName, tableName] = parts
-          await getTable(catalogId, schemaName, tableName)
-          setLoadedMetadata((prev) => new Set(prev).add(id))
-        }
+    // 更新 URL，组件会通过 useEffect 响应参数变化
+    if (type === 'ROOT') {
+      navigate('/governance/metadata')
+    } else if (type === 'CATALOG') {
+      navigate(`/governance/metadata/catalogs/${encodeURIComponent(id)}`)
+    } else if (type === 'SCHEMA') {
+      const parts = id.split('.')
+      if (parts.length === 2) {
+        const [catalog, schema] = parts
+        navigate(`/governance/metadata/catalogs/${encodeURIComponent(catalog)}/schemas/${encodeURIComponent(schema)}`)
       }
-    } catch (error) {
-      console.error(`加载元数据失败 (${type}=${id}):`, error)
+    } else if (type === 'TABLE') {
+      const parts = id.split('.')
+      if (parts.length === 3) {
+        const [catalog, schema, table] = parts
+        navigate(`/governance/metadata/catalogs/${encodeURIComponent(catalog)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}`)
+      }
     }
+    setActiveTab('OVERVIEW')
   }
 
   const toggleNode = async (id: string, type: NodeType) => {
@@ -389,7 +574,8 @@ export function MetadataView() {
       isOpen: false,
       nodeId: '',
       nodeType: 'ROOT',
-      nodeName: ''
+      nodeName: '',
+      editingTable: undefined
     })
     setFooterLeft(null)
     setContentOverlay(null)
@@ -400,6 +586,7 @@ export function MetadataView() {
       <section className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {selectedNodeType === 'TABLE' && selectedTable ? (
           <TableOverview
+            key={`${selectedTable.table.id}-${refreshKey}`}
             activeTab={activeTab}
             onTabChange={setActiveTab}
             table={selectedTable.table}
@@ -409,6 +596,16 @@ export function MetadataView() {
               selectedTable.schema.name,
               selectedTable.table.name
             ]}
+            onEdit={(tableData) => {
+              setModalState({
+                isOpen: true,
+                nodeId: selectedTable.schema.id,
+                nodeType: 'SCHEMA',
+                nodeName: selectedTable.schema.name,
+                provider: selectedTable.catalog.provider,
+                editingTable: tableData
+              })
+            }}
           />
         ) : selectedNodeType === 'SCHEMA' && selectedSchema ? (
           <SchemaOverview schema={selectedSchema.schema} catalog={selectedSchema.catalog} />
@@ -465,36 +662,33 @@ export function MetadataView() {
       <Modal
         isOpen={modalState.isOpen}
         onClose={closeModal}
-        size="md"
+        size={modalState.nodeType === 'SCHEMA' ? 'lg' : 'md'}
         title={
           modalState.nodeType === 'ROOT'
             ? '创建 Catalog'
             : modalState.nodeType === 'CATALOG'
               ? '创建 Schema'
               : modalState.nodeType === 'SCHEMA'
-                ? '创建 Table'
+                ? modalState.editingTable ? '编辑 Table' : '创建 Table'
                 : '管理表'
+        }
+        subtitle={
+          modalState.nodeType === 'SCHEMA' ? (
+            <span className="text-xs text-slate-400 dark:text-slate-500">
+              {modalState.editingTable ? '编辑' : '将创建于'} Schema「<span className="font-medium text-blue-600 dark:text-blue-400">{modalState.nodeName}</span>」
+            </span>
+          ) : undefined
         }
         footerLeft={footerLeft}
         footerRight={
           modalState.nodeType !== 'TABLE' ? (
             <>
-              <button
-                type="button"
-                onClick={closeModal}
-                disabled={isSubmitting}
-                className="px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              <ModalCancelButton onClick={closeModal} disabled={isSubmitting}>
                 取消
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? '创建中...' : '创建'}
-              </button>
+              </ModalCancelButton>
+              <ModalPrimaryButton onClick={handleSubmit} disabled={isSubmitting} loading={isSubmitting}>
+                {modalState.editingTable ? '保存修改' : '创建物理资产'}
+              </ModalPrimaryButton>
             </>
           ) : undefined
         }
@@ -506,10 +700,13 @@ export function MetadataView() {
         {modalState.nodeType === 'CATALOG' && <CreateSchemaForm ref={schemaFormRef} parentName={modalState.nodeName} />}
         {modalState.nodeType === 'SCHEMA' && (
           <CreateTableForm
+            key={modalState.editingTable?.name || 'new'}
+            ref={tableFormRef}
             parentName={modalState.nodeName}
             provider={modalState.provider}
             onDDLButtonRender={setFooterLeft}
             onOverlayRender={setContentOverlay}
+            initialData={modalState.editingTable}
           />
         )}
       </Modal>

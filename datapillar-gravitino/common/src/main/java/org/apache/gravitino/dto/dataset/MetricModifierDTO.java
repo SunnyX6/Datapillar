@@ -41,11 +41,11 @@ public class MetricModifierDTO implements MetricModifier {
   @JsonProperty("code")
   private String code;
 
-  @JsonProperty("type")
-  private Type type;
-
   @JsonProperty("comment")
   private String comment;
+
+  @JsonProperty("modifierType")
+  private String modifierType;
 
   @JsonProperty("audit")
   private AuditDTO audit;
@@ -61,13 +61,13 @@ public class MetricModifierDTO implements MetricModifier {
   }
 
   @Override
-  public Type type() {
-    return type;
+  public String comment() {
+    return comment;
   }
 
   @Override
-  public String comment() {
-    return comment;
+  public String modifierType() {
+    return modifierType;
   }
 
   @Override
@@ -83,8 +83,8 @@ public class MetricModifierDTO implements MetricModifier {
   public static class Builder {
     private String name;
     private String code;
-    private Type type;
     private String comment;
+    private String modifierType;
     private AuditDTO audit;
 
     public Builder withName(String name) {
@@ -97,13 +97,13 @@ public class MetricModifierDTO implements MetricModifier {
       return this;
     }
 
-    public Builder withType(Type type) {
-      this.type = type;
+    public Builder withComment(String comment) {
+      this.comment = comment;
       return this;
     }
 
-    public Builder withComment(String comment) {
-      this.comment = comment;
+    public Builder withModifierType(String modifierType) {
+      this.modifierType = modifierType;
       return this;
     }
 
@@ -115,10 +115,9 @@ public class MetricModifierDTO implements MetricModifier {
     public MetricModifierDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(StringUtils.isNotBlank(code), "code cannot be null or empty");
-      Preconditions.checkArgument(type != null, "type cannot be null");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
-      return new MetricModifierDTO(name, code, type, comment, audit);
+      return new MetricModifierDTO(name, code, comment, modifierType, audit);
     }
   }
 }

@@ -5,6 +5,7 @@
 import { forwardRef, useImperativeHandle, useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { testCatalogConnection } from '@/services/oneMetaService'
+import { Select } from '@/components/ui'
 
 type CatalogType = 'RELATIONAL' | 'FILESET' | 'MESSAGING'
 
@@ -75,9 +76,8 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
           properties: formData.properties
         })
         toast.success('连接测试成功')
-      } catch (error) {
-        const message = error instanceof Error ? error.message : '连接测试失败'
-        toast.error(message)
+      } catch {
+        // 错误已由统一客户端通过 toast 显示
       } finally {
         setIsTesting(false)
       }
@@ -91,8 +91,14 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
             type="button"
             onClick={handleTestConnection}
             disabled={isTesting}
-            className="px-3 py-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-5 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
           >
+            {isTesting && (
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
             {isTesting ? '测试中...' : '测试连接'}
           </button>
         )
@@ -147,7 +153,7 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
           placeholder="例如: prod_mysql_catalog"
           value={formData.name}
           onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-          className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+          className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
         />
       </div>
 
@@ -155,32 +161,28 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
         <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
           Catalog 类型 <span className="text-red-500">*</span>
         </label>
-        <select
+        <Select
           value={catalogType}
-          onChange={(e) => handleTypeChange(e.target.value as CatalogType)}
-          className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-        >
-          <option value="RELATIONAL">数据库</option>
-          <option value="FILESET">文件集</option>
-          <option value="MESSAGING">消息队列</option>
-        </select>
+          onChange={(value) => handleTypeChange(value as CatalogType)}
+          options={[
+            { value: 'RELATIONAL', label: '数据库' },
+            { value: 'FILESET', label: '文件集' },
+            { value: 'MESSAGING', label: '消息队列' }
+          ]}
+          dropdownHeader="选择 Catalog 类型"
+        />
       </div>
 
       <div>
         <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
           Provider <span className="text-red-500">*</span>
         </label>
-        <select
+        <Select
           value={provider}
-          onChange={(e) => handleProviderChange(e.target.value)}
-          className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-        >
-          {PROVIDER_BY_TYPE[catalogType].map((p) => (
-            <option key={p.value} value={p.value}>
-              {p.label}
-            </option>
-          ))}
-        </select>
+          onChange={handleProviderChange}
+          options={PROVIDER_BY_TYPE[catalogType]}
+          dropdownHeader="选择数据源类型"
+        />
       </div>
 
       {/* 动态配置项 */}
@@ -198,7 +200,7 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
           value={formData.comment}
           onChange={(e) => setFormData((prev) => ({ ...prev, comment: e.target.value }))}
           rows={2}
-          className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
+          className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none placeholder:text-slate-400 dark:placeholder:text-slate-600"
         />
       </div>
     </div>
@@ -248,11 +250,6 @@ function ProviderConfigFields({
     type: 'text' | 'password' | 'number' | 'select' = 'text',
     options?: { value: string; label: string }[]
   ) => {
-    // 首次渲染时写入默认值
-    if (values[key] === undefined) {
-      onChange(key, defaultValue)
-    }
-
     return (
       <div key={key} className="flex items-center gap-2">
         <div className="w-1/3 flex-shrink-0">
@@ -265,24 +262,19 @@ function ProviderConfigFields({
         </div>
         <div className="flex-1">
           {type === 'select' && options ? (
-            <select
+            <Select
               value={values[key] ?? options[0]?.value ?? ''}
-              onChange={(e) => onChange(key, e.target.value)}
-              className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-            >
-              {options.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => onChange(key, value)}
+              options={options}
+              dropdownHeader={`选择${label}`}
+            />
           ) : (
             <input
               type={type}
               placeholder={defaultValue}
               value={values[key] ?? ''}
               onChange={(e) => onChange(key, e.target.value)}
-              className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
             />
           )}
         </div>
@@ -309,7 +301,7 @@ function ProviderConfigFields({
             placeholder="配置项名称"
             value={displayKey}
             onChange={(e) => handleKeyChange(tempKey, e.target.value)}
-            className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            className="w-full px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
         <div className="flex-1">
@@ -318,7 +310,7 @@ function ProviderConfigFields({
             placeholder="配置项值"
             value={values[actualKey] || ''}
             onChange={(e) => onChange(actualKey, e.target.value)}
-            className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
         <button

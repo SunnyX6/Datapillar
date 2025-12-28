@@ -75,6 +75,20 @@ public interface Metric extends Auditable {
   }
 
   /**
+   * @return 单位编码，如 CNY、PERCENT、COUNT，如果未设置则返回 null
+   */
+  default String unit() {
+    return null;
+  }
+
+  /**
+   * @return 单位名称，如 人民币、百分比、个数，如果未设置则返回 null
+   */
+  default String unitName() {
+    return null;
+  }
+
+  /**
    * @return 指标的属性
    */
   default Map<String, String> properties() {
@@ -82,12 +96,12 @@ public interface Metric extends Auditable {
   }
 
   /**
-   * @return 指标的当前版本
+   * @return 指标的当前版本号
    */
   int currentVersion();
 
   /**
-   * @return 指标的最后版本
+   * @return 指标的最新版本号
    */
   int lastVersion();
 

@@ -18,8 +18,8 @@ import structlog
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel
 
+from src.modules.openlineage.core.event_processor import event_processor
 from src.modules.openlineage.schemas.events import RunEvent
-from src.modules.openlineage.service import OpenLineageSinkService
 
 logger = structlog.get_logger()
 
@@ -85,8 +85,7 @@ async def receive_event(event: RunEvent, response: Response) -> SinkResponse:
             outputs=output_details,
         )
 
-        service = OpenLineageSinkService.get_instance()
-        result = await service.receive_event(event)
+        result = await event_processor.put(event)
 
         if not result.get("success"):
             error = result.get("error", "Unknown error")
@@ -112,6 +111,5 @@ async def receive_event(event: RunEvent, response: Response) -> SinkResponse:
 @router.get("/stats", summary="获取统计信息")
 async def get_stats() -> dict[str, Any]:
     """获取统计信息"""
-    service = OpenLineageSinkService.get_instance()
-    return service.get_stats()
+    return event_processor.stats
 

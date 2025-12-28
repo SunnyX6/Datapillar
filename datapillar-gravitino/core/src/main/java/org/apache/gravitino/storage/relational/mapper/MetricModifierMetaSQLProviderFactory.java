@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.MetricModifierMetaBaseSQLProvider;
@@ -66,6 +67,11 @@ public class MetricModifierMetaSQLProviderFactory {
   public static String selectMetricModifierMetaBySchemaIdAndModifierCode(
       @Param("schemaId") Long schemaId, @Param("modifierCode") String modifierCode) {
     return getProvider().selectMetricModifierMetaBySchemaIdAndModifierCode(schemaId, modifierCode);
+  }
+
+  public static String listMetricModifierPOsByModifierIds(
+      @Param("modifierIds") List<Long> modifierIds) {
+    return getProvider().listMetricModifierPOsByModifierIds(modifierIds);
   }
 
   public static String updateMetricModifierMeta(

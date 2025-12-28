@@ -38,10 +38,11 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.DatasetDispatcher;
+import org.apache.gravitino.dto.dataset.WordRootDTO;
 import org.apache.gravitino.dto.requests.WordRootCreateRequest;
 import org.apache.gravitino.dto.requests.WordRootUpdateRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
-import org.apache.gravitino.dto.responses.PagedEntityListResponse;
+import org.apache.gravitino.dto.responses.WordRootListResponse;
 import org.apache.gravitino.dto.responses.WordRootResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
@@ -83,10 +84,11 @@ public class WordRootOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            PagedResult<NameIdentifier> result =
+            PagedResult<org.apache.gravitino.dataset.WordRoot> result =
                 datasetDispatcher.listWordRoots(rootNs, offset, limit);
-            NameIdentifier[] rootIds = result.items().toArray(new NameIdentifier[0]);
-            return Utils.ok(new PagedEntityListResponse(rootIds, result.total(), offset, limit));
+            WordRootDTO[] rootDTOs =
+                result.items().stream().map(DTOConverters::toDTO).toArray(WordRootDTO[]::new);
+            return Utils.ok(new WordRootListResponse(rootDTOs, result.total(), offset, limit));
           });
 
     } catch (Exception e) {

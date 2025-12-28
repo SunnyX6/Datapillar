@@ -1,6 +1,6 @@
 export type Column = {
   name: string
-  type: string
+  dataType: string
   comment?: string
   isPrimaryKey?: boolean
   piiTag?: string

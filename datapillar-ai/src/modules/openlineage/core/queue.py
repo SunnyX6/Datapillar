@@ -42,6 +42,7 @@ class AsyncEventQueue:
     - 事件缓冲：当写入速度跟不上接收速度时缓冲事件
     - 批量处理：积累一定数量后批量写入，提高效率
     - 背压控制：队列满时拒绝新事件，防止内存溢出
+    - 暂停/恢复：支持在同步期间暂停消费
     """
 
     def __init__(self, config: QueueConfig | None = None):
@@ -49,6 +50,9 @@ class AsyncEventQueue:
         self._queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=self.config.max_size)
         self._stats = QueueStats()
         self._running = False
+        self._paused = False
+        self._pause_event = asyncio.Event()
+        self._pause_event.set()  # 初始状态为非暂停
         self._processor_task: asyncio.Task | None = None
         self._processor: Callable[[list[Any]], Any] | None = None
 
@@ -126,6 +130,25 @@ class AsyncEventQueue:
         """设置批量处理器"""
         self._processor = processor
 
+    @property
+    def is_paused(self) -> bool:
+        """是否处于暂停状态"""
+        return self._paused
+
+    def pause(self) -> None:
+        """暂停队列消费（事件仍可入队，但不会被处理）"""
+        if not self._paused:
+            self._paused = True
+            self._pause_event.clear()
+            logger.info("事件队列消费已暂停")
+
+    def resume(self) -> None:
+        """恢复队列消费"""
+        if self._paused:
+            self._paused = False
+            self._pause_event.set()
+            logger.info("事件队列消费已恢复")
+
     async def start(self) -> None:
         """启动队列处理"""
         if self._running:
@@ -159,6 +182,9 @@ class AsyncEventQueue:
         """处理循环"""
         while self._running:
             try:
+                # 等待非暂停状态
+                await self._pause_event.wait()
+
                 batch = await self.get_batch()
                 if batch and self._processor:
                     try:

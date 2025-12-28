@@ -20,6 +20,7 @@ package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -27,6 +28,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dataset.ValueDomain;
+import org.apache.gravitino.dto.dataset.ValueDomainItemDTO;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** 创建值域的请求 */
@@ -46,14 +48,17 @@ public class ValueDomainCreateRequest implements RESTRequest {
   @JsonProperty("domainType")
   private ValueDomain.Type domainType;
 
-  @JsonProperty("itemValue")
-  private String itemValue;
+  @JsonProperty("domainLevel")
+  private ValueDomain.Level domainLevel;
 
-  @JsonProperty("itemLabel")
-  private String itemLabel;
+  @JsonProperty("items")
+  private List<ValueDomainItemDTO> items;
 
   @JsonProperty("comment")
   private String comment;
+
+  @JsonProperty("dataType")
+  private String dataType;
 
   @Override
   public void validate() throws IllegalArgumentException {
@@ -63,6 +68,12 @@ public class ValueDomainCreateRequest implements RESTRequest {
         StringUtils.isNotBlank(domainName), "\"domainName\" field is required and cannot be empty");
     Preconditions.checkArgument(domainType != null, "\"domainType\" field is required");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(itemValue), "\"itemValue\" field is required and cannot be empty");
+        items != null && !items.isEmpty(), "\"items\" field is required and cannot be empty");
+
+    for (ValueDomainItemDTO item : items) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(item.getValue()),
+          "\"items[].value\" field is required and cannot be empty");
+    }
   }
 }

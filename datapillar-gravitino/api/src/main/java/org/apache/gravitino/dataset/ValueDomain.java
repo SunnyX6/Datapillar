@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dataset;
 
+import java.util.List;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
@@ -31,6 +32,8 @@ import org.apache.gravitino.annotation.Evolving;
  *   <li>RANGE - 区间型值域：如概率区间 [0, 1]
  *   <li>REGEX - 模式型值域：如身份证校验正则
  * </ul>
+ *
+ * <p>值域可以通过 Tag 机制被任意 MetadataObject 引用（column、table、metric 等）
  */
 @Evolving
 public interface ValueDomain extends Auditable {
@@ -43,6 +46,31 @@ public interface ValueDomain extends Auditable {
     RANGE,
     /** 模式型：定义正则表达式约束 */
     REGEX
+  }
+
+  /** 值域级别枚举 */
+  enum Level {
+    /** 内置：系统预定义，不可删除 */
+    BUILTIN,
+    /** 业务：用户自定义，可增删改 */
+    BUSINESS
+  }
+
+  /** 值域项（枚举值/区间/正则） */
+  interface Item {
+    /**
+     * 获取值
+     *
+     * @return 值
+     */
+    String value();
+
+    /**
+     * 获取标签（显示名称）
+     *
+     * @return 标签
+     */
+    String label();
   }
 
   /**
@@ -67,18 +95,18 @@ public interface ValueDomain extends Auditable {
   Type domainType();
 
   /**
-   * 获取值项
+   * 获取值域级别
    *
-   * @return 值项：枚举值/区间表达式/正则
+   * @return 值域级别：BUILTIN（内置）, BUSINESS（业务）
    */
-  String itemValue();
+  Level domainLevel();
 
   /**
-   * 获取值项标签
+   * 获取值域项列表
    *
-   * @return 值项标签/显示名称
+   * @return 值域项列表（枚举值/区间表达式/正则）
    */
-  String itemLabel();
+  List<Item> items();
 
   /**
    * 获取值域注释
@@ -86,4 +114,11 @@ public interface ValueDomain extends Auditable {
    * @return 值域注释
    */
   String comment();
+
+  /**
+   * 获取值域数据类型
+   *
+   * @return 值域数据类型，如 STRING, INTEGER, DECIMAL 等
+   */
+  String dataType();
 }

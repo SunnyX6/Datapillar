@@ -1,191 +1,213 @@
-import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useCallback, useLayoutEffect, memo, startTransition, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { Database, Box, Hash, ChevronRight, Loader2, ArrowRight, Search, Filter, Target } from 'lucide-react'
-import { fetchCatalogs, fetchSchemas, fetchTables, getTable, fetchMetrics } from '@/services/oneMetaService'
+import { Database, Box, Hash, ChevronRight, Loader2, ArrowRight, Search, Filter, Target, Pin } from 'lucide-react'
+import { fetchCatalogs, fetchSchemas, fetchTables, getTable, getObjectTags } from '@/services/oneMetaService'
+import { fetchValueDomains } from '@/services/oneMetaSemanticService'
 import type { MetricFormData, MeasureColumn, FilterColumn } from './types'
 
-/** 模拟值域数据 */
-const MOCK_VALUE_DOMAINS: Record<string, Array<{ key: string; label: string }>> = {
-  status: [
-    { key: 'pending', label: '待处理' },
-    { key: 'paid', label: '已支付' },
-    { key: 'shipped', label: '已发货' },
-    { key: 'completed', label: '已完成' },
-    { key: 'cancelled', label: '已取消' }
-  ],
-  type: [
-    { key: 'normal', label: '普通' },
-    { key: 'vip', label: 'VIP' },
-    { key: 'enterprise', label: '企业' }
-  ],
-  category: [
-    { key: 'electronics', label: '电子产品' },
-    { key: 'clothing', label: '服装' },
-    { key: 'food', label: '食品' }
-  ]
-}
+const VALUE_DOMAIN_TAG_PREFIX = 'vd:'
 
-function getColumnValueDomain(columnName: string): Array<{ key: string; label: string }> {
-  const lowerName = columnName.toLowerCase()
-  for (const [key, values] of Object.entries(MOCK_VALUE_DOMAINS)) {
-    if (lowerName.includes(key)) {
-      return values
-    }
-  }
-  return [
-    { key: 'value1', label: '值1' },
-    { key: 'value2', label: '值2' },
-    { key: 'value3', label: '值3' }
-  ]
-}
-
-function ColumnTableRow({ colInfo, isMeasure, isFilter, filterValues, onMeasureToggle, onFilterToggle }: {
+const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilter, filterValues, domainCode, onMeasureToggle, onFilterToggle, mode = 'atomic' }: {
   colInfo: { name: string; type: string; comment?: string }
   isMeasure: boolean
   isFilter: boolean
   filterValues: Array<{ key: string; label: string }>
-  onMeasureToggle: () => void
-  onFilterToggle: (values: Array<{ key: string; label: string }>) => void
+  domainCode: string | undefined
+  onMeasureToggle: (col: MeasureColumn, selected: boolean) => void
+  onFilterToggle: (col: MeasureColumn, selected: boolean, filterCol?: FilterColumn) => void
+  mode?: 'atomic' | 'derived'
 }) {
-  const [filterOpen, setFilterOpen] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [loadingDomain, setLoadingDomain] = useState(false)
+  const [valueDomain, setValueDomain] = useState<Array<{ key: string; label: string }>>([])
   const filterButtonRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null)
-  const valueDomain = getColumnValueDomain(colInfo.name)
+  const [dropdownPos, setDropdownPos] = useState<{ bottom: number; left: number } | null>(null)
 
-  const closeDropdown = () => {
-    setFilterOpen(false)
-    setDropdownPos(null)
+  const col = useMemo<MeasureColumn>(() => ({ name: colInfo.name, type: colInfo.type, comment: colInfo.comment }), [colInfo.name, colInfo.type, colInfo.comment])
+  const DROPDOWN_WIDTH = 192
+
+  const handleMeasureClick = useCallback(() => {
+    onMeasureToggle(col, !isMeasure)
+  }, [col, isMeasure, onMeasureToggle])
+
+  const handleFilterChange = useCallback((values: Array<{ key: string; label: string }>) => {
+    if (values.length > 0) {
+      onFilterToggle(col, true, { ...col, values })
+    } else {
+      onFilterToggle(col, false)
+    }
+  }, [col, onFilterToggle])
+
+  // 点击只负责切换开关
+  const handleFilterClick = () => {
+    setOpen((prev) => !prev)
   }
 
+  // 点击外部关闭
   useEffect(() => {
-    if (!filterOpen) return
+    if (!open) return
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node
       if (filterButtonRef.current?.contains(target)) return
       if (dropdownRef.current?.contains(target)) return
-      closeDropdown()
+      setOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [filterOpen])
+  }, [open])
 
+  // 位置计算 - 和左侧完全一致的模式
   useLayoutEffect(() => {
-    if (!filterOpen) return
-    const DROPDOWN_WIDTH = 192
+    if (!open) return
     const updatePosition = () => {
       const btn = filterButtonRef.current
       if (!btn) return
       const rect = btn.getBoundingClientRect()
       const left = Math.max(12, rect.right - DROPDOWN_WIDTH)
-      const top = rect.top // 用 transform 向上移动
-      setDropdownPos({ top, left })
+      const bottom = window.innerHeight - rect.top + 4
+      setDropdownPos({ bottom, left })
     }
     updatePosition()
-    const handleScroll = () => updatePosition()
     window.addEventListener('resize', updatePosition)
-    window.addEventListener('scroll', handleScroll, true)
+    window.addEventListener('scroll', updatePosition, true)
     return () => {
+      setDropdownPos(null)
       window.removeEventListener('resize', updatePosition)
-      window.removeEventListener('scroll', handleScroll, true)
+      window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [filterOpen])
+  }, [open])
+
+  // 数据加载 - 只在首次打开且有 domainCode 时加载
+  const loadedRef = useRef(false)
+  useEffect(() => {
+    if (!open || !domainCode || loadedRef.current) return
+    loadedRef.current = true
+    startTransition(() => setLoadingDomain(true))
+    fetchValueDomains(0, 100)
+      .then((result) => {
+        const domain = result.items.find((d) => d.domainCode === domainCode)
+        if (domain) {
+          setValueDomain(domain.items.map((i) => ({ key: i.value, label: i.label || i.value })))
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingDomain(false))
+  }, [open, domainCode])
   const toggleValue = (val: { key: string; label: string }) => {
     const exists = filterValues.some((v) => v.key === val.key)
     if (exists) {
-      onFilterToggle(filterValues.filter((v) => v.key !== val.key))
+      handleFilterChange(filterValues.filter((v) => v.key !== val.key))
     } else {
-      onFilterToggle([...filterValues, val])
+      handleFilterChange([...filterValues, val])
     }
   }
 
-  const isSelected = isMeasure || isFilter
+  // 派生模式只看过滤列，原子模式看度量或过滤
+  const isSelected = mode === 'derived' ? isFilter : (isMeasure || isFilter)
 
   return (
-    <tr className={`border-b transition-all ${
+    <tr className={`border-b ${
       isSelected
         ? 'bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-        : 'border-slate-100 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-900 hover:shadow-sm'
+        : 'border-slate-100 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-900'
     }`}>
       <td className="px-4 py-2.5" title={colInfo.comment || ''}>
-        <div className={`text-body-sm font-medium truncate ${
+        <div className={`flex items-center gap-1.5 text-body-sm font-medium truncate ${
           isSelected ? 'text-blue-700 dark:text-blue-300' : 'text-slate-800 dark:text-slate-200'
-        }`}>{colInfo.name}</div>
+        }`}>
+          {colInfo.name}
+          {domainCode && (
+            <span
+              className="inline-flex items-center px-1.5 py-0.5 text-micro font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 rounded-full"
+              title="已关联值域"
+            >
+              <Pin size={8} />
+            </span>
+          )}
+        </div>
       </td>
       <td className="px-4 py-2.5">
         <span className="text-caption font-mono text-slate-500">{colInfo.type}</span>
       </td>
       <td className="px-4 py-2.5 w-20">
         <div className="flex items-center justify-center gap-1">
-          <button
-            type="button"
-            onClick={onMeasureToggle}
-            title={isMeasure ? '取消度量' : '设为度量列'}
-            className={`p-1 rounded transition-all ${
-              isMeasure
-                ? 'bg-blue-500 text-white'
-                : 'text-slate-400 hover:bg-blue-50 hover:text-blue-500 dark:hover:bg-blue-900/30'
-            }`}
-          >
-            <Target size={14} />
-          </button>
+          {/* 原子模式显示度量按钮，派生模式隐藏 */}
+          {mode === 'atomic' && (
+            <button
+              type="button"
+              onClick={handleMeasureClick}
+              title={isMeasure ? '取消度量' : '设为度量列'}
+              className={`p-1 rounded ${
+                isMeasure
+                  ? 'bg-blue-500 text-white'
+                  : 'text-slate-400 hover:bg-blue-50 hover:text-blue-500 dark:hover:bg-blue-900/30'
+              }`}
+            >
+              <Target size={14} />
+            </button>
+          )}
 
           <div className="relative">
             <button
               type="button"
               ref={filterButtonRef}
-              onClick={() => {
-                if (filterOpen) {
-                  closeDropdown()
-                } else {
-                  setFilterOpen(true)
-                }
-              }}
+              onClick={handleFilterClick}
               title={isFilter ? `已选${filterValues.length}个过滤值` : '设为过滤列'}
-              className={`p-1 rounded transition-all ${
+              className={`p-1 rounded ${
                 isFilter
                   ? 'bg-amber-500 text-white'
-                  : 'text-slate-400 hover:bg-amber-50 hover:text-amber-500 dark:hover:bg-amber-900/30'
+                  : loadingDomain
+                    ? 'text-slate-300'
+                    : 'text-slate-400 hover:bg-amber-50 hover:text-amber-500 dark:hover:bg-amber-900/30'
               }`}
+              disabled={loadingDomain}
             >
-              <Filter size={14} />
+              {loadingDomain ? <Loader2 size={14} className="animate-spin" /> : <Filter size={14} />}
             </button>
 
-            {filterOpen && dropdownPos && createPortal(
+            {open && dropdownPos && createPortal(
               <div
                 ref={dropdownRef}
-                style={{ top: dropdownPos.top, left: dropdownPos.left, transform: 'translateY(-100%)' }}
+                style={{ bottom: dropdownPos.bottom, left: dropdownPos.left }}
                 className="fixed w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[1000000]"
               >
-                <div className="p-2 border-b border-slate-100 dark:border-slate-800">
-                  <div className="text-micro font-semibold text-slate-500">选择过滤值</div>
+                <div className="p-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <span className="text-micro font-semibold text-slate-500">选择过滤值</span>
+                  {loadingDomain && <Loader2 size={12} className="animate-spin text-slate-400" />}
                 </div>
                 <div className="max-h-48 overflow-y-auto custom-scrollbar">
-                  {valueDomain.map((val) => {
-                    const checked = filterValues.some((v) => v.key === val.key)
-                    return (
-                      <label
-                        key={val.key}
-                        className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleValue(val)}
-                          className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
-                        />
-                        <span className="text-caption text-slate-700 dark:text-slate-300">{val.label}</span>
-                        <span className="text-micro text-slate-400 ml-auto">{val.key}</span>
-                      </label>
-                    )
-                  })}
+                  {valueDomain.length > 0 ? (
+                    valueDomain.map((val) => {
+                      const checked = filterValues.some((v) => v.key === val.key)
+                      return (
+                        <label
+                          key={val.key}
+                          className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleValue(val)}
+                            className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                          />
+                          <span className="text-caption font-mono text-slate-700 dark:text-slate-300">{val.key}</span>
+                          {val.label && val.label !== val.key && (
+                            <span className="text-micro text-slate-400 truncate">({val.label})</span>
+                          )}
+                        </label>
+                      )
+                    })
+                  ) : !loadingDomain ? (
+                    <div className="py-4 text-center text-caption text-slate-400">暂无值域数据</div>
+                  ) : null}
                 </div>
                 {filterValues.length > 0 && (
                   <div className="p-2 border-t border-slate-100 dark:border-slate-800">
                     <button
                       type="button"
-                      onClick={() => onFilterToggle([])}
-                      className="w-full text-caption text-red-500 hover:text-red-600"
+                      onClick={() => handleFilterChange([])}
+                      className="w-full text-micro text-red-500 hover:text-red-600"
                     >
                       清除全部
                     </button>
@@ -199,13 +221,18 @@ function ColumnTableRow({ colInfo, isMeasure, isFilter, filterValues, onMeasureT
       </td>
     </tr>
   )
-}
+})
 
-function CascadingPicker({ onMeasureToggle, onFilterToggle, measureColumns, filterColumns }: {
+function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onTableSelect, measureColumns, filterColumns, initialRef, aiSuggestedMeasures, aiSuggestedFilters }: {
+  mode?: 'atomic' | 'derived'
   onMeasureToggle: (col: MeasureColumn, selected: boolean) => void
   onFilterToggle: (col: MeasureColumn, selected: boolean, filterCol?: FilterColumn) => void
+  onTableSelect?: (catalog: string, schema: string, table: string) => void
   measureColumns: MeasureColumn[]
   filterColumns: FilterColumn[]
+  initialRef?: { catalog?: string; schema?: string; table?: string }
+  aiSuggestedMeasures?: string[]
+  aiSuggestedFilters?: string[]
 }) {
   type Level = 'CATALOG' | 'SCHEMA' | 'TABLE' | 'COLUMN'
 
@@ -216,17 +243,116 @@ function CascadingPicker({ onMeasureToggle, onFilterToggle, measureColumns, filt
 
   const [selected, setSelected] = useState({ catalog: '', schema: '', table: '' })
   const [level, setLevel] = useState<Level>('CATALOG')
+
+  // 使用 ref 存储回调函数和当前已选列，避免 effect 依赖频繁变化
+  const callbacksRef = useRef({ onMeasureToggle, onFilterToggle, measureColumns, filterColumns })
+  useLayoutEffect(() => {
+    callbacksRef.current = { onMeasureToggle, onFilterToggle, measureColumns, filterColumns }
+  })
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
 
+  // 列的值域标签映射（columnName -> domainCode），用于显示 Pin 图标
+  const [columnDomainMap, setColumnDomainMap] = useState<Map<string, string>>(new Map())
+
+  // 批量加载列的值域标签，返回 Map
+  const loadColumnDomainTags = useCallback(async (catalog: string, schema: string, table: string, columnNames: string[]) => {
+    const map = new Map<string, string>()
+    await Promise.all(
+      columnNames.map(async (colName) => {
+        try {
+          const fullName = `${catalog}.${schema}.${table}.${colName}`
+          const tags = await getObjectTags('COLUMN', fullName)
+          const tag = tags.find((t) => t.startsWith(VALUE_DOMAIN_TAG_PREFIX))
+          if (tag) {
+            map.set(colName, tag.slice(VALUE_DOMAIN_TAG_PREFIX.length))
+          }
+        } catch {
+          // 忽略单个列的错误
+        }
+      })
+    )
+    return map
+  }, [])
+
+  // 初始化加载数据
   useEffect(() => {
     let cancelled = false
-    fetchCatalogs()
-      .then((data) => { if (!cancelled) setCatalogs(data.map((c) => c.name)) })
-      .catch(() => { if (!cancelled) setCatalogs([]) })
-      .finally(() => { if (!cancelled) setLoading(false) })
+    const hasInitialRef = initialRef?.catalog && initialRef?.schema && initialRef?.table
+
+    if (hasInitialRef) {
+      // 编辑模式：直接用三个参数请求表详情
+      startTransition(() => {
+        setLoading(true)
+        setSelected({
+          catalog: initialRef.catalog!,
+          schema: initialRef.schema!,
+          table: initialRef.table!
+        })
+        setLevel('COLUMN')
+      })
+      getTable(initialRef.catalog!, initialRef.schema!, initialRef.table!)
+        .then(async (data) => {
+          if (cancelled) return
+          const cols = data.columns?.map((c) => ({ name: c.name, type: c.dataType, comment: c.comment })) || []
+          // 先加载标签，再一起设置状态
+          const domainMap = await loadColumnDomainTags(initialRef.catalog!, initialRef.schema!, initialRef.table!, cols.map((c) => c.name))
+          if (!cancelled) {
+            setColumns(cols)
+            setColumnDomainMap(domainMap)
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setColumns([])
+            setColumnDomainMap(new Map())
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    } else {
+      // 新建模式：从 catalog 开始
+      fetchCatalogs()
+        .then((data) => { if (!cancelled) setCatalogs(data.map((c) => c.name)) })
+        .catch(() => { if (!cancelled) setCatalogs([]) })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    }
+
     return () => { cancelled = true }
-  }, [])
+  }, [initialRef?.catalog, initialRef?.schema, initialRef?.table, loadColumnDomainTags])
+
+  // AI 建议的列自动选中
+  useEffect(() => {
+    if (columns.length === 0) return
+    const { onMeasureToggle: toggleMeasure, onFilterToggle: toggleFilter, measureColumns: measures, filterColumns: filters } = callbacksRef.current
+
+    // 处理 AI 建议的度量列
+    if (aiSuggestedMeasures && aiSuggestedMeasures.length > 0) {
+      const existingMeasureNames = new Set(measures.map((c) => c.name))
+      aiSuggestedMeasures.forEach((colName) => {
+        if (existingMeasureNames.has(colName)) return
+        const col = columns.find((c) => c.name === colName)
+        if (col) {
+          toggleMeasure({ name: col.name, type: col.type, comment: col.comment }, true)
+        }
+      })
+    }
+
+    // 处理 AI 建议的过滤列（简单选中，不设置值域值）
+    if (aiSuggestedFilters && aiSuggestedFilters.length > 0) {
+      const existingFilterNames = new Set(filters.map((c) => c.name))
+      aiSuggestedFilters.forEach((colName) => {
+        if (existingFilterNames.has(colName)) return
+        const col = columns.find((c) => c.name === colName)
+        if (col) {
+          toggleFilter({ name: col.name, type: col.type, comment: col.comment }, true)
+        }
+      })
+    }
+  }, [aiSuggestedMeasures, aiSuggestedFilters, columns])
 
   const handleSelect = useCallback((item: string) => {
     setSearch('')
@@ -235,6 +361,7 @@ function CascadingPicker({ onMeasureToggle, onFilterToggle, measureColumns, filt
       setSchemas([])
       setTables([])
       setColumns([])
+      setColumnDomainMap(new Map())
       setLoading(true)
       fetchSchemas(item)
         .then((data) => setSchemas(data.map((s) => s.name)))
@@ -245,6 +372,7 @@ function CascadingPicker({ onMeasureToggle, onFilterToggle, measureColumns, filt
       setSelected((p) => ({ ...p, schema: item, table: '' }))
       setTables([])
       setColumns([])
+      setColumnDomainMap(new Map())
       setLoading(true)
       fetchTables(selected.catalog, item)
         .then((data) => setTables(data.map((t) => t.name)))
@@ -254,14 +382,25 @@ function CascadingPicker({ onMeasureToggle, onFilterToggle, measureColumns, filt
     } else if (level === 'TABLE') {
       setSelected((p) => ({ ...p, table: item }))
       setColumns([])
+      setColumnDomainMap(new Map())
       setLoading(true)
+      // 通知父组件表选择变化
+      onTableSelect?.(selected.catalog, selected.schema, item)
       getTable(selected.catalog, selected.schema, item)
-        .then((data) => setColumns(data.columns?.map((c) => ({ name: c.name, type: c.type, comment: c.comment })) || []))
-        .catch(() => setColumns([]))
+        .then(async (data) => {
+          const cols = data.columns?.map((c) => ({ name: c.name, type: c.dataType, comment: c.comment })) || []
+          const domainMap = await loadColumnDomainTags(selected.catalog, selected.schema, item, cols.map((c) => c.name))
+          setColumns(cols)
+          setColumnDomainMap(domainMap)
+        })
+        .catch(() => {
+          setColumns([])
+          setColumnDomainMap(new Map())
+        })
         .finally(() => setLoading(false))
       setLevel('COLUMN')
     }
-  }, [level, selected])
+  }, [level, selected, loadColumnDomainTags, onTableSelect])
 
   const goBack = useCallback((targetLevel: Level) => {
     setSearch('')
@@ -269,18 +408,21 @@ function CascadingPicker({ onMeasureToggle, onFilterToggle, measureColumns, filt
 
     if (targetLevel === 'CATALOG') {
       setLoading(true)
+      setColumnDomainMap(new Map())
       fetchCatalogs()
         .then((data) => setCatalogs(data.map((c) => c.name)))
         .catch(() => setCatalogs([]))
         .finally(() => setLoading(false))
     } else if (targetLevel === 'SCHEMA' && selected.catalog) {
       setLoading(true)
+      setColumnDomainMap(new Map())
       fetchSchemas(selected.catalog)
         .then((data) => setSchemas(data.map((s) => s.name)))
         .catch(() => setSchemas([]))
         .finally(() => setLoading(false))
     } else if (targetLevel === 'TABLE' && selected.catalog && selected.schema) {
       setLoading(true)
+      setColumnDomainMap(new Map())
       fetchTables(selected.catalog, selected.schema)
         .then((data) => setTables(data.map((t) => t.name)))
         .catch(() => setTables([]))
@@ -288,11 +430,19 @@ function CascadingPicker({ onMeasureToggle, onFilterToggle, measureColumns, filt
     } else if (targetLevel === 'COLUMN' && selected.catalog && selected.schema && selected.table) {
       setLoading(true)
       getTable(selected.catalog, selected.schema, selected.table)
-        .then((data) => setColumns(data.columns?.map((c) => ({ name: c.name, type: c.type, comment: c.comment })) || []))
-        .catch(() => setColumns([]))
+        .then(async (data) => {
+          const cols = data.columns?.map((c) => ({ name: c.name, type: c.dataType, comment: c.comment })) || []
+          const domainMap = await loadColumnDomainTags(selected.catalog, selected.schema, selected.table, cols.map((c) => c.name))
+          setColumns(cols)
+          setColumnDomainMap(domainMap)
+        })
+        .catch(() => {
+          setColumns([])
+          setColumnDomainMap(new Map())
+        })
         .finally(() => setLoading(false))
     }
-  }, [selected])
+  }, [selected, loadColumnDomainTags])
 
   const levels: { id: Level; label: string; icon: typeof Database; value: string }[] = [
     { id: 'CATALOG', label: '数据源', icon: Database, value: selected.catalog },
@@ -339,7 +489,7 @@ function CascadingPicker({ onMeasureToggle, onFilterToggle, measureColumns, filt
           <input
             type="text"
             placeholder={`搜索 ${levels.find((l) => l.id === level)?.label}...`}
-            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-caption placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
+            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-caption placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -372,6 +522,7 @@ function CascadingPicker({ onMeasureToggle, onFilterToggle, measureColumns, filt
                 const isMeasure = measureColumns.some((c) => c.name === item)
                 const filterCol = filterColumns.find((c) => c.name === item)
                 const isFilter = !!filterCol
+                const domainCode = columnDomainMap.get(item)
 
                 return (
                   <ColumnTableRow
@@ -380,19 +531,10 @@ function CascadingPicker({ onMeasureToggle, onFilterToggle, measureColumns, filt
                     isMeasure={isMeasure}
                     isFilter={isFilter}
                     filterValues={filterCol?.values || []}
-                    onMeasureToggle={() => {
-                      const col: MeasureColumn = { name: colInfo.name, type: colInfo.type, comment: colInfo.comment }
-                      onMeasureToggle(col, !isMeasure)
-                    }}
-                    onFilterToggle={(values) => {
-                      const col: MeasureColumn = { name: colInfo.name, type: colInfo.type, comment: colInfo.comment }
-                      if (values.length > 0) {
-                        const filterCol: FilterColumn = { ...col, values }
-                        onFilterToggle(col, true, filterCol)
-                      } else {
-                        onFilterToggle(col, false)
-                      }
-                    }}
+                    domainCode={domainCode}
+                    onMeasureToggle={onMeasureToggle}
+                    onFilterToggle={onFilterToggle}
+                    mode={mode}
                   />
                 )
               })}
@@ -422,39 +564,65 @@ function CascadingPicker({ onMeasureToggle, onFilterToggle, measureColumns, filt
   )
 }
 
-function MetricPicker({ onInsert }: { onInsert: (text: string) => void }) {
-  const [metrics, setMetrics] = useState<{ name: string; code: string; type: string }[]>([])
+/** 复合指标 - 指标选择器 */
+function MetricSelector({ selectedMetrics, onMetricsChange }: {
+  selectedMetrics: Array<{ code: string; name: string; comment?: string }>
+  onMetricsChange?: (metrics: Array<{ code: string; name: string; comment?: string }>) => void
+}) {
+  const [metrics, setMetrics] = useState<Array<{ code: string; name: string; type: string; comment?: string }>>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
+  // 加载原子指标和派生指标
   useEffect(() => {
-    let cancelled = false
-    fetchMetrics(0, 100)
-      .then((data) => { if (!cancelled) setMetrics(data.items.map((m) => ({ name: m.name, code: m.code, type: m.type }))) })
-      .catch(() => { if (!cancelled) setMetrics([]) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+    import('@/services/oneMetaSemanticService').then(({ fetchMetrics }) => {
+      fetchMetrics(0, 500)
+        .then((data) => {
+          // 只取原子指标和派生指标
+          const filtered = data.items
+            .filter((m) => m.type.toUpperCase() === 'ATOMIC' || m.type.toUpperCase() === 'DERIVED')
+            .map((m) => ({ code: m.code, name: m.name, type: m.type.toUpperCase(), comment: m.comment }))
+          setMetrics(filtered)
+        })
+        .catch(() => setMetrics([]))
+        .finally(() => setLoading(false))
+    })
   }, [])
 
-  const filteredMetrics = metrics.filter(
-    (m) => m.name.toLowerCase().includes(search.toLowerCase()) || m.code.toLowerCase().includes(search.toLowerCase())
+  const filteredMetrics = metrics.filter((m) =>
+    m.name.toLowerCase().includes(search.toLowerCase()) ||
+    m.code.toLowerCase().includes(search.toLowerCase())
   )
 
+  const toggleMetric = (metric: { code: string; name: string; comment?: string }) => {
+    const exists = selectedMetrics.some((m) => m.code === metric.code)
+    if (exists) {
+      onMetricsChange?.(selectedMetrics.filter((m) => m.code !== metric.code))
+    } else {
+      onMetricsChange?.([...selectedMetrics, metric])
+    }
+  }
+
+  const isSelected = (code: string) => selectedMetrics.some((m) => m.code === code)
+
   return (
-    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[620px]">
-      <div className="p-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
+    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col h-[620px]">
+      {/* 搜索 */}
+      <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-t-2xl">
         <div className="relative">
           <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
           <input
             type="text"
+            placeholder="搜索指标..."
+            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-caption placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-emerald-500"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索指标..."
-            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-caption placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
           />
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-1.5 custom-scrollbar">
+
+      {/* 指标列表 */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 size={20} className="animate-spin text-slate-400" />
@@ -465,19 +633,55 @@ function MetricPicker({ onInsert }: { onInsert: (text: string) => void }) {
             <span className="text-caption">暂无可用指标</span>
           </div>
         ) : (
-          filteredMetrics.map((m) => (
-            <button
-              key={m.code}
-              onClick={() => onInsert(`{${m.code}}`)}
-              className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-blue-200 dark:hover:border-blue-700 hover:shadow-sm text-left transition-all"
-            >
-              <Target size={14} className="text-blue-500" />
-              <div className="flex-1 min-w-0">
-                <div className="text-body-sm font-medium text-slate-700 dark:text-slate-300">{m.name}</div>
-                <div className="text-micro font-mono text-slate-400">{m.code}</div>
-              </div>
-            </button>
-          ))
+          <div className="p-3 space-y-1.5">
+            {filteredMetrics.map((metric) => {
+              const selected = isSelected(metric.code)
+              return (
+                <button
+                  key={metric.code}
+                  type="button"
+                  onClick={() => toggleMetric(metric)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all group ${
+                    selected
+                      ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20'
+                      : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-emerald-200 dark:hover:border-emerald-700 hover:shadow-sm'
+                  }`}
+                >
+                  <div className={`p-1.5 rounded-lg ${
+                    selected
+                      ? 'bg-emerald-500 text-white'
+                      : metric.type === 'ATOMIC'
+                        ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-500'
+                        : 'bg-blue-50 dark:bg-blue-900/30 text-blue-500'
+                  }`}>
+                    <Target size={14} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-body-sm font-medium truncate ${
+                      selected ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-800 dark:text-slate-200'
+                    }`}>
+                      {metric.name}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-micro font-mono text-slate-400">{metric.code}</span>
+                      <span className={`text-micro px-1.5 py-0.5 rounded ${
+                        metric.type === 'ATOMIC'
+                          ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-500'
+                          : 'bg-blue-50 dark:bg-blue-900/30 text-blue-500'
+                      }`}>
+                        {metric.type === 'ATOMIC' ? '原子' : '派生'}
+                      </span>
+                    </div>
+                  </div>
+                  {selected && (
+                    <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                      <span className="text-white text-micro">✓</span>
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         )}
       </div>
     </div>
@@ -488,33 +692,95 @@ interface MetricFormRightProps {
   form: MetricFormData
   onMeasureToggle: (col: MeasureColumn, selected: boolean) => void
   onFilterToggle: (col: MeasureColumn, selected: boolean, filterCol?: FilterColumn) => void
-  insertDerivedFormula: (text: string) => void
+  onTableSelect?: (catalog: string, schema: string, table: string) => void
+  onMetricsChange?: (metrics: Array<{ code: string; name: string; comment?: string }>) => void
+  aiSuggestedMeasures?: string[]
+  aiSuggestedFilters?: string[]
 }
 
 export function MetricFormRight({
   form,
   onMeasureToggle,
   onFilterToggle,
-  insertDerivedFormula
+  onTableSelect,
+  onMetricsChange,
+  aiSuggestedMeasures,
+  aiSuggestedFilters
 }: MetricFormRightProps) {
+  // 原子指标：选择物理资产（度量列 + 过滤列）
+  if (form.type === 'ATOMIC') {
+    return (
+      <div className="col-span-7 flex h-full min-h-0 flex-col">
+        <div className="h-full min-h-0 flex flex-col gap-1.5">
+          <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-2 shrink-0">
+            <Database size={14} className="text-blue-500" />
+            物理资产（选择度量列或过滤列）
+          </label>
+          <div className="flex-1 min-h-0">
+            <CascadingPicker
+              mode="atomic"
+              onMeasureToggle={onMeasureToggle}
+              onFilterToggle={onFilterToggle}
+              onTableSelect={onTableSelect}
+              measureColumns={form.measureColumns}
+              filterColumns={form.filterColumns}
+              initialRef={{
+                catalog: form.refCatalog,
+                schema: form.refSchema,
+                table: form.refTable
+              }}
+              aiSuggestedMeasures={aiSuggestedMeasures}
+              aiSuggestedFilters={aiSuggestedFilters}
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // 派生指标：选择物理资产（仅维度过滤列）
+  if (form.type === 'DERIVED') {
+    return (
+      <div className="col-span-7 flex h-full min-h-0 flex-col">
+        <div className="h-full min-h-0 flex flex-col gap-1.5">
+          <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-2 shrink-0">
+            <Database size={14} className="text-amber-500" />
+            物理资产（选择维度列过滤）
+          </label>
+          <div className="flex-1 min-h-0">
+            <CascadingPicker
+              mode="derived"
+              onMeasureToggle={onMeasureToggle}
+              onFilterToggle={onFilterToggle}
+              onTableSelect={onTableSelect}
+              measureColumns={form.measureColumns}
+              filterColumns={form.filterColumns}
+              initialRef={{
+                catalog: form.refCatalog,
+                schema: form.refSchema,
+                table: form.refTable
+              }}
+              aiSuggestedFilters={aiSuggestedFilters}
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // 复合指标：选择指标列表
   return (
     <div className="col-span-7 flex h-full min-h-0 flex-col">
       <div className="h-full min-h-0 flex flex-col gap-1.5">
         <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-2 shrink-0">
-          <Database size={14} className="text-blue-500" />
-          {form.type === 'ATOMIC' ? '选择物理资产（度量列或者过滤列）' : '选择语义资产（指标）'}
+          <Target size={14} className="text-emerald-500" />
+          选择参与运算的指标
         </label>
         <div className="flex-1 min-h-0">
-          {form.type === 'ATOMIC' ? (
-            <CascadingPicker
-              onMeasureToggle={onMeasureToggle}
-              onFilterToggle={onFilterToggle}
-              measureColumns={form.measureColumns}
-              filterColumns={form.filterColumns}
-            />
-          ) : (
-            <MetricPicker onInsert={insertDerivedFormula} />
-          )}
+          <MetricSelector
+            selectedMetrics={form.compositeMetrics || []}
+            onMetricsChange={onMetricsChange}
+          />
         </div>
       </div>
     </div>

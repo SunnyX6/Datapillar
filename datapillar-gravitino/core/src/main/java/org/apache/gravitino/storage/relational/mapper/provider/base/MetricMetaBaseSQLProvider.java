@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
-import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetricMetaMapper;
 import org.apache.gravitino.storage.relational.po.MetricPO;
 import org.apache.ibatis.annotations.Param;
@@ -28,28 +27,29 @@ public class MetricMetaBaseSQLProvider {
   public String insertMetricMeta(@Param("metricMeta") MetricPO metricPO) {
     return "INSERT INTO "
         + MetricMetaMapper.TABLE_NAME
-        + " (metric_id, metric_name, metric_code, metric_type, data_type, metalake_id, catalog_id, schema_id,"
+        + " (metric_id, metric_name, metric_code, metric_type, data_type, metric_unit, metalake_id, catalog_id, schema_id,"
         + " metric_comment, current_version, last_version, audit_info, deleted_at)"
         + " VALUES (#{metricMeta.metricId}, #{metricMeta.metricName}, #{metricMeta.metricCode},"
-        + " #{metricMeta.metricType}, #{metricMeta.dataType}, #{metricMeta.metalakeId}, #{metricMeta.catalogId},"
-        + " #{metricMeta.schemaId}, #{metricMeta.metricComment}, #{metricMeta.currentVersion},"
-        + " #{metricMeta.lastVersion}, #{metricMeta.auditInfo}, #{metricMeta.deletedAt})";
+        + " #{metricMeta.metricType}, #{metricMeta.dataType}, #{metricMeta.unit}, #{metricMeta.metalakeId}, #{metricMeta.catalogId},"
+        + " #{metricMeta.schemaId}, #{metricMeta.metricComment}, #{metricMeta.currentVersion}, #{metricMeta.lastVersion},"
+        + " #{metricMeta.auditInfo}, #{metricMeta.deletedAt})";
   }
 
   public String insertMetricMetaOnDuplicateKeyUpdate(@Param("metricMeta") MetricPO metricPO) {
     return "INSERT INTO "
         + MetricMetaMapper.TABLE_NAME
-        + " (metric_id, metric_name, metric_code, metric_type, data_type, metalake_id, catalog_id, schema_id,"
+        + " (metric_id, metric_name, metric_code, metric_type, data_type, metric_unit, metalake_id, catalog_id, schema_id,"
         + " metric_comment, current_version, last_version, audit_info, deleted_at)"
         + " VALUES (#{metricMeta.metricId}, #{metricMeta.metricName}, #{metricMeta.metricCode},"
-        + " #{metricMeta.metricType}, #{metricMeta.dataType}, #{metricMeta.metalakeId}, #{metricMeta.catalogId},"
-        + " #{metricMeta.schemaId}, #{metricMeta.metricComment}, #{metricMeta.currentVersion},"
-        + " #{metricMeta.lastVersion}, #{metricMeta.auditInfo}, #{metricMeta.deletedAt})"
+        + " #{metricMeta.metricType}, #{metricMeta.dataType}, #{metricMeta.unit}, #{metricMeta.metalakeId}, #{metricMeta.catalogId},"
+        + " #{metricMeta.schemaId}, #{metricMeta.metricComment}, #{metricMeta.currentVersion}, #{metricMeta.lastVersion},"
+        + " #{metricMeta.auditInfo}, #{metricMeta.deletedAt})"
         + " ON DUPLICATE KEY UPDATE"
         + " metric_name = #{metricMeta.metricName},"
         + " metric_code = #{metricMeta.metricCode},"
         + " metric_type = #{metricMeta.metricType},"
         + " data_type = #{metricMeta.dataType},"
+        + " metric_unit = #{metricMeta.unit},"
         + " metalake_id = #{metricMeta.metalakeId},"
         + " catalog_id = #{metricMeta.catalogId},"
         + " schema_id = #{metricMeta.schemaId},"
@@ -62,9 +62,9 @@ public class MetricMetaBaseSQLProvider {
 
   public String listMetricPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return "SELECT metric_id AS metricId, metric_name AS metricName, metric_code AS metricCode,"
-        + " metric_type AS metricType, data_type AS dataType, metalake_id AS metalakeId, catalog_id AS catalogId,"
-        + " schema_id AS schemaId, metric_comment AS metricComment, current_version AS currentVersion,"
-        + " last_version AS lastVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
+        + " metric_type AS metricType, data_type AS dataType, metric_unit AS unit, metalake_id AS metalakeId, catalog_id AS catalogId,"
+        + " schema_id AS schemaId, metric_comment AS metricComment, current_version AS currentVersion, last_version AS lastVersion,"
+        + " audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + MetricMetaMapper.TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
@@ -72,14 +72,16 @@ public class MetricMetaBaseSQLProvider {
 
   public String listMetricPOsBySchemaIdWithPagination(
       @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit) {
-    return "SELECT metric_id AS metricId, metric_name AS metricName, metric_code AS metricCode,"
-        + " metric_type AS metricType, data_type AS dataType, metalake_id AS metalakeId, catalog_id AS catalogId,"
-        + " schema_id AS schemaId, metric_comment AS metricComment, current_version AS currentVersion,"
-        + " last_version AS lastVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
+    return "SELECT m.metric_id AS metricId, m.metric_name AS metricName, m.metric_code AS metricCode,"
+        + " m.metric_type AS metricType, m.data_type AS dataType, m.metric_unit AS unit, u.unit_name AS unitName,"
+        + " m.metalake_id AS metalakeId, m.catalog_id AS catalogId,"
+        + " m.schema_id AS schemaId, m.metric_comment AS metricComment, m.current_version AS currentVersion, m.last_version AS lastVersion,"
+        + " m.audit_info AS auditInfo, m.deleted_at AS deletedAt"
         + " FROM "
         + MetricMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
-        + " ORDER BY metric_id"
+        + " m LEFT JOIN unit_meta u ON m.schema_id = u.schema_id AND m.metric_unit = u.unit_code AND u.deleted_at = 0"
+        + " WHERE m.schema_id = #{schemaId} AND m.deleted_at = 0"
+        + " ORDER BY m.metric_id"
         + " LIMIT #{limit} OFFSET #{offset}";
   }
 
@@ -89,32 +91,17 @@ public class MetricMetaBaseSQLProvider {
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
-  public String listMetricPOsByMetricIds(List<Long> metricIds) {
-    return "<script>"
-        + " SELECT metric_id AS metricId, metric_name AS metricName, metric_code AS metricCode,"
-        + " metric_type AS metricType, data_type AS dataType, metalake_id AS metalakeId, catalog_id AS catalogId,"
-        + " schema_id AS schemaId, metric_comment AS metricComment, current_version AS currentVersion,"
-        + " last_version AS lastVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
-        + " FROM "
-        + MetricMetaMapper.TABLE_NAME
-        + " WHERE deleted_at = 0"
-        + " AND metric_id in ("
-        + "<foreach collection='metricIds' item='metricId' separator=','>"
-        + "#{metricId}"
-        + "</foreach>"
-        + ") "
-        + "</script>";
-  }
-
   public String selectMetricMetaBySchemaIdAndMetricCode(
       @Param("schemaId") Long schemaId, @Param("metricCode") String metricCode) {
-    return "SELECT metric_id AS metricId, metric_name AS metricName, metric_code AS metricCode,"
-        + " metric_type AS metricType, data_type AS dataType, metalake_id AS metalakeId, catalog_id AS catalogId,"
-        + " schema_id AS schemaId, metric_comment AS metricComment, current_version AS currentVersion,"
-        + " last_version AS lastVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
+    return "SELECT m.metric_id AS metricId, m.metric_name AS metricName, m.metric_code AS metricCode,"
+        + " m.metric_type AS metricType, m.data_type AS dataType, m.metric_unit AS unit, u.unit_name AS unitName,"
+        + " m.metalake_id AS metalakeId, m.catalog_id AS catalogId,"
+        + " m.schema_id AS schemaId, m.metric_comment AS metricComment, m.current_version AS currentVersion, m.last_version AS lastVersion,"
+        + " m.audit_info AS auditInfo, m.deleted_at AS deletedAt"
         + " FROM "
         + MetricMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND metric_code = #{metricCode} AND deleted_at = 0";
+        + " m LEFT JOIN unit_meta u ON m.schema_id = u.schema_id AND m.metric_unit = u.unit_code AND u.deleted_at = 0"
+        + " WHERE m.schema_id = #{schemaId} AND m.metric_code = #{metricCode} AND m.deleted_at = 0";
   }
 
   public String selectMetricIdBySchemaIdAndMetricCode(
@@ -126,13 +113,15 @@ public class MetricMetaBaseSQLProvider {
   }
 
   public String selectMetricMetaByMetricId(@Param("metricId") Long metricId) {
-    return "SELECT metric_id AS metricId, metric_name AS metricName, metric_code AS metricCode,"
-        + " metric_type AS metricType, data_type AS dataType, metalake_id AS metalakeId, catalog_id AS catalogId,"
-        + " schema_id AS schemaId, metric_comment AS metricComment, current_version AS currentVersion,"
-        + " last_version AS lastVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
+    return "SELECT m.metric_id AS metricId, m.metric_name AS metricName, m.metric_code AS metricCode,"
+        + " m.metric_type AS metricType, m.data_type AS dataType, m.metric_unit AS unit, u.unit_name AS unitName,"
+        + " m.metalake_id AS metalakeId, m.catalog_id AS catalogId,"
+        + " m.schema_id AS schemaId, m.metric_comment AS metricComment, m.current_version AS currentVersion, m.last_version AS lastVersion,"
+        + " m.audit_info AS auditInfo, m.deleted_at AS deletedAt"
         + " FROM "
         + MetricMetaMapper.TABLE_NAME
-        + " WHERE metric_id = #{metricId} AND deleted_at = 0";
+        + " m LEFT JOIN unit_meta u ON m.schema_id = u.schema_id AND m.metric_unit = u.unit_code AND u.deleted_at = 0"
+        + " WHERE m.metric_id = #{metricId} AND m.deleted_at = 0";
   }
 
   public String softDeleteMetricMetaBySchemaIdAndMetricCode(
@@ -183,6 +172,7 @@ public class MetricMetaBaseSQLProvider {
         + " metric_code = #{newMetricMeta.metricCode},"
         + " metric_type = #{newMetricMeta.metricType},"
         + " data_type = #{newMetricMeta.dataType},"
+        + " metric_unit = #{newMetricMeta.unit},"
         + " metalake_id = #{newMetricMeta.metalakeId},"
         + " catalog_id = #{newMetricMeta.catalogId},"
         + " schema_id = #{newMetricMeta.schemaId},"
@@ -192,15 +182,6 @@ public class MetricMetaBaseSQLProvider {
         + " audit_info = #{newMetricMeta.auditInfo},"
         + " deleted_at = #{newMetricMeta.deletedAt}"
         + " WHERE metric_id = #{oldMetricMeta.metricId}"
-        + " AND current_version = #{oldMetricMeta.currentVersion}"
         + " AND deleted_at = 0";
-  }
-
-  /** 原子递增 metric 的 last_version 和 current_version */
-  public String updateMetricLastVersion(@Param("metricId") Long metricId) {
-    return "UPDATE "
-        + MetricMetaMapper.TABLE_NAME
-        + " SET last_version = last_version + 1, current_version = last_version + 1"
-        + " WHERE metric_id = #{metricId} AND deleted_at = 0";
   }
 }

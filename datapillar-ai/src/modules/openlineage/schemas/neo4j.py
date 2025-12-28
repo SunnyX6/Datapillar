@@ -30,6 +30,7 @@ class CatalogNode:
     provider: str | None = None
     description: str | None = None
     properties: dict[str, str] | None = None
+    tags: list[str] | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -48,6 +49,7 @@ class SchemaNode:
     name: str
     description: str | None = None
     properties: dict[str, str] | None = None
+    tags: list[str] | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -75,6 +77,7 @@ class TableNode:
     create_time: str | None = None
     last_modifier: str | None = None
     last_modified_time: str | None = None
+    tags: list[str] | None = None
     embedding: list[float] | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -99,6 +102,7 @@ class ColumnNode:
     nullable: bool | None = None
     auto_increment: bool | None = None
     default_value: str | None = None
+    tags: list[str] | None = None
     embedding: list[float] | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -160,6 +164,7 @@ class MetricNode:
     aggregation_logic: str | None = None
     calculation_formula: str | None = None
     parent_metric_codes: list[str] = field(default_factory=list)
+    tags: list[str] | None = None
     embedding: list[float] | None = None
     created_at: datetime | None = None
 
@@ -179,6 +184,7 @@ class WordRootNode:
     name: str | None = None
     data_type: str | None = None
     description: str | None = None
+    tags: list[str] | None = None
     embedding: list[float] | None = None
     created_at: datetime | None = None
 
@@ -197,6 +203,7 @@ class ModifierNode:
     code: str
     modifier_type: str  # PREFIX, SUFFIX, INFIX
     description: str | None = None
+    tags: list[str] | None = None
     embedding: list[float] | None = None
     created_at: datetime | None = None
 
@@ -216,6 +223,7 @@ class UnitNode:
     name: str | None = None
     symbol: str | None = None
     description: str | None = None
+    tags: list[str] | None = None
     embedding: list[float] | None = None
     created_at: datetime | None = None
 
@@ -228,23 +236,26 @@ class UnitNode:
 
 @dataclass
 class ValueDomainNode:
-    """值域节点"""
+    """值域节点 - 一个值域一个节点，items 作为数组属性"""
 
     id: str  # 唯一标识
     domain_code: str
     domain_type: str  # ENUM, RANGE, REGEX
-    item_value: str
+    domain_level: str  # 值域级别
     domain_name: str | None = None
-    item_label: str | None = None
+    items: str | None = None  # 格式: "value1:label1,value2:label2"
     description: str | None = None
+    data_type: str | None = None
+    tags: list[str] | None = None
     embedding: list[float] | None = None
     created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     @classmethod
-    def create(cls, domain_code: str, item_value: str, domain_type: str, **kwargs) -> "ValueDomainNode":
+    def create(cls, domain_code: str, domain_type: str, domain_level: str, **kwargs) -> "ValueDomainNode":
         """工厂方法：创建 ValueDomain 节点"""
-        node_id = generate_id("valuedomain", domain_code, item_value)
-        return cls(id=node_id, domain_code=domain_code, domain_type=domain_type, item_value=item_value, **kwargs)
+        node_id = generate_id("valuedomain", domain_code)
+        return cls(id=node_id, domain_code=domain_code, domain_type=domain_type, domain_level=domain_level, **kwargs)
 
 
 @dataclass

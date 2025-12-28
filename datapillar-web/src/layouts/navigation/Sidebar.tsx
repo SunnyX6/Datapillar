@@ -41,7 +41,7 @@ export function Sidebar({ onNavigate, currentView, collapsed, onToggleCollapse }
 
   const brandNameClass = collapsed
     ? undefined
-    : 'text-xl font-bold leading-tight tracking-tight text-indigo-600 dark:text-indigo-200'
+    : 'text-lg font-bold leading-tight tracking-tight text-indigo-600 dark:text-indigo-200'
 
   return (
     <aside className={`${sidebarWidth} flex-shrink-0 bg-[#F9FAFB] dark:bg-[#0B1120] border-r border-slate-200 dark:border-slate-800 flex flex-col h-full z-30 overflow-visible relative transition-[width] duration-200 ease-out`}>
@@ -129,7 +129,7 @@ function NavSection({ title, children, collapsed }: NavSectionProps) {
       {collapsed ? (
         <div className="h-px w-full bg-slate-200 dark:bg-slate-800/70 mb-2" />
       ) : (
-        <div className="px-2 mb-2 text-body-sm font-bold text-slate-400 dark:text-slate-600 uppercase tracking-widest flex items-center gap-2">
+        <div className="px-2 mb-2 text-caption font-semibold text-slate-400 dark:text-slate-600 uppercase tracking-wider flex items-center gap-2">
           {title}
           <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
         </div>

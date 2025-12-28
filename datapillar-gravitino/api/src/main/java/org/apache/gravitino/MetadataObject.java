@@ -61,7 +61,9 @@ public interface MetadataObject {
     /** A role is an object contains specific securable objects with privileges */
     ROLE,
     /** A model is mapped to the model artifact in ML. */
-    MODEL
+    MODEL,
+    /** A value domain defines a set of valid values for columns or fields. */
+    VALUE_DOMAIN
   }
 
   /**

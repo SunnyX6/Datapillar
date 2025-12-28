@@ -51,6 +51,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN)
           .put(MetadataObject.Type.ROLE, Entity.EntityType.ROLE)
           .put(MetadataObject.Type.MODEL, Entity.EntityType.MODEL)
+          .put(MetadataObject.Type.VALUE_DOMAIN, Entity.EntityType.VALUE_DOMAIN)
           .build();
 
   private MetadataObjectUtil() {}
@@ -111,6 +112,7 @@ public class MetadataObjectUtil {
       case FILESET:
       case COLUMN:
       case MODEL:
+      case VALUE_DOMAIN:
         String fullName = DOT.join(metalakeName, metadataObject.fullName());
         return NameIdentifier.parse(fullName);
       default:
@@ -181,6 +183,14 @@ public class MetadataObjectUtil {
       case MODEL:
         NameIdentifierUtil.checkModel(identifier);
         check(env.modelDispatcher().modelExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case VALUE_DOMAIN:
+        try {
+          env.datasetDispatcher().getValueDomain(identifier);
+        } catch (Exception e) {
+          throw checkNotNull(exceptionToThrowSupplier).get();
+        }
         break;
 
       case ROLE:

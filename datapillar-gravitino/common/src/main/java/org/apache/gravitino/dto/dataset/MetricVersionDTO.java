@@ -37,8 +37,11 @@ import org.apache.gravitino.dto.AuditDTO;
 @EqualsAndHashCode
 public class MetricVersionDTO implements MetricVersion {
 
+  @JsonProperty("id")
+  private Long id;
+
   @JsonProperty("version")
-  private int version;
+  private Integer version;
 
   @JsonProperty("name")
   private String name;
@@ -58,11 +61,14 @@ public class MetricVersionDTO implements MetricVersion {
   @JsonProperty("unit")
   private String unit;
 
-  @JsonProperty("aggregationLogic")
-  private String aggregationLogic;
+  @JsonProperty("unitName")
+  private String unitName;
 
-  @JsonProperty("parentMetricIds")
-  private Long[] parentMetricIds;
+  @JsonProperty("unitSymbol")
+  private String unitSymbol;
+
+  @JsonProperty("parentMetricCodes")
+  private String[] parentMetricCodes;
 
   @JsonProperty("calculationFormula")
   private String calculationFormula;
@@ -89,7 +95,12 @@ public class MetricVersionDTO implements MetricVersion {
   private AuditDTO audit;
 
   @Override
-  public int version() {
+  public Long id() {
+    return id;
+  }
+
+  @Override
+  public Integer version() {
     return version;
   }
 
@@ -124,13 +135,18 @@ public class MetricVersionDTO implements MetricVersion {
   }
 
   @Override
-  public String aggregationLogic() {
-    return aggregationLogic;
+  public String unitName() {
+    return unitName;
   }
 
   @Override
-  public Long[] parentMetricIds() {
-    return parentMetricIds;
+  public String unitSymbol() {
+    return unitSymbol;
+  }
+
+  @Override
+  public String[] parentMetricCodes() {
+    return parentMetricCodes;
   }
 
   @Override
@@ -179,15 +195,17 @@ public class MetricVersionDTO implements MetricVersion {
 
   /** Builder for constructing a Metric Version DTO. */
   public static class Builder {
-    private int version;
+    private Long id;
+    private Integer version;
     private String name;
     private String code;
     private Metric.Type type;
     private String dataType;
     private String comment;
     private String unit;
-    private String aggregationLogic;
-    private Long[] parentMetricIds;
+    private String unitName;
+    private String unitSymbol;
+    private String[] parentMetricCodes;
     private String calculationFormula;
     private String refCatalogName;
     private String refSchemaName;
@@ -197,7 +215,12 @@ public class MetricVersionDTO implements MetricVersion {
     private Map<String, String> properties;
     private AuditDTO audit;
 
-    public Builder withVersion(int version) {
+    public Builder withId(Long id) {
+      this.id = id;
+      return this;
+    }
+
+    public Builder withVersion(Integer version) {
       this.version = version;
       return this;
     }
@@ -232,13 +255,18 @@ public class MetricVersionDTO implements MetricVersion {
       return this;
     }
 
-    public Builder withAggregationLogic(String aggregationLogic) {
-      this.aggregationLogic = aggregationLogic;
+    public Builder withUnitName(String unitName) {
+      this.unitName = unitName;
       return this;
     }
 
-    public Builder withParentMetricIds(Long[] parentMetricIds) {
-      this.parentMetricIds = parentMetricIds;
+    public Builder withUnitSymbol(String unitSymbol) {
+      this.unitSymbol = unitSymbol;
+      return this;
+    }
+
+    public Builder withParentMetricCodes(String[] parentMetricCodes) {
+      this.parentMetricCodes = parentMetricCodes;
       return this;
     }
 
@@ -283,13 +311,14 @@ public class MetricVersionDTO implements MetricVersion {
     }
 
     public MetricVersionDTO build() {
-      Preconditions.checkArgument(version >= 0, "version cannot be negative");
+      Preconditions.checkArgument(version != null && version >= 1, "version must be >= 1");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(StringUtils.isNotBlank(code), "code cannot be null or empty");
       Preconditions.checkArgument(type != null, "type cannot be null");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
       return new MetricVersionDTO(
+          id,
           version,
           name,
           code,
@@ -297,8 +326,9 @@ public class MetricVersionDTO implements MetricVersion {
           dataType,
           comment,
           unit,
-          aggregationLogic,
-          parentMetricIds,
+          unitName,
+          unitSymbol,
+          parentMetricCodes,
           calculationFormula,
           refCatalogName,
           refSchemaName,

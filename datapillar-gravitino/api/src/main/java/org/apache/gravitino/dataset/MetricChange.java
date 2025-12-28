@@ -46,6 +46,16 @@ public interface MetricChange {
   }
 
   /**
+   * 创建更新数据类型的变更
+   *
+   * @param newDataType 新的数据类型
+   * @return 指标变更对象
+   */
+  static MetricChange updateDataType(String newDataType) {
+    return new UpdateDataType(newDataType);
+  }
+
+  /**
    * 创建设置属性的变更
    *
    * @param property 属性名
@@ -125,6 +135,37 @@ public interface MetricChange {
     @Override
     public String toString() {
       return "UPDATECOMMENT " + newComment;
+    }
+  }
+
+  /** 更新数据类型变更 */
+  final class UpdateDataType implements MetricChange {
+    private final String newDataType;
+
+    private UpdateDataType(String newDataType) {
+      this.newDataType = newDataType;
+    }
+
+    public String newDataType() {
+      return newDataType;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof UpdateDataType)) return false;
+      UpdateDataType that = (UpdateDataType) o;
+      return Objects.equals(newDataType, that.newDataType);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(newDataType);
+    }
+
+    @Override
+    public String toString() {
+      return "UPDATEDATATYPE " + newDataType;
     }
   }
 

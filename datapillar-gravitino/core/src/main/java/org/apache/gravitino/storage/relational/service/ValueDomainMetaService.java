@@ -47,6 +47,22 @@ public class ValueDomainMetaService {
 
   private ValueDomainMetaService() {}
 
+  /** 根据 schemaId 和 domainCode 获取值域的 domainId */
+  public Long getValueDomainIdBySchemaIdAndDomainCode(Long schemaId, String domainCode) {
+    ValueDomainPO domainPO =
+        SessionUtils.getWithoutCommit(
+            ValueDomainMetaMapper.class,
+            mapper -> mapper.selectValueDomainMetaBySchemaIdAndDomainCode(schemaId, domainCode));
+
+    if (domainPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.VALUE_DOMAIN.name().toLowerCase(),
+          domainCode);
+    }
+    return domainPO.getDomainId();
+  }
+
   /** 插入 ValueDomain */
   public void insertValueDomain(ValueDomainEntity entity, boolean overwrite) throws IOException {
     try {
@@ -114,37 +130,11 @@ public class ValueDomainMetaService {
   public ValueDomainEntity getValueDomainByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkValueDomain(ident);
 
-    // ident.name() 格式为 "domainCode:itemValue"
-    String[] parts = ident.name().split(":");
-    if (parts.length != 2) {
-      throw new IllegalArgumentException(
-          "Invalid value domain identifier: "
-              + ident.name()
-              + ", expected format: domainCode:itemValue");
-    }
-    String domainCode = parts[0];
-    String itemValue = parts[1];
-
+    String domainCode = ident.name();
     Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
-    ValueDomainPO domainPO =
-        getValueDomainPOBySchemaIdAndDomainCodeAndItemValue(schemaId, domainCode, itemValue);
+    ValueDomainPO domainPO = getValueDomainPOBySchemaIdAndDomainCode(schemaId, domainCode);
 
     return POConverters.fromValueDomainPO(domainPO, ident.namespace());
-  }
-
-  /** 根据 domainCode 列出所有 items */
-  public List<ValueDomainEntity> listValueDomainItemsByDomainCode(
-      Namespace namespace, String domainCode) {
-    NamespaceUtil.checkValueDomain(namespace);
-
-    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
-
-    List<ValueDomainPO> domainPOs =
-        SessionUtils.getWithoutCommit(
-            ValueDomainMetaMapper.class,
-            mapper -> mapper.listValueDomainPOsBySchemaIdAndDomainCode(schemaId, domainCode));
-
-    return POConverters.fromValueDomainPOs(domainPOs, namespace);
   }
 
   /** 更新 ValueDomain */
@@ -152,20 +142,10 @@ public class ValueDomainMetaService {
       NameIdentifier ident, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkValueDomain(ident);
 
-    String[] parts = ident.name().split(":");
-    if (parts.length != 2) {
-      throw new IllegalArgumentException(
-          "Invalid value domain identifier: "
-              + ident.name()
-              + ", expected format: domainCode:itemValue");
-    }
-    String domainCode = parts[0];
-    String itemValue = parts[1];
-
+    String domainCode = ident.name();
     Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
 
-    ValueDomainPO oldPO =
-        getValueDomainPOBySchemaIdAndDomainCodeAndItemValue(schemaId, domainCode, itemValue);
+    ValueDomainPO oldPO = getValueDomainPOBySchemaIdAndDomainCode(schemaId, domainCode);
     ValueDomainEntity oldEntity = POConverters.fromValueDomainPO(oldPO, ident.namespace());
     ValueDomainEntity newEntity = (ValueDomainEntity) updater.apply((E) oldEntity);
     Preconditions.checkArgument(
@@ -195,61 +175,33 @@ public class ValueDomainMetaService {
     }
   }
 
-  /** 删除单个 ValueDomain item */
+  /** 删除 ValueDomain */
   public boolean deleteValueDomain(NameIdentifier ident) {
     NameIdentifierUtil.checkValueDomain(ident);
 
-    String[] parts = ident.name().split(":");
-    if (parts.length != 2) {
-      throw new IllegalArgumentException(
-          "Invalid value domain identifier: "
-              + ident.name()
-              + ", expected format: domainCode:itemValue");
-    }
-    String domainCode = parts[0];
-    String itemValue = parts[1];
-
+    String domainCode = ident.name();
     Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
 
     Integer deleteResult =
         SessionUtils.doWithCommitAndFetchResult(
             ValueDomainMetaMapper.class,
             mapper ->
-                mapper.softDeleteValueDomainMetaBySchemaIdAndDomainCodeAndItemValue(
-                    schemaId, domainCode, itemValue));
+                mapper.softDeleteValueDomainMetaBySchemaIdAndDomainCode(schemaId, domainCode));
 
     return deleteResult > 0;
   }
 
-  /** 删除整个 domain（所有 items） */
-  public boolean deleteValueDomainByCode(Namespace namespace, String domainCode) {
-    NamespaceUtil.checkValueDomain(namespace);
-
-    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
-
-    Integer deleteResult =
-        SessionUtils.doWithCommitAndFetchResult(
-            ValueDomainMetaMapper.class,
-            mapper ->
-                mapper.softDeleteValueDomainMetasBySchemaIdAndDomainCode(schemaId, domainCode));
-
-    return deleteResult > 0;
-  }
-
-  private ValueDomainPO getValueDomainPOBySchemaIdAndDomainCodeAndItemValue(
-      Long schemaId, String domainCode, String itemValue) {
+  private ValueDomainPO getValueDomainPOBySchemaIdAndDomainCode(Long schemaId, String domainCode) {
     ValueDomainPO domainPO =
         SessionUtils.getWithoutCommit(
             ValueDomainMetaMapper.class,
-            mapper ->
-                mapper.selectValueDomainMetaBySchemaIdAndDomainCodeAndItemValue(
-                    schemaId, domainCode, itemValue));
+            mapper -> mapper.selectValueDomainMetaBySchemaIdAndDomainCode(schemaId, domainCode));
 
     if (domainPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.VALUE_DOMAIN.name().toLowerCase(),
-          domainCode + ":" + itemValue);
+          domainCode);
     }
     return domainPO;
   }

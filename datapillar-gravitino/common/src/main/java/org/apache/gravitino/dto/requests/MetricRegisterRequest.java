@@ -59,11 +59,8 @@ public class MetricRegisterRequest implements RESTRequest {
   @JsonProperty("unit")
   private String unit;
 
-  @JsonProperty("aggregationLogic")
-  private String aggregationLogic;
-
-  @JsonProperty("parentMetricIds")
-  private Long[] parentMetricIds;
+  @JsonProperty("parentMetricCodes")
+  private String[] parentMetricCodes;
 
   @JsonProperty("calculationFormula")
   private String calculationFormula;
@@ -83,6 +80,10 @@ public class MetricRegisterRequest implements RESTRequest {
   @JsonProperty("filterColumns")
   private String filterColumns;
 
+  /** 允许的数值数据类型 */
+  private static final java.util.Set<String> NUMERIC_DATA_TYPES =
+      java.util.Set.of("BYTE", "SHORT", "INTEGER", "LONG", "FLOAT", "DOUBLE", "DECIMAL");
+
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
@@ -90,6 +91,22 @@ public class MetricRegisterRequest implements RESTRequest {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(code), "\"code\" field is required and cannot be empty");
     Preconditions.checkArgument(type != null, "\"type\" field is required and cannot be null");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(dataType), "\"dataType\" field is required and cannot be empty");
+
+    // 校验 dataType 必须是数值类型
+    String baseType =
+        dataType.contains("(") ? dataType.substring(0, dataType.indexOf("(")) : dataType;
+    Preconditions.checkArgument(
+        NUMERIC_DATA_TYPES.contains(baseType.toUpperCase()),
+        "\"dataType\" must be a numeric type (BYTE, SHORT, INTEGER, LONG, FLOAT, DOUBLE, DECIMAL), but got: %s",
+        dataType);
+
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(unit), "\"unit\" field is required and cannot be empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(calculationFormula),
+        "\"calculationFormula\" field is required and cannot be empty");
 
     // ATOMIC 类型必须指定数据源引用
     if (type == Metric.Type.ATOMIC) {
@@ -98,11 +115,11 @@ public class MetricRegisterRequest implements RESTRequest {
           "\"refTableName\" is required for ATOMIC metric type");
     }
 
-    // DERIVED 和 COMPOSITE 类型必须指定 parentMetricIds
+    // DERIVED 和 COMPOSITE 类型必须指定 parentMetricCodes
     if (type == Metric.Type.DERIVED || type == Metric.Type.COMPOSITE) {
       Preconditions.checkArgument(
-          parentMetricIds != null && parentMetricIds.length > 0,
-          "\"parentMetricIds\" is required for %s metric type",
+          parentMetricCodes != null && parentMetricCodes.length > 0,
+          "\"parentMetricCodes\" is required for %s metric type",
           type.name());
     }
   }

@@ -2,7 +2,7 @@ import { createPortal } from 'react-dom'
 import { Book, X, Info, GitBranch, Layers, Share2, ExternalLink } from 'lucide-react'
 import type { WordRoot } from '../types'
 import { iconSizeToken } from '@/design-tokens/dimensions'
-import { useIsZhCN } from '@/stores/i18nStore'
+import { formatTime } from '@/lib/utils'
 
 interface WordRootOverviewProps {
   wordRoot: WordRoot
@@ -10,9 +10,6 @@ interface WordRootOverviewProps {
 }
 
 export function WordRootOverview({ wordRoot, onClose }: WordRootOverviewProps) {
-  const isZhCN = useIsZhCN()
-  const displayName = isZhCN ? wordRoot.nameCn : wordRoot.nameEn
-
   return createPortal(
     <div className="fixed inset-0 z-[100] flex justify-end">
       <div
@@ -38,7 +35,7 @@ export function WordRootOverview({ wordRoot, onClose }: WordRootOverviewProps) {
         <div className="flex-1 overflow-auto p-6 custom-scrollbar">
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-1.5">
-              <h1 className="text-title font-bold text-slate-900 dark:text-slate-100 tracking-tight">{displayName}</h1>
+              <h1 className="text-title font-bold text-slate-900 dark:text-slate-100 tracking-tight">{wordRoot.name}</h1>
               <span className="px-2.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-body-sm font-mono font-semibold border border-blue-100 dark:border-blue-800 uppercase">
                 {wordRoot.code}
               </span>
@@ -69,7 +66,7 @@ export function WordRootOverview({ wordRoot, onClose }: WordRootOverviewProps) {
                 {wordRoot.audit?.createTime && (
                   <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                     <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">创建时间</div>
-                    <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">{wordRoot.audit.createTime}</div>
+                    <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">{formatTime(wordRoot.audit.createTime)}</div>
                   </div>
                 )}
               </div>

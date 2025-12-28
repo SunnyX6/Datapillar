@@ -38,10 +38,12 @@ public class MetricEntity implements Entity, Auditable, HasIdentifier {
   public static final Field CODE = Field.required("code", String.class, "指标实体的编码");
   public static final Field TYPE = Field.required("type", Metric.Type.class, "指标实体的类型");
   public static final Field DATA_TYPE = Field.optional("data_type", String.class, "指标的数据类型");
+  public static final Field UNIT = Field.optional("unit", String.class, "指标的单位");
   public static final Field COMMENT = Field.optional("comment", String.class, "指标实体的注释或描述");
   public static final Field CURRENT_VERSION =
-      Field.required("current_version", Integer.class, "指标的当前版本");
-  public static final Field LAST_VERSION = Field.required("last_version", Integer.class, "指标的最后版本");
+      Field.optional("current_version", Integer.class, "指标的当前版本号");
+  public static final Field LAST_VERSION =
+      Field.optional("last_version", Integer.class, "指标的最新版本号");
   public static final Field PROPERTIES = Field.optional("properties", Map.class, "指标实体的属性");
   public static final Field AUDIT_INFO = Field.required("audit_info", AuditInfo.class, "指标实体的审计信息");
 
@@ -51,6 +53,8 @@ public class MetricEntity implements Entity, Auditable, HasIdentifier {
   private String code;
   private Metric.Type type;
   private String dataType;
+  private String unit;
+  private String unitName;
   private String comment;
   private Integer currentVersion;
   private Integer lastVersion;
@@ -67,6 +71,7 @@ public class MetricEntity implements Entity, Auditable, HasIdentifier {
     fields.put(CODE, code);
     fields.put(TYPE, type);
     fields.put(DATA_TYPE, dataType);
+    fields.put(UNIT, unit);
     fields.put(COMMENT, comment);
     fields.put(CURRENT_VERSION, currentVersion);
     fields.put(LAST_VERSION, lastVersion);
@@ -100,6 +105,14 @@ public class MetricEntity implements Entity, Auditable, HasIdentifier {
 
   public String dataType() {
     return dataType;
+  }
+
+  public String unit() {
+    return unit;
+  }
+
+  public String unitName() {
+    return unitName;
   }
 
   public String comment() {
@@ -202,6 +215,16 @@ public class MetricEntity implements Entity, Auditable, HasIdentifier {
 
     public Builder withDataType(String dataType) {
       metric.dataType = dataType;
+      return this;
+    }
+
+    public Builder withUnit(String unit) {
+      metric.unit = unit;
+      return this;
+    }
+
+    public Builder withUnitName(String unitName) {
+      metric.unitName = unitName;
       return this;
     }
 

@@ -57,17 +57,19 @@ public interface ValueDomainMetaMapper {
 
   @SelectProvider(
       type = ValueDomainMetaSQLProviderFactory.class,
-      method = "selectValueDomainMetaBySchemaIdAndDomainCodeAndItemValue")
-  ValueDomainPO selectValueDomainMetaBySchemaIdAndDomainCodeAndItemValue(
-      @Param("schemaId") Long schemaId,
-      @Param("domainCode") String domainCode,
-      @Param("itemValue") String itemValue);
+      method = "selectValueDomainMetaBySchemaIdAndDomainCode")
+  ValueDomainPO selectValueDomainMetaBySchemaIdAndDomainCode(
+      @Param("schemaId") Long schemaId, @Param("domainCode") String domainCode);
 
   @SelectProvider(
       type = ValueDomainMetaSQLProviderFactory.class,
-      method = "listValueDomainPOsBySchemaIdAndDomainCode")
-  List<ValueDomainPO> listValueDomainPOsBySchemaIdAndDomainCode(
-      @Param("schemaId") Long schemaId, @Param("domainCode") String domainCode);
+      method = "selectValueDomainMetaByDomainId")
+  ValueDomainPO selectValueDomainMetaByDomainId(@Param("domainId") Long domainId);
+
+  @SelectProvider(
+      type = ValueDomainMetaSQLProviderFactory.class,
+      method = "listValueDomainPOsByDomainIds")
+  List<ValueDomainPO> listValueDomainPOsByDomainIds(@Param("domainIds") List<Long> domainIds);
 
   @UpdateProvider(type = ValueDomainMetaSQLProviderFactory.class, method = "updateValueDomainMeta")
   Integer updateValueDomainMeta(
@@ -75,16 +77,8 @@ public interface ValueDomainMetaMapper {
 
   @UpdateProvider(
       type = ValueDomainMetaSQLProviderFactory.class,
-      method = "softDeleteValueDomainMetaBySchemaIdAndDomainCodeAndItemValue")
-  Integer softDeleteValueDomainMetaBySchemaIdAndDomainCodeAndItemValue(
-      @Param("schemaId") Long schemaId,
-      @Param("domainCode") String domainCode,
-      @Param("itemValue") String itemValue);
-
-  @UpdateProvider(
-      type = ValueDomainMetaSQLProviderFactory.class,
-      method = "softDeleteValueDomainMetasBySchemaIdAndDomainCode")
-  Integer softDeleteValueDomainMetasBySchemaIdAndDomainCode(
+      method = "softDeleteValueDomainMetaBySchemaIdAndDomainCode")
+  Integer softDeleteValueDomainMetaBySchemaIdAndDomainCode(
       @Param("schemaId") Long schemaId, @Param("domainCode") String domainCode);
 
   @UpdateProvider(

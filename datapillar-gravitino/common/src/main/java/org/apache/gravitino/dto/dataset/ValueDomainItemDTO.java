@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.dto.requests;
+package org.apache.gravitino.dto.dataset;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
@@ -24,33 +24,29 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
-import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.dataset.ValueDomain;
 
-/** 创建新指标版本的请求（版本号自动递增） */
+/** 值域枚举项 DTO，实现 ValueDomain.Item 接口 */
 @Getter
 @ToString
 @EqualsAndHashCode
 @NoArgsConstructor
 @AllArgsConstructor
-public class MetricVersionLinkRequest implements RESTRequest {
+public class ValueDomainItemDTO implements ValueDomain.Item {
 
-  @JsonProperty("comment")
-  private String comment;
+  @JsonProperty("value")
+  private String value;
 
-  @JsonProperty("unit")
-  private String unit;
-
-  @JsonProperty("aggregationLogic")
-  private String aggregationLogic;
-
-  @JsonProperty("parentMetricIds")
-  private Long[] parentMetricIds;
-
-  @JsonProperty("calculationFormula")
-  private String calculationFormula;
+  @JsonProperty("label")
+  private String label;
 
   @Override
-  public void validate() throws IllegalArgumentException {
-    // 所有字段都是可选的
+  public String value() {
+    return value;
+  }
+
+  @Override
+  public String label() {
+    return label;
   }
 }

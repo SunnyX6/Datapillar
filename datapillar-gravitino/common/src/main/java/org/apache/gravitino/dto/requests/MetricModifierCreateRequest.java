@@ -26,7 +26,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.dataset.MetricModifier;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** 创建指标修饰符的请求 */
@@ -43,11 +42,11 @@ public class MetricModifierCreateRequest implements RESTRequest {
   @JsonProperty("code")
   private String code;
 
-  @JsonProperty("type")
-  private MetricModifier.Type type;
-
   @JsonProperty("comment")
   private String comment;
+
+  @JsonProperty("modifierType")
+  private String modifierType;
 
   @Override
   public void validate() throws IllegalArgumentException {
@@ -55,6 +54,5 @@ public class MetricModifierCreateRequest implements RESTRequest {
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(code), "\"code\" field is required and cannot be empty");
-    Preconditions.checkArgument(type != null, "\"type\" field is required and cannot be null");
   }
 }

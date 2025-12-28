@@ -89,7 +89,8 @@ public class MetricVersionMetaService {
     MetricVersionPO versionPO =
         SessionUtils.getWithoutCommit(
             MetricVersionMetaMapper.class,
-            mapper -> mapper.selectMetricVersionMeta(metricEntity.id(), version));
+            mapper ->
+                mapper.selectMetricVersionMetaByMetricIdAndVersion(metricEntity.id(), version));
 
     if (versionPO == null) {
       throw new NoSuchEntityException(

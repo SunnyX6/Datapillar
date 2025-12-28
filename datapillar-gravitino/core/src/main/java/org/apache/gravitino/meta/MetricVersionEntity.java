@@ -40,7 +40,8 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
 
   public static final Field METRIC_IDENT =
       Field.required("metric_ident", NameIdentifier.class, "指标的名称标识符");
-  public static final Field VERSION = Field.required("version", Integer.class, "指标版本号");
+  public static final Field ID = Field.optional("id", Long.class, "指标版本ID（自增主键）");
+  public static final Field VERSION = Field.required("version", Integer.class, "版本号，从1开始");
   public static final Field METRIC_NAME = Field.required("metric_name", String.class, "指标名称快照");
   public static final Field METRIC_CODE = Field.required("metric_code", String.class, "指标编码快照");
   public static final Field METRIC_TYPE =
@@ -48,10 +49,8 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
   public static final Field DATA_TYPE = Field.optional("data_type", String.class, "数据类型快照");
   public static final Field COMMENT = Field.optional("comment", String.class, "指标版本注释");
   public static final Field UNIT = Field.optional("unit", String.class, "指标单位");
-  public static final Field AGGREGATION_LOGIC =
-      Field.optional("aggregation_logic", String.class, "聚合逻辑");
-  public static final Field PARENT_METRIC_IDS =
-      Field.optional("parent_metric_ids", Long[].class, "父指标ID数组");
+  public static final Field PARENT_METRIC_CODES =
+      Field.optional("parent_metric_codes", String[].class, "父指标编码数组");
   public static final Field CALCULATION_FORMULA =
       Field.optional("calculation_formula", String.class, "计算公式");
   public static final Field REF_CATALOG_NAME =
@@ -68,6 +67,7 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
   public static final Field AUDIT_INFO = Field.required("audit_info", AuditInfo.class, "审计信息");
 
   private NameIdentifier metricIdent;
+  private Long id;
   private Integer version;
   private String metricName;
   private String metricCode;
@@ -75,8 +75,9 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
   private String dataType;
   private String comment;
   private String unit;
-  private String aggregationLogic;
-  private Long[] parentMetricIds;
+  private String unitName;
+  private String unitSymbol;
+  private String[] parentMetricCodes;
   private String calculationFormula;
   private String refCatalogName;
   private String refSchemaName;
@@ -92,6 +93,7 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = Maps.newHashMap();
     fields.put(METRIC_IDENT, metricIdent);
+    fields.put(ID, id);
     fields.put(VERSION, version);
     fields.put(METRIC_NAME, metricName);
     fields.put(METRIC_CODE, metricCode);
@@ -99,8 +101,7 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
     fields.put(DATA_TYPE, dataType);
     fields.put(COMMENT, comment);
     fields.put(UNIT, unit);
-    fields.put(AGGREGATION_LOGIC, aggregationLogic);
-    fields.put(PARENT_METRIC_IDS, parentMetricIds);
+    fields.put(PARENT_METRIC_CODES, parentMetricCodes);
     fields.put(CALCULATION_FORMULA, calculationFormula);
     fields.put(REF_CATALOG_NAME, refCatalogName);
     fields.put(REF_SCHEMA_NAME, refSchemaName);
@@ -117,7 +118,12 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
   }
 
   @Override
-  public int version() {
+  public Long id() {
+    return id;
+  }
+
+  @Override
+  public Integer version() {
     return version;
   }
 
@@ -152,13 +158,18 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
   }
 
   @Override
-  public String aggregationLogic() {
-    return aggregationLogic;
+  public String unitName() {
+    return unitName;
   }
 
   @Override
-  public Long[] parentMetricIds() {
-    return parentMetricIds;
+  public String unitSymbol() {
+    return unitSymbol;
+  }
+
+  @Override
+  public String[] parentMetricCodes() {
+    return parentMetricCodes;
   }
 
   @Override
@@ -208,7 +219,7 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
 
   @Override
   public String name() {
-    return String.valueOf(version);
+    return String.valueOf(id);
   }
 
   @Override
@@ -216,11 +227,6 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
     List<String> levels = Lists.newArrayList(metricIdent.namespace().levels());
     levels.add(metricIdent.name());
     return Namespace.of(levels.toArray(new String[0]));
-  }
-
-  @Override
-  public Long id() {
-    throw new UnsupportedOperationException("Metric version entity does not have an ID.");
   }
 
   @Override
@@ -232,7 +238,8 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
       return false;
     }
     MetricVersionEntity that = (MetricVersionEntity) o;
-    return Objects.equals(version, that.version)
+    return Objects.equals(id, that.id)
+        && Objects.equals(version, that.version)
         && Objects.equals(metricIdent, that.metricIdent)
         && Objects.equals(metricName, that.metricName)
         && Objects.equals(metricCode, that.metricCode)
@@ -240,8 +247,7 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
         && Objects.equals(dataType, that.dataType)
         && Objects.equals(comment, that.comment)
         && Objects.equals(unit, that.unit)
-        && Objects.equals(aggregationLogic, that.aggregationLogic)
-        && Objects.deepEquals(parentMetricIds, that.parentMetricIds)
+        && Objects.deepEquals(parentMetricCodes, that.parentMetricCodes)
         && Objects.equals(calculationFormula, that.calculationFormula)
         && Objects.equals(refCatalogName, that.refCatalogName)
         && Objects.equals(refSchemaName, that.refSchemaName)
@@ -257,6 +263,7 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
     int result =
         Objects.hash(
             metricIdent,
+            id,
             version,
             metricName,
             metricCode,
@@ -264,7 +271,6 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
             dataType,
             comment,
             unit,
-            aggregationLogic,
             calculationFormula,
             refCatalogName,
             refSchemaName,
@@ -273,7 +279,7 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
             filterColumns,
             properties,
             auditInfo);
-    result = 31 * result + Arrays.hashCode(parentMetricIds);
+    result = 31 * result + Arrays.hashCode(parentMetricCodes);
     return result;
   }
 
@@ -293,7 +299,12 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
       return this;
     }
 
-    public Builder withVersion(int version) {
+    public Builder withId(Long id) {
+      metricVersion.id = id;
+      return this;
+    }
+
+    public Builder withVersion(Integer version) {
       metricVersion.version = version;
       return this;
     }
@@ -328,13 +339,18 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
       return this;
     }
 
-    public Builder withAggregationLogic(String aggregationLogic) {
-      metricVersion.aggregationLogic = aggregationLogic;
+    public Builder withUnitName(String unitName) {
+      metricVersion.unitName = unitName;
       return this;
     }
 
-    public Builder withParentMetricIds(Long[] parentMetricIds) {
-      metricVersion.parentMetricIds = parentMetricIds;
+    public Builder withUnitSymbol(String unitSymbol) {
+      metricVersion.unitSymbol = unitSymbol;
+      return this;
+    }
+
+    public Builder withParentMetricCodes(String[] parentMetricCodes) {
+      metricVersion.parentMetricCodes = parentMetricCodes;
       return this;
     }
 

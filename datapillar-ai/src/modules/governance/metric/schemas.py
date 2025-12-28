@@ -13,9 +13,6 @@ class MetricType(str, Enum):
     COMPOSITE = "COMPOSITE"
 
 
-class IssueSeverity(str, Enum):
-    ERROR = "error"
-    WARNING = "warning"
 
 
 # ============ Fill ============
@@ -54,11 +51,11 @@ class FilterColumn(BaseModel):
 
 
 class FormOptions(BaseModel):
-    """表单可选项"""
+    """表单可选项（词根/修饰符/单位：前端传了就用，没传由后端从 Neo4j 获取）"""
     data_types: List[str] = Field(alias="dataTypes")
-    units: List[str]
-    word_roots: List[WordRoot] = Field(alias="wordRoots", default_factory=list)
-    modifiers: List[Modifier] = Field(default_factory=list)
+    units: Optional[List[str]] = Field(default=None)
+    word_roots: Optional[List[WordRoot]] = Field(alias="wordRoots", default=None)
+    modifiers: Optional[List[Modifier]] = Field(default=None)
 
     class Config:
         populate_by_name = True
@@ -68,6 +65,10 @@ class AtomicPayload(BaseModel):
     """原子指标 payload"""
     measure_columns: List[MeasureColumn] = Field(alias="measureColumns", default_factory=list)
     filter_columns: List[FilterColumn] = Field(alias="filterColumns", default_factory=list)
+    # 物理表引用，用于查询表的上下文
+    ref_catalog: Optional[str] = Field(alias="refCatalog", default=None)
+    ref_schema: Optional[str] = Field(alias="refSchema", default=None)
+    ref_table: Optional[str] = Field(alias="refTable", default=None)
 
     class Config:
         populate_by_name = True
@@ -76,21 +77,36 @@ class AtomicPayload(BaseModel):
 class BaseMetric(BaseModel):
     """基础指标引用"""
     code: str
+    name: Optional[str] = None
+    description: Optional[str] = None
 
 
 class DerivedPayload(BaseModel):
     """派生指标 payload"""
     base_metric: BaseMetric = Field(alias="baseMetric")
-    modifiers: List[str] = Field(default_factory=list)
+    modifiers: List[Modifier] = Field(default_factory=list)
+    filter_columns: List[FilterColumn] = Field(alias="filterColumns", default_factory=list)
+    ref_catalog: Optional[str] = Field(alias="refCatalog", default=None)
+    ref_schema: Optional[str] = Field(alias="refSchema", default=None)
+    ref_table: Optional[str] = Field(alias="refTable", default=None)
 
     class Config:
         populate_by_name = True
 
 
+class CompositeMetricRef(BaseModel):
+    """复合指标引用的指标"""
+    code: str
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
 class CompositePayload(BaseModel):
     """复合指标 payload"""
-    metrics: List[str] = Field(default_factory=list)
-    operation: str = "divide"
+    metrics: List[CompositeMetricRef] = Field(default_factory=list)
+
+    class Config:
+        populate_by_name = True
 
 
 class FillContext(BaseModel):
@@ -132,49 +148,21 @@ class AIFillRequest(BaseModel):
 
 class AIFillResponse(BaseModel):
     """AI 填写响应"""
-    name: str
-    code: str
-    type: MetricType
-    data_type: str = Field(alias="dataType")
+    name: Optional[str] = ""
+    word_roots: List[str] = Field(alias="wordRoots", default_factory=list)
+    aggregation: Optional[str] = ""
+    modifiers_selected: List[str] = Field(alias="modifiersSelected", default_factory=list)
+    type: Optional[MetricType] = MetricType.ATOMIC
+    data_type: Optional[str] = Field(alias="dataType", default="")
     unit: Optional[str] = None
-    calculation_formula: str = Field(alias="calculationFormula")
-    comment: str
+    calculation_formula: Optional[str] = Field(alias="calculationFormula", default="")
+    comment: Optional[str] = ""
+    measure_columns: List[str] = Field(alias="measureColumns", default_factory=list)
+    filter_columns: List[str] = Field(alias="filterColumns", default_factory=list)
+    warning: Optional[str] = None
 
     class Config:
         populate_by_name = True
         by_alias = True
 
 
-# ============ Check ============
-
-class MetricForm(BaseModel):
-    """指标表单"""
-    name: str
-    code: str
-    type: MetricType
-    data_type: str = Field(alias="dataType")
-    unit: Optional[str] = None
-    calculation_formula: str = Field(alias="calculationFormula")
-    comment: str
-
-    class Config:
-        populate_by_name = True
-
-
-class AICheckRequest(BaseModel):
-    """AI 检查请求"""
-    form: MetricForm
-
-
-class SemanticIssue(BaseModel):
-    """语义问题"""
-    field: str
-    severity: IssueSeverity
-    message: str
-
-
-class AICheckResponse(BaseModel):
-    """AI 检查响应"""
-    valid: bool
-    issues: List[SemanticIssue] = Field(default_factory=list)
-    suggestions: dict = Field(default_factory=dict)

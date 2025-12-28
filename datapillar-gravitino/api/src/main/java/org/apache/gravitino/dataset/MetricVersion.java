@@ -28,9 +28,14 @@ import org.apache.gravitino.annotation.Evolving;
 public interface MetricVersion extends Auditable {
 
   /**
-   * @return 版本号
+   * @return 版本ID（自增主键）
    */
-  int version();
+  Long id();
+
+  /**
+   * @return 版本号，从1开始
+   */
+  Integer version();
 
   /**
    * @return 指标名称快照
@@ -62,24 +67,31 @@ public interface MetricVersion extends Auditable {
   }
 
   /**
-   * @return 指标单位，例如：元、个、%，如果未设置则返回 null
+   * @return 指标单位编码，如果未设置则返回 null
    */
   default String unit() {
     return null;
   }
 
   /**
-   * @return 聚合逻辑，例如：SUM、COUNT、AVG、MAX、MIN、DISTINCT_COUNT，如果未设置则返回 null
+   * @return 指标单位名称，如果未设置则返回 null
    */
-  default String aggregationLogic() {
+  default String unitName() {
     return null;
   }
 
   /**
-   * @return 父指标ID数组，用于派生指标和复合指标，如果未设置则返回空数组
+   * @return 指标单位符号，如 ¥、$、%，如果未设置则返回 null
    */
-  default Long[] parentMetricIds() {
-    return new Long[0];
+  default String unitSymbol() {
+    return null;
+  }
+
+  /**
+   * @return 父指标编码数组，用于派生指标和复合指标，如果未设置则返回空数组
+   */
+  default String[] parentMetricCodes() {
+    return new String[0];
   }
 
   /**

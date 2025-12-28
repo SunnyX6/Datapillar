@@ -27,15 +27,17 @@ import org.apache.gravitino.meta.AuditInfo;
 /** MetricVersion 接口的实现类 */
 public class MetricVersionImpl implements MetricVersion, Auditable {
 
-  private int version;
+  private Long id;
+  private Integer version;
   private String name;
   private String code;
   private Metric.Type type;
   private String dataType;
   private String comment;
   private String unit;
-  private String aggregationLogic;
-  private Long[] parentMetricIds;
+  private String unitName;
+  private String unitSymbol;
+  private String[] parentMetricCodes;
   private String calculationFormula;
   private String refCatalogName;
   private String refSchemaName;
@@ -48,7 +50,12 @@ public class MetricVersionImpl implements MetricVersion, Auditable {
   private MetricVersionImpl() {}
 
   @Override
-  public int version() {
+  public Long id() {
+    return id;
+  }
+
+  @Override
+  public Integer version() {
     return version;
   }
 
@@ -83,13 +90,18 @@ public class MetricVersionImpl implements MetricVersion, Auditable {
   }
 
   @Override
-  public String aggregationLogic() {
-    return aggregationLogic;
+  public String unitName() {
+    return unitName;
   }
 
   @Override
-  public Long[] parentMetricIds() {
-    return parentMetricIds;
+  public String unitSymbol() {
+    return unitSymbol;
+  }
+
+  @Override
+  public String[] parentMetricCodes() {
+    return parentMetricCodes;
   }
 
   @Override
@@ -140,7 +152,12 @@ public class MetricVersionImpl implements MetricVersion, Auditable {
       metricVersion = new MetricVersionImpl();
     }
 
-    public Builder withVersion(int version) {
+    public Builder withId(Long id) {
+      metricVersion.id = id;
+      return this;
+    }
+
+    public Builder withVersion(Integer version) {
       metricVersion.version = version;
       return this;
     }
@@ -175,13 +192,18 @@ public class MetricVersionImpl implements MetricVersion, Auditable {
       return this;
     }
 
-    public Builder withAggregationLogic(String aggregationLogic) {
-      metricVersion.aggregationLogic = aggregationLogic;
+    public Builder withUnitName(String unitName) {
+      metricVersion.unitName = unitName;
       return this;
     }
 
-    public Builder withParentMetricIds(Long[] parentMetricIds) {
-      metricVersion.parentMetricIds = parentMetricIds;
+    public Builder withUnitSymbol(String unitSymbol) {
+      metricVersion.unitSymbol = unitSymbol;
+      return this;
+    }
+
+    public Builder withParentMetricCodes(String[] parentMetricCodes) {
+      metricVersion.parentMetricCodes = parentMetricCodes;
       return this;
     }
 

@@ -20,6 +20,8 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.List;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -38,10 +40,12 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.DatasetDispatcher;
+import org.apache.gravitino.dataset.ValueDomain;
+import org.apache.gravitino.dto.dataset.ValueDomainDTO;
 import org.apache.gravitino.dto.requests.ValueDomainCreateRequest;
 import org.apache.gravitino.dto.requests.ValueDomainUpdateRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
-import org.apache.gravitino.dto.responses.PagedEntityListResponse;
+import org.apache.gravitino.dto.responses.ValueDomainListResponse;
 import org.apache.gravitino.dto.responses.ValueDomainResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
@@ -83,11 +87,15 @@ public class ValueDomainOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            PagedResult<NameIdentifier> result =
+            PagedResult<ValueDomain> result =
                 datasetDispatcher.listValueDomains(valueDomainNs, offset, limit);
-            NameIdentifier[] valueDomainIds = result.items().toArray(new NameIdentifier[0]);
+
+            // 转换为 DTO 数组
+            ValueDomainDTO[] domains =
+                result.items().stream().map(DTOConverters::toDTO).toArray(ValueDomainDTO[]::new);
+
             return Utils.ok(
-                new PagedEntityListResponse(valueDomainIds, result.total(), offset, limit));
+                new ValueDomainListResponse(domains, (int) result.total(), offset, limit));
           });
 
     } catch (Exception e) {
@@ -96,7 +104,7 @@ public class ValueDomainOperations {
   }
 
   @GET
-  @Path("{domainCodeItemValue}")
+  @Path("{domainCode}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-valuedomain." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-valuedomain", absolute = true)
@@ -108,22 +116,19 @@ public class ValueDomainOperations {
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("domainCodeItemValue") String domainCodeItemValue) {
-    NameIdentifier valueDomainId =
-        NameIdentifier.of(metalake, catalog, schema, domainCodeItemValue);
+      @PathParam("domainCode") String domainCode) {
+    NameIdentifier valueDomainId = NameIdentifier.of(metalake, catalog, schema, domainCode);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            org.apache.gravitino.dataset.ValueDomain valueDomain =
-                datasetDispatcher.getValueDomain(valueDomainId);
+            ValueDomain valueDomain = datasetDispatcher.getValueDomain(valueDomainId);
             return Utils.ok(new ValueDomainResponse(DTOConverters.toDTO(valueDomain)));
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleValueDomainException(
-          OperationType.GET, domainCodeItemValue, schema, e);
+      return ExceptionHandlers.handleValueDomainException(OperationType.GET, domainCode, schema, e);
     }
   }
 
@@ -147,17 +152,26 @@ public class ValueDomainOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            String identName = request.getDomainCode() + ":" + request.getItemValue();
-            NameIdentifier valueDomainId = NameIdentifier.of(metalake, catalog, schema, identName);
-            org.apache.gravitino.dataset.ValueDomain valueDomain =
+            NameIdentifier valueDomainId =
+                NameIdentifier.of(metalake, catalog, schema, request.getDomainCode());
+
+            // 转换 items 为 ValueDomain.Item 列表
+            List<ValueDomain.Item> items =
+                request.getItems().stream()
+                    .map(item -> (ValueDomain.Item) item)
+                    .collect(Collectors.toList());
+
+            ValueDomain valueDomain =
                 datasetDispatcher.createValueDomain(
                     valueDomainId,
                     request.getDomainCode(),
                     request.getDomainName(),
                     request.getDomainType(),
-                    request.getItemValue(),
-                    request.getItemLabel(),
-                    request.getComment());
+                    request.getDomainLevel(),
+                    items,
+                    request.getComment(),
+                    request.getDataType());
+
             return Utils.ok(new ValueDomainResponse(DTOConverters.toDTO(valueDomain)));
           });
 
@@ -168,7 +182,7 @@ public class ValueDomainOperations {
   }
 
   @DELETE
-  @Path("{domainCodeItemValue}")
+  @Path("{domainCode}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "delete-valuedomain." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-valuedomain", absolute = true)
@@ -180,9 +194,8 @@ public class ValueDomainOperations {
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("domainCodeItemValue") String domainCodeItemValue) {
-    NameIdentifier valueDomainId =
-        NameIdentifier.of(metalake, catalog, schema, domainCodeItemValue);
+      @PathParam("domainCode") String domainCode) {
+    NameIdentifier valueDomainId = NameIdentifier.of(metalake, catalog, schema, domainCode);
 
     try {
       return Utils.doAs(
@@ -194,12 +207,12 @@ public class ValueDomainOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleValueDomainException(
-          OperationType.DELETE, domainCodeItemValue, schema, e);
+          OperationType.DELETE, domainCode, schema, e);
     }
   }
 
   @PUT
-  @Path("{domainCodeItemValue}")
+  @Path("{domainCode}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "alter-valuedomain." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-valuedomain", absolute = true)
@@ -211,10 +224,9 @@ public class ValueDomainOperations {
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("domainCodeItemValue") String domainCodeItemValue,
+      @PathParam("domainCode") String domainCode,
       ValueDomainUpdateRequest request) {
-    NameIdentifier valueDomainId =
-        NameIdentifier.of(metalake, catalog, schema, domainCodeItemValue);
+    NameIdentifier valueDomainId = NameIdentifier.of(metalake, catalog, schema, domainCode);
 
     try {
       request.validate();
@@ -222,18 +234,29 @@ public class ValueDomainOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            org.apache.gravitino.dataset.ValueDomain valueDomain =
+            // 转换 items 为 ValueDomain.Item 列表（如果提供）
+            List<ValueDomain.Item> items = null;
+            if (request.getItems() != null) {
+              items =
+                  request.getItems().stream()
+                      .map(item -> (ValueDomain.Item) item)
+                      .collect(Collectors.toList());
+            }
+
+            ValueDomain valueDomain =
                 datasetDispatcher.alterValueDomain(
                     valueDomainId,
                     request.getDomainName(),
-                    request.getItemLabel(),
-                    request.getComment());
+                    request.getDomainLevel(),
+                    items,
+                    request.getComment(),
+                    request.getDataType());
             return Utils.ok(new ValueDomainResponse(DTOConverters.toDTO(valueDomain)));
           });
 
     } catch (Exception e) {
       return ExceptionHandlers.handleValueDomainException(
-          OperationType.ALTER, domainCodeItemValue, schema, e);
+          OperationType.ALTER, domainCode, schema, e);
     }
   }
 }

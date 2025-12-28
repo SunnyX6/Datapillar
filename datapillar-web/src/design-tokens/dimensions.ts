@@ -171,6 +171,9 @@ export const iconSizeToken = {
  * ✅  直接使用固定宽度 + 最大高度限制
  */
 export const modalWidthClassMap = {
+  /** 迷你模态：400px（简单表单弹窗，如新建单位/修饰符）*/
+  mini: 'max-w-[400px]',
+
   /** 紧凑模态：560px（元数据等表单弹窗默认）*/
   small: 'max-w-[560px]',
 

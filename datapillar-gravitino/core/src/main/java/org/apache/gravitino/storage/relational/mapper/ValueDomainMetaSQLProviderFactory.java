@@ -69,17 +69,18 @@ public class ValueDomainMetaSQLProviderFactory {
     return getProvider().countValueDomainsBySchemaId(schemaId);
   }
 
-  public static String selectValueDomainMetaBySchemaIdAndDomainCodeAndItemValue(
-      @Param("schemaId") Long schemaId,
-      @Param("domainCode") String domainCode,
-      @Param("itemValue") String itemValue) {
-    return getProvider()
-        .selectValueDomainMetaBySchemaIdAndDomainCodeAndItemValue(schemaId, domainCode, itemValue);
+  public static String selectValueDomainMetaBySchemaIdAndDomainCode(
+      @Param("schemaId") Long schemaId, @Param("domainCode") String domainCode) {
+    return getProvider().selectValueDomainMetaBySchemaIdAndDomainCode(schemaId, domainCode);
   }
 
-  public static String listValueDomainPOsBySchemaIdAndDomainCode(
-      @Param("schemaId") Long schemaId, @Param("domainCode") String domainCode) {
-    return getProvider().listValueDomainPOsBySchemaIdAndDomainCode(schemaId, domainCode);
+  public static String selectValueDomainMetaByDomainId(@Param("domainId") Long domainId) {
+    return getProvider().selectValueDomainMetaByDomainId(domainId);
+  }
+
+  public static String listValueDomainPOsByDomainIds(
+      @Param("domainIds") java.util.List<Long> domainIds) {
+    return getProvider().listValueDomainPOsByDomainIds(domainIds);
   }
 
   public static String updateValueDomainMeta(
@@ -88,18 +89,9 @@ public class ValueDomainMetaSQLProviderFactory {
     return getProvider().updateValueDomainMeta(newDomainPO, oldDomainPO);
   }
 
-  public static String softDeleteValueDomainMetaBySchemaIdAndDomainCodeAndItemValue(
-      @Param("schemaId") Long schemaId,
-      @Param("domainCode") String domainCode,
-      @Param("itemValue") String itemValue) {
-    return getProvider()
-        .softDeleteValueDomainMetaBySchemaIdAndDomainCodeAndItemValue(
-            schemaId, domainCode, itemValue);
-  }
-
-  public static String softDeleteValueDomainMetasBySchemaIdAndDomainCode(
+  public static String softDeleteValueDomainMetaBySchemaIdAndDomainCode(
       @Param("schemaId") Long schemaId, @Param("domainCode") String domainCode) {
-    return getProvider().softDeleteValueDomainMetasBySchemaIdAndDomainCode(schemaId, domainCode);
+    return getProvider().softDeleteValueDomainMetaBySchemaIdAndDomainCode(schemaId, domainCode);
   }
 
   public static String softDeleteValueDomainMetasBySchemaId(@Param("schemaId") Long schemaId) {

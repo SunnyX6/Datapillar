@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Target, X, Info, Code, GitBranch, Layers, Share2, History, Database, Hash, Loader2, Check } from 'lucide-react'
+import { Target, X, Info, Code, GitBranch, Layers, Share2, History, Loader2, Check, RotateCcw } from 'lucide-react'
 import { Badge } from '../components'
 import type { Metric } from '../types'
 import { iconSizeToken } from '@/design-tokens/dimensions'
-import { fetchMetricVersion, fetchMetricVersions } from '@/services/oneMetaService'
+import { fetchMetricVersion, fetchMetricVersionNumbers, switchMetricVersion as apiSwitchMetricVersion } from '@/services/oneMetaSemanticService'
+import { formatTime } from '@/lib/utils'
 
 /** 指标类型标签映射 */
 const TYPE_LABELS: Record<string, { label: string; variant: 'blue' | 'purple' | 'amber' }> = {
@@ -14,44 +15,75 @@ const TYPE_LABELS: Record<string, { label: string; variant: 'blue' | 'purple' | 
 }
 
 interface MetricVersionDetail {
+  name?: string
+  code?: string
+  type?: string
+  dataType?: string
+  comment?: string
   calculationFormula?: string
   unit?: string
-  aggregationLogic?: string
+  unitName?: string
   refCatalogName?: string
   refSchemaName?: string
   refTableName?: string
   refColumnName?: string
+  audit?: {
+    creator?: string
+    createTime?: string
+  }
 }
 
 interface MetricOverviewProps {
   metric: Metric
   onClose: () => void
+  onVersionSwitch?: (updatedMetric: Metric) => void
 }
 
-export function MetricOverview({ metric, onClose }: MetricOverviewProps) {
+export function MetricOverview({ metric, onClose, onVersionSwitch }: MetricOverviewProps) {
   const [versionDetail, setVersionDetail] = useState<MetricVersionDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [versions, setVersions] = useState<number[]>([])
   const [selectedVersion, setSelectedVersion] = useState(metric.currentVersion)
   const [showVersionPanel, setShowVersionPanel] = useState(false)
   const [loadingVersions, setLoadingVersions] = useState(false)
+  const [switching, setSwitching] = useState(false)
+
+  // 当 metric 变化时，重置版本状态
+  useEffect(() => {
+    setSelectedVersion(metric.currentVersion)
+    setVersions([])
+    setShowVersionPanel(false)
+  }, [metric.code, metric.currentVersion])
+
+  // 使用 ref 跟踪是否有数据，避免将 versionDetail 加入依赖数组
+  const hasDataRef = useRef(!!versionDetail)
 
   // 加载版本详情
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
+    // 只在首次加载时显示 loading，切换版本时保持旧数据避免抖动
+    if (!hasDataRef.current) {
+      setLoading(true)
+    }
     fetchMetricVersion(metric.code, selectedVersion)
       .then((data) => {
         if (!cancelled) {
           setVersionDetail({
+            name: data.name,
+            code: data.code,
+            type: data.type,
+            dataType: data.dataType,
+            comment: data.comment,
             calculationFormula: data.calculationFormula,
             unit: data.unit,
-            aggregationLogic: data.aggregationLogic,
+            unitName: data.unitName,
             refCatalogName: data.refCatalogName,
             refSchemaName: data.refSchemaName,
             refTableName: data.refTableName,
-            refColumnName: data.refColumnName
+            refColumnName: data.refColumnName,
+            audit: data.audit
           })
+          hasDataRef.current = true
         }
       })
       .catch(() => {
@@ -71,7 +103,7 @@ export function MetricOverview({ metric, onClose }: MetricOverviewProps) {
     }
     setLoadingVersions(true)
     try {
-      const data = await fetchMetricVersions(metric.code)
+      const data = await fetchMetricVersionNumbers(metric.code)
       setVersions(data.sort((a, b) => b - a)) // 降序排列
       setShowVersionPanel(true)
     } catch {
@@ -86,14 +118,35 @@ export function MetricOverview({ metric, onClose }: MetricOverviewProps) {
     setShowVersionPanel(false)
   }
 
-  const typeInfo = TYPE_LABELS[metric.type] || { label: metric.type, variant: 'blue' as const }
+  // 切换当前版本
+  const handleSwitchVersion = async () => {
+    if (selectedVersion === metric.currentVersion) return
+    setSwitching(true)
+    try {
+      const versionData = await apiSwitchMetricVersion(metric.code, selectedVersion)
+      // 用返回的版本数据构造更新后的 Metric
+      const updatedMetric: Metric = {
+        ...metric,
+        name: versionData.name,
+        code: versionData.code,
+        type: versionData.type,
+        dataType: versionData.dataType,
+        unit: versionData.unit,
+        unitName: versionData.unitName,
+        comment: versionData.comment,
+        currentVersion: selectedVersion
+      }
+      onVersionSwitch?.(updatedMetric)
+      onClose()
+    } catch {
+      // 错误已由统一客户端通过 toast 显示
+    } finally {
+      setSwitching(false)
+    }
+  }
 
-  // 构建资产引用路径
-  const assetPath = versionDetail?.refTableName
-    ? [versionDetail.refCatalogName, versionDetail.refSchemaName, versionDetail.refTableName, versionDetail.refColumnName]
-        .filter(Boolean)
-        .join(' / ')
-    : null
+  const typeKey = (versionDetail?.type || '').toUpperCase()
+  const typeInfo = TYPE_LABELS[typeKey] || { label: typeKey || '-', variant: 'blue' as const }
 
   return createPortal(
     <div className="fixed inset-0 z-[100] flex justify-end">
@@ -123,12 +176,14 @@ export function MetricOverview({ metric, onClose }: MetricOverviewProps) {
           {/* 指标名称和类型 */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-2">
-              <h1 className="text-title font-bold text-slate-900 dark:text-slate-100 tracking-tight">{metric.name}</h1>
-              <Badge variant={typeInfo.variant}>{typeInfo.label}</Badge>
+              <h1 className="text-title font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                {loading ? <Loader2 size={20} className="animate-spin" /> : versionDetail?.name || '-'}
+              </h1>
+              {!loading && <Badge variant={typeInfo.variant}>{typeKey || '-'}</Badge>}
             </div>
             <div className="flex items-center gap-3 mb-3">
-              <span className="text-body-sm font-mono text-slate-400 dark:text-slate-500 uppercase tracking-tight">
-                {metric.code}
+              <span className="text-body-sm font-mono font-semibold text-purple-600 dark:text-purple-400 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-700 px-3 py-1 rounded-lg tracking-wide">
+                {versionDetail?.code || metric.code}
               </span>
               <span className="text-micro font-mono text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded">
                 v{selectedVersion}
@@ -136,9 +191,23 @@ export function MetricOverview({ metric, onClose }: MetricOverviewProps) {
                   <span className="text-amber-500 ml-1">(非当前)</span>
                 )}
               </span>
+              {selectedVersion !== metric.currentVersion && (
+                <button
+                  onClick={handleSwitchVersion}
+                  disabled={switching}
+                  className="text-micro font-medium text-white bg-emerald-500 hover:bg-emerald-600 px-2 py-0.5 rounded transition-colors disabled:opacity-50 flex items-center gap-1"
+                >
+                  {switching ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <RotateCcw size={12} />
+                  )}
+                  设为当前版本
+                </button>
+              )}
             </div>
             <p className="text-slate-500 dark:text-slate-400 text-body-sm leading-relaxed">
-              {metric.comment || '暂无业务描述...'}
+              {loading ? <Loader2 size={14} className="animate-spin" /> : versionDetail?.comment || '暂无业务描述...'}
             </p>
           </div>
 
@@ -151,11 +220,15 @@ export function MetricOverview({ metric, onClose }: MetricOverviewProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                   <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">指标类型</div>
-                  <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">{typeInfo.label}</div>
+                  <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">
+                    {loading ? <Loader2 size={14} className="animate-spin" /> : typeKey || '-'}
+                  </div>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                   <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">数据类型</div>
-                  <div className="text-body-sm font-mono font-semibold text-cyan-600 dark:text-cyan-400">{metric.dataType || '-'}</div>
+                  <div className="text-body-sm font-mono font-semibold text-cyan-600 dark:text-cyan-400">
+                    {loading ? <Loader2 size={14} className="animate-spin" /> : versionDetail?.dataType || '-'}
+                  </div>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                   <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">当前版本</div>
@@ -164,46 +237,30 @@ export function MetricOverview({ metric, onClose }: MetricOverviewProps) {
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                   <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">单位</div>
                   <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">
-                    {loading ? <Loader2 size={14} className="animate-spin" /> : versionDetail?.unit || '-'}
+                    {loading ? <Loader2 size={14} className="animate-spin" /> : (
+                      versionDetail?.unitName ? (
+                        <>
+                          {versionDetail.unitSymbol && <span className="text-amber-500 mr-1">{versionDetail.unitSymbol}</span>}
+                          {versionDetail.unitName}
+                        </>
+                      ) : '-'
+                    )}
                   </div>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                   <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">创建人</div>
-                  <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">{metric.audit?.creator || '-'}</div>
+                  <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">
+                    {loading ? <Loader2 size={14} className="animate-spin" /> : versionDetail?.audit?.creator || '-'}
+                  </div>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                   <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">创建时间</div>
                   <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">
-                    {metric.audit?.createTime ? new Date(metric.audit.createTime).toLocaleDateString() : '-'}
+                    {loading ? <Loader2 size={14} className="animate-spin" /> : formatTime(versionDetail?.audit?.createTime)}
                   </div>
                 </div>
               </div>
             </section>
-
-            {/* 资产引用（原子指标） */}
-            {metric.type === 'ATOMIC' && (
-              <section>
-                <div className="text-micro font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <Database size={iconSizeToken.small} className="text-emerald-500" /> 物理资产引用
-                </div>
-                {loading ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 size={20} className="animate-spin text-slate-400" />
-                  </div>
-                ) : assetPath ? (
-                  <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800">
-                    <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-                      <Hash size={14} />
-                      <span className="font-mono text-body-sm">{assetPath}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center text-slate-400 text-caption">
-                    暂无物理资产引用
-                  </div>
-                )}
-              </section>
-            )}
 
             {/* 公式表达式 */}
             <section>

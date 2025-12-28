@@ -27,7 +27,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.dataset.MetricModifier;
 
 /** MetricModifier 实体，表示指标修饰符 */
 @ToString
@@ -37,8 +36,9 @@ public class MetricModifierEntity implements Entity, Auditable, HasIdentifier {
   public static final Field NAME = Field.required("name", String.class, "指标修饰符的名称");
   public static final Field NAMESPACE = Field.required("namespace", Namespace.class, "指标修饰符的命名空间");
   public static final Field CODE = Field.required("code", String.class, "指标修饰符的编码");
-  public static final Field TYPE = Field.required("type", MetricModifier.Type.class, "指标修饰符的类型");
   public static final Field COMMENT = Field.optional("comment", String.class, "指标修饰符的注释");
+  public static final Field MODIFIER_TYPE =
+      Field.optional("modifier_type", String.class, "指标修饰符的类型，来自值域");
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "指标修饰符的审计信息");
 
@@ -46,8 +46,8 @@ public class MetricModifierEntity implements Entity, Auditable, HasIdentifier {
   private String name;
   private Namespace namespace;
   private String code;
-  private MetricModifier.Type type;
   private String comment;
+  private String modifierType;
   private AuditInfo auditInfo;
 
   private MetricModifierEntity() {}
@@ -59,8 +59,8 @@ public class MetricModifierEntity implements Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(NAMESPACE, namespace);
     fields.put(CODE, code);
-    fields.put(TYPE, type);
     fields.put(COMMENT, comment);
+    fields.put(MODIFIER_TYPE, modifierType);
     fields.put(AUDIT_INFO, auditInfo);
     return fields;
   }
@@ -84,12 +84,12 @@ public class MetricModifierEntity implements Entity, Auditable, HasIdentifier {
     return code;
   }
 
-  public MetricModifier.Type modifierType() {
-    return type;
-  }
-
   public String comment() {
     return comment;
+  }
+
+  public String modifierType() {
+    return modifierType;
   }
 
   @Override
@@ -111,14 +111,14 @@ public class MetricModifierEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equals(name, that.name)
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(code, that.code)
-        && type == that.type
         && Objects.equals(comment, that.comment)
+        && Objects.equals(modifierType, that.modifierType)
         && Objects.equals(auditInfo, that.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, namespace, code, type, comment, auditInfo);
+    return Objects.hash(id, name, namespace, code, comment, modifierType, auditInfo);
   }
 
   public static Builder builder() {
@@ -152,13 +152,13 @@ public class MetricModifierEntity implements Entity, Auditable, HasIdentifier {
       return this;
     }
 
-    public Builder withType(MetricModifier.Type type) {
-      metricModifierEntity.type = type;
+    public Builder withComment(String comment) {
+      metricModifierEntity.comment = comment;
       return this;
     }
 
-    public Builder withComment(String comment) {
-      metricModifierEntity.comment = comment;
+    public Builder withModifierType(String modifierType) {
+      metricModifierEntity.modifierType = modifierType;
       return this;
     }
 

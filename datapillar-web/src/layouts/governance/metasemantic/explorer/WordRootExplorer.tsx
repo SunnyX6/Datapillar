@@ -3,9 +3,14 @@ import { ArrowLeft, Plus, BookA, Pencil, Trash2, Check, X, Loader2 } from 'lucid
 import { Badge } from '../components'
 import type { WordRoot } from '../types'
 import { iconSizeToken } from '@/design-tokens/dimensions'
-import { useSearchStore } from '@/stores'
-import { useIsZhCN } from '@/stores/i18nStore'
-import { fetchWordRoots, createWordRoot, deleteWordRoot, updateWordRoot, type CreateWordRootRequest, type UpdateWordRootRequest } from '@/services/oneMetaService'
+import { useSearchStore, useSemanticStatsStore } from '@/stores'
+import { useInfiniteScroll } from '@/hooks'
+import { fetchWordRoots, createWordRoot, deleteWordRoot, updateWordRoot, type CreateWordRootRequest, type UpdateWordRootRequest } from '@/services/oneMetaSemanticService'
+import { DataTypeSelector, parseDataTypeString, buildDataTypeString, type DataTypeValue } from '@/components/ui'
+import { formatTime } from '@/lib/utils'
+
+/** 每页加载数量 */
+const PAGE_SIZE = 20
 
 interface WordRootExplorerProps {
   onBack: () => void
@@ -15,49 +20,43 @@ interface WordRootExplorerProps {
 /** 新增行的表单状态 */
 interface NewRowForm {
   code: string
-  nameCn: string
-  nameEn: string
-  dataType: string
+  name: string
+  dataTypeValue: DataTypeValue
   comment: string
 }
 
 const emptyForm: NewRowForm = {
   code: '',
-  nameCn: '',
-  nameEn: '',
-  dataType: 'STRING',
+  name: '',
+  dataTypeValue: { type: 'STRING' },
   comment: ''
 }
-
-/** 数据类型选项 */
-const DATA_TYPES = ['STRING', 'NUMBER', 'DECIMAL', 'DATE', 'DATETIME', 'BOOLEAN']
 
 /** 词根行组件 */
 function WordRootRow({
   root,
+  isEditing,
+  onStartEdit,
+  onEndEdit,
   onClick,
   onDelete,
-  onUpdate,
-  isZhCN
+  onUpdate
 }: {
   root: WordRoot
+  isEditing: boolean
+  onStartEdit: () => void
+  onEndEdit: () => void
   onClick: () => void
   onDelete: (code: string) => void
   onUpdate: (code: string, updated: WordRoot) => void
-  isZhCN: boolean
 }) {
   const [deleting, setDeleting] = useState(false)
-  const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [editForm, setEditForm] = useState({
-    nameCn: root.nameCn,
-    nameEn: root.nameEn,
-    dataType: root.dataType || 'STRING',
+  const [editForm, setEditForm] = useState(() => ({
+    name: root.name,
+    dataTypeValue: parseDataTypeString(root.dataType),
     comment: root.comment || ''
-  })
-
-  // 当前语言下的编辑值
-  const currentEditName = isZhCN ? editForm.nameCn : editForm.nameEn
+  }))
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -73,42 +72,32 @@ function WordRootRow({
 
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setEditing(true)
+    onStartEdit()
   }
 
   const handleCancel = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setEditing(false)
+    onEndEdit()
     setEditForm({
-      nameCn: root.nameCn,
-      nameEn: root.nameEn,
-      dataType: root.dataType || 'STRING',
+      name: root.name,
+      dataTypeValue: parseDataTypeString(root.dataType),
       comment: root.comment || ''
     })
   }
 
-  const handleNameChange = (value: string) => {
-    if (isZhCN) {
-      setEditForm({ ...editForm, nameCn: value })
-    } else {
-      setEditForm({ ...editForm, nameEn: value })
-    }
-  }
-
   const handleSave = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (saving || !currentEditName.trim()) return
+    if (saving || !editForm.name.trim()) return
     setSaving(true)
     try {
       const request: UpdateWordRootRequest = {
-        nameCn: editForm.nameCn.trim() || root.nameCn,
-        nameEn: editForm.nameEn.trim() || root.nameEn,
-        dataType: editForm.dataType,
+        name: editForm.name.trim(),
+        dataType: buildDataTypeString(editForm.dataTypeValue),
         comment: editForm.comment.trim() || undefined
       }
       const updated = await updateWordRoot(root.code, request)
       onUpdate(root.code, updated)
-      setEditing(false)
+      onEndEdit()
     } catch {
       // 保存失败
     } finally {
@@ -116,35 +105,29 @@ function WordRootRow({
     }
   }
 
-  const displayName = isZhCN ? root.nameCn : root.nameEn
-
-  if (editing) {
+  if (isEditing) {
     return (
       <tr className="bg-blue-50/50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800">
         <td className="px-4 py-2">
           <div className="space-y-1">
             <input
               type="text"
-              value={currentEditName}
-              onChange={(e) => handleNameChange(e.target.value)}
+              value={editForm.name}
+              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               onClick={(e) => e.stopPropagation()}
-              placeholder={isZhCN ? '中文名' : 'English Name'}
+              placeholder="词根名称"
               className="w-full px-2 py-1 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="text-micro font-mono text-slate-400 uppercase px-1">{root.code}</div>
           </div>
         </td>
-        <td className="px-4 py-2 text-center">
-          <select
-            value={editForm.dataType}
-            onChange={(e) => setEditForm({ ...editForm, dataType: e.target.value })}
-            onClick={(e) => e.stopPropagation()}
-            className="px-2 py-1.5 text-body-sm font-mono border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {DATA_TYPES.map((type) => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
+        <td className="px-4 py-2">
+          <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+            <DataTypeSelector
+              value={editForm.dataTypeValue}
+              onChange={(value) => setEditForm({ ...editForm, dataTypeValue: value })}
+            />
+          </div>
         </td>
         <td className="px-4 py-2">
           <input
@@ -160,10 +143,13 @@ function WordRootRow({
           <span className="text-caption text-slate-400">{root.audit?.creator || '-'}</span>
         </td>
         <td className="px-4 py-2">
+          <span className="text-caption text-slate-400">{formatTime(root.audit?.createTime)}</span>
+        </td>
+        <td className="px-4 py-2">
           <div className="flex items-center justify-center gap-1">
             <button
               onClick={handleSave}
-              disabled={saving || !currentEditName.trim()}
+              disabled={saving || !editForm.name.trim()}
               className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors disabled:opacity-50"
               title="保存"
             >
@@ -195,7 +181,7 @@ function WordRootRow({
           </div>
           <div>
             <div className="font-medium text-slate-800 dark:text-slate-100 text-body-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-              {displayName}
+              {root.name}
             </div>
             <div className="text-micro font-mono text-slate-400 dark:text-slate-500 uppercase tracking-tight">{root.code}</div>
           </div>
@@ -211,6 +197,9 @@ function WordRootRow({
       </td>
       <td className="px-4 py-3">
         <div className="text-caption text-slate-500 dark:text-slate-400">{root.audit?.creator || '-'}</div>
+      </td>
+      <td className="px-4 py-3">
+        <div className="text-caption text-slate-500 dark:text-slate-400">{formatTime(root.audit?.createTime)}</div>
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center justify-center gap-1">
@@ -241,29 +230,15 @@ function NewWordRootRow({
   onChange,
   onSave,
   onCancel,
-  saving,
-  isZhCN
+  saving
 }: {
   form: NewRowForm
   onChange: (form: NewRowForm) => void
   onSave: () => void
   onCancel: () => void
   saving: boolean
-  isZhCN: boolean
 }) {
-  // 当前语言下的名称值
-  const currentName = isZhCN ? form.nameCn : form.nameEn
-
-  // 验证：编码必填，当前语言名称必填
-  const isValid = form.code.trim() && currentName.trim()
-
-  const handleNameChange = (value: string) => {
-    if (isZhCN) {
-      onChange({ ...form, nameCn: value })
-    } else {
-      onChange({ ...form, nameEn: value })
-    }
-  }
+  const isValid = form.code.trim() && form.name.trim()
 
   return (
     <tr className="bg-blue-50/50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800">
@@ -271,32 +246,27 @@ function NewWordRootRow({
         <div className="space-y-1">
           <input
             type="text"
-            value={currentName}
-            onChange={(e) => handleNameChange(e.target.value)}
-            placeholder={isZhCN ? '中文名' : 'English Name'}
+            value={form.name}
+            onChange={(e) => onChange({ ...form, name: e.target.value })}
+            placeholder="词根名称"
             className="w-full px-2 py-1 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <input
             type="text"
             value={form.code}
-            onChange={(e) => onChange({ ...form, code: e.target.value })}
+            onChange={(e) => onChange({ ...form, code: e.target.value.toUpperCase() })}
             placeholder="编码 (CODE)"
             className="w-full px-2 py-1 text-micro font-mono uppercase border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </td>
       <td className="px-4 py-2 text-center">
-        <select
-          value={form.dataType}
-          onChange={(e) => onChange({ ...form, dataType: e.target.value })}
-          className="px-2 py-1.5 text-body-sm font-mono border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {DATA_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </select>
+        <div className="flex justify-center">
+          <DataTypeSelector
+            value={form.dataTypeValue}
+            onChange={(value) => onChange({ ...form, dataTypeValue: value })}
+          />
+        </div>
       </td>
       <td className="px-4 py-2">
         <input
@@ -306,6 +276,9 @@ function NewWordRootRow({
           placeholder="描述（可选）"
           className="w-full px-2 py-1.5 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+      </td>
+      <td className="px-4 py-2">
+        <span className="text-caption text-slate-400">-</span>
       </td>
       <td className="px-4 py-2">
         <span className="text-caption text-slate-400">-</span>
@@ -336,31 +309,61 @@ function NewWordRootRow({
 
 export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps) {
   const searchTerm = useSearchStore((state) => state.searchTerm)
-  const isZhCN = useIsZhCN()
+  const setWordRootsTotal = useSemanticStatsStore((state) => state.setWordRootsTotal)
 
   // 数据状态
   const [wordRoots, setWordRoots] = useState<WordRoot[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   // 新增行状态
   const [showNewRow, setShowNewRow] = useState(false)
   const [newRowForm, setNewRowForm] = useState<NewRowForm>(emptyForm)
   const [saving, setSaving] = useState(false)
 
-  // 加载数据
+  // 当前编辑行的 code（同时只能编辑一行）
+  const [editingCode, setEditingCode] = useState<string | null>(null)
+
+  // 是否还有更多数据
+  const hasMore = wordRoots.length < total
+
+  // 加载首页数据
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await fetchWordRoots(0, 100)
+      const result = await fetchWordRoots(0, PAGE_SIZE)
       setWordRoots(result.items)
       setTotal(result.total)
+      setWordRootsTotal(result.total)
     } catch {
       // 加载失败时保持空列表
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [setWordRootsTotal])
+
+  // 加载更多数据
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const result = await fetchWordRoots(wordRoots.length, PAGE_SIZE)
+      setWordRoots((prev) => [...prev, ...result.items])
+      setTotal(result.total)
+    } catch {
+      // 加载失败
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [loadingMore, hasMore, wordRoots.length])
+
+  // 无限滚动
+  const { sentinelRef } = useInfiniteScroll({
+    hasMore,
+    loading: loadingMore,
+    onLoadMore: loadMore
+  })
 
   useEffect(() => {
     loadData()
@@ -370,8 +373,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
   const filteredRoots = wordRoots.filter(
     (r) =>
       r.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.nameCn.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.nameEn.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (r.comment && r.comment.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
@@ -382,9 +384,8 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
     try {
       const request: CreateWordRootRequest = {
         code: newRowForm.code.trim().toUpperCase(),
-        nameCn: newRowForm.nameCn.trim(),
-        nameEn: newRowForm.nameEn.trim(),
-        dataType: newRowForm.dataType,
+        name: newRowForm.name.trim(),
+        dataType: buildDataTypeString(newRowForm.dataTypeValue),
         comment: newRowForm.comment.trim() || undefined
       }
       const newRoot = await createWordRoot(request)
@@ -418,6 +419,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
 
   // 显示新增行
   const handleShowNewRow = () => {
+    setEditingCode(null) // 取消当前编辑行
     setShowNewRow(true)
   }
 
@@ -450,16 +452,17 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
             <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-semibold text-micro uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3 w-56">词根名称 / 编码</th>
-                <th className="px-4 py-3 w-28 text-center">数据类型</th>
+                <th className="px-4 py-3 w-52 text-center">数据类型</th>
                 <th className="px-4 py-3">描述</th>
                 <th className="px-4 py-3 w-24">创建人</th>
+                <th className="px-4 py-3 w-40">创建时间</th>
                 <th className="px-4 py-3 w-24 text-center">操作</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center">
+                  <td colSpan={6} className="px-4 py-12 text-center">
                     <Loader2 className="w-6 h-6 animate-spin text-blue-500 mx-auto" />
                     <div className="text-slate-400 text-caption mt-2">加载中...</div>
                   </td>
@@ -467,7 +470,16 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
               ) : (
                 <>
                   {filteredRoots.map((root) => (
-                    <WordRootRow key={root.code} root={root} onClick={() => onOpenDrawer(root)} onDelete={handleDelete} onUpdate={handleUpdate} isZhCN={isZhCN} />
+                    <WordRootRow
+                      key={root.code}
+                      root={root}
+                      isEditing={editingCode === root.code}
+                      onStartEdit={() => setEditingCode(root.code)}
+                      onEndEdit={() => setEditingCode(null)}
+                      onClick={() => onOpenDrawer(root)}
+                      onDelete={handleDelete}
+                      onUpdate={handleUpdate}
+                    />
                   ))}
                   {showNewRow && (
                     <NewWordRootRow
@@ -476,12 +488,11 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
                       onSave={handleSaveNewRow}
                       onCancel={handleCancelNewRow}
                       saving={saving}
-                      isZhCN={isZhCN}
                     />
                   )}
                   {filteredRoots.length === 0 && !showNewRow && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-12 @md:py-16 text-center text-slate-400 text-caption @md:text-body-sm">
+                      <td colSpan={6} className="px-4 py-12 @md:py-16 text-center text-slate-400 text-caption @md:text-body-sm">
                         未找到匹配的词根
                       </td>
                     </tr>
@@ -490,6 +501,13 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
               )}
             </tbody>
           </table>
+          {/* 哨兵元素 + 加载更多 */}
+          <div ref={sentinelRef} className="h-1" />
+          {loadingMore && (
+            <div className="flex justify-center py-4 border-t border-slate-100 dark:border-slate-800">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+            </div>
+          )}
         </div>
       </div>
     </div>

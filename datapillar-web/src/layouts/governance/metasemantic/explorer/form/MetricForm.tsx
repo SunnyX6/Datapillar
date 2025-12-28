@@ -7,9 +7,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Target, Zap, Layers, ArrowRight, ChevronLeft, CheckCircle2, Loader2, Sparkles, AlertTriangle } from 'lucide-react'
-import { Modal, ModalCancelButton, ModalPrimaryButton } from '@/components/Modal'
-import { fetchMetricVersion, fetchWordRoots } from '@/services/oneMetaService'
-import { aiFillMetric, aiCheckMetric, type AICheckResponse } from '@/services/metricAIService'
+import { Modal, ModalCancelButton, ModalPrimaryButton } from '@/components/ui'
+import { parseDataTypeString } from '@/components/ui'
+import { fetchMetricVersion, fetchUnits, fetchModifiers, fetchWordRoots, fetchMetrics, type UnitDTO, type MetricModifierDTO, type WordRootDTO } from '@/services/oneMetaSemanticService'
+import { aiFillMetric } from '@/services/metricAIService'
 import type { MetricType, Metric } from '../types'
 import { MetricFormLeft } from './MetricFormLeft'
 import { MetricFormRight } from './MetricFormRight'
@@ -43,31 +44,14 @@ const METRIC_TYPE_CONFIG: Record<MetricType, { label: string; desc: string; icon
 
 const DATA_TYPES = ['INTEGER', 'LONG', 'DOUBLE', 'DECIMAL']
 
-/** 单位数据 - 与侧边栏保持一致 */
-const UNITS = [
-  { symbol: '¥', name: '人民币', code: 'CURRENCY' },
-  { symbol: '%', name: '百分比', code: 'RATIO' },
-  { symbol: '人', name: '人数', code: 'COUNT' },
-  { symbol: 's', name: '秒', code: 'TIME' },
-  { symbol: '个', name: '个数', code: 'PIECE' },
-  { symbol: '次', name: '次数', code: 'TIMES' }
-]
-
-/** 修饰符数据 - 与侧边栏保持一致 */
-const MODIFIERS = [
-  { symbol: 'Σ', name: '累计', code: 'CUM' },
-  { symbol: 'Δ', name: '同比', code: 'YOY' },
-  { symbol: '环', name: '环比', code: 'MOM' },
-  { symbol: '均', name: '平均', code: 'AVG' },
-  { symbol: '最', name: '最大', code: 'MAX' },
-  { symbol: '小', name: '最小', code: 'MIN' }
-]
-
 const emptyForm: MetricFormData = {
   name: '',
   code: '',
-  baseCode: '',
+  customSuffix: '',
+  wordRoots: [],
+  aggregation: '',
   modifiers: [],
+  baseCode: '',
   type: 'ATOMIC',
   dataType: '',
   precision: 10,
@@ -76,7 +60,8 @@ const emptyForm: MetricFormData = {
   unit: '',
   formula: '',
   measureColumns: [],
-  filterColumns: []
+  filterColumns: [],
+  compositeMetrics: []
 }
 
 interface MetricFormProps {
@@ -94,65 +79,158 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
   const [form, setForm] = useState<MetricFormData>(emptyForm)
   const [loadingVersion, setLoadingVersion] = useState(false)
   const formulaRef = useRef<HTMLTextAreaElement>(null)
-  const checkResultRef = useRef<HTMLDivElement>(null)
 
   // AI 相关状态
   const [aiInput, setAiInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
-  const [checking, setChecking] = useState(false)
-  const [checkResult, setCheckResult] = useState<AICheckResponse | null>(null)
-  const [wordRoots, setWordRoots] = useState<{ code: string; name: string }[]>([])
+  const [aiWarning, setAiWarning] = useState('')
+  const [aiSuggestedMeasures, setAiSuggestedMeasures] = useState<string[]>([])
+  const [aiSuggestedFilters, setAiSuggestedFilters] = useState<string[]>([])
 
-  // 加载词根
-  useEffect(() => {
-    if (!isOpen) return
-    fetchWordRoots(0, 100)
-      .then((data) => setWordRoots(data.items.map((r) => ({ code: r.code, name: r.nameCn }))))
-      .catch(() => setWordRoots([]))
-  }, [isOpen])
+  // 单位、修饰符、词根数据（懒加载）
+  const [units, setUnits] = useState<UnitDTO[]>([])
+  const [modifiers, setModifiers] = useState<MetricModifierDTO[]>([])
+  const [wordRoots, setWordRoots] = useState<WordRootDTO[]>([])
+  const [atomicMetrics, setAtomicMetrics] = useState<Array<{ code: string; name: string; comment?: string }>>([])
+  const [modifierTotal, setModifierTotal] = useState(0)
+  const [atomicTotal, setAtomicTotal] = useState(0)
 
-  // 编辑模式：加载指标版本详情
+  // 加载单位（点击下拉时懒加载）
+  const loadUnits = useCallback(async () => {
+    if (units.length > 0) return units
+    const data = await fetchUnits(0, 100).catch(() => ({ items: [] }))
+    setUnits(data.items)
+    return data.items
+  }, [units])
+
+  // 加载修饰符（点击下拉时懒加载）
+  const loadModifiers = useCallback(async () => {
+    if (modifiers.length > 0) return modifiers
+    const data = await fetchModifiers(0, 100).catch(() => ({ items: [], total: 0 }))
+    setModifiers(data.items)
+    setModifierTotal(data.total || data.items.length)
+    return data.items
+  }, [modifiers])
+
+  // 加载词根（点击下拉时懒加载）
+  const loadWordRoots = useCallback(async () => {
+    if (wordRoots.length > 0) return wordRoots
+    const data = await fetchWordRoots(0, 200).catch(() => ({ items: [] }))
+    setWordRoots(data.items)
+    return data.items
+  }, [wordRoots])
+
+  // 加载原子指标列表（派生指标用）
+  const loadAtomicMetrics = useCallback(async () => {
+    if (atomicMetrics.length > 0) return atomicMetrics
+    const data = await fetchMetrics(0, 500).catch(() => ({ items: [], total: 0 }))
+    const atomics = data.items
+      .filter((m) => m.type.toUpperCase() === 'ATOMIC')
+      .map((m) => ({ code: m.code, name: m.name, comment: m.comment }))
+    setAtomicMetrics(atomics)
+    setAtomicTotal(data.total || atomics.length)
+    return atomics
+  }, [atomicMetrics])
+
+  // 用于防止编辑保存成功后重复请求
+  const loadedMetricCodeRef = useRef<string | null>(null)
+
+  // 编辑模式：加载指标版本详情（只在首次打开时加载）
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      // 弹窗关闭时重置
+      loadedMetricCodeRef.current = null
+      return
+    }
 
     if (isEditMode && editMetric) {
+      // 如果已经加载过这个指标的数据，不再重复请求
+      if (loadedMetricCodeRef.current === editMetric.code) {
+        return
+      }
+
       setStep(2)
       setLoadingVersion(true)
-      // 确保 type 是大写格式
+      loadedMetricCodeRef.current = editMetric.code
+
       const metricType = (editMetric.type?.toUpperCase() || 'ATOMIC') as MetricType
-      // 获取当前版本详情以获取公式
       fetchMetricVersion(editMetric.code, editMetric.currentVersion)
         .then((versionData) => {
+          let measureColumns: MeasureColumn[] = []
+          let filterColumns: FilterColumn[] = []
+          try {
+            if (versionData.measureColumns) {
+              measureColumns = JSON.parse(versionData.measureColumns)
+            }
+            if (versionData.filterColumns) {
+              const parsed = JSON.parse(versionData.filterColumns)
+              filterColumns = parsed.map((col: { name: string; type: string; comment?: string; values?: string[] }) => ({
+                name: col.name,
+                type: col.type,
+                comment: col.comment,
+                values: (col.values || []).map((v: string) => ({ key: v, label: v }))
+              }))
+            }
+          } catch {
+            // JSON 解析失败，保持空数组
+          }
+
+          const parsedDataType = parseDataTypeString(editMetric.dataType)
+
+          // 处理 parentMetricCodes：派生指标取第一个作为 baseCode，复合指标转换为 compositeMetrics
+          const parentCodes = versionData.parentMetricCodes || []
+          let baseCode = ''
+          let compositeMetrics: Array<{ code: string; name: string }> = []
+          if (metricType === 'DERIVED' && parentCodes.length > 0) {
+            baseCode = parentCodes[0]
+          } else if (metricType === 'COMPOSITE' && parentCodes.length > 0) {
+            compositeMetrics = parentCodes.map((code) => ({ code, name: code }))
+          }
+
           setForm({
             name: editMetric.name,
             code: editMetric.code,
-            baseCode: '',
+            customSuffix: '',
+            wordRoots: [],
+            aggregation: '',
+            baseCode,
             modifiers: [],
             type: metricType,
-            dataType: editMetric.dataType || '',
-            precision: 10,
-            scale: 2,
+            dataType: parsedDataType.type || '',
+            precision: parsedDataType.precision ?? 10,
+            scale: parsedDataType.scale ?? 2,
             comment: editMetric.comment || '',
             unit: versionData.unit || '',
+            unitName: versionData.unitName || '',
+            unitSymbol: versionData.unitSymbol || '',
             formula: versionData.calculationFormula || '',
-            measureColumns: [],
-            filterColumns: []
+            measureColumns,
+            filterColumns,
+            refCatalog: versionData.refCatalogName,
+            refSchema: versionData.refSchemaName,
+            refTable: versionData.refTableName,
+            compositeMetrics
           })
         })
         .catch(() => {
-          // 获取版本详情失败，使用基本信息
+          const parsedDataType = parseDataTypeString(editMetric.dataType)
           setForm({
             name: editMetric.name,
             code: editMetric.code,
+            customSuffix: '',
+            wordRoots: [],
+            aggregation: '',
             baseCode: '',
             modifiers: [],
-            type: metricType,
-            dataType: editMetric.dataType || '',
-            precision: 10,
-            scale: 2,
+            type: (editMetric.type?.toUpperCase() || 'ATOMIC') as MetricType,
+            dataType: parsedDataType.type || '',
+            precision: parsedDataType.precision ?? 10,
+            scale: parsedDataType.scale ?? 2,
             comment: editMetric.comment || '',
             unit: '',
+            unitName: '',
+            unitSymbol: '',
             formula: '',
             measureColumns: [],
             filterColumns: []
@@ -170,49 +248,28 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
     setForm(emptyForm)
     setAiInput('')
     setAiError('')
-    setChecking(false)
-    setCheckResult(null)
+    setAiWarning('')
     onClose()
   }
 
   const handleSelectType = (type: MetricType) => {
     setForm({ ...emptyForm, type })
+    setAiInput('')
+    setAiError('')
+    setAiWarning('')
     setStep(2)
+  }
+
+  const handleBack = () => {
+    setStep(1)
+    setForm(emptyForm)
+    setAiInput('')
+    setAiError('')
+    setAiWarning('')
   }
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.code.trim() || !form.formula.trim()) return
-
-    // 先调用 AI Check
-    setChecking(true)
-    setCheckResult(null)
-    try {
-      const result = await aiCheckMetric({
-        form: {
-          name: form.name,
-          code: form.code,
-          type: form.type,
-          dataType: form.dataType,
-          unit: form.unit,
-          calculationFormula: form.formula,
-          comment: form.comment
-        }
-      })
-      setCheckResult(result)
-
-      // 有 error 级别问题时阻止保存，并滚动到检查结果
-      if (result.issues.some((i) => i.severity === 'error')) {
-        setTimeout(() => {
-          checkResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }, 100)
-        return
-      }
-    } catch {
-      // Check 失败时继续保存
-    } finally {
-      setChecking(false)
-    }
-
     onSave(form)
   }
 
@@ -227,25 +284,54 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
       return
     }
     if (form.type === 'DERIVED' && !form.baseCode) {
-      setAiError('请先在右侧选择基础指标')
+      setAiError('请先在指标编码区选择一个原子指标')
+      return
+    }
+    if (form.type === 'COMPOSITE' && (!form.compositeMetrics || form.compositeMetrics.length < 2)) {
+      setAiError('请先在右侧选择至少两个参与运算的指标')
       return
     }
 
     setAiLoading(true)
-    setCheckResult(null)
 
     try {
+      // 懒加载单位数据
+      await loadUnits()
+
       const payload: Record<string, unknown> = {}
 
       if (form.type === 'ATOMIC') {
         payload.measureColumns = form.measureColumns
         payload.filterColumns = form.filterColumns
+        // 传递表的引用信息，让后端查询表的上下文
+        payload.refCatalog = form.refCatalog
+        payload.refSchema = form.refSchema
+        payload.refTable = form.refTable
       } else if (form.type === 'DERIVED') {
-        payload.baseMetric = { code: form.baseCode }
-        payload.modifiers = form.modifiers
+        // 基础指标：code + name + description
+        const baseMetricInfo = atomicMetrics.find((m) => m.code === form.baseCode)
+        payload.baseMetric = {
+          code: form.baseCode,
+          name: baseMetricInfo?.name || form.baseCode,
+          description: baseMetricInfo?.comment
+        }
+        // 修饰符：code + name
+        payload.modifiers = form.modifiers.map((code) => {
+          const mod = modifiers.find((m) => m.code === code)
+          return { code, name: mod?.name || code }
+        })
+        // 过滤列和表引用（可选）
+        payload.filterColumns = form.filterColumns
+        payload.refCatalog = form.refCatalog
+        payload.refSchema = form.refSchema
+        payload.refTable = form.refTable
       } else {
-        payload.metrics = []
-        payload.operation = 'divide'
+        // 复合指标：用户选择的指标列表（code + name + description）
+        payload.metrics = (form.compositeMetrics || []).map((m) => ({
+          code: m.code,
+          name: m.name,
+          description: m.comment
+        }))
       }
 
       const result = await aiFillMetric({
@@ -255,23 +341,67 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
           payload,
           formOptions: {
             dataTypes: DATA_TYPES,
-            units: UNITS.map((u) => u.code),
-            wordRoots: wordRoots,
-            modifiers: MODIFIERS.map((m) => ({ code: m.code, name: m.name }))
+            // 用户选了就传，没选就不传（后端会查 Neo4j）
+            units: form.unit ? [form.unit] : undefined,
+            // 用户选了词根就传
+            wordRoots: form.wordRoots.length > 0
+              ? form.wordRoots.map((code) => {
+                  const root = wordRoots.find((r) => r.code === code)
+                  return { code, name: root?.name || code }
+                })
+              : undefined,
+            // 派生指标：用户选了修饰符就传
+            modifiers: form.modifiers.length > 0
+              ? form.modifiers.map((code) => {
+                  const mod = modifiers.find((m) => m.code === code)
+                  return { code, name: mod?.name || code }
+                })
+              : undefined
           }
         }
       })
 
+      // 处理 AI 返回的警告信息：有 warning 就只显示警告，不更新表单
+      if (result.warning) {
+        setAiWarning(result.warning)
+        return
+      }
+      setAiWarning('')
+
+      // 设置 AI 建议的列，触发自动选中
+      setAiSuggestedMeasures(result.measureColumns || [])
+      setAiSuggestedFilters(result.filterColumns || [])
+
       // 应用 AI 填写结果
-      setForm((prev) => ({
-        ...prev,
-        name: result.name || prev.name,
-        code: result.code || prev.code,
-        dataType: result.dataType || prev.dataType,
-        unit: result.unit || prev.unit,
-        formula: result.calculationFormula || prev.formula,
-        comment: result.comment || prev.comment
-      }))
+      setForm((prev) => {
+        const newWordRoots = result.wordRoots || prev.wordRoots
+        const newModifiers = result.modifiersSelected || prev.modifiers
+        const newAggregation = result.aggregation || prev.aggregation
+
+        // 拼接 code: 原子/复合指标 = wordRoots + aggregation + customSuffix
+        //          派生指标 = baseCode + modifiers + customSuffix
+        let code: string
+        if (prev.type === 'DERIVED') {
+          const parts = [prev.baseCode, ...newModifiers, prev.customSuffix].filter(Boolean)
+          code = parts.join('_').toUpperCase()
+        } else {
+          const parts = [...newWordRoots, newAggregation, prev.customSuffix].filter(Boolean)
+          code = parts.join('_').toUpperCase()
+        }
+
+        return {
+          ...prev,
+          name: result.name || prev.name,
+          wordRoots: newWordRoots,
+          aggregation: newAggregation,
+          modifiers: newModifiers,
+          code,
+          dataType: result.dataType || prev.dataType,
+          unit: result.unit || prev.unit,
+          formula: result.calculationFormula || prev.formula,
+          comment: result.comment || prev.comment
+        }
+      })
     } catch {
       setAiError('AI 填写失败，请重试')
     } finally {
@@ -321,36 +451,81 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
     }
   }
 
-  // 派生/复合指标：仅插入公式
-  const insertDerivedFormula = (text: string) => {
-    setForm({ ...form, formula: text })
-    setTimeout(() => {
-      formulaRef.current?.focus()
-    }, 0)
-  }
-
-  // 派生指标：自动拼接编码 = baseCode + modifiers
-  const updateDerivedCode = useCallback((baseCode: string, modifiers: string[]) => {
-    const parts = [baseCode, ...modifiers].filter(Boolean)
+  // 自动拼接 code: 原子/复合指标 = wordRoots + aggregation + customSuffix
+  const updateCode = useCallback((
+    customSuffix: string,
+    selectedWordRoots: string[],
+    aggregation: string
+  ) => {
+    const parts = [...selectedWordRoots, aggregation, customSuffix].filter(Boolean)
     const code = parts.join('_').toUpperCase()
-    setForm((prev) => ({ ...prev, baseCode, modifiers, code }))
+    setForm((prev) => ({
+      ...prev,
+      customSuffix,
+      wordRoots: selectedWordRoots,
+      aggregation,
+      code
+    }))
   }, [])
 
-  // 添加修饰符
-  const addModifier = (modifierCode: string) => {
-    if (form.modifiers.includes(modifierCode)) return
-    const newModifiers = [...form.modifiers, modifierCode]
-    updateDerivedCode(form.baseCode, newModifiers)
+  // 添加词根
+  const addWordRoot = (rootCode: string) => {
+    if (form.wordRoots.includes(rootCode)) return
+    const newWordRoots = [...form.wordRoots, rootCode]
+    updateCode(form.customSuffix, newWordRoots, form.aggregation)
   }
 
-  // 移除修饰符
-  const removeModifier = (modifierCode: string) => {
-    const newModifiers = form.modifiers.filter((m) => m !== modifierCode)
-    updateDerivedCode(form.baseCode, newModifiers)
+  // 移除词根
+  const removeWordRoot = (rootCode: string) => {
+    const newWordRoots = form.wordRoots.filter((r) => r !== rootCode)
+    updateCode(form.customSuffix, newWordRoots, form.aggregation)
+  }
+
+  // 更新聚合函数
+  const updateAggregation = (aggregation: string) => {
+    updateCode(form.customSuffix, form.wordRoots, aggregation)
+  }
+
+  // 更新自定义后缀
+  const updateCustomSuffix = (customSuffix: string) => {
+    updateCode(customSuffix, form.wordRoots, form.aggregation)
+  }
+
+  // 派生指标：更新基础指标 code 和修饰符
+  const updateDerivedCode = (baseCode: string, selectedModifiers: string[], customSuffix?: string) => {
+    // 派生指标的 code = baseCode + modifiers + customSuffix
+    setForm((prev) => {
+      const suffix = customSuffix ?? prev.customSuffix
+      const parts = [baseCode, ...selectedModifiers, suffix].filter(Boolean)
+      const code = parts.join('_').toUpperCase()
+      return {
+        ...prev,
+        baseCode,
+        modifiers: selectedModifiers,
+        customSuffix: suffix,
+        code
+      }
+    })
+  }
+
+  // 派生指标：更新自定义后缀
+  const updateDerivedCustomSuffix = (customSuffix: string) => {
+    updateDerivedCode(form.baseCode, form.modifiers, customSuffix)
   }
 
   const isValid = form.name.trim() && form.code.trim() && form.formula.trim()
   const typeConfig = METRIC_TYPE_CONFIG[form.type] || METRIC_TYPE_CONFIG.ATOMIC
+
+  // 派生场景提前预取下拉数据，避免首次打开闪烁
+  useEffect(() => {
+    if (!isOpen || step !== 2 || form.type !== 'DERIVED') return
+    if (atomicMetrics.length === 0) {
+      loadAtomicMetrics()
+    }
+    if (modifiers.length === 0) {
+      loadModifiers()
+    }
+  }, [isOpen, step, form.type, atomicMetrics.length, modifiers.length, loadAtomicMetrics, loadModifiers])
 
   // Step 1: 选择指标类型
   if (step === 1) {
@@ -396,61 +571,52 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
       isOpen={isOpen}
       onClose={handleClose}
       size="lg"
-      title={isEditMode ? '编辑指标' : '配置指标详情'}
+      title={
+        <div className="flex items-center gap-3">
+          {!isEditMode && (
+            <button onClick={handleBack} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 transition-all">
+              <ChevronLeft size={18} />
+            </button>
+          )}
+          <span>{isEditMode ? '编辑指标' : '配置指标详情'}</span>
+          <span className={`text-caption font-medium px-2 py-0.5 rounded ${typeConfig.bg} ${typeConfig.color}`}>
+            {typeConfig.label}
+          </span>
+        </div>
+      }
       footer={
         <>
-          <ModalCancelButton onClick={handleClose} disabled={saving || checking || loadingVersion} />
-          <ModalPrimaryButton onClick={handleSave} disabled={!isValid || loadingVersion || checking} loading={saving || checking}>
-            {checking ? (
-              <>检查中...</>
-            ) : (
-              <><CheckCircle2 size={16} /> {isEditMode ? '保存修改' : '确认发布'}</>
-            )}
+          <ModalCancelButton onClick={handleClose} disabled={saving || loadingVersion} />
+          <ModalPrimaryButton onClick={handleSave} disabled={!isValid || loadingVersion} loading={saving}>
+            <CheckCircle2 size={16} /> {isEditMode ? '保存修改' : '确认发布'}
           </ModalPrimaryButton>
         </>
       }
     >
-      {/* 返回按钮和类型标签 */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          {!isEditMode && (
-            <button onClick={() => setStep(1)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 transition-all">
-              <ChevronLeft size={20} />
-            </button>
-          )}
-          <div className="flex items-center gap-2">
-            <span className="text-caption text-slate-400">指标类型:</span>
-            <span className={`text-caption font-semibold px-2 py-0.5 rounded ${typeConfig.bg} ${typeConfig.color}`}>
-              {typeConfig.label}
-            </span>
-          </div>
-        </div>
-      </div>
-
       <div className="flex flex-col gap-6 min-h-0 flex-1 overflow-hidden">
-        {/* AI 辅助填写 */}
+        {/* AI 帮写 */}
         <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-2xl border border-purple-100 dark:border-purple-800/50 shrink-0">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles size={16} className="text-purple-500" />
-            <span className="text-caption font-semibold text-purple-700 dark:text-purple-300">AI 辅助填写</span>
+            <span className="text-caption font-semibold text-purple-700 dark:text-purple-300">AI 帮写</span>
           </div>
           <div className="flex gap-2">
             <input
               type="text"
               placeholder={
                 form.type === 'ATOMIC'
-                  ? '选择右侧资产，然后描述您想要创建的指标，例如：单价和数量相乘，过滤掉未支付状态的订单'
+                  ? '先在右侧选择度量列，然后描述指标，例如：单价和数量相乘，累加订单总金额'
                   : form.type === 'DERIVED'
-                    ? '选择基础指标和修饰符，描述派生规则，例如：基于订单金额统计北京地区的月度累计值'
-                    : '选择多个指标进行运算，例如：销售额减去成本再除以销售额，计算毛利率百分比'
+                    ? '先在左侧编码区选择原子指标，右侧选择维度过滤列，例如：统计北京地区的月度累计值'
+                    : '先在右侧选择至少两个指标，然后描述运算规则，例如：销售额减成本再除以销售额'
               }
-              className="flex-1 bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 rounded-xl px-4 py-2.5 text-body-sm placeholder:text-slate-400 focus:outline-none focus:border-purple-500 transition-all"
+              className="flex-1 bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-purple-500 transition-all"
               value={aiInput}
               onChange={(e) => {
                 setAiInput(e.target.value)
                 setAiError('')
               }}
-              onKeyDown={(e) => e.key === 'Enter' && handleAiFill()}
+              onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && handleAiFill()}
               disabled={aiLoading}
             />
             <button
@@ -468,70 +634,15 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
               {aiError}
             </div>
           )}
-        </div>
-
-        {/* AI 检查结果 */}
-        {checkResult && checkResult.issues.length > 0 && (
-          <div ref={checkResultRef} className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-200 dark:border-amber-800/50 shrink-0">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <AlertTriangle size={16} className="text-amber-500" />
-                <span className="text-caption font-semibold text-amber-700 dark:text-amber-300">语义检查发现问题</span>
+          {aiWarning && (
+            <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                <span className="text-caption text-amber-700 dark:text-amber-300">{aiWarning}</span>
               </div>
-              {checkResult.suggestions && Object.keys(checkResult.suggestions).length > 0 && (
-                <button
-                  onClick={() => {
-                    const suggestions = checkResult.suggestions || {}
-                    setForm((prev) => ({
-                      ...prev,
-                      name: suggestions.name || prev.name,
-                      code: suggestions.code || prev.code,
-                      dataType: suggestions.dataType || prev.dataType,
-                      unit: suggestions.unit || prev.unit,
-                      formula: suggestions.calculationFormula || prev.formula,
-                      comment: suggestions.comment || prev.comment
-                    }))
-                    setCheckResult(null)
-                  }}
-                  className="text-caption font-medium text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 flex items-center gap-1 transition-colors"
-                >
-                  <Sparkles size={14} />
-                  应用建议
-                </button>
-              )}
             </div>
-            <div className="space-y-2">
-              {checkResult.issues.map((issue, idx) => {
-                const suggestion = checkResult.suggestions?.[issue.field === 'calculationFormula' ? 'calculationFormula' : issue.field]
-                return (
-                  <div
-                    key={idx}
-                    className={`p-2 rounded-lg ${
-                      issue.severity === 'error'
-                        ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                        : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                    }`}
-                  >
-                    <div className="flex items-start gap-2">
-                      <span className={`text-micro font-semibold px-1.5 py-0.5 rounded shrink-0 ${
-                        issue.severity === 'error' ? 'bg-red-200 dark:bg-red-800' : 'bg-amber-200 dark:bg-amber-800'
-                      }`}>
-                        {issue.field}
-                      </span>
-                      <span className="text-caption">{issue.message}</span>
-                    </div>
-                    {suggestion && (
-                      <div className="mt-2 pl-2 border-l-2 border-purple-300 dark:border-purple-600">
-                        <span className="text-micro text-purple-600 dark:text-purple-400">建议: </span>
-                        <span className="text-caption text-purple-700 dark:text-purple-300 font-medium">{suggestion}</span>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* 加载状态 */}
         {loadingVersion ? (
@@ -546,19 +657,45 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
               <MetricFormLeft
                 form={form}
                 setForm={setForm}
-                dataTypes={DATA_TYPES}
-                units={UNITS}
-                modifiers={MODIFIERS}
+                isEditMode={isEditMode}
+                units={units.map((u) => ({ symbol: u.symbol || u.code[0], name: u.name, code: u.code }))}
+                modifiers={modifiers.map((m) => ({ symbol: m.name[0], name: m.name, code: m.code }))}
+                wordRoots={wordRoots.map((r) => ({ code: r.code, name: r.name }))}
+                atomicMetrics={atomicMetrics}
+                modifierTotal={modifierTotal}
+                atomicTotal={atomicTotal}
+                loadUnits={loadUnits}
+                loadModifiers={loadModifiers}
+                loadWordRoots={loadWordRoots}
+                loadAtomicMetrics={loadAtomicMetrics}
                 updateDerivedCode={updateDerivedCode}
-                addModifier={addModifier}
-                removeModifier={removeModifier}
+                updateDerivedCustomSuffix={updateDerivedCustomSuffix}
+                addWordRoot={addWordRoot}
+                removeWordRoot={removeWordRoot}
+                updateCustomSuffix={updateCustomSuffix}
+                updateAggregation={updateAggregation}
                 formulaRef={formulaRef}
               />
               <MetricFormRight
                 form={form}
                 onMeasureToggle={handleMeasureColumnToggle}
                 onFilterToggle={handleFilterColumnToggle}
-                insertDerivedFormula={insertDerivedFormula}
+                onTableSelect={(catalog, schema, table) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    refCatalog: catalog,
+                    refSchema: schema,
+                    refTable: table
+                  }))
+                }}
+                onMetricsChange={(metrics) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    compositeMetrics: metrics
+                  }))
+                }}
+                aiSuggestedMeasures={aiSuggestedMeasures}
+                aiSuggestedFilters={aiSuggestedFilters}
               />
             </div>
           </div>

@@ -38,10 +38,12 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.DatasetDispatcher;
+import org.apache.gravitino.dataset.Unit;
+import org.apache.gravitino.dto.dataset.UnitDTO;
 import org.apache.gravitino.dto.requests.UnitCreateRequest;
 import org.apache.gravitino.dto.requests.UnitUpdateRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
-import org.apache.gravitino.dto.responses.PagedEntityListResponse;
+import org.apache.gravitino.dto.responses.UnitListResponse;
 import org.apache.gravitino.dto.responses.UnitResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
@@ -83,9 +85,10 @@ public class UnitOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            PagedResult<NameIdentifier> result = datasetDispatcher.listUnits(unitNs, offset, limit);
-            NameIdentifier[] unitIds = result.items().toArray(new NameIdentifier[0]);
-            return Utils.ok(new PagedEntityListResponse(unitIds, result.total(), offset, limit));
+            PagedResult<Unit> result = datasetDispatcher.listUnits(unitNs, offset, limit);
+            UnitDTO[] unitDTOs =
+                result.items().stream().map(DTOConverters::toDTO).toArray(UnitDTO[]::new);
+            return Utils.ok(new UnitListResponse(unitDTOs, result.total(), offset, limit));
           });
 
     } catch (Exception e) {

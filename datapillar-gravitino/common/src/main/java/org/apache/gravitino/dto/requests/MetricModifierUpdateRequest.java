@@ -19,13 +19,11 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
-import org.apache.gravitino.dataset.MetricModifier;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** 更新指标修饰符的请求 */
@@ -36,14 +34,14 @@ import org.apache.gravitino.rest.RESTRequest;
 @AllArgsConstructor
 public class MetricModifierUpdateRequest implements RESTRequest {
 
-  @JsonProperty("type")
-  private MetricModifier.Type type;
+  @JsonProperty("name")
+  private String name;
 
   @JsonProperty("comment")
   private String comment;
 
   @Override
   public void validate() throws IllegalArgumentException {
-    Preconditions.checkArgument(type != null, "\"type\" field is required and cannot be null");
+    // 所有字段可选，无需校验
   }
 }

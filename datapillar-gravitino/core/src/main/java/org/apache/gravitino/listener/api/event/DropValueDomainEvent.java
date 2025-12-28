@@ -22,27 +22,27 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event that is generated after a word root is successfully deleted. */
+/** Represents an event that is generated after a value domain is successfully dropped. */
 @DeveloperApi
-public class DeleteWordRootEvent extends WordRootEvent {
+public class DropValueDomainEvent extends ValueDomainEvent {
   private final boolean isExists;
 
   /**
-   * Constructs an instance of {@link DeleteWordRootEvent}.
+   * Constructs an instance of {@link DropValueDomainEvent}.
    *
-   * @param user The user responsible for triggering the word root operation.
-   * @param identifier The identifier of the WordRoot involved in the operation.
-   * @param isExists A boolean flag indicating whether the word root existed before deletion.
+   * @param user The user responsible for triggering the value domain operation.
+   * @param identifier The identifier of the ValueDomain involved in the operation.
+   * @param isExists A boolean indicating whether the value domain existed before dropping.
    */
-  public DeleteWordRootEvent(String user, NameIdentifier identifier, boolean isExists) {
+  public DropValueDomainEvent(String user, NameIdentifier identifier, boolean isExists) {
     super(user, identifier);
     this.isExists = isExists;
   }
 
   /**
-   * Retrieves the existence status of the word root before deletion.
+   * Retrieves the existence status of the value domain before the drop operation.
    *
-   * @return true if the word root existed, false otherwise.
+   * @return A boolean value indicating whether the value domain existed before dropping.
    */
   public boolean isExists() {
     return isExists;
@@ -50,6 +50,6 @@ public class DeleteWordRootEvent extends WordRootEvent {
 
   @Override
   public OperationType operationType() {
-    return OperationType.DELETE_WORDROOT;
+    return OperationType.DROP_VALUE_DOMAIN;
   }
 }

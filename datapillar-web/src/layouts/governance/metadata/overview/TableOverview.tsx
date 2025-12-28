@@ -1,21 +1,66 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Activity,
   Book,
   CheckCircle2,
+  ChevronRight,
   Clock,
   Fingerprint,
   Key,
   Lock,
   Medal,
   Table as TableIcon,
-  User
+  User,
+  Pin,
+  List,
+  Hash,
+  Type,
+  Share2,
+  Play,
+  Pencil,
+  Tag,
+  X
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { contentMaxWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
+import { formatTime } from '@/lib/utils'
 import { type TableAsset } from '../type/types'
-import { getTable } from '@/services/oneMetaService'
+import { getTable, associateObjectTags, getObjectTags, createTag } from '@/services/oneMetaService'
+import { fetchValueDomains, type ValueDomainDTO } from '@/services/oneMetaSemanticService'
 import type { GravitinoIndexDTO } from '@/types/oneMeta'
+
+const VALUE_DOMAIN_TAG_PREFIX = 'vd:'
+
+/** 数据类型等价组（同组内的类型视为兼容） */
+const TYPE_EQUIVALENTS: string[][] = [
+  ['STRING', 'VARCHAR', 'TEXT', 'CHAR', 'FIXEDCHAR'],
+  ['INT', 'INTEGER'],
+  ['BIGINT', 'LONG'],
+  ['FLOAT', 'REAL'],
+  ['DOUBLE', 'DOUBLE PRECISION'],
+  ['BOOLEAN', 'BOOL']
+]
+
+/** 检查列数据类型与值域数据类型是否兼容（忽略大小写，考虑等价类型） */
+function isDataTypeCompatible(columnDataType: string, domainDataType?: string): boolean {
+  if (!domainDataType) return false // 值域未指定数据类型，不允许关联
+  // 提取基础类型（去掉括号中的参数）
+  const normalizeType = (type: string) => type.toUpperCase().replace(/\(.*\)$/, '')
+  const colType = normalizeType(columnDataType)
+  const domType = normalizeType(domainDataType)
+
+  // 完全相同
+  if (colType === domType) return true
+
+  // 检查是否在同一等价组
+  for (const group of TYPE_EQUIVALENTS) {
+    if (group.includes(colType) && group.includes(domType)) return true
+  }
+
+  return false
+}
 
 const QUALITY_RULES = [
   { name: 'unique_region_id', type: 'Uniqueness', status: 'PASS', value: '100%' },
@@ -47,6 +92,11 @@ type TableOverviewProps = {
   breadcrumb: string[]
   activeTab: 'OVERVIEW' | 'COLUMNS' | 'QUALITY' | 'LINEAGE'
   onTabChange: (tab: 'OVERVIEW' | 'COLUMNS' | 'QUALITY' | 'LINEAGE') => void
+  onEdit?: (tableData: {
+    name: string
+    comment?: string
+    columns: Array<{ name: string; type: string; comment?: string; valueDomainCode?: string }>
+  }) => void
 }
 
 /**
@@ -57,7 +107,7 @@ function isJdbcProvider(provider?: string): boolean {
   return provider.startsWith('jdbc-')
 }
 
-export function TableOverview({ table, provider, breadcrumb, activeTab, onTabChange }: TableOverviewProps) {
+export function TableOverview({ table, provider, breadcrumb, activeTab, onTabChange, onEdit }: TableOverviewProps) {
   const [owner, setOwner] = useState<string>(table.owner)
   const [updatedAt, setUpdatedAt] = useState<string>(table.updatedAt)
   const [description, setDescription] = useState<string>(table.description)
@@ -65,6 +115,120 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
   const [indexes, setIndexes] = useState<GravitinoIndexDTO[]>([])
   // 动态展示的属性，根据不同 catalog 返回的 properties 动态生成
   const [tableSpecs, setTableSpecs] = useState<{ label: string; value: string }[]>([])
+  // 值域相关状态
+  const [valueDomains, setValueDomains] = useState<ValueDomainDTO[]>([])
+  const [valueDomainsLoaded, setValueDomainsLoaded] = useState(false)
+  const [columnValueDomainMap, setColumnValueDomainMap] = useState<Map<string, string>>(new Map())
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null)
+  const dropdownButtonRefs = useRef<Map<string, HTMLElement>>(new Map())
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // 值域悬浮详情相关状态
+  const [hoveredDomain, setHoveredDomain] = useState<string | null>(null)
+  const [domainCardPos, setDomainCardPos] = useState<{ top: number; left: number } | null>(null)
+  const hoverItemRef = useRef<HTMLDivElement>(null)
+  const hoverTimeout = useRef<NodeJS.Timeout | null>(null)
+  const domainCardRef = useRef<HTMLDivElement>(null)
+  const isCardHovered = useRef(false)
+
+  // 表 tag 相关状态
+  const [tableTags, setTableTags] = useState<string[]>([])
+  const [tagDropdownOpen, setTagDropdownOpen] = useState(false)
+
+  const closeDropdown = () => {
+    setOpenDropdown(null)
+    setDropdownPos(null)
+    setHoveredDomain(null)
+  }
+
+  /** 打开值域下拉（首次打开时加载值域列表） */
+  const handleOpenValueDomainDropdown = async (columnName: string) => {
+    if (openDropdown === columnName) {
+      closeDropdown()
+      return
+    }
+    setOpenDropdown(columnName)
+    // 首次打开时加载值域列表
+    if (!valueDomainsLoaded) {
+      try {
+        const result = await fetchValueDomains(0, 100)
+        setValueDomains(result.items)
+        setValueDomainsLoaded(true)
+      } catch (error) {
+        console.error('加载值域列表失败:', error)
+      }
+    }
+  }
+
+  // 值域悬浮事件处理
+  const handleDomainItemMouseEnter = (domainCode: string) => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current)
+    setHoveredDomain(domainCode)
+  }
+
+  const handleDomainItemMouseLeave = () => {
+    hoverTimeout.current = setTimeout(() => {
+      if (!isCardHovered.current) setHoveredDomain(null)
+    }, 100)
+  }
+
+  const handleDomainCardMouseEnter = () => {
+    isCardHovered.current = true
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current)
+  }
+
+  const handleDomainCardMouseLeave = () => {
+    isCardHovered.current = false
+    setHoveredDomain(null)
+  }
+
+  // 计算值域详情卡片位置
+  useLayoutEffect(() => {
+    if (!hoveredDomain || !hoverItemRef.current) return
+    const rect = hoverItemRef.current.getBoundingClientRect()
+    setDomainCardPos({
+      top: rect.top,
+      left: rect.right + 8
+    })
+    return () => setDomainCardPos(null)
+  }, [hoveredDomain])
+
+  const activeHoveredDomain = valueDomains.find((d) => d.domainCode === hoveredDomain)
+
+  // 点击外部关闭下拉
+  useEffect(() => {
+    if (!openDropdown) return
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node
+      const buttonEl = dropdownButtonRefs.current.get(openDropdown)
+      if (buttonEl?.contains(target)) return
+      if (dropdownRef.current?.contains(target)) return
+      closeDropdown()
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [openDropdown])
+
+  // 计算下拉位置
+  useLayoutEffect(() => {
+    if (!openDropdown) return
+    const updatePosition = () => {
+      const btn = dropdownButtonRefs.current.get(openDropdown)
+      if (!btn) return
+      const rect = btn.getBoundingClientRect()
+      const left = Math.max(12, rect.left)
+      const top = rect.bottom + 4
+      setDropdownPos({ top, left })
+    }
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [openDropdown])
 
   // 构建列名到索引类型的映射（仅对 JDBC 类型的 catalog 有效）
   const columnIndexMap = useMemo(() => {
@@ -101,6 +265,29 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
           // 更新columns
           if (detail.columns) {
             setColumns(detail.columns)
+
+            // 获取每个列的 tag，提取值域关联
+            const loadColumnTags = async () => {
+              const domainMap = new Map<string, string>()
+              await Promise.all(
+                detail.columns.map(async (col) => {
+                  try {
+                    const columnFullName = `${catalogName}.${schemaName}.${tableName}.${col.name}`
+                    const tags = await getObjectTags('COLUMN', columnFullName)
+                    // 找出值域 tag（以 vd: 开头）
+                    const valueDomainTag = tags.find((tag) => tag.startsWith(VALUE_DOMAIN_TAG_PREFIX))
+                    if (valueDomainTag) {
+                      const domainCode = valueDomainTag.slice(VALUE_DOMAIN_TAG_PREFIX.length)
+                      domainMap.set(col.name, domainCode)
+                    }
+                  } catch {
+                    // 忽略单个列的 tag 获取失败
+                  }
+                })
+              )
+              setColumnValueDomainMap(domainMap)
+            }
+            loadColumnTags()
           }
 
           // 更新indexes（仅对 JDBC 类型有效）
@@ -113,9 +300,10 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
             if (detail.audit.creator) {
               setOwner(detail.audit.creator)
             }
-            if (detail.audit.lastModifiedTime) {
-              const date = new Date(detail.audit.lastModifiedTime)
-              setUpdatedAt(date.toLocaleDateString())
+            // 优先使用更新时间，没有则使用创建时间
+            const timeValue = detail.audit.lastModifiedTime || detail.audit.createTime
+            if (timeValue) {
+              setUpdatedAt(formatTime(timeValue))
             }
           }
 
@@ -189,6 +377,112 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
     }
   }, [table.id])
 
+  // 加载表 tag
+  useEffect(() => {
+    const parts = table.id.split('.')
+    if (parts.length === 3) {
+      const fullName = table.id
+      // 获取表的 tags（排除值域 tag）
+      getObjectTags('TABLE', fullName)
+        .then((tags) => setTableTags(tags.filter((t) => !t.startsWith(VALUE_DOMAIN_TAG_PREFIX))))
+        .catch(console.error)
+    }
+  }, [table.id])
+
+  /** 添加表 tag */
+  const handleAddTableTag = async (tagName: string) => {
+    try {
+      // 先创建 tag（如果已存在会忽略错误）
+      try {
+        await createTag(tagName)
+      } catch {
+        // tag 可能已存在，忽略
+      }
+      // 关联 tag 到表
+      await associateObjectTags('TABLE', table.id, [tagName], [])
+      setTableTags((prev) => [...prev, tagName])
+      toast.success(`已添加标签: ${tagName}`)
+    } catch {
+      // 错误已由统一客户端通过 toast 显示
+    }
+  }
+
+  /** 移除表 tag */
+  const handleRemoveTableTag = async (tagName: string) => {
+    try {
+      await associateObjectTags('TABLE', table.id, [], [tagName])
+      setTableTags((prev) => prev.filter((t) => t !== tagName))
+      toast.success(`已移除标签: ${tagName}`)
+    } catch {
+      // 错误已由统一客户端通过 toast 显示
+    }
+  }
+
+  /** 获取值域类型图标 */
+  const getDomainIcon = (domainType?: string) => {
+    switch (domainType?.toUpperCase()) {
+      case 'ENUM':
+        return <List size={10} className="text-purple-500" />
+      case 'RANGE':
+        return <Hash size={10} className="text-blue-500" />
+      case 'REGEX':
+        return <Type size={10} className="text-amber-500" />
+      default:
+        return <Pin size={10} className="text-indigo-400" />
+    }
+  }
+
+  /** 获取值域类型标签 */
+  const getDomainTypeLabel = (domainType?: string) => {
+    switch (domainType?.toUpperCase()) {
+      case 'ENUM':
+        return '枚举'
+      case 'RANGE':
+        return '范围'
+      case 'REGEX':
+        return '正则'
+      default:
+        return '未知'
+    }
+  }
+
+  /** 为列关联值域 tag */
+  const handleAssociateValueDomain = async (columnName: string, domainCode: string) => {
+    const columnFullName = `${table.id}.${columnName}`
+    const tagName = `${VALUE_DOMAIN_TAG_PREFIX}${domainCode}`
+    try {
+      // 如果已有关联，先移除
+      const currentDomain = columnValueDomainMap.get(columnName)
+      const tagsToRemove = currentDomain ? [`${VALUE_DOMAIN_TAG_PREFIX}${currentDomain}`] : []
+
+      await associateObjectTags('COLUMN', columnFullName, [tagName], tagsToRemove)
+      setColumnValueDomainMap((prev) => new Map(prev).set(columnName, domainCode))
+      setOpenDropdown(null)
+      toast.success('值域关联成功')
+    } catch {
+      // 错误已由统一客户端通过 toast 显示
+    }
+  }
+
+  /** 移除列的值域关联 */
+  const handleRemoveValueDomain = async (columnName: string) => {
+    const columnFullName = `${table.id}.${columnName}`
+    const currentDomain = columnValueDomainMap.get(columnName)
+    if (!currentDomain) return
+
+    try {
+      await associateObjectTags('COLUMN', columnFullName, [], [`${VALUE_DOMAIN_TAG_PREFIX}${currentDomain}`])
+      setColumnValueDomainMap((prev) => {
+        const next = new Map(prev)
+        next.delete(columnName)
+        return next
+      })
+      toast.success('值域关联已移除')
+    } catch {
+      // 错误已由统一客户端通过 toast 显示
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 @md:px-8 py-4 shadow-sm">
@@ -209,6 +503,55 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
             <div className="space-y-2">
               <div className="flex items-center gap-3">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">{table.name}</h2>
+                {/* Tag 区域 */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setTagDropdownOpen(true)}
+                    className="text-slate-400 hover:text-emerald-500 transition-colors"
+                    title="添加标签"
+                  >
+                    <Tag size={14} />
+                  </button>
+                  {tableTags.map((tagName) => (
+                    <span
+                      key={tagName}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full border border-emerald-200 dark:border-emerald-800"
+                    >
+                      {tagName}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTableTag(tagName)}
+                        className="text-emerald-400 hover:text-red-500"
+                        title="移除"
+                      >
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                  {tagDropdownOpen && (
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="回车添加"
+                      className="w-24 px-2 py-0.5 text-xs border border-emerald-300 dark:border-emerald-700 rounded-full bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          const input = e.target as HTMLInputElement
+                          const value = input.value.trim()
+                          if (value) {
+                            await handleAddTableTag(value)
+                          }
+                          setTagDropdownOpen(false)
+                        } else if (e.key === 'Escape') {
+                          setTagDropdownOpen(false)
+                        }
+                      }}
+                      onBlur={() => setTagDropdownOpen(false)}
+                    />
+                  )}
+                </div>
                 {table.certification && (
                   <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${TYPOGRAPHY.micro} font-bold uppercase border border-amber-200 bg-amber-50 text-amber-600`}>
                     <Medal size={10} />
@@ -243,12 +586,37 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
-              Share
+          <div className="flex items-center gap-1 mt-6">
+            <button
+              type="button"
+              className="h-9 w-9 inline-flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-colors"
+              title="查询"
+            >
+              <Play size={16} />
             </button>
-            <button className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium shadow-sm">
-              Query
+            <button
+              type="button"
+              className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              title="分享"
+            >
+              <Share2 size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => onEdit?.({
+                name: table.name,
+                comment: description,
+                columns: columns.map((col) => ({
+                  name: col.name,
+                  type: col.dataType,
+                  comment: col.comment,
+                  valueDomainCode: columnValueDomainMap.get(col.name)
+                }))
+              })}
+              className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              title="编辑"
+            >
+              <Pencil size={16} />
             </button>
           </div>
         </div>
@@ -331,7 +699,7 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                   <tr>
                     <th className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Column Name</th>
                     <th className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Data Type</th>
-                    <th className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Description</th>
+                    <th className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Comment</th>
                     <th className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Tags</th>
                   </tr>
                 </thead>
@@ -340,12 +708,49 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                     const indexTypes = columnIndexMap.get(col.name)
                     const isPrimaryKey = indexTypes?.has('PRIMARY_KEY') ?? false
                     const isUniqueKey = indexTypes?.has('UNIQUE_KEY') ?? false
+                    const currentDomainCode = columnValueDomainMap.get(col.name)
+                    const currentDomain = valueDomains.find((d) => d.domainCode === currentDomainCode)
 
                     return (
-                      <tr key={col.name} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                      <tr key={col.name} className="group hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
                         <td className="px-6 py-3 font-mono text-xs text-slate-800 dark:text-slate-100">
                           <div className="flex items-center gap-2">
-                            {col.name}
+                            {/* 列名 + 值域标记容器 */}
+                            <span className="relative inline-flex items-center">
+                              {col.name}
+                              {/* 值域标签/图钉 - 紧贴列名右上角 */}
+                              <span
+                                className="absolute -top-2 left-full ml-0.5"
+                                ref={(el) => { if (el) dropdownButtonRefs.current.set(col.name, el) }}
+                              >
+                              {currentDomain ? (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-micro font-medium bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-full border border-indigo-200 dark:border-indigo-800">
+                                  <span
+                                    className="inline-flex items-center gap-0.5 cursor-pointer hover:text-indigo-800"
+                                    title={`点击修改值域: ${currentDomain.domainName}`}
+                                    onClick={() => handleOpenValueDomainDropdown(col.name)}
+                                  >
+                                    {getDomainIcon(currentDomain.domainType)}
+                                    <span className="max-w-16 truncate">{currentDomain.domainName}</span>
+                                  </span>
+                                  <span
+                                    className="text-indigo-400 hover:text-red-500 cursor-pointer ml-0.5"
+                                    title="清除关联"
+                                    onClick={(e) => { e.stopPropagation(); handleRemoveValueDomain(col.name) }}
+                                  >×</span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenValueDomainDropdown(col.name)}
+                                  className="h-4 w-4 inline-flex items-center justify-center rounded-full text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors opacity-0 group-hover:opacity-100"
+                                  title="关联值域"
+                                >
+                                  <Pin size={10} />
+                                </button>
+                              )}
+                              </span>
+                            </span>
                             {isPrimaryKey && (
                               <span title="Primary Key">
                                 <Key size={12} className="text-amber-500" />
@@ -358,7 +763,7 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-3 font-mono text-xs text-slate-500 dark:text-slate-300">{col.type}</td>
+                        <td className="px-6 py-3 font-mono text-xs text-slate-500 dark:text-slate-300">{col.dataType}</td>
                         <td className="px-6 py-3 text-slate-600 dark:text-slate-300">{col.comment ?? '-'}</td>
                         <td className="px-6 py-3">
                           {col.piiTag && (
@@ -373,6 +778,110 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                   })}
                 </tbody>
               </table>
+              {/* 值域选择下拉 - Portal 到 body */}
+              {openDropdown && dropdownPos && createPortal(
+                <div
+                  ref={dropdownRef}
+                  style={{ top: dropdownPos.top, left: dropdownPos.left }}
+                  className="fixed w-44 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[1000000]"
+                >
+                  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 rounded-t-xl">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">选择值域</span>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto py-1">
+                    {!valueDomainsLoaded ? (
+                      <div className="px-3 py-2 text-xs text-slate-400 text-center">加载中...</div>
+                    ) : valueDomains.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-slate-400 text-center">暂无值域</div>
+                    ) : (
+                    valueDomains.map((domain) => (
+                      <div
+                        key={domain.domainCode}
+                        ref={hoveredDomain === domain.domainCode ? hoverItemRef : null}
+                        onMouseEnter={() => handleDomainItemMouseEnter(domain.domainCode)}
+                        onMouseLeave={handleDomainItemMouseLeave}
+                        className={`flex items-center justify-between px-3 py-1.5 text-xs cursor-pointer transition-colors ${
+                          hoveredDomain === domain.domainCode
+                            ? 'bg-blue-50 dark:bg-blue-900/30'
+                            : columnValueDomainMap.get(openDropdown) === domain.domainCode
+                              ? 'text-blue-600 font-medium bg-blue-50/50 dark:bg-blue-900/20'
+                              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                        }`}
+                        onClick={() => {
+                          // 获取列的数据类型
+                          const columnDataType = columns.find((c) => c.name === openDropdown)?.dataType || ''
+                          // 校验数据类型是否匹配
+                          if (!domain.dataType) {
+                            toast.error(`值域 ${domain.domainName} 未指定数据类型，无法关联`)
+                            return
+                          }
+                          if (!isDataTypeCompatible(columnDataType, domain.dataType)) {
+                            toast.error(`数据类型不匹配：列类型为 ${columnDataType.toUpperCase()}，值域类型为 ${domain.dataType.toUpperCase()}`)
+                            return
+                          }
+                          handleAssociateValueDomain(openDropdown, domain.domainCode)
+                        }}
+                      >
+                        <span className="truncate">{domain.domainName}</span>
+                        <ChevronRight size={12} className={`flex-shrink-0 ml-1 ${hoveredDomain === domain.domainCode ? 'text-blue-400' : 'text-slate-300'}`} />
+                      </div>
+                    ))
+                    )}
+                  </div>
+                </div>,
+                document.body
+              )}
+              {/* 值域详情卡片 - Portal */}
+              {activeHoveredDomain && domainCardPos && createPortal(
+                <div
+                  ref={domainCardRef}
+                  style={{ top: domainCardPos.top, left: domainCardPos.left }}
+                  className="fixed z-[1000001] w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl animate-in fade-in-0 slide-in-from-left-2 duration-150"
+                  onMouseEnter={handleDomainCardMouseEnter}
+                  onMouseLeave={handleDomainCardMouseLeave}
+                >
+                  {/* 卡片头部 */}
+                  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 rounded-t-xl">
+                    <div className="flex items-center gap-2">
+                      {getDomainIcon(activeHoveredDomain.domainType)}
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">{activeHoveredDomain.domainName}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-micro px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                        {getDomainTypeLabel(activeHoveredDomain.domainType)}
+                      </span>
+                      {activeHoveredDomain.dataType && (
+                        <span className="text-micro px-1.5 py-0.5 rounded font-mono bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400">
+                          {activeHoveredDomain.dataType}
+                        </span>
+                      )}
+                      {activeHoveredDomain.domainLevel && (
+                        <span className={`text-micro px-1.5 py-0.5 rounded ${activeHoveredDomain.domainLevel === 'BUILTIN' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                          {activeHoveredDomain.domainLevel === 'BUILTIN' ? '内置' : '业务'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {/* 枚举项列表 */}
+                  {activeHoveredDomain.items.length > 0 && (
+                    <div className="px-3 py-2">
+                      <p className="text-micro font-medium text-slate-400 dark:text-slate-500 mb-1.5">枚举值 ({activeHoveredDomain.items.length})</p>
+                      <div className="max-h-32 overflow-y-auto space-y-1">
+                        {activeHoveredDomain.items.slice(0, 10).map((item) => (
+                          <div key={item.value} className="flex items-center gap-2 text-micro">
+                            <span className="font-mono text-slate-600 dark:text-slate-300">{item.value}</span>
+                            {item.label && <span className="text-slate-400 truncate">({item.label})</span>}
+                          </div>
+                        ))}
+                        {activeHoveredDomain.items.length > 10 && (
+                          <p className="text-micro text-slate-400">...还有 {activeHoveredDomain.items.length - 10} 项</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>,
+                document.body
+              )}
             </div>
           )}
 

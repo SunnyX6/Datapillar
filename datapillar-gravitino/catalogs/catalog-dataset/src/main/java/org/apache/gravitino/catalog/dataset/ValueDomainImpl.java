@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.dataset;
 
+import java.util.List;
 import org.apache.gravitino.dataset.ValueDomain;
 import org.apache.gravitino.meta.AuditInfo;
 
@@ -27,9 +28,10 @@ public class ValueDomainImpl implements ValueDomain {
   private String domainCode;
   private String domainName;
   private Type domainType;
-  private String itemValue;
-  private String itemLabel;
+  private Level domainLevel;
+  private List<Item> items;
   private String comment;
+  private String dataType;
   private AuditInfo auditInfo;
 
   private ValueDomainImpl() {}
@@ -50,18 +52,23 @@ public class ValueDomainImpl implements ValueDomain {
   }
 
   @Override
-  public String itemValue() {
-    return itemValue;
+  public Level domainLevel() {
+    return domainLevel;
   }
 
   @Override
-  public String itemLabel() {
-    return itemLabel;
+  public List<Item> items() {
+    return items;
   }
 
   @Override
   public String comment() {
     return comment;
+  }
+
+  @Override
+  public String dataType() {
+    return dataType;
   }
 
   @Override
@@ -91,18 +98,23 @@ public class ValueDomainImpl implements ValueDomain {
       return this;
     }
 
-    public Builder withItemValue(String itemValue) {
-      impl.itemValue = itemValue;
+    public Builder withDomainLevel(Level domainLevel) {
+      impl.domainLevel = domainLevel;
       return this;
     }
 
-    public Builder withItemLabel(String itemLabel) {
-      impl.itemLabel = itemLabel;
+    public Builder withItems(List<Item> items) {
+      impl.items = items;
       return this;
     }
 
     public Builder withComment(String comment) {
       impl.comment = comment;
+      return this;
+    }
+
+    public Builder withDataType(String dataType) {
+      impl.dataType = dataType;
       return this;
     }
 

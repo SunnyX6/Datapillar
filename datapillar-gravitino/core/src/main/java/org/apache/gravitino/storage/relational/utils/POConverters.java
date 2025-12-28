@@ -37,7 +37,6 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.dataset.Metric;
-import org.apache.gravitino.dataset.MetricModifier;
 import org.apache.gravitino.dto.rel.expressions.FunctionArg;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.file.Fileset;
@@ -407,6 +406,7 @@ public class POConverters {
       return builder
           .withTableId(tableEntity.id())
           .withTableName(tableEntity.name())
+          .withTableComment(tableEntity.comment())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -441,6 +441,7 @@ public class POConverters {
       return TablePO.builder()
           .withTableId(oldTablePO.getTableId())
           .withTableName(newTable.name())
+          .withTableComment(newTable.comment())
           .withMetalakeId(oldTablePO.getMetalakeId())
           .withCatalogId(oldTablePO.getCatalogId())
           .withSchemaId(oldTablePO.getSchemaId())
@@ -471,6 +472,7 @@ public class POConverters {
       return TableEntity.builder()
           .withId(tablePO.getTableId())
           .withName(tablePO.getTableName())
+          .withComment(tablePO.getTableComment())
           .withNamespace(namespace)
           .withColumns(fromColumnPOs(columnPOs))
           .withAuditInfo(
@@ -1719,10 +1721,12 @@ public class POConverters {
           .withCode(metricPO.getMetricCode())
           .withType(Metric.Type.valueOf(metricPO.getMetricType()))
           .withDataType(metricPO.getDataType())
+          .withUnit(metricPO.getUnit())
+          .withUnitName(metricPO.getUnitName())
           .withComment(metricPO.getMetricComment())
           .withCurrentVersion(metricPO.getCurrentVersion())
           .withLastVersion(metricPO.getLastVersion())
-          .withProperties(JsonUtils.anyFieldMapper().readValue(metricPO.getAuditInfo(), Map.class))
+          .withProperties(null)
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(metricPO.getAuditInfo(), AuditInfo.class))
           .build();
@@ -1746,7 +1750,7 @@ public class POConverters {
    * @return MetricPO 对象
    */
   public static MetricPO initializeMetricPOWithVersion(
-      MetricEntity metricEntity, MetricPO.Builder builder) {
+      MetricEntity metricEntity, MetricPO.Builder builder, String unit) {
     try {
       return builder
           .withMetricId(metricEntity.id())
@@ -1754,9 +1758,10 @@ public class POConverters {
           .withMetricCode(metricEntity.code())
           .withMetricType(metricEntity.metricType().name())
           .withDataType(metricEntity.dataType())
+          .withUnit(unit)
           .withMetricComment(metricEntity.comment())
-          .withCurrentVersion((int) INIT_VERSION)
-          .withLastVersion((int) INIT_VERSION)
+          .withCurrentVersion(1)
+          .withLastVersion(1)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(metricEntity.auditInfo()))
           .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
@@ -1766,26 +1771,16 @@ public class POConverters {
   }
 
   /**
-   * 更新 MetricPO（带版本信息）
+   * 更新 MetricPO
    *
    * @param oldMetricPO 旧的 MetricPO 对象
    * @param newMetric 新的 MetricEntity 对象
-   * @param needUpdateVersion 是否需要更新版本
+   * @param newVersion 新版本号（如果为 null，保持原有版本号）
    * @return 更新后的 MetricPO 对象
    */
   public static MetricPO updateMetricPOWithVersion(
-      MetricPO oldMetricPO, MetricEntity newMetric, boolean needUpdateVersion) {
+      MetricPO oldMetricPO, MetricEntity newMetric, Integer newVersion) {
     try {
-      Integer lastVersion = oldMetricPO.getLastVersion();
-      Integer currentVersion;
-
-      if (needUpdateVersion) {
-        lastVersion++;
-        currentVersion = lastVersion;
-      } else {
-        currentVersion = oldMetricPO.getCurrentVersion();
-      }
-
       return MetricPO.builder()
           .withMetricId(newMetric.id())
           .withMetricName(newMetric.name())
@@ -1796,8 +1791,8 @@ public class POConverters {
           .withCatalogId(oldMetricPO.getCatalogId())
           .withSchemaId(oldMetricPO.getSchemaId())
           .withMetricComment(newMetric.comment())
-          .withCurrentVersion(currentVersion)
-          .withLastVersion(lastVersion)
+          .withCurrentVersion(newVersion != null ? newVersion : oldMetricPO.getCurrentVersion())
+          .withLastVersion(newVersion != null ? newVersion : oldMetricPO.getLastVersion())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newMetric.auditInfo()))
           .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
@@ -1836,12 +1831,12 @@ public class POConverters {
   public static MetricVersionEntity fromMetricVersionPO(
       MetricVersionPO metricVersionPO, NameIdentifier metricIdent) {
     try {
-      // 解析 parentMetricIds JSON 字符串为 Long 数组
-      Long[] parentMetricIds = null;
-      if (StringUtils.isNotBlank(metricVersionPO.getParentMetricIds())) {
-        parentMetricIds =
+      // 解析 parentMetricCodes JSON 字符串为 String 数组
+      String[] parentMetricCodes = null;
+      if (StringUtils.isNotBlank(metricVersionPO.getParentMetricCodes())) {
+        parentMetricCodes =
             JsonUtils.anyFieldMapper()
-                .readValue(metricVersionPO.getParentMetricIds(), Long[].class);
+                .readValue(metricVersionPO.getParentMetricCodes(), String[].class);
       }
 
       // 解析 versionProperties JSON 字符串为 Map
@@ -1852,16 +1847,18 @@ public class POConverters {
       }
 
       return MetricVersionEntity.builder()
-          .withMetricIdentifier(metricIdent)
+          .withId(metricVersionPO.getId())
           .withVersion(metricVersionPO.getVersion())
+          .withMetricIdentifier(metricIdent)
           .withMetricName(metricVersionPO.getMetricName())
           .withMetricCode(metricVersionPO.getMetricCode())
           .withMetricType(Metric.Type.valueOf(metricVersionPO.getMetricType()))
           .withDataType(metricVersionPO.getDataType())
           .withComment(metricVersionPO.getMetricComment())
           .withUnit(metricVersionPO.getMetricUnit())
-          .withAggregationLogic(metricVersionPO.getAggregationLogic())
-          .withParentMetricIds(parentMetricIds)
+          .withUnitName(metricVersionPO.getUnitName())
+          .withUnitSymbol(metricVersionPO.getUnitSymbol())
+          .withParentMetricCodes(parentMetricCodes)
           .withCalculationFormula(metricVersionPO.getCalculationFormula())
           .withRefCatalogName(metricVersionPO.getRefCatalogName())
           .withRefSchemaName(metricVersionPO.getRefSchemaName())
@@ -1892,13 +1889,15 @@ public class POConverters {
       Long metricId,
       Long metalakeId,
       Long catalogId,
-      Long schemaId) {
+      Long schemaId,
+      Integer version) {
     try {
-      // 将 parentMetricIds 转换为 JSON 字符串
-      String parentMetricIdsJson = null;
-      if (versionEntity.parentMetricIds() != null && versionEntity.parentMetricIds().length > 0) {
-        parentMetricIdsJson =
-            JsonUtils.anyFieldMapper().writeValueAsString(versionEntity.parentMetricIds());
+      // 将 parentMetricCodes 转换为 JSON 字符串
+      String parentMetricCodesJson = null;
+      if (versionEntity.parentMetricCodes() != null
+          && versionEntity.parentMetricCodes().length > 0) {
+        parentMetricCodesJson =
+            JsonUtils.anyFieldMapper().writeValueAsString(versionEntity.parentMetricCodes());
       }
 
       // 将 properties 转换为 JSON 字符串
@@ -1912,15 +1911,14 @@ public class POConverters {
           .withMetalakeId(metalakeId)
           .withCatalogId(catalogId)
           .withSchemaId(schemaId)
-          .withVersion(versionEntity.version())
+          .withVersion(version)
           .withMetricName(versionEntity.metricName())
           .withMetricCode(versionEntity.metricCode())
           .withMetricType(versionEntity.metricType().name())
           .withDataType(versionEntity.dataType())
           .withMetricComment(versionEntity.comment())
           .withMetricUnit(versionEntity.unit())
-          .withAggregationLogic(versionEntity.aggregationLogic())
-          .withParentMetricIds(parentMetricIdsJson)
+          .withParentMetricCodes(parentMetricCodesJson)
           .withCalculationFormula(versionEntity.calculationFormula())
           .withRefCatalogName(versionEntity.refCatalogName())
           .withRefSchemaName(versionEntity.refSchemaName())
@@ -1946,11 +1944,11 @@ public class POConverters {
   public static MetricVersionPO updateMetricVersionPO(
       MetricVersionPO oldVersionPO, MetricVersionEntity newVersion) {
     try {
-      // 将 parentMetricIds 转换为 JSON 字符串
-      String parentMetricIdsJson = null;
-      if (newVersion.parentMetricIds() != null && newVersion.parentMetricIds().length > 0) {
-        parentMetricIdsJson =
-            JsonUtils.anyFieldMapper().writeValueAsString(newVersion.parentMetricIds());
+      // 将 parentMetricCodes 转换为 JSON 字符串
+      String parentMetricCodesJson = null;
+      if (newVersion.parentMetricCodes() != null && newVersion.parentMetricCodes().length > 0) {
+        parentMetricCodesJson =
+            JsonUtils.anyFieldMapper().writeValueAsString(newVersion.parentMetricCodes());
       }
 
       // 将 properties 转换为 JSON 字符串
@@ -1960,19 +1958,18 @@ public class POConverters {
       }
 
       return MetricVersionPO.builder()
+          .withId(oldVersionPO.getId())
           .withMetricId(oldVersionPO.getMetricId())
           .withMetalakeId(oldVersionPO.getMetalakeId())
           .withCatalogId(oldVersionPO.getCatalogId())
           .withSchemaId(oldVersionPO.getSchemaId())
-          .withVersion(oldVersionPO.getVersion())
           .withMetricName(newVersion.metricName())
           .withMetricCode(newVersion.metricCode())
           .withMetricType(newVersion.metricType().name())
           .withDataType(newVersion.dataType())
           .withMetricComment(newVersion.comment())
           .withMetricUnit(newVersion.unit())
-          .withAggregationLogic(newVersion.aggregationLogic())
-          .withParentMetricIds(parentMetricIdsJson)
+          .withParentMetricCodes(parentMetricCodesJson)
           .withCalculationFormula(newVersion.calculationFormula())
           .withVersionProperties(propertiesJson)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newVersion.auditInfo()))
@@ -1990,15 +1987,13 @@ public class POConverters {
    * @return MetricVersionEntity 对象
    */
   public static MetricVersionEntity createInitialMetricVersion(MetricEntity metricEntity) {
-    return createInitialMetricVersion(
-        metricEntity, null, null, null, null, null, null, null, null, null);
+    return createInitialMetricVersion(metricEntity, null, null, null, null, null, null, null, null);
   }
 
   public static MetricVersionEntity createInitialMetricVersion(
       MetricEntity metricEntity,
       String unit,
-      String aggregationLogic,
-      Long[] parentMetricIds,
+      String[] parentMetricCodes,
       String calculationFormula,
       String refCatalogName,
       String refSchemaName,
@@ -2007,15 +2002,14 @@ public class POConverters {
       String filterColumns) {
     return MetricVersionEntity.builder()
         .withMetricIdentifier(metricEntity.nameIdentifier())
-        .withVersion((int) INIT_VERSION)
+        .withVersion(1)
         .withMetricName(metricEntity.name())
         .withMetricCode(metricEntity.code())
         .withMetricType(metricEntity.metricType())
         .withDataType(metricEntity.dataType())
         .withComment(metricEntity.comment())
         .withUnit(unit)
-        .withAggregationLogic(aggregationLogic)
-        .withParentMetricIds(parentMetricIds)
+        .withParentMetricCodes(parentMetricCodes)
         .withCalculationFormula(calculationFormula)
         .withRefCatalogName(refCatalogName)
         .withRefSchemaName(refSchemaName)
@@ -2031,22 +2025,18 @@ public class POConverters {
    * 从 MetricEntity 创建新版本
    *
    * @param metricEntity MetricEntity 对象
-   * @param newVersion 新版本号
    * @return MetricVersionEntity 对象
    */
-  public static MetricVersionEntity createMetricVersionFromEntity(
-      MetricEntity metricEntity, int newVersion) {
+  public static MetricVersionEntity createMetricVersionFromEntity(MetricEntity metricEntity) {
     return MetricVersionEntity.builder()
         .withMetricIdentifier(metricEntity.nameIdentifier())
-        .withVersion(newVersion)
         .withMetricName(metricEntity.name())
         .withMetricCode(metricEntity.code())
         .withMetricType(metricEntity.metricType())
         .withDataType(metricEntity.dataType())
         .withComment(metricEntity.comment())
         .withUnit(null)
-        .withAggregationLogic(null)
-        .withParentMetricIds(null)
+        .withParentMetricCodes(null)
         .withCalculationFormula(null)
         .withProperties(metricEntity.properties())
         .withAuditInfo(metricEntity.auditInfo())
@@ -2077,8 +2067,8 @@ public class POConverters {
           .withName(metricModifierPO.getModifierName())
           .withNamespace(namespace)
           .withCode(metricModifierPO.getModifierCode())
-          .withType(MetricModifier.Type.valueOf(metricModifierPO.getModifierType()))
           .withComment(metricModifierPO.getModifierComment())
+          .withModifierType(metricModifierPO.getModifierType())
           .withAuditInfo(
               JsonUtils.anyFieldMapper()
                   .readValue(metricModifierPO.getAuditInfo(), AuditInfo.class))
@@ -2104,8 +2094,8 @@ public class POConverters {
           .withModifierId(metricModifierEntity.id())
           .withModifierName(metricModifierEntity.name())
           .withModifierCode(metricModifierEntity.code())
-          .withModifierType(metricModifierEntity.modifierType().name())
           .withModifierComment(metricModifierEntity.comment())
+          .withModifierType(metricModifierEntity.modifierType())
           .withAuditInfo(
               JsonUtils.anyFieldMapper().writeValueAsString(metricModifierEntity.auditInfo()))
           .withDeletedAt(0L)
@@ -2124,11 +2114,11 @@ public class POConverters {
           .withModifierId(oldMetricModifierPO.getModifierId())
           .withModifierName(newMetricModifierEntity.name())
           .withModifierCode(newMetricModifierEntity.code())
-          .withModifierType(newMetricModifierEntity.modifierType().name())
           .withMetalakeId(oldMetricModifierPO.getMetalakeId())
           .withCatalogId(oldMetricModifierPO.getCatalogId())
           .withSchemaId(oldMetricModifierPO.getSchemaId())
           .withModifierComment(newMetricModifierEntity.comment())
+          .withModifierType(newMetricModifierEntity.modifierType())
           .withAuditInfo(
               JsonUtils.anyFieldMapper().writeValueAsString(newMetricModifierEntity.auditInfo()))
           .withDeletedAt(oldMetricModifierPO.getDeletedAt())
@@ -2275,15 +2265,37 @@ public class POConverters {
   /** 将 ValueDomainPO 转换为 ValueDomainEntity */
   public static ValueDomainEntity fromValueDomainPO(ValueDomainPO domainPO, Namespace namespace) {
     try {
+      // 处理 domainLevel，兼容旧数据（默认 BUSINESS）
+      org.apache.gravitino.dataset.ValueDomain.Level domainLevel =
+          domainPO.getDomainLevel() != null
+              ? org.apache.gravitino.dataset.ValueDomain.Level.valueOf(domainPO.getDomainLevel())
+              : org.apache.gravitino.dataset.ValueDomain.Level.BUSINESS;
+
+      // 解析 items JSON 数组
+      List<org.apache.gravitino.dataset.ValueDomain.Item> items = null;
+      if (domainPO.getItems() != null && !domainPO.getItems().isEmpty()) {
+        List<org.apache.gravitino.dto.dataset.ValueDomainItemDTO> itemDTOs =
+            JsonUtils.anyFieldMapper()
+                .readValue(
+                    domainPO.getItems(),
+                    new com.fasterxml.jackson.core.type.TypeReference<
+                        List<org.apache.gravitino.dto.dataset.ValueDomainItemDTO>>() {});
+        items =
+            itemDTOs.stream()
+                .map(dto -> (org.apache.gravitino.dataset.ValueDomain.Item) dto)
+                .collect(Collectors.toList());
+      }
+
       return ValueDomainEntity.builder()
-          .withId(domainPO.getItemId())
+          .withId(domainPO.getDomainId())
           .withDomainCode(domainPO.getDomainCode())
           .withDomainName(domainPO.getDomainName())
           .withDomainType(
               org.apache.gravitino.dataset.ValueDomain.Type.valueOf(domainPO.getDomainType()))
-          .withItemValue(domainPO.getItemValue())
-          .withItemLabel(domainPO.getItemLabel())
+          .withDomainLevel(domainLevel)
+          .withItems(items)
           .withComment(domainPO.getDomainComment())
+          .withDataType(domainPO.getDataType())
           .withNamespace(namespace)
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(domainPO.getAuditInfo(), AuditInfo.class))
@@ -2305,13 +2317,26 @@ public class POConverters {
   public static ValueDomainPO initializeValueDomainPO(
       ValueDomainEntity entity, ValueDomainPO.Builder builder) {
     try {
+      // 默认级别为 BUSINESS
+      String domainLevel =
+          entity.domainLevel() != null
+              ? entity.domainLevel().name()
+              : org.apache.gravitino.dataset.ValueDomain.Level.BUSINESS.name();
+
+      // 序列化 items 为 JSON 数组
+      String itemsJson = null;
+      if (entity.items() != null && !entity.items().isEmpty()) {
+        itemsJson = JsonUtils.anyFieldMapper().writeValueAsString(entity.items());
+      }
+
       return builder
-          .withItemId(entity.id())
+          .withDomainId(entity.id())
           .withDomainCode(entity.domainCode())
           .withDomainName(entity.domainName())
           .withDomainType(entity.domainType().name())
-          .withItemValue(entity.itemValue())
-          .withItemLabel(entity.itemLabel())
+          .withDomainLevel(domainLevel)
+          .withItems(itemsJson)
+          .withDataType(entity.dataType())
           .withDomainComment(entity.comment())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(entity.auditInfo()))
           .withDeletedAt(0L)
@@ -2325,13 +2350,26 @@ public class POConverters {
   public static ValueDomainPO updateValueDomainPO(
       ValueDomainPO oldPO, ValueDomainEntity newEntity) {
     try {
+      // 默认级别为 BUSINESS
+      String domainLevel =
+          newEntity.domainLevel() != null
+              ? newEntity.domainLevel().name()
+              : org.apache.gravitino.dataset.ValueDomain.Level.BUSINESS.name();
+
+      // 序列化 items 为 JSON 数组
+      String itemsJson = null;
+      if (newEntity.items() != null && !newEntity.items().isEmpty()) {
+        itemsJson = JsonUtils.anyFieldMapper().writeValueAsString(newEntity.items());
+      }
+
       return ValueDomainPO.builder()
-          .withItemId(oldPO.getItemId())
+          .withDomainId(oldPO.getDomainId())
           .withDomainCode(newEntity.domainCode())
           .withDomainName(newEntity.domainName())
           .withDomainType(newEntity.domainType().name())
-          .withItemValue(newEntity.itemValue())
-          .withItemLabel(newEntity.itemLabel())
+          .withDomainLevel(domainLevel)
+          .withItems(itemsJson)
+          .withDataType(newEntity.dataType())
           .withMetalakeId(oldPO.getMetalakeId())
           .withCatalogId(oldPO.getCatalogId())
           .withSchemaId(oldPO.getSchemaId())

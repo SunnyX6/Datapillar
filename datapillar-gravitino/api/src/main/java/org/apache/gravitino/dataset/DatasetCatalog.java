@@ -48,10 +48,10 @@ public interface DatasetCatalog {
    * @param namespace schema 命名空间
    * @param offset 偏移量
    * @param limit 每页大小
-   * @return 分页结果
+   * @return 分页结果，包含完整的指标数据
    * @throws NoSuchSchemaException 如果 schema 不存在
    */
-  PagedResult<NameIdentifier> listMetrics(Namespace namespace, int offset, int limit)
+  PagedResult<Metric> listMetrics(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException;
 
   /**
@@ -82,14 +82,14 @@ public interface DatasetCatalog {
    * 在 catalog 中注册指标
    *
    * @param ident 指标的名称标识符
+   * @param name 指标名称（中文名）
    * @param code 指标编码
    * @param type 指标类型
    * @param dataType 数据类型，如 DECIMAL(18,2)
    * @param comment 指标注释，可选，可为 null
    * @param properties 指标属性，可选，可为 null 或空
    * @param unit 指标单位，可选，可为 null
-   * @param aggregationLogic 聚合逻辑（如SUM/COUNT/AVG），可选，可为 null
-   * @param parentMetricIds 父指标ID数组（用于派生/复合指标），可选，可为 null
+   * @param parentMetricCodes 父指标编码数组（用于派生/复合指标），可选，可为 null
    * @param calculationFormula 计算公式（用于复合指标），可选，可为 null
    * @param refCatalogName 引用的数据源名称（原子指标用），可选，可为 null
    * @param refSchemaName 引用的数据库名称（原子指标用），可选，可为 null
@@ -102,14 +102,14 @@ public interface DatasetCatalog {
    */
   Metric registerMetric(
       NameIdentifier ident,
+      String name,
       String code,
       Metric.Type type,
       String dataType,
       String comment,
       Map<String, String> properties,
       String unit,
-      String aggregationLogic,
-      Long[] parentMetricIds,
+      String[] parentMetricCodes,
       String calculationFormula,
       String refCatalogName,
       String refSchemaName,
@@ -199,56 +199,53 @@ public interface DatasetCatalog {
    *
    * @param ident 指标的名称标识符
    * @param targetVersion 目标版本号
-   * @return 更新后的 {@link Metric} 实例
+   * @return 目标版本的 {@link MetricVersion} 详情
    * @throws NoSuchMetricException 如果指标不存在
    * @throws NoSuchMetricVersionException 如果目标版本不存在
    * @throws IllegalArgumentException 如果目标版本号无效或等于当前版本
    */
-  Metric switchMetricVersion(NameIdentifier ident, int targetVersion)
+  MetricVersion switchMetricVersion(NameIdentifier ident, int targetVersion)
       throws NoSuchMetricException, NoSuchMetricVersionException, IllegalArgumentException;
 
   /**
-   * 为指标创建新版本（版本号自动递增）
-   *
-   * @param ident 指标的名称标识符
-   * @param comment 版本注释
-   * @param unit 指标单位
-   * @param aggregationLogic 聚合逻辑
-   * @param parentMetricIds 父指标ID数组
-   * @param calculationFormula 计算公式
-   * @return 新创建的版本
-   * @throws NoSuchMetricException 如果指标不存在
-   */
-  MetricVersion linkMetricVersion(
-      NameIdentifier ident,
-      String comment,
-      String unit,
-      String aggregationLogic,
-      Long[] parentMetricIds,
-      String calculationFormula)
-      throws NoSuchMetricException;
-
-  /**
-   * 修改指定版本的信息
+   * 修改指定版本的信息（会自动创建新版本）
    *
    * @param ident 指标的名称标识符
    * @param version 版本号
+   * @param metricName 指标名称
+   * @param metricCode 指标编码
+   * @param metricType 指标类型
+   * @param dataType 数据类型
    * @param comment 版本注释
    * @param unit 指标单位
-   * @param aggregationLogic 聚合逻辑
-   * @param parentMetricIds 父指标ID数组
+   * @param unitName 指标单位名称
+   * @param parentMetricCodes 父指标编码数组
    * @param calculationFormula 计算公式
+   * @param refCatalogName 引用的Catalog名称
+   * @param refSchemaName 引用的Schema名称
+   * @param refTableName 引用的Table名称
+   * @param measureColumns 度量列JSON
+   * @param filterColumns 过滤列JSON
    * @return 更新后的版本
    * @throws NoSuchMetricVersionException 如果版本不存在
    */
   MetricVersion alterMetricVersion(
       NameIdentifier ident,
       int version,
+      String metricName,
+      String metricCode,
+      String metricType,
+      String dataType,
       String comment,
       String unit,
-      String aggregationLogic,
-      Long[] parentMetricIds,
-      String calculationFormula)
+      String unitName,
+      String[] parentMetricCodes,
+      String calculationFormula,
+      String refCatalogName,
+      String refSchemaName,
+      String refTableName,
+      String measureColumns,
+      String filterColumns)
       throws NoSuchMetricVersionException;
 
   // ============================= MetricModifier 管理 =============================
@@ -259,10 +256,10 @@ public interface DatasetCatalog {
    * @param namespace schema 命名空间
    * @param offset 偏移量
    * @param limit 每页大小
-   * @return 分页结果
+   * @return 分页结果，包含完整的修饰符数据
    * @throws NoSuchSchemaException 如果 schema 不存在
    */
-  PagedResult<NameIdentifier> listMetricModifiers(Namespace namespace, int offset, int limit)
+  PagedResult<MetricModifier> listMetricModifiers(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException;
 
   /**
@@ -278,13 +275,13 @@ public interface DatasetCatalog {
    *
    * @param ident 指标修饰符的名称标识符
    * @param code 修饰符编码
-   * @param type 修饰符类型
    * @param comment 修饰符注释，可选，可为 null
+   * @param modifierType 修饰符类型，来自值域，可选，可为 null
    * @return 创建的指标修饰符对象
    * @throws NoSuchSchemaException 如果 schema 不存在
    */
   MetricModifier createMetricModifier(
-      NameIdentifier ident, String code, MetricModifier.Type type, String comment)
+      NameIdentifier ident, String code, String comment, String modifierType)
       throws NoSuchSchemaException;
 
   /**
@@ -299,12 +296,11 @@ public interface DatasetCatalog {
    * 修改修饰符信息
    *
    * @param ident 修饰符的名称标识符
-   * @param type 修饰符类型
-   * @param comment 修饰符注释
+   * @param name 修饰符名称（可选）
+   * @param comment 修饰符注释（可选）
    * @return 更新后的修饰符
    */
-  MetricModifier alterMetricModifier(
-      NameIdentifier ident, MetricModifier.Type type, String comment);
+  MetricModifier alterMetricModifier(NameIdentifier ident, String name, String comment);
 
   // ============================= WordRoot 管理 =============================
 
@@ -314,10 +310,10 @@ public interface DatasetCatalog {
    * @param namespace schema 命名空间
    * @param offset 偏移量
    * @param limit 每页大小
-   * @return 分页结果
+   * @return 分页结果，包含完整的词根数据
    * @throws NoSuchSchemaException 如果 schema 不存在
    */
-  PagedResult<NameIdentifier> listWordRoots(Namespace namespace, int offset, int limit)
+  PagedResult<WordRoot> listWordRoots(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException;
 
   /**
@@ -374,10 +370,10 @@ public interface DatasetCatalog {
    * @param namespace schema 命名空间
    * @param offset 偏移量
    * @param limit 每页大小
-   * @return 分页结果
+   * @return 分页结果，包含完整的单位数据
    * @throws NoSuchSchemaException 如果 schema 不存在
    */
-  PagedResult<NameIdentifier> listUnits(Namespace namespace, int offset, int limit)
+  PagedResult<Unit> listUnits(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException;
 
   /**
@@ -433,47 +429,49 @@ public interface DatasetCatalog {
    * @param namespace schema 命名空间
    * @param offset 偏移量
    * @param limit 每页大小
-   * @return 分页结果
+   * @return 分页结果，包含完整的值域数据
    * @throws NoSuchSchemaException 如果 schema 不存在
    */
-  PagedResult<NameIdentifier> listValueDomains(Namespace namespace, int offset, int limit)
+  PagedResult<ValueDomain> listValueDomains(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException;
 
   /**
    * 通过 {@link NameIdentifier} 从 catalog 获取值域
    *
-   * @param ident 值域标识符 (格式: domainCode:itemValue)
+   * @param ident 值域标识符 (domainCode)
    * @return 值域对象
    * @throws NoSuchValueDomainException 如果值域不存在
    */
   ValueDomain getValueDomain(NameIdentifier ident) throws NoSuchValueDomainException;
 
   /**
-   * 在 catalog 中创建值域项
+   * 在 catalog 中创建值域
    *
-   * @param ident 值域的名称标识符 (格式: domainCode:itemValue)
+   * @param ident 值域的名称标识符 (domainCode)
    * @param domainCode 值域编码
    * @param domainName 值域名称
    * @param domainType 值域类型 (ENUM/RANGE/REGEX)
-   * @param itemValue 值域项值
-   * @param itemLabel 值域项标签
+   * @param domainLevel 值域级别 (BUILTIN/BUSINESS)
+   * @param items 值域项列表
    * @param comment 值域注释，可选，可为 null
+   * @param dataType 值域数据类型，如 STRING, INTEGER 等
    * @return 创建的值域对象
    * @throws NoSuchSchemaException 如果 schema 不存在
-   * @throws ValueDomainAlreadyExistsException 如果值域项已存在
+   * @throws ValueDomainAlreadyExistsException 如果值域已存在
    */
   ValueDomain createValueDomain(
       NameIdentifier ident,
       String domainCode,
       String domainName,
       ValueDomain.Type domainType,
-      String itemValue,
-      String itemLabel,
-      String comment)
+      ValueDomain.Level domainLevel,
+      java.util.List<ValueDomain.Item> items,
+      String comment,
+      String dataType)
       throws NoSuchSchemaException, ValueDomainAlreadyExistsException;
 
   /**
-   * 从 catalog 删除值域项
+   * 从 catalog 删除值域
    *
    * @param ident 值域的名称标识符
    * @return 如果删除值域则返回 true，如果值域不存在则返回 false
@@ -481,16 +479,23 @@ public interface DatasetCatalog {
   boolean deleteValueDomain(NameIdentifier ident);
 
   /**
-   * 更新值域项信息
+   * 更新值域信息
    *
    * @param ident 值域的名称标识符
    * @param domainName 值域名称
-   * @param itemLabel 值域项标签
+   * @param domainLevel 值域级别
+   * @param items 值域项列表
    * @param comment 注释
+   * @param dataType 值域数据类型
    * @return 更新后的值域对象
    * @throws NoSuchValueDomainException 如果值域不存在
    */
   ValueDomain alterValueDomain(
-      NameIdentifier ident, String domainName, String itemLabel, String comment)
+      NameIdentifier ident,
+      String domainName,
+      ValueDomain.Level domainLevel,
+      java.util.List<ValueDomain.Item> items,
+      String comment,
+      String dataType)
       throws NoSuchValueDomainException;
 }

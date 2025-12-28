@@ -41,9 +41,7 @@ public class MetricInfo {
   private final Optional<Integer> currentVersion;
   private final Optional<Integer> lastVersion;
   private final Optional<String> unit;
-  private final Optional<String> aggregationLogic;
   private final Optional<String> calculationFormula;
-  private final Long[] parentMetricIds;
   private final String[] parentMetricCodes;
   private final Optional<String> refCatalogName;
   private final Optional<String> refSchemaName;
@@ -73,8 +71,6 @@ public class MetricInfo {
         null,
         null,
         null,
-        null,
-        null,
         null);
   }
 
@@ -83,9 +79,7 @@ public class MetricInfo {
    *
    * @param metric the metric to expose information for.
    * @param unit the unit of the metric.
-   * @param aggregationLogic the aggregation logic of the metric.
    * @param calculationFormula the calculation formula of the metric.
-   * @param parentMetricIds the parent metric IDs for derived/composite metrics.
    * @param parentMetricCodes the parent metric codes for derived/composite metrics.
    * @param refCatalogName the reference catalog name for atomic metrics.
    * @param refSchemaName the reference schema name for atomic metrics.
@@ -96,9 +90,7 @@ public class MetricInfo {
   public MetricInfo(
       Metric metric,
       String unit,
-      String aggregationLogic,
       String calculationFormula,
-      Long[] parentMetricIds,
       String[] parentMetricCodes,
       String refCatalogName,
       String refSchemaName,
@@ -115,9 +107,7 @@ public class MetricInfo {
         metric.currentVersion(),
         metric.lastVersion(),
         unit,
-        aggregationLogic,
         calculationFormula,
-        parentMetricIds,
         parentMetricCodes,
         refCatalogName,
         refSchemaName,
@@ -138,9 +128,7 @@ public class MetricInfo {
    * @param currentVersion the current version of the metric.
    * @param lastVersion the last version of the metric.
    * @param unit the unit of the metric.
-   * @param aggregationLogic the aggregation logic of the metric.
    * @param calculationFormula the calculation formula of the metric.
-   * @param parentMetricIds the parent metric IDs for derived/composite metrics.
    * @param parentMetricCodes the parent metric codes for derived/composite metrics.
    * @param refCatalogName the reference catalog name for atomic metrics.
    * @param refSchemaName the reference schema name for atomic metrics.
@@ -158,9 +146,7 @@ public class MetricInfo {
       Integer currentVersion,
       Integer lastVersion,
       String unit,
-      String aggregationLogic,
       String calculationFormula,
-      Long[] parentMetricIds,
       String[] parentMetricCodes,
       String refCatalogName,
       String refSchemaName,
@@ -176,9 +162,7 @@ public class MetricInfo {
     this.currentVersion = Optional.ofNullable(currentVersion);
     this.lastVersion = Optional.ofNullable(lastVersion);
     this.unit = Optional.ofNullable(unit);
-    this.aggregationLogic = Optional.ofNullable(aggregationLogic);
     this.calculationFormula = Optional.ofNullable(calculationFormula);
-    this.parentMetricIds = parentMetricIds;
     this.parentMetricCodes = parentMetricCodes;
     this.refCatalogName = Optional.ofNullable(refCatalogName);
     this.refSchemaName = Optional.ofNullable(refSchemaName);
@@ -269,30 +253,12 @@ public class MetricInfo {
   }
 
   /**
-   * Returns the aggregation logic of the metric.
-   *
-   * @return the aggregation logic of the metric, or empty if not set.
-   */
-  public Optional<String> aggregationLogic() {
-    return aggregationLogic;
-  }
-
-  /**
    * Returns the calculation formula of the metric.
    *
    * @return the calculation formula of the metric, or empty if not set.
    */
   public Optional<String> calculationFormula() {
     return calculationFormula;
-  }
-
-  /**
-   * Returns the parent metric IDs for derived/composite metrics.
-   *
-   * @return the parent metric IDs, or null if not set.
-   */
-  public Long[] parentMetricIds() {
-    return parentMetricIds;
   }
 
   /**

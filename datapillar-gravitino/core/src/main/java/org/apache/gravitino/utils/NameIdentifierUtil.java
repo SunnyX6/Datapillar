@@ -579,6 +579,12 @@ public class NameIdentifierUtil {
         String modelParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(modelParent, ident.name(), MetadataObject.Type.MODEL);
 
+      case VALUE_DOMAIN:
+        checkValueDomain(ident);
+        String valueDomainParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(
+            valueDomainParent, ident.name(), MetadataObject.Type.VALUE_DOMAIN);
+
       case ROLE:
         AuthorizationUtils.checkRole(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.ROLE);

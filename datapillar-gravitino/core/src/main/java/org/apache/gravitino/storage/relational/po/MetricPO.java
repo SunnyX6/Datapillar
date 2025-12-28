@@ -32,6 +32,8 @@ public class MetricPO {
   private String metricCode;
   private String metricType;
   private String dataType;
+  private String unit;
+  private String unitName;
   private Long metalakeId;
   private Long catalogId;
   private Long schemaId;
@@ -77,6 +79,16 @@ public class MetricPO {
 
     public Builder withDataType(String dataType) {
       metricPO.dataType = dataType;
+      return this;
+    }
+
+    public Builder withUnit(String unit) {
+      metricPO.unit = unit;
+      return this;
+    }
+
+    public Builder withUnitName(String unitName) {
+      metricPO.unitName = unitName;
       return this;
     }
 
@@ -131,8 +143,6 @@ public class MetricPO {
       Preconditions.checkArgument(metricPO.metalakeId != null, "Metalake id is required");
       Preconditions.checkArgument(metricPO.catalogId != null, "Catalog id is required");
       Preconditions.checkArgument(metricPO.schemaId != null, "Schema id is required");
-      Preconditions.checkArgument(metricPO.currentVersion != null, "Current version is required");
-      Preconditions.checkArgument(metricPO.lastVersion != null, "Last version is required");
       Preconditions.checkArgument(
           StringUtils.isNotBlank(metricPO.auditInfo), "Audit info cannot be empty");
       Preconditions.checkArgument(metricPO.deletedAt != null, "Deleted at is required");

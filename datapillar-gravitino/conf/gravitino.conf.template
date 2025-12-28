@@ -132,3 +132,13 @@ gravitino.openlineage.transport.retry.backoffFactor = 0.3
 # Custom Headers (optional)
 # gravitino.openlineage.transport.headers.X-Tenant-Id = default
 # gravitino.openlineage.transport.headers.X-Custom-Header = value
+
+# ==================== OneMeta Auto Initialization ====================
+# Whether to enable OneMeta auto initialization on startup
+gravitino.onemeta.enabled = true
+# The metalake name for OneMeta
+gravitino.onemeta.metalake = OneMeta
+# The dataset catalog name for OneMeta
+gravitino.onemeta.catalog.dataset = OneDS
+# The schema name for OneMeta
+gravitino.onemeta.schema.dataset = OneDS
