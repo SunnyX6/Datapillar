@@ -95,6 +95,7 @@ CREATE INDEX unit_name IF NOT EXISTS FOR (u:Unit) ON (u.name);
 // 值域索引
 CREATE INDEX valuedomain_domain_code IF NOT EXISTS FOR (v:ValueDomain) ON (v.domainCode);
 CREATE INDEX valuedomain_domain_type IF NOT EXISTS FOR (v:ValueDomain) ON (v.domainType);
+CREATE INDEX valuedomain_domain_level IF NOT EXISTS FOR (v:ValueDomain) ON (v.domainLevel);
 
 // ==================== 向量索引（语义搜索） ====================
 
@@ -202,7 +203,7 @@ FOR (u:Unit) ON EACH [u.code, u.name, u.description];
 
 // 值域全文索引
 CREATE FULLTEXT INDEX valuedomain_fulltext IF NOT EXISTS
-FOR (v:ValueDomain) ON EACH [v.domainCode, v.domainName, v.description];
+FOR (v:ValueDomain) ON EACH [v.domainCode, v.domainName, v.items, v.description];
 
 // ==================== 验证索引创建 ====================
 SHOW INDEXES;

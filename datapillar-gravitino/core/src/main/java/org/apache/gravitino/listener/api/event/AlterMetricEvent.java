@@ -21,35 +21,36 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.info.MetricInfo;
 
-/** Represents an event that is generated after a modifier is successfully deleted. */
+/** Represents an event that is generated after a metric is successfully altered. */
 @DeveloperApi
-public class DeleteModifierEvent extends ModifierEvent {
-  private final boolean isExists;
+public class AlterMetricEvent extends MetricEvent {
+  private final MetricInfo updatedMetricInfo;
 
   /**
-   * Constructs an instance of {@link DeleteModifierEvent}.
+   * Constructs an instance of {@link AlterMetricEvent}.
    *
-   * @param user The user responsible for triggering the modifier operation.
-   * @param identifier The identifier of the Modifier involved in the operation.
-   * @param isExists A boolean indicating whether the modifier existed before deletion.
+   * @param user The user responsible for triggering the metric operation.
+   * @param identifier The identifier of the Metric involved in the operation.
+   * @param updatedMetricInfo The final state of the metric post-alteration.
    */
-  public DeleteModifierEvent(String user, NameIdentifier identifier, boolean isExists) {
+  public AlterMetricEvent(String user, NameIdentifier identifier, MetricInfo updatedMetricInfo) {
     super(user, identifier);
-    this.isExists = isExists;
+    this.updatedMetricInfo = updatedMetricInfo;
   }
 
   /**
-   * Retrieves the existence status of the modifier before the delete operation.
+   * Retrieves the final state of the metric after successful alteration.
    *
-   * @return A boolean value indicating whether the modifier existed before deletion.
+   * @return The metric information.
    */
-  public boolean isExists() {
-    return isExists;
+  public MetricInfo updatedMetricInfo() {
+    return updatedMetricInfo;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.DELETE_METRIC_MODIFIER;
+    return OperationType.ALTER_METRIC;
   }
 }

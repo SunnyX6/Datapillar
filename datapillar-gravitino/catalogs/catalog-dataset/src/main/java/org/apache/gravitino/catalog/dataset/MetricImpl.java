@@ -30,6 +30,8 @@ public class MetricImpl implements Metric, Auditable {
   private String code;
   private Type type;
   private String dataType;
+  private String unit;
+  private String unitName;
   private String comment;
   private Map<String, String> properties;
   private int currentVersion;
@@ -56,6 +58,16 @@ public class MetricImpl implements Metric, Auditable {
   @Override
   public String dataType() {
     return dataType;
+  }
+
+  @Override
+  public String unit() {
+    return unit;
+  }
+
+  @Override
+  public String unitName() {
+    return unitName;
   }
 
   @Override
@@ -108,6 +120,16 @@ public class MetricImpl implements Metric, Auditable {
 
     public Builder withDataType(String dataType) {
       metric.dataType = dataType;
+      return this;
+    }
+
+    public Builder withUnit(String unit) {
+      metric.unit = unit;
+      return this;
+    }
+
+    public Builder withUnitName(String unitName) {
+      metric.unitName = unitName;
       return this;
     }
 

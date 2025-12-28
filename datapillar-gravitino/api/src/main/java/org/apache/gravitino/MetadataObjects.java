@@ -85,8 +85,9 @@ public class MetadataObjects {
             || type == MetadataObject.Type.FILESET
             || type == MetadataObject.Type.TABLE
             || type == MetadataObject.Type.TOPIC
-            || type == MetadataObject.Type.MODEL,
-        "If the length of names is 3, it must be FILESET, TABLE, TOPIC or MODEL");
+            || type == MetadataObject.Type.MODEL
+            || type == MetadataObject.Type.VALUE_DOMAIN,
+        "If the length of names is 3, it must be FILESET, TABLE, TOPIC, MODEL or VALUE_DOMAIN");
 
     Preconditions.checkArgument(
         names.size() != 4 || type == MetadataObject.Type.COLUMN,
@@ -127,6 +128,7 @@ public class MetadataObjects {
       case FILESET:
       case TOPIC:
       case MODEL:
+      case VALUE_DOMAIN:
         parentType = MetadataObject.Type.SCHEMA;
         break;
       case SCHEMA:

@@ -479,4 +479,39 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault(LancePartitionStatisticStorageFactory.class.getCanonicalName());
+
+  // ==================== OneMeta 自动初始化配置 ====================
+
+  public static final String DEFAULT_ONEMETA_NAME = "OneMeta";
+
+  public static final ConfigEntry<Boolean> ONEMETA_ENABLED =
+      new ConfigBuilder("gravitino.onemeta.enabled")
+          .doc("Whether to enable OneMeta auto initialization on startup")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .booleanConf()
+          .createWithDefault(true);
+
+  public static final ConfigEntry<String> ONEMETA_METALAKE =
+      new ConfigBuilder("gravitino.onemeta.metalake")
+          .doc("The metalake name for OneMeta")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault(DEFAULT_ONEMETA_NAME);
+
+  public static final ConfigEntry<String> ONEMETA_CATALOG_DATASET =
+      new ConfigBuilder("gravitino.onemeta.catalog.dataset")
+          .doc("The dataset catalog name for OneMeta")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault(DEFAULT_ONEMETA_NAME);
+
+  public static final ConfigEntry<String> ONEMETA_SCHEMA_DATASET =
+      new ConfigBuilder("gravitino.onemeta.schema.dataset")
+          .doc("The dataset schema name for OneMeta")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault(DEFAULT_ONEMETA_NAME);
 }

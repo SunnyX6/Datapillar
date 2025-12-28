@@ -30,65 +30,64 @@ public class MetricVersionMetaBaseSQLProvider {
     return "INSERT INTO "
         + MetricVersionMetaMapper.TABLE_NAME
         + " (metric_id, metalake_id, catalog_id, schema_id, version, metric_name, metric_code,"
-        + " metric_type, data_type, metric_comment, metric_unit, aggregation_logic, parent_metric_ids,"
+        + " metric_type, data_type, metric_comment, metric_unit, parent_metric_codes,"
         + " calculation_formula, ref_catalog_name, ref_schema_name, ref_table_name, measure_columns, filter_columns,"
         + " version_properties, audit_info, deleted_at)"
         + " VALUES (#{metricVersionMeta.metricId}, #{metricVersionMeta.metalakeId},"
         + " #{metricVersionMeta.catalogId}, #{metricVersionMeta.schemaId}, #{metricVersionMeta.version},"
         + " #{metricVersionMeta.metricName}, #{metricVersionMeta.metricCode}, #{metricVersionMeta.metricType},"
         + " #{metricVersionMeta.dataType}, #{metricVersionMeta.metricComment}, #{metricVersionMeta.metricUnit},"
-        + " #{metricVersionMeta.aggregationLogic}, #{metricVersionMeta.parentMetricIds},"
+        + " #{metricVersionMeta.parentMetricCodes},"
         + " #{metricVersionMeta.calculationFormula}, #{metricVersionMeta.refCatalogName},"
         + " #{metricVersionMeta.refSchemaName}, #{metricVersionMeta.refTableName}, #{metricVersionMeta.measureColumns},"
         + " #{metricVersionMeta.filterColumns}, #{metricVersionMeta.versionProperties}, #{metricVersionMeta.auditInfo}, #{metricVersionMeta.deletedAt})";
   }
 
-  /** 插入新版本记录，版本号从 metric_meta 表实时获取（SQL 层保证原子性） */
-  public String insertMetricVersionMetaWithAutoVersion(
-      @Param("metricVersionMeta") MetricVersionPO metricVersionPO) {
-    return "INSERT INTO "
-        + MetricVersionMetaMapper.TABLE_NAME
-        + " (metric_id, metalake_id, catalog_id, schema_id, version, metric_name, metric_code,"
-        + " metric_type, data_type, metric_comment, metric_unit, aggregation_logic, parent_metric_ids,"
-        + " calculation_formula, ref_catalog_name, ref_schema_name, ref_table_name, measure_columns, filter_columns,"
-        + " version_properties, audit_info, deleted_at)"
-        + " SELECT m.metric_id, m.metalake_id, m.catalog_id, m.schema_id, m.last_version,"
-        + " #{metricVersionMeta.metricName}, #{metricVersionMeta.metricCode}, #{metricVersionMeta.metricType},"
-        + " #{metricVersionMeta.dataType}, #{metricVersionMeta.metricComment}, #{metricVersionMeta.metricUnit},"
-        + " #{metricVersionMeta.aggregationLogic}, #{metricVersionMeta.parentMetricIds},"
-        + " #{metricVersionMeta.calculationFormula}, #{metricVersionMeta.refCatalogName},"
-        + " #{metricVersionMeta.refSchemaName}, #{metricVersionMeta.refTableName}, #{metricVersionMeta.measureColumns},"
-        + " #{metricVersionMeta.filterColumns}, #{metricVersionMeta.versionProperties}, #{metricVersionMeta.auditInfo}, #{metricVersionMeta.deletedAt}"
-        + " FROM "
-        + MetricMetaMapper.TABLE_NAME
-        + " m WHERE m.metric_id = #{metricVersionMeta.metricId} AND m.deleted_at = 0";
-  }
-
   public String listMetricVersionMetasByMetricId(@Param("metricId") Long metricId) {
-    return "SELECT metric_id AS metricId, metalake_id AS metalakeId, catalog_id AS catalogId,"
-        + " schema_id AS schemaId, version, metric_name AS metricName, metric_code AS metricCode,"
-        + " metric_type AS metricType, data_type AS dataType, metric_comment AS metricComment, metric_unit AS metricUnit,"
-        + " aggregation_logic AS aggregationLogic, parent_metric_ids AS parentMetricIds,"
-        + " calculation_formula AS calculationFormula, ref_catalog_name AS refCatalogName,"
-        + " ref_schema_name AS refSchemaName, ref_table_name AS refTableName, measure_columns AS measureColumns,"
-        + " filter_columns AS filterColumns, version_properties AS versionProperties, audit_info AS auditInfo, deleted_at AS deletedAt"
+    return "SELECT mv.id, mv.metric_id AS metricId, mv.metalake_id AS metalakeId, mv.catalog_id AS catalogId,"
+        + " mv.schema_id AS schemaId, mv.version, mv.metric_name AS metricName, mv.metric_code AS metricCode,"
+        + " mv.metric_type AS metricType, mv.data_type AS dataType, mv.metric_comment AS metricComment,"
+        + " mv.metric_unit AS metricUnit, u.unit_name AS unitName, u.unit_symbol AS unitSymbol,"
+        + " mv.parent_metric_codes AS parentMetricCodes,"
+        + " mv.calculation_formula AS calculationFormula, mv.ref_catalog_name AS refCatalogName,"
+        + " mv.ref_schema_name AS refSchemaName, mv.ref_table_name AS refTableName, mv.measure_columns AS measureColumns,"
+        + " mv.filter_columns AS filterColumns, mv.version_properties AS versionProperties, mv.audit_info AS auditInfo, mv.deleted_at AS deletedAt"
         + " FROM "
         + MetricVersionMetaMapper.TABLE_NAME
-        + " WHERE metric_id = #{metricId} AND deleted_at = 0";
+        + " mv LEFT JOIN unit_meta u ON mv.schema_id = u.schema_id AND mv.metric_unit = u.unit_code AND u.deleted_at = 0"
+        + " WHERE mv.metric_id = #{metricId} AND mv.deleted_at = 0"
+        + " ORDER BY mv.version DESC";
   }
 
-  public String selectMetricVersionMeta(
-      @Param("metricId") Long metricId, @Param("version") Integer version) {
-    return "SELECT metric_id AS metricId, metalake_id AS metalakeId, catalog_id AS catalogId,"
-        + " schema_id AS schemaId, version, metric_name AS metricName, metric_code AS metricCode,"
-        + " metric_type AS metricType, data_type AS dataType, metric_comment AS metricComment, metric_unit AS metricUnit,"
-        + " aggregation_logic AS aggregationLogic, parent_metric_ids AS parentMetricIds,"
-        + " calculation_formula AS calculationFormula, ref_catalog_name AS refCatalogName,"
-        + " ref_schema_name AS refSchemaName, ref_table_name AS refTableName, measure_columns AS measureColumns,"
-        + " filter_columns AS filterColumns, version_properties AS versionProperties, audit_info AS auditInfo, deleted_at AS deletedAt"
+  public String selectMetricVersionMetaById(@Param("id") Long id) {
+    return "SELECT mv.id, mv.metric_id AS metricId, mv.metalake_id AS metalakeId, mv.catalog_id AS catalogId,"
+        + " mv.schema_id AS schemaId, mv.version, mv.metric_name AS metricName, mv.metric_code AS metricCode,"
+        + " mv.metric_type AS metricType, mv.data_type AS dataType, mv.metric_comment AS metricComment,"
+        + " mv.metric_unit AS metricUnit, u.unit_name AS unitName, u.unit_symbol AS unitSymbol,"
+        + " mv.parent_metric_codes AS parentMetricCodes,"
+        + " mv.calculation_formula AS calculationFormula, mv.ref_catalog_name AS refCatalogName,"
+        + " mv.ref_schema_name AS refSchemaName, mv.ref_table_name AS refTableName, mv.measure_columns AS measureColumns,"
+        + " mv.filter_columns AS filterColumns, mv.version_properties AS versionProperties, mv.audit_info AS auditInfo, mv.deleted_at AS deletedAt"
         + " FROM "
         + MetricVersionMetaMapper.TABLE_NAME
-        + " WHERE metric_id = #{metricId} AND version = #{version} AND deleted_at = 0";
+        + " mv LEFT JOIN unit_meta u ON mv.schema_id = u.schema_id AND mv.metric_unit = u.unit_code AND u.deleted_at = 0"
+        + " WHERE mv.id = #{id} AND mv.deleted_at = 0";
+  }
+
+  public String selectMetricVersionMetaByMetricIdAndVersion(
+      @Param("metricId") Long metricId, @Param("version") Integer version) {
+    return "SELECT mv.id, mv.metric_id AS metricId, mv.metalake_id AS metalakeId, mv.catalog_id AS catalogId,"
+        + " mv.schema_id AS schemaId, mv.version, mv.metric_name AS metricName, mv.metric_code AS metricCode,"
+        + " mv.metric_type AS metricType, mv.data_type AS dataType, mv.metric_comment AS metricComment,"
+        + " mv.metric_unit AS metricUnit, u.unit_name AS unitName, u.unit_symbol AS unitSymbol,"
+        + " mv.parent_metric_codes AS parentMetricCodes,"
+        + " mv.calculation_formula AS calculationFormula, mv.ref_catalog_name AS refCatalogName,"
+        + " mv.ref_schema_name AS refSchemaName, mv.ref_table_name AS refTableName, mv.measure_columns AS measureColumns,"
+        + " mv.filter_columns AS filterColumns, mv.version_properties AS versionProperties, mv.audit_info AS auditInfo, mv.deleted_at AS deletedAt"
+        + " FROM "
+        + MetricVersionMetaMapper.TABLE_NAME
+        + " mv LEFT JOIN unit_meta u ON mv.schema_id = u.schema_id AND mv.metric_unit = u.unit_code AND u.deleted_at = 0"
+        + " WHERE mv.metric_id = #{metricId} AND mv.version = #{version} AND mv.deleted_at = 0";
   }
 
   public String softDeleteMetricVersionsBySchemaIdAndMetricCode(
@@ -104,13 +103,12 @@ public class MetricVersionMetaBaseSQLProvider {
         + " AND mm.deleted_at = 0) AND mvi.deleted_at = 0";
   }
 
-  public String softDeleteMetricVersionMetaByMetricIdAndVersion(
-      @Param("metricId") Long metricId, @Param("version") Integer version) {
+  public String softDeleteMetricVersionMetaById(@Param("id") Long id) {
     return "UPDATE "
         + MetricVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metric_id = #{metricId} AND version = #{version} AND deleted_at = 0";
+        + " WHERE id = #{id} AND deleted_at = 0";
   }
 
   public String softDeleteMetricVersionMetasBySchemaId(@Param("schemaId") Long schemaId) {
@@ -161,8 +159,7 @@ public class MetricVersionMetaBaseSQLProvider {
         + "data_type = #{newMetricVersionMeta.dataType}, "
         + "metric_comment = #{newMetricVersionMeta.metricComment}, "
         + "metric_unit = #{newMetricVersionMeta.metricUnit}, "
-        + "aggregation_logic = #{newMetricVersionMeta.aggregationLogic}, "
-        + "parent_metric_ids = #{newMetricVersionMeta.parentMetricIds}, "
+        + "parent_metric_codes = #{newMetricVersionMeta.parentMetricCodes}, "
         + "calculation_formula = #{newMetricVersionMeta.calculationFormula}, "
         + "ref_catalog_name = #{newMetricVersionMeta.refCatalogName}, "
         + "ref_schema_name = #{newMetricVersionMeta.refSchemaName}, "
@@ -172,14 +169,7 @@ public class MetricVersionMetaBaseSQLProvider {
         + "version_properties = #{newMetricVersionMeta.versionProperties}, "
         + "audit_info = #{newMetricVersionMeta.auditInfo}, "
         + "deleted_at = #{newMetricVersionMeta.deletedAt} "
-        + "WHERE metric_id = #{oldMetricVersionMeta.metricId} "
-        + "AND metalake_id = #{oldMetricVersionMeta.metalakeId} "
-        + "AND catalog_id = #{oldMetricVersionMeta.catalogId} "
-        + "AND schema_id = #{oldMetricVersionMeta.schemaId} "
-        + "AND version = #{oldMetricVersionMeta.version} "
-        + "AND metric_name = #{oldMetricVersionMeta.metricName} "
-        + "AND metric_code = #{oldMetricVersionMeta.metricCode} "
-        + "AND metric_type = #{oldMetricVersionMeta.metricType} "
+        + "WHERE id = #{oldMetricVersionMeta.id} "
         + "AND deleted_at = 0";
   }
 }

@@ -18,28 +18,17 @@
  */
 package org.apache.gravitino.dataset;
 
+import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
  * MetricModifier 接口表示指标修饰符
  *
- * <p>修饰符用于对指标进行分类和标记
+ * <p>修饰符用于对指标进行分类和标记，修饰符类型通过关联值域（ValueDomain）来定义
  */
 @Evolving
 public interface MetricModifier extends Auditable {
-
-  /** MetricModifier 类型枚举 */
-  enum Type {
-    /** 时间修饰符 */
-    TIME,
-    /** 维度修饰符 */
-    DIMENSION,
-    /** 业务修饰符 */
-    BUSINESS,
-    /** 其他类型 */
-    OTHER
-  }
 
   /**
    * 获取修饰符名称
@@ -56,16 +45,17 @@ public interface MetricModifier extends Auditable {
   String code();
 
   /**
-   * 获取修饰符类型
-   *
-   * @return 修饰符类型
-   */
-  Type type();
-
-  /**
    * 获取修饰符注释
    *
    * @return 修饰符注释
    */
   String comment();
+
+  /**
+   * 获取修饰符类型，来自值域
+   *
+   * @return 修饰符类型，可为空
+   */
+  @Nullable
+  String modifierType();
 }

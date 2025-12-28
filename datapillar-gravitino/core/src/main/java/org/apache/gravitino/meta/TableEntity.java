@@ -37,6 +37,8 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
 
   public static final Field ID = Field.required("id", Long.class, "The table's unique identifier");
   public static final Field NAME = Field.required("name", String.class, "The table's name");
+  public static final Field COMMENT =
+      Field.optional("comment", String.class, "The table's comment");
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the table");
   public static final Field COLUMNS =
@@ -45,6 +47,8 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
   private Long id;
 
   private String name;
+
+  private String comment;
 
   private AuditInfo auditInfo;
 
@@ -62,6 +66,7 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
     Map<Field, Object> fields = Maps.newHashMap();
     fields.put(ID, id);
     fields.put(NAME, name);
+    fields.put(COMMENT, comment);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(COLUMNS, columns);
 
@@ -96,6 +101,15 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
   @Override
   public String name() {
     return name;
+  }
+
+  /**
+   * Returns the comment of the table.
+   *
+   * @return The comment of the table, null if not specified.
+   */
+  public String comment() {
+    return comment;
   }
 
   /**
@@ -134,6 +148,7 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
     TableEntity baseTable = (TableEntity) o;
     return Objects.equal(id, baseTable.id)
         && Objects.equal(name, baseTable.name)
+        && Objects.equal(comment, baseTable.comment)
         && Objects.equal(namespace, baseTable.namespace)
         && Objects.equal(auditInfo, baseTable.auditInfo)
         && CollectionUtils.isEqualCollection(columns, baseTable.columns);
@@ -141,7 +156,7 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(id, name, auditInfo, columns, namespace);
+    return Objects.hashCode(id, name, comment, auditInfo, columns, namespace);
   }
 
   public static class Builder {
@@ -159,6 +174,11 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
 
     public Builder withName(String name) {
       tableEntity.name = name;
+      return this;
+    }
+
+    public Builder withComment(String comment) {
+      tableEntity.comment = comment;
       return this;
     }
 

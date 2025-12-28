@@ -19,10 +19,14 @@ from src.shared.config.logging import setup_logging
 logger = logging.getLogger(__name__)
 
 from src.modules.etl.orchestrator import EtlOrchestrator, create_etl_orchestrator
+from src.modules.openlineage.core.event_processor import event_processor
+from src.modules.openlineage.core.embedding_processor import embedding_processor
+from src.modules.openlineage.sync import sync_gravitino_metadata
 from src.shared.config.exceptions import BaseError, AuthenticationError, AuthorizationError
 from src.api.router import api_router
 from src.shared.config import settings
 from src.infrastructure.database import Neo4jClient, AsyncNeo4jClient, RedisClient, MySQLClient
+from src.infrastructure.database.gravitino import GravitinoDBClient
 from src.shared.auth.middleware import AuthMiddleware
 
 
@@ -96,7 +100,7 @@ def create_app() -> FastAPI:
         logger.info(f"MySQL: {settings.mysql_host}:{settings.mysql_port}/{settings.mysql_database}")
         logger.info("=" * 60)
 
-        orchestrator: Orchestrator | None = None
+        orchestrator: EtlOrchestrator | None = None
         try:
             # 初始化连接池（全局单例，自动管理）
             logger.info("初始化 MySQL 连接池...")
@@ -108,6 +112,29 @@ def create_app() -> FastAPI:
             logger.info("初始化 Redis 连接池...")
             await RedisClient.get_instance()
 
+            logger.info("初始化 Gravitino 数据库连接...")
+            GravitinoDBClient.get_engine()  # 触发连接池初始化
+
+            # 启动 EventProcessor（暂停状态，接收事件但不处理）
+            logger.info("启动 EventProcessor（暂停消费模式）...")
+            await event_processor.start(paused=True)
+
+            # 启动 EmbeddingProcessor
+            logger.info("启动 EmbeddingProcessor...")
+            await embedding_processor.start()
+
+            # 执行 Gravitino 全量同步
+            logger.info("开始 Gravitino 元数据全量同步...")
+            try:
+                sync_stats = await sync_gravitino_metadata()
+                logger.info(f"Gravitino 元数据同步完成: {sync_stats}")
+            except Exception as e:
+                logger.error(f"Gravitino 元数据同步失败: {e}", exc_info=True)
+
+            # 同步完成后恢复事件处理
+            logger.info("恢复 EventProcessor 事件消费...")
+            event_processor.resume()
+
             # 创建 Orchestrator（使用内存 checkpoint）
             orchestrator = await create_etl_orchestrator()
             app.state.orchestrator = orchestrator
@@ -117,6 +144,14 @@ def create_app() -> FastAPI:
 
         finally:
             logger.info("Datapillar AI - 关闭中...")
+
+            # 停止处理器
+            logger.info("停止 EventProcessor...")
+            await event_processor.stop()
+
+            logger.info("停止 EmbeddingProcessor...")
+            await embedding_processor.stop()
+
             if orchestrator:
                 logger.info("Orchestrator 已释放")
 
@@ -125,6 +160,7 @@ def create_app() -> FastAPI:
             await AsyncNeo4jClient.close()
             Neo4jClient.close()
             MySQLClient.close()
+            GravitinoDBClient.close()
             logger.info("所有连接池已关闭")
 
     app = FastAPI(

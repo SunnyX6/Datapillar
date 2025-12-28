@@ -14,6 +14,8 @@ interface ModalProps {
   isOpen: boolean
   onClose: () => void
   title?: string
+  /** 副标题，显示在标题下方 */
+  subtitle?: ReactNode
   children: ReactNode
   /** 统一 footer（与 footerLeft/footerRight 二选一） */
   footer?: ReactNode
@@ -21,14 +23,15 @@ interface ModalProps {
   footerLeft?: ReactNode
   /** 右侧 footer 按钮区域 */
   footerRight?: ReactNode
-  /** 小(sm): 窄表单 | 中(md): 标准表单 | 大(lg): 复杂表单 */
-  size?: 'sm' | 'md' | 'lg'
+  /** 迷你(mini): 简单表单 | 小(sm): 窄表单 | 中(md): 标准表单 | 大(lg): 复杂表单 */
+  size?: 'mini' | 'sm' | 'md' | 'lg'
 }
 
 export function Modal({
   isOpen,
   onClose,
   title,
+  subtitle,
   children,
   footer,
   footerLeft,
@@ -68,11 +71,13 @@ export function Modal({
 
   // 使用 design-tokens 中定义的模态框宽度
   const widthClass =
-    size === 'sm'
-      ? modalWidthClassMap.small
-      : size === 'md'
-        ? modalWidthClassMap.normal
-        : modalWidthClassMap.huge
+    size === 'mini'
+      ? modalWidthClassMap.mini
+      : size === 'sm'
+        ? modalWidthClassMap.small
+        : size === 'md'
+          ? modalWidthClassMap.normal
+          : modalWidthClassMap.huge
 
   const modalContent = (
     <div className="fixed inset-0 z-[999999] flex items-center justify-center p-6">
@@ -102,6 +107,7 @@ export function Modal({
         {title && (
           <div className="px-8 pt-8 pb-2">
             <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">{title}</h2>
+            {subtitle && <div className="mt-1">{subtitle}</div>}
           </div>
         )}
 

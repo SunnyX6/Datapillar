@@ -45,7 +45,10 @@ import org.apache.gravitino.rest.RESTRequest;
       name = "setProperty"),
   @JsonSubTypes.Type(
       value = MetricUpdateRequest.UpdateMetricCommentRequest.class,
-      name = "updateComment")
+      name = "updateComment"),
+  @JsonSubTypes.Type(
+      value = MetricUpdateRequest.UpdateMetricDataTypeRequest.class,
+      name = "updateDataType")
 })
 public interface MetricUpdateRequest extends RESTRequest {
 
@@ -154,6 +157,30 @@ public interface MetricUpdateRequest extends RESTRequest {
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
           newComment != null, "\"newComment\" field is required and cannot be null");
+    }
+  }
+
+  /** 更新指标数据类型的更新请求 */
+  @EqualsAndHashCode
+  @AllArgsConstructor
+  @NoArgsConstructor(force = true)
+  @ToString
+  @Getter
+  class UpdateMetricDataTypeRequest implements MetricUpdateRequest {
+
+    @JsonProperty("newDataType")
+    private final String newDataType;
+
+    @Override
+    public MetricChange metricChange() {
+      return MetricChange.updateDataType(newDataType);
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(newDataType),
+          "\"newDataType\" field is required and cannot be empty");
     }
   }
 }

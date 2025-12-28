@@ -54,18 +54,17 @@ public class MetricVersionMetaSQLProviderFactory {
     return getProvider().insertMetricVersionMeta(metricVersionPO);
   }
 
-  public static String insertMetricVersionMetaWithAutoVersion(
-      @Param("metricVersionMeta") MetricVersionPO metricVersionPO) {
-    return getProvider().insertMetricVersionMetaWithAutoVersion(metricVersionPO);
-  }
-
   public static String listMetricVersionMetasByMetricId(@Param("metricId") Long metricId) {
     return getProvider().listMetricVersionMetasByMetricId(metricId);
   }
 
-  public static String selectMetricVersionMeta(
+  public static String selectMetricVersionMetaById(@Param("id") Long id) {
+    return getProvider().selectMetricVersionMetaById(id);
+  }
+
+  public static String selectMetricVersionMetaByMetricIdAndVersion(
       @Param("metricId") Long metricId, @Param("version") Integer version) {
-    return getProvider().selectMetricVersionMeta(metricId, version);
+    return getProvider().selectMetricVersionMetaByMetricIdAndVersion(metricId, version);
   }
 
   public static String softDeleteMetricVersionsBySchemaIdAndMetricCode(
@@ -73,9 +72,8 @@ public class MetricVersionMetaSQLProviderFactory {
     return getProvider().softDeleteMetricVersionsBySchemaIdAndMetricCode(schemaId, metricCode);
   }
 
-  public static String softDeleteMetricVersionMetaByMetricIdAndVersion(
-      @Param("metricId") Long metricId, @Param("version") Integer version) {
-    return getProvider().softDeleteMetricVersionMetaByMetricIdAndVersion(metricId, version);
+  public static String softDeleteMetricVersionMetaById(@Param("id") Long id) {
+    return getProvider().softDeleteMetricVersionMetaById(id);
   }
 
   public static String softDeleteMetricVersionMetasBySchemaId(@Param("schemaId") Long schemaId) {

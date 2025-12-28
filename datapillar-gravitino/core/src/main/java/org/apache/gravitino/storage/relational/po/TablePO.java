@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 public class TablePO {
   private Long tableId;
   private String tableName;
+  private String tableComment;
   private Long metalakeId;
   private Long catalogId;
   private Long schemaId;
@@ -38,6 +39,10 @@ public class TablePO {
 
   public String getTableName() {
     return tableName;
+  }
+
+  public String getTableComment() {
+    return tableComment;
   }
 
   public Long getMetalakeId() {
@@ -79,6 +84,7 @@ public class TablePO {
     TablePO tablePO = (TablePO) o;
     return Objects.equal(getTableId(), tablePO.getTableId())
         && Objects.equal(getTableName(), tablePO.getTableName())
+        && Objects.equal(getTableComment(), tablePO.getTableComment())
         && Objects.equal(getMetalakeId(), tablePO.getMetalakeId())
         && Objects.equal(getCatalogId(), tablePO.getCatalogId())
         && Objects.equal(getSchemaId(), tablePO.getSchemaId())
@@ -93,6 +99,7 @@ public class TablePO {
     return Objects.hashCode(
         getTableId(),
         getTableName(),
+        getTableComment(),
         getMetalakeId(),
         getCatalogId(),
         getSchemaId(),
@@ -116,6 +123,11 @@ public class TablePO {
 
     public Builder withTableName(String tableName) {
       tablePO.tableName = tableName;
+      return this;
+    }
+
+    public Builder withTableComment(String tableComment) {
+      tablePO.tableComment = tableComment;
       return this;
     }
 

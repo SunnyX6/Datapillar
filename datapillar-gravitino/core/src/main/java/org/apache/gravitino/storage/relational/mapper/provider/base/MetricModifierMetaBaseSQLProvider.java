@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.MetricModifierMetaMapper.TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.po.MetricModifierPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -27,9 +28,9 @@ import org.apache.ibatis.annotations.Param;
 public class MetricModifierMetaBaseSQLProvider {
 
   public String listMetricModifierPOsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "SELECT modifier_id AS modifierId, modifier_name AS modifierName, modifier_code AS modifierCode, modifier_type AS modifierType,"
+    return "SELECT modifier_id AS modifierId, modifier_name AS modifierName, modifier_code AS modifierCode,"
         + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, modifier_comment AS modifierComment,"
-        + " audit_info AS auditInfo, deleted_at AS deletedAt"
+        + " modifier_type AS modifierType, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
@@ -37,9 +38,9 @@ public class MetricModifierMetaBaseSQLProvider {
 
   public String listMetricModifierPOsBySchemaIdWithPagination(
       @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit) {
-    return "SELECT modifier_id AS modifierId, modifier_name AS modifierName, modifier_code AS modifierCode, modifier_type AS modifierType,"
+    return "SELECT modifier_id AS modifierId, modifier_name AS modifierName, modifier_code AS modifierCode,"
         + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, modifier_comment AS modifierComment,"
-        + " audit_info AS auditInfo, deleted_at AS deletedAt"
+        + " modifier_type AS modifierType, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
@@ -55,12 +56,31 @@ public class MetricModifierMetaBaseSQLProvider {
 
   public String selectMetricModifierMetaBySchemaIdAndModifierCode(
       @Param("schemaId") Long schemaId, @Param("modifierCode") String modifierCode) {
-    return "SELECT modifier_id AS modifierId, modifier_name AS modifierName, modifier_code AS modifierCode, modifier_type AS modifierType,"
+    return "SELECT modifier_id AS modifierId, modifier_name AS modifierName, modifier_code AS modifierCode,"
         + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, modifier_comment AS modifierComment,"
-        + " audit_info AS auditInfo, deleted_at AS deletedAt"
+        + " modifier_type AS modifierType, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND modifier_code = #{modifierCode} AND deleted_at = 0";
+  }
+
+  public String listMetricModifierPOsByModifierIds(@Param("modifierIds") List<Long> modifierIds) {
+    StringBuilder sql = new StringBuilder();
+    sql.append(
+        "SELECT modifier_id AS modifierId, modifier_name AS modifierName, modifier_code AS modifierCode,"
+            + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, modifier_comment AS modifierComment,"
+            + " modifier_type AS modifierType, audit_info AS auditInfo, deleted_at AS deletedAt"
+            + " FROM "
+            + TABLE_NAME
+            + " WHERE deleted_at = 0 AND modifier_id IN (");
+    for (int i = 0; i < modifierIds.size(); i++) {
+      sql.append("#{modifierIds[").append(i).append("]}");
+      if (i < modifierIds.size() - 1) {
+        sql.append(", ");
+      }
+    }
+    sql.append(")");
+    return sql.toString();
   }
 
   public String updateMetricModifierMeta(
@@ -70,17 +90,16 @@ public class MetricModifierMetaBaseSQLProvider {
         + TABLE_NAME
         + " SET modifier_name = #{newMetricModifier.modifierName},"
         + " modifier_code = #{newMetricModifier.modifierCode},"
-        + " modifier_type = #{newMetricModifier.modifierType},"
         + " metalake_id = #{newMetricModifier.metalakeId},"
         + " catalog_id = #{newMetricModifier.catalogId},"
         + " schema_id = #{newMetricModifier.schemaId},"
         + " modifier_comment = #{newMetricModifier.modifierComment},"
+        + " modifier_type = #{newMetricModifier.modifierType},"
         + " audit_info = #{newMetricModifier.auditInfo},"
         + " deleted_at = #{newMetricModifier.deletedAt}"
         + " WHERE modifier_id = #{oldMetricModifier.modifierId}"
         + " AND modifier_name = #{oldMetricModifier.modifierName}"
         + " AND modifier_code = #{oldMetricModifier.modifierCode}"
-        + " AND modifier_type = #{oldMetricModifier.modifierType}"
         + " AND metalake_id = #{oldMetricModifier.metalakeId}"
         + " AND catalog_id = #{oldMetricModifier.catalogId}"
         + " AND schema_id = #{oldMetricModifier.schemaId}"

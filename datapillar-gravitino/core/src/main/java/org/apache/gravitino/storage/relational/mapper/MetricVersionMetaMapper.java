@@ -35,12 +35,6 @@ public interface MetricVersionMetaMapper {
       method = "insertMetricVersionMeta")
   void insertMetricVersionMeta(@Param("metricVersionMeta") MetricVersionPO metricVersionPO);
 
-  @InsertProvider(
-      type = MetricVersionMetaSQLProviderFactory.class,
-      method = "insertMetricVersionMetaWithAutoVersion")
-  void insertMetricVersionMetaWithAutoVersion(
-      @Param("metricVersionMeta") MetricVersionPO metricVersionPO);
-
   @SelectProvider(
       type = MetricVersionMetaSQLProviderFactory.class,
       method = "listMetricVersionMetasByMetricId")
@@ -48,8 +42,13 @@ public interface MetricVersionMetaMapper {
 
   @SelectProvider(
       type = MetricVersionMetaSQLProviderFactory.class,
-      method = "selectMetricVersionMeta")
-  MetricVersionPO selectMetricVersionMeta(
+      method = "selectMetricVersionMetaById")
+  MetricVersionPO selectMetricVersionMetaById(@Param("id") Long id);
+
+  @SelectProvider(
+      type = MetricVersionMetaSQLProviderFactory.class,
+      method = "selectMetricVersionMetaByMetricIdAndVersion")
+  MetricVersionPO selectMetricVersionMetaByMetricIdAndVersion(
       @Param("metricId") Long metricId, @Param("version") Integer version);
 
   @UpdateProvider(
@@ -60,9 +59,8 @@ public interface MetricVersionMetaMapper {
 
   @UpdateProvider(
       type = MetricVersionMetaSQLProviderFactory.class,
-      method = "softDeleteMetricVersionMetaByMetricIdAndVersion")
-  Integer softDeleteMetricVersionMetaByMetricIdAndVersion(
-      @Param("metricId") Long metricId, @Param("version") Integer version);
+      method = "softDeleteMetricVersionMetaById")
+  Integer softDeleteMetricVersionMetaById(@Param("id") Long id);
 
   @UpdateProvider(
       type = MetricVersionMetaSQLProviderFactory.class,

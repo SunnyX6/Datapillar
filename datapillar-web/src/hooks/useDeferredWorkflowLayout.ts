@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { formatWorkflowGraph, type WorkflowLayoutOptions, type WorkflowLayoutResult } from '@/lib/workflow/formatter'
+import { formatWorkflowGraph, type WorkflowLayoutOptions, type WorkflowLayoutResult } from '@/layouts/workflow/utils/formatter'
 import type { WorkflowGraph } from '@/services/workflowStudioService'
 
 type IdleTaskHandle = number | null

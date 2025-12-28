@@ -27,8 +27,8 @@ public class ModifierImpl implements MetricModifier, Auditable {
 
   private String name;
   private String code;
-  private Type type;
   private String comment;
+  private String modifierType;
   private AuditInfo auditInfo;
 
   private ModifierImpl() {}
@@ -44,13 +44,13 @@ public class ModifierImpl implements MetricModifier, Auditable {
   }
 
   @Override
-  public Type type() {
-    return type;
+  public String comment() {
+    return comment;
   }
 
   @Override
-  public String comment() {
-    return comment;
+  public String modifierType() {
+    return modifierType;
   }
 
   @Override
@@ -76,13 +76,13 @@ public class ModifierImpl implements MetricModifier, Auditable {
       return this;
     }
 
-    public Builder withType(Type type) {
-      modifier.type = type;
+    public Builder withComment(String comment) {
+      modifier.comment = comment;
       return this;
     }
 
-    public Builder withComment(String comment) {
-      modifier.comment = comment;
+    public Builder withModifierType(String modifierType) {
+      modifier.modifierType = modifierType;
       return this;
     }
 

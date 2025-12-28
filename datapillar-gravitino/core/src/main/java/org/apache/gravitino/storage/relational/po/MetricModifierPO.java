@@ -26,11 +26,11 @@ public class MetricModifierPO {
   private Long modifierId;
   private String modifierName;
   private String modifierCode;
-  private String modifierType;
   private Long metalakeId;
   private Long catalogId;
   private Long schemaId;
   private String modifierComment;
+  private String modifierType;
   private String auditInfo;
   private Long deletedAt;
 
@@ -60,11 +60,6 @@ public class MetricModifierPO {
       return this;
     }
 
-    public Builder withModifierType(String modifierType) {
-      metricModifierPO.modifierType = modifierType;
-      return this;
-    }
-
     public Builder withMetalakeId(Long metalakeId) {
       metricModifierPO.metalakeId = metalakeId;
       return this;
@@ -82,6 +77,11 @@ public class MetricModifierPO {
 
     public Builder withModifierComment(String modifierComment) {
       metricModifierPO.modifierComment = modifierComment;
+      return this;
+    }
+
+    public Builder withModifierType(String modifierType) {
+      metricModifierPO.modifierType = modifierType;
       return this;
     }
 

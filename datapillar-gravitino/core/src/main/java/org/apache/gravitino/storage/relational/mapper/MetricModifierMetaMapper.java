@@ -35,35 +35,37 @@ public interface MetricModifierMetaMapper {
   @Insert(
       "INSERT INTO "
           + TABLE_NAME
-          + " (modifier_id, modifier_name, modifier_code, modifier_type,"
-          + " metalake_id, catalog_id, schema_id, modifier_comment,"
+          + " (modifier_id, modifier_name, modifier_code,"
+          + " metalake_id, catalog_id, schema_id, modifier_comment, modifier_type,"
           + " audit_info, deleted_at)"
           + " VALUES (#{metricModifier.modifierId}, #{metricModifier.modifierName},"
-          + " #{metricModifier.modifierCode}, #{metricModifier.modifierType},"
+          + " #{metricModifier.modifierCode},"
           + " #{metricModifier.metalakeId}, #{metricModifier.catalogId},"
           + " #{metricModifier.schemaId}, #{metricModifier.modifierComment},"
+          + " #{metricModifier.modifierType},"
           + " #{metricModifier.auditInfo}, #{metricModifier.deletedAt})")
   void insertMetricModifierMeta(@Param("metricModifier") MetricModifierPO metricModifierPO);
 
   @Insert(
       "INSERT INTO "
           + TABLE_NAME
-          + " (modifier_id, modifier_name, modifier_code, modifier_type,"
-          + " metalake_id, catalog_id, schema_id, modifier_comment,"
+          + " (modifier_id, modifier_name, modifier_code,"
+          + " metalake_id, catalog_id, schema_id, modifier_comment, modifier_type,"
           + " audit_info, deleted_at)"
           + " VALUES (#{metricModifier.modifierId}, #{metricModifier.modifierName},"
-          + " #{metricModifier.modifierCode}, #{metricModifier.modifierType},"
+          + " #{metricModifier.modifierCode},"
           + " #{metricModifier.metalakeId}, #{metricModifier.catalogId},"
           + " #{metricModifier.schemaId}, #{metricModifier.modifierComment},"
+          + " #{metricModifier.modifierType},"
           + " #{metricModifier.auditInfo}, #{metricModifier.deletedAt})"
           + " ON DUPLICATE KEY UPDATE"
           + " modifier_name = #{metricModifier.modifierName},"
           + " modifier_code = #{metricModifier.modifierCode},"
-          + " modifier_type = #{metricModifier.modifierType},"
           + " metalake_id = #{metricModifier.metalakeId},"
           + " catalog_id = #{metricModifier.catalogId},"
           + " schema_id = #{metricModifier.schemaId},"
           + " modifier_comment = #{metricModifier.modifierComment},"
+          + " modifier_type = #{metricModifier.modifierType},"
           + " audit_info = #{metricModifier.auditInfo},"
           + " deleted_at = #{metricModifier.deletedAt}")
   void insertMetricModifierMetaOnDuplicateKeyUpdate(
@@ -99,13 +101,19 @@ public interface MetricModifierMetaMapper {
       @Param("schemaId") Long schemaId, @Param("modifierCode") String modifierCode);
 
   @Select(
-      "SELECT modifier_id, modifier_name, modifier_code, modifier_type,"
-          + " metalake_id, catalog_id, schema_id, modifier_comment,"
-          + " audit_info, deleted_at"
+      "SELECT modifier_id AS modifierId, modifier_name AS modifierName, modifier_code AS modifierCode,"
+          + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, modifier_comment AS modifierComment,"
+          + " modifier_type AS modifierType, audit_info AS auditInfo, deleted_at AS deletedAt"
           + " FROM "
           + TABLE_NAME
           + " WHERE modifier_id = #{modifierId} AND deleted_at = 0")
   MetricModifierPO selectMetricModifierMetaByModifierId(@Param("modifierId") Long modifierId);
+
+  @SelectProvider(
+      type = MetricModifierMetaSQLProviderFactory.class,
+      method = "listMetricModifierPOsByModifierIds")
+  List<MetricModifierPO> listMetricModifierPOsByModifierIds(
+      @Param("modifierIds") List<Long> modifierIds);
 
   @Update(
       "UPDATE "

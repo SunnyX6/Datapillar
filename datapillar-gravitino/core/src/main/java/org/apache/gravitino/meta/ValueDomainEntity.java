@@ -19,6 +19,7 @@
 package org.apache.gravitino.meta;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import lombok.ToString;
@@ -38,18 +39,20 @@ public class ValueDomainEntity implements Entity, Auditable, HasIdentifier, Valu
   public static final Field DOMAIN_CODE = Field.required("domainCode", String.class, "值域编码");
   public static final Field DOMAIN_NAME = Field.required("domainName", String.class, "值域名称");
   public static final Field DOMAIN_TYPE = Field.required("domainType", Type.class, "值域类型");
-  public static final Field ITEM_VALUE = Field.required("itemValue", String.class, "值项");
-  public static final Field ITEM_LABEL = Field.optional("itemLabel", String.class, "值项标签");
+  public static final Field DOMAIN_LEVEL = Field.required("domainLevel", Level.class, "值域级别");
+  public static final Field ITEMS = Field.optional("items", List.class, "值域项列表");
   public static final Field COMMENT = Field.optional("comment", String.class, "注释");
+  public static final Field DATA_TYPE = Field.optional("dataType", String.class, "数据类型");
   public static final Field AUDIT_INFO = Field.required("auditInfo", AuditInfo.class, "审计信息");
 
   private Long id;
   private String domainCode;
   private String domainName;
   private Type domainType;
-  private String itemValue;
-  private String itemLabel;
+  private Level domainLevel;
+  private List<Item> items;
   private String comment;
+  private String dataType;
   private AuditInfo auditInfo;
   private Namespace namespace;
 
@@ -81,18 +84,23 @@ public class ValueDomainEntity implements Entity, Auditable, HasIdentifier, Valu
   }
 
   @Override
-  public String itemValue() {
-    return itemValue;
+  public Level domainLevel() {
+    return domainLevel;
   }
 
   @Override
-  public String itemLabel() {
-    return itemLabel;
+  public List<Item> items() {
+    return items;
   }
 
   @Override
   public String comment() {
     return comment;
+  }
+
+  @Override
+  public String dataType() {
+    return dataType;
   }
 
   @Override
@@ -107,7 +115,7 @@ public class ValueDomainEntity implements Entity, Auditable, HasIdentifier, Valu
 
   @Override
   public NameIdentifier nameIdentifier() {
-    return NameIdentifier.of(namespace, domainCode + ":" + itemValue);
+    return NameIdentifier.of(namespace, domainCode);
   }
 
   @Override
@@ -129,9 +137,10 @@ public class ValueDomainEntity implements Entity, Auditable, HasIdentifier, Valu
         && Objects.equals(domainCode, that.domainCode)
         && Objects.equals(domainName, that.domainName)
         && domainType == that.domainType
-        && Objects.equals(itemValue, that.itemValue)
-        && Objects.equals(itemLabel, that.itemLabel)
+        && domainLevel == that.domainLevel
+        && Objects.equals(items, that.items)
         && Objects.equals(comment, that.comment)
+        && Objects.equals(dataType, that.dataType)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(namespace, that.namespace);
   }
@@ -143,9 +152,10 @@ public class ValueDomainEntity implements Entity, Auditable, HasIdentifier, Valu
         domainCode,
         domainName,
         domainType,
-        itemValue,
-        itemLabel,
+        domainLevel,
+        items,
         comment,
+        dataType,
         auditInfo,
         namespace);
   }
@@ -177,18 +187,23 @@ public class ValueDomainEntity implements Entity, Auditable, HasIdentifier, Valu
       return this;
     }
 
-    public Builder withItemValue(String itemValue) {
-      entity.itemValue = itemValue;
+    public Builder withDomainLevel(Level domainLevel) {
+      entity.domainLevel = domainLevel;
       return this;
     }
 
-    public Builder withItemLabel(String itemLabel) {
-      entity.itemLabel = itemLabel;
+    public Builder withItems(List<Item> items) {
+      entity.items = items;
       return this;
     }
 
     public Builder withComment(String comment) {
       entity.comment = comment;
+      return this;
+    }
+
+    public Builder withDataType(String dataType) {
+      entity.dataType = dataType;
       return this;
     }
 

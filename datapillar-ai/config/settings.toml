@@ -20,6 +20,16 @@ mysql_port = 3306
 mysql_database = "datapillar"
 mysql_username = "root"
 
+# ==================== Gravitino 元数据库配置 ====================
+# 支持 mysql, postgresql, h2
+gravitino_db_type = "mysql"
+gravitino_db_host = "localhost"
+gravitino_db_port = 3306
+gravitino_db_database = "gravitino"
+gravitino_db_username = "root"
+# 只同步指定 metalake 下的数据
+gravitino_sync_metalake = "OneMeta"
+
 # ==================== Redis 配置 ====================
 redis_host = "127.0.0.1"
 redis_port = 6379

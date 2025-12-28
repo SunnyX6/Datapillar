@@ -27,12 +27,13 @@ import lombok.ToString;
 @ToString
 @EqualsAndHashCode
 public class ValueDomainPO {
-  private Long itemId;
+  private Long domainId;
   private String domainCode;
   private String domainName;
   private String domainType;
-  private String itemValue;
-  private String itemLabel;
+  private String domainLevel;
+  private String items;
+  private String dataType;
   private Long metalakeId;
   private Long catalogId;
   private Long schemaId;
@@ -49,8 +50,8 @@ public class ValueDomainPO {
   public static class Builder {
     private final ValueDomainPO po = new ValueDomainPO();
 
-    public Builder withItemId(Long itemId) {
-      po.itemId = itemId;
+    public Builder withDomainId(Long domainId) {
+      po.domainId = domainId;
       return this;
     }
 
@@ -69,13 +70,18 @@ public class ValueDomainPO {
       return this;
     }
 
-    public Builder withItemValue(String itemValue) {
-      po.itemValue = itemValue;
+    public Builder withDomainLevel(String domainLevel) {
+      po.domainLevel = domainLevel;
       return this;
     }
 
-    public Builder withItemLabel(String itemLabel) {
-      po.itemLabel = itemLabel;
+    public Builder withItems(String items) {
+      po.items = items;
+      return this;
+    }
+
+    public Builder withDataType(String dataType) {
+      po.dataType = dataType;
       return this;
     }
 

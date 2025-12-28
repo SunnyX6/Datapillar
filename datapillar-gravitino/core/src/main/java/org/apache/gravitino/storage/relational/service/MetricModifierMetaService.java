@@ -180,6 +180,22 @@ public class MetricModifierMetaService {
     return deleteResult > 0;
   }
 
+  /** 根据 schemaId 和 code 获取 modifierId */
+  public Long getModifierIdBySchemaIdAndCode(Long schemaId, String modifierCode) {
+    Long modifierId =
+        SessionUtils.getWithoutCommit(
+            MetricModifierMetaMapper.class,
+            mapper -> mapper.selectModifierIdBySchemaIdAndModifierCode(schemaId, modifierCode));
+
+    if (modifierId == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METRIC_MODIFIER.name().toLowerCase(),
+          modifierCode);
+    }
+    return modifierId;
+  }
+
   private MetricModifierPO getModifierPOBySchemaIdAndCode(Long schemaId, String modifierCode) {
     MetricModifierPO modifierPO =
         SessionUtils.getWithoutCommit(

@@ -9,8 +9,8 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { login as apiLogin, logout as apiLogout } from '@/lib/auth'
-import { startTokenRefresh, stopTokenRefresh, getTokenInfo } from '@/lib/token'
+import { login as apiLogin, logout as apiLogout } from '@/lib/api/auth'
+import { startTokenRefresh, stopTokenRefresh, getTokenInfo } from '@/lib/api/token'
 import type { User } from '@/types/auth'
 
 /**

@@ -28,8 +28,8 @@ import org.apache.gravitino.dataset.MetricModifier;
 @DeveloperApi
 public class ModifierInfo {
   private final String code;
-  private final MetricModifier.Type type;
   private final Optional<String> comment;
+  private final Optional<String> modifierType;
   private final Optional<Audit> audit;
 
   /**
@@ -38,21 +38,21 @@ public class ModifierInfo {
    * @param modifier the modifier to expose information for.
    */
   public ModifierInfo(MetricModifier modifier) {
-    this(modifier.code(), modifier.type(), modifier.comment(), modifier.auditInfo());
+    this(modifier.code(), modifier.comment(), modifier.modifierType(), modifier.auditInfo());
   }
 
   /**
    * Constructs a {@link ModifierInfo} instance based on all fields.
    *
    * @param code the code of the modifier.
-   * @param type the type of the modifier.
    * @param comment the comment of the modifier.
+   * @param modifierType the type of the modifier.
    * @param audit the audit information of the modifier.
    */
-  public ModifierInfo(String code, MetricModifier.Type type, String comment, Audit audit) {
+  public ModifierInfo(String code, String comment, String modifierType, Audit audit) {
     this.code = code;
-    this.type = type;
     this.comment = Optional.ofNullable(comment);
+    this.modifierType = Optional.ofNullable(modifierType);
     this.audit = Optional.ofNullable(audit);
   }
 
@@ -66,21 +66,21 @@ public class ModifierInfo {
   }
 
   /**
-   * Returns the type of the modifier.
-   *
-   * @return the type of the modifier.
-   */
-  public MetricModifier.Type modifierType() {
-    return type;
-  }
-
-  /**
    * Returns the comment of the modifier.
    *
    * @return the comment of the modifier or empty if not set.
    */
   public Optional<String> comment() {
     return comment;
+  }
+
+  /**
+   * Returns the type of the modifier.
+   *
+   * @return the type of the modifier or empty if not set.
+   */
+  public Optional<String> modifierType() {
+    return modifierType;
   }
 
   /**

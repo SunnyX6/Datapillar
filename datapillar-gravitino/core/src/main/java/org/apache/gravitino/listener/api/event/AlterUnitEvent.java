@@ -21,35 +21,36 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.info.UnitInfo;
 
-/** Represents an event that is generated after a metric is successfully deleted. */
+/** Represents an event that is generated after a unit is successfully altered. */
 @DeveloperApi
-public class DeleteMetricEvent extends MetricEvent {
-  private final boolean isExists;
+public class AlterUnitEvent extends UnitEvent {
+  private final UnitInfo updatedUnitInfo;
 
   /**
-   * Constructs an instance of {@link DeleteMetricEvent}.
+   * Constructs an instance of {@link AlterUnitEvent}.
    *
-   * @param user The user responsible for triggering the metric operation.
-   * @param identifier The identifier of the Metric involved in the operation.
-   * @param isExists A boolean flag indicating whether the metric existed before deletion.
+   * @param user The user responsible for triggering the unit operation.
+   * @param identifier The identifier of the Unit involved in the operation.
+   * @param updatedUnitInfo The final state of the unit post-alteration.
    */
-  public DeleteMetricEvent(String user, NameIdentifier identifier, boolean isExists) {
+  public AlterUnitEvent(String user, NameIdentifier identifier, UnitInfo updatedUnitInfo) {
     super(user, identifier);
-    this.isExists = isExists;
+    this.updatedUnitInfo = updatedUnitInfo;
   }
 
   /**
-   * Retrieves the existence status of the metric before deletion.
+   * Retrieves the final state of the unit after successful alteration.
    *
-   * @return true if the metric existed, false otherwise.
+   * @return The unit information.
    */
-  public boolean isExists() {
-    return isExists;
+  public UnitInfo updatedUnitInfo() {
+    return updatedUnitInfo;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.DELETE_METRIC;
+    return OperationType.ALTER_UNIT;
   }
 }

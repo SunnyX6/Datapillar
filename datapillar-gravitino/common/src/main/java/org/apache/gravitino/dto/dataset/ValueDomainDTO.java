@@ -19,6 +19,8 @@
 package org.apache.gravitino.dto.dataset;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.dataset.ValueDomain;
@@ -38,14 +40,17 @@ public class ValueDomainDTO implements ValueDomain {
   @JsonProperty("domainType")
   private Type domainType;
 
-  @JsonProperty("itemValue")
-  private String itemValue;
+  @JsonProperty("domainLevel")
+  private Level domainLevel;
 
-  @JsonProperty("itemLabel")
-  private String itemLabel;
+  @JsonProperty("items")
+  private List<ValueDomainItemDTO> items;
 
   @JsonProperty("comment")
   private String comment;
+
+  @JsonProperty("dataType")
+  private String dataType;
 
   @JsonProperty("audit")
   private AuditDTO audit;
@@ -68,18 +73,31 @@ public class ValueDomainDTO implements ValueDomain {
   }
 
   @Override
-  public String itemValue() {
-    return itemValue;
+  public Level domainLevel() {
+    return domainLevel;
   }
 
   @Override
-  public String itemLabel() {
-    return itemLabel;
+  public List<Item> items() {
+    if (items == null) {
+      return null;
+    }
+    return items.stream().map(item -> (Item) item).collect(Collectors.toList());
+  }
+
+  /** 获取原始的 DTO items 列表 */
+  public List<ValueDomainItemDTO> itemDTOs() {
+    return items;
   }
 
   @Override
   public String comment() {
     return comment;
+  }
+
+  @Override
+  public String dataType() {
+    return dataType;
   }
 
   @Override
@@ -109,18 +127,23 @@ public class ValueDomainDTO implements ValueDomain {
       return this;
     }
 
-    public Builder withItemValue(String itemValue) {
-      dto.itemValue = itemValue;
+    public Builder withDomainLevel(Level domainLevel) {
+      dto.domainLevel = domainLevel;
       return this;
     }
 
-    public Builder withItemLabel(String itemLabel) {
-      dto.itemLabel = itemLabel;
+    public Builder withItems(List<ValueDomainItemDTO> items) {
+      dto.items = items;
       return this;
     }
 
     public Builder withComment(String comment) {
       dto.comment = comment;
+      return this;
+    }
+
+    public Builder withDataType(String dataType) {
+      dto.dataType = dataType;
       return this;
     }
 

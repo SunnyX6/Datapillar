@@ -12,8 +12,13 @@ export type SemanticCategory = 'HOME' | 'METRICS' | 'GLOSSARY' | 'STANDARDS' | '
 
 export type ViewMode = 'CARD' | 'LIST'
 
-/** 数据类型枚举 */
-export type DataType = 'STRING' | 'NUMBER' | 'DECIMAL' | 'DATE' | 'DATETIME' | 'BOOLEAN' | 'ARRAY' | 'MAP'
+/** 子入口配置 */
+export interface SubEntry {
+  id: string
+  label: string
+  icon: React.ElementType
+  route: string
+}
 
 export interface CategoryConfig {
   id: SemanticCategory
@@ -23,4 +28,5 @@ export interface CategoryConfig {
   description: string
   count: number
   trend?: string
+  subEntries?: SubEntry[]
 }

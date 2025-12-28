@@ -27,6 +27,7 @@ import org.apache.commons.lang3.StringUtils;
 @Getter
 public class MetricVersionPO {
 
+  private Long id;
   private Long metricId;
   private Long metalakeId;
   private Long catalogId;
@@ -38,8 +39,9 @@ public class MetricVersionPO {
   private String dataType;
   private String metricComment;
   private String metricUnit;
-  private String aggregationLogic;
-  private String parentMetricIds;
+  private String unitName;
+  private String unitSymbol;
+  private String parentMetricCodes;
   private String calculationFormula;
   private String refCatalogName;
   private String refSchemaName;
@@ -62,6 +64,11 @@ public class MetricVersionPO {
 
     private Builder() {
       metricVersionPO = new MetricVersionPO();
+    }
+
+    public Builder withId(Long id) {
+      metricVersionPO.id = id;
+      return this;
     }
 
     public Builder withMetricId(Long metricId) {
@@ -119,13 +126,18 @@ public class MetricVersionPO {
       return this;
     }
 
-    public Builder withAggregationLogic(String aggregationLogic) {
-      metricVersionPO.aggregationLogic = aggregationLogic;
+    public Builder withUnitName(String unitName) {
+      metricVersionPO.unitName = unitName;
       return this;
     }
 
-    public Builder withParentMetricIds(String parentMetricIds) {
-      metricVersionPO.parentMetricIds = parentMetricIds;
+    public Builder withUnitSymbol(String unitSymbol) {
+      metricVersionPO.unitSymbol = unitSymbol;
+      return this;
+    }
+
+    public Builder withParentMetricCodes(String parentMetricCodes) {
+      metricVersionPO.parentMetricCodes = parentMetricCodes;
       return this;
     }
 
@@ -179,7 +191,6 @@ public class MetricVersionPO {
       Preconditions.checkArgument(metricVersionPO.metalakeId != null, "Metalake id is required");
       Preconditions.checkArgument(metricVersionPO.catalogId != null, "Catalog id is required");
       Preconditions.checkArgument(metricVersionPO.schemaId != null, "Schema id is required");
-      Preconditions.checkArgument(metricVersionPO.version != null, "Version is required");
       Preconditions.checkArgument(
           StringUtils.isNotBlank(metricVersionPO.metricName), "Metric name cannot be empty");
       Preconditions.checkArgument(

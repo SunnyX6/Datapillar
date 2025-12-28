@@ -19,11 +19,14 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
+import org.apache.gravitino.dataset.ValueDomain;
+import org.apache.gravitino.dto.dataset.ValueDomainItemDTO;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** 更新值域的请求 */
@@ -37,11 +40,17 @@ public class ValueDomainUpdateRequest implements RESTRequest {
   @JsonProperty("domainName")
   private String domainName;
 
-  @JsonProperty("itemLabel")
-  private String itemLabel;
+  @JsonProperty("domainLevel")
+  private ValueDomain.Level domainLevel;
+
+  @JsonProperty("items")
+  private List<ValueDomainItemDTO> items;
 
   @JsonProperty("comment")
   private String comment;
+
+  @JsonProperty("dataType")
+  private String dataType;
 
   @Override
   public void validate() throws IllegalArgumentException {

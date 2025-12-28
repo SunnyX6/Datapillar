@@ -22,27 +22,27 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event that is generated after a value domain is successfully deleted. */
+/** Represents an event that is generated after a metric is successfully dropped. */
 @DeveloperApi
-public class DeleteValueDomainEvent extends ValueDomainEvent {
+public class DropMetricEvent extends MetricEvent {
   private final boolean isExists;
 
   /**
-   * Constructs an instance of {@link DeleteValueDomainEvent}.
+   * Constructs an instance of {@link DropMetricEvent}.
    *
-   * @param user The user responsible for triggering the value domain operation.
-   * @param identifier The identifier of the ValueDomain involved in the operation.
-   * @param isExists A boolean indicating whether the value domain existed before deletion.
+   * @param user The user responsible for triggering the metric operation.
+   * @param identifier The identifier of the Metric involved in the operation.
+   * @param isExists A boolean flag indicating whether the metric existed before dropping.
    */
-  public DeleteValueDomainEvent(String user, NameIdentifier identifier, boolean isExists) {
+  public DropMetricEvent(String user, NameIdentifier identifier, boolean isExists) {
     super(user, identifier);
     this.isExists = isExists;
   }
 
   /**
-   * Retrieves the existence status of the value domain before the delete operation.
+   * Retrieves the existence status of the metric before dropping.
    *
-   * @return A boolean value indicating whether the value domain existed before deletion.
+   * @return true if the metric existed, false otherwise.
    */
   public boolean isExists() {
     return isExists;
@@ -50,6 +50,6 @@ public class DeleteValueDomainEvent extends ValueDomainEvent {
 
   @Override
   public OperationType operationType() {
-    return OperationType.DELETE_VALUE_DOMAIN;
+    return OperationType.DROP_METRIC;
   }
 }

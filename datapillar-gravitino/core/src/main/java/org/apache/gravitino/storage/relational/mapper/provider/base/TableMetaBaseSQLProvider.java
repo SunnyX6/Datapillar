@@ -28,6 +28,7 @@ public class TableMetaBaseSQLProvider {
 
   public String listTablePOsBySchemaId(@Param("schemaId") Long schemaId) {
     return "SELECT table_id as tableId, table_name as tableName,"
+        + " table_comment as tableComment,"
         + " metalake_id as metalakeId, catalog_id as catalogId,"
         + " schema_id as schemaId, audit_info as auditInfo,"
         + " current_version as currentVersion, last_version as lastVersion,"
@@ -40,6 +41,7 @@ public class TableMetaBaseSQLProvider {
   public String listTablePOsByTableIds(List<Long> tableIds) {
     return "<script>"
         + " SELECT table_id as tableId, table_name as tableName,"
+        + " table_comment as tableComment,"
         + " metalake_id as metalakeId, catalog_id as catalogId,"
         + " schema_id as schemaId, audit_info as auditInfo,"
         + " current_version as currentVersion, last_version as lastVersion,"
@@ -66,6 +68,7 @@ public class TableMetaBaseSQLProvider {
   public String selectTableMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name) {
     return "SELECT table_id as tableId, table_name as tableName,"
+        + " table_comment as tableComment,"
         + " metalake_id as metalakeId, catalog_id as catalogId,"
         + " schema_id as schemaId, audit_info as auditInfo,"
         + " current_version as currentVersion, last_version as lastVersion,"
@@ -77,6 +80,7 @@ public class TableMetaBaseSQLProvider {
 
   public String selectTableMetaById(@Param("tableId") Long tableId) {
     return "SELECT table_id as tableId, table_name as tableName,"
+        + " table_comment as tableComment,"
         + " metalake_id as metalakeId, catalog_id as catalogId,"
         + " schema_id as schemaId, audit_info as auditInfo,"
         + " current_version as currentVersion, last_version as lastVersion,"
@@ -89,12 +93,13 @@ public class TableMetaBaseSQLProvider {
   public String insertTableMeta(@Param("tableMeta") TablePO tablePO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(table_id, table_name, metalake_id,"
+        + "(table_id, table_name, table_comment, metalake_id,"
         + " catalog_id, schema_id, audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES("
         + " #{tableMeta.tableId},"
         + " #{tableMeta.tableName},"
+        + " #{tableMeta.tableComment},"
         + " #{tableMeta.metalakeId},"
         + " #{tableMeta.catalogId},"
         + " #{tableMeta.schemaId},"
@@ -108,12 +113,13 @@ public class TableMetaBaseSQLProvider {
   public String insertTableMetaOnDuplicateKeyUpdate(@Param("tableMeta") TablePO tablePO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(table_id, table_name, metalake_id,"
+        + "(table_id, table_name, table_comment, metalake_id,"
         + " catalog_id, schema_id, audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES("
         + " #{tableMeta.tableId},"
         + " #{tableMeta.tableName},"
+        + " #{tableMeta.tableComment},"
         + " #{tableMeta.metalakeId},"
         + " #{tableMeta.catalogId},"
         + " #{tableMeta.schemaId},"
@@ -124,6 +130,7 @@ public class TableMetaBaseSQLProvider {
         + " )"
         + " ON DUPLICATE KEY UPDATE"
         + " table_name = #{tableMeta.tableName},"
+        + " table_comment = #{tableMeta.tableComment},"
         + " metalake_id = #{tableMeta.metalakeId},"
         + " catalog_id = #{tableMeta.catalogId},"
         + " schema_id = #{tableMeta.schemaId},"
@@ -138,6 +145,7 @@ public class TableMetaBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET table_name = #{newTableMeta.tableName},"
+        + " table_comment = #{newTableMeta.tableComment},"
         + " metalake_id = #{newTableMeta.metalakeId},"
         + " catalog_id = #{newTableMeta.catalogId},"
         + " schema_id = #{newTableMeta.schemaId},"

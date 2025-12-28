@@ -76,9 +76,12 @@ class LineageWriter(BaseWriter):
     - 表级血缘：INPUT_OF / OUTPUT_TO
     - 列级血缘：DERIVES_FROM
     - 指标列血缘：MEASURES / FILTERS_BY
+    - 列值域血缘：HAS_VALUE_DOMAIN
     """
 
-    METRIC_OPERATIONS = {"register_metric"}
+    METRIC_OPERATIONS = {"register_metric", "alter_metric"}
+    TAG_OPERATIONS = {"associate_tags"}
+    VALUE_DOMAIN_TAG_PREFIX = "vd:"
 
     def __init__(self) -> None:
         super().__init__()
@@ -86,6 +89,7 @@ class LineageWriter(BaseWriter):
         self._table_lineage_written = 0
         self._column_lineage_written = 0
         self._metric_lineage_written = 0
+        self._column_valuedomain_lineage_written = 0
         self._sql_analyzer = SQLLineageAnalyzer(dialect="hive")
 
     @property
@@ -100,6 +104,11 @@ class LineageWriter(BaseWriter):
         # 处理指标血缘
         if operation in self.METRIC_OPERATIONS:
             await self._write_metric_column_lineage(session, event)
+            return
+
+        # 处理列与值域的血缘关系
+        if operation in self.TAG_OPERATIONS:
+            await self._write_column_valuedomain_lineage(session, event)
             return
 
         # 获取 SQL
@@ -640,6 +649,13 @@ class LineageWriter(BaseWriter):
         column_names: list[str],
     ) -> None:
         """批量写入指标度量列关系"""
+        # 先删除该指标的旧 MEASURES 关系（确保修改时数据一致）
+        delete_query = """
+        MATCH (m:AtomicMetric {id: $metricId})-[r:MEASURES]->()
+        DELETE r
+        """
+        await session.run(delete_query, metricId=metric_id)
+
         lineage_data = [
             {
                 "metricId": metric_id,
@@ -672,6 +688,13 @@ class LineageWriter(BaseWriter):
         column_names: list[str],
     ) -> None:
         """批量写入指标过滤列关系"""
+        # 先删除该指标的旧 FILTERS_BY 关系（确保修改时数据一致）
+        delete_query = """
+        MATCH (m:AtomicMetric {id: $metricId})-[r:FILTERS_BY]->()
+        DELETE r
+        """
+        await session.run(delete_query, metricId=metric_id)
+
         lineage_data = [
             {
                 "metricId": metric_id,
@@ -693,6 +716,145 @@ class LineageWriter(BaseWriter):
         self._metric_lineage_written += len(lineage_data)
         logger.debug("metric_filters_written", metric_id=metric_id, count=len(column_names))
 
+    # ==================== 列与值域血缘关系 ====================
+
+    async def _write_column_valuedomain_lineage(
+        self, session: AsyncSession, event: RunEvent
+    ) -> None:
+        """
+        处理列与值域的血缘关系
+
+        当 objectType 为 COLUMN 且 tag 以 'vd:' 前缀时：
+        - tagsToAdd 中的 vd:xxx → 建立 Column -[:HAS_VALUE_DOMAIN]-> ValueDomain 关系
+        - tagsToRemove 中的 vd:xxx → 删除 Column -[:HAS_VALUE_DOMAIN]-> ValueDomain 关系
+        """
+        for dataset in event.get_all_datasets():
+            # 解析 gravitinoTag facet
+            if not dataset.facets or "gravitinoTag" not in dataset.facets:
+                continue
+
+            tag_facet = dataset.facets["gravitinoTag"]
+            object_type = tag_facet.get("objectType")
+
+            # 只处理 COLUMN 类型
+            if object_type != "COLUMN":
+                continue
+
+            tags_to_add = tag_facet.get("tagsToAdd", [])
+            tags_to_remove = tag_facet.get("tagsToRemove", [])
+
+            # 解析 namespace 和 name，生成列 ID
+            parsed_ns = self._parse_job_namespace(dataset.namespace)
+            column_id = self._generate_column_id_for_tag(parsed_ns, dataset.name)
+
+            if not column_id:
+                logger.warning(
+                    "column_valuedomain_skip_no_column_id",
+                    namespace=dataset.namespace,
+                    name=dataset.name,
+                )
+                continue
+
+            # 处理要删除的值域关联
+            vd_tags_to_remove = [
+                t[len(self.VALUE_DOMAIN_TAG_PREFIX):]
+                for t in tags_to_remove
+                if t.startswith(self.VALUE_DOMAIN_TAG_PREFIX)
+            ]
+            for domain_code in vd_tags_to_remove:
+                await self._remove_column_valuedomain_relation(
+                    session, column_id, domain_code
+                )
+
+            # 处理要添加的值域关联
+            vd_tags_to_add = [
+                t[len(self.VALUE_DOMAIN_TAG_PREFIX):]
+                for t in tags_to_add
+                if t.startswith(self.VALUE_DOMAIN_TAG_PREFIX)
+            ]
+            for domain_code in vd_tags_to_add:
+                await self._add_column_valuedomain_relation(
+                    session, column_id, domain_code
+                )
+
+    def _generate_column_id_for_tag(
+        self, parsed_ns: ParsedNamespace, name: str
+    ) -> str | None:
+        """根据 tag 事件中的 name 生成列 ID"""
+        # name 格式: schema.table.column
+        if not parsed_ns.metalake or not parsed_ns.catalog:
+            return None
+
+        parts = name.split(".", 2)
+        if len(parts) != 3:
+            return None
+
+        schema_name, table_name, column_name = parts
+        return generate_id(
+            "column",
+            parsed_ns.metalake,
+            parsed_ns.catalog,
+            schema_name,
+            table_name,
+            column_name,
+        )
+
+    async def _add_column_valuedomain_relation(
+        self, session: AsyncSession, column_id: str, domain_code: str
+    ) -> None:
+        """建立 Column -> ValueDomain 关系"""
+        query = """
+        MATCH (c:Column {id: $columnId})
+        MATCH (v:ValueDomain {domainCode: $domainCode})
+        MERGE (c)-[r:HAS_VALUE_DOMAIN]->(v)
+        ON CREATE SET r.createdAt = datetime()
+        ON MATCH SET r.updatedAt = datetime()
+        RETURN c.id as columnId, v.id as valueDomainId
+        """
+        result = await session.run(query, columnId=column_id, domainCode=domain_code)
+        record = await result.single()
+
+        if record:
+            self._column_valuedomain_lineage_written += 1
+            logger.info(
+                "column_valuedomain_relation_added",
+                column_id=column_id,
+                domain_code=domain_code,
+                value_domain_id=record["valueDomainId"],
+            )
+        else:
+            logger.warning(
+                "column_valuedomain_relation_add_failed",
+                column_id=column_id,
+                domain_code=domain_code,
+                reason="column or valuedomain not found",
+            )
+
+    async def _remove_column_valuedomain_relation(
+        self, session: AsyncSession, column_id: str, domain_code: str
+    ) -> None:
+        """删除 Column -> ValueDomain 关系"""
+        query = """
+        MATCH (c:Column {id: $columnId})-[r:HAS_VALUE_DOMAIN]->(v:ValueDomain {domainCode: $domainCode})
+        DELETE r
+        RETURN c.id as columnId, v.id as valueDomainId
+        """
+        result = await session.run(query, columnId=column_id, domainCode=domain_code)
+        record = await result.single()
+
+        if record:
+            logger.info(
+                "column_valuedomain_relation_removed",
+                column_id=column_id,
+                domain_code=domain_code,
+            )
+        else:
+            logger.debug(
+                "column_valuedomain_relation_not_found",
+                column_id=column_id,
+                domain_code=domain_code,
+            )
+
     def get_detailed_stats(self) -> dict:
         """获取详细统计"""
         stats = self.get_stats().to_dict()
@@ -700,4 +862,5 @@ class LineageWriter(BaseWriter):
         stats["table_lineage_written"] = self._table_lineage_written
         stats["column_lineage_written"] = self._column_lineage_written
         stats["metric_lineage_written"] = self._metric_lineage_written
+        stats["column_valuedomain_lineage_written"] = self._column_valuedomain_lineage_written
         return stats

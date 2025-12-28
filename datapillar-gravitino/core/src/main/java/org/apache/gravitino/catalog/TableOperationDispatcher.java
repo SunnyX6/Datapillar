@@ -257,6 +257,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                     .map(c -> ((TableChange.RenameTable) c).getNewName())
                                     .reduce((c1, c2) -> c2)
                                     .orElse(tableEntity.name());
+                            // Handle comment update
+                            String newComment =
+                                Arrays.stream(changes)
+                                    .filter(c -> c instanceof TableChange.UpdateComment)
+                                    .map(c -> ((TableChange.UpdateComment) c).getNewComment())
+                                    .reduce((c1, c2) -> c2)
+                                    .orElse(tableEntity.comment());
                             // Update the columns
                             Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
                                 updateColumnsIfNecessary(alteredTable, tableEntity);
@@ -264,6 +271,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                             return TableEntity.builder()
                                 .withId(tableEntity.id())
                                 .withName(newName)
+                                .withComment(newComment)
                                 .withNamespace(ident.namespace())
                                 .withColumns(columnsUpdateResult.getRight())
                                 .withAuditInfo(
@@ -432,6 +440,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         TableEntity.builder()
             .withId(uid)
             .withName(identifier.name())
+            .withComment(table.tableFromCatalog().comment())
             .withNamespace(identifier.namespace())
             .withColumns(columnEntityList)
             .withAuditInfo(audit)
@@ -571,6 +580,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         TableEntity.builder()
             .withId(uid)
             .withName(ident.name())
+            .withComment(comment)
             .withNamespace(ident.namespace())
             .withColumns(columnEntityList)
             .withAuditInfo(audit)

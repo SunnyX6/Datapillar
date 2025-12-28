@@ -27,6 +27,7 @@
     "@neo4j-nvl/base": "^1.0.0",
     "@neo4j-nvl/interaction-handlers": "^1.0.0",
     "@neo4j-nvl/react": "^1.0.0",
+    "@radix-ui/react-select": "^2.2.6",
     "@xyflow/react": "^12.9.0",
     "axios": "^1.13.1",
     "class-variance-authority": "^0.7.1",

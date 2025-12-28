@@ -39,6 +39,7 @@ import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ValueDomainMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
@@ -47,6 +48,7 @@ import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.storage.relational.po.ValueDomainPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,15 +67,19 @@ public class MetadataObjectService {
 
   static final Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
       TYPE_TO_FULLNAME_FUNCTION_MAP =
-          ImmutableMap.of(
-              MetadataObject.Type.METALAKE, MetadataObjectService::getMetalakeObjectsFullName,
-              MetadataObject.Type.CATALOG, MetadataObjectService::getCatalogObjectsFullName,
-              MetadataObject.Type.SCHEMA, MetadataObjectService::getSchemaObjectsFullName,
-              MetadataObject.Type.TABLE, MetadataObjectService::getTableObjectsFullName,
-              MetadataObject.Type.FILESET, MetadataObjectService::getFilesetObjectsFullName,
-              MetadataObject.Type.MODEL, MetadataObjectService::getModelObjectsFullName,
-              MetadataObject.Type.TOPIC, MetadataObjectService::getTopicObjectsFullName,
-              MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName);
+          ImmutableMap.<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>builder()
+              .put(MetadataObject.Type.METALAKE, MetadataObjectService::getMetalakeObjectsFullName)
+              .put(MetadataObject.Type.CATALOG, MetadataObjectService::getCatalogObjectsFullName)
+              .put(MetadataObject.Type.SCHEMA, MetadataObjectService::getSchemaObjectsFullName)
+              .put(MetadataObject.Type.TABLE, MetadataObjectService::getTableObjectsFullName)
+              .put(MetadataObject.Type.FILESET, MetadataObjectService::getFilesetObjectsFullName)
+              .put(MetadataObject.Type.MODEL, MetadataObjectService::getModelObjectsFullName)
+              .put(MetadataObject.Type.TOPIC, MetadataObjectService::getTopicObjectsFullName)
+              .put(MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName)
+              .put(
+                  MetadataObject.Type.VALUE_DOMAIN,
+                  MetadataObjectService::getValueDomainObjectsFullName)
+              .build();
 
   private MetadataObjectService() {}
 
@@ -139,6 +145,10 @@ public class MetadataObjectService {
     } else if (type == MetadataObject.Type.MODEL) {
       return ModelMetaService.getInstance()
           .getModelIdBySchemaIdAndModelName(schemaId, names.get(2));
+    } else if (type == MetadataObject.Type.VALUE_DOMAIN) {
+      // names.get(2) 就是 domainCode
+      return ValueDomainMetaService.getInstance()
+          .getValueDomainIdBySchemaIdAndDomainCode(schemaId, names.get(2));
     }
 
     long tableId =
@@ -463,5 +473,47 @@ public class MetadataObjectService {
         });
 
     return schemaIdAndNameMap;
+  }
+
+  /**
+   * Retrieves a map of ValueDomain object IDs to their full names.
+   *
+   * @param domainIds A list of ValueDomain domain IDs to fetch names for.
+   * @return A Map where the key is the domain ID and the value is the ValueDomain full name. The
+   *     map may contain null values for the names if its parent object is deleted. Returns an empty
+   *     map if no ValueDomain objects are found for the given IDs. {@code @example} value of
+   *     ValueDomain full name: "catalog1.schema1.domainCode"
+   */
+  public static Map<Long, String> getValueDomainObjectsFullName(List<Long> domainIds) {
+    List<ValueDomainPO> domainPOs =
+        SessionUtils.getWithoutCommit(
+            ValueDomainMetaMapper.class, mapper -> mapper.listValueDomainPOsByDomainIds(domainIds));
+
+    if (domainPOs == null || domainPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> schemaIds =
+        domainPOs.stream().map(ValueDomainPO::getSchemaId).collect(Collectors.toList());
+
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
+
+    HashMap<Long, String> domainIdAndNameMap = new HashMap<>();
+
+    domainPOs.forEach(
+        domainPO -> {
+          String schemaName = schemaIdAndNameMap.getOrDefault(domainPO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of value domain {} may be deleted", domainPO.getDomainId());
+            domainIdAndNameMap.put(domainPO.getDomainId(), null);
+            return;
+          }
+
+          // fullName 格式: catalog.schema.domainCode
+          String fullName = DOT_JOINER.join(schemaName, domainPO.getDomainCode());
+          domainIdAndNameMap.put(domainPO.getDomainId(), fullName);
+        });
+
+    return domainIdAndNameMap;
   }
 }

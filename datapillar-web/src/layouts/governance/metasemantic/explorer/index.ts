@@ -1,5 +1,6 @@
 export { MetricExplorer } from './MetricExplorer'
 export { WordRootExplorer } from './WordRootExplorer'
-export { StandardsExplorer } from './StandardsExplorer'
 export { ModelsExplorer } from './ModelsExplorer'
 export { ApisExplorer } from './ApisExplorer'
+export { ValueDomainExplorer } from './ValueDomainExplorer'
+export { ClassificationExplorer } from './ClassificationExplorer'

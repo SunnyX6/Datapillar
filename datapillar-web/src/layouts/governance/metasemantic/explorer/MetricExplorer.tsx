@@ -3,16 +3,22 @@ import { Target, ArrowLeft, Plus, List, Grid, Box, Trash2, Loader2, Pencil } fro
 import { Badge } from '../components'
 import type { Metric, ViewMode } from '../types'
 import { iconSizeToken } from '@/design-tokens/dimensions'
-import { useSearchStore } from '@/stores'
-import { fetchMetrics, deleteMetric, registerMetric, updateMetric, alterMetricVersion } from '@/services/oneMetaService'
+import { useSearchStore, useSemanticStatsStore } from '@/stores'
+import { useInfiniteScroll } from '@/hooks'
+import { fetchMetrics, deleteMetric, registerMetric, alterMetricVersion } from '@/services/oneMetaSemanticService'
 import { MetricFormModal, type MetricFormData } from './form/MetricForm'
+import { buildDataTypeString, type DataTypeValue } from '@/components/ui'
 import { ComponentLibrarySidebar } from './ComponentLibrarySidebar'
+import { formatTime } from '@/lib/utils'
 
-/** 指标类型标签映射 */
-const TYPE_LABELS: Record<string, { label: string; variant: 'blue' | 'purple' | 'amber' }> = {
-  ATOMIC: { label: '原子', variant: 'blue' },
-  DERIVED: { label: '派生', variant: 'purple' },
-  COMPOSITE: { label: '复合', variant: 'amber' }
+/** 每页加载数量 */
+const PAGE_SIZE = 20
+
+/** 指标类型颜色映射 */
+const TYPE_VARIANTS: Record<string, 'blue' | 'purple' | 'amber'> = {
+  ATOMIC: 'blue',
+  DERIVED: 'purple',
+  COMPOSITE: 'amber'
 }
 
 function MetricCard({
@@ -45,7 +51,7 @@ function MetricCard({
     onEdit(metric)
   }
 
-  const typeInfo = TYPE_LABELS[metric.type] || { label: metric.type, variant: 'blue' as const }
+  const typeVariant = TYPE_VARIANTS[metric.type?.toUpperCase()] || 'blue'
 
   return (
     <div
@@ -61,7 +67,7 @@ function MetricCard({
             {metric.code}
           </div>
         </div>
-        <Badge variant={typeInfo.variant}>{typeInfo.label}</Badge>
+        <Badge variant={typeVariant}>{metric.type?.toUpperCase()}</Badge>
       </div>
 
       <p className="text-caption text-slate-500 dark:text-slate-400 line-clamp-2 mb-3 leading-relaxed">
@@ -127,7 +133,7 @@ function MetricRow({
     onEdit(metric)
   }
 
-  const typeInfo = TYPE_LABELS[metric.type] || { label: metric.type, variant: 'blue' as const }
+  const typeVariant = TYPE_VARIANTS[metric.type?.toUpperCase()] || 'blue'
 
   return (
     <tr
@@ -139,32 +145,40 @@ function MetricRow({
           <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
             <Target size={iconSizeToken.small} />
           </div>
-          <div>
-            <div className="font-medium text-slate-800 dark:text-slate-100 text-body-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+          <div className="min-w-0">
+            <div className="font-medium text-slate-800 dark:text-slate-100 text-body-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
               {metric.name}
             </div>
-            <div className="text-micro font-mono text-slate-400 dark:text-slate-500 uppercase tracking-tight">{metric.code}</div>
+            <div className="text-micro font-mono text-slate-400 dark:text-slate-500 uppercase tracking-tight truncate">{metric.code}</div>
           </div>
         </div>
       </td>
-      <td className="px-4 py-3 text-center">
-        <Badge variant={typeInfo.variant}>{typeInfo.label}</Badge>
+      <td className="px-3 py-3 text-center">
+        <Badge variant={typeVariant}>{metric.type?.toUpperCase()}</Badge>
       </td>
-      <td className="px-4 py-3 text-center">
+      <td className="px-3 py-3 text-center">
         <span className="font-mono text-micro text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/30 px-2 py-0.5 rounded border border-cyan-100 dark:border-cyan-800">
           {metric.dataType || '-'}
         </span>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3 text-center">
+        <span className="text-caption text-slate-600 dark:text-slate-400">
+          {metric.unitName || '-'}
+        </span>
+      </td>
+      <td className="px-3 py-3">
         <div className="text-caption text-slate-500 dark:text-slate-400 line-clamp-1">{metric.comment || '-'}</div>
       </td>
-      <td className="px-4 py-3 text-center">
+      <td className="px-3 py-3 text-center">
         <span className="text-micro font-mono text-slate-600 dark:text-slate-400">v{metric.currentVersion}</span>
       </td>
-      <td className="px-4 py-3">
-        <div className="text-caption text-slate-500 dark:text-slate-400">{metric.audit?.creator || '-'}</div>
+      <td className="px-3 py-3">
+        <div className="text-caption text-slate-500 dark:text-slate-400 truncate">{metric.audit?.creator || '-'}</div>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3">
+        <div className="text-caption text-slate-500 dark:text-slate-400">{formatTime(metric.audit?.createTime)}</div>
+      </td>
+      <td className="px-3 py-3">
         <div className="flex items-center justify-center gap-1">
           <button
             onClick={handleEdit}
@@ -190,16 +204,19 @@ function MetricRow({
 interface MetricExplorerProps {
   onBack: () => void
   onOpenDrawer: (metric: Metric) => void
+  updatedMetric?: Metric | null
 }
 
-export function MetricExplorer({ onBack, onOpenDrawer }: MetricExplorerProps) {
+export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricExplorerProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('LIST')
   const searchTerm = useSearchStore((state) => state.searchTerm)
+  const setMetricsTotal = useSemanticStatsStore((state) => state.setMetricsTotal)
 
   // 数据状态
   const [metrics, setMetrics] = useState<Metric[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   // 新建弹窗状态
   const [showNewModal, setShowNewModal] = useState(false)
@@ -208,23 +225,58 @@ export function MetricExplorer({ onBack, onOpenDrawer }: MetricExplorerProps) {
   // 编辑弹窗状态
   const [editingMetric, setEditingMetric] = useState<Metric | null>(null)
 
-  // 加载数据
+  // 是否还有更多数据
+  const hasMore = metrics.length < total
+
+  // 加载首页数据
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await fetchMetrics(0, 100)
+      const result = await fetchMetrics(0, PAGE_SIZE)
       setMetrics(result.items)
       setTotal(result.total)
+      setMetricsTotal(result.total)
     } catch {
       // 加载失败时保持空列表
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [setMetricsTotal])
+
+  // 加载更多数据
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const result = await fetchMetrics(metrics.length, PAGE_SIZE)
+      setMetrics((prev) => [...prev, ...result.items])
+      setTotal(result.total)
+    } catch {
+      // 加载失败
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [loadingMore, hasMore, metrics.length])
+
+  // 无限滚动
+  const { sentinelRef } = useInfiniteScroll({
+    hasMore,
+    loading: loadingMore,
+    onLoadMore: loadMore
+  })
 
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // 当外部传入更新的指标时，更新列表中对应项
+  useEffect(() => {
+    if (updatedMetric) {
+      setMetrics((prev) =>
+        prev.map((m) => (m.code === updatedMetric.code ? updatedMetric : m))
+      )
+    }
+  }, [updatedMetric])
 
   // 过滤指标
   const filteredMetrics = metrics.filter(
@@ -240,32 +292,61 @@ export function MetricExplorer({ onBack, onOpenDrawer }: MetricExplorerProps) {
     setTotal((prev) => prev - 1)
   }
 
-  // 更新指标（编辑后刷新列表中的数据）
-  const handleUpdate = (code: string, updated: Metric) => {
-    setMetrics((prev) => prev.map((m) => (m.code === code ? updated : m)))
-  }
-
   // 保存新指标
   const handleSaveNewMetric = async (form: MetricFormData) => {
     if (saving) return
     setSaving(true)
     try {
-      const newMetric = await registerMetric({
+      // 构建完整的 dataType 字符串（包含精度）
+      const dataTypeValue: DataTypeValue = {
+        type: form.dataType,
+        precision: form.precision,
+        scale: form.scale
+      }
+      // 构建 parentMetricCodes：派生指标取 baseCode，复合指标取 compositeMetrics
+      let parentMetricCodes: string[] | undefined
+      if (form.type === 'DERIVED' && form.baseCode) {
+        parentMetricCodes = [form.baseCode]
+      } else if (form.type === 'COMPOSITE' && form.compositeMetrics && form.compositeMetrics.length > 0) {
+        parentMetricCodes = form.compositeMetrics.map((m) => m.code)
+      }
+
+      await registerMetric({
         name: form.name.trim(),
         code: form.code.trim().toUpperCase(),
         type: form.type,
-        dataType: form.dataType,
+        dataType: form.dataType ? buildDataTypeString(dataTypeValue) : undefined,
         comment: form.comment.trim() || undefined,
         unit: form.unit.trim() || undefined,
-        // 公式字段（包含聚合逻辑和计算表达式）
         calculationFormula: form.formula.trim() || undefined,
-        // 原子指标数据源配置
-        refCatalogName: form.type === 'ATOMIC' ? form.refCatalogName || undefined : undefined,
-        refSchemaName: form.type === 'ATOMIC' ? form.refSchemaName || undefined : undefined,
-        refTableName: form.type === 'ATOMIC' ? form.refTableName || undefined : undefined,
-        refColumnName: form.type === 'ATOMIC' ? form.refColumnName || undefined : undefined
+        parentMetricCodes,
+        refCatalogName: (form.type === 'ATOMIC' || form.type === 'DERIVED') ? form.refCatalog || undefined : undefined,
+        refSchemaName: (form.type === 'ATOMIC' || form.type === 'DERIVED') ? form.refSchema || undefined : undefined,
+        refTableName: (form.type === 'ATOMIC' || form.type === 'DERIVED') ? form.refTable || undefined : undefined,
+        measureColumns: form.type === 'ATOMIC' && form.measureColumns.length > 0
+          ? JSON.stringify(form.measureColumns)
+          : undefined,
+        filterColumns: (form.type === 'ATOMIC' || form.type === 'DERIVED') && form.filterColumns.length > 0
+          ? JSON.stringify(form.filterColumns)
+          : undefined
       })
-      setMetrics((prev) => [...prev, newMetric])
+      // 构造新指标对象，直接添加到列表
+      const newMetric: Metric = {
+        name: form.name.trim(),
+        code: form.code.trim().toUpperCase(),
+        type: form.type,
+        dataType: form.dataType ? buildDataTypeString(dataTypeValue) : undefined,
+        unit: form.unit.trim() || undefined,
+        unitName: form.unitName,
+        comment: form.comment.trim() || undefined,
+        currentVersion: 1,
+        lastVersion: 1,
+        audit: {
+          creator: 'anonymous',
+          createTime: new Date().toISOString()
+        }
+      }
+      setMetrics((prev) => [newMetric, ...prev])
       setTotal((prev) => prev + 1)
       setShowNewModal(false)
     } catch {
@@ -280,18 +361,55 @@ export function MetricExplorer({ onBack, onOpenDrawer }: MetricExplorerProps) {
     if (saving || !editingMetric) return
     setSaving(true)
     try {
-      // 更新指标基本信息（name, comment）
-      const updated = await updateMetric(editingMetric.code, {
-        name: form.name.trim(),
-        comment: form.comment.trim() || undefined
-      })
-      // 更新指标版本（公式、单位等）
-      await alterMetricVersion(editingMetric.code, editingMetric.currentVersion, {
+      // 构建完整的 dataType 字符串（包含精度）
+      const dataTypeValue: DataTypeValue = {
+        type: form.dataType,
+        precision: form.precision,
+        scale: form.scale
+      }
+      const fullDataType = form.dataType ? buildDataTypeString(dataTypeValue) : undefined
+
+      // 构建 parentMetricCodes：派生指标取 baseCode，复合指标取 compositeMetrics
+      let parentMetricCodes: string[] | undefined
+      if (form.type === 'DERIVED' && form.baseCode) {
+        parentMetricCodes = [form.baseCode]
+      } else if (form.type === 'COMPOSITE' && form.compositeMetrics && form.compositeMetrics.length > 0) {
+        parentMetricCodes = form.compositeMetrics.map((m) => m.code)
+      }
+
+      // 直接调用 alterMetricVersion，会自动创建新版本
+      const versionData = await alterMetricVersion(editingMetric.code, editingMetric.currentVersion, {
+        metricName: form.name.trim(),
+        metricCode: form.code.trim(),
+        metricType: form.type,
+        dataType: fullDataType,
         comment: form.comment.trim() || undefined,
         unit: form.unit.trim() || undefined,
-        calculationFormula: form.formula.trim() || undefined
+        unitName: form.unitName || undefined,
+        parentMetricCodes,
+        calculationFormula: form.formula.trim() || undefined,
+        refCatalogName: form.refCatalog || undefined,
+        refSchemaName: form.refSchema || undefined,
+        refTableName: form.refTable || undefined,
+        measureColumns: form.measureColumns.length > 0 ? JSON.stringify(form.measureColumns) : undefined,
+        filterColumns: form.filterColumns.length > 0 ? JSON.stringify(form.filterColumns) : undefined
       })
-      handleUpdate(editingMetric.code, updated)
+
+      // 用后端返回的版本数据更新列表
+      const updatedMetric: Metric = {
+        ...editingMetric,
+        name: versionData.name,
+        code: versionData.code,
+        type: versionData.type,
+        dataType: versionData.dataType,
+        unit: versionData.unit,
+        unitName: versionData.unitName,
+        comment: versionData.comment,
+        currentVersion: versionData.version
+      }
+      setMetrics((prev) =>
+        prev.map((m) => (m.code === editingMetric.code ? updatedMetric : m))
+      )
       setEditingMetric(null)
     } catch {
       // 保存失败
@@ -342,14 +460,15 @@ export function MetricExplorer({ onBack, onOpenDrawer }: MetricExplorerProps) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-4 @md:p-6 custom-scrollbar">
-          <div>
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                <div className="text-slate-400 text-caption mt-3">加载中...</div>
-              </div>
-            ) : viewMode === 'CARD' ? (
+        {/* 内容区域 - 高度自适应，最大不超过容器 */}
+        <div className="flex-1 min-h-0 p-4 @md:p-6 pb-6 @md:pb-8 overflow-auto custom-scrollbar">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+              <div className="text-slate-400 text-caption mt-3">加载中...</div>
+            </div>
+          ) : viewMode === 'CARD' ? (
+            <>
               <div className="grid grid-cols-1 @md:grid-cols-2 @lg:grid-cols-3 gap-3 @md:gap-4">
                 {filteredMetrics.map((m) => (
                   <MetricCard key={m.code} metric={m} onClick={() => onOpenDrawer(m)} onDelete={handleDelete} onEdit={setEditingMetric} />
@@ -361,36 +480,52 @@ export function MetricExplorer({ onBack, onOpenDrawer }: MetricExplorerProps) {
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-x-auto">
-                <table className="w-full text-left border-collapse table-fixed min-w-table-wide">
-                  <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-semibold text-micro uppercase tracking-wider">
+              {/* 哨兵元素 + 加载更多 */}
+              <div ref={sentinelRef} className="h-4" />
+              {loadingMore && (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+              <table className="w-full text-left border-collapse table-fixed min-w-table-wide">
+                <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-semibold text-micro uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3 w-52">指标名称 / 编码</th>
+                    <th className="px-3 py-3 w-16 text-center">类型</th>
+                    <th className="px-3 py-3 w-32 text-center">数据类型</th>
+                    <th className="px-3 py-3 w-16 text-center">单位</th>
+                    <th className="px-3 py-3">描述</th>
+                    <th className="px-3 py-3 w-14 text-center">版本</th>
+                    <th className="px-3 py-3 w-20">创建人</th>
+                    <th className="px-3 py-3 w-40">创建时间</th>
+                    <th className="px-3 py-3 w-16 text-center">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredMetrics.map((m) => (
+                    <MetricRow key={m.code} metric={m} onClick={() => onOpenDrawer(m)} onDelete={handleDelete} onEdit={setEditingMetric} />
+                  ))}
+                  {filteredMetrics.length === 0 && (
                     <tr>
-                      <th className="px-4 py-3 w-56">指标名称 / 编码</th>
-                      <th className="px-4 py-3 w-20 text-center">类型</th>
-                      <th className="px-4 py-3 w-24 text-center">数据类型</th>
-                      <th className="px-4 py-3">描述</th>
-                      <th className="px-4 py-3 w-16 text-center">版本</th>
-                      <th className="px-4 py-3 w-24">创建人</th>
-                      <th className="px-4 py-3 w-16 text-center">操作</th>
+                      <td colSpan={8} className="px-4 py-12 @md:py-16 text-center text-slate-400 text-caption @md:text-body-sm">
+                        未找到匹配的指标
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredMetrics.map((m) => (
-                      <MetricRow key={m.code} metric={m} onClick={() => onOpenDrawer(m)} onDelete={handleDelete} onEdit={setEditingMetric} />
-                    ))}
-                    {filteredMetrics.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="px-4 py-12 @md:py-16 text-center text-slate-400 text-caption @md:text-body-sm">
-                          未找到匹配的指标
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                  )}
+                </tbody>
+              </table>
+              {/* 哨兵元素 + 加载更多 */}
+              <div ref={sentinelRef} className="h-1" />
+              {loadingMore && (
+                <div className="flex justify-center py-4 border-t border-slate-100 dark:border-slate-800">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.info;
 
+import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.annotation.DeveloperApi;
@@ -33,9 +34,10 @@ public class ValueDomainInfo {
   private final String domainCode;
   private final Optional<String> domainName;
   private final ValueDomain.Type domainType;
-  private final String itemValue;
-  private final Optional<String> itemLabel;
+  private final ValueDomain.Level domainLevel;
+  private final List<ValueDomain.Item> items;
   private final Optional<String> comment;
+  private final Optional<String> dataType;
   private final Optional<Audit> audit;
 
   /**
@@ -48,9 +50,10 @@ public class ValueDomainInfo {
         valueDomain.domainCode(),
         valueDomain.domainName(),
         valueDomain.domainType(),
-        valueDomain.itemValue(),
-        valueDomain.itemLabel(),
+        valueDomain.domainLevel(),
+        valueDomain.items(),
         valueDomain.comment(),
+        valueDomain.dataType(),
         valueDomain.auditInfo());
   }
 
@@ -60,25 +63,28 @@ public class ValueDomainInfo {
    * @param domainCode the code of the value domain.
    * @param domainName the name of the value domain.
    * @param domainType the type of the value domain.
-   * @param itemValue the item value.
-   * @param itemLabel the item label.
+   * @param domainLevel the level of the value domain.
+   * @param items the items of the value domain.
    * @param comment the comment of the value domain.
+   * @param dataType the data type of the value domain.
    * @param audit the audit information of the value domain.
    */
   public ValueDomainInfo(
       String domainCode,
       String domainName,
       ValueDomain.Type domainType,
-      String itemValue,
-      String itemLabel,
+      ValueDomain.Level domainLevel,
+      List<ValueDomain.Item> items,
       String comment,
+      String dataType,
       Audit audit) {
     this.domainCode = domainCode;
     this.domainName = Optional.ofNullable(domainName);
     this.domainType = domainType;
-    this.itemValue = itemValue;
-    this.itemLabel = Optional.ofNullable(itemLabel);
+    this.domainLevel = domainLevel;
+    this.items = items;
     this.comment = Optional.ofNullable(comment);
+    this.dataType = Optional.ofNullable(dataType);
     this.audit = Optional.ofNullable(audit);
   }
 
@@ -110,21 +116,21 @@ public class ValueDomainInfo {
   }
 
   /**
-   * Returns the item value.
+   * Returns the level of the value domain.
    *
-   * @return the item value.
+   * @return the level of the value domain.
    */
-  public String itemValue() {
-    return itemValue;
+  public ValueDomain.Level domainLevel() {
+    return domainLevel;
   }
 
   /**
-   * Returns the item label.
+   * Returns the items of the value domain.
    *
-   * @return the item label or empty if not set.
+   * @return the items of the value domain.
    */
-  public Optional<String> itemLabel() {
-    return itemLabel;
+  public List<ValueDomain.Item> items() {
+    return items;
   }
 
   /**
@@ -134,6 +140,15 @@ public class ValueDomainInfo {
    */
   public Optional<String> comment() {
     return comment;
+  }
+
+  /**
+   * Returns the data type of the value domain.
+   *
+   * @return the data type of the value domain or empty if not set.
+   */
+  public Optional<String> dataType() {
+    return dataType;
   }
 
   /**

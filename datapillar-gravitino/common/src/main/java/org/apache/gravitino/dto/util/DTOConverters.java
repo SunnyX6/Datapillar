@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.util;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.ArrayUtils;
@@ -759,6 +760,8 @@ public class DTOConverters {
         .withCode(metric.code())
         .withType(metric.type())
         .withDataType(metric.dataType())
+        .withUnit(metric.unit())
+        .withUnitName(metric.unitName())
         .withComment(metric.comment())
         .withProperties(metric.properties())
         .withCurrentVersion(metric.currentVersion())
@@ -775,6 +778,7 @@ public class DTOConverters {
    */
   public static MetricVersionDTO toDTO(MetricVersion metricVersion) {
     return MetricVersionDTO.builder()
+        .withId(metricVersion.id())
         .withVersion(metricVersion.version())
         .withName(metricVersion.metricName())
         .withCode(metricVersion.metricCode())
@@ -782,8 +786,9 @@ public class DTOConverters {
         .withDataType(metricVersion.dataType())
         .withComment(metricVersion.comment())
         .withUnit(metricVersion.unit())
-        .withAggregationLogic(metricVersion.aggregationLogic())
-        .withParentMetricIds(metricVersion.parentMetricIds())
+        .withUnitName(metricVersion.unitName())
+        .withUnitSymbol(metricVersion.unitSymbol())
+        .withParentMetricCodes(metricVersion.parentMetricCodes())
         .withCalculationFormula(metricVersion.calculationFormula())
         .withRefCatalogName(metricVersion.refCatalogName())
         .withRefSchemaName(metricVersion.refSchemaName())
@@ -831,8 +836,8 @@ public class DTOConverters {
     return MetricModifierDTO.builder()
         .withName(modifier.name())
         .withCode(modifier.code())
-        .withType(modifier.type())
         .withComment(modifier.comment())
+        .withModifierType(modifier.modifierType())
         .withAudit(toDTO(modifier.auditInfo()))
         .build();
   }
@@ -876,13 +881,25 @@ public class DTOConverters {
    * @return 值域 DTO
    */
   public static ValueDomainDTO toDTO(org.apache.gravitino.dataset.ValueDomain valueDomain) {
+    List<org.apache.gravitino.dto.dataset.ValueDomainItemDTO> itemDTOs = null;
+    if (valueDomain.items() != null) {
+      itemDTOs =
+          valueDomain.items().stream()
+              .map(
+                  item ->
+                      new org.apache.gravitino.dto.dataset.ValueDomainItemDTO(
+                          item.value(), item.label()))
+              .collect(java.util.stream.Collectors.toList());
+    }
+
     return ValueDomainDTO.builder()
         .withDomainCode(valueDomain.domainCode())
         .withDomainName(valueDomain.domainName())
         .withDomainType(valueDomain.domainType())
-        .withItemValue(valueDomain.itemValue())
-        .withItemLabel(valueDomain.itemLabel())
+        .withDomainLevel(valueDomain.domainLevel())
+        .withItems(itemDTOs)
         .withComment(valueDomain.comment())
+        .withDataType(valueDomain.dataType())
         .withAudit(toDTO(valueDomain.auditInfo()))
         .build();
   }

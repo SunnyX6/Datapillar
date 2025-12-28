@@ -6,16 +6,14 @@
 - Metric 节点
 """
 
-import asyncio
 import json
 import re
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 import structlog
 from neo4j import AsyncSession
 
-from src.infrastructure.llm.embeddings import UnifiedEmbedder
+from src.modules.openlineage.core.embedding_processor import embedding_processor
 from src.modules.openlineage.schemas.events import Dataset, RunEvent
 from src.modules.openlineage.schemas.facets import GravitinoDatasetFacet, SchemaDatasetFacet
 from src.modules.openlineage.schemas.neo4j import (
@@ -57,7 +55,7 @@ class MetadataWriter(BaseWriter):
     - Column: 字段
     - Metric: 指标
 
-    写入时同步生成 embedding
+    写入后将 embedding 任务入队，由 EmbeddingProcessor 异步处理
     """
 
     def __init__(self) -> None:
@@ -67,28 +65,21 @@ class MetadataWriter(BaseWriter):
         self._tables_written = 0
         self._columns_written = 0
         self._metrics_written = 0
-        self._embeddings_generated = 0
-        self._embedder: UnifiedEmbedder | None = None
-        self._executor = ThreadPoolExecutor(max_workers=2)
+        self._embedding_tasks_queued = 0
 
-    def _get_embedder(self) -> UnifiedEmbedder:
-        """懒加载 Embedder"""
-        if self._embedder is None:
-            self._embedder = UnifiedEmbedder()
-        return self._embedder
-
-    async def _generate_embedding(self, name: str, description: str | None) -> list[float] | None:
-        """生成 embedding"""
-        try:
-            text = f"{name}: {description}" if description else name
-            loop = asyncio.get_event_loop()
-            embedder = self._get_embedder()
-            embedding = await loop.run_in_executor(self._executor, embedder.embed_query, text)
-            self._embeddings_generated += 1
-            return embedding
-        except Exception as e:
-            logger.warning("embedding_generation_failed", name=name, error=str(e))
-            return None
+    async def _queue_embedding_task(
+        self, node_id: str, node_label: str, name: str,
+        description: str | None = None, tags: list[str] | None = None
+    ) -> None:
+        """将 embedding 任务入队"""
+        parts = [name]
+        if description:
+            parts.append(description)
+        if tags:
+            parts.extend(tags)
+        text = " ".join(parts)
+        if await embedding_processor.put(node_id, node_label, text):
+            self._embedding_tasks_queued += 1
 
     @property
     def name(self) -> str:
@@ -97,16 +88,16 @@ class MetadataWriter(BaseWriter):
     # 表相关的操作
     TABLE_OPERATIONS = {"create_table", "alter_table", "load_table"}
     # Schema 相关的操作
-    SCHEMA_OPERATIONS = {"create_schema", "load_schema"}
+    SCHEMA_OPERATIONS = {"create_schema", "alter_schema", "load_schema"}
     # Catalog 相关的操作
-    CATALOG_OPERATIONS = {"create_catalog"}
+    CATALOG_OPERATIONS = {"create_catalog", "alter_catalog"}
     # 指标相关的操作
-    METRIC_OPERATIONS = {"register_metric"}
+    METRIC_OPERATIONS = {"register_metric", "alter_metric"}
     # 语义层操作
-    WORDROOT_OPERATIONS = {"create_wordroot"}
-    MODIFIER_OPERATIONS = {"create_modifier"}
-    UNIT_OPERATIONS = {"create_unit"}
-    VALUEDOMAIN_OPERATIONS = {"create_valuedomain"}
+    WORDROOT_OPERATIONS = {"create_wordroot", "alter_wordroot"}
+    MODIFIER_OPERATIONS = {"create_modifier", "alter_modifier"}
+    UNIT_OPERATIONS = {"create_unit", "alter_unit"}
+    VALUEDOMAIN_OPERATIONS = {"create_valuedomain", "alter_valuedomain"}
     # 删除操作（统一用 drop）
     DROP_TABLE_OPERATIONS = {"drop_table"}
     DROP_SCHEMA_OPERATIONS = {"drop_schema"}
@@ -118,6 +109,7 @@ class MetadataWriter(BaseWriter):
     DROP_VALUEDOMAIN_OPERATIONS = {"drop_valuedomain"}
     # Tag 操作
     TAG_OPERATIONS = {"associate_tags"}
+    VALUE_DOMAIN_TAG_PREFIX = "vd:"
 
     async def write(self, session: AsyncSession, event: RunEvent) -> None:
         """写入元数据"""
@@ -219,6 +211,9 @@ class MetadataWriter(BaseWriter):
                     gravitino_facet,
                 )
                 if columns:
+                    # 先删除不再存在的列（处理 alter_table 删除列的情况）
+                    column_ids = [col.id for col in columns]
+                    await self._delete_orphan_columns(session, table_node.id, column_ids)
                     await self._write_columns_batch(session, columns, table_node.id)
 
     async def _write_schema_metadata(self, session: AsyncSession, event: RunEvent) -> None:
@@ -530,17 +525,15 @@ class MetadataWriter(BaseWriter):
 
             schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
             domain_code = None
-            item_value = None
             for field in schema_facet.fields:
                 if field.name == "domainCode" and field.description:
                     domain_code = field.description
-                if field.name == "itemValue" and field.description:
-                    item_value = field.description
+                    break
 
-            if not domain_code or not item_value:
+            if not domain_code:
                 continue
 
-            valuedomain_id = generate_id("valuedomain", domain_code, item_value)
+            valuedomain_id = generate_id("valuedomain", domain_code)
             query = """
             MATCH (v:ValueDomain {id: $id})
             DETACH DELETE v
@@ -554,7 +547,9 @@ class MetadataWriter(BaseWriter):
 
     async def _update_tags(self, session: AsyncSession, event: RunEvent) -> None:
         """
-        更新节点的 Tag 标签
+        更新节点的普通 Tag 标签
+
+        注意：值域 tags（vd: 前缀）由 lineage_writer 处理，这里只处理普通 tags
 
         事件格式：
         - namespace: gravitino://{metalake}/{catalog} 或 gravitino://{metalake}
@@ -593,14 +588,20 @@ class MetadataWriter(BaseWriter):
             # 根据 objectType 确定节点标签
             node_label = self._get_node_label_for_tag(object_type)
 
-            # 更新节点的 tags 属性
+            # 过滤掉值域 tags（vd: 前缀），只保留普通 tags
+            normal_tags = [
+                t for t in associated_tags
+                if not t.startswith(self.VALUE_DOMAIN_TAG_PREFIX)
+            ]
+
+            # 更新节点的 tags 属性，并返回 name 和 description 用于重新入队 embedding
             query = f"""
             MATCH (n:{node_label} {{id: $nodeId}})
             SET n.tags = $tags, n.updatedAt = datetime()
-            RETURN n.id as id
+            RETURN n.id as id, n.name as name, n.description as description
             """
 
-            result = await session.run(query, nodeId=node_id, tags=list(associated_tags))
+            result = await session.run(query, nodeId=node_id, tags=list(normal_tags))
             record = await result.single()
 
             if record:
@@ -608,8 +609,16 @@ class MetadataWriter(BaseWriter):
                     "tags_updated",
                     node_id=node_id,
                     object_type=object_type,
-                    tags=associated_tags,
+                    tags=normal_tags,
                 )
+
+                # 所有物理资产（Catalog/Schema/Table/Column）都需要重新入队 embedding
+                if object_type in ("CATALOG", "SCHEMA", "TABLE", "COLUMN"):
+                    await self._queue_embedding_task(
+                        node_id, node_label,
+                        record["name"], record["description"],
+                        list(normal_tags)
+                    )
             else:
                 logger.warning(
                     "tags_update_node_not_found",
@@ -744,12 +753,9 @@ class MetadataWriter(BaseWriter):
     async def _write_metric_with_schema(
         self, session: AsyncSession, metric: MetricNode, schema_id: str
     ) -> None:
-        """写入 Metric 节点 + 关系 + embedding"""
+        """写入 Metric 节点 + 关系"""
         label = self._get_metric_label(metric.metric_type)
         is_atomic = metric.metric_type.upper() == "ATOMIC"
-
-        # 生成 embedding
-        embedding = await self._generate_embedding(metric.name, metric.description)
 
         if is_atomic:
             # 原子指标：写入节点 + Schema->Metric 关系
@@ -762,12 +768,10 @@ class MetadataWriter(BaseWriter):
                 m.description = $description,
                 m.unit = $unit,
                 m.aggregationLogic = $aggregationLogic,
-                m.embedding = $embedding,
                 m.createdBy = 'OPENLINEAGE'
             ON MATCH SET
                 m.updatedAt = datetime(),
-                m.description = COALESCE($description, m.description),
-                m.embedding = COALESCE($embedding, m.embedding)
+                m.description = COALESCE($description, m.description)
             WITH m
             MATCH (s:Schema {{id: $schemaId}})
             MERGE (s)-[:HAS_METRIC]->(m)
@@ -780,7 +784,6 @@ class MetadataWriter(BaseWriter):
                 description=metric.description,
                 unit=metric.unit,
                 aggregationLogic=metric.aggregation_logic,
-                embedding=embedding,
                 schemaId=schema_id,
             )
         else:
@@ -794,12 +797,10 @@ class MetadataWriter(BaseWriter):
                 m.description = $description,
                 m.unit = $unit,
                 m.calculationFormula = $calculationFormula,
-                m.embedding = $embedding,
                 m.createdBy = 'OPENLINEAGE'
             ON MATCH SET
                 m.updatedAt = datetime(),
-                m.description = COALESCE($description, m.description),
-                m.embedding = COALESCE($embedding, m.embedding)
+                m.description = COALESCE($description, m.description)
             """
             await session.run(
                 query,
@@ -809,7 +810,6 @@ class MetadataWriter(BaseWriter):
                 description=metric.description,
                 unit=metric.unit,
                 calculationFormula=metric.calculation_formula,
-                embedding=embedding,
             )
 
             # 写入父子关系
@@ -820,6 +820,9 @@ class MetadataWriter(BaseWriter):
                 await self._write_metric_parent_relationships(
                     session, metric.id, label, metric.parent_metric_codes, rel_type
                 )
+
+        # 将 Metric embedding 任务入队
+        await self._queue_embedding_task(metric.id, label, metric.name, metric.description)
 
         self._metrics_written += 1
         logger.debug("metric_written", id=metric.id, name=metric.name)
@@ -833,6 +836,13 @@ class MetadataWriter(BaseWriter):
         rel_type: str,
     ) -> None:
         """写入指标父子关系"""
+        # 先删除该指标的旧父子关系（确保修改时数据一致）
+        delete_query = f"""
+        MATCH (child:{child_label} {{id: $childId}})-[r:{rel_type}]->()
+        DELETE r
+        """
+        await session.run(delete_query, childId=child_id)
+
         for parent_code in parent_codes:
             # 根据 parent_code 生成父指标的 id
             parent_id = generate_id("metric", parent_code)
@@ -881,10 +891,6 @@ class MetadataWriter(BaseWriter):
 
     async def _write_wordroot(self, session: AsyncSession, wordroot: WordRootNode) -> None:
         """写入 WordRoot 节点"""
-        embedding = await self._generate_embedding(
-            wordroot.name or wordroot.code, wordroot.description
-        )
-
         query = """
         MERGE (w:WordRoot:Knowledge {id: $id})
         ON CREATE SET
@@ -893,14 +899,12 @@ class MetadataWriter(BaseWriter):
             w.name = $name,
             w.dataType = $dataType,
             w.description = $description,
-            w.embedding = $embedding,
             w.createdBy = 'OPENLINEAGE'
         ON MATCH SET
             w.updatedAt = datetime(),
             w.name = COALESCE($name, w.name),
             w.dataType = COALESCE($dataType, w.dataType),
-            w.description = COALESCE($description, w.description),
-            w.embedding = COALESCE($embedding, w.embedding)
+            w.description = COALESCE($description, w.description)
         """
 
         await session.run(
@@ -910,7 +914,12 @@ class MetadataWriter(BaseWriter):
             name=wordroot.name,
             dataType=wordroot.data_type,
             description=wordroot.description,
-            embedding=embedding,
+        )
+
+        # 将 WordRoot embedding 任务入队
+        await self._queue_embedding_task(
+            wordroot.id, "WordRoot",
+            wordroot.name or wordroot.code, wordroot.description
         )
 
         logger.debug("wordroot_written", id=wordroot.id, code=wordroot.code)
@@ -943,8 +952,6 @@ class MetadataWriter(BaseWriter):
 
     async def _write_modifier(self, session: AsyncSession, modifier: ModifierNode) -> None:
         """写入 Modifier 节点"""
-        embedding = await self._generate_embedding(modifier.code, modifier.description)
-
         query = """
         MERGE (m:Modifier:Knowledge {id: $id})
         ON CREATE SET
@@ -952,13 +959,11 @@ class MetadataWriter(BaseWriter):
             m.code = $code,
             m.modifierType = $modifierType,
             m.description = $description,
-            m.embedding = $embedding,
             m.createdBy = 'OPENLINEAGE'
         ON MATCH SET
             m.updatedAt = datetime(),
             m.modifierType = COALESCE($modifierType, m.modifierType),
-            m.description = COALESCE($description, m.description),
-            m.embedding = COALESCE($embedding, m.embedding)
+            m.description = COALESCE($description, m.description)
         """
 
         await session.run(
@@ -967,7 +972,11 @@ class MetadataWriter(BaseWriter):
             code=modifier.code,
             modifierType=modifier.modifier_type,
             description=modifier.description,
-            embedding=embedding,
+        )
+
+        # 将 Modifier embedding 任务入队
+        await self._queue_embedding_task(
+            modifier.id, "Modifier", modifier.code, modifier.description
         )
 
         logger.debug("modifier_written", id=modifier.id, code=modifier.code)
@@ -1001,8 +1010,6 @@ class MetadataWriter(BaseWriter):
 
     async def _write_unit(self, session: AsyncSession, unit: UnitNode) -> None:
         """写入 Unit 节点"""
-        embedding = await self._generate_embedding(unit.name or unit.code, unit.description)
-
         query = """
         MERGE (u:Unit:Knowledge {id: $id})
         ON CREATE SET
@@ -1011,14 +1018,12 @@ class MetadataWriter(BaseWriter):
             u.name = $name,
             u.symbol = $symbol,
             u.description = $description,
-            u.embedding = $embedding,
             u.createdBy = 'OPENLINEAGE'
         ON MATCH SET
             u.updatedAt = datetime(),
             u.name = COALESCE($name, u.name),
             u.symbol = COALESCE($symbol, u.symbol),
-            u.description = COALESCE($description, u.description),
-            u.embedding = COALESCE($embedding, u.embedding)
+            u.description = COALESCE($description, u.description)
         """
 
         await session.run(
@@ -1028,7 +1033,12 @@ class MetadataWriter(BaseWriter):
             name=unit.name,
             symbol=unit.symbol,
             description=unit.description,
-            embedding=embedding,
+        )
+
+        # 将 Unit embedding 任务入队
+        await self._queue_embedding_task(
+            unit.id, "Unit",
+            unit.name or unit.code, unit.description
         )
 
         logger.debug("unit_written", id=unit.id, code=unit.code)
@@ -1044,36 +1054,34 @@ class MetadataWriter(BaseWriter):
 
             domain_code_field = fields.get("domainCode")
             domain_type_field = fields.get("domainType")
-            item_value_field = fields.get("itemValue")
-            if not domain_code_field or not domain_type_field or not item_value_field:
+            domain_level_field = fields.get("domainLevel")
+            if not domain_code_field or not domain_type_field or not domain_level_field:
                 continue
 
             domain_code = domain_code_field.description
             domain_type = domain_type_field.description or "ENUM"
-            item_value = item_value_field.description
+            domain_level = domain_level_field.description or "GLOBAL"
             domain_name = (
                 fields.get("domainName").description if fields.get("domainName") else None
             )
-            item_label = fields.get("itemLabel").description if fields.get("itemLabel") else None
+            items = fields.get("items").description if fields.get("items") else None
             description = fields.get("comment").description if fields.get("comment") else None
+            data_type = fields.get("dataType").description if fields.get("dataType") else None
 
             valuedomain_node = ValueDomainNode.create(
                 domain_code=domain_code,
-                item_value=item_value,
                 domain_type=domain_type,
+                domain_level=domain_level,
                 domain_name=domain_name,
-                item_label=item_label,
+                items=items,
                 description=description,
+                data_type=data_type,
             )
 
             await self._write_valuedomain(session, valuedomain_node)
 
     async def _write_valuedomain(self, session: AsyncSession, valuedomain: ValueDomainNode) -> None:
         """写入 ValueDomain 节点"""
-        embedding = await self._generate_embedding(
-            valuedomain.domain_name or valuedomain.domain_code, valuedomain.description
-        )
-
         query = """
         MERGE (v:ValueDomain:Knowledge {id: $id})
         ON CREATE SET
@@ -1081,17 +1089,18 @@ class MetadataWriter(BaseWriter):
             v.domainCode = $domainCode,
             v.domainName = $domainName,
             v.domainType = $domainType,
-            v.itemValue = $itemValue,
-            v.itemLabel = $itemLabel,
+            v.domainLevel = $domainLevel,
+            v.items = $items,
+            v.dataType = $dataType,
             v.description = $description,
-            v.embedding = $embedding,
             v.createdBy = 'OPENLINEAGE'
         ON MATCH SET
             v.updatedAt = datetime(),
             v.domainName = COALESCE($domainName, v.domainName),
-            v.itemLabel = COALESCE($itemLabel, v.itemLabel),
-            v.description = COALESCE($description, v.description),
-            v.embedding = COALESCE($embedding, v.embedding)
+            v.domainLevel = COALESCE($domainLevel, v.domainLevel),
+            v.items = COALESCE($items, v.items),
+            v.dataType = COALESCE($dataType, v.dataType),
+            v.description = COALESCE($description, v.description)
         """
 
         await session.run(
@@ -1100,10 +1109,18 @@ class MetadataWriter(BaseWriter):
             domainCode=valuedomain.domain_code,
             domainName=valuedomain.domain_name,
             domainType=valuedomain.domain_type,
-            itemValue=valuedomain.item_value,
-            itemLabel=valuedomain.item_label,
+            domainLevel=valuedomain.domain_level,
+            items=valuedomain.items,
+            dataType=valuedomain.data_type,
             description=valuedomain.description,
-            embedding=embedding,
+        )
+
+        # 将 ValueDomain embedding 任务入队（包含 items 信息）
+        embedding_text = valuedomain.domain_name or valuedomain.domain_code
+        if valuedomain.items:
+            embedding_text += f" {valuedomain.items}"
+        await self._queue_embedding_task(
+            valuedomain.id, "ValueDomain", embedding_text, valuedomain.description
         )
 
         logger.debug("valuedomain_written", id=valuedomain.id, domainCode=valuedomain.domain_code)
@@ -1235,13 +1252,21 @@ class MetadataWriter(BaseWriter):
             c.createdBy = 'OPENLINEAGE'
         ON MATCH SET
             c.updatedAt = datetime()
+        RETURN c.tags as tags
         """
 
-        await session.run(
+        result = await session.run(
             query,
             id=catalog.id,
             name=catalog.name,
             metalake=catalog.metalake,
+        )
+        record = await result.single()
+        tags = record["tags"] if record and record["tags"] else None
+
+        # 入队 embedding（带 tags）
+        await self._queue_embedding_task(
+            catalog.id, "Catalog", catalog.name, None, tags
         )
 
         self._catalogs_written += 1
@@ -1264,14 +1289,22 @@ class MetadataWriter(BaseWriter):
         WITH s
         MATCH (c:Catalog {id: $catalogId})
         MERGE (c)-[:HAS_SCHEMA]->(s)
+        RETURN s.tags as tags
         """
 
-        await session.run(
+        result = await session.run(
             query,
             id=schema.id,
             name=schema.name,
             description=schema.description,
             catalogId=catalog_id,
+        )
+        record = await result.single()
+        tags = record["tags"] if record and record["tags"] else None
+
+        # 入队 embedding（带 tags）
+        await self._queue_embedding_task(
+            schema.id, "Schema", schema.name, schema.description, tags
         )
 
         self._schemas_written += 1
@@ -1280,11 +1313,8 @@ class MetadataWriter(BaseWriter):
     async def _write_table(
         self, session: AsyncSession, table: TableNode, schema_id: str
     ) -> None:
-        """写入 Table 节点 + Schema->Table 关系 + embedding"""
+        """写入 Table 节点 + Schema->Table 关系"""
         properties_json = json.dumps(table.properties) if table.properties else None
-
-        # 生成 embedding
-        embedding = await self._generate_embedding(table.name, table.description)
 
         query = """
         MERGE (t:Table:Knowledge {id: $id})
@@ -1302,20 +1332,19 @@ class MetadataWriter(BaseWriter):
             t.createTime = $createTime,
             t.lastModifier = $lastModifier,
             t.lastModifiedTime = $lastModifiedTime,
-            t.embedding = $embedding,
             t.createdBy = 'OPENLINEAGE'
         ON MATCH SET
             t.updatedAt = datetime(),
             t.producer = $producer,
             t.description = COALESCE($description, t.description),
-            t.properties = COALESCE($properties, t.properties),
-            t.embedding = COALESCE($embedding, t.embedding)
+            t.properties = COALESCE($properties, t.properties)
         WITH t
         MATCH (s:Schema {id: $schemaId})
         MERGE (s)-[:HAS_TABLE]->(t)
+        RETURN t.tags as tags
         """
 
-        await session.run(
+        result = await session.run(
             query,
             id=table.id,
             name=table.name,
@@ -1330,22 +1359,40 @@ class MetadataWriter(BaseWriter):
             createTime=table.create_time,
             lastModifier=table.last_modifier,
             lastModifiedTime=table.last_modified_time,
-            embedding=embedding,
             schemaId=schema_id,
         )
+        record = await result.single()
+        tags = record["tags"] if record and record["tags"] else None
+
+        # 入队 embedding（带 tags）
+        await self._queue_embedding_task(table.id, "Table", table.name, table.description, tags)
 
         self._tables_written += 1
         logger.debug("table_written", id=table.id, name=table.name)
 
+    async def _delete_orphan_columns(
+        self, session: AsyncSession, table_id: str, valid_column_ids: list[str]
+    ) -> None:
+        """删除表下不再存在的列节点（处理 alter_table 删除列的情况）"""
+        query = """
+        MATCH (t:Table {id: $tableId})-[:HAS_COLUMN]->(c:Column)
+        WHERE NOT c.id IN $validColumnIds
+        DETACH DELETE c
+        RETURN count(c) as deletedCount
+        """
+        result = await session.run(query, tableId=table_id, validColumnIds=valid_column_ids)
+        record = await result.single()
+        if record and record["deletedCount"] > 0:
+            logger.info(
+                "orphan_columns_deleted",
+                table_id=table_id,
+                deleted_count=record["deletedCount"],
+            )
+
     async def _write_columns_batch(
         self, session: AsyncSession, columns: list[ColumnNode], table_id: str
     ) -> None:
-        """批量写入 Column 节点 + Table->Column 关系 + embedding"""
-        # 批量生成 embeddings
-        embeddings = await asyncio.gather(
-            *[self._generate_embedding(col.name, col.description) for col in columns]
-        )
-
+        """批量写入 Column 节点 + Table->Column 关系"""
         # 构建批量数据
         column_data = [
             {
@@ -1356,9 +1403,8 @@ class MetadataWriter(BaseWriter):
                 "nullable": col.nullable,
                 "autoIncrement": col.auto_increment,
                 "defaultValue": col.default_value,
-                "embedding": emb,
             }
-            for col, emb in zip(columns, embeddings)
+            for col in columns
         ]
 
         # 使用 UNWIND 批量写入
@@ -1373,19 +1419,27 @@ class MetadataWriter(BaseWriter):
             c.nullable = col.nullable,
             c.autoIncrement = col.autoIncrement,
             c.defaultValue = col.defaultValue,
-            c.embedding = col.embedding,
             c.createdBy = 'OPENLINEAGE'
         ON MATCH SET
             c.updatedAt = datetime(),
             c.dataType = COALESCE(col.dataType, c.dataType),
-            c.description = COALESCE(col.description, c.description),
-            c.embedding = COALESCE(col.embedding, c.embedding)
+            c.description = COALESCE(col.description, c.description)
         WITH c
         MATCH (t:Table {id: $tableId})
         MERGE (t)-[:HAS_COLUMN]->(c)
+        RETURN c.id as id, c.tags as tags
         """
 
-        await session.run(query, columns=column_data, tableId=table_id)
+        result = await session.run(query, columns=column_data, tableId=table_id)
+        records = [record async for record in result]
+
+        # 构建 id -> tags 映射
+        tags_map = {r["id"]: r["tags"] for r in records if r["id"]}
+
+        # 将 Column embedding 任务入队（带 tags）
+        for col in columns:
+            tags = tags_map.get(col.id)
+            await self._queue_embedding_task(col.id, "Column", col.name, col.description, tags)
 
         self._columns_written += len(columns)
         logger.debug("columns_batch_written", count=len(columns), table_id=table_id)
@@ -1393,10 +1447,7 @@ class MetadataWriter(BaseWriter):
     async def _write_column(
         self, session: AsyncSession, column: ColumnNode, table_id: str
     ) -> None:
-        """写入 Column 节点 + Table->Column 关系 + embedding"""
-        # 生成 embedding
-        embedding = await self._generate_embedding(column.name, column.description)
-
+        """写入 Column 节点 + Table->Column 关系"""
         query = """
         MERGE (c:Column:Knowledge {id: $id})
         ON CREATE SET
@@ -1407,13 +1458,11 @@ class MetadataWriter(BaseWriter):
             c.nullable = $nullable,
             c.autoIncrement = $autoIncrement,
             c.defaultValue = $defaultValue,
-            c.embedding = $embedding,
             c.createdBy = 'OPENLINEAGE'
         ON MATCH SET
             c.updatedAt = datetime(),
             c.dataType = COALESCE($dataType, c.dataType),
-            c.description = COALESCE($description, c.description),
-            c.embedding = COALESCE($embedding, c.embedding)
+            c.description = COALESCE($description, c.description)
         WITH c
         MATCH (t:Table {id: $tableId})
         MERGE (t)-[:HAS_COLUMN]->(c)
@@ -1428,19 +1477,18 @@ class MetadataWriter(BaseWriter):
             nullable=column.nullable,
             autoIncrement=column.auto_increment,
             defaultValue=column.default_value,
-            embedding=embedding,
             tableId=table_id,
         )
+
+        # 将 Column embedding 任务入队
+        await self._queue_embedding_task(column.id, "Column", column.name, column.description)
 
         self._columns_written += 1
         logger.debug("column_written", id=column.id, name=column.name)
 
     async def write_metric(self, session: AsyncSession, metric: MetricNode) -> None:
-        """写入 Metric 节点 + embedding"""
+        """写入 Metric 节点"""
         label = self._get_metric_label(metric.metric_type)
-
-        # 生成 embedding
-        embedding = await self._generate_embedding(metric.name, metric.description)
 
         query = f"""
         MERGE (m:{label}:Knowledge {{id: $id}})
@@ -1452,12 +1500,10 @@ class MetadataWriter(BaseWriter):
             m.unit = $unit,
             m.aggregationLogic = $aggregationLogic,
             m.calculationFormula = $calculationFormula,
-            m.embedding = $embedding,
             m.createdBy = 'OPENLINEAGE'
         ON MATCH SET
             m.updatedAt = datetime(),
-            m.description = COALESCE($description, m.description),
-            m.embedding = COALESCE($embedding, m.embedding)
+            m.description = COALESCE($description, m.description)
         """
 
         await session.run(
@@ -1469,8 +1515,10 @@ class MetadataWriter(BaseWriter):
             unit=metric.unit,
             aggregationLogic=metric.aggregation_logic,
             calculationFormula=metric.calculation_formula,
-            embedding=embedding,
         )
+
+        # 将 Metric embedding 任务入队
+        await self._queue_embedding_task(metric.id, label, metric.name, metric.description)
 
         # 写入指标依赖关系
         if metric.parent_metric_ids:
@@ -1517,5 +1565,5 @@ class MetadataWriter(BaseWriter):
         stats["tables_written"] = self._tables_written
         stats["columns_written"] = self._columns_written
         stats["metrics_written"] = self._metrics_written
-        stats["embeddings_generated"] = self._embeddings_generated
+        stats["embedding_tasks_queued"] = self._embedding_tasks_queued
         return stats

@@ -1,0 +1,6 @@
+export { GovernanceSemanticPage } from './SemanticPage'
+export { GovernanceMetricPage } from './MetricPage'
+export { GovernanceWordRootPage } from './WordRootPage'
+export { GovernanceDataTypePage } from './DataTypePage'
+export { GovernanceValueDomainPage } from './ValueDomainPage'
+export { GovernanceClassificationPage } from './ClassificationPage'

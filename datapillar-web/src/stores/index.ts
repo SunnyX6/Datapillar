@@ -39,3 +39,6 @@ export {
   useSearchTerm,
   type SearchContext
 } from './searchStore'
+
+// Semantic Stats Store - 语义资产统计缓存
+export { useSemanticStatsStore } from './semanticStatsStore'

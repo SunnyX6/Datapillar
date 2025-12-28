@@ -29,13 +29,11 @@ public class ValueDomainMetaBaseSQLProvider {
   public String insertValueDomainMeta(@Param("domain") ValueDomainPO domainPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (item_id, domain_code, domain_name, domain_type,"
-        + " item_value, item_label, metalake_id, catalog_id,"
-        + " schema_id, domain_comment, audit_info, deleted_at)"
-        + " VALUES (#{domain.itemId}, #{domain.domainCode},"
-        + " #{domain.domainName}, #{domain.domainType},"
-        + " #{domain.itemValue}, #{domain.itemLabel},"
-        + " #{domain.metalakeId}, #{domain.catalogId},"
+        + " (domain_id, domain_code, domain_name, domain_type, domain_level,"
+        + " items, data_type, metalake_id, catalog_id, schema_id, domain_comment, audit_info, deleted_at)"
+        + " VALUES (#{domain.domainId}, #{domain.domainCode},"
+        + " #{domain.domainName}, #{domain.domainType}, #{domain.domainLevel},"
+        + " #{domain.items}, #{domain.dataType}, #{domain.metalakeId}, #{domain.catalogId},"
         + " #{domain.schemaId}, #{domain.domainComment},"
         + " #{domain.auditInfo}, #{domain.deletedAt})";
   }
@@ -43,27 +41,27 @@ public class ValueDomainMetaBaseSQLProvider {
   public String insertValueDomainMetaOnDuplicateKeyUpdate(@Param("domain") ValueDomainPO domainPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (item_id, domain_code, domain_name, domain_type,"
-        + " item_value, item_label, metalake_id, catalog_id,"
-        + " schema_id, domain_comment, audit_info, deleted_at)"
-        + " VALUES (#{domain.itemId}, #{domain.domainCode},"
-        + " #{domain.domainName}, #{domain.domainType},"
-        + " #{domain.itemValue}, #{domain.itemLabel},"
-        + " #{domain.metalakeId}, #{domain.catalogId},"
+        + " (domain_id, domain_code, domain_name, domain_type, domain_level,"
+        + " items, data_type, metalake_id, catalog_id, schema_id, domain_comment, audit_info, deleted_at)"
+        + " VALUES (#{domain.domainId}, #{domain.domainCode},"
+        + " #{domain.domainName}, #{domain.domainType}, #{domain.domainLevel},"
+        + " #{domain.items}, #{domain.dataType}, #{domain.metalakeId}, #{domain.catalogId},"
         + " #{domain.schemaId}, #{domain.domainComment},"
         + " #{domain.auditInfo}, #{domain.deletedAt})"
         + " ON DUPLICATE KEY UPDATE"
         + " domain_name = #{domain.domainName},"
         + " domain_type = #{domain.domainType},"
-        + " item_label = #{domain.itemLabel},"
+        + " domain_level = #{domain.domainLevel},"
+        + " items = #{domain.items},"
+        + " data_type = #{domain.dataType},"
         + " domain_comment = #{domain.domainComment},"
         + " audit_info = #{domain.auditInfo},"
         + " deleted_at = #{domain.deletedAt}";
   }
 
   public String listValueDomainPOsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "SELECT item_id AS itemId, domain_code AS domainCode, domain_name AS domainName,"
-        + " domain_type AS domainType, item_value AS itemValue, item_label AS itemLabel,"
+    return "SELECT domain_id AS domainId, domain_code AS domainCode, domain_name AS domainName,"
+        + " domain_type AS domainType, domain_level AS domainLevel, items, data_type AS dataType,"
         + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId,"
         + " domain_comment AS domainComment, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
@@ -73,14 +71,14 @@ public class ValueDomainMetaBaseSQLProvider {
 
   public String listValueDomainPOsBySchemaIdWithPagination(
       @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit) {
-    return "SELECT item_id AS itemId, domain_code AS domainCode, domain_name AS domainName,"
-        + " domain_type AS domainType, item_value AS itemValue, item_label AS itemLabel,"
+    return "SELECT domain_id AS domainId, domain_code AS domainCode, domain_name AS domainName,"
+        + " domain_type AS domainType, domain_level AS domainLevel, items, data_type AS dataType,"
         + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId,"
         + " domain_comment AS domainComment, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
-        + " ORDER BY item_id"
+        + " ORDER BY domain_id"
         + " LIMIT #{limit} OFFSET #{offset}";
   }
 
@@ -90,29 +88,45 @@ public class ValueDomainMetaBaseSQLProvider {
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
-  public String selectValueDomainMetaBySchemaIdAndDomainCodeAndItemValue(
-      @Param("schemaId") Long schemaId,
-      @Param("domainCode") String domainCode,
-      @Param("itemValue") String itemValue) {
-    return "SELECT item_id AS itemId, domain_code AS domainCode, domain_name AS domainName,"
-        + " domain_type AS domainType, item_value AS itemValue, item_label AS itemLabel,"
-        + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId,"
-        + " domain_comment AS domainComment, audit_info AS auditInfo, deleted_at AS deletedAt"
-        + " FROM "
-        + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND domain_code = #{domainCode}"
-        + " AND item_value = #{itemValue} AND deleted_at = 0";
-  }
-
-  public String listValueDomainPOsBySchemaIdAndDomainCode(
+  public String selectValueDomainMetaBySchemaIdAndDomainCode(
       @Param("schemaId") Long schemaId, @Param("domainCode") String domainCode) {
-    return "SELECT item_id AS itemId, domain_code AS domainCode, domain_name AS domainName,"
-        + " domain_type AS domainType, item_value AS itemValue, item_label AS itemLabel,"
+    return "SELECT domain_id AS domainId, domain_code AS domainCode, domain_name AS domainName,"
+        + " domain_type AS domainType, domain_level AS domainLevel, items, data_type AS dataType,"
         + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId,"
         + " domain_comment AS domainComment, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND domain_code = #{domainCode} AND deleted_at = 0";
+  }
+
+  public String selectValueDomainMetaByDomainId(@Param("domainId") Long domainId) {
+    return "SELECT domain_id AS domainId, domain_code AS domainCode, domain_name AS domainName,"
+        + " domain_type AS domainType, domain_level AS domainLevel, items, data_type AS dataType,"
+        + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId,"
+        + " domain_comment AS domainComment, audit_info AS auditInfo, deleted_at AS deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE domain_id = #{domainId} AND deleted_at = 0";
+  }
+
+  public String listValueDomainPOsByDomainIds(@Param("domainIds") java.util.List<Long> domainIds) {
+    StringBuilder sql = new StringBuilder();
+    sql.append(
+        "SELECT domain_id AS domainId, domain_code AS domainCode, domain_name AS domainName,"
+            + " domain_type AS domainType, domain_level AS domainLevel, items, data_type AS dataType,"
+            + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId,"
+            + " domain_comment AS domainComment, audit_info AS auditInfo, deleted_at AS deletedAt"
+            + " FROM ");
+    sql.append(TABLE_NAME);
+    sql.append(" WHERE domain_id IN (");
+    for (int i = 0; i < domainIds.size(); i++) {
+      sql.append("#{domainIds[").append(i).append("]}");
+      if (i < domainIds.size() - 1) {
+        sql.append(", ");
+      }
+    }
+    sql.append(") AND deleted_at = 0");
+    return sql.toString();
   }
 
   public String updateValueDomainMeta(
@@ -122,29 +136,17 @@ public class ValueDomainMetaBaseSQLProvider {
         + TABLE_NAME
         + " SET domain_name = #{newDomain.domainName},"
         + " domain_type = #{newDomain.domainType},"
-        + " item_label = #{newDomain.itemLabel},"
+        + " domain_level = #{newDomain.domainLevel},"
+        + " items = #{newDomain.items},"
+        + " data_type = #{newDomain.dataType},"
         + " domain_comment = #{newDomain.domainComment},"
         + " audit_info = #{newDomain.auditInfo},"
         + " deleted_at = #{newDomain.deletedAt}"
-        + " WHERE item_id = #{oldDomain.itemId}"
-        + " AND domain_code = #{oldDomain.domainCode}"
-        + " AND item_value = #{oldDomain.itemValue}"
+        + " WHERE domain_id = #{oldDomain.domainId}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteValueDomainMetaBySchemaIdAndDomainCodeAndItemValue(
-      @Param("schemaId") Long schemaId,
-      @Param("domainCode") String domainCode,
-      @Param("itemValue") String itemValue) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND domain_code = #{domainCode}"
-        + " AND item_value = #{itemValue} AND deleted_at = 0";
-  }
-
-  public String softDeleteValueDomainMetasBySchemaIdAndDomainCode(
+  public String softDeleteValueDomainMetaBySchemaIdAndDomainCode(
       @Param("schemaId") Long schemaId, @Param("domainCode") String domainCode) {
     return "UPDATE "
         + TABLE_NAME

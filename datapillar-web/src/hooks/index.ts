@@ -7,3 +7,4 @@ export { useScenarioState, ScenarioPhase, type ScenarioState } from './demo/useS
 export { useProgressLog } from './demo/useProgressLog'
 export { usePageVisibility } from './usePageVisibility'
 export { useFrameScheduler } from './useFrameScheduler'
+export { useInfiniteScroll } from './useInfiniteScroll'

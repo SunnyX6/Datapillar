@@ -21,35 +21,37 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.info.ModifierInfo;
 
-/** Represents an event that is generated after a unit is successfully deleted. */
+/** Represents an event that is generated after a modifier is successfully altered. */
 @DeveloperApi
-public class DeleteUnitEvent extends UnitEvent {
-  private final boolean isExists;
+public class AlterModifierEvent extends ModifierEvent {
+  private final ModifierInfo updatedModifierInfo;
 
   /**
-   * Constructs an instance of {@link DeleteUnitEvent}.
+   * Constructs an instance of {@link AlterModifierEvent}.
    *
-   * @param user The user responsible for triggering the unit operation.
-   * @param identifier The identifier of the Unit involved in the operation.
-   * @param isExists A boolean indicating whether the unit existed before deletion.
+   * @param user The user responsible for triggering the modifier operation.
+   * @param identifier The identifier of the Modifier involved in the operation.
+   * @param updatedModifierInfo The final state of the modifier post-alteration.
    */
-  public DeleteUnitEvent(String user, NameIdentifier identifier, boolean isExists) {
+  public AlterModifierEvent(
+      String user, NameIdentifier identifier, ModifierInfo updatedModifierInfo) {
     super(user, identifier);
-    this.isExists = isExists;
+    this.updatedModifierInfo = updatedModifierInfo;
   }
 
   /**
-   * Retrieves the existence status of the unit before the delete operation.
+   * Retrieves the final state of the modifier after successful alteration.
    *
-   * @return A boolean value indicating whether the unit existed before deletion.
+   * @return The modifier information.
    */
-  public boolean isExists() {
-    return isExists;
+  public ModifierInfo updatedModifierInfo() {
+    return updatedModifierInfo;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.DELETE_UNIT;
+    return OperationType.ALTER_METRIC_MODIFIER;
   }
 }

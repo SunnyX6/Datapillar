@@ -26,11 +26,25 @@ export function Badge({
   )
 }
 
-export function HubAssetCard({ config, onClick }: { config: CategoryConfig; onClick: () => void }) {
+interface HubAssetCardProps {
+  config: CategoryConfig
+  onClick: () => void
+  onSubEntryClick?: (route: string) => void
+}
+
+export function HubAssetCard({ config, onClick, onSubEntryClick }: HubAssetCardProps) {
+  const hasSubEntries = config.subEntries && config.subEntries.length > 0
+
+  const handleCardClick = () => {
+    if (!hasSubEntries) {
+      onClick()
+    }
+  }
+
   return (
     <div
-      onClick={onClick}
-      className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl @md:rounded-2xl p-4 @md:p-6 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 transition-all cursor-pointer relative overflow-hidden"
+      onClick={handleCardClick}
+      className={`group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl @md:rounded-2xl p-4 @md:p-6 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 transition-all relative overflow-hidden ${hasSubEntries ? 'cursor-default' : 'cursor-pointer'}`}
     >
       <div
         className={`${config.color} w-8 h-8 @md:w-10 @md:h-10 rounded-lg @md:rounded-xl flex items-center justify-center text-white mb-3 @md:mb-4 shadow-md`}
@@ -38,7 +52,7 @@ export function HubAssetCard({ config, onClick }: { config: CategoryConfig; onCl
         <config.icon size={iconSizeToken.medium} className="@md:hidden" />
         <config.icon size={iconSizeToken.large} className="hidden @md:block" />
       </div>
-      <h3 className="text-body-sm @md:text-heading font-semibold text-slate-800 dark:text-slate-100 mb-1 @md:mb-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+      <h3 className={`text-body-sm @md:text-heading font-semibold text-slate-800 dark:text-slate-100 mb-1 @md:mb-1.5 transition-colors ${!hasSubEntries ? 'group-hover:text-blue-600 dark:group-hover:text-blue-400' : ''}`}>
         {config.label}
       </h3>
       <p className="text-slate-500 dark:text-slate-400 text-caption @md:text-body-sm leading-relaxed mb-3 @md:mb-4">{config.description}</p>
@@ -47,9 +61,34 @@ export function HubAssetCard({ config, onClick }: { config: CategoryConfig; onCl
           <span className="text-subtitle @md:text-title font-bold text-slate-900 dark:text-slate-100">{config.count}</span>
           <span className="text-micro @md:text-caption font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">Assets</span>
         </div>
-        {config.trend && (
+        {config.trend && !hasSubEntries && (
           <div className="text-emerald-600 dark:text-emerald-400 text-micro font-semibold bg-emerald-50 dark:bg-emerald-900/30 px-1.5 @md:px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-800 flex items-center gap-0.5 @md:gap-1">
             <TrendingUp size={iconSizeToken.tiny} /> {config.trend}
+          </div>
+        )}
+        {hasSubEntries && (
+          <div className="flex items-center gap-2">
+            {config.subEntries!.map((entry, index) => {
+              const iconColors = [
+                'text-blue-600 dark:text-blue-400',
+                'text-amber-600 dark:text-amber-400',
+                'text-rose-600 dark:text-rose-400'
+              ]
+              return (
+                <button
+                  key={entry.id}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onSubEntryClick?.(entry.route)
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-micro font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                  title={entry.label}
+                >
+                  <entry.icon size={iconSizeToken.small} className={iconColors[index % iconColors.length]} />
+                  <span>{entry.label}</span>
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
