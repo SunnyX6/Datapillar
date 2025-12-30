@@ -21,7 +21,7 @@ import { CatalogOverview } from './metadata/overview/CatalogOverview'
 import { Overview } from './metadata/overview/Overview'
 import { SchemaOverview } from './metadata/overview/SchemaOverview'
 import { TableOverview } from './metadata/overview/TableOverview'
-import { CreateCatalogForm, CreateSchemaForm, CreateTableForm, type TableFormHandle } from './metadata/form'
+import { CreateCatalogForm, CreateSchemaForm, CreateTableForm, TableBasicForm, type TableFormHandle, type TableBasicFormHandle } from './metadata/form'
 import { type CatalogFormHandle } from './metadata/form/CatalogForm'
 import { type SchemaFormHandle } from './metadata/form/SchemaForm'
 import { type CatalogAsset, type NodeType, type SchemaAsset, type TableAsset } from './metadata/type/types'
@@ -65,6 +65,7 @@ export function MetadataView() {
   const catalogFormRef = useRef<CatalogFormHandle>(null)
   const schemaFormRef = useRef<SchemaFormHandle>(null)
   const tableFormRef = useRef<TableFormHandle>(null)
+  const tableBasicFormRef = useRef<TableBasicFormHandle>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -163,6 +164,68 @@ export function MetadataView() {
 
     try {
       setIsSubmitting(true)
+
+      // 基础信息编辑模式
+      if (modalState.editMode === 'basic' && modalState.editingBasic) {
+        if (!tableBasicFormRef.current?.validate()) return
+
+        const formData = tableBasicFormRef.current.getData()
+        const [catalogName, schemaName] = modalState.nodeId.split('.')
+        const originalName = modalState.editingBasic.name
+
+        const updates: Array<{ '@type': string; [key: string]: unknown }> = []
+
+        // 更新表名
+        if (formData.name !== originalName) {
+          updates.push({ '@type': 'rename', newName: formData.name })
+        }
+
+        // 更新表注释
+        if (formData.comment !== (modalState.editingBasic.comment || '')) {
+          updates.push({ '@type': 'updateComment', newComment: formData.comment || '' })
+        }
+
+        // 更新表参数
+        const oldProperties = modalState.editingBasic.properties || {}
+        const newProperties = formData.properties || {}
+
+        // 新增或修改的参数
+        Object.entries(newProperties).forEach(([key, value]) => {
+          if (oldProperties[key] !== value) {
+            updates.push({ '@type': 'setProperty', property: key, value })
+          }
+        })
+
+        // 删除的参数
+        Object.keys(oldProperties).forEach((key) => {
+          if (!(key in newProperties)) {
+            updates.push({ '@type': 'removeProperty', property: key })
+          }
+        })
+
+        if (updates.length > 0) {
+          await updateTable(catalogName, schemaName, originalName, { updates })
+        }
+
+        closeModal()
+
+        // 清除表缓存，强制重新加载
+        setTablesMap((prev) => {
+          const next = new Map(prev)
+          next.delete(modalState.nodeId)
+          return next
+        })
+        await loadTables(catalogName, schemaName)
+        setRefreshKey((k) => k + 1)
+
+        // 如果表名变了，需要更新 URL
+        if (formData.name !== originalName) {
+          navigate(`/governance/metadata/catalogs/${encodeURIComponent(catalogName)}/schemas/${encodeURIComponent(schemaName)}/tables/${encodeURIComponent(formData.name)}`)
+        }
+
+        toast.success(`表 ${formData.name} 更新成功`)
+        return
+      }
 
       if (modalState.nodeType === 'ROOT') {
         if (!catalogFormRef.current?.validate()) return
@@ -340,6 +403,8 @@ export function MetadataView() {
     nodeType: NodeType
     nodeName: string
     provider?: string
+    /** 编辑模式：basic=编辑表名描述，columns=编辑列 */
+    editMode?: 'basic' | 'columns'
     editingTable?: {
       name: string
       comment?: string
@@ -351,13 +416,21 @@ export function MetadataView() {
         valueDomainCode?: string
       }>
     }
+    /** 基础信息编辑数据（仅 editMode=basic 时使用） */
+    editingBasic?: {
+      name: string
+      comment?: string
+      properties?: Record<string, string>
+    }
   }>({
     isOpen: false,
     nodeId: '',
     nodeType: 'ROOT',
     nodeName: '',
     provider: undefined,
-    editingTable: undefined
+    editMode: undefined,
+    editingTable: undefined,
+    editingBasic: undefined
   })
   const [footerLeft, setFooterLeft] = useState<React.ReactNode>(null)
   const [contentOverlay, setContentOverlay] = useState<React.ReactNode>(null)
@@ -575,7 +648,9 @@ export function MetadataView() {
       nodeId: '',
       nodeType: 'ROOT',
       nodeName: '',
-      editingTable: undefined
+      editMode: undefined,
+      editingTable: undefined,
+      editingBasic: undefined
     })
     setFooterLeft(null)
     setContentOverlay(null)
@@ -596,15 +671,34 @@ export function MetadataView() {
               selectedTable.schema.name,
               selectedTable.table.name
             ]}
-            onEdit={(tableData) => {
-              setModalState({
-                isOpen: true,
-                nodeId: selectedTable.schema.id,
-                nodeType: 'SCHEMA',
-                nodeName: selectedTable.schema.name,
-                provider: selectedTable.catalog.provider,
-                editingTable: tableData
-              })
+            onEdit={(mode, data) => {
+              if (mode === 'basic') {
+                // 基础信息编辑模式
+                setModalState({
+                  isOpen: true,
+                  nodeId: selectedTable.schema.id,
+                  nodeType: 'SCHEMA',
+                  nodeName: selectedTable.table.name,
+                  provider: selectedTable.catalog.provider,
+                  editMode: 'basic',
+                  editingBasic: data as { name: string; comment?: string; properties?: Record<string, string> }
+                })
+              } else {
+                // 列编辑模式
+                setModalState({
+                  isOpen: true,
+                  nodeId: selectedTable.schema.id,
+                  nodeType: 'SCHEMA',
+                  nodeName: selectedTable.schema.name,
+                  provider: selectedTable.catalog.provider,
+                  editMode: 'columns',
+                  editingTable: data as {
+                    name: string
+                    comment?: string
+                    columns: Array<{ name: string; type: string; comment?: string; valueDomainCode?: string }>
+                  }
+                })
+              }
             }}
           />
         ) : selectedNodeType === 'SCHEMA' && selectedSchema ? (
@@ -662,18 +756,24 @@ export function MetadataView() {
       <Modal
         isOpen={modalState.isOpen}
         onClose={closeModal}
-        size={modalState.nodeType === 'SCHEMA' ? 'lg' : 'md'}
+        size={modalState.editMode === 'basic' ? 'md' : modalState.nodeType === 'SCHEMA' ? 'lg' : 'md'}
         title={
-          modalState.nodeType === 'ROOT'
-            ? '创建 Catalog'
-            : modalState.nodeType === 'CATALOG'
-              ? '创建 Schema'
-              : modalState.nodeType === 'SCHEMA'
-                ? modalState.editingTable ? '编辑 Table' : '创建 Table'
-                : '管理表'
+          modalState.editMode === 'basic'
+            ? '编辑表信息'
+            : modalState.nodeType === 'ROOT'
+              ? '创建 Catalog'
+              : modalState.nodeType === 'CATALOG'
+                ? '创建 Schema'
+                : modalState.nodeType === 'SCHEMA'
+                  ? modalState.editingTable ? '编辑列' : '创建 Table'
+                  : '管理表'
         }
         subtitle={
-          modalState.nodeType === 'SCHEMA' ? (
+          modalState.editMode === 'basic' ? (
+            <span className="text-xs text-slate-400 dark:text-slate-500">
+              编辑表「<span className="font-medium text-blue-600 dark:text-blue-400">{modalState.nodeName}</span>」的基础信息
+            </span>
+          ) : modalState.nodeType === 'SCHEMA' ? (
             <span className="text-xs text-slate-400 dark:text-slate-500">
               {modalState.editingTable ? '编辑' : '将创建于'} Schema「<span className="font-medium text-blue-600 dark:text-blue-400">{modalState.nodeName}</span>」
             </span>
@@ -687,18 +787,24 @@ export function MetadataView() {
                 取消
               </ModalCancelButton>
               <ModalPrimaryButton onClick={handleSubmit} disabled={isSubmitting} loading={isSubmitting}>
-                {modalState.editingTable ? '保存修改' : '创建物理资产'}
+                {modalState.editMode === 'basic' || modalState.editingTable ? '保存修改' : '创建物理资产'}
               </ModalPrimaryButton>
             </>
           ) : undefined
         }
         contentOverlay={contentOverlay}
       >
-        {modalState.nodeType === 'ROOT' && (
+        {modalState.editMode === 'basic' && modalState.editingBasic && (
+          <TableBasicForm
+            ref={tableBasicFormRef}
+            initialData={modalState.editingBasic}
+          />
+        )}
+        {modalState.nodeType === 'ROOT' && !modalState.editMode && (
           <CreateCatalogForm ref={catalogFormRef} parentName={modalState.nodeName} onFooterLeftRender={setFooterLeft} />
         )}
-        {modalState.nodeType === 'CATALOG' && <CreateSchemaForm ref={schemaFormRef} parentName={modalState.nodeName} />}
-        {modalState.nodeType === 'SCHEMA' && (
+        {modalState.nodeType === 'CATALOG' && !modalState.editMode && <CreateSchemaForm ref={schemaFormRef} parentName={modalState.nodeName} />}
+        {modalState.nodeType === 'SCHEMA' && (modalState.editMode === 'columns' || !modalState.editMode) && (
           <CreateTableForm
             key={modalState.editingTable?.name || 'new'}
             ref={tableFormRef}

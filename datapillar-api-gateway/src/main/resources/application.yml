@@ -7,66 +7,67 @@ spring:
 
   cloud:
     gateway:
-      # 全局 CORS 配置
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowedOriginPatterns: "*"
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - DELETE
-              - OPTIONS
-            allowedHeaders: "*"
-            allowCredentials: true
-            maxAge: 3600
+      server:
+        webflux:
+          # 全局 CORS 配置
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOriginPatterns: "*"
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders: "*"
+                allowCredentials: true
+                maxAge: 3600
 
-      # 默认过滤器
-      default-filters:
-        - name: RequestRateLimiter
-          args:
-            redis-rate-limiter.replenishRate: 100
-            redis-rate-limiter.burstCapacity: 200
-            redis-rate-limiter.requestedTokens: 1
-            key-resolver: "#{@ipKeyResolver}"
-            deny-empty-key: false
+          # 默认过滤器
+          default-filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+                deny-empty-key: false
 
-      # 路由配置
-      routes:
-        # 1. 认证服务 (datapillar-auth)
-        # 重写: /api/auth/** → /auth/**
-        - id: auth-service
-          uri: http://localhost:6001
-          predicates:
-            - Path=/api/auth/**
-          filters:
-            - RewritePath=/api(?<segment>/?.*), ${segment}
+          # 路由配置
+          routes:
+            # 1. 认证服务 (datapillar-auth)
+            # 重写: /api/auth/** → /auth/**
+            - id: auth-service
+              uri: http://localhost:6001
+              predicates:
+                - Path=/api/auth/**
+              filters:
+                - RewritePath=/api(?<segment>/?.*), ${segment}
 
-        # 2. 核心业务服务 (datapillar-web-admin)
-        - id: webadmin-service
-          uri: http://localhost:6002
-          predicates:
-            - Path=/api/users/**,/api/roles/**
-          filters:
-            - RewritePath=/api(?<segment>/?.*), ${segment}
+            # 2. 核心业务服务 (datapillar-web-admin)
+            - id: webadmin-service
+              uri: http://localhost:6002
+              predicates:
+                - Path=/api/users/**,/api/roles/**
+              filters:
+                - RewritePath=/api(?<segment>/?.*), ${segment}
 
-        # 3. AI 服务 (datapillar-ai)
-        # 路径直接转发，不重写
-        - id: ai-service
-          uri: http://localhost:6003
-          predicates:
-            - Path=/api/ai/**
+            # 3. AI 服务 (datapillar-ai)
+            - id: ai-service
+              uri: http://localhost:6003
+              predicates:
+                - Path=/api/ai/**
 
-        # 4. 元数据服务 (datapillar-gravitino)
-        # Gravitino 原生 REST API
-        # 重写: /api/metadata/** → /api/**
-        - id: onemeta-service
-          uri: http://localhost:8090
-          predicates:
-            - Path=/api/onemeta/**
-          filters:
-            - RewritePath=/api/onemeta(?<segment>/?.*), /api${segment}
+            # 4. 元数据服务 (datapillar-gravitino)
+            # Gravitino 原生 REST API
+            # 重写: /api/metadata/** → /api/**
+            - id: onemeta-service
+              uri: http://localhost:8090
+              predicates:
+                - Path=/api/onemeta/**
+              filters:
+                - RewritePath=/api/onemeta(?<segment>/?.*), /api${segment}
 
   # Redis 配置（用于限流）
   data:
@@ -137,6 +138,7 @@ logging:
     org.springframework.cloud.gateway: INFO
     reactor.netty: INFO
     com.sunny.datapillar.gateway: DEBUG
+    io.netty.resolver.dns: WARN
     root: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

@@ -148,18 +148,25 @@ class AIFillRequest(BaseModel):
 
 class AIFillResponse(BaseModel):
     """AI 填写响应"""
-    name: Optional[str] = ""
+    # 状态：成功/失败
+    success: bool = True
+    # AI 消息：始终有值，成功时是友好提示，失败时是失败原因
+    message: str = ""
+    # 推荐列表：失败时返回推荐的表和列
+    recommendations: List[dict] = Field(default_factory=list)
+
+    # 以下字段仅在 success=True 时有值
+    name: Optional[str] = None
     word_roots: List[str] = Field(alias="wordRoots", default_factory=list)
-    aggregation: Optional[str] = ""
+    aggregation: Optional[str] = None
     modifiers_selected: List[str] = Field(alias="modifiersSelected", default_factory=list)
-    type: Optional[MetricType] = MetricType.ATOMIC
-    data_type: Optional[str] = Field(alias="dataType", default="")
+    type: Optional[MetricType] = None
+    data_type: Optional[str] = Field(alias="dataType", default=None)
     unit: Optional[str] = None
-    calculation_formula: Optional[str] = Field(alias="calculationFormula", default="")
-    comment: Optional[str] = ""
+    calculation_formula: Optional[str] = Field(alias="calculationFormula", default=None)
+    comment: Optional[str] = None
     measure_columns: List[str] = Field(alias="measureColumns", default_factory=list)
     filter_columns: List[str] = Field(alias="filterColumns", default_factory=list)
-    warning: Optional[str] = None
 
     class Config:
         populate_by_name = True

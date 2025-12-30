@@ -18,6 +18,7 @@ export type TableAsset = {
   updatedAt: string
   domains: string[]
   columns: Column[]
+  properties?: Record<string, string>
 }
 
 export type SchemaAsset = {

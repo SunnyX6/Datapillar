@@ -3,7 +3,7 @@
  */
 
 // 从统一类型文件重新导出
-export type { MetricType, Metric, WordRootDTO } from '@/types/metric'
+export type { MetricType, Metric, WordRootDTO, AIRecommendation, AITableRecommendation, AIMetricRecommendation } from '@/types/metric'
 
 // 兼容别名
 export type { WordRootDTO as WordRoot } from '@/types/metric'

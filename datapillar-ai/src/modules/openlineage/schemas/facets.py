@@ -59,6 +59,59 @@ class SchemaDatasetFacet(BaseFacet):
 # ==================== Gravitino 自定义 Facet ====================
 
 
+class TableChangeType(str, Enum):
+    """表变更类型"""
+
+    # 表级别变更
+    RENAME_TABLE = "RENAME_TABLE"
+    UPDATE_COMMENT = "UPDATE_COMMENT"
+    SET_PROPERTY = "SET_PROPERTY"
+    REMOVE_PROPERTY = "REMOVE_PROPERTY"
+    ADD_INDEX = "ADD_INDEX"
+    DELETE_INDEX = "DELETE_INDEX"
+
+    # 列级别变更
+    ADD_COLUMN = "ADD_COLUMN"
+    DELETE_COLUMN = "DELETE_COLUMN"
+    RENAME_COLUMN = "RENAME_COLUMN"
+    UPDATE_COLUMN_TYPE = "UPDATE_COLUMN_TYPE"
+    UPDATE_COLUMN_COMMENT = "UPDATE_COLUMN_COMMENT"
+    UPDATE_COLUMN_POSITION = "UPDATE_COLUMN_POSITION"
+    UPDATE_COLUMN_NULLABILITY = "UPDATE_COLUMN_NULLABILITY"
+    UPDATE_COLUMN_DEFAULT_VALUE = "UPDATE_COLUMN_DEFAULT_VALUE"
+    UPDATE_COLUMN_AUTO_INCREMENT = "UPDATE_COLUMN_AUTO_INCREMENT"
+
+
+class TableChangeInfo(BaseModel):
+    """表变更信息"""
+
+    type: TableChangeType = Field(..., description="变更类型")
+
+    # 表级别变更字段
+    newName: str | None = Field(default=None, description="新表名（RENAME_TABLE）")
+    newComment: str | None = Field(default=None, description="新注释（UPDATE_COMMENT / UPDATE_COLUMN_COMMENT）")
+    propertyKey: str | None = Field(default=None, description="属性键（SET_PROPERTY / REMOVE_PROPERTY）")
+    propertyValue: str | None = Field(default=None, description="属性值（SET_PROPERTY）")
+
+    # 列级别变更字段
+    columnName: str | None = Field(default=None, description="列名")
+    oldColumnName: str | None = Field(default=None, description="旧列名（RENAME_COLUMN）")
+    newColumnName: str | None = Field(default=None, description="新列名（RENAME_COLUMN）")
+    dataType: str | None = Field(default=None, description="列数据类型（ADD_COLUMN / UPDATE_COLUMN_TYPE）")
+    columnComment: str | None = Field(default=None, description="列注释（ADD_COLUMN）")
+    nullable: bool | None = Field(default=None, description="是否可空")
+    autoIncrement: bool | None = Field(default=None, description="是否自增")
+    defaultValue: str | None = Field(default=None, description="默认值")
+    position: str | None = Field(default=None, description="列位置（FIRST / AFTER xxx）")
+
+    # 索引相关字段
+    indexName: str | None = Field(default=None, description="索引名（ADD_INDEX / DELETE_INDEX）")
+    indexType: str | None = Field(default=None, description="索引类型（ADD_INDEX）")
+    indexColumns: list[str] | None = Field(default=None, description="索引列（ADD_INDEX）")
+
+    model_config = {"populate_by_name": True, "extra": "allow"}
+
+
 class GravitinoColumnMetadata(BaseModel):
     """Gravitino 列扩展元数据"""
 
@@ -88,6 +141,7 @@ class GravitinoDatasetFacet(BaseFacet):
     lastModifier: str | None = Field(default=None, description="最后修改者")
     lastModifiedTime: str | None = Field(default=None, description="最后修改时间（ISO 8601）")
     columns: list[GravitinoColumnMetadata] | None = Field(default=None, description="列扩展元数据")
+    changes: list[TableChangeInfo] | None = Field(default=None, description="表变更列表（alter_table 事件）")
 
     model_config = {"populate_by_name": True, "extra": "allow"}
 
@@ -96,6 +150,9 @@ class GravitinoDatasetFacet(BaseFacet):
         """从字典创建 GravitinoDatasetFacet"""
         columns_data = data.get("columns", [])
         columns = [GravitinoColumnMetadata(**c) for c in columns_data] if columns_data else None
+
+        changes_data = data.get("changes", [])
+        changes = [TableChangeInfo(**c) for c in changes_data] if changes_data else None
 
         return cls(
             description=data.get("description"),
@@ -109,6 +166,7 @@ class GravitinoDatasetFacet(BaseFacet):
             lastModifier=data.get("lastModifier"),
             lastModifiedTime=data.get("lastModifiedTime"),
             columns=columns,
+            changes=changes,
             producer=data.get("_producer"),
             schema_url=data.get("_schemaURL"),
         )
