@@ -5,21 +5,31 @@
 """
 
 from src.infrastructure.repository.model_repository import ModelRepository
-from src.infrastructure.repository.knowledge_repository import KnowledgeRepository
 from src.infrastructure.repository.component_repository import ComponentRepository
-from src.infrastructure.repository.semantic_repository import (
-    SemanticRepository,
+from src.infrastructure.repository.neo4j_kg import (
+    Neo4jKGRepository,
     WordRootDTO,
     ModifierDTO,
     UnitDTO,
+    TableContextDTO,
+    MetricDTO,
 )
+
+# 兼容别名
+KnowledgeRepository = Neo4jKGRepository
+SemanticRepository = Neo4jKGRepository
 
 __all__ = [
     "ModelRepository",
-    "KnowledgeRepository",
     "ComponentRepository",
+    "Neo4jKGRepository",
+    # 兼容别名
+    "KnowledgeRepository",
     "SemanticRepository",
+    # DTOs
     "WordRootDTO",
     "ModifierDTO",
     "UnitDTO",
+    "TableContextDTO",
+    "MetricDTO",
 ]

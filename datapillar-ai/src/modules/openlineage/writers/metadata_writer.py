@@ -9,6 +9,7 @@
 import json
 import re
 from dataclasses import dataclass
+from typing import Any
 
 import structlog
 from neo4j import AsyncSession
@@ -71,10 +72,12 @@ class MetadataWriter(BaseWriter):
         self, node_id: str, node_label: str, name: str,
         description: str | None = None, tags: list[str] | None = None
     ) -> None:
-        """将 embedding 任务入队"""
-        parts = [name]
-        if description:
-            parts.append(description)
+        """将 embedding 任务入队（跳过无描述的节点）"""
+        # 没有描述的节点不做 embedding，避免低质量向量误导检索
+        if not description or not description.strip():
+            return
+
+        parts = [name, description]
         if tags:
             parts.extend(tags)
         text = " ".join(parts)
@@ -85,8 +88,10 @@ class MetadataWriter(BaseWriter):
     def name(self) -> str:
         return "metadata_writer"
 
-    # 表相关的操作
-    TABLE_OPERATIONS = {"create_table", "alter_table", "load_table"}
+    # 表相关的操作（create/load 使用统一处理）
+    TABLE_OPERATIONS = {"create_table", "load_table"}
+    # alter_table 单独处理（需要解析 changes）
+    ALTER_TABLE_OPERATIONS = {"alter_table"}
     # Schema 相关的操作
     SCHEMA_OPERATIONS = {"create_schema", "alter_schema", "load_schema"}
     # Catalog 相关的操作
@@ -120,6 +125,8 @@ class MetadataWriter(BaseWriter):
 
         if operation in self.TABLE_OPERATIONS:
             await self._write_table_metadata(session, event)
+        elif operation in self.ALTER_TABLE_OPERATIONS:
+            await self._handle_alter_table(session, event)
         elif operation in self.SCHEMA_OPERATIONS:
             await self._write_schema_metadata(session, event)
         elif operation in self.CATALOG_OPERATIONS:
@@ -215,6 +222,395 @@ class MetadataWriter(BaseWriter):
                     column_ids = [col.id for col in columns]
                     await self._delete_orphan_columns(session, table_node.id, column_ids)
                     await self._write_columns_batch(session, columns, table_node.id)
+
+    async def _handle_alter_table(self, session: AsyncSession, event: RunEvent) -> None:
+        """
+        处理 alter_table 事件
+
+        根据 changes 列表中的变更类型执行对应操作：
+        - RENAME_TABLE: 删除旧表节点，创建新表节点
+        - UPDATE_COMMENT: 更新表注释
+        - ADD_COLUMN: 添加列节点
+        - DELETE_COLUMN: 删除列节点
+        - RENAME_COLUMN: 删除旧列节点，创建新列节点
+        - UPDATE_COLUMN_*: 更新列属性
+        """
+        from src.modules.openlineage.schemas.facets import TableChangeType
+
+        for dataset in event.get_all_datasets():
+            parsed_ns = self._parse_namespace(dataset.namespace)
+            schema_name, table_name = self._parse_dataset_name(dataset.name)
+
+            if not parsed_ns.metalake or not parsed_ns.catalog or not schema_name:
+                logger.warning(
+                    "skip_alter_table_no_hierarchy",
+                    namespace=dataset.namespace,
+                    name=dataset.name,
+                )
+                continue
+
+            gravitino_facet = self._parse_gravitino_facet(dataset)
+            if not gravitino_facet or not gravitino_facet.changes:
+                logger.debug(
+                    "skip_alter_table_no_changes",
+                    namespace=dataset.namespace,
+                    name=dataset.name,
+                )
+                continue
+
+            # 当前表的 ID（基于原始表名）
+            current_table_id = generate_id(
+                "table", parsed_ns.metalake, parsed_ns.catalog, schema_name, table_name
+            )
+            schema_id = generate_id(
+                "schema", parsed_ns.metalake, parsed_ns.catalog, schema_name
+            )
+
+            # 遍历 changes 处理每个变更
+            new_table_name = table_name  # 跟踪可能的重命名
+            for change in gravitino_facet.changes:
+                change_type = change.type
+
+                if change_type == TableChangeType.RENAME_TABLE:
+                    # 重命名表：删除旧节点，创建新节点
+                    new_table_name = change.newName
+                    await self._rename_table(
+                        session,
+                        parsed_ns.metalake,
+                        parsed_ns.catalog,
+                        schema_name,
+                        table_name,
+                        new_table_name,
+                        schema_id,
+                        event,
+                        gravitino_facet,
+                    )
+
+                elif change_type == TableChangeType.UPDATE_COMMENT:
+                    # 更新表注释
+                    await self._update_table_comment(
+                        session, current_table_id, change.newComment
+                    )
+
+                elif change_type == TableChangeType.SET_PROPERTY:
+                    # 设置表属性（已在 gravitino_facet.properties 中）
+                    await self._update_table_properties(
+                        session, current_table_id, gravitino_facet.properties
+                    )
+
+                elif change_type == TableChangeType.ADD_COLUMN:
+                    # 添加列
+                    await self._add_column(
+                        session,
+                        parsed_ns.metalake,
+                        parsed_ns.catalog,
+                        schema_name,
+                        new_table_name,
+                        change,
+                    )
+
+                elif change_type == TableChangeType.DELETE_COLUMN:
+                    # 删除列
+                    await self._delete_column(
+                        session,
+                        parsed_ns.metalake,
+                        parsed_ns.catalog,
+                        schema_name,
+                        new_table_name,
+                        change.columnName,
+                    )
+
+                elif change_type == TableChangeType.RENAME_COLUMN:
+                    # 重命名列
+                    await self._rename_column(
+                        session,
+                        parsed_ns.metalake,
+                        parsed_ns.catalog,
+                        schema_name,
+                        new_table_name,
+                        change.oldColumnName,
+                        change.newColumnName,
+                    )
+
+                elif change_type == TableChangeType.UPDATE_COLUMN_COMMENT:
+                    # 更新列注释
+                    column_id = generate_id(
+                        "column",
+                        parsed_ns.metalake,
+                        parsed_ns.catalog,
+                        schema_name,
+                        new_table_name,
+                        change.columnName,
+                    )
+                    await self._update_column_property(
+                        session, column_id, "description", change.newComment
+                    )
+
+                elif change_type == TableChangeType.UPDATE_COLUMN_TYPE:
+                    # 更新列类型
+                    column_id = generate_id(
+                        "column",
+                        parsed_ns.metalake,
+                        parsed_ns.catalog,
+                        schema_name,
+                        new_table_name,
+                        change.columnName,
+                    )
+                    await self._update_column_property(
+                        session, column_id, "dataType", change.dataType
+                    )
+
+                elif change_type == TableChangeType.UPDATE_COLUMN_NULLABILITY:
+                    # 更新列可空性
+                    column_id = generate_id(
+                        "column",
+                        parsed_ns.metalake,
+                        parsed_ns.catalog,
+                        schema_name,
+                        new_table_name,
+                        change.columnName,
+                    )
+                    await self._update_column_property(
+                        session, column_id, "nullable", change.nullable
+                    )
+
+                elif change_type == TableChangeType.UPDATE_COLUMN_DEFAULT_VALUE:
+                    # 更新列默认值
+                    column_id = generate_id(
+                        "column",
+                        parsed_ns.metalake,
+                        parsed_ns.catalog,
+                        schema_name,
+                        new_table_name,
+                        change.columnName,
+                    )
+                    await self._update_column_property(
+                        session, column_id, "defaultValue", change.defaultValue
+                    )
+
+                else:
+                    logger.debug(
+                        "skip_unsupported_change_type",
+                        change_type=change_type,
+                    )
+
+    async def _rename_table(
+        self,
+        session: AsyncSession,
+        metalake: str,
+        catalog: str,
+        schema_name: str,
+        old_table_name: str,
+        new_table_name: str,
+        schema_id: str,
+        event: RunEvent,
+        gravitino_facet: GravitinoDatasetFacet,
+    ) -> None:
+        """重命名表：删除旧节点及其列，创建新节点及其列"""
+        old_table_id = generate_id("table", metalake, catalog, schema_name, old_table_name)
+
+        # 1. 删除旧表节点及其列
+        query = """
+        MATCH (t:Table {id: $oldTableId})
+        OPTIONAL MATCH (t)-[:HAS_COLUMN]->(c:Column)
+        DETACH DELETE t, c
+        """
+        await session.run(query, {"oldTableId": old_table_id})
+
+        # 2. 创建新表节点
+        new_table_node = TableNode.create(
+            metalake=metalake,
+            catalog=catalog,
+            schema=schema_name,
+            table_name=new_table_name,
+            producer=event.producer,
+        )
+        # 从 gravitino_facet 补充属性
+        if gravitino_facet:
+            new_table_node.description = gravitino_facet.description
+            new_table_node.properties = gravitino_facet.properties
+            new_table_node.creator = gravitino_facet.creator
+            new_table_node.createTime = gravitino_facet.createTime
+            new_table_node.lastModifier = gravitino_facet.lastModifier
+            new_table_node.lastModifiedTime = gravitino_facet.lastModifiedTime
+
+        await self._write_table(session, new_table_node, schema_id)
+
+        logger.info(
+            "table_renamed",
+            old_name=old_table_name,
+            new_name=new_table_name,
+            schema=schema_name,
+        )
+
+    async def _update_table_comment(
+        self, session: AsyncSession, table_id: str, new_comment: str | None
+    ) -> None:
+        """更新表注释"""
+        query = """
+        MATCH (t:Table {id: $tableId})
+        SET t.description = $description, t.updatedAt = datetime()
+        RETURN t.name AS name
+        """
+        result = await session.run(query, {"tableId": table_id, "description": new_comment})
+        record = await result.single()
+        if record:
+            # 重新入队 embedding（描述更新了）
+            await self._queue_embedding_task(table_id, "Table", record["name"], new_comment)
+
+    async def _update_table_properties(
+        self, session: AsyncSession, table_id: str, properties: dict | None
+    ) -> None:
+        """更新表属性"""
+        if properties is None:
+            return
+        query = """
+        MATCH (t:Table {id: $tableId})
+        SET t.properties = $properties, t.updatedAt = datetime()
+        """
+        await session.run(query, {"tableId": table_id, "properties": properties})
+
+    async def _add_column(
+        self,
+        session: AsyncSession,
+        metalake: str,
+        catalog: str,
+        schema_name: str,
+        table_name: str,
+        change: "TableChangeInfo",
+    ) -> None:
+        """添加列节点"""
+        from src.modules.openlineage.schemas.facets import TableChangeInfo
+
+        table_id = generate_id("table", metalake, catalog, schema_name, table_name)
+        column_id = generate_id(
+            "column", metalake, catalog, schema_name, table_name, change.columnName
+        )
+
+        query = """
+        MATCH (t:Table {id: $tableId})
+        MERGE (c:Column:Knowledge {id: $columnId})
+        ON CREATE SET
+            c.createdAt = datetime(),
+            c.name = $name,
+            c.dataType = $dataType,
+            c.description = $description,
+            c.nullable = $nullable,
+            c.autoIncrement = $autoIncrement,
+            c.defaultValue = $defaultValue,
+            c.createdBy = 'OPENLINEAGE'
+        MERGE (t)-[:HAS_COLUMN]->(c)
+        """
+        await session.run(
+            query,
+            {
+                "tableId": table_id,
+                "columnId": column_id,
+                "name": change.columnName,
+                "dataType": change.dataType,
+                "description": change.columnComment,
+                "nullable": change.nullable,
+                "autoIncrement": change.autoIncrement,
+                "defaultValue": change.defaultValue,
+            },
+        )
+        # 入队 embedding
+        await self._queue_embedding_task(
+            column_id, "Column", change.columnName, change.columnComment
+        )
+
+    async def _delete_column(
+        self,
+        session: AsyncSession,
+        metalake: str,
+        catalog: str,
+        schema_name: str,
+        table_name: str,
+        column_name: str,
+    ) -> None:
+        """删除列节点"""
+        column_id = generate_id(
+            "column", metalake, catalog, schema_name, table_name, column_name
+        )
+        query = """
+        MATCH (c:Column {id: $columnId})
+        DETACH DELETE c
+        """
+        await session.run(query, {"columnId": column_id})
+
+    async def _rename_column(
+        self,
+        session: AsyncSession,
+        metalake: str,
+        catalog: str,
+        schema_name: str,
+        table_name: str,
+        old_column_name: str,
+        new_column_name: str,
+    ) -> None:
+        """重命名列：更新列的 name 和 id"""
+        old_column_id = generate_id(
+            "column", metalake, catalog, schema_name, table_name, old_column_name
+        )
+        new_column_id = generate_id(
+            "column", metalake, catalog, schema_name, table_name, new_column_name
+        )
+        table_id = generate_id("table", metalake, catalog, schema_name, table_name)
+
+        # 获取旧列的属性，然后删除旧列，创建新列
+        query = """
+        MATCH (c:Column {id: $oldColumnId})
+        WITH c, c.dataType as dataType, c.description as description,
+             c.nullable as nullable, c.autoIncrement as autoIncrement,
+             c.defaultValue as defaultValue
+        DETACH DELETE c
+        WITH dataType, description, nullable, autoIncrement, defaultValue
+        MATCH (t:Table {id: $tableId})
+        MERGE (nc:Column:Knowledge {id: $newColumnId})
+        ON CREATE SET
+            nc.createdAt = datetime(),
+            nc.name = $newColumnName,
+            nc.dataType = dataType,
+            nc.description = description,
+            nc.nullable = nullable,
+            nc.autoIncrement = autoIncrement,
+            nc.defaultValue = defaultValue,
+            nc.createdBy = 'OPENLINEAGE'
+        MERGE (t)-[:HAS_COLUMN]->(nc)
+        RETURN description
+        """
+        result = await session.run(
+            query,
+            {
+                "oldColumnId": old_column_id,
+                "newColumnId": new_column_id,
+                "newColumnName": new_column_name,
+                "tableId": table_id,
+            },
+        )
+        record = await result.single()
+        # 入队新列的 embedding
+        description = record["description"] if record else None
+        await self._queue_embedding_task(
+            new_column_id, "Column", new_column_name, description
+        )
+
+    async def _update_column_property(
+        self, session: AsyncSession, column_id: str, property_name: str, value: Any
+    ) -> None:
+        """更新列的单个属性"""
+        query = f"""
+        MATCH (c:Column {{id: $columnId}})
+        SET c.{property_name} = $value, c.updatedAt = datetime()
+        RETURN c.name AS name, c.description AS description
+        """
+        result = await session.run(query, {"columnId": column_id, "value": value})
+        record = await result.single()
+        # 如果更新的是描述，重新入队 embedding
+        if record and property_name == "description":
+            await self._queue_embedding_task(
+                column_id, "Column", record["name"], value
+            )
 
     async def _write_schema_metadata(self, session: AsyncSession, event: RunEvent) -> None:
         """

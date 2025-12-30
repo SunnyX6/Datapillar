@@ -181,8 +181,6 @@ function ColumnRow({
 
   return (
     <div
-      draggable
-      onDragStart={(e) => onDragStart(e, index)}
       onDragOver={onDragOver}
       onDrop={(e) => onDrop(e, index)}
       className={`group relative w-full min-w-0 px-1.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg transition-all ${
@@ -205,8 +203,12 @@ function ColumnRow({
       )}
 
       <div className="grid grid-cols-[auto_minmax(0,1fr)_8.5rem_auto_auto_minmax(0,1fr)_auto_auto] items-center gap-1.5">
-        {/* 拖拽手柄 */}
-        <div className="flex items-center justify-center cursor-grab active:cursor-grabbing text-slate-300 dark:text-slate-600 hover:text-slate-400 dark:hover:text-slate-500">
+        {/* 拖拽手柄 - 只有这个元素可拖拽 */}
+        <div
+          draggable
+          onDragStart={(e) => onDragStart(e, index)}
+          className="flex items-center justify-center cursor-grab active:cursor-grabbing text-slate-300 dark:text-slate-600 hover:text-slate-400 dark:hover:text-slate-500"
+        >
           <GripVertical size={12} />
         </div>
 
@@ -411,7 +413,8 @@ export const CreateTableForm = forwardRef<TableFormHandle, CreateTableFormProps>
   const [parseError, setParseError] = useState<string | null>(null)
   const [columns, setColumns] = useState<TableColumn[]>(() => {
     if (initialData?.columns) {
-      return initialData.columns.map((col) => ({
+      return initialData.columns.map((col, index) => ({
+        id: `col_init_${index}_${Date.now()}`,
         name: col.name,
         dataType: col.type.toUpperCase(),
         comment: col.comment,
@@ -606,10 +609,28 @@ export const CreateTableForm = forwardRef<TableFormHandle, CreateTableFormProps>
     setProperties((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)))
   }
 
+  // 编辑模式：隐藏左侧面板，专注于列编辑
+  const isEditMode = !!initialData
+
   return (
-    <div className="flex min-h-[500px]">
-      {/* 左侧：配置面板（参考 ComponentLibrarySidebar 折叠态保留窄栏） */}
-      {isLeftCollapsed ? (
+    <div className="flex flex-col min-h-[500px]">
+      {/* 智能提示卡片 - 编辑模式时放在上方 */}
+      {isEditMode && (
+        <div className="p-3 mb-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">
+          <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 mb-1.5">
+            <Sparkles size={14} />
+            <span className="text-xs font-semibold">智能提示</span>
+          </div>
+          <p className="text-xs text-blue-600/80 dark:text-blue-400/80 leading-relaxed">
+            输入列名时，系统将自动匹配 One Meta 语义标准并建议最合适的物理类型。拖拽列可调整顺序。
+          </p>
+        </div>
+      )}
+
+      <div className="flex flex-1 min-h-0">
+      {/* 左侧：配置面板（编辑模式时隐藏） */}
+      {!isEditMode && (
+        isLeftCollapsed ? (
         <div className="w-12 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center py-4">
           <button
             type="button"
@@ -720,10 +741,11 @@ export const CreateTableForm = forwardRef<TableFormHandle, CreateTableFormProps>
             </div>
           </div>
         </div>
+      )
       )}
 
       {/* 右侧：列定义 */}
-      <div className="flex-1 flex flex-col min-w-0 pl-6">
+      <div className={`flex-1 flex flex-col min-w-0 ${isEditMode ? '' : 'pl-6'}`}>
         {/* 列定义头部 */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
@@ -766,6 +788,7 @@ export const CreateTableForm = forwardRef<TableFormHandle, CreateTableFormProps>
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   )

@@ -1,22 +1,35 @@
 """
-LLM统一调用层 - 原生SDK + 统一接口
-合并了原app/config/llm_factory.py和app/config/llm_caller.py
-支持OpenAI、Claude、智谱GLM、OpenRouter、Ollama
-支持LangChain ChatModel包装器 + 结构化输出
+LLM统一调用层 - 基于 LangChain 统一接口
+支持 OpenAI、Claude、智谱GLM、OpenRouter、Ollama
+GLM 使用 langchain-openai 的 ChatOpenAI（官方推荐方式）
 """
 
-from typing import Optional, Any, List, Dict, TypeVar, Union, Literal
+from typing import Optional, Any, TypeVar
 import logging
 
-logger = logging.getLogger(__name__)
 from pydantic import BaseModel
+from langchain_core.globals import set_llm_cache
 
-from src.shared.config import model_manager, ModelConfig
-from langchain_core.language_models.base import LanguageModelInput
-from src.infrastructure.llm.glm import GlmNativeChatModel
-from langchain_core.language_models.chat_models import BaseChatModel
+from src.shared.config import model_manager
+from src.infrastructure.llm.semantic_cache import create_default_semantic_llm_cache
+
+logger = logging.getLogger(__name__)
+
+
+# ==================== 全局语义缓存（业务无关）====================
+#
+# 说明：
+# - 只做"高相似直接命中"（不返回中等相似参考答案）
+# - 只依赖 prompt + llm_string 推导缓存隔离边界（不引入任何业务字段）
+set_llm_cache(create_default_semantic_llm_cache())
+logger.info("LLM 语义缓存已启用（通用语义缓存）")
 
 T = TypeVar('T', bound=BaseModel)
+
+# ==================== LLM 实例缓存 ====================
+# 按 (model_id, temperature, max_tokens, json_mode) 缓存，避免重复创建
+_llm_cache: dict[tuple, Any] = {}
+
 
 # ==================== LLM工厂 ====================
 
@@ -42,8 +55,6 @@ class LLMFactory:
         if not model:
             raise ValueError("未找到可用的Chat模型配置，请在数据库中配置")
 
-        logger.info(f"创建LangChain ChatModel: {model.name} ({model.provider}/{model.model_name})")
-
         provider = model.provider.lower()
 
         if provider == "openai":
@@ -52,6 +63,7 @@ class LLMFactory:
                 api_key=model.api_key,
                 base_url=model.base_url,
                 model=model.model_name,
+                streaming=False,
             )
 
         elif provider == "claude":
@@ -60,14 +72,18 @@ class LLMFactory:
                 api_key=model.api_key,
                 base_url=model.base_url if model.base_url else None,
                 model=model.model_name,
+                streaming=False,
             )
 
         elif provider == "glm":
-            # 使用官方 GLM 接口 + LangChain BaseChatModel 适配器
-            return GlmNativeChatModel(
+            # GLM 兼容 OpenAI API，直接用 ChatOpenAI
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(
                 api_key=model.api_key,
                 base_url=model.base_url or "https://open.bigmodel.cn/api/paas/v4/",
                 model=model.model_name,
+                streaming=False,
+                extra_body={"thinking": {"type": "disabled"}},  # 关闭 GLM 思考模式
             )
 
         elif provider == "openrouter":
@@ -76,6 +92,7 @@ class LLMFactory:
                 api_key=model.api_key,
                 base_url=model.base_url or "https://openrouter.ai/api/v1",
                 model=model.model_name,
+                streaming=False,
             )
 
         elif provider == "ollama":
@@ -84,17 +101,11 @@ class LLMFactory:
                 api_key="ollama",
                 base_url=model.base_url or "http://localhost:11434/v1",
                 model=model.model_name,
+                streaming=False,
             )
 
         else:
             raise ValueError(f"不支持的Chat模型提供商: {provider}")
-
-
-# ==================== 内部辅助函数 ====================
-
-def get_langchain_chat_model(model_id: Optional[int] = None) -> Any:
-    """获取LangChain ChatModel实例（内部使用）"""
-    return LLMFactory.create_langchain_chat_model(model_id)
 
 
 # ==================== 统一调用接口（基于LangChain）====================
@@ -105,69 +116,40 @@ def call_llm(
     **kwargs
 ) -> Any:
     """
-    统一的LLM获取接口（屏蔽模型差异）
-
-    作用：返回配置好的 LLM 实例，屏蔽不同模型的差异性
-    上层自己决定如何使用（bind_tools、with_structured_output等）
+    统一的LLM获取接口（屏蔽模型差异，带缓存）
 
     Args:
         model_id: 模型ID（None=使用默认模型）
-        enable_json_mode: 是否启用JSON模式（仅用于structured output，会禁用工具调用）
+        enable_json_mode: 是否启用JSON模式
         **kwargs: temperature, max_tokens等额外参数
 
     Returns:
-        配置好的 LangChain ChatModel 实例
-
-    GLM特殊处理:
-        - 禁用thinking: extra_body={"thinking": {"type": "disabled"}}
-        - enable_json_mode=True时启用response_format（禁用工具调用）
-
-    Example:
-        # 基础使用
-        llm = call_llm()
-        result = await llm.ainvoke([HumanMessage(content="...")])
-
-        # 绑定工具（不要启用json_mode）
-        llm = call_llm()
-        llm_with_tools = llm.bind_tools([tool1, tool2])
-
-        # 结构化输出（需要启用json_mode）
-        llm = call_llm(enable_json_mode=True)
-        llm_structured = llm.with_structured_output(MySchema)
+        配置好的 LangChain ChatModel 实例（缓存复用）
     """
-    # 获取模型配置
-    if model_id:
-        model_config = model_manager.get_model_by_id(model_id)
-    else:
-        model_config = model_manager.get_default_chat_model()
+    # 构建缓存键
+    temperature = kwargs.get("temperature")
+    max_tokens = kwargs.get("max_tokens")
+    cache_key = (model_id, temperature, max_tokens, enable_json_mode)
 
-    is_glm = model_config.provider.lower() == "glm"
-    llm = get_langchain_chat_model(model_id)
+    if cache_key in _llm_cache:
+        return _llm_cache[cache_key]
 
-    # GLM：用官方适配器，直接重建实例以应用 json_mode / temperature
-    if is_glm and isinstance(llm, GlmNativeChatModel):
-        temp = kwargs.get("temperature", llm.temperature)
-        max_tokens = kwargs.get("max_tokens", llm.max_tokens)
-        llm = GlmNativeChatModel(
-            api_key=llm.api_key,
-            base_url=llm.base_url,
-            model=llm.model_name,
-            temperature=temp,
-            max_tokens=max_tokens,
-            json_mode=enable_json_mode,
-            bound_tools=llm.bound_tools,
-        )
-    else:
-        # 其他模型沿用 LangChain ChatModel 的 bind
-        bind_kwargs = {}
-        if "temperature" in kwargs:
-            bind_kwargs["temperature"] = kwargs["temperature"]
-        if "max_tokens" in kwargs:
-            bind_kwargs["max_tokens"] = kwargs["max_tokens"]
-        if enable_json_mode:
-            bind_kwargs["response_format"] = {"type": "json_object"}
+    # 创建基础 LLM
+    llm = LLMFactory.create_langchain_chat_model(model_id)
+    logger.info(f"创建 LLM 实例: model_id={model_id}, temp={temperature}, json={enable_json_mode}")
 
-        if bind_kwargs and hasattr(llm, "bind"):
-            llm = llm.bind(**bind_kwargs)
+    # 构建 bind 参数
+    bind_kwargs = {}
+    if temperature is not None:
+        bind_kwargs["temperature"] = temperature
+    if max_tokens is not None:
+        bind_kwargs["max_tokens"] = max_tokens
+    if enable_json_mode:
+        bind_kwargs["response_format"] = {"type": "json_object"}
 
+    if bind_kwargs and hasattr(llm, "bind"):
+        llm = llm.bind(**bind_kwargs)
+
+    # 缓存并返回
+    _llm_cache[cache_key] = llm
     return llm

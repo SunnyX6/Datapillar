@@ -34,12 +34,12 @@ dependencies = [
     # 二进制序列化
     "msgpack>=1.0.8",
     # 多LLM原生SDK
-    "openai>=1.54.0",
+    "openai==2.8.0",
     "anthropic>=0.39.0",
-    "zai-sdk>=0.0.4",
+    "zai-sdk>=0.2.0",
     # 工具库
     "dynaconf>=3.2.0",
-    "httpx>=0.26.0",
+    "httpx>=0.26.0,<0.28.0",
     "pyyaml>=6.0.1",
     "tenacity>=8.2.3",
     "structlog>=23.0.0",

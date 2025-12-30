@@ -99,6 +99,14 @@ CREATE INDEX valuedomain_domain_level IF NOT EXISTS FOR (v:ValueDomain) ON (v.do
 
 // ==================== 向量索引（语义搜索） ====================
 
+// 统一知识图谱向量索引（覆盖所有 Knowledge 节点）
+CREATE VECTOR INDEX kg_unified_vector_index IF NOT EXISTS
+FOR (n:Knowledge) ON (n.embedding)
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 2048,
+  `vector.similarity_function`: 'cosine'
+}};
+
 // Table embedding 向量索引
 CREATE VECTOR INDEX table_embedding IF NOT EXISTS
 FOR (t:Table) ON (t.embedding)

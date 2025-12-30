@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.openlineage.facets;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.openlineage.client.OpenLineage;
 import java.net.URI;
@@ -37,6 +38,7 @@ import lombok.Getter;
  */
 @Getter
 @Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class GravitinoDatasetFacet implements OpenLineage.DatasetFacet {
 
   private static final URI SCHEMA_URL =
@@ -97,6 +99,10 @@ public class GravitinoDatasetFacet implements OpenLineage.DatasetFacet {
   /** 列扩展元数据 */
   @JsonProperty("columns")
   private final List<GravitinoColumnMetadata> columns;
+
+  /** 表变更列表（alter_table 事件时使用） */
+  @JsonProperty("changes")
+  private final List<TableChangeInfo> changes;
 
   @Override
   public URI get_producer() {

@@ -38,16 +38,75 @@ class GravitinoSyncService:
             "column_valuedomain_lineage": 0,
             "tags_synced": 0,
             "embedding_tasks_queued": 0,
+            "embedding_tasks_skipped": 0,
         }
+        # 已有正确 embedding 的节点 ID 集合（provider 匹配才算有效）
+        self._valid_embeddings: set[str] = set()
+        # 当前 embedding provider 标识
+        self._current_embedding_provider: str = ""
+
+    async def _load_valid_embeddings(self, session) -> None:
+        """
+        加载 Neo4j 中 embedding provider 与当前配置匹配的节点 ID
+
+        只有 provider 匹配的节点才跳过向量化，避免：
+        1. 重复向量化浪费 API 费用
+        2. 切换模型后数据不一致
+        """
+        from src.infrastructure.llm.embeddings import UnifiedEmbedder
+
+        try:
+            embedder = UnifiedEmbedder()
+            self._current_embedding_provider = f"{embedder.provider}/{embedder.model_name}"
+        except Exception as e:
+            logger.warning("gravitino_sync_embedder_init_failed", error=str(e))
+            self._current_embedding_provider = ""
+            return
+
+        query = """
+        MATCH (n:Knowledge)
+        WHERE n.embedding IS NOT NULL
+          AND n.embeddingProvider = $provider
+        RETURN n.id AS id
+        """
+        result = await session.run(query, provider=self._current_embedding_provider)
+        records = await result.data()
+        self._valid_embeddings = {r["id"] for r in records}
+
+        # 统计不匹配的节点数量（将被重新向量化）
+        count_query = """
+        MATCH (n:Knowledge)
+        WHERE n.embedding IS NOT NULL
+          AND (n.embeddingProvider IS NULL OR n.embeddingProvider <> $provider)
+        RETURN count(n) AS count
+        """
+        count_result = await session.run(count_query, provider=self._current_embedding_provider)
+        count_record = await count_result.single()
+        stale_count = count_record["count"] if count_record else 0
+
+        logger.info(
+            "gravitino_sync_embedding_check",
+            current_provider=self._current_embedding_provider,
+            valid_count=len(self._valid_embeddings),
+            stale_count=stale_count,
+        )
 
     async def _queue_embedding_task(
         self, node_id: str, node_label: str, name: str,
         description: str | None = None, tags: list[str] | None = None
     ) -> None:
-        """将 embedding 任务入队"""
-        parts = [name]
-        if description:
-            parts.append(description)
+        """将 embedding 任务入队（跳过无描述或 provider 匹配的节点）"""
+        # 没有描述的节点不做 embedding，避免低质量向量误导检索
+        if not description or not description.strip():
+            self._stats["embedding_tasks_skipped"] += 1
+            return
+
+        # 跳过已有正确 embedding 的节点（provider 匹配）
+        if node_id in self._valid_embeddings:
+            self._stats["embedding_tasks_skipped"] += 1
+            return
+
+        parts = [name, description]
         if tags:
             parts.extend(tags)
         text = " ".join(parts)
@@ -74,7 +133,10 @@ class GravitinoSyncService:
         driver = await AsyncNeo4jClient.get_driver()
 
         async with driver.session(database=settings.neo4j_database) as session:
-            # 3. 同步各类元数据
+            # 3. 加载已有正确 embedding 的节点（避免重复向量化）
+            await self._load_valid_embeddings(session)
+
+            # 4. 同步各类元数据
             await self._sync_catalogs(session)
             await self._sync_schemas(session)
             await self._sync_tables_and_columns(session)

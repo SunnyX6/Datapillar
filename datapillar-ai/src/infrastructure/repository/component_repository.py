@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from src.infrastructure.database import MySQLClient
+from src.infrastructure.database.mysql import MySQLClient
 
 
 class ComponentRepository:

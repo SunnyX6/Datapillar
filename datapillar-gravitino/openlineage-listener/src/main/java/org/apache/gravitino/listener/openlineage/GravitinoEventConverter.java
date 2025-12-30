@@ -81,7 +81,9 @@ import org.apache.gravitino.listener.api.info.WordRootInfo;
 import org.apache.gravitino.listener.openlineage.facets.GravitinoDatasetFacet;
 import org.apache.gravitino.listener.openlineage.facets.GravitinoDatasetFacet.GravitinoColumnMetadata;
 import org.apache.gravitino.listener.openlineage.facets.GravitinoTagFacet;
+import org.apache.gravitino.listener.openlineage.facets.TableChangeInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 
 /**
@@ -194,8 +196,12 @@ public class GravitinoEventConverter {
   private RunEvent convertAlterTable(AlterTableEvent event) {
     TableInfo tableInfo = event.updatedTableInfo();
     NameIdentifier identifier = event.identifier();
+    TableChange[] tableChanges = event.tableChanges();
 
-    OutputDataset outputDataset = createTableDataset(identifier, tableInfo);
+    // 解析 tableChanges 构建 changes 列表
+    List<TableChangeInfo> changes = parseTableChanges(tableChanges);
+
+    OutputDataset outputDataset = createAlterTableDataset(identifier, tableInfo, changes);
 
     return createRunEvent(
         event,
@@ -203,6 +209,248 @@ public class GravitinoEventConverter {
         OpenLineage.RunEvent.EventType.COMPLETE,
         Collections.emptyList(),
         Collections.singletonList(outputDataset));
+  }
+
+  /** 解析 TableChange 数组，构建 TableChangeInfo 列表 */
+  private List<TableChangeInfo> parseTableChanges(TableChange[] tableChanges) {
+    if (tableChanges == null || tableChanges.length == 0) {
+      return new ArrayList<>();
+    }
+
+    return Arrays.stream(tableChanges)
+        .map(this::convertTableChange)
+        .filter(info -> info != null)
+        .collect(Collectors.toList());
+  }
+
+  /** 将单个 TableChange 转换为 TableChangeInfo */
+  private TableChangeInfo convertTableChange(TableChange change) {
+    if (change instanceof TableChange.RenameTable) {
+      TableChange.RenameTable rename = (TableChange.RenameTable) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.RENAME_TABLE)
+          .newName(rename.getNewName())
+          .build();
+    } else if (change instanceof TableChange.UpdateComment) {
+      TableChange.UpdateComment update = (TableChange.UpdateComment) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.UPDATE_COMMENT)
+          .newComment(update.getNewComment())
+          .build();
+    } else if (change instanceof TableChange.SetProperty) {
+      TableChange.SetProperty set = (TableChange.SetProperty) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.SET_PROPERTY)
+          .propertyKey(set.getProperty())
+          .propertyValue(set.getValue())
+          .build();
+    } else if (change instanceof TableChange.RemoveProperty) {
+      TableChange.RemoveProperty remove = (TableChange.RemoveProperty) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.REMOVE_PROPERTY)
+          .propertyKey(remove.getProperty())
+          .build();
+    } else if (change instanceof TableChange.AddColumn) {
+      TableChange.AddColumn add = (TableChange.AddColumn) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.ADD_COLUMN)
+          .columnName(String.join(".", add.fieldName()))
+          .dataType(add.getDataType().simpleString())
+          .columnComment(add.getComment())
+          .nullable(add.isNullable())
+          .autoIncrement(add.isAutoIncrement())
+          .defaultValue(formatDefaultValue(add.getDefaultValue()))
+          .position(formatColumnPosition(add.getPosition()))
+          .build();
+    } else if (change instanceof TableChange.DeleteColumn) {
+      TableChange.DeleteColumn delete = (TableChange.DeleteColumn) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.DELETE_COLUMN)
+          .columnName(String.join(".", delete.fieldName()))
+          .build();
+    } else if (change instanceof TableChange.RenameColumn) {
+      TableChange.RenameColumn rename = (TableChange.RenameColumn) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.RENAME_COLUMN)
+          .oldColumnName(String.join(".", rename.fieldName()))
+          .newColumnName(rename.getNewName())
+          .build();
+    } else if (change instanceof TableChange.UpdateColumnType) {
+      TableChange.UpdateColumnType update = (TableChange.UpdateColumnType) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.UPDATE_COLUMN_TYPE)
+          .columnName(String.join(".", update.fieldName()))
+          .dataType(update.getNewDataType().simpleString())
+          .build();
+    } else if (change instanceof TableChange.UpdateColumnComment) {
+      TableChange.UpdateColumnComment update = (TableChange.UpdateColumnComment) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.UPDATE_COLUMN_COMMENT)
+          .columnName(String.join(".", update.fieldName()))
+          .newComment(update.getNewComment())
+          .build();
+    } else if (change instanceof TableChange.UpdateColumnPosition) {
+      TableChange.UpdateColumnPosition update = (TableChange.UpdateColumnPosition) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.UPDATE_COLUMN_POSITION)
+          .columnName(String.join(".", update.fieldName()))
+          .position(formatColumnPosition(update.getPosition()))
+          .build();
+    } else if (change instanceof TableChange.UpdateColumnNullability) {
+      TableChange.UpdateColumnNullability update = (TableChange.UpdateColumnNullability) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.UPDATE_COLUMN_NULLABILITY)
+          .columnName(String.join(".", update.fieldName()))
+          .nullable(update.nullable())
+          .build();
+    } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+      TableChange.UpdateColumnDefaultValue update = (TableChange.UpdateColumnDefaultValue) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.UPDATE_COLUMN_DEFAULT_VALUE)
+          .columnName(String.join(".", update.fieldName()))
+          .defaultValue(formatDefaultValue(update.getNewDefaultValue()))
+          .build();
+    } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+      TableChange.UpdateColumnAutoIncrement update = (TableChange.UpdateColumnAutoIncrement) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.UPDATE_COLUMN_AUTO_INCREMENT)
+          .columnName(String.join(".", update.fieldName()))
+          .autoIncrement(update.isAutoIncrement())
+          .build();
+    } else if (change instanceof TableChange.AddIndex) {
+      TableChange.AddIndex add = (TableChange.AddIndex) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.ADD_INDEX)
+          .indexName(add.getName())
+          .indexType(add.getType().name())
+          .indexColumns(
+              Arrays.stream(add.getFieldNames())
+                  .map(arr -> String.join(".", arr))
+                  .toArray(String[]::new))
+          .build();
+    } else if (change instanceof TableChange.DeleteIndex) {
+      TableChange.DeleteIndex delete = (TableChange.DeleteIndex) change;
+      return TableChangeInfo.builder()
+          .type(TableChangeInfo.ChangeType.DELETE_INDEX)
+          .indexName(delete.getName())
+          .build();
+    }
+
+    log.debug("Unsupported TableChange type: {}", change.getClass().getSimpleName());
+    return null;
+  }
+
+  /** 格式化列位置 */
+  private String formatColumnPosition(TableChange.ColumnPosition position) {
+    if (position == null) {
+      return null;
+    }
+    if (position instanceof TableChange.First) {
+      return "FIRST";
+    } else if (position instanceof TableChange.After) {
+      return "AFTER " + ((TableChange.After) position).getColumn();
+    }
+    return null;
+  }
+
+  /** 创建 alter_table 事件的 OutputDataset（包含 changes） */
+  private OutputDataset createAlterTableDataset(
+      NameIdentifier identifier, TableInfo tableInfo, List<TableChangeInfo> changes) {
+    List<SchemaDatasetFacetFields> fields = new ArrayList<>();
+    List<GravitinoColumnMetadata> columnMetadataList = new ArrayList<>();
+
+    if (tableInfo != null && tableInfo.columns() != null) {
+      for (Column column : tableInfo.columns()) {
+        fields.add(
+            openLineage.newSchemaDatasetFacetFields(
+                column.name(), column.dataType().simpleString(), column.comment(), null));
+
+        columnMetadataList.add(
+            GravitinoColumnMetadata.builder()
+                .name(column.name())
+                .nullable(column.nullable())
+                .autoIncrement(column.autoIncrement())
+                .defaultValue(formatDefaultValue(column.defaultValue()))
+                .build());
+      }
+    }
+
+    SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
+
+    // 构建包含 changes 的 Gravitino facet
+    GravitinoDatasetFacet gravitinoFacet =
+        buildAlterTableFacet(tableInfo, columnMetadataList, changes);
+
+    DatasetFacetsBuilder facetsBuilder =
+        openLineage
+            .newDatasetFacetsBuilder()
+            .schema(schemaFacet)
+            .lifecycleStateChange(
+                openLineage.newLifecycleStateChangeDatasetFacet(
+                    OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.ALTER, null));
+
+    if (gravitinoFacet != null) {
+      facetsBuilder.put(GRAVITINO_FACET_KEY, gravitinoFacet);
+    }
+
+    return openLineage
+        .newOutputDatasetBuilder()
+        .namespace(formatDatasetNamespace(identifier))
+        .name(formatDatasetName(identifier))
+        .facets(facetsBuilder.build())
+        .build();
+  }
+
+  /** 构建 alter_table 事件的 Gravitino facet（包含 changes） */
+  private GravitinoDatasetFacet buildAlterTableFacet(
+      TableInfo tableInfo,
+      List<GravitinoColumnMetadata> columnMetadataList,
+      List<TableChangeInfo> changes) {
+    if (tableInfo == null) {
+      return GravitinoDatasetFacet.builder(producerUri).changes(changes).build();
+    }
+
+    GravitinoDatasetFacet.GravitinoDatasetFacetBuilder builder =
+        GravitinoDatasetFacet.builder(producerUri)
+            .description(tableInfo.comment())
+            .properties(tableInfo.properties())
+            .columns(columnMetadataList)
+            .changes(changes);
+
+    // 分区信息
+    if (tableInfo.partitioning() != null && tableInfo.partitioning().length > 0) {
+      builder.partitions(
+          Arrays.stream(tableInfo.partitioning())
+              .map(Object::toString)
+              .collect(Collectors.joining(", ")));
+    }
+
+    // 分布信息
+    if (tableInfo.distribution() != null) {
+      builder.distribution(tableInfo.distribution().toString());
+    }
+
+    // 排序信息
+    if (tableInfo.sortOrder() != null && tableInfo.sortOrder().length > 0) {
+      builder.sortOrders(
+          Arrays.stream(tableInfo.sortOrder())
+              .map(Object::toString)
+              .collect(Collectors.joining(", ")));
+    }
+
+    // 索引信息
+    if (tableInfo.index() != null && tableInfo.index().length > 0) {
+      builder.indexes(
+          Arrays.stream(tableInfo.index()).map(Object::toString).collect(Collectors.joining(", ")));
+    }
+
+    // 审计信息
+    Audit audit = tableInfo.auditInfo();
+    if (audit != null) {
+      GravitinoDatasetFacet.fromAudit(builder, audit);
+    }
+
+    return builder.build();
   }
 
   private RunEvent convertDropTable(DropTableEvent event) {

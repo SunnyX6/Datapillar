@@ -192,8 +192,11 @@ class EmbeddingProcessor:
     async def _write_embeddings_to_neo4j(
         self, tasks: list[EmbeddingTask], embeddings: list[list[float]]
     ) -> None:
-        """批量回写 embedding 到 Neo4j"""
+        """批量回写 embedding 到 Neo4j（同时记录模型 provider 用于增量检测）"""
         driver = await AsyncNeo4jClient.get_driver()
+        embedder = self._get_embedder()
+        # 记录 provider，格式：provider/model_name，用于检测模型变更
+        embedding_provider = f"{embedder.provider}/{embedder.model_name}"
 
         async with driver.session(database=settings.neo4j_database) as session:
             # 按 label 分组，使用 UNWIND 批量更新
@@ -209,13 +212,16 @@ class EmbeddingProcessor:
                 query = f"""
                 UNWIND $data AS item
                 MATCH (n:{label} {{id: item.id}})
-                SET n.embedding = item.embedding, n.embeddingUpdatedAt = datetime()
+                SET n.embedding = item.embedding,
+                    n.embeddingProvider = $provider,
+                    n.embeddingUpdatedAt = datetime()
                 """
 
-                await session.run(query, data=data)
+                await session.run(query, data=data, provider=embedding_provider)
 
             logger.debug(
                 "embeddings_written_to_neo4j",
+                provider=embedding_provider,
                 groups={label: len(items) for label, items in label_groups.items()},
             )
 

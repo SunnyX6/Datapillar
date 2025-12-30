@@ -86,17 +86,30 @@ const formatBytes = (bytes: number): string => {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
 
+/** 编辑模式类型 */
+export type TableEditMode = 'basic' | 'columns'
+
+/** 表基础信息编辑数据 */
+export interface TableBasicEditData {
+  name: string
+  comment?: string
+  properties?: Record<string, string>
+}
+
+/** 表列编辑数据 */
+export interface TableColumnsEditData {
+  name: string
+  comment?: string
+  columns: Array<{ name: string; type: string; comment?: string; valueDomainCode?: string }>
+}
+
 type TableOverviewProps = {
   table: TableAsset
   provider?: string
   breadcrumb: string[]
   activeTab: 'OVERVIEW' | 'COLUMNS' | 'QUALITY' | 'LINEAGE'
   onTabChange: (tab: 'OVERVIEW' | 'COLUMNS' | 'QUALITY' | 'LINEAGE') => void
-  onEdit?: (tableData: {
-    name: string
-    comment?: string
-    columns: Array<{ name: string; type: string; comment?: string; valueDomainCode?: string }>
-  }) => void
+  onEdit?: (mode: TableEditMode, data: TableBasicEditData | TableColumnsEditData) => void
 }
 
 /**
@@ -113,6 +126,7 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
   const [description, setDescription] = useState<string>(table.description)
   const [columns, setColumns] = useState(table.columns)
   const [indexes, setIndexes] = useState<GravitinoIndexDTO[]>([])
+  const [properties, setProperties] = useState<Record<string, string>>(table.properties || {})
   // 动态展示的属性，根据不同 catalog 返回的 properties 动态生成
   const [tableSpecs, setTableSpecs] = useState<{ label: string; value: string }[]>([])
   // 值域相关状态
@@ -309,6 +323,7 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
 
           // 根据 properties 动态构建展示字段
           if (detail.properties) {
+            setProperties(detail.properties)
             const props = detail.properties
             const specs: { label: string; value: string }[] = []
 
@@ -485,8 +500,8 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
 
   return (
     <div className="flex flex-col h-full">
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 @md:px-8 py-4 shadow-sm">
-        <div className={`flex items-center gap-2 ${TYPOGRAPHY.legal} uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3`}>
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 @md:px-8 py-7 shadow-sm">
+        <div className={`flex items-center gap-2 ${TYPOGRAPHY.legal} uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-4`}>
           {breadcrumb.map((crumb, index) => (
             <span key={crumb} className="flex items-center gap-2">
               {index > 0 && <span className="text-slate-300">/</span>}
@@ -496,11 +511,11 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
         </div>
 
         <div className="flex flex-col gap-4 @md:flex-row @md:items-start @md:justify-between">
-          <div className="flex gap-4">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-200 dark:shadow-blue-900/40">
-              <TableIcon size={26} />
+          <div className="flex gap-5">
+            <div className="w-[72px] h-[72px] rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-200 dark:shadow-blue-900/40">
+              <TableIcon size={30} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">{table.name}</h2>
                 {/* Tag 区域 */}
@@ -562,7 +577,7 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
               <p className="text-sm text-slate-500 dark:text-slate-400 max-w-3xl leading-relaxed">
                 {description}
               </p>
-              <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600 dark:text-slate-300">
+              <div className="flex items-center gap-4 text-xs text-slate-600 dark:text-slate-300">
                 <QualityBadge score={table.qualityScore} />
                 <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
                 <div className="flex items-center gap-2">
@@ -574,7 +589,7 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                   <span>Updated: <span className="font-semibold text-slate-800 dark:text-slate-200">{updatedAt || '-'}</span></span>
                 </div>
               </div>
-              <div className="flex items-center flex-wrap gap-2">
+              <div className="flex items-center flex-wrap gap-3">
                 {table.domains.map((d) => (
                   <span
                     key={d}
@@ -586,7 +601,7 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1 mt-6">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               className="h-9 w-9 inline-flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-colors"
@@ -603,16 +618,28 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
             </button>
             <button
               type="button"
-              onClick={() => onEdit?.({
-                name: table.name,
-                comment: description,
-                columns: columns.map((col) => ({
-                  name: col.name,
-                  type: col.dataType,
-                  comment: col.comment,
-                  valueDomainCode: columnValueDomainMap.get(col.name)
-                }))
-              })}
+              onClick={() => {
+                if (activeTab === 'COLUMNS') {
+                  // 列编辑模式
+                  onEdit?.('columns', {
+                    name: table.name,
+                    comment: description,
+                    columns: columns.map((col) => ({
+                      name: col.name,
+                      type: col.dataType,
+                      comment: col.comment,
+                      valueDomainCode: columnValueDomainMap.get(col.name)
+                    }))
+                  })
+                } else {
+                  // 基础信息编辑模式（OVERVIEW 及其他 Tab）
+                  onEdit?.('basic', {
+                    name: table.name,
+                    comment: description,
+                    properties
+                  })
+                }
+              }}
               className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
               title="编辑"
             >

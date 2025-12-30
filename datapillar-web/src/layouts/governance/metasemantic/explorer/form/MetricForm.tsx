@@ -11,7 +11,7 @@ import { Modal, ModalCancelButton, ModalPrimaryButton } from '@/components/ui'
 import { parseDataTypeString } from '@/components/ui'
 import { fetchMetricVersion, fetchUnits, fetchModifiers, fetchWordRoots, fetchMetrics, type UnitDTO, type MetricModifierDTO, type WordRootDTO } from '@/services/oneMetaSemanticService'
 import { aiFillMetric } from '@/services/metricAIService'
-import type { MetricType, Metric } from '../types'
+import type { MetricType, Metric, AIRecommendation } from '../types'
 import { MetricFormLeft } from './MetricFormLeft'
 import { MetricFormRight } from './MetricFormRight'
 import type { MetricFormData, MeasureColumn, FilterColumn } from './types'
@@ -84,7 +84,7 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
   const [aiInput, setAiInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
-  const [aiWarning, setAiWarning] = useState('')
+  const [aiMessage, setAiMessage] = useState<{ success: boolean; text: string; recommendations?: AIRecommendation[] } | null>(null)
   const [aiSuggestedMeasures, setAiSuggestedMeasures] = useState<string[]>([])
   const [aiSuggestedFilters, setAiSuggestedFilters] = useState<string[]>([])
 
@@ -248,7 +248,9 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
     setForm(emptyForm)
     setAiInput('')
     setAiError('')
-    setAiWarning('')
+    setAiMessage(null)
+    setAiSuggestedMeasures([])
+    setAiSuggestedFilters([])
     onClose()
   }
 
@@ -256,7 +258,9 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
     setForm({ ...emptyForm, type })
     setAiInput('')
     setAiError('')
-    setAiWarning('')
+    setAiMessage(null)
+    setAiSuggestedMeasures([])
+    setAiSuggestedFilters([])
     setStep(2)
   }
 
@@ -265,7 +269,9 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
     setForm(emptyForm)
     setAiInput('')
     setAiError('')
-    setAiWarning('')
+    setAiMessage(null)
+    setAiSuggestedMeasures([])
+    setAiSuggestedFilters([])
   }
 
   const handleSave = async () => {
@@ -277,6 +283,7 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
   const handleAiFill = async () => {
     if (!aiInput.trim() || aiLoading) return
     setAiError('')
+    setAiMessage(null)
 
     // 校验：不同类型指标需要先选择必要的数据
     if (form.type === 'ATOMIC' && form.measureColumns.length === 0) {
@@ -334,6 +341,7 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
         }))
       }
 
+      // 调用 AI 服务
       const result = await aiFillMetric({
         userInput: aiInput,
         context: {
@@ -341,16 +349,13 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
           payload,
           formOptions: {
             dataTypes: DATA_TYPES,
-            // 用户选了就传，没选就不传（后端会查 Neo4j）
             units: form.unit ? [form.unit] : undefined,
-            // 用户选了词根就传
             wordRoots: form.wordRoots.length > 0
               ? form.wordRoots.map((code) => {
                   const root = wordRoots.find((r) => r.code === code)
                   return { code, name: root?.name || code }
                 })
               : undefined,
-            // 派生指标：用户选了修饰符就传
             modifiers: form.modifiers.length > 0
               ? form.modifiers.map((code) => {
                   const mod = modifiers.find((m) => m.code === code)
@@ -361,14 +366,16 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
         }
       })
 
-      // 处理 AI 返回的警告信息：有 warning 就只显示警告，不更新表单
-      if (result.warning) {
-        setAiWarning(result.warning)
+      // 处理 AI 返回结果
+      if (!result.success) {
+        setAiMessage({ success: false, text: result.message, recommendations: result.recommendations })
         return
       }
-      setAiWarning('')
 
-      // 设置 AI 建议的列，触发自动选中
+      // 成功：显示消息并更新表单
+      setAiMessage({ success: true, text: result.message })
+
+      // 设置 AI 建议的列
       setAiSuggestedMeasures(result.measureColumns || [])
       setAiSuggestedFilters(result.filterColumns || [])
 
@@ -378,8 +385,6 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
         const newModifiers = result.modifiersSelected || prev.modifiers
         const newAggregation = result.aggregation || prev.aggregation
 
-        // 拼接 code: 原子/复合指标 = wordRoots + aggregation + customSuffix
-        //          派生指标 = baseCode + modifiers + customSuffix
         let code: string
         if (prev.type === 'DERIVED') {
           const parts = [prev.baseCode, ...newModifiers, prev.customSuffix].filter(Boolean)
@@ -389,6 +394,10 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
           code = parts.join('_').toUpperCase()
         }
 
+        // 根据 unit code 从 units 列表查找 name 和 symbol
+        const unitCode = result.unit || prev.unit
+        const unitInfo = units.find((u) => u.code === unitCode)
+
         return {
           ...prev,
           name: result.name || prev.name,
@@ -397,7 +406,9 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
           modifiers: newModifiers,
           code,
           dataType: result.dataType || prev.dataType,
-          unit: result.unit || prev.unit,
+          unit: unitCode,
+          unitName: unitInfo?.name || prev.unitName,
+          unitSymbol: unitInfo?.symbol || prev.unitSymbol,
           formula: result.calculationFormula || prev.formula,
           comment: result.comment || prev.comment
         }
@@ -634,12 +645,78 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
               {aiError}
             </div>
           )}
-          {aiWarning && (
-            <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl">
+          {aiMessage && (
+            <div className={`mt-2 p-3 rounded-xl border ${
+              aiMessage.success
+                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700'
+                : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700'
+            }`}>
               <div className="flex items-start gap-2">
-                <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
-                <span className="text-caption text-amber-700 dark:text-amber-300">{aiWarning}</span>
+                {aiMessage.success ? (
+                  <Sparkles size={14} className="text-emerald-500 mt-0.5 shrink-0" />
+                ) : (
+                  <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                )}
+                <span className={`text-caption ${
+                  aiMessage.success
+                    ? 'text-emerald-700 dark:text-emerald-300'
+                    : 'text-amber-700 dark:text-amber-300'
+                }`}>{aiMessage.text}</span>
               </div>
+              {/* 失败时显示推荐列表 */}
+              {!aiMessage.success && aiMessage.recommendations && aiMessage.recommendations.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-700">
+                  <div className="text-caption font-medium text-amber-700 dark:text-amber-300 mb-2">
+                    {(() => {
+                      const hasMetric = aiMessage.recommendations.some((r) => r.msgType === 'metric')
+                      const hasTable = aiMessage.recommendations.some((r) => r.msgType === 'table')
+                      if (hasMetric && hasTable) return '推荐的指标和表：'
+                      if (hasMetric) return '推荐的指标：'
+                      return '推荐的表和列：'
+                    })()}
+                  </div>
+                  <div className="space-y-2">
+                    {aiMessage.recommendations.map((rec, idx) => (
+                      rec.msgType === 'table' ? (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex items-center gap-2 text-caption">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">表</span>
+                            <code className="text-slate-700 dark:text-slate-300 font-mono">{rec.fullPath}</code>
+                            {rec.description && (
+                              <span className="text-slate-500 dark:text-slate-400">- {rec.description}</span>
+                            )}
+                          </div>
+                          {rec.columns && rec.columns.length > 0 && (
+                            <div className="ml-6 space-y-0.5">
+                              {rec.columns.map((col, colIdx) => (
+                                <div key={colIdx} className="flex items-center gap-2 text-caption">
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">列</span>
+                                  <code className="text-slate-600 dark:text-slate-400 font-mono text-[11px]">{col.name}</code>
+                                  {col.dataType && (
+                                    <span className="text-slate-400 dark:text-slate-500 text-[10px]">({col.dataType})</span>
+                                  )}
+                                  {col.description && (
+                                    <span className="text-slate-500 dark:text-slate-400">- {col.description}</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div key={idx} className="flex items-center gap-2 text-caption">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">指标</span>
+                          <code className="text-slate-700 dark:text-slate-300 font-mono">{rec.code}</code>
+                          <span className="text-slate-600 dark:text-slate-400">{rec.name}</span>
+                          {rec.description && (
+                            <span className="text-slate-500 dark:text-slate-400">- {rec.description}</span>
+                          )}
+                        </div>
+                      )
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

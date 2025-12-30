@@ -103,19 +103,51 @@ export interface AIFillRequest {
   context: AIFillContext
 }
 
+/** AI 推荐项 - 表类型 */
+export interface AITableRecommendation {
+  msgType: 'table'
+  catalog: string
+  schema: string
+  name: string
+  fullPath: string
+  description?: string
+  score: number
+  columns: Array<{
+    name: string
+    dataType?: string
+    description?: string
+    score: number
+  }>
+}
+
+/** AI 推荐项 - 指标类型 */
+export interface AIMetricRecommendation {
+  msgType: 'metric'
+  code: string
+  name: string
+  metricType: string  // AtomicMetric/DerivedMetric/CompositeMetric
+  description?: string
+  score: number
+}
+
+/** AI 推荐项（联合类型） */
+export type AIRecommendation = AITableRecommendation | AIMetricRecommendation
+
 /** AI Fill 响应 */
 export interface AIFillResponse {
-  name: string
-  wordRoots: string[]         // 词根组，从词根库选择
-  aggregation: string         // 聚合函数
-  modifiersSelected: string[] // 修饰符，派生指标用
-  type: MetricType
-  dataType: string
-  unit?: string
-  calculationFormula: string
-  comment: string
-  measureColumns?: string[]   // AI 推荐使用的度量列
-  filterColumns?: string[]    // AI 推荐使用的过滤列
-  warning?: string            // 语义不匹配时的警告信息
+  success: boolean              // 是否成功
+  message: string               // AI 消息，成功时是友好提示，失败时是失败原因
+  recommendations?: AIRecommendation[]  // 推荐列表，失败时返回推荐的表和列
+  name?: string
+  wordRoots?: string[]          // 词根组，从词根库选择
+  aggregation?: string          // 聚合函数
+  modifiersSelected?: string[]  // 修饰符，派生指标用
+  type?: MetricType
+  dataType?: string
+  unit?: string                 // 单位code，前端根据code查找name和symbol
+  calculationFormula?: string
+  comment?: string
+  measureColumns?: string[]     // AI 推荐使用的度量列
+  filterColumns?: string[]      // AI 推荐使用的过滤列
 }
 

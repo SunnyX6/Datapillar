@@ -7,14 +7,6 @@
     from src.infrastructure.llm import LLMFactory, call_llm, UnifiedEmbedder
 """
 
-from src.infrastructure.database import (
-    Neo4jClient,
-    AsyncNeo4jClient,
-    MySQLClient,
-    RedisClient,
-    convert_neo4j_types,
-)
-
 __all__ = [
     # Database
     "Neo4jClient",
@@ -23,3 +15,20 @@ __all__ = [
     "RedisClient",
     "convert_neo4j_types",
 ]
+
+
+def __getattr__(name: str):
+    """
+    延迟导入（避免 package import 触发数据库/配置的循环依赖）。
+
+    说明：
+    - `import src.infrastructure.llm...` 也会执行本文件；
+      如果这里 eager import database，将导致 database->config->repository->database 的循环依赖。
+    - 使用 __getattr__ 让需要 Database client 的模块仍能通过
+      `from src.infrastructure import MySQLClient` 这种写法获取对象。
+    """
+    if name in {"Neo4jClient", "AsyncNeo4jClient", "MySQLClient", "RedisClient", "convert_neo4j_types"}:
+        from src.infrastructure import database as _db
+
+        return getattr(_db, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
