@@ -48,6 +48,19 @@
     overflow-y: auto;
   }
 
+  /* Shimmer 动画 - 光泽划过效果 */
+  @keyframes shimmer {
+    0% {
+      background-position: 100% 50%;
+    }
+    50% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: 100% 50%;
+    }
+  }
+
   #root {
     min-height: inherit;
   }
@@ -225,6 +238,17 @@
     }
   }
 
+  /* Minimap 组件专用样式（支持 CSS 变量动态字体） */
+  .minimap-code {
+    font-size: var(--minimap-font-size, 12px);
+    line-height: 1;
+    white-space: pre;
+  }
+
+  .minimap-line {
+    height: var(--minimap-font-size, 12px);
+  }
+
   /* 抽屉宽度（详情面板/侧边抽屉） */
   .w-drawer-responsive {
     width: 480px;
@@ -283,6 +307,15 @@
 
   .animate-fade-in {
     animation: fade-in 0.3s ease-out;
+  }
+
+  /* Monaco Editor 行号区域边框 */
+  .monaco-editor .margin {
+    border-right: 1px solid #e2e8f0;
+  }
+
+  .dark .monaco-editor .margin {
+    border-right: 1px solid #334155;
   }
 }
 

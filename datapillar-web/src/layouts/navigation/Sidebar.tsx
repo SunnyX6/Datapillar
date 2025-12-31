@@ -2,7 +2,6 @@ import {
   Cloud,
   Code2,
   Cpu,
-  Database,
   GitBranch,
   History,
   Play,
@@ -21,7 +20,7 @@ import {
 } from '@/design-tokens/dimensions'
 import { ExpandToggle } from './ExpandToggle'
 
-type View = 'dashboard' | 'workflow' | 'profile'
+type View = 'dashboard' | 'workflow' | 'profile' | 'ide'
 
 interface SidebarProps {
   onNavigate: (view: View) => void
@@ -71,8 +70,7 @@ export function Sidebar({ onNavigate, currentView, collapsed, onToggleCollapse }
       <div className={`flex-1 overflow-y-auto ${sectionPadding} ${contentPaddingY} ${stackSpacing} scrollbar-invisible`}>
         <NavSection title={t('side.sections.build', { ns: 'navigation' })} collapsed={collapsed}>
           <NavItem collapsed={collapsed} icon={<Workflow size={iconSizeToken.normal} />} label={t('side.items.workflow', { ns: 'navigation' })} active={currentView === 'workflow'} onClick={() => onNavigate('workflow')} shortcut="W" />
-          <NavItem collapsed={collapsed} icon={<Code2 size={iconSizeToken.normal} />} label={t('side.items.sql', { ns: 'navigation' })} />
-          <NavItem collapsed={collapsed} icon={<Database size={iconSizeToken.normal} />} label={t('side.items.catalog', { ns: 'navigation' })} />
+          <NavItem collapsed={collapsed} icon={<Code2 size={iconSizeToken.normal} />} label={t('side.items.ide', { ns: 'navigation' })} active={currentView === 'ide'} onClick={() => onNavigate('ide')} shortcut="I" />
         </NavSection>
 
         <NavSection title={t('side.sections.compute', { ns: 'navigation' })} collapsed={collapsed}>

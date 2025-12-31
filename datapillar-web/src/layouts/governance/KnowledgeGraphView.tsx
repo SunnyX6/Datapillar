@@ -1,4 +1,4 @@
-import { type JSX, type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type JSX, type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import NVL, {
   d3ForceLayoutType,
   type Node as NvlNode,
@@ -36,8 +36,8 @@ import {
 } from 'lucide-react'
 import { KnowledgeImportMenu } from './KnowledgeImportMenu'
 import { panelWidthClassMap, panelHeightClassMap, inputContainerWidthClassMap } from '@/design-tokens/dimensions'
-import { useIsDark } from '@/stores'
-import { fetchInitialGraph, searchGraph, type GraphData, type GraphLink, type GraphNode } from '@/services/knowledgeGraphService'
+import { useIsDark, useKnowledgeGraphStore } from '@/stores'
+import type { GraphData, GraphNode, GraphLink } from '@/services/knowledgeGraphService'
 
 type NvlNodeWithMeta = NvlNode & { raw: GraphNode }
 type NvlRelWithMeta = NvlRelationship & { raw: GraphLink }
@@ -290,39 +290,22 @@ const GOVERNANCE_ISSUES = [
   }
 ]
 
-function mergeGraph(base: GraphData, incoming: GraphData): GraphData {
-  const nodeMap = new Map<string, GraphNode>()
-  base.nodes.forEach(node => nodeMap.set(node.id, node))
-  incoming.nodes.forEach(node => {
-    if (!nodeMap.has(node.id)) {
-      nodeMap.set(node.id, node)
-    }
-  })
-
-  const linkKey = (link: GraphLink) => `${link.source}->${link.target}:${link.type ?? ''}`
-  const linkMap = new Map<string, GraphLink>()
-  base.links.forEach(link => linkMap.set(linkKey(link), link))
-  incoming.links.forEach(link => {
-    const key = linkKey(link)
-    if (!linkMap.has(key)) {
-      linkMap.set(key, link)
-    }
-  })
-
-  return {
-    nodes: Array.from(nodeMap.values()),
-    links: Array.from(linkMap.values())
-  }
-}
-
 export function KnowledgeGraphView() {
   const nvlRef = useRef<NVL | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const isCardPinnedRef = useRef(false)
   const selectedNodeIdRef = useRef<string | null>(null)
   const filterTypeRef = useRef<string | null>(null)
+
+  // 使用全局 store 管理图数据
+  const {
+    allGraphData,
+    isLoading: storeLoading,
+    loadInitialGraph,
+    searchAndMerge
+  } = useKnowledgeGraphStore()
+
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] })
-  const [allGraphData, setAllGraphData] = useState<GraphData>({ nodes: [], links: [] })
   const [filterType, setFilterType] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [hoverNodeId, setHoverNodeId] = useState<string | null>(null)
@@ -429,34 +412,27 @@ export function KnowledgeGraphView() {
     }
   }, [activeNodeId, graphData.nodes])
 
-  const applyAndSetGraph = useCallback((incoming: GraphData) => {
-    setAllGraphData(prev => {
-      const merged = mergeGraph(prev, incoming)
-      setGraphData(filterGraphByType(filterTypeRef.current, merged))
-      return merged
-    })
-  }, [])
-
+  // 当 store 的 allGraphData 或 filterType 变化时，更新显示的 graphData
   useEffect(() => {
     setGraphData(filterGraphByType(filterType, allGraphData))
   }, [filterType, allGraphData])
 
-
+  // 加载初始数据（store 内部会检查缓存）
   useEffect(() => {
-    const loadGraphData = async () => {
-      try {
-        setLoading(true)
-        const graphData = await fetchInitialGraph(100)
-        applyAndSetGraph(graphData)
-      } catch (error) {
-        console.error('[KG] 加载图数据失败:', error)
-      } finally {
-        setLoading(false)
-      }
+    const load = async () => {
+      setLoading(true)
+      await loadInitialGraph(100)
+      setLoading(false)
     }
+    load()
+  }, [loadInitialGraph])
 
-    loadGraphData()
-  }, [applyAndSetGraph])
+  // store 数据变化时同步 loading 状态
+  useEffect(() => {
+    if (!storeLoading && allGraphData.nodes.length > 0) {
+      setLoading(false)
+    }
+  }, [storeLoading, allGraphData.nodes.length])
 
   // NVL 实例初始化和交互处理器管理
   useEffect(() => {
@@ -640,16 +616,13 @@ export function KnowledgeGraphView() {
     setIssues((prev) => prev.filter((item) => item.id !== issueId))
     setFixingIssueId(null)
 
-    setAllGraphData((prev) => {
-      const next = {
-        ...prev,
-        nodes: prev.nodes.map((node) =>
-          node.health === 'warning' && Math.random() > 0.5 ? { ...node, health: 'healthy' } : node
-        )
-      }
-      setGraphData(filterGraphByType(filterType, next))
-      return next
-    })
+    // 模拟修复：更新本地显示的 graphData（不影响 store 缓存）
+    setGraphData((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((node) =>
+        node.health === 'warning' && Math.random() > 0.5 ? { ...node, health: 'healthy' } : node
+      )
+    }))
   }
 
   const handleCommand = async () => {
@@ -657,10 +630,9 @@ export function KnowledgeGraphView() {
     setIsExecuting(true)
 
     try {
-      const searchResult = await searchGraph(inputValue, 10)
+      const searchResult = await searchAndMerge(inputValue, 10)
 
       if (searchResult.nodes.length > 0) {
-        applyAndSetGraph(searchResult)
         const firstNode = searchResult.nodes[0]
         if (firstNode) setPendingFocusId(firstNode.id)
       }

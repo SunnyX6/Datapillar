@@ -55,6 +55,7 @@ class LineageEdge(BaseModel):
 class ComponentNav(BaseModel):
     """组件导航信息"""
 
+    id: int | None = Field(default=None, description="组件 ID（对应 job_component.id）")
     code: str = Field(..., description="组件代码（HIVE/SPARK_SQL/SHELL）")
     name: str = Field(..., description="组件名称")
     type: str = Field(..., description="组件类型（SQL/SCRIPT/SYNC）")

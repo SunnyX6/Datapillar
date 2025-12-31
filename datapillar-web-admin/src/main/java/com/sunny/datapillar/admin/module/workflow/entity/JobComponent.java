@@ -43,6 +43,8 @@ public class JobComponent {
 
     private String icon;
 
+    private String color;
+
     private Integer status;
 
     private Integer sortOrder;

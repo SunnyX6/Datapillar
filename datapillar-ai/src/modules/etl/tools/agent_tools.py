@@ -410,9 +410,10 @@ def list_component() -> str:
     ArchitectAgent 必须基于这些组件来设计工作流节点。
 
     返回字段：
-    - component_id: 组件 ID（如 HIVE、SPARK_SQL）
-    - component_name: 组件名称
-    - component_type: 组件类型（SQL/SCRIPT/SYNC）
+    - id: 组件数字 ID（设计 Job 时填充到 type_id）
+    - code: 组件代码（如 HIVE、SPARK_SQL，设计 Job 时填充到 type）
+    - name: 组件名称
+    - type: 组件类型（SQL/SCRIPT/SYNC）
     - description: 组件描述
     - config_schema: 配置模板
     """
@@ -443,10 +444,10 @@ def list_component() -> str:
 
             components.append(
                 {
-                    "component_id": row.get("component_id"),
-                    "component_name": row.get("component_name"),
-                    "component_type": row.get("component_type"),
-                    "category": row.get("category"),
+                    "id": row.get("id"),
+                    "code": row.get("component_code"),
+                    "name": row.get("component_name"),
+                    "type": row.get("component_type"),
                     "description": row.get("description"),
                     "config_schema": config_schema,
                 }
@@ -457,7 +458,7 @@ def list_component() -> str:
                 "status": "success",
                 "total": len(components),
                 "components": components,
-                "hint": "设计工作流时，每个节点的 type 必须是以上 component_id 之一",
+                "hint": "设计 Job 时，type 填组件 code，type_id 填组件 id",
             },
             ensure_ascii=False,
         )

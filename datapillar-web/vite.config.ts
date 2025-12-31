@@ -84,8 +84,15 @@ export default defineConfig(({ mode }) => {
         'react-router-dom',
         'axios',
         'lodash-es',
+        'lodash',
         'dt-sql-parser',
-        'antlr4ng'
+        'antlr4ng',
+        '@neo4j-nvl/base',
+        '@neo4j-nvl/interaction-handlers',
+        '@neo4j-nvl/react',
+        // neo4j 依赖的 CommonJS 模块，需要预构建
+        '@neo4j-bloom/dagre',
+        'graphlib'
       ],
       exclude: ['monaco-editor'] // Monaco 按需加载，不预构建
     }

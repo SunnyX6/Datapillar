@@ -575,6 +575,9 @@ class EtlOrchestrator:
             "data": {"session_id": session_id},
         }
 
+        # 追踪当前 agent
+        current_agent = None
+
         try:
             async for event in self.graph.astream_events(
                 input_data,
@@ -588,6 +591,7 @@ class EtlOrchestrator:
 
                 # Agent 开始
                 if kind == "on_chain_start" and node:
+                    current_agent = node
                     yield {
                         "event_type": "agent_started",
                         "agent": node,
@@ -614,6 +618,7 @@ class EtlOrchestrator:
                 elif kind == "on_tool_start":
                     yield {
                         "event_type": "tool_called",
+                        "agent": current_agent,
                         "tool": name,
                         "data": event.get("data", {}).get("input", {}),
                     }
@@ -624,6 +629,7 @@ class EtlOrchestrator:
                 interrupt_data = snapshot.tasks[0].interrupts[0].value
                 yield {
                     "event_type": "session_interrupted",
+                    "agent": current_agent,
                     "data": interrupt_data,
                 }
                 return

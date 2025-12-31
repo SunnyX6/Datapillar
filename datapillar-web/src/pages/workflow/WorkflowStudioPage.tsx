@@ -226,7 +226,7 @@ export function WorkflowStudioPage() {
   return (
     <>
       <section
-        className={`flex h-full flex-col overflow-y-hidden overflow-x-visible bg-[#f8fafc] dark:bg-[#01030a] text-slate-900 dark:text-white relative z-40 ${layoutLocked ? 'visible' : 'invisible'}`}
+        className={`flex h-full flex-col overflow-y-hidden overflow-x-visible bg-[#f8fafc] dark:bg-slate-900 text-slate-900 dark:text-white relative z-40 ${layoutLocked ? 'visible' : 'invisible'}`}
       >
         <div ref={(node) => {
           containerRef.current = node
@@ -241,7 +241,7 @@ export function WorkflowStudioPage() {
           </div>
 
           <div className="flex-1 flex flex-col overflow-hidden">
-            <Suspense fallback={<div className="flex flex-1 items-center justify-center bg-[#050713]"><div className="rounded-full border-2 border-indigo-200 border-t-indigo-500 size-10 animate-spin" /></div>}>
+            <Suspense fallback={<div className="flex flex-1 items-center justify-center bg-[#f1f5f9] dark:bg-slate-900"><div className="rounded-full border-2 border-indigo-200 border-t-indigo-500 size-10 animate-spin" /></div>}>
               <LazyWorkflowCanvasPanel viewportVersion={canvasViewportVersion} />
             </Suspense>
           </div>

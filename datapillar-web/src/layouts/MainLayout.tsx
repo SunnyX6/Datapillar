@@ -3,7 +3,7 @@ import { Sidebar } from './navigation/Sidebar'
 import { TopNav } from './navigation/TopNav'
 import { useThemeStore, useAuthStore, useLayoutStore } from '@/stores'
 
-type View = 'dashboard' | 'workflow' | 'profile'
+type View = 'dashboard' | 'workflow' | 'profile' | 'ide'
 
 const MOCK_USER = {
   name: 'S. Engineer',
@@ -19,9 +19,11 @@ export function MainLayout() {
   const isDark = mode === 'dark'
   const currentView: View = location.pathname.startsWith('/workflow')
     ? 'workflow'
-    : location.pathname.startsWith('/profile')
-      ? 'profile'
-      : 'dashboard'
+    : location.pathname.startsWith('/ide')
+      ? 'ide'
+      : location.pathname.startsWith('/profile')
+        ? 'profile'
+        : 'dashboard'
   const isSidebarCollapsed = useLayoutStore((state) => state.isSidebarCollapsed)
   const toggleSidebar = useLayoutStore((state) => state.toggleSidebar)
 
@@ -40,7 +42,7 @@ export function MainLayout() {
 
   const handleViewChange = (nextView: View) => {
     const targetPath =
-      nextView === 'workflow' ? '/workflow' : nextView === 'profile' ? '/profile' : '/home'
+      nextView === 'workflow' ? '/workflow' : nextView === 'ide' ? '/ide' : nextView === 'profile' ? '/profile' : '/home'
     if (location.pathname === targetPath) {
       return
     }

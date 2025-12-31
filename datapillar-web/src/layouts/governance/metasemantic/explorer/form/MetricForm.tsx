@@ -680,7 +680,7 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
                       rec.msgType === 'table' ? (
                         <div key={idx} className="space-y-1">
                           <div className="flex items-center gap-2 text-caption">
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">表</span>
+                            <span className="px-1.5 py-0.5 rounded text-micro font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">表</span>
                             <code className="text-slate-700 dark:text-slate-300 font-mono">{rec.fullPath}</code>
                             {rec.description && (
                               <span className="text-slate-500 dark:text-slate-400">- {rec.description}</span>
@@ -690,10 +690,10 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
                             <div className="ml-6 space-y-0.5">
                               {rec.columns.map((col, colIdx) => (
                                 <div key={colIdx} className="flex items-center gap-2 text-caption">
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">列</span>
-                                  <code className="text-slate-600 dark:text-slate-400 font-mono text-[11px]">{col.name}</code>
+                                  <span className="px-1.5 py-0.5 rounded text-micro font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">列</span>
+                                  <code className="text-slate-600 dark:text-slate-400 font-mono text-legal">{col.name}</code>
                                   {col.dataType && (
-                                    <span className="text-slate-400 dark:text-slate-500 text-[10px]">({col.dataType})</span>
+                                    <span className="text-slate-400 dark:text-slate-500 text-micro">({col.dataType})</span>
                                   )}
                                   {col.description && (
                                     <span className="text-slate-500 dark:text-slate-400">- {col.description}</span>
@@ -705,7 +705,7 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
                         </div>
                       ) : (
                         <div key={idx} className="flex items-center gap-2 text-caption">
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">指标</span>
+                          <span className="px-1.5 py-0.5 rounded text-micro font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">指标</span>
                           <code className="text-slate-700 dark:text-slate-300 font-mono">{rec.code}</code>
                           <span className="text-slate-600 dark:text-slate-400">{rec.name}</span>
                           {rec.description && (

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type JSX } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -17,70 +17,70 @@ import {
   useReactFlow
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Database, MoreHorizontal, Play, Share2, Shield, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { WorkflowLayoutResult } from '@/layouts/workflow/utils/formatter'
-import type { WorkflowNodeType } from '@/services/workflowStudioService'
+import { useComponentStore } from '@/stores'
+import { DynamicIcon } from '@/components/ui/dynamic-icon'
+import { MoreHorizontal, Play, Share2 } from 'lucide-react'
 
 type StudioNodeData = {
   label: string
-  type: WorkflowNodeType
+  componentCode: string
   description: string
 }
 
-const CustomNode = ({ data }: NodeProps<Node<StudioNodeData>>) => {
-  const palette: Record<WorkflowNodeType, { border: string; glow: string; accent: string; icon: JSX.Element }> = {
-    source: {
-      border: 'border-blue-500/30',
-      glow: 'shadow-[0_0_30px_-5px_rgba(59,130,246,0.25)]',
-      accent: 'bg-blue-500/15',
-      icon: <Database size={14} className="text-blue-300" />
-    },
-    transform: {
-      border: 'border-purple-500/30',
-      glow: 'shadow-[0_0_30px_-5px_rgba(168,85,247,0.25)]',
-      accent: 'bg-purple-500/15',
-      icon: <Sparkles size={14} className="text-purple-200" />
-    },
-    quality: {
-      border: 'border-emerald-500/40',
-      glow: 'shadow-[0_0_30px_-5px_rgba(16,185,129,0.35)]',
-      accent: 'bg-emerald-500/15',
-      icon: <Shield size={14} className="text-emerald-200" />
-    },
-    sink: {
-      border: 'border-amber-500/40',
-      glow: 'shadow-[0_0_30px_-5px_rgba(245,158,11,0.35)]',
-      accent: 'bg-amber-500/15',
-      icon: <Share2 size={14} className="text-amber-200" />
-    }
+/**
+ * 根据颜色生成样式类
+ */
+function generateColorStyles(color: string) {
+  return {
+    borderColor: `${color}40`,
+    glowColor: `${color}25`,
+    accentBg: `${color}15`
   }
+}
 
-  const styles = palette[data.type]
+const CustomNode = ({ data }: NodeProps<Node<StudioNodeData>>) => {
+  const getStyle = useComponentStore((state) => state.getStyle)
+  const { icon, color } = getStyle(data.componentCode)
+  const colorStyles = generateColorStyles(color)
 
   return (
     <div
       className={cn(
-        'w-44 rounded-xl border bg-white/95 dark:bg-slate-900/85 backdrop-blur-md transition-all duration-300 group relative overflow-hidden',
-        styles.border,
+        'w-44 rounded-xl border bg-white/95 dark:bg-slate-900/85 backdrop-blur-md transition-all duration-300 group relative overflow-hidden'
       )}
+      style={{
+        borderColor: colorStyles.borderColor,
+        boxShadow: `0 0 30px -5px ${colorStyles.glowColor}`
+      }}
     >
-      <div className={cn('absolute top-0 left-0 right-0 h-px opacity-70', styles.accent)} />
+      <div
+        className="absolute top-0 left-0 right-0 h-px opacity-70"
+        style={{ backgroundColor: colorStyles.accentBg }}
+      />
 
-      {data.type !== 'source' && (
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="!w-2.5 !h-2.5 !bg-white !dark:!bg-slate-900 !border !border-slate-300 dark:!border-slate-600 !-left-1"
-        />
-      )}
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!w-2.5 !h-2.5 !bg-white !dark:!bg-slate-900 !border !border-slate-300 dark:!border-slate-600 !-left-1"
+      />
 
       <div className="p-2.5 pt-3">
         <div className="flex items-center gap-1.5 mb-1.5">
-          <div className={cn('p-1.5 rounded-lg border border-white/10 shadow-inner', styles.accent)}>{styles.icon}</div>
+          <div
+            className="p-1.5 rounded-lg border border-white/10 shadow-inner"
+            style={{ backgroundColor: colorStyles.accentBg }}
+          >
+            <DynamicIcon name={icon} size={14} color={color} />
+          </div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-slate-900 dark:text-slate-100 text-legal truncate tracking-tight">{data.label}</p>
-            <span className="text-tiny text-slate-500 dark:text-slate-400 uppercase tracking-[0.25em]">{data.type}</span>
+            <p className="font-medium text-slate-900 dark:text-slate-100 text-legal truncate tracking-tight">
+              {data.label}
+            </p>
+            <span className="text-tiny text-slate-500 dark:text-slate-400 uppercase tracking-[0.25em]">
+              {data.componentCode}
+            </span>
           </div>
         </div>
         <p className="text-micro text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 border-l border-slate-200 dark:border-slate-700 pl-1.5">
@@ -88,13 +88,11 @@ const CustomNode = ({ data }: NodeProps<Node<StudioNodeData>>) => {
         </p>
       </div>
 
-      {data.type !== 'sink' && (
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="!w-2.5 !h-2.5 !bg-white !dark:!bg-slate-900 !border !border-slate-300 dark:!border-slate-600 !-right-1"
-        />
-      )}
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!w-2.5 !h-2.5 !bg-white !dark:!bg-slate-900 !border !border-slate-300 dark:!border-slate-600 !-right-1"
+      />
     </div>
   )
 }
@@ -130,7 +128,6 @@ type FlowWrapperProps = {
   workflowTimestamp: number
 }
 
-// 内部组件，处理 fitView
 function FlowWrapper({
   fitViewOptions,
   viewportVersion,
@@ -188,10 +185,7 @@ function FlowWrapper({
           await fitView(fitViewOptions)
           const { zoom } = getViewport()
           const zoomTarget = Number.isFinite(preferredZoom) ? preferredZoom : zoom
-          const targetZoom = Math.max(
-            fitViewOptions.minZoom ?? 0,
-            Math.min(zoom * DEFAULT_ZOOM_FACTOR, zoomTarget)
-          )
+          const targetZoom = Math.max(fitViewOptions.minZoom ?? 0, Math.min(zoom * DEFAULT_ZOOM_FACTOR, zoomTarget))
           await setCenter(offsetX, offsetY, { zoom: targetZoom, duration: 0 })
         } catch (error) {
           if (import.meta.env.DEV) {
@@ -203,17 +197,7 @@ function FlowWrapper({
     })
 
     return () => cancelAnimationFrame(frame)
-  }, [
-    nodesLength,
-    nodesInitialized,
-    workflowTimestamp,
-    fitViewOptions,
-    viewportVersion,
-    resizeVersion,
-    preferredZoom,
-    offsetX,
-    offsetY
-  ])
+  }, [nodesLength, nodesInitialized, workflowTimestamp, fitViewOptions, viewportVersion, resizeVersion, preferredZoom, offsetX, offsetY])
 
   return null
 }
@@ -229,6 +213,12 @@ export default function WorkflowCanvasRenderer({
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<StudioNodeData>>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const hasWorkflow = formattedLayout.nodes.length > 0
+  const loadComponents = useComponentStore((state) => state.loadComponents)
+
+  // 加载组件列表
+  useEffect(() => {
+    loadComponents()
+  }, [loadComponents])
 
   useEffect(() => {
     if (!hasWorkflow) {
@@ -240,11 +230,12 @@ export default function WorkflowCanvasRenderer({
     setNodes((previous) => {
       const previousMap = new Map(previous.map((node) => [node.id, node]))
       return formattedLayout.nodes.map((node) => {
-        const existing = previousMap.get(node.id)
+        const nodeId = String(node.id)
+        const existing = previousMap.get(nodeId)
         const samePosition = existing?.position?.x === node.position.x && existing?.position?.y === node.position.y
         const sameData =
           existing?.data?.label === node.label &&
-          existing?.data?.type === node.type &&
+          existing?.data?.componentCode === node.componentCode &&
           existing?.data?.description === node.description
 
         if (existing && samePosition && sameData) {
@@ -253,12 +244,12 @@ export default function WorkflowCanvasRenderer({
 
         return {
           ...existing,
-          id: node.id,
+          id: nodeId,
           type: 'studio',
           position: node.position,
           data: {
             label: node.label,
-            type: node.type,
+            componentCode: node.componentCode,
             description: node.description
           }
         }
@@ -304,7 +295,10 @@ export default function WorkflowCanvasRenderer({
     <>
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
         <div className="flex items-center gap-1.5 rounded-full border border-white/30 bg-white/80 dark:bg-slate-900/85 dark:border-white/10 backdrop-blur-lg px-2 py-0.5 shadow-xl text-legal">
-          <button type="button" className="p-1.5 rounded-full hover:bg-white/70 dark:hover:bg-white/10 transition-colors text-slate-500 dark:text-slate-100">
+          <button
+            type="button"
+            className="p-1.5 rounded-full hover:bg-white/70 dark:hover:bg-white/10 transition-colors text-slate-500 dark:text-slate-100"
+          >
             <Share2 size={14} />
           </button>
           <span className="font-semibold text-slate-600 dark:text-slate-100 px-2">Pipeline v1.0</span>
@@ -315,7 +309,10 @@ export default function WorkflowCanvasRenderer({
             <Play size={10} fill="currentColor" />
             Run
           </button>
-          <button type="button" className="p-1.5 rounded-full hover:bg-white/70 dark:hover:bg-white/10 transition-colors text-slate-500 dark:text-slate-100">
+          <button
+            type="button"
+            className="p-1.5 rounded-full hover:bg-white/70 dark:hover:bg-white/10 transition-colors text-slate-500 dark:text-slate-100"
+          >
             <MoreHorizontal size={14} />
           </button>
         </div>

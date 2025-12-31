@@ -42,3 +42,12 @@ export {
 
 // Semantic Stats Store - 语义资产统计缓存
 export { useSemanticStatsStore } from './semanticStatsStore'
+
+// Component Store - 组件缓存
+export { useComponentStore } from './componentStore'
+
+// Metadata Store - 元数据缓存（Catalog/Schema/Table）
+export { useMetadataStore } from './metadataStore'
+
+// Knowledge Graph Store - 知识谱图缓存
+export { useKnowledgeGraphStore } from './knowledgeGraphStore'

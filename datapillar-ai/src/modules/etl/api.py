@@ -70,6 +70,7 @@ async def generate_workflow_stream(
                 "data": json.dumps({
                     "eventType": event_type,
                     "agent": event.get("agent"),
+                    "tool": event.get("tool"),
                     "data": event_data,
                 }, ensure_ascii=False),
                 "event": event_type,

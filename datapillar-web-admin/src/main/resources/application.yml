@@ -78,3 +78,14 @@ airflow:
   password: ${AIRFLOW_PASSWORD:123456asd}
   connect-timeout: 5000
   read-timeout: 30000
+
+# Gravitino 配置
+gravitino:
+  uri: ${GRAVITINO_URI:http://localhost:8090}
+  metalake: ${GRAVITINO_METALAKE:OneMeta}
+
+# SQL 执行配置
+sql:
+  enabled: ${SQL_ENABLED:true}
+  max-rows: ${SQL_MAX_ROWS:200}
+  execution-timeout: ${SQL_TIMEOUT:300000}
