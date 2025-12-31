@@ -184,13 +184,14 @@ class ArchitectAgent:
 
         # 检查是否已选择组件（interrupt 恢复后会有）
         selected_component = state.metadata.get("selected_component")
+        selected_component_id = state.metadata.get("selected_component_id")
 
         if not selected_component:
             # 让用户选择组件
-            selected_component = self._ask_user_select_component(components)
+            selected_component, selected_component_id = self._ask_user_select_component(components)
             # interrupt 返回后，selected_component 是用户选择的值
 
-        logger.info(f"📦 用户选择组件: {selected_component}")
+        logger.info(f"📦 用户选择组件: {selected_component} (id={selected_component_id})")
 
         try:
             # 执行架构设计（带工具调用）
@@ -203,7 +204,9 @@ class ArchitectAgent:
             )
 
             # 构建 Workflow（强制使用用户选择的组件）
-            workflow_plan = self._build_workflow(result_dict, analysis, selected_component)
+            workflow_plan = self._build_workflow(
+                result_dict, analysis, selected_component, selected_component_id
+            )
 
             # DAG 验证
             dag_errors = workflow_plan.validate_dag()
@@ -239,7 +242,11 @@ class ArchitectAgent:
                     "messages": [AIMessage(content=f"架构设计完成: {workflow_plan.name}")],
                     "architecture_plan": workflow_plan.model_dump(),
                     "current_agent": "architect_agent",
-                    "metadata": {**state.metadata, "selected_component": selected_component},
+                    "metadata": {
+                        **state.metadata,
+                        "selected_component": selected_component,
+                        "selected_component_id": selected_component_id,
+                    },
                 }
             )
 
@@ -265,7 +272,7 @@ class ArchitectAgent:
             logger.error(f"获取组件列表失败: {e}")
             return []
 
-    def _ask_user_select_component(self, components: list) -> str:
+    def _ask_user_select_component(self, components: list) -> tuple[str, int | None]:
         """
         使用 interrupt 让用户选择组件
 
@@ -273,20 +280,24 @@ class ArchitectAgent:
             components: 可用组件列表
 
         Returns:
-            用户选择的组件代码
+            (组件代码, 组件ID)
         """
-        # 构建组件选项
+        # 构建组件选项和 code -> id 映射
         options = []
+        code_to_id = {}
         for comp in components:
             if isinstance(comp, dict):
-                code = comp.get("component_code", comp.get("code", ""))
-                name = comp.get("component_name", comp.get("name", ""))
-                comp_type = comp.get("component_type", comp.get("type", ""))
+                comp_id = comp.get("id")
+                code = comp.get("code", comp.get("component_code", ""))
+                name = comp.get("name", comp.get("component_name", ""))
+                comp_type = comp.get("type", comp.get("component_type", ""))
             else:
+                comp_id = getattr(comp, "id", None)
                 code = comp.code
                 name = comp.name
                 comp_type = comp.type
 
+            code_to_id[code] = comp_id
             options.append({
                 "value": code,
                 "label": f"{code}: {name}",
@@ -304,10 +315,14 @@ class ArchitectAgent:
             "options": options,
         })
 
-        # 返回用户选择的组件
+        # 解析用户选择
         if isinstance(user_selection, dict):
-            return user_selection.get("component", options[0]["value"] if options else "HIVE")
-        return user_selection or (options[0]["value"] if options else "HIVE")
+            selected_code = user_selection.get("component", options[0]["value"] if options else "HIVE")
+        else:
+            selected_code = user_selection or (options[0]["value"] if options else "HIVE")
+
+        selected_id = code_to_id.get(selected_code)
+        return selected_code, selected_id
 
     async def _design_with_tools(
         self,
@@ -395,6 +410,7 @@ class ArchitectAgent:
         result_dict: dict,
         analysis: AnalysisResult,
         selected_component: str,
+        selected_component_id: int | None,
     ) -> Workflow:
         """构建 Workflow 对象（强制使用用户选择的组件）"""
         jobs = []
@@ -416,7 +432,8 @@ class ArchitectAgent:
                 id=job_dict.get("id", ""),
                 name=job_dict.get("name", ""),
                 description=job_dict.get("description"),
-                type=selected_component,  
+                type=selected_component,
+                type_id=selected_component_id,
                 depends=job_dict.get("depends", []),
                 step_ids=job_dict.get("step_ids", []),
                 stages=stages,

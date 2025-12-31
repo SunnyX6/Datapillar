@@ -46,7 +46,8 @@ class Job(BaseModel):
     description: Optional[str] = Field(None, description="Job 描述")
 
     # 作业类型（统一字段：type）
-    type: str = Field(..., description="Job 类型：hive/shell/datax/flink/jdbc/python")
+    type: str = Field(..., description="Job 类型：HIVE/SHELL/DATAX/SPARK_SQL/PYTHON")
+    type_id: Optional[int] = Field(None, description="组件数字 ID（对应 job_component.id）")
 
     # 依赖关系（统一字段：depends）
     depends: List[str] = Field(default_factory=list, description="依赖的上游 Job ID 列表")

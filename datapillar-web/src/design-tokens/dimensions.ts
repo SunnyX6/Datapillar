@@ -164,6 +164,29 @@ export const iconSizeToken = {
 } as const
 
 /**
+ * 图标容器尺寸 ClassMap（正方形容器）
+ * 适用场景：大型装饰图标容器、表头图标、资产图标等
+ *
+ * ⚠️ 禁止直接硬编码 w-[72px] h-[72px]
+ * ✅ 使用此 ClassMap 的 size-* 类
+ */
+export const iconContainerSizeClassMap = {
+  /** 小：48px */
+  small: 'size-12',
+
+  /** 标准：64px */
+  normal: 'size-16',
+
+  /** 大：72px（表头大图标常用）*/
+  large: 'size-[72px]',
+
+  /** 超大：96px */
+  extraLarge: 'size-24'
+} as const
+
+export type IconContainerSize = keyof typeof iconContainerSizeClassMap
+
+/**
  * 模态框宽度 ClassMap（PC 端）
  * 适用场景：对话框、弹窗
  *

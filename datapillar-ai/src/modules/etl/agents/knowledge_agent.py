@@ -211,6 +211,7 @@ class KnowledgeAgent:
             results = ComponentRepository.list_active_components()
             return [
                 ComponentNav(
+                    id=row.get("id"),
                     code=row.get("component_code", ""),
                     name=row.get("component_name", ""),
                     type=row.get("component_type", ""),

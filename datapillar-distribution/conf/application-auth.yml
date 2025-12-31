@@ -1,0 +1,41 @@
+# Datapillar Auth 生产环境配置
+
+server:
+  port: ${SERVER_PORT:8082}
+
+spring:
+  application:
+    name: datapillar-auth
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:datapillar}?useSSL=false&serverTimezone=UTC&characterEncoding=utf8&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:Sunny.123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+
+logging:
+  level:
+    com.sunny.datapillar: INFO
+    org.springframework: WARN
+    root: INFO
+  file:
+    name: ${DATAPILLAR_LOG_DIR:./logs}/datapillar-auth.log
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
+      total-size-cap: 5GB
+
+# JWT 配置
+jwt:
+  secret: ${JWT_SECRET:datapillar-secret-key-please-change-in-production}
+  expiration: ${JWT_EXPIRATION:86400000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}

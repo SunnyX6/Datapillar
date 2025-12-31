@@ -52,6 +52,7 @@ public enum WebAdminErrorCode {
     WORKFLOW_INVALID_STATUS("WORKFLOW_INVALID_STATUS", "工作流状态不正确: %s"),
     JOB_NOT_FOUND("JOB_NOT_FOUND", "任务不存在: jobId=%s"),
     JOB_TYPE_NOT_FOUND("JOB_TYPE_NOT_FOUND", "任务类型不存在: jobType=%s"),
+    COMPONENT_NOT_FOUND("COMPONENT_NOT_FOUND", "组件不存在: code=%s"),
     DEPENDENCY_EXISTS("DEPENDENCY_EXISTS", "依赖关系已存在"),
     DEPENDENCY_NOT_FOUND("DEPENDENCY_NOT_FOUND", "依赖关系不存在"),
     DAG_HAS_CYCLE("DAG_HAS_CYCLE", "工作流存在循环依赖");

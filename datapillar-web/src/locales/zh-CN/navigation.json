@@ -32,7 +32,7 @@
     },
     "items": {
       "workflow": "工作流构建",
-      "sql": "SQL 编辑器",
+      "ide": "统一开发 IDE",
       "catalog": "数据目录",
       "warehouses": "计算仓",
       "jobs": "任务与集群",

@@ -48,7 +48,7 @@ export function WorkflowCanvasPanel({ viewportVersion = 0 }: { viewportVersion?:
   return (
     <div
       ref={canvasRef}
-      className={cn('flex-1 relative overflow-hidden transition-colors duration-300', isDark ? 'bg-[#050713]' : 'bg-[#f1f5f9]')}
+      className={cn('flex-1 relative overflow-hidden transition-colors duration-300', isDark ? 'bg-slate-900' : 'bg-[#f1f5f9]')}
     >
       {hasWorkflow ? (
         <Suspense

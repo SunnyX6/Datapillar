@@ -23,7 +23,7 @@ import {
   X
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { contentMaxWidthClassMap } from '@/design-tokens/dimensions'
+import { contentMaxWidthClassMap, iconContainerSizeClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { formatTime } from '@/lib/utils'
 import { type TableAsset } from '../type/types'
@@ -512,8 +512,8 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
 
         <div className="flex flex-col gap-4 @md:flex-row @md:items-start @md:justify-between">
           <div className="flex gap-5">
-            <div className="w-[72px] h-[72px] rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-200 dark:shadow-blue-900/40">
-              <TableIcon size={30} />
+            <div className={`${iconContainerSizeClassMap.small} rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-200 dark:shadow-blue-900/40`}>
+              <TableIcon size={24} />
             </div>
             <div className="space-y-3">
               <div className="flex items-center gap-3">

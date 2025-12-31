@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Database, FolderTree, Menu, MoreVertical, Server, Table as TableIcon, Folder, Activity, Box, Layers } from 'lucide-react'
+import { Database, Menu, MoreVertical, Server, Table as TableIcon, Folder, Activity, Box, Layers } from 'lucide-react'
 import {
   SiApachehive,
   SiApachespark,
@@ -26,20 +26,14 @@ import { type CatalogFormHandle } from './metadata/form/CatalogForm'
 import { type SchemaFormHandle } from './metadata/form/SchemaForm'
 import { type CatalogAsset, type NodeType, type SchemaAsset, type TableAsset } from './metadata/type/types'
 import { Modal, ModalCancelButton, ModalPrimaryButton } from '@/components/ui'
-import { useSearchStore } from '@/stores'
+import { useSearchStore, useMetadataStore } from '@/stores'
 import {
-  fetchCatalogs,
-  fetchSchemas,
-  fetchTables,
   createCatalog,
   createSchema,
   createTable,
   updateTable,
   mapProviderToIcon,
-  associateObjectTags,
-  type CatalogItem,
-  type SchemaItem,
-  type TableItem
+  associateObjectTags
 } from '@/services/oneMetaService'
 
 const INDENT_PX = 18
@@ -53,10 +47,19 @@ export function MetadataView() {
     tableName?: string
   }>()
 
-  const [catalogs, setCatalogs] = useState<CatalogItem[]>([])
-  const [schemasMap, setSchemasMap] = useState<Map<string, SchemaItem[]>>(new Map())
-  const [tablesMap, setTablesMap] = useState<Map<string, TableItem[]>>(new Map())
-  const [_isLoading, setIsLoading] = useState(false)
+  // 使用全局 store 管理元数据
+  const {
+    catalogs,
+    schemasMap,
+    tablesMap,
+    loadCatalogs,
+    loadSchemas,
+    loadTables,
+    refreshCatalogs,
+    refreshSchemas,
+    refreshTables
+  } = useMetadataStore()
+
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => new Set<string>(['ROOT']))
   const [selectedNodeId, setSelectedNodeId] = useState<string>('ROOT')
   const [selectedNodeType, setSelectedNodeType] = useState<NodeType>('ROOT')
@@ -100,64 +103,15 @@ export function MetadataView() {
       return next
     })
 
-    // 加载数据
-    async function loadData() {
-      try {
-        setIsLoading(true)
-        const catalogsData = await fetchCatalogs()
-        setCatalogs(catalogsData)
-
-        if (catalogName) {
-          const schemas = await fetchSchemas(catalogName)
-          setSchemasMap((prev) => new Map(prev).set(catalogName, schemas))
-        }
-        if (catalogName && schemaName) {
-          const tables = await fetchTables(catalogName, schemaName)
-          setTablesMap((prev) => new Map(prev).set(`${catalogName}.${schemaName}`, tables))
-        }
-      } catch {
-        // 错误已由统一客户端通过 toast 显示
-      } finally {
-        setIsLoading(false)
-      }
+    // 加载数据（store 内部会检查缓存，避免重复请求）
+    loadCatalogs()
+    if (catalogName) {
+      loadSchemas(catalogName)
     }
-    loadData()
-  }, [catalogName, schemaName, tableName])
-
-  async function loadCatalogs() {
-    try {
-      setIsLoading(true)
-      const catalogsData = await fetchCatalogs()
-      setCatalogs(catalogsData)
-    } catch {
-      // 错误已由统一客户端通过 toast 显示
-    } finally {
-      setIsLoading(false)
+    if (catalogName && schemaName) {
+      loadTables(catalogName, schemaName)
     }
-  }
-
-  async function loadSchemas(catalogId: string) {
-    if (schemasMap.has(catalogId)) return
-
-    try {
-      const schemas = await fetchSchemas(catalogId)
-      setSchemasMap((prev) => new Map(prev).set(catalogId, schemas))
-    } catch {
-      // 错误已由统一客户端通过 toast 显示
-    }
-  }
-
-  async function loadTables(catalogId: string, schemaId: string) {
-    const fullSchemaId = `${catalogId}.${schemaId}`
-    if (tablesMap.has(fullSchemaId)) return
-
-    try {
-      const tables = await fetchTables(catalogId, schemaId)
-      setTablesMap((prev) => new Map(prev).set(fullSchemaId, tables))
-    } catch {
-      // 错误已由统一客户端通过 toast 显示
-    }
-  }
+  }, [catalogName, schemaName, tableName, loadCatalogs, loadSchemas, loadTables])
 
   async function handleSubmit() {
     if (isSubmitting) return
@@ -209,13 +163,8 @@ export function MetadataView() {
 
         closeModal()
 
-        // 清除表缓存，强制重新加载
-        setTablesMap((prev) => {
-          const next = new Map(prev)
-          next.delete(modalState.nodeId)
-          return next
-        })
-        await loadTables(catalogName, schemaName)
+        // 刷新表缓存
+        await refreshTables(catalogName, schemaName)
         setRefreshKey((k) => k + 1)
 
         // 如果表名变了，需要更新 URL
@@ -239,7 +188,7 @@ export function MetadataView() {
           properties: formData.properties
         })
 
-        await loadCatalogs()
+        await refreshCatalogs()
 
         const newCatalogId = formData.name
         setExpandedNodes((prev) => new Set(prev).add(newCatalogId))
@@ -255,12 +204,7 @@ export function MetadataView() {
           comment: formData.comment
         })
 
-        setSchemasMap((prev) => {
-          const next = new Map(prev)
-          next.delete(modalState.nodeId)
-          return next
-        })
-        await loadSchemas(modalState.nodeId)
+        await refreshSchemas(modalState.nodeId)
         closeModal()
       } else if (modalState.nodeType === 'SCHEMA') {
         if (!tableFormRef.current?.validate()) return
@@ -380,12 +324,7 @@ export function MetadataView() {
           }
 
           // 刷新表列表
-          setTablesMap((prev) => {
-            const next = new Map(prev)
-            next.delete(modalState.nodeId)
-            return next
-          })
-          await loadTables(catalogName, schemaName)
+          await refreshTables(catalogName, schemaName)
           closeModal()
           toast.success(`表 ${formData.name} 创建成功`)
         }
@@ -979,7 +918,7 @@ function TreeNode({
   const icon = (() => {
     if (type === 'ROOT') return <Server size={14} className="text-indigo-500" />
     if (type === 'CATALOG') return getCatalogIcon(catalogIcon)
-    if (type === 'SCHEMA') return <FolderTree size={14} className="text-amber-500" />
+    if (type === 'SCHEMA') return <Database size={14} className="text-amber-500" />
     return <TableIcon size={14} className="text-slate-400" />
   })()
 

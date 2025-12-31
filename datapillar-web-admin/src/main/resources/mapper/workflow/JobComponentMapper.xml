@@ -4,7 +4,7 @@
 
     <select id="selectAllComponents" resultType="com.sunny.datapillar.admin.module.workflow.entity.JobComponent">
         SELECT id, component_code, component_name, component_type,
-               job_params, description, icon, sort_order
+               job_params, description, icon, color, sort_order
         FROM job_component
         WHERE status = 1 AND is_deleted = 0
         ORDER BY sort_order, id
@@ -12,14 +12,14 @@
 
     <select id="selectByCode" resultType="com.sunny.datapillar.admin.module.workflow.entity.JobComponent">
         SELECT id, component_code, component_name, component_type,
-               job_params, description, icon, sort_order
+               job_params, description, icon, color, sort_order
         FROM job_component
         WHERE component_code = #{code} AND is_deleted = 0
     </select>
 
     <select id="selectByType" resultType="com.sunny.datapillar.admin.module.workflow.entity.JobComponent">
         SELECT id, component_code, component_name, component_type,
-               job_params, description, icon, sort_order
+               job_params, description, icon, color, sort_order
         FROM job_component
         WHERE component_type = #{type} AND status = 1 AND is_deleted = 0
         ORDER BY sort_order, id

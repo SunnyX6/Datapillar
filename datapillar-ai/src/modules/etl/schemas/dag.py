@@ -14,7 +14,7 @@ from src.modules.etl.schemas.plan import Job, Workflow
 class JobResponse(BaseModel):
     """任务响应格式（与 Web-Admin JobDto.Response 兼容）"""
 
-    id: str = Field(..., description="任务 ID（临时 ID，保存时由后端生成）")
+    id: int | None = Field(default=None, description="任务 ID（临时 ID，保存时由后端生成）")
     jobName: str = Field(..., description="任务名称")
     jobType: int | None = Field(default=None, description="任务类型 ID")
     jobTypeCode: str = Field(..., description="组件代码（hive/shell/python 等）")
@@ -32,8 +32,8 @@ class JobResponse(BaseModel):
 class JobDependencyResponse(BaseModel):
     """任务依赖响应格式（与 Web-Admin JobDependencyDto.Response 兼容）"""
 
-    jobId: str = Field(..., description="当前任务 ID")
-    parentJobId: str = Field(..., description="上游任务 ID")
+    jobId: int = Field(..., description="当前任务 ID")
+    parentJobId: int = Field(..., description="上游任务 ID")
 
 
 class WorkflowResponse(BaseModel):
@@ -153,14 +153,21 @@ def convert_workflow(workflow: Workflow) -> WorkflowResponse:
         trigger_type = 1  # CRON
         trigger_value = workflow.schedule
 
+    # 建立字符串 ID 到数字临时 ID 的映射
+    id_mapping: dict[str, int] = {}
+    for idx, job in enumerate(workflow.jobs, start=1):
+        id_mapping[job.id] = idx
+
     # 转换 Jobs
     job_responses: list[JobResponse] = []
     for job in workflow.jobs:
         pos_x, pos_y = positions.get(job.id, (0.0, 0.0))
+        temp_id = id_mapping.get(job.id)
 
         job_response = JobResponse(
-            id=job.id,
+            id=temp_id,
             jobName=job.name or job.id,
+            jobType=job.type_id,
             jobTypeCode=job.type,
             jobParams=job.config or {},
             timeoutSeconds=job.timeout or 0,
@@ -177,9 +184,11 @@ def convert_workflow(workflow: Workflow) -> WorkflowResponse:
     dependency_responses: list[JobDependencyResponse] = []
     for job in workflow.jobs:
         for parent_id in job.depends:
+            job_temp_id = id_mapping.get(job.id, 0)
+            parent_temp_id = id_mapping.get(parent_id, 0)
             dependency_response = JobDependencyResponse(
-                jobId=job.id,
-                parentJobId=parent_id,
+                jobId=job_temp_id,
+                parentJobId=parent_temp_id,
             )
             dependency_responses.append(dependency_response)
 

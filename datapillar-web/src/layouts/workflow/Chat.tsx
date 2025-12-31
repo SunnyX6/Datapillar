@@ -3,7 +3,9 @@ import { ArrowUp, Bot, Loader2, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { messageWidthClassMap } from '@/design-tokens/dimensions'
 import { useWorkflowStudioStore } from '@/stores'
-import { generateWorkflowFromPrompt } from '@/services/workflowStudioService'
+import { convertAIResponseToGraph } from '@/services/workflowStudioService'
+import { createWorkflowStream, generateSessionId, type CompletedData, type InterruptData } from '@/services/aiWorkflowService'
+
 type WorkflowStudioSnapshot = ReturnType<typeof useWorkflowStudioStore.getState>
 
 const prefetchWorkflowCanvas = (() => {
@@ -53,7 +55,7 @@ function VirtualizedMessageList({ messages, renderMessage, scrollRef, className 
   const heightsRef = useRef<Map<string, number>>(new Map())
   const [heightsVersion, setHeightsVersion] = useState(0)
   const [viewport, setViewport] = useState({ top: 0, height: 0 })
-   const [measurements, setMeasurements] = useState<{ items: MeasuredItem[]; totalHeight: number }>({
+  const [measurements, setMeasurements] = useState<{ items: MeasuredItem[]; totalHeight: number }>({
     items: [],
     totalHeight: 0
   })
@@ -178,7 +180,10 @@ export function ChatPanel() {
   const setWorkflow = useWorkflowStudioStore((state) => state.setWorkflow)
   const setLastPrompt = useWorkflowStudioStore((state) => state.setLastPrompt)
   const [input, setInput] = useState('')
+  const [statusText, setStatusText] = useState('构建编排图中...')
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const cancelStreamRef = useRef<(() => void) | null>(null)
+  const sessionIdRef = useRef<string>(generateSessionId())
 
   useEffect(() => {
     const handle = scheduleIdle(() => {
@@ -192,6 +197,15 @@ export function ChatPanel() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages, isGenerating])
+
+  // 清理 SSE 连接
+  useEffect(() => {
+    return () => {
+      if (cancelStreamRef.current) {
+        cancelStreamRef.current()
+      }
+    }
+  }, [])
 
   const typingIconSize = 14
   const sendIconSize = 15
@@ -212,29 +226,62 @@ export function ChatPanel() {
     setInput('')
     setLastPrompt(prompt)
     setGenerating(true)
+    setStatusText('正在连接 AI 服务...')
 
-    try {
-      const workflow = await generateWorkflowFromPrompt(prompt)
-      setWorkflow(workflow)
-      addMessage({
-        id: nextMessageId(),
-        role: 'assistant',
-        content: `生成完成：${workflow.name}，共 ${workflow.stats.nodes} 个节点、${workflow.stats.edges} 条连线。${workflow.summary}`,
-        timestamp: Date.now()
-      })
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('[WorkflowStudio] generate workflow failed', error)
-      }
-      addMessage({
-        id: nextMessageId(),
-        role: 'assistant',
-        content: '生成工作流失败，请稍后再试或修改描述。',
-        timestamp: Date.now()
-      })
-    } finally {
-      setGenerating(false)
+    // 取消之前的流
+    if (cancelStreamRef.current) {
+      cancelStreamRef.current()
     }
+
+    // 创建新的 SSE 连接
+    cancelStreamRef.current = createWorkflowStream(prompt, sessionIdRef.current, {
+      onAgentStarted: (_agent: string, name: string) => {
+        setStatusText(`${name} 正在工作...`)
+      },
+      onToolCalled: (_agent: string, tool: string) => {
+        setStatusText(`正在调用 ${tool}...`)
+      },
+      onInterrupted: (data: InterruptData) => {
+        setGenerating(false)
+        addMessage({
+          id: nextMessageId(),
+          role: 'assistant',
+          content: `${data.message}\n${data.questions?.join('\n') || ''}`,
+          timestamp: Date.now()
+        })
+      },
+      onCompleted: (data: CompletedData) => {
+        setGenerating(false)
+        if (data.dag_output) {
+          const workflow = convertAIResponseToGraph(data.dag_output)
+          setWorkflow(workflow)
+          addMessage({
+            id: nextMessageId(),
+            role: 'assistant',
+            content: `生成完成：${workflow.name}，共 ${workflow.stats.nodes} 个节点、${workflow.stats.edges} 条连线。${workflow.summary}`,
+            timestamp: Date.now()
+          })
+          // 生成新的 sessionId 用于下次对话
+          sessionIdRef.current = generateSessionId()
+        } else {
+          addMessage({
+            id: nextMessageId(),
+            role: 'assistant',
+            content: '工作流生成完成，但未返回结果。',
+            timestamp: Date.now()
+          })
+        }
+      },
+      onError: (error: string) => {
+        setGenerating(false)
+        addMessage({
+          id: nextMessageId(),
+          role: 'assistant',
+          content: `生成工作流失败：${error}`,
+          timestamp: Date.now()
+        })
+      }
+    })
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -245,7 +292,7 @@ export function ChatPanel() {
   }
 
   return (
-    <aside className="w-full h-full flex-shrink-0 bg-white/90 dark:bg-[#0a0b14] flex flex-col overflow-hidden">
+    <aside className="w-full h-full flex-shrink-0 bg-white/90 dark:bg-slate-900/95 flex flex-col overflow-hidden">
       <VirtualizedMessageList
         messages={messages}
         scrollRef={scrollRef}
@@ -259,7 +306,7 @@ export function ChatPanel() {
           </div>
           <div className="bg-slate-100 dark:bg-slate-800/70 rounded-lg border border-slate-200/50 dark:border-slate-700/50 flex items-center gap-2 text-slate-600 dark:text-slate-300 px-3 py-2 text-body-sm">
             <Loader2 size={typingIconSize} className="animate-spin text-indigo-500" />
-            构建编排图中...
+            {statusText}
           </div>
         </div>
       )}
@@ -274,7 +321,7 @@ export function ChatPanel() {
             className={cn(
               'w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/60 text-slate-700 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:focus:ring-indigo-500 scrollbar-invisible',
               'text-body-sm min-h-12 pl-4 pr-11 py-1.5 leading-snug'
-        )}
+            )}
             placeholder="描述你的数据工作流需求..."
           />
           <button
@@ -314,7 +361,7 @@ const ChatBubble = memo(
         <div className={cn('flex flex-col gap-1', messageWidthClassMap.default, isUser ? 'items-end' : 'items-start')}>
           <div
             className={cn(
-              'rounded-2xl leading-relaxed border',
+              'rounded-2xl leading-relaxed border whitespace-pre-wrap',
               isUser
                 ? 'bg-indigo-600 text-white rounded-tr-none border-indigo-600/60'
                 : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 rounded-tl-none border-slate-200 dark:border-slate-700',
