@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import QueuePool
 
-from src.shared.config import settings
+from src.shared.config.settings import settings
 
 logger = structlog.get_logger()
 

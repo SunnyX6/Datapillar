@@ -11,8 +11,9 @@ from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field, field_validator
 
-from src.modules.etl.schemas.kg_context import GlobalKGContext, AgentScopedContext
+from src.modules.etl.schemas.kg_context import AgentScopedContext
 from src.modules.etl.schemas.plan import TestResult, Workflow
+from src.modules.etl.schemas.requests import BlackboardRequest
 from src.modules.etl.schemas.requirement import AnalysisResult
 
 
@@ -34,13 +35,33 @@ class AgentState(BaseModel):
     # ==================== 用户输入 ====================
     user_input: str = Field(default="")
 
-    # ==================== 知识图谱上下文（KnowledgeAgent 输出）====================
-    # 全局知识图谱上下文（所有 Agent 共享的导航信息）
-    global_kg_context: GlobalKGContext | None = None
-
-    # Agent 专属上下文（每个 Agent 的指针 + 工具）
+    # ==================== 知识上下文（KnowledgeAgent 输出）====================
+    # Agent 专属上下文（每个 Agent 的指针 + 工具 allowlist）
     # key: agent_type（analyst/architect/developer/tester）
     agent_contexts: dict[str, AgentScopedContext] = Field(default_factory=dict)
+
+    # ==================== 黑板请求（协作与人机交互）====================
+    pending_requests: list[BlackboardRequest] = Field(default_factory=list)
+
+    # ==================== 人机交互结果（控制面）====================
+    # 原始用户回复（按 request_id 聚合，便于审计与复盘）
+    human_responses: dict[str, Any] = Field(default_factory=dict)
+    # writeback_key 对应的结构化写回（用于 UI 控件选择等；避免污染 metadata）
+    human_writebacks: dict[str, Any] = Field(default_factory=dict)
+
+    # ==================== 关键决策（业务主线）====================
+    # 架构师需要的组件选择（来自 human_in_the_loop 的 writeback）
+    selected_component: str | None = None
+    selected_component_id: int | None = None
+
+    # ==================== 委派与请求审计（控制面）====================
+    # 防止同一 Agent 重复委派造成死循环
+    delegation_counters: dict[str, int] = Field(default_factory=dict)
+    # delegate 请求完成记录（按 request_id）
+    request_results: dict[str, Any] = Field(default_factory=dict)
+
+    # ==================== 路由辅助（控制面）====================
+    last_node: str | None = None
 
     # ==================== 需求分析（Analyst Agent 输出）====================
     analysis_result: AnalysisResult | None = None
@@ -63,17 +84,13 @@ class AgentState(BaseModel):
     iteration_count: int = Field(default=0)
     max_iterations: int = Field(default=3)
 
-    # 澄清计数（用于控制澄清循环次数）
-    clarification_count: int = Field(default=0)
-    max_clarifications: int = Field(default=3)
-
     # ==================== 状态标记 ====================
-    # 是否需要用户澄清
-    needs_clarification: bool = Field(default=False)
-    clarification_questions: list[str] = Field(default_factory=list)
-
     # 是否完成
     is_completed: bool = Field(default=False)
+
+    # 人机交互上限（避免无限 interrupt）
+    human_request_count: int = Field(default=0)
+    max_human_requests: int = Field(default=6)
 
     # 错误信息
     error: str | None = None
@@ -90,16 +107,6 @@ class AgentState(BaseModel):
 
     # ==================== 自动类型转换 ====================
 
-    @field_validator("global_kg_context", mode="before")
-    @classmethod
-    def convert_global_kg_context(cls, v):
-        """自动将 dict 转换为 GlobalKGContext"""
-        if v is None:
-            return None
-        if isinstance(v, dict):
-            return GlobalKGContext(**v)
-        return v
-
     @field_validator("agent_contexts", mode="before")
     @classmethod
     def convert_agent_contexts(cls, v):
@@ -114,6 +121,57 @@ class AgentState(BaseModel):
                 else:
                     result[key] = value
             return result
+        return v
+
+    @field_validator("metadata", mode="before")
+    @classmethod
+    def validate_metadata_reserved_keys(cls, v):
+        """
+        metadata 仅允许存放调试信息，禁止承载任何业务主线或编排控制字段。
+
+        说明：
+        - 关键决策/控制面字段必须放在 AgentState 显式字段里（例如 selected_component / request_results 等）
+        - 这样可以避免 metadata 退化为“垃圾堆”，导致代码可读性与可维护性崩溃
+        """
+        if v is None:
+            return {}
+        if not isinstance(v, dict):
+            return v
+        reserved = {
+            "selected_component",
+            "selected_component_id",
+            "human_responses",
+            "human_writebacks",
+            "delegation_counters",
+            "request_results",
+            "last_node",
+        }
+        bad = sorted(set(v.keys()) & reserved)
+        if bad:
+            raise ValueError(f"metadata 禁止包含保留字段: {bad}（请迁移到 AgentState 显式字段）")
+        legacy_patterns = (
+            "_delegate_knowledge_count",
+            "delegate_developer_for_sql_count",
+        )
+        legacy_hits = [k for k in v.keys() if any(p in k for p in legacy_patterns)]
+        if legacy_hits:
+            raise ValueError(f"metadata 禁止包含旧版委派计数 key: {sorted(legacy_hits)}（请迁移到 delegation_counters）")
+        return v
+
+    @field_validator("pending_requests", mode="before")
+    @classmethod
+    def convert_pending_requests(cls, v):
+        """自动将 dict 转换为 BlackboardRequest"""
+        if v is None:
+            return []
+        if isinstance(v, list):
+            converted = []
+            for item in v:
+                if isinstance(item, dict):
+                    converted.append(BlackboardRequest(**item))
+                else:
+                    converted.append(item)
+            return converted
         return v
 
     @field_validator("analysis_result", mode="before")
@@ -165,15 +223,6 @@ class AgentState(BaseModel):
         self.error = None
 
     # ==================== 类型安全的 Getter ====================
-
-    def get_global_kg_context(self) -> GlobalKGContext | None:
-        """类型安全地获取 global_kg_context"""
-        v = self.global_kg_context
-        if v is None:
-            return None
-        if isinstance(v, dict):
-            return GlobalKGContext(**v)
-        return v
 
     def get_agent_context(self, agent_type: str) -> AgentScopedContext | None:
         """获取指定 Agent 的专属上下文"""

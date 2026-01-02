@@ -2,7 +2,7 @@
 Architect Agent（数据架构师）
 
 职责：技术层面的规划
-- 根据业务分析结果，决定技术实现方案
+- 根据需求分析结果（AnalystAgent 产物），决定技术实现方案
 - 选择合适的组件（HIVE/SPARK_SQL/FLINK 等）
 - 决定需要几个 Job（前端节点）
 - 规划每个 Job 的 Stage（SQL 执行单元）
@@ -11,15 +11,15 @@ Architect Agent（数据架构师）
 
 import json
 import logging
-import re
-from collections import Counter
+import uuid
 
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-from langgraph.types import Command, interrupt
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langgraph.types import Command
 
 from src.infrastructure.llm.client import call_llm
-from src.modules.etl.schemas.kg_context import AgentScopedContext, AgentType, GlobalKGContext
+from src.modules.etl.schemas.kg_context import AgentScopedContext, AgentType
 from src.modules.etl.schemas.plan import Job, Stage, Workflow
+from src.modules.etl.schemas.requests import BlackboardRequest
 from src.modules.etl.schemas.requirement import AnalysisResult
 from src.modules.etl.schemas.state import AgentState
 from src.modules.etl.tools.agent_tools import get_table_lineage, list_component
@@ -27,40 +27,36 @@ from src.modules.etl.tools.agent_tools import get_table_lineage, list_component
 logger = logging.getLogger(__name__)
 
 
-ARCHITECT_AGENT_PROMPT = """你是资深数据架构师。
+ARCHITECT_AGENT_SYSTEM_INSTRUCTIONS = """你是资深数据架构师。
 
 ## 任务
-根据业务分析结果，设计技术实现方案：
+根据需求分析结果，设计技术实现方案：
 1. 决定需要几个 Job（前端节点）
 2. 规划每个 Job 的 Stage（SQL 执行单元）
 3. 确定 Job 之间的调度依赖
 
-## 业务分析结果
-{analysis_result}
+## 任务参数（系统注入，不是用户输入）
+系统会提供一段“任务参数 JSON”（SystemMessage），其中包含：
+- analysis_result：需求分析结果（AnalystAgent 产物，严格 JSON）
+- selected_component：用户选择的组件（所有 Job 都使用此组件）
+- tools_description：可用工具说明（用于决定何时调用工具）
 
-## 用户选择的组件
-{selected_component}
-（所有 Job 都使用此组件）
+## 知识上下文（系统注入，不是用户输入）
+系统会提供一段“知识上下文 JSON”（SystemMessage），其中包含：
+- tables：可用的 schema.table 列表（导航指针）
+- table_pointers/etl_pointers：可验证的 ETL 指针（含 qualified_name/element_id/tools）
+- allowlist_tools：你允许调用的工具名列表
 
-## 知识上下文
-
-### 相关表（KnowledgeAgent 发现的）
-{discovered_tables}
-
-### 表级血缘（已有的数据流向）
-{lineage_info}
-
-### 可用工具
-{tools_description}
-
-## 用户原始需求
-{user_query}
+你必须把该 JSON 视为唯一可信知识入口：
+- 禁止臆造任何 schema.table
+- 工具调用只能使用该 JSON 中出现的表指针（按 qualified_name 精确匹配）
+- 仅当 ETLPointer.tools 包含工具名时，才允许对该表调用该工具
 
 ## 设计原则
 1. **Job 划分**：
    - 简单需求用一个 Job
    - 每个 Job 对应前端一个节点
-   - 所有 Job 的 type 都使用用户选择的组件: {selected_component}
+   - 所有 Job 的 type 都使用 selected_component
 
 2. **Job 依赖**（调度依赖）：
    - Job 之间是调度依赖，不是数据依赖
@@ -73,8 +69,6 @@ ARCHITECT_AGENT_PROMPT = """你是资深数据架构师。
    - 跨 Job 必须用持久化表
 
 ## 输出格式
-
-```json
 {{
   "name": "工作流名称",
   "description": "工作流描述",
@@ -103,14 +97,12 @@ ARCHITECT_AGENT_PROMPT = """你是资深数据架构师。
   "risks": ["架构风险点"],
   "confidence": 0.85
 }}
-```
+
+重要：
+- **必须输出纯 JSON**：不得输出 Markdown、不得输出 ```json 代码块、不得输出解释性文字
 
 只输出 JSON，不要解释。
 """
-
-
-# 绑定的工具
-ARCHITECT_TOOLS = [get_table_lineage, list_component]
 
 
 class ArchitectAgent:
@@ -127,7 +119,7 @@ class ArchitectAgent:
 
     def __init__(self):
         self.llm = call_llm(temperature=0.0)
-        self.llm_with_tools = self.llm.bind_tools(ARCHITECT_TOOLS)
+        self.llm_json = call_llm(temperature=0.0, enable_json_mode=True)
         self.max_tool_calls = 4
 
     async def __call__(self, state: AgentState) -> Command:
@@ -136,29 +128,39 @@ class ArchitectAgent:
         user_input = state.user_input
 
         if not analysis_result:
+            req = BlackboardRequest(
+                request_id=f"req_{uuid.uuid4().hex}",
+                kind="delegate",
+                created_by="architect_agent",
+                target_agent="analyst_agent",
+                resume_to="architect_agent",
+                payload={
+                    "type": "need_analysis_result",
+                    "message": "架构设计需要需求分析结果，已委派需求分析师先完成需求收敛。",
+                },
+            )
+            pending = list(state.pending_requests or [])
+            pending.append(req)
             return Command(
                 update={
-                    "messages": [AIMessage(content="缺少需求分析结果，无法设计架构")],
+                    "messages": [AIMessage(content="缺少需求分析结果，已委派需求分析师")],
                     "current_agent": "architect_agent",
-                    "error": "缺少需求分析结果",
+                    "pending_requests": [r.model_dump() for r in pending],
                 }
             )
 
         logger.info("🏗️ ArchitectAgent 开始设计架构")
 
         # 获取上下文
-        global_kg_context = state.get_global_kg_context()
         agent_context = state.get_agent_context(AgentType.ARCHITECT)
-
-        if not global_kg_context:
-            global_kg_context = GlobalKGContext()
 
         if not agent_context:
             agent_context = AgentScopedContext.create_for_agent(
                 agent_type=AgentType.ARCHITECT,
                 tables=[],
-                user_query=user_input,
             )
+        context_payload = self._build_context_payload(agent_context=agent_context)
+        llm_with_tools = self._bind_tools_by_allowlist(agent_context)
 
         # 解析 AnalysisResult
         if isinstance(analysis_result, dict):
@@ -166,30 +168,61 @@ class ArchitectAgent:
         else:
             analysis = analysis_result
 
-        # 获取可用组件
-        components = global_kg_context.components
+        # 获取可用组件（必须通过工具获取，禁止依赖全局上下文缓存）
+        components = await self._get_components(agent_context=agent_context)
         if not components:
-            # 通过工具获取组件列表
-            components_result = await self._get_components()
-            if not components_result:
-                return Command(
-                    update={
-                        "messages": [AIMessage(content="未找到可用组件")],
-                        "current_agent": "architect_agent",
-                        "error": "未找到可用组件",
-                    }
-                )
-            # 解析组件列表用于展示
-            components = components_result
+            return Command(
+                update={
+                    "messages": [AIMessage(content="未找到可用组件")],
+                    "current_agent": "architect_agent",
+                    "error": "未找到可用组件",
+                }
+            )
 
-        # 检查是否已选择组件（interrupt 恢复后会有）
-        selected_component = state.metadata.get("selected_component")
-        selected_component_id = state.metadata.get("selected_component_id")
-
+        # 检查是否已选择组件（由统一 human_in_the_loop 写回）
+        selected_component = state.selected_component
         if not selected_component:
-            # 让用户选择组件
-            selected_component, selected_component_id = self._ask_user_select_component(components)
-            # interrupt 返回后，selected_component 是用户选择的值
+            options = []
+            for comp in components:
+                comp_id = comp.get("id")
+                code = comp.get("code", comp.get("component_code", ""))
+                name = comp.get("name", comp.get("component_name", ""))
+                comp_type = comp.get("type", comp.get("component_type", ""))
+                options.append({
+                    "value": code,
+                    "label": f"{code}: {name}",
+                    "type": comp_type,
+                    "id": comp_id,
+                })
+
+            req = BlackboardRequest(
+                request_id=f"req_{uuid.uuid4().hex}",
+                kind="human",
+                created_by="architect_agent",
+                resume_to="blackboard_router",
+                payload={
+                    "type": "component_selection",
+                    "message": "请选择要使用的技术组件：",
+                    "options": options,
+                    "writeback_key": "selected_component",
+                },
+            )
+            pending = list(state.pending_requests or [])
+            pending.append(req)
+            return Command(
+                update={
+                    "messages": [AIMessage(content="需要你先选择技术组件，才能继续架构设计")],
+                    "pending_requests": [r.model_dump() for r in pending],
+                    "current_agent": "architect_agent",
+                }
+            )
+
+        selected_component_id = state.selected_component_id
+        for comp in components:
+            code = comp.get("code", comp.get("component_code", ""))
+            if code == selected_component:
+                selected_component_id = comp.get("id")
+                break
 
         logger.info(f"📦 用户选择组件: {selected_component} (id={selected_component_id})")
 
@@ -199,7 +232,8 @@ class ArchitectAgent:
                 analysis=analysis,
                 selected_component=selected_component,
                 agent_context=agent_context,
-                global_kg_context=global_kg_context,
+                context_payload=context_payload,
+                llm_with_tools=llm_with_tools,
                 user_query=user_input,
             )
 
@@ -232,6 +266,64 @@ class ArchitectAgent:
                 for err in temp_table_errors:
                     logger.warning(f"⚠️ 临时表作用域问题: {err}")
 
+            # 表指针约束：禁止引入知识上下文之外的持久化表（temp.* 除外）
+            allowed_tables = self._build_allowed_tables(agent_context.etl_pointers)
+            unknown_tables = self._find_unknown_tables(workflow_plan, allowed_tables=allowed_tables)
+            if unknown_tables:
+                counters = dict(state.delegation_counters or {})
+                counter_key = "architect_agent:delegate:knowledge_agent:unknown_tables"
+                delegated = int(counters.get(counter_key) or 0)
+                if delegated < 1:
+                    counters[counter_key] = delegated + 1
+                    req = BlackboardRequest(
+                        request_id=f"req_{uuid.uuid4().hex}",
+                        kind="delegate",
+                        created_by="architect_agent",
+                        target_agent="knowledge_agent",
+                        resume_to="architect_agent",
+                        payload={
+                            "type": "refresh_knowledge",
+                            "reason": "unknown_tables",
+                            "unknown_tables": unknown_tables,
+                            "message": "架构设计阶段发现未知表，已委派知识检索刷新上下文后再继续。",
+                        },
+                    )
+                    pending = list(state.pending_requests or [])
+                    pending.append(req)
+                    return Command(
+                        update={
+                            "messages": [AIMessage(content="检测到未知表，已委派知识检索刷新上下文")],
+                            "current_agent": "architect_agent",
+                            "pending_requests": [r.model_dump() for r in pending],
+                            "delegation_counters": counters,
+                        }
+                    )
+                request_id = f"req_{uuid.uuid4().hex}"
+                req = BlackboardRequest(
+                    request_id=request_id,
+                    kind="human",
+                    created_by="architect_agent",
+                    resume_to="blackboard_router",
+                    payload={
+                        "type": "clarification",
+                        "message": "架构设计无法继续：知识库无法定位工作流中引用的表，请补充可验证线索。",
+                        "questions": [
+                            f"请确认这些表是否存在及其准确名称（推荐 schema.table）：{', '.join(unknown_tables[:12])}",
+                            "如果你不确定表名：请提供字段清单/样例数据/现有 SQL，或说明上游来源系统与目标表。",
+                        ],
+                    },
+                )
+                pending = list(state.pending_requests or [])
+                pending.append(req)
+                return Command(
+                    update={
+                        "messages": [AIMessage(content="无法定位表指针：需要你补充上下文信息后才能继续")],
+                        "current_agent": "architect_agent",
+                        "pending_requests": [r.model_dump() for r in pending],
+                        "delegation_counters": counters,
+                    }
+                )
+
             logger.info(
                 f"✅ ArchitectAgent 完成设计: {workflow_plan.name}, "
                 f"Job 数={len(workflow_plan.jobs)}, 风险={len(workflow_plan.risks)}"
@@ -242,11 +334,8 @@ class ArchitectAgent:
                     "messages": [AIMessage(content=f"架构设计完成: {workflow_plan.name}")],
                     "architecture_plan": workflow_plan.model_dump(),
                     "current_agent": "architect_agent",
-                    "metadata": {
-                        **state.metadata,
-                        "selected_component": selected_component,
-                        "selected_component_id": selected_component_id,
-                    },
+                    "selected_component": selected_component,
+                    "selected_component_id": selected_component_id,
                 }
             )
 
@@ -260,8 +349,11 @@ class ArchitectAgent:
                 }
             )
 
-    async def _get_components(self) -> list[dict]:
+    async def _get_components(self, *, agent_context: AgentScopedContext) -> list[dict]:
         """通过工具获取组件列表"""
+        if "list_component" not in set(agent_context.tools or []):
+            logger.error("工具不在 allowlist 中: list_component")
+            return []
         try:
             result = list_component.invoke({})
             data = json.loads(result)
@@ -272,86 +364,32 @@ class ArchitectAgent:
             logger.error(f"获取组件列表失败: {e}")
             return []
 
-    def _ask_user_select_component(self, components: list) -> tuple[str, int | None]:
-        """
-        使用 interrupt 让用户选择组件
-
-        Args:
-            components: 可用组件列表
-
-        Returns:
-            (组件代码, 组件ID)
-        """
-        # 构建组件选项和 code -> id 映射
-        options = []
-        code_to_id = {}
-        for comp in components:
-            if isinstance(comp, dict):
-                comp_id = comp.get("id")
-                code = comp.get("code", comp.get("component_code", ""))
-                name = comp.get("name", comp.get("component_name", ""))
-                comp_type = comp.get("type", comp.get("component_type", ""))
-            else:
-                comp_id = getattr(comp, "id", None)
-                code = comp.code
-                name = comp.name
-                comp_type = comp.type
-
-            code_to_id[code] = comp_id
-            options.append({
-                "value": code,
-                "label": f"{code}: {name}",
-                "type": comp_type,
-            })
-
-        message = "请选择要使用的技术组件："
-
-        logger.info(f"⏸️ 等待用户选择组件...")
-
-        # 使用 interrupt 暂停执行
-        user_selection = interrupt({
-            "type": "component_selection",
-            "message": message,
-            "options": options,
-        })
-
-        # 解析用户选择
-        if isinstance(user_selection, dict):
-            selected_code = user_selection.get("component", options[0]["value"] if options else "HIVE")
-        else:
-            selected_code = user_selection or (options[0]["value"] if options else "HIVE")
-
-        selected_id = code_to_id.get(selected_code)
-        return selected_code, selected_id
-
     async def _design_with_tools(
         self,
         analysis: AnalysisResult,
         selected_component: str,
         agent_context: AgentScopedContext,
-        global_kg_context: GlobalKGContext,
+        context_payload: dict,
+        llm_with_tools,
         user_query: str,
     ) -> dict:
         """执行带工具调用的架构设计"""
-        # 格式化血缘信息
-        lineage_lines = []
-        for edge in global_kg_context.lineage_graph[:20]:
-            lineage_lines.append(f"- {edge.source_table} → {edge.target_table}")
+        task_payload = {
+            "analysis_result": analysis.model_dump(),
+            "selected_component": selected_component,
+            "tools_description": agent_context.get_tools_description(),
+        }
 
-        prompt = ARCHITECT_AGENT_PROMPT.format(
-            analysis_result=json.dumps(analysis.model_dump(), ensure_ascii=False, indent=2),
-            selected_component=selected_component,
-            discovered_tables=", ".join(agent_context.tables) if agent_context.tables else "（无）",
-            lineage_info="\n".join(lineage_lines) if lineage_lines else "（无）",
-            tools_description=agent_context.get_tools_description(),
-            user_query=user_query,
-        )
-
-        messages = [HumanMessage(content=prompt)]
+        messages = [
+            SystemMessage(content=ARCHITECT_AGENT_SYSTEM_INSTRUCTIONS),
+            SystemMessage(content=json.dumps(task_payload, ensure_ascii=False)),
+            SystemMessage(content=json.dumps(context_payload, ensure_ascii=False)),
+            HumanMessage(content=user_query),
+        ]
         tool_call_count = 0
 
         while tool_call_count < self.max_tool_calls:
-            response = await self.llm_with_tools.ainvoke(messages)
+            response = await llm_with_tools.ainvoke(messages)
             messages.append(response)
 
             # 如果没有工具调用，解析响应
@@ -367,7 +405,7 @@ class ArchitectAgent:
 
                 logger.info(f"🔧 ArchitectAgent 调用工具: {tool_name}({tool_args})")
 
-                tool_result = await self._execute_tool(tool_name, tool_args)
+                tool_result = await self._execute_tool(tool_name, tool_args, agent_context=agent_context)
 
                 messages.append(
                     ToolMessage(content=tool_result, tool_call_id=tool_id)
@@ -376,34 +414,80 @@ class ArchitectAgent:
                 if tool_call_count >= self.max_tool_calls:
                     break
 
-        # 达到最大工具调用次数，获取最终响应
-        response = await self.llm.ainvoke(messages)
+        # 达到最大工具调用次数，强制使用 JSON 模式获取最终响应
+        response = await self.llm_json.ainvoke(messages)
         return self._parse_response(response.content)
 
-    async def _execute_tool(self, tool_name: str, tool_args: dict) -> str:
+    def _bind_tools_by_allowlist(self, agent_context: AgentScopedContext):
+        """
+        按 allowlist 动态绑定工具，避免硬编码导致的“越权/误导”。
+
+        说明：
+        - bind_tools 决定 LLM 能否发起工具调用（能力面）
+        - allowlist 决定该 Agent 是否允许调用（权限面）
+        """
+        allowlist = set(agent_context.tools or [])
+        tool_registry = {
+            "get_table_lineage": get_table_lineage,
+            "list_component": list_component,
+        }
+        tools = [tool_registry[name] for name in allowlist if name in tool_registry]
+        return self.llm.bind_tools(tools)
+
+    async def _execute_tool(self, tool_name: str, tool_args: dict, *, agent_context: AgentScopedContext) -> str:
         """执行工具调用"""
         try:
+            allowlist = set(agent_context.tools or [])
+            if tool_name not in allowlist:
+                return json.dumps(
+                    {"status": "error", "message": f"工具不在 allowlist 中: {tool_name}"},
+                    ensure_ascii=False,
+                )
+
             if tool_name == "get_table_lineage":
-                return await get_table_lineage.ainvoke(tool_args)
-            elif tool_name == "list_component":
+                table_name = (tool_args or {}).get("table_name") or ""
+                direction = (tool_args or {}).get("direction") or "both"
+                table_index = self._build_allowed_table_index(agent_context.etl_pointers)
+                pointer = table_index.get(table_name)
+                if not pointer:
+                    return json.dumps(
+                        {
+                            "status": "error",
+                            "message": "禁止对未下发的表指针调用工具",
+                            "table_name": table_name,
+                        },
+                        ensure_ascii=False,
+                    )
+                if tool_name not in set(pointer.tools or []):
+                    return json.dumps(
+                        {
+                            "status": "error",
+                            "message": "该表指针未授权此工具（ETLPointer.tools）",
+                            "table_name": table_name,
+                            "pointer_element_id": pointer.element_id,
+                        },
+                        ensure_ascii=False,
+                    )
+                return await get_table_lineage.ainvoke({"table_name": table_name, "direction": direction})
+
+            if tool_name == "list_component":
                 return list_component.invoke(tool_args)
-            else:
-                return json.dumps({"status": "error", "message": f"未知工具: {tool_name}"})
+
+            return json.dumps({"status": "error", "message": f"未知工具: {tool_name}"}, ensure_ascii=False)
         except Exception as e:
             logger.error(f"工具 {tool_name} 执行失败: {e}")
-            return json.dumps({"status": "error", "message": str(e)})
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
     def _parse_response(self, content: str) -> dict:
-        """解析 LLM 响应"""
-        json_match = re.search(r'```json\s*([\s\S]*?)\s*```', content)
-        if json_match:
-            return json.loads(json_match.group(1))
-
-        json_match = re.search(r'\{[\s\S]*\}', content)
-        if json_match:
-            return json.loads(json_match.group())
-
-        raise ValueError("无法解析 LLM 响应为 JSON")
+        """严格解析 LLM 响应（必须是纯 JSON）"""
+        text = (content or "").strip()
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as e:
+            raise ValueError("LLM 输出不是合法 JSON（必须输出纯 JSON）") from e
+        if not isinstance(parsed, dict):
+            raise ValueError("LLM 输出必须是 JSON object")
+        return parsed
 
     def _build_workflow(
         self,
@@ -454,3 +538,75 @@ class ArchitectAgent:
             decision_points=[],
             confidence=result_dict.get("confidence", analysis.confidence),
         )
+
+    @staticmethod
+    def _build_context_payload(*, agent_context: AgentScopedContext) -> dict:
+        """
+        构造“知识上下文JSON”（下发给 LLM 的 SystemMessage）
+
+        约束：
+        - 只传递指针与导航信息，不传递表明细
+        """
+        node_pointers = agent_context.etl_pointers or []
+        table_pointers = [
+            {
+                "element_id": p.element_id,
+                "qualified_name": p.qualified_name,
+                "path": p.path,
+                "display_name": p.display_name,
+                "description": p.description,
+                "tools": p.tools,
+            }
+            for p in node_pointers
+            if "Table" in set(p.labels or []) and p.qualified_name
+        ]
+
+        return {
+            "agent_type": agent_context.agent_type,
+            "allowlist_tools": agent_context.tools,
+            "tables": agent_context.tables,
+            "table_pointers": table_pointers,
+            "etl_pointers": [p.model_dump() for p in node_pointers],
+            "doc_pointers": [p.model_dump() for p in (agent_context.doc_pointers or [])],
+        }
+
+    @staticmethod
+    def _build_allowed_table_index(node_pointers) -> dict:
+        table_index: dict[str, object] = {}
+        for p in node_pointers or []:
+            if "Table" not in set(getattr(p, "labels", None) or []):
+                continue
+            qualified_name = getattr(p, "qualified_name", None)
+            if not qualified_name:
+                continue
+            table_index[qualified_name] = p
+        return table_index
+
+    @staticmethod
+    def _build_allowed_tables(node_pointers) -> set[str]:
+        allowed: set[str] = set()
+        for p in node_pointers or []:
+            if "Table" not in set(getattr(p, "labels", None) or []):
+                continue
+            qualified_name = getattr(p, "qualified_name", None)
+            if qualified_name:
+                allowed.add(qualified_name)
+        return allowed
+
+    @staticmethod
+    def _find_unknown_tables(plan: Workflow, *, allowed_tables: set[str]) -> list[str]:
+        unknown: list[str] = []
+        seen: set[str] = set()
+        for job in plan.jobs or []:
+            for t in job.input_tables or []:
+                if not t or t.startswith("temp."):
+                    continue
+                if t not in allowed_tables and t not in seen:
+                    seen.add(t)
+                    unknown.append(t)
+            if job.output_table and not job.output_table.startswith("temp."):
+                t = job.output_table
+                if t not in allowed_tables and t not in seen:
+                    seen.add(t)
+                    unknown.append(t)
+        return unknown

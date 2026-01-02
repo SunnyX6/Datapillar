@@ -1,44 +1,75 @@
 /**
  * AI 工作流服务
  *
- * 通过 SSE 事件流与 AI 服务交互
+ * 使用 SSE/JSON 事件流进行传输（浏览器端可断线重连并基于 Last-Event-ID 重放）
  */
 
 /**
  * SSE 事件类型
  */
-export type SSEEventType =
-  | 'session_started'
-  | 'agent_started'
-  | 'agent_completed'
-  | 'tool_called'
-  | 'session_interrupted'
-  | 'session_completed'
-  | 'session_error'
+export type SseEventType =
+  | 'agent.start'
+  | 'agent.end'
+  | 'tool.start'
+  | 'tool.end'
+  | 'interrupt'
+  | 'result'
+  | 'error'
 
 /**
- * SSE 事件数据
+ * SSE 事件状态（用于前端渲染 icon/颜色）
  */
-export interface SSEEvent {
-  eventType: SSEEventType
-  agent: string | null
-  tool: string | null
-  data: Record<string, unknown>
+export type SseState = 'thinking' | 'invoking' | 'waiting' | 'done' | 'error'
+
+/**
+ * SSE 严重级别（用于前端映射颜色）
+ */
+export type SseLevel = 'info' | 'success' | 'warning' | 'error'
+
+export interface SseEventAgent {
+  id: string
+  name: string
 }
 
-/**
- * 中断类型
- */
-export type InterruptType = 'clarification' | 'component_selection' | 'feedback_request'
+export interface SseEventMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool'
+  content: string
+}
 
-/**
- * 中断数据
- */
-export interface InterruptData {
-  type: InterruptType
+export interface SseEventTool {
+  name: string
+  input?: unknown
+  output?: unknown
+}
+
+export interface SseEventInterrupt {
+  kind: string
   message: string
   questions?: string[]
   options?: Array<{ value: string; label: string; type?: string }>
+}
+
+export interface SseEventResult {
+  workflow?: WorkflowResponse
+}
+
+export interface SseEventError {
+  message: string
+  detail?: string
+}
+
+export interface SseEvent {
+  v: number
+  ts: number
+  event: SseEventType
+  state: SseState
+  level: SseLevel
+  agent?: SseEventAgent
+  message?: SseEventMessage
+  tool?: SseEventTool
+  interrupt?: SseEventInterrupt
+  result?: SseEventResult
+  error?: SseEventError
 }
 
 /**
@@ -84,24 +115,10 @@ export interface WorkflowResponse {
 }
 
 /**
- * 完成数据
+ * 消息回调
  */
-export interface CompletedData {
-  dag_output: WorkflowResponse | null
-  is_completed: boolean
-}
-
-/**
- * 事件回调
- */
-export interface SSECallbacks {
-  onSessionStarted?: (sessionId: string) => void
-  onAgentStarted?: (agent: string, name: string) => void
-  onAgentCompleted?: (agent: string, data: Record<string, unknown>) => void
-  onToolCalled?: (agent: string, tool: string, data: Record<string, unknown>) => void
-  onInterrupted?: (data: InterruptData) => void
-  onCompleted?: (data: CompletedData) => void
-  onError?: (error: string) => void
+export interface StreamCallbacks {
+  onEvent: (event: SseEvent) => void
 }
 
 /**
@@ -112,118 +129,100 @@ export function generateSessionId(): string {
 }
 
 /**
- * 创建 AI 工作流 SSE 连接
+ * 创建 AI 工作流消息流
  */
 export function createWorkflowStream(
   userInput: string,
   sessionId: string,
-  callbacks: SSECallbacks,
+  callbacks: StreamCallbacks,
   resumeValue?: unknown
 ): () => void {
-  const controller = new AbortController()
+  let closed = false
+  let eventSource: EventSource | null = null
 
   const request = async () => {
     try {
-      const response = await fetch('/api/ai/agent/workflow/sse', {
+      const startPath = resumeValue === undefined ? '/api/ai/etl/workflow/start' : '/api/ai/etl/workflow/continue'
+      const response = await fetch(startPath, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           userInput,
           sessionId,
           resumeValue
         }),
-        signal: controller.signal
+        credentials: 'include'
       })
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const reader = response.body?.getReader()
-      if (!reader) {
-        throw new Error('无法获取响应流')
+      if (closed) return
+
+      eventSource = new EventSource(`/api/ai/etl/workflow/sse?sessionId=${encodeURIComponent(sessionId)}`, {
+        withCredentials: true
+      })
+
+      eventSource.onmessage = (event) => {
+        if (closed) return
+        try {
+          const sseEvent = JSON.parse(event.data) as SseEvent
+          callbacks.onEvent(sseEvent)
+          if (sseEvent.event === 'interrupt' || sseEvent.event === 'result' || sseEvent.event === 'error') {
+            eventSource?.close()
+            eventSource = null
+          }
+        } catch (error) {
+          callbacks.onEvent({
+            v: 1,
+            ts: Date.now(),
+            event: 'error',
+            state: 'error',
+            level: 'error',
+            error: { message: '解析 SSE 消息失败', detail: error instanceof Error ? error.message : String(error) },
+            message: { role: 'system', content: '解析 SSE 消息失败' }
+          })
+          eventSource?.close()
+          eventSource = null
+        }
       }
 
-      const decoder = new TextDecoder()
-      let buffer = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-
-        // 解析 SSE 事件
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
-        let eventData = ''
-
-        for (const line of lines) {
-          if (line.startsWith('event:')) {
-            // event 行跳过，使用 data 中的 eventType
-            continue
-          } else if (line.startsWith('data:')) {
-            eventData = line.slice(5).trim()
-          } else if (line === '' && eventData) {
-            // 空行表示事件结束
-            try {
-              const parsed = JSON.parse(eventData) as SSEEvent
-              handleEvent(parsed, callbacks)
-            } catch {
-              console.error('解析 SSE 事件失败:', eventData)
-            }
-            eventData = ''
-          }
+      eventSource.onerror = () => {
+        if (closed) return
+        // 交给 EventSource 自动重连；只有当连接被显式关闭时才停止
+        if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+          callbacks.onEvent({
+            v: 1,
+            ts: Date.now(),
+            event: 'error',
+            state: 'error',
+            level: 'error',
+            error: { message: 'SSE 连接已关闭' },
+            message: { role: 'system', content: 'SSE 连接已关闭' }
+          })
         }
       }
     } catch (error) {
-      if ((error as Error).name !== 'AbortError') {
-        callbacks.onError?.((error as Error).message)
-      }
+      callbacks.onEvent({
+        v: 1,
+        ts: Date.now(),
+        event: 'error',
+        state: 'error',
+        level: 'error',
+        error: { message: '连接失败', detail: error instanceof Error ? error.message : String(error) },
+        message: { role: 'system', content: '连接失败' }
+      })
     }
   }
 
   request()
 
-  // 返回取消函数
-  return () => controller.abort()
-}
-
-/**
- * 处理 SSE 事件
- */
-function handleEvent(event: SSEEvent, callbacks: SSECallbacks): void {
-  switch (event.eventType) {
-    case 'session_started':
-      callbacks.onSessionStarted?.(event.data.session_id as string)
-      break
-
-    case 'agent_started':
-      callbacks.onAgentStarted?.(event.agent || '', (event.data.name as string) || '')
-      break
-
-    case 'agent_completed':
-      callbacks.onAgentCompleted?.(event.agent || '', event.data)
-      break
-
-    case 'tool_called':
-      callbacks.onToolCalled?.(event.agent || '', event.tool || '', event.data)
-      break
-
-    case 'session_interrupted':
-      callbacks.onInterrupted?.(event.data as unknown as InterruptData)
-      break
-
-    case 'session_completed':
-      callbacks.onCompleted?.(event.data as unknown as CompletedData)
-      break
-
-    case 'session_error':
-      callbacks.onError?.(event.data.error as string)
-      break
+  return () => {
+    closed = true
+    eventSource?.close()
+    eventSource = null
   }
 }

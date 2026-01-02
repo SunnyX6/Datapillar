@@ -1,83 +1,59 @@
 """
-Knowledge Agent（知识检索专家）
+Knowledge Agent（知识服务：指针编译器）
 
-职责：
-1. 加载全局知识图谱上下文（GlobalKGContext）
-2. 根据用户查询，使用工具发现相关表
-3. 为每个 Agent 准备专属上下文（AgentScopedContext）
+定位：
+- 这是“知识服务层”，不是“流程控制/人机交互”Agent
+- 只负责把输入线索编译为可验证的指针集合（以及按 Agent 的最小权限下发可用工具）
 
 设计原则：
-- 全局上下文只做导航，不存储细节
-- 细节由各 Agent 通过工具按需查询
-- 工具也是上下文的一部分
+- 指针是“指路”，不是“明细”：不输出列/SQL/全文等大字段
+- 严格可验证：资产类指针必须包含 Neo4j element_id
+- Pull-first：是否触发检索由上游 Agent/黑板路由决定；本服务不抢占用户交互
 """
 
-import asyncio
 import json
 import logging
 
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage
 from langgraph.types import Command
 
-from src.infrastructure.llm.client import call_llm
-from src.infrastructure.repository import ComponentRepository, KnowledgeRepository
-from src.modules.etl.schemas.kg_context import (
-    AgentScopedContext,
-    AgentType,
-    CatalogNav,
-    ComponentNav,
-    GlobalKGContext,
-    LineageEdge,
-    SchemaNav,
-    TableNav,
-)
+from src.modules.etl.schemas.kg_context import AgentScopedContext, AgentType, ETLPointer
+from src.modules.etl.schemas.requests import BlackboardRequest
 from src.modules.etl.schemas.state import AgentState
-from src.modules.etl.tools.agent_tools import SEARCH_TOOLS
+from src.modules.etl.tools.agent_tools import search_knowledge_nodes
 
 logger = logging.getLogger(__name__)
-
-# 系统提示词（只用于发现相关表）
-KNOWLEDGE_DISCOVERY_PROMPT = """你是数仓知识检索专家。
-
-## 任务
-根据用户需求，从知识库中发现相关的表。
-
-## 全局上下文
-{global_context_summary}
-
-## 可用工具
-- search_assets: 语义搜索数据资产，查找相关表
-
-## 用户需求
-{user_query}
-
-## 要求
-1. 分析用户需求，理解需要哪些表
-2. 使用 search_assets 工具搜索相关表
-3. 返回发现的表名列表
-
-只需要发现相关表，不需要获取详情。详情由后续 Agent 通过工具获取。
-"""
-
 
 class KnowledgeAgent:
     """
     知识检索专家
 
     职责：
-    1. 加载全局知识图谱上下文
-    2. 根据用户查询发现相关表
-    3. 为每个 Agent 准备专属上下文（指针 + 工具）
+    1. 产出可验证的 ETLPointer（指向任意 Knowledge 节点）
+    2. 生成严格的 schema.table 列表（仅当命中表节点时）
+    3. 为指针注入可展开工具名（ETLPointer.tools）
+    4. 下发 AgentScopedContext（指针 + 工具 allowlist）
     """
 
-    def __init__(self):
-        self.llm = call_llm(temperature=0.0)
-        self.llm_with_tools = self.llm.bind_tools(SEARCH_TOOLS)
-        self.max_tool_calls = 3
+    def __init__(self, *, max_pointers: int = 12, min_score: float = 0.8):
+        self.max_pointers = max(1, min(int(max_pointers), 50))
+        self.min_score = float(min_score)
 
     async def __call__(self, state: AgentState) -> Command:
         """执行知识检索"""
         user_query = state.user_input
+        # Pull-first：当上游通过 delegate 触发刷新时，尽量利用 payload 中的线索提升召回
+        if state.pending_requests:
+            req0_raw = state.pending_requests[0]
+            req0 = BlackboardRequest(**req0_raw) if isinstance(req0_raw, dict) else req0_raw
+            if req0.kind == "delegate" and (req0.target_agent in {"knowledge_agent", "知识检索专家"}):
+                payload = dict(req0.payload or {})
+                if payload.get("type") == "refresh_knowledge":
+                    unknown_tables = payload.get("unknown_tables") or []
+                    if isinstance(unknown_tables, list):
+                        hints = [t.strip() for t in unknown_tables if isinstance(t, str) and t.strip()]
+                        if hints:
+                            user_query = f"{user_query}\n候选表: {', '.join(hints[:20])}"
         if not user_query:
             return Command(
                 update={
@@ -87,47 +63,45 @@ class KnowledgeAgent:
                 }
             )
 
-        logger.info(f"🔍 KnowledgeAgent 开始检索: {user_query}")
-
         try:
-            # 1. 加载全局知识图谱上下文
-            global_kg_context = await self._load_global_kg_context()
+            etl_pointers = await self._retrieve_node_pointers(user_query)
+            if not etl_pointers:
+                return Command(
+                    update={
+                        "messages": [AIMessage(content="知识检索未命中：未找到可验证的知识指针")],
+                        "current_agent": "knowledge_agent",
+                        "metadata": {
+                            **state.metadata,
+                            "knowledge_user_input": user_query,
+                            "knowledge_no_hit": {"user_query": user_query},
+                        },
+                    }
+                )
+            qualified_tables = self._build_strict_schema_table_list(etl_pointers)
 
-            logger.info(
-                f"📊 全局上下文加载完成: "
-                f"{len(global_kg_context.catalogs)} Catalogs, "
-                f"{len(global_kg_context.get_all_tables())} Tables, "
-                f"{len(global_kg_context.lineage_graph)} 血缘边, "
-                f"{len(global_kg_context.components)} 组件"
-            )
-
-            # 2. 使用工具发现相关表
-            discovered_tables = await self._discover_tables(user_query, global_kg_context)
-
-            logger.info(f"🔎 发现 {len(discovered_tables)} 个相关表: {discovered_tables}")
-
-            # 3. 为每个 Agent 准备专属上下文
             agent_contexts = self._create_agent_contexts(
-                user_query=user_query,
-                discovered_tables=discovered_tables,
+                qualified_tables=qualified_tables,
+                etl_pointers=etl_pointers,
             )
 
-            logger.info(
-                f"✅ KnowledgeAgent 完成: "
-                f"发现 {len(discovered_tables)} 表, "
-                f"创建 {len(agent_contexts)} 个 Agent 上下文"
-            )
+            summary = f"知识检索完成：命中 {len(etl_pointers)} 个指针"
+            ai_message = AIMessage(content=summary)
 
             return Command(
                 update={
                     "messages": [
-                        AIMessage(
-                            content=f"知识检索完成，发现 {len(discovered_tables)} 个相关表"
-                        )
+                        ai_message
                     ],
-                    "global_kg_context": global_kg_context.model_dump(),
                     "agent_contexts": {k: v.model_dump() for k, v in agent_contexts.items()},
                     "current_agent": "knowledge_agent",
+                    "metadata": {
+                        **state.metadata,
+                        "knowledge_user_input": user_query,
+                        "knowledge_agent": {
+                            "summary": summary,
+                            "etl_pointers": [p.model_dump() for p in etl_pointers],
+                        },
+                    },
                 }
             )
 
@@ -141,264 +115,159 @@ class KnowledgeAgent:
                 }
             )
 
-    async def _load_global_kg_context(self) -> GlobalKGContext:
+    async def _retrieve_node_pointers(self, user_query: str) -> list[ETLPointer]:
         """
-        加载全局知识图谱上下文
+        产出通用节点指针列表（严格可验证）
 
-        Returns:
-            GlobalKGContext 对象
+        策略：
+        1) 语义检索（向量/全文/混合）召回候选 Knowledge 节点 element_id
+        2) 精确取回上下文并组装为可验证 ETLPointer
+
+        约束：
+        - 不对用户自由文本做“显式 schema.table 解析”短路；这属于输入规范问题，不应由后端猜测前端写法。
         """
-        # 并发加载数据
-        catalog_data, lineage_data = await asyncio.gather(
-            KnowledgeRepository.load_catalog_hierarchy(),
-            KnowledgeRepository.load_table_lineage(),
+        raw_json = await search_knowledge_nodes.ainvoke(
+            {"query": user_query, "top_k": self.max_pointers, "min_score": self.min_score}
         )
-
-        # 转换 Catalog 层级结构
-        catalogs = []
-        for cat_dict in catalog_data:
-            schemas = []
-            for sch_dict in cat_dict.get("schemas", []):
-                tables = [
-                    TableNav(
-                        name=t.get("name", ""),
-                        schema_name=t.get("schema_name", ""),
-                        catalog=t.get("catalog", ""),
-                        tags=t.get("tags") or [],
-                        description=t.get("description"),
-                        column_count=t.get("column_count", 0),
-                    )
-                    for t in sch_dict.get("tables", [])
-                ]
-                schemas.append(
-                    SchemaNav(
-                        name=sch_dict.get("name", ""),
-                        catalog=sch_dict.get("catalog", ""),
-                        description=sch_dict.get("description"),
-                        tables=tables,
-                    )
-                )
-            catalogs.append(
-                CatalogNav(
-                    name=cat_dict.get("name", ""),
-                    metalake=cat_dict.get("metalake", ""),
-                    schemas=schemas,
-                )
-            )
-
-        # 转换血缘边
-        lineage_graph = [
-            LineageEdge(
-                source_table=edge.get("source_table", ""),
-                target_table=edge.get("target_table", ""),
-                sql_id=edge.get("sql_id"),
-            )
-            for edge in lineage_data
-        ]
-
-        # 加载组件列表
-        components = self._load_components()
-
-        return GlobalKGContext(
-            catalogs=catalogs,
-            lineage_graph=lineage_graph,
-            components=components,
-        )
-
-    def _load_components(self) -> list[ComponentNav]:
-        """加载组件列表"""
+        raw: list[dict] = []
         try:
-            results = ComponentRepository.list_active_components()
-            return [
-                ComponentNav(
-                    id=row.get("id"),
-                    code=row.get("component_code", ""),
-                    name=row.get("component_name", ""),
-                    type=row.get("component_type", ""),
+            parsed = json.loads(raw_json or "")
+            if isinstance(parsed, dict) and isinstance(parsed.get("nodes"), list):
+                raw = parsed["nodes"]
+        except Exception:
+            raw = []
+
+        pointers: list[ETLPointer] = []
+        for item in raw:
+            element_id = item.get("element_id")
+            if not element_id:
+                continue
+            labels = item.get("labels") or []
+            schema_name = item.get("schema_name")
+            name = item.get("name")
+            table_name = item.get("table_name")
+            if not table_name and "Table" in set(labels or []) and name:
+                table_name = name
+
+            qualified_name = item.get("qualified_name")
+            if not qualified_name:
+                if "Table" in set(labels or []) and schema_name and table_name:
+                    qualified_name = f"{schema_name}.{table_name}"
+                elif "Column" in set(labels or []) and schema_name and table_name and name:
+                    qualified_name = f"{schema_name}.{table_name}.{name}"
+
+            pointers.append(
+                ETLPointer(
+                    element_id=element_id,
+                    labels=labels,
+                    primary_label=item.get("primary_label"),
+                    node_id=item.get("node_id"),
+                    code=item.get("code"),
+                    name=name,
+                    display_name=item.get("display_name"),
+                    description=item.get("description"),
+                    tags=item.get("tags") or [],
+                    catalog_name=item.get("catalog_name"),
+                    schema_name=schema_name,
+                    table_name=table_name,
+                    path=item.get("path"),
+                    qualified_name=qualified_name,
+                    score=float(item.get("score") or 0.0),
+                    tools=self._infer_pointer_tools(labels),
                 )
-                for row in results
-            ]
-        except Exception as e:
-            logger.error(f"加载组件列表失败: {e}")
+            )
+
+        if not pointers:
             return []
+        return pointers
 
-    def _summarize_global_context(self, global_kg_context: GlobalKGContext) -> str:
-        """生成全局上下文摘要"""
-        lines = ["### 数据资产概览\n"]
-
-        # Catalog/Schema/Table 层级
-        for catalog in global_kg_context.catalogs:
-            lines.append(f"**Catalog: {catalog.name}** (metalake: {catalog.metalake})")
-            for schema in catalog.schemas:
-                lines.append(f"  - Schema: {schema.name}")
-                for table in schema.tables[:10]:
-                    tags_str = ", ".join(table.tags) if table.tags else "无标签"
-                    lines.append(
-                        f"    - {table.name} ({table.column_count}列) [{tags_str}]"
-                    )
-                if len(schema.tables) > 10:
-                    lines.append(f"    - ...共 {len(schema.tables)} 张表")
-
-        # 血缘关系
-        if global_kg_context.lineage_graph:
-            lines.append("\n### 表级血缘关系\n")
-            for edge in global_kg_context.lineage_graph[:20]:
-                lines.append(f"- {edge.source_table} → {edge.target_table}")
-            if len(global_kg_context.lineage_graph) > 20:
-                lines.append(f"- ...共 {len(global_kg_context.lineage_graph)} 条血缘")
-
-        # 可用组件
-        if global_kg_context.components:
-            lines.append("\n### 可用组件\n")
-            for comp in global_kg_context.components:
-                lines.append(f"- {comp.code}: {comp.name} ({comp.type})")
-
-        return "\n".join(lines)
-
-    async def _discover_tables(
-        self, user_query: str, global_kg_context: GlobalKGContext
-    ) -> list[str]:
+    @staticmethod
+    def _infer_pointer_tools(labels: list[str] | None) -> list[str]:
         """
-        使用工具发现相关表
+        基于节点类型给出“可展开工具”建议。
 
-        Returns:
-            发现的表名列表
+        说明：
+        - 这里只返回工具名，不塞任何工具说明/提示词
+        - 最终下发时会按 Agent allowlist 过滤
         """
-        discovered_tables: list[str] = []
+        label_set = set(labels or [])
+        if "Table" in label_set:
+            return [
+                "get_table_columns",
+                "get_table_lineage",
+                "get_column_lineage",
+                "get_sql_by_lineage",
+            ]
+        if "Column" in label_set:
+            return ["get_column_value_domain"]
+        return []
 
-        # 生成全局上下文摘要
-        context_summary = self._summarize_global_context(global_kg_context)
-
-        # 初始消息
-        messages = [
-            HumanMessage(
-                content=KNOWLEDGE_DISCOVERY_PROMPT.format(
-                    global_context_summary=context_summary,
-                    user_query=user_query,
-                )
-            )
-        ]
-
-        tool_call_count = 0
-
-        while tool_call_count < self.max_tool_calls:
-            # 调用 LLM
-            response = await self.llm_with_tools.ainvoke(messages)
-            messages.append(response)
-
-            # 检查是否有工具调用
-            if not response.tool_calls:
-                logger.info("LLM 决定停止工具调用")
-                break
-
-            # 执行工具调用
-            for tool_call in response.tool_calls:
-                tool_call_count += 1
-                tool_name = tool_call["name"]
-                tool_args = tool_call["args"]
-                tool_id = tool_call["id"]
-
-                logger.info(
-                    f"🔧 调用工具 [{tool_call_count}/{self.max_tool_calls}]: "
-                    f"{tool_name}({tool_args})"
-                )
-
-                # 执行工具
-                tool_result = await self._execute_tool(tool_name, tool_args)
-
-                # 解析结果，收集表名
-                self._collect_tables(tool_result, discovered_tables)
-
-                # 添加工具结果到消息列表
-                messages.append(
-                    ToolMessage(
-                        content=tool_result,
-                        tool_call_id=tool_id,
-                    )
-                )
-
-                if tool_call_count >= self.max_tool_calls:
-                    logger.info(f"已达到最大工具调用次数 {self.max_tool_calls}")
-                    break
-
-        return discovered_tables
-
-    async def _execute_tool(self, tool_name: str, tool_args: dict) -> str:
-        """执行单个工具调用"""
-        from src.modules.etl.tools.agent_tools import search_assets
-
-        try:
-            if tool_name == "search_assets":
-                return await search_assets.ainvoke(tool_args)
-            else:
-                return json.dumps(
-                    {"status": "error", "message": f"未知工具: {tool_name}"}
-                )
-        except Exception as e:
-            logger.error(f"工具 {tool_name} 执行失败: {e}")
-            return json.dumps({"status": "error", "message": str(e)})
-
-    def _collect_tables(self, tool_result: str, discovered_tables: list[str]) -> None:
-        """从工具结果中收集表名"""
-        try:
-            data = json.loads(tool_result)
-            if data.get("status") == "error":
-                logger.warning(f"工具返回错误: {data.get('message')}")
-                return
-
-            # search_assets 返回的表
-            tables = data.get("tables", [])
-            for t in tables:
-                table_name = t.get("table_name")
-                if table_name and table_name not in discovered_tables:
-                    discovered_tables.append(table_name)
-
-        except json.JSONDecodeError:
-            logger.error(f"工具返回无效 JSON: {tool_result}")
+    def _build_strict_schema_table_list(self, node_pointers: list[ETLPointer]) -> list[str]:
+        """
+        严格：只输出 schema.table（保持“检索顺序”，避免无意义的字母序扰动）
+        """
+        schema_tables: list[str] = []
+        seen: set[str] = set()
+        for p in node_pointers:
+            if "Table" not in set(p.labels or []):
+                continue
+            if not p.schema_name or not (p.table_name or p.name):
+                continue
+            qualified = f"{p.schema_name}.{p.table_name or p.name}"
+            if qualified in seen:
+                continue
+            seen.add(qualified)
+            schema_tables.append(qualified)
+        return schema_tables
 
     def _create_agent_contexts(
         self,
-        user_query: str,
-        discovered_tables: list[str],
+        qualified_tables: list[str],
+        etl_pointers: list[ETLPointer],
     ) -> dict[str, AgentScopedContext]:
         """
         为每个 Agent 创建专属上下文
 
         每个 Agent 的上下文包含：
         - 可访问的表名列表（指针）
+        - 通用节点指针（可指向任意 Knowledge 节点）
         - 可用的工具列表
-        - 用户需求
 
         详情由各 Agent 自己通过工具获取。
         """
         contexts = {}
 
-        # AnalystAgent - 需求分析
         contexts[AgentType.ANALYST] = AgentScopedContext.create_for_agent(
             agent_type=AgentType.ANALYST,
-            tables=discovered_tables,
-            user_query=user_query,
+            tables=qualified_tables,
+            etl_pointers=self._filter_pointer_tools_by_allowlist(etl_pointers, AgentType.ANALYST),
         )
 
-        # ArchitectAgent - 架构设计
         contexts[AgentType.ARCHITECT] = AgentScopedContext.create_for_agent(
             agent_type=AgentType.ARCHITECT,
-            tables=discovered_tables,
-            user_query=user_query,
+            tables=qualified_tables,
+            etl_pointers=self._filter_pointer_tools_by_allowlist(etl_pointers, AgentType.ARCHITECT),
         )
 
-        # DeveloperAgent - 代码开发
         contexts[AgentType.DEVELOPER] = AgentScopedContext.create_for_agent(
             agent_type=AgentType.DEVELOPER,
-            tables=discovered_tables,
-            user_query=user_query,
+            tables=qualified_tables,
+            etl_pointers=self._filter_pointer_tools_by_allowlist(etl_pointers, AgentType.DEVELOPER),
         )
 
-        # TesterAgent - 测试验证
         contexts[AgentType.TESTER] = AgentScopedContext.create_for_agent(
             agent_type=AgentType.TESTER,
-            tables=discovered_tables,
-            user_query=user_query,
+            tables=qualified_tables,
+            etl_pointers=self._filter_pointer_tools_by_allowlist(etl_pointers, AgentType.TESTER),
         )
 
         return contexts
+
+    @staticmethod
+    def _filter_pointer_tools_by_allowlist(node_pointers: list[ETLPointer], agent_type: str) -> list[ETLPointer]:
+        allowlist = set(AgentScopedContext.create_for_agent(agent_type=agent_type, tables=[]).tools)
+        filtered: list[ETLPointer] = []
+        for p in node_pointers:
+            tools = [t for t in (p.tools or []) if t in allowlist]
+            filtered.append(p.model_copy(update={"tools": tools}))
+        return filtered

@@ -4,6 +4,8 @@
 将 Workflow 转换为与 Web-Admin 兼容的格式，前端可直接用于保存。
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -54,6 +56,79 @@ class WorkflowResponse(BaseModel):
     description: str | None = Field(default=None, description="工作流描述")
     jobs: list[JobResponse] = Field(default_factory=list, description="任务列表")
     dependencies: list[JobDependencyResponse] = Field(default_factory=list, description="依赖关系列表")
+
+    @classmethod
+    def from_workflow(cls, workflow: Workflow) -> WorkflowResponse:
+        """
+        从 Workflow 转换为 Web-Admin 兼容的响应格式
+
+        Args:
+            workflow: ETL Agent 生成的 Workflow
+
+        Returns:
+            WorkflowResponse: 可直接用于前端渲染和保存的格式
+        """
+        # 计算布局
+        layout_engine = DagLayoutEngine()
+        positions = layout_engine.calculate_positions(workflow.jobs)
+
+        # 解析 schedule 为 triggerType 和 triggerValue
+        trigger_type = 4  # 默认手动
+        trigger_value = None
+        if workflow.schedule:
+            trigger_type = 1  # CRON
+            trigger_value = workflow.schedule
+
+        # 建立字符串 ID 到数字临时 ID 的映射
+        id_mapping: dict[str, int] = {}
+        for idx, job in enumerate(workflow.jobs, start=1):
+            id_mapping[job.id] = idx
+
+        # 转换 Jobs
+        job_responses: list[JobResponse] = []
+        for job in workflow.jobs:
+            pos_x, pos_y = positions.get(job.id, (0.0, 0.0))
+            temp_id = id_mapping.get(job.id)
+
+            job_response = JobResponse(
+                id=temp_id,
+                jobName=job.name or job.id,
+                jobType=job.type_id,
+                jobTypeCode=job.type,
+                jobParams=job.config or {},
+                timeoutSeconds=job.timeout or 0,
+                maxRetryTimes=job.retry_times or 0,
+                retryInterval=0,
+                priority=job.priority or 0,
+                positionX=pos_x,
+                positionY=pos_y,
+                description=job.description,
+            )
+            job_responses.append(job_response)
+
+        # 转换 Dependencies
+        dependency_responses: list[JobDependencyResponse] = []
+        for job in workflow.jobs:
+            for parent_id in job.depends:
+                job_temp_id = id_mapping.get(job.id, 0)
+                parent_temp_id = id_mapping.get(parent_id, 0)
+                dependency_response = JobDependencyResponse(
+                    jobId=job_temp_id,
+                    parentJobId=parent_temp_id,
+                )
+                dependency_responses.append(dependency_response)
+
+        return cls(
+            workflowName=workflow.name,
+            triggerType=trigger_type,
+            triggerValue=trigger_value,
+            timeoutSeconds=0,
+            maxRetryTimes=0,
+            priority=0,
+            description=workflow.description,
+            jobs=job_responses,
+            dependencies=dependency_responses,
+        )
 
 
 class DagLayoutEngine:
@@ -130,76 +205,3 @@ class DagLayoutEngine:
             x += self.node_width + self.horizontal_gap
 
         return positions
-
-
-def convert_workflow(workflow: Workflow) -> WorkflowResponse:
-    """
-    将 Workflow 转换为 Web-Admin 兼容的响应格式
-
-    Args:
-        workflow: ETL Agent 生成的 Workflow
-
-    Returns:
-        WorkflowResponse: 可直接用于前端渲染和保存的格式
-    """
-    # 计算布局
-    layout_engine = DagLayoutEngine()
-    positions = layout_engine.calculate_positions(workflow.jobs)
-
-    # 解析 schedule 为 triggerType 和 triggerValue
-    trigger_type = 4  # 默认手动
-    trigger_value = None
-    if workflow.schedule:
-        trigger_type = 1  # CRON
-        trigger_value = workflow.schedule
-
-    # 建立字符串 ID 到数字临时 ID 的映射
-    id_mapping: dict[str, int] = {}
-    for idx, job in enumerate(workflow.jobs, start=1):
-        id_mapping[job.id] = idx
-
-    # 转换 Jobs
-    job_responses: list[JobResponse] = []
-    for job in workflow.jobs:
-        pos_x, pos_y = positions.get(job.id, (0.0, 0.0))
-        temp_id = id_mapping.get(job.id)
-
-        job_response = JobResponse(
-            id=temp_id,
-            jobName=job.name or job.id,
-            jobType=job.type_id,
-            jobTypeCode=job.type,
-            jobParams=job.config or {},
-            timeoutSeconds=job.timeout or 0,
-            maxRetryTimes=job.retry_times or 0,
-            retryInterval=0,
-            priority=job.priority or 0,
-            positionX=pos_x,
-            positionY=pos_y,
-            description=job.description,
-        )
-        job_responses.append(job_response)
-
-    # 转换 Dependencies
-    dependency_responses: list[JobDependencyResponse] = []
-    for job in workflow.jobs:
-        for parent_id in job.depends:
-            job_temp_id = id_mapping.get(job.id, 0)
-            parent_temp_id = id_mapping.get(parent_id, 0)
-            dependency_response = JobDependencyResponse(
-                jobId=job_temp_id,
-                parentJobId=parent_temp_id,
-            )
-            dependency_responses.append(dependency_response)
-
-    return WorkflowResponse(
-        workflowName=workflow.name,
-        triggerType=trigger_type,
-        triggerValue=trigger_value,
-        timeoutSeconds=0,
-        maxRetryTimes=0,
-        priority=0,
-        description=workflow.description,
-        jobs=job_responses,
-        dependencies=dependency_responses,
-    )

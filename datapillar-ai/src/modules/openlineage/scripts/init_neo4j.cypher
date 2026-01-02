@@ -179,6 +179,11 @@ OPTIONS {indexConfig: {
 
 // ==================== 全文索引（文本搜索） ====================
 
+// 统一知识图谱全文索引（覆盖所有 Knowledge 节点）
+// 用于 HybridRetriever 的关键词召回，属性缺失不影响索引创建
+CREATE FULLTEXT INDEX kg_unified_fulltext_index IF NOT EXISTS
+FOR (n:Knowledge) ON EACH [n.name, n.displayName, n.description, n.code, n.domainCode, n.domainName, n.items];
+
 // Table 全文索引
 CREATE FULLTEXT INDEX table_fulltext IF NOT EXISTS
 FOR (t:Table) ON EACH [t.name, t.description];

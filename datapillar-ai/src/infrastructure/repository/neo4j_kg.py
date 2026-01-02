@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import Any
 
 from src.infrastructure.database import AsyncNeo4jClient, Neo4jClient, convert_neo4j_types
-from src.shared.config import settings
+from src.shared.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -432,6 +432,131 @@ class Neo4jKGRepository:
     # =========================================================================
 
     @classmethod
+    async def load_catalog_schema_nav(cls) -> list[dict[str, Any]]:
+        """
+        加载 Catalog -> Schema 导航（禁止包含表明细）
+
+        返回结构：
+        [
+          { "name": "catalog", "metalake": "ml", "schemas": [{ "name": "schema", "table_count": 123 }] }
+        ]
+        """
+        cypher = """
+        MATCH (cat:Catalog:Knowledge)-[:HAS_SCHEMA]->(sch:Schema:Knowledge)
+        OPTIONAL MATCH (sch)-[:HAS_TABLE]->(t:Table:Knowledge)
+        WITH cat, sch, count(t) AS table_count
+        WITH cat, collect({
+            name: sch.name,
+            table_count: table_count
+        }) AS schemas
+        RETURN
+            cat.name AS name,
+            cat.metalake AS metalake,
+            schemas
+        ORDER BY cat.name
+        """
+
+        try:
+            driver = await AsyncNeo4jClient.get_driver()
+            async with driver.session(database=settings.neo4j_database) as session:
+                result = await session.run(cypher)
+                records = await result.data()
+                return [convert_neo4j_types(r) for r in records]
+        except Exception as e:
+            logger.error(f"加载 Catalog/Schema 导航失败: {e}")
+            return []
+
+    @classmethod
+    async def load_tag_nav(
+        cls,
+        *,
+        limit_tags: int = 12,
+        tables_per_tag: int = 8,
+    ) -> list[dict[str, Any]]:
+        """
+        加载 tag 导航（基于 Table.tags 的自由标签）
+
+        关键事实：
+        - tag 是用户可自由维护的“标签”，不要求任何前缀规范（例如：ods、交易域）
+        - 该接口用于 no-hit 场景下给用户做“我能帮你做什么”的引导（非指针、无 element_id）
+
+        返回结构：
+        [
+          {
+            "tag": "交易域",
+            "table_count": 123,
+            "schemas": ["ods", "dwd"],
+            "sample_tables": [
+              {"schema_name": "ods", "table_name": "t_order", "display_name": "订单", "description": "...", "tags": ["ods", "交易域"]}
+            ]
+          }
+        ]
+        """
+        safe_limit_tags = max(1, min(int(limit_tags), 50))
+        safe_tables_per_tag = max(1, min(int(tables_per_tag), 30))
+
+        cypher = """
+        MATCH (t:Table:Knowledge)
+        WITH t, coalesce(t.tags, []) AS tags
+        UNWIND tags AS tag
+        WITH tag, t
+        WHERE tag IS NOT NULL AND trim(toString(tag)) <> ''
+        OPTIONAL MATCH (t)<-[:HAS_TABLE]-(sch:Schema:Knowledge)
+        WITH tag, sch, t
+        WITH
+            tag,
+            collect(DISTINCT sch.name) AS schemas,
+            count(DISTINCT t) AS table_count,
+            collect(DISTINCT {
+                schema_name: sch.name,
+                table_name: t.name,
+                display_name: coalesce(t.displayName, t.name),
+                description: coalesce(t.description, ''),
+                tags: coalesce(t.tags, [])
+            }) AS tables
+        RETURN
+            tag,
+            table_count,
+            [s IN schemas WHERE s IS NOT NULL] AS schemas,
+            tables[0..$tables_per_tag] AS sample_tables
+        ORDER BY table_count DESC, tag ASC
+        LIMIT $limit_tags
+        """
+
+        try:
+            driver = await AsyncNeo4jClient.get_driver()
+            async with driver.session(database=settings.neo4j_database) as session:
+                result = await session.run(
+                    cypher,
+                    {"limit_tags": safe_limit_tags, "tables_per_tag": safe_tables_per_tag},
+                )
+                records = await result.data()
+                return [convert_neo4j_types(r) for r in records]
+        except Exception as e:
+            logger.error(f"加载 tag 导航失败: {e}")
+            return []
+
+    @classmethod
+    async def count_table_lineage_edges(cls) -> int:
+        """统计表级血缘边数量（禁止返回边明细）"""
+        cypher = """
+        MATCH (source:Table:Knowledge)-[:INPUT_OF]->(sql:SQL:Knowledge)-[:OUTPUT_TO]->(target:Table:Knowledge)
+        RETURN count(DISTINCT (source.id + '|' + sql.id + '|' + target.id)) AS edge_count
+        """
+        try:
+            driver = await AsyncNeo4jClient.get_driver()
+            async with driver.session(database=settings.neo4j_database) as session:
+                result = await session.run(cypher)
+                record = await result.single()
+                if not record:
+                    return 0
+                edge_count = record["edge_count"]
+                return int(edge_count) if edge_count is not None else 0
+        except Exception as e:
+            logger.error(f"统计表级血缘边数量失败: {e}")
+            return 0
+
+    @classmethod
     async def load_catalog_hierarchy(cls) -> list[dict[str, Any]]:
         """加载 Catalog -> Schema -> Table 层级结构"""
         cypher = """
@@ -472,7 +597,19 @@ class Neo4jKGRepository:
     @classmethod
     async def load_table_lineage(cls) -> list[dict[str, Any]]:
         """加载表级血缘图"""
-        cypher = """
+        cypher = cls._TABLE_LINEAGE_CYPHER
+
+        try:
+            driver = await AsyncNeo4jClient.get_driver()
+            async with driver.session(database=settings.neo4j_database) as session:
+                result = await session.run(cypher)
+                records = await result.data()
+                return [convert_neo4j_types(r) for r in records]
+        except Exception as e:
+            logger.error(f"加载表级血缘失败: {e}")
+            return []
+
+    _TABLE_LINEAGE_CYPHER = """
         MATCH (source:Table)-[:INPUT_OF]->(sql:SQL)-[:OUTPUT_TO]->(target:Table)
         WITH source, target, sql
         MATCH (source)<-[:HAS_TABLE]-(source_schema:Schema)
@@ -484,14 +621,18 @@ class Neo4jKGRepository:
         ORDER BY source_table, target_table
         """
 
+    @classmethod
+    def load_table_lineage_sync(cls) -> list[dict[str, Any]]:
+        """加载表级血缘图（同步方法）"""
+        cypher = cls._TABLE_LINEAGE_CYPHER
         try:
-            driver = await AsyncNeo4jClient.get_driver()
-            async with driver.session(database=settings.neo4j_database) as session:
-                result = await session.run(cypher)
-                records = await result.data()
+            driver = Neo4jClient.get_driver()
+            with driver.session(database=settings.neo4j_database) as session:
+                result = session.run(cypher)
+                records = result.data()
                 return [convert_neo4j_types(r) for r in records]
         except Exception as e:
-            logger.error(f"加载表级血缘失败: {e}")
+            logger.error(f"加载表级血缘失败(同步): {e}")
             return []
 
     @classmethod
@@ -551,6 +692,62 @@ class Neo4jKGRepository:
         except Exception as e:
             logger.error(f"获取表列详情失败: {e}")
             return []
+
+    @classmethod
+    async def get_column_value_domains_by_element_id(
+        cls,
+        column_element_id: str,
+    ) -> dict[str, Any] | None:
+        """
+        根据 Column 的 elementId 精确获取其关联的 ValueDomain（同步列-值域关系）
+
+        返回（不解析 items，仅返回原始字段）：
+        - column_element_id, column_id, column_name, schema_name, table_name
+        - value_domains: [{element_id, domain_code, domain_name, domain_type, domain_level, data_type, description, items}]
+        """
+        if not column_element_id:
+            return None
+
+        cypher = """
+        MATCH (c:Column:Knowledge)
+        WHERE elementId(c) = $column_eid
+        OPTIONAL MATCH (t:Table:Knowledge)-[:HAS_COLUMN]->(c)
+        OPTIONAL MATCH (s:Schema:Knowledge)-[:HAS_TABLE]->(t)
+        OPTIONAL MATCH (c)-[:HAS_VALUE_DOMAIN]->(vd:ValueDomain:Knowledge)
+        WITH c, t, s, collect(DISTINCT {
+            element_id: elementId(vd),
+            domain_code: vd.domainCode,
+            domain_name: vd.domainName,
+            domain_type: vd.domainType,
+            domain_level: vd.domainLevel,
+            data_type: vd.dataType,
+            description: vd.description,
+            items: vd.items
+        }) AS value_domains
+        RETURN
+            elementId(c) AS column_element_id,
+            c.id AS column_id,
+            c.name AS column_name,
+            s.name AS schema_name,
+            t.name AS table_name,
+            value_domains
+        """
+
+        try:
+            driver = await AsyncNeo4jClient.get_driver()
+            async with driver.session(database=settings.neo4j_database) as session:
+                record = await (await session.run(cypher, {"column_eid": column_element_id})).single()
+                if not record:
+                    return None
+                data = convert_neo4j_types(record.data())
+                value_domains = data.get("value_domains") or []
+                data["value_domains"] = [
+                    vd for vd in value_domains if isinstance(vd, dict) and vd.get("element_id")
+                ]
+                return data
+        except Exception as e:
+            logger.error(f"获取列值域失败: {e}")
+            return None
 
     @classmethod
     async def get_column_lineage(
@@ -805,34 +1002,31 @@ class Neo4jKGRepository:
 
     @classmethod
     async def search_tables_with_context(cls, table_ids: list[str]) -> list[dict[str, Any]]:
-        """基于表 ID 列表，获取表详情及业务上下文"""
+        """
+        基于 Table.id 列表，获取表的轻量上下文（用于 search_assets）
+
+        重要：兼容两种 ID：
+        - table.id（节点属性 id，由 generate_id 生成的稳定 ID）
+        - elementId(table)（Neo4j 内部 elementId）
+        """
         cypher = """
         UNWIND $table_ids AS table_id
-        MATCH (table:Table)
-        WHERE elementId(table) = table_id
-        OPTIONAL MATCH (table)-[:HAS_COLUMN]->(col:Column)
-        OPTIONAL MATCH (table)-[:HAS_DOWNSTREAM_LINEAGE]->(downstream:Table)
-        MATCH (table)<-[:CONTAINS]-(sch:Schema)<-[:CONTAINS]-(subj:Subject)<-[:CONTAINS]-(cat:Catalog)<-[:CONTAINS]-(dom:Domain)
-        WITH table, sch, subj, cat, dom,
-             collect(DISTINCT {
-                 name: col.name,
-                 displayName: col.displayName,
-                 dataType: col.dataType,
-                 description: col.description
-             }) as columns,
-             collect(DISTINCT downstream.name) as downstream_tables
+        MATCH (table:Table:Knowledge)
+        WHERE table.id = table_id OR elementId(table) = table_id
+        OPTIONAL MATCH (table)<-[:HAS_TABLE]-(sch:Schema:Knowledge)<-[:HAS_SCHEMA]-(cat:Catalog:Knowledge)
+        OPTIONAL MATCH (table)-[:HAS_COLUMN]->(col:Column:Knowledge)
+        WITH table, sch, cat, count(col) AS column_count
         RETURN
-            elementId(table) as table_id,
-            table.name as table_name,
-            table.displayName as table_display_name,
-            table.description as table_description,
-            columns,
-            downstream_tables,
-            sch.layer as schema_layer,
-            sch.displayName as schema_name,
-            subj.displayName as subject_name,
-            cat.displayName as catalog_name,
-            dom.displayName as domain_name
+            table.id AS table_id,
+            elementId(table) AS element_id,
+            table.name AS table_name,
+            coalesce(table.displayName, table.name) AS table_display_name,
+            table.description AS table_description,
+            column_count,
+            sch.name AS schema_name,
+            cat.name AS catalog_name,
+            coalesce(table.tags, []) AS table_tags,
+            head([t IN coalesce(sch.tags, []) WHERE t STARTS WITH 'layer:']) AS schema_layer_tag
         """
 
         try:
@@ -1375,6 +1569,330 @@ class Neo4jKGRepository:
         except Exception as e:
             logger.error(f"混合检索失败: {e}")
             return []
+
+    @classmethod
+    def get_knowledge_nodes_context_by_element_ids(
+        cls,
+        element_ids: list[str],
+    ) -> list[dict[str, Any]]:
+        """
+        批量获取 Knowledge 节点上下文（同步方法）
+
+        设计目标：
+        - 给 KnowledgeAgent 构造“指针（pointer）”使用：必须可定位、可再解析
+        - 不返回列明细/大字段，只返回定位与导航信息
+
+        返回字段（按节点类型尽可能填充）：
+        - element_id, labels, primary_label, node_id, code, name, display_name, description, tags
+        - catalog_name, schema_name, table_name, path, qualified_name
+        """
+        if not element_ids:
+            return []
+
+        cypher = """
+        UNWIND $element_ids AS eid
+        MATCH (n:Knowledge)
+        WHERE elementId(n) = eid
+        WITH n, labels(n) AS labels
+
+        WITH
+            n,
+            labels,
+            head([x IN labels WHERE x <> 'Knowledge']) AS primary_label,
+            head([(cat:Catalog:Knowledge)-[:HAS_SCHEMA]->(sch:Schema:Knowledge)-[:HAS_TABLE]->(n) | cat.name]) AS table_catalog,
+            head([(cat:Catalog:Knowledge)-[:HAS_SCHEMA]->(sch:Schema:Knowledge)-[:HAS_TABLE]->(n) | sch.name]) AS table_schema,
+            head([(sch:Schema:Knowledge)-[:HAS_TABLE]->(n) | n.name]) AS table_name,
+            head([(cat:Catalog:Knowledge)-[:HAS_SCHEMA]->(n) | cat.name]) AS schema_catalog,
+            head([(cat:Catalog:Knowledge)-[:HAS_SCHEMA]->(sch:Schema:Knowledge)-[:HAS_TABLE]->(t:Table:Knowledge)-[:HAS_COLUMN]->(n) | cat.name]) AS column_catalog,
+            head([(cat:Catalog:Knowledge)-[:HAS_SCHEMA]->(sch:Schema:Knowledge)-[:HAS_TABLE]->(t:Table:Knowledge)-[:HAS_COLUMN]->(n) | sch.name]) AS column_schema,
+            head([(cat:Catalog:Knowledge)-[:HAS_SCHEMA]->(sch:Schema:Knowledge)-[:HAS_TABLE]->(t:Table:Knowledge)-[:HAS_COLUMN]->(n) | t.name]) AS column_table
+
+        RETURN
+            elementId(n) AS element_id,
+            labels AS labels,
+            primary_label AS primary_label,
+            coalesce(n.id, null) AS node_id,
+            CASE
+                WHEN 'ValueDomain' IN labels THEN coalesce(n.domainCode, null)
+                ELSE coalesce(n.code, null)
+            END AS code,
+            CASE
+                WHEN 'ValueDomain' IN labels THEN coalesce(n.domainName, n.domainCode, null)
+                ELSE n.name
+            END AS name,
+            CASE
+                WHEN 'ValueDomain' IN labels THEN coalesce(n.domainName, null)
+                ELSE coalesce(n.displayName, null)
+            END AS display_name,
+            coalesce(n.description, null) AS description,
+            coalesce(n.tags, []) AS tags,
+            coalesce(table_catalog, schema_catalog, column_catalog, null) AS catalog_name,
+            coalesce(table_schema, column_schema, null) AS schema_name,
+            coalesce(table_name, column_table, null) AS table_name,
+            CASE
+                WHEN 'Catalog' IN labels THEN n.name
+                WHEN 'Schema' IN labels THEN coalesce(schema_catalog, '') + '.' + n.name
+                WHEN 'Table' IN labels THEN coalesce(table_catalog, '') + '.' + coalesce(table_schema, '') + '.' + n.name
+                WHEN 'Column' IN labels THEN coalesce(column_catalog, '') + '.' + coalesce(column_schema, '') + '.' + coalesce(column_table, '') + '.' + n.name
+                WHEN 'ValueDomain' IN labels THEN 'valuedomain.' + coalesce(n.domainCode, '')
+                ELSE coalesce(n.code, n.name)
+            END AS path,
+            CASE
+                WHEN 'Schema' IN labels THEN coalesce(schema_catalog, '') + '.' + n.name
+                WHEN 'Table' IN labels THEN coalesce(table_schema, '') + '.' + n.name
+                WHEN 'Column' IN labels THEN coalesce(column_schema, '') + '.' + coalesce(column_table, '') + '.' + n.name
+                WHEN 'ValueDomain' IN labels THEN 'valuedomain.' + coalesce(n.domainCode, '')
+                ELSE coalesce(n.code, n.name)
+            END AS qualified_name
+        """
+
+        try:
+            driver = Neo4jClient.get_driver()
+            with driver.session(database=settings.neo4j_database) as session:
+                result = session.run(cypher, {"element_ids": element_ids})
+                records = result.data()
+                return [convert_neo4j_types(r) for r in records]
+        except Exception as e:
+            logger.error(f"批量获取 Knowledge 节点上下文失败: {e}")
+            return []
+
+    @classmethod
+    def search_knowledge_nodes_with_context(
+        cls,
+        query: str,
+        top_k: int = 10,
+        min_score: float = 0.8,
+    ) -> list[dict[str, Any]]:
+        """
+        通用 Knowledge 节点检索（同步方法）
+
+        先做混合检索得到 element_id+score，再批量取上下文返回。
+        """
+        results = cls.hybrid_search(
+            query=query,
+            top_k=top_k,
+            vector_index="kg_unified_vector_index",
+            fulltext_index="kg_unified_fulltext_index",
+            min_score=min_score,
+        )
+        if not results:
+            return []
+
+        score_map = {r.get("element_id"): float(r.get("score", 0) or 0) for r in results if r.get("element_id")}
+        element_ids = [r.get("element_id") for r in results if r.get("element_id")]
+        context = cls.get_knowledge_nodes_context_by_element_ids(element_ids)
+
+        for item in context:
+            eid = item.get("element_id")
+            item["score"] = score_map.get(eid, 0.0)
+
+        context.sort(key=lambda x: x.get("score", 0), reverse=True)
+        return context
+
+    # -------------------------------------------------------------------------
+    # 精确解析（Identifier Resolver） - 同步方法（统一入口）
+    # -------------------------------------------------------------------------
+
+    @classmethod
+    def resolve_knowledge_element_ids_exact(
+        cls,
+        *,
+        kind: str,
+        ref: str,
+        limit: int = 20,
+    ) -> list[str]:
+        """
+        统一精确解析：将“确定性标识符”解析为 Knowledge 节点 elementId 列表（同步方法）
+
+        【弃用提示（重要）】
+        - 该方法只适用于“确定性标识符”（例如 element_id / node_id / catalog.schema.table / schema.table.column / metric.code）
+        - 不要用于解析用户自由文本，更不要让 KnowledgeAgent 通过“从句子里抠 schema.table”来短路语义检索链路
+        - 正确链路应为：语义检索召回候选 element_id → 再用 element_id 精确查询 Neo4j → 产出 ETLPointer
+
+        约束：
+        - 只做精确定位，不走向量/全文，不做语义猜测
+        - 允许返回多个候选（歧义），由上层（KnowledgeAgent/前端）要求用户澄清
+
+        kind 支持（大小写不敏感）：
+        - catalog: catalog
+        - schema: catalog.schema 或 schema
+        - table: catalog.schema.table 或 schema.table 或 table
+        - column: catalog.schema.table.column 或 schema.table.column
+        - valuedomain: valuedomain.<domainCode> 或 <domainCode>
+        - metric: metric.<code> 或 <code>
+        - wordroot/modifier/unit: <code>
+        - node_id: <n.id>
+        - element_id: <elementId(n)>
+        """
+        kind_norm = (kind or "").strip().lower()
+        raw_ref = (ref or "").strip()
+        if not kind_norm or not raw_ref:
+            return []
+
+        parts = [p for p in raw_ref.split(".") if p]
+        driver = Neo4jClient.get_driver()
+
+        def run(cypher: str, params: dict[str, Any]) -> list[str]:
+            try:
+                with driver.session(database=settings.neo4j_database) as session:
+                    result = session.run(cypher, params)
+                    records = result.data()
+                    return [r.get("element_id") for r in records if r.get("element_id")]
+            except Exception as e:
+                logger.error(f"统一精确解析失败(kind={kind_norm}): {e}")
+                return []
+
+        if kind_norm == "element_id":
+            return run(
+                """
+                MATCH (n:Knowledge)
+                WHERE elementId(n) = $eid
+                RETURN elementId(n) AS element_id
+                """,
+                {"eid": raw_ref},
+            )
+
+        if kind_norm == "node_id":
+            return run(
+                """
+                MATCH (n:Knowledge {id: $id})
+                RETURN elementId(n) AS element_id
+                LIMIT $limit
+                """,
+                {"id": raw_ref, "limit": int(limit)},
+            )
+
+        if kind_norm == "catalog":
+            name = parts[0] if parts else raw_ref
+            return run(
+                """
+                MATCH (c:Catalog:Knowledge {name: $name})
+                RETURN elementId(c) AS element_id
+                LIMIT $limit
+                """,
+                {"name": name, "limit": int(limit)},
+            )
+
+        if kind_norm == "schema":
+            if len(parts) >= 2:
+                catalog_name, schema_name = parts[0], parts[1]
+                return run(
+                    """
+                    MATCH (c:Catalog:Knowledge {name: $catalog})-[:HAS_SCHEMA]->(s:Schema:Knowledge {name: $schema})
+                    RETURN elementId(s) AS element_id
+                    LIMIT $limit
+                    """,
+                    {"catalog": catalog_name, "schema": schema_name, "limit": int(limit)},
+                )
+            schema_name = parts[0] if parts else raw_ref
+            return run(
+                """
+                MATCH (s:Schema:Knowledge {name: $schema})
+                RETURN elementId(s) AS element_id
+                LIMIT $limit
+                """,
+                {"schema": schema_name, "limit": int(limit)},
+            )
+
+        if kind_norm == "table":
+            if len(parts) >= 3:
+                catalog_name, schema_name, table_name = parts[0], parts[1], parts[2]
+                return run(
+                    """
+                    MATCH (c:Catalog:Knowledge {name: $catalog})-[:HAS_SCHEMA]->(s:Schema:Knowledge {name: $schema})
+                          -[:HAS_TABLE]->(t:Table:Knowledge {name: $table})
+                    RETURN elementId(t) AS element_id
+                    LIMIT $limit
+                    """,
+                    {"catalog": catalog_name, "schema": schema_name, "table": table_name, "limit": int(limit)},
+                )
+            if len(parts) == 2:
+                schema_name, table_name = parts[0], parts[1]
+                return run(
+                    """
+                    MATCH (s:Schema:Knowledge {name: $schema})-[:HAS_TABLE]->(t:Table:Knowledge {name: $table})
+                    RETURN elementId(t) AS element_id
+                    LIMIT $limit
+                    """,
+                    {"schema": schema_name, "table": table_name, "limit": int(limit)},
+                )
+            table_name = parts[0] if parts else raw_ref
+            return run(
+                """
+                MATCH (t:Table:Knowledge {name: $table})
+                RETURN elementId(t) AS element_id
+                LIMIT $limit
+                """,
+                {"table": table_name, "limit": int(limit)},
+            )
+
+        if kind_norm == "column":
+            if len(parts) >= 4:
+                catalog_name, schema_name, table_name, column_name = parts[0], parts[1], parts[2], parts[3]
+                return run(
+                    """
+                    MATCH (c:Catalog:Knowledge {name: $catalog})-[:HAS_SCHEMA]->(s:Schema:Knowledge {name: $schema})
+                          -[:HAS_TABLE]->(t:Table:Knowledge {name: $table})-[:HAS_COLUMN]->(col:Column:Knowledge {name: $column})
+                    RETURN elementId(col) AS element_id
+                    LIMIT $limit
+                    """,
+                    {
+                        "catalog": catalog_name,
+                        "schema": schema_name,
+                        "table": table_name,
+                        "column": column_name,
+                        "limit": int(limit),
+                    },
+                )
+            if len(parts) == 3:
+                schema_name, table_name, column_name = parts[0], parts[1], parts[2]
+                return run(
+                    """
+                    MATCH (s:Schema:Knowledge {name: $schema})-[:HAS_TABLE]->(t:Table:Knowledge {name: $table})
+                          -[:HAS_COLUMN]->(col:Column:Knowledge {name: $column})
+                    RETURN elementId(col) AS element_id
+                    LIMIT $limit
+                    """,
+                    {"schema": schema_name, "table": table_name, "column": column_name, "limit": int(limit)},
+                )
+            return []
+
+        if kind_norm == "valuedomain":
+            domain_code = raw_ref.removeprefix("valuedomain.").strip()
+            return run(
+                """
+                MATCH (v:ValueDomain:Knowledge {domainCode: $code})
+                RETURN elementId(v) AS element_id
+                LIMIT $limit
+                """,
+                {"code": domain_code, "limit": int(limit)},
+            )
+
+        if kind_norm == "metric":
+            code = raw_ref.removeprefix("metric.").strip()
+            return run(
+                """
+                MATCH (m:Knowledge)
+                WHERE (m:AtomicMetric OR m:DerivedMetric OR m:CompositeMetric)
+                  AND m.code = $code
+                RETURN elementId(m) AS element_id
+                LIMIT $limit
+                """,
+                {"code": code, "limit": int(limit)},
+            )
+
+        if kind_norm in {"wordroot", "modifier", "unit"}:
+            label = {"wordroot": "WordRoot", "modifier": "Modifier", "unit": "Unit"}[kind_norm]
+            return run(
+                f"""
+                MATCH (n:{label}:Knowledge {{code: $code}})
+                RETURN elementId(n) AS element_id
+                LIMIT $limit
+                """,
+                {"code": raw_ref, "limit": int(limit)},
+            )
+
+        return []
 
     # =========================================================================
     # 5. 知识写回 - 持久化用户确认的知识

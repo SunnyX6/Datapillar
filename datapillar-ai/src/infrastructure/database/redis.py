@@ -9,7 +9,7 @@ import logging
 
 import redis.asyncio as redis
 
-from src.shared.config import settings
+from src.shared.config.settings import settings
 from src.shared.config.exceptions import RedisError
 
 logger = logging.getLogger(__name__)

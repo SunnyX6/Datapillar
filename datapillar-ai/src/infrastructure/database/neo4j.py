@@ -10,7 +10,7 @@ import logging
 from neo4j import GraphDatabase, Driver, AsyncGraphDatabase, AsyncDriver
 from neo4j.time import DateTime as Neo4jDateTime
 
-from src.shared.config import settings
+from src.shared.config.settings import settings
 from src.shared.config.exceptions import Neo4jError
 
 logger = logging.getLogger(__name__)

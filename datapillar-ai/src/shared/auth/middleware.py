@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 from src.shared.auth.jwt_util import JwtTokenUtil
 from src.shared.auth.user import CurrentUser
-from src.shared.config import settings
+from src.shared.config.settings import settings
 
 
 class AuthMiddleware(BaseHTTPMiddleware):

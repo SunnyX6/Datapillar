@@ -2,13 +2,15 @@
 ETL 多智能体编排器
 
 使用 LangGraph 实现智能体协作：
-- 条件路由（根据测试结果决定下一步）
-- 反馈循环（测试不通过 → 重新开发）
-- 人机交互（需求澄清、方案确认、反馈收集）
-- 迭代控制（最大迭代次数限制）
+- 黑板模式（Blackboard）：所有产物写入共享 state，由编排器统一路由
+- 动态委派（Delegation）：任意 Agent 可创建请求，编排器抢占处理
+- 全局可抢占人机交互（HITL）：请求队列不为空时优先中断等待用户输入
 """
 
 import logging
+import json
+import time
+import uuid
 from typing import Any, AsyncGenerator, Literal
 
 from langchain_core.messages import AIMessage, HumanMessage
@@ -25,11 +27,14 @@ from src.modules.etl.agents import (
     TesterAgent,
 )
 from src.modules.etl.memory import MemoryManager
-from src.modules.etl.schemas.dag import WorkflowResponse, convert_workflow
-from src.modules.etl.schemas.kg_context import AgentScopedContext, AgentType, GlobalKGContext
+from src.modules.etl.schemas.dag import WorkflowResponse
+from src.modules.etl.schemas.kg_context import AgentScopedContext, AgentType
 from src.modules.etl.schemas.plan import Workflow
 from src.modules.etl.schemas.requirement import AnalysisResult
+from src.modules.etl.schemas.requests import BlackboardRequest
 from src.modules.etl.schemas.state import AgentState
+from src.modules.etl.schemas.sse_msg import SseEvent
+from src.shared.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -38,21 +43,20 @@ class EtlOrchestrator:
     """
     ETL 多智能体编排器
 
-    工作流程：
-    1. KnowledgeAgent: 检索相关知识
-    2. AnalystAgent: 分析需求（可能需要用户澄清）
-    3. ArchitectAgent: 设计方案
-    4. DeveloperAgent: 生成代码
-    5. TesterAgent: 测试验证（不通过 → 回到 4）
-    6. FeedbackHandler: 收集用户反馈（满意时给参考的 SQL 加分）
-    7. END: 输出最终结果
+    黑板协作（重要）：
+    - 编排器不再依赖固定流水线边
+    - 统一入口 blackboard_router：根据 state 产物与 pending_requests 动态选择下一步
+    - 任意 Agent 都可以通过 state.pending_requests 发起：
+      - 人机交互（interrupt）
+      - 委派给其他 Agent 的子任务（delegate）
     """
 
     def __init__(
         self,
         checkpointer: BaseCheckpointSaver | None = None,
-        max_iterations: int = 3,
-        agent_max_retries: int = 2,
+        max_iterations: int | None = None,
+        agent_max_retries: int | None = None,
+        max_human_requests: int | None = None,
     ):
         """
         初始化编排器
@@ -63,8 +67,21 @@ class EtlOrchestrator:
             agent_max_retries: Agent 执行失败时的最大重试次数
         """
         self.checkpointer = checkpointer or InMemorySaver()
-        self.max_iterations = max_iterations
-        self.agent_max_retries = agent_max_retries
+        self.max_iterations = int(
+            max_iterations
+            if max_iterations is not None
+            else settings.get("etl_orchestrator_max_iterations", 3)
+        )
+        self.agent_max_retries = int(
+            agent_max_retries
+            if agent_max_retries is not None
+            else settings.get("etl_orchestrator_agent_max_retries", 2)
+        )
+        self.max_human_requests = int(
+            max_human_requests
+            if max_human_requests is not None
+            else settings.get("etl_orchestrator_max_human_requests", 6)
+        )
 
         # 初始化 Memory
         self.memory = MemoryManager()
@@ -183,20 +200,20 @@ class EtlOrchestrator:
         """
         构建 LangGraph 状态图
 
-        流程：
-        START → knowledge → analyst → [clarification?] → architect
-              → developer → tester → [passed?] → feedback → finalize → END
+        结构：
+        START → blackboard_router → (动态路由到任意节点) → ... → blackboard_router → finalize → END
 
-        错误处理：
-        - 每个 Agent 有重试机制（最多重试 N 次）
-        - 重试耗尽后，路由检查 error 字段，有错误则跳转到 finalize 终止流程
-
-        Returns:
-            编译后的 StateGraph
+        说明：
+        - 所有节点执行结束后回到 blackboard_router
+        - blackboard_router 优先处理 pending_requests（全局可抢占）
+        - 不再使用固定的 clarification_handler/feedback_handler
         """
         builder = StateGraph(AgentState)
 
-        # ===== 添加节点（Agent 节点带重试机制）=====
+        # ===== 添加节点 =====
+        builder.add_node("blackboard_router", self._blackboard_router)
+        builder.add_node("human_in_the_loop", self._handle_human_in_the_loop)
+
         builder.add_node(
             "knowledge_agent",
             self._wrap_agent_with_retry(self.knowledge_agent, "知识检索专家")
@@ -205,7 +222,6 @@ class EtlOrchestrator:
             "analyst_agent",
             self._wrap_agent_with_retry(self.analyst_agent, "需求分析师")
         )
-        builder.add_node("clarification_handler", self._handle_clarification)
         builder.add_node(
             "architect_agent",
             self._wrap_agent_with_retry(self.architect_agent, "数据架构师")
@@ -218,72 +234,33 @@ class EtlOrchestrator:
             "tester_agent",
             self._wrap_agent_with_retry(self.tester_agent, "测试验证")
         )
-        builder.add_node("feedback_handler", self._handle_feedback)
         builder.add_node("finalize", self._finalize)
 
         # ===== 设置入口 =====
-        builder.set_entry_point("knowledge_agent")
+        builder.set_entry_point("blackboard_router")
 
-        # ===== 添加边（所有节点都检查错误）=====
-
-        # knowledge → analyst（检查错误）
+        # ===== router 动态路由 =====
         builder.add_conditional_edges(
-            "knowledge_agent",
-            self._check_error_and_continue,
+            "blackboard_router",
+            self._route_from_blackboard,
             {
-                "continue": "analyst_agent",
-                "error": "finalize",
+                "human_in_the_loop": "human_in_the_loop",
+                "knowledge_agent": "knowledge_agent",
+                "analyst_agent": "analyst_agent",
+                "architect_agent": "architect_agent",
+                "developer_agent": "developer_agent",
+                "tester_agent": "tester_agent",
+                "finalize": "finalize",
             },
         )
 
-        # analyst → [条件路由：错误/澄清/继续]
-        builder.add_conditional_edges(
-            "analyst_agent",
-            self._route_after_analyst,
-            {
-                "clarification": "clarification_handler",
-                "continue": "architect_agent",
-                "error": "finalize",
-            },
-        )
-
-        # clarification → analyst（重新分析）
-        builder.add_edge("clarification_handler", "analyst_agent")
-
-        # architect → developer（检查错误）
-        builder.add_conditional_edges(
-            "architect_agent",
-            self._check_error_and_continue,
-            {
-                "continue": "developer_agent",
-                "error": "finalize",
-            },
-        )
-
-        # developer → tester（检查错误）
-        builder.add_conditional_edges(
-            "developer_agent",
-            self._check_error_and_continue,
-            {
-                "continue": "tester_agent",
-                "error": "finalize",
-            },
-        )
-
-        # tester → [条件路由：错误/通过/失败/达到最大迭代]
-        builder.add_conditional_edges(
-            "tester_agent",
-            self._route_after_test,
-            {
-                "passed": "feedback_handler",
-                "failed": "developer_agent",
-                "max_iterations": "feedback_handler",
-                "error": "finalize",
-            },
-        )
-
-        # feedback → finalize
-        builder.add_edge("feedback_handler", "finalize")
+        # 所有节点执行结束回到 router（黑板驱动）
+        builder.add_edge("human_in_the_loop", "blackboard_router")
+        builder.add_edge("knowledge_agent", "blackboard_router")
+        builder.add_edge("analyst_agent", "blackboard_router")
+        builder.add_edge("architect_agent", "blackboard_router")
+        builder.add_edge("developer_agent", "blackboard_router")
+        builder.add_edge("tester_agent", "blackboard_router")
 
         # finalize → END
         builder.add_edge("finalize", END)
@@ -297,173 +274,320 @@ class EtlOrchestrator:
         logger.info("LangGraph 状态图编译完成")
         return graph
 
-    # ===== 路由函数 =====
+    # ===== 黑板路由与人机交互 =====
 
-    def _check_error_and_continue(self, state: AgentState) -> Literal["continue", "error"]:
-        """检查是否有错误，决定继续还是终止"""
-        if state.error:
-            logger.error(f"❌ 流程终止，原因: {state.error}")
-            return "error"
-        return "continue"
+    @staticmethod
+    def _now_ms() -> int:
+        return int(time.time() * 1000)
 
-    def _route_after_analyst(self, state: AgentState) -> Literal["clarification", "continue", "error"]:
-        """分析完成后的路由"""
-        # 先检查错误
-        if state.error:
-            logger.error(f"❌ AnalystAgent 失败，流程终止: {state.error}")
-            return "error"
+    @staticmethod
+    def _normalize_node_id(value: str | None) -> str | None:
+        if not value:
+            return value
+        allowed = {
+            "blackboard_router",
+            "human_in_the_loop",
+            "knowledge_agent",
+            "analyst_agent",
+            "architect_agent",
+            "developer_agent",
+            "tester_agent",
+            "finalize",
+        }
+        if value in allowed:
+            return value
 
-        if state.needs_clarification:
-            # 检查是否达到最大澄清次数
-            if state.clarification_count >= state.max_clarifications:
-                logger.warning(f"已达到最大澄清次数 {state.max_clarifications}，强制继续")
-                return "continue"
-            return "clarification"
-        return "continue"
+        name_to_node = {
+            "黑板路由": "blackboard_router",
+            "人机交互": "human_in_the_loop",
+            "知识检索专家": "knowledge_agent",
+            "需求分析师": "analyst_agent",
+            "数据架构师": "architect_agent",
+            "数据开发": "developer_agent",
+            "测试验证": "tester_agent",
+            "完成处理": "finalize",
+        }
+        return name_to_node.get(value, value)
 
-    def _route_after_test(self, state: AgentState) -> Literal["passed", "failed", "max_iterations", "error"]:
-        """测试完成后的路由"""
-        # 先检查错误
-        if state.error:
-            logger.error(f"❌ TesterAgent 失败，流程终止: {state.error}")
-            return "error"
+    async def _blackboard_router(self, state: AgentState) -> Command:
+        """
+        黑板路由器：只负责决定 next_agent（以及必要的抢占请求创建）
+        """
+        last_node = state.current_agent
+        last_node_id = self._normalize_node_id(last_node)
+        next_agent = "finalize"
+        metadata = dict(state.metadata or {})
+        request_results_update: dict[str, Any] | None = None
+        counters = dict(state.delegation_counters or {})
+        should_clear_error = False
 
-        # 检查迭代次数
-        if state.iteration_count >= self.max_iterations:
-            logger.warning(f"已达到最大迭代次数 {self.max_iterations}，强制结束")
-            return "max_iterations"
+        pending_requests: list[Any] = list(state.pending_requests or [])
 
-        test_result = state.test_result
-        if test_result:
-            if isinstance(test_result, dict):
-                passed = test_result.get("passed", False)
+        completed_delegate_resume_to: str | None = None
+
+        # 如果队首是 delegate 且目标节点已执行完成，则出队（并按 resume_to 回跳）
+        if pending_requests:
+            req0_raw = pending_requests[0]
+            req0 = BlackboardRequest(**req0_raw) if isinstance(req0_raw, dict) else req0_raw
+            if req0.kind == "delegate" and req0.target_agent:
+                target_id = self._normalize_node_id(req0.target_agent) or req0.target_agent
+                if last_node_id == target_id:
+                    completed_delegate_resume_to = req0.resume_to
+                    request_results = dict((state.request_results or {}))
+                    request_results[req0.request_id] = {
+                        "kind": "delegate",
+                        "created_by": req0.created_by,
+                        "target_agent": target_id,
+                        "resume_to": req0.resume_to,
+                        "completed_by": target_id,
+                        "completed_at_ms": self._now_ms(),
+                    }
+                    request_results_update = request_results
+                    pending_requests = pending_requests[1:]
+
+        def has_pending_human(reqs: list[Any]) -> bool:
+            for raw in reqs or []:
+                req = BlackboardRequest(**raw) if isinstance(raw, dict) else raw
+                if getattr(req, "kind", None) == "human" and getattr(req, "status", "pending") == "pending":
+                    return True
+            return False
+
+        # 1) 全局可抢占：human 请求优先（避免 delegate 阻塞用户交互）
+        if pending_requests and has_pending_human(pending_requests):
+            next_agent = "human_in_the_loop"
+        elif pending_requests:
+            # 1.1) 非 human：仅处理队首（保持 delegate 完成语义依赖“队首→执行→回跳”）
+            req0 = pending_requests[0]
+            if isinstance(req0, dict):
+                req0 = BlackboardRequest(**req0)
+            if req0.kind == "delegate":
+                target = req0.target_agent or ""
+                target_id = self._normalize_node_id(target) if target else None
+                next_agent = target_id if target_id else "finalize"
             else:
-                passed = getattr(test_result, "passed", False)
+                next_agent = "finalize"
+        else:
+            # 1.2) 刚完成 delegate：优先按 resume_to 回跳（保证“委派→返回”闭环语义）
+            resume_to = self._normalize_node_id(completed_delegate_resume_to) if completed_delegate_resume_to else None
+            if resume_to and resume_to not in {"blackboard_router"} and resume_to in {
+                "human_in_the_loop",
+                "knowledge_agent",
+                "analyst_agent",
+                "architect_agent",
+                "developer_agent",
+                "tester_agent",
+                "finalize",
+            }:
+                next_agent = resume_to
+            else:
+                # 2) 无 pending_requests：优先处理可恢复错误（避免直接 finalize 造成“假完成”）
+                if state.error:
+                    recover_count = int(counters.get("orchestrator:error_recovery") or 0)
+                    if state.human_request_count < state.max_human_requests and recover_count < 1:
+                        req = BlackboardRequest(
+                            request_id=f"req_{uuid.uuid4().hex}",
+                            kind="human",
+                            created_by="blackboard_router",
+                            resume_to="blackboard_router",
+                            payload={
+                                "type": "error_recovery",
+                                "message": "系统在生成工作流时遇到异常，需要你补充信息或简化描述后继续。",
+                                "questions": [
+                                    "请用更具体的一句话重述需求（尽量明确源数据范围与目标产物）。",
+                                    "如果方便：请提供任意一项可验证线索（现有 SQL/字段清单/上游表名/目标表名）。",
+                                ],
+                                "error": str(state.error)[:500],
+                            },
+                        )
+                        pending_requests.append(req)
+                        counters["orchestrator:error_recovery"] = recover_count + 1
+                        metadata["last_error"] = {
+                            "error": str(state.error),
+                            "at_ms": self._now_ms(),
+                            "recovered_by": "human",
+                        }
+                        should_clear_error = True
+                        next_agent = "human_in_the_loop"
+                    else:
+                        next_agent = "finalize"
+                else:
+                    # 3) 动态选择下一步（基于黑板产物）
+                    if not state.analysis_result:
+                        next_agent = "analyst_agent"
+                    elif not state.architecture_plan:
+                        next_agent = "architect_agent"
+                    else:
+                        # plan 已存在：如果 Job 还没生成 SQL，则走 developer
+                        plan = state.architecture_plan
+                        jobs = plan.get("jobs", []) if isinstance(plan, dict) else getattr(plan, "jobs", [])
+                        has_unbuilt_sql = any(
+                            not (
+                                j.get("config_generated")
+                                if isinstance(j, dict)
+                                else getattr(j, "config_generated", False)
+                            )
+                            for j in jobs
+                        )
+                        if has_unbuilt_sql:
+                            next_agent = "developer_agent"
+                        else:
+                            test_result = state.test_result
+                            passed = False
+                            if test_result:
+                                passed = (
+                                    test_result.get("passed", False)
+                                    if isinstance(test_result, dict)
+                                    else getattr(test_result, "passed", False)
+                                )
+                            if not test_result:
+                                next_agent = "tester_agent"
+                            elif not passed and state.iteration_count < state.max_iterations:
+                                next_agent = "developer_agent"
+                            else:
+                                next_agent = "finalize"
 
-            if passed:
-                return "passed"
+        update: dict[str, Any] = {
+            "current_agent": "blackboard_router",
+            "next_agent": next_agent,
+            "last_node": last_node,
+            "metadata": metadata,
+        }
+        update["pending_requests"] = [r.model_dump() if hasattr(r, "model_dump") else r for r in pending_requests]
+        if request_results_update is not None:
+            update["request_results"] = request_results_update
+        if counters != (state.delegation_counters or {}):
+            update["delegation_counters"] = counters
+        if should_clear_error:
+            update["error"] = None
+        return Command(update=update)
 
-        return "failed"
+    @staticmethod
+    def _route_from_blackboard(state: AgentState) -> Literal[
+        "human_in_the_loop",
+        "knowledge_agent",
+        "analyst_agent",
+        "architect_agent",
+        "developer_agent",
+        "tester_agent",
+        "finalize",
+    ]:
+        next_agent = state.next_agent or "finalize"
+        allowed = {
+            "human_in_the_loop",
+            "knowledge_agent",
+            "analyst_agent",
+            "architect_agent",
+            "developer_agent",
+            "tester_agent",
+            "finalize",
+        }
+        return next_agent if next_agent in allowed else "finalize"
 
-    # ===== 节点处理函数 =====
+    async def _handle_human_in_the_loop(self, state: AgentState) -> Command:
+        """
+        统一的人机交互处理节点（全局可抢占）
+        - 优先处理队列中最早的 human request（允许 human 抢占）
+        - interrupt 等待用户输入
+        - 完成后从队列移除该请求并回到 blackboard_router
+        """
+        if not state.pending_requests:
+            return Command(update={"current_agent": "human_in_the_loop"})
 
-    async def _handle_clarification(self, state: AgentState) -> Command:
-        """处理需求澄清（人机交互）"""
-        questions = state.clarification_questions or []
-
-        if questions:
-            logger.info(f"⏸️ 需要用户澄清 (第 {state.clarification_count + 1} 次): {questions}")
-
-            # 使用 interrupt 暂停执行，等待用户输入
-            user_response = interrupt({
-                "type": "clarification",
-                "questions": questions,
-                "message": "请回答以下问题以便继续分析",
-                "clarification_count": state.clarification_count + 1,
-                "max_clarifications": state.max_clarifications,
-            })
-
-            # 用户回答后，更新状态
+        if state.human_request_count >= state.max_human_requests:
             return Command(
                 update={
-                    "messages": [HumanMessage(content=f"用户澄清: {user_response}")],
-                    "user_input": f"{state.user_input}\n用户补充: {user_response}",
-                    "needs_clarification": False,
-                    "clarification_questions": [],
-                    "clarification_count": state.clarification_count + 1,
-                    "current_agent": "clarification_handler",
+                    "current_agent": "human_in_the_loop",
+                    "error": f"已达到最大人机交互次数限制: {state.max_human_requests}",
                 }
             )
 
+        req_index: int | None = None
+        req: BlackboardRequest | None = None
+        for idx, raw in enumerate(state.pending_requests):
+            cand = BlackboardRequest(**raw) if isinstance(raw, dict) else raw
+            if cand.kind == "human" and cand.status == "pending":
+                req_index = idx
+                req = cand
+                break
+        if req_index is None or req is None:
+            return Command(
+                update={
+                    "current_agent": "human_in_the_loop",
+                    "error": "human_in_the_loop 未找到可处理的 human 请求（可能已完成或队列异常）",
+                }
+            )
+
+        interrupt_payload = dict(req.payload or {})
+        if "type" not in interrupt_payload:
+            interrupt_payload["type"] = "human_input"
+        if "message" not in interrupt_payload:
+            interrupt_payload["message"] = "请补充信息以便继续"
+
+        logger.info("⏸️ 等待用户输入: request_id=%s, type=%s", req.request_id, interrupt_payload.get("type"))
+        user_response = interrupt(interrupt_payload)
+
+        request_results = dict((state.request_results or {}))
+        request_results[req.request_id] = {
+            "kind": "human",
+            "created_by": req.created_by,
+            "resume_to": req.resume_to,
+            "completed_by": "human_in_the_loop",
+            "completed_at_ms": self._now_ms(),
+            "payload_type": interrupt_payload.get("type"),
+            "writeback_key": interrupt_payload.get("writeback_key"),
+            "response_preview": str(user_response)[:200],
+        }
+
+        # 完成出队（仅移除本次处理的 human request）
+        remaining = list(state.pending_requests)
+        remaining.pop(req_index)
+        responses = dict((state.human_responses or {}))
+        responses[req.request_id] = user_response
+        writeback_key = interrupt_payload.get("writeback_key")
+        writebacks = dict((state.human_writebacks or {}))
+
+        update_selected_component: dict[str, Any] = {}
+        if isinstance(writeback_key, str) and writeback_key.strip():
+            writebacks[writeback_key] = user_response
+            # 关键字段显式化：selected_component 由 human writeback 统一写入 state 字段
+            if writeback_key == "selected_component":
+                normalized_code: str | None = None
+                normalized_id: int | None = None
+                if isinstance(user_response, str):
+                    normalized_code = user_response.strip()
+                elif isinstance(user_response, dict):
+                    raw_code = user_response.get("component") or user_response.get("value") or user_response.get("code")
+                    if isinstance(raw_code, str) and raw_code.strip():
+                        normalized_code = raw_code.strip()
+                    raw_id = user_response.get("id") or user_response.get("component_id")
+                    if isinstance(raw_id, int):
+                        normalized_id = raw_id
+                    elif isinstance(raw_id, str) and raw_id.isdigit():
+                        normalized_id = int(raw_id)
+
+                if normalized_code:
+                    update_selected_component["selected_component"] = normalized_code
+                if normalized_id is not None:
+                    update_selected_component["selected_component_id"] = normalized_id
+
+        # 对 clarifications：把用户补充并入 user_input（保持与现有 Agent 读取方式一致）
+        merged_user_input = state.user_input
+        if interrupt_payload.get("type") in {"clarification", "error_recovery"}:
+            merged_user_input = f"{state.user_input}\n用户补充: {user_response}"
+
         return Command(
             update={
-                "needs_clarification": False,
-                "current_agent": "clarification_handler",
+                "messages": [HumanMessage(content=f"用户输入: {user_response}")],
+                "user_input": merged_user_input,
+                "pending_requests": [r.model_dump() if hasattr(r, "model_dump") else r for r in remaining],
+                "human_request_count": state.human_request_count + 1,
+                "current_agent": "human_in_the_loop",
+                "human_responses": responses,
+                "human_writebacks": writebacks,
+                "request_results": request_results,
+                **update_selected_component,
             }
         )
-
-    async def _handle_feedback(self, state: AgentState) -> Command:
-        """处理用户反馈（人机交互）
-
-        收集用户反馈，如果满意则给 AI 参考过的历史 SQL 加分。
-        """
-        # 构建结果摘要
-        plan = state.architecture_plan
-        if isinstance(plan, dict):
-            plan_name = plan.get("name", "ETL 工作流")
-            job_count = len(plan.get("jobs", []))
-        else:
-            plan_name = plan.name if plan else "ETL 工作流"
-            job_count = len(plan.jobs) if plan else 0
-
-        result_summary = f"生成了 {plan_name}，包含 {job_count} 个 Job"
-
-        # 提取测试警告（如果有）
-        test_warnings = []
-        test_result = state.test_result
-        if test_result:
-            if isinstance(test_result, dict):
-                test_warnings = test_result.get("validation_warnings", [])
-            else:
-                test_warnings = getattr(test_result, "validation_warnings", [])
-
-        logger.info("⏸️ 收集用户反馈...")
-
-        # 构建 interrupt 消息
-        feedback_message = "请对生成结果进行评价"
-        if test_warnings:
-            feedback_message = f"请对生成结果进行评价（检测到 {len(test_warnings)} 个警告，建议仔细确认）"
-
-        # 使用 interrupt 暂停执行，等待用户反馈
-        feedback_response = interrupt({
-            "type": "feedback_request",
-            "message": feedback_message,
-            "result_summary": result_summary,
-            "sql_preview": None,
-            "validation_warnings": test_warnings,
-            "options": [
-                {"value": "satisfied", "label": "👍 满意，直接采纳"},
-                {"value": "unsatisfied", "label": "👎 不满意，重新生成"},
-                {"value": "need_modification", "label": "✏️ 需要修改"},
-                {"value": "skip", "label": "⏭️ 跳过"},
-            ],
-        })
-
-        # 解析反馈
-        rating = feedback_response.get("rating", "skip") if isinstance(feedback_response, dict) else feedback_response
-
-        logger.info(f"收到用户反馈: {rating}")
-
-        # 如果用户满意，给参考的历史 SQL 加分
-        if rating == "satisfied":
-            await self._increment_referenced_sql_use_count(state)
-
-        return Command(
-            update={
-                "current_agent": "feedback_handler",
-                "metadata": {**state.metadata, "user_feedback": {"rating": rating}},
-            }
-        )
-
-    async def _increment_referenced_sql_use_count(self, state: AgentState) -> None:
-        """给 AI 参考过的历史 SQL 加分"""
-        from src.infrastructure.repository import KnowledgeRepository
-
-        # 从 state.referenced_sql_ids 获取 DeveloperAgent 实际参考的 SQL ID
-        referenced_sql_ids = state.referenced_sql_ids or []
-
-        if not referenced_sql_ids:
-            logger.info("📊 本次无参考历史 SQL，跳过打分")
-            return
-
-        logger.info(f"📊 准备为 {len(referenced_sql_ids)} 个参考 SQL 加分: {referenced_sql_ids}")
-
-        for sql_id in referenced_sql_ids:
-            try:
-                await KnowledgeRepository.increment_sql_use_count(sql_id)
-                logger.info(f"✅ SQL 加分成功: {sql_id}")
-            except Exception as e:
-                logger.warning(f"SQL 加分失败: {sql_id}, {e}")
 
     async def _finalize(self, state: AgentState) -> Command:
         """最终处理 - 生成可渲染的 DAG"""
@@ -473,6 +597,17 @@ class EtlOrchestrator:
         plan = state.architecture_plan
         dag_output = None
 
+        if state.error and not plan:
+            summary = f"工作流生成失败：{str(state.error)[:200]}"
+            return Command(
+                update={
+                    "messages": [AIMessage(content=summary)],
+                    "dag_output": None,
+                    "current_agent": "finalize",
+                    "is_completed": True,
+                }
+            )
+
         if plan:
             # 转换为 Workflow 对象
             if isinstance(plan, dict):
@@ -481,7 +616,7 @@ class EtlOrchestrator:
                 plan_obj = plan
 
             # 转换为工作流响应格式
-            workflow_response = convert_workflow(plan_obj)
+            workflow_response = WorkflowResponse.from_workflow(plan_obj)
             dag_output = workflow_response.model_dump()
 
             # 生成摘要
@@ -528,7 +663,17 @@ class EtlOrchestrator:
             "user_input": user_input,
             "messages": [HumanMessage(content=user_input)],
             "max_iterations": self.max_iterations,
+            "max_human_requests": self.max_human_requests,
             "referenced_sql_ids": [],  # 显式清空，避免跨 session 污染
+            "pending_requests": [],
+            "human_request_count": 0,
+            "delegation_counters": {},
+            "request_results": {},
+            "human_responses": {},
+            "human_writebacks": {},
+            "selected_component": None,
+            "selected_component_id": None,
+            "last_node": None,
         }
 
         final_state = await self.graph.ainvoke(initial_state, config=config)
@@ -542,7 +687,13 @@ class EtlOrchestrator:
         resume_value: Any | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """
-        流式执行
+        流式执行（统一消息流）
+
+        事件类型（见 src/modules/etl/schemas/sse_msg.py）：
+        - agent.start / agent.end
+        - llm.start / llm.end
+        - tool.start / tool.end
+        - interrupt / result / error
 
         Args:
             user_input: 用户输入
@@ -551,32 +702,74 @@ class EtlOrchestrator:
             resume_value: 恢复值（用于中断恢复）
 
         Yields:
-            事件流
+            SseEvent.to_dict() 格式的事件
         """
         config = self._build_config(session_id, user_id)
 
         if resume_value is not None:
-            # 恢复执行
             input_data = Command(resume=resume_value)
         else:
-            # 首次执行 - 显式初始化所有需要的字段
             input_data = {
                 "session_id": session_id,
                 "user_id": user_id,
                 "user_input": user_input,
                 "messages": [HumanMessage(content=user_input)],
                 "max_iterations": self.max_iterations,
-                "referenced_sql_ids": [],  # 显式清空，避免跨 session 污染
+                "max_human_requests": self.max_human_requests,
+                "referenced_sql_ids": [],
+                "pending_requests": [],
+                "human_request_count": 0,
+                "delegation_counters": {},
+                "request_results": {},
+                "human_responses": {},
+                "human_writebacks": {},
+                "selected_component": None,
+                "selected_component_id": None,
+                "last_node": None,
             }
 
-        # 发送开始事件
-        yield {
-            "event_type": "session_started",
-            "data": {"session_id": session_id},
-        }
+        # 当前正在执行的顶层节点（用于绑定 tool/llm 事件）
+        active_node: str | None = None
+        active_agent_id: str | None = None
+        active_agent_name: str | None = None
 
-        # 追踪当前 agent
-        current_agent = None
+        # 事件去噪：连续重复的 tool.start/tool.end/llm.start 直接跳过
+        last_event_fingerprint: str | None = None
+
+        def _compact(value: Any) -> str | None:
+            if value is None:
+                return None
+            text = str(value)
+            return text[:2000] if len(text) > 2000 else text
+
+        def _fingerprint(payload: dict[str, Any]) -> str:
+            tool = payload.get("tool") or {}
+            llm = payload.get("llm") or {}
+            agent = payload.get("agent") or {}
+            span = payload.get("span") or {}
+            return json.dumps(
+                {
+                    "event": payload.get("event"),
+                    "agent": agent.get("id"),
+                    "run_id": span.get("run_id"),
+                    "tool": tool.get("name"),
+                    "tool_in": _compact(tool.get("input")),
+                    "tool_out": _compact(tool.get("output")),
+                    "llm": llm.get("name"),
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+            )
+
+        def _emit(evt: SseEvent) -> dict[str, Any] | None:
+            nonlocal last_event_fingerprint
+            payload = evt.to_dict()
+            fp = _fingerprint(payload)
+            if fp == last_event_fingerprint:
+                return None
+            last_event_fingerprint = fp
+            return payload
 
         try:
             async for event in self.graph.astream_events(
@@ -585,72 +778,178 @@ class EtlOrchestrator:
                 version="v2",
             ):
                 kind = event.get("event")
-                name = event.get("name")
                 meta = event.get("metadata", {})
                 node = meta.get("langgraph_node")
+                run_id = event.get("run_id")
+                parent_run_id = event.get("parent_run_id")
 
-                # Agent 开始
-                if kind == "on_chain_start" and node:
-                    current_agent = node
-                    yield {
-                        "event_type": "agent_started",
-                        "agent": node,
-                        "data": {"name": self._agent_display_name(node)},
-                    }
+                def _bind_agent_from_node(node_id: str) -> tuple[str, str]:
+                    return node_id, self._agent_display_name(node_id)
 
-                # Agent 结束
-                elif kind == "on_chain_end" and node:
-                    output = event.get("data", {}).get("output")
-                    if isinstance(output, Command):
-                        output = output.update if hasattr(output, "update") else {}
+                # 只关心顶层编排节点（避免内部 chain 事件刷屏）
+                is_top_node = node in {
+                    "blackboard_router",
+                    "human_in_the_loop",
+                    "knowledge_agent",
+                    "analyst_agent",
+                    "architect_agent",
+                    "developer_agent",
+                    "tester_agent",
+                    "finalize",
+                }
 
-                    # messages 是 LangGraph 内部状态，不输出给前端
+                # blackboard_router/human_in_the_loop 都是“系统节点”：
+                # - blackboard_router：内部调度噪声
+                # - human_in_the_loop：前端只需要展示 interrupt 事件（waiting），不需要 agent.start/end
+                is_hidden_agent_node = node in {"blackboard_router", "human_in_the_loop"}
+
+                # 顶层 Agent 开始
+                if kind == "on_chain_start" and node and is_top_node:
+                    # 防止同一节点的重复 on_chain_start 导致前端出现“重复开始”
+                    if active_node == node and active_agent_id:
+                        continue
+                    active_node = node
+                    active_agent_id, active_agent_name = _bind_agent_from_node(node)
+                    if is_hidden_agent_node:
+                        continue
+                    maybe = _emit(
+                        SseEvent.agent_start(
+                            agent_id=active_agent_id,
+                            agent_name=active_agent_name,
+                            run_id=run_id,
+                            parent_run_id=parent_run_id,
+                        )
+                    )
+                    if maybe:
+                        yield maybe
+                    continue
+
+                # 顶层 Agent 结束
+                if kind == "on_chain_end" and node and is_top_node:
+                    # 只对当前 active_node 发 end，避免重复结束事件刷屏
+                    if active_node != node:
+                        continue
+                    agent_id, agent_name = _bind_agent_from_node(node)
+                    summary = None
+                    data = event.get("data") or {}
+                    output = data.get("output")
                     if isinstance(output, dict):
-                        output.pop("messages", None)
+                        msgs = output.get("messages")
+                        if isinstance(msgs, list) and msgs:
+                            last_msg = msgs[-1]
+                            if hasattr(last_msg, "content"):
+                                summary = getattr(last_msg, "content", None)
+                    if not is_hidden_agent_node:
+                        maybe = _emit(
+                            SseEvent.agent_end(
+                                agent_id=agent_id,
+                                agent_name=agent_name,
+                                summary=summary,
+                                run_id=run_id,
+                                parent_run_id=parent_run_id,
+                            )
+                        )
+                        if maybe:
+                            yield maybe
+                    if active_node == node:
+                        active_node = None
+                        active_agent_id = None
+                        active_agent_name = None
+                    continue
 
-                    yield {
-                        "event_type": "agent_completed",
-                        "agent": node,
-                        "data": output,
-                    }
+                # LLM start/end 对前端用户是噪声：不再下发
+                if kind in {"on_chat_model_start", "on_llm_start", "on_chat_model_end", "on_llm_end"}:
+                    continue
 
                 # 工具调用
-                elif kind == "on_tool_start":
-                    yield {
-                        "event_type": "tool_called",
-                        "agent": current_agent,
-                        "tool": name,
-                        "data": event.get("data", {}).get("input", {}),
-                    }
+                if kind == "on_tool_start":
+                    if active_agent_id and active_agent_name:
+                        if not self._should_emit_tool_start_sse(active_agent_id):
+                            continue
+                        tool_name = event.get("name", "unknown")
+                        maybe = _emit(
+                            SseEvent.tool_start(
+                                agent_id=active_agent_id,
+                                agent_name=active_agent_name,
+                                tool_name=tool_name,
+                                tool_input=None,
+                                run_id=run_id,
+                                parent_run_id=parent_run_id,
+                            )
+                        )
+                        if maybe:
+                            yield maybe
+                    continue
+
+                # tool.end 对用户是噪声：不再下发（只保留 tool.start）
+                if kind == "on_tool_end":
+                    continue
 
             # 检查中断
             snapshot = await self.graph.aget_state(config)
             if snapshot.tasks and snapshot.tasks[0].interrupts:
                 interrupt_data = snapshot.tasks[0].interrupts[0].value
-                yield {
-                    "event_type": "session_interrupted",
-                    "agent": current_agent,
-                    "data": interrupt_data,
-                }
+                # interrupt 发生时 current_agent 可能是 handler，这里优先用 interrupt.type 映射
+                kind = interrupt_data.get("type") or "interrupt"
+                agent_id = active_agent_id or "human_in_the_loop"
+                agent_name = active_agent_name or self._agent_display_name(agent_id)
+                yield SseEvent.interrupt_event(
+                    agent_id=agent_id,
+                    agent_name=agent_name,
+                    kind=kind,
+                    message=interrupt_data.get("message", "请回答以下问题"),
+                    questions=interrupt_data.get("questions"),
+                    options=interrupt_data.get("options"),
+                ).to_dict()
                 return
 
-            # 完成 - 只输出前端需要的最终结果
-            final_data = {}
+            # 完成
+            workflow = None
             if snapshot and snapshot.values:
-                final_data["dag_output"] = snapshot.values.get("dag_output")
-                final_data["is_completed"] = snapshot.values.get("is_completed", False)
+                workflow = snapshot.values.get("dag_output")
+                error = snapshot.values.get("error")
+                if error:
+                    current_agent = snapshot.values.get("current_agent")
+                    node_to_name = {
+                        "blackboard_router": "黑板路由",
+                        "human_in_the_loop": "人机交互",
+                        "knowledge_agent": "知识检索专家",
+                        "analyst_agent": "需求分析师",
+                        "architect_agent": "数据架构师",
+                        "developer_agent": "数据开发",
+                        "tester_agent": "测试验证",
+                        "finalize": "完成处理",
+                    }
+                    name_to_node = {v: k for k, v in node_to_name.items()}
+                    agent_id = None
+                    agent_name = None
+                    if isinstance(current_agent, str):
+                        if current_agent in node_to_name:
+                            agent_id = current_agent
+                            agent_name = node_to_name[current_agent]
+                        elif current_agent in name_to_node:
+                            agent_id = name_to_node[current_agent]
+                            agent_name = current_agent
+                    yield SseEvent.error_event(
+                        message="执行失败",
+                        detail=str(error),
+                        agent_id=agent_id,
+                        agent_name=agent_name,
+                    ).to_dict()
+                    return
 
-            yield {
-                "event_type": "session_completed",
-                "data": final_data,
-            }
+            if workflow:
+                yield SseEvent.result_event(workflow=workflow, message="生成完成").to_dict()
+            else:
+                yield SseEvent.result_event(workflow=None, message="处理完成，但未生成工作流").to_dict()
 
         except Exception as e:
             logger.error(f"流式执行失败: {e}", exc_info=True)
-            yield {
-                "event_type": "session_error",
-                "data": {"error": str(e)},
-            }
+            yield SseEvent.error_event(message="执行失败", detail=str(e)).to_dict()
+
+    @staticmethod
+    def _should_emit_tool_start_sse(agent_id: str) -> bool:
+        return agent_id != "knowledge_agent"
 
     def _build_config(self, session_id: str, user_id: str) -> dict[str, Any]:
         """构建配置"""
@@ -667,13 +966,13 @@ class EtlOrchestrator:
     def _agent_display_name(node: str) -> str:
         """获取 Agent 展示名称"""
         names = {
+            "blackboard_router": "黑板路由",
+            "human_in_the_loop": "人机交互",
             "knowledge_agent": "知识检索专家",
             "analyst_agent": "需求分析师",
             "architect_agent": "数据架构师",
             "developer_agent": "数据开发",
             "tester_agent": "测试验证",
-            "clarification_handler": "需求澄清",
-            "feedback_handler": "反馈收集",
             "learning_handler": "学习沉淀",
             "finalize": "完成处理",
         }

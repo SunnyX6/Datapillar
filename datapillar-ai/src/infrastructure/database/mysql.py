@@ -9,7 +9,7 @@ import logging
 from sqlalchemy import create_engine
 from sqlalchemy.pool import QueuePool
 
-from src.shared.config import settings
+from src.shared.config.settings import settings
 from src.shared.config.exceptions import MySQLError
 
 logger = logging.getLogger(__name__)
