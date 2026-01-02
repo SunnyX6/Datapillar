@@ -5,17 +5,19 @@ Agent API 路由
 提供工作流生成相关的 API 接口
 """
 
-import json
 from typing import AsyncGenerator, Optional, Any
 
+import msgpack
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 import logging
 
 logger = logging.getLogger(__name__)
-from sse_starlette.sse import EventSourceResponse
 
 from src.modules.etl.orchestrator import EtlOrchestrator
+from src.modules.etl.sse_manager import etl_stream_manager
+from sse_starlette.sse import EventSourceResponse
 
 
 router = APIRouter()
@@ -40,45 +42,115 @@ def _get_orchestrator(request: Request) -> EtlOrchestrator:
 
 
 @router.post("/workflow/sse")
-async def generate_workflow_stream(
+async def generate_workflow_msgpack_stream(
     payload: WorkflowRequest,
     request: Request,
 ):
-    """多智能体流式生成工作流"""
+    """多智能体流式生成工作流（兼容：msgpack 二进制流）"""
     current_user = request.state.current_user
     orchestrator = _get_orchestrator(request)
 
-    async def event_generator() -> AsyncGenerator[dict[str, str], None]:
-        if not payload.session_id:
-            raise HTTPException(status_code=400, detail="sessionId 不能为空")
+    if not payload.session_id:
+        raise HTTPException(status_code=400, detail="sessionId 不能为空")
 
-        logger.info(
-            f"[Stream] user={current_user.username}, userId={current_user.user_id}, "
-            f"userInput={payload.user_input}, sessionId={payload.session_id}"
-        )
+    logger.info(
+        f"[Stream] user={current_user.username}, userId={current_user.user_id}, "
+        f"userInput={payload.user_input}, sessionId={payload.session_id}"
+    )
 
-        async for event in orchestrator.stream(
+    async def msgpack_generator() -> AsyncGenerator[bytes, None]:
+        async for message in orchestrator.stream(
             user_input=payload.user_input,
             session_id=payload.session_id,
             user_id=str(current_user.user_id),
             resume_value=payload.resume_value,
         ):
-            event_type = event.get("event_type", "unknown")
-            event_data = event.get("data", {})
+            yield msgpack.packb(message, use_bin_type=True)
 
-            sse_payload = {
-                "data": json.dumps({
-                    "eventType": event_type,
-                    "agent": event.get("agent"),
-                    "tool": event.get("tool"),
-                    "data": event_data,
-                }, ensure_ascii=False),
-                "event": event_type,
-            }
-            yield sse_payload
+    return StreamingResponse(
+        msgpack_generator(),
+        media_type="application/x-msgpack",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.post("/workflow/start")
+async def start_workflow_stream(payload: WorkflowRequest, request: Request):
+    """启动 ETL 多智能体工作流（SSE/JSON 事件流）"""
+    current_user = request.state.current_user
+    orchestrator = _get_orchestrator(request)
+
+    if not payload.session_id:
+        raise HTTPException(status_code=400, detail="sessionId 不能为空")
+    if not payload.user_input:
+        raise HTTPException(status_code=400, detail="userInput 不能为空")
+
+    logger.info(
+        f"[ETL Start] user={current_user.username}, userId={current_user.user_id}, sessionId={payload.session_id}"
+    )
+
+    await etl_stream_manager.start(
+        orchestrator=orchestrator,
+        user_input=payload.user_input,
+        session_id=payload.session_id,
+        user_id=str(current_user.user_id),
+    )
+
+    return {
+        "success": True,
+        "stream_url": f"/api/ai/etl/workflow/sse?sessionId={payload.session_id}",
+    }
+
+
+@router.post("/workflow/continue")
+async def continue_workflow_stream(payload: WorkflowRequest, request: Request):
+    """继续 ETL 多智能体工作流（用于 interrupt 人机交互的 resumeValue，不是断线续传）"""
+    current_user = request.state.current_user
+    orchestrator = _get_orchestrator(request)
+
+    if not payload.session_id:
+        raise HTTPException(status_code=400, detail="sessionId 不能为空")
+    if payload.resume_value is None:
+        raise HTTPException(status_code=400, detail="resumeValue 不能为空")
+
+    logger.info(
+        f"[ETL Continue] user={current_user.username}, userId={current_user.user_id}, sessionId={payload.session_id}"
+    )
+
+    await etl_stream_manager.continue_from_interrupt(
+        orchestrator=orchestrator,
+        session_id=payload.session_id,
+        user_id=str(current_user.user_id),
+        resume_value=payload.resume_value,
+    )
+
+    return {"success": True}
+
+
+@router.get("/workflow/sse")
+async def workflow_sse(request: Request, sessionId: str):
+    """SSE/JSON 事件流：前端可用 Last-Event-ID 重连重放（断线续传）"""
+    current_user = request.state.current_user
+
+    last_event_id_raw = request.headers.get("Last-Event-ID")
+    last_event_id: int | None = None
+    if last_event_id_raw:
+        try:
+            last_event_id = int(last_event_id_raw)
+        except ValueError:
+            last_event_id = None
 
     return EventSourceResponse(
-        event_generator(),
+        etl_stream_manager.subscribe(
+            request=request,
+            session_id=sessionId,
+            user_id=str(current_user.user_id),
+            last_event_id=last_event_id,
+        ),
         ping=15,
         headers={
             "Cache-Control": "no-cache",

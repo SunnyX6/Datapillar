@@ -3,11 +3,23 @@ import { emptyWorkflowGraph, type WorkflowGraph } from '@/services/workflowStudi
 
 export type ChatRole = 'user' | 'assistant'
 
+export interface AgentActivity {
+  id: string
+  type: 'thought' | 'tool' | 'result' | 'error'
+  state: 'thinking' | 'invoking' | 'waiting' | 'done' | 'error'
+  level: 'info' | 'success' | 'warning' | 'error'
+  agent: string
+  message: string
+  timestamp: number
+}
+
 export interface ChatMessage {
   id: string
   role: ChatRole
   content: string
   timestamp: number
+  agentRows?: AgentActivity[]
+  isStreaming?: boolean
 }
 
 interface WorkflowStudioState {
@@ -16,6 +28,7 @@ interface WorkflowStudioState {
   workflow: WorkflowGraph
   lastPrompt: string
   addMessage: (message: ChatMessage) => void
+  updateMessage: (id: string, updater: Partial<ChatMessage> | ((msg: ChatMessage) => ChatMessage)) => void
   setGenerating: (value: boolean) => void
   setWorkflow: (workflow: WorkflowGraph) => void
   setLastPrompt: (prompt: string) => void
@@ -39,6 +52,12 @@ export const useWorkflowStudioStore = create<WorkflowStudioState>((set) => ({
   addMessage: (message) =>
     set((state) => ({
       messages: [...state.messages, message]
+    })),
+  updateMessage: (id, updater) =>
+    set((state) => ({
+      messages: state.messages.map((msg) =>
+        msg.id === id ? (typeof updater === 'function' ? updater(msg) : { ...msg, ...updater }) : msg
+      )
     })),
   setGenerating: (value) => set({ isGenerating: value }),
   setWorkflow: (workflow) => set({ workflow }),

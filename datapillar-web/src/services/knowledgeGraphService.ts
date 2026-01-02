@@ -1,10 +1,8 @@
 /**
  * 知识图谱 API 服务
  *
- * 使用 SSE + MsgPack 进行流式数据传输
+ * 知识图谱使用非 SSE 接口（一次性 JSON 返回）
  */
-
-import { decode } from '@msgpack/msgpack'
 
 /**
  * 后端返回的节点结构（Neo4j 格式）
@@ -30,21 +28,6 @@ interface Neo4jRelationship {
   end: number
   type: string
   properties: Record<string, unknown>
-}
-
-/**
- * SSE 事件类型
- */
-type KGEventType = 'stream_start' | 'nodes_batch' | 'rels_batch' | 'search_result' | 'stream_end' | 'error'
-
-/**
- * SSE 事件数据
- */
-interface KGStreamEvent {
-  event_type: KGEventType
-  data: string // Base64 编码的 MsgPack 数据
-  total?: number
-  current?: number
 }
 
 /**
@@ -82,26 +65,6 @@ export interface GraphLink {
 export interface GraphData {
   nodes: GraphNode[]
   links: GraphLink[]
-}
-
-/**
- * Base64 解码为 Uint8Array
- */
-function base64ToUint8Array(base64: string): Uint8Array {
-  const binaryString = atob(base64)
-  const bytes = new Uint8Array(binaryString.length)
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i)
-  }
-  return bytes
-}
-
-/**
- * 解析 MsgPack 数据
- */
-function decodeMsgPack<T>(base64Data: string): T {
-  const bytes = base64ToUint8Array(base64Data)
-  return decode(bytes) as T
 }
 
 /**
@@ -147,133 +110,42 @@ export async function fetchInitialGraph(
   limit: number = 500,
   onProgress?: (current: number, total: number) => void
 ): Promise<GraphData> {
-  const nodes: GraphNode[] = []
-  const links: GraphLink[] = []
-
-  return new Promise((resolve, reject) => {
-    const eventSource = new EventSource(`/api/ai/knowledge/initial?limit=${limit}`, {
-      withCredentials: true
-    })
-
-    eventSource.addEventListener('stream_start', () => {
-      console.log('[KG] 开始接收图数据')
-    })
-
-    eventSource.addEventListener('nodes_batch', (event) => {
-      try {
-        const eventData: KGStreamEvent = JSON.parse(event.data)
-        const batchNodes = decodeMsgPack<Neo4jNode[]>(eventData.data)
-
-        nodes.push(...batchNodes.map(transformNode))
-
-        if (eventData.total && eventData.current && onProgress) {
-          onProgress(eventData.current, eventData.total)
-        }
-      } catch (error) {
-        console.error('[KG] 解析节点数据失败:', error)
-      }
-    })
-
-    eventSource.addEventListener('rels_batch', (event) => {
-      try {
-        const eventData: KGStreamEvent = JSON.parse(event.data)
-        const batchRels = decodeMsgPack<Neo4jRelationship[]>(eventData.data)
-
-        links.push(...batchRels.map(transformRelationship))
-
-        if (eventData.total && eventData.current && onProgress) {
-          onProgress(eventData.current, eventData.total)
-        }
-      } catch (error) {
-        console.error('[KG] 解析关系数据失败:', error)
-      }
-    })
-
-    eventSource.addEventListener('stream_end', () => {
-      console.log(`[KG] 数据接收完成: ${nodes.length} 节点, ${links.length} 关系`)
-      eventSource.close()
-      resolve({ nodes, links })
-    })
-
-    eventSource.addEventListener('error', () => {
-      console.error('[KG] SSE 连接错误')
-      eventSource.close()
-      reject(new Error('Failed to fetch graph data'))
-    })
-
-    eventSource.onerror = () => {
-      eventSource.close()
-      reject(new Error('SSE connection failed'))
-    }
+  const response = await fetch(`/api/ai/knowledge/initial?limit=${limit}`, {
+    method: 'GET',
+    credentials: 'include'
   })
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+
+  const data = (await response.json()) as { nodes: Neo4jNode[]; relationships: Neo4jRelationship[] }
+  const nodes = (data.nodes ?? []).map(transformNode)
+  const links = (data.relationships ?? []).map(transformRelationship)
+  onProgress?.(nodes.length, nodes.length)
+  return { nodes, links }
 }
 
 /**
- * 搜索知识图谱（SSE 流式）
+ * 搜索知识图谱（非 SSE，一次性返回）
  */
 export async function searchGraph(
   query: string,
   topK: number = 10
 ): Promise<GraphData> {
-  const nodes: GraphNode[] = []
-  const links: GraphLink[] = []
-
-  return new Promise((resolve, reject) => {
-    fetch('/api/ai/knowledge/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ query, top_k: topK })
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`)
-        }
-
-        const reader = response.body?.getReader()
-        if (!reader) {
-          throw new Error('ReadableStream not supported')
-        }
-
-        const decoder = new TextDecoder()
-        let buffer = ''
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-
-          for (const line of lines) {
-            if (!line.trim() || !line.startsWith('data:')) continue
-
-            const jsonData = line.replace(/^data:\s*/, '')
-            try {
-              const eventData: KGStreamEvent = JSON.parse(jsonData)
-
-              if (eventData.event_type === 'search_result') {
-                const result = decodeMsgPack<{
-                  nodes: Neo4jNode[]
-                  relationships: Neo4jRelationship[]
-                  highlight_node_ids: number[]
-                }>(eventData.data)
-
-                nodes.push(...result.nodes.map(transformNode))
-                links.push(...result.relationships.map(transformRelationship))
-              } else if (eventData.event_type === 'stream_end') {
-                resolve({ nodes, links })
-              } else if (eventData.event_type === 'error') {
-                reject(new Error('Search failed'))
-              }
-            } catch (error) {
-              console.error('[KG] 解析搜索结果失败:', error)
-            }
-          }
-        }
-      })
-      .catch(reject)
+  const response = await fetch('/api/ai/knowledge/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ query, top_k: topK })
   })
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+
+  const data = (await response.json()) as { nodes: Neo4jNode[]; relationships: Neo4jRelationship[] }
+  const nodes = (data.nodes ?? []).map(transformNode)
+  const links = (data.relationships ?? []).map(transformRelationship)
+  return { nodes, links }
 }

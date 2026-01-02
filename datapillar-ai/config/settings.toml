@@ -41,6 +41,14 @@ redis_checkpoint_ttl_seconds = 604800  # 7天
 jwt_issuer = "datapillar-auth"
 auth_enabled = true  # 是否启用认证，开发调试时可设为 false
 
+# ==================== ETL 多智能体配置 ====================
+# 说明：
+# - 该模块的默认交付物是“ETL 工作流（Job/Stage/SQL）”
+# - 阈值允许按环境/租户通过环境变量覆盖（DATAPILLAR_*）
+etl_orchestrator_max_iterations = 3
+etl_orchestrator_agent_max_retries = 2
+etl_orchestrator_max_human_requests = 6
+
 # ==================== OpenLineage Sink 配置 ====================
 # Sink 端负责接收事件并写入 Neo4j
 # retry、rate_limit、filter 等配置由 Producer 端（Flink/Spark/Airflow）在 openlineage.yml 中配置

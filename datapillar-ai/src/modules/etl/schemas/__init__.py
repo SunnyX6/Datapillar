@@ -3,12 +3,7 @@ ETL 多智能体系统数据结构
 """
 
 from src.modules.etl.schemas.kg_context import (
-    CatalogNav,
-    ComponentNav,
-    GlobalKGContext,
-    LineageEdge,
-    SchemaNav,
-    TableNav,
+    ETLPointer,
     AgentScopedContext,
     AgentType,
     AGENT_TOOLS_MAP,
@@ -29,22 +24,30 @@ from src.modules.etl.schemas.dag import (
     WorkflowResponse,
     JobResponse,
     JobDependencyResponse,
-    convert_workflow,
 )
 from src.modules.etl.schemas.state import AgentState
+from src.modules.etl.schemas.requests import BlackboardRequest
+from src.modules.etl.schemas.sse_msg import (
+    SseAgent,
+    SseError,
+    SseEvent,
+    SseEventType,
+    SseInterrupt,
+    SseLevel,
+    SseLlm,
+    SseMessage,
+    SseResult,
+    SseSpan,
+    SseState,
+    SseTool,
+)
 
 __all__ = [
     # KG Context - 知识图谱上下文
-    "GlobalKGContext",
     "AgentScopedContext",
     "AgentType",
     "AGENT_TOOLS_MAP",
-    # Navigation - 导航模型
-    "CatalogNav",
-    "SchemaNav",
-    "TableNav",
-    "LineageEdge",
-    "ComponentNav",
+    "ETLPointer",
     # Requirement
     "AnalysisResult",
     "Step",
@@ -59,7 +62,21 @@ __all__ = [
     "WorkflowResponse",
     "JobResponse",
     "JobDependencyResponse",
-    "convert_workflow",
     # State
     "AgentState",
+    # Blackboard Requests
+    "BlackboardRequest",
+    # SSE Message - 消息流协议
+    "SseEvent",
+    "SseEventType",
+    "SseState",
+    "SseLevel",
+    "SseAgent",
+    "SseSpan",
+    "SseMessage",
+    "SseTool",
+    "SseLlm",
+    "SseInterrupt",
+    "SseResult",
+    "SseError",
 ]

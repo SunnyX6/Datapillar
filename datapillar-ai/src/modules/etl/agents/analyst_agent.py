@@ -10,74 +10,42 @@ Analyst Agent（需求分析师）
 
 import json
 import logging
-import re
+import uuid
 
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.types import Command
 
 from src.infrastructure.llm.client import call_llm
-from src.modules.etl.schemas.kg_context import AgentScopedContext, AgentType, GlobalKGContext
+from src.modules.etl.schemas.kg_context import AgentScopedContext, AgentType, ETLPointer
 from src.modules.etl.schemas.requirement import AnalysisResult, Ambiguity, DataTarget, Step
+from src.modules.etl.schemas.requests import BlackboardRequest
 from src.modules.etl.schemas.state import AgentState
-from src.modules.etl.tools.agent_tools import search_assets, get_table_columns
+from src.modules.etl.tools.agent_tools import get_table_columns, recommend_guidance
 
 logger = logging.getLogger(__name__)
 
 
-ANALYST_AGENT_PROMPT = """你是资深数据需求分析师。
+ANALYST_AGENT_SYSTEM_INSTRUCTIONS = """你是 Datapillar 的 AnalystAgent（需求分析与收敛）。
 
 ## 任务
-根据知识上下文，将用户需求收敛为明确的业务步骤。
+把用户需求收敛成可执行的业务步骤（Step），输出严格 JSON。
 
 ## 核心原则
-1. **需求必须收敛** - 每个 Step 必须有明确的输入表和输出表
-2. **基于知识库** - 源头输入表和最终目标表必须在知识库中存在
-3. **拒绝模糊需求** - 如果需求无法收敛，必须返回具体问题让用户澄清
+1. 你只做“做什么”（业务拆解），不做“怎么做”（不写 SQL，不选组件，不画 DAG）。
+2. 你必须基于 KnowledgeAgent 下发的“ETL 指针（etl_pointers / ETLPointer）”完成表级收敛。
+3. 不允许臆造：你只能引用上下文中已给出的表（schema.table），否则必须提出澄清问题。
 
-## 知识上下文
+## 知识上下文（系统注入，不是用户输入）
+系统会向你提供一份“知识上下文 JSON”，其中包含：
+- etl_pointers：可验证的 ETL 指针（含 element_id、qualified_name、tools 等）
+- allowlist_tools：该 Agent 允许调用的工具名列表
 
-### 可用的表（KnowledgeAgent 发现的相关表）
-{discovered_tables}
+你必须把该 JSON 视为可信输入；并以它为唯一知识来源来收敛表名与工具调用。
 
-### 全局表清单（导航）
-{tables_summary}
-
-### 表级血缘（已有的数据流向）
-{lineage_summary}
-
-### 可用工具
-{tools_description}
-
-## 用户需求
-{user_query}
-
-## 分析要求
-
-0. **知识库为空检查**：
-   - 如果"可用的表"和"全局表清单"都为空，说明知识库尚未初始化
-   - 此时必须直接返回提示：
-     - summary: "当前知识库为空，无法处理您的需求"
-     - steps: []
-     - ambiguities: 包含一条建议，说明需要先在 Gravitino 中创建数据表并同步元数据
-     - confidence: 0
-
-1. **验证可行性**：
-   - 用户提到的**源头输入表**必须在知识库中存在
-   - 用户提到的**最终目标表**必须在知识库中存在
-   - 如果不确定表是否存在，使用 search_assets 或 get_table_columns 工具验证
-
-2. **明确输入输出**：
-   - 每个 Step 必须有 input_tables（从哪读）
-   - 每个 Step 必须有 output_table（写到哪）
-
-3. **需求收敛**：
-   - 如果需求模糊（如"处理用户数据"），必须要求用户明确
-   - 如果缺少关键信息（如目标表），必须要求用户补充
-   - confidence < 0.7 时，必须有 ambiguities
+## 工具使用规则（严格）
+你只能调用 allowlist 中出现的工具；并且仅当某个 ETLPointer.tools 包含该工具名时，才允许对该节点调用该工具。
 
 ## 输出格式
-
-```json
 {{
   "summary": "一句话概括需求（必须具体，不能模糊）",
   "steps": [
@@ -104,19 +72,16 @@ ANALYST_AGENT_PROMPT = """你是资深数据需求分析师。
   ],
   "confidence": 0.85
 }}
-```
 
 重要：
-- 如果知识库中没有用户提到的源头输入表或最终目标表，直接返回提示，confidence 设为 0
+- **必须输出纯 JSON**：不得输出 Markdown、不得输出 ```json 代码块、不得输出解释性文字
+- ambiguities 中的每条 question 必须唯一，不允许同义重复
+- 如果无法在上下文中定位用户提到的源头输入表或最终目标表，必须提出澄清（禁止臆造表名），confidence 设为 0
 - 如果无法明确 input_tables 或 output_table，必须在 ambiguities 中提问
 - confidence 反映需求的明确程度，模糊需求必须 < 0.7
 
 只输出 JSON，不要解释。
 """
-
-
-# 绑定的工具
-ANALYST_TOOLS = [search_assets, get_table_columns]
 
 
 class AnalystAgent:
@@ -132,7 +97,7 @@ class AnalystAgent:
 
     def __init__(self):
         self.llm = call_llm(temperature=0.0)
-        self.llm_with_tools = self.llm.bind_tools(ANALYST_TOOLS)
+        self.llm_json = call_llm(temperature=0.0, enable_json_mode=True)
         self.max_tool_calls = 4
 
     async def __call__(self, state: AgentState) -> Command:
@@ -151,54 +116,140 @@ class AnalystAgent:
         logger.info(f"📋 AnalystAgent 开始分析需求: {user_query}")
 
         try:
-            # 获取上下文
-            global_kg_context = state.get_global_kg_context()
             agent_context = state.get_agent_context(AgentType.ANALYST)
-
-            if not global_kg_context:
-                global_kg_context = GlobalKGContext()
 
             if not agent_context:
                 agent_context = AgentScopedContext.create_for_agent(
                     agent_type=AgentType.ANALYST,
                     tables=[],
-                    user_query=user_query,
                 )
 
-            # 格式化上下文
-            context_info = self._format_context(global_kg_context, agent_context)
+            context_payload = self._build_context_payload(
+                agent_context=agent_context,
+            )
+
+            llm_with_tools = self._bind_tools_by_allowlist(agent_context)
 
             # 执行分析（带工具调用）
             result_dict = await self._analyze_with_tools(
                 user_query=user_query,
-                context_info=context_info,
+                context_payload=context_payload,
                 agent_context=agent_context,
+                llm_with_tools=llm_with_tools,
             )
 
             analysis_result = self._build_analysis_result(result_dict, user_query)
 
-            # 基于知识库验证需求是否收敛
-            validation_issues = await self._validate_convergence(
-                analysis_result, global_kg_context, agent_context
-            )
-            if validation_issues:
-                for issue in validation_issues:
-                    analysis_result.ambiguities.append(issue)
-                analysis_result.confidence = min(analysis_result.confidence, 0.5)
-
             plan_summary = analysis_result.get_execution_plan_summary()
             logger.info(f"✅ AnalystAgent 完成分析:\n{plan_summary}")
 
-            # 需求不明确时，强制要求澄清
-            if analysis_result.needs_clarification() or analysis_result.confidence < 0.7:
-                questions = [a.question for a in analysis_result.ambiguities]
+            allowed_tables = self._build_allowed_tables(agent_context.etl_pointers)
+            unknown_tables = self._find_unknown_tables(analysis_result, allowed_tables=allowed_tables)
+            if unknown_tables:
+                # 黑板模式：遇到未知表，优先委派 KnowledgeAgent 刷新上下文，而不是直接报错终止
+                counters = dict(state.delegation_counters or {})
+                counter_key = "analyst_agent:delegate:knowledge_agent:unknown_tables"
+                delegated = int(counters.get(counter_key) or 0)
+                if delegated < 1:
+                    counters[counter_key] = delegated + 1
+                    req = BlackboardRequest(
+                        request_id=f"req_{uuid.uuid4().hex}",
+                        kind="delegate",
+                        created_by="analyst_agent",
+                        target_agent="knowledge_agent",
+                        resume_to="analyst_agent",
+                        payload={
+                            "type": "refresh_knowledge",
+                            "reason": "unknown_tables",
+                            "unknown_tables": unknown_tables,
+                            "message": "需求分析阶段发现未知表，已委派知识检索刷新上下文后再继续。",
+                        },
+                    )
+                    pending = list(state.pending_requests or [])
+                    pending.append(req)
+                    return Command(
+                        update={
+                            "messages": [AIMessage(content="检测到未知表，已委派知识检索刷新上下文")],
+                            "current_agent": "analyst_agent",
+                            "pending_requests": [r.model_dump() for r in pending],
+                            "delegation_counters": counters,
+                        }
+                    )
+                request_id = f"req_{uuid.uuid4().hex}"
+                guidance = await self._try_recommend_guidance(user_query)
+                payload = {
+                    "type": "clarification",
+                    "message": "知识库无法定位你提到的表，请补充可验证线索（避免系统臆造）。",
+                    "questions": [
+                        f"请确认这些表的准确名称（推荐 schema.table）：{', '.join(unknown_tables[:12])}",
+                        "如果你不确定表名：请粘贴一段现有 SQL/DDL/字段清单，或说明数据来源系统与目标表。",
+                    ],
+                }
+                if guidance:
+                    payload["guidance"] = guidance
+                req = BlackboardRequest(
+                    request_id=request_id,
+                    kind="human",
+                    created_by="analyst_agent",
+                    resume_to="blackboard_router",
+                    payload=payload,
+                )
+                pending = list(state.pending_requests or [])
+                pending.append(req)
                 return Command(
                     update={
-                        "messages": [AIMessage(content="需求不够明确，请补充以下信息")],
+                        "messages": [AIMessage(content="无法定位表指针：需要你补充上下文信息后才能继续")],
+                        "current_agent": "analyst_agent",
+                        "pending_requests": [r.model_dump() for r in pending],
+                        "delegation_counters": counters,
+                    }
+                )
+
+            # 需求不明确时，强制要求澄清（以 LLM 输出为准，不做程序“后补问题”）
+            if analysis_result.needs_clarification() or analysis_result.confidence < 0.7:
+                questions = [a.question for a in analysis_result.ambiguities if a.question]
+                if not questions:
+                    return Command(
+                        update={
+                            "messages": [AIMessage(content="需求未收敛，但未生成可执行的澄清问题（LLM 输出不合格）")],
+                            "current_agent": "analyst_agent",
+                            "error": "需求未收敛且 ambiguities 为空",
+                        }
+                    )
+                request_id = f"req_{uuid.uuid4().hex}"
+                guidance = await self._try_recommend_guidance(user_query)
+                payload = {
+                    "type": "clarification",
+                    "message": "请回答以下问题以便继续分析",
+                    "questions": questions,
+                }
+                if guidance:
+                    payload["guidance"] = guidance
+                req = BlackboardRequest(
+                    request_id=request_id,
+                    kind="human",
+                    created_by="analyst_agent",
+                    resume_to="blackboard_router",
+                    payload=payload,
+                )
+                pending = list(state.pending_requests or [])
+                pending.append(req)
+                return Command(
+                    update={
+                        "messages": [AIMessage(content="需求不够明确，需要你补充关键信息后才能继续")],
+                        "current_agent": "analyst_agent",
+                        "pending_requests": [r.model_dump() for r in pending],
+                    }
+                )
+
+            # 结构性收敛校验（只做校验，不做后补）
+            if not self._is_converged(analysis_result):
+                return Command(
+                    update={
+                        "messages": [AIMessage(content="需求未收敛：输出不满足步骤/输入输出/目标表等约束（LLM 输出不合格）")],
                         "analysis_result": analysis_result.model_dump(),
                         "current_agent": "analyst_agent",
-                        "needs_clarification": True,
-                        "clarification_questions": questions,
+                        "error": "需求未收敛：缺少 steps 或 input/output 或 final_target",
                     }
                 )
 
@@ -220,26 +271,41 @@ class AnalystAgent:
                 }
             )
 
+    @staticmethod
+    async def _try_recommend_guidance(user_query: str) -> dict | None:
+        """
+        no-hit/需澄清场景的轻量引导数据（tag/catalog 导航）
+
+        约束：
+        - 只返回导航信息，不返回 element_id/指针
+        - 失败时静默降级，不影响主链路
+        """
+        try:
+            raw = await recommend_guidance.ainvoke({"user_query": user_query})
+            parsed = json.loads(raw or "")
+            if isinstance(parsed, dict) and parsed.get("status") == "success":
+                return parsed
+            return None
+        except Exception:
+            return None
+
     async def _analyze_with_tools(
         self,
         user_query: str,
-        context_info: dict,
+        context_payload: dict,
         agent_context: AgentScopedContext,
+        llm_with_tools,
     ) -> dict:
         """执行带工具调用的分析"""
-        prompt = ANALYST_AGENT_PROMPT.format(
-            discovered_tables=", ".join(agent_context.tables) if agent_context.tables else "（无）",
-            tables_summary=context_info["tables"],
-            lineage_summary=context_info["lineage"],
-            tools_description=agent_context.get_tools_description(),
-            user_query=user_query,
-        )
-
-        messages = [HumanMessage(content=prompt)]
+        messages = [
+            SystemMessage(content=ANALYST_AGENT_SYSTEM_INSTRUCTIONS),
+            SystemMessage(content=json.dumps(context_payload, ensure_ascii=False)),
+            HumanMessage(content=user_query),
+        ]
         tool_call_count = 0
 
         while tool_call_count < self.max_tool_calls:
-            response = await self.llm_with_tools.ainvoke(messages)
+            response = await llm_with_tools.ainvoke(messages)
             messages.append(response)
 
             # 如果没有工具调用，解析响应
@@ -255,7 +321,11 @@ class AnalystAgent:
 
                 logger.info(f"🔧 AnalystAgent 调用工具: {tool_name}({tool_args})")
 
-                tool_result = await self._execute_tool(tool_name, tool_args)
+                tool_result = await self._execute_tool(
+                    tool_name=tool_name,
+                    tool_args=tool_args,
+                    agent_context=agent_context,
+                )
 
                 messages.append(
                     ToolMessage(content=tool_result, tool_call_id=tool_id)
@@ -265,127 +335,130 @@ class AnalystAgent:
                     break
 
         # 达到最大工具调用次数，获取最终响应
-        response = await self.llm.ainvoke(messages)
+        response = await self.llm_json.ainvoke(messages)
         return self._parse_response(response.content)
 
-    async def _execute_tool(self, tool_name: str, tool_args: dict) -> str:
+    @staticmethod
+    def _build_allowed_table_index(node_pointers: list[ETLPointer]) -> dict[str, ETLPointer]:
+        """
+        从 etl_pointers 构建可调用工具的表索引（按 qualified_name）
+
+        说明：
+        - AnalystAgent 只做表级收敛，因此这里只关心 Table 指针
+        - 下游只允许对“上下文已给出的表指针”调用 get_table_columns
+        """
+        table_index: dict[str, ETLPointer] = {}
+        for p in node_pointers or []:
+            if "Table" not in set(p.labels or []):
+                continue
+            if not p.qualified_name:
+                continue
+            table_index[p.qualified_name] = p
+        return table_index
+
+    async def _execute_tool(self, *, tool_name: str, tool_args: dict, agent_context: AgentScopedContext) -> str:
         """执行工具调用"""
         try:
-            if tool_name == "search_assets":
-                return await search_assets.ainvoke(tool_args)
-            elif tool_name == "get_table_columns":
-                return await get_table_columns.ainvoke(tool_args)
-            else:
-                return json.dumps({"status": "error", "message": f"未知工具: {tool_name}"})
+            allowlist = set(agent_context.tools or [])
+            if tool_name not in allowlist:
+                return json.dumps(
+                    {"status": "error", "message": f"工具不在 allowlist 中: {tool_name}"},
+                    ensure_ascii=False,
+                )
+
+            if tool_name == "get_table_columns":
+                table_name = (tool_args or {}).get("table_name") or ""
+                table_index = self._build_allowed_table_index(agent_context.etl_pointers)
+                pointer = table_index.get(table_name)
+                if not pointer:
+                    return json.dumps(
+                        {
+                            "status": "error",
+                            "message": "禁止对未下发的表指针调用工具",
+                            "table_name": table_name,
+                        },
+                        ensure_ascii=False,
+                    )
+                if tool_name not in set(pointer.tools or []):
+                    return json.dumps(
+                        {
+                            "status": "error",
+                            "message": "该表指针未授权此工具（ETLPointer.tools）",
+                            "table_name": table_name,
+                            "pointer_element_id": pointer.element_id,
+                        },
+                        ensure_ascii=False,
+                    )
+                return await get_table_columns.ainvoke({"table_name": table_name})
+
+            return json.dumps({"status": "error", "message": f"未知工具: {tool_name}"}, ensure_ascii=False)
         except Exception as e:
             logger.error(f"工具 {tool_name} 执行失败: {e}")
             return json.dumps({"status": "error", "message": str(e)})
 
-    async def _validate_convergence(
-        self,
-        analysis: AnalysisResult,
-        global_kg_context: GlobalKGContext,
-        agent_context: AgentScopedContext,
-    ) -> list[Ambiguity]:
-        """
-        验证需求是否收敛
-
-        验证规则（业务层面）：
-        1. 每个 Step 必须有明确的 input_tables 和 output_table
-        2. 源头输入表（第一个 Step 的 input）必须在知识库中存在
-        3. 最终目标表（final_target）必须在知识库中存在
-
-        注意：中间步骤的表不验证，那是技术层面的事情（ArchitectAgent 负责）
-        """
-        issues = []
-
-        # 获取已知表集合
-        known_tables = set(global_kg_context.get_table_names())
-        known_tables.update(agent_context.tables)
-
-        # 1. 检查 Steps 是否存在
+    def _is_converged(self, analysis: AnalysisResult) -> bool:
+        """只做结构性收敛校验，不做任何“补全/追加”"""
         if not analysis.steps:
-            issues.append(Ambiguity(
-                question="无法从需求中识别出具体的业务步骤，请明确说明要做什么",
-                context="需求过于模糊，无法拆分为可执行的步骤",
-                options=["请描述具体的数据处理逻辑", "请指明源表和目标表"],
-            ))
-            return issues
-
-        # 2. 检查每个 Step 是否有输入输出声明
+            return False
         for step in analysis.steps:
             if not step.input_tables:
-                issues.append(Ambiguity(
-                    question=f"步骤 '{step.step_name}' 缺少输入表，请指明从哪些表读取数据",
-                    context=f"步骤描述: {step.description}",
-                    options=[],
-                ))
+                return False
             if not step.output_table:
-                issues.append(Ambiguity(
-                    question=f"步骤 '{step.step_name}' 缺少输出表，请指明数据写入哪个表",
-                    context=f"步骤描述: {step.description}",
-                    options=[],
-                ))
-
-        # 3. 验证源头输入表（第一个 Step 的 input_tables）
-        if analysis.steps and analysis.steps[0].input_tables:
-            for table in analysis.steps[0].input_tables:
-                if table not in known_tables:
-                    exists = await self._verify_table_exists(table)
-                    if not exists:
-                        issues.append(Ambiguity(
-                            question=f"源表 '{table}' 不在知识库中，请确认表名是否正确",
-                            context="源头输入表必须在 Gravitino 中存在",
-                            options=["请检查表名拼写", "请先在 Gravitino 中创建此表并同步元数据"],
-                        ))
-
-        # 4. 验证最终目标表
-        if not analysis.final_target or not analysis.final_target.table_name:
-            issues.append(Ambiguity(
-                question="请明确最终数据要写入哪个表",
-                context="缺少最终目标表信息",
-                options=[],
-            ))
-        else:
-            final_table = analysis.final_target.table_name
-            if final_table not in known_tables:
-                exists = await self._verify_table_exists(final_table)
-                if not exists:
-                    issues.append(Ambiguity(
-                        question=f"最终目标表 '{final_table}' 不在知识库中",
-                        context="最终目标表必须先在 Gravitino 中创建并同步元数据",
-                        options=["请先创建目标表，同步元数据后再生成 ETL"],
-                    ))
-
-        return issues
-
-    async def _verify_table_exists(self, table_name: str) -> bool:
-        """通过工具验证表是否存在"""
-        try:
-            result = await get_table_columns.ainvoke({"table_name": table_name})
-            data = json.loads(result)
-            return data.get("status") == "success"
-        except Exception as e:
-            logger.warning(f"验证表 {table_name} 是否存在失败: {e}")
+                return False
+        if not analysis.final_target:
             return False
+        if not analysis.final_target.table_name:
+            return False
+        return True
+
+    @staticmethod
+    def _build_allowed_tables(node_pointers: list[ETLPointer]) -> set[str]:
+        allowed: set[str] = set()
+        for p in node_pointers or []:
+            if "Table" not in set(p.labels or []):
+                continue
+            if p.qualified_name:
+                allowed.add(p.qualified_name)
+        return allowed
+
+    @staticmethod
+    def _find_unknown_tables(analysis: AnalysisResult, *, allowed_tables: set[str]) -> list[str]:
+        referenced = set(analysis.get_all_tables())
+        unknown: list[str] = []
+        for t in referenced:
+            if not t or t.startswith("temp."):
+                continue
+            if t not in allowed_tables:
+                unknown.append(t)
+        return sorted(set(unknown))
+
+    def _bind_tools_by_allowlist(self, agent_context: AgentScopedContext):
+        """
+        按 allowlist 动态绑定工具，避免硬编码导致的“越权/误导”。
+
+        说明：
+        - bind_tools 决定 LLM 能否发起工具调用（能力面）
+        - allowlist 决定该 Agent 是否允许调用（权限面）
+        """
+        allowlist = set(agent_context.tools or [])
+        tool_registry = {
+            "get_table_columns": get_table_columns,
+        }
+        tools = [tool_registry[name] for name in allowlist if name in tool_registry]
+        return self.llm.bind_tools(tools)
 
     def _parse_response(self, content: str) -> dict:
-        """解析 LLM 响应"""
-        logger.info(f"🔍 解析 LLM 响应 (长度: {len(content)}): {content[:1000]}...")
-
-        json_match = re.search(r'```json\s*([\s\S]*?)\s*```', content)
-        if json_match:
-            return json.loads(json_match.group(1))
-
-        json_match = re.search(r'\{[\s\S]*\}', content)
-        if json_match:
-            try:
-                return json.loads(json_match.group())
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON 解析失败: {e}, 匹配内容: {json_match.group()[:500]}...")
-
-        logger.error(f"无法解析 LLM 响应为 JSON，原始内容: {content}")
-        raise ValueError("无法解析 LLM 响应为 JSON")
+        """严格解析 LLM 响应（必须是纯 JSON）"""
+        text = (content or "").strip()
+        logger.info(f"🔍 解析 LLM JSON (长度: {len(text)}): {text[:500]}...")
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as e:
+            logger.error("LLM 输出不是合法 JSON: %s", e)
+            raise ValueError("LLM 输出不是合法 JSON（必须输出纯 JSON）") from e
+        if not isinstance(parsed, dict):
+            raise ValueError("LLM 输出必须是 JSON object")
+        return parsed
 
     def _build_analysis_result(self, result_dict: dict, user_query: str) -> AnalysisResult:
         """构建 AnalysisResult"""
@@ -433,26 +506,36 @@ class AnalystAgent:
             confidence=result_dict.get("confidence", 0.5),
         )
 
-    def _format_context(
-        self, global_kg_context: GlobalKGContext, agent_context: AgentScopedContext
+    @staticmethod
+    def _build_context_payload(
+        *,
+        agent_context: AgentScopedContext,
     ) -> dict:
-        """格式化上下文信息"""
-        # 格式化表信息
-        tables_lines = []
-        for catalog in global_kg_context.catalogs:
-            for schema in catalog.schemas:
-                for table in schema.tables[:20]:
-                    tags_str = ", ".join(table.tags) if table.tags else ""
-                    tables_lines.append(
-                        f"- {schema.name}.{table.name} ({table.column_count}列) [{tags_str}]"
-                    )
+        """
+        构造“知识上下文JSON”（下发给 LLM 的 SystemMessage）
 
-        # 格式化血缘
-        lineage_lines = []
-        for edge in global_kg_context.lineage_graph[:10]:
-            lineage_lines.append(f"- {edge.source_table} → {edge.target_table}")
+        约束：
+        - 只传递指针与导航信息，不传递表明细（列明细必须通过工具获取）
+        """
+        node_pointers = agent_context.etl_pointers or []
+        table_pointers = [
+            {
+                "element_id": p.element_id,
+                "qualified_name": p.qualified_name,
+                "path": p.path,
+                "display_name": p.display_name,
+                "description": p.description,
+                "tools": p.tools,
+            }
+            for p in node_pointers
+            if "Table" in set(p.labels or []) and p.qualified_name
+        ]
 
         return {
-            "tables": "\n".join(tables_lines) if tables_lines else "（无）",
-            "lineage": "\n".join(lineage_lines) if lineage_lines else "（无）",
+            "agent_type": agent_context.agent_type,
+            "allowlist_tools": agent_context.tools,
+            "tables": agent_context.tables,
+            "table_pointers": table_pointers,
+            "etl_pointers": [p.model_dump() for p in node_pointers],
+            "doc_pointers": [p.model_dump() for p in (agent_context.doc_pointers or [])],
         }

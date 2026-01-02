@@ -1,6 +1,8 @@
 import type { ChatMessage } from '@/stores/workflowStudioStore'
 import type { WorkflowGraph } from '@/services/workflowStudioService'
 
+export { upsertAgentActivityByAgent } from './utils/agentRows'
+
 /**
  * 判断是否需要展示双栏布局：出现用户消息或已有工作流节点就切换
  */
