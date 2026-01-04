@@ -48,15 +48,18 @@ dependencies = [
     # JWT认证
     "pyjwt>=2.8.0",
     "sqlalchemy>=2.0.0",
-    # 测试框架
-    "pytest>=7.4.4",
-    "pytest-asyncio>=0.23.4",
+    # OpenAI 兼容 token 计数（用于上下文预算/记忆裁剪的 token 口径）
+    "tiktoken>=0.7.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.4",
     "pytest-asyncio>=0.23.4",
+    "ruff>=0.7.0",
+    "black>=24.0.0",
+    "pyright>=1.1.0",
+    "pre-commit>=4.5.1",
 ]
 
 [build-system]
@@ -65,3 +68,73 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+
+[tool.ruff]
+line-length = 100
+indent-width = 4
+target-version = "py311"
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+# 先落地“低噪音、强收益”的基础规则，避免一上来逼着全仓大改。
+# - F: Pyflakes（未使用导入、未定义变量等）
+# - E7/E9: pycodestyle 的语法级别问题（多语句一行、语法错误等）
+#
+# - B: flake8-bugbear（真实坑位/bug 预防）
+# - UP: pyupgrade（对齐 py311）
+# - I: import 排序（Ruff 内置 isort）
+# - N801/N802/N803/N804/N805: pep8-naming（命名规范：类 CamelCase；函数/方法/参数 snake_case；self/cls）
+# - C90: McCabe 圈复杂度（单一职责：避免“一个函数做一堆事”）
+# - PLR091x: 复杂度/分支/参数/语句数量（单一职责：强制拆分）
+select = [
+    "F",
+    "E7",
+    "E9",
+    "B",
+    "UP",
+    "I",
+    "SIM",
+    "C4",
+    "S",
+    "N801",
+    "N802",
+    "N803",
+    "N804",
+    "N805",
+    "C90",
+    "PLR0911",
+    "PLR0912",
+    "PLR0913",
+    "PLR0915",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# __init__.py 常用于聚合导出，会触发“导入未使用”警告，项目内属于预期行为。
+"**/__init__.py" = ["F401"]
+# 安全扫描只针对线上代码；测试/脚本噪音大且不作为治理目标。
+"**/tests/**" = ["S"]
+"**/scripts/**" = ["S"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.ruff.lint.mccabe]
+# 渐进式阈值：能卡住新增“巨石函数”，但不强迫全仓立即重构。
+max-complexity = 18
+
+[tool.ruff.lint.pylint]
+max-args = 10
+max-branches = 20
+max-returns = 10
+max-statements = 90
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+skip-string-normalization = true

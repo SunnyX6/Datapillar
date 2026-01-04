@@ -6,7 +6,14 @@ ETL 模块 - 智能 ETL 工作流生成
 
 from __future__ import annotations
 
-__all__ = ["router", "EtlOrchestrator", "create_etl_orchestrator"]
+from typing import TYPE_CHECKING
+
+__all__ = ["router"]
+
+if TYPE_CHECKING:
+    from fastapi import APIRouter
+
+    from src.modules.etl.api import router as router
 
 
 def __getattr__(name: str):
@@ -14,8 +21,4 @@ def __getattr__(name: str):
         from src.modules.etl.api import router
 
         return router
-    if name in {"EtlOrchestrator", "create_etl_orchestrator"}:
-        from src.modules.etl.orchestrator import EtlOrchestrator, create_etl_orchestrator
-
-        return {"EtlOrchestrator": EtlOrchestrator, "create_etl_orchestrator": create_etl_orchestrator}[name]
     raise AttributeError(name)

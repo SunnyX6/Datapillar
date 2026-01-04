@@ -5,14 +5,15 @@ OpenLineage 事件处理器
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
 
-from src.infrastructure.database.neo4j import AsyncNeo4jClient
+from src.infrastructure.repository.neo4j_uow import neo4j_async_session
 from src.modules.openlineage.config import OpenLineageSinkConfig
 from src.modules.openlineage.core.queue import AsyncEventQueue, QueueConfig
+from src.modules.openlineage.parsers.plans import OpenLineagePlanBuilder
 from src.modules.openlineage.schemas.events import RunEvent
 from src.modules.openlineage.writers.lineage_writer import LineageWriter
 from src.modules.openlineage.writers.metadata_writer import MetadataWriter
@@ -29,10 +30,10 @@ class ProcessorStats:
     events_queued: int = 0
     events_processed: int = 0
     events_failed: int = 0
-    start_time: datetime = field(default_factory=datetime.utcnow)
+    start_time: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
-        uptime = (datetime.utcnow() - self.start_time).total_seconds()
+        uptime = (datetime.now(UTC) - self.start_time).total_seconds()
         return {
             "events_received": self.events_received,
             "events_queued": self.events_queued,
@@ -77,6 +78,7 @@ class EventProcessor:
         self._queue.set_processor(self._process_batch)
 
         # 初始化写入器
+        self._plan_builder = OpenLineagePlanBuilder()
         self._metadata_writer = MetadataWriter()
         self._lineage_writer = LineageWriter()
 
@@ -155,15 +157,14 @@ class EventProcessor:
 
     async def _process_batch(self, events: list[RunEvent]) -> None:
         """批量处理事件"""
-        driver = await AsyncNeo4jClient.get_driver()
-
         for event in events:
             try:
-                async with driver.session(database=settings.neo4j_database) as session:
+                async with neo4j_async_session() as session:
+                    plans = self._plan_builder.build(event)
                     # 1. 先写入元数据节点
-                    await self._metadata_writer.write(session, event)
-                    # 2. 再写入血缘关系
-                    await self._lineage_writer.write(session, event)
+                    await self._metadata_writer.write(session, plans.metadata)
+                    # 2. 再写入关系（结构边 + 血缘边）
+                    await self._lineage_writer.write(session, plans.lineage)
 
                 self._stats.events_processed += 1
                 logger.debug("event_processed", job=event.job.name)

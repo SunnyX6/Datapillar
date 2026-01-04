@@ -18,7 +18,9 @@ class QueueConfig(BaseModel):
 
     max_size: int = Field(default=10000, ge=100, le=1000000, description="最大队列大小")
     batch_size: int = Field(default=100, ge=1, le=1000, description="批量处理大小")
-    flush_interval_seconds: float = Field(default=5.0, ge=0.1, le=60.0, description="刷新间隔（秒）")
+    flush_interval_seconds: float = Field(
+        default=5.0, ge=0.1, le=60.0, description="刷新间隔（秒）"
+    )
 
 
 class Neo4jConfig(BaseModel):
@@ -35,7 +37,9 @@ class OpenLineageSinkConfig(BaseModel):
     Sink 端负责接收事件并写入 Neo4j
     """
 
-    graceful_shutdown_timeout: float = Field(default=30.0, ge=5.0, le=120.0, description="优雅关闭超时")
+    graceful_shutdown_timeout: float = Field(
+        default=30.0, ge=5.0, le=120.0, description="优雅关闭超时"
+    )
     queue: QueueConfig = Field(default_factory=QueueConfig)
     neo4j: Neo4jConfig = Field(default_factory=Neo4jConfig)
 

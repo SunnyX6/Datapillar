@@ -3,6 +3,31 @@ Agent 工具集
 
 使用 LangChain 标准的 @tool 装饰器定义工具。
 
+==================== 工具开发规范（重要）====================
+
+本文件的工具定义是“唯一权威来源”，禁止在 Agent 的 prompt / task_payload 里重复描述工具能力，
+避免双来源漂移导致 LLM 幻觉、误调用。
+
+1) 命名规范（强制）
+- 工具对外名称必须等于函数名：@tool("xxx", ...) + def xxx(...)
+- 禁止出现 @tool("a") 但函数名是 b 的不一致写法（会造成 allowlist/路由/测试全链路混乱）
+
+2) 入参规范（强制）
+- 每个工具必须显式声明：args_schema=XXXInput（Pydantic BaseModel）
+- 约束要写在 Field(description=...) / Literal / 范围限制里，减少模型自由发挥空间
+
+3) 示例规范（强烈建议）
+- 对容易用错的工具，必须在工具 docstring 里给出 1-3 个最小正确调用示例（JSON）
+- 不要把“怎么用工具”的描述散落到 Agent prompt：工具定义才是唯一权威
+
+4) 输出规范（强制）
+- 工具返回必须是 JSON 字符串（str），并包含 status 字段（success / not_found / error）
+- 输出保持“短、可解析、可复用”：禁止塞超长 SQL/全文/无边界列表（必要时截断+给 count/preview）
+
+5) 安全/权限（强制）
+- 工具层只负责“按需取证”，权限由上层 allowlist + 指针授权控制；工具本身不扩大权限边界
+- 遵循本仓库约束：导航工具禁止输出 element_id 等指针；资产工具按设计返回可验证 element_id
+
 设计原则：
 1. 全局上下文只做导航，不存储细节
 2. 细节通过 Tool 按需查询
@@ -18,7 +43,7 @@ import httpx
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
-from src.infrastructure.repository import ComponentRepository, KnowledgeRepository
+from src.infrastructure.repository import ComponentRepository, Neo4jKGRepository
 
 logger = logging.getLogger(__name__)
 
@@ -32,19 +57,6 @@ class GetTableColumnsInput(BaseModel):
     table_name: str = Field(
         ...,
         description="表名，支持 schema.table 或 table 格式",
-    )
-
-
-class GetColumnLineageInput(BaseModel):
-    """获取列级血缘的参数"""
-
-    source_table: str = Field(
-        ...,
-        description="源表名，格式为 schema.table",
-    )
-    target_table: str = Field(
-        ...,
-        description="目标表名，格式为 schema.table",
     )
 
 
@@ -108,8 +120,11 @@ class GetTagNavInput(BaseModel):
     tables_per_tag: int = Field(default=8, ge=1, le=30, description="每个 tag 返回样例表数量")
 
 
-@tool(args_schema=GetCatalogSchemaNavInput)
-async def get_catalog_schema_nav(limit: int = 2000) -> str:
+@tool(
+    "get_schema_nav",
+    args_schema=GetCatalogSchemaNavInput,
+)
+async def get_schema_nav(limit: int = 2000) -> str:
     """
     获取 Catalog -> Schema 导航（导航级）
 
@@ -117,10 +132,13 @@ async def get_catalog_schema_nav(limit: int = 2000) -> str:
     - no-hit 引导时告诉用户“知识库里大概有哪些库/Schema”
     约束：
     - 禁止返回表明细/指针/element_id
+
+    输入示例（JSON）：
+    - {"limit": 2000}
     """
-    logger.info("get_catalog_schema_nav(limit=%s)", limit)
+    logger.info("get_schema_nav(limit=%s)", limit)
     try:
-        nav = await KnowledgeRepository.load_catalog_schema_nav()
+        nav = await Neo4jKGRepository.load_catalog_nav()
         if not nav:
             return json.dumps(
                 {"status": "no_results", "catalog_schema_nav": []},
@@ -131,14 +149,17 @@ async def get_catalog_schema_nav(limit: int = 2000) -> str:
             ensure_ascii=False,
         )
     except Exception as e:
-        logger.error("get_catalog_schema_nav 执行失败: %s", e, exc_info=True)
+        logger.error("get_schema_nav 执行失败: %s", e, exc_info=True)
         return json.dumps(
             {"status": "error", "message": str(e), "catalog_schema_nav": []},
             ensure_ascii=False,
         )
 
 
-@tool(args_schema=GetTagNavInput)
+@tool(
+    "get_tag_nav",
+    args_schema=GetTagNavInput,
+)
 async def get_tag_nav(limit_tags: int = 12, tables_per_tag: int = 8) -> str:
     """
     获取 tag 导航（导航级）
@@ -148,10 +169,13 @@ async def get_tag_nav(limit_tags: int = 12, tables_per_tag: int = 8) -> str:
     约束：
     - 返回样例表仅包含 table_name/display_name/description/tags 等导航信息
     - 禁止返回指针/element_id
+
+    输入示例（JSON）：
+    - {"limit_tags": 12, "tables_per_tag": 8}
     """
     logger.info("get_tag_nav(limit_tags=%s, tables_per_tag=%s)", limit_tags, tables_per_tag)
     try:
-        nav = await KnowledgeRepository.load_tag_nav(
+        nav = await Neo4jKGRepository.load_tag_nav(
             limit_tags=limit_tags,
             tables_per_tag=tables_per_tag,
         )
@@ -179,7 +203,10 @@ class RecommendGuidanceInput(BaseModel):
     catalog_limit: int = Field(default=2000, ge=1, le=2000, description="返回 catalog 数量限制")
 
 
-@tool(args_schema=RecommendGuidanceInput)
+@tool(
+    "recommend_guidance",
+    args_schema=RecommendGuidanceInput,
+)
 async def recommend_guidance(
     user_query: str,
     limit_tags: int = 12,
@@ -193,6 +220,9 @@ async def recommend_guidance(
     - 这是“推荐引导数据”工具：只负责聚合知识库导航（tag/catalog），不给用户生成文案
     - 面向用户的引导文案必须由 KnowledgeAgent 生成（工具层不调用 LLM）
     - 禁止输出 element_id / node_id（避免把知识指针暴露给用户）
+
+    输入示例（JSON）：
+    - {"user_query": "把订单清洗到 dwd.order_clean", "limit_tags": 12, "tables_per_tag": 8}
     """
     logger.info(
         "recommend_guidance(query='%s', limit_tags=%s, tables_per_tag=%s, catalog_limit=%s)",
@@ -202,8 +232,10 @@ async def recommend_guidance(
         catalog_limit,
     )
     try:
-        catalog_nav = await KnowledgeRepository.load_catalog_schema_nav()
-        tag_nav = await KnowledgeRepository.load_tag_nav(limit_tags=limit_tags, tables_per_tag=tables_per_tag)
+        catalog_nav = await Neo4jKGRepository.load_catalog_nav()
+        tag_nav = await Neo4jKGRepository.load_tag_nav(
+            limit_tags=limit_tags, tables_per_tag=tables_per_tag
+        )
         return json.dumps(
             {
                 "status": "success",
@@ -216,7 +248,13 @@ async def recommend_guidance(
     except Exception as e:
         logger.error("recommend_guidance 执行失败: %s", e, exc_info=True)
         return json.dumps(
-            {"status": "error", "message": str(e), "user_query": user_query, "catalog_schema_nav": [], "tag_nav": []},
+            {
+                "status": "error",
+                "message": str(e),
+                "user_query": user_query,
+                "catalog_schema_nav": [],
+                "tag_nav": [],
+            },
             ensure_ascii=False,
         )
 
@@ -227,6 +265,10 @@ class SearchKnowledgeNodesInput(BaseModel):
     query: str = Field(..., description="检索 query（自由文本）")
     top_k: int = Field(default=12, ge=1, le=50, description="召回数量")
     min_score: float = Field(default=0.8, ge=0.0, le=1.0, description="最低相关性阈值")
+    node_types: list[str] | None = Field(
+        default=None,
+        description="节点类型过滤（如 ['Table', 'Column', 'ValueDomain']），None 表示不过滤",
+    )
 
 
 class ResolveDocPointerInput(BaseModel):
@@ -239,27 +281,55 @@ class ResolveDocPointerInput(BaseModel):
     """
 
     provider: str = Field(..., description="文档指针提供方（例如 url/gitlab/vectordb 等）")
-    ref: dict[str, Any] = Field(default_factory=dict, description="不透明引用（由 provider 自行定义）")
+    ref: dict[str, Any] = Field(
+        default_factory=dict, description="不透明引用（由 provider 自行定义）"
+    )
 
 
-@tool(args_schema=SearchKnowledgeNodesInput)
-async def search_knowledge_nodes(query: str, top_k: int = 12, min_score: float = 0.8) -> str:
+@tool(
+    "search_knowledge_nodes",
+    args_schema=SearchKnowledgeNodesInput,
+)
+async def search_knowledge_nodes(
+    query: str,
+    top_k: int = 12,
+    min_score: float = 0.8,
+    node_types: list[str] | None = None,
+) -> str:
     """
     统一检索 Knowledge 节点（返回可验证 element_id）
 
     说明：
-    - 该工具返回的是“候选节点（含 element_id）”，不是指针（ETLPointer）与明细
+    - 该工具返回的是"候选节点（含 element_id）"，不是指针（ETLPointer）与明细
     - KnowledgeAgent 会基于返回结果组装严格 ETLPointer
+    - 可通过 node_types 参数过滤节点类型（如 ["Table", "Column", "ValueDomain"]）
+
+    输入示例（JSON）：
+    - {"query": "ods.order", "top_k": 12, "min_score": 0.8}
+    - {"query": "order_status", "node_types": ["Column", "ValueDomain"]}
     """
-    logger.info("search_knowledge_nodes(query='%s', top_k=%s, min_score=%s)", query, top_k, min_score)
+    logger.info(
+        "search_knowledge_nodes(query='%s', top_k=%s, min_score=%s, node_types=%s)",
+        query,
+        top_k,
+        min_score,
+        node_types,
+    )
     try:
-        raw_nodes = KnowledgeRepository.search_knowledge_nodes_with_context(
+        raw_nodes = Neo4jKGRepository.search_nodes(
             query=query,
             top_k=top_k,
             min_score=min_score,
+            node_types=node_types,
         )
         return json.dumps(
-            {"status": "success", "query": query, "total": len(raw_nodes or []), "nodes": raw_nodes or []},
+            {
+                "status": "success",
+                "query": query,
+                "node_types": node_types,
+                "total": len(raw_nodes or []),
+                "nodes": raw_nodes or [],
+            },
             ensure_ascii=False,
         )
     except Exception as e:
@@ -308,7 +378,10 @@ def _truncate(text: str, *, max_chars: int) -> tuple[str, bool]:
     return text[:max_chars], True
 
 
-@tool(args_schema=ResolveDocPointerInput)
+@tool(
+    "resolve_doc_pointer",
+    args_schema=ResolveDocPointerInput,
+)
 async def resolve_doc_pointer(provider: str, ref: dict[str, Any]) -> str:
     """
     解析文档/规范指针为可引用证据
@@ -318,6 +391,10 @@ async def resolve_doc_pointer(provider: str, ref: dict[str, Any]) -> str:
     - source: {provider, ref}
     - content: 证据内容（可能截断）
     - retrieved_at_ms: 拉取时间
+
+    输入示例（JSON）：
+    - {"provider": "url", "ref": {"url": "https://example.com/doc"}}
+    - {"provider": "inline", "ref": {"content": "规范内容...", "max_chars": 2000}}
     """
     provider_norm = (provider or "").strip().lower()
     ref = ref or {}
@@ -415,7 +492,10 @@ async def resolve_doc_pointer(provider: str, ref: dict[str, Any]) -> str:
         )
 
 
-@tool(args_schema=GetTableColumnsInput)
+@tool(
+    "get_table_columns",
+    args_schema=GetTableColumnsInput,
+)
 async def get_table_columns(table_name: str) -> str:
     """
     获取表的所有列详情
@@ -429,11 +509,14 @@ async def get_table_columns(table_name: str) -> str:
     - description: 列描述
     - nullable: 是否可空
     - tags: 列标签
+
+    输入示例（JSON）：
+    - {"table_name": "ods.order"}
     """
     logger.info(f"get_table_columns(table_name='{table_name}')")
 
     try:
-        columns = await KnowledgeRepository.get_table_columns(table_name)
+        columns = await Neo4jKGRepository.get_table_columns(table_name)
 
         if not columns:
             return json.dumps(
@@ -467,7 +550,7 @@ async def get_table_columns(table_name: str) -> str:
         )
 
 
-def _parse_value_domain_items(items: object) -> list[dict]:
+def _parse_domain_items(items: object) -> list[dict]:
     """
     将 ValueDomain.items 解析为枚举项列表
 
@@ -509,7 +592,7 @@ def _parse_value_domain_items(items: object) -> list[dict]:
             try:
                 parsed = json.loads(raw)
                 if isinstance(parsed, list):
-                    return _parse_value_domain_items(parsed)
+                    return _parse_domain_items(parsed)
                 if isinstance(parsed, dict):
                     return [parsed]
             except json.JSONDecodeError:
@@ -526,18 +609,24 @@ def _parse_value_domain_items(items: object) -> list[dict]:
     return []
 
 
-@tool(args_schema=GetColumnValueDomainInput)
-async def get_column_value_domain(column_element_id: str) -> str:
+@tool(
+    "get_column_valuedomain",
+    args_schema=GetColumnValueDomainInput,
+)
+async def get_column_valuedomain(column_element_id: str) -> str:
     """
     获取列关联的值域（ValueDomain）
 
     用途：
     - 将自然语言取值（如“未支付/退款”）映射到值域枚举的真实取值
+
+    输入示例（JSON）：
+    - {"column_element_id": "eid_col_1"}
     """
-    logger.info(f"get_column_value_domain(column_element_id='{column_element_id}')")
+    logger.info(f"get_column_valuedomain(column_element_id='{column_element_id}')")
 
     try:
-        payload = await KnowledgeRepository.get_column_value_domains_by_element_id(column_element_id)
+        payload = await Neo4jKGRepository.get_column_domains(column_element_id)
         if not payload:
             return json.dumps(
                 {
@@ -563,7 +652,7 @@ async def get_column_value_domain(column_element_id: str) -> str:
                     "domain_level": vd.get("domain_level"),
                     "data_type": vd.get("data_type"),
                     "description": vd.get("description"),
-                    "items": _parse_value_domain_items(vd.get("items")),
+                    "items": _parse_domain_items(vd.get("items")),
                     "raw_items": vd.get("items"),
                 }
             )
@@ -582,7 +671,7 @@ async def get_column_value_domain(column_element_id: str) -> str:
             ensure_ascii=False,
         )
     except Exception as e:
-        logger.error(f"get_column_value_domain 执行失败: {e}", exc_info=True)
+        logger.error(f"get_column_valuedomain 执行失败: {e}", exc_info=True)
         return json.dumps(
             {
                 "status": "error",
@@ -594,74 +683,30 @@ async def get_column_value_domain(column_element_id: str) -> str:
         )
 
 
-@tool(args_schema=GetColumnLineageInput)
-async def get_column_lineage(source_table: str, target_table: str) -> str:
-    """
-    获取列级血缘映射
-
-    当需要了解源表到目标表的字段对应关系时调用此工具。
-    返回 SQL 节点及其推导出的列级映射。
-
-    返回字段：
-    - sql_id: SQL 节点 ID
-    - sql_content: SQL 代码
-    - column_mappings: 列映射列表
-    """
-    logger.info(f"get_column_lineage(source='{source_table}', target='{target_table}')")
-
-    try:
-        lineage = await KnowledgeRepository.get_column_lineage(source_table, target_table)
-
-        if not lineage:
-            return json.dumps(
-                {
-                    "status": "not_found",
-                    "message": f"未找到 '{source_table}' 到 '{target_table}' 的列级血缘",
-                    "lineage": [],
-                },
-                ensure_ascii=False,
-            )
-
-        return json.dumps(
-            {
-                "status": "success",
-                "source_table": source_table,
-                "target_table": target_table,
-                "lineage": lineage,
-            },
-            ensure_ascii=False,
-        )
-
-    except Exception as e:
-        logger.error(f"get_column_lineage 执行失败: {e}", exc_info=True)
-        return json.dumps(
-            {
-                "status": "error",
-                "message": f"查询失败：{str(e)}",
-                "lineage": [],
-            },
-            ensure_ascii=False,
-        )
-
-
-@tool(args_schema=GetTableLineageInput)
+@tool(
+    "get_table_lineage",
+    args_schema=GetTableLineageInput,
+)
 async def get_table_lineage(table_name: str, direction: str = "both") -> str:
     """
-    获取表级血缘关系
+    获取表血缘关系（含列级映射）
 
-    查询指定表的上下游血缘关系，帮助理解数据流向。
-    ETL 开发时必须了解源表和目标表之间的血缘关系。
+    查询指定表的上下游血缘关系，同时返回列级映射。
+    ETL 开发时必须了解源表和目标表之间的血缘关系及字段对应。
 
     返回字段：
     - upstream: 上游表列表（数据来源）
     - downstream: 下游表列表（数据去向）
-    - lineage_edges: 血缘边详情
+    - lineage_edges: 血缘边详情（含 column_mappings 列级映射）
+
+    输入示例（JSON）：
+    - {"table_name": "dwd.order_clean", "direction": "both"}
     """
     logger.info(f"get_table_lineage(table_name='{table_name}', direction='{direction}')")
 
     try:
         # 加载全量表级血缘
-        all_lineage = await KnowledgeRepository.load_table_lineage()
+        all_lineage = await Neo4jKGRepository.load_table_lineage()
 
         upstream = []
         downstream = []
@@ -677,11 +722,28 @@ async def get_table_lineage(table_name: str, direction: str = "both") -> str:
 
             if direction in ("upstream", "both") and is_target:
                 upstream.append(source)
-                lineage_edges.append(edge)
+                # 获取列级血缘
+                column_lineage = await Neo4jKGRepository.get_column_lineage(source, target)
+                edge_with_columns = {
+                    **edge,
+                    "column_mappings": (
+                        column_lineage[0].get("column_mappings", []) if column_lineage else []
+                    ),
+                }
+                lineage_edges.append(edge_with_columns)
 
             if direction in ("downstream", "both") and is_source:
                 downstream.append(target)
-                lineage_edges.append(edge)
+                # 获取列级血缘（避免重复查询同一条边）
+                if not (direction == "both" and is_target):
+                    column_lineage = await Neo4jKGRepository.get_column_lineage(source, target)
+                    edge_with_columns = {
+                        **edge,
+                        "column_mappings": (
+                            column_lineage[0].get("column_mappings", []) if column_lineage else []
+                        ),
+                    }
+                    lineage_edges.append(edge_with_columns)
 
         # 去重
         upstream = list(set(upstream))
@@ -725,8 +787,11 @@ async def get_table_lineage(table_name: str, direction: str = "both") -> str:
         )
 
 
-@tool(args_schema=GetSqlByLineageInput)
-async def get_sql_by_lineage(source_tables: list[str], target_table: str) -> str:
+@tool(
+    "get_lineage_sql",
+    args_schema=GetSqlByLineageInput,
+)
+async def get_lineage_sql(source_tables: list[str], target_table: str) -> str:
     """
     根据血缘关系精准查找历史 SQL
 
@@ -738,12 +803,13 @@ async def get_sql_by_lineage(source_tables: list[str], target_table: str) -> str
     - 字段映射关系
     - 经过验证的写法风格
 
-    优先使用此工具，而不是 search_reference_sql。
+    输入示例（JSON）：
+    - {"source_tables": ["ods.order"], "target_table": "dwd.order_clean"}
     """
-    logger.info(f"get_sql_by_lineage(source={source_tables}, target={target_table})")
+    logger.info(f"get_lineage_sql(source={source_tables}, target={target_table})")
 
     try:
-        sql_info = await KnowledgeRepository.get_sql_by_lineage(source_tables, target_table)
+        sql_info = await Neo4jKGRepository.find_sql(source_tables, target_table)
 
         if not sql_info:
             return json.dumps(
@@ -771,7 +837,7 @@ async def get_sql_by_lineage(source_tables: list[str], target_table: str) -> str
         )
 
     except Exception as e:
-        logger.error(f"get_sql_by_lineage 执行失败: {e}", exc_info=True)
+        logger.error(f"get_lineage_sql 执行失败: {e}", exc_info=True)
         return json.dumps(
             {
                 "status": "error",
@@ -782,7 +848,10 @@ async def get_sql_by_lineage(source_tables: list[str], target_table: str) -> str
         )
 
 
-@tool(args_schema=SearchAssetsInput)
+@tool(
+    "search_assets",
+    args_schema=SearchAssetsInput,
+)
 async def search_assets(query: str) -> str:
     """
     搜索数仓数据资产（向量检索）
@@ -796,11 +865,14 @@ async def search_assets(query: str) -> str:
     返回字段：
     - nodes: [{element_id, labels, primary_label, qualified_name, path, name, code, score, catalog_name, schema_name, table_name}]
     - tables: [{table_id, element_id, table_name, table_display_name, description, relevance_score, tags, schema_name, catalog_name, layer, column_count}]
+
+    输入示例（JSON）：
+    - {"query": "订单"}
     """
     logger.info(f"search_assets(query='{query}')")
 
     try:
-        raw_nodes = KnowledgeRepository.search_knowledge_nodes_with_context(
+        raw_nodes = Neo4jKGRepository.search_nodes(
             query=query,
             top_k=12,
             min_score=0.8,
@@ -857,7 +929,7 @@ async def search_assets(query: str) -> str:
 
         tables: list[dict] = []
         if table_candidates:
-            expanded_results = await KnowledgeRepository.search_tables_with_context(table_candidates)
+            expanded_results = await Neo4jKGRepository.search_tables(table_candidates)
             for result in expanded_results:
                 schema_layer_tag = result.get("schema_layer_tag") or ""
                 layer = None
@@ -915,7 +987,11 @@ async def search_assets(query: str) -> str:
         )
 
 
-@tool
+class ListComponentInput(BaseModel):
+    """获取组件列表的参数（无参数）"""
+
+
+@tool("list_component", args_schema=ListComponentInput)
 def list_component() -> str:
     """
     获取企业支持的所有大数据组件列表
@@ -930,6 +1006,9 @@ def list_component() -> str:
     - type: 组件类型（SQL/SCRIPT/SYNC）
     - description: 组件描述
     - config_schema: 配置模板
+
+    输入示例（JSON）：
+    - {}
     """
     logger.info("list_component()")
 
@@ -994,10 +1073,9 @@ def list_component() -> str:
 # 核心工具：按需查询细节
 DETAIL_TOOLS = [
     get_table_columns,
-    get_column_value_domain,
-    get_column_lineage,
+    get_column_valuedomain,
     get_table_lineage,
-    get_sql_by_lineage,  # 根据血缘精准匹配历史 SQL
+    get_lineage_sql,  # 根据血缘精准匹配历史 SQL
 ]
 
 # 搜索工具：发现相关资产

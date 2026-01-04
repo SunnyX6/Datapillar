@@ -5,12 +5,13 @@ Neo4j 节点和关系模型
 - Catalog -[:HAS_SCHEMA]-> Schema
 - Schema -[:HAS_TABLE]-> Table
 - Table -[:HAS_COLUMN]-> Column
+- (Catalog|Schema|Table|Column) -[:HAS_TAG]-> Tag
+- Column -[:HAS_VALUE_DOMAIN]-> ValueDomain (特例：值域作为特殊 Tag)
 """
 
 import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
 
 
 def generate_id(*parts: str) -> str:
@@ -175,6 +176,22 @@ class MetricNode:
         return cls(id=node_id, name=name, code=code, metric_type=metric_type, **kwargs)
 
 
+def get_metric_label(metric_type: str) -> str:
+    """
+    将指标类型映射为 Neo4j label。
+
+    - ATOMIC -> AtomicMetric
+    - DERIVED -> DerivedMetric
+    - COMPOSITE -> CompositeMetric
+    """
+    label_map = {
+        "ATOMIC": "AtomicMetric",
+        "DERIVED": "DerivedMetric",
+        "COMPOSITE": "CompositeMetric",
+    }
+    return label_map.get((metric_type or "").upper(), "AtomicMetric")
+
+
 @dataclass
 class WordRootNode:
     """词根节点"""
@@ -252,10 +269,18 @@ class ValueDomainNode:
     updated_at: datetime | None = None
 
     @classmethod
-    def create(cls, domain_code: str, domain_type: str, domain_level: str, **kwargs) -> "ValueDomainNode":
+    def create(
+        cls, domain_code: str, domain_type: str, domain_level: str, **kwargs
+    ) -> "ValueDomainNode":
         """工厂方法：创建 ValueDomain 节点"""
         node_id = generate_id("valuedomain", domain_code)
-        return cls(id=node_id, domain_code=domain_code, domain_type=domain_type, domain_level=domain_level, **kwargs)
+        return cls(
+            id=node_id,
+            domain_code=domain_code,
+            domain_type=domain_type,
+            domain_level=domain_level,
+            **kwargs,
+        )
 
 
 @dataclass
@@ -287,3 +312,22 @@ class MetricColumnLineage:
     column_id: str
     lineage_type: str  # MEASURES, FILTERS_BY
     created_at: datetime | None = None
+
+
+@dataclass
+class TagNode:
+    """Tag 节点 - 独立的标签实体"""
+
+    id: str  # 唯一标识
+    name: str  # Tag 名称
+    description: str | None = None
+    properties: dict[str, str] | None = None  # Tag 属性（如 color）
+    embedding: list[float] | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    @classmethod
+    def create(cls, metalake: str, tag_name: str, **kwargs) -> "TagNode":
+        """工厂方法：创建 Tag 节点"""
+        node_id = generate_id("tag", metalake, tag_name)
+        return cls(id=node_id, name=tag_name, **kwargs)

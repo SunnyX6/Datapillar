@@ -4,28 +4,27 @@
 提供数据库访问的统一接口
 """
 
-from src.infrastructure.repository.model_repository import ModelRepository
-from src.infrastructure.repository.component_repository import ComponentRepository
-from src.infrastructure.repository.neo4j_kg import (
-    Neo4jKGRepository,
-    WordRootDTO,
-    ModifierDTO,
-    UnitDTO,
-    TableContextDTO,
+from src.infrastructure.repository.kg import (
     MetricDTO,
+    ModifierDTO,
+    Neo4jKGRepository,
+    Neo4jKGWritebackRepository,
+    TableContextDTO,
+    UnitDTO,
+    WordRootDTO,
 )
-
-# 兼容别名
-KnowledgeRepository = Neo4jKGRepository
-SemanticRepository = Neo4jKGRepository
+from src.infrastructure.repository.system import (
+    ComponentRepository,
+    LlmUsageRepository,
+    ModelRepository,
+)
 
 __all__ = [
     "ModelRepository",
+    "LlmUsageRepository",
     "ComponentRepository",
     "Neo4jKGRepository",
-    # 兼容别名
-    "KnowledgeRepository",
-    "SemanticRepository",
+    "Neo4jKGWritebackRepository",
     # DTOs
     "WordRootDTO",
     "ModifierDTO",

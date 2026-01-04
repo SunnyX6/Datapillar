@@ -3,16 +3,13 @@
 删除所有节点、关系、约束和索引
 """
 
+import logging
+import os
 import sys
 from pathlib import Path
-import os
-import logging
 
 # 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # 添加项目根目录到Python路径

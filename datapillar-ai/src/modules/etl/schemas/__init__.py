@@ -2,31 +2,36 @@
 ETL 多智能体系统数据结构
 """
 
-from src.modules.etl.schemas.kg_context import (
-    ETLPointer,
-    AgentScopedContext,
-    AgentType,
+from src.modules.etl.agents.knowledge_agent import (
     AGENT_TOOLS_MAP,
+    AgentType,
+    ETLPointer,
+    get_agent_tools,
 )
-from src.modules.etl.schemas.requirement import (
-    AnalysisResult,
-    Step,
-    DataTarget,
-    Ambiguity,
+from src.modules.etl.schemas.agent_result import (
+    AgentResult,
+    AgentResultStatus,
+    ClarificationRequest,
+    DelegationRequest,
+)
+from src.modules.etl.schemas.dag import (
+    JobDependencyResponse,
+    JobResponse,
+    WorkflowResponse,
 )
 from src.modules.etl.schemas.plan import (
-    Workflow,
     Job,
     Stage,
     TestResult,
+    Workflow,
 )
-from src.modules.etl.schemas.dag import (
-    WorkflowResponse,
-    JobResponse,
-    JobDependencyResponse,
-)
-from src.modules.etl.schemas.state import AgentState
 from src.modules.etl.schemas.requests import BlackboardRequest
+from src.modules.etl.schemas.requirement import (
+    Ambiguity,
+    AnalysisResult,
+    DataTarget,
+    Step,
+)
 from src.modules.etl.schemas.sse_msg import (
     SseAgent,
     SseError,
@@ -43,11 +48,16 @@ from src.modules.etl.schemas.sse_msg import (
 )
 
 __all__ = [
-    # KG Context - 知识图谱上下文
-    "AgentScopedContext",
+    # Agent Result - Agent 执行结果
+    "AgentResult",
+    "AgentResultStatus",
+    "ClarificationRequest",
+    "DelegationRequest",
+    # Knowledge Agent - 知识服务
     "AgentType",
     "AGENT_TOOLS_MAP",
     "ETLPointer",
+    "get_agent_tools",
     # Requirement
     "AnalysisResult",
     "Step",
@@ -62,8 +72,6 @@ __all__ = [
     "WorkflowResponse",
     "JobResponse",
     "JobDependencyResponse",
-    # State
-    "AgentState",
     # Blackboard Requests
     "BlackboardRequest",
     # SSE Message - 消息流协议

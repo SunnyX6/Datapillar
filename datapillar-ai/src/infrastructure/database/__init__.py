@@ -4,6 +4,8 @@
 提供 Neo4j、MySQL、Redis 连接池
 """
 
+from typing import TYPE_CHECKING
+
 __all__ = [
     "Neo4jClient",
     "AsyncNeo4jClient",
@@ -11,6 +13,19 @@ __all__ = [
     "MySQLClient",
     "RedisClient",
 ]
+
+if TYPE_CHECKING:
+    from src.infrastructure.database.mysql import MySQLClient as MySQLClient
+    from src.infrastructure.database.neo4j import (
+        AsyncNeo4jClient as AsyncNeo4jClient,
+    )
+    from src.infrastructure.database.neo4j import (
+        Neo4jClient as Neo4jClient,
+    )
+    from src.infrastructure.database.neo4j import (
+        convert_neo4j_types as convert_neo4j_types,
+    )
+    from src.infrastructure.database.redis import RedisClient as RedisClient
 
 
 def __getattr__(name: str):

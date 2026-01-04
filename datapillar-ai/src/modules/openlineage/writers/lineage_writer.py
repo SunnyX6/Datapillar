@@ -1,866 +1,124 @@
 """
-血缘写入器
+关系写入器（LineageWriter）
 
-负责写入血缘关系：
-- SQL 节点
-- 表级血缘：Table -[:INPUT_OF]-> SQL, SQL -[:OUTPUT_TO]-> Table
-- 列级血缘：Column -[:DERIVES_FROM]-> Column
-- 指标列血缘：AtomicMetric -[:MEASURES]-> Column, AtomicMetric -[:FILTERS_BY]-> Column
+职责边界：
+- 负责写入 Neo4j 的“关系（边）”，以及血缘侧的 SQL 节点
+- 不写入任何元数据资产节点（Catalog/Schema/Table/Column/Metric/语义资产等）
+- 包括结构关系（HAS_*）与血缘关系（INPUT_OF/OUTPUT_TO/DERIVES_FROM/...）
 
-血缘提取策略：
-1. 优先使用 OpenLineage facets（columnLineage）
-2. 当 facets 不存在时，用 SQL 解析补充列级血缘
-3. 原子指标通过 ref 字段建立与列的血缘关系
-
-支持的数据源：
-- Gravitino: namespace 格式为 gravitino://metalake/catalog
-- Spark OpenLineage: 使用 symlinks facet 获取逻辑表名
+实现方式：
+- 采用与 MetadataWriter 一致的“编排层 + 子 writer”结构
 """
 
-import json
-import re
-from dataclasses import dataclass
+from __future__ import annotations
 
 import structlog
 from neo4j import AsyncSession
 
-from src.shared.utils.sql_lineage import SQLLineageAnalyzer
-from src.modules.openlineage.schemas.events import InputDataset, OutputDataset, RunEvent
-from src.modules.openlineage.schemas.facets import (
-    ColumnLineageDatasetFacet,
-    SchemaDatasetFacet,
-    SQLJobFacet,
-)
-from src.modules.openlineage.schemas.neo4j import SQLNode, generate_id
+from src.modules.openlineage.parsers.plans.types import LineageWritePlans
 from src.modules.openlineage.writers.base import BaseWriter
+from src.modules.openlineage.writers.lineage import (
+    ColumnLineageWriter,
+    HierarchyWriter,
+    MetricColumnLineageWriter,
+    MetricRelationshipWriter,
+    SQLWriter,
+    TableLineageWriter,
+    TagRelationshipWriter,
+    ValueDomainLineageWriter,
+)
 
 logger = structlog.get_logger()
 
 
-@dataclass
-class ParsedNamespace:
-    """解析后的 namespace"""
-
-    metalake: str | None = None
-    catalog: str | None = None
-
-
-@dataclass
-class TableInfo:
-    """表信息"""
-
-    metalake: str
-    catalog: str
-    schema: str
-    table: str
-    physical_path: str = ""
-
-    @property
-    def id(self) -> str:
-        """生成表 ID"""
-        return generate_id("table", self.metalake, self.catalog, self.schema, self.table)
-
-    def column_id(self, column_name: str) -> str:
-        """生成列 ID"""
-        return generate_id(
-            "column", self.metalake, self.catalog, self.schema, self.table, column_name
-        )
-
-
 class LineageWriter(BaseWriter):
     """
-    血缘写入器
+    关系写入器
 
-    负责将血缘关系写入 Neo4j：
-    - SQL: SQL 语句节点
-    - 表级血缘：INPUT_OF / OUTPUT_TO
+    负责写入：
+    - 结构层级关系：HAS_SCHEMA / HAS_TABLE / HAS_COLUMN / HAS_METRIC
+    - SQL 节点相关关系：INPUT_OF / OUTPUT_TO
     - 列级血缘：DERIVES_FROM
     - 指标列血缘：MEASURES / FILTERS_BY
-    - 列值域血缘：HAS_VALUE_DOMAIN
+    - 列值域关系：HAS_VALUE_DOMAIN
+    - 指标父子关系：DERIVED_FROM / COMPUTED_FROM
+    - Tag 关系：HAS_TAG
     """
-
-    METRIC_OPERATIONS = {"register_metric", "alter_metric"}
-    TAG_OPERATIONS = {"associate_tags"}
-    VALUE_DOMAIN_TAG_PREFIX = "vd:"
 
     def __init__(self) -> None:
         super().__init__()
-        self._sql_written = 0
-        self._table_lineage_written = 0
-        self._column_lineage_written = 0
-        self._metric_lineage_written = 0
-        self._column_valuedomain_lineage_written = 0
-        self._sql_analyzer = SQLLineageAnalyzer(dialect="hive")
+
+        self._hierarchy_writer = HierarchyWriter()
+        self._metric_relationship_writer = MetricRelationshipWriter()
+
+        self._sql_writer = SQLWriter()
+        self._table_lineage_writer = TableLineageWriter()
+        self._column_lineage_writer = ColumnLineageWriter()
+        self._metric_column_lineage_writer = MetricColumnLineageWriter()
+        self._valuedomain_lineage_writer = ValueDomainLineageWriter()
+        self._tag_relationship_writer = TagRelationshipWriter()
 
     @property
     def name(self) -> str:
         return "lineage_writer"
 
-    async def write(self, session: AsyncSession, event: RunEvent) -> None:
-        """写入血缘"""
-        job_name = event.job.name if event.job else ""
-        operation = job_name.split(".")[-1] if "." in job_name else job_name
+    async def write(self, session: AsyncSession, plans: LineageWritePlans) -> None:
+        # 1) 结构层级关系（HAS_*）
+        await self._hierarchy_writer.write(session, plans)
 
-        # 处理指标血缘
-        if operation in self.METRIC_OPERATIONS:
-            await self._write_metric_column_lineage(session, event)
-            return
+        # 2) 指标关系（Schema->Metric + Metric 父子）
+        if plans.schema_metric_edges or plans.metric_parent_relationships:
+            await self._metric_relationship_writer.write(session, plans)
 
-        # 处理列与值域的血缘关系
-        if operation in self.TAG_OPERATIONS:
-            await self._write_column_valuedomain_lineage(session, event)
-            return
-
-        # 获取 SQL
-        sql = self._get_sql(event)
-        if not sql:
-            return
-
-        # 写入 SQL 节点
-        sql_node = SQLNode.create(
-            sql=sql,
-            job_namespace=event.job.namespace,
-            job_name=event.job.name,
-            dialect=self._get_sql_dialect(event),
-            engine=self._get_producer_type(event),
-        )
-        await self._write_sql(session, sql_node)
-
-        # 写入表级血缘
-        await self._write_table_lineage(session, event, sql_node.id)
-
-        # 写入列级血缘
-        await self._write_column_lineage(session, event)
-
-    def _get_sql(self, event: RunEvent) -> str | None:
-        """获取 SQL"""
-        if event.job.facets and "sql" in event.job.facets:
-            sql_facet = SQLJobFacet.from_dict(event.job.facets["sql"])
-            return sql_facet.query
-        return None
-
-    def _get_sql_dialect(self, event: RunEvent) -> str | None:
-        """获取 SQL 方言"""
-        if event.job.facets and "sql" in event.job.facets:
-            sql_facet = SQLJobFacet.from_dict(event.job.facets["sql"])
-            return sql_facet.dialect
-        return None
-
-    def _get_producer_type(self, event: RunEvent) -> str | None:
-        """获取生产者类型"""
-        if event.producer:
-            # 从 producer URL 提取类型
-            # 例如: https://github.com/apache/gravitino/openlineage-listener -> gravitino
-            if "gravitino" in event.producer.lower():
-                return "gravitino"
-            if "spark" in event.producer.lower():
-                return "spark"
-            if "flink" in event.producer.lower():
-                return "flink"
-        return None
-
-    def _parse_job_namespace(self, job_namespace: str) -> ParsedNamespace:
-        """
-        解析 job namespace 获取 metalake/catalog
-
-        格式: gravitino://metalake/catalog
-        """
-        result = ParsedNamespace()
-        match = re.match(r"gravitino://([^/]+)/([^/]+)(?:/.*)?", job_namespace)
-        if match:
-            result.metalake = match.group(1)
-            result.catalog = match.group(2)
-        return result
-
-    def _extract_table_info(
-        self,
-        dataset: InputDataset | OutputDataset,
-        job_namespace: str,
-    ) -> TableInfo | None:
-        """
-        从 dataset 提取表信息
-
-        优先级：
-        1. symlinks facet（Spark OpenLineage）
-        2. gravitino:// namespace（Gravitino）
-        """
-        # 从 job_namespace 获取 metalake/catalog
-        parsed = self._parse_job_namespace(job_namespace)
-        if not parsed.metalake or not parsed.catalog:
-            return None
-
-        # 优先从 symlinks facet 提取表名（Spark OpenLineage）
-        table_name = self._get_table_name_from_symlinks(dataset)
-
-        # 如果没有 symlinks，尝试从 dataset.name 提取
-        if not table_name:
-            # 检查 namespace 是否是 gravitino:// 格式
-            if dataset.namespace.startswith("gravitino://"):
-                table_name = dataset.name
-            else:
-                # 非 gravitino 格式且无 symlinks，无法提取
-                logger.debug(
-                    "cannot_extract_table_info",
-                    namespace=dataset.namespace,
-                    name=dataset.name,
-                )
-                return None
-
-        # 解析 schema.table 格式
-        parts = table_name.split(".", 1)
-        if len(parts) < 2:
-            logger.debug("invalid_table_name_format", table_name=table_name)
-            return None
-
-        return TableInfo(
-            metalake=parsed.metalake,
-            catalog=parsed.catalog,
-            schema=parts[0],
-            table=parts[1],
-            physical_path=dataset.name,
-        )
-
-    def _get_table_name_from_symlinks(
-        self, dataset: InputDataset | OutputDataset
-    ) -> str | None:
-        """
-        从 symlinks facet 提取逻辑表名
-
-        symlinks 格式：
-        {
-            "identifiers": [
-                {"namespace": "hive://host:port", "name": "schema.table", "type": "TABLE"}
-            ]
-        }
-        """
-        if not dataset.facets or "symlinks" not in dataset.facets:
-            return None
-
-        symlinks = dataset.facets.get("symlinks", {})
-        identifiers = symlinks.get("identifiers", [])
-
-        if not identifiers:
-            return None
-
-        # 取第一个 identifier 的 name
-        return identifiers[0].get("name")
-
-    def _build_path_to_table_mapping(
-        self,
-        datasets: list[InputDataset],
-        job_namespace: str,
-    ) -> dict[str, TableInfo]:
-        """
-        建立物理路径到表信息的映射
-
-        用于列级血缘：columnLineage.inputFields 使用物理路径
-        """
-        mapping: dict[str, TableInfo] = {}
-
-        for ds in datasets:
-            table_info = self._extract_table_info(ds, job_namespace)
-            if table_info:
-                # 用 dataset.name（物理路径）作为 key
-                mapping[ds.name] = table_info
-
-        return mapping
-
-    async def _write_sql(self, session: AsyncSession, sql: SQLNode) -> None:
-        """写入 SQL 节点"""
-        query = """
-        MERGE (s:SQL:Knowledge {id: $id})
-        ON CREATE SET
-            s.createdAt = datetime(),
-            s.content = $content,
-            s.dialect = $dialect,
-            s.engine = $engine,
-            s.jobNamespace = $jobNamespace,
-            s.jobName = $jobName,
-            s.executionCount = 1,
-            s.createdBy = 'OPENLINEAGE'
-        ON MATCH SET
-            s.updatedAt = datetime(),
-            s.executionCount = COALESCE(s.executionCount, 0) + 1
-        """
-
-        await session.run(
-            query,
-            id=sql.id,
-            content=sql.content,
-            dialect=sql.dialect,
-            engine=sql.engine,
-            jobNamespace=sql.job_namespace,
-            jobName=sql.job_name,
-        )
-
-        self._sql_written += 1
-        logger.debug("sql_written", id=sql.id)
-
-    async def _write_table_lineage(
-        self, session: AsyncSession, event: RunEvent, sql_id: str
-    ) -> None:
-        """写入表级血缘（批量）"""
-        job_namespace = event.job.namespace
-
-        # 收集 INPUT 表
-        input_table_ids = []
-        for input_ds in event.inputs:
-            table_info = self._extract_table_info(input_ds, job_namespace)
-            if table_info:
-                input_table_ids.append(table_info.id)
-
-        # 收集 OUTPUT 表
-        output_table_ids = []
-        for output_ds in event.outputs:
-            table_info = self._extract_table_info(output_ds, job_namespace)
-            if table_info:
-                output_table_ids.append(table_info.id)
-
-        # 批量写入 INPUT 血缘
-        if input_table_ids:
-            query = """
-            UNWIND $tableIds AS tableId
-            MATCH (t:Table {id: tableId})
-            MATCH (s:SQL {id: $sqlId})
-            MERGE (t)-[r:INPUT_OF]->(s)
-            ON CREATE SET r.createdAt = datetime()
-            ON MATCH SET r.updatedAt = datetime()
-            """
-            await session.run(query, tableIds=input_table_ids, sqlId=sql_id)
-            self._table_lineage_written += len(input_table_ids)
-            logger.debug("table_input_lineage_batch_written", count=len(input_table_ids))
-
-        # 批量写入 OUTPUT 血缘
-        if output_table_ids:
-            query = """
-            UNWIND $tableIds AS tableId
-            MATCH (s:SQL {id: $sqlId})
-            MATCH (t:Table {id: tableId})
-            MERGE (s)-[r:OUTPUT_TO]->(t)
-            ON CREATE SET r.createdAt = datetime()
-            ON MATCH SET r.updatedAt = datetime()
-            """
-            await session.run(query, tableIds=output_table_ids, sqlId=sql_id)
-            self._table_lineage_written += len(output_table_ids)
-            logger.debug("table_output_lineage_batch_written", count=len(output_table_ids))
-
-    async def _write_column_lineage(
-        self, session: AsyncSession, event: RunEvent
-    ) -> None:
-        """
-        写入列级血缘
-
-        策略：
-        1. 优先使用 columnLineage facet（Spark 等提供）
-        2. 当 facet 不存在时，用 SQL 解析补充（Flink 等场景）
-        """
-        job_namespace = event.job.namespace
-
-        # 检查是否有 columnLineage facet
-        has_column_lineage_facet = any(
-            output_ds.facets and "columnLineage" in output_ds.facets
-            for output_ds in event.outputs
-        )
-
-        if has_column_lineage_facet:
-            # 使用 OpenLineage facet
-            await self._write_column_lineage_from_facet(session, event)
-        else:
-            # 用 SQL 解析补充
-            await self._write_column_lineage_from_sql(session, event)
-
-    async def _write_column_lineage_from_facet(
-        self, session: AsyncSession, event: RunEvent
-    ) -> None:
-        """从 columnLineage facet 批量写入列级血缘"""
-        job_namespace = event.job.namespace
-
-        # 建立物理路径到表信息的映射（用于解析 inputFields）
-        path_to_table = self._build_path_to_table_mapping(event.inputs, job_namespace)
-
-        # 收集所有列血缘关系
-        lineage_data = []
-
-        for output_ds in event.outputs:
-            if not output_ds.facets or "columnLineage" not in output_ds.facets:
-                continue
-
-            # 获取输出表信息
-            output_table_info = self._extract_table_info(output_ds, job_namespace)
-            if not output_table_info:
-                continue
-
-            col_lineage = ColumnLineageDatasetFacet.from_dict(
-                output_ds.facets["columnLineage"]
+        # 3) 指标列血缘（MEASURES / FILTERS_BY）
+        for metric_id, column_ids in plans.metric_measures:
+            await self._metric_column_lineage_writer.write_measures(
+                session,
+                metric_id=metric_id,
+                column_ids=column_ids,
+            )
+        for metric_id, column_ids in plans.metric_filters:
+            await self._metric_column_lineage_writer.write_filters(
+                session,
+                metric_id=metric_id,
+                column_ids=column_ids,
             )
 
-            for output_col_name, lineage_info in col_lineage.fields.items():
-                # 目标列 ID
-                target_col_id = output_table_info.column_id(output_col_name)
+        # 4) 列值域关系（HAS_VALUE_DOMAIN）
+        if plans.column_valuedomain_add or plans.column_valuedomain_remove:
+            await self._valuedomain_lineage_writer.write(session, plans)
 
-                for input_field in lineage_info.inputFields:
-                    # 从映射表获取源表信息
-                    source_table_info = path_to_table.get(input_field.name)
-                    if not source_table_info:
-                        continue
+        # 5) Tag 关系（HAS_TAG）
+        if plans.tag_update_plans:
+            await self._tag_relationship_writer.write(session, plans.tag_update_plans)
 
-                    # 源列 ID
-                    source_col_id = source_table_info.column_id(input_field.field)
-
-                    # 提取转换类型
-                    transform_type = None
-                    transform_subtype = None
-                    if input_field.transformations:
-                        first_transform = input_field.transformations[0]
-                        transform_type = first_transform.type.value if first_transform.type else None
-                        transform_subtype = first_transform.subtype
-
-                    lineage_data.append({
-                        "srcId": source_col_id,
-                        "dstId": target_col_id,
-                        "transformType": transform_type,
-                        "transformSubtype": transform_subtype,
-                    })
-
-        # 批量写入
-        if lineage_data:
-            await self._write_column_lineage_batch(session, lineage_data)
-
-    async def _write_column_lineage_batch(
-        self, session: AsyncSession, lineage_data: list[dict]
-    ) -> None:
-        """批量写入列级血缘"""
-        query = """
-        UNWIND $lineageData AS item
-        MATCH (src:Column {id: item.srcId})
-        MATCH (dst:Column {id: item.dstId})
-        MERGE (dst)-[r:DERIVES_FROM]->(src)
-        ON CREATE SET
-            r.createdAt = datetime(),
-            r.transformationType = item.transformType,
-            r.transformationSubtype = item.transformSubtype
-        ON MATCH SET
-            r.updatedAt = datetime()
-        """
-
-        await session.run(query, lineageData=lineage_data)
-
-        self._column_lineage_written += len(lineage_data)
-        logger.debug("column_lineage_batch_written", count=len(lineage_data))
-
-    async def _write_column_lineage_from_sql(
-        self, session: AsyncSession, event: RunEvent
-    ) -> None:
-        """
-        从 SQL 解析写入列级血缘
-
-        当 OpenLineage 不提供 columnLineage facet 时使用
-        """
-        sql = self._get_sql(event)
-        if not sql:
-            return
-
-        job_namespace = event.job.namespace
-        parsed = self._parse_job_namespace(job_namespace)
-        if not parsed.metalake or not parsed.catalog:
-            return
-
-        try:
-            result = self._sql_analyzer.analyze_sql(sql)
-        except Exception as e:
-            logger.warning("sql_column_lineage_analysis_failed", error=str(e))
-            return
-
-        # 收集所有列血缘关系
-        lineage_data = []
-
-        for col_lineage in result.column_lineages:
-            # 构建源列 ID
-            source_schema = col_lineage.source.table.schema or ""
-            source_table = col_lineage.source.table.table
-            if not source_schema and "." in source_table:
-                parts = source_table.split(".", 1)
-                source_schema, source_table = parts[0], parts[1]
-
-            source_col_id = generate_id(
-                "column",
-                parsed.metalake,
-                parsed.catalog,
-                source_schema,
-                source_table,
-                col_lineage.source.column,
+        # 6) SQL 血缘（SQL 节点 + 表级 + 列级）
+        if plans.sql_node:
+            await self._sql_writer.write(session, plans.sql_node)
+            await self._table_lineage_writer.write(
+                session,
+                sql=plans.sql_node,
+                input_table_ids=plans.table_input_ids,
+                output_table_ids=plans.table_output_ids,
             )
 
-            # 构建目标列 ID
-            target_schema = col_lineage.target.table.schema or ""
-            target_table = col_lineage.target.table.table
-            if not target_schema and "." in target_table:
-                parts = target_table.split(".", 1)
-                target_schema, target_table = parts[0], parts[1]
-
-            target_col_id = generate_id(
-                "column",
-                parsed.metalake,
-                parsed.catalog,
-                target_schema,
-                target_table,
-                col_lineage.target.column,
-            )
-
-            lineage_data.append({
-                "srcId": source_col_id,
-                "dstId": target_col_id,
-                "transformType": col_lineage.transformation,
-                "transformSubtype": None,
-            })
-
-        # 批量写入
-        if lineage_data:
-            await self._write_column_lineage_batch(session, lineage_data)
-
-    async def _write_metric_column_lineage(
-        self, session: AsyncSession, event: RunEvent
-    ) -> None:
-        """
-        写入原子指标与列的血缘关系
-
-        从 schema facet 解析 ref 字段：
-        - refCatalogName, refSchemaName, refTableName: 引用的表
-        - measureColumns: JSON 数组 [{name, type, comment}, ...]
-        - filterColumns: JSON 数组 [{name, type, comment, values}, ...]
-
-        建立关系：
-        - AtomicMetric -[:MEASURES]-> Column
-        - AtomicMetric -[:FILTERS_BY]-> Column
-        """
-        for dataset in event.get_all_datasets():
-            if not dataset.facets or "schema" not in dataset.facets:
-                continue
-
-            schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
-            fields = {f.name: f for f in schema_facet.fields}
-
-            # 获取指标 code 和 type
-            code_field = fields.get("code")
-            type_field = fields.get("type")
-            if not code_field or not code_field.description:
-                continue
-
-            metric_type = type_field.description if type_field else "ATOMIC"
-            if metric_type.upper() != "ATOMIC":
-                # 只有原子指标才有列血缘
-                continue
-
-            metric_code = code_field.description
-            metric_id = generate_id("metric", metric_code)
-
-            # 解析 ref 字段
-            ref_catalog = (
-                fields.get("refCatalogName").description
-                if fields.get("refCatalogName")
-                else None
-            )
-            ref_schema = (
-                fields.get("refSchemaName").description
-                if fields.get("refSchemaName")
-                else None
-            )
-            ref_table = (
-                fields.get("refTableName").description
-                if fields.get("refTableName")
-                else None
-            )
-
-            if not ref_catalog or not ref_schema or not ref_table:
-                logger.debug(
-                    "metric_lineage_skip_no_ref",
-                    metric_code=metric_code,
-                    ref_catalog=ref_catalog,
-                    ref_schema=ref_schema,
-                    ref_table=ref_table,
-                )
-                continue
-
-            # 从 dataset.namespace 解析 metalake
-            # 格式: gravitino://metalake/catalog
-            parsed_ns = self._parse_job_namespace(dataset.namespace)
-            if not parsed_ns.metalake:
-                logger.debug(
-                    "metric_lineage_skip_no_metalake",
-                    metric_code=metric_code,
-                    namespace=dataset.namespace,
-                )
-                continue
-
-            # 解析 measureColumns
-            measure_columns_field = fields.get("measureColumns")
-            if measure_columns_field and measure_columns_field.description:
-                try:
-                    measure_columns = json.loads(measure_columns_field.description)
-                    measure_col_names = [col["name"] for col in measure_columns if "name" in col]
-                    if measure_col_names:
-                        await self._write_metric_measures_batch(
-                            session,
-                            metric_id,
-                            parsed_ns.metalake,
-                            ref_catalog,
-                            ref_schema,
-                            ref_table,
-                            measure_col_names,
-                        )
-                except json.JSONDecodeError as e:
-                    logger.warning(
-                        "metric_lineage_measure_parse_error",
-                        metric_code=metric_code,
-                        error=str(e),
-                    )
-
-            # 解析 filterColumns
-            filter_columns_field = fields.get("filterColumns")
-            if filter_columns_field and filter_columns_field.description:
-                try:
-                    filter_columns = json.loads(filter_columns_field.description)
-                    filter_col_names = [col["name"] for col in filter_columns if "name" in col]
-                    if filter_col_names:
-                        await self._write_metric_filters_batch(
-                            session,
-                            metric_id,
-                            parsed_ns.metalake,
-                            ref_catalog,
-                            ref_schema,
-                            ref_table,
-                            filter_col_names,
-                        )
-                except json.JSONDecodeError as e:
-                    logger.warning(
-                        "metric_lineage_filter_parse_error",
-                        metric_code=metric_code,
-                        error=str(e),
-                    )
-
-    async def _write_metric_measures_batch(
-        self,
-        session: AsyncSession,
-        metric_id: str,
-        metalake: str,
-        catalog: str,
-        schema: str,
-        table: str,
-        column_names: list[str],
-    ) -> None:
-        """批量写入指标度量列关系"""
-        # 先删除该指标的旧 MEASURES 关系（确保修改时数据一致）
-        delete_query = """
-        MATCH (m:AtomicMetric {id: $metricId})-[r:MEASURES]->()
-        DELETE r
-        """
-        await session.run(delete_query, metricId=metric_id)
-
-        lineage_data = [
-            {
-                "metricId": metric_id,
-                "columnId": generate_id("column", metalake, catalog, schema, table, col_name),
-            }
-            for col_name in column_names
-        ]
-
-        query = """
-        UNWIND $lineageData AS item
-        MATCH (m:AtomicMetric {id: item.metricId})
-        MATCH (c:Column {id: item.columnId})
-        MERGE (m)-[r:MEASURES]->(c)
-        ON CREATE SET r.createdAt = datetime()
-        ON MATCH SET r.updatedAt = datetime()
-        """
-
-        await session.run(query, lineageData=lineage_data)
-        self._metric_lineage_written += len(lineage_data)
-        logger.debug("metric_measures_written", metric_id=metric_id, count=len(column_names))
-
-    async def _write_metric_filters_batch(
-        self,
-        session: AsyncSession,
-        metric_id: str,
-        metalake: str,
-        catalog: str,
-        schema: str,
-        table: str,
-        column_names: list[str],
-    ) -> None:
-        """批量写入指标过滤列关系"""
-        # 先删除该指标的旧 FILTERS_BY 关系（确保修改时数据一致）
-        delete_query = """
-        MATCH (m:AtomicMetric {id: $metricId})-[r:FILTERS_BY]->()
-        DELETE r
-        """
-        await session.run(delete_query, metricId=metric_id)
-
-        lineage_data = [
-            {
-                "metricId": metric_id,
-                "columnId": generate_id("column", metalake, catalog, schema, table, col_name),
-            }
-            for col_name in column_names
-        ]
-
-        query = """
-        UNWIND $lineageData AS item
-        MATCH (m:AtomicMetric {id: item.metricId})
-        MATCH (c:Column {id: item.columnId})
-        MERGE (m)-[r:FILTERS_BY]->(c)
-        ON CREATE SET r.createdAt = datetime()
-        ON MATCH SET r.updatedAt = datetime()
-        """
-
-        await session.run(query, lineageData=lineage_data)
-        self._metric_lineage_written += len(lineage_data)
-        logger.debug("metric_filters_written", metric_id=metric_id, count=len(column_names))
-
-    # ==================== 列与值域血缘关系 ====================
-
-    async def _write_column_valuedomain_lineage(
-        self, session: AsyncSession, event: RunEvent
-    ) -> None:
-        """
-        处理列与值域的血缘关系
-
-        当 objectType 为 COLUMN 且 tag 以 'vd:' 前缀时：
-        - tagsToAdd 中的 vd:xxx → 建立 Column -[:HAS_VALUE_DOMAIN]-> ValueDomain 关系
-        - tagsToRemove 中的 vd:xxx → 删除 Column -[:HAS_VALUE_DOMAIN]-> ValueDomain 关系
-        """
-        for dataset in event.get_all_datasets():
-            # 解析 gravitinoTag facet
-            if not dataset.facets or "gravitinoTag" not in dataset.facets:
-                continue
-
-            tag_facet = dataset.facets["gravitinoTag"]
-            object_type = tag_facet.get("objectType")
-
-            # 只处理 COLUMN 类型
-            if object_type != "COLUMN":
-                continue
-
-            tags_to_add = tag_facet.get("tagsToAdd", [])
-            tags_to_remove = tag_facet.get("tagsToRemove", [])
-
-            # 解析 namespace 和 name，生成列 ID
-            parsed_ns = self._parse_job_namespace(dataset.namespace)
-            column_id = self._generate_column_id_for_tag(parsed_ns, dataset.name)
-
-            if not column_id:
-                logger.warning(
-                    "column_valuedomain_skip_no_column_id",
-                    namespace=dataset.namespace,
-                    name=dataset.name,
-                )
-                continue
-
-            # 处理要删除的值域关联
-            vd_tags_to_remove = [
-                t[len(self.VALUE_DOMAIN_TAG_PREFIX):]
-                for t in tags_to_remove
-                if t.startswith(self.VALUE_DOMAIN_TAG_PREFIX)
-            ]
-            for domain_code in vd_tags_to_remove:
-                await self._remove_column_valuedomain_relation(
-                    session, column_id, domain_code
-                )
-
-            # 处理要添加的值域关联
-            vd_tags_to_add = [
-                t[len(self.VALUE_DOMAIN_TAG_PREFIX):]
-                for t in tags_to_add
-                if t.startswith(self.VALUE_DOMAIN_TAG_PREFIX)
-            ]
-            for domain_code in vd_tags_to_add:
-                await self._add_column_valuedomain_relation(
-                    session, column_id, domain_code
-                )
-
-    def _generate_column_id_for_tag(
-        self, parsed_ns: ParsedNamespace, name: str
-    ) -> str | None:
-        """根据 tag 事件中的 name 生成列 ID"""
-        # name 格式: schema.table.column
-        if not parsed_ns.metalake or not parsed_ns.catalog:
-            return None
-
-        parts = name.split(".", 2)
-        if len(parts) != 3:
-            return None
-
-        schema_name, table_name, column_name = parts
-        return generate_id(
-            "column",
-            parsed_ns.metalake,
-            parsed_ns.catalog,
-            schema_name,
-            table_name,
-            column_name,
-        )
-
-    async def _add_column_valuedomain_relation(
-        self, session: AsyncSession, column_id: str, domain_code: str
-    ) -> None:
-        """建立 Column -> ValueDomain 关系"""
-        query = """
-        MATCH (c:Column {id: $columnId})
-        MATCH (v:ValueDomain {domainCode: $domainCode})
-        MERGE (c)-[r:HAS_VALUE_DOMAIN]->(v)
-        ON CREATE SET r.createdAt = datetime()
-        ON MATCH SET r.updatedAt = datetime()
-        RETURN c.id as columnId, v.id as valueDomainId
-        """
-        result = await session.run(query, columnId=column_id, domainCode=domain_code)
-        record = await result.single()
-
-        if record:
-            self._column_valuedomain_lineage_written += 1
-            logger.info(
-                "column_valuedomain_relation_added",
-                column_id=column_id,
-                domain_code=domain_code,
-                value_domain_id=record["valueDomainId"],
-            )
-        else:
-            logger.warning(
-                "column_valuedomain_relation_add_failed",
-                column_id=column_id,
-                domain_code=domain_code,
-                reason="column or valuedomain not found",
-            )
-
-    async def _remove_column_valuedomain_relation(
-        self, session: AsyncSession, column_id: str, domain_code: str
-    ) -> None:
-        """删除 Column -> ValueDomain 关系"""
-        query = """
-        MATCH (c:Column {id: $columnId})-[r:HAS_VALUE_DOMAIN]->(v:ValueDomain {domainCode: $domainCode})
-        DELETE r
-        RETURN c.id as columnId, v.id as valueDomainId
-        """
-        result = await session.run(query, columnId=column_id, domainCode=domain_code)
-        record = await result.single()
-
-        if record:
-            logger.info(
-                "column_valuedomain_relation_removed",
-                column_id=column_id,
-                domain_code=domain_code,
-            )
-        else:
-            logger.debug(
-                "column_valuedomain_relation_not_found",
-                column_id=column_id,
-                domain_code=domain_code,
-            )
+        if plans.column_lineage_data:
+            await self._column_lineage_writer.write(session, plans.column_lineage_data)
 
     def get_detailed_stats(self) -> dict:
-        """获取详细统计"""
         stats = self.get_stats().to_dict()
-        stats["sql_written"] = self._sql_written
-        stats["table_lineage_written"] = self._table_lineage_written
-        stats["column_lineage_written"] = self._column_lineage_written
-        stats["metric_lineage_written"] = self._metric_lineage_written
-        stats["column_valuedomain_lineage_written"] = self._column_valuedomain_lineage_written
+        stats["hierarchy_edges_written"] = self._hierarchy_writer.hierarchy_edges_written
+
+        stats["sql_written"] = self._sql_writer.sql_written
+        stats["table_lineage_written"] = self._table_lineage_writer.table_lineage_written
+        stats["column_lineage_written"] = self._column_lineage_writer.column_lineage_written
+
+        stats["metric_schema_edges_written"] = self._metric_relationship_writer.metric_schema_edges
+        stats["metric_parent_edges_written"] = self._metric_relationship_writer.metric_parent_edges
+        stats["metric_lineage_written"] = self._metric_column_lineage_writer.metric_lineage_written
+        stats["column_valuedomain_lineage_written"] = (
+            self._valuedomain_lineage_writer.col_domain_edges
+        )
+        stats["tag_edges_added"] = self._tag_relationship_writer.tag_edges_added
+        stats["tag_edges_removed"] = self._tag_relationship_writer.tag_edges_removed
         return stats

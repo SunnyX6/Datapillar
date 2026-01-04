@@ -1,0 +1,34 @@
+repos:
+  # 说明：
+  # - 本仓库是 monorepo，Git 根目录在 `Datapillar/`。
+  # - datapillar-ai 的 Python 质量门禁只对 `datapillar-ai/` 生效，避免影响其它子项目。
+  # - 使用 datapillar-ai 的 `.venv`，保证 Ruff/Black 版本与项目一致（uv 管理）。
+  - repo: local
+    hooks:
+      - id: datapillar-ai-ruff
+        name: datapillar-ai / ruff check
+        entry: datapillar-ai/.venv/bin/ruff
+        language: system
+        types: [python]
+        files: ^datapillar-ai/
+        args: [check, --config, datapillar-ai/pyproject.toml]
+
+      - id: datapillar-ai-black
+        name: datapillar-ai / black
+        entry: datapillar-ai/.venv/bin/black
+        language: system
+        types: [python]
+        files: ^datapillar-ai/
+        args: [--config, datapillar-ai/pyproject.toml]
+
+      - id: datapillar-ai-function-name-max-segments
+        name: datapillar-ai / function name segments (<= 3)
+        entry: datapillar-ai/.venv/bin/python
+        language: system
+        types: [python]
+        files: ^datapillar-ai/src/.*\.py$
+        args:
+          [
+            -c,
+            "import ast\nimport sys\n\nMAX_SEGMENTS = 3\n\n\ndef _segments(name: str) -> int:\n    core = name.strip(\"_\")\n    if not core:\n        return 0\n    return len([p for p in core.split(\"_\") if p])\n\n\nerrors: list[str] = []\nfor path in sys.argv[1:]:\n    try:\n        src = open(path, \"r\", encoding=\"utf-8\").read()\n        tree = ast.parse(src, filename=path)\n    except Exception as e:\n        errors.append(f\"{path}:1: 无法解析文件({e})\")\n        continue\n\n    for node in ast.walk(tree):\n        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):\n            continue\n        lineno = getattr(node, \"lineno\", 1)\n        if _segments(node.name) > MAX_SEGMENTS:\n            errors.append(f\"{path}:{lineno}: 方法/函数名过长(>{MAX_SEGMENTS}段): {node.name}\")\n\nif errors:\n    print(\"命名门禁失败：方法/函数名必须言简意赅，最多三段式(最多2个下划线)。\")\n    for e in errors:\n        print(e)\n    sys.exit(1)\n",
+          ]

@@ -49,6 +49,10 @@ FOR (u:Unit) REQUIRE u.id IS UNIQUE;
 CREATE CONSTRAINT valuedomain_unique IF NOT EXISTS
 FOR (v:ValueDomain) REQUIRE v.id IS UNIQUE;
 
+// Tag 节点：id 唯一
+CREATE CONSTRAINT tag_unique IF NOT EXISTS
+FOR (t:Tag) REQUIRE t.id IS UNIQUE;
+
 // ==================== 普通索引（加速查询） ====================
 
 // Catalog 索引
@@ -96,6 +100,9 @@ CREATE INDEX unit_name IF NOT EXISTS FOR (u:Unit) ON (u.name);
 CREATE INDEX valuedomain_domain_code IF NOT EXISTS FOR (v:ValueDomain) ON (v.domainCode);
 CREATE INDEX valuedomain_domain_type IF NOT EXISTS FOR (v:ValueDomain) ON (v.domainType);
 CREATE INDEX valuedomain_domain_level IF NOT EXISTS FOR (v:ValueDomain) ON (v.domainLevel);
+
+// Tag 索引
+CREATE INDEX tag_name IF NOT EXISTS FOR (t:Tag) ON (t.name);
 
 // ==================== 向量索引（语义搜索） ====================
 
@@ -177,6 +184,14 @@ OPTIONS {indexConfig: {
   `vector.similarity_function`: 'cosine'
 }};
 
+// Tag embedding 向量索引
+CREATE VECTOR INDEX tag_embedding IF NOT EXISTS
+FOR (t:Tag) ON (t.embedding)
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 2048,
+  `vector.similarity_function`: 'cosine'
+}};
+
 // ==================== 全文索引（文本搜索） ====================
 
 // 统一知识图谱全文索引（覆盖所有 Knowledge 节点）
@@ -217,6 +232,10 @@ FOR (u:Unit) ON EACH [u.code, u.name, u.description];
 // 值域全文索引
 CREATE FULLTEXT INDEX valuedomain_fulltext IF NOT EXISTS
 FOR (v:ValueDomain) ON EACH [v.domainCode, v.domainName, v.items, v.description];
+
+// Tag 全文索引
+CREATE FULLTEXT INDEX tag_fulltext IF NOT EXISTS
+FOR (t:Tag) ON EACH [t.name, t.description];
 
 // ==================== 验证索引创建 ====================
 SHOW INDEXES;

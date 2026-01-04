@@ -40,10 +40,10 @@ class SseState(str, Enum):
 
     THINKING = "thinking"  # agent 内部推理/规划中（主要用于 agent.start）
     INVOKING = "invoking"  # 正在调用（主要用于 tool.start）
-    TOOL = "tool"          # （已弃用）历史兼容：工具阶段请用 event=tool.* 表达
-    WAITING = "waiting"    # 等待用户输入（interrupt）
-    DONE = "done"          # 阶段完成（agent/result）
-    ERROR = "error"        # 失败
+    TOOL = "tool"  # （已弃用）历史兼容：工具阶段请用 event=tool.* 表达
+    WAITING = "waiting"  # 等待用户输入（interrupt）
+    DONE = "done"  # 阶段完成（agent/result）
+    ERROR = "error"  # 失败
 
 
 class SseLevel(str, Enum):
@@ -78,6 +78,14 @@ class SseTool(BaseModel):
 
 class SseLlm(BaseModel):
     name: str | None = Field(default=None, description="模型名（可选）")
+    usage: dict[str, Any] | None = Field(
+        default=None,
+        description="token 使用量（prompt/completion/total/estimated，标准化后）",
+    )
+    cost_usd: dict[str, Any] | None = Field(
+        default=None,
+        description="费用预估（USD，标准化后）",
+    )
 
 
 class SseInterrupt(BaseModel):
@@ -127,7 +135,14 @@ class SseEvent(BaseModel):
         return self.model_dump(exclude_none=True)
 
     @classmethod
-    def agent_start(cls, *, agent_id: str, agent_name: str, run_id: str | None = None, parent_run_id: str | None = None) -> "SseEvent":
+    def agent_start(
+        cls,
+        *,
+        agent_id: str,
+        agent_name: str,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+    ) -> SseEvent:
         return cls(
             event=SseEventType.AGENT_START,
             state=SseState.THINKING,
@@ -137,7 +152,15 @@ class SseEvent(BaseModel):
         )
 
     @classmethod
-    def agent_end(cls, *, agent_id: str, agent_name: str, summary: str | None = None, run_id: str | None = None, parent_run_id: str | None = None) -> "SseEvent":
+    def agent_end(
+        cls,
+        *,
+        agent_id: str,
+        agent_name: str,
+        summary: str | None = None,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+    ) -> SseEvent:
         return cls(
             event=SseEventType.AGENT_END,
             state=SseState.DONE,
@@ -148,7 +171,15 @@ class SseEvent(BaseModel):
         )
 
     @classmethod
-    def llm_start(cls, *, agent_id: str, agent_name: str, model_name: str | None = None, run_id: str | None = None, parent_run_id: str | None = None) -> "SseEvent":
+    def llm_start(
+        cls,
+        *,
+        agent_id: str,
+        agent_name: str,
+        model_name: str | None = None,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+    ) -> SseEvent:
         return cls(
             event=SseEventType.LLM_START,
             state=SseState.THINKING,
@@ -159,17 +190,37 @@ class SseEvent(BaseModel):
         )
 
     @classmethod
-    def llm_end(cls, *, agent_id: str, agent_name: str, run_id: str | None = None, parent_run_id: str | None = None) -> "SseEvent":
+    def llm_end(
+        cls,
+        *,
+        agent_id: str,
+        agent_name: str,
+        model_name: str | None = None,
+        usage: dict[str, Any] | None = None,
+        cost_usd: dict[str, Any] | None = None,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+    ) -> SseEvent:
         return cls(
             event=SseEventType.LLM_END,
             state=SseState.THINKING,
             level=SseLevel.INFO,
             agent=SseAgent(id=agent_id, name=agent_name),
             span=SseSpan(run_id=run_id, parent_run_id=parent_run_id),
+            llm=SseLlm(name=model_name, usage=usage, cost_usd=cost_usd),
         )
 
     @classmethod
-    def tool_start(cls, *, agent_id: str, agent_name: str, tool_name: str, tool_input: Any | None = None, run_id: str | None = None, parent_run_id: str | None = None) -> "SseEvent":
+    def tool_start(
+        cls,
+        *,
+        agent_id: str,
+        agent_name: str,
+        tool_name: str,
+        tool_input: Any | None = None,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+    ) -> SseEvent:
         return cls(
             event=SseEventType.TOOL_START,
             state=SseState.INVOKING,
@@ -180,7 +231,16 @@ class SseEvent(BaseModel):
         )
 
     @classmethod
-    def tool_end(cls, *, agent_id: str, agent_name: str, tool_name: str, tool_output: Any | None = None, run_id: str | None = None, parent_run_id: str | None = None) -> "SseEvent":
+    def tool_end(
+        cls,
+        *,
+        agent_id: str,
+        agent_name: str,
+        tool_name: str,
+        tool_output: Any | None = None,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+    ) -> SseEvent:
         return cls(
             event=SseEventType.TOOL_END,
             state=SseState.DONE,
@@ -200,17 +260,21 @@ class SseEvent(BaseModel):
         message: str,
         questions: list[str] | None = None,
         options: list[dict[str, Any]] | None = None,
-    ) -> "SseEvent":
+    ) -> SseEvent:
         return cls(
             event=SseEventType.INTERRUPT,
             state=SseState.WAITING,
             level=SseLevel.WARNING,
             agent=SseAgent(id=agent_id, name=agent_name),
-            interrupt=SseInterrupt(kind=kind, message=message, questions=questions, options=options),
+            interrupt=SseInterrupt(
+                kind=kind, message=message, questions=questions, options=options
+            ),
         )
 
     @classmethod
-    def result_event(cls, *, workflow: dict[str, Any] | None, message: str = "生成完成") -> "SseEvent":
+    def result_event(
+        cls, *, workflow: dict[str, Any] | None, message: str = "生成完成"
+    ) -> SseEvent:
         return cls(
             event=SseEventType.RESULT,
             state=SseState.DONE,
@@ -220,7 +284,14 @@ class SseEvent(BaseModel):
         )
 
     @classmethod
-    def error_event(cls, *, message: str, detail: str | None = None, agent_id: str | None = None, agent_name: str | None = None) -> "SseEvent":
+    def error_event(
+        cls,
+        *,
+        message: str,
+        detail: str | None = None,
+        agent_id: str | None = None,
+        agent_name: str | None = None,
+    ) -> SseEvent:
         return cls(
             event=SseEventType.ERROR,
             state=SseState.ERROR,

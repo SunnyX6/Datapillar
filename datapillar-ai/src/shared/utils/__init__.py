@@ -3,12 +3,12 @@
 """
 
 from src.shared.utils.sql_lineage import (
-    SQLLineageAnalyzer,
-    LineageResult,
-    TableRef,
-    ColumnRef,
-    TableLineage,
     ColumnLineage,
+    ColumnRef,
+    LineageResult,
+    SQLLineageAnalyzer,
+    TableLineage,
+    TableRef,
     TableRole,
 )
 

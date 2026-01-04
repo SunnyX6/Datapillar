@@ -3,22 +3,25 @@ Embedding 集成层
 支持 GLM、OpenAI、DeepSeek 等多种 Embedding 模型
 """
 
-from functools import lru_cache
-from typing import List, Tuple
 import logging
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
 from neo4j_graphrag.embeddings.base import Embedder
-from src.shared.config import model_manager
+
+from src.infrastructure.llm.model_manager import model_manager
 
 
 # 模块级缓存：text -> embedding（最多缓存 500 个）
 @lru_cache(maxsize=500)
-def _cached_embed(provider: str, api_key: str, base_url: str, model_name: str, text: str) -> Tuple[float, ...]:
+def _cached_embed(
+    provider: str, api_key: str, base_url: str, model_name: str, text: str
+) -> tuple[float, ...]:
     """缓存的 embedding 调用（返回 tuple 以支持 lru_cache）"""
     if provider == "glm":
         from zai import ZhipuAiClient
+
         client = ZhipuAiClient(api_key=api_key, base_url=base_url)
         response = client.embeddings.create(model=model_name, input=text)
         if hasattr(response, "data") and len(response.data) > 0:
@@ -30,6 +33,7 @@ def _cached_embed(provider: str, api_key: str, base_url: str, model_name: str, t
 
     elif provider in ["openai", "deepseek"]:
         from openai import OpenAI
+
         client = OpenAI(api_key=api_key, base_url=base_url)
         response = client.embeddings.create(model=model_name, input=text)
         return tuple(response.data[0].embedding)
@@ -65,7 +69,7 @@ class UnifiedEmbedder(Embedder):
         if self._initialized:
             return
 
-        model = model_manager.get_default_embedding_model()
+        model = model_manager.default_embed_model()
         if not model:
             raise ValueError("未找到默认 Embedding 模型配置，请在 MySQL ai_model 表中配置")
 
@@ -76,9 +80,11 @@ class UnifiedEmbedder(Embedder):
         self.batch_size = self.DEFAULT_BATCH_SIZES.get(self.provider, 20)
 
         UnifiedEmbedder._initialized = True
-        logger.info(f"UnifiedEmbedder 初始化完成: {self.provider}/{self.model_name}, batch_size={self.batch_size}")
+        logger.info(
+            f"UnifiedEmbedder 初始化完成: {self.provider}/{self.model_name}, batch_size={self.batch_size}"
+        )
 
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text: str) -> list[float]:
         """
         生成单个查询的向量嵌入（带 LRU 缓存）
 
@@ -89,16 +95,10 @@ class UnifiedEmbedder(Embedder):
             向量嵌入列表
         """
         # 使用模块级缓存函数
-        result = _cached_embed(
-            self.provider,
-            self.api_key,
-            self.base_url,
-            self.model_name,
-            text
-        )
+        result = _cached_embed(self.provider, self.api_key, self.base_url, self.model_name, text)
         return list(result)
 
-    def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """
         批量生成向量嵌入
 
@@ -113,34 +113,24 @@ class UnifiedEmbedder(Embedder):
 
         if self.provider == "glm":
             from zai import ZhipuAiClient
-            client = ZhipuAiClient(
-                api_key=self.api_key,
-                base_url=self.base_url
-            )
-            response = client.embeddings.create(
-                model=self.model_name,
-                input=texts
-            )
+
+            client = ZhipuAiClient(api_key=self.api_key, base_url=self.base_url)
+            response = client.embeddings.create(model=self.model_name, input=texts)
             if hasattr(response, "data") and len(response.data) > 0:
-                sorted_data = sorted(response.data, key=lambda x: x.index)
+                sorted_data = sorted(response.data, key=lambda x: int(x.index or 0))
                 return [item.embedding for item in sorted_data]
             elif isinstance(response, dict) and "data" in response:
-                sorted_data = sorted(response["data"], key=lambda x: x["index"])
+                sorted_data = sorted(response["data"], key=lambda x: int(x.get("index") or 0))
                 return [item["embedding"] for item in sorted_data]
             else:
                 raise ValueError(f"无法从 Embedding 响应中提取向量: {response}")
 
         elif self.provider in ["openai", "deepseek"]:
             from openai import OpenAI
-            client = OpenAI(
-                api_key=self.api_key,
-                base_url=self.base_url
-            )
-            response = client.embeddings.create(
-                model=self.model_name,
-                input=texts
-            )
-            sorted_data = sorted(response.data, key=lambda x: x.index)
+
+            client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+            response = client.embeddings.create(model=self.model_name, input=texts)
+            sorted_data = sorted(response.data, key=lambda x: int(x.index or 0))
             return [item.embedding for item in sorted_data]
 
         else:

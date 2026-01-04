@@ -48,14 +48,18 @@ class WorkflowResponse(BaseModel):
     """
 
     workflowName: str = Field(..., description="工作流名称")
-    triggerType: int = Field(default=4, description="触发类型: 1-CRON 2-固定频率 3-固定延迟 4-手动 5-API")
+    triggerType: int = Field(
+        default=4, description="触发类型: 1-CRON 2-固定频率 3-固定延迟 4-手动 5-API"
+    )
     triggerValue: str | None = Field(default=None, description="触发配置（CRON 表达式或秒数）")
     timeoutSeconds: int = Field(default=0, description="超时时间（秒）")
     maxRetryTimes: int = Field(default=0, description="最大重试次数")
     priority: int = Field(default=0, description="优先级")
     description: str | None = Field(default=None, description="工作流描述")
     jobs: list[JobResponse] = Field(default_factory=list, description="任务列表")
-    dependencies: list[JobDependencyResponse] = Field(default_factory=list, description="依赖关系列表")
+    dependencies: list[JobDependencyResponse] = Field(
+        default_factory=list, description="依赖关系列表"
+    )
 
     @classmethod
     def from_workflow(cls, workflow: Workflow) -> WorkflowResponse:

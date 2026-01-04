@@ -1,11 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 知识图谱 API 路由（使用 Repository 模式）
 """
 
-from typing import Any
-from fastapi import APIRouter, Request
 import logging
+from typing import Any
+
+from fastapi import APIRouter, Request
 
 logger = logging.getLogger(__name__)
 

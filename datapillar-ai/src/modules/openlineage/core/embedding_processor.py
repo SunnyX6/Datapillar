@@ -8,15 +8,15 @@ Embedding 批量处理器
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
 
-from src.infrastructure.database.neo4j import AsyncNeo4jClient
 from src.infrastructure.llm.embeddings import UnifiedEmbedder
+from src.infrastructure.repository.neo4j_uow import neo4j_async_session
+from src.infrastructure.repository.openlineage import OpenLineageMetadataRepository
 from src.modules.openlineage.core.queue import AsyncEventQueue, QueueConfig
-from src.shared.config import settings
 
 logger = structlog.get_logger()
 
@@ -36,11 +36,11 @@ class ProcessorStats:
 
     total_embedded: int = 0
     total_failed: int = 0
-    start_time: datetime = field(default_factory=datetime.utcnow)
+    start_time: datetime = field(default_factory=lambda: datetime.now(UTC))
     last_batch_time: datetime | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        uptime = (datetime.utcnow() - self.start_time).total_seconds()
+        uptime = (datetime.now(UTC) - self.start_time).total_seconds()
         return {
             "total_embedded": self.total_embedded,
             "total_failed": self.total_failed,
@@ -80,8 +80,8 @@ class EmbeddingProcessor:
         try:
             embedder = self._get_embedder()
             batch_size = embedder.batch_size
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("embedding_processor_get_batch_size_failed", error=str(exc))
 
         # 初始化队列
         queue_config = QueueConfig(
@@ -172,15 +172,13 @@ class EmbeddingProcessor:
             # 2. 批量调用 embedding API（在线程池中执行）
             loop = asyncio.get_event_loop()
             embedder = self._get_embedder()
-            embeddings = await loop.run_in_executor(
-                self._executor, embedder.embed_batch, texts
-            )
+            embeddings = await loop.run_in_executor(self._executor, embedder.embed_batch, texts)
 
             # 3. 批量回写 Neo4j
-            await self._write_embeddings_to_neo4j(tasks, embeddings)
+            await self._write_embeddings(tasks, embeddings)
 
             self._stats.total_embedded += len(tasks)
-            self._stats.last_batch_time = datetime.utcnow()
+            self._stats.last_batch_time = datetime.now(UTC)
 
             logger.info("embedding_batch_complete", count=len(tasks))
 
@@ -189,35 +187,30 @@ class EmbeddingProcessor:
             logger.error("embedding_batch_failed", count=len(tasks), error=str(e))
             raise
 
-    async def _write_embeddings_to_neo4j(
+    async def _write_embeddings(
         self, tasks: list[EmbeddingTask], embeddings: list[list[float]]
     ) -> None:
         """批量回写 embedding 到 Neo4j（同时记录模型 provider 用于增量检测）"""
-        driver = await AsyncNeo4jClient.get_driver()
         embedder = self._get_embedder()
         # 记录 provider，格式：provider/model_name，用于检测模型变更
         embedding_provider = f"{embedder.provider}/{embedder.model_name}"
 
-        async with driver.session(database=settings.neo4j_database) as session:
+        async with neo4j_async_session() as session:
             # 按 label 分组，使用 UNWIND 批量更新
             label_groups: dict[str, list[tuple[str, list[float]]]] = {}
-            for task, embedding in zip(tasks, embeddings):
+            for task, embedding in zip(tasks, embeddings, strict=False):
                 if task.node_label not in label_groups:
                     label_groups[task.node_label] = []
                 label_groups[task.node_label].append((task.node_id, embedding))
 
             for label, items in label_groups.items():
                 data = [{"id": node_id, "embedding": emb} for node_id, emb in items]
-
-                query = f"""
-                UNWIND $data AS item
-                MATCH (n:{label} {{id: item.id}})
-                SET n.embedding = item.embedding,
-                    n.embeddingProvider = $provider,
-                    n.embeddingUpdatedAt = datetime()
-                """
-
-                await session.run(query, data=data, provider=embedding_provider)
+                await OpenLineageMetadataRepository.write_embeddings_batch(
+                    session,
+                    node_label=label,
+                    data=data,
+                    provider=embedding_provider,
+                )
 
             logger.debug(
                 "embeddings_written_to_neo4j",

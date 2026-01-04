@@ -12,17 +12,13 @@ Tester Agent（测试验证）
 
 import json
 import logging
-import uuid
-
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langgraph.types import Command
 
 from src.infrastructure.llm.client import call_llm
-from src.modules.etl.schemas.kg_context import AgentScopedContext, AgentType
+from src.modules.etl.agents.knowledge_agent import AgentType, get_agent_tools
+from src.modules.etl.agents.prompt_messages import build_llm_messages
+from src.modules.etl.schemas.agent_result import AgentResult
 from src.modules.etl.schemas.plan import TestResult, Workflow
 from src.modules.etl.schemas.requirement import AnalysisResult
-from src.modules.etl.schemas.requests import BlackboardRequest
-from src.modules.etl.schemas.state import AgentState
 
 logger = logging.getLogger(__name__)
 
@@ -30,16 +26,16 @@ logger = logging.getLogger(__name__)
 TESTER_AGENT_SYSTEM_INSTRUCTIONS = """你是 Datapillar 的 TesterAgent（测试验证）。
 
 ## 任务
-根据“任务参数 JSON”和“知识上下文 JSON”，对生成的 ETL 工作流做严格 review，并输出严格 JSON 结论。
+根据"任务参数 JSON"和"知识上下文 JSON"，对生成的 ETL 工作流做严格 review，并输出严格 JSON 结论。
 
 ## 任务参数（系统注入，不是用户输入）
-系统会提供一段“任务参数 JSON”（SystemMessage），其中包含：
+系统会提供一段"任务参数 JSON"（SystemMessage），其中包含：
 - analysis_result：需求分析结果（AnalystAgent 产物，严格 JSON）
 - workflow：架构/工作流方案（含 jobs 与 SQL）
 - jobs_detail：便于扫读的 Jobs 与 SQL 汇总文本
 
 ## 知识上下文（系统注入，不是用户输入）
-系统会提供一段“知识上下文 JSON”（SystemMessage），其中包含：
+系统会提供一段"知识上下文 JSON"（SystemMessage），其中包含：
 - tables：可用的 schema.table 列表（导航指针）
 - etl_pointers：可验证的 ETL 指针（含 qualified_name/element_id/tools）
 - allowlist_tools：你允许调用的工具名列表
@@ -66,7 +62,7 @@ TESTER_AGENT_SYSTEM_INSTRUCTIONS = """你是 Datapillar 的 TesterAgent（测试
 
 重要：
 - 必须输出纯 JSON：不得输出 Markdown、不得输出 ```json 代码块、不得输出解释性文字
-- issues 必须是“阻断级问题”；warnings 是“建议/风险”
+- issues 必须是"阻断级问题"；warnings 是"建议/风险"
 
 只输出 JSON，不要解释。
 """
@@ -79,126 +75,63 @@ class TesterAgent:
     将整个工作流和用户需求一起交给 LLM review。
     """
 
+    __test__ = False
+
     def __init__(self):
         self.llm = call_llm(temperature=0.0, enable_json_mode=True)
+        self.allowlist = get_agent_tools(AgentType.TESTER)
 
-    async def __call__(self, state: AgentState) -> Command:
-        """执行测试验证"""
-        architecture_plan = state.architecture_plan
-        analysis_result = state.analysis_result
+    async def run(
+        self,
+        *,
+        user_query: str,
+        analysis_result: AnalysisResult,
+        workflow: Workflow,
+    ) -> AgentResult:
+        """
+        执行测试验证
 
-        if not analysis_result:
-            req = BlackboardRequest(
-                request_id=f"req_{uuid.uuid4().hex}",
-                kind="delegate",
-                created_by="tester_agent",
-                target_agent="analyst_agent",
-                resume_to="tester_agent",
-                payload={
-                    "type": "need_analysis_result",
-                    "message": "测试验证需要需求分析结果，已委派需求分析师先完成需求收敛。",
-                },
-            )
-            pending = list(state.pending_requests or [])
-            pending.append(req)
-            return Command(
-                update={
-                    "messages": [AIMessage(content="缺少需求分析结果，已委派需求分析师")],
-                    "current_agent": "tester_agent",
-                    "pending_requests": [r.model_dump() for r in pending],
-                }
-            )
+        参数：
+        - user_query: 用户输入
+        - analysis_result: 需求分析结果
+        - workflow: 工作流
 
-        if not architecture_plan:
-            req = BlackboardRequest(
-                request_id=f"req_{uuid.uuid4().hex}",
-                kind="delegate",
-                created_by="tester_agent",
-                target_agent="architect_agent",
-                resume_to="tester_agent",
-                payload={
-                    "type": "need_architecture_plan",
-                    "message": "测试验证需要架构方案，已委派数据架构师先完成工作流设计。",
-                },
-            )
-            pending = list(state.pending_requests or [])
-            pending.append(req)
-            return Command(
-                update={
-                    "messages": [AIMessage(content="缺少架构方案，已委派数据架构师")],
-                    "current_agent": "tester_agent",
-                    "pending_requests": [r.model_dump() for r in pending],
-                }
-            )
-
+        返回：
+        - AgentResult: 执行结果
+        """
         logger.info("🧪 TesterAgent 开始 review 工作流")
 
-        agent_context = state.get_agent_context(AgentType.TESTER)
-        if not agent_context:
-            agent_context = AgentScopedContext.create_for_agent(
-                agent_type=AgentType.TESTER,
-                tables=[],
-            )
-        context_payload = self._build_context_payload(agent_context=agent_context)
-
         try:
-            # 转换为对象
-            if isinstance(architecture_plan, dict):
-                plan = Workflow(**architecture_plan)
-            else:
-                plan = architecture_plan
-
-            if isinstance(analysis_result, dict):
-                analysis = AnalysisResult(**analysis_result)
-            else:
-                analysis = analysis_result
-
-            # 黑板模式：如果 SQL 还没生成，优先委派 DeveloperAgent 生成 SQL，再回来 review
+            # 检查是否所有 Job 都已生成 SQL
             has_missing_sql = any(
-                (not (job.config and isinstance(job.config.get("content"), str) and job.config.get("content").strip()))
-                for job in plan.jobs
+                (
+                    not (
+                        job.config
+                        and isinstance((content := job.config.get("content")), str)
+                        and content.strip()
+                    )
+                )
+                for job in workflow.jobs
             )
             if has_missing_sql:
-                counters = dict(state.delegation_counters or {})
-                counter_key = "tester_agent:delegate:developer_agent:missing_sql"
-                delegated = int(counters.get(counter_key) or 0)
-                if delegated < 1:
-                    counters[counter_key] = delegated + 1
-                    req = BlackboardRequest(
-                        request_id=f"req_{uuid.uuid4().hex}",
-                        kind="delegate",
-                        created_by="tester_agent",
-                        target_agent="developer_agent",
-                        resume_to="tester_agent",
-                        payload={
-                            "type": "need_sql_generation",
-                            "message": "检测到工作流中存在未生成 SQL 的 Job，已委派数据开发先生成 SQL。",
-                        },
-                    )
-                    pending = list(state.pending_requests or [])
-                    pending.append(req)
-                    return Command(
-                        update={
-                            "messages": [AIMessage(content="存在未生成 SQL 的任务，已委派数据开发先生成 SQL")],
-                            "current_agent": "tester_agent",
-                            "pending_requests": [r.model_dump() for r in pending],
-                            "delegation_counters": counters,
-                        }
-                    )
+                return AgentResult.needs_delegation(
+                    summary="存在未生成 SQL 的 Job，需要先生成 SQL",
+                    target_agent="developer_agent",
+                    reason="missing_sql",
+                    payload={
+                        "message": "检测到工作流中存在未生成 SQL 的 Job，已委派数据开发先生成 SQL。",
+                    },
+                )
 
-            # 构建 Jobs 详情
-            jobs_detail = self._build_jobs_detail(plan)
+            jobs_detail = self._build_jobs_detail(workflow)
 
-            # 调用 LLM review
             review_result = await self._review_workflow(
-                user_input=state.user_input,
-                analysis=analysis,
-                plan=plan,
+                user_query=user_query,
+                analysis=analysis_result,
+                workflow=workflow,
                 jobs_detail=jobs_detail,
-                context_payload=context_payload,
             )
 
-            # 构建测试结果
             passed = review_result.get("passed", True)
             score = review_result.get("score", 100)
 
@@ -219,102 +152,71 @@ class TesterAgent:
 
             if not passed:
                 logger.warning(f"⚠️ 工作流 review 未通过: {review_result.get('summary')}")
-            else:
-                logger.info(f"✅ TesterAgent review 通过，评分: {score}")
-
-            pending = list(state.pending_requests or [])
-            next_iteration_count = state.iteration_count if passed else state.iteration_count + 1
-            if (not passed) and next_iteration_count < state.max_iterations:
-                req = BlackboardRequest(
-                    request_id=f"req_{uuid.uuid4().hex}",
-                    kind="delegate",
-                    created_by="tester_agent",
-                    target_agent="developer_agent",
-                    resume_to="tester_agent",
-                    payload={
-                        "type": "fix_sql_from_review",
-                        "message": "请根据测试验证的 issues/warnings 修复 SQL 后重新生成",
-                        "review": {
-                            "summary": review_result.get("summary", ""),
-                            "issues": review_result.get("issues", []),
-                            "warnings": review_result.get("warnings", []),
-                            "score": score,
-                        },
-                    },
+                return AgentResult.completed(
+                    summary=f"测试未通过，评分: {score}",
+                    deliverable=test_result,
+                    deliverable_type="test",
                 )
-                pending.append(req)
 
-            return Command(
-                update={
-                    "messages": [AIMessage(content=f"Review 完成，评分: {score}")],
-                    "test_result": test_result.model_dump(),
-                    "current_agent": "tester_agent",
-                    "iteration_count": next_iteration_count,
-                    "pending_requests": [r.model_dump() for r in pending],
-                }
+            logger.info(f"✅ TesterAgent review 通过，评分: {score}")
+
+            return AgentResult.completed(
+                summary=f"测试通过，评分: {score}",
+                deliverable=test_result,
+                deliverable_type="test",
             )
 
         except Exception as e:
             logger.error(f"TesterAgent review 失败: {e}", exc_info=True)
-            return Command(
-                update={
-                    "messages": [AIMessage(content=f"Review 失败: {str(e)}")],
-                    "current_agent": "tester_agent",
-                    "error": str(e),
-                }
+            return AgentResult.failed(
+                summary=f"Review 失败: {str(e)}",
+                error=str(e),
             )
 
     def _build_jobs_detail(self, plan: Workflow) -> str:
         """构建 Jobs 详情文本"""
         lines = []
-
         for i, job in enumerate(plan.jobs, 1):
             lines.append(f"#### Job {i}: {job.name}")
             lines.append(f"- 描述: {job.description}")
             lines.append(f"- 类型: {job.type}")
             lines.append(f"- 输入表: {', '.join(job.input_tables) if job.input_tables else '无'}")
             lines.append(f"- 输出表: {job.output_table or '无'}")
-
-            # SQL
             sql = job.config.get("content") if job.config else None
             if sql:
-                lines.append(f"- SQL:")
+                lines.append("- SQL:")
                 lines.append("```sql")
                 lines.append(sql)
                 lines.append("```")
             else:
                 lines.append("- SQL: 未生成")
-
             lines.append("")
-
         return "\n".join(lines)
 
     async def _review_workflow(
         self,
-        user_input: str,
-        analysis: AnalysisResult | None,
-        plan: Workflow,
+        user_query: str,
+        analysis: AnalysisResult,
+        workflow: Workflow,
         jobs_detail: str,
-        context_payload: dict,
     ) -> dict:
         """使用 LLM review 整个工作流"""
         try:
             task_payload = {
-                "analysis_result": analysis.model_dump() if analysis else None,
-                "workflow": plan.model_dump(),
+                "analysis_result": analysis.model_dump(),
+                "workflow": workflow.model_dump(),
                 "jobs_detail": jobs_detail,
             }
 
             response = await self.llm.ainvoke(
-                [
-                    SystemMessage(content=TESTER_AGENT_SYSTEM_INSTRUCTIONS),
-                    SystemMessage(content=json.dumps(task_payload, ensure_ascii=False)),
-                    SystemMessage(content=json.dumps(context_payload, ensure_ascii=False)),
-                    HumanMessage(content=user_input),
-                ]
+                build_llm_messages(
+                    system_instructions=TESTER_AGENT_SYSTEM_INSTRUCTIONS,
+                    agent_id="tester_agent",
+                    user_query=user_query,
+                    task_payload=task_payload,
+                )
             )
 
-            # 严格解析响应（必须是纯 JSON）
             content = (response.content or "").strip()
             result = json.loads(content)
             if not isinstance(result, dict):
@@ -336,34 +238,3 @@ class TesterAgent:
                 "issues": [f"review_parse_error: {str(e)}"],
                 "warnings": [],
             }
-
-    @staticmethod
-    def _build_context_payload(*, agent_context: AgentScopedContext) -> dict:
-        """
-        构造“知识上下文JSON”（下发给 LLM 的 SystemMessage）
-
-        约束：
-        - 只传递指针与导航信息，不传递表明细
-        """
-        node_pointers = agent_context.etl_pointers or []
-        table_pointers = [
-            {
-                "element_id": p.element_id,
-                "qualified_name": p.qualified_name,
-                "path": p.path,
-                "display_name": p.display_name,
-                "description": p.description,
-                "tools": p.tools,
-            }
-            for p in node_pointers
-            if "Table" in set(p.labels or []) and p.qualified_name
-        ]
-
-        return {
-            "agent_type": agent_context.agent_type,
-            "allowlist_tools": agent_context.tools,
-            "tables": agent_context.tables,
-            "table_pointers": table_pointers,
-            "etl_pointers": [p.model_dump() for p in node_pointers],
-            "doc_pointers": [p.model_dump() for p in (agent_context.doc_pointers or [])],
-        }

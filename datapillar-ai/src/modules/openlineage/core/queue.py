@@ -5,9 +5,10 @@
 """
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -92,7 +93,7 @@ class AsyncEventQueue:
             await asyncio.wait_for(self._queue.put(event), timeout=timeout)
             self._stats.total_received += 1
             return True
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("事件队列添加超时")
             return False
 
@@ -111,9 +112,11 @@ class AsyncEventQueue:
 
         # 至少等待一个事件
         try:
-            event = await asyncio.wait_for(self._queue.get(), timeout=self.config.flush_interval_seconds)
+            event = await asyncio.wait_for(
+                self._queue.get(), timeout=self.config.flush_interval_seconds
+            )
             batch.append(event)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return batch
 
         # 非阻塞获取更多事件
@@ -167,14 +170,12 @@ class AsyncEventQueue:
             # 等待处理完剩余事件
             try:
                 await asyncio.wait_for(self._drain(), timeout=timeout)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(f"队列排空超时，剩余 {self._queue.qsize()} 个事件未处理")
 
             self._processor_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._processor_task
-            except asyncio.CancelledError:
-                pass
 
         logger.info("事件队列处理器已停止")
 

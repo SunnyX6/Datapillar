@@ -3,10 +3,10 @@ JWT Token 工具类
 本地验证 JWT Token，无需调用认证中心
 """
 
-from datetime import datetime, timezone
+import logging
+from datetime import UTC, datetime
 
 import jwt
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +92,8 @@ class JwtTokenUtil:
         if not exp_timestamp:
             return True
 
-        exp_time = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
-        return exp_time < datetime.now(timezone.utc)
+        exp_time = datetime.fromtimestamp(exp_timestamp, tz=UTC)
+        return exp_time < datetime.now(UTC)
 
     def get_user_id(self, token: str) -> int:
         """
