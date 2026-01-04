@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 ETL SSE 流管理器
 
@@ -13,16 +12,17 @@ ETL SSE 流管理器
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
-import time
-from dataclasses import dataclass, field
-from typing import Any, AsyncGenerator
-
 import logging
+import time
+from collections.abc import AsyncGenerator
+from dataclasses import dataclass, field
+from typing import Any
 
 from starlette.requests import Request
 
-from src.modules.etl.orchestrator import EtlOrchestrator
+from src.modules.etl.orchestrator_v2 import EtlOrchestratorV2
 from src.modules.etl.schemas.sse_msg import SseEvent
 
 logger = logging.getLogger(__name__)
@@ -75,8 +75,7 @@ class EtlStreamManager:
         now_ms = _now_ms()
         expire_before_ms = now_ms - self._session_ttl_seconds * 1000
         expired_keys = [
-            key for key, run in self._runs.items()
-            if run.last_activity_ms < expire_before_ms
+            key for key, run in self._runs.items() if run.last_activity_ms < expire_before_ms
         ]
         for key in expired_keys:
             self._runs.pop(key, None)
@@ -90,7 +89,7 @@ class EtlStreamManager:
             record = StreamRecord(seq=seq, payload=payload, created_at_ms=_now_ms())
             run.buffer.append(record)
             if len(run.buffer) > self._buffer_size:
-                run.buffer = run.buffer[-self._buffer_size:]
+                run.buffer = run.buffer[-self._buffer_size :]
 
             dead_subscribers: list[asyncio.Queue[StreamRecord | object]] = []
             for queue in run.subscribers:
@@ -101,25 +100,21 @@ class EtlStreamManager:
 
             for queue in dead_subscribers:
                 run.subscribers.discard(queue)
-                try:
+                with contextlib.suppress(Exception):
                     queue.put_nowait(_SENTINEL)
-                except Exception:
-                    pass
 
     async def _complete(self, run: _SessionRun) -> None:
         async with run.lock:
             run.completed = True
             run.last_activity_ms = _now_ms()
             for queue in list(run.subscribers):
-                try:
+                with contextlib.suppress(Exception):
                     queue.put_nowait(_SENTINEL)
-                except Exception:
-                    pass
 
     async def _run_orchestrator_stream(
         self,
         *,
-        orchestrator: EtlOrchestrator,
+        orchestrator: EtlOrchestratorV2,
         user_input: str | None,
         session_id: str,
         user_id: str,
@@ -146,7 +141,7 @@ class EtlStreamManager:
     async def start(
         self,
         *,
-        orchestrator: EtlOrchestrator,
+        orchestrator: EtlOrchestratorV2,
         user_input: str,
         session_id: str,
         user_id: str,
@@ -170,7 +165,7 @@ class EtlStreamManager:
     async def continue_from_interrupt(
         self,
         *,
-        orchestrator: EtlOrchestrator,
+        orchestrator: EtlOrchestratorV2,
         session_id: str,
         user_id: str,
         resume_value: Any,
@@ -211,7 +206,9 @@ class EtlStreamManager:
             run = _SessionRun(user_id=user_id, session_id=session_id)
             self._runs[key] = run
 
-        queue: asyncio.Queue[StreamRecord | object] = asyncio.Queue(maxsize=self._subscriber_queue_size)
+        queue: asyncio.Queue[StreamRecord | object] = asyncio.Queue(
+            maxsize=self._subscriber_queue_size
+        )
         async with run.lock:
             run.subscribers.add(queue)
             run.last_activity_ms = _now_ms()
@@ -242,7 +239,7 @@ class EtlStreamManager:
 
                 try:
                     item = await asyncio.wait_for(queue.get(), timeout=5)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     async with run.lock:
                         if run.completed:
                             break
@@ -251,6 +248,8 @@ class EtlStreamManager:
                 if item is _SENTINEL:
                     break
 
+                if not isinstance(item, StreamRecord):
+                    continue
                 record = item
                 if record.seq <= last_sent_seq:
                     continue
@@ -264,6 +263,20 @@ class EtlStreamManager:
             async with run.lock:
                 run.subscribers.discard(queue)
                 run.last_activity_ms = _now_ms()
+
+    def clear_session(self, *, user_id: str, session_id: str) -> bool:
+        """
+        清理 SSE 侧的会话缓冲（仅影响推送/重放，不影响 LangGraph checkpoint）。
+
+        返回：
+        - True: 存在并已清理
+        - False: 不存在
+        """
+
+        key = self._key(user_id, session_id)
+        existed = key in self._runs
+        self._runs.pop(key, None)
+        return existed
 
 
 etl_stream_manager = EtlStreamManager()

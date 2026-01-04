@@ -11,7 +11,8 @@
 - depends：Job 之间的依赖关系
 """
 
-from typing import List, Dict, Any, Optional, Literal
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -22,15 +23,16 @@ class Stage(BaseModel):
     由架构师规划，一个 Stage 对应一个 SQL，产出一个表。
     一个 Job 可包含多个 Stage，按顺序执行。
     """
+
     stage_id: int = Field(..., description="Stage 序号（Job 内唯一）")
     name: str = Field(..., description="Stage 名称")
     description: str = Field(..., description="这个 Stage 做什么")
 
-    input_tables: List[str] = Field(default_factory=list, description="读取的表")
+    input_tables: list[str] = Field(default_factory=list, description="读取的表")
     output_table: str = Field(..., description="输出表")
     is_temp_table: bool = Field(default=True, description="是否是临时表")
 
-    sql: Optional[str] = Field(None, description="SQL 语句（由 DeveloperAgent 生成）")
+    sql: str | None = Field(None, description="SQL 语句（由 DeveloperAgent 生成）")
 
 
 class Job(BaseModel):
@@ -40,30 +42,31 @@ class Job(BaseModel):
     每个 Job 是一个独立的执行单元（前端一个节点）。
     一个 Job 可包含多个业务步骤（step_ids）和多个执行阶段（stages）。
     """
+
     # 基础信息
     id: str = Field(..., description="Job 唯一标识")
     name: str = Field(..., description="Job 名称（中文）")
-    description: Optional[str] = Field(None, description="Job 描述")
+    description: str | None = Field(None, description="Job 描述")
 
     # 作业类型（统一字段：type）
     type: str = Field(..., description="Job 类型：HIVE/SHELL/DATAX/SPARK_SQL/PYTHON")
-    type_id: Optional[int] = Field(None, description="组件数字 ID（对应 job_component.id）")
+    type_id: int | None = Field(None, description="组件数字 ID（对应 job_component.id）")
 
     # 依赖关系（统一字段：depends）
-    depends: List[str] = Field(default_factory=list, description="依赖的上游 Job ID 列表")
+    depends: list[str] = Field(default_factory=list, description="依赖的上游 Job ID 列表")
 
     # 关联的业务步骤（来自 AnalystAgent）
-    step_ids: List[str] = Field(default_factory=list, description="包含的业务步骤 ID 列表")
+    step_ids: list[str] = Field(default_factory=list, description="包含的业务步骤 ID 列表")
 
     # 执行阶段（由 ArchitectAgent 规划）
-    stages: List[Stage] = Field(default_factory=list, description="执行阶段列表")
+    stages: list[Stage] = Field(default_factory=list, description="执行阶段列表")
 
     # 数据读写声明（通过共享存储传递数据）
-    input_tables: List[str] = Field(default_factory=list, description="读取的表列表")
-    output_table: Optional[str] = Field(None, description="写入的目标表")
+    input_tables: list[str] = Field(default_factory=list, description="读取的表列表")
+    output_table: str | None = Field(None, description="写入的目标表")
 
     # 组件配置（由 DeveloperAgent 生成）
-    config: Dict[str, Any] = Field(default_factory=dict, description="组件配置")
+    config: dict[str, Any] = Field(default_factory=dict, description="组件配置")
 
     # 运行时配置
     priority: int = Field(default=0, description="优先级")
@@ -75,7 +78,7 @@ class Job(BaseModel):
     config_generated: bool = Field(default=False, description="配置是否已生成")
     config_validated: bool = Field(default=False, description="配置是否已验证")
 
-    def get_ordered_stages(self) -> List[Stage]:
+    def get_ordered_stages(self) -> list[Stage]:
         """按执行顺序返回 Stage"""
         return sorted(self.stages, key=lambda s: s.stage_id)
 
@@ -87,57 +90,58 @@ class Workflow(BaseModel):
     描述完整的 ETL 工作流，由多个 Job 组成的 DAG。
     由 ArchitectAgent 根据业务分析结果规划。
     """
+
     # 基础信息
-    id: Optional[str] = Field(None, description="工作流唯一标识")
+    id: str | None = Field(None, description="工作流唯一标识")
     name: str = Field(..., description="工作流名称")
-    description: Optional[str] = Field(None, description="工作流描述")
+    description: str | None = Field(None, description="工作流描述")
 
     # 调度配置
-    schedule: Optional[str] = Field(None, description="调度 cron 表达式")
+    schedule: str | None = Field(None, description="调度 cron 表达式")
     env: Literal["dev", "stg", "prod"] = Field(default="dev", description="运行环境")
 
     # 作业列表
-    jobs: List[Job] = Field(default_factory=list, description="作业列表")
+    jobs: list[Job] = Field(default_factory=list, description="作业列表")
 
     # 风险提示
-    risks: List[str] = Field(default_factory=list, description="架构风险点")
+    risks: list[str] = Field(default_factory=list, description="架构风险点")
 
     # 决策点（需要用户确认）
-    decision_points: List[Dict[str, Any]] = Field(default_factory=list)
+    decision_points: list[dict[str, Any]] = Field(default_factory=list)
 
     # 置信度
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
-    def get_job(self, job_id: str) -> Optional[Job]:
+    def get_job(self, job_id: str) -> Job | None:
         """获取作业"""
         for job in self.jobs:
             if job.id == job_id:
                 return job
         return None
 
-    def get_upstream_jobs(self, job_id: str) -> List[Job]:
+    def get_upstream_jobs(self, job_id: str) -> list[Job]:
         """获取上游作业"""
         job = self.get_job(job_id)
         if not job:
             return []
         return [j for j in self.jobs if j.id in job.depends]
 
-    def get_downstream_jobs(self, job_id: str) -> List[Job]:
+    def get_downstream_jobs(self, job_id: str) -> list[Job]:
         """获取下游作业"""
         return [j for j in self.jobs if job_id in j.depends]
 
-    def get_root_jobs(self) -> List[Job]:
+    def get_root_jobs(self) -> list[Job]:
         """获取根作业（无依赖的作业）"""
         return [j for j in self.jobs if not j.depends]
 
-    def get_leaf_jobs(self) -> List[Job]:
+    def get_leaf_jobs(self) -> list[Job]:
         """获取叶子作业（无下游的作业）"""
         all_deps = set()
         for job in self.jobs:
             all_deps.update(job.depends)
         return [j for j in self.jobs if j.id not in all_deps]
 
-    def topological_sort(self) -> List[Job]:
+    def topological_sort(self) -> list[Job]:
         """拓扑排序（按执行顺序）"""
         visited = set()
         result = []
@@ -157,7 +161,7 @@ class Workflow(BaseModel):
 
         return result
 
-    def validate_dag(self) -> List[str]:
+    def validate_dag(self) -> list[str]:
         """验证 DAG 是否合法"""
         errors = []
 
@@ -192,7 +196,7 @@ class Workflow(BaseModel):
 
         return errors
 
-    def validate_data_dependencies(self) -> tuple[List[str], List[str]]:
+    def validate_data_dependencies(self) -> tuple[list[str], list[str]]:
         """
         验证数据依赖是否正确声明
 
@@ -209,7 +213,7 @@ class Workflow(BaseModel):
         warnings = []
 
         # 构建 output_table -> job_id 映射
-        output_to_job: Dict[str, str] = {}
+        output_to_job: dict[str, str] = {}
         for job in self.jobs:
             if job.output_table:
                 output_to_job[job.output_table] = job.id
@@ -222,18 +226,20 @@ class Workflow(BaseModel):
             for input_table in job.input_tables:
                 # 检查这个输入表是否由其他 Job 产出
                 producer_job_id = output_to_job.get(input_table)
-                if producer_job_id and producer_job_id != job.id:
-                    # 检查是否已声明依赖
-                    if producer_job_id not in job.depends:
-                        errors.append(
-                            f"Job '{job.id}' 读取表 '{input_table}'，"
-                            f"该表由 Job '{producer_job_id}' 产出，"
-                            f"但未声明依赖关系"
-                        )
+                if (
+                    producer_job_id
+                    and producer_job_id != job.id
+                    and producer_job_id not in job.depends
+                ):
+                    errors.append(
+                        f"Job '{job.id}' 读取表 '{input_table}'，"
+                        f"该表由 Job '{producer_job_id}' 产出，"
+                        f"但未声明依赖关系"
+                    )
 
         return errors, warnings
 
-    def fix_missing_dependencies(self) -> List[str]:
+    def fix_missing_dependencies(self) -> list[str]:
         """
         自动修复缺失的数据依赖
 
@@ -243,7 +249,7 @@ class Workflow(BaseModel):
         fixes = []
 
         # 构建 output_table -> job_id 映射
-        output_to_job: Dict[str, str] = {}
+        output_to_job: dict[str, str] = {}
         for job in self.jobs:
             if job.output_table:
                 output_to_job[job.output_table] = job.id
@@ -255,17 +261,20 @@ class Workflow(BaseModel):
 
             for input_table in job.input_tables:
                 producer_job_id = output_to_job.get(input_table)
-                if producer_job_id and producer_job_id != job.id:
-                    if producer_job_id not in job.depends:
-                        job.depends.append(producer_job_id)
-                        fixes.append(
-                            f"自动添加依赖: Job '{job.id}' -> Job '{producer_job_id}' "
-                            f"(因为读取表 '{input_table}')"
-                        )
+                if (
+                    producer_job_id
+                    and producer_job_id != job.id
+                    and producer_job_id not in job.depends
+                ):
+                    job.depends.append(producer_job_id)
+                    fixes.append(
+                        f"自动添加依赖: Job '{job.id}' -> Job '{producer_job_id}' "
+                        f"(因为读取表 '{input_table}')"
+                    )
 
         return fixes
 
-    def validate_temp_table_scope(self) -> List[str]:
+    def validate_temp_scope(self) -> list[str]:
         """
         验证临时表作用域
 
@@ -278,7 +287,7 @@ class Workflow(BaseModel):
         errors = []
 
         # 收集每个 Job 内部的临时表
-        job_temp_tables: Dict[str, set] = {}  # job_id -> {temp_table1, temp_table2}
+        job_temp_tables: dict[str, set] = {}  # job_id -> {temp_table1, temp_table2}
 
         for job in self.jobs:
             temp_tables = set()
@@ -288,7 +297,7 @@ class Workflow(BaseModel):
             job_temp_tables[job.id] = temp_tables
 
         # 合并所有临时表
-        all_temp_tables: Dict[str, str] = {}  # temp_table -> owner_job_id
+        all_temp_tables: dict[str, str] = {}  # temp_table -> owner_job_id
         for job_id, temp_tables in job_temp_tables.items():
             for temp_table in temp_tables:
                 all_temp_tables[temp_table] = job_id
@@ -322,13 +331,14 @@ class Workflow(BaseModel):
 
 class TestCase(BaseModel):
     """测试用例（TesterAgent 生成）"""
+
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     test_type: Literal["positive", "boundary", "negative"] = "positive"
-    node_id: Optional[str] = None
-    input_data: Optional[str] = None
-    expected_result: Optional[str] = None
-    sql_assertion: Optional[str] = None
+    node_id: str | None = None
+    input_data: str | None = None
+    expected_result: str | None = None
+    sql_assertion: str | None = None
 
 
 class TestResult(BaseModel):
@@ -340,11 +350,11 @@ class TestResult(BaseModel):
     total_tests: int
     passed_tests: int
     failed_tests: int
-    test_cases: List[TestCase] = Field(default_factory=list)
-    validation_errors: List[str] = Field(default_factory=list)
-    validation_warnings: List[str] = Field(default_factory=list)
-    coverage_summary: Dict[str, Any] = Field(default_factory=dict)
-    notes: Optional[str] = None
+    test_cases: list[TestCase] = Field(default_factory=list)
+    validation_errors: list[str] = Field(default_factory=list)
+    validation_warnings: list[str] = Field(default_factory=list)
+    coverage_summary: dict[str, Any] = Field(default_factory=dict)
+    notes: str | None = None
 
     def all_passed(self) -> bool:
         """是否全部测试通过"""

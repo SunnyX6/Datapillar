@@ -13,14 +13,14 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-
 RequestKind = Literal[
-    "human",          # 需要用户输入/确认
-    "delegate",       # 委派给另一个 Agent 执行子任务
+    "human",  # 需要用户输入/确认
+    "delegate",  # 委派给另一个 Agent 执行子任务
 ]
 
 
@@ -31,6 +31,10 @@ RequestStatus = Literal[
 ]
 
 
+def _now_ms() -> int:
+    return int(time.time() * 1000)
+
+
 class BlackboardRequest(BaseModel):
     """
     黑板请求（统一协议）
@@ -38,19 +42,31 @@ class BlackboardRequest(BaseModel):
     设计要点：
     - kind=human：payload 直接用于 LangGraph interrupt（包含 type/message/questions/options 等）
     - kind=delegate：target_agent 指定要运行的 Agent，payload 作为子任务输入（由目标 Agent 自行解释）
-    - resume_to：请求完成后恢复到哪个节点（通常是发起请求的 Agent 或 blackboard_router）
+    - resume_to：请求完成后恢复到哪个节点（通常是发起请求的 Agent 或 commander）
     """
 
     request_id: str = Field(..., description="请求ID（全局唯一）")
     kind: RequestKind = Field(..., description="请求类型：human/delegate")
-    status: RequestStatus = Field(default="pending", description="请求状态：pending/completed/canceled")
+    status: RequestStatus = Field(
+        default="pending", description="请求状态：pending/completed/canceled"
+    )
+    created_at_ms: int = Field(
+        default_factory=_now_ms,
+        description="请求创建时间（毫秒时间戳），用于审计与耗时统计",
+    )
 
     created_by: str = Field(..., description="发起请求的节点ID（例如 analyst_agent）")
-    target_agent: str | None = Field(default=None, description="委派目标节点ID（仅 kind=delegate 使用）")
+    target_agent: str | None = Field(
+        default=None, description="委派目标节点ID（仅 kind=delegate 使用）"
+    )
     resume_to: str | None = Field(default=None, description="请求完成后恢复到的节点ID")
 
-    payload: dict[str, Any] = Field(default_factory=dict, description="请求载荷（human: interrupt payload；delegate: 子任务输入）")
-    response: Any | None = Field(default=None, description="请求的响应（human: 用户输入；delegate: 目标Agent产物摘要）")
+    payload: dict[str, Any] = Field(
+        default_factory=dict,
+        description="请求载荷（human: interrupt payload；delegate: 子任务输入）",
+    )
+    response: Any | None = Field(
+        default=None, description="请求的响应（human: 用户输入；delegate: 目标Agent产物摘要）"
+    )
 
     model_config = {"extra": "ignore"}
-

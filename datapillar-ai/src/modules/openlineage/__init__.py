@@ -25,8 +25,8 @@ gravitino.openlineage.transport.endpoint = /api/ai/openlineage
 
 from src.modules.openlineage.api import router
 from src.modules.openlineage.config import OpenLineageSinkConfig
-from src.modules.openlineage.core.event_processor import EventProcessor, event_processor
 from src.modules.openlineage.core.embedding_processor import EmbeddingProcessor, embedding_processor
+from src.modules.openlineage.core.event_processor import EventProcessor, event_processor
 from src.modules.openlineage.schemas.events import (
     Dataset,
     EventType,

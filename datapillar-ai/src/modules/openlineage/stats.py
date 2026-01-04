@@ -5,7 +5,7 @@
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -51,7 +51,7 @@ class SinkMetrics:
         """转换为字典"""
         uptime = 0.0
         if self.start_time:
-            uptime = (datetime.utcnow() - self.start_time).total_seconds()
+            uptime = (datetime.now(UTC) - self.start_time).total_seconds()
 
         result = {
             "state": self.state,
@@ -106,7 +106,7 @@ class StatsCollector:
         """更新状态"""
         self._metrics.state = state
         if state == "running" and self._metrics.start_time is None:
-            self._metrics.start_time = datetime.utcnow()
+            self._metrics.start_time = datetime.now(UTC)
 
     def record_event_received(self) -> None:
         """记录接收事件"""

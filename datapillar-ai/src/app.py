@@ -1,33 +1,32 @@
-# -*- coding: utf-8 -*-
 """
 FastAPI 应用入口（使用 Repository 模式）
 """
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 import gzip
+import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-import logging
 
 from src.shared.config.logging import setup_logging
 
 logger = logging.getLogger(__name__)
 
-from src.modules.etl.orchestrator import EtlOrchestrator, create_etl_orchestrator
-from src.modules.openlineage.core.event_processor import event_processor
-from src.modules.openlineage.core.embedding_processor import embedding_processor
-from src.modules.openlineage.sync import sync_gravitino_metadata
-from src.shared.config.exceptions import BaseError, AuthenticationError, AuthorizationError
 from src.api.router import api_router
-from src.shared.config import settings
-from src.infrastructure.database import Neo4jClient, AsyncNeo4jClient, RedisClient, MySQLClient
+from src.infrastructure.database import AsyncNeo4jClient, MySQLClient, Neo4jClient, RedisClient
 from src.infrastructure.database.gravitino import GravitinoDBClient
+from src.modules.etl.checkpointer import etl_checkpointer
+from src.modules.etl.orchestrator_v2 import EtlOrchestratorV2
+from src.modules.openlineage.core.embedding_processor import embedding_processor
+from src.modules.openlineage.core.event_processor import event_processor
+from src.modules.openlineage.once_sync import sync_gravitino_metadata
 from src.shared.auth.middleware import AuthMiddleware
+from src.shared.config import settings
+from src.shared.config.exceptions import AuthenticationError, AuthorizationError, BaseError
 
 
 class GzipRequestMiddleware:
@@ -67,7 +66,8 @@ class GzipRequestMiddleware:
 
         # 修改 headers，移除 content-encoding，更新 content-length
         new_headers = [
-            (k, v) for k, v in scope["headers"]
+            (k, v)
+            for k, v in scope["headers"]
             if k.lower() not in (b"content-encoding", b"content-length")
         ]
         new_headers.append((b"content-length", str(len(decompressed_body)).encode()))
@@ -100,7 +100,7 @@ def create_app() -> FastAPI:
         logger.info(f"MySQL: {settings.mysql_host}:{settings.mysql_port}/{settings.mysql_database}")
         logger.info("=" * 60)
 
-        orchestrator: EtlOrchestrator | None = None
+        orchestrator: EtlOrchestratorV2 | None = None
         try:
             # 初始化连接池（全局单例，自动管理）
             logger.info("初始化 MySQL 连接池...")
@@ -135,12 +135,13 @@ def create_app() -> FastAPI:
             logger.info("恢复 EventProcessor 事件消费...")
             event_processor.resume()
 
-            # 创建 Orchestrator（使用内存 checkpoint）
-            orchestrator = await create_etl_orchestrator()
-            app.state.orchestrator = orchestrator
+            async with etl_checkpointer() as checkpointer:
+                # 创建 Orchestrator
+                orchestrator = EtlOrchestratorV2(checkpointer=checkpointer)
+                app.state.orchestrator = orchestrator
 
-            logger.info("FastAPI 应用启动完成")
-            yield
+                logger.info("FastAPI 应用启动完成")
+                yield
 
         finally:
             logger.info("Datapillar AI - 关闭中...")
@@ -224,6 +225,7 @@ def create_app() -> FastAPI:
         # 检查 MySQL 连接
         try:
             from sqlalchemy import text
+
             with MySQLClient.get_engine().connect() as conn:
                 conn.execute(text("SELECT 1"))
             mysql_connected = True
@@ -239,7 +241,7 @@ def create_app() -> FastAPI:
             "connections": {
                 "neo4j": neo4j_connected,
                 "mysql": mysql_connected,
-            }
+            },
         }
 
     return app
@@ -250,6 +252,7 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "src.app:app",
         host=settings.app_host,

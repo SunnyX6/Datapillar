@@ -4,13 +4,13 @@ Redis 连接管理
 提供 Redis 异步连接池
 """
 
-from typing import Optional
 import logging
+from typing import Optional
 
 import redis.asyncio as redis
 
-from src.shared.config.settings import settings
 from src.shared.config.exceptions import RedisError
+from src.shared.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class RedisClient:
     """Redis 连接池管理器（单例）"""
 
     _instance: Optional["RedisClient"] = None
-    _pool: Optional[redis.ConnectionPool] = None
+    _pool: redis.ConnectionPool | None = None
 
     def __init__(self):
         if RedisClient._pool is None:
@@ -32,7 +32,9 @@ class RedisClient:
         if cls._instance is None:
             if cls._pool is None:
                 try:
-                    logger.info(f"初始化 Redis 连接池: {settings.redis_host}:{settings.redis_port}/{settings.redis_db}")
+                    logger.info(
+                        f"初始化 Redis 连接池: {settings.redis_host}:{settings.redis_port}/{settings.redis_db}"
+                    )
                     cls._pool = redis.ConnectionPool(
                         host=settings.redis_host,
                         port=settings.redis_port,
@@ -45,7 +47,7 @@ class RedisClient:
                     logger.info("Redis 连接池已初始化")
                 except Exception as e:
                     logger.error(f"Redis 连接池初始化失败: {e}")
-                    raise RedisError(f"Redis 连接失败: {e}")
+                    raise RedisError(f"Redis 连接失败: {e}") from e
             cls._instance = cls()
         return cls._instance
 

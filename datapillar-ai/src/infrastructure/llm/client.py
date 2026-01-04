@@ -4,14 +4,14 @@ LLM统一调用层 - 基于 LangChain 统一接口
 GLM 使用 langchain-openai 的 ChatOpenAI（官方推荐方式）
 """
 
-from typing import Optional, Any, TypeVar
 import logging
+from typing import Any, TypeVar, cast
 
-from pydantic import BaseModel
 from langchain_core.globals import set_llm_cache
+from pydantic import BaseModel
 
-from src.shared.config import model_manager
-from src.infrastructure.llm.semantic_cache import create_default_semantic_llm_cache
+from src.infrastructure.llm.model_manager import model_manager
+from src.infrastructure.llm.semantic_cache import create_semantic_cache
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # 说明：
 # - 只做"高相似直接命中"（不返回中等相似参考答案）
 # - 只依赖 prompt + llm_string 推导缓存隔离边界（不引入任何业务字段）
-set_llm_cache(create_default_semantic_llm_cache())
+set_llm_cache(create_semantic_cache())
 logger.info("LLM 语义缓存已启用（通用语义缓存）")
 
 T = TypeVar('T', bound=BaseModel)
@@ -33,11 +33,12 @@ _llm_cache: dict[tuple, Any] = {}
 
 # ==================== LLM工厂 ====================
 
+
 class LLMFactory:
     """LLM工厂类 - 从数据库读取配置，返回原生SDK客户端"""
 
     @staticmethod
-    def create_langchain_chat_model(model_id: Optional[int] = None) -> Any:
+    def create_chat_model(model_id: int | None = None) -> Any:
         """
         创建LangChain ChatModel实例（支持with_structured_output）
 
@@ -48,9 +49,9 @@ class LLMFactory:
             LangChain ChatModel实例 (ChatOpenAI/ChatAnthropic/ChatZhipuAI)
         """
         if model_id:
-            model = model_manager.get_model_by_id(model_id)
+            model = model_manager.model_by_id(model_id)
         else:
-            model = model_manager.get_default_chat_model()
+            model = model_manager.default_chat_model()
 
         if not model:
             raise ValueError("未找到可用的Chat模型配置，请在数据库中配置")
@@ -58,7 +59,10 @@ class LLMFactory:
         provider = model.provider.lower()
 
         if provider == "openai":
-            from langchain_openai import ChatOpenAI
+            from langchain_openai import ChatOpenAI as _ChatOpenAI
+
+            ChatOpenAI = cast(Any, _ChatOpenAI)
+
             return ChatOpenAI(
                 api_key=model.api_key,
                 base_url=model.base_url,
@@ -67,7 +71,10 @@ class LLMFactory:
             )
 
         elif provider == "claude":
-            from langchain_anthropic import ChatAnthropic
+            from langchain_anthropic import ChatAnthropic as _ChatAnthropic
+
+            ChatAnthropic = cast(Any, _ChatAnthropic)
+
             return ChatAnthropic(
                 api_key=model.api_key,
                 base_url=model.base_url if model.base_url else None,
@@ -77,7 +84,10 @@ class LLMFactory:
 
         elif provider == "glm":
             # GLM 兼容 OpenAI API，直接用 ChatOpenAI
-            from langchain_openai import ChatOpenAI
+            from langchain_openai import ChatOpenAI as _ChatOpenAI
+
+            ChatOpenAI = cast(Any, _ChatOpenAI)
+
             return ChatOpenAI(
                 api_key=model.api_key,
                 base_url=model.base_url or "https://open.bigmodel.cn/api/paas/v4/",
@@ -87,7 +97,10 @@ class LLMFactory:
             )
 
         elif provider == "openrouter":
-            from langchain_openai import ChatOpenAI
+            from langchain_openai import ChatOpenAI as _ChatOpenAI
+
+            ChatOpenAI = cast(Any, _ChatOpenAI)
+
             return ChatOpenAI(
                 api_key=model.api_key,
                 base_url=model.base_url or "https://openrouter.ai/api/v1",
@@ -96,7 +109,10 @@ class LLMFactory:
             )
 
         elif provider == "ollama":
-            from langchain_openai import ChatOpenAI
+            from langchain_openai import ChatOpenAI as _ChatOpenAI
+
+            ChatOpenAI = cast(Any, _ChatOpenAI)
+
             return ChatOpenAI(
                 api_key="ollama",
                 base_url=model.base_url or "http://localhost:11434/v1",
@@ -110,11 +126,8 @@ class LLMFactory:
 
 # ==================== 统一调用接口（基于LangChain）====================
 
-def call_llm(
-    model_id: int = None,
-    enable_json_mode: bool = False,
-    **kwargs
-) -> Any:
+
+def call_llm(model_id: int | None = None, enable_json_mode: bool = False, **kwargs) -> Any:
     """
     统一的LLM获取接口（屏蔽模型差异，带缓存）
 
@@ -135,7 +148,7 @@ def call_llm(
         return _llm_cache[cache_key]
 
     # 创建基础 LLM
-    llm = LLMFactory.create_langchain_chat_model(model_id)
+    llm = LLMFactory.create_chat_model(model_id)
     logger.info(f"创建 LLM 实例: model_id={model_id}, temp={temperature}, json={enable_json_mode}")
 
     # 构建 bind 参数

@@ -3,13 +3,11 @@
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from neo4j import AsyncSession
-
-from src.modules.openlineage.schemas.events import RunEvent
 
 
 @dataclass
@@ -26,7 +24,9 @@ class WriterStats:
             "total_writes": self.total_writes,
             "successful_writes": self.successful_writes,
             "failed_writes": self.failed_writes,
-            "success_rate": self.successful_writes / self.total_writes if self.total_writes > 0 else 0,
+            "success_rate": (
+                self.successful_writes / self.total_writes if self.total_writes > 0 else 0
+            ),
             "last_write_time": self.last_write_time.isoformat() if self.last_write_time else None,
         }
 
@@ -48,32 +48,32 @@ class BaseWriter(ABC):
         pass
 
     @abstractmethod
-    async def write(self, session: AsyncSession, event: RunEvent) -> None:
+    async def write(self, session: AsyncSession, plans: Any) -> None:
         """
-        写入事件
+        写入计划（plans）
 
         Args:
             session: Neo4j 异步会话
-            event: OpenLineage 事件
+            plans: 写入计划（由 event_processor 预先解析得到）
         """
         pass
 
-    async def safe_write(self, session: AsyncSession, event: RunEvent) -> bool:
+    async def safe_write(self, session: AsyncSession, plans: Any) -> bool:
         """
         安全写入（捕获异常）
 
         Args:
             session: Neo4j 异步会话
-            event: OpenLineage 事件
+            plans: 写入计划
 
         Returns:
             是否写入成功
         """
         self._stats.total_writes += 1
-        self._stats.last_write_time = datetime.utcnow()
+        self._stats.last_write_time = datetime.now(UTC)
 
         try:
-            await self.write(session, event)
+            await self.write(session, plans)
             self._stats.successful_writes += 1
             return True
         except Exception:

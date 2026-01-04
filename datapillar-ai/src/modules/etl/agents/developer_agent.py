@@ -11,22 +11,19 @@ Developer Agent（数据开发）
 import json
 import logging
 import re
-import uuid
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from langgraph.types import Command
+from langchain_core.messages import ToolMessage
 
 from src.infrastructure.llm.client import call_llm
-from src.modules.etl.schemas.kg_context import AgentScopedContext, AgentType
-from src.modules.etl.schemas.plan import Job, Stage, Workflow
-from src.modules.etl.schemas.requests import BlackboardRequest
-from src.modules.etl.schemas.state import AgentState
+from src.modules.etl.agents.knowledge_agent import AgentType, get_agent_tools
+from src.modules.etl.agents.prompt_messages import build_llm_messages
+from src.modules.etl.schemas.agent_result import AgentResult
+from src.modules.etl.schemas.plan import Job, Stage, TestResult, Workflow
 from src.modules.etl.tools.agent_tools import (
+    get_column_valuedomain,
+    get_lineage_sql,
     get_table_columns,
-    get_column_lineage,
-    get_sql_by_lineage,
-    get_column_value_domain,
-    recommend_guidance,
+    get_table_lineage,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,18 +32,17 @@ logger = logging.getLogger(__name__)
 DEVELOPER_AGENT_SYSTEM_INSTRUCTIONS = """你是 Datapillar 的 DeveloperAgent（数据开发）。
 
 ## 任务
-根据“任务参数 JSON”和“知识上下文 JSON”，为指定 Job 生成完整 SQL 脚本。
+根据"任务参数 JSON"和"知识上下文 JSON"，为指定 Job 生成完整 SQL 脚本。
 
 ## 任务参数（系统注入，不是用户输入）
-系统会提供一段“任务参数 JSON”（SystemMessage），其中包含：
+系统会提供一段"任务参数 JSON"（SystemMessage），其中包含：
 - user_query：用户原始需求（仅用于理解业务）
 - current_job：本次需要生成 SQL 的 Job（含 stages）
 - evidence：已通过工具获取的证据（表结构/列级血缘/历史 SQL）
-- tools_description：可用工具说明
 - test_feedback：上一轮测试反馈（如有）
 
 ## 知识上下文（系统注入，不是用户输入）
-系统会提供一段“知识上下文 JSON”（SystemMessage），其中包含：
+系统会提供一段"知识上下文 JSON"（SystemMessage），其中包含：
 - tables：可用的 schema.table 列表（导航指针）
 - etl_pointers：可验证的 ETL 指针（含 qualified_name/element_id/tools）
 - allowlist_tools：你允许调用的工具名列表
@@ -124,152 +120,59 @@ class DeveloperAgent:
         self.llm = call_llm(temperature=0.0)
         self.max_retries = 2
         self.max_tool_calls = 6
-        # 记录本次参考的 SQL ID
         self._referenced_sql_ids: list[str] = []
+        self.allowlist = get_agent_tools(AgentType.DEVELOPER)
 
-    async def __call__(self, state: AgentState) -> Command:
-        """执行 SQL 生成"""
-        architecture_plan = state.architecture_plan
-        test_result = state.test_result
+    async def run(
+        self,
+        *,
+        user_query: str,
+        workflow: Workflow,
+        test_feedback: TestResult | None = None,
+        knowledge_agent=None,
+    ) -> AgentResult:
+        """
+        执行 SQL 生成
 
-        # 清空参考 SQL ID 列表（每次执行重新收集）
+        参数：
+        - user_query: 用户输入
+        - workflow: 工作流（包含 Jobs）
+        - test_feedback: 上一轮测试反馈
+        - knowledge_agent: KnowledgeAgent 实例（用于按需查询指针）
+
+        返回：
+        - AgentResult: 执行结果
+        """
         self._referenced_sql_ids = []
+        self._knowledge_agent = knowledge_agent
 
-        if not architecture_plan:
-            req = BlackboardRequest(
-                request_id=f"req_{uuid.uuid4().hex}",
-                kind="delegate",
-                created_by="developer_agent",
-                target_agent="architect_agent",
-                resume_to="developer_agent",
-                payload={
-                    "type": "need_architecture_plan",
-                    "message": "SQL 生成需要架构方案，已委派数据架构师先完成工作流设计。",
-                },
-            )
-            pending = list(state.pending_requests or [])
-            pending.append(req)
-            return Command(
-                update={
-                    "messages": [AIMessage(content="缺少架构方案，已委派数据架构师")],
-                    "current_agent": "developer_agent",
-                    "pending_requests": [r.model_dump() for r in pending],
-                }
-            )
-
-        # 检查是否是迭代（有测试反馈）
-        is_iteration = test_result is not None
+        is_iteration = test_feedback is not None
         if is_iteration:
             logger.info("💻 DeveloperAgent 根据测试反馈重新生成 SQL")
         else:
             logger.info("💻 DeveloperAgent 开始生成 SQL")
 
-        # 获取上下文
-        agent_context = state.get_agent_context(AgentType.DEVELOPER)
-
-        if not agent_context:
-            agent_context = AgentScopedContext.create_for_agent(
-                agent_type=AgentType.DEVELOPER,
-                tables=[],
-            )
-        context_payload = self._build_context_payload(agent_context=agent_context)
-
-        # 转换为 Workflow
-        if isinstance(architecture_plan, dict):
-            plan = Workflow(**architecture_plan)
-        else:
-            plan = architecture_plan
-
-        allowed_tables = self._build_allowed_tables(agent_context.etl_pointers)
-        unknown_tables = self._find_unknown_tables(plan, allowed_tables=allowed_tables)
-        if unknown_tables:
-            counters = dict(state.delegation_counters or {})
-            counter_key = "developer_agent:delegate:knowledge_agent:unknown_tables"
-            delegated = int(counters.get(counter_key) or 0)
-            if delegated < 1:
-                counters[counter_key] = delegated + 1
-                req = BlackboardRequest(
-                    request_id=f"req_{uuid.uuid4().hex}",
-                    kind="delegate",
-                    created_by="developer_agent",
-                    target_agent="knowledge_agent",
-                    resume_to="developer_agent",
-                    payload={
-                        "type": "refresh_knowledge",
-                        "reason": "unknown_tables",
-                        "unknown_tables": unknown_tables,
-                        "message": "SQL 生成阶段发现未知表，已委派知识检索刷新上下文后再继续。",
-                    },
-                )
-                pending = list(state.pending_requests or [])
-                pending.append(req)
-                return Command(
-                    update={
-                        "messages": [AIMessage(content="检测到未知表，已委派知识检索刷新上下文")],
-                        "current_agent": "developer_agent",
-                        "pending_requests": [r.model_dump() for r in pending],
-                        "delegation_counters": counters,
-                    }
-                )
-            request_id = f"req_{uuid.uuid4().hex}"
-            guidance = await self._try_recommend_guidance(state.user_input)
-            payload = {
-                "type": "clarification",
-                "message": "SQL 生成无法继续：知识库无法定位架构方案中引用的表，请补充可验证线索。",
-                "questions": [
-                    f"请确认这些表的准确名称（推荐 schema.table）：{', '.join(unknown_tables[:12])}",
-                    "如果你不确定表名：请粘贴现有 SQL/DDL/字段清单，或说明上游来源系统与目标表。",
-                ],
-            }
-            if guidance:
-                payload["guidance"] = guidance
-            req = BlackboardRequest(
-                request_id=request_id,
-                kind="human",
-                created_by="developer_agent",
-                resume_to="blackboard_router",
-                payload=payload,
-            )
-            pending = list(state.pending_requests or [])
-            pending.append(req)
-            return Command(
-                update={
-                    "messages": [AIMessage(content="无法定位表指针：需要你补充上下文信息后才能继续")],
-                    "current_agent": "developer_agent",
-                    "pending_requests": [r.model_dump() for r in pending],
-                    "delegation_counters": counters,
-                }
-            )
-
         all_errors: list[str] = []
         generated_count = 0
 
         try:
-            # 按拓扑顺序处理 Job
-            sorted_jobs = plan.topological_sort()
+            sorted_jobs = workflow.topological_sort()
 
             for job in sorted_jobs:
                 if not job.stages:
                     all_errors.append(f"Job {job.id} 没有 Stage 信息")
-                    break  # 有错误立即停止
+                    break
 
-                # 获取上一轮生成的 SQL（如果有）
                 previous_sql = job.config.get("content") if job.config else None
+                job_test_feedback = self._format_test_feedback(test_feedback, previous_sql)
 
-                # 格式化测试反馈（带上错误 SQL）
-                job_test_feedback = self._format_test_feedback(test_result, previous_sql)
-
-                # 为整个 Job 生成 SQL 脚本
                 sql_script, success, errors = await self._generate_job_sql(
-                    user_query=state.user_input,
+                    user_query=user_query,
                     job=job,
-                    agent_context=agent_context,
-                    context_payload=context_payload,
                     test_feedback=job_test_feedback,
                 )
 
                 if success:
-                    # 更新 Job 配置
                     job.config = {"content": sql_script}
                     job.config_generated = True
                     generated_count += 1
@@ -277,62 +180,43 @@ class DeveloperAgent:
                 else:
                     all_errors.extend(errors)
                     logger.error(f"❌ Job {job.id} SQL 生成失败: {errors}")
-                    break  # 有错误立即停止，不继续生成
+                    break
 
-            # 部分成功 = 整体失败
             if all_errors or generated_count < len(sorted_jobs):
                 logger.error(f"❌ DeveloperAgent 失败: {generated_count}/{len(sorted_jobs)} 成功")
-                return Command(
-                    update={
-                        "messages": [AIMessage(content=f"SQL 生成失败: {all_errors[0] if all_errors else '部分 Job 未生成'}")],
-                        "architecture_plan": plan.model_dump(),
-                        "current_agent": "developer_agent",
-                        "test_result": None,
-                        "error": "\n".join(all_errors) if all_errors else "部分 Job 生成失败",
-                    }
+                return AgentResult.failed(
+                    summary=f"SQL 生成失败: {all_errors[0] if all_errors else '部分 Job 未生成'}",
+                    error="\n".join(all_errors) if all_errors else "部分 Job 生成失败",
                 )
 
             logger.info(f"✅ DeveloperAgent 完成: 全部 {generated_count} 个 Job 成功")
 
-            # 记录参考的 SQL ID（去重）
             unique_sql_ids = list(set(self._referenced_sql_ids))
             if unique_sql_ids:
                 logger.info(f"📝 参考了 {len(unique_sql_ids)} 个历史 SQL: {unique_sql_ids}")
 
-            return Command(
-                update={
-                    "messages": [AIMessage(content=f"SQL 生成完成: {generated_count} 个 Job")],
-                    "architecture_plan": plan.model_dump(),
-                    "current_agent": "developer_agent",
-                    "test_result": None,
-                    "referenced_sql_ids": unique_sql_ids,
-                }
+            return AgentResult.completed(
+                summary=f"SQL 生成完成: {generated_count} 个 Job",
+                deliverable=workflow,
+                deliverable_type="workflow",
             )
 
         except Exception as e:
             logger.error(f"DeveloperAgent 生成失败: {e}", exc_info=True)
-            return Command(
-                update={
-                    "messages": [AIMessage(content=f"SQL 生成失败: {str(e)}")],
-                    "current_agent": "developer_agent",
-                    "error": str(e),
-                }
+            return AgentResult.failed(
+                summary=f"SQL 生成失败: {str(e)}",
+                error=str(e),
             )
 
-    def _format_test_feedback(self, test_result, previous_sql: str | None = None) -> str:
+    def _format_test_feedback(
+        self, test_result: TestResult | None, previous_sql: str | None = None
+    ) -> str:
         """格式化测试反馈（包含上一轮错误 SQL）"""
         if not test_result:
             return ""
 
-        # 解析 test_result
-        if isinstance(test_result, dict):
-            validation_errors = test_result.get("validation_errors", [])
-            failed_tests = test_result.get("failed_tests", 0)
-            notes = test_result.get("notes", "")
-        else:
-            validation_errors = getattr(test_result, "validation_errors", [])
-            failed_tests = getattr(test_result, "failed_tests", 0)
-            notes = getattr(test_result, "notes", "")
+        validation_errors = test_result.validation_errors or []
+        failed_tests = test_result.failed_tests or 0
 
         if not validation_errors and failed_tests == 0:
             return ""
@@ -347,63 +231,28 @@ class DeveloperAgent:
             for error in validation_errors:
                 lines.append(f"- {error}")
 
-        # 展示上一轮错误的 SQL，让 LLM 知道不要再这样写
         if previous_sql:
             lines.append("\n### 上一轮生成的错误 SQL（不要重复这些错误！）")
             lines.append(f"```sql\n{previous_sql[:1500]}\n```")
 
-        if notes:
-            lines.append(f"\n备注: {notes}")
-
         lines.append("")
         return "\n".join(lines)
-
-    @staticmethod
-    async def _try_recommend_guidance(user_query: str) -> dict | None:
-        """
-        no-hit/需澄清场景的轻量引导数据（tag/catalog 导航）
-
-        约束：
-        - 只返回导航信息，不返回 element_id/指针
-        - 失败时静默降级，不影响主链路
-        """
-        try:
-            raw = await recommend_guidance.ainvoke({"user_query": user_query})
-            parsed = json.loads(raw or "")
-            if isinstance(parsed, dict) and parsed.get("status") == "success":
-                return parsed
-            return None
-        except Exception:
-            return None
 
     async def _generate_job_sql(
         self,
         *,
         user_query: str,
         job: Job,
-        agent_context: AgentScopedContext,
-        context_payload: dict,
         test_feedback: str = "",
     ) -> tuple[str, bool, list[str]]:
         """为整个 Job 生成 SQL 脚本（通过工具获取知识）"""
-        # 收集持久化输入表（跳过临时表，临时表在 temp 库下）
         all_input_tables = set(job.input_tables or [])
         output_table = job.output_table
 
-        # 通过工具获取表结构
-        table_schemas = await self._get_table_schemas_via_tool(list(all_input_tables), agent_context=agent_context)
+        table_schemas = await self._fetch_table_schemas(list(all_input_tables))
+        column_lineage = await self._fetch_column_lineage(list(all_input_tables), output_table)
+        reference_sql = await self._fetch_reference_sql(list(all_input_tables), output_table)
 
-        # 通过工具获取列级血缘
-        column_lineage = await self._get_column_lineage_via_tool(
-            list(all_input_tables), output_table, agent_context=agent_context
-        )
-
-        # 通过工具精准匹配历史 SQL（根据血缘关系）
-        reference_sql = await self._get_reference_sql_via_tool(
-            list(all_input_tables), output_table, agent_context=agent_context
-        )
-
-        # 格式化 Stage 信息（用于模型快速扫读；结构化数据仍在 task_payload.current_job.stages）
         stages_info = self._format_stages(job.stages)
 
         for attempt in range(self.max_retries):
@@ -435,16 +284,12 @@ class DeveloperAgent:
                         "column_lineage": column_lineage,
                         "reference_sql": reference_sql,
                     },
-                    "tools_description": agent_context.get_tools_description(),
                     "test_feedback": test_feedback,
                 }
 
-                # 使用带工具的 LLM 生成 SQL
-                sql = await self._generate_sql_with_tools(
+                sql = await self._generate_sql(
                     user_query=user_query,
                     task_payload=task_payload,
-                    agent_context=agent_context,
-                    context_payload=context_payload,
                 )
 
                 if not sql or len(sql) < 20:
@@ -460,33 +305,29 @@ class DeveloperAgent:
 
         return "", False, [f"Job {job.id} SQL 生成失败"]
 
-    async def _generate_sql_with_tools(
+    async def _generate_sql(
         self,
         *,
         user_query: str,
         task_payload: dict,
-        agent_context: AgentScopedContext,
-        context_payload: dict,
     ) -> str:
         """使用工具生成 SQL"""
-        llm_with_tools = self._bind_tools_by_allowlist(agent_context)
-        messages = [
-            SystemMessage(content=DEVELOPER_AGENT_SYSTEM_INSTRUCTIONS),
-            SystemMessage(content=json.dumps(task_payload, ensure_ascii=False)),
-            SystemMessage(content=json.dumps(context_payload, ensure_ascii=False)),
-            HumanMessage(content=user_query),
-        ]
+        llm_with_tools = self._bind_tools()
+        messages = build_llm_messages(
+            system_instructions=DEVELOPER_AGENT_SYSTEM_INSTRUCTIONS,
+            agent_id="developer_agent",
+            user_query=user_query,
+            task_payload=task_payload,
+        )
         tool_call_count = 0
 
         while tool_call_count < self.max_tool_calls:
             response = await llm_with_tools.ainvoke(messages)
             messages.append(response)
 
-            # 如果没有工具调用，返回 SQL
             if not response.tool_calls:
                 return self._clean_sql(response.content)
 
-            # 执行工具调用
             for tool_call in response.tool_calls:
                 tool_call_count += 1
                 tool_name = tool_call["name"]
@@ -495,161 +336,168 @@ class DeveloperAgent:
 
                 logger.info(f"🔧 DeveloperAgent 调用工具: {tool_name}({tool_args})")
 
-                tool_result = await self._execute_tool(tool_name, tool_args, agent_context=agent_context)
+                tool_result = await self._execute_tool(tool_name, tool_args)
 
-                messages.append(
-                    ToolMessage(content=tool_result, tool_call_id=tool_id)
-                )
+                messages.append(ToolMessage(content=tool_result, tool_call_id=tool_id))
 
                 if tool_call_count >= self.max_tool_calls:
                     break
 
-        # 达到最大工具调用次数，获取最终响应
         response = await self.llm.ainvoke(messages)
         return self._clean_sql(response.content)
 
-    def _bind_tools_by_allowlist(self, agent_context: AgentScopedContext):
-        """
-        按 allowlist 动态绑定工具，避免硬编码导致的“越权/误导”。
-
-        说明：
-        - bind_tools 决定 LLM 能否发起工具调用（能力面）
-        - allowlist 决定该 Agent 是否允许调用（权限面）
-        """
-        allowlist = set(agent_context.tools or [])
+    def _bind_tools(self):
+        """绑定工具到 LLM"""
         tool_registry = {
             "get_table_columns": get_table_columns,
-            "get_column_value_domain": get_column_value_domain,
-            "get_column_lineage": get_column_lineage,
-            "get_sql_by_lineage": get_sql_by_lineage,
+            "get_column_valuedomain": get_column_valuedomain,
+            "get_table_lineage": get_table_lineage,
+            "get_lineage_sql": get_lineage_sql,
         }
-        tools = [tool_registry[name] for name in allowlist if name in tool_registry]
+        tools = [tool_registry[name] for name in self.allowlist if name in tool_registry]
         return self.llm.bind_tools(tools)
 
-    async def _execute_tool(self, tool_name: str, tool_args: dict, *, agent_context: AgentScopedContext) -> str:
-        """执行工具调用"""
+    @staticmethod
+    def _tool_error(message: str, **extra: object) -> str:
+        payload: dict[str, object] = {"status": "error", "message": message}
+        payload.update(extra)
+        return json.dumps(payload, ensure_ascii=False)
+
+    # 工具处理器映射
+    _TOOL_HANDLERS: dict[str, str] = {
+        "get_table_columns": "_exec_columns",
+        "get_column_valuedomain": "_exec_valuedomain",
+        "get_table_lineage": "_exec_lineage",
+        "get_lineage_sql": "_exec_lineagesql",
+    }
+
+    async def _execute_tool(self, tool_name: str, tool_args: dict) -> str:
+        """
+        执行工具调用（按需获取指针 + 权限校验）
+
+        流程：
+        1. 调用 query_pointers 获取对应类型的指针
+        2. 检查指针上的 tools 是否包含要调用的工具
+        3. 用指针的信息调用工具
+        """
         try:
-            allowlist = set(agent_context.tools or [])
-            if tool_name not in allowlist:
-                return json.dumps(
-                    {"status": "error", "message": f"工具不在 allowlist 中: {tool_name}"},
-                    ensure_ascii=False,
-                )
+            if tool_name not in self.allowlist:
+                return self._tool_error(f"工具不在 allowlist 中: {tool_name}")
 
-            table_index = self._build_allowed_table_index(agent_context.etl_pointers)
-            column_index = self._build_allowed_column_index(agent_context.etl_pointers)
+            if not self._knowledge_agent:
+                return self._tool_error("无法查询指针：knowledge_agent 未注入")
 
-            if tool_name == "get_table_columns":
-                table_name = (tool_args or {}).get("table_name") or ""
-                pointer = table_index.get(table_name)
-                if not pointer:
-                    return json.dumps(
-                        {
-                            "status": "error",
-                            "message": "禁止对未下发的表指针调用工具",
-                            "table_name": table_name,
-                        },
-                        ensure_ascii=False,
-                    )
-                if tool_name not in set(pointer.tools or []):
-                    return json.dumps(
-                        {
-                            "status": "error",
-                            "message": "该表指针未授权此工具（ETLPointer.tools）",
-                            "table_name": table_name,
-                            "pointer_element_id": pointer.element_id,
-                        },
-                        ensure_ascii=False,
-                    )
-                return await get_table_columns.ainvoke({"table_name": table_name})
+            handler_name = self._TOOL_HANDLERS.get(tool_name)
+            if not handler_name:
+                return self._tool_error(f"未知工具: {tool_name}")
 
-            if tool_name == "get_column_value_domain":
-                column_element_id = (tool_args or {}).get("column_element_id") or ""
-                pointer = column_index.get(column_element_id)
-                if not pointer:
-                    return json.dumps(
-                        {
-                            "status": "error",
-                            "message": "禁止对未下发的列指针调用工具",
-                            "column_element_id": column_element_id,
-                        },
-                        ensure_ascii=False,
-                    )
-                if tool_name not in set(pointer.tools or []):
-                    return json.dumps(
-                        {
-                            "status": "error",
-                            "message": "该列指针未授权此工具（ETLPointer.tools）",
-                            "column_element_id": column_element_id,
-                            "pointer_element_id": pointer.element_id,
-                        },
-                        ensure_ascii=False,
-                    )
-                return await get_column_value_domain.ainvoke({"column_element_id": column_element_id})
-
-            if tool_name == "get_column_lineage":
-                source_table = (tool_args or {}).get("source_table") or ""
-                target_table = (tool_args or {}).get("target_table") or ""
-                missing = [t for t in [source_table, target_table] if not table_index.get(t)]
-                if missing:
-                    return json.dumps(
-                        {
-                            "status": "error",
-                            "message": "禁止对未下发的表指针调用工具",
-                            "tables": missing,
-                        },
-                        ensure_ascii=False,
-                    )
-                for t in [source_table, target_table]:
-                    pointer = table_index[t]
-                    if tool_name not in set(pointer.tools or []):
-                        return json.dumps(
-                            {
-                                "status": "error",
-                                "message": "该表指针未授权此工具（ETLPointer.tools）",
-                                "table_name": t,
-                                "pointer_element_id": pointer.element_id,
-                            },
-                            ensure_ascii=False,
-                        )
-                return await get_column_lineage.ainvoke({"source_table": source_table, "target_table": target_table})
-
-            if tool_name == "get_sql_by_lineage":
-                source_tables = (tool_args or {}).get("source_tables") or []
-                target_table = (tool_args or {}).get("target_table") or ""
-                if not isinstance(source_tables, list):
-                    source_tables = []
-                all_tables = list(source_tables) + ([target_table] if target_table else [])
-                missing = [t for t in all_tables if t and not table_index.get(t)]
-                if missing:
-                    return json.dumps(
-                        {
-                            "status": "error",
-                            "message": "禁止对未下发的表指针调用工具",
-                            "tables": missing,
-                        },
-                        ensure_ascii=False,
-                    )
-                for t in all_tables:
-                    if not t:
-                        continue
-                    pointer = table_index[t]
-                    if tool_name not in set(pointer.tools or []):
-                        return json.dumps(
-                            {
-                                "status": "error",
-                                "message": "该表指针未授权此工具（ETLPointer.tools）",
-                                "table_name": t,
-                                "pointer_element_id": pointer.element_id,
-                            },
-                            ensure_ascii=False,
-                        )
-                return await get_sql_by_lineage.ainvoke({"source_tables": source_tables, "target_table": target_table})
-
-            return json.dumps({"status": "error", "message": f"未知工具: {tool_name}"}, ensure_ascii=False)
+            handler = getattr(self, handler_name)
+            return await handler(tool_args or {})
         except Exception as e:
             logger.error(f"工具 {tool_name} 执行失败: {e}")
-            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+            return self._tool_error(str(e))
+
+    async def _exec_columns(self, args: dict) -> str:
+        """执行 get_table_columns 工具"""
+        table_name = args.get("table_name") or ""
+        if not table_name:
+            return self._tool_error("缺少 table_name 参数")
+
+        pointers = await self._knowledge_agent.query_pointers(
+            table_name, node_types=["Table"], top_k=5
+        )
+        pointer = self._find_matching_pointer(pointers, table_name)
+        if not pointer:
+            return self._tool_error("未找到指针", table_name=table_name)
+        if "get_table_columns" not in (pointer.tools or []):
+            return self._tool_error("指针未授权此工具", table_name=table_name)
+
+        logger.info(f"📊 调用 get_table_columns: {pointer.qualified_name}")
+        return await get_table_columns.ainvoke({"table_name": pointer.qualified_name})
+
+    async def _exec_valuedomain(self, args: dict) -> str:
+        """执行 get_column_valuedomain 工具"""
+        column_name = args.get("column_name") or ""
+        if not column_name:
+            return self._tool_error("缺少 column_name 参数")
+
+        pointers = await self._knowledge_agent.query_pointers(
+            column_name, node_types=["Column"], top_k=5
+        )
+        pointer = self._find_matching_pointer(pointers, column_name)
+        if not pointer:
+            return self._tool_error("未找到指针", column_name=column_name)
+        if "get_column_valuedomain" not in (pointer.tools or []):
+            return self._tool_error("指针未授权此工具", column_name=column_name)
+
+        logger.info(f"📊 调用 get_column_valuedomain: {pointer.qualified_name}")
+        return await get_column_valuedomain.ainvoke({"column_name": pointer.qualified_name})
+
+    async def _exec_lineage(self, args: dict) -> str:
+        """执行 get_table_lineage 工具"""
+        table_name = args.get("table_name") or ""
+        direction = args.get("direction") or "both"
+        if not table_name:
+            return self._tool_error("缺少 table_name 参数")
+
+        pointers = await self._knowledge_agent.query_pointers(
+            table_name, node_types=["Table"], top_k=5
+        )
+        pointer = self._find_matching_pointer(pointers, table_name)
+        if not pointer:
+            return self._tool_error("未找到指针", table_name=table_name)
+        if "get_table_lineage" not in (pointer.tools or []):
+            return self._tool_error("指针未授权此工具", table_name=table_name)
+
+        logger.info(f"📊 调用 get_table_lineage: {pointer.qualified_name}")
+        return await get_table_lineage.ainvoke(
+            {"table_name": pointer.qualified_name, "direction": direction}
+        )
+
+    async def _exec_lineagesql(self, args: dict) -> str:
+        """执行 get_lineage_sql 工具"""
+        source_tables = args.get("source_tables") or []
+        target_table = args.get("target_table") or ""
+        if not source_tables or not target_table:
+            return self._tool_error("缺少 source_tables 或 target_table 参数")
+
+        target_pointers = await self._knowledge_agent.query_pointers(
+            target_table, node_types=["Table"], top_k=3
+        )
+        target_ptr = self._find_matching_pointer(target_pointers, target_table)
+        if not target_ptr:
+            return self._tool_error("未找到指针", target_table=target_table)
+        if "get_lineage_sql" not in (target_ptr.tools or []):
+            return self._tool_error("指针未授权此工具", target_table=target_table)
+
+        validated_sources = []
+        for src in source_tables:
+            src_pointers = await self._knowledge_agent.query_pointers(
+                src, node_types=["Table"], top_k=3
+            )
+            src_ptr = self._find_matching_pointer(src_pointers, src)
+            if src_ptr:
+                validated_sources.append(src_ptr.qualified_name)
+
+        logger.info(f"📊 调用 get_lineage_sql: {validated_sources} -> {target_ptr.qualified_name}")
+        return await get_lineage_sql.ainvoke(
+            {"source_tables": validated_sources, "target_table": target_ptr.qualified_name}
+        )
+
+    def _find_matching_pointer(self, pointers: list, name: str):
+        """从指针列表中找到匹配的指针"""
+        if not pointers:
+            return None
+        # 精确匹配
+        for p in pointers:
+            if p.qualified_name == name:
+                return p
+        # 部分匹配
+        for p in pointers:
+            if name in (p.qualified_name or ""):
+                return p
+        # 返回第一个
+        return pointers[0] if pointers else None
 
     def _format_stages(self, stages: list[Stage]) -> str:
         """格式化 Stage 列表"""
@@ -663,24 +511,20 @@ class DeveloperAgent:
             lines.append("")
         return "\n".join(lines)
 
-    async def _get_table_schemas_via_tool(self, input_tables: list[str], *, agent_context: AgentScopedContext) -> str:
+    async def _fetch_table_schemas(self, input_tables: list[str]) -> str:
         """通过工具获取表结构信息"""
         lines = []
-
         for table_name in input_tables:
             try:
                 result = await self._execute_tool(
                     "get_table_columns",
                     {"table_name": table_name},
-                    agent_context=agent_context,
                 )
                 data = json.loads(result)
-
                 if data.get("status") == "success":
                     columns = data.get("columns", [])
                     col_info = [
-                        f"{c.get('name')} ({c.get('data_type', 'string')})"
-                        for c in columns[:20]
+                        f"{c.get('name')} ({c.get('data_type', 'string')})" for c in columns[:20]
                     ]
                     lines.append(f"### {table_name}")
                     lines.append(f"字段: {', '.join(col_info)}")
@@ -689,68 +533,65 @@ class DeveloperAgent:
                     lines.append("")
             except Exception as e:
                 logger.warning(f"获取表 {table_name} 结构失败: {e}")
-
         return "\n".join(lines) if lines else "（无）"
 
-    async def _get_column_lineage_via_tool(
-        self, input_tables: list[str], output_table: str | None, *, agent_context: AgentScopedContext
+    async def _fetch_column_lineage(
+        self,
+        input_tables: list[str],
+        output_table: str | None,
     ) -> str:
-        """通过工具获取列级血缘信息"""
+        """通过 get_table_lineage 获取列级血缘信息"""
         if not output_table or not input_tables:
             return "（无）"
-
         lines = []
-        for source_table in input_tables:
-            try:
-                result = await self._execute_tool(
-                    "get_column_lineage",
-                    {"source_table": source_table, "target_table": output_table},
-                    agent_context=agent_context,
-                )
-                data = json.loads(result)
-
-                if data.get("status") == "success":
-                    lineage = data.get("lineage", [])
-                    if lineage:
-                        lines.append(f"### {source_table} → {output_table}")
-                        for item in lineage:
-                            mappings = item.get("column_mappings", [])
+        try:
+            # 调用 get_table_lineage 获取目标表的上游血缘（含列映射）
+            result = await self._execute_tool(
+                "get_table_lineage",
+                {"table_name": output_table, "direction": "upstream"},
+            )
+            data = json.loads(result)
+            if data.get("status") == "success":
+                lineage_edges = data.get("lineage_edges", [])
+                input_set = set(input_tables)
+                for edge in lineage_edges:
+                    source = edge.get("source_table", "")
+                    # 匹配输入表
+                    if source in input_set or any(source.endswith(f".{t}") for t in input_set):
+                        mappings = edge.get("column_mappings", [])
+                        if mappings:
+                            lines.append(f"### {source} → {output_table}")
                             for m in mappings[:20]:
                                 src_col = m.get("source_column", "")
                                 tgt_col = m.get("target_column", "")
                                 transform = m.get("transformation", "direct")
                                 if src_col and tgt_col:
                                     lines.append(f"- {src_col} → {tgt_col} ({transform})")
-                        lines.append("")
-            except Exception as e:
-                logger.warning(f"获取列级血缘失败 {source_table} → {output_table}: {e}")
-
+                            lines.append("")
+        except Exception as e:
+            logger.warning(f"获取列级血缘失败: {e}")
         return "\n".join(lines) if lines else "（无）"
 
-    async def _get_reference_sql_via_tool(
-        self, input_tables: list[str], output_table: str | None, *, agent_context: AgentScopedContext
+    async def _fetch_reference_sql(
+        self,
+        input_tables: list[str],
+        output_table: str | None,
     ) -> str:
         """通过工具精准匹配历史 SQL（根据血缘关系）"""
         if not input_tables or not output_table:
             return "（无历史 SQL）"
-
         try:
             result = await self._execute_tool(
-                "get_sql_by_lineage",
+                "get_lineage_sql",
                 {"source_tables": input_tables, "target_table": output_table},
-                agent_context=agent_context,
             )
             data = json.loads(result)
-
             if data.get("status") == "success":
                 sql_content = data.get("sql_content")
                 sql_id = data.get("sql_id")
-
-                # 记录参考的 SQL ID（用于后续打分）
                 if sql_id:
                     self._referenced_sql_ids.append(sql_id)
                     logger.info(f"📌 参考历史 SQL: {sql_id}")
-
                 if sql_content:
                     sql_name = data.get("sql_name", "")
                     engine = data.get("engine", "")
@@ -761,103 +602,17 @@ class DeveloperAgent:
 {sql_content}
 ```
 """
-
         except Exception as e:
             logger.warning(f"获取历史 SQL 失败: {e}")
-
         return "（无历史 SQL）"
-
-    @staticmethod
-    def _build_context_payload(*, agent_context: AgentScopedContext) -> dict:
-        """
-        构造“知识上下文JSON”（下发给 LLM 的 SystemMessage）
-
-        约束：
-        - 只传递指针与导航信息，不传递表明细
-        """
-        node_pointers = agent_context.etl_pointers or []
-        table_pointers = [
-            {
-                "element_id": p.element_id,
-                "qualified_name": p.qualified_name,
-                "path": p.path,
-                "display_name": p.display_name,
-                "description": p.description,
-                "tools": p.tools,
-            }
-            for p in node_pointers
-            if "Table" in set(p.labels or []) and p.qualified_name
-        ]
-        return {
-            "agent_type": agent_context.agent_type,
-            "allowlist_tools": agent_context.tools,
-            "tables": agent_context.tables,
-            "table_pointers": table_pointers,
-            "etl_pointers": [p.model_dump() for p in node_pointers],
-            "doc_pointers": [p.model_dump() for p in (agent_context.doc_pointers or [])],
-        }
-
-    @staticmethod
-    def _build_allowed_table_index(node_pointers) -> dict:
-        table_index: dict[str, object] = {}
-        for p in node_pointers or []:
-            if "Table" not in set(getattr(p, "labels", None) or []):
-                continue
-            qualified_name = getattr(p, "qualified_name", None)
-            if not qualified_name:
-                continue
-            table_index[qualified_name] = p
-        return table_index
-
-    @staticmethod
-    def _build_allowed_column_index(node_pointers) -> dict:
-        column_index: dict[str, object] = {}
-        for p in node_pointers or []:
-            if "Column" not in set(getattr(p, "labels", None) or []):
-                continue
-            element_id = getattr(p, "element_id", None)
-            if element_id:
-                column_index[element_id] = p
-        return column_index
-
-    @staticmethod
-    def _build_allowed_tables(node_pointers) -> set[str]:
-        allowed: set[str] = set()
-        for p in node_pointers or []:
-            if "Table" not in set(getattr(p, "labels", None) or []):
-                continue
-            qualified_name = getattr(p, "qualified_name", None)
-            if qualified_name:
-                allowed.add(qualified_name)
-        return allowed
-
-    @staticmethod
-    def _find_unknown_tables(plan: Workflow, *, allowed_tables: set[str]) -> list[str]:
-        unknown: list[str] = []
-        seen: set[str] = set()
-        for job in plan.jobs or []:
-            for t in job.input_tables or []:
-                if not t or t.startswith("temp."):
-                    continue
-                if t not in allowed_tables and t not in seen:
-                    seen.add(t)
-                    unknown.append(t)
-            if job.output_table and not job.output_table.startswith("temp."):
-                t = job.output_table
-                if t not in allowed_tables and t not in seen:
-                    seen.add(t)
-                    unknown.append(t)
-        return unknown
 
     @staticmethod
     def _clean_sql(content: str) -> str:
         """清理 SQL（去掉 markdown 代码块）"""
-        sql_match = re.search(r'```sql\s*([\s\S]*?)\s*```', content)
+        sql_match = re.search(r"```sql\s*([\s\S]*?)\s*```", content)
         if sql_match:
             return sql_match.group(1).strip()
-
-        code_match = re.search(r'```\s*([\s\S]*?)\s*```', content)
+        code_match = re.search(r"```\s*([\s\S]*?)\s*```", content)
         if code_match:
             return code_match.group(1).strip()
-
         return content.strip()

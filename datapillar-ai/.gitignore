@@ -33,6 +33,9 @@ graphrag_cache/
 .pytest_cache/
 .coverage
 
+# pre-commit（本项目内自定义缓存目录）
+.pre-commit-cache/
+
 # macOS
 .DS_Store
 

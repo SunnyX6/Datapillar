@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 日志配置模块
 
@@ -11,6 +10,7 @@
 import logging
 import logging.config
 import os
+import tempfile
 from pathlib import Path
 
 import yaml
@@ -25,7 +25,7 @@ class ExcludeNoisyFilter(logging.Filter):
         return not any(record.name.startswith(name) for name in self.NOISY_LOGGERS)
 
 
-def setup_logging(config_path: str = None) -> None:
+def setup_logging(config_path: str | Path | None = None) -> None:
     """
     初始化日志配置
 
@@ -38,36 +38,37 @@ def setup_logging(config_path: str = None) -> None:
         root_dir = Path(__file__).parent.parent.parent.parent
         config_path = root_dir / "logging.yaml"
 
-    if not os.path.exists(config_path):
+    config_path_str = str(config_path)
+    if not os.path.exists(config_path_str):
         # 配置文件不存在，使用基础配置
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s | %(levelname)-8s | %(name)s - %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
-        logging.warning(f"日志配置文件不存在: {config_path}，使用默认配置")
+        logging.warning(f"日志配置文件不存在: {config_path_str}，使用默认配置")
         return
 
     # 加载 YAML 配置
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path_str, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     # 处理环境变量 LOG_HOME
-    log_home = os.environ.get("LOG_HOME", "/tmp/datapillar-logs")
+    default_log_home = str(Path(tempfile.gettempdir()) / "datapillar-logs")
+    log_home = os.environ.get("LOG_HOME", default_log_home)
 
     # 确保日志目录存在（从配置中读取）
+    yaml_default_prefix = default_log_home
     for handler in config.get("handlers", {}).values():
         if "filename" in handler:
             # 替换日志路径前缀
-            handler["filename"] = handler["filename"].replace(
-                "/tmp/datapillar-logs", log_home
-            )
+            handler["filename"] = handler["filename"].replace(yaml_default_prefix, log_home)
             log_dir = Path(handler["filename"]).parent
             log_dir.mkdir(parents=True, exist_ok=True)
 
     # 应用配置
     logging.config.dictConfig(config)
-    logging.info(f"日志配置已加载: {config_path}")
+    logging.info(f"日志配置已加载: {config_path_str}")
 
 
 def get_logger(name: str) -> logging.Logger:

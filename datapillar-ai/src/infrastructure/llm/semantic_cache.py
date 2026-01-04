@@ -10,19 +10,21 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import json
 import logging
 import os
-import pickle
 import re
 import sqlite3
 import time
-from typing import Any, Callable, Iterable, Optional, Protocol
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from typing import Any, Protocol
 
 import numpy as np
-from langchain_core.caches import BaseCache, RETURN_VAL_TYPE
+from langchain_core.caches import RETURN_VAL_TYPE, BaseCache
+from langchain_core.messages import AIMessage
+from langchain_core.outputs import ChatGeneration, Generation
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +55,7 @@ def _clip(text: str, max_chars: int) -> str:
     return text[:max_chars]
 
 
-def _json_content_to_text(content: Any) -> str:
+def _json_to_text(content: Any) -> str:
     """
     LangChain message content 可能是 str，也可能是 content blocks 列表。
     这里统一转为可哈希/可 embedding 的纯文本。
@@ -88,7 +90,7 @@ def _extract_content(msg: dict) -> str:
     content = msg.get("kwargs", {}).get("content")
     if content is None:
         content = msg.get("content")
-    return _json_content_to_text(content)
+    return _json_to_text(content)
 
 
 def _try_parse_prompt(prompt: str) -> list[_PromptMessage] | None:
@@ -148,10 +150,7 @@ def _build_context_part(
             last_human_index = idx
             break
 
-    if last_human_index is None:
-        messages_before_query = parsed
-    else:
-        messages_before_query = parsed[:last_human_index]
+    messages_before_query = parsed if last_human_index is None else parsed[:last_human_index]
 
     system_parts: list[str] = []
     for msg in parsed:
@@ -159,7 +158,9 @@ def _build_context_part(
             system_parts.append(f"system:{_clip(_normalize_text(msg.content), 1500)}")
 
     history_candidates = [m for m in messages_before_query if m.role != "system"]
-    history_window = history_candidates[-context_window_messages:] if context_window_messages > 0 else []
+    history_window = (
+        history_candidates[-context_window_messages:] if context_window_messages > 0 else []
+    )
 
     history_parts: list[str] = []
     for msg in history_window:
@@ -189,7 +190,7 @@ def _has_cacheable_text(return_val: RETURN_VAL_TYPE) -> bool:
         msg = getattr(gen, "message", None)
         if msg is not None:
             content = getattr(msg, "content", None)
-            content_text = _normalize_text(_json_content_to_text(content))
+            content_text = _normalize_text(_json_to_text(content))
             if content_text:
                 return True
         text = getattr(gen, "text", None)
@@ -210,7 +211,7 @@ def _prompt_requests_json(prompt: str) -> bool:
     return "```json" in p or "response_format" in p or "JSON 对象" in p
 
 
-def _contains_valid_json_object(text: str) -> bool:
+def _has_json_object(text: str) -> bool:
     """
     检测文本是否包含可解析的 JSON 对象（用于缓存有效性校验）。
 
@@ -226,8 +227,8 @@ def _contains_valid_json_object(text: str) -> bool:
         try:
             obj = json.loads(m.group(1))
             return isinstance(obj, dict)
-        except Exception:
-            pass  # 继续尝试其他格式
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.debug("json_codeblock_parse_failed: %s", exc)
 
     # 2. 尝试匹配裸 JSON 对象 { ... }
     m = re.search(r"\{[\s\S]*\}", t)
@@ -235,7 +236,8 @@ def _contains_valid_json_object(text: str) -> bool:
         try:
             obj = json.loads(m.group(0))
             return isinstance(obj, dict)
-        except Exception:
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.debug("json_object_parse_failed: %s", exc)
             return False
 
     return False
@@ -249,7 +251,7 @@ def _return_val_text(return_val: RETURN_VAL_TYPE) -> str:
         msg = getattr(gen, "message", None)
         if msg is not None:
             content = getattr(msg, "content", None)
-            content_text = _json_content_to_text(content)
+            content_text = _json_to_text(content)
             if isinstance(content_text, str) and content_text:
                 parts.append(content_text)
                 continue
@@ -257,6 +259,65 @@ def _return_val_text(return_val: RETURN_VAL_TYPE) -> str:
         if isinstance(text, str) and text:
             parts.append(text)
     return "\n".join(parts)
+
+
+def _serialize_embedding(embedding: Iterable[float]) -> bytes:
+    return json.dumps(list(embedding), ensure_ascii=False).encode("utf-8")
+
+
+def _deserialize_embedding(blob: bytes) -> list[float] | None:
+    try:
+        raw = json.loads((blob or b"").decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(raw, list):
+        return None
+    out: list[float] = []
+    for item in raw:
+        if isinstance(item, (int, float)):
+            out.append(float(item))
+        else:
+            return None
+    return out
+
+
+def _serialize_return_val(return_val: RETURN_VAL_TYPE) -> bytes:
+    items: list[dict[str, Any]] = []
+    for gen in return_val or []:
+        msg = getattr(gen, "message", None)
+        if msg is not None:
+            content = getattr(msg, "content", None)
+            try:
+                json.dumps(content)
+                serializable_content = content
+            except TypeError:
+                serializable_content = _json_to_text(content)
+            items.append({"type": "chat", "content": serializable_content})
+            continue
+        text = getattr(gen, "text", None)
+        items.append({"type": "text", "text": str(text or "")})
+    return json.dumps(items, ensure_ascii=False).encode("utf-8")
+
+
+def _deserialize_return_val(blob: bytes) -> RETURN_VAL_TYPE | None:
+    try:
+        raw = json.loads((blob or b"").decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(raw, list):
+        return None
+
+    result: list[Any] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        item_type = item.get("type")
+        if item_type == "chat":
+            content = item.get("content", "")
+            result.append(ChatGeneration(message=AIMessage(content=content)))
+        elif item_type == "text":
+            result.append(Generation(text=str(item.get("text", ""))))
+    return result
 
 
 class SemanticLLMCache(BaseCache):
@@ -378,9 +439,9 @@ class SemanticLLMCache(BaseCache):
         best_row_id: int | None = None
 
         for row_id, cached_query, embedding_blob, response_blob in rows:
-            try:
-                cached_embedding = pickle.loads(embedding_blob)
-            except Exception:
+            cached_embedding = _deserialize_embedding(embedding_blob)
+            if cached_embedding is None:
+                logger.debug("语义缓存条目 embedding 反序列化失败，已跳过: id=%s", row_id)
                 continue
             similarity = _cosine_similarity(query_embedding, cached_embedding)
             if similarity > best_similarity:
@@ -397,13 +458,17 @@ class SemanticLLMCache(BaseCache):
                 best_cached_query[:40],
             )
             try:
-                val = pickle.loads(best_response_blob)
+                val = _deserialize_return_val(best_response_blob)
+                if val is None:
+                    raise ValueError("invalid cached response format")
                 if require_json:
                     cached_text = _return_val_text(val)
-                    if not _contains_valid_json_object(cached_text):
+                    if not _has_json_object(cached_text):
                         if best_row_id is not None:
                             with self._connect() as conn:
-                                conn.execute("DELETE FROM llm_semantic_cache WHERE id = ?", (best_row_id,))
+                                conn.execute(
+                                    "DELETE FROM llm_semantic_cache WHERE id = ?", (best_row_id,)
+                                )
                                 conn.commit()
                         logger.warning(
                             "语义缓存命中但输出非 JSON，已丢弃该缓存条目：id=%s",
@@ -413,6 +478,10 @@ class SemanticLLMCache(BaseCache):
                 return val
             except Exception as e:
                 logger.warning("语义缓存命中但反序列化失败：%s", e)
+                if best_row_id is not None:
+                    with self._connect() as conn:
+                        conn.execute("DELETE FROM llm_semantic_cache WHERE id = ?", (best_row_id,))
+                        conn.commit()
                 return None
 
         return None
@@ -422,7 +491,7 @@ class SemanticLLMCache(BaseCache):
             return
         if _prompt_requests_json(prompt):
             content_text = _return_val_text(return_val)
-            if not _contains_valid_json_object(content_text):
+            if not _has_json_object(content_text):
                 logger.debug("语义缓存跳过：prompt 要求 JSON，但输出不包含有效 JSON")
                 return
 
@@ -439,8 +508,8 @@ class SemanticLLMCache(BaseCache):
         now = self._now()
         expires_at = now + float(self.ttl_seconds)
 
-        embedding_blob = pickle.dumps(list(embedding), protocol=pickle.HIGHEST_PROTOCOL)
-        response_blob = pickle.dumps(return_val, protocol=pickle.HIGHEST_PROTOCOL)
+        embedding_blob = _serialize_embedding(embedding)
+        response_blob = _serialize_return_val(return_val)
 
         with self._connect() as conn:
             rows = conn.execute(
@@ -455,9 +524,9 @@ class SemanticLLMCache(BaseCache):
             ).fetchall()
 
             for row_id, cached_embedding_blob in rows:
-                try:
-                    cached_embedding = pickle.loads(cached_embedding_blob)
-                except Exception:
+                cached_embedding = _deserialize_embedding(cached_embedding_blob)
+                if cached_embedding is None:
+                    logger.debug("语义缓存条目 embedding 反序列化失败，已跳过: id=%s", row_id)
                     continue
                 similarity = _cosine_similarity(embedding, cached_embedding)
                 if similarity >= self.hard_threshold:
@@ -479,7 +548,15 @@ class SemanticLLMCache(BaseCache):
                 (scope_key, query_text, query_embedding, response, llm_string, created_at, expires_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (scope_key, query_text, embedding_blob, response_blob, llm_string or "", now, expires_at),
+                (
+                    scope_key,
+                    query_text,
+                    embedding_blob,
+                    response_blob,
+                    llm_string or "",
+                    now,
+                    expires_at,
+                ),
             )
             conn.commit()
 
@@ -498,7 +575,7 @@ def _create_default_embedder() -> Embedder:
     return UnifiedEmbedder()
 
 
-def create_default_semantic_llm_cache() -> SemanticLLMCache:
+def create_semantic_cache() -> SemanticLLMCache:
     """
     创建默认语义缓存实例（通过环境变量可覆写）。
 
@@ -512,9 +589,7 @@ def create_default_semantic_llm_cache() -> SemanticLLMCache:
     db_path = os.getenv("DATAPILLAR_LLM_CACHE_DB_PATH", ".semantic_cache.db")
     ttl_seconds = int(os.getenv("DATAPILLAR_LLM_CACHE_TTL_SECONDS", "60"))
     hard_threshold = float(os.getenv("DATAPILLAR_LLM_CACHE_HARD_THRESHOLD", "0.95"))
-    context_window_messages = int(
-        os.getenv("DATAPILLAR_LLM_CACHE_CONTEXT_WINDOW_MESSAGES", "6")
-    )
+    context_window_messages = int(os.getenv("DATAPILLAR_LLM_CACHE_CONTEXT_WINDOW_MESSAGES", "6"))
     max_candidates = int(os.getenv("DATAPILLAR_LLM_CACHE_MAX_CANDIDATES", "200"))
 
     return SemanticLLMCache(

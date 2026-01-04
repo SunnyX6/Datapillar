@@ -1,17 +1,13 @@
 """
-Facet 解析器
+OpenLineage 解析层（parsers）
 
-负责从 OpenLineage 事件中解析各种 Facet 并转换为 Neo4j 节点
+职责：
+- 将 OpenLineage RunEvent 解析为“写入 plans”（无副作用）
+- event_processor 只依赖 plans，writers 只消费 plans
 """
 
-from src.modules.openlineage.parsers.base import BaseFacetParser
-from src.modules.openlineage.parsers.schema_parser import SchemaFacetParser
-from src.modules.openlineage.parsers.sql_parser import SQLFacetParser
-from src.modules.openlineage.parsers.lineage_parser import ColumnLineageFacetParser
+from src.modules.openlineage.parsers.plans import OpenLineagePlanBuilder
 
 __all__ = [
-    "BaseFacetParser",
-    "SchemaFacetParser",
-    "SQLFacetParser",
-    "ColumnLineageFacetParser",
+    "OpenLineagePlanBuilder",
 ]

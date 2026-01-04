@@ -42,19 +42,27 @@ class Run(BaseModel):
 class Job(BaseModel):
     """OpenLineage 作业"""
 
-    namespace: str = Field(..., description="作业所属的命名空间", examples=["spark://cluster", "gravitino"])
-    name: str = Field(..., description="作业名称", examples=["etl_job.orders", "gravitino.create_table"])
+    namespace: str = Field(
+        ..., description="作业所属的命名空间", examples=["spark://cluster", "gravitino"]
+    )
+    name: str = Field(
+        ..., description="作业名称", examples=["etl_job.orders", "gravitino.create_table"]
+    )
     facets: dict[str, Any] | None = Field(default_factory=dict, description="作业级别的 facets")
 
 
 class Dataset(BaseModel):
     """OpenLineage 数据集基类"""
 
-    namespace: str = Field(..., description="数据集所属的命名空间", examples=["hive://warehouse", "gravitino://metalake/catalog"])
+    namespace: str = Field(
+        ...,
+        description="数据集所属的命名空间",
+        examples=["hive://warehouse", "gravitino://metalake/catalog"],
+    )
     name: str = Field(..., description="数据集名称", examples=["db.schema.table"])
     facets: dict[str, Any] | None = Field(default_factory=dict, description="数据集级别的 facets")
 
-    def get_full_qualified_name(self) -> str:
+    def qualified_name(self) -> str:
         """获取完整限定名"""
         return f"{self.namespace}/{self.name}"
 
@@ -62,13 +70,17 @@ class Dataset(BaseModel):
 class InputDataset(Dataset):
     """OpenLineage 输入数据集"""
 
-    inputFacets: dict[str, Any] | None = Field(default_factory=dict, description="输入数据集特有的 facets")
+    inputFacets: dict[str, Any] | None = Field(
+        default_factory=dict, description="输入数据集特有的 facets"
+    )
 
 
 class OutputDataset(Dataset):
     """OpenLineage 输出数据集"""
 
-    outputFacets: dict[str, Any] | None = Field(default_factory=dict, description="输出数据集特有的 facets")
+    outputFacets: dict[str, Any] | None = Field(
+        default_factory=dict, description="输出数据集特有的 facets"
+    )
 
 
 class RunEvent(BaseModel):
@@ -131,7 +143,10 @@ class RunEvent(BaseModel):
 
     def get_all_datasets(self) -> list[Dataset]:
         """获取所有数据集（输入 + 输出）"""
-        return list(self.inputs) + list(self.outputs)
+        datasets: list[Dataset] = []
+        datasets.extend(self.inputs)
+        datasets.extend(self.outputs)
+        return datasets
 
     def has_sql_facet(self) -> bool:
         """检查是否包含 SQL facet"""
@@ -139,14 +154,16 @@ class RunEvent(BaseModel):
 
     def get_sql(self) -> str | None:
         """获取 SQL 语句"""
-        if not self.has_sql_facet():
+        job_facets = self.job.facets
+        if not job_facets or "sql" not in job_facets:
             return None
-        sql_facet = self.job.facets.get("sql", {})
-        return sql_facet.get("query")
+        sql_facet = job_facets.get("sql", {})
+        return sql_facet.get("query") if isinstance(sql_facet, dict) else None
 
     def get_sql_dialect(self) -> str | None:
         """获取 SQL 方言"""
-        if not self.has_sql_facet():
+        job_facets = self.job.facets
+        if not job_facets or "sql" not in job_facets:
             return None
-        sql_facet = self.job.facets.get("sql", {})
-        return sql_facet.get("dialect")
+        sql_facet = job_facets.get("sql", {})
+        return sql_facet.get("dialect") if isinstance(sql_facet, dict) else None

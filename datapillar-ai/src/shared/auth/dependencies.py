@@ -2,11 +2,11 @@
 FastAPI 认证依赖
 """
 
+import logging
 from typing import Annotated
 
 import jwt
 from fastapi import Depends, HTTPException, Request, status
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ def extract_token(request: Request) -> str:
     )
 
 
-def get_current_user_from_state(request: Request) -> CurrentUser:
+def current_user_state(request: Request) -> CurrentUser:
     """
     从 request.state 获取当前用户
     由全局认证中间件注入
@@ -79,7 +79,7 @@ def get_current_user_from_state(request: Request) -> CurrentUser:
 
 
 # 【已废弃】旧的认证依赖，保留用于向后兼容
-# 推荐使用 get_current_user_from_state
+# 推荐使用 current_user_state
 def get_current_user(
     token: Annotated[str, Depends(extract_token)],
     jwt_util: Annotated[JwtTokenUtil, Depends(get_jwt_util)],
@@ -108,9 +108,9 @@ def get_current_user(
             )
 
         # 检查 Token 类型
-        token_type = jwt_util.get_token_type(token)
-        if token_type != "access":
-            logger.warning(f"Invalid token type: {token_type}, expected: access")
+        jwt_type = jwt_util.get_token_type(token)
+        if jwt_type != "access":
+            logger.warning(f"Invalid token type: {jwt_type}, expected: access")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token类型错误，请使用Access Token",
@@ -130,24 +130,24 @@ def get_current_user(
             email=email,
         )
 
-    except jwt.ExpiredSignatureError:
+    except jwt.ExpiredSignatureError as e:
         logger.debug("Token已过期")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token已过期",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
     except jwt.InvalidTokenError as e:
         logger.warning(f"Token无效: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token无效",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
     except Exception as e:
         logger.error(f"认证过程发生异常: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="认证失败",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e

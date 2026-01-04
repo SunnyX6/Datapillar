@@ -4,14 +4,14 @@ Neo4j 数据库连接管理
 提供 Neo4j 同步和异步连接池
 """
 
-from typing import Optional, Any
 import logging
+from typing import Any
 
-from neo4j import GraphDatabase, Driver, AsyncGraphDatabase, AsyncDriver
+from neo4j import AsyncDriver, AsyncGraphDatabase, Driver, GraphDatabase
 from neo4j.time import DateTime as Neo4jDateTime
 
-from src.shared.config.settings import settings
 from src.shared.config.exceptions import Neo4jError
+from src.shared.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ def convert_neo4j_types(value: Any) -> Any:
 class Neo4jClient:
     """Neo4j 连接池管理器（Neo4j Driver 自带连接池）"""
 
-    _driver: Optional[Driver] = None
+    _driver: Driver | None = None
 
     @classmethod
     def get_driver(cls) -> Driver:
@@ -51,7 +51,7 @@ class Neo4jClient:
                 logger.info("Neo4j Driver 初始化成功")
             except Exception as e:
                 logger.error(f"Neo4j Driver 初始化失败: {e}")
-                raise Neo4jError(f"Neo4j 连接失败: {e}")
+                raise Neo4jError(f"Neo4j 连接失败: {e}") from e
         return cls._driver
 
     @classmethod
@@ -66,7 +66,7 @@ class Neo4jClient:
 class AsyncNeo4jClient:
     """Neo4j 异步连接池管理器"""
 
-    _driver: Optional[AsyncDriver] = None
+    _driver: AsyncDriver | None = None
 
     @classmethod
     async def get_driver(cls) -> AsyncDriver:
@@ -84,7 +84,7 @@ class AsyncNeo4jClient:
                 logger.info("Neo4j AsyncDriver 初始化成功")
             except Exception as e:
                 logger.error(f"Neo4j AsyncDriver 初始化失败: {e}")
-                raise Neo4jError(f"Neo4j 异步连接失败: {e}")
+                raise Neo4jError(f"Neo4j 异步连接失败: {e}") from e
         return cls._driver
 
     @classmethod

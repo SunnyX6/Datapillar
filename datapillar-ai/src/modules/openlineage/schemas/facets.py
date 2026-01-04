@@ -51,8 +51,8 @@ class SchemaDatasetFacet(BaseFacet):
         fields = [SchemaField(**f) for f in fields_data]
         return cls(
             fields=fields,
-            producer=data.get("_producer"),
-            schema_url=data.get("_schemaURL"),
+            _producer=data.get("_producer"),
+            _schemaURL=data.get("_schemaURL"),
         )
 
 
@@ -89,15 +89,21 @@ class TableChangeInfo(BaseModel):
 
     # 表级别变更字段
     newName: str | None = Field(default=None, description="新表名（RENAME_TABLE）")
-    newComment: str | None = Field(default=None, description="新注释（UPDATE_COMMENT / UPDATE_COLUMN_COMMENT）")
-    propertyKey: str | None = Field(default=None, description="属性键（SET_PROPERTY / REMOVE_PROPERTY）")
+    newComment: str | None = Field(
+        default=None, description="新注释（UPDATE_COMMENT / UPDATE_COLUMN_COMMENT）"
+    )
+    propertyKey: str | None = Field(
+        default=None, description="属性键（SET_PROPERTY / REMOVE_PROPERTY）"
+    )
     propertyValue: str | None = Field(default=None, description="属性值（SET_PROPERTY）")
 
     # 列级别变更字段
     columnName: str | None = Field(default=None, description="列名")
     oldColumnName: str | None = Field(default=None, description="旧列名（RENAME_COLUMN）")
     newColumnName: str | None = Field(default=None, description="新列名（RENAME_COLUMN）")
-    dataType: str | None = Field(default=None, description="列数据类型（ADD_COLUMN / UPDATE_COLUMN_TYPE）")
+    dataType: str | None = Field(
+        default=None, description="列数据类型（ADD_COLUMN / UPDATE_COLUMN_TYPE）"
+    )
     columnComment: str | None = Field(default=None, description="列注释（ADD_COLUMN）")
     nullable: bool | None = Field(default=None, description="是否可空")
     autoIncrement: bool | None = Field(default=None, description="是否自增")
@@ -141,7 +147,9 @@ class GravitinoDatasetFacet(BaseFacet):
     lastModifier: str | None = Field(default=None, description="最后修改者")
     lastModifiedTime: str | None = Field(default=None, description="最后修改时间（ISO 8601）")
     columns: list[GravitinoColumnMetadata] | None = Field(default=None, description="列扩展元数据")
-    changes: list[TableChangeInfo] | None = Field(default=None, description="表变更列表（alter_table 事件）")
+    changes: list[TableChangeInfo] | None = Field(
+        default=None, description="表变更列表（alter_table 事件）"
+    )
 
     model_config = {"populate_by_name": True, "extra": "allow"}
 
@@ -167,8 +175,8 @@ class GravitinoDatasetFacet(BaseFacet):
             lastModifiedTime=data.get("lastModifiedTime"),
             columns=columns,
             changes=changes,
-            producer=data.get("_producer"),
-            schema_url=data.get("_schemaURL"),
+            _producer=data.get("_producer"),
+            _schemaURL=data.get("_schemaURL"),
         )
 
     def get_column_metadata(self, column_name: str) -> GravitinoColumnMetadata | None:
@@ -208,8 +216,8 @@ class LifecycleStateChangeDatasetFacet(BaseFacet):
         state = data.get("lifecycleStateChange", "")
         return cls(
             lifecycleStateChange=LifecycleStateChange(state),
-            producer=data.get("_producer"),
-            schema_url=data.get("_schemaURL"),
+            _producer=data.get("_producer"),
+            _schemaURL=data.get("_schemaURL"),
         )
 
 
@@ -230,8 +238,8 @@ class SQLJobFacet(BaseFacet):
         return cls(
             query=data.get("query", ""),
             dialect=data.get("dialect"),
-            producer=data.get("_producer"),
-            schema_url=data.get("_schemaURL"),
+            _producer=data.get("_producer"),
+            _schemaURL=data.get("_schemaURL"),
         )
 
 
@@ -263,9 +271,11 @@ class InputField(BaseModel):
     namespace: str = Field(..., description="输入数据集命名空间")
     name: str = Field(..., description="输入数据集名称")
     field: str = Field(..., description="输入字段名称")
-    transformations: list[Transformation] | None = Field(default_factory=list, description="转换信息")
+    transformations: list[Transformation] | None = Field(
+        default_factory=list, description="转换信息"
+    )
 
-    def get_full_qualified_name(self) -> str:
+    def qualified_name(self) -> str:
         """获取完整限定名：namespace/name.field"""
         return f"{self.namespace}/{self.name}.{self.field}"
 
@@ -347,6 +357,6 @@ class ColumnLineageDatasetFacet(BaseFacet):
         return cls(
             fields=fields,
             dataset=dataset_fields,
-            producer=data.get("_producer"),
-            schema_url=data.get("_schemaURL"),
+            _producer=data.get("_producer"),
+            _schemaURL=data.get("_schemaURL"),
         )

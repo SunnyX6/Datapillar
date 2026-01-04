@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
 """
 全局认证中间件
 """
 
-from typing import Callable
 import logging
+from collections.abc import Callable
 
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
@@ -54,7 +53,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # 白名单放行
-        if path in self.WHITELIST_PATHS or path.startswith("/docs") or path.startswith("/redoc") or path.startswith("/api/v1/lineage"):
+        if (
+            path in self.WHITELIST_PATHS
+            or path.startswith("/docs")
+            or path.startswith("/redoc")
+            or path.startswith("/api/v1/lineage")
+        ):
             return await call_next(request)
 
         # 提取 Token
@@ -78,9 +82,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 )
 
             # 检查 Token 类型
-            token_type = self.jwt_util.get_token_type(token)
-            if token_type != "access":
-                logger.warning(f"[Auth] Token类型错误: {token_type}, path={path}")
+            jwt_type = self.jwt_util.get_token_type(token)
+            if jwt_type != "access":
+                logger.warning(f"[Auth] Token类型错误: {jwt_type}, path={path}")
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     content={"error": "Token类型错误，请使用Access Token"},

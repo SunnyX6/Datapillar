@@ -35,10 +35,7 @@ class GravitinoDBClient:
                 f"@{host}:{port}/{database}?charset=utf8mb4"
             )
         elif db_type == "postgresql":
-            return (
-                f"postgresql+psycopg2://{username}:{password}"
-                f"@{host}:{port}/{database}"
-            )
+            return f"postgresql+psycopg2://{username}:{password}" f"@{host}:{port}/{database}"
         elif db_type == "h2":
             # H2 通常用于测试，使用文件模式
             return f"h2+jaydebeapi:///{database}"
@@ -88,4 +85,4 @@ class GravitinoDBClient:
             result = conn.execute(text(query), params or {})
             rows = result.fetchall()
             columns = result.keys()
-            return [dict(zip(columns, row)) for row in rows]
+            return [dict(zip(columns, row, strict=False)) for row in rows]

@@ -3,12 +3,13 @@
 
 包含:
 - settings: 项目环境配置
-- models: LLM 模型配置管理
 - exceptions: 全局异常
 - logging: 日志配置
 """
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 # 注意：必须显式导出 settings 对象，避免 `from src.shared.config import settings`
 # 被 Python 解析为“导入子模块 src.shared.config.settings”而得到 module 对象。
@@ -17,38 +18,37 @@ from src.shared.config.settings import settings
 
 __all__ = [
     "settings",
-    "model_manager",
-    "ModelConfig",
-    "ModelManager",
     "Neo4jError",
     "MySQLError",
     "RedisError",
     "LLMError",
 ]
 
+if TYPE_CHECKING:
+    from src.shared.config.exceptions import (
+        LLMError as LLMError,
+    )
+    from src.shared.config.exceptions import (
+        MySQLError as MySQLError,
+    )
+    from src.shared.config.exceptions import (
+        Neo4jError as Neo4jError,
+    )
+    from src.shared.config.exceptions import (
+        RedisError as RedisError,
+    )
+
 
 def __getattr__(name: str):
     """
-    延迟导入（避免 settings/models/repository 之间的循环依赖）。
-
-    关键点：
-    - 任何 import `src.shared.config.settings` 都会先执行本文件
-    - 因此禁止在 import 阶段加载 `models`（它会反向依赖 repository/mysql/settings）
+    延迟导入（避免导入阶段触发重依赖/循环依赖）。
     """
     if name == "settings":
         from src.shared.config.settings import settings
 
         return settings
-    if name in {"model_manager", "ModelConfig", "ModelManager"}:
-        from src.shared.config.models import model_manager, ModelConfig, ModelManager
-
-        return {
-            "model_manager": model_manager,
-            "ModelConfig": ModelConfig,
-            "ModelManager": ModelManager,
-        }[name]
     if name in {"Neo4jError", "MySQLError", "RedisError", "LLMError"}:
-        from src.shared.config.exceptions import Neo4jError, MySQLError, RedisError, LLMError
+        from src.shared.config.exceptions import LLMError, MySQLError, Neo4jError, RedisError
 
         return {
             "Neo4jError": Neo4jError,

@@ -6,15 +6,15 @@ API 路由聚合
 """
 
 import importlib
+import logging
 import pkgutil
-from typing import Optional
 
 from fastapi import APIRouter
 
 import src.modules as modules_pkg
 
-
 api_router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _register_module(module_path: str, parent_prefix: str = "/ai") -> None:
@@ -28,10 +28,11 @@ def _register_module(module_path: str, parent_prefix: str = "/ai") -> None:
     """
     try:
         module = importlib.import_module(module_path)
-    except ImportError:
+    except Exception as exc:
+        logger.error("模块导入失败，路由未注册: %s, error=%s", module_path, exc, exc_info=True)
         return
 
-    router: Optional[APIRouter] = getattr(module, "router", None)
+    router: APIRouter | None = getattr(module, "router", None)
     if router is None:
         return
 
@@ -52,7 +53,7 @@ def _scan_modules() -> None:
     base_path = modules_pkg.__path__
     base_name = modules_pkg.__name__
 
-    for importer, modname, ispkg in pkgutil.iter_modules(base_path):
+    for _importer, modname, ispkg in pkgutil.iter_modules(base_path):
         if modname.startswith("_"):
             continue
 
@@ -78,8 +79,10 @@ def _scan_modules() -> None:
                     else:
                         pass  # 非包的子模块不处理
 
-            except ImportError:
-                pass
+            except Exception as exc:
+                logger.error(
+                    "模块扫描失败，路由可能不完整: %s, error=%s", module_path, exc, exc_info=True
+                )
         else:
             _register_module(module_path)
 
@@ -88,10 +91,11 @@ def _register_submodule(module_path: str, parent_name: str) -> None:
     """注册子模块，路径为 /ai/{parent}/{submodule}"""
     try:
         module = importlib.import_module(module_path)
-    except ImportError:
+    except Exception as exc:
+        logger.error("子模块导入失败，路由未注册: %s, error=%s", module_path, exc, exc_info=True)
         return
 
-    router: Optional[APIRouter] = getattr(module, "router", None)
+    router: APIRouter | None = getattr(module, "router", None)
     if router is None:
         return
 

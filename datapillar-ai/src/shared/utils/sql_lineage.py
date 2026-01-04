@@ -18,7 +18,6 @@ from enum import Enum
 import sqlglot
 import structlog
 from sqlglot import exp
-from sqlglot.lineage import lineage
 
 logger = structlog.get_logger()
 
@@ -169,9 +168,7 @@ class SQLLineageAnalyzer:
         targets = written_tables - temp_tables
 
         # 构建表级血缘（穿透临时表）
-        table_lineages = self._build_table_lineages(
-            sql_dependencies, sources, targets, temp_tables
-        )
+        table_lineages = self._build_table_lineages(sql_dependencies, sources, targets, temp_tables)
 
         # 提取列级血缘
         column_lineages = self._extract_column_lineages(sqls, sources, targets)
@@ -276,7 +273,7 @@ class SQLLineageAnalyzer:
 
         # 构建依赖图：table -> [依赖的表]
         dependencies: dict[TableRef, set[TableRef]] = {}
-        for reads, writes, sql in sql_dependencies:
+        for reads, writes, _sql in sql_dependencies:
             for write_table in writes:
                 if write_table not in dependencies:
                     dependencies[write_table] = set()
@@ -324,9 +321,7 @@ class SQLLineageAnalyzer:
         for dep in dependencies[table]:
             if dep in temp_tables:
                 # 穿透临时表
-                sources.update(
-                    self._trace_sources(dep, dependencies, temp_tables, visited)
-                )
+                sources.update(self._trace_sources(dep, dependencies, temp_tables, visited))
             else:
                 sources.add(dep)
 
@@ -393,7 +388,7 @@ class SQLLineageAnalyzer:
                 continue
 
             # 只处理有输出的语句（SELECT, INSERT, CREATE AS SELECT）
-            select = self._get_select_from_statement(statement)
+            select = self._select_from_stmt(statement)
             if not select:
                 continue
 
@@ -401,7 +396,7 @@ class SQLLineageAnalyzer:
             target_table = self._get_write_table(statement)
 
             # 分析每个输出列
-            for i, expr in enumerate(select.expressions):
+            for _i, expr in enumerate(select.expressions):
                 if isinstance(expr, exp.Alias):
                     output_name = expr.alias
                     source_expr = expr.this
@@ -430,9 +425,7 @@ class SQLLineageAnalyzer:
 
         return lineages
 
-    def _get_select_from_statement(
-        self, statement: exp.Expression
-    ) -> exp.Select | None:
+    def _select_from_stmt(self, statement: exp.Expression) -> exp.Select | None:
         """从语句中获取 SELECT 子句"""
         if isinstance(statement, exp.Select):
             return statement

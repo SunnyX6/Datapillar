@@ -105,11 +105,10 @@ async def receive_event(event: RunEvent, response: Response) -> SinkResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
-        )
+        ) from e
 
 
 @router.get("/stats", summary="获取统计信息")
 async def get_stats() -> dict[str, Any]:
     """获取统计信息"""
     return event_processor.stats
-

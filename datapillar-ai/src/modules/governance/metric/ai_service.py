@@ -17,7 +17,9 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from src.infrastructure.llm.client import call_llm
 from src.infrastructure.repository import Neo4jKGRepository
 from src.modules.governance.metric.schemas import (
-    AIFillRequest, AIFillResponse, MetricType,
+    AIFillRequest,
+    AIFillResponse,
+    MetricType,
 )
 
 logger = logging.getLogger(__name__)
@@ -169,6 +171,7 @@ COMPOSITE_FILL_PROMPT = """你专门为用户生成复合指标。
 # AI 服务
 # ============================================================================
 
+
 class MetricAIService:
     """指标 AI 治理服务"""
 
@@ -197,10 +200,7 @@ class MetricAIService:
 
         # 5. 构建 prompt
         system_prompt = self._build_system_prompt(
-            request.context.metric_type,
-            semantic_assets,
-            table_context,
-            metric_context
+            request.context.metric_type, semantic_assets, table_context, metric_context
         )
         user_message = self._build_user_message(request)
 
@@ -210,7 +210,7 @@ class MetricAIService:
         messages = [
             SystemMessage(content=system_prompt),
             *STYLE_EXAMPLES,
-            HumanMessage(content=user_message)
+            HumanMessage(content=user_message),
         ]
 
         response = await llm.ainvoke(messages)
@@ -233,9 +233,7 @@ class MetricAIService:
         except json.JSONDecodeError as e:
             logger.error(f"[fill] JSON 解析失败: {e}, content={content[:200]}")
             return AIFillResponse(
-                success=False,
-                message=f"JSON 解析失败: {e}",
-                recommendations=recommendations_list
+                success=False, message=f"JSON 解析失败: {e}", recommendations=recommendations_list
             )
 
     def _get_table_context(self, request: AIFillRequest) -> str:
@@ -254,14 +252,18 @@ class MetricAIService:
                 catalog, schema, table = payload.ref_catalog, payload.ref_schema, payload.ref_table
 
         if catalog and schema and table:
-            result = Neo4jKGRepository.get_table_context_sync(catalog, schema, table)
+            result = Neo4jKGRepository.get_tablecontext_sync(catalog, schema, table)
             if result:
                 logger.info(f"[context] 获取表 {table}, {len(result.columns or [])} 列")
-                return json.dumps({
-                    "table": result.table,
-                    "description": result.description,
-                    "columns": result.columns
-                }, ensure_ascii=False, indent=2)
+                return json.dumps(
+                    {
+                        "table": result.table,
+                        "description": result.description,
+                        "columns": result.columns,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
 
         return "无表信息"
 
@@ -283,7 +285,7 @@ class MetricAIService:
         if not codes:
             return "无指标信息"
 
-        metrics = Neo4jKGRepository.get_metric_context_sync(codes)
+        metrics = Neo4jKGRepository.get_metriccontext_sync(codes)
         if not metrics:
             logger.warning(f"[context] 未找到指标: {codes}")
             return "无指标信息"
@@ -318,10 +320,10 @@ class MetricAIService:
             combined = metrics_list + tables_list
             # 统一按 score 降序排列
             combined.sort(key=lambda x: x.get("score", 0), reverse=True)
-            return (json.dumps({
-                "status": "success",
-                "recommendations": combined
-            }, ensure_ascii=False), combined)
+            return (
+                json.dumps({"status": "success", "recommendations": combined}, ensure_ascii=False),
+                combined,
+            )
         else:
             return self._recommend_metrics(request.user_input)
 
@@ -332,11 +334,17 @@ class MetricAIService:
 
         if not raw_results:
             logger.info(f"[recommend] 推荐表/列无结果, 耗时 {time.time() - start:.3f}s")
-            return (json.dumps({
-                "status": "no_results",
-                "message": f"未找到与「{user_input}」相关的表和列",
-                "recommendations": []
-            }, ensure_ascii=False), [])
+            return (
+                json.dumps(
+                    {
+                        "status": "no_results",
+                        "message": f"未找到与「{user_input}」相关的表和列",
+                        "recommendations": [],
+                    },
+                    ensure_ascii=False,
+                ),
+                [],
+            )
 
         # 按表分组
         tables_map: dict[str, dict] = {}
@@ -357,7 +365,7 @@ class MetricAIService:
                             "fullPath": path,
                             "description": item.get("description"),
                             "tableScore": item.get("score", 0),
-                            "columns": []
+                            "columns": [],
                         }
                     elif item.get("score", 0) > tables_map[table_key]["tableScore"]:
                         tables_map[table_key]["tableScore"] = item.get("score", 0)
@@ -381,15 +389,17 @@ class MetricAIService:
                                 "fullPath": table_path,
                                 "description": None,
                                 "tableScore": 0,
-                                "columns": []
+                                "columns": [],
                             }
 
-                        tables_map[table_path]["columns"].append({
-                            "name": item.get("name"),
-                            "dataType": item.get("dataType"),
-                            "description": item.get("description"),
-                            "score": item.get("score", 0)
-                        })
+                        tables_map[table_path]["columns"].append(
+                            {
+                                "name": item.get("name"),
+                                "dataType": item.get("dataType"),
+                                "description": item.get("description"),
+                                "score": item.get("score", 0),
+                            }
+                        )
 
         # 计算聚合分数：final_score = max(table_score, max_column_score) + bonus
         # bonus = 0.05 × min(matched_column_count, 3)
@@ -408,12 +418,16 @@ class MetricAIService:
         for table in recommendations:
             table["columns"].sort(key=lambda x: x.get("score", 0), reverse=True)
 
-        logger.info(f"[recommend] 推荐表/列完成, {len(recommendations)} 个表, 耗时 {time.time() - start:.3f}s")
+        logger.info(
+            f"[recommend] 推荐表/列完成, {len(recommendations)} 个表, 耗时 {time.time() - start:.3f}s"
+        )
 
-        return (json.dumps({
-            "status": "success",
-            "recommendations": recommendations
-        }, ensure_ascii=False), recommendations)
+        return (
+            json.dumps(
+                {"status": "success", "recommendations": recommendations}, ensure_ascii=False
+            ),
+            recommendations,
+        )
 
     def _recommend_metrics(self, user_input: str) -> tuple[str, list]:
         """推荐指标，返回 (格式化字符串, 原始列表)"""
@@ -422,11 +436,17 @@ class MetricAIService:
 
         if not raw_results:
             logger.info(f"[recommend] 推荐指标无结果, 耗时 {time.time() - start:.3f}s")
-            return (json.dumps({
-                "status": "no_results",
-                "message": f"未找到与「{user_input}」相关的指标",
-                "recommendations": []
-            }, ensure_ascii=False), [])
+            return (
+                json.dumps(
+                    {
+                        "status": "no_results",
+                        "message": f"未找到与「{user_input}」相关的指标",
+                        "recommendations": [],
+                    },
+                    ensure_ascii=False,
+                ),
+                [],
+            )
 
         recommendations = [
             {
@@ -435,41 +455,39 @@ class MetricAIService:
                 "name": m.get("name"),
                 "description": m.get("description"),
                 "type": m.get("type"),
-                "score": m.get("score", 0)
+                "score": m.get("score", 0),
             }
             for m in raw_results[:10]
         ]
 
-        logger.info(f"[recommend] 推荐指标完成, {len(recommendations)} 个, 耗时 {time.time() - start:.3f}s")
+        logger.info(
+            f"[recommend] 推荐指标完成, {len(recommendations)} 个, 耗时 {time.time() - start:.3f}s"
+        )
 
-        return (json.dumps({
-            "status": "success",
-            "recommendations": recommendations
-        }, ensure_ascii=False), recommendations)
+        return (
+            json.dumps(
+                {"status": "success", "recommendations": recommendations}, ensure_ascii=False
+            ),
+            recommendations,
+        )
 
     def _build_system_prompt(
-        self,
-        metric_type: MetricType,
-        semantic_assets: str,
-        table_context: str,
-        metric_context: str
+        self, metric_type: MetricType, semantic_assets: str, table_context: str, metric_context: str
     ) -> str:
         """构建 system prompt"""
         if metric_type == MetricType.ATOMIC:
             return ATOMIC_FILL_PROMPT.format(
-                semantic_assets=semantic_assets,
-                table_context=table_context
+                semantic_assets=semantic_assets, table_context=table_context
             )
         elif metric_type == MetricType.DERIVED:
             return DERIVED_FILL_PROMPT.format(
                 semantic_assets=semantic_assets,
                 table_context=table_context,
-                metric_context=metric_context
+                metric_context=metric_context,
             )
         else:
             return COMPOSITE_FILL_PROMPT.format(
-                semantic_assets=semantic_assets,
-                metric_context=metric_context
+                semantic_assets=semantic_assets, metric_context=metric_context
             )
 
     def _search_semantic_assets(self, user_input: str) -> str:
@@ -516,20 +534,26 @@ class MetricAIService:
             payload = ctx.get_atomic_payload()
             if payload:
                 if payload.ref_catalog and payload.ref_schema and payload.ref_table:
-                    parts.append(f"\n表信息：{payload.ref_catalog}.{payload.ref_schema}.{payload.ref_table}")
+                    parts.append(
+                        f"\n表信息：{payload.ref_catalog}.{payload.ref_schema}.{payload.ref_table}"
+                    )
 
                 if payload.measure_columns:
-                    cols = "\n".join([
-                        f"  - {c.name} ({c.type}): {c.comment or '无注释'}"
-                        for c in payload.measure_columns
-                    ])
+                    cols = "\n".join(
+                        [
+                            f"  - {c.name} ({c.type}): {c.comment or '无注释'}"
+                            for c in payload.measure_columns
+                        ]
+                    )
                     parts.append(f"\n用户选择的度量列：\n{cols}")
 
                 if payload.filter_columns:
-                    cols = "\n".join([
-                        f"  - {c.name} ({c.type}): 可选值 {[v.key for v in c.values]}"
-                        for c in payload.filter_columns
-                    ])
+                    cols = "\n".join(
+                        [
+                            f"  - {c.name} ({c.type}): 可选值 {[v.key for v in c.values]}"
+                            for c in payload.filter_columns
+                        ]
+                    )
                     parts.append(f"\n用户选择的过滤列：\n{cols}")
 
         elif ctx.metric_type == MetricType.DERIVED:
@@ -537,29 +561,37 @@ class MetricAIService:
             if payload:
                 if payload.base_metric:
                     bm = payload.base_metric
-                    parts.append(f"\n基础指标：{bm.code}({bm.name or ''}): {bm.description or '无描述'}")
+                    parts.append(
+                        f"\n基础指标：{bm.code}({bm.name or ''}): {bm.description or '无描述'}"
+                    )
 
                 if payload.ref_catalog and payload.ref_schema and payload.ref_table:
-                    parts.append(f"\n表信息：{payload.ref_catalog}.{payload.ref_schema}.{payload.ref_table}")
+                    parts.append(
+                        f"\n表信息：{payload.ref_catalog}.{payload.ref_schema}.{payload.ref_table}"
+                    )
 
                 if payload.modifiers:
                     mods = ", ".join([f"{m.code}({m.name})" for m in payload.modifiers])
                     parts.append(f"\n用户选择的修饰符：{mods}")
 
                 if payload.filter_columns:
-                    cols = "\n".join([
-                        f"  - {c.name} ({c.type}): 可选值 {[v.key for v in c.values]}"
-                        for c in payload.filter_columns
-                    ])
+                    cols = "\n".join(
+                        [
+                            f"  - {c.name} ({c.type}): 可选值 {[v.key for v in c.values]}"
+                            for c in payload.filter_columns
+                        ]
+                    )
                     parts.append(f"\n用户选择的过滤列：\n{cols}")
 
         else:  # COMPOSITE
             payload = ctx.get_composite_payload()
             if payload and payload.metrics:
-                metrics = "\n".join([
-                    f"  - {m.code}({m.name or ''}): {m.description or '无描述'}"
-                    for m in payload.metrics
-                ])
+                metrics = "\n".join(
+                    [
+                        f"  - {m.code}({m.name or ''}): {m.description or '无描述'}"
+                        for m in payload.metrics
+                    ]
+                )
                 parts.append(f"\n用户选择的指标：\n{metrics}")
 
         return "\n".join(parts)

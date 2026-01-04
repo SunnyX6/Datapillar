@@ -49,6 +49,29 @@ etl_orchestrator_max_iterations = 3
 etl_orchestrator_agent_max_retries = 2
 etl_orchestrator_max_human_requests = 6
 
+# ==================== ETL 对话记忆与上下文压缩 ====================
+# 说明：
+# - 对话记忆存放在 AgentState.messages，并由 LangGraph checkpoint（Redis）持久化
+# - 这里的参数只影响“喂给 LLM 的历史对话窗口”，不影响持久化的数据本身
+etl_conversation_history_max_messages = 12
+# 统一用 token 口径（估算 token；真实 token 以厂商 usage 为准）
+etl_conversation_history_max_tokens = 512
+# OpenAI 兼容模型建议使用 cl100k_base；如需更贴近 gpt-4o 系列，可切到 o200k_base
+etl_tokenizer_encoding = "cl100k_base"
+
+# 说明：
+# - 对话短记忆（agent_conversations）也会进入 checkpoint，为避免 session 膨胀需要做存储上限
+# - 该上限只影响“记忆存储”，不影响 requirement_todo_store / artifact_store 等结构化长期记忆
+etl_agent_conversation_max_turns_per_agent = 200
+# 单条 turn 的上限同样用 token 口径（估算 token）
+etl_agent_conversation_max_content_tokens_per_turn = 800
+
+# ==================== ETL 语义指挥官（用户输入语义分流）====================
+# 说明：
+# - 前端不传 agent_id，由系统在无 pending human request 时做语义分流
+# - 低置信（< 阈值）不允许随便路由：必须转为澄清（clarification）
+etl_semantic_router_min_confidence = 0.7
+
 # ==================== OpenLineage Sink 配置 ====================
 # Sink 端负责接收事件并写入 Neo4j
 # retry、rate_limit、filter 等配置由 Producer 端（Flink/Spark/Airflow）在 openlineage.yml 中配置

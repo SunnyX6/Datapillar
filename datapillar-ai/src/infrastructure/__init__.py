@@ -16,6 +16,21 @@ __all__ = [
     "convert_neo4j_types",
 ]
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.infrastructure.database.mysql import MySQLClient as MySQLClient
+    from src.infrastructure.database.neo4j import (
+        AsyncNeo4jClient as AsyncNeo4jClient,
+    )
+    from src.infrastructure.database.neo4j import (
+        Neo4jClient as Neo4jClient,
+    )
+    from src.infrastructure.database.neo4j import (
+        convert_neo4j_types as convert_neo4j_types,
+    )
+    from src.infrastructure.database.redis import RedisClient as RedisClient
+
 
 def __getattr__(name: str):
     """
@@ -27,7 +42,13 @@ def __getattr__(name: str):
     - 使用 __getattr__ 让需要 Database client 的模块仍能通过
       `from src.infrastructure import MySQLClient` 这种写法获取对象。
     """
-    if name in {"Neo4jClient", "AsyncNeo4jClient", "MySQLClient", "RedisClient", "convert_neo4j_types"}:
+    if name in {
+        "Neo4jClient",
+        "AsyncNeo4jClient",
+        "MySQLClient",
+        "RedisClient",
+        "convert_neo4j_types",
+    }:
         from src.infrastructure import database as _db
 
         return getattr(_db, name)

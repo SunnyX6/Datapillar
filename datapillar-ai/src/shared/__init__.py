@@ -6,7 +6,12 @@
 
 from __future__ import annotations
 
-__all__ = ["settings", "model_manager", "ModelConfig", "ModelManager"]
+from typing import TYPE_CHECKING
+
+__all__ = ["settings"]
+
+if TYPE_CHECKING:
+    from src.shared.config.settings import settings as settings
 
 
 def __getattr__(name: str):
@@ -21,12 +26,4 @@ def __getattr__(name: str):
         from src.shared.config.settings import settings
 
         return settings
-    if name in {"model_manager", "ModelConfig", "ModelManager"}:
-        from src.shared.config.models import model_manager, ModelConfig, ModelManager
-
-        return {
-            "model_manager": model_manager,
-            "ModelConfig": ModelConfig,
-            "ModelManager": ModelManager,
-        }[name]
     raise AttributeError(name)

@@ -9,8 +9,8 @@ import logging
 from sqlalchemy import create_engine
 from sqlalchemy.pool import QueuePool
 
-from src.shared.config.settings import settings
 from src.shared.config.exceptions import MySQLError
+from src.shared.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +40,12 @@ class MySQLClient:
                     pool_timeout=30,
                     echo=False,
                 )
-                logger.info(f"MySQL 连接池已初始化: {settings.mysql_host}:{settings.mysql_port}/{settings.mysql_database}")
+                logger.info(
+                    f"MySQL 连接池已初始化: {settings.mysql_host}:{settings.mysql_port}/{settings.mysql_database}"
+                )
             except Exception as e:
                 logger.error(f"MySQL 连接池初始化失败: {e}")
-                raise MySQLError(f"MySQL 连接池初始化失败: {e}")
+                raise MySQLError(f"MySQL 连接池初始化失败: {e}") from e
         return cls._engine
 
     @classmethod
