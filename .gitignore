@@ -75,6 +75,7 @@ nohup.out
 .pytest_cache/
 .pycache/
 .uv-cache/
+.uv_cache/
 .pre-commit-cache/
 **/.pytest_cache/
 .nyc_output/

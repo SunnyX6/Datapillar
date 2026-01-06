@@ -4,13 +4,13 @@ from dataclasses import dataclass
 
 import structlog
 
+from src.infrastructure.repository.kg.dto import generate_id
 from src.modules.openlineage.parsers.common.namespace import (
     dataset_table_name,
     parse_gravitino_namespace,
 )
 from src.modules.openlineage.parsers.common.qualified_name import parse_schema_table
 from src.modules.openlineage.schemas.events import InputDataset, OutputDataset
-from src.modules.openlineage.schemas.neo4j import generate_id
 
 logger = structlog.get_logger()
 

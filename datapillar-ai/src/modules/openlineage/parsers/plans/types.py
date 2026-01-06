@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from src.infrastructure.repository.kg.dto import (
+    SQLDTO,
+    ModifierDTO,
+    UnitDTO,
+    ValueDomainDTO,
+    WordRootDTO,
+)
 from src.modules.openlineage.parsers.plans.metadata import (
     AlterTablePlan,
     CatalogWritePlan,
@@ -10,13 +17,6 @@ from src.modules.openlineage.parsers.plans.metadata import (
     TableWritePlan,
     TagUpdatePlan,
     TagWritePlan,
-)
-from src.modules.openlineage.schemas.neo4j import (
-    ModifierNode,
-    SQLNode,
-    UnitNode,
-    ValueDomainNode,
-    WordRootNode,
 )
 
 
@@ -45,10 +45,10 @@ class MetadataWritePlans:
     tag_plans: list[TagWritePlan] = field(default_factory=list)
     tag_ids_to_drop: list[str] = field(default_factory=list)
 
-    wordroot_nodes: list[WordRootNode] = field(default_factory=list)
-    modifier_nodes: list[ModifierNode] = field(default_factory=list)
-    unit_nodes: list[UnitNode] = field(default_factory=list)
-    valuedomain_nodes: list[ValueDomainNode] = field(default_factory=list)
+    wordroot_nodes: list[WordRootDTO] = field(default_factory=list)
+    modifier_nodes: list[ModifierDTO] = field(default_factory=list)
+    unit_nodes: list[UnitDTO] = field(default_factory=list)
+    valuedomain_nodes: list[ValueDomainDTO] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -64,9 +64,12 @@ class LineageWritePlans:
     metric_parent_relationships: list[dict] = field(default_factory=list)
 
     # ===== SQL & 血缘 =====
-    sql_node: SQLNode | None = None
+    sql_node: SQLDTO | None = None
     table_input_ids: list[str] = field(default_factory=list)
     table_output_ids: list[str] = field(default_factory=list)
+    # 表名（用于 SQL 摘要生成，格式：schema.table）
+    table_input_names: list[str] = field(default_factory=list)
+    table_output_names: list[str] = field(default_factory=list)
     column_lineage_data: list[dict] = field(default_factory=list)
 
     # ===== 指标列血缘 =====

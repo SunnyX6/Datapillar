@@ -3,8 +3,8 @@ from __future__ import annotations
 import structlog
 from neo4j import AsyncSession
 
-from src.infrastructure.repository.openlineage import OpenLineageLineageRepository
-from src.modules.openlineage.schemas.neo4j import SQLNode
+from src.infrastructure.repository.kg.dto import SQLDTO
+from src.infrastructure.repository.openlineage import Lineage
 
 logger = structlog.get_logger()
 
@@ -23,12 +23,12 @@ class TableLineageWriter:
         self,
         session: AsyncSession,
         *,
-        sql: SQLNode,
+        sql: SQLDTO,
         input_table_ids: list[str],
         output_table_ids: list[str],
     ) -> None:
         if input_table_ids:
-            await OpenLineageLineageRepository.link_sql_inputs(
+            await Lineage.link_sql_inputs(
                 session,
                 sql_id=sql.id,
                 table_ids=input_table_ids,
@@ -37,7 +37,7 @@ class TableLineageWriter:
             logger.debug("table_input_lineage_batch_written", count=len(input_table_ids))
 
         if output_table_ids:
-            await OpenLineageLineageRepository.link_sql_outputs(
+            await Lineage.link_sql_outputs(
                 session,
                 sql_id=sql.id,
                 table_ids=output_table_ids,

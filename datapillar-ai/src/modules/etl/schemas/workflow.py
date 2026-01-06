@@ -11,9 +11,119 @@
 - depends：Job 之间的依赖关系
 """
 
+import json
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def _try_parse_json(value: object) -> object:
+    if not isinstance(value, str):
+        return value
+    text = value.strip()
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return value
+
+
+# ==================== LLM 输出专用 Schema ====================
+# 只包含 LLM 需要输出的字段，其他字段由代码填充
+
+
+class StageOutput(BaseModel):
+    """Stage 输出（LLM 生成，用于 structured output）"""
+
+    stage_id: int = Field(..., description="Stage 序号，Job 内唯一，从 1 开始递增")
+    name: str = Field(..., description="Stage 名称，简洁描述这个阶段做什么")
+    description: str = Field(..., description="Stage 详细描述，说明数据处理逻辑")
+    input_tables: list[str] = Field(
+        default_factory=list, description="读取的表列表，格式为 schema.table"
+    )
+    output_table: str = Field(..., description="输出表名，格式为 schema.table")
+    is_temp_table: bool = Field(default=True, description="是否是临时表，临时表只在当前 Job 内有效")
+
+    @field_validator("input_tables", mode="before")
+    @classmethod
+    def _parse_input_tables(cls, v: object) -> object:
+        return _try_parse_json(v)
+
+
+class JobOutput(BaseModel):
+    """Job 输出（LLM 生成，用于 structured output）"""
+
+    id: str = Field(..., description="Job 唯一标识，建议使用 job_1, job_2 格式")
+    name: str = Field(..., description="Job 名称，简洁描述这个作业做什么")
+    description: str | None = Field(None, description="Job 详细描述")
+    depends: list[str] = Field(
+        default_factory=list,
+        description="依赖的上游 Job ID 列表，用于调度依赖，如果 Job B 读的表是 Job A 写的，则填 Job A 的 ID",
+    )
+    step_ids: list[str] = Field(
+        default_factory=list, description="关联的业务步骤 ID 列表，来自 AnalysisResult.steps"
+    )
+    stages: list[StageOutput] = Field(
+        default_factory=list, description="执行阶段列表，按执行顺序排列"
+    )
+    input_tables: list[str] = Field(default_factory=list, description="Job 读取的持久化表列表")
+    output_table: str | None = Field(None, description="Job 写入的最终目标表")
+
+    @field_validator("depends", "step_ids", "input_tables", mode="before")
+    @classmethod
+    def _parse_list_fields(cls, v: object) -> object:
+        """容错：null -> 空列表，字符串化 JSON -> 解析"""
+        v = _try_parse_json(v)
+        if v is None:
+            return []
+        if isinstance(v, str):
+            items = [s.strip() for s in v.split(",")]
+            return [s for s in items if s]
+        return v
+
+    @field_validator("stages", mode="before")
+    @classmethod
+    def _parse_stages(cls, v: object) -> object:
+        return _try_parse_json(v)
+
+
+class WorkflowOutput(BaseModel):
+    """
+    工作流输出（LLM 生成，用于 structured output）
+
+    不含 id/schedule/env 等运行时字段，由代码填充。
+    """
+
+    name: str = Field(..., description="工作流名称，简洁描述整个 ETL 流程")
+    description: str | None = Field(None, description="工作流详细描述")
+    jobs: list[JobOutput] = Field(default_factory=list, description="作业列表，按 DAG 拓扑顺序排列")
+    risks: list[str] = Field(
+        default_factory=list, description="架构风险点列表，如性能瓶颈、数据倾斜等"
+    )
+    confidence: float = Field(
+        default=0.8, ge=0.0, le=1.0, description="架构方案置信度，复杂场景应 < 0.8"
+    )
+
+    @field_validator("jobs", mode="before")
+    @classmethod
+    def _parse_jobs(cls, v: object) -> object:
+        return _try_parse_json(v)
+
+    @field_validator("risks", mode="before")
+    @classmethod
+    def _parse_risks(cls, v: object) -> object:
+        """容错：null -> 空列表，字符串化 JSON -> 解析"""
+        v = _try_parse_json(v)
+        if v is None:
+            return []
+        if isinstance(v, str):
+            items = [s.strip() for s in v.split(",")]
+            return [s for s in items if s]
+        return v
+
+
+# ==================== 完整数据结构 ====================
 
 
 class Stage(BaseModel):
@@ -112,6 +222,57 @@ class Workflow(BaseModel):
     # 置信度
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
+    @classmethod
+    def from_output(
+        cls,
+        output: "WorkflowOutput",
+        selected_component: str,
+        selected_component_id: int | None = None,
+    ) -> "Workflow":
+        """
+        从 LLM 输出构建完整的 Workflow
+
+        Args:
+            output: LLM 生成的 WorkflowOutput
+            selected_component: 用户选择的组件类型
+            selected_component_id: 组件 ID
+        """
+        jobs = []
+        for job_output in output.jobs:
+            stages = [
+                Stage(
+                    stage_id=s.stage_id,
+                    name=s.name,
+                    description=s.description,
+                    input_tables=s.input_tables,
+                    output_table=s.output_table,
+                    is_temp_table=s.is_temp_table,
+                    sql=None,
+                )
+                for s in job_output.stages
+            ]
+            job = Job(
+                id=job_output.id,
+                name=job_output.name,
+                description=job_output.description,
+                type=selected_component,
+                type_id=selected_component_id,
+                depends=job_output.depends,
+                step_ids=job_output.step_ids,
+                stages=stages,
+                input_tables=job_output.input_tables,
+                output_table=job_output.output_table,
+            )
+            jobs.append(job)
+
+        return cls(
+            name=output.name,
+            description=output.description,
+            jobs=jobs,
+            risks=output.risks,
+            confidence=output.confidence,
+        )
+
     def get_job(self, job_id: str) -> Job | None:
         """获取作业"""
         for job in self.jobs:
@@ -160,6 +321,52 @@ class Workflow(BaseModel):
             dfs(job.id)
 
         return result
+
+    def topological_layers(self) -> list[list[Job]]:
+        """
+        拓扑分层（按依赖层级分组）
+
+        返回按执行顺序排列的层列表，同一层内的 Job 可以并行执行。
+        例如：[[job_1, job_2], [job_3], [job_4, job_5]]
+        表示 job_1 和 job_2 可以并行，完成后 job_3 执行，最后 job_4 和 job_5 并行。
+
+        算法：Kahn's algorithm（BFS 拓扑排序）
+        """
+        if not self.jobs:
+            return []
+
+        # 构建入度表和邻接表
+        in_degree: dict[str, int] = {job.id: 0 for job in self.jobs}
+        adjacency: dict[str, list[str]] = {job.id: [] for job in self.jobs}
+
+        for job in self.jobs:
+            for dep_id in job.depends:
+                if dep_id in adjacency:
+                    adjacency[dep_id].append(job.id)
+                    in_degree[job.id] += 1
+
+        layers: list[list[Job]] = []
+
+        # BFS 分层
+        while True:
+            # 找出当前入度为 0 的所有节点（当前层）
+            current_layer_ids = [job_id for job_id, degree in in_degree.items() if degree == 0]
+            if not current_layer_ids:
+                break
+
+            # 获取当前层的 Job 对象
+            current_layer = [job for job in self.jobs if job.id in current_layer_ids]
+            if current_layer:
+                layers.append(current_layer)
+
+            # 移除当前层节点，更新下游节点的入度
+            for job_id in current_layer_ids:
+                del in_degree[job_id]
+                for downstream_id in adjacency.get(job_id, []):
+                    if downstream_id in in_degree:
+                        in_degree[downstream_id] -= 1
+
+        return layers
 
     def validate_dag(self) -> list[str]:
         """验证 DAG 是否合法"""
@@ -327,39 +534,3 @@ class Workflow(BaseModel):
                             )
 
         return errors
-
-
-class TestCase(BaseModel):
-    """测试用例（TesterAgent 生成）"""
-
-    name: str
-    description: str | None = None
-    test_type: Literal["positive", "boundary", "negative"] = "positive"
-    node_id: str | None = None
-    input_data: str | None = None
-    expected_result: str | None = None
-    sql_assertion: str | None = None
-
-
-class TestResult(BaseModel):
-    """
-    测试结果（Tester Agent 输出）
-    """
-
-    passed: bool
-    total_tests: int
-    passed_tests: int
-    failed_tests: int
-    test_cases: list[TestCase] = Field(default_factory=list)
-    validation_errors: list[str] = Field(default_factory=list)
-    validation_warnings: list[str] = Field(default_factory=list)
-    coverage_summary: dict[str, Any] = Field(default_factory=dict)
-    notes: str | None = None
-
-    def all_passed(self) -> bool:
-        """是否全部测试通过"""
-        return self.passed
-
-    def has_warnings(self) -> bool:
-        """是否有警告"""
-        return len(self.validation_warnings) > 0

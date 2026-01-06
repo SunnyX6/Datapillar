@@ -8,9 +8,18 @@
 辅助模块：
 - budget.py: 预算判断（何时需要压缩）
 - clip.py: 载荷裁剪（截断过长字符串/列表）
+- agent_compressor.py: Agent 对话压缩器
 """
 
 # 产物索引
+# Agent 对话压缩
+from src.modules.etl.context.compress.agent_compressor import (
+    CompressionResult,
+    compress_agent_conversation,
+    estimate_context_tokens,
+    maybe_compress,
+    should_compress,
+)
 from src.modules.etl.context.compress.artifact import (
     ArtifactStatus,
     ArtifactStore,
@@ -49,4 +58,10 @@ __all__ = [
     "CompressionReason",
     # 载荷裁剪
     "clip_payload",
+    # Agent 对话压缩
+    "CompressionResult",
+    "compress_agent_conversation",
+    "estimate_context_tokens",
+    "maybe_compress",
+    "should_compress",
 ]

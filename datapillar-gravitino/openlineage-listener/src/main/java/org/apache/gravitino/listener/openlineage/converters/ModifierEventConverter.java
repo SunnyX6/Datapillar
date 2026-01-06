@@ -158,9 +158,15 @@ public class ModifierEventConverter extends BaseEventConverter {
     fields.add(
         openLineage.newSchemaDatasetFacetFields("code", "STRING", modifierInfo.code(), null));
     modifierInfo
+        .name()
+        .ifPresent(
+            n -> fields.add(openLineage.newSchemaDatasetFacetFields("name", "STRING", n, null)));
+    modifierInfo
         .modifierType()
         .ifPresent(
-            t -> fields.add(openLineage.newSchemaDatasetFacetFields("type", "STRING", t, null)));
+            t ->
+                fields.add(
+                    openLineage.newSchemaDatasetFacetFields("modifierType", "STRING", t, null)));
     modifierInfo
         .comment()
         .ifPresent(

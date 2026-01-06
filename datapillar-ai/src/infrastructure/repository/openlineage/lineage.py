@@ -1,9 +1,9 @@
 """
-OpenLineage 血缘 Repository（MyBatis Mapper 风格）
+OpenLineage 血缘数据访问
 
 约束：
 - openlineage 模块内禁止直接拼接/执行 Cypher
-- 所有与“血缘关系边（SQL/表级/列级/指标列/列值域）”相关的 Cypher 语句在此集中管理
+- 所有与"血缘关系边（SQL/表级/列级/指标列/列值域）"相关的 Cypher 语句在此集中管理
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Any
 from src.infrastructure.database.cypher import arun_cypher
 
 
-class OpenLineageLineageRepository:
+class Lineage:
     """OpenLineage 血缘 Neo4j 访问层（Cypher Mapper）"""
 
     # ==================== 结构关系（层级边） ====================
@@ -91,12 +91,12 @@ class OpenLineageLineageRepository:
 
     @staticmethod
     def _assert_metric_label(label: str) -> None:
-        if label not in OpenLineageLineageRepository._ALLOWED_METRIC_LABELS:
+        if label not in Lineage._ALLOWED_METRIC_LABELS:
             raise ValueError(f"不支持的 Metric label: {label}")
 
     @staticmethod
     def _assert_metric_rel(rel_type: str) -> None:
-        if rel_type not in OpenLineageLineageRepository._ALLOWED_METRIC_REL_TYPES:
+        if rel_type not in Lineage._ALLOWED_METRIC_REL_TYPES:
             raise ValueError(f"不支持的 Metric 关系类型: {rel_type}")
 
     @staticmethod
@@ -113,8 +113,8 @@ class OpenLineageLineageRepository:
 
         注意：父指标固定为 AtomicMetric；子指标可能为 DerivedMetric / CompositeMetric。
         """
-        OpenLineageLineageRepository._assert_metric_label(child_label)
-        OpenLineageLineageRepository._assert_metric_rel(rel_type)
+        Lineage._assert_metric_label(child_label)
+        Lineage._assert_metric_rel(rel_type)
 
         delete_query = f"""
         MATCH (child:{child_label} {{id: $childId}})-[r:{rel_type}]->()
@@ -148,8 +148,8 @@ class OpenLineageLineageRepository:
         """
         追加写入父子关系（不删除旧关系）。
         """
-        OpenLineageLineageRepository._assert_metric_label(child_label)
-        OpenLineageLineageRepository._assert_metric_rel(rel_type)
+        Lineage._assert_metric_label(child_label)
+        Lineage._assert_metric_rel(rel_type)
 
         if not parent_ids:
             return
@@ -405,7 +405,7 @@ class OpenLineageLineageRepository:
 
     @staticmethod
     def _assert_tag_label(label: str) -> None:
-        if label not in OpenLineageLineageRepository._ALLOWED_TAG_SOURCE_LABELS:
+        if label not in Lineage._ALLOWED_TAG_SOURCE_LABELS:
             raise ValueError(f"不支持的 Tag 源节点类型: {label}")
 
     @staticmethod
@@ -417,7 +417,7 @@ class OpenLineageLineageRepository:
         tag_id: str,
     ) -> dict[str, Any] | None:
         """添加 HAS_TAG 关系边"""
-        OpenLineageLineageRepository._assert_tag_label(source_label)
+        Lineage._assert_tag_label(source_label)
         query = f"""
         MATCH (src:{source_label} {{id: $sourceId}})
         MATCH (tag:Tag {{id: $tagId}})
@@ -439,7 +439,7 @@ class OpenLineageLineageRepository:
         tag_id: str,
     ) -> dict[str, Any] | None:
         """移除 HAS_TAG 关系边"""
-        OpenLineageLineageRepository._assert_tag_label(source_label)
+        Lineage._assert_tag_label(source_label)
         query = f"""
         MATCH (src:{source_label} {{id: $sourceId}})-[r:HAS_TAG]->(tag:Tag {{id: $tagId}})
         DELETE r
@@ -460,7 +460,7 @@ class OpenLineageLineageRepository:
         """批量添加 HAS_TAG 关系边"""
         if not tag_ids:
             return
-        OpenLineageLineageRepository._assert_tag_label(source_label)
+        Lineage._assert_tag_label(source_label)
         query = f"""
         UNWIND $tagIds AS tagId
         MATCH (src:{source_label} {{id: $sourceId}})
@@ -482,7 +482,7 @@ class OpenLineageLineageRepository:
         """批量移除 HAS_TAG 关系边"""
         if not tag_ids:
             return
-        OpenLineageLineageRepository._assert_tag_label(source_label)
+        Lineage._assert_tag_label(source_label)
         query = f"""
         UNWIND $tagIds AS tagId
         MATCH (src:{source_label} {{id: $sourceId}})-[r:HAS_TAG]->(tag:Tag {{id: tagId}})

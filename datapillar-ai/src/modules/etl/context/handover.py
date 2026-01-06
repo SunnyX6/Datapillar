@@ -11,7 +11,7 @@ Handover - 员工交接物存储（运行时）
 交接物引用格式：
 - analysis:{uuid}  -> AnalysisResult
 - workflow:{uuid}  -> Workflow
-- test:{uuid}      -> TestResult
+- review:{uuid}    -> ReviewResult
 """
 
 from __future__ import annotations
@@ -21,8 +21,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from src.modules.etl.schemas.plan import TestResult
-from src.modules.etl.schemas.requirement import AnalysisResult
+from src.modules.etl.schemas.analyst import AnalysisResult
+from src.modules.etl.schemas.review import ReviewResult
 
 
 class DeliverableRef(BaseModel):
@@ -59,7 +59,7 @@ class Handover(BaseModel):
     # ==================== 快捷访问 ====================
     latest_analysis_ref: str | None = Field(None, description="最新的需求分析结果引用")
     latest_workflow_ref: str | None = Field(None, description="最新的工作流引用")
-    latest_test_ref: str | None = Field(None, description="最新的测试结果引用")
+    latest_review_ref: str | None = Field(None, description="最新的 review 结果引用")
     latest_knowledge_refs: dict[str, str] = Field(
         default_factory=dict,
         description="各 Agent 最新的知识上下文引用",
@@ -77,8 +77,8 @@ class Handover(BaseModel):
             self.latest_analysis_ref = ref.ref
         elif ref.type == "workflow" or ref.type == "plan":
             self.latest_workflow_ref = ref.ref
-        elif ref.type == "test":
-            self.latest_test_ref = ref.ref
+        elif ref.type == "test" or ref.type == "review":
+            self.latest_review_ref = ref.ref
         elif ref.type == "knowledge" or ref.type == "context":
             self.latest_knowledge_refs[ref.producer] = ref.ref
 
@@ -105,15 +105,15 @@ class Handover(BaseModel):
             return None
         return self.deliverables.get(self.latest_workflow_ref)
 
-    def get_test_result(self) -> TestResult | None:
-        """获取最新的测试结果"""
-        if not self.latest_test_ref:
+    def get_review_result(self) -> ReviewResult | None:
+        """获取最新的 review 结果"""
+        if not self.latest_review_ref:
             return None
-        content = self.deliverables.get(self.latest_test_ref)
-        if isinstance(content, TestResult):
+        content = self.deliverables.get(self.latest_review_ref)
+        if isinstance(content, ReviewResult):
             return content
         if isinstance(content, dict):
-            return TestResult(**content)
+            return ReviewResult(**content)
         return None
 
     # ==================== 简化接口（供 Orchestrator 使用） ====================
@@ -129,14 +129,14 @@ class Handover(BaseModel):
         """获取最新的交付物（按类型）"""
         if dtype == "analysis":
             return self.get_analysis()
-        if dtype == "test":
-            return self.get_test_result()
+        if dtype == "review":
+            return self.get_review_result()
         if dtype == "plan" or dtype == "workflow":
             return self.get_workflow()
         # 通用查找
-        for key, value in self.deliverables.items():
+        for key in reversed(list(self.deliverables.keys())):
             if key.startswith(f"{dtype}:"):
-                return value
+                return self.deliverables.get(key)
         return None
 
     def store_context(self, agent_type: str, context: Any) -> None:
@@ -159,5 +159,5 @@ class Handover(BaseModel):
         self.deliverables.clear()
         self.latest_analysis_ref = None
         self.latest_workflow_ref = None
-        self.latest_test_ref = None
+        self.latest_review_ref = None
         self.latest_knowledge_refs.clear()

@@ -11,14 +11,20 @@ import structlog
 from neo4j import AsyncSession
 
 from src.infrastructure.database.gravitino import GravitinoDBClient
+from src.infrastructure.repository.kg.dto import (
+    ModifierDTO,
+    UnitDTO,
+    ValueDomainDTO,
+    WordRootDTO,
+    generate_id,
+)
 from src.infrastructure.repository.neo4j_uow import neo4j_async_session
 from src.infrastructure.repository.openlineage import (
-    OpenLineageLineageRepository,
-    OpenLineageMetadataRepository,
+    Lineage,
+    Metadata,
 )
-from src.infrastructure.repository.openlineage.metadata_repository import TableUpsertPayload
+from src.infrastructure.repository.openlineage.metadata import TableUpsertPayload
 from src.modules.openlineage.core.embedding_processor import embedding_processor
-from src.modules.openlineage.schemas.neo4j import generate_id
 from src.shared.config import settings
 
 logger = structlog.get_logger()
@@ -70,11 +76,11 @@ class GravitinoSyncService:
             self._current_embedding_provider = ""
             return
 
-        self._valid_embeddings = await OpenLineageMetadataRepository.list_embedding_ids(
+        self._valid_embeddings = await Metadata.list_embedding_ids(
             session,
             provider=self._current_embedding_provider,
         )
-        stale_count = await OpenLineageMetadataRepository.count_stale_embeddings(
+        stale_count = await Metadata.count_stale_embeddings(
             session,
             provider=self._current_embedding_provider,
         )
@@ -183,7 +189,7 @@ class GravitinoSyncService:
             properties = json.loads(row["properties"]) if row["properties"] else None
             tags = row["tags"].split(",") if row["tags"] else None
 
-            await OpenLineageMetadataRepository.upsert_catalog(
+            await Metadata.upsert_catalog(
                 session,
                 id=catalog_id,
                 name=row["catalog_name"],
@@ -229,7 +235,7 @@ class GravitinoSyncService:
             catalog_id = generate_id("catalog", self._metalake_name, row["catalog_name"])
             properties = json.loads(row["properties"]) if row["properties"] else None
             tags = row["tags"].split(",") if row["tags"] else None
-            await OpenLineageMetadataRepository.upsert_schema(
+            await Metadata.upsert_schema(
                 session,
                 id=schema_id,
                 name=row["schema_name"],
@@ -237,7 +243,7 @@ class GravitinoSyncService:
                 properties=json.dumps(properties) if properties else None,
                 created_by="GRAVITINO_SYNC",
             )
-            await OpenLineageLineageRepository.link_catalog_schema(
+            await Lineage.link_catalog_schema(
                 session,
                 catalog_id=catalog_id,
                 schema_id=schema_id,
@@ -287,14 +293,14 @@ class GravitinoSyncService:
             table_tags = table["tags"].split(",") if table["tags"] else None
 
             # 写入 Table 节点
-            await OpenLineageMetadataRepository.upsert_table(
+            await Metadata.upsert_table(
                 session,
                 id=table_id,
                 name=table["table_name"],
                 created_by="GRAVITINO_SYNC",
                 payload=TableUpsertPayload(description=table.get("table_comment")),
             )
-            await OpenLineageLineageRepository.link_schema_table(
+            await Lineage.link_schema_table(
                 session,
                 schema_id=schema_id,
                 table_id=table_id,
@@ -341,7 +347,7 @@ class GravitinoSyncService:
                 )
                 col_tags = col["tags"].split(",") if col["tags"] else None
 
-                await OpenLineageMetadataRepository.upsert_column_sync(
+                await Metadata.upsert_column_sync(
                     session,
                     id=column_id,
                     name=col["column_name"],
@@ -360,7 +366,7 @@ class GravitinoSyncService:
                 )
 
             if column_ids:
-                await OpenLineageLineageRepository.link_table_columns(
+                await Lineage.link_table_columns(
                     session,
                     table_id=table_id,
                     column_ids=column_ids,
@@ -404,7 +410,7 @@ class GravitinoSyncService:
                 "schema", self._metalake_name, row["catalog_name"], row["schema_name"]
             )
 
-            await OpenLineageMetadataRepository.upsert_metric_sync(
+            await Metadata.upsert_metric_sync(
                 session,
                 label=label,
                 id=metric_id,
@@ -418,7 +424,7 @@ class GravitinoSyncService:
 
             # 原子指标挂在 Schema 下
             if metric_type == "ATOMIC":
-                await OpenLineageLineageRepository.link_schema_metric(
+                await Lineage.link_schema_metric(
                     session,
                     schema_id=schema_id,
                     metric_id=metric_id,
@@ -437,7 +443,7 @@ class GravitinoSyncService:
                 ]
                 rel_type = "DERIVED_FROM" if metric_type == "DERIVED" else "COMPUTED_FROM"
                 parent_ids = [generate_id("metric", parent_code) for parent_code in parent_codes]
-                await OpenLineageLineageRepository.set_metric_parents(
+                await Lineage.set_metric_parents(
                     session,
                     child_label=label,
                     child_id=metric_id,
@@ -460,15 +466,15 @@ class GravitinoSyncService:
 
         for row in rows:
             wordroot_id = generate_id("wordroot", row["root_code"])
-            await OpenLineageMetadataRepository.upsert_wordroot(
-                session,
+            dto = WordRootDTO(
                 id=wordroot_id,
+                name=row["root_name"] or row["root_code"],
                 code=row["root_code"],
-                name=row["root_name"],
                 data_type=row["data_type"],
                 description=row["root_comment"],
                 created_by="GRAVITINO_SYNC",
             )
+            await Metadata.upsert_wordroot(session, dto)
 
             # 将 WordRoot embedding 任务入队
             await self._queue_embedding_task(
@@ -490,18 +496,22 @@ class GravitinoSyncService:
 
         for row in rows:
             modifier_id = generate_id("modifier", row["modifier_code"])
-            await OpenLineageMetadataRepository.upsert_modifier(
-                session,
+            dto = ModifierDTO(
                 id=modifier_id,
+                name=row["modifier_name"] or row["modifier_code"],
                 code=row["modifier_code"],
                 modifier_type=row["modifier_type"],
                 description=row["modifier_comment"],
                 created_by="GRAVITINO_SYNC",
             )
+            await Metadata.upsert_modifier(session, dto)
 
             # 将 Modifier embedding 任务入队
             await self._queue_embedding_task(
-                modifier_id, "Modifier", row["modifier_code"], row["modifier_comment"]
+                modifier_id,
+                "Modifier",
+                row["modifier_name"] or row["modifier_code"],
+                row["modifier_comment"],
             )
 
             self._stats["modifiers"] += 1
@@ -519,15 +529,15 @@ class GravitinoSyncService:
 
         for row in rows:
             unit_id = generate_id("unit", row["unit_code"])
-            await OpenLineageMetadataRepository.upsert_unit(
-                session,
+            dto = UnitDTO(
                 id=unit_id,
+                name=row["unit_name"] or row["unit_code"],
                 code=row["unit_code"],
-                name=row["unit_name"],
                 symbol=row["unit_symbol"],
                 description=row["unit_comment"],
                 created_by="GRAVITINO_SYNC",
             )
+            await Metadata.upsert_unit(session, dto)
 
             # 将 Unit embedding 任务入队
             await self._queue_embedding_task(
@@ -550,11 +560,10 @@ class GravitinoSyncService:
 
         for row in rows:
             valuedomain_id = generate_id("valuedomain", row["domain_code"])
-            await OpenLineageMetadataRepository.upsert_valuedomain(
-                session,
+            dto = ValueDomainDTO(
                 id=valuedomain_id,
-                domain_code=row["domain_code"],
-                domain_name=row["domain_name"],
+                name=row["domain_name"] or row["domain_code"],
+                code=row["domain_code"],
                 domain_type=row["domain_type"],
                 domain_level=row["domain_level"],
                 items=row["items"],
@@ -562,6 +571,7 @@ class GravitinoSyncService:
                 description=row["domain_comment"],
                 created_by="GRAVITINO_SYNC",
             )
+            await Metadata.upsert_valuedomain(session, dto)
 
             # 将 ValueDomain embedding 任务入队（包含 items 信息）
             embedding_text = row["domain_name"] or row["domain_code"]
@@ -615,7 +625,7 @@ class GravitinoSyncService:
                             ref_table,
                             col_name,
                         )
-                        await OpenLineageLineageRepository.add_metric_measure(
+                        await Lineage.add_metric_measure(
                             session,
                             metric_id=metric_id,
                             column_id=column_id,
@@ -640,7 +650,7 @@ class GravitinoSyncService:
                             ref_table,
                             col_name,
                         )
-                        await OpenLineageLineageRepository.add_metric_filter(
+                        await Lineage.add_metric_filter(
                             session,
                             metric_id=metric_id,
                             column_id=column_id,
@@ -705,7 +715,7 @@ class GravitinoSyncService:
                 col_info["column_name"],
             )
 
-            await OpenLineageLineageRepository.set_column_valuedomain(
+            await Lineage.set_column_valuedomain(
                 session,
                 column_id=column_id,
                 domain_code=domain_code,
@@ -724,7 +734,7 @@ class GravitinoSyncService:
         从 tag_meta 表同步到 Neo4j Tag 节点
         """
         query = """
-        SELECT tag_id, tag_name, tag_comment, tag_properties
+        SELECT tag_id, tag_name, tag_comment, properties
         FROM tag_meta
         WHERE metalake_id = :metalake_id AND deleted_at = 0
             AND tag_name NOT LIKE 'vd:%%'
@@ -733,9 +743,9 @@ class GravitinoSyncService:
 
         for row in rows:
             tag_id = generate_id("tag", self._metalake_name, row["tag_name"])
-            properties = json.loads(row["tag_properties"]) if row["tag_properties"] else None
+            properties = json.loads(row["properties"]) if row["properties"] else None
 
-            await OpenLineageMetadataRepository.upsert_tag(
+            await Metadata.upsert_tag(
                 session,
                 id=tag_id,
                 name=row["tag_name"],
@@ -817,7 +827,7 @@ class GravitinoSyncService:
         source_id = generate_id(
             "table", self._metalake_name, row["catalog_name"], row["schema_name"], row["table_name"]
         )
-        await OpenLineageLineageRepository.add_has_tag(
+        await Lineage.add_has_tag(
             session,
             source_label="Table",
             source_id=source_id,
@@ -853,7 +863,7 @@ class GravitinoSyncService:
             row["table_name"],
             row["column_name"],
         )
-        await OpenLineageLineageRepository.add_has_tag(
+        await Lineage.add_has_tag(
             session,
             source_label="Column",
             source_id=source_id,
@@ -878,7 +888,7 @@ class GravitinoSyncService:
         source_id = generate_id(
             "schema", self._metalake_name, row["catalog_name"], row["schema_name"]
         )
-        await OpenLineageLineageRepository.add_has_tag(
+        await Lineage.add_has_tag(
             session,
             source_label="Schema",
             source_id=source_id,
@@ -900,7 +910,7 @@ class GravitinoSyncService:
 
         row = rows[0]
         source_id = generate_id("catalog", self._metalake_name, row["catalog_name"])
-        await OpenLineageLineageRepository.add_has_tag(
+        await Lineage.add_has_tag(
             session,
             source_label="Catalog",
             source_id=source_id,

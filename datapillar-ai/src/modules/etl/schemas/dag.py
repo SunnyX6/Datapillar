@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from src.modules.etl.schemas.plan import Job, Workflow
+from src.modules.etl.schemas.workflow import Job, Workflow
 
 
 class JobResponse(BaseModel):

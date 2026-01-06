@@ -11,9 +11,9 @@ from __future__ import annotations
 import structlog
 from neo4j import AsyncSession
 
+from src.infrastructure.repository.kg.dto import MetricDTO
 from src.modules.openlineage.core.embedding_processor import embedding_processor
 from src.modules.openlineage.parsers.plans.types import MetadataWritePlans
-from src.modules.openlineage.schemas.neo4j import MetricNode
 from src.modules.openlineage.writers.base import BaseWriter
 from src.modules.openlineage.writers.metadata import (
     PhysicalAssetsWriter,
@@ -183,7 +183,7 @@ class MetadataWriter(BaseWriter):
         if self._is_empty(plans):
             logger.debug("skip_empty_metadata_plans", operation=plans.operation)
 
-    async def write_metric(self, session: AsyncSession, metric: MetricNode) -> None:
+    async def write_metric(self, session: AsyncSession, metric: MetricDTO) -> None:
         """写入 Metric 节点"""
         await self._semantic_assets_writer.write_metric(session, metric)
 

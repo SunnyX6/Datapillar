@@ -3,9 +3,8 @@
 
 架构：简单 LLM 调用
 1. 预先获取所有上下文（表详情、推荐）
-2. 一次 LLM 调用，直接输出 JSON
-3. 使用 JSON mode 保证输出格式
-4. 使用 ainvoke 走缓存
+2. 一次 LLM 调用，使用 structured output 保证输出格式
+3. 使用 ainvoke 走缓存
 """
 
 import json
@@ -15,8 +14,13 @@ import time
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from src.infrastructure.llm.client import call_llm
-from src.infrastructure.repository import Neo4jKGRepository
+from src.infrastructure.repository.kg import (
+    Neo4jMetricSearch,
+    Neo4jSemanticSearch,
+    Neo4jTableSearch,
+)
 from src.modules.governance.metric.schemas import (
+    AIFillOutput,
     AIFillRequest,
     AIFillResponse,
     MetricType,
@@ -57,27 +61,7 @@ ATOMIC_FILL_PROMPT = """你专门为用户创建原子指标。
 2. 验证列知识：用户描述的业务概念必须能在列的描述中找到对应。仅靠列名猜测不算验证通过
 3. 验证用户选择：公式需要的列都选了吗？
 
-失败时：返回 success=false 和失败原因 message。
-
-## 输出要求
-只输出 JSON 对象，不要输出任何其他内容。
-{{
-  "success": true/false,
-  "message": "傲娇语气消息（失败时说明原因）",
-  "name": "中文名称",
-  "wordRoots": [],
-  "aggregation": "聚合函数",
-  "modifiersSelected": [],
-  "type": "ATOMIC",
-  "dataType": "数据类型",
-  "unit": "必须是语义资产上下文中的单位code",
-  "calculationFormula": "指标计算公式",
-  "comment": "业务描述",
-  "measureColumns": ["列名1", "列名2"],
-  "filterColumns": ["列名1", "列名2"]
-}}
-注意：measureColumns 和 filterColumns 是列名字符串数组，不是对象数组。
-成功时填值，失败时只需 success=false 和 message。
+失败时：返回 success=false 和失败原因 message（使用傲娇语气）。
 
 ## 禁止（违反则直接返回失败）
 1. 禁止根据表名猜测业务场景！
@@ -102,26 +86,7 @@ DERIVED_FILL_PROMPT = """你专门为用户生成派生指标。
 2. 验证过滤列：用户描述的过滤条件必须能在列的描述中找到对应。仅靠列名猜测不算验证通过
 3. 验证修饰符：如果需要修饰符，必须从可用列表中选择
 
-失败时：返回 success=false 和失败原因 message。
-
-## 输出要求
-只输出 JSON 对象，不要输出任何其他内容。
-{{
-  "success": true/false,
-  "message": "傲娇语气消息（失败时说明原因）",
-  "name": "中文名称",
-  "wordRoots": [],
-  "aggregation": "",
-  "modifiersSelected": [],
-  "type": "DERIVED",
-  "dataType": "数据类型",
-  "unit": "必须是语义资产上下文中的单位code",
-  "calculationFormula": "{{基础指标code}} WHERE 过滤条件",
-  "comment": "业务描述",
-  "filterColumns": ["列名1", "列名2"]
-}}
-注意：filterColumns 是列名字符串数组，不是对象数组。
-成功时填值，失败时只需 success=false 和 message。
+失败时：返回 success=false 和失败原因 message（使用傲娇语气）。
 
 ## 禁止（违反则直接返回失败）
 1. 禁止在基础指标没有描述时生成派生指标！
@@ -142,24 +107,7 @@ COMPOSITE_FILL_PROMPT = """你专门为用户生成复合指标。
 2. 验证业务匹配：用户描述的业务概念必须能在指标的描述中找到明确对应。仅靠指标名称或code猜测不算验证通过
 3. 验证可计算性：用户描述的运算规则必须能用已选指标完成
 
-失败时：返回 success=false 和失败原因 message。
-
-## 输出要求
-只输出 JSON 对象，不要输出任何其他内容。
-{{
-  "success": true/false,
-  "message": "傲娇语气消息（失败时说明原因）",
-  "name": "中文名称",
-  "wordRoots": [],
-  "aggregation": "",
-  "modifiersSelected": [],
-  "type": "COMPOSITE",
-  "dataType": "数据类型",
-  "unit": "必须是语义资产上下文中的单位code",
-  "calculationFormula": "({{指标A}} - {{指标B}}) / {{指标A}} * 100",
-  "comment": "业务描述"
-}}
-成功时填值，失败时只需 success=false 和 message。
+失败时：返回 success=false 和失败原因 message（使用傲娇语气）。
 
 ## 禁止（违反则直接返回失败）
 1. 禁止在任意指标没有描述时生成复合指标！
@@ -181,7 +129,7 @@ class MetricAIService:
 
         流程：
         1. 按需检索语义资产
-        2. 一次 LLM 调用（使用 ainvoke 走缓存）
+        2. 一次 LLM 调用（使用 structured output）
         3. 返回结果（success=false 时由程序附加 recommendations）
         """
         total_start = time.time()
@@ -204,8 +152,8 @@ class MetricAIService:
         )
         user_message = self._build_user_message(request)
 
-        # 5. 调用 LLM（使用 JSON mode + ainvoke 走缓存）
-        llm = call_llm(temperature=0.3, max_tokens=4096, enable_json_mode=True)
+        # 6. 调用 LLM（使用 structured output）
+        llm = call_llm(temperature=0.3, max_tokens=4096, output_schema=AIFillOutput)
 
         messages = [
             SystemMessage(content=system_prompt),
@@ -213,28 +161,15 @@ class MetricAIService:
             HumanMessage(content=user_message),
         ]
 
-        response = await llm.ainvoke(messages)
-        content = response.content if hasattr(response, "content") else str(response)
+        # structured output 直接返回 AIFillOutput 实例
+        output: AIFillOutput = await llm.ainvoke(messages)
 
         total_elapsed = time.time() - total_start
-        logger.info(f"[fill] 总耗时: {total_elapsed:.2f}s")
-        logger.debug(f"[fill] LLM 返回: {content}")
+        logger.info(f"[fill] 总耗时: {total_elapsed:.2f}s, success={output.success}")
 
-        # 解析结果
-        try:
-            result = json.loads(content)
-            logger.info(f"[fill] 解析结果: {json.dumps(result, ensure_ascii=False)}")
-
-            # 如果 success=false，由程序附加 recommendations（避免 LLM 幻觉）
-            if not result.get("success", True):
-                result["recommendations"] = recommendations_list
-
-            return AIFillResponse(**result)
-        except json.JSONDecodeError as e:
-            logger.error(f"[fill] JSON 解析失败: {e}, content={content[:200]}")
-            return AIFillResponse(
-                success=False, message=f"JSON 解析失败: {e}", recommendations=recommendations_list
-            )
+        # 如果 success=false，由程序附加 recommendations（避免 LLM 幻觉）
+        recs = recommendations_list if not output.success else []
+        return AIFillResponse.from_output(output, recs)
 
     def _get_table_context(self, request: AIFillRequest) -> str:
         """获取表上下文"""
@@ -252,14 +187,14 @@ class MetricAIService:
                 catalog, schema, table = payload.ref_catalog, payload.ref_schema, payload.ref_table
 
         if catalog and schema and table:
-            result = Neo4jKGRepository.get_tablecontext_sync(catalog, schema, table)
+            result = Neo4jTableSearch.get_table_detail(catalog, schema, table)
             if result:
-                logger.info(f"[context] 获取表 {table}, {len(result.columns or [])} 列")
+                logger.info(f"[context] 获取表 {table}, {len(result.get('columns') or [])} 列")
                 return json.dumps(
                     {
-                        "table": result.table,
-                        "description": result.description,
-                        "columns": result.columns,
+                        "table": result.get("table"),
+                        "description": result.get("description"),
+                        "columns": result.get("columns"),
                     },
                     ensure_ascii=False,
                     indent=2,
@@ -285,7 +220,7 @@ class MetricAIService:
         if not codes:
             return "无指标信息"
 
-        metrics = Neo4jKGRepository.get_metriccontext_sync(codes)
+        metrics = Neo4jMetricSearch.get_metric_context(codes)
         if not metrics:
             logger.warning(f"[context] 未找到指标: {codes}")
             return "无指标信息"
@@ -295,16 +230,16 @@ class MetricAIService:
         result = []
         for m in metrics:
             info = {
-                "code": m.code,
-                "name": m.name,
-                "type": m.metric_type,
-                "description": m.description or "无描述",
-                "calculationFormula": m.calculation_formula or "无公式",
+                "code": m.get("code"),
+                "name": m.get("name"),
+                "type": m.get("metric_type"),
+                "description": m.get("description") or "无描述",
+                "calculationFormula": m.get("calculation_formula") or "无公式",
             }
-            if m.unit:
-                info["unit"] = m.unit
-            if m.aggregation_logic:
-                info["aggregationLogic"] = m.aggregation_logic
+            if m.get("unit"):
+                info["unit"] = m.get("unit")
+            if m.get("aggregation_logic"):
+                info["aggregationLogic"] = m.get("aggregation_logic")
             result.append(info)
 
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -330,7 +265,7 @@ class MetricAIService:
     def _recommend_tables(self, user_input: str) -> tuple[str, list]:
         """推荐表和列，返回 (格式化字符串, 原始列表)"""
         start = time.time()
-        raw_results = Neo4jKGRepository.search_tables_columns(query=user_input)
+        raw_results = Neo4jTableSearch.search_tables_columns(query=user_input)
 
         if not raw_results:
             logger.info(f"[recommend] 推荐表/列无结果, 耗时 {time.time() - start:.3f}s")
@@ -432,7 +367,7 @@ class MetricAIService:
     def _recommend_metrics(self, user_input: str) -> tuple[str, list]:
         """推荐指标，返回 (格式化字符串, 原始列表)"""
         start = time.time()
-        raw_results = Neo4jKGRepository.search_metrics(query=user_input)
+        raw_results = Neo4jMetricSearch.search_metrics(query=user_input)
 
         if not raw_results:
             logger.info(f"[recommend] 推荐指标无结果, 耗时 {time.time() - start:.3f}s")
@@ -492,7 +427,7 @@ class MetricAIService:
 
     def _search_semantic_assets(self, user_input: str) -> str:
         """按需检索语义资产（混合检索：向量+全文）"""
-        assets = Neo4jKGRepository.search_semantic_assets(query=user_input, top_k=15)
+        assets = Neo4jSemanticSearch.search_semantic_assets(query=user_input, top_k=15)
         return self._format_semantic_assets(assets)
 
     def _format_semantic_assets(self, assets: dict) -> str:

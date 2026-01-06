@@ -126,8 +126,7 @@ public class ValueDomainEventConverter extends BaseEventConverter {
     NameIdentifier identifier = event.identifier();
 
     List<SchemaDatasetFacetFields> fields = new ArrayList<>();
-    fields.add(
-        openLineage.newSchemaDatasetFacetFields("domainCode", "STRING", identifier.name(), null));
+    fields.add(openLineage.newSchemaDatasetFacetFields("code", "STRING", identifier.name(), null));
 
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
 
@@ -159,13 +158,11 @@ public class ValueDomainEventConverter extends BaseEventConverter {
     List<SchemaDatasetFacetFields> fields = new ArrayList<>();
     fields.add(
         openLineage.newSchemaDatasetFacetFields(
-            "domainCode", "STRING", valueDomainInfo.domainCode(), null));
+            "code", "STRING", valueDomainInfo.domainCode(), null));
     valueDomainInfo
         .domainName()
         .ifPresent(
-            n ->
-                fields.add(
-                    openLineage.newSchemaDatasetFacetFields("domainName", "STRING", n, null)));
+            n -> fields.add(openLineage.newSchemaDatasetFacetFields("name", "STRING", n, null)));
     fields.add(
         openLineage.newSchemaDatasetFacetFields(
             "domainType", "STRING", valueDomainInfo.domainType().name(), null));

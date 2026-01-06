@@ -17,8 +17,9 @@ from typing import Any
 import structlog
 from neo4j import AsyncSession
 
-from src.infrastructure.repository.openlineage import OpenLineageMetadataRepository
-from src.infrastructure.repository.openlineage.metadata_repository import TableUpsertPayload
+from src.infrastructure.repository.kg.dto import CatalogDTO, ColumnDTO, SchemaDTO, TableDTO
+from src.infrastructure.repository.openlineage import Metadata
+from src.infrastructure.repository.openlineage.metadata import TableUpsertPayload
 from src.modules.openlineage.parsers.plans.metadata import (
     AddColumnAction,
     AlterTablePlan,
@@ -32,7 +33,6 @@ from src.modules.openlineage.parsers.plans.metadata import (
     UpdateTableCommentAction,
     UpdateTablePropertiesAction,
 )
-from src.modules.openlineage.schemas.neo4j import CatalogNode, ColumnNode, SchemaNode, TableNode
 from src.modules.openlineage.writers.metadata.types import QueueEmbeddingTask
 
 logger = structlog.get_logger()
@@ -141,7 +141,7 @@ class PhysicalAssetsWriter:
         - name: {schema}.{table}
         """
         for table_id in table_ids:
-            await OpenLineageMetadataRepository.delete_table(session, table_id=table_id)
+            await Metadata.delete_table(session, table_id=table_id)
             logger.info("table_deleted", table_id=table_id)
 
     async def delete_schema_metadata(self, session: AsyncSession, schema_ids: list[str]) -> None:
@@ -154,7 +154,7 @@ class PhysicalAssetsWriter:
         - name: {schema}
         """
         for schema_id in schema_ids:
-            await OpenLineageMetadataRepository.delete_schema_cascade(session, schema_id=schema_id)
+            await Metadata.delete_schema_cascade(session, schema_id=schema_id)
             logger.info("schema_deleted", schema_id=schema_id)
 
     async def delete_catalog_metadata(self, session: AsyncSession, catalog_ids: list[str]) -> None:
@@ -167,14 +167,12 @@ class PhysicalAssetsWriter:
         - name: {catalog}
         """
         for catalog_id in catalog_ids:
-            await OpenLineageMetadataRepository.delete_catalog_cascade(
-                session, catalog_id=catalog_id
-            )
+            await Metadata.delete_catalog_cascade(session, catalog_id=catalog_id)
             logger.info("catalog_deleted", catalog_id=catalog_id)
 
-    async def write_catalog(self, session: AsyncSession, catalog: CatalogNode) -> None:
+    async def write_catalog(self, session: AsyncSession, catalog: CatalogDTO) -> None:
         """写入 Catalog 节点"""
-        tags = await OpenLineageMetadataRepository.upsert_catalog(
+        tags = await Metadata.upsert_catalog(
             session,
             id=catalog.id,
             name=catalog.name,
@@ -189,9 +187,9 @@ class PhysicalAssetsWriter:
         self._catalogs_written += 1
         logger.debug("catalog_written", id=catalog.id, name=catalog.name)
 
-    async def write_schema(self, session: AsyncSession, schema: SchemaNode) -> None:
+    async def write_schema(self, session: AsyncSession, schema: SchemaDTO) -> None:
         """写入 Schema 节点（不写 Catalog->Schema 关系）"""
-        tags = await OpenLineageMetadataRepository.upsert_schema(
+        tags = await Metadata.upsert_schema(
             session,
             id=schema.id,
             name=schema.name,
@@ -207,11 +205,11 @@ class PhysicalAssetsWriter:
         self._schemas_written += 1
         logger.debug("schema_written", id=schema.id, name=schema.name)
 
-    async def write_table(self, session: AsyncSession, table: TableNode) -> None:
+    async def write_table(self, session: AsyncSession, table: TableDTO) -> None:
         """写入 Table 节点（不写 Schema->Table 关系）"""
         properties_json = json.dumps(table.properties) if table.properties else None
 
-        tags = await OpenLineageMetadataRepository.upsert_table(
+        tags = await Metadata.upsert_table(
             session,
             id=table.id,
             name=table.name,
@@ -241,9 +239,7 @@ class PhysicalAssetsWriter:
     async def _apply_alter_plan(self, session: AsyncSession, plan: AlterTablePlan) -> None:
         for action in plan.actions:
             if isinstance(action, RenameTableAction):
-                await OpenLineageMetadataRepository.delete_table(
-                    session, table_id=action.old_table_id
-                )
+                await Metadata.delete_table(session, table_id=action.old_table_id)
                 await self.write_table(session, action.new_table)
                 logger.info(
                     "table_renamed",
@@ -261,7 +257,7 @@ class PhysicalAssetsWriter:
                 continue
 
             if isinstance(action, AddColumnAction):
-                await OpenLineageMetadataRepository.upsert_column_event(
+                await Metadata.upsert_column_event(
                     session,
                     column_id=action.column.id,
                     name=action.column.name,
@@ -281,13 +277,11 @@ class PhysicalAssetsWriter:
                 continue
 
             if isinstance(action, DeleteColumnAction):
-                await OpenLineageMetadataRepository.delete_column(
-                    session, column_id=action.column_id
-                )
+                await Metadata.delete_column(session, column_id=action.column_id)
                 continue
 
             if isinstance(action, RenameColumnAction):
-                description = await OpenLineageMetadataRepository.rename_column(
+                description = await Metadata.rename_column(
                     session,
                     old_column_id=action.old_column_id,
                     new_column_id=action.new_column_id,
@@ -315,7 +309,7 @@ class PhysicalAssetsWriter:
         self, session: AsyncSession, table_id: str, new_comment: str | None
     ) -> None:
         """更新表注释"""
-        table_name = await OpenLineageMetadataRepository.update_table_comment(
+        table_name = await Metadata.update_table_comment(
             session,
             table_id=table_id,
             description=new_comment,
@@ -330,7 +324,7 @@ class PhysicalAssetsWriter:
         """更新表属性"""
         if properties is None:
             return
-        await OpenLineageMetadataRepository.update_table_properties(
+        await Metadata.update_table_properties(
             session,
             table_id=table_id,
             properties=properties,
@@ -340,7 +334,7 @@ class PhysicalAssetsWriter:
         self, session: AsyncSession, column_id: str, property_name: str, value: Any
     ) -> None:
         """更新列的单个属性"""
-        record = await OpenLineageMetadataRepository.update_column_property(
+        record = await Metadata.update_column_property(
             session,
             column_id=column_id,
             property_name=property_name,
@@ -354,7 +348,7 @@ class PhysicalAssetsWriter:
         self, session: AsyncSession, table_id: str, valid_column_ids: list[str]
     ) -> None:
         """删除表下不再存在的列节点（处理 alter_table 删除列的情况）"""
-        deleted_count = await OpenLineageMetadataRepository.delete_orphan_columns(
+        deleted_count = await Metadata.delete_orphan_columns(
             session,
             table_id=table_id,
             valid_column_ids=valid_column_ids,
@@ -367,7 +361,7 @@ class PhysicalAssetsWriter:
             )
 
     async def _write_columns_batch(
-        self, session: AsyncSession, columns: list[ColumnNode], table_id: str
+        self, session: AsyncSession, columns: list[ColumnDTO], table_id: str
     ) -> None:
         """批量写入 Column 节点（不写 Table->Column 关系）"""
         # 构建批量数据
@@ -385,7 +379,7 @@ class PhysicalAssetsWriter:
             for col in columns
         ]
 
-        tags_map = await OpenLineageMetadataRepository.upsert_columns_event(
+        tags_map = await Metadata.upsert_columns_event(
             session,
             columns=column_data,
         )
@@ -398,9 +392,9 @@ class PhysicalAssetsWriter:
         self._columns_written += len(columns)
         logger.debug("columns_batch_written", count=len(columns), table_id=table_id)
 
-    async def write_column(self, session: AsyncSession, column: ColumnNode, table_id: str) -> None:
+    async def write_column(self, session: AsyncSession, column: ColumnDTO, table_id: str) -> None:
         """写入 Column 节点（不写 Table->Column 关系）"""
-        await OpenLineageMetadataRepository.upsert_column_event(
+        await Metadata.upsert_column_event(
             session,
             column_id=column.id,
             name=column.name,

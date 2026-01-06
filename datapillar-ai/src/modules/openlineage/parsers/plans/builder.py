@@ -6,6 +6,7 @@ from typing import Any
 
 import structlog
 
+from src.infrastructure.repository.kg.dto import SQLDTO, generate_id
 from src.modules.openlineage.parsers.common.dataset import DatasetResolver
 from src.modules.openlineage.parsers.common.operation import get_operation
 from src.modules.openlineage.parsers.common.qualified_name import (
@@ -25,7 +26,6 @@ from src.modules.openlineage.parsers.plans.types import (
 )
 from src.modules.openlineage.schemas.events import RunEvent
 from src.modules.openlineage.schemas.facets import ColumnLineageDatasetFacet, SchemaDatasetFacet
-from src.modules.openlineage.schemas.neo4j import SQLNode, generate_id
 from src.shared.utils.sql_lineage import SQLLineageAnalyzer
 
 logger = structlog.get_logger()
@@ -158,6 +158,8 @@ class OpenLineagePlanBuilder:
                 sql_node=self._build_sql_node(event) if event.get_sql() else None,
                 table_input_ids=self._table_in_ids(event) if need_lineage_details else [],
                 table_output_ids=self._table_out_ids(event) if need_lineage_details else [],
+                table_input_names=self._table_in_names(event) if need_lineage_details else [],
+                table_output_names=self._table_out_names(event) if need_lineage_details else [],
                 column_lineage_data=self._col_lineage_data(event) if need_lineage_details else [],
             )
 
@@ -180,6 +182,8 @@ class OpenLineagePlanBuilder:
                 sql_node=self._build_sql_node(event) if event.get_sql() else None,
                 table_input_ids=self._table_in_ids(event) if need_lineage_details else [],
                 table_output_ids=self._table_out_ids(event) if need_lineage_details else [],
+                table_input_names=self._table_in_names(event) if need_lineage_details else [],
+                table_output_names=self._table_out_names(event) if need_lineage_details else [],
                 column_lineage_data=self._col_lineage_data(event) if need_lineage_details else [],
             )
 
@@ -260,14 +264,16 @@ class OpenLineagePlanBuilder:
             sql_node=self._build_sql_node(event) if event.get_sql() else None,
             table_input_ids=self._table_in_ids(event),
             table_output_ids=self._table_out_ids(event),
+            table_input_names=self._table_in_names(event),
+            table_output_names=self._table_out_names(event),
             column_lineage_data=self._col_lineage_data(event),
         )
 
-    def _build_sql_node(self, event: RunEvent) -> SQLNode | None:
+    def _build_sql_node(self, event: RunEvent) -> SQLDTO | None:
         sql = event.get_sql()
         if not sql:
             return None
-        return SQLNode.create(
+        return SQLDTO.create(
             sql=sql,
             job_namespace=event.job.namespace,
             job_name=event.job.name,
@@ -292,6 +298,26 @@ class OpenLineagePlanBuilder:
             if table_info:
                 ids.append(table_info.id)
         return ids
+
+    def _table_in_names(self, event: RunEvent) -> list[str]:
+        """获取输入表名列表（格式：schema.table）"""
+        job_namespace = event.job.namespace
+        names: list[str] = []
+        for input_ds in event.inputs:
+            table_info = self._resolver.extract_table_info(input_ds, job_namespace=job_namespace)
+            if table_info:
+                names.append(f"{table_info.schema}.{table_info.table}")
+        return names
+
+    def _table_out_names(self, event: RunEvent) -> list[str]:
+        """获取输出表名列表（格式：schema.table）"""
+        job_namespace = event.job.namespace
+        names: list[str] = []
+        for output_ds in event.outputs:
+            table_info = self._resolver.extract_table_info(output_ds, job_namespace=job_namespace)
+            if table_info:
+                names.append(f"{table_info.schema}.{table_info.table}")
+        return names
 
     def _col_lineage_data(self, event: RunEvent) -> list[dict]:
         has_column_lineage_facet = any(

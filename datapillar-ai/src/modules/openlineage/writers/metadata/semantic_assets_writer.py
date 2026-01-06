@@ -15,16 +15,16 @@ from __future__ import annotations
 import structlog
 from neo4j import AsyncSession
 
-from src.infrastructure.repository.openlineage import OpenLineageMetadataRepository
-from src.modules.openlineage.parsers.plans.metadata import MetricWritePlan
-from src.modules.openlineage.schemas.neo4j import (
-    MetricNode,
-    ModifierNode,
-    UnitNode,
-    ValueDomainNode,
-    WordRootNode,
+from src.infrastructure.repository.kg.dto import (
+    MetricDTO,
+    ModifierDTO,
+    UnitDTO,
+    ValueDomainDTO,
+    WordRootDTO,
     get_metric_label,
 )
+from src.infrastructure.repository.openlineage import Metadata
+from src.modules.openlineage.parsers.plans.metadata import MetricWritePlan
 from src.modules.openlineage.writers.metadata.physical_assets_writer import PhysicalAssetsWriter
 from src.modules.openlineage.writers.metadata.types import QueueEmbeddingTask
 
@@ -69,7 +69,7 @@ class SemanticAssetsWriter:
         - name: {schema}.{metric}
         """
         for metric_id in metric_ids:
-            await OpenLineageMetadataRepository.delete_metric(session, metric_id=metric_id)
+            await Metadata.delete_metric(session, metric_id=metric_id)
             logger.info("metric_deleted", metric_id=metric_id)
 
     async def delete_wordroot_metadata(
@@ -77,7 +77,7 @@ class SemanticAssetsWriter:
     ) -> None:
         """删除 WordRoot 元数据"""
         for wordroot_id in wordroot_ids:
-            await OpenLineageMetadataRepository.delete_node(
+            await Metadata.delete_node(
                 session,
                 node_id=wordroot_id,
                 node_label="WordRoot",
@@ -89,7 +89,7 @@ class SemanticAssetsWriter:
     ) -> None:
         """删除 Modifier 元数据"""
         for modifier_id in modifier_ids:
-            await OpenLineageMetadataRepository.delete_node(
+            await Metadata.delete_node(
                 session,
                 node_id=modifier_id,
                 node_label="Modifier",
@@ -99,7 +99,7 @@ class SemanticAssetsWriter:
     async def delete_unit_metadata(self, session: AsyncSession, unit_ids: list[str]) -> None:
         """删除 Unit 元数据"""
         for unit_id in unit_ids:
-            await OpenLineageMetadataRepository.delete_node(
+            await Metadata.delete_node(
                 session,
                 node_id=unit_id,
                 node_label="Unit",
@@ -111,7 +111,7 @@ class SemanticAssetsWriter:
     ) -> None:
         """删除 ValueDomain 元数据"""
         for valuedomain_id in valuedomain_ids:
-            await OpenLineageMetadataRepository.delete_node(
+            await Metadata.delete_node(
                 session,
                 node_id=valuedomain_id,
                 node_label="ValueDomain",
@@ -135,11 +135,11 @@ class SemanticAssetsWriter:
     async def _write_metric_schema(
         self,
         session: AsyncSession,
-        metric: MetricNode,
+        metric: MetricDTO,
         metric_label: str,
     ) -> None:
         """写入 Metric 节点（不写 Schema->Metric、Metric 父子关系）"""
-        await OpenLineageMetadataRepository.upsert_metric_event(
+        await Metadata.upsert_metric_event(
             session,
             label=metric_label,
             id=metric.id,
@@ -158,22 +158,22 @@ class SemanticAssetsWriter:
         self._metrics_written += 1
         logger.debug("metric_written", id=metric.id, name=metric.name)
 
-    async def write_wordroot_nodes(self, session: AsyncSession, nodes: list[WordRootNode]) -> None:
+    async def write_wordroot_nodes(self, session: AsyncSession, nodes: list[WordRootDTO]) -> None:
         """写入词根节点"""
         for node in nodes:
             await self._write_wordroot(session, node)
 
-    async def _write_wordroot(self, session: AsyncSession, wordroot: WordRootNode) -> None:
+    async def _write_wordroot(self, session: AsyncSession, wordroot: WordRootDTO) -> None:
         """写入 WordRoot 节点"""
-        await OpenLineageMetadataRepository.upsert_wordroot(
-            session,
+        dto = WordRootDTO(
             id=wordroot.id,
-            code=wordroot.code,
             name=wordroot.name,
+            code=wordroot.code,
             data_type=wordroot.data_type,
             description=wordroot.description,
             created_by="OPENLINEAGE",
         )
+        await Metadata.upsert_wordroot(session, dto)
 
         # 将 WordRoot embedding 任务入队
         await self._queue_embedding_task(
@@ -182,45 +182,46 @@ class SemanticAssetsWriter:
 
         logger.debug("wordroot_written", id=wordroot.id, code=wordroot.code)
 
-    async def write_modifier_nodes(self, session: AsyncSession, nodes: list[ModifierNode]) -> None:
+    async def write_modifier_nodes(self, session: AsyncSession, nodes: list[ModifierDTO]) -> None:
         """写入修饰符节点"""
         for node in nodes:
             await self._write_modifier(session, node)
 
-    async def _write_modifier(self, session: AsyncSession, modifier: ModifierNode) -> None:
+    async def _write_modifier(self, session: AsyncSession, modifier: ModifierDTO) -> None:
         """写入 Modifier 节点"""
-        await OpenLineageMetadataRepository.upsert_modifier(
-            session,
+        dto = ModifierDTO(
             id=modifier.id,
+            name=modifier.name,
             code=modifier.code,
             modifier_type=modifier.modifier_type,
             description=modifier.description,
             created_by="OPENLINEAGE",
         )
+        await Metadata.upsert_modifier(session, dto)
 
         # 将 Modifier embedding 任务入队
         await self._queue_embedding_task(
-            modifier.id, "Modifier", modifier.code, modifier.description
+            modifier.id, "Modifier", modifier.name or modifier.code, modifier.description
         )
 
         logger.debug("modifier_written", id=modifier.id, code=modifier.code)
 
-    async def write_unit_nodes(self, session: AsyncSession, nodes: list[UnitNode]) -> None:
+    async def write_unit_nodes(self, session: AsyncSession, nodes: list[UnitDTO]) -> None:
         """写入单位节点"""
         for node in nodes:
             await self._write_unit(session, node)
 
-    async def _write_unit(self, session: AsyncSession, unit: UnitNode) -> None:
+    async def _write_unit(self, session: AsyncSession, unit: UnitDTO) -> None:
         """写入 Unit 节点"""
-        await OpenLineageMetadataRepository.upsert_unit(
-            session,
+        dto = UnitDTO(
             id=unit.id,
-            code=unit.code,
             name=unit.name,
+            code=unit.code,
             symbol=unit.symbol,
             description=unit.description,
             created_by="OPENLINEAGE",
         )
+        await Metadata.upsert_unit(session, dto)
 
         # 将 Unit embedding 任务入队
         await self._queue_embedding_task(unit.id, "Unit", unit.name or unit.code, unit.description)
@@ -228,19 +229,18 @@ class SemanticAssetsWriter:
         logger.debug("unit_written", id=unit.id, code=unit.code)
 
     async def write_valuedomain_nodes(
-        self, session: AsyncSession, nodes: list[ValueDomainNode]
+        self, session: AsyncSession, nodes: list[ValueDomainDTO]
     ) -> None:
         """写入值域节点"""
         for node in nodes:
             await self._write_valuedomain(session, node)
 
-    async def _write_valuedomain(self, session: AsyncSession, valuedomain: ValueDomainNode) -> None:
+    async def _write_valuedomain(self, session: AsyncSession, valuedomain: ValueDomainDTO) -> None:
         """写入 ValueDomain 节点"""
-        await OpenLineageMetadataRepository.upsert_valuedomain(
-            session,
+        dto = ValueDomainDTO(
             id=valuedomain.id,
-            domain_code=valuedomain.domain_code,
-            domain_name=valuedomain.domain_name,
+            name=valuedomain.name or valuedomain.code,  # name 必填，fallback 到 code
+            code=valuedomain.code,
             domain_type=valuedomain.domain_type,
             domain_level=valuedomain.domain_level,
             items=valuedomain.items,
@@ -248,21 +248,22 @@ class SemanticAssetsWriter:
             description=valuedomain.description,
             created_by="OPENLINEAGE",
         )
+        await Metadata.upsert_valuedomain(session, dto)
 
         # 将 ValueDomain embedding 任务入队（包含 items 信息）
-        embedding_text = valuedomain.domain_name or valuedomain.domain_code
+        embedding_text = valuedomain.name or valuedomain.code
         if valuedomain.items:
             embedding_text += f" {valuedomain.items}"
         await self._queue_embedding_task(
             valuedomain.id, "ValueDomain", embedding_text, valuedomain.description
         )
 
-        logger.debug("valuedomain_written", id=valuedomain.id, domainCode=valuedomain.domain_code)
+        logger.debug("valuedomain_written", id=valuedomain.id, code=valuedomain.code)
 
-    async def write_metric(self, session: AsyncSession, metric: MetricNode) -> None:
+    async def write_metric(self, session: AsyncSession, metric: MetricDTO) -> None:
         """写入 Metric 节点（不写任何关系）"""
         label = get_metric_label(metric.metric_type)
-        await OpenLineageMetadataRepository.upsert_metric_event(
+        await Metadata.upsert_metric_event(
             session,
             label=label,
             id=metric.id,

@@ -1,29 +1,32 @@
 """
 Agent 工具集
+
+模块结构：
+- table.py: 表相关工具（get_table_detail, get_table_lineage, get_lineage_sql）
+- column.py: 列相关工具（get_column_valuedomain）
+- component.py: 组件工具（list_component）
+- recommend.py: 推荐引导工具（recommend_guidance）
+- doc.py: 文档指针工具（resolve_doc_pointer）
 """
 
-from src.modules.etl.tools.agent_tools import (
-    ALL_TOOLS,
-    COMPONENT_TOOLS,
-    DETAIL_TOOLS,
-    SEARCH_TOOLS,
-    get_column_valuedomain,
-    get_lineage_sql,
-    get_table_columns,
-    get_table_lineage,
-    list_component,
-    search_assets,
-)
+from src.modules.etl.tools.column import COLUMN_TOOLS
+from src.modules.etl.tools.component import COMPONENT_TOOLS
+from src.modules.etl.tools.doc import DOC_TOOLS
+from src.modules.etl.tools.recommend import RECOMMEND_TOOLS
+from src.modules.etl.tools.table import TABLE_TOOLS
+
+# 核心工具：按需查询细节
+DETAIL_TOOLS = TABLE_TOOLS + COLUMN_TOOLS
+
+# 所有工具
+ALL_TOOLS = DETAIL_TOOLS + COMPONENT_TOOLS + RECOMMEND_TOOLS + DOC_TOOLS
 
 __all__ = [
-    "get_table_columns",
-    "get_column_valuedomain",
-    "get_table_lineage",
-    "get_lineage_sql",
-    "search_assets",
-    "list_component",
-    "DETAIL_TOOLS",
-    "SEARCH_TOOLS",
+    "TABLE_TOOLS",
+    "COLUMN_TOOLS",
     "COMPONENT_TOOLS",
+    "RECOMMEND_TOOLS",
+    "DOC_TOOLS",
+    "DETAIL_TOOLS",
     "ALL_TOOLS",
 ]

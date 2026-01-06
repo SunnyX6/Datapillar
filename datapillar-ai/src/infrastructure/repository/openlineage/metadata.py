@@ -1,11 +1,11 @@
 """
-OpenLineage 元数据 Repository（MyBatis Mapper 风格）
+OpenLineage 元数据数据访问
 
 约束：
 - openlineage 模块内禁止直接拼接/执行 Cypher
-- 所有与“元数据节点（Catalog/Schema/Table/Column/Metric/语义层）”相关的 Cypher 语句在此集中管理
-- 不创建任何关系（HAS_* / 血缘边等）；关系统一由 OpenLineageLineageRepository 管理
-- 事务边界由调用方（AsyncSession）控制；Repository 只做语句与参数映射
+- 所有与"元数据节点（Catalog/Schema/Table/Column/Metric/语义层）"相关的 Cypher 语句在此集中管理
+- 不创建任何关系（HAS_* / 血缘边等）；关系统一由 Lineage 管理
+- 事务边界由调用方（AsyncSession）控制；此层只做语句与参数映射
 """
 
 from __future__ import annotations
@@ -15,6 +15,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from src.infrastructure.database.cypher import arun_cypher
+from src.infrastructure.repository.kg.dto import (
+    ModifierDTO,
+    UnitDTO,
+    ValueDomainDTO,
+    WordRootDTO,
+)
 
 _ALLOWED_NODE_LABELS: set[str] = {
     "Knowledge",
@@ -44,7 +50,22 @@ _ALLOWED_COLUMN_PROPERTIES: set[str] = {
 }
 
 
-class OpenLineageMetadataRepository:
+@dataclass(frozen=True, slots=True)
+class TableUpsertPayload:
+    producer: str | None = None
+    description: str | None = None
+    properties: str | None = None
+    partitions: Any | None = None
+    distribution: Any | None = None
+    sort_orders: Any | None = None
+    indexes: Any | None = None
+    creator: str | None = None
+    create_time: Any | None = None
+    last_modifier: str | None = None
+    last_modified_time: Any | None = None
+
+
+class Metadata:
     """OpenLineage 元数据 Neo4j 访问层（Cypher Mapper）"""
 
     @staticmethod
@@ -110,7 +131,7 @@ class OpenLineageMetadataRepository:
 
         data: [{"id": "...", "embedding": [...]}, ...]
         """
-        OpenLineageMetadataRepository._assert_node_label(node_label)
+        Metadata._assert_node_label(node_label)
         query = f"""
         UNWIND $data AS item
         MATCH (n:{node_label} {{id: item.id}})
@@ -139,20 +160,21 @@ class OpenLineageMetadataRepository:
         query = """
         MERGE (c:Catalog:Knowledge {id: $id})
         ON CREATE SET
-            c.createdAt = datetime(),
+            c.id = $id,
             c.name = $name,
             c.metalake = $metalake,
             c.catalogType = $catalogType,
             c.provider = $provider,
             c.description = $description,
             c.properties = $properties,
-            c.createdBy = $createdBy
+            c.createdBy = $createdBy,
+            c.createdAt = datetime()
         ON MATCH SET
-            c.updatedAt = datetime(),
             c.catalogType = COALESCE($catalogType, c.catalogType),
             c.provider = COALESCE($provider, c.provider),
             c.description = COALESCE($description, c.description),
-            c.properties = COALESCE($properties, c.properties)
+            c.properties = COALESCE($properties, c.properties),
+            c.updatedAt = datetime()
         """
         if return_tags:
             query += "\nRETURN c.tags as tags\n"
@@ -194,15 +216,16 @@ class OpenLineageMetadataRepository:
         query = """
         MERGE (s:Schema:Knowledge {id: $id})
         ON CREATE SET
-            s.createdAt = datetime(),
+            s.id = $id,
             s.name = $name,
             s.description = $description,
             s.properties = $properties,
-            s.createdBy = $createdBy
+            s.createdBy = $createdBy,
+            s.createdAt = datetime()
         ON MATCH SET
-            s.updatedAt = datetime(),
             s.description = COALESCE($description, s.description),
-            s.properties = COALESCE($properties, s.properties)
+            s.properties = COALESCE($properties, s.properties),
+            s.updatedAt = datetime()
         """
         if return_tags:
             query += "\nRETURN s.tags as tags\n"
@@ -239,7 +262,7 @@ class OpenLineageMetadataRepository:
         query = """
         MERGE (t:Table:Knowledge {id: $id})
         ON CREATE SET
-            t.createdAt = datetime(),
+            t.id = $id,
             t.name = $name,
             t.producer = $producer,
             t.description = $description,
@@ -252,12 +275,13 @@ class OpenLineageMetadataRepository:
             t.createTime = $createTime,
             t.lastModifier = $lastModifier,
             t.lastModifiedTime = $lastModifiedTime,
-            t.createdBy = $createdBy
+            t.createdBy = $createdBy,
+            t.createdAt = datetime()
         ON MATCH SET
-            t.updatedAt = datetime(),
             t.producer = COALESCE($producer, t.producer),
             t.description = COALESCE($description, t.description),
-            t.properties = COALESCE($properties, t.properties)
+            t.properties = COALESCE($properties, t.properties),
+            t.updatedAt = datetime()
         """
         if return_tags:
             query += "\nRETURN t.tags as tags\n"
@@ -286,21 +310,6 @@ class OpenLineageMetadataRepository:
         tags = record["tags"] if record and record.get("tags") else None
         return tags
 
-
-@dataclass(frozen=True, slots=True)
-class TableUpsertPayload:
-    producer: str | None = None
-    description: str | None = None
-    properties: str | None = None
-    partitions: Any | None = None
-    distribution: Any | None = None
-    sort_orders: Any | None = None
-    indexes: Any | None = None
-    creator: str | None = None
-    create_time: Any | None = None
-    last_modifier: str | None = None
-    last_modified_time: Any | None = None
-
     @staticmethod
     async def upsert_columns_event(
         session: Any,
@@ -314,18 +323,19 @@ class TableUpsertPayload:
         UNWIND $columns AS col
         MERGE (c:Column:Knowledge {id: col.id})
         ON CREATE SET
-            c.createdAt = datetime(),
+            c.id = col.id,
             c.name = col.name,
             c.dataType = col.dataType,
             c.description = col.description,
             c.nullable = col.nullable,
             c.autoIncrement = col.autoIncrement,
             c.defaultValue = col.defaultValue,
-            c.createdBy = col.createdBy
+            c.createdBy = col.createdBy,
+            c.createdAt = datetime()
         ON MATCH SET
-            c.updatedAt = datetime(),
             c.dataType = COALESCE(col.dataType, c.dataType),
-            c.description = COALESCE(col.description, c.description)
+            c.description = COALESCE(col.description, c.description),
+            c.updatedAt = datetime()
         RETURN c.id as id, c.tags as tags
         """
         result = await arun_cypher(session, query, columns=list(columns))
@@ -351,18 +361,19 @@ class TableUpsertPayload:
         query = """
         MERGE (c:Column:Knowledge {id: $columnId})
         ON CREATE SET
-            c.createdAt = datetime(),
+            c.id = $columnId,
             c.name = $name,
             c.dataType = $dataType,
             c.description = $description,
             c.nullable = $nullable,
             c.autoIncrement = $autoIncrement,
             c.defaultValue = $defaultValue,
-            c.createdBy = $createdBy
+            c.createdBy = $createdBy,
+            c.createdAt = datetime()
         ON MATCH SET
-            c.updatedAt = datetime(),
             c.dataType = COALESCE($dataType, c.dataType),
-            c.description = COALESCE($description, c.description)
+            c.description = COALESCE($description, c.description),
+            c.updatedAt = datetime()
         """
         await arun_cypher(
             session,
@@ -395,21 +406,22 @@ class TableUpsertPayload:
         query = """
         MERGE (col:Column:Knowledge {id: $id})
         ON CREATE SET
-            col.createdAt = datetime(),
+            col.id = $id,
             col.name = $name,
             col.dataType = $dataType,
             col.description = $description,
             col.nullable = $nullable,
             col.autoIncrement = $autoIncrement,
             col.defaultValue = $defaultValue,
-            col.createdBy = 'GRAVITINO_SYNC'
+            col.createdBy = 'GRAVITINO_SYNC',
+            col.createdAt = datetime()
         ON MATCH SET
-            col.updatedAt = datetime(),
             col.dataType = $dataType,
             col.description = COALESCE($description, col.description),
             col.nullable = $nullable,
             col.autoIncrement = $autoIncrement,
-            col.defaultValue = $defaultValue
+            col.defaultValue = $defaultValue,
+            col.updatedAt = datetime()
         """
         await arun_cypher(
             session,
@@ -522,22 +534,23 @@ class TableUpsertPayload:
         WITH dataType, description, nullable, autoIncrement, defaultValue
         MERGE (nc:Column:Knowledge {id: $newColumnId})
         ON CREATE SET
-            nc.createdAt = datetime(),
+            nc.id = $newColumnId,
             nc.name = $newColumnName,
             nc.dataType = dataType,
             nc.description = description,
             nc.nullable = nullable,
             nc.autoIncrement = autoIncrement,
             nc.defaultValue = defaultValue,
-            nc.createdBy = $createdBy
+            nc.createdBy = $createdBy,
+            nc.createdAt = datetime()
         ON MATCH SET
-            nc.updatedAt = datetime(),
             nc.name = COALESCE($newColumnName, nc.name),
             nc.dataType = COALESCE(dataType, nc.dataType),
             nc.description = COALESCE(description, nc.description),
             nc.nullable = COALESCE(nullable, nc.nullable),
             nc.autoIncrement = COALESCE(autoIncrement, nc.autoIncrement),
-            nc.defaultValue = COALESCE(defaultValue, nc.defaultValue)
+            nc.defaultValue = COALESCE(defaultValue, nc.defaultValue),
+            nc.updatedAt = datetime()
         RETURN description
         """
         result = await arun_cypher(
@@ -581,7 +594,6 @@ class TableUpsertPayload:
         await arun_cypher(session, query, tableId=table_id, properties=properties)
 
     @staticmethod
-    @staticmethod
     async def update_column_property(
         session: Any,
         *,
@@ -589,7 +601,7 @@ class TableUpsertPayload:
         property_name: str,
         value: Any,
     ) -> dict[str, Any] | None:
-        OpenLineageMetadataRepository._assert_column_property(property_name)
+        Metadata._assert_column_property(property_name)
         query = f"""
         MATCH (c:Column {{id: $columnId}})
         SET c.{property_name} = $value, c.updatedAt = datetime()
@@ -610,7 +622,7 @@ class TableUpsertPayload:
         tags: Sequence[str],
         return_fields: bool = False,
     ) -> dict[str, Any] | None:
-        OpenLineageMetadataRepository._assert_node_label(node_label)
+        Metadata._assert_node_label(node_label)
         query = f"""
         MATCH (n:{node_label} {{id: $nodeId}})
         SET n.tags = $tags, n.updatedAt = datetime()
@@ -640,25 +652,26 @@ class TableUpsertPayload:
         calculation_formula: str | None = None,
         created_by: str,
     ) -> None:
-        OpenLineageMetadataRepository._assert_node_label(label)
+        Metadata._assert_node_label(label)
         query = f"""
         MERGE (m:{label}:Knowledge {{id: $id}})
         ON CREATE SET
-            m.createdAt = datetime(),
-            m.name = $name,
+            m.id = $id,
             m.code = $code,
+            m.name = $name,
             m.description = $description,
             m.unit = $unit,
             m.aggregationLogic = $aggregationLogic,
             m.calculationFormula = $calculationFormula,
-            m.createdBy = $createdBy
+            m.createdBy = $createdBy,
+            m.createdAt = datetime()
         ON MATCH SET
-            m.updatedAt = datetime(),
             m.name = COALESCE($name, m.name),
             m.description = COALESCE($description, m.description),
             m.unit = COALESCE($unit, m.unit),
             m.aggregationLogic = COALESCE($aggregationLogic, m.aggregationLogic),
-            m.calculationFormula = COALESCE($calculationFormula, m.calculationFormula)
+            m.calculationFormula = COALESCE($calculationFormula, m.calculationFormula),
+            m.updatedAt = datetime()
         """
         await arun_cypher(
             session,
@@ -690,21 +703,22 @@ class TableUpsertPayload:
         """
         写入观测到的 Metric：只在 ON MATCH 更新 description，保持历史语义。
         """
-        OpenLineageMetadataRepository._assert_node_label(label)
+        Metadata._assert_node_label(label)
         query = f"""
         MERGE (m:{label}:Knowledge {{id: $id}})
         ON CREATE SET
-            m.createdAt = datetime(),
-            m.name = $name,
+            m.id = $id,
             m.code = $code,
+            m.name = $name,
             m.description = $description,
             m.unit = $unit,
             m.aggregationLogic = $aggregationLogic,
             m.calculationFormula = $calculationFormula,
-            m.createdBy = $createdBy
+            m.createdBy = $createdBy,
+            m.createdAt = datetime()
         ON MATCH SET
-            m.updatedAt = datetime(),
-            m.description = COALESCE($description, m.description)
+            m.description = COALESCE($description, m.description),
+            m.updatedAt = datetime()
         """
         await arun_cypher(
             session,
@@ -727,7 +741,7 @@ class TableUpsertPayload:
         node_label: str | None = None,
     ) -> None:
         if node_label:
-            OpenLineageMetadataRepository._assert_node_label(node_label)
+            Metadata._assert_node_label(node_label)
             query = f"""
             MATCH (n:{node_label} {{id: $id}})
             DETACH DELETE n
@@ -753,159 +767,132 @@ class TableUpsertPayload:
         await arun_cypher(session, query, metricId=metric_id)
 
     @staticmethod
-    async def upsert_wordroot(
-        session: Any,
-        *,
-        id: str,
-        code: str,
-        name: str | None,
-        data_type: str | None,
-        description: str | None,
-        created_by: str,
-    ) -> None:
+    async def upsert_wordroot(session: Any, dto: WordRootDTO) -> None:
+        """写入 WordRoot 节点（必须先构建 DTO 验证）"""
         query = """
         MERGE (w:WordRoot:Knowledge {id: $id})
         ON CREATE SET
-            w.createdAt = datetime(),
+            w.id = $id,
             w.code = $code,
             w.name = $name,
             w.dataType = $dataType,
             w.description = $description,
-            w.createdBy = $createdBy
+            w.createdBy = $createdBy,
+            w.createdAt = datetime()
         ON MATCH SET
-            w.updatedAt = datetime(),
             w.name = COALESCE($name, w.name),
             w.dataType = COALESCE($dataType, w.dataType),
-            w.description = COALESCE($description, w.description)
+            w.description = COALESCE($description, w.description),
+            w.updatedAt = datetime()
         """
         await arun_cypher(
             session,
             query,
-            id=id,
-            code=code,
-            name=name,
-            dataType=data_type,
-            description=description,
-            createdBy=created_by,
+            id=dto.id,
+            code=dto.code,
+            name=dto.name,
+            dataType=dto.data_type,
+            description=dto.description,
+            createdBy=dto.created_by,
         )
 
     @staticmethod
-    async def upsert_modifier(
-        session: Any,
-        *,
-        id: str,
-        code: str,
-        modifier_type: str | None,
-        description: str | None,
-        created_by: str,
-    ) -> None:
+    async def upsert_modifier(session: Any, dto: ModifierDTO) -> None:
+        """写入 Modifier 节点（必须先构建 DTO 验证）"""
         query = """
         MERGE (m:Modifier:Knowledge {id: $id})
         ON CREATE SET
-            m.createdAt = datetime(),
+            m.id = $id,
             m.code = $code,
+            m.name = $name,
             m.modifierType = $modifierType,
             m.description = $description,
-            m.createdBy = $createdBy
+            m.createdBy = $createdBy,
+            m.createdAt = datetime()
         ON MATCH SET
-            m.updatedAt = datetime(),
+            m.name = COALESCE($name, m.name),
             m.modifierType = COALESCE($modifierType, m.modifierType),
-            m.description = COALESCE($description, m.description)
+            m.description = COALESCE($description, m.description),
+            m.updatedAt = datetime()
         """
         await arun_cypher(
             session,
             query,
-            id=id,
-            code=code,
-            modifierType=modifier_type,
-            description=description,
-            createdBy=created_by,
+            id=dto.id,
+            code=dto.code,
+            name=dto.name,
+            modifierType=dto.modifier_type,
+            description=dto.description,
+            createdBy=dto.created_by,
         )
 
     @staticmethod
-    async def upsert_unit(
-        session: Any,
-        *,
-        id: str,
-        code: str,
-        name: str | None,
-        symbol: str | None,
-        description: str | None,
-        created_by: str,
-    ) -> None:
+    async def upsert_unit(session: Any, dto: UnitDTO) -> None:
+        """写入 Unit 节点（必须先构建 DTO 验证）"""
         query = """
         MERGE (u:Unit:Knowledge {id: $id})
         ON CREATE SET
-            u.createdAt = datetime(),
+            u.id = $id,
             u.code = $code,
             u.name = $name,
             u.symbol = $symbol,
             u.description = $description,
-            u.createdBy = $createdBy
+            u.createdBy = $createdBy,
+            u.createdAt = datetime()
         ON MATCH SET
-            u.updatedAt = datetime(),
             u.name = COALESCE($name, u.name),
             u.symbol = COALESCE($symbol, u.symbol),
-            u.description = COALESCE($description, u.description)
+            u.description = COALESCE($description, u.description),
+            u.updatedAt = datetime()
         """
         await arun_cypher(
             session,
             query,
-            id=id,
-            code=code,
-            name=name,
-            symbol=symbol,
-            description=description,
-            createdBy=created_by,
+            id=dto.id,
+            code=dto.code,
+            name=dto.name,
+            symbol=dto.symbol,
+            description=dto.description,
+            createdBy=dto.created_by,
         )
 
     @staticmethod
-    async def upsert_valuedomain(
-        session: Any,
-        *,
-        id: str,
-        domain_code: str,
-        domain_name: str | None,
-        domain_type: str | None,
-        domain_level: str | None,
-        items: str | None,
-        data_type: str | None,
-        description: str | None,
-        created_by: str,
-    ) -> None:
+    async def upsert_valuedomain(session: Any, dto: ValueDomainDTO) -> None:
+        """写入 ValueDomain 节点（必须先构建 DTO 验证）"""
         query = """
         MERGE (v:ValueDomain:Knowledge {id: $id})
         ON CREATE SET
-            v.createdAt = datetime(),
-            v.domainCode = $domainCode,
-            v.domainName = $domainName,
+            v.id = $id,
+            v.code = $code,
+            v.name = $name,
             v.domainType = $domainType,
             v.domainLevel = $domainLevel,
             v.items = $items,
             v.dataType = $dataType,
             v.description = $description,
-            v.createdBy = $createdBy
+            v.createdBy = $createdBy,
+            v.createdAt = datetime()
         ON MATCH SET
-            v.updatedAt = datetime(),
-            v.domainName = COALESCE($domainName, v.domainName),
+            v.name = COALESCE($name, v.name),
             v.domainType = COALESCE($domainType, v.domainType),
             v.domainLevel = COALESCE($domainLevel, v.domainLevel),
             v.items = COALESCE($items, v.items),
             v.dataType = COALESCE($dataType, v.dataType),
-            v.description = COALESCE($description, v.description)
+            v.description = COALESCE($description, v.description),
+            v.updatedAt = datetime()
         """
         await arun_cypher(
             session,
             query,
-            id=id,
-            domainCode=domain_code,
-            domainName=domain_name,
-            domainType=domain_type,
-            domainLevel=domain_level,
-            items=items,
-            dataType=data_type,
-            description=description,
-            createdBy=created_by,
+            id=dto.id,
+            code=dto.code,
+            name=dto.name,
+            domainType=dto.domain_type,
+            domainLevel=dto.domain_level,
+            items=dto.items,
+            dataType=dto.data_type,
+            description=dto.description,
+            createdBy=dto.created_by,
         )
 
     # ==================== Tag 节点（create_tag / alter_tag / drop_tag）====================
@@ -924,16 +911,17 @@ class TableUpsertPayload:
         query = """
         MERGE (t:Tag:Knowledge {id: $id})
         ON CREATE SET
-            t.createdAt = datetime(),
+            t.id = $id,
             t.name = $name,
             t.description = $description,
             t.properties = $properties,
-            t.createdBy = $createdBy
+            t.createdBy = $createdBy,
+            t.createdAt = datetime()
         ON MATCH SET
-            t.updatedAt = datetime(),
             t.name = $name,
             t.description = COALESCE($description, t.description),
-            t.properties = COALESCE($properties, t.properties)
+            t.properties = COALESCE($properties, t.properties),
+            t.updatedAt = datetime()
         """
         await arun_cypher(
             session,

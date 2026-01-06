@@ -21,19 +21,19 @@ import logging
 import time
 import uuid
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, Literal
 
-from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import Command, interrupt
 
 from src.infrastructure.llm.client import call_llm
+from src.infrastructure.repository.checkpoint import Checkpoint
 from src.modules.etl.agents import (
     AnalystAgent,
     ArchitectAgent,
     DeveloperAgent,
     KnowledgeAgent,
-    TesterAgent,
+    ReviewerAgent,
 )
 from src.modules.etl.boss import EtlBoss
 from src.modules.etl.context import Handover
@@ -48,9 +48,10 @@ from src.modules.etl.context.compress.budget import (
     parse_compress,
 )
 from src.modules.etl.schemas.agent_result import AgentResult
-from src.modules.etl.schemas.plan import TestResult, Workflow
+from src.modules.etl.schemas.analyst import AnalysisResult
 from src.modules.etl.schemas.requests import BlackboardRequest
-from src.modules.etl.schemas.requirement import AnalysisResult
+from src.modules.etl.schemas.review import ReviewResult
+from src.modules.etl.schemas.workflow import Workflow
 from src.modules.etl.state import AgentReport, Blackboard
 from src.shared.config.settings import settings
 
@@ -66,20 +67,17 @@ class EtlOrchestratorV2:
 
     def __init__(
         self,
-        checkpointer: BaseCheckpointSaver,
-        max_iterations: int | None = None,
+        review_retry_threshold: int | None = None,
         context_budget: ContextBudget | None = None,
     ):
-        self.checkpointer = checkpointer
-        self.max_iterations = int(
-            max_iterations
-            if max_iterations is not None
-            else settings.get("etl_orchestrator_max_iterations", 3)
+        self.review_retry_threshold = int(
+            review_retry_threshold
+            if review_retry_threshold is not None
+            else settings.get("etl_review_retry_threshold", 3)
         )
 
-        # LLM 实例
-        boss_llm = call_llm(enable_json_mode=True)
-        self.boss = EtlBoss(llm=boss_llm)
+        # Boss（内部使用 structured output）
+        self.boss = EtlBoss()
         self.compress_llm = call_llm(temperature=0.0)  # 用于压缩的 LLM
         self.context_budget = context_budget or get_default_budget()
 
@@ -88,7 +86,7 @@ class EtlOrchestratorV2:
         self.analyst_agent = AnalystAgent()
         self.architect_agent = ArchitectAgent()
         self.developer_agent = DeveloperAgent()
-        self.tester_agent = TesterAgent()
+        self.reviewer_agent = ReviewerAgent()
 
         # Handover 存储（运行时交接物，不持久化）
         self._handover: dict[str, Handover] = {}
@@ -106,7 +104,7 @@ class EtlOrchestratorV2:
         graph.add_node("analyst_agent", self._analyst_node)
         graph.add_node("architect_agent", self._architect_node)
         graph.add_node("developer_agent", self._developer_node)
-        graph.add_node("tester_agent", self._tester_node)
+        graph.add_node("reviewer_agent", self._reviewer_node)
         graph.add_node("finalize", self._finalize_node)
 
         # 设置入口
@@ -122,7 +120,7 @@ class EtlOrchestratorV2:
                 "analyst_agent": "analyst_agent",
                 "architect_agent": "architect_agent",
                 "developer_agent": "developer_agent",
-                "tester_agent": "tester_agent",
+                "reviewer_agent": "reviewer_agent",
                 "finalize": "finalize",
             },
         )
@@ -134,7 +132,7 @@ class EtlOrchestratorV2:
             "analyst_agent",
             "architect_agent",
             "developer_agent",
-            "tester_agent",
+            "reviewer_agent",
         ]:
             graph.add_edge(node, "boss")
 
@@ -156,6 +154,10 @@ class EtlOrchestratorV2:
         触发条件：
         - 用户手动 /compress
         - 该 Agent 上下文 token 数 >= 阈值
+
+        返回：
+        - True: 执行了压缩（成功或失败但保留了数据）
+        - False: 未触发压缩
         """
         memory = blackboard.ensure_memory()
         user_query = blackboard.task or ""
@@ -168,7 +170,7 @@ class EtlOrchestratorV2:
 
         # 估算 token 数（使用简化的系统指令估算）
         estimated = estimate_context_tokens(
-            system_instructions="[Agent System Prompt]",  # 实际估算时会包含完整提示词
+            system_instructions="[Agent System Prompt]",
             context_payload=None,
             memory_context=memory_context,
             user_query=user_query,
@@ -184,7 +186,7 @@ class EtlOrchestratorV2:
         # 执行压缩
         logger.info(f"Agent {agent_id} 触发压缩: tokens={estimated}, manual={manual_trigger}")
 
-        compressed = await maybe_compress(
+        result = await maybe_compress(
             llm=self.compress_llm,
             memory=memory,
             agent_id=agent_id,
@@ -195,7 +197,14 @@ class EtlOrchestratorV2:
             manual_trigger=manual_trigger,
         )
 
-        return compressed
+        # 处理压缩结果
+        if result.status == "failed":
+            logger.warning(
+                f"Agent {agent_id} 压缩失败: {result.error}, "
+                f"保留原始数据: {result.keep_recent_turns}"
+            )
+
+        return result.status != "skipped"
 
     def _route_from_boss(self, blackboard: Blackboard) -> str:
         """从 Boss 决策路由到下一个节点"""
@@ -209,7 +218,7 @@ class EtlOrchestratorV2:
             "analyst_agent",
             "architect_agent",
             "developer_agent",
-            "tester_agent",
+            "reviewer_agent",
             "finalize",
         }
         return next_node if next_node in valid_nodes else "finalize"
@@ -228,10 +237,17 @@ class EtlOrchestratorV2:
         req = pending[0]
         payload = req.payload or {}
 
+        message = payload.get("message", "请输入")
+        questions = payload.get("questions", [])
+        if isinstance(questions, list) and questions:
+            question_lines = "\n".join([f"- {str(q)}" for q in questions if str(q).strip()])
+            if question_lines.strip():
+                message = f"{message}\n\n需要确认：\n{question_lines}"
+
         user_input = interrupt(
             {
                 "type": payload.get("type", "question"),
-                "message": payload.get("message", "请输入"),
+                "message": message,
                 "options": payload.get("options", []),
             }
         )
@@ -244,12 +260,50 @@ class EtlOrchestratorV2:
             "completed_at_ms": int(time.time() * 1000),
         }
 
-        return Command(
-            update={
-                "pending_requests": remaining,
-                "request_results": results,
-            }
-        )
+        update: dict[str, Any] = {
+            "pending_requests": remaining,
+            "request_results": results,
+        }
+
+        # 可选：human 输入完成后，自动创建委派请求（用于“超阈值回炉暂停后由用户指定下一步”）
+        post_action = payload.get("post_action")
+        if post_action == "delegate" and isinstance(user_input, str):
+            target_agent = user_input.strip()
+            if target_agent in {
+                "knowledge_agent",
+                "analyst_agent",
+                "architect_agent",
+                "developer_agent",
+                "reviewer_agent",
+            }:
+                remaining.append(
+                    BlackboardRequest(
+                        request_id=f"req_{uuid.uuid4().hex}",
+                        kind="delegate",
+                        created_by="human_in_the_loop",
+                        target_agent=target_agent,
+                        resume_to="boss",
+                        payload={
+                            "type": payload.get("delegate_reason", "human_selected_next_step"),
+                            "message": payload.get(
+                                "delegate_message",
+                                "用户已指定下一步处理人，请继续。",
+                            ),
+                        },
+                    )
+                )
+                update["pending_requests"] = remaining
+
+        reset_fields = payload.get("reset_fields", [])
+        if isinstance(reset_fields, list):
+            for field_name in reset_fields:
+                if field_name in {
+                    "design_review_iteration_count",
+                    "development_review_iteration_count",
+                }:
+                    update[field_name] = 0
+
+        return Command(update=update)
 
     async def _knowledge_node(self, blackboard: Blackboard) -> Command:
         """知识检索节点"""
@@ -306,6 +360,7 @@ class EtlOrchestratorV2:
 
     async def _architect_node(self, blackboard: Blackboard) -> Command:
         """数据架构师节点"""
+        agent_id = "architect_agent"
         handover = self._get_handover(blackboard.session_id)
 
         # 获取需求分析结果
@@ -313,7 +368,7 @@ class EtlOrchestratorV2:
         if not analysis_result:
             return self._create_delegation_request(
                 blackboard=blackboard,
-                from_agent="architect_agent",
+                from_agent=agent_id,
                 to_agent="analyst_agent",
                 reason="need_analysis_result",
                 message="架构设计需要需求分析结果，已委派需求分析师先完成需求收敛。",
@@ -328,7 +383,7 @@ class EtlOrchestratorV2:
             # 获取组件列表并请求用户选择
             components = await self.architect_agent.get_components()
             if not components:
-                return self._create_error_result(blackboard, "architect_agent", "未找到可用组件")
+                return self._create_error_result(blackboard, agent_id, "未找到可用组件")
 
             options = []
             for comp in components:
@@ -345,7 +400,7 @@ class EtlOrchestratorV2:
 
             return self._create_human_request(
                 blackboard=blackboard,
-                agent_id="architect_agent",
+                agent_id=agent_id,
                 request_type="component_selection",
                 message="请选择要使用的技术组件：",
                 options=options,
@@ -360,6 +415,13 @@ class EtlOrchestratorV2:
                 selected_component_id = comp.get("id")
                 break
 
+        # 检查是否需要压缩（手动触发或达到阈值）
+        await self._maybe_compress_agent(blackboard, agent_id)
+
+        # 记录用户输入到该 Agent 的对话历史
+        if blackboard.task:
+            blackboard.add_agent_turn(agent_id, "user", blackboard.task)
+
         result = await self.architect_agent.run(
             user_query=blackboard.task or "",
             analysis_result=analysis_result,
@@ -368,15 +430,20 @@ class EtlOrchestratorV2:
             knowledge_agent=self.knowledge_agent,
         )
 
+        # 记录 Agent 响应到对话历史
+        if result.summary:
+            blackboard.add_agent_turn(agent_id, "assistant", result.summary)
+
         return self._handle_agent_result(
             blackboard=blackboard,
             handover=handover,
-            agent_id="architect_agent",
+            agent_id=agent_id,
             result=result,
         )
 
     async def _developer_node(self, blackboard: Blackboard) -> Command:
         """数据开发节点"""
+        agent_id = "developer_agent"
         handover = self._get_handover(blackboard.session_id)
 
         # 获取工作流
@@ -384,7 +451,7 @@ class EtlOrchestratorV2:
         if not workflow:
             return self._create_delegation_request(
                 blackboard=blackboard,
-                from_agent="developer_agent",
+                from_agent=agent_id,
                 to_agent="architect_agent",
                 reason="need_architecture_plan",
                 message="SQL 生成需要架构方案，已委派数据架构师先完成工作流设计。",
@@ -393,27 +460,39 @@ class EtlOrchestratorV2:
         if isinstance(workflow, dict):
             workflow = Workflow(**workflow)
 
-        # 获取测试反馈（如果有）
-        test_feedback = handover.get_deliverable("test")
-        if isinstance(test_feedback, dict):
-            test_feedback = TestResult(**test_feedback)
+        # 获取 review 反馈（如果有）
+        review_feedback = handover.get_deliverable("review_development")
+        if isinstance(review_feedback, dict):
+            review_feedback = ReviewResult(**review_feedback)
+
+        # 检查是否需要压缩（手动触发或达到阈值）
+        await self._maybe_compress_agent(blackboard, agent_id)
+
+        # 记录用户输入到该 Agent 的对话历史
+        if blackboard.task:
+            blackboard.add_agent_turn(agent_id, "user", blackboard.task)
 
         result = await self.developer_agent.run(
             user_query=blackboard.task or "",
             workflow=workflow,
-            test_feedback=test_feedback if isinstance(test_feedback, TestResult) else None,
+            review_feedback=review_feedback if isinstance(review_feedback, ReviewResult) else None,
             knowledge_agent=self.knowledge_agent,
         )
+
+        # 记录 Agent 响应到对话历史
+        if result.summary:
+            blackboard.add_agent_turn(agent_id, "assistant", result.summary)
 
         return self._handle_agent_result(
             blackboard=blackboard,
             handover=handover,
-            agent_id="developer_agent",
+            agent_id=agent_id,
             result=result,
         )
 
-    async def _tester_node(self, blackboard: Blackboard) -> Command:
-        """测试验证节点"""
+    async def _reviewer_node(self, blackboard: Blackboard) -> Command:
+        """Review 节点"""
+        agent_id = "reviewer_agent"
         handover = self._get_handover(blackboard.session_id)
 
         # 获取需求分析结果
@@ -421,10 +500,10 @@ class EtlOrchestratorV2:
         if not analysis_result:
             return self._create_delegation_request(
                 blackboard=blackboard,
-                from_agent="tester_agent",
+                from_agent=agent_id,
                 to_agent="analyst_agent",
                 reason="need_analysis_result",
-                message="测试验证需要需求分析结果，已委派需求分析师先完成需求收敛。",
+                message="Review 需要需求分析结果，已委派需求分析师先完成需求收敛。",
             )
 
         if isinstance(analysis_result, dict):
@@ -435,41 +514,184 @@ class EtlOrchestratorV2:
         if not workflow:
             return self._create_delegation_request(
                 blackboard=blackboard,
-                from_agent="tester_agent",
+                from_agent=agent_id,
                 to_agent="architect_agent",
                 reason="need_architecture_plan",
-                message="测试验证需要架构方案，已委派数据架构师先完成工作流设计。",
+                message="Review 需要架构方案，已委派数据架构师先完成工作流设计。",
             )
 
         if isinstance(workflow, dict):
             workflow = Workflow(**workflow)
 
-        result = await self.tester_agent.run(
+        review_stage: Literal["design", "development"] = (
+            "design" if not blackboard.design_review_passed else "development"
+        )
+
+        # 确定性前置校验：开发阶段必须有 SQL
+        if review_stage == "development":
+            missing_sql_jobs = self._check_missing_sql(workflow)
+            if missing_sql_jobs:
+                return self._create_delegation_request(
+                    blackboard=blackboard,
+                    from_agent=agent_id,
+                    to_agent="developer_agent",
+                    reason="missing_sql",
+                    message=f"存在未生成 SQL 的 Job: {', '.join(missing_sql_jobs)}，请先生成完整 SQL。",
+                )
+
+        # 检查是否需要压缩（手动触发或达到阈值）
+        await self._maybe_compress_agent(blackboard, agent_id)
+
+        # 记录用户输入到该 Agent 的对话历史
+        if blackboard.task:
+            blackboard.add_agent_turn(agent_id, "user", blackboard.task)
+
+        # 调用 ReviewerAgent 执行 review
+        result = await self.reviewer_agent.run(
             user_query=blackboard.task or "",
             analysis_result=analysis_result,
             workflow=workflow,
+            review_stage=review_stage,
         )
 
+        # 记录 Agent 响应到对话历史
+        if result.summary:
+            blackboard.add_agent_turn(agent_id, "assistant", result.summary)
+
+        # 处理技术故障（Agent 执行失败）
+        if result.status == "failed":
+            return self._handle_agent_result(
+                blackboard=blackboard,
+                handover=handover,
+                agent_id=agent_id,
+                result=result,
+            )
+
+        # 获取 review 结果
+        review_result = result.deliverable
+        if not isinstance(review_result, ReviewResult):
+            return self._create_error_result(
+                blackboard, agent_id, "ReviewerAgent 未返回有效的 ReviewResult"
+            )
+
+        # 存储测试结果
         cmd = self._handle_agent_result(
             blackboard=blackboard,
             handover=handover,
-            agent_id="tester_agent",
+            agent_id=agent_id,
             result=result,
+            create_followup_requests=False,  # 打回逻辑由本方法处理
+        )
+        update = dict(cmd.update or {})
+
+        # 阶段迭代计数
+        stage_counter_field = (
+            "design_review_iteration_count"
+            if review_stage == "design"
+            else "development_review_iteration_count"
         )
 
-        # 如果测试通过，标记完成
-        if result.status == "completed" and result.deliverable:
-            test_result = result.deliverable
-            if isinstance(test_result, TestResult) and test_result.passed:
-                update = dict(cmd.update or {})
+        # Review 通过：标记阶段通过，重置计数
+        if review_result.passed:
+            if review_stage == "design":
+                update["design_review_passed"] = True
+                update["design_review_iteration_count"] = 0
+            else:
+                update["development_review_passed"] = True
+                update["development_review_iteration_count"] = 0
                 update["is_completed"] = True
                 update["deliverable"] = workflow
-                return Command(update=update)
+            return Command(update=update)
 
-        return cmd
+        # Review 未通过：检查迭代次数，决定打回或暂停
+        current_count = getattr(blackboard, stage_counter_field)
+        next_count = current_count + 1
+        update[stage_counter_field] = next_count
+
+        # 确定打回目标
+        target_agent = "architect_agent" if review_stage == "design" else "developer_agent"
+        stage_cn = "设计阶段" if review_stage == "design" else "开发阶段"
+
+        # 超过阈值：暂停，请求用户介入
+        if next_count >= int(blackboard.review_retry_threshold):
+            options = [
+                {
+                    "value": "analyst_agent",
+                    "label": "analyst_agent：需求/口径澄清",
+                    "type": "agent",
+                },
+                {
+                    "value": "architect_agent",
+                    "label": "architect_agent：架构/依赖/写入设计",
+                    "type": "agent",
+                },
+                {
+                    "value": "developer_agent",
+                    "label": "developer_agent：SQL/字段映射/性能修复",
+                    "type": "agent",
+                },
+            ]
+
+            message = (
+                f"{stage_cn} review 已连续 {next_count} 次未通过，已暂停自动回炉。\n"
+                "请选择下一步由谁继续处理（将自动委派并继续执行）。"
+            )
+
+            pending = list(update.get("pending_requests") or blackboard.pending_requests or [])
+            pending.append(
+                BlackboardRequest(
+                    request_id=f"req_{uuid.uuid4().hex}",
+                    kind="human",
+                    created_by="reviewer_agent",
+                    resume_to="boss",
+                    payload={
+                        "type": "review_threshold_exceeded",
+                        "message": message,
+                        "options": options,
+                        "post_action": "delegate",
+                        "delegate_reason": "review_threshold_exceeded",
+                        "delegate_message": f"{stage_cn} review 超阈值后由用户指定下一步处理人。",
+                        "reset_fields": [stage_counter_field],
+                    },
+                )
+            )
+            update["pending_requests"] = pending
+            return Command(update=update)
+
+        # 未超过阈值：直接打回给对应 Agent
+        pending = list(update.get("pending_requests") or blackboard.pending_requests or [])
+        pending.append(
+            BlackboardRequest(
+                request_id=f"req_{uuid.uuid4().hex}",
+                kind="delegate",
+                created_by="reviewer_agent",
+                target_agent=target_agent,
+                resume_to="reviewer_agent",
+                payload={
+                    "type": "review_failed",
+                    "message": f"{stage_cn} review 未通过（第 {next_count} 次），请根据测试报告修复问题。",
+                    "issues": review_result.issues,
+                    "warnings": review_result.warnings,
+                },
+            )
+        )
+        update["pending_requests"] = pending
+        return Command(update=update)
+
+    @staticmethod
+    def _check_missing_sql(workflow: Workflow) -> list[str]:
+        """检查工作流中缺少 SQL 的 Job"""
+        missing: list[str] = []
+        for job in workflow.jobs:
+            sql = job.config.get("content") if job.config else None
+            if not (isinstance(sql, str) and sql.strip()):
+                missing.append(job.id)
+        return missing
 
     async def _finalize_node(self, blackboard: Blackboard) -> Command:
-        """完成节点"""
+        """完成节点：清理运行时交接物，标记任务完成"""
+        # 任务完成，清理交接物（遵循"用完即弃"原则）
+        self._handover.pop(blackboard.session_id, None)
         return Command(update={"is_completed": True})
 
     def _handle_agent_result(
@@ -479,16 +701,20 @@ class EtlOrchestratorV2:
         handover: Handover,
         agent_id: str,
         result: AgentResult,
+        create_followup_requests: bool = True,
     ) -> Command:
         """处理 Agent 结果，更新 Blackboard 和 Handover"""
         now_ms = int(time.time() * 1000)
+
+        # 如果当前 Agent 是“被委派者”，则在其执行完成后弹出对应的 delegate 请求，避免重复执行。
+        blackboard, _popped = self.boss.pop_completed_request(blackboard, agent_id)
 
         # 存储交付物到 Handover（运行时交接，不持久化）
         if result.deliverable and result.deliverable_type:
             handover.store_deliverable(result.deliverable_type, result.deliverable)
 
         # 更新短期记忆中的 Agent 状态（通过 Checkpointer 持久化）
-        blackboard.update_memory_agent_status(
+        blackboard.update_agent_status(
             agent_id=agent_id,
             status=result.status,
             deliverable_type=result.deliverable_type,
@@ -510,43 +736,49 @@ class EtlOrchestratorV2:
         reports = dict(blackboard.reports)
         reports[agent_id] = report
 
-        update: dict[str, Any] = {"reports": reports}
+        update: dict[str, Any] = {
+            "reports": reports,
+            # pop_completed_request 可能更新 pending_requests/request_results
+            "pending_requests": list(blackboard.pending_requests),
+            "request_results": dict(blackboard.request_results),
+        }
 
-        # 处理需要澄清的情况
-        if result.status == "needs_clarification" and result.clarification:
-            req = BlackboardRequest(
-                request_id=f"req_{uuid.uuid4().hex}",
-                kind="human",
-                created_by=f"{agent_id}_agent",
-                resume_to="boss",
-                payload={
-                    "type": "clarification",
-                    "message": result.clarification.message,
-                    "questions": result.clarification.questions,
-                    "options": result.clarification.options,
-                    "guidance": result.clarification.guidance,
-                },
-            )
-            pending = list(blackboard.pending_requests)
-            pending.append(req)
-            update["pending_requests"] = pending
+        if create_followup_requests:
+            # 处理需要澄清的情况
+            if result.status == "needs_clarification" and result.clarification:
+                req = BlackboardRequest(
+                    request_id=f"req_{uuid.uuid4().hex}",
+                    kind="human",
+                    created_by=agent_id,
+                    resume_to="boss",
+                    payload={
+                        "type": "clarification",
+                        "message": result.clarification.message,
+                        "questions": result.clarification.questions,
+                        "options": result.clarification.options,
+                        "guidance": result.clarification.guidance,
+                    },
+                )
+                pending = list(update.get("pending_requests") or [])
+                pending.append(req)
+                update["pending_requests"] = pending
 
-        # 处理需要委派的情况
-        if result.status == "needs_delegation" and result.delegation:
-            req = BlackboardRequest(
-                request_id=f"req_{uuid.uuid4().hex}",
-                kind="delegate",
-                created_by=f"{agent_id}_agent",
-                target_agent=result.delegation.target_agent,
-                resume_to=f"{agent_id}_agent",
-                payload={
-                    "type": result.delegation.reason,
-                    **result.delegation.payload,
-                },
-            )
-            pending = list(blackboard.pending_requests)
-            pending.append(req)
-            update["pending_requests"] = pending
+            # 处理需要委派的情况
+            if result.status == "needs_delegation" and result.delegation:
+                req = BlackboardRequest(
+                    request_id=f"req_{uuid.uuid4().hex}",
+                    kind="delegate",
+                    created_by=agent_id,
+                    target_agent=result.delegation.target_agent,
+                    resume_to=agent_id,
+                    payload={
+                        "type": result.delegation.reason,
+                        **result.delegation.payload,
+                    },
+                )
+                pending = list(update.get("pending_requests") or [])
+                pending.append(req)
+                update["pending_requests"] = pending
 
         # 处理失败情况
         if result.status == "failed":
@@ -620,7 +852,7 @@ class EtlOrchestratorV2:
         req = BlackboardRequest(
             request_id=f"req_{uuid.uuid4().hex}",
             kind="human",
-            created_by=f"{agent_id}_agent",
+            created_by=agent_id,
             resume_to="boss",
             payload={
                 "type": request_type,
@@ -669,9 +901,10 @@ class EtlOrchestratorV2:
             }
         )
 
-    def compile(self):
-        """编译图"""
-        return self._graph.compile(checkpointer=self.checkpointer)
+    async def compile(self):
+        """编译图（使用 Checkpoint 获取 checkpointer）"""
+        saver = await Checkpoint._ensure_saver()
+        return self._graph.compile(checkpointer=saver)
 
     def _get_thread_id(self, session_id: str, user_id: str) -> str:
         """生成 thread_id"""
@@ -699,7 +932,7 @@ class EtlOrchestratorV2:
         """
         thread_id = self._get_thread_id(session_id, user_id)
         config = {"configurable": {"thread_id": thread_id}}
-        app = self.compile()
+        app = await self.compile()
 
         if resume_value is not None:
             async for event in app.astream(Command(resume=resume_value), config):
@@ -709,7 +942,7 @@ class EtlOrchestratorV2:
                 session_id=session_id,
                 user_id=user_id,
                 task=user_input,
-                max_iterations=self.max_iterations,
+                review_retry_threshold=self.review_retry_threshold,
             )
             async for event in app.astream(blackboard, config):
                 yield self._format_event(event, session_id)
@@ -728,8 +961,7 @@ class EtlOrchestratorV2:
         """清除会话"""
         thread_id = self._get_thread_id(session_id, user_id)
         # 清除 checkpoint
-        if hasattr(self.checkpointer, "adelete"):
-            await self.checkpointer.adelete({"configurable": {"thread_id": thread_id}})
+        await Checkpoint.delete_thread(thread_id)
         # 清除 handover
         self._handover.pop(session_id, None)
         logger.info(f"Session cleared: {thread_id}")

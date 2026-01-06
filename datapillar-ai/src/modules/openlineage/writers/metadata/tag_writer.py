@@ -13,7 +13,7 @@ from __future__ import annotations
 import structlog
 from neo4j import AsyncSession
 
-from src.infrastructure.repository.openlineage import OpenLineageMetadataRepository
+from src.infrastructure.repository.openlineage import Metadata
 from src.modules.openlineage.parsers.plans.metadata import TagWritePlan
 from src.modules.openlineage.writers.metadata.types import QueueTagEmbeddingTask
 
@@ -39,7 +39,7 @@ class TagWriter:
         """写入 Tag 节点（create_tag / alter_tag）"""
         for plan in plans:
             tag = plan.tag
-            await OpenLineageMetadataRepository.upsert_tag(
+            await Metadata.upsert_tag(
                 session,
                 id=tag.id,
                 name=tag.name,
@@ -60,5 +60,5 @@ class TagWriter:
     async def delete_tags(self, session: AsyncSession, tag_ids: list[str]) -> None:
         """删除 Tag 节点（drop_tag）"""
         for tag_id in tag_ids:
-            await OpenLineageMetadataRepository.delete_tag(session, tag_id=tag_id)
+            await Metadata.delete_tag(session, tag_id=tag_id)
             logger.info("tag_deleted", tag_id=tag_id)

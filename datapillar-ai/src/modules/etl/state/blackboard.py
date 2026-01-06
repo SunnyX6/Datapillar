@@ -23,10 +23,18 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from src.modules.etl.memory.session_memory import SessionMemory
-from src.modules.etl.schemas.plan import Workflow
 from src.modules.etl.schemas.requests import BlackboardRequest
+from src.modules.etl.schemas.workflow import Workflow
 
-ReportStatus = Literal["completed", "in_progress", "blocked", "failed"]
+ReportStatus = Literal[
+    "completed",
+    "in_progress",
+    "blocked",
+    "failed",
+    "needs_clarification",
+    "needs_delegation",
+    "waiting",
+]
 
 
 class AgentReport(BaseModel):
@@ -41,7 +49,13 @@ class AgentReport(BaseModel):
     - 建议的下一步
     """
 
-    status: ReportStatus = Field(..., description="状态：completed/in_progress/blocked/failed")
+    status: ReportStatus = Field(
+        ...,
+        description=(
+            "状态：completed/in_progress/blocked/failed/"
+            "needs_clarification/needs_delegation/waiting"
+        ),
+    )
     summary: str = Field(..., description="一句话总结（如：需求分析完成，识别出3个业务步骤）")
     deliverable_ref: str | None = Field(None, description="交接物引用（如：analysis:abc123）")
     blocked_reason: str | None = Field(None, description="如果 blocked，原因是什么")
@@ -92,8 +106,17 @@ class Blackboard(BaseModel):
 
     # ==================== 执行控制 ====================
     current_agent: str | None = Field(None, description="当前执行的员工")
-    iteration_count: int = Field(default=0, description="迭代计数")
-    max_iterations: int = Field(default=3, description="最大迭代次数")
+    review_retry_threshold: int = Field(
+        default=3, description="Review 打回阈值（连续失败几次后暂停请求用户介入）"
+    )
+    design_review_iteration_count: int = Field(
+        default=0, description="设计阶段 review 迭代计数（独立计数）"
+    )
+    development_review_iteration_count: int = Field(
+        default=0, description="开发阶段 review 迭代计数（独立计数）"
+    )
+    design_review_passed: bool = Field(default=False, description="设计阶段 review 是否通过")
+    development_review_passed: bool = Field(default=False, description="开发阶段 review 是否通过")
     is_completed: bool = Field(default=False, description="是否完成")
     error: str | None = Field(None, description="错误信息")
 
@@ -135,10 +158,6 @@ class Blackboard(BaseModel):
         return any(
             req.kind == "delegate" and req.status == "pending" for req in self.pending_requests
         )
-
-    def can_iterate(self) -> bool:
-        """是否可以继续迭代"""
-        return self.iteration_count < self.max_iterations
 
     # ==================== 短期记忆操作 ====================
 

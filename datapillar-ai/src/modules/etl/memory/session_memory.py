@@ -27,7 +27,18 @@ from pydantic import BaseModel, Field
 class AgentStatus(BaseModel):
     """Agent 产物状态（不存原文，只存状态）"""
 
-    status: Literal["pending", "in_progress", "completed", "failed"] = "pending"
+    # 注意：这里存的是“编排视角”状态，用于回放/观测/续跑。
+    # 编排器会写入 AgentResult.status（含 needs_*），因此必须与之兼容。
+    status: Literal[
+        "pending",
+        "in_progress",
+        "completed",
+        "failed",
+        "needs_clarification",
+        "needs_delegation",
+        "waiting",
+        "blocked",
+    ] = "pending"
     deliverable_type: str | None = None  # "analysis" / "workflow" / "sql" / "test"
     summary: str = ""  # 简短摘要
     updated_at_ms: int = Field(default_factory=lambda: int(time.time() * 1000))

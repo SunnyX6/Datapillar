@@ -15,7 +15,7 @@ import structlog
 
 from src.infrastructure.llm.embeddings import UnifiedEmbedder
 from src.infrastructure.repository.neo4j_uow import neo4j_async_session
-from src.infrastructure.repository.openlineage import OpenLineageMetadataRepository
+from src.infrastructure.repository.openlineage import Metadata
 from src.modules.openlineage.core.queue import AsyncEventQueue, QueueConfig
 
 logger = structlog.get_logger()
@@ -205,7 +205,7 @@ class EmbeddingProcessor:
 
             for label, items in label_groups.items():
                 data = [{"id": node_id, "embedding": emb} for node_id, emb in items]
-                await OpenLineageMetadataRepository.write_embeddings_batch(
+                await Metadata.write_embeddings_batch(
                     session,
                     node_label=label,
                     data=data,

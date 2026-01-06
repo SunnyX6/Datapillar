@@ -3,7 +3,7 @@ from __future__ import annotations
 import structlog
 from neo4j import AsyncSession
 
-from src.infrastructure.repository.openlineage import OpenLineageLineageRepository
+from src.infrastructure.repository.openlineage import Lineage
 
 logger = structlog.get_logger()
 
@@ -21,7 +21,7 @@ class MetricColumnLineageWriter:
     async def write_measures(
         self, session: AsyncSession, *, metric_id: str, column_ids: list[str]
     ) -> None:
-        await OpenLineageLineageRepository.set_metric_measures(
+        await Lineage.set_metric_measures(
             session,
             metric_id=metric_id,
             column_ids=column_ids,
@@ -32,7 +32,7 @@ class MetricColumnLineageWriter:
     async def write_filters(
         self, session: AsyncSession, *, metric_id: str, column_ids: list[str]
     ) -> None:
-        await OpenLineageLineageRepository.set_metric_filters(
+        await Lineage.set_metric_filters(
             session,
             metric_id=metric_id,
             column_ids=column_ids,

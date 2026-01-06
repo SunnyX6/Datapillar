@@ -28,6 +28,7 @@ import org.apache.gravitino.dataset.MetricModifier;
 @DeveloperApi
 public class ModifierInfo {
   private final String code;
+  private final Optional<String> name;
   private final Optional<String> comment;
   private final Optional<String> modifierType;
   private final Optional<Audit> audit;
@@ -38,19 +39,26 @@ public class ModifierInfo {
    * @param modifier the modifier to expose information for.
    */
   public ModifierInfo(MetricModifier modifier) {
-    this(modifier.code(), modifier.comment(), modifier.modifierType(), modifier.auditInfo());
+    this(
+        modifier.code(),
+        modifier.name(),
+        modifier.comment(),
+        modifier.modifierType(),
+        modifier.auditInfo());
   }
 
   /**
    * Constructs a {@link ModifierInfo} instance based on all fields.
    *
    * @param code the code of the modifier.
+   * @param name the name of the modifier.
    * @param comment the comment of the modifier.
    * @param modifierType the type of the modifier.
    * @param audit the audit information of the modifier.
    */
-  public ModifierInfo(String code, String comment, String modifierType, Audit audit) {
+  public ModifierInfo(String code, String name, String comment, String modifierType, Audit audit) {
     this.code = code;
+    this.name = Optional.ofNullable(name);
     this.comment = Optional.ofNullable(comment);
     this.modifierType = Optional.ofNullable(modifierType);
     this.audit = Optional.ofNullable(audit);
@@ -63,6 +71,15 @@ public class ModifierInfo {
    */
   public String code() {
     return code;
+  }
+
+  /**
+   * Returns the name of the modifier.
+   *
+   * @return the name of the modifier or empty if not set.
+   */
+  public Optional<String> name() {
+    return name;
   }
 
   /**

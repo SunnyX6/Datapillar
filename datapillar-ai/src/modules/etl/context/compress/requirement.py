@@ -762,7 +762,7 @@ AgentId = Literal[
     "analyst_agent",
     "architect_agent",
     "developer_agent",
-    "tester_agent",
+    "reviewer_agent",
 ]
 
 
