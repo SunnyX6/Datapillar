@@ -3,7 +3,7 @@ from __future__ import annotations
 import structlog
 from neo4j import AsyncSession
 
-from src.infrastructure.repository.openlineage import OpenLineageLineageRepository
+from src.infrastructure.repository.openlineage import Lineage
 from src.modules.openlineage.parsers.plans.types import LineageWritePlans
 
 logger = structlog.get_logger()
@@ -27,7 +27,7 @@ class HierarchyWriter:
 
     async def write(self, session: AsyncSession, plans: LineageWritePlans) -> None:
         for catalog_id, schema_id in plans.catalog_schema_edges:
-            await OpenLineageLineageRepository.link_catalog_schema(
+            await Lineage.link_catalog_schema(
                 session,
                 catalog_id=catalog_id,
                 schema_id=schema_id,
@@ -35,7 +35,7 @@ class HierarchyWriter:
             self._hierarchy_edges_written += 1
 
         for schema_id, table_id in plans.schema_table_edges:
-            await OpenLineageLineageRepository.link_schema_table(
+            await Lineage.link_schema_table(
                 session,
                 schema_id=schema_id,
                 table_id=table_id,
@@ -43,7 +43,7 @@ class HierarchyWriter:
             self._hierarchy_edges_written += 1
 
         for table_id, column_ids in plans.table_column_edges:
-            await OpenLineageLineageRepository.link_table_columns(
+            await Lineage.link_table_columns(
                 session,
                 table_id=table_id,
                 column_ids=column_ids,

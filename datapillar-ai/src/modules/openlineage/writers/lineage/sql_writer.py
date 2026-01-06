@@ -3,8 +3,8 @@ from __future__ import annotations
 import structlog
 from neo4j import AsyncSession
 
-from src.infrastructure.repository.openlineage import OpenLineageLineageRepository
-from src.modules.openlineage.schemas.neo4j import SQLNode
+from src.infrastructure.repository.kg.dto import SQLDTO
+from src.infrastructure.repository.openlineage import Lineage
 
 logger = structlog.get_logger()
 
@@ -17,8 +17,8 @@ class SQLWriter:
     def sql_written(self) -> int:
         return self._sql_written
 
-    async def write(self, session: AsyncSession, sql: SQLNode) -> None:
-        await OpenLineageLineageRepository.upsert_sql(
+    async def write(self, session: AsyncSession, sql: SQLDTO) -> None:
+        await Lineage.upsert_sql(
             session,
             id=sql.id,
             content=sql.content,

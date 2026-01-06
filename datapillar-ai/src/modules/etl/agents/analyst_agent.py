@@ -8,17 +8,23 @@ Analyst Agent（需求分析师）
 - 通过工具验证表是否存在
 """
 
+import asyncio
 import json
 import logging
+import time
 
 from langchain_core.messages import ToolMessage
 
 from src.infrastructure.llm.client import call_llm
+from src.infrastructure.resilience import get_resilience_config
 from src.modules.etl.agents.knowledge_agent import AgentType, get_agent_tools
 from src.modules.etl.agents.prompt_messages import build_llm_messages
 from src.modules.etl.schemas.agent_result import AgentResult
-from src.modules.etl.schemas.requirement import Ambiguity, AnalysisResult, DataTarget, Step
-from src.modules.etl.tools.agent_tools import get_table_columns, recommend_guidance
+from src.modules.etl.schemas.analyst import (
+    AnalysisResult,
+    AnalysisResultOutput,
+)
+from src.modules.etl.tools.table import get_table_detail
 
 logger = logging.getLogger(__name__)
 
@@ -30,50 +36,76 @@ def _tool_error(message: str, **extra: object) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
-ANALYST_AGENT_SYSTEM_INSTRUCTIONS = """你是 Datapillar 的 AnalystAgent（需求分析与收敛）。
+ANALYST_AGENT_SYSTEM_INSTRUCTIONS = """你是 Datapillar 的需求分析师（AnalystAgent）。
 
-## 任务
-把用户需求收敛成可执行的业务步骤（Step），输出严格 JSON。
+## 你的任务
+将用户的 ETL 需求拆分为可执行的业务步骤（Step），并验证涉及的表是否存在。
 
-## 核心原则
-1. 你只做"做什么"（业务拆解），不做"怎么做"（不写 SQL，不选组件，不画 DAG）。
-2. 不允许臆造表名，如果不确定，必须提出澄清问题。
+## 可用工具
 
-## 输出格式
-{{
-  "summary": "一句话概括需求（必须具体，不能模糊）",
+### get_table_detail
+查询表的详细信息（字段、类型等）。
+- 用户提到的表名可能不完整，需要通过此工具验证
+- 如果返回"未找到表"，说明表名或路径不正确
+
+## 工作流程
+1. 分析用户需求
+2. 如果需要验证表信息，调用 get_table_detail
+3. 分析完成后，直接输出 JSON 格式的分析结果
+
+## 输出格式（JSON）
+分析完成后，直接输出以下 JSON 格式：
+```json
+{
+  "summary": "一句话概括用户需求",
+  "confidence": 0.8,
   "steps": [
-    {{
-      "step_id": "step_1",
-      "step_name": "业务步骤名称",
-      "description": "这一步做什么（业务描述）",
-      "input_tables": ["schema.table"],
-      "output_table": "schema.table",
+    {
+      "step_id": "s1",
+      "step_name": "步骤名称",
+      "description": "这一步做什么",
+      "input_tables": ["catalog.schema.table"],
+      "output_table": "catalog.schema.table",
       "depends_on": []
-    }}
+    }
   ],
-  "final_target": {{
-    "table_name": "最终目标表（必须明确）",
+  "final_target": {
+    "table_name": "目标表名",
     "write_mode": "overwrite",
-    "partition_by": ["dt"]
-  }},
-  "ambiguities": [
-    {{
-      "question": "需要用户澄清的具体问题",
-      "context": "为什么需要澄清",
-      "options": ["可能的选项1", "可能的选项2"]
-    }}
-  ],
-  "confidence": 0.85
-}}
+    "description": "描述"
+  },
+  "ambiguities": []
+}
+```
 
-重要：
-- **必须输出纯 JSON**：不得输出 Markdown、不得输出 ```json 代码块、不得输出解释性文字
-- ambiguities 中的每条 question 必须唯一，不允许同义重复
-- 如果无法明确 input_tables 或 output_table，必须在 ambiguities 中提问
-- confidence 反映需求的明确程度，模糊需求必须 < 0.7
+## 字段说明
+- summary: 一句话概括用户需求
+- confidence: 需求明确程度 (0-1)，模糊需求 < 0.7
+- steps: 业务步骤列表
+  - step_id: 步骤唯一标识
+  - step_name: 步骤名称
+  - description: 这一步做什么
+  - input_tables: 输入表列表（完整路径 catalog.schema.table）
+  - output_table: 输出表（完整路径）
+  - depends_on: 依赖的上游步骤 ID
+- final_target: 最终数据目标
+  - table_name: 目标表名
+  - write_mode: overwrite/append/upsert
+  - description: 描述
+- ambiguities: 需要澄清的问题列表
 
-只输出 JSON，不要解释。
+## 收敛标准
+需求分析必须"收敛"才算完成：
+1. 每个 Step 必须有明确的 input_tables 和 output_table
+2. 必须有 final_target
+3. confidence >= 0.7
+
+如果无法收敛，设置 confidence < 0.7 并在 ambiguities 中列出问题。
+
+## 重要约束
+1. 你只负责"做什么"（业务拆解），不写 SQL，不选组件
+2. 不允许臆造表名，必须通过工具验证或在 ambiguities 中询问
+3. 分析完成后直接输出 JSON，不要调用任何工具
 """
 
 
@@ -90,8 +122,8 @@ class AnalystAgent:
 
     def __init__(self):
         self.llm = call_llm(temperature=0.0)
-        self.llm_json = call_llm(temperature=0.0, enable_json_mode=True)
-        self.max_tool_calls = 4
+        config = get_resilience_config()
+        self.max_iterations = config.max_iterations
         self.allowlist = get_agent_tools(AgentType.ANALYST)
 
     async def run(
@@ -123,36 +155,13 @@ class AnalystAgent:
         try:
             llm_with_tools = self._bind_tools()
 
-            result_dict = await self._analyze_with_tools(
+            output = await self._analyze_with_tools(
                 user_query=user_query,
                 llm_with_tools=llm_with_tools,
             )
 
-            analysis_result = self._build_analysis_result(result_dict, user_query)
-
-            plan_summary = analysis_result.plan_summary()
-            logger.info(f"✅ AnalystAgent 完成分析:\n{plan_summary}")
-
-            if analysis_result.needs_clarification() or analysis_result.confidence < 0.7:
-                questions = [a.question for a in analysis_result.ambiguities if a.question]
-                if not questions:
-                    return AgentResult.failed(
-                        summary="需求未收敛，LLM 未生成有效澄清问题",
-                        error="需求未收敛且 ambiguities 为空",
-                    )
-                guidance = await self._try_recommend_guidance(user_query)
-                return AgentResult.needs_clarification(
-                    summary="需求不够明确，需要补充关键信息",
-                    message="请回答以下问题以便继续分析",
-                    questions=questions,
-                    guidance=guidance,
-                )
-
-            if not self._is_converged(analysis_result):
-                return AgentResult.failed(
-                    summary="需求未收敛：缺少 steps 或 input/output 或 final_target",
-                    error="需求未收敛：输出不满足步骤/输入输出/目标表等约束",
-                )
+            analysis_result = AnalysisResult.from_output(output, user_query)
+            logger.info(f"✅ AnalystAgent 完成分析:\n{analysis_result.plan_summary()}")
 
             return AgentResult.completed(
                 summary=f"需求分析完成: {analysis_result.summary}",
@@ -167,175 +176,181 @@ class AnalystAgent:
                 error=str(e),
             )
 
-    @staticmethod
-    async def _try_recommend_guidance(user_query: str) -> dict | None:
-        """no-hit/需澄清场景的轻量引导数据"""
-        try:
-            raw = await recommend_guidance.ainvoke({"user_query": user_query})
-            parsed = json.loads(raw or "")
-            if isinstance(parsed, dict) and parsed.get("status") == "success":
-                return parsed
-            return None
-        except Exception:
-            return None
-
     async def _analyze_with_tools(
         self,
         user_query: str,
         llm_with_tools,
-    ) -> dict:
-        """执行带工具调用的分析"""
+    ) -> AnalysisResultOutput:
+        """
+        带工具调用的分析流程：
+        1. 预先调用 KnowledgeAgent 获取候选表/列/值域（带权限过滤）
+        2. 第一阶段：LLM 调用工具收集信息（bind_tools + ToolMessage）
+        3. 第二阶段：LLM 输出结构化结果（with_structured_output + parse_structured_output 兜底）
+        """
+        total_start = time.perf_counter()
+
+        # 预先检索知识上下文（带权限过滤）
+        context_payload = None
+        if self._knowledge_agent:
+            search_start = time.perf_counter()
+            ctx = await self._knowledge_agent.global_search(user_query, top_k=10, min_score=0.5)
+            search_elapsed = time.perf_counter() - search_start
+            logger.info(f"⏱️ 知识检索耗时: {search_elapsed:.2f}s, 找到 {ctx.summary()}")
+            # 传入 allowlist 过滤钥匙：只保留该员工有权限的工具
+            context_payload = ctx.to_llm_context(allowlist=self.allowlist)
+
         messages = build_llm_messages(
             system_instructions=ANALYST_AGENT_SYSTEM_INSTRUCTIONS,
             agent_id="analyst_agent",
             user_query=user_query,
+            context_payload=context_payload,
         )
-        tool_call_count = 0
 
-        while tool_call_count < self.max_tool_calls:
+        # 第一阶段：工具调用收集信息
+        for iteration in range(1, self.max_iterations + 1):
+            llm_start = time.perf_counter()
             response = await llm_with_tools.ainvoke(messages)
-            messages.append(response)
+            llm_elapsed = time.perf_counter() - llm_start
+            logger.info(f"⏱️ [第{iteration}轮] LLM 调用耗时: {llm_elapsed:.2f}s")
 
             if not response.tool_calls:
-                return self._parse_response(response.content)
+                # 没有工具调用，进入第二阶段
+                break
 
-            for tool_call in response.tool_calls:
-                tool_call_count += 1
-                tool_name = tool_call["name"]
-                tool_args = tool_call["args"]
-                tool_id = tool_call["id"]
+            # 执行工具调用，结果放入 ToolMessage
+            messages.append(response)
+            for tc in response.tool_calls:
+                logger.info(f"🔧 AnalystAgent 调用工具: {tc['name']}({tc['args']})")
 
-                logger.info(f"🔧 AnalystAgent 调用工具: {tool_name}({tool_args})")
+            tool_start = time.perf_counter()
+            results = await asyncio.gather(
+                *[self._execute_tool(tc["name"], tc["args"]) for tc in response.tool_calls]
+            )
+            tool_elapsed = time.perf_counter() - tool_start
+            logger.info(
+                f"⏱️ [第{iteration}轮] 工具调用耗时: {tool_elapsed:.2f}s ({len(results)} 个工具并行)"
+            )
 
-                tool_result = await self._execute_tool(tool_name, tool_args)
+            for tc, result in zip(response.tool_calls, results, strict=True):
+                messages.append(ToolMessage(content=result, tool_call_id=tc["id"]))
 
-                messages.append(ToolMessage(content=tool_result, tool_call_id=tool_id))
+        # 第二阶段：结构化输出（with_structured_output 让 LLM 知道 schema）
+        structured_start = time.perf_counter()
+        output = await self._get_structured_output(messages, AnalysisResultOutput)
+        structured_elapsed = time.perf_counter() - structured_start
+        logger.info(f"⏱️ 结构化输出耗时: {structured_elapsed:.2f}s")
 
-                if tool_call_count >= self.max_tool_calls:
-                    break
+        total_elapsed = time.perf_counter() - total_start
+        logger.info(f"⏱️ AnalystAgent 总耗时: {total_elapsed:.2f}s")
 
-        response = await self.llm_json.ainvoke(messages)
-        return self._parse_response(response.content)
+        return output
+
+    async def _get_structured_output(
+        self,
+        messages: list,
+        schema: type[AnalysisResultOutput],
+    ) -> AnalysisResultOutput:
+        """
+        获取结构化输出：with_structured_output(json_mode) + parse_structured_output 兜底
+        """
+        from src.infrastructure.llm.structured_output import parse_structured_output
+
+        # 使用 json_mode（不是 function_calling，避免和工具调用混淆）
+        llm_structured = self.llm.with_structured_output(
+            schema,
+            method="json_mode",
+            include_raw=True,
+        )
+        result = await llm_structured.ainvoke(messages)
+
+        # 情况 1：直接解析成功
+        if isinstance(result, schema):
+            return result
+
+        # 情况 2：dict 格式（include_raw=True 的返回）
+        if isinstance(result, dict):
+            parsed = result.get("parsed")
+            if isinstance(parsed, schema):
+                return parsed
+
+            # 解析失败，尝试从 raw 中恢复
+            parsing_error = result.get("parsing_error")
+            raw = result.get("raw")
+
+            if raw:
+                raw_text = getattr(raw, "content", None)
+                if raw_text:
+                    logger.warning(
+                        "with_structured_output 解析失败，尝试 parse_structured_output 兜底"
+                    )
+                    try:
+                        return parse_structured_output(raw_text, schema)
+                    except ValueError as e:
+                        logger.error(f"parse_structured_output 兜底也失败: {e}")
+                        raise
+
+            if parsing_error:
+                raise parsing_error
+
+        raise ValueError(f"无法获取结构化输出: {type(result)}")
 
     async def _execute_tool(self, tool_name: str, tool_args: dict) -> str:
-        """执行工具调用（按需获取指针 + 权限校验）"""
+        """执行工具调用（支持精确参数和模糊参数）"""
         try:
             if tool_name not in self.allowlist:
                 return _tool_error(f"工具不在 allowlist 中: {tool_name}")
 
-            if not self._knowledge_agent:
-                return _tool_error("无法查询指针：knowledge_agent 未注入")
+            if tool_name == "get_table_detail":
+                # 检查是否已提供精确参数
+                catalog = tool_args.get("catalog")
+                schema_name = tool_args.get("schema_name") or tool_args.get("schema")
+                table = tool_args.get("table")
 
-            if tool_name == "get_table_columns":
-                table_name = (tool_args or {}).get("table_name") or ""
-                if not table_name:
-                    return _tool_error("缺少 table_name 参数")
+                # 如果只提供了 table_name，尝试通过 knowledge_agent 查找精确路径
+                if not (catalog and schema_name and table):
+                    table_name = tool_args.get("table_name") or tool_args.get("table") or ""
+                    if not table_name:
+                        return _tool_error("缺少 table 参数")
 
-                pointers = await self._knowledge_agent.query_pointers(
-                    table_name,
-                    node_types=["Table"],
-                    top_k=5,
+                    # 尝试解析 schema.table 或 catalog.schema.table 格式
+                    parts = table_name.split(".")
+                    if len(parts) >= 3:
+                        catalog, schema_name, table = parts[0], parts[1], parts[2]
+                    elif len(parts) == 2:
+                        schema_name, table = parts[0], parts[1]
+                        catalog = ""
+                    else:
+                        # 无法解析，尝试通过 knowledge_agent 查找
+                        if self._knowledge_agent:
+                            ctx = await self._knowledge_agent.global_search(
+                                table_name, top_k=1, min_score=0.6
+                            )
+                            if ctx.tables:
+                                pointer = ctx.tables[0]
+                                catalog = pointer.catalog
+                                schema_name = pointer.schema_name
+                                table = pointer.table
+                            else:
+                                return _tool_error(f"未找到表: {table_name}")
+                        else:
+                            return _tool_error(f"无法解析表名: {table_name}")
+
+                logger.info(
+                    f"🔧 调用工具: {tool_name}(catalog={catalog}, schema_name={schema_name}, table={table})"
                 )
-                pointer = self._find_matching_pointer(pointers, table_name)
-                if not pointer:
-                    return _tool_error("未找到指针", table_name=table_name)
-                if "get_table_columns" not in (pointer.tools or []):
-                    return _tool_error("指针未授权此工具", table_name=table_name)
-
-                logger.info(f"📊 调用 get_table_columns: {pointer.qualified_name}")
-                return await get_table_columns.ainvoke({"table_name": pointer.qualified_name})
+                return await get_table_detail.ainvoke(
+                    {
+                        "catalog": catalog,
+                        "schema_name": schema_name,
+                        "table": table,
+                    }
+                )
 
             return _tool_error(f"未知工具: {tool_name}")
         except Exception as e:
             logger.error(f"工具 {tool_name} 执行失败: {e}")
             return _tool_error(str(e))
 
-    def _find_matching_pointer(self, pointers: list, name: str):
-        """从指针列表中找到匹配的指针"""
-        if not pointers:
-            return None
-        for p in pointers:
-            if p.qualified_name == name:
-                return p
-        for p in pointers:
-            if name in (p.qualified_name or ""):
-                return p
-        return pointers[0] if pointers else None
-
-    def _is_converged(self, analysis: AnalysisResult) -> bool:
-        """只做结构性收敛校验"""
-        if not analysis.steps:
-            return False
-        for step in analysis.steps:
-            if not step.input_tables:
-                return False
-            if not step.output_table:
-                return False
-        if not analysis.final_target:
-            return False
-        return bool(analysis.final_target.table_name)
-
     def _bind_tools(self):
-        """绑定工具到 LLM"""
-        tool_registry = {
-            "get_table_columns": get_table_columns,
-        }
-        tools = [tool_registry[name] for name in self.allowlist if name in tool_registry]
-        return self.llm.bind_tools(tools)
-
-    def _parse_response(self, content: str) -> dict:
-        """严格解析 LLM 响应"""
-        text = (content or "").strip()
-        try:
-            parsed = json.loads(text)
-        except json.JSONDecodeError as e:
-            raise ValueError("LLM 输出不是合法 JSON") from e
-        if not isinstance(parsed, dict):
-            raise ValueError("LLM 输出必须是 JSON object")
-        return parsed
-
-    def _build_analysis_result(self, result_dict: dict, user_query: str) -> AnalysisResult:
-        """构建 AnalysisResult"""
-        steps = []
-        for step_dict in result_dict.get("steps", []):
-            step = Step(
-                step_id=step_dict.get("step_id", ""),
-                step_name=step_dict.get("step_name", ""),
-                description=step_dict.get("description", ""),
-                input_tables=step_dict.get("input_tables", []),
-                output_table=step_dict.get("output_table"),
-                depends_on=step_dict.get("depends_on", []),
-            )
-            steps.append(step)
-
-        ambiguities = []
-        for amb_dict in result_dict.get("ambiguities", []):
-            if isinstance(amb_dict, dict):
-                ambiguities.append(
-                    Ambiguity(
-                        question=amb_dict.get("question", ""),
-                        context=amb_dict.get("context"),
-                        options=amb_dict.get("options", []),
-                    )
-                )
-            elif isinstance(amb_dict, str):
-                ambiguities.append(Ambiguity(question=amb_dict, context=None))
-
-        final_target = None
-        final_target_dict = result_dict.get("final_target")
-        if final_target_dict and isinstance(final_target_dict, dict):
-            final_target = DataTarget(
-                table_name=final_target_dict.get("table_name", ""),
-                write_mode=final_target_dict.get("write_mode", "overwrite"),
-                partition_by=final_target_dict.get("partition_by", []),
-                description=final_target_dict.get("description"),
-            )
-
-        return AnalysisResult(
-            user_query=user_query,
-            summary=result_dict.get("summary", ""),
-            steps=steps,
-            final_target=final_target,
-            ambiguities=ambiguities,
-            confidence=result_dict.get("confidence", 0.5),
-        )
+        """绑定查询工具到 LLM"""
+        return self.llm.bind_tools([get_table_detail])

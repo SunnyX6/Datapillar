@@ -4,8 +4,8 @@
 
 from fastapi import APIRouter
 
-from src.modules.governance.metric.ai_service import metric_ai_service
 from src.modules.governance.metric.schemas import AIFillRequest, AIFillResponse
+from src.modules.governance.metric.service import metric_ai_service
 
 router = APIRouter()
 

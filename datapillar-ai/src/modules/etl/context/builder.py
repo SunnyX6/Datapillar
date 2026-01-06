@@ -124,9 +124,13 @@ class ContextBuilder:
 
         tables = []
         for pointer in knowledge.table_index.values():
+            # 构造表名：schema_name.name
+            table_name = (
+                f"{pointer.schema_name}.{pointer.name}" if pointer.schema_name else pointer.name
+            )
             tables.append(
                 {
-                    "name": pointer.qualified_name,
+                    "name": table_name,
                     "description": pointer.description or "",
                 }
             )

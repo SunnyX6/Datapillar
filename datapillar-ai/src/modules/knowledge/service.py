@@ -1,5 +1,5 @@
 """
-知识图谱服务层（使用 Neo4jKGRepository）
+知识图谱服务层
 
 提供:
 - 初始图数据加载
@@ -12,7 +12,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-from src.infrastructure.repository import Neo4jKGRepository
+from src.infrastructure.repository.kg import Neo4jGraphSearch, Neo4jNodeSearch
 from src.modules.knowledge.schemas import (
     GraphData,
     GraphNode,
@@ -27,7 +27,7 @@ BATCH_SIZE = 200
 
 
 class KnowledgeGraphService:
-    """知识图谱服务（使用 Repository 模式）"""
+    """知识图谱服务"""
 
     def get_initial_graph(self, limit: int = 50) -> GraphData:
         """
@@ -40,7 +40,7 @@ class KnowledgeGraphService:
             GraphData: 包含节点和关系的图数据
         """
         try:
-            records = Neo4jKGRepository.get_initial_graph(limit)
+            records = Neo4jGraphSearch.get_initial_graph(limit)
             if not records:
                 return GraphData()
 
@@ -86,18 +86,18 @@ class KnowledgeGraphService:
         logger.info(f"搜索知识图谱: query='{query}', top_k={top_k}, type={search_type}")
 
         try:
-            # 通过 Repository 执行检索
+            # 通过搜索服务执行检索
             if search_type == "vector":
-                results = Neo4jKGRepository.vector_search(
+                results = Neo4jNodeSearch.vector_search(
                     query, top_k, index_name="kg_unified_vector_index"
                 )
             elif search_type == "hybrid":
-                results = Neo4jKGRepository.hybrid_search(query, top_k)
+                results = Neo4jNodeSearch.hybrid_search(query, top_k)
             else:
                 raise ValueError(f"不支持的搜索类型: {search_type}，仅支持 vector/hybrid")
 
-            # 直接从检索结果提取 element_id
-            matched_node_ids = [item["element_id"] for item in results if item.get("element_id")]
+            # 直接从检索结果提取 node_id（SearchHit 对象）
+            matched_node_ids = [hit.node_id for hit in results if hit.node_id]
 
             # 扩展图数据
             expanded_result = self._expand_graph_data(matched_node_ids)
@@ -119,7 +119,7 @@ class KnowledgeGraphService:
         if not node_ids:
             return {"nodes": [], "relationships": []}
 
-        data = Neo4jKGRepository.get_graph(node_ids)
+        data = Neo4jGraphSearch.get_graph(node_ids)
 
         nodes = [
             GraphNode(

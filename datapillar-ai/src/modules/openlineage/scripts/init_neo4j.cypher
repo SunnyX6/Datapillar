@@ -73,6 +73,8 @@ CREATE INDEX column_data_type IF NOT EXISTS FOR (c:Column) ON (c.dataType);
 
 // SQL 索引
 CREATE INDEX sql_dialect IF NOT EXISTS FOR (s:SQL) ON (s.dialect);
+CREATE INDEX sql_engine IF NOT EXISTS FOR (s:SQL) ON (s.engine);
+CREATE INDEX sql_summary_generated IF NOT EXISTS FOR (s:SQL) ON (s.summaryGeneratedAt);
 
 // 指标索引：三种类型
 CREATE INDEX atomic_metric_code IF NOT EXISTS FOR (m:AtomicMetric) ON (m.code);
@@ -90,6 +92,7 @@ CREATE INDEX wordroot_name IF NOT EXISTS FOR (w:WordRoot) ON (w.name);
 
 // 修饰符索引
 CREATE INDEX modifier_code IF NOT EXISTS FOR (m:Modifier) ON (m.code);
+CREATE INDEX modifier_name IF NOT EXISTS FOR (m:Modifier) ON (m.name);
 CREATE INDEX modifier_type IF NOT EXISTS FOR (m:Modifier) ON (m.modifierType);
 
 // 单位索引
@@ -97,7 +100,8 @@ CREATE INDEX unit_code IF NOT EXISTS FOR (u:Unit) ON (u.code);
 CREATE INDEX unit_name IF NOT EXISTS FOR (u:Unit) ON (u.name);
 
 // 值域索引
-CREATE INDEX valuedomain_domain_code IF NOT EXISTS FOR (v:ValueDomain) ON (v.domainCode);
+CREATE INDEX valuedomain_code IF NOT EXISTS FOR (v:ValueDomain) ON (v.code);
+CREATE INDEX valuedomain_name IF NOT EXISTS FOR (v:ValueDomain) ON (v.name);
 CREATE INDEX valuedomain_domain_type IF NOT EXISTS FOR (v:ValueDomain) ON (v.domainType);
 CREATE INDEX valuedomain_domain_level IF NOT EXISTS FOR (v:ValueDomain) ON (v.domainLevel);
 
@@ -114,6 +118,22 @@ OPTIONS {indexConfig: {
   `vector.similarity_function`: 'cosine'
 }};
 
+// Catalog embedding 向量索引
+CREATE VECTOR INDEX catalog_embedding IF NOT EXISTS
+FOR (c:Catalog) ON (c.embedding)
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 2048,
+  `vector.similarity_function`: 'cosine'
+}};
+
+// Schema embedding 向量索引
+CREATE VECTOR INDEX schema_embedding IF NOT EXISTS
+FOR (s:Schema) ON (s.embedding)
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 2048,
+  `vector.similarity_function`: 'cosine'
+}};
+
 // Table embedding 向量索引
 CREATE VECTOR INDEX table_embedding IF NOT EXISTS
 FOR (t:Table) ON (t.embedding)
@@ -125,6 +145,14 @@ OPTIONS {indexConfig: {
 // Column embedding 向量索引
 CREATE VECTOR INDEX column_embedding IF NOT EXISTS
 FOR (c:Column) ON (c.embedding)
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 2048,
+  `vector.similarity_function`: 'cosine'
+}};
+
+// SQL embedding 向量索引（基于 summary 生成的向量）
+CREATE VECTOR INDEX sql_embedding IF NOT EXISTS
+FOR (s:SQL) ON (s.embedding)
 OPTIONS {indexConfig: {
   `vector.dimensions`: 2048,
   `vector.similarity_function`: 'cosine'
@@ -196,8 +224,20 @@ OPTIONS {indexConfig: {
 
 // 统一知识图谱全文索引（覆盖所有 Knowledge 节点）
 // 用于 HybridRetriever 的关键词召回，属性缺失不影响索引创建
+// 字段说明：
+//   - name, description: 通用字段（Table/Column/Schema/Catalog/Metric等）
+//   - summary, content, tags: SQL 节点专用
+//   - code, items: 标准规范节点（WordRoot/Modifier/Unit/ValueDomain）
 CREATE FULLTEXT INDEX kg_unified_fulltext_index IF NOT EXISTS
-FOR (n:Knowledge) ON EACH [n.name, n.displayName, n.description, n.code, n.domainCode, n.domainName, n.items];
+FOR (n:Knowledge) ON EACH [n.name, n.description, n.summary, n.content, n.tags, n.code, n.items];
+
+// Catalog 全文索引
+CREATE FULLTEXT INDEX catalog_fulltext IF NOT EXISTS
+FOR (c:Catalog) ON EACH [c.name, c.description];
+
+// Schema 全文索引
+CREATE FULLTEXT INDEX schema_fulltext IF NOT EXISTS
+FOR (s:Schema) ON EACH [s.name, s.description];
 
 // Table 全文索引
 CREATE FULLTEXT INDEX table_fulltext IF NOT EXISTS
@@ -206,6 +246,10 @@ FOR (t:Table) ON EACH [t.name, t.description];
 // Column 全文索引
 CREATE FULLTEXT INDEX column_fulltext IF NOT EXISTS
 FOR (c:Column) ON EACH [c.name, c.description];
+
+// SQL 全文索引（搜索 SQL 内容、摘要、标签）
+CREATE FULLTEXT INDEX sql_fulltext IF NOT EXISTS
+FOR (s:SQL) ON EACH [s.content, s.summary, s.tags];
 
 // 指标全文索引：三种类型
 CREATE FULLTEXT INDEX atomic_metric_fulltext IF NOT EXISTS
@@ -223,7 +267,7 @@ FOR (w:WordRoot) ON EACH [w.code, w.name, w.description];
 
 // 修饰符全文索引
 CREATE FULLTEXT INDEX modifier_fulltext IF NOT EXISTS
-FOR (m:Modifier) ON EACH [m.code, m.description];
+FOR (m:Modifier) ON EACH [m.code, m.name, m.description];
 
 // 单位全文索引
 CREATE FULLTEXT INDEX unit_fulltext IF NOT EXISTS
@@ -231,7 +275,7 @@ FOR (u:Unit) ON EACH [u.code, u.name, u.description];
 
 // 值域全文索引
 CREATE FULLTEXT INDEX valuedomain_fulltext IF NOT EXISTS
-FOR (v:ValueDomain) ON EACH [v.domainCode, v.domainName, v.items, v.description];
+FOR (v:ValueDomain) ON EACH [v.code, v.name, v.items, v.description];
 
 // Tag 全文索引
 CREATE FULLTEXT INDEX tag_fulltext IF NOT EXISTS

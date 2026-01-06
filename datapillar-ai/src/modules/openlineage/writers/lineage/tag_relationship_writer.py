@@ -9,9 +9,9 @@ from __future__ import annotations
 import structlog
 from neo4j import AsyncSession
 
-from src.infrastructure.repository.openlineage import OpenLineageLineageRepository
+from src.infrastructure.repository.kg.dto import generate_id
+from src.infrastructure.repository.openlineage import Lineage
 from src.modules.openlineage.parsers.plans.metadata import TagUpdatePlan
-from src.modules.openlineage.schemas.neo4j import generate_id
 
 logger = structlog.get_logger()
 
@@ -44,7 +44,7 @@ class TagRelationshipWriter:
 
             # 添加 HAS_TAG 关系
             if tag_ids_to_add:
-                await OpenLineageLineageRepository.batch_add_has_tag(
+                await Lineage.batch_add_has_tag(
                     session,
                     source_label=plan.node_label,
                     source_id=plan.node_id,
@@ -60,7 +60,7 @@ class TagRelationshipWriter:
 
             # 移除 HAS_TAG 关系
             if tag_ids_to_remove:
-                await OpenLineageLineageRepository.batch_remove_has_tag(
+                await Lineage.batch_remove_has_tag(
                     session,
                     source_label=plan.node_label,
                     source_id=plan.node_id,

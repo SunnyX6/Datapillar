@@ -2,35 +2,25 @@
 ETL 多智能体系统数据结构
 """
 
-from src.modules.etl.agents.knowledge_agent import (
-    AGENT_TOOLS_MAP,
-    AgentType,
-    ETLPointer,
-    get_agent_tools,
-)
 from src.modules.etl.schemas.agent_result import (
     AgentResult,
     AgentResultStatus,
     ClarificationRequest,
     DelegationRequest,
 )
+from src.modules.etl.schemas.analyst import (
+    AnalysisResult,
+    DataTarget,
+    Step,
+)
 from src.modules.etl.schemas.dag import (
     JobDependencyResponse,
     JobResponse,
     WorkflowResponse,
 )
-from src.modules.etl.schemas.plan import (
-    Job,
-    Stage,
-    TestResult,
-    Workflow,
-)
 from src.modules.etl.schemas.requests import BlackboardRequest
-from src.modules.etl.schemas.requirement import (
-    Ambiguity,
-    AnalysisResult,
-    DataTarget,
-    Step,
+from src.modules.etl.schemas.review import (
+    ReviewResult,
 )
 from src.modules.etl.schemas.sse_msg import (
     SseAgent,
@@ -46,6 +36,11 @@ from src.modules.etl.schemas.sse_msg import (
     SseState,
     SseTool,
 )
+from src.modules.etl.schemas.workflow import (
+    Job,
+    Stage,
+    Workflow,
+)
 
 __all__ = [
     # Agent Result - Agent 执行结果
@@ -53,21 +48,16 @@ __all__ = [
     "AgentResultStatus",
     "ClarificationRequest",
     "DelegationRequest",
-    # Knowledge Agent - 知识服务
-    "AgentType",
-    "AGENT_TOOLS_MAP",
-    "ETLPointer",
-    "get_agent_tools",
-    # Requirement
+    # Requirement - 需求分析
     "AnalysisResult",
     "Step",
-    "Stage",
     "DataTarget",
-    "Ambiguity",
-    # Plan
+    # Workflow - 工作流
     "Workflow",
     "Job",
-    "TestResult",
+    "Stage",
+    # Review - 评审
+    "ReviewResult",
     # DAG / Workflow Response
     "WorkflowResponse",
     "JobResponse",

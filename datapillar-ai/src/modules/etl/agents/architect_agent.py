@@ -9,18 +9,21 @@ Architect Agent（数据架构师）
 - 通过工具获取血缘和组件信息
 """
 
+import asyncio
 import json
 import logging
 
 from langchain_core.messages import ToolMessage
 
 from src.infrastructure.llm.client import call_llm
+from src.infrastructure.resilience import get_resilience_config
 from src.modules.etl.agents.knowledge_agent import AgentType, get_agent_tools
 from src.modules.etl.agents.prompt_messages import build_llm_messages
 from src.modules.etl.schemas.agent_result import AgentResult
-from src.modules.etl.schemas.plan import Job, Stage, Workflow
-from src.modules.etl.schemas.requirement import AnalysisResult
-from src.modules.etl.tools.agent_tools import get_table_lineage, list_component
+from src.modules.etl.schemas.analyst import AnalysisResult
+from src.modules.etl.schemas.workflow import Workflow, WorkflowOutput
+from src.modules.etl.tools.component import list_component
+from src.modules.etl.tools.table import get_table_lineage
 
 logger = logging.getLogger(__name__)
 
@@ -40,72 +43,90 @@ ARCHITECT_AGENT_SYSTEM_INSTRUCTIONS = """你是资深数据架构师。
 2. 规划每个 Job 的 Stage（SQL 执行单元）
 3. 确定 Job 之间的调度依赖
 
-## 任务参数（系统注入，不是用户输入）
-系统会提供一段"任务参数 JSON"（SystemMessage），其中包含：
-- analysis_result：需求分析结果（AnalystAgent 产物，严格 JSON）
-- selected_component：用户选择的组件（本 Agent 的交互结果，用于本次架构规划）
+## 任务参数（系统注入）
+系统会提供 analysis_result（需求分析结果）和 selected_component（用户选择的组件）。
 
-## 知识上下文（系统注入，不是用户输入）
-系统会提供一段"知识上下文 JSON"（SystemMessage），其中包含：
-- tables：可用的 schema.table 列表（导航指针）
-- etl_pointers：可验证的 ETL 指针（含 qualified_name/element_id/tools/labels）
-- allowlist_tools：你允许调用的工具名列表
+## 可用工具
 
-你必须把该 JSON 视为唯一可信知识入口：
-- 禁止臆造任何 schema.table
-- 工具调用只能使用该 JSON 中出现的表指针（按 qualified_name 精确匹配）
-- 仅当 ETLPointer.tools 包含工具名时，才允许对该表调用该工具
+### get_table_lineage
+查询表的血缘关系（上下游表）。
+- 用于推导 Job 之间的依赖关系
+- 如果 Job B 读的表是 Job A 写的，则 Job B 依赖 Job A
+
+### list_component
+获取可用组件列表（可选）。
 
 ## 设计原则
-1. **Job 划分**：
-   - 简单需求用一个 Job
-   - 每个 Job 对应前端一个节点
-   - 所有 Job 的 type 都使用 selected_component
 
-2. **Job 依赖**（调度依赖）：
-   - Job 之间是调度依赖，不是数据依赖
-   - 如果 Job B 读的表是 Job A 写的，则 Job B 依赖 Job A
-   - 参考表级血缘推导依赖关系
+### Job 划分
+- 简单需求用一个 Job
+- 每个 Job 对应前端一个节点
+- 所有 Job 的 type 都使用 selected_component
 
-3. **Stage 规划**：
-   - Stage 是 Job 内部的执行单元
-   - 临时表只在 Job 内部 Stage 之间使用
-   - 跨 Job 必须用持久化表
+### Job 依赖（调度依赖）
+- Job 之间是调度依赖，不是数据依赖
+- 如果 Job B 读的表是 Job A 写的，则 Job B 依赖 Job A
+- 参考表级血缘推导依赖关系
 
-## 输出格式
-{{
+### Stage 规划
+- Stage 是 Job 内部的执行单元
+- 临时表只在 Job 内部 Stage 之间使用
+- 跨 Job 必须用持久化表
+
+## 输出格式（JSON）
+设计完成后，直接输出以下 JSON 格式：
+```json
+{
   "name": "工作流名称",
   "description": "工作流描述",
   "jobs": [
-    {{
+    {
       "id": "job_1",
-      "name": "Job 名称",
-      "description": "Job 描述",
-      "type": "{selected_component}",
-      "depends": ["依赖的 Job ID（调度依赖）"],
-      "step_ids": ["关联的业务步骤 ID"],
-      "input_tables": ["读取的持久化表"],
-      "output_table": "写入的持久化表",
+      "name": "作业名称",
+      "description": "作业描述",
+      "depends": [],
+      "step_ids": ["s1"],
       "stages": [
-        {{
+        {
           "stage_id": 1,
-          "name": "Stage 名称",
-          "description": "这个 Stage 做什么",
-          "input_tables": ["输入表"],
-          "output_table": "输出表或临时表",
-          "is_temp_table": true
-        }}
-      ]
-    }}
+          "name": "Stage名称",
+          "description": "Stage描述",
+          "input_tables": ["schema.table"],
+          "output_table": "schema.output_table",
+          "is_temp_table": false
+        }
+      ],
+      "input_tables": ["schema.table"],
+      "output_table": "schema.output_table"
+    }
   ],
-  "risks": ["架构风险点"],
-  "confidence": 0.85
-}}
+  "risks": ["风险点1", "风险点2"],
+  "confidence": 0.8
+}
+```
 
-重要：
-- **必须输出纯 JSON**：不得输出 Markdown、不得输出 ```json 代码块、不得输出解释性文字
+## 字段说明
+- name: 工作流名称
+- description: 工作流描述
+- jobs: 作业列表
+  - id: Job 唯一标识（job_1, job_2 格式）
+  - name: Job 名称
+  - depends: 依赖的上游 Job ID 列表
+  - step_ids: 关联的业务步骤 ID
+  - stages: Stage 列表
+    - stage_id: Stage 序号（从 1 开始）
+    - name: Stage 名称
+    - input_tables: 读取的表
+    - output_table: 输出的表
+    - is_temp_table: 是否临时表
+  - input_tables: Job 读取的持久化表
+  - output_table: Job 写入的最终目标表
+- risks: 架构风险点
+- confidence: 置信度（复杂场景 < 0.8）
 
-只输出 JSON，不要解释。
+## 重要约束
+1. 不允许臆造表名，必须使用工具验证或使用 analysis_result 中的表名
+2. 设计完成后直接输出 JSON，不要调用任何工具
 """
 
 
@@ -123,8 +144,8 @@ class ArchitectAgent:
 
     def __init__(self):
         self.llm = call_llm(temperature=0.0)
-        self.llm_json = call_llm(temperature=0.0, enable_json_mode=True)
-        self.max_tool_calls = 4
+        config = get_resilience_config()
+        self.max_iterations = config.max_iterations
         self.allowlist = get_agent_tools(AgentType.ARCHITECT)
 
     async def run(
@@ -156,16 +177,27 @@ class ArchitectAgent:
         try:
             llm_with_tools = self._bind_tools()
 
-            result_dict = await self._design_with_tools(
+            output = await self._design_with_tools(
                 analysis=analysis_result,
                 selected_component=selected_component,
                 llm_with_tools=llm_with_tools,
                 user_query=user_query,
             )
 
-            workflow_plan = self._build_workflow(
-                result_dict, analysis_result, selected_component, selected_component_id
-            )
+            workflow_plan = Workflow.from_output(output, selected_component, selected_component_id)
+
+            # completed 标准：必须生成可执行的 Job/Stage 结构
+            if not workflow_plan.jobs:
+                return AgentResult.failed(
+                    summary="架构设计失败：未生成任何 Job",
+                    error="Workflow.jobs 为空",
+                )
+            jobs_missing_stages = [job.id for job in workflow_plan.jobs if not job.stages]
+            if jobs_missing_stages:
+                return AgentResult.failed(
+                    summary=f"架构设计失败：存在没有 Stage 的 Job: {', '.join(jobs_missing_stages)}",
+                    error=f"存在没有 Stage 的 Job: {', '.join(jobs_missing_stages)}",
+                )
 
             dag_errors = workflow_plan.validate_dag()
             if dag_errors:
@@ -221,8 +253,20 @@ class ArchitectAgent:
         selected_component: str,
         llm_with_tools,
         user_query: str,
-    ) -> dict:
-        """执行带工具调用的架构设计"""
+    ) -> WorkflowOutput:
+        """
+        带工具调用的架构设计流程：
+        1. 预先调用 KnowledgeAgent 获取候选表/列/值域（带权限过滤）
+        2. 第一阶段：LLM 调用工具获取血缘信息（bind_tools + ToolMessage）
+        3. 第二阶段：LLM 输出结构化结果（with_structured_output + parse_structured_output 兜底）
+        """
+        # 预先检索知识上下文（带权限过滤）
+        context_payload = None
+        if self._knowledge_agent:
+            ctx = await self._knowledge_agent.global_search(user_query, top_k=10, min_score=0.5)
+            logger.info(f"📚 知识检索完成: {ctx.summary()}")
+            context_payload = ctx.to_llm_context(allowlist=self.allowlist)
+
         task_payload = {
             "analysis_result": analysis.model_dump(),
             "selected_component": selected_component,
@@ -233,52 +277,95 @@ class ArchitectAgent:
             agent_id="architect_agent",
             user_query=user_query,
             task_payload=task_payload,
+            context_payload=context_payload,
         )
-        tool_call_count = 0
 
-        while tool_call_count < self.max_tool_calls:
+        # 第一阶段：工具调用收集信息
+        for _ in range(self.max_iterations):
             response = await llm_with_tools.ainvoke(messages)
-            messages.append(response)
 
             if not response.tool_calls:
-                return self._parse_response(response.content)
+                # 没有工具调用，进入第二阶段
+                break
 
-            for tool_call in response.tool_calls:
-                tool_call_count += 1
-                tool_name = tool_call["name"]
-                tool_args = tool_call["args"]
-                tool_id = tool_call["id"]
+            # 执行工具调用，结果放入 ToolMessage
+            messages.append(response)
+            for tc in response.tool_calls:
+                logger.info(f"🔧 ArchitectAgent 调用工具: {tc['name']}({tc['args']})")
 
-                logger.info(f"🔧 ArchitectAgent 调用工具: {tool_name}({tool_args})")
+            results = await asyncio.gather(
+                *[self._execute_tool(tc["name"], tc["args"]) for tc in response.tool_calls]
+            )
 
-                tool_result = await self._execute_tool(tool_name, tool_args)
+            for tc, result in zip(response.tool_calls, results, strict=True):
+                messages.append(ToolMessage(content=result, tool_call_id=tc["id"]))
 
-                messages.append(ToolMessage(content=tool_result, tool_call_id=tool_id))
+        # 第二阶段：结构化输出（with_structured_output 让 LLM 知道 schema）
+        return await self._get_structured_output(messages, WorkflowOutput)
 
-                if tool_call_count >= self.max_tool_calls:
-                    break
+    async def _get_structured_output(
+        self,
+        messages: list,
+        schema: type[WorkflowOutput],
+    ) -> WorkflowOutput:
+        """
+        获取结构化输出：with_structured_output(json_mode) + parse_structured_output 兜底
+        """
+        from src.infrastructure.llm.structured_output import parse_structured_output
 
-        response = await self.llm_json.ainvoke(messages)
-        return self._parse_response(response.content)
+        # 使用 json_mode（不是 function_calling，避免和工具调用混淆）
+        llm_structured = self.llm.with_structured_output(
+            schema,
+            method="json_mode",
+            include_raw=True,
+        )
+        result = await llm_structured.ainvoke(messages)
+
+        # 情况 1：直接解析成功
+        if isinstance(result, schema):
+            return result
+
+        # 情况 2：dict 格式（include_raw=True 的返回）
+        if isinstance(result, dict):
+            parsed = result.get("parsed")
+            if isinstance(parsed, schema):
+                return parsed
+
+            # 解析失败，尝试从 raw 中恢复
+            parsing_error = result.get("parsing_error")
+            raw = result.get("raw")
+
+            if raw:
+                raw_text = getattr(raw, "content", None)
+                if raw_text:
+                    logger.warning(
+                        "with_structured_output 解析失败，尝试 parse_structured_output 兜底"
+                    )
+                    try:
+                        return parse_structured_output(raw_text, schema)
+                    except ValueError as e:
+                        logger.error(f"parse_structured_output 兜底也失败: {e}")
+                        raise
+
+            if parsing_error:
+                raise parsing_error
+
+        raise ValueError(f"无法获取结构化输出: {type(result)}")
 
     def _bind_tools(self):
-        """绑定工具到 LLM"""
+        """绑定查询工具到 LLM"""
         tool_registry = {
             "get_table_lineage": get_table_lineage,
             "list_component": list_component,
         }
         tools = [tool_registry[name] for name in self.allowlist if name in tool_registry]
-        return self.llm.bind_tools(tools)
+        return self.llm.bind_tools(
+            tools,
+            tool_choice="auto",
+        )
 
     async def _execute_tool(self, tool_name: str, tool_args: dict) -> str:
-        """
-        执行工具调用（按需获取指针 + 权限校验）
-
-        流程：
-        1. 调用 query_pointers 获取对应类型的指针
-        2. 检查指针上的 tools 是否包含要调用的工具
-        3. 用指针的信息调用工具
-        """
+        """执行工具调用（通过 knowledge_agent 获取精确路径）"""
         try:
             if tool_name not in self.allowlist:
                 return _tool_error(f"工具不在 allowlist 中: {tool_name}")
@@ -287,112 +374,67 @@ class ArchitectAgent:
             if tool_name == "list_component":
                 return list_component.invoke(tool_args)
 
-            if not self._knowledge_agent:
-                return _tool_error("无法查询指针：knowledge_agent 未注入")
-
             if tool_name == "get_table_lineage":
-                table_name = (tool_args or {}).get("table_name") or ""
-                direction = (tool_args or {}).get("direction") or "both"
-                if not table_name:
-                    return _tool_error("缺少 table_name 参数")
+                # 检查是否已提供精确参数
+                catalog = tool_args.get("catalog")
+                schema_name = tool_args.get("schema_name") or tool_args.get("schema")
+                table = tool_args.get("table")
+                direction = tool_args.get("direction", "both")
 
-                # 按需查询指针
-                pointers = await self._knowledge_agent.query_pointers(
-                    table_name,
-                    node_types=["Table"],
-                    top_k=5,
+                # 如果只提供了 table_name，通过 knowledge_agent 查找精确路径
+                if not (catalog and schema_name and table):
+                    table_name = tool_args.get("table_name") or tool_args.get("table") or ""
+                    if not table_name:
+                        return _tool_error("缺少 table 参数")
+
+                    if not self._knowledge_agent:
+                        return _tool_error("无法查询表位置：knowledge_agent 未注入")
+
+                    # 使用 global_search 查找表
+                    ctx = await self._knowledge_agent.global_search(
+                        table_name, top_k=5, min_score=0.6
+                    )
+                    if not ctx.tables:
+                        return _tool_error("未找到相关表", table_name=table_name)
+
+                    # 遍历所有匹配的表
+                    results = []
+                    for pointer in ctx.tables:
+                        if "get_table_lineage" not in pointer.tools:
+                            continue
+                        logger.info(
+                            f"📊 调用 get_table_lineage: catalog={pointer.catalog}, "
+                            f"schema_name={pointer.schema_name}, table={pointer.table}"
+                        )
+                        result = await get_table_lineage.ainvoke(
+                            {
+                                "catalog": pointer.catalog,
+                                "schema_name": pointer.schema_name,
+                                "table": pointer.table,
+                                "direction": direction,
+                            }
+                        )
+                        results.append(result)
+
+                    if not results:
+                        return _tool_error("无可用指针授权此工具", table_name=table_name)
+
+                    return json.dumps({"status": "success", "results": results}, ensure_ascii=False)
+
+                # 已提供精确参数，直接调用
+                logger.info(
+                    f"📊 调用 get_table_lineage: catalog={catalog}, schema_name={schema_name}, table={table}"
                 )
-                pointer = self._find_matching_pointer(pointers, table_name)
-                if not pointer:
-                    return _tool_error("未找到指针", table_name=table_name)
-                if "get_table_lineage" not in (pointer.tools or []):
-                    return _tool_error("指针未授权此工具", table_name=table_name)
-
-                logger.info(f"📊 调用 get_table_lineage: {pointer.qualified_name}")
                 return await get_table_lineage.ainvoke(
-                    {"table_name": pointer.qualified_name, "direction": direction}
+                    {
+                        "catalog": catalog,
+                        "schema_name": schema_name,
+                        "table": table,
+                        "direction": direction,
+                    }
                 )
 
             return _tool_error(f"未知工具: {tool_name}")
         except Exception as e:
             logger.error(f"工具 {tool_name} 执行失败: {e}")
             return _tool_error(str(e))
-
-    def _find_matching_pointer(self, pointers: list, name: str):
-        """从指针列表中找到匹配的指针"""
-        if not pointers:
-            return None
-        # 精确匹配
-        for p in pointers:
-            if p.qualified_name == name:
-                return p
-        # 部分匹配
-        for p in pointers:
-            if name in (p.qualified_name or ""):
-                return p
-        # 返回第一个
-        return pointers[0] if pointers else None
-
-    def _parse_response(self, content: str) -> dict:
-        """严格解析 LLM 响应（必须是纯 JSON）"""
-        text = (content or "").strip()
-        try:
-            parsed = json.loads(text)
-        except json.JSONDecodeError as e:
-            raise ValueError("LLM 输出不是合法 JSON（必须输出纯 JSON）") from e
-        if not isinstance(parsed, dict):
-            raise ValueError("LLM 输出必须是 JSON object")
-        return parsed
-
-    def _build_workflow(
-        self,
-        result_dict: dict,
-        analysis: AnalysisResult,
-        selected_component: str,
-        selected_component_id: int | None,
-    ) -> Workflow:
-        """构建 Workflow 对象（强制使用用户选择的组件）"""
-        jobs = []
-        for job_dict in result_dict.get("jobs", []):
-            stages = []
-            for stage_dict in job_dict.get("stages", []):
-                stage = Stage(
-                    stage_id=stage_dict.get("stage_id", 1),
-                    name=stage_dict.get("name", ""),
-                    description=stage_dict.get("description", ""),
-                    input_tables=stage_dict.get("input_tables", []),
-                    output_table=stage_dict.get("output_table", ""),
-                    is_temp_table=stage_dict.get("is_temp_table", True),
-                    sql=None,
-                )
-                stages.append(stage)
-
-            job = Job(
-                id=job_dict.get("id", ""),
-                name=job_dict.get("name", ""),
-                description=job_dict.get("description"),
-                type=selected_component,
-                type_id=selected_component_id,
-                depends=job_dict.get("depends", []),
-                step_ids=job_dict.get("step_ids", []),
-                stages=stages,
-                input_tables=job_dict.get("input_tables", []),
-                output_table=job_dict.get("output_table"),
-                config_generated=False,
-                config_validated=False,
-            )
-            jobs.append(job)
-
-        return Workflow(
-            id=None,
-            name=result_dict.get(
-                "name", analysis.summary[:50] if analysis.summary else "etl_workflow"
-            ),
-            description=result_dict.get("description", analysis.summary),
-            schedule=None,
-            env="dev",
-            jobs=jobs,
-            risks=result_dict.get("risks", []),
-            decision_points=[],
-            confidence=result_dict.get("confidence", analysis.confidence),
-        )

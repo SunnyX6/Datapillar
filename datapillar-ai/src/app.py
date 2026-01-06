@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 from src.api.router import api_router
 from src.infrastructure.database import AsyncNeo4jClient, MySQLClient, Neo4jClient, RedisClient
 from src.infrastructure.database.gravitino import GravitinoDBClient
-from src.modules.etl.checkpointer import etl_checkpointer
 from src.modules.etl.orchestrator_v2 import EtlOrchestratorV2
 from src.modules.openlineage.core.embedding_processor import embedding_processor
 from src.modules.openlineage.core.event_processor import event_processor
@@ -111,6 +110,9 @@ def create_app() -> FastAPI:
 
             logger.info("初始化 Redis 连接池...")
             await RedisClient.get_instance()
+            if not await RedisClient.ping():
+                raise RuntimeError("Redis 连接验证失败")
+            logger.info("Redis 连接验证通过")
 
             logger.info("初始化 Gravitino 数据库连接...")
             GravitinoDBClient.get_engine()  # 触发连接池初始化
@@ -135,13 +137,12 @@ def create_app() -> FastAPI:
             logger.info("恢复 EventProcessor 事件消费...")
             event_processor.resume()
 
-            async with etl_checkpointer() as checkpointer:
-                # 创建 Orchestrator
-                orchestrator = EtlOrchestratorV2(checkpointer=checkpointer)
-                app.state.orchestrator = orchestrator
+            # 创建 Orchestrator（内部管理 checkpointer）
+            orchestrator = EtlOrchestratorV2()
+            app.state.orchestrator = orchestrator
 
-                logger.info("FastAPI 应用启动完成")
-                yield
+            logger.info("FastAPI 应用启动完成")
+            yield
 
         finally:
             logger.info("Datapillar AI - 关闭中...")
@@ -213,6 +214,7 @@ def create_app() -> FastAPI:
         """健康检查（使用连接池）"""
         neo4j_connected = False
         mysql_connected = False
+        redis_connected = False
 
         # 检查 Neo4j 连接
         try:
@@ -232,7 +234,13 @@ def create_app() -> FastAPI:
         except Exception as e:
             logger.warning(f"MySQL 健康检查失败: {e}")
 
-        all_ok = neo4j_connected and mysql_connected
+        # 检查 Redis 连接
+        try:
+            redis_connected = await RedisClient.ping()
+        except Exception as e:
+            logger.warning(f"Redis 健康检查失败: {e}")
+
+        all_ok = neo4j_connected and mysql_connected and redis_connected
 
         return {
             "status": "ok" if all_ok else "degraded",
@@ -241,6 +249,7 @@ def create_app() -> FastAPI:
             "connections": {
                 "neo4j": neo4j_connected,
                 "mysql": mysql_connected,
+                "redis": redis_connected,
             },
         }
 

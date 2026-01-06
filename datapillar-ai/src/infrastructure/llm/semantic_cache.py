@@ -13,7 +13,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import re
 import sqlite3
 import time
@@ -575,22 +574,45 @@ def _create_default_embedder() -> Embedder:
     return UnifiedEmbedder()
 
 
-def create_semantic_cache() -> SemanticLLMCache:
+def create_semantic_cache() -> SemanticLLMCache | None:
     """
-    创建默认语义缓存实例（通过环境变量可覆写）。
+    创建默认语义缓存实例（从 settings.toml 读取配置）。
 
-    环境变量：
-    - DATAPILLAR_LLM_CACHE_DB_PATH: SQLite 文件路径（默认 .semantic_cache.db）
-    - DATAPILLAR_LLM_CACHE_TTL_SECONDS: TTL 秒（默认 60）
-    - DATAPILLAR_LLM_CACHE_HARD_THRESHOLD: 高相似阈值（默认 0.95）
-    - DATAPILLAR_LLM_CACHE_CONTEXT_WINDOW_MESSAGES: 上下文窗口 K（默认 6）
-    - DATAPILLAR_LLM_CACHE_MAX_CANDIDATES: 候选数量（默认 200）
+    配置项（settings.toml [default.semantic_cache]）：
+    - enabled: 是否启用语义缓存（默认 true）
+    - db_path: SQLite 文件路径（默认 .semantic_cache.db）
+    - ttl_seconds: TTL 秒（默认 60）
+    - hard_threshold: 高相似阈值（默认 0.95）
+    - context_window_messages: 上下文窗口 K（默认 6）
+    - max_candidates: 候选数量（默认 200）
+
+    环境变量覆盖（优先级更高）：
+    - DATAPILLAR_SEMANTIC_CACHE__ENABLED
+    - DATAPILLAR_SEMANTIC_CACHE__DB_PATH
+    - DATAPILLAR_SEMANTIC_CACHE__TTL_SECONDS
+    - 等等...
     """
-    db_path = os.getenv("DATAPILLAR_LLM_CACHE_DB_PATH", ".semantic_cache.db")
-    ttl_seconds = int(os.getenv("DATAPILLAR_LLM_CACHE_TTL_SECONDS", "60"))
-    hard_threshold = float(os.getenv("DATAPILLAR_LLM_CACHE_HARD_THRESHOLD", "0.95"))
-    context_window_messages = int(os.getenv("DATAPILLAR_LLM_CACHE_CONTEXT_WINDOW_MESSAGES", "6"))
-    max_candidates = int(os.getenv("DATAPILLAR_LLM_CACHE_MAX_CANDIDATES", "200"))
+    from src.shared.config import settings
+
+    cache_config = getattr(settings, "semantic_cache", None)
+
+    if cache_config is None:
+        logger.warning("未找到 semantic_cache 配置，使用默认值")
+        return SemanticLLMCache(
+            database_path=".semantic_cache.db",
+            embedder_factory=_create_default_embedder,
+        )
+
+    enabled = getattr(cache_config, "enabled", True)
+    if not enabled:
+        logger.info("语义缓存已禁用（semantic_cache.enabled=false）")
+        return None
+
+    db_path = getattr(cache_config, "db_path", ".semantic_cache.db")
+    ttl_seconds = int(getattr(cache_config, "ttl_seconds", 60))
+    hard_threshold = float(getattr(cache_config, "hard_threshold", 0.95))
+    context_window_messages = int(getattr(cache_config, "context_window_messages", 6))
+    max_candidates = int(getattr(cache_config, "max_candidates", 200))
 
     return SemanticLLMCache(
         database_path=db_path,

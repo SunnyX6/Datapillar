@@ -6,14 +6,21 @@ Agent 执行结果
 设计原则：
 - Agent 只负责执行逻辑，不负责更新状态
 - Agent 返回结构化结果，Orchestrator 负责存储和协调
-- 清晰区分：成功、需澄清、需委派、失败
+- 状态语义清晰区分：
+  - completed: Agent 正确完成了职责，产出了合格的交付物
+  - needs_clarification: 需要用户澄清才能继续
+  - needs_delegation: 需要其他 Agent 协助
+  - failed: Agent 自身执行失败（技术故障：LLM 超时、网络异常、代码 bug 等）
+
+注意：交付物的业务状态（如 ReviewResult.passed）不影响 Agent 状态。
+ReviewerAgent 成功完成 review 工作就是 completed，即使 ReviewResult.passed=False。
 """
 
 from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 AgentResultStatus = Literal["completed", "needs_clarification", "needs_delegation", "failed"]
 
@@ -39,7 +46,13 @@ class AgentResult(BaseModel):
     """
     Agent 执行结果
 
-    统一的返回类型，包含：
+    状态语义：
+    - completed: Agent 正确完成了职责，产出了交付物（交付物的业务状态由其自身字段表示）
+    - needs_clarification: 需要用户澄清才能继续
+    - needs_delegation: 需要其他 Agent 协助
+    - failed: Agent 自身执行失败（技术故障），无法产出交付物
+
+    字段说明：
     - status: 执行状态
     - summary: 一句话总结（给 Boss 看）
     - deliverable: 交付物（存入 Handover）
@@ -51,12 +64,60 @@ class AgentResult(BaseModel):
     status: AgentResultStatus = Field(..., description="执行状态")
     summary: str = Field(..., description="一句话总结")
     deliverable: Any | None = Field(
-        None, description="交付物（AnalysisResult/Workflow/TestResult 等）"
+        None, description="交付物（AnalysisResult/Workflow/ReviewResult 等）"
     )
     deliverable_type: str | None = Field(None, description="交付物类型（analysis/plan/test）")
     clarification: ClarificationRequest | None = Field(None, description="澄清请求")
     delegation: DelegationRequest | None = Field(None, description="委派请求")
     error: str | None = Field(None, description="错误信息")
+
+    @property
+    def message(self) -> str | None:
+        """
+        兼容字段：历史代码/测试使用 `result.message`。
+
+        约定：
+        - needs_clarification: 返回 clarification.message
+        - needs_delegation: 返回 delegation.reason
+        - 其他状态: None
+        """
+        if self.clarification is not None:
+            return self.clarification.message
+        if self.delegation is not None:
+            return self.delegation.reason
+        return None
+
+    @model_validator(mode="after")
+    def _validate_contract(self) -> AgentResult:
+        """
+        AgentResult 契约校验（跨字段）。
+
+        目标：
+        - completed 必须带交付物（deliverable/deliverable_type）
+        - needs_clarification 必须带 clarification
+        - needs_delegation 必须带 delegation
+        - failed 必须带 error
+        - deliverable 存在时，deliverable_type 必须存在（否则无法存入 Handover）
+        """
+        if self.deliverable is not None and not self.deliverable_type:
+            raise ValueError("deliverable 不为空时，deliverable_type 不能为空")
+
+        if self.status == "completed":
+            if self.deliverable is None:
+                raise ValueError("status=completed 时 deliverable 不能为空")
+            if not self.deliverable_type:
+                raise ValueError("status=completed 时 deliverable_type 不能为空")
+
+        if self.status == "needs_clarification" and self.clarification is None:
+            raise ValueError("status=needs_clarification 时 clarification 不能为空")
+
+        if self.status == "needs_delegation" and self.delegation is None:
+            raise ValueError("status=needs_delegation 时 delegation 不能为空")
+
+        if self.status == "failed" and not (self.error and self.error.strip()):
+            raise ValueError("status=failed 时 error 不能为空")
+
+        return self
 
     @classmethod
     def completed(

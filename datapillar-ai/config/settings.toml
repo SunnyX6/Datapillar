@@ -41,21 +41,42 @@ redis_checkpoint_ttl_seconds = 604800  # 7天
 jwt_issuer = "datapillar-auth"
 auth_enabled = true  # 是否启用认证，开发调试时可设为 false
 
+# ==================== 弹性机制配置（通用） ====================
+# 说明：
+# - 适用于所有智能体、所有 LLM 调用场景
+# - 技术故障（超时、网络抖动）自动重试，用户无感知
+[default.resilience]
+# 重试配置
+max_retries = 3                    # 最大重试次数
+initial_delay_ms = 500             # 初始延迟（毫秒）
+max_delay_ms = 30000               # 最大延迟（毫秒）
+exponential_base = 2               # 指数基数
+jitter = true                      # 是否添加抖动（避免惊群效应）
+
+# 超时配置
+llm_timeout_seconds = 120          # LLM 调用超时
+tool_timeout_seconds = 30          # 工具调用超时
+
+# Agent 执行配置
+max_iterations = 10                # LLM 调用轮次上限（每轮可调用多个工具）
+
+# 熔断配置
+circuit_failure_threshold = 5      # 连续失败次数触发熔断
+circuit_recovery_timeout_seconds = 60  # 熔断恢复等待时间
+
 # ==================== ETL 多智能体配置 ====================
 # 说明：
-# - 该模块的默认交付物是“ETL 工作流（Job/Stage/SQL）”
+# - 该模块的默认交付物是"ETL 工作流（Job/Stage/SQL）"
 # - 阈值允许按环境/租户通过环境变量覆盖（DATAPILLAR_*）
-etl_orchestrator_max_iterations = 3
-etl_orchestrator_agent_max_retries = 2
-etl_orchestrator_max_human_requests = 6
+etl_review_retry_threshold = 3     # Review 打回阈值（连续失败几次后暂停请求用户介入）
 
 # ==================== ETL 对话记忆与上下文压缩 ====================
 # 说明：
 # - 对话记忆存放在 AgentState.messages，并由 LangGraph checkpoint（Redis）持久化
 # - 这里的参数只影响“喂给 LLM 的历史对话窗口”，不影响持久化的数据本身
-etl_conversation_history_max_messages = 12
+etl_conversation_history_max_messages = 8
 # 统一用 token 口径（估算 token；真实 token 以厂商 usage 为准）
-etl_conversation_history_max_tokens = 512
+etl_conversation_history_max_tokens = 4096
 # OpenAI 兼容模型建议使用 cl100k_base；如需更贴近 gpt-4o 系列，可切到 o200k_base
 etl_tokenizer_encoding = "cl100k_base"
 
@@ -88,6 +109,32 @@ flush_interval_seconds = 3.0  # 刷新间隔（秒）
 [default.openlineage_sink.neo4j]
 batch_size = 50               # 批量写入大小
 max_concurrent = 10           # 最大并发写入数
+
+# ==================== LLM 语义缓存配置 ====================
+# 说明：
+# - 基于 embedding 相似度的 LLM 响应缓存，减少重复调用
+# - SQLite 持久化，支持 TTL 过期清理
+# - 通过 scope_key 隔离不同上下文的缓存
+[default.semantic_cache]
+enabled = true                      # 是否启用语义缓存
+db_path = ".semantic_cache.db"      # SQLite 文件路径
+ttl_seconds = 300                   # 缓存 TTL（秒），生产环境建议 3600
+hard_threshold = 0.95               # 高相似命中阈值（0-1），越高越严格
+context_window_messages = 6         # 上下文窗口消息数（用于 scope 隔离）
+max_candidates = 200                # 每次查询的最大候选数量
+
+# ==================== SQL 摘要生成配置 ====================
+# 说明：
+# - 从 OpenLineage 事件解析的 SQL 可生成语义摘要，用于智能检索
+# - 摘要由 LLM 生成，会产生 API 调用成本
+# - 通过批量处理和去重机制控制成本
+[default.sql_summary]
+enabled = true                # 是否启用 SQL 摘要生成
+batch_size = 5                # 积累多少条后批量处理（建议 3-10）
+flush_interval_seconds = 300  # 最长等待时间（秒），超时自动处理
+max_queue_size = 1000         # 队列最大容量，超出则丢弃新任务
+max_sql_length = 10000        # SQL 最大长度（字符），超出则截断
+min_sql_length = 50           # SQL 最小长度，太短的 SQL 跳过生成
 
 
 # ==================== 开发环境 ====================

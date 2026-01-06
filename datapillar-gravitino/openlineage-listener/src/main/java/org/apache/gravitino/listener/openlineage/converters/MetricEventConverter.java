@@ -156,9 +156,10 @@ public class MetricEventConverter extends BaseEventConverter {
   private List<SchemaDatasetFacetFields> buildMetricFields(MetricInfo metricInfo) {
     List<SchemaDatasetFacetFields> fields = new ArrayList<>();
     fields.add(openLineage.newSchemaDatasetFacetFields("code", "STRING", metricInfo.code(), null));
+    fields.add(openLineage.newSchemaDatasetFacetFields("name", "STRING", metricInfo.name(), null));
     fields.add(
         openLineage.newSchemaDatasetFacetFields(
-            "type", "STRING", metricInfo.metricType().name(), null));
+            "metricType", "STRING", metricInfo.metricType().name(), null));
     metricInfo
         .comment()
         .ifPresent(

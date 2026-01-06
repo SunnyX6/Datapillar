@@ -1,439 +1,224 @@
 """
-EtlBoss 单元测试
+ETL Boss 决策测试
 
 测试场景：
-1. 前置拦截：human 请求
-2. 前置拦截：delegate 请求
-3. LLM 决策：route 到员工
-4. LLM 决策：complete 任务完成
-5. LLM 决策：ask_human 需要澄清
-6. LLM 返回无效 action
-7. LLM 返回无效 target_agent
-8. LLM 未配置
-9. 状态描述完整性
+1. 空任务 -> 要求用户输入
+2. 新任务 -> LLM 决策路由到分析师
+3. 分析完成 -> 确定性推进到架构师
+4. 全部完成 -> finalize
+5. LLM 结构化输出验证
 """
 
-from unittest.mock import AsyncMock, MagicMock
+import logging
+import sys
+from pathlib import Path
 
 import pytest
 
-from src.modules.etl.boss import (
-    AGENT_IDS,
-    AGENT_IDS_SET,
-    BossDecision,
-    EtlBoss,
-)
-from src.modules.etl.schemas.requests import BlackboardRequest
-from src.modules.etl.state.blackboard import AgentReport, Blackboard
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+logger = logging.getLogger(__name__)
 
 
-class TestBossDecision:
-    """测试 BossDecision 数据结构"""
-
-    def test_route_decision(self):
-        """route 决策需要 target_agent"""
-        decision = BossDecision(
-            action="route",
-            target_agent="analyst_agent",
-            reason="用户提出新需求",
-        )
-        assert decision.action == "route"
-        assert decision.target_agent == "analyst_agent"
-
-    def test_complete_decision(self):
-        """complete 决策不需要 target_agent"""
-        decision = BossDecision(
-            action="complete",
-            reason="所有员工已完成",
-        )
-        assert decision.action == "complete"
-        assert decision.target_agent is None
-
-    def test_ask_human_decision(self):
-        """ask_human 决策不需要 target_agent"""
-        decision = BossDecision(
-            action="ask_human",
-            reason="需求不明确",
-        )
-        assert decision.action == "ask_human"
-        assert decision.target_agent is None
+# ==================== Fixtures ====================
 
 
-class TestAgentIds:
-    """测试 Agent ID 常量"""
+@pytest.fixture
+def boss():
+    """创建 Boss 实例"""
+    from src.modules.etl.boss import EtlBoss
 
-    def test_agent_ids_order(self):
-        """AGENT_IDS 是有序元组"""
-        assert AGENT_IDS == (
-            "analyst_agent",
-            "architect_agent",
-            "developer_agent",
-            "tester_agent",
-        )
-
-    def test_agent_ids_set(self):
-        """AGENT_IDS_SET 包含所有员工"""
-        assert "analyst_agent" in AGENT_IDS_SET
-        assert "architect_agent" in AGENT_IDS_SET
-        assert "developer_agent" in AGENT_IDS_SET
-        assert "tester_agent" in AGENT_IDS_SET
-        # knowledge_agent 不是员工
-        assert "knowledge_agent" not in AGENT_IDS_SET
+    return EtlBoss()
 
 
-class TestBossDecide:
-    """测试 Boss.decide 方法"""
+@pytest.fixture
+def empty_blackboard():
+    """空黑板（无任务）"""
+    from src.modules.etl.state.blackboard import Blackboard
 
-    @pytest.fixture
-    def boss(self):
-        """创建 Boss 实例（无 LLM）"""
-        return EtlBoss()
+    return Blackboard(session_id="test_session", user_id="test_user")
 
-    @pytest.fixture
-    def boss_with_llm(self):
-        """创建带 Mock LLM 的 Boss 实例"""
-        mock_llm = AsyncMock()
-        return EtlBoss(llm=mock_llm), mock_llm
 
-    @pytest.fixture
-    def empty_blackboard(self):
-        """空白 Blackboard"""
-        return Blackboard(session_id="test-session", task="帮我做一个订单汇总表")
+@pytest.fixture
+def blackboard_with_task():
+    """带任务的黑板（无进度）"""
+    from src.modules.etl.state.blackboard import Blackboard
 
-    # ==================== 前置拦截测试 ====================
+    return Blackboard(
+        session_id="test_session",
+        user_id="test_user",
+        task="把用户表同步到用户维度表",
+    )
 
-    @pytest.mark.asyncio
-    async def test_intercept_human_request(self, boss_with_llm, empty_blackboard):
-        """前置拦截：有 human 请求时，直接返回 human_in_the_loop"""
-        boss, mock_llm = boss_with_llm
-        blackboard = empty_blackboard
 
-        # 添加 human 请求
-        blackboard.pending_requests = [
-            BlackboardRequest(
-                request_id="req-1",
-                kind="human",
-                status="pending",
-                created_by="analyst_agent",
-                payload={"message": "请确认数据源"},
-            )
-        ]
+@pytest.fixture
+def blackboard_analyst_done():
+    """分析完成的黑板"""
+    from src.modules.etl.state.blackboard import AgentReport, Blackboard
 
-        result = await boss.decide(blackboard)
+    return Blackboard(
+        session_id="test_session",
+        user_id="test_user",
+        task="把用户表同步到用户维度表",
+        reports={
+            "analyst_agent": AgentReport(
+                status="completed",
+                summary="需求分析完成",
+                deliverable_ref="analysis:123",
+            ),
+        },
+    )
 
-        assert result == {"current_agent": "human_in_the_loop"}
-        # LLM 不应该被调用
-        mock_llm.ainvoke.assert_not_called()
 
-    @pytest.mark.asyncio
-    async def test_intercept_delegate_request(self, boss_with_llm, empty_blackboard):
-        """前置拦截：有 delegate 请求时，直接路由到目标员工"""
-        boss, mock_llm = boss_with_llm
-        blackboard = empty_blackboard
+@pytest.fixture
+def blackboard_architect_done():
+    """架构设计完成的黑板（待设计 review）"""
+    from src.modules.etl.state.blackboard import AgentReport, Blackboard
 
-        # 添加 delegate 请求
-        blackboard.pending_requests = [
-            BlackboardRequest(
-                request_id="req-1",
-                kind="delegate",
-                status="pending",
-                created_by="analyst_agent",
-                target_agent="architect_agent",
-                payload={},
-            )
-        ]
+    return Blackboard(
+        session_id="test_session",
+        user_id="test_user",
+        task="把用户表同步到用户维度表",
+        reports={
+            "analyst_agent": AgentReport(status="completed", summary="需求分析完成"),
+            "architect_agent": AgentReport(status="completed", summary="架构设计完成"),
+        },
+        design_review_passed=False,
+    )
 
-        result = await boss.decide(blackboard)
 
-        assert result == {"current_agent": "architect_agent"}
-        # LLM 不应该被调用
-        mock_llm.ainvoke.assert_not_called()
+@pytest.fixture
+def blackboard_design_review_passed():
+    """设计 review 通过的黑板（待开发）"""
+    from src.modules.etl.state.blackboard import AgentReport, Blackboard
+
+    return Blackboard(
+        session_id="test_session",
+        user_id="test_user",
+        task="把用户表同步到用户维度表",
+        reports={
+            "analyst_agent": AgentReport(status="completed", summary="需求分析完成"),
+            "architect_agent": AgentReport(status="completed", summary="架构设计完成"),
+        },
+        design_review_passed=True,
+    )
+
+
+@pytest.fixture
+def blackboard_all_done():
+    """全部完成的黑板"""
+    from src.modules.etl.state.blackboard import AgentReport, Blackboard
+
+    return Blackboard(
+        session_id="test_session",
+        user_id="test_user",
+        task="把用户表同步到用户维度表",
+        reports={
+            "analyst_agent": AgentReport(status="completed", summary="需求分析完成"),
+            "architect_agent": AgentReport(status="completed", summary="架构设计完成"),
+            "developer_agent": AgentReport(status="completed", summary="SQL 生成完成"),
+            "reviewer_agent": AgentReport(status="completed", summary="Review 通过"),
+        },
+        design_review_passed=True,
+        development_review_passed=True,
+    )
+
+
+# ==================== 确定性决策测试（不依赖 LLM）====================
+
+
+class TestBossDecisionDeterministic:
+    """Boss 确定性决策测试（基于状态推导，不调用 LLM）"""
 
     @pytest.mark.asyncio
-    async def test_intercept_invalid_delegate_target(self, boss_with_llm, empty_blackboard):
-        """前置拦截：delegate 目标无效时，走 LLM 决策"""
-        boss, mock_llm = boss_with_llm
-        blackboard = empty_blackboard
-
-        # 添加无效目标的 delegate 请求
-        blackboard.pending_requests = [
-            BlackboardRequest(
-                request_id="req-1",
-                kind="delegate",
-                status="pending",
-                created_by="analyst_agent",
-                target_agent="invalid_agent",  # 无效目标
-                payload={},
-            )
-        ]
-
-        # Mock LLM 返回
-        mock_response = MagicMock()
-        mock_response.content = (
-            '{"action": "route", "target_agent": "analyst_agent", "reason": "test"}'
-        )
-        mock_llm.ainvoke.return_value = mock_response
-
-        result = await boss.decide(blackboard)
-
-        # 应该走 LLM 决策
-        assert result == {"current_agent": "analyst_agent"}
-        mock_llm.ainvoke.assert_called_once()
-
-    # ==================== LLM 决策测试 ====================
-
-    @pytest.mark.asyncio
-    async def test_llm_route_decision(self, boss_with_llm, empty_blackboard):
-        """LLM 决策：route 到员工"""
-        boss, mock_llm = boss_with_llm
-
-        mock_response = MagicMock()
-        mock_response.content = (
-            '{"action": "route", "target_agent": "developer_agent", "reason": "需要生成SQL"}'
-        )
-        mock_llm.ainvoke.return_value = mock_response
-
+    async def test_empty_task_ask_human(self, boss, empty_blackboard):
+        """测试空任务时要求用户输入"""
         result = await boss.decide(empty_blackboard)
 
-        assert result == {"current_agent": "developer_agent"}
+        print(f"\n决策结果: {result}")
+        assert result["current_agent"] == "human_in_the_loop"
 
     @pytest.mark.asyncio
-    async def test_llm_complete_decision(self, boss_with_llm, empty_blackboard):
-        """LLM 决策：complete 任务完成"""
-        boss, mock_llm = boss_with_llm
+    async def test_analyst_done_route_to_architect(self, boss, blackboard_analyst_done):
+        """测试分析完成后确定性推进到架构师"""
+        result = await boss.decide(blackboard_analyst_done)
 
-        mock_response = MagicMock()
-        mock_response.content = '{"action": "complete", "reason": "所有员工已完成工作"}'
-        mock_llm.ainvoke.return_value = mock_response
-
-        result = await boss.decide(empty_blackboard)
-
-        assert result == {"current_agent": "finalize"}
+        print(f"\n决策结果: {result}")
+        assert result["current_agent"] == "architect_agent"
 
     @pytest.mark.asyncio
-    async def test_llm_ask_human_decision(self, boss_with_llm, empty_blackboard):
-        """LLM 决策：ask_human 需要澄清"""
-        boss, mock_llm = boss_with_llm
+    async def test_architect_done_route_to_reviewer(self, boss, blackboard_architect_done):
+        """测试架构设计完成后推进到 reviewer（设计 review）"""
+        result = await boss.decide(blackboard_architect_done)
 
-        mock_response = MagicMock()
-        mock_response.content = '{"action": "ask_human", "reason": "需求不明确，请用户补充"}'
-        mock_llm.ainvoke.return_value = mock_response
-
-        result = await boss.decide(empty_blackboard)
-
-        assert result == {"current_agent": "human_in_the_loop"}
-
-    # ==================== 异常处理测试 ====================
+        print(f"\n决策结果: {result}")
+        assert result["current_agent"] == "reviewer_agent"
 
     @pytest.mark.asyncio
-    async def test_llm_invalid_action(self, boss_with_llm, empty_blackboard):
-        """LLM 返回无效 action 时，fallback 到 ask_human"""
-        boss, mock_llm = boss_with_llm
+    async def test_design_review_passed_route_to_developer(
+        self, boss, blackboard_design_review_passed
+    ):
+        """测试设计 review 通过后推进到开发"""
+        result = await boss.decide(blackboard_design_review_passed)
 
-        mock_response = MagicMock()
-        mock_response.content = '{"action": "invalid_action", "reason": "test"}'
-        mock_llm.ainvoke.return_value = mock_response
-
-        result = await boss.decide(empty_blackboard)
-
-        assert result == {"current_agent": "human_in_the_loop"}
+        print(f"\n决策结果: {result}")
+        assert result["current_agent"] == "developer_agent"
 
     @pytest.mark.asyncio
-    async def test_llm_invalid_target_agent(self, boss_with_llm, empty_blackboard):
-        """LLM 返回无效 target_agent 时，fallback 到 ask_human"""
-        boss, mock_llm = boss_with_llm
+    async def test_all_done_finalize(self, boss, blackboard_all_done):
+        """测试全部完成后结束"""
+        result = await boss.decide(blackboard_all_done)
 
-        mock_response = MagicMock()
-        mock_response.content = (
-            '{"action": "route", "target_agent": "unknown_agent", "reason": "test"}'
-        )
-        mock_llm.ainvoke.return_value = mock_response
+        print(f"\n决策结果: {result}")
+        assert result["current_agent"] == "finalize"
 
-        result = await boss.decide(empty_blackboard)
 
-        assert result == {"current_agent": "human_in_the_loop"}
+# ==================== LLM 决策测试 ====================
 
-    @pytest.mark.asyncio
-    async def test_llm_not_configured(self, boss, empty_blackboard):
-        """LLM 未配置时，返回 ask_human"""
-        result = await boss.decide(empty_blackboard)
 
-        assert result == {"current_agent": "human_in_the_loop"}
+class TestBossDecisionLLM:
+    """Boss LLM 决策测试（需要调用 LLM）"""
 
     @pytest.mark.asyncio
-    async def test_empty_task(self, boss_with_llm):
-        """任务为空时，返回 ask_human"""
-        boss, mock_llm = boss_with_llm
-        blackboard = Blackboard(session_id="test-session", task="")
+    async def test_new_task_llm_decision(self, boss, blackboard_with_task):
+        """测试新任务时 LLM 决策"""
+        from src.modules.etl.boss import BossDecision
 
-        result = await boss.decide(blackboard)
+        # 直接调用 _decide_by_llm 测试结构化输出
+        decision = await boss._decide_by_llm(blackboard_with_task)
 
-        assert result == {"current_agent": "human_in_the_loop"}
-        # LLM 不应该被调用
-        mock_llm.ainvoke.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_llm_exception(self, boss_with_llm, empty_blackboard):
-        """LLM 调用异常时，返回 ask_human"""
-        boss, mock_llm = boss_with_llm
-
-        mock_llm.ainvoke.side_effect = Exception("LLM 服务不可用")
-
-        result = await boss.decide(empty_blackboard)
-
-        assert result == {"current_agent": "human_in_the_loop"}
-
-    @pytest.mark.asyncio
-    async def test_llm_invalid_json(self, boss_with_llm, empty_blackboard):
-        """LLM 返回无效 JSON 时，返回 ask_human"""
-        boss, mock_llm = boss_with_llm
-
-        mock_response = MagicMock()
-        mock_response.content = "这不是JSON"
-        mock_llm.ainvoke.return_value = mock_response
-
-        result = await boss.decide(empty_blackboard)
-
-        assert result == {"current_agent": "human_in_the_loop"}
-
-
-class TestBuildStateDescription:
-    """测试状态描述构建"""
-
-    @pytest.fixture
-    def boss(self):
-        return EtlBoss()
-
-    def test_empty_state(self, boss):
-        """空白状态描述"""
-        blackboard = Blackboard(session_id="test", task="测试任务")
-
-        desc = boss._build_state_description(blackboard)
-
-        assert "任务状态: 进行中" in desc
-        assert "analyst_agent: 未开始" in desc
-        assert "architect_agent: 未开始" in desc
-        assert "developer_agent: 未开始" in desc
-        assert "tester_agent: 未开始" in desc
-
-    def test_completed_state(self, boss):
-        """已完成状态"""
-        blackboard = Blackboard(session_id="test", task="测试任务", is_completed=True)
-
-        desc = boss._build_state_description(blackboard)
-
-        assert "任务状态: 已完成" in desc
-
-    def test_error_state(self, boss):
-        """错误状态"""
-        blackboard = Blackboard(
-            session_id="test",
-            task="测试任务",
-            error="SQL 语法错误",
+        print(f"\n决策类型: {type(decision)}")
+        print(
+            f"决策内容: action={decision.action}, target={decision.target_agent}, reason={decision.reason}"
         )
 
-        desc = boss._build_state_description(blackboard)
+        # 验证返回的是 BossDecision 实例
+        assert isinstance(decision, BossDecision)
+        assert decision.action in ["route", "complete", "ask_human"]
+        assert decision.reason  # 必须有理由
 
-        assert "任务状态: 错误" in desc
-        assert "SQL 语法错误" in desc
+        # 新任务应该路由到 analyst_agent
+        if decision.action == "route":
+            print(f"✅ LLM 决策路由到: {decision.target_agent}")
+            assert (
+                decision.target_agent == "analyst_agent"
+            ), f"新任务应该路由到 analyst_agent，而不是 {decision.target_agent}"
 
-    def test_agent_reports(self, boss):
-        """员工汇报状态"""
-        blackboard = Blackboard(session_id="test", task="测试任务")
-        blackboard.reports["analyst_agent"] = AgentReport(
-            status="completed",
-            summary="识别出3个业务步骤",
-        )
-        blackboard.reports["architect_agent"] = AgentReport(
-            status="in_progress",
-            summary="正在设计工作流",
-        )
+    @pytest.mark.asyncio
+    async def test_new_task_full_decide(self, boss, blackboard_with_task):
+        """测试新任务完整决策流程"""
+        result = await boss.decide(blackboard_with_task)
 
-        desc = boss._build_state_description(blackboard)
-
-        assert "analyst_agent: completed - 识别出3个业务步骤" in desc
-        assert "architect_agent: in_progress - 正在设计工作流" in desc
-        assert "developer_agent: 未开始" in desc
-
-    def test_agent_ids_order_in_description(self, boss):
-        """状态描述中员工顺序固定"""
-        blackboard = Blackboard(session_id="test", task="测试任务")
-
-        desc = boss._build_state_description(blackboard)
-
-        # 检查顺序
-        analyst_pos = desc.find("analyst_agent")
-        architect_pos = desc.find("architect_agent")
-        developer_pos = desc.find("developer_agent")
-        tester_pos = desc.find("tester_agent")
-
-        assert analyst_pos < architect_pos < developer_pos < tester_pos
+        print(f"\n决策结果: {result}")
+        # 新任务应该路由到 analyst_agent
+        assert (
+            result["current_agent"] == "analyst_agent"
+        ), f"新任务应该路由到 analyst_agent，而不是 {result['current_agent']}"
 
 
-class TestRecordReport:
-    """测试记录员工汇报"""
-
-    def test_record_report_with_full_agent_id(self):
-        """使用完整 agent ID 记录汇报"""
-        boss = EtlBoss()
-        blackboard = Blackboard(session_id="test")
-
-        boss.record_report(
-            blackboard,
-            agent_id="analyst_agent",
-            status="completed",
-            summary="分析完成",
-            deliverable_ref="analysis:abc123",
-        )
-
-        assert "analyst_agent" in blackboard.reports
-        report = blackboard.reports["analyst_agent"]
-        assert report.status == "completed"
-        assert report.summary == "分析完成"
-        assert report.deliverable_ref == "analysis:abc123"
+# ==================== 直接运行 ====================
 
 
-class TestPopCompletedRequest:
-    """测试弹出已完成请求"""
-
-    def test_pop_delegate_request(self):
-        """弹出 delegate 请求"""
-        boss = EtlBoss()
-        blackboard = Blackboard(session_id="test")
-        blackboard.pending_requests = [
-            BlackboardRequest(
-                request_id="req-1",
-                kind="delegate",
-                status="pending",
-                created_by="analyst_agent",
-                target_agent="architect_agent",
-                payload={},
-            )
-        ]
-
-        updated, req = boss.pop_completed_request(blackboard, "architect_agent")
-
-        assert req is not None
-        assert req.request_id == "req-1"
-        assert len(updated.pending_requests) == 0
-        assert "req-1" in updated.request_results
-
-    def test_pop_wrong_target(self):
-        """目标不匹配时不弹出"""
-        boss = EtlBoss()
-        blackboard = Blackboard(session_id="test")
-        blackboard.pending_requests = [
-            BlackboardRequest(
-                request_id="req-1",
-                kind="delegate",
-                status="pending",
-                created_by="analyst_agent",
-                target_agent="architect_agent",
-                payload={},
-            )
-        ]
-
-        updated, req = boss.pop_completed_request(blackboard, "developer_agent")
-
-        assert req is None
-        assert len(updated.pending_requests) == 1
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s", "--tb=short"])

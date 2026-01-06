@@ -3,7 +3,7 @@ from __future__ import annotations
 import structlog
 from neo4j import AsyncSession
 
-from src.infrastructure.repository.openlineage import OpenLineageLineageRepository
+from src.infrastructure.repository.openlineage import Lineage
 
 logger = structlog.get_logger()
 
@@ -19,7 +19,7 @@ class ColumnLineageWriter:
         return self._column_lineage_written
 
     async def write(self, session: AsyncSession, lineage_data: list[dict]) -> None:
-        await OpenLineageLineageRepository.link_column_lineage(
+        await Lineage.link_column_lineage(
             session,
             lineage_data=lineage_data,
         )

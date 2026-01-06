@@ -3,10 +3,9 @@
 
 边界（强约束）：
 - 这里只允许“写回/更新”知识图谱，不允许承载任何读查询逻辑。
-- 读查询统一放在 `kg/queries.py` 与 `kg/retrieval.py`。
 
 目的：
-- 避免把查询与写回混在一个 Repository 里，后续一定踩坑（越界、误用、权限扩散）。
+- 避免把查询与写回混在一个 Repository 里
 """
 
 from __future__ import annotations

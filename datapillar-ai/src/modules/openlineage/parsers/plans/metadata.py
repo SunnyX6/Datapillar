@@ -14,6 +14,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from src.infrastructure.repository.kg.dto import (
+    CatalogDTO,
+    ColumnDTO,
+    MetricDTO,
+    ModifierDTO,
+    SchemaDTO,
+    TableDTO,
+    TagDTO,
+    UnitDTO,
+    ValueDomainDTO,
+    WordRootDTO,
+    generate_id,
+    get_metric_label,
+)
 from src.modules.openlineage.parsers.common.namespace import (
     dataset_table_name,
     parse_gravitino_namespace,
@@ -29,20 +43,6 @@ from src.modules.openlineage.schemas.facets import (
     SchemaDatasetFacet,
     TableChangeInfo,
 )
-from src.modules.openlineage.schemas.neo4j import (
-    CatalogNode,
-    ColumnNode,
-    MetricNode,
-    ModifierNode,
-    SchemaNode,
-    TableNode,
-    TagNode,
-    UnitNode,
-    ValueDomainNode,
-    WordRootNode,
-    generate_id,
-    get_metric_label,
-)
 
 GRAVITINO_FACET_KEY = "gravitino"
 
@@ -56,21 +56,21 @@ class ParsedNamespace:
 
 @dataclass(frozen=True)
 class TableWritePlan:
-    catalog: CatalogNode
-    schema: SchemaNode
-    table: TableNode
-    columns: list[ColumnNode]
+    catalog: CatalogDTO
+    schema: SchemaDTO
+    table: TableDTO
+    columns: list[ColumnDTO]
 
 
 @dataclass(frozen=True)
 class SchemaWritePlan:
-    catalog: CatalogNode
-    schema: SchemaNode
+    catalog: CatalogDTO
+    schema: SchemaDTO
 
 
 @dataclass(frozen=True)
 class CatalogWritePlan:
-    catalog: CatalogNode
+    catalog: CatalogDTO
 
 
 @dataclass(slots=True)
@@ -81,10 +81,10 @@ class _AlterTableState:
 
 @dataclass(frozen=True)
 class MetricWritePlan:
-    catalog: CatalogNode
-    schema: SchemaNode
+    catalog: CatalogDTO
+    schema: SchemaDTO
     schema_id: str
-    metric: MetricNode
+    metric: MetricDTO
     metric_label: str
     is_atomic: bool
     parent_metric_codes: list[str]
@@ -106,7 +106,7 @@ class TagUpdatePlan:
 class TagWritePlan:
     """Tag 节点写入计划 - 用于 create_tag/alter_tag 操作"""
 
-    tag: TagNode
+    tag: TagDTO
 
 
 # ===== alter_table actions =====
@@ -116,7 +116,7 @@ class TagWritePlan:
 class RenameTableAction:
     old_table_id: str
     schema_id: str
-    new_table: TableNode
+    new_table: TableDTO
 
 
 @dataclass(frozen=True)
@@ -134,7 +134,7 @@ class UpdateTablePropertiesAction:
 @dataclass(frozen=True)
 class AddColumnAction:
     table_id: str
-    column: ColumnNode
+    column: ColumnDTO
 
     # 来自 change（OpenLineage 事件）
     nullable: bool | None
@@ -292,16 +292,16 @@ class OpenLineageMetadataPlanParser:
                 continue
             schema_name, table_only = parsed_table
 
-            catalog_node = CatalogNode.create(
+            catalog_node = CatalogDTO.create(
                 metalake=job_ns.metalake,
                 catalog_name=job_ns.catalog,
             )
-            schema_node = SchemaNode.create(
+            schema_node = SchemaDTO.create(
                 metalake=job_ns.metalake,
                 catalog=job_ns.catalog,
                 schema_name=schema_name,
             )
-            table_node = TableNode.create(
+            table_node = TableDTO.create(
                 metalake=job_ns.metalake,
                 catalog=job_ns.catalog,
                 schema=schema_name,
@@ -309,12 +309,12 @@ class OpenLineageMetadataPlanParser:
                 producer=event.producer,
             )
 
-            columns: list[ColumnNode] = []
+            columns: list[ColumnDTO] = []
             if dataset.facets and "schema" in dataset.facets:
                 schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
                 for field_info in schema_facet.fields:
                     columns.append(
-                        ColumnNode.create(
+                        ColumnDTO.create(
                             metalake=job_ns.metalake,
                             catalog=job_ns.catalog,
                             schema=schema_name,
@@ -338,7 +338,7 @@ class OpenLineageMetadataPlanParser:
             if not columns:
                 continue
 
-            merged: dict[str, ColumnNode] = {c.id: c for c in existing.columns}
+            merged: dict[str, ColumnDTO] = {c.id: c for c in existing.columns}
             for c in columns:
                 merged.setdefault(c.id, c)
             by_table_id[table_node.id] = TableWritePlan(
@@ -362,17 +362,17 @@ class OpenLineageMetadataPlanParser:
 
             gravitino_facet = cls.parse_gravitino_facet(dataset)
 
-            catalog_node = CatalogNode.create(
+            catalog_node = CatalogDTO.create(
                 metalake=parsed_ns.metalake,
                 catalog_name=parsed_ns.catalog,
             )
-            schema_node = SchemaNode.create(
+            schema_node = SchemaDTO.create(
                 metalake=parsed_ns.metalake,
                 catalog=parsed_ns.catalog,
                 schema_name=schema_name,
             )
 
-            table_node = TableNode.create(
+            table_node = TableDTO.create(
                 metalake=parsed_ns.metalake,
                 catalog=parsed_ns.catalog,
                 schema=schema_name,
@@ -392,11 +392,11 @@ class OpenLineageMetadataPlanParser:
                 table_node.last_modifier = gravitino_facet.lastModifier
                 table_node.last_modified_time = gravitino_facet.lastModifiedTime
 
-            columns: list[ColumnNode] = []
+            columns: list[ColumnDTO] = []
             if dataset.facets and "schema" in dataset.facets:
                 schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
                 for field_info in schema_facet.fields:
-                    column = ColumnNode.create(
+                    column = ColumnDTO.create(
                         metalake=parsed_ns.metalake,
                         catalog=parsed_ns.catalog,
                         schema=schema_name,
@@ -434,11 +434,11 @@ class OpenLineageMetadataPlanParser:
 
             gravitino_facet = cls.parse_gravitino_facet(dataset)
 
-            catalog_node = CatalogNode.create(
+            catalog_node = CatalogDTO.create(
                 metalake=parsed_ns.metalake,
                 catalog_name=parsed_ns.catalog,
             )
-            schema_node = SchemaNode.create(
+            schema_node = SchemaDTO.create(
                 metalake=parsed_ns.metalake,
                 catalog=parsed_ns.catalog,
                 schema_name=schema_name,
@@ -457,9 +457,7 @@ class OpenLineageMetadataPlanParser:
             catalog_name = dataset.name or ""
             if not parsed_ns.metalake or not catalog_name:
                 continue
-            catalog_node = CatalogNode.create(
-                metalake=parsed_ns.metalake, catalog_name=catalog_name
-            )
+            catalog_node = CatalogDTO.create(metalake=parsed_ns.metalake, catalog_name=catalog_name)
             plans.append(CatalogWritePlan(catalog=catalog_node))
         return plans
 
@@ -586,7 +584,7 @@ class OpenLineageMetadataPlanParser:
             )
         elif change_type == table_change_type.ADD_COLUMN:
             if change.columnName:
-                column = ColumnNode.create(
+                column = ColumnDTO.create(
                     metalake=parsed_ns.metalake,
                     catalog=parsed_ns.catalog,
                     schema=schema_name,
@@ -678,7 +676,7 @@ class OpenLineageMetadataPlanParser:
             return None
         old_table_id = table_state.table_id
         new_table_name = change.newName
-        new_table_node = TableNode.create(
+        new_table_node = TableDTO.create(
             metalake=parsed_ns.metalake,
             catalog=parsed_ns.catalog,
             schema=schema_name,
@@ -736,10 +734,11 @@ class OpenLineageMetadataPlanParser:
             fields = {f.name: f for f in schema_facet.fields}
 
             code_field = fields.get("code")
-            type_field = fields.get("type")
-            if not code_field or not type_field:
+            metric_type_field = fields.get("metricType")
+            if not code_field or not metric_type_field:
                 continue
 
+            name_field = fields.get("name")
             comment_field = fields.get("comment")
             unit_field = fields.get("unit")
             aggregation_logic_field = fields.get("aggregationLogic")
@@ -754,24 +753,24 @@ class OpenLineageMetadataPlanParser:
                     if code.strip()
                 ]
 
-            catalog_node = CatalogNode.create(
+            catalog_node = CatalogDTO.create(
                 metalake=parsed_ns.metalake,
                 catalog_name=parsed_ns.catalog,
             )
-            schema_node = SchemaNode.create(
+            schema_node = SchemaDTO.create(
                 metalake=parsed_ns.metalake,
                 catalog=parsed_ns.catalog,
                 schema_name=schema_name,
             )
             schema_id = schema_node.id
 
-            metric_type = type_field.description or "ATOMIC"
+            metric_type = metric_type_field.description or "ATOMIC"
             metric_label = get_metric_label(metric_type)
             is_atomic = metric_type.upper() == "ATOMIC"
 
-            metric_node = MetricNode.create(
+            metric_node = MetricDTO.create(
                 code=(code_field.description or metric_name),
-                name=metric_name,
+                name=name_field.description if name_field else metric_name,
                 metric_type=metric_type,
                 description=comment_field.description if comment_field else None,
                 unit=unit_field.description if unit_field else None,
@@ -798,8 +797,8 @@ class OpenLineageMetadataPlanParser:
         return plans
 
     @classmethod
-    def parse_wordroot_nodes(cls, event: RunEvent) -> list[WordRootNode]:
-        nodes: list[WordRootNode] = []
+    def parse_wordroot_nodes(cls, event: RunEvent) -> list[WordRootDTO]:
+        nodes: list[WordRootDTO] = []
         for dataset in event.get_all_datasets():
             if not dataset.facets or "schema" not in dataset.facets:
                 continue
@@ -813,7 +812,7 @@ class OpenLineageMetadataPlanParser:
             data_type_field = fields.get("dataType")
             comment_field = fields.get("comment")
             nodes.append(
-                WordRootNode.create(
+                WordRootDTO.create(
                     code=code,
                     name=name_field.description if name_field else None,
                     data_type=data_type_field.description if data_type_field else None,
@@ -823,30 +822,32 @@ class OpenLineageMetadataPlanParser:
         return nodes
 
     @classmethod
-    def parse_modifier_nodes(cls, event: RunEvent) -> list[ModifierNode]:
-        nodes: list[ModifierNode] = []
+    def parse_modifier_nodes(cls, event: RunEvent) -> list[ModifierDTO]:
+        nodes: list[ModifierDTO] = []
         for dataset in event.get_all_datasets():
             if not dataset.facets or "schema" not in dataset.facets:
                 continue
             schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
             fields = {f.name: f for f in schema_facet.fields}
             code_field = fields.get("code")
-            type_field = fields.get("type")
-            if not code_field or not code_field.description or not type_field:
+            modifier_type_field = fields.get("modifierType")
+            if not code_field or not code_field.description or not modifier_type_field:
                 continue
+            name_field = fields.get("name")
             comment_field = fields.get("comment")
             nodes.append(
-                ModifierNode.create(
+                ModifierDTO.create(
                     code=code_field.description,
-                    modifier_type=type_field.description or "PREFIX",
+                    name=name_field.description if name_field else code_field.description,
+                    modifier_type=modifier_type_field.description or "PREFIX",
                     description=comment_field.description if comment_field else None,
                 )
             )
         return nodes
 
     @classmethod
-    def parse_unit_nodes(cls, event: RunEvent) -> list[UnitNode]:
-        nodes: list[UnitNode] = []
+    def parse_unit_nodes(cls, event: RunEvent) -> list[UnitDTO]:
+        nodes: list[UnitDTO] = []
         for dataset in event.get_all_datasets():
             if not dataset.facets or "schema" not in dataset.facets:
                 continue
@@ -859,7 +860,7 @@ class OpenLineageMetadataPlanParser:
             symbol_field = fields.get("symbol")
             comment_field = fields.get("comment")
             nodes.append(
-                UnitNode.create(
+                UnitDTO.create(
                     code=code_field.description,
                     name=name_field.description if name_field else None,
                     symbol=symbol_field.description if symbol_field else None,
@@ -869,34 +870,34 @@ class OpenLineageMetadataPlanParser:
         return nodes
 
     @classmethod
-    def parse_valuedomain_nodes(cls, event: RunEvent) -> list[ValueDomainNode]:
-        nodes: list[ValueDomainNode] = []
+    def parse_valuedomain_nodes(cls, event: RunEvent) -> list[ValueDomainDTO]:
+        nodes: list[ValueDomainDTO] = []
         for dataset in event.get_all_datasets():
             if not dataset.facets or "schema" not in dataset.facets:
                 continue
             schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
             fields = {f.name: f for f in schema_facet.fields}
 
-            domain_code_field = fields.get("domainCode")
+            code_field = fields.get("code")
             domain_type_field = fields.get("domainType")
             domain_level_field = fields.get("domainLevel")
-            if not domain_code_field or not domain_type_field or not domain_level_field:
+            if not code_field or not domain_type_field or not domain_level_field:
                 continue
-            domain_code = (domain_code_field.description or "").strip()
-            if not domain_code:
+            code = (code_field.description or "").strip()
+            if not code:
                 continue
 
-            domain_name_field = fields.get("domainName")
+            name_field = fields.get("name")
             items_field = fields.get("items")
             comment_field = fields.get("comment")
             data_type_field = fields.get("dataType")
 
             nodes.append(
-                ValueDomainNode.create(
-                    domain_code=domain_code,
+                ValueDomainDTO.create(
+                    code=code,
                     domain_type=domain_type_field.description or "ENUM",
                     domain_level=domain_level_field.description or "GLOBAL",
-                    domain_name=domain_name_field.description if domain_name_field else None,
+                    name=name_field.description if name_field else None,
                     items=items_field.description if items_field else None,
                     description=comment_field.description if comment_field else None,
                     data_type=data_type_field.description if data_type_field else None,
@@ -975,15 +976,15 @@ class OpenLineageMetadataPlanParser:
     def drop_valuedomain_ids(cls, event: RunEvent) -> list[str]:
         ids: list[str] = []
         for dataset in event.get_all_datasets():
-            domain_code = None
+            code = None
             if dataset.facets and "schema" in dataset.facets:
                 schema_facet = SchemaDatasetFacet.from_dict(dataset.facets["schema"])
                 for field in schema_facet.fields:
-                    if field.name == "domainCode" and field.description:
-                        domain_code = field.description
+                    if field.name == "code" and field.description:
+                        code = field.description
                         break
-            if domain_code:
-                ids.append(generate_id("valuedomain", domain_code))
+            if code:
+                ids.append(generate_id("valuedomain", code))
         return ids
 
     # ===== tags =====
@@ -1019,7 +1020,7 @@ class OpenLineageMetadataPlanParser:
                         k, v = pair.split("=", 1)
                         properties[k.strip()] = v.strip()
 
-            tag_node = TagNode.create(
+            tag_node = TagDTO.create(
                 metalake=parsed_ns.metalake,
                 tag_name=tag_name,
                 description=comment_field.description if comment_field else None,

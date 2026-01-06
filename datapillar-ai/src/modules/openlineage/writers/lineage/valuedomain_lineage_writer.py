@@ -3,7 +3,7 @@ from __future__ import annotations
 import structlog
 from neo4j import AsyncSession
 
-from src.infrastructure.repository.openlineage import OpenLineageLineageRepository
+from src.infrastructure.repository.openlineage import Lineage
 from src.modules.openlineage.parsers.plans.types import LineageWritePlans
 
 logger = structlog.get_logger()
@@ -27,7 +27,7 @@ class ValueDomainLineageWriter:
             await self._add_relation(session, column_id, domain_code)
 
     async def _add_relation(self, session: AsyncSession, column_id: str, domain_code: str) -> None:
-        record = await OpenLineageLineageRepository.add_column_valuedomain(
+        record = await Lineage.add_column_valuedomain(
             session,
             column_id=column_id,
             domain_code=domain_code,
@@ -52,7 +52,7 @@ class ValueDomainLineageWriter:
     async def _remove_relation(
         self, session: AsyncSession, column_id: str, domain_code: str
     ) -> None:
-        record = await OpenLineageLineageRepository.remove_column_valuedomain(
+        record = await Lineage.remove_column_valuedomain(
             session,
             column_id=column_id,
             domain_code=domain_code,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import structlog
 from neo4j import AsyncSession
 
-from src.infrastructure.repository.openlineage import OpenLineageLineageRepository
+from src.infrastructure.repository.openlineage import Lineage
 from src.modules.openlineage.parsers.plans.types import LineageWritePlans
 
 logger = structlog.get_logger()
@@ -26,7 +26,7 @@ class MetricRelationshipWriter:
 
     async def write(self, session: AsyncSession, plans: LineageWritePlans) -> None:
         for schema_id, metric_id in plans.schema_metric_edges:
-            await OpenLineageLineageRepository.link_schema_metric(
+            await Lineage.link_schema_metric(
                 session,
                 schema_id=schema_id,
                 metric_id=metric_id,
@@ -34,7 +34,7 @@ class MetricRelationshipWriter:
             self._metric_schema_edges_written += 1
 
         for item in plans.metric_parent_relationships:
-            await OpenLineageLineageRepository.set_metric_parents(
+            await Lineage.set_metric_parents(
                 session,
                 child_label=item["child_label"],
                 child_id=item["child_id"],

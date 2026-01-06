@@ -11,7 +11,7 @@ dependencies = [
     # Neo4j图数据库
     "neo4j>=5.17.0",
     # Neo4j官方GraphRAG库
-    "neo4j-graphrag>=1.0.0",
+    "neo4j-graphrag>=1.11.0",
     # OpenLineage（血缘事件标准）
     "openlineage-python>=1.0.0",
     # MySQL数据库（读取AI模型配置）
@@ -50,6 +50,10 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     # OpenAI 兼容 token 计数（用于上下文预算/记忆裁剪的 token 口径）
     "tiktoken>=0.7.0",
+    # JSON 修复（处理 LLM 输出的畸形 JSON）
+    "json-repair>=0.30.0",
+    # 高性能哈希（内容去重）
+    "xxhash>=3.4.0",
 ]
 
 [project.optional-dependencies]
@@ -82,7 +86,7 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-# 先落地“低噪音、强收益”的基础规则，避免一上来逼着全仓大改。
+# 先落地"低噪音、强收益"的基础规则，避免一上来逼着全仓大改。
 # - F: Pyflakes（未使用导入、未定义变量等）
 # - E7/E9: pycodestyle 的语法级别问题（多语句一行、语法错误等）
 #
@@ -90,7 +94,7 @@ exclude = [
 # - UP: pyupgrade（对齐 py311）
 # - I: import 排序（Ruff 内置 isort）
 # - N801/N802/N803/N804/N805: pep8-naming（命名规范：类 CamelCase；函数/方法/参数 snake_case；self/cls）
-# - C90: McCabe 圈复杂度（单一职责：避免“一个函数做一堆事”）
+# - C90: McCabe 圈复杂度（单一职责：避免"一个函数做一堆事"）
 # - PLR091x: 复杂度/分支/参数/语句数量（单一职责：强制拆分）
 select = [
     "F",
@@ -113,6 +117,9 @@ select = [
     "PLR0913",
     "PLR0915",
 ]
+# 忽略误报规则：
+# - S311: random 用于抖动（jitter），非安全场景
+ignore = ["S311"]
 
 [tool.ruff.lint.per-file-ignores]
 # __init__.py 常用于聚合导出，会触发“导入未使用”警告，项目内属于预期行为。

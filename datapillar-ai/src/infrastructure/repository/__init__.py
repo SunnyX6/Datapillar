@@ -4,31 +4,40 @@
 提供数据库访问的统一接口
 """
 
+from src.infrastructure.repository.checkpoint import Checkpoint
 from src.infrastructure.repository.kg import (
     MetricDTO,
     ModifierDTO,
-    Neo4jKGRepository,
+    Neo4jGraphSearch,
     Neo4jKGWritebackRepository,
-    TableContextDTO,
+    Neo4jMetricSearch,
+    Neo4jNodeSearch,
+    Neo4jSemanticSearch,
+    Neo4jTableSearch,
     UnitDTO,
     WordRootDTO,
 )
 from src.infrastructure.repository.system import (
-    ComponentRepository,
-    LlmUsageRepository,
-    ModelRepository,
+    Component,
+    LlmUsage,
+    Model,
 )
 
 __all__ = [
-    "ModelRepository",
-    "LlmUsageRepository",
-    "ComponentRepository",
-    "Neo4jKGRepository",
+    "Model",
+    "LlmUsage",
+    "Component",
+    "Checkpoint",
+    # Neo4j 搜索服务
+    "Neo4jTableSearch",
+    "Neo4jMetricSearch",
+    "Neo4jSemanticSearch",
+    "Neo4jNodeSearch",
+    "Neo4jGraphSearch",
     "Neo4jKGWritebackRepository",
     # DTOs
     "WordRootDTO",
     "ModifierDTO",
     "UnitDTO",
-    "TableContextDTO",
     "MetricDTO",
 ]
