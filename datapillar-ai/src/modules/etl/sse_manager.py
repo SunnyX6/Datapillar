@@ -20,6 +20,7 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from typing import Any
 
+from pydantic import BaseModel
 from starlette.requests import Request
 
 from src.modules.etl.orchestrator_v2 import EtlOrchestratorV2
@@ -33,6 +34,13 @@ _SENTINEL = object()
 
 def _now_ms() -> int:
     return int(time.time() * 1000)
+
+
+def _json_serializer(obj: Any) -> Any:
+    """自定义 JSON 序列化器，处理 Pydantic 模型"""
+    if isinstance(obj, BaseModel):
+        return obj.model_dump()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
 @dataclass(slots=True)
@@ -138,53 +146,41 @@ class EtlStreamManager:
         finally:
             await self._complete(run)
 
-    async def start(
+    async def chat(
         self,
         *,
         orchestrator: EtlOrchestratorV2,
-        user_input: str,
+        user_input: str | None,
         session_id: str,
         user_id: str,
+        resume_value: Any | None,
     ) -> None:
+        """
+        统一的聊天入口
+
+        场景：
+        - resume_value 不为空：interrupt 恢复
+        - user_input 不为空：用户消息（新会话或续聊由 orchestrator 判断）
+        """
         self._cleanup_expired()
         key = self._key(user_id, session_id)
+        run = self._runs.get(key)
 
-        run = _SessionRun(user_id=user_id, session_id=session_id)
-        self._runs[key] = run
+        if run is None:
+            run = _SessionRun(user_id=user_id, session_id=session_id)
+            self._runs[key] = run
+        else:
+            async with run.lock:
+                run.completed = False
+                run.last_activity_ms = _now_ms()
+                # 清空旧的 buffer，避免重放历史消息
+                run.buffer.clear()
+                run.next_seq = 1
 
         asyncio.create_task(
             self._run_orchestrator_stream(
                 orchestrator=orchestrator,
                 user_input=user_input,
-                session_id=session_id,
-                user_id=user_id,
-                resume_value=None,
-            )
-        )
-
-    async def continue_from_interrupt(
-        self,
-        *,
-        orchestrator: EtlOrchestratorV2,
-        session_id: str,
-        user_id: str,
-        resume_value: Any,
-    ) -> None:
-        self._cleanup_expired()
-        key = self._key(user_id, session_id)
-        run = self._runs.get(key)
-        if run is None:
-            run = _SessionRun(user_id=user_id, session_id=session_id)
-            self._runs[key] = run
-
-        async with run.lock:
-            run.completed = False
-            run.last_activity_ms = _now_ms()
-
-        asyncio.create_task(
-            self._run_orchestrator_stream(
-                orchestrator=orchestrator,
-                user_input=None,
                 session_id=session_id,
                 user_id=user_id,
                 resume_value=resume_value,
@@ -225,7 +221,9 @@ class EtlStreamManager:
                 last_sent_seq = record.seq
                 yield {
                     "id": str(record.seq),
-                    "data": json.dumps(record.payload, ensure_ascii=False),
+                    "data": json.dumps(
+                        record.payload, ensure_ascii=False, default=_json_serializer
+                    ),
                 }
 
             # 如果已经完成且没有新数据，直接结束
@@ -257,7 +255,9 @@ class EtlStreamManager:
 
                 yield {
                     "id": str(record.seq),
-                    "data": json.dumps(record.payload, ensure_ascii=False),
+                    "data": json.dumps(
+                        record.payload, ensure_ascii=False, default=_json_serializer
+                    ),
                 }
         finally:
             async with run.lock:
