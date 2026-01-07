@@ -142,8 +142,8 @@ export function createWorkflowStream(
 
   const request = async () => {
     try {
-      const startPath = resumeValue === undefined ? '/api/ai/etl/workflow/start' : '/api/ai/etl/workflow/continue'
-      const response = await fetch(startPath, {
+      // 统一使用 /workflow/chat 端点
+      const response = await fetch('/api/ai/etl/workflow/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

@@ -8,6 +8,9 @@ import { createWorkflowStream, generateSessionId, type SseEvent } from '@/servic
 
 type WorkflowStudioSnapshot = ReturnType<typeof useWorkflowStudioStore.getState>
 
+const DEFAULT_WORKFLOW_INTRO_MESSAGE =
+  '你好呀！我是 Sunny，Datapillar 数仓团队的负责人 👋。我的团队专精于 ETL 任务，比如数据清洗、工作流设计和 SQL 开发。有什么数据开发需求想要我帮忙吗？'
+
 const prefetchWorkflowCanvas = (() => {
   let started = false
   return () => {
@@ -211,9 +214,29 @@ export function ChatPanel() {
     }
   }, [])
 
-  const sendIconSize = 15
-
   const nextMessageId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+  // 进入页面时给一个静态引导语：不触发后端请求，避免 LLM 卡住导致无限加载
+  useEffect(() => {
+    const store = useWorkflowStudioStore.getState()
+    if (store.isInitialized) return
+    if (store.messages.length > 0) {
+      store.setInitialized(true)
+      return
+    }
+
+    store.addMessage({
+      id: nextMessageId(),
+      role: 'assistant',
+      content: DEFAULT_WORKFLOW_INTRO_MESSAGE,
+      timestamp: Date.now(),
+      agentRows: [],
+      isStreaming: false
+    })
+    store.setInitialized(true)
+  }, [])
+
+  const sendIconSize = 15
   const MAX_AGENT_ROWS = 200
 
   const handleSend = async () => {
@@ -464,13 +487,13 @@ const ChatBubble = memo(
         >
           {isUser ? <User size={avatarIconSize} /> : <Bot size={avatarIconSize} />}
         </div>
-        <div className={cn('flex flex-col gap-1 w-[80%]', isUser ? 'items-end' : 'items-start')}>
+        <div className={cn('flex flex-col gap-1 max-w-[80%]', isUser ? 'items-end' : 'items-start')}>
           <div
             className={cn(
-              'w-full rounded-2xl leading-relaxed border whitespace-pre-wrap',
+              'rounded-2xl leading-relaxed border whitespace-pre-wrap',
               isUser
                 ? 'bg-indigo-600 text-white rounded-tr-none border-indigo-600/60'
-                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 rounded-tl-none border-slate-200 dark:border-slate-700',
+                : 'w-full bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100 rounded-tl-none border-slate-200 dark:border-slate-700',
               'px-4 py-2.5 text-body-sm'
             )}
           >

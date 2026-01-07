@@ -25,28 +25,22 @@ export interface ChatMessage {
 interface WorkflowStudioState {
   messages: ChatMessage[]
   isGenerating: boolean
+  isInitialized: boolean
   workflow: WorkflowGraph
   lastPrompt: string
   addMessage: (message: ChatMessage) => void
   updateMessage: (id: string, updater: Partial<ChatMessage> | ((msg: ChatMessage) => ChatMessage)) => void
   setGenerating: (value: boolean) => void
+  setInitialized: (value: boolean) => void
   setWorkflow: (workflow: WorkflowGraph) => void
   setLastPrompt: (prompt: string) => void
   reset: () => void
 }
 
-const initialMessages: ChatMessage[] = [
-  {
-    id: 'assistant-welcome',
-    role: 'assistant',
-    content: '你好，我是 Workflow Architect。告诉我你的业务目标，比如“将订单和日志流清洗后写入 Delta Lake”。',
-    timestamp: Date.now()
-  }
-]
-
 export const useWorkflowStudioStore = create<WorkflowStudioState>((set) => ({
-  messages: [...initialMessages],
+  messages: [],
   isGenerating: false,
+  isInitialized: false,
   workflow: emptyWorkflowGraph,
   lastPrompt: '',
   addMessage: (message) =>
@@ -60,12 +54,14 @@ export const useWorkflowStudioStore = create<WorkflowStudioState>((set) => ({
       )
     })),
   setGenerating: (value) => set({ isGenerating: value }),
+  setInitialized: (value) => set({ isInitialized: value }),
   setWorkflow: (workflow) => set({ workflow }),
   setLastPrompt: (prompt) => set({ lastPrompt: prompt }),
   reset: () =>
     set({
-      messages: [...initialMessages],
+      messages: [],
       isGenerating: false,
+      isInitialized: false,
       workflow: emptyWorkflowGraph,
       lastPrompt: ''
     })
