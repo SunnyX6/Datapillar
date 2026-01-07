@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import re
+from typing import Any
 
 from langchain_core.messages import ToolMessage
 
@@ -74,14 +75,27 @@ DEVELOPER_AGENT_SYSTEM_INSTRUCTIONS = """你是 Datapillar 的 DeveloperAgent（
 生成完成后，直接输出以下 JSON 格式：
 ```json
 {
-  "sql": "-- Stage 1: xxx\\nDROP TABLE IF EXISTS temp.tmp_step1;\\nCREATE TABLE temp.tmp_step1 AS\\nSELECT ...\\n\\n-- Stage 2: xxx\\nINSERT OVERWRITE TABLE ..."
+  "sql": "-- Stage 1: xxx\\nDROP TABLE IF EXISTS temp.tmp_step1;\\nCREATE TABLE temp.tmp_step1 AS\\nSELECT ...\\n\\n-- Stage 2: xxx\\nINSERT OVERWRITE TABLE ...",
+  "confidence": 0.9,
+  "issues": []
 }
 ```
+
+## 字段说明
+- sql: 完整 SQL 脚本（包含所有 Stage）
+- confidence: SQL 生成置信度 (0-1)
+  - >= 0.8: 确定，可以直接执行
+  - < 0.8: 存在不确定因素，需要用户确认
+- issues: 需要用户确认的问题列表，例如：
+  - "字段 user_id 的 JOIN 条件不明确，是左连接还是内连接？"
+  - "金额字段 amount 需要转换为分还是元？"
+  - "日期字段格式不确定，是 yyyy-MM-dd 还是 yyyyMMdd？"
 
 ## 重要约束
 1. sql 字段包含所有 Stage 的 SQL，用换行分隔
 2. 最后一个 Stage 必须写入最终目标表
-3. 生成完成后直接输出 JSON，不要调用任何工具
+3. 如果有不确定的地方，设置 confidence < 0.8 并在 issues 中列出问题
+4. 生成完成后直接输出 JSON，不要调用任何工具
 """
 
 
@@ -112,6 +126,7 @@ class DeveloperAgent:
         workflow: Workflow,
         review_feedback: ReviewResult | None = None,
         knowledge_agent=None,
+        memory_context: dict[str, Any] | None = None,
     ) -> AgentResult:
         """
         执行 SQL 生成
@@ -121,12 +136,14 @@ class DeveloperAgent:
         - workflow: 工作流（包含 Jobs）
         - review_feedback: 上一轮 review 反馈
         - knowledge_agent: KnowledgeAgent 实例（用于按需查询指针）
+        - memory_context: 对话历史上下文（支持多轮对话）
 
         返回：
         - AgentResult: 执行结果
         """
         self._referenced_sql_ids = []
         self._knowledge_agent = knowledge_agent
+        self._memory_context = memory_context
 
         is_iteration = review_feedback is not None
         if is_iteration:
@@ -135,6 +152,8 @@ class DeveloperAgent:
             logger.info("💻 DeveloperAgent 开始生成 SQL")
 
         all_errors: list[str] = []
+        all_issues: list[str] = []  # 收集所有需要用户确认的问题
+        min_confidence: float = 1.0  # 记录最低置信度
         generated_count = 0
         total_jobs = len(workflow.jobs)
 
@@ -159,12 +178,19 @@ class DeveloperAgent:
 
                 # 检查当前层是否全部成功
                 layer_has_error = False
-                for job, (sql_script, success, errors) in zip(layer, layer_results, strict=True):
+                for job, (sql_script, success, errors, confidence, issues) in zip(
+                    layer, layer_results, strict=True
+                ):
                     if success:
                         job.config = {"content": sql_script}
                         job.config_generated = True
                         generated_count += 1
                         logger.info(f"✅ Job {job.id} SQL 生成成功 ({len(job.stages)} 个 Stage)")
+                        # 收集 issues 和更新最低置信度
+                        if issues:
+                            all_issues.extend([f"[{job.id}] {issue}" for issue in issues])
+                        if confidence < min_confidence:
+                            min_confidence = confidence
                     else:
                         all_errors.extend(errors)
                         logger.error(f"❌ Job {job.id} SQL 生成失败: {errors}")
@@ -199,11 +225,23 @@ class DeveloperAgent:
                     error=f"缺少有效 SQL 的 Job: {', '.join(missing_sql_jobs)}",
                 )
 
+            # 检查是否有需要用户确认的问题
+            if min_confidence < 0.8 and all_issues:
+                logger.info(
+                    f"⚠️ DeveloperAgent 需要确认: min_confidence={min_confidence}, "
+                    f"issues={all_issues}"
+                )
+                return AgentResult.needs_clarification(
+                    summary="SQL 生成有不确定的地方，需要确认",
+                    message="我生成了 SQL，但有一些地方不太确定，需要你确认",
+                    questions=all_issues,
+                )
+
             return AgentResult.completed(
                 summary=f"SQL 生成完成: {generated_count} 个 Job",
                 deliverable=workflow,
-                # DeveloperAgent 的产物是对架构师 plan 的“补全”（填充 SQL），必须写回同一份交付物类型
-                # 否则后续迭代会读到旧 plan，导致“看似完成但实际没更新”的甩锅式状态漂移。
+                # DeveloperAgent 的产物是对架构师 plan 的"补全"（填充 SQL），必须写回同一份交付物类型
+                # 否则后续迭代会读到旧 plan，导致"看似完成但实际没更新"的甩锅式状态漂移。
                 deliverable_type="plan",
             )
 
@@ -250,14 +288,14 @@ class DeveloperAgent:
         job: Job,
         user_query: str,
         review_feedback: ReviewResult | None,
-    ) -> tuple[str, bool, list[str]]:
+    ) -> tuple[str, bool, list[str], float, list[str]]:
         """
         处理单个 Job 的 SQL 生成（可并行调用）
 
-        返回：(sql_script, success, errors)
+        返回：(sql_script, success, errors, confidence, issues)
         """
         if not job.stages:
-            return "", False, [f"Job {job.id} 没有 Stage 信息"]
+            return "", False, [f"Job {job.id} 没有 Stage 信息"], 0.0, []
 
         previous_sql = job.config.get("content") if job.config else None
         job_review_feedback = self._format_review_feedback(review_feedback, previous_sql)
@@ -274,8 +312,12 @@ class DeveloperAgent:
         user_query: str,
         job: Job,
         review_feedback: str = "",
-    ) -> tuple[str, bool, list[str]]:
-        """为整个 Job 生成 SQL 脚本（通过工具获取知识）"""
+    ) -> tuple[str, bool, list[str], float, list[str]]:
+        """
+        为整个 Job 生成 SQL 脚本（通过工具获取知识）
+
+        返回：(sql_script, success, errors, confidence, issues)
+        """
         all_input_tables = set(job.input_tables or [])
         output_table = job.output_table
 
@@ -317,30 +359,31 @@ class DeveloperAgent:
                     "review_feedback": review_feedback,
                 }
 
-                sql = await self._generate_sql(
+                output = await self._generate_sql(
                     user_query=user_query,
                     task_payload=task_payload,
                 )
 
+                sql = output.sql
                 if not sql or len(sql) < 20:
                     continue
 
                 if not any(kw in sql.upper() for kw in ["SELECT", "INSERT", "CREATE"]):
                     continue
 
-                return sql, True, []
+                return sql, True, [], output.confidence, output.issues
 
             except Exception as e:
                 logger.error(f"Job {job.id} SQL 生成失败 (尝试 {attempt + 1}): {e}")
 
-        return "", False, [f"Job {job.id} SQL 生成失败"]
+        return "", False, [f"Job {job.id} SQL 生成失败"], 0.0, []
 
     async def _generate_sql(
         self,
         *,
         user_query: str,
         task_payload: dict,
-    ) -> str:
+    ) -> DeveloperSqlOutput:
         """
         带工具调用的 SQL 生成流程：
         1. 预先调用 KnowledgeAgent 获取候选表/列/值域（带权限过滤）
@@ -361,6 +404,7 @@ class DeveloperAgent:
             user_query=user_query,
             task_payload=task_payload,
             context_payload=context_payload,
+            memory_context=self._memory_context,
         )
 
         # 第一阶段：工具调用收集信息
@@ -385,7 +429,9 @@ class DeveloperAgent:
 
         # 第二阶段：结构化输出（with_structured_output 让 LLM 知道 schema）
         output = await self._get_structured_output(messages, DeveloperSqlOutput)
-        return self._clean_sql(output.sql)
+        # 清理 SQL 中的 markdown 代码块
+        output.sql = self._clean_sql(output.sql)
+        return output
 
     async def _get_structured_output(
         self,

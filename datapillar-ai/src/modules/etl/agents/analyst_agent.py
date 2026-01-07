@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import time
+from typing import Any
 
 from langchain_core.messages import ToolMessage
 
@@ -131,6 +132,7 @@ class AnalystAgent:
         *,
         user_query: str,
         knowledge_agent=None,
+        memory_context: dict[str, Any] | None = None,
     ) -> AgentResult:
         """
         执行需求分析
@@ -138,6 +140,7 @@ class AnalystAgent:
         参数：
         - user_query: 用户输入
         - knowledge_agent: KnowledgeAgent 实例（用于按需查询指针）
+        - memory_context: 对话历史上下文（支持多轮对话）
 
         返回：
         - AgentResult: 执行结果
@@ -158,10 +161,23 @@ class AnalystAgent:
             output = await self._analyze_with_tools(
                 user_query=user_query,
                 llm_with_tools=llm_with_tools,
+                memory_context=memory_context,
             )
 
             analysis_result = AnalysisResult.from_output(output, user_query)
             logger.info(f"✅ AnalystAgent 完成分析:\n{analysis_result.plan_summary()}")
+
+            # 检查 LLM 返回的 confidence 和 ambiguities，判断是否需要用户澄清
+            if analysis_result.confidence < 0.7 and analysis_result.ambiguities:
+                logger.info(
+                    f"⚠️ AnalystAgent 需要澄清: confidence={analysis_result.confidence}, "
+                    f"ambiguities={analysis_result.ambiguities}"
+                )
+                return AgentResult.needs_clarification(
+                    summary="需求不够明确，需要澄清",
+                    message="我有一些问题需要确认后才能继续分析",
+                    questions=analysis_result.ambiguities,
+                )
 
             return AgentResult.completed(
                 summary=f"需求分析完成: {analysis_result.summary}",
@@ -180,6 +196,7 @@ class AnalystAgent:
         self,
         user_query: str,
         llm_with_tools,
+        memory_context: dict[str, Any] | None = None,
     ) -> AnalysisResultOutput:
         """
         带工具调用的分析流程：
@@ -204,6 +221,7 @@ class AnalystAgent:
             agent_id="analyst_agent",
             user_query=user_query,
             context_payload=context_payload,
+            memory_context=memory_context,
         )
 
         # 第一阶段：工具调用收集信息

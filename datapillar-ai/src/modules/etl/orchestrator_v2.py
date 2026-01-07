@@ -1,18 +1,16 @@
 """
-ETL 多智能体编排器 v2
+ETL 多智能体编排器 v2（父子图架构）
 
-基于新架构：
-- Blackboard: 唯一共享状态（Boss工作台）
-- Boss: 老板（协调员工）
-- Handover: 员工交接物存储
-- AgentResult: Agent 统一返回类型
-- SessionMemory: 按 Agent 隔离的短期记忆
+架构设计：
+- 父图：包含 Boss 节点和 human_in_the_loop 节点
+- 子图：WorkerGraph，包含所有员工节点
+- Boss 通过 worker_graph.invoke() 调用员工子图
 
 设计原则：
-- 状态清晰：Blackboard 只放老板关心的信息
-- Agent 接收明确参数，返回 AgentResult
-- Orchestrator 负责存储、协调和压缩触发
-- 压缩时机：用户手动 /compress 或 Agent 上下文达到阈值
+- Boss 独立于员工图，主动查看 Blackboard 和调用员工
+- 员工图是独立子图，有自己的状态和路由逻辑
+- Blackboard 以 dict 形式存储在状态中，保证序列化/反序列化一致性
+- 保持 checkpoint 和 human-in-the-loop 能力
 """
 
 from __future__ import annotations
@@ -21,48 +19,51 @@ import logging
 import time
 import uuid
 from collections.abc import AsyncGenerator
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from langgraph.graph import END, StateGraph
 from langgraph.types import Command, interrupt
+from pydantic import BaseModel, Field
 
 from src.infrastructure.llm.client import call_llm
 from src.infrastructure.repository.checkpoint import Checkpoint
-from src.modules.etl.agents import (
-    AnalystAgent,
-    ArchitectAgent,
-    DeveloperAgent,
-    KnowledgeAgent,
-    ReviewerAgent,
-)
-from src.modules.etl.boss import EtlBoss
-from src.modules.etl.context import Handover
-from src.modules.etl.context.compress.agent_compressor import (
-    estimate_context_tokens,
-    maybe_compress,
-    should_compress,
-)
-from src.modules.etl.context.compress.budget import (
-    ContextBudget,
-    get_default_budget,
-    parse_compress,
-)
-from src.modules.etl.schemas.agent_result import AgentResult
-from src.modules.etl.schemas.analyst import AnalysisResult
+from src.modules.etl.boss import BossAgent
+from src.modules.etl.context.compress.budget import ContextBudget, get_default_budget
 from src.modules.etl.schemas.requests import BlackboardRequest
-from src.modules.etl.schemas.review import ReviewResult
-from src.modules.etl.schemas.workflow import Workflow
-from src.modules.etl.state import AgentReport, Blackboard
+from src.modules.etl.state import Blackboard
+from src.modules.etl.worker_graph import WorkerGraph
 from src.shared.config.settings import settings
+
+if TYPE_CHECKING:
+    from src.modules.etl.schemas.sse_msg import SseEvent
 
 logger = logging.getLogger(__name__)
 
 
+class OrchestratorState(BaseModel):
+    """
+    编排器状态（父图状态）
+
+    设计说明：
+    - blackboard 以 dict 形式存储，保证 checkpoint 序列化/反序列化一致性
+    - 节点内部使用 Blackboard.model_validate() 转换为对象操作
+    - 节点返回时使用 model_dump() 转换为 dict 存储
+    """
+
+    blackboard: dict = Field(default_factory=dict)
+    need_human_input: bool = Field(default=False)
+    boss_message: str | None = Field(default=None)
+
+
 class EtlOrchestratorV2:
     """
-    ETL 多智能体编排器 v2
+    ETL 多智能体编排器 v2（父子图架构）
 
-    使用新架构：Blackboard + Boss + Handover + AgentResult + SessionMemory
+    架构：
+    - 父图：boss_node → human_in_the_loop → boss_node（循环）
+    - 子图：WorkerGraph（员工图）
+
+    Boss 在父图中，通过 worker_graph.invoke() 调用员工子图。
     """
 
     def __init__(
@@ -76,163 +77,115 @@ class EtlOrchestratorV2:
             else settings.get("etl_review_retry_threshold", 3)
         )
 
-        # Boss（内部使用 structured output）
-        self.boss = EtlBoss()
-        self.compress_llm = call_llm(temperature=0.0)  # 用于压缩的 LLM
+        # Boss Agent
+        self.boss = BossAgent()
+
+        # 员工子图
+        self.worker_graph = WorkerGraph(
+            review_retry_threshold=self.review_retry_threshold,
+        )
+
+        # 压缩配置
+        self.compress_llm = call_llm(temperature=0.0)
         self.context_budget = context_budget or get_default_budget()
 
-        # Agent 实例
-        self.knowledge_agent = KnowledgeAgent()
-        self.analyst_agent = AnalystAgent()
-        self.architect_agent = ArchitectAgent()
-        self.developer_agent = DeveloperAgent()
-        self.reviewer_agent = ReviewerAgent()
-
-        # Handover 存储（运行时交接物，不持久化）
-        self._handover: dict[str, Handover] = {}
-
+        # 构建父图
         self._graph = self._build_graph()
 
     def _build_graph(self) -> StateGraph:
-        """构建 LangGraph 图"""
-        graph = StateGraph(Blackboard)
+        """构建父图"""
+        graph = StateGraph(OrchestratorState)
 
         # 添加节点
         graph.add_node("boss", self._boss_node)
         graph.add_node("human_in_the_loop", self._human_node)
-        graph.add_node("knowledge_agent", self._knowledge_node)
-        graph.add_node("analyst_agent", self._analyst_node)
-        graph.add_node("architect_agent", self._architect_node)
-        graph.add_node("developer_agent", self._developer_node)
-        graph.add_node("reviewer_agent", self._reviewer_node)
         graph.add_node("finalize", self._finalize_node)
 
         # 设置入口
         graph.set_entry_point("boss")
 
-        # 添加条件边
+        # Boss 节点后的路由
         graph.add_conditional_edges(
             "boss",
             self._route_from_boss,
             {
                 "human_in_the_loop": "human_in_the_loop",
-                "knowledge_agent": "knowledge_agent",
-                "analyst_agent": "analyst_agent",
-                "architect_agent": "architect_agent",
-                "developer_agent": "developer_agent",
-                "reviewer_agent": "reviewer_agent",
                 "finalize": "finalize",
+                "boss": "boss",  # 继续循环
             },
         )
 
-        # 所有 Agent 执行完后回到 Boss
-        for node in [
-            "human_in_the_loop",
-            "knowledge_agent",
-            "analyst_agent",
-            "architect_agent",
-            "developer_agent",
-            "reviewer_agent",
-        ]:
-            graph.add_edge(node, "boss")
+        # human_in_the_loop 后回到 Boss
+        graph.add_edge("human_in_the_loop", "boss")
 
         # finalize 结束
         graph.add_edge("finalize", END)
 
         return graph
 
-    def _get_handover(self, session_id: str) -> Handover:
-        """获取或创建 Handover（运行时交接物存储）"""
-        if session_id not in self._handover:
-            self._handover[session_id] = Handover(session_id=session_id)
-        return self._handover[session_id]
+    def _route_from_boss(self, state: OrchestratorState) -> str:
+        """Boss 节点后的路由"""
+        # 从 dict 恢复 Blackboard 对象
+        blackboard = Blackboard.model_validate(state.blackboard)
 
-    async def _maybe_compress_agent(self, blackboard: Blackboard, agent_id: str) -> bool:
+        # 任务完成
+        if blackboard.is_completed:
+            return "finalize"
+
+        # 需要人机交互
+        if state.need_human_input or blackboard.has_human_request():
+            return "human_in_the_loop"
+
+        # 继续循环（Boss 会继续推进任务）
+        return "boss"
+
+    async def _boss_node(self, state: OrchestratorState) -> Command:
         """
-        检查并执行 Agent 上下文压缩（如果需要）
+        Boss 节点
 
-        触发条件：
-        - 用户手动 /compress
-        - 该 Agent 上下文 token 数 >= 阈值
-
-        返回：
-        - True: 执行了压缩（成功或失败但保留了数据）
-        - False: 未触发压缩
+        Boss 在这里：
+        1. 查看 Blackboard（主动）
+        2. 做决策（LLM 或确定性规则）
+        3. 调用员工子图执行任务
+        4. 返回更新后的状态
         """
-        memory = blackboard.ensure_memory()
-        user_query = blackboard.task or ""
+        # 从 dict 恢复 Blackboard 对象
+        blackboard = Blackboard.model_validate(state.blackboard)
 
-        # 检查是否用户手动触发
-        manual_trigger = parse_compress(user_query) is not None
-
-        # 获取记忆上下文用于估算
-        memory_context = memory.get_agent_context(agent_id)
-
-        # 估算 token 数（使用简化的系统指令估算）
-        estimated = estimate_context_tokens(
-            system_instructions="[Agent System Prompt]",
-            context_payload=None,
-            memory_context=memory_context,
-            user_query=user_query,
+        # 调用 BossAgent.run()
+        result = await self.boss.run(
+            user_input=blackboard.task or "",
+            blackboard=blackboard,
+            worker_graph=self.worker_graph,
         )
 
-        if not should_compress(
-            estimated_tokens=estimated,
-            budget=self.context_budget,
-            manual_trigger=manual_trigger,
-        ):
-            return False
+        # 更新状态
+        updated_blackboard = result.get("blackboard", blackboard)
+        need_human = result.get("need_human_input", False)
+        boss_message = result.get("boss_message")
 
-        # 执行压缩
-        logger.info(f"Agent {agent_id} 触发压缩: tokens={estimated}, manual={manual_trigger}")
-
-        result = await maybe_compress(
-            llm=self.compress_llm,
-            memory=memory,
-            agent_id=agent_id,
-            system_instructions="[Agent System Prompt]",
-            context_payload=None,
-            user_query=user_query,
-            budget=self.context_budget,
-            manual_trigger=manual_trigger,
+        return Command(
+            update={
+                # 转换为 dict 存储
+                "blackboard": updated_blackboard.model_dump(),
+                "need_human_input": need_human,
+                "boss_message": boss_message,
+            }
         )
 
-        # 处理压缩结果
-        if result.status == "failed":
-            logger.warning(
-                f"Agent {agent_id} 压缩失败: {result.error}, "
-                f"保留原始数据: {result.keep_recent_turns}"
-            )
-
-        return result.status != "skipped"
-
-    def _route_from_boss(self, blackboard: Blackboard) -> str:
-        """从 Boss 决策路由到下一个节点"""
-        # _boss_node 已经通过 Command(update={"current_agent": xxx}) 设置了 current_agent
-        # 这里直接读取即可
-        next_node = blackboard.current_agent or "finalize"
-
-        valid_nodes = {
-            "human_in_the_loop",
-            "knowledge_agent",
-            "analyst_agent",
-            "architect_agent",
-            "developer_agent",
-            "reviewer_agent",
-            "finalize",
-        }
-        return next_node if next_node in valid_nodes else "finalize"
-
-    async def _boss_node(self, blackboard: Blackboard) -> Command:
-        """Boss 节点：决策下一步（异步版本，调用 LLM）"""
-        decision = await self.boss.decide(blackboard)
-        return Command(update=decision)
-
-    async def _human_node(self, blackboard: Blackboard) -> Command:
+    async def _human_node(self, state: OrchestratorState) -> Command:
         """人机交互节点"""
+        # 从 dict 恢复 Blackboard 对象
+        blackboard = Blackboard.model_validate(state.blackboard)
         pending = [r for r in blackboard.pending_requests if r.kind == "human"]
+
         if not pending:
-            return Command(update={})
+            return Command(
+                update={
+                    "blackboard": blackboard.model_dump(),
+                    "need_human_input": False,
+                }
+            )
 
         req = pending[0]
         payload = req.payload or {}
@@ -244,6 +197,7 @@ class EtlOrchestratorV2:
             if question_lines.strip():
                 message = f"{message}\n\n需要确认：\n{question_lines}"
 
+        # 使用 interrupt 暂停等待用户输入
         user_input = interrupt(
             {
                 "type": payload.get("type", "question"),
@@ -252,31 +206,69 @@ class EtlOrchestratorV2:
             }
         )
 
+        # 移除已处理的请求
         remaining = [r for r in blackboard.pending_requests if r.request_id != req.request_id]
-        results = dict(blackboard.request_results)
-        results[req.request_id] = {
+        blackboard.pending_requests = remaining
+
+        # 记录结果
+        blackboard.request_results[req.request_id] = {
             "status": "completed",
             "response": user_input,
             "completed_at_ms": int(time.time() * 1000),
         }
 
-        update: dict[str, Any] = {
-            "pending_requests": remaining,
-            "request_results": results,
-        }
+        # 如果是 Boss 发起的对话请求，更新 task 为用户的新输入
+        if (
+            req.created_by == "boss"
+            and payload.get("type") == "boss_conversation"
+            and isinstance(user_input, str)
+            and user_input.strip()
+        ):
+            blackboard.task = user_input.strip()
 
-        # 可选：human 输入完成后，自动创建委派请求（用于“超阈值回炉暂停后由用户指定下一步”）
+        # 如果是 Agent 发起的澄清请求，更新 task 并创建 delegate 请求
+        # 这样用户回复后可以直接回到对应的 agent，不需要 Boss 二次决策
+        valid_agents = {
+            "analyst_agent",
+            "architect_agent",
+            "developer_agent",
+            "reviewer_agent",
+        }
+        if (
+            payload.get("type") == "clarification"
+            and req.resume_to in valid_agents
+            and isinstance(user_input, str)
+            and user_input.strip()
+        ):
+            # 更新 task 为用户回复
+            blackboard.task = user_input.strip()
+            # 创建 delegate 请求，让 Boss 直接派发给对应的 agent
+            blackboard.pending_requests.append(
+                BlackboardRequest(
+                    request_id=f"req_{uuid.uuid4().hex}",
+                    kind="delegate",
+                    created_by="human_in_the_loop",
+                    target_agent=req.resume_to,
+                    resume_to="boss",
+                    payload={
+                        "type": "clarification_response",
+                        "original_request_id": req.request_id,
+                    },
+                )
+            )
+
+        # 处理 post_action（用于 review 超阈值后用户选择下一步）
         post_action = payload.get("post_action")
         if post_action == "delegate" and isinstance(user_input, str):
             target_agent = user_input.strip()
-            if target_agent in {
-                "knowledge_agent",
+            valid_agents = {
                 "analyst_agent",
                 "architect_agent",
                 "developer_agent",
                 "reviewer_agent",
-            }:
-                remaining.append(
+            }
+            if target_agent in valid_agents:
+                blackboard.pending_requests.append(
                     BlackboardRequest(
                         request_id=f"req_{uuid.uuid4().hex}",
                         kind="delegate",
@@ -285,621 +277,33 @@ class EtlOrchestratorV2:
                         resume_to="boss",
                         payload={
                             "type": payload.get("delegate_reason", "human_selected_next_step"),
-                            "message": payload.get(
-                                "delegate_message",
-                                "用户已指定下一步处理人，请继续。",
-                            ),
                         },
                     )
                 )
-                update["pending_requests"] = remaining
 
+        # 处理 reset_fields
         reset_fields = payload.get("reset_fields", [])
         if isinstance(reset_fields, list):
             for field_name in reset_fields:
-                if field_name in {
-                    "design_review_iteration_count",
-                    "development_review_iteration_count",
-                }:
-                    update[field_name] = 0
-
-        return Command(update=update)
-
-    async def _knowledge_node(self, blackboard: Blackboard) -> Command:
-        """知识检索节点"""
-        handover = self._get_handover(blackboard.session_id)
-
-        # 从 pending_requests 获取额外提示
-        additional_hints = []
-        for req in blackboard.pending_requests:
-            if req.kind == "delegate" and req.target_agent == "knowledge_agent":
-                payload = req.payload or {}
-                unknown_tables = payload.get("unknown_tables", [])
-                if isinstance(unknown_tables, list):
-                    additional_hints.extend(unknown_tables)
-
-        result = await self.knowledge_agent.run(
-            user_query=blackboard.task or "",
-            additional_hints=additional_hints if additional_hints else None,
-        )
-
-        return self._handle_agent_result(
-            blackboard=blackboard,
-            handover=handover,
-            agent_id="knowledge_agent",
-            result=result,
-        )
-
-    async def _analyst_node(self, blackboard: Blackboard) -> Command:
-        """需求分析师节点"""
-        agent_id = "analyst_agent"
-        handover = self._get_handover(blackboard.session_id)
-
-        # 检查是否需要压缩（手动触发或达到阈值）
-        await self._maybe_compress_agent(blackboard, agent_id)
-
-        # 记录用户输入到该 Agent 的对话历史
-        if blackboard.task:
-            blackboard.add_agent_turn(agent_id, "user", blackboard.task)
-
-        result = await self.analyst_agent.run(
-            user_query=blackboard.task or "",
-            knowledge_agent=self.knowledge_agent,
-        )
-
-        # 记录 Agent 响应到对话历史
-        if result.summary:
-            blackboard.add_agent_turn(agent_id, "assistant", result.summary)
-
-        return self._handle_agent_result(
-            blackboard=blackboard,
-            handover=handover,
-            agent_id=agent_id,
-            result=result,
-        )
-
-    async def _architect_node(self, blackboard: Blackboard) -> Command:
-        """数据架构师节点"""
-        agent_id = "architect_agent"
-        handover = self._get_handover(blackboard.session_id)
-
-        # 获取需求分析结果
-        analysis_result = handover.get_deliverable("analysis")
-        if not analysis_result:
-            return self._create_delegation_request(
-                blackboard=blackboard,
-                from_agent=agent_id,
-                to_agent="analyst_agent",
-                reason="need_analysis_result",
-                message="架构设计需要需求分析结果，已委派需求分析师先完成需求收敛。",
-            )
-
-        if isinstance(analysis_result, dict):
-            analysis_result = AnalysisResult(**analysis_result)
-
-        # 检查是否已选择组件
-        selected_component = self._get_selected_component(blackboard)
-        if not selected_component:
-            # 获取组件列表并请求用户选择
-            components = await self.architect_agent.get_components()
-            if not components:
-                return self._create_error_result(blackboard, agent_id, "未找到可用组件")
-
-            options = []
-            for comp in components:
-                code = comp.get("code", comp.get("component_code", ""))
-                name = comp.get("name", comp.get("component_name", ""))
-                comp_type = comp.get("type", comp.get("component_type", ""))
-                options.append(
-                    {
-                        "value": code,
-                        "label": f"{code}: {name}",
-                        "type": comp_type,
-                    }
-                )
-
-            return self._create_human_request(
-                blackboard=blackboard,
-                agent_id=agent_id,
-                request_type="component_selection",
-                message="请选择要使用的技术组件：",
-                options=options,
-                writeback_key="selected_component",
-            )
-
-        # 获取组件 ID
-        selected_component_id = None
-        components = await self.architect_agent.get_components()
-        for comp in components:
-            if comp.get("code") == selected_component:
-                selected_component_id = comp.get("id")
-                break
-
-        # 检查是否需要压缩（手动触发或达到阈值）
-        await self._maybe_compress_agent(blackboard, agent_id)
-
-        # 记录用户输入到该 Agent 的对话历史
-        if blackboard.task:
-            blackboard.add_agent_turn(agent_id, "user", blackboard.task)
-
-        result = await self.architect_agent.run(
-            user_query=blackboard.task or "",
-            analysis_result=analysis_result,
-            selected_component=selected_component,
-            selected_component_id=selected_component_id,
-            knowledge_agent=self.knowledge_agent,
-        )
-
-        # 记录 Agent 响应到对话历史
-        if result.summary:
-            blackboard.add_agent_turn(agent_id, "assistant", result.summary)
-
-        return self._handle_agent_result(
-            blackboard=blackboard,
-            handover=handover,
-            agent_id=agent_id,
-            result=result,
-        )
-
-    async def _developer_node(self, blackboard: Blackboard) -> Command:
-        """数据开发节点"""
-        agent_id = "developer_agent"
-        handover = self._get_handover(blackboard.session_id)
-
-        # 获取工作流
-        workflow = handover.get_deliverable("plan")
-        if not workflow:
-            return self._create_delegation_request(
-                blackboard=blackboard,
-                from_agent=agent_id,
-                to_agent="architect_agent",
-                reason="need_architecture_plan",
-                message="SQL 生成需要架构方案，已委派数据架构师先完成工作流设计。",
-            )
-
-        if isinstance(workflow, dict):
-            workflow = Workflow(**workflow)
-
-        # 获取 review 反馈（如果有）
-        review_feedback = handover.get_deliverable("review_development")
-        if isinstance(review_feedback, dict):
-            review_feedback = ReviewResult(**review_feedback)
-
-        # 检查是否需要压缩（手动触发或达到阈值）
-        await self._maybe_compress_agent(blackboard, agent_id)
-
-        # 记录用户输入到该 Agent 的对话历史
-        if blackboard.task:
-            blackboard.add_agent_turn(agent_id, "user", blackboard.task)
-
-        result = await self.developer_agent.run(
-            user_query=blackboard.task or "",
-            workflow=workflow,
-            review_feedback=review_feedback if isinstance(review_feedback, ReviewResult) else None,
-            knowledge_agent=self.knowledge_agent,
-        )
-
-        # 记录 Agent 响应到对话历史
-        if result.summary:
-            blackboard.add_agent_turn(agent_id, "assistant", result.summary)
-
-        return self._handle_agent_result(
-            blackboard=blackboard,
-            handover=handover,
-            agent_id=agent_id,
-            result=result,
-        )
-
-    async def _reviewer_node(self, blackboard: Blackboard) -> Command:
-        """Review 节点"""
-        agent_id = "reviewer_agent"
-        handover = self._get_handover(blackboard.session_id)
-
-        # 获取需求分析结果
-        analysis_result = handover.get_deliverable("analysis")
-        if not analysis_result:
-            return self._create_delegation_request(
-                blackboard=blackboard,
-                from_agent=agent_id,
-                to_agent="analyst_agent",
-                reason="need_analysis_result",
-                message="Review 需要需求分析结果，已委派需求分析师先完成需求收敛。",
-            )
-
-        if isinstance(analysis_result, dict):
-            analysis_result = AnalysisResult(**analysis_result)
-
-        # 获取工作流
-        workflow = handover.get_deliverable("plan") or handover.get_deliverable("workflow")
-        if not workflow:
-            return self._create_delegation_request(
-                blackboard=blackboard,
-                from_agent=agent_id,
-                to_agent="architect_agent",
-                reason="need_architecture_plan",
-                message="Review 需要架构方案，已委派数据架构师先完成工作流设计。",
-            )
-
-        if isinstance(workflow, dict):
-            workflow = Workflow(**workflow)
-
-        review_stage: Literal["design", "development"] = (
-            "design" if not blackboard.design_review_passed else "development"
-        )
-
-        # 确定性前置校验：开发阶段必须有 SQL
-        if review_stage == "development":
-            missing_sql_jobs = self._check_missing_sql(workflow)
-            if missing_sql_jobs:
-                return self._create_delegation_request(
-                    blackboard=blackboard,
-                    from_agent=agent_id,
-                    to_agent="developer_agent",
-                    reason="missing_sql",
-                    message=f"存在未生成 SQL 的 Job: {', '.join(missing_sql_jobs)}，请先生成完整 SQL。",
-                )
-
-        # 检查是否需要压缩（手动触发或达到阈值）
-        await self._maybe_compress_agent(blackboard, agent_id)
-
-        # 记录用户输入到该 Agent 的对话历史
-        if blackboard.task:
-            blackboard.add_agent_turn(agent_id, "user", blackboard.task)
-
-        # 调用 ReviewerAgent 执行 review
-        result = await self.reviewer_agent.run(
-            user_query=blackboard.task or "",
-            analysis_result=analysis_result,
-            workflow=workflow,
-            review_stage=review_stage,
-        )
-
-        # 记录 Agent 响应到对话历史
-        if result.summary:
-            blackboard.add_agent_turn(agent_id, "assistant", result.summary)
-
-        # 处理技术故障（Agent 执行失败）
-        if result.status == "failed":
-            return self._handle_agent_result(
-                blackboard=blackboard,
-                handover=handover,
-                agent_id=agent_id,
-                result=result,
-            )
-
-        # 获取 review 结果
-        review_result = result.deliverable
-        if not isinstance(review_result, ReviewResult):
-            return self._create_error_result(
-                blackboard, agent_id, "ReviewerAgent 未返回有效的 ReviewResult"
-            )
-
-        # 存储测试结果
-        cmd = self._handle_agent_result(
-            blackboard=blackboard,
-            handover=handover,
-            agent_id=agent_id,
-            result=result,
-            create_followup_requests=False,  # 打回逻辑由本方法处理
-        )
-        update = dict(cmd.update or {})
-
-        # 阶段迭代计数
-        stage_counter_field = (
-            "design_review_iteration_count"
-            if review_stage == "design"
-            else "development_review_iteration_count"
-        )
-
-        # Review 通过：标记阶段通过，重置计数
-        if review_result.passed:
-            if review_stage == "design":
-                update["design_review_passed"] = True
-                update["design_review_iteration_count"] = 0
-            else:
-                update["development_review_passed"] = True
-                update["development_review_iteration_count"] = 0
-                update["is_completed"] = True
-                update["deliverable"] = workflow
-            return Command(update=update)
-
-        # Review 未通过：检查迭代次数，决定打回或暂停
-        current_count = getattr(blackboard, stage_counter_field)
-        next_count = current_count + 1
-        update[stage_counter_field] = next_count
-
-        # 确定打回目标
-        target_agent = "architect_agent" if review_stage == "design" else "developer_agent"
-        stage_cn = "设计阶段" if review_stage == "design" else "开发阶段"
-
-        # 超过阈值：暂停，请求用户介入
-        if next_count >= int(blackboard.review_retry_threshold):
-            options = [
-                {
-                    "value": "analyst_agent",
-                    "label": "analyst_agent：需求/口径澄清",
-                    "type": "agent",
-                },
-                {
-                    "value": "architect_agent",
-                    "label": "architect_agent：架构/依赖/写入设计",
-                    "type": "agent",
-                },
-                {
-                    "value": "developer_agent",
-                    "label": "developer_agent：SQL/字段映射/性能修复",
-                    "type": "agent",
-                },
-            ]
-
-            message = (
-                f"{stage_cn} review 已连续 {next_count} 次未通过，已暂停自动回炉。\n"
-                "请选择下一步由谁继续处理（将自动委派并继续执行）。"
-            )
-
-            pending = list(update.get("pending_requests") or blackboard.pending_requests or [])
-            pending.append(
-                BlackboardRequest(
-                    request_id=f"req_{uuid.uuid4().hex}",
-                    kind="human",
-                    created_by="reviewer_agent",
-                    resume_to="boss",
-                    payload={
-                        "type": "review_threshold_exceeded",
-                        "message": message,
-                        "options": options,
-                        "post_action": "delegate",
-                        "delegate_reason": "review_threshold_exceeded",
-                        "delegate_message": f"{stage_cn} review 超阈值后由用户指定下一步处理人。",
-                        "reset_fields": [stage_counter_field],
-                    },
-                )
-            )
-            update["pending_requests"] = pending
-            return Command(update=update)
-
-        # 未超过阈值：直接打回给对应 Agent
-        pending = list(update.get("pending_requests") or blackboard.pending_requests or [])
-        pending.append(
-            BlackboardRequest(
-                request_id=f"req_{uuid.uuid4().hex}",
-                kind="delegate",
-                created_by="reviewer_agent",
-                target_agent=target_agent,
-                resume_to="reviewer_agent",
-                payload={
-                    "type": "review_failed",
-                    "message": f"{stage_cn} review 未通过（第 {next_count} 次），请根据测试报告修复问题。",
-                    "issues": review_result.issues,
-                    "warnings": review_result.warnings,
-                },
-            )
-        )
-        update["pending_requests"] = pending
-        return Command(update=update)
-
-    @staticmethod
-    def _check_missing_sql(workflow: Workflow) -> list[str]:
-        """检查工作流中缺少 SQL 的 Job"""
-        missing: list[str] = []
-        for job in workflow.jobs:
-            sql = job.config.get("content") if job.config else None
-            if not (isinstance(sql, str) and sql.strip()):
-                missing.append(job.id)
-        return missing
-
-    async def _finalize_node(self, blackboard: Blackboard) -> Command:
-        """完成节点：清理运行时交接物，标记任务完成"""
-        # 任务完成，清理交接物（遵循"用完即弃"原则）
-        self._handover.pop(blackboard.session_id, None)
-        return Command(update={"is_completed": True})
-
-    def _handle_agent_result(
-        self,
-        *,
-        blackboard: Blackboard,
-        handover: Handover,
-        agent_id: str,
-        result: AgentResult,
-        create_followup_requests: bool = True,
-    ) -> Command:
-        """处理 Agent 结果，更新 Blackboard 和 Handover"""
-        now_ms = int(time.time() * 1000)
-
-        # 如果当前 Agent 是“被委派者”，则在其执行完成后弹出对应的 delegate 请求，避免重复执行。
-        blackboard, _popped = self.boss.pop_completed_request(blackboard, agent_id)
-
-        # 存储交付物到 Handover（运行时交接，不持久化）
-        if result.deliverable and result.deliverable_type:
-            handover.store_deliverable(result.deliverable_type, result.deliverable)
-
-        # 更新短期记忆中的 Agent 状态（通过 Checkpointer 持久化）
-        blackboard.update_agent_status(
-            agent_id=agent_id,
-            status=result.status,
-            deliverable_type=result.deliverable_type,
-            summary=result.summary or "",
-        )
-
-        # 创建 AgentReport
-        report = AgentReport(
-            status=result.status,
-            summary=result.summary,
-            deliverable_ref=(
-                f"{result.deliverable_type}:{uuid.uuid4().hex[:8]}"
-                if result.deliverable_type
-                else None
-            ),
-            updated_at_ms=now_ms,
-        )
-
-        reports = dict(blackboard.reports)
-        reports[agent_id] = report
-
-        update: dict[str, Any] = {
-            "reports": reports,
-            # pop_completed_request 可能更新 pending_requests/request_results
-            "pending_requests": list(blackboard.pending_requests),
-            "request_results": dict(blackboard.request_results),
-        }
-
-        if create_followup_requests:
-            # 处理需要澄清的情况
-            if result.status == "needs_clarification" and result.clarification:
-                req = BlackboardRequest(
-                    request_id=f"req_{uuid.uuid4().hex}",
-                    kind="human",
-                    created_by=agent_id,
-                    resume_to="boss",
-                    payload={
-                        "type": "clarification",
-                        "message": result.clarification.message,
-                        "questions": result.clarification.questions,
-                        "options": result.clarification.options,
-                        "guidance": result.clarification.guidance,
-                    },
-                )
-                pending = list(update.get("pending_requests") or [])
-                pending.append(req)
-                update["pending_requests"] = pending
-
-            # 处理需要委派的情况
-            if result.status == "needs_delegation" and result.delegation:
-                req = BlackboardRequest(
-                    request_id=f"req_{uuid.uuid4().hex}",
-                    kind="delegate",
-                    created_by=agent_id,
-                    target_agent=result.delegation.target_agent,
-                    resume_to=agent_id,
-                    payload={
-                        "type": result.delegation.reason,
-                        **result.delegation.payload,
-                    },
-                )
-                pending = list(update.get("pending_requests") or [])
-                pending.append(req)
-                update["pending_requests"] = pending
-
-        # 处理失败情况
-        if result.status == "failed":
-            update["error"] = result.error
-
-        return Command(update=update)
-
-    def _get_selected_component(self, blackboard: Blackboard) -> str | None:
-        """从 request_results 获取用户选择的组件"""
-        for _req_id, result in blackboard.request_results.items():
-            if isinstance(result, dict):
-                response = result.get("response")
-                if isinstance(response, str) and response.strip():
-                    return response.strip()
-                if isinstance(response, dict):
-                    comp = response.get("component") or response.get("value")
-                    if isinstance(comp, str) and comp.strip():
-                        return comp.strip()
-        return None
-
-    def _create_delegation_request(
-        self,
-        *,
-        blackboard: Blackboard,
-        from_agent: str,
-        to_agent: str,
-        reason: str,
-        message: str,
-    ) -> Command:
-        """创建委派请求"""
-        req = BlackboardRequest(
-            request_id=f"req_{uuid.uuid4().hex}",
-            kind="delegate",
-            created_by=from_agent,
-            target_agent=to_agent,
-            resume_to=from_agent,
-            payload={
-                "type": reason,
-                "message": message,
-            },
-        )
-        pending = list(blackboard.pending_requests)
-        pending.append(req)
-
-        report = AgentReport(
-            status="waiting",
-            summary=message,
-            updated_at_ms=int(time.time() * 1000),
-        )
-        reports = dict(blackboard.reports)
-        reports[from_agent] = report
+                if field_name == "design_review_iteration_count":
+                    blackboard.design_review_iteration_count = 0
+                elif field_name == "development_review_iteration_count":
+                    blackboard.development_review_iteration_count = 0
 
         return Command(
             update={
-                "reports": reports,
-                "pending_requests": pending,
+                # 转换为 dict 存储
+                "blackboard": blackboard.model_dump(),
+                "need_human_input": False,
             }
         )
 
-    def _create_human_request(
-        self,
-        *,
-        blackboard: Blackboard,
-        agent_id: str,
-        request_type: str,
-        message: str,
-        options: list[dict],
-        writeback_key: str,
-    ) -> Command:
-        """创建人机交互请求"""
-        req = BlackboardRequest(
-            request_id=f"req_{uuid.uuid4().hex}",
-            kind="human",
-            created_by=agent_id,
-            resume_to="boss",
-            payload={
-                "type": request_type,
-                "message": message,
-                "options": options,
-                "writeback_key": writeback_key,
-            },
-        )
-        pending = list(blackboard.pending_requests)
-        pending.append(req)
-
-        report = AgentReport(
-            status="waiting",
-            summary=message,
-            updated_at_ms=int(time.time() * 1000),
-        )
-        reports = dict(blackboard.reports)
-        reports[agent_id] = report
-
-        return Command(
-            update={
-                "reports": reports,
-                "pending_requests": pending,
-            }
-        )
-
-    def _create_error_result(
-        self,
-        blackboard: Blackboard,
-        agent_id: str,
-        error: str,
-    ) -> Command:
-        """创建错误结果"""
-        report = AgentReport(
-            status="failed",
-            summary=error,
-            updated_at_ms=int(time.time() * 1000),
-        )
-        reports = dict(blackboard.reports)
-        reports[agent_id] = report
-
-        return Command(
-            update={
-                "reports": reports,
-                "error": error,
-            }
-        )
+    async def _finalize_node(self, state: OrchestratorState) -> Command:
+        """完成节点"""
+        # 从 dict 恢复 Blackboard 对象
+        blackboard = Blackboard.model_validate(state.blackboard)
+        blackboard.is_completed = True
+        return Command(update={"blackboard": blackboard.model_dump()})
 
     async def compile(self):
         """编译图（使用 Checkpoint 获取 checkpointer）"""
@@ -928,40 +332,175 @@ class EtlOrchestratorV2:
             resume_value: 恢复值（用于 interrupt 后继续）
 
         Yields:
-            SSE 事件
+            SseEvent 格式的事件
         """
+        from src.modules.etl.schemas.sse_msg import SseEvent
+
         thread_id = self._get_thread_id(session_id, user_id)
         config = {"configurable": {"thread_id": thread_id}}
         app = await self.compile()
 
         if resume_value is not None:
+            # interrupt 恢复场景
             async for event in app.astream(Command(resume=resume_value), config):
-                yield self._format_event(event, session_id)
+                if "__interrupt__" in event:
+                    continue
+                sse_event = self._to_sse_event(event)
+                if sse_event:
+                    yield sse_event.to_dict()
         else:
-            blackboard = Blackboard(
-                session_id=session_id,
-                user_id=user_id,
-                task=user_input,
-                review_retry_threshold=self.review_retry_threshold,
-            )
-            async for event in app.astream(blackboard, config):
-                yield self._format_event(event, session_id)
+            # 用户消息场景：检查是否有已存在的 checkpoint
+            existing_state = await app.aget_state(config)
 
-        yield {"event": "complete", "data": {"session_id": session_id}}
+            if existing_state and existing_state.values:
+                # 已有会话，更新 task 并继续
+                blackboard_data = existing_state.values.get("blackboard")
+                if blackboard_data and isinstance(blackboard_data, dict):
+                    # 从 dict 恢复 Blackboard 对象
+                    blackboard = Blackboard.model_validate(blackboard_data)
 
-    def _format_event(self, event: dict[str, Any], session_id: str) -> dict[str, Any]:
-        """格式化事件"""
-        return {
-            "event": "state_update",
-            "data": event,
-            "session_id": session_id,
+                    # 更新用户输入（boss.run 会负责记录到对话历史）
+                    blackboard.task = user_input
+                    # 清除之前的 human 请求（用户已响应）
+                    blackboard.pending_requests = [
+                        r for r in blackboard.pending_requests if r.kind != "human"
+                    ]
+
+                    # 使用 dict 格式的状态继续执行
+                    updated_state = OrchestratorState(
+                        blackboard=blackboard.model_dump(),
+                        need_human_input=False,
+                        boss_message=None,
+                    )
+                    async for event in app.astream(updated_state, config):
+                        if "__interrupt__" in event:
+                            continue
+                        sse_event = self._to_sse_event(event)
+                        if sse_event:
+                            yield sse_event.to_dict()
+                else:
+                    # checkpoint 存在但 blackboard 为空或格式不对，创建新会话
+                    async for event in self._start_new_session(
+                        app, config, session_id, user_id, user_input
+                    ):
+                        yield event
+            else:
+                # 全新会话
+                async for event in self._start_new_session(
+                    app, config, session_id, user_id, user_input
+                ):
+                    yield event
+
+        # 流程结束，发送 result 事件
+        yield SseEvent.result_event(workflow=None, message="流程结束").to_dict()
+
+    async def _start_new_session(
+        self,
+        app,
+        config: dict,
+        session_id: str,
+        user_id: str,
+        user_input: str,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """启动全新会话"""
+        initial_blackboard = Blackboard(
+            session_id=session_id,
+            user_id=user_id,
+            task=user_input,
+            review_retry_threshold=self.review_retry_threshold,
+        )
+        # 使用 dict 格式的状态
+        initial_state = OrchestratorState(blackboard=initial_blackboard.model_dump())
+
+        async for event in app.astream(initial_state, config):
+            if "__interrupt__" in event:
+                continue
+            sse_event = self._to_sse_event(event)
+            if sse_event:
+                yield sse_event.to_dict()
+
+    def _to_sse_event(self, event: dict[str, Any]) -> SseEvent | None:
+        """将 LangGraph 事件转换为 SseEvent 格式"""
+        from src.modules.etl.schemas.sse_msg import SseEvent
+
+        # Agent 名称映射
+        agent_names = {
+            "boss": "老板",
+            "analyst_agent": "需求分析师",
+            "architect_agent": "数据架构师",
+            "developer_agent": "数据开发",
+            "reviewer_agent": "代码审核员",
+            "knowledge_agent": "知识检索专家",
+            "human_in_the_loop": "人机交互",
         }
+
+        for node_name, node_output in event.items():
+            if not isinstance(node_output, dict):
+                continue
+
+            # 获取 blackboard（现在是 dict 格式）
+            blackboard_data = node_output.get("blackboard")
+            if not blackboard_data:
+                continue
+
+            # 从 dict 恢复 Blackboard 对象
+            if isinstance(blackboard_data, dict):
+                blackboard = Blackboard.model_validate(blackboard_data)
+            else:
+                continue
+
+            # 检查是否有 human 类型的 pending_requests
+            pending_requests = blackboard.pending_requests or []
+            for req in pending_requests:
+                if hasattr(req, "kind") and req.kind == "human":
+                    payload = req.payload or {}
+                    return SseEvent.interrupt_event(
+                        agent_id=req.created_by or "boss",
+                        agent_name=agent_names.get(req.created_by or "boss", "老板"),
+                        kind=payload.get("type", "question"),
+                        message=payload.get("message", "请输入"),
+                        questions=payload.get("questions"),
+                        options=payload.get("options"),
+                    )
+
+            # 检查是否完成
+            if blackboard.is_completed:
+                deliverable = blackboard.deliverable
+                workflow_dict = None
+                if deliverable:
+                    workflow_dict = (
+                        deliverable.model_dump()
+                        if hasattr(deliverable, "model_dump")
+                        else deliverable
+                    )
+                return SseEvent.result_event(
+                    workflow=workflow_dict,
+                    message="ETL 工作流生成完成",
+                )
+
+            # Boss 消息
+            boss_message = node_output.get("boss_message")
+            if boss_message and node_name == "boss":
+                return SseEvent.interrupt_event(
+                    agent_id="boss",
+                    agent_name="老板",
+                    kind="boss_conversation",
+                    message=boss_message,
+                )
+
+            # Agent 状态更新（从 reports 中获取）
+            reports = blackboard.reports or {}
+            for agent_id, report in reports.items():
+                if report and report.status == "in_progress":
+                    return SseEvent.agent_start(
+                        agent_id=agent_id,
+                        agent_name=agent_names.get(agent_id, agent_id),
+                    )
+
+        return None
 
     async def clear_session(self, session_id: str, user_id: str) -> None:
         """清除会话"""
         thread_id = self._get_thread_id(session_id, user_id)
-        # 清除 checkpoint
         await Checkpoint.delete_thread(thread_id)
-        # 清除 handover
-        self._handover.pop(session_id, None)
         logger.info(f"Session cleared: {thread_id}")

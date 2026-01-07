@@ -110,18 +110,15 @@ flush_interval_seconds = 3.0  # 刷新间隔（秒）
 batch_size = 50               # 批量写入大小
 max_concurrent = 10           # 最大并发写入数
 
-# ==================== LLM 语义缓存配置 ====================
+# ==================== LLM 缓存配置 ====================
 # 说明：
-# - 基于 embedding 相似度的 LLM 响应缓存，减少重复调用
-# - SQLite 持久化，支持 TTL 过期清理
-# - 通过 scope_key 隔离不同上下文的缓存
-[default.semantic_cache]
-enabled = true                      # 是否启用语义缓存
-db_path = ".semantic_cache.db"      # SQLite 文件路径
-ttl_seconds = 300                   # 缓存 TTL（秒），生产环境建议 3600
-hard_threshold = 0.95               # 高相似命中阈值（0-1），越高越严格
-context_window_messages = 6         # 上下文窗口消息数（用于 scope 隔离）
-max_candidates = 200                # 每次查询的最大候选数量
+# - 精确匹配缓存：相同输入 = 命中，任何差异 = 不命中
+# - Redis 存储，支持 TTL，分布式友好
+# - 解决 LangChain 动态 ID 问题，规范化后匹配
+[default.llm_cache]
+enabled = true                      # 是否启用缓存
+ttl_seconds = 300                   # 缓存 TTL（秒）
+key_prefix = "llm_cache:"           # Redis key 前缀
 
 # ==================== SQL 摘要生成配置 ====================
 # 说明：

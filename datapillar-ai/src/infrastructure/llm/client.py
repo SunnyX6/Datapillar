@@ -22,8 +22,8 @@ from langchain_core.messages import BaseMessage
 from langchain_core.runnables import Runnable
 from pydantic import BaseModel
 
+from src.infrastructure.llm.llm_cache import create_llm_cache
 from src.infrastructure.llm.model_manager import model_manager
-from src.infrastructure.llm.semantic_cache import create_semantic_cache
 from src.infrastructure.llm.usage_tracker import (
     estimate_cost_usd,
     estimate_usage,
@@ -41,13 +41,13 @@ from src.infrastructure.resilience import (
 logger = logging.getLogger(__name__)
 
 
-# ==================== 全局语义缓存（业务无关）====================
-_semantic_cache = create_semantic_cache()
-if _semantic_cache is not None:
-    set_llm_cache(_semantic_cache)
-    logger.info("LLM 语义缓存已启用")
+# ==================== 全局 LLM 缓存（精确匹配）====================
+_llm_cache_instance = create_llm_cache()
+if _llm_cache_instance is not None:
+    set_llm_cache(_llm_cache_instance)
+    logger.info("LLM 缓存已启用（精确匹配，Redis 存储）")
 else:
-    logger.info("LLM 语义缓存已禁用")
+    logger.info("LLM 缓存已禁用")
 
 T = TypeVar('T', bound=BaseModel)
 
@@ -270,7 +270,14 @@ class ResilientChatModel:
     ) -> "ResilientChatModel":
         """绑定结构化输出，返回新的弹性包装器"""
         if hasattr(self._llm, "with_structured_output"):
+            method = kwargs.get("method", "function_calling")
             bound = self._llm.with_structured_output(schema, **kwargs)
+
+            # GLM 使用 json_mode 时需要通过 extra_body 传递 response_format 参数
+            if self._provider and self._provider.lower() == "glm" and method == "json_mode":
+                logger.info("GLM json_mode: 通过 extra_body 绑定 response_format")
+                bound = bound.bind(extra_body={"response_format": {"type": "json_object"}})
+
             return ResilientChatModel(
                 bound,
                 provider=self._provider,

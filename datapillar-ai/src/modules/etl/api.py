@@ -25,7 +25,7 @@ class WorkflowRequest(BaseModel):
 
     user_input: str | None = Field(None, alias="userInput", description="用户输入")
     session_id: str | None = Field(None, alias="sessionId", description="会话ID")
-    resume_value: Any | None = Field(None, alias="resumeValue", description="断点恢复数据")
+    resume_value: Any | None = Field(None, alias="resumeValue", description="interrupt 恢复数据")
 
     class Config:
         populate_by_name = True
@@ -39,57 +39,56 @@ def _get_orchestrator(request: Request) -> EtlOrchestratorV2:
     return orchestrator
 
 
-@router.post("/workflow/start")
-async def start_workflow_stream(payload: WorkflowRequest, request: Request):
-    """启动 ETL 多智能体工作流（SSE/JSON 事件流）"""
+@router.post("/workflow/chat")
+async def chat(payload: WorkflowRequest, request: Request):
+    """
+    统一的 ETL 多智能体工作流入口
+
+    自动判断场景：
+    - 有 resume_value：interrupt 恢复
+    - 有 user_input：新消息（后端自动判断是新会话还是续聊）
+    """
     current_user = request.state.current_user
     orchestrator = _get_orchestrator(request)
 
     if not payload.session_id:
         raise HTTPException(status_code=400, detail="sessionId 不能为空")
-    if not payload.user_input:
-        raise HTTPException(status_code=400, detail="userInput 不能为空")
 
-    logger.info(
-        f"[ETL Start] user={current_user.username}, userId={current_user.user_id}, sessionId={payload.session_id}"
-    )
+    user_id = str(current_user.user_id)
 
-    await etl_stream_manager.start(
-        orchestrator=orchestrator,
-        user_input=payload.user_input,
-        session_id=payload.session_id,
-        user_id=str(current_user.user_id),
-    )
+    # 场景判断
+    if payload.resume_value is not None:
+        # interrupt 恢复场景
+        logger.info(
+            f"[ETL Resume] user={current_user.username}, userId={user_id}, sessionId={payload.session_id}"
+        )
+        await etl_stream_manager.chat(
+            orchestrator=orchestrator,
+            user_input=None,
+            session_id=payload.session_id,
+            user_id=user_id,
+            resume_value=payload.resume_value,
+        )
+    else:
+        # 用户消息场景（新会话或续聊，由 orchestrator 自动判断）
+        if not payload.user_input:
+            raise HTTPException(status_code=400, detail="userInput 不能为空")
+
+        logger.info(
+            f"[ETL Chat] user={current_user.username}, userId={user_id}, sessionId={payload.session_id}"
+        )
+        await etl_stream_manager.chat(
+            orchestrator=orchestrator,
+            user_input=payload.user_input,
+            session_id=payload.session_id,
+            user_id=user_id,
+            resume_value=None,
+        )
 
     return {
         "success": True,
         "stream_url": f"/api/ai/etl/workflow/sse?sessionId={payload.session_id}",
     }
-
-
-@router.post("/workflow/continue")
-async def continue_workflow_stream(payload: WorkflowRequest, request: Request):
-    """继续 ETL 多智能体工作流（用于 interrupt 人机交互的 resumeValue，不是断线续传）"""
-    current_user = request.state.current_user
-    orchestrator = _get_orchestrator(request)
-
-    if not payload.session_id:
-        raise HTTPException(status_code=400, detail="sessionId 不能为空")
-    if payload.resume_value is None:
-        raise HTTPException(status_code=400, detail="resumeValue 不能为空")
-
-    logger.info(
-        f"[ETL Continue] user={current_user.username}, userId={current_user.user_id}, sessionId={payload.session_id}"
-    )
-
-    await etl_stream_manager.continue_from_interrupt(
-        orchestrator=orchestrator,
-        session_id=payload.session_id,
-        user_id=str(current_user.user_id),
-        resume_value=payload.resume_value,
-    )
-
-    return {"success": True}
 
 
 @router.get("/workflow/sse")
@@ -114,6 +113,7 @@ async def workflow_sse(request: Request, session_id: str = Query(..., alias="ses
         ),
         ping=15,
         headers={
+            "Content-Type": "text/event-stream; charset=utf-8",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",

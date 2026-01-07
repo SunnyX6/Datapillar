@@ -12,6 +12,7 @@ Architect Agent（数据架构师）
 import asyncio
 import json
 import logging
+from typing import Any
 
 from langchain_core.messages import ToolMessage
 
@@ -156,6 +157,7 @@ class ArchitectAgent:
         selected_component: str,
         selected_component_id: int | None = None,
         knowledge_agent=None,
+        memory_context: dict[str, Any] | None = None,
     ) -> AgentResult:
         """
         执行架构设计
@@ -166,6 +168,7 @@ class ArchitectAgent:
         - selected_component: 用户选择的组件
         - selected_component_id: 组件 ID
         - knowledge_agent: KnowledgeAgent 实例（用于按需查询指针）
+        - memory_context: 对话历史上下文（支持多轮对话）
 
         返回：
         - AgentResult: 执行结果
@@ -182,6 +185,7 @@ class ArchitectAgent:
                 selected_component=selected_component,
                 llm_with_tools=llm_with_tools,
                 user_query=user_query,
+                memory_context=memory_context,
             )
 
             workflow_plan = Workflow.from_output(output, selected_component, selected_component_id)
@@ -219,6 +223,20 @@ class ArchitectAgent:
                 f"Job 数={len(workflow_plan.jobs)}, 风险={len(workflow_plan.risks)}"
             )
 
+            # 检查 LLM 返回的 confidence 和 risks，判断是否需要用户确认
+            # 过滤掉已自动修复的风险，只保留需要用户关注的风险
+            unresolved_risks = [r for r in workflow_plan.risks if not r.startswith("[已自动修复]")]
+            if workflow_plan.confidence < 0.8 and unresolved_risks:
+                logger.info(
+                    f"⚠️ ArchitectAgent 需要确认: confidence={workflow_plan.confidence}, "
+                    f"risks={unresolved_risks}"
+                )
+                return AgentResult.needs_clarification(
+                    summary="架构方案需要确认",
+                    message="架构设计存在一些风险点，需要你确认后才能继续",
+                    questions=unresolved_risks,
+                )
+
             return AgentResult.completed(
                 summary=f"架构设计完成: {workflow_plan.name}",
                 deliverable=workflow_plan,
@@ -253,6 +271,7 @@ class ArchitectAgent:
         selected_component: str,
         llm_with_tools,
         user_query: str,
+        memory_context: dict[str, Any] | None = None,
     ) -> WorkflowOutput:
         """
         带工具调用的架构设计流程：
@@ -278,6 +297,7 @@ class ArchitectAgent:
             user_query=user_query,
             task_payload=task_payload,
             context_payload=context_payload,
+            memory_context=memory_context,
         )
 
         # 第一阶段：工具调用收集信息
