@@ -4,7 +4,6 @@
 提供数据库访问的统一接口
 """
 
-from src.infrastructure.repository.checkpoint import Checkpoint
 from src.infrastructure.repository.kg import (
     MetricDTO,
     ModifierDTO,
@@ -27,7 +26,6 @@ __all__ = [
     "Model",
     "LlmUsage",
     "Component",
-    "Checkpoint",
     # Neo4j 搜索服务
     "Neo4jTableSearch",
     "Neo4jMetricSearch",

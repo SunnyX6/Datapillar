@@ -1,0 +1,75 @@
+# Datapillar OneAgentic 配置示例
+# 将此文件保存为 datapillar.toml 或 config.toml
+
+# ============================================================================
+# LLM 配置
+# ============================================================================
+[llm]
+# 基础配置（敏感信息建议用环境变量: DATAPILLAR_LLM__API_KEY）
+# api_key = "sk-xxx"
+model = "glm-4.7"
+base_url = "https://open.bigmodel.cn/api/paas/v4"
+temperature = 0.0
+timeout_seconds = 120
+
+# 重试配置
+retry.max_retries = 3
+retry.initial_delay_ms = 500
+retry.max_delay_ms = 30000
+retry.exponential_base = 2.0
+retry.jitter = true
+
+# 熔断配置
+circuit_breaker.failure_threshold = 5
+circuit_breaker.recovery_seconds = 60
+
+# 限流配置
+rate_limit.enabled = true
+rate_limit.default.rpm = 60
+rate_limit.default.max_concurrent = 10
+
+# 按 Provider 覆盖（可选）
+# rate_limit.providers.glm.rpm = 10
+# rate_limit.providers.glm.max_concurrent = 3
+
+# ============================================================================
+# Embedding 配置（经验学习需要）
+# ============================================================================
+[embedding]
+# api_key = "sk-xxx"  # 敏感信息建议用环境变量
+model = "text-embedding-3-small"
+dimension = 1536
+
+# ============================================================================
+# Agent 配置
+# ============================================================================
+[agent]
+max_steps = 25
+timeout_seconds = 300.0
+tool_timeout_seconds = 30.0
+
+# ============================================================================
+# 上下文配置
+# ============================================================================
+[context]
+window_size = 200000
+compact_trigger_threshold = 0.95
+compact_target_ratio = 0.6
+
+# ============================================================================
+# 缓存配置
+# ============================================================================
+[cache]
+enabled = true
+ttl_seconds = 300
+key_prefix = "llm_cache:"
+
+# ============================================================================
+# 遥测配置（可观测性）
+# ============================================================================
+[telemetry]
+enabled = false
+# otlp_endpoint = "http://localhost:4317"
+service_name = "datapillar-oneagentic"
+verbose = false
+log_level = "INFO"

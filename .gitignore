@@ -226,6 +226,10 @@ code_review.sh.log
 *.bak
 *.orig
 .claude/
+CLAUDE.md
+**/CLAUDE.md
+AGENTS.md
+**/AGENTS.md
 # ============================================
 # Gravitino 特定忽略 (仅忽略构建产物，保留所有源码)
 # ============================================

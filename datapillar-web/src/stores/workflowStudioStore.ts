@@ -13,6 +13,18 @@ export interface AgentActivity {
   timestamp: number
 }
 
+export interface ChatMessageOption {
+  type: string
+  name: string
+  path: string
+  description?: string
+  tools?: string[]
+  extra?: Record<string, unknown>
+  // 兼容旧格式
+  value?: string
+  label?: string
+}
+
 export interface ChatMessage {
   id: string
   role: ChatRole
@@ -20,6 +32,7 @@ export interface ChatMessage {
   timestamp: number
   agentRows?: AgentActivity[]
   isStreaming?: boolean
+  options?: ChatMessageOption[]
 }
 
 interface WorkflowStudioState {

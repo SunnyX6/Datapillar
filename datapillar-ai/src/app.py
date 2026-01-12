@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 from src.api.router import api_router
 from src.infrastructure.database import AsyncNeo4jClient, MySQLClient, Neo4jClient, RedisClient
 from src.infrastructure.database.gravitino import GravitinoDBClient
-from src.modules.etl.orchestrator_v2 import EtlOrchestratorV2
+from src.modules.etl.agents import create_etl_team
 from src.modules.openlineage.core.embedding_processor import embedding_processor
 from src.modules.openlineage.core.event_processor import event_processor
 from src.modules.openlineage.once_sync import sync_gravitino_metadata
@@ -99,7 +99,7 @@ def create_app() -> FastAPI:
         logger.info(f"MySQL: {settings.mysql_host}:{settings.mysql_port}/{settings.mysql_database}")
         logger.info("=" * 60)
 
-        orchestrator: EtlOrchestratorV2 | None = None
+        etl_team = None
         try:
             # 初始化连接池（全局单例，自动管理）
             logger.info("初始化 MySQL 连接池...")
@@ -137,9 +137,9 @@ def create_app() -> FastAPI:
             logger.info("恢复 EventProcessor 事件消费...")
             event_processor.resume()
 
-            # 创建 Orchestrator（内部管理 checkpointer）
-            orchestrator = EtlOrchestratorV2()
-            app.state.orchestrator = orchestrator
+            # 创建 ETL 团队
+            etl_team = create_etl_team()
+            app.state.etl_team = etl_team
 
             logger.info("FastAPI 应用启动完成")
             yield
@@ -153,9 +153,6 @@ def create_app() -> FastAPI:
 
             logger.info("停止 EmbeddingProcessor...")
             await embedding_processor.stop()
-
-            if orchestrator:
-                logger.info("Orchestrator 已释放")
 
             # 关闭连接池
             await RedisClient.close()
@@ -207,6 +204,11 @@ def create_app() -> FastAPI:
 
     # 注册 API 路由
     app.include_router(api_router, prefix="/api")
+
+    # 注册 A2A 网关路由（根路径，用于 Agent 协议）
+    from src.modules.oneagentic.a2a import a2a_router
+
+    app.include_router(a2a_router)
 
     # 健康检查
     @app.get("/health")

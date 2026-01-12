@@ -1,10 +1,10 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type CSSProperties } from 'react'
-import { Activity, AlertTriangle, ArrowUp, Bot, CheckCircle2, ChevronDown, Loader2, User, Wrench, XCircle } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowUp, Bot, CheckCircle2, ChevronDown, Loader2, Square, User, Wrench, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useWorkflowStudioStore, type AgentActivity } from '@/stores'
+import { useWorkflowStudioStore, type AgentActivity, type ChatMessageOption } from '@/stores'
 import { upsertAgentActivityByAgent } from '@/layouts/workflow/utils'
 import { convertAIResponseToGraph } from '@/services/workflowStudioService'
-import { createWorkflowStream, generateSessionId, type SseEvent } from '@/services/aiWorkflowService'
+import { abortWorkflow, createWorkflowStream, generateSessionId, type SseEvent } from '@/services/aiWorkflowService'
 
 type WorkflowStudioSnapshot = ReturnType<typeof useWorkflowStudioStore.getState>
 
@@ -191,6 +191,7 @@ export function ChatPanel() {
   const cancelStreamRef = useRef<(() => void) | null>(null)
   const sessionIdRef = useRef<string>(generateSessionId())
   const streamingMessageIdRef = useRef<string | null>(null)
+  const waitingResumeRef = useRef(false)
 
   useEffect(() => {
     const handle = scheduleIdle(() => {
@@ -272,7 +273,10 @@ export function ChatPanel() {
     }
 
     // 创建消息流
-    cancelStreamRef.current = createWorkflowStream(prompt, sessionIdRef.current, {
+    const shouldResume = waitingResumeRef.current
+    waitingResumeRef.current = false
+
+    cancelStreamRef.current = createWorkflowStream(shouldResume ? '' : prompt, sessionIdRef.current, {
       onEvent: (evt: SseEvent) => {
         const msgId = streamingMessageIdRef.current
         if (!msgId) return
@@ -347,25 +351,44 @@ export function ChatPanel() {
           return
         }
 
-        // interrupt: 更新内容，停止流式
+        // interrupt: 更新内容，停止流式，options 存到消息中
         if (evt.event === 'interrupt') {
           setGenerating(false)
           const questions = evt.interrupt?.questions?.join('\n') || ''
           const interruptMessage = evt.interrupt?.message || evt.message?.content || '需要你补充信息才能继续'
+          const rawOptions = evt.interrupt?.options ?? []
+          // 转换 options 格式（兼容新旧格式）
+          const normalizedOptions: ChatMessageOption[] = rawOptions.map((opt) => ({
+            type: opt.type ?? 'option',
+            name: opt.name ?? opt.label ?? opt.value ?? '',
+            path: opt.path ?? opt.value ?? '',
+            description: opt.description,
+            tools: opt.tools,
+            extra: opt.extra,
+            value: opt.value,
+            label: opt.label
+          }))
           updateMessage(msgId, {
-            content: `${interruptMessage}\n${questions}`.trim(),
-            isStreaming: false
+            content: `${interruptMessage}${questions ? '\n' + questions : ''}`.trim(),
+            isStreaming: false,
+            options: normalizedOptions
           })
           streamingMessageIdRef.current = null
+          waitingResumeRef.current = true
           return
         }
 
         // result: 更新内容，添加最终状态，停止流式
         if (evt.event === 'result') {
           setGenerating(false)
-          const workflow = evt.result?.workflow
-          if (workflow) {
-            const graph = convertAIResponseToGraph(workflow)
+          waitingResumeRef.current = false
+          const deliverable = evt.result?.deliverable
+          const deliverableType = evt.result?.deliverable_type
+
+          // 根据 deliverable_type 决定如何渲染
+          if (deliverableType === 'workflow' || deliverableType === 'plan') {
+            // 工作流类型：渲染到画布
+            const graph = convertAIResponseToGraph(deliverable)
             setWorkflow(graph)
             updateMessage(msgId, {
               content: `${evt.message?.content || '生成完成'}：${graph.name}，共 ${graph.stats.nodes} 个节点、${graph.stats.edges} 条连线。`,
@@ -373,8 +396,9 @@ export function ChatPanel() {
             })
             sessionIdRef.current = generateSessionId()
           } else {
+            // 其他类型（chat_response 等）：直接显示文本
             updateMessage(msgId, {
-              content: evt.message?.content || '生成完成',
+              content: evt.message?.content || '完成',
               isStreaming: false
             })
           }
@@ -385,6 +409,7 @@ export function ChatPanel() {
         // error: 更新内容，添加错误状态，停止流式
         if (evt.event === 'error') {
           setGenerating(false)
+          waitingResumeRef.current = false
           const errorText = evt.error?.detail ? `${evt.error.message}：${evt.error.detail}` : evt.error?.message || '未知错误'
           updateMessage(msgId, {
             content: errorText,
@@ -394,10 +419,22 @@ export function ChatPanel() {
           return
         }
 
+        // aborted: 用户主动打断
+        if (evt.event === 'aborted') {
+          setGenerating(false)
+          waitingResumeRef.current = false
+          updateMessage(msgId, {
+            content: evt.message?.content || '已停止',
+            isStreaming: false
+          })
+          streamingMessageIdRef.current = null
+          return
+        }
+
         // 兜底：未知消息类型，记录警告
         console.warn('[Chat] 未知 SSE 事件:', evt)
       }
-    })
+    }, shouldResume ? prompt : undefined)
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -407,35 +444,103 @@ export function ChatPanel() {
     }
   }
 
+  // 打断当前 run
+  const handleAbort = useCallback(async () => {
+    if (!isGenerating) return
+
+    try {
+      // 先关闭 SSE 连接
+      if (cancelStreamRef.current) {
+        cancelStreamRef.current()
+        cancelStreamRef.current = null
+      }
+
+      // 调用后端 abort API
+      await abortWorkflow(sessionIdRef.current)
+
+      // 更新 UI 状态
+      setGenerating(false)
+      waitingResumeRef.current = false
+
+      // 更新消息状态
+      const msgId = streamingMessageIdRef.current
+      if (msgId) {
+        updateMessage(msgId, {
+          content: '已停止',
+          isStreaming: false
+        })
+        streamingMessageIdRef.current = null
+      }
+    } catch (error) {
+      console.error('[Chat] Abort 失败:', error)
+    }
+  }, [isGenerating, updateMessage, setGenerating])
+
+  // ESC 键打断
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isGenerating) {
+        event.preventDefault()
+        handleAbort()
+      }
+    }
+
+    document.addEventListener('keydown', handleEsc)
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [isGenerating, handleAbort])
+
   return (
     <aside className="w-full h-full flex-shrink-0 bg-white/90 dark:bg-slate-900/95 flex flex-col overflow-hidden">
       <VirtualizedMessageList
         messages={messages}
         scrollRef={scrollRef}
         className="flex-1 p-5 text-body-sm"
-        renderMessage={(message) => <ChatBubble key={message.id} message={message} />}
+        renderMessage={(message) => (
+          <ChatBubble
+            key={message.id}
+            message={message}
+            onOptionClick={(option) => {
+              // 点击选项后，设置输入并发送
+              const value = option.path || option.value || option.name
+              setInput(value)
+              // 自动发送
+              setTimeout(() => {
+                const btn = document.querySelector('[data-send-btn]') as HTMLButtonElement | null
+                btn?.click()
+              }, 50)
+            }}
+          />
+        )}
       />
 
       <div className="border-t border-slate-200/80 dark:border-white/10 p-3">
         <div className="relative">
           <textarea
             value={input}
+            rows={1}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={prefetchWorkflowCanvas}
             className={cn(
               'w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/60 text-slate-700 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:focus:ring-indigo-500 scrollbar-invisible',
-              'text-body-sm min-h-12 pl-4 pr-11 py-1.5 leading-snug'
+              'text-body-sm pl-4 pr-11 py-2.5 leading-normal'
             )}
             placeholder="描述你的数据工作流需求..."
           />
           <button
             type="button"
-            onClick={handleSend}
-            disabled={isGenerating || !input.trim()}
-            className="absolute right-1.5 top-1/2 -translate-y-[65%] h-7 w-7 flex items-center justify-center border border-indigo-200 dark:border-indigo-800 rounded-full text-indigo-600 hover:text-white hover:bg-indigo-500 disabled:text-slate-400 disabled:border-slate-300 dark:disabled:border-slate-700 transition-colors"
+            data-send-btn
+            onClick={isGenerating ? handleAbort : handleSend}
+            disabled={!isGenerating && !input.trim()}
+            className={cn(
+              'absolute right-1.5 top-1/2 -translate-y-[65%] h-7 w-7 flex items-center justify-center border rounded-full transition-colors',
+              isGenerating
+                ? 'border-red-200 dark:border-red-800 text-red-500 hover:text-white hover:bg-red-500'
+                : 'border-indigo-200 dark:border-indigo-800 text-indigo-600 hover:text-white hover:bg-indigo-500 disabled:text-slate-400 disabled:border-slate-300 dark:disabled:border-slate-700'
+            )}
+            title={isGenerating ? '停止 (ESC)' : '发送'}
           >
-            <ArrowUp size={sendIconSize} />
+            {isGenerating ? <Square size={sendIconSize - 2} fill="currentColor" /> : <ArrowUp size={sendIconSize} />}
           </button>
         </div>
         <p className="text-slate-500 dark:text-slate-400 text-center mt-1 text-micro">AI 可能出错，请务必验证逻辑。</p>
@@ -445,12 +550,19 @@ export function ChatPanel() {
 }
 
 const ChatBubble = memo(
-  function ChatBubble({ message }: { message: WorkflowStudioSnapshot['messages'][number] }) {
+  function ChatBubble({
+    message,
+    onOptionClick
+  }: {
+    message: WorkflowStudioSnapshot['messages'][number]
+    onOptionClick?: (option: ChatMessageOption) => void
+  }) {
     const isUser = message.role === 'user'
     const formattedTime = useMemo(() => new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), [message.timestamp])
 	    const avatarIconSize = 16
 	    const hasAgentRows = !isUser && message.agentRows && message.agentRows.length > 0
 	    const isStreaming = message.isStreaming === true
+	    const hasOptions = !isUser && message.options && message.options.length > 0
 	    const [isExpanded, setIsExpanded] = useState(false)
 	    const latestAgentRow = useMemo(() => {
 	      const rows = message.agentRows
@@ -586,6 +698,25 @@ const ChatBubble = memo(
 
             {/* 消息内容 */}
             {message.content}
+
+            {/* Options 选项（卡片内部整齐排列） */}
+            {hasOptions && (
+              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/50">
+                <div className="flex flex-wrap gap-2">
+                  {message.options!.map((opt, idx) => (
+                    <button
+                      key={`${opt.path || opt.value || idx}`}
+                      type="button"
+                      onClick={() => onOptionClick?.(opt)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors text-legal font-medium"
+                    >
+                      <span className="text-nano uppercase tracking-wider text-indigo-400 dark:text-indigo-500">{opt.type}</span>
+                      <span>{opt.name || opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <span className="text-slate-400 px-1 text-micro">{formattedTime}</span>
         </div>
@@ -605,5 +736,6 @@ const ChatBubble = memo(
       r.agent === next.message.agentRows?.[i]?.agent &&
       r.message === next.message.agentRows?.[i]?.message
     ) &&
-    previous.message.isStreaming === next.message.isStreaming
+    previous.message.isStreaming === next.message.isStreaming &&
+    previous.message.options?.length === next.message.options?.length
 )

@@ -13,6 +13,7 @@ LLM 统一调用层 - 基于 LangChain 统一接口
 import asyncio
 import json
 import logging
+import threading
 import uuid
 from typing import Any, TypeVar, cast
 
@@ -53,6 +54,7 @@ T = TypeVar('T', bound=BaseModel)
 
 # ==================== LLM 实例缓存 ====================
 _llm_cache: dict[tuple, Any] = {}
+_llm_cache_lock = threading.Lock()  # 线程锁，防止并发创建
 
 
 # ==================== 弹性包装器 ====================
@@ -417,43 +419,53 @@ def call_llm(
     schema_name = output_schema.__name__ if output_schema else None
     cache_key = (model_id, temperature, max_tokens, schema_name)
 
+    # 双重检查锁定模式（Double-Checked Locking）
+    # 第一次检查（无锁，快速路径）
     if cache_key in _llm_cache:
         return _llm_cache[cache_key]
 
-    # 获取模型配置（用于 usage 追踪）
-    model = model_manager.model_by_id(model_id) if model_id else model_manager.default_chat_model()
+    # 获取锁后再次检查（防止并发创建）
+    with _llm_cache_lock:
+        # 第二次检查（有锁，确保只创建一次）
+        if cache_key in _llm_cache:
+            return _llm_cache[cache_key]
 
-    if not model:
-        raise ValueError("未找到可用的 Chat 模型配置，请在数据库中配置")
+        # 获取模型配置（用于 usage 追踪）
+        model = (
+            model_manager.model_by_id(model_id) if model_id else model_manager.default_chat_model()
+        )
 
-    # 创建基础 LLM
-    llm = LLMFactory.create_chat_model(model_id)
-    logger.info(
-        f"创建 LLM 实例: model_id={model_id}, provider={model.provider}, "
-        f"model={model.model_name}, temp={temperature}, schema={schema_name}"
-    )
+        if not model:
+            raise ValueError("未找到可用的 Chat 模型配置，请在数据库中配置")
 
-    # 绑定参数
-    bind_kwargs = {}
-    if temperature is not None:
-        bind_kwargs["temperature"] = temperature
-    if max_tokens is not None:
-        bind_kwargs["max_tokens"] = max_tokens
+        # 创建基础 LLM
+        llm = LLMFactory.create_chat_model(model_id)
+        logger.info(
+            f"创建 LLM 实例: model_id={model_id}, provider={model.provider}, "
+            f"model={model.model_name}, temp={temperature}, schema={schema_name}"
+        )
 
-    if bind_kwargs and hasattr(llm, "bind"):
-        llm = llm.bind(**bind_kwargs)
+        # 绑定参数
+        bind_kwargs = {}
+        if temperature is not None:
+            bind_kwargs["temperature"] = temperature
+        if max_tokens is not None:
+            bind_kwargs["max_tokens"] = max_tokens
 
-    # 应用 structured output
-    if output_schema is not None:
-        llm = llm.with_structured_output(output_schema, method="function_calling")
+        if bind_kwargs and hasattr(llm, "bind"):
+            llm = llm.bind(**bind_kwargs)
 
-    # 包装为弹性模型（传入模型元信息用于 usage 追踪）
-    resilient_llm = ResilientChatModel(
-        llm,
-        provider=model.provider,
-        model_name=model.model_name,
-        config_json=model.config_json,
-    )
+        # 应用 structured output
+        if output_schema is not None:
+            llm = llm.with_structured_output(output_schema, method="function_calling")
 
-    _llm_cache[cache_key] = resilient_llm
-    return resilient_llm
+        # 包装为弹性模型（传入模型元信息用于 usage 追踪）
+        resilient_llm = ResilientChatModel(
+            llm,
+            provider=model.provider,
+            model_name=model.model_name,
+            config_json=model.config_json,
+        )
+
+        _llm_cache[cache_key] = resilient_llm
+        return resilient_llm

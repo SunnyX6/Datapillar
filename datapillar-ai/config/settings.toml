@@ -93,6 +93,22 @@ etl_agent_conversation_max_content_tokens_per_turn = 800
 # - 低置信（< 阈值）不允许随便路由：必须转为澄清（clarification）
 etl_semantic_router_min_confidence = 0.7
 
+# ==================== ETL 记忆存储配置 ====================
+# 说明：
+# - BossMemory: Boss 的工作日志（Timeline），记录所有关键事件
+# - WorkerMemory: Worker 的短期工作记忆，任务完成后可丢弃
+# - 存储在 Redis，通过 TTL 自动清理
+[default.etl_memory]
+boss_memory_ttl_seconds = 604800      # Boss 记忆 TTL（7天）
+worker_memory_ttl_seconds = 3600      # Worker 记忆 TTL（1小时）
+timeline_max_entries = 100            # Timeline 最大条目数
+timeline_compress_threshold = 80      # 触发压缩的阈值
+timeline_compress_keep_recent = 15    # 压缩后保留最近多少条
+timeline_entry_max_length = 500       # 单条 Timeline 内容最大长度
+worker_turn_max_length = 2000         # Worker 对话单条最大长度
+worker_compress_threshold = 20        # Worker 对话压缩阈值（对话轮次超过此值时触发压缩）
+worker_keep_recent = 5                # Worker 对话压缩后保留最近多少轮
+
 # ==================== OpenLineage Sink 配置 ====================
 # Sink 端负责接收事件并写入 Neo4j
 # retry、rate_limit、filter 等配置由 Producer 端（Flink/Spark/Airflow）在 openlineage.yml 中配置
