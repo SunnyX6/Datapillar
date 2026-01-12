@@ -67,6 +67,121 @@ class Neo4jTableSearch:
     # =========================================================================
 
     @classmethod
+    def list_catalogs(cls, limit: int = 50) -> list[dict[str, Any]]:
+        """列出 Catalog 列表（导航用途）"""
+        safe_limit = min(max(int(limit), 1), 2000)
+        cypher = """
+        MATCH (c:Catalog)
+        RETURN
+            c.id AS node_id,
+            c.name AS name,
+            coalesce(c.description, '') AS description
+        ORDER BY name
+        LIMIT $limit
+        """
+
+        try:
+            driver = Neo4jClient.get_driver()
+            with driver.session(database=settings.neo4j_database) as session:
+                result = run_cypher(session, cypher, {"limit": safe_limit})
+                return [convert_neo4j_types(r) for r in (result.data() or [])]
+        except Exception as e:
+            logger.error(f"列出 Catalog 失败: {e}")
+            return []
+
+    @classmethod
+    def list_schemas(cls, catalog: str, limit: int = 200) -> list[dict[str, Any]]:
+        """列出指定 Catalog 下的 Schema 列表（导航用途）"""
+        if not (isinstance(catalog, str) and catalog.strip()):
+            return []
+
+        safe_limit = min(max(int(limit), 1), 2000)
+        cypher = """
+        MATCH (c:Catalog {name: $catalog})-[:HAS_SCHEMA]->(s:Schema)
+        RETURN
+            s.id AS node_id,
+            s.name AS name,
+            coalesce(s.description, '') AS description
+        ORDER BY name
+        LIMIT $limit
+        """
+
+        try:
+            driver = Neo4jClient.get_driver()
+            with driver.session(database=settings.neo4j_database) as session:
+                result = run_cypher(
+                    session, cypher, {"catalog": catalog.strip(), "limit": safe_limit}
+                )
+                return [convert_neo4j_types(r) for r in (result.data() or [])]
+        except Exception as e:
+            logger.error(f"列出 Schema 失败: {e}")
+            return []
+
+    @classmethod
+    def list_tables(
+        cls,
+        catalog: str,
+        schema: str,
+        keyword: str | None = None,
+        cursor: str | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        """列出指定 Catalog + Schema 下的 Table 列表（导航用途，支持 cursor 翻页）"""
+        if not (isinstance(catalog, str) and catalog.strip()):
+            return []
+        if not (isinstance(schema, str) and schema.strip()):
+            return []
+
+        safe_limit = min(max(int(limit), 1), 2000)
+        kw = (keyword or "").strip()
+
+        cur = (cursor or "").strip()
+
+        cypher = """
+        MATCH (c:Catalog {name: $catalog})-[:HAS_SCHEMA]->(s:Schema {name: $schema})-[:HAS_TABLE]->(t:Table)
+        WHERE ($keyword = '' OR toLower(t.name) CONTAINS toLower($keyword))
+          AND ($cursor = '' OR t.name > $cursor)
+        RETURN
+            t.id AS node_id,
+            t.name AS name,
+            coalesce(t.description, '') AS description
+        ORDER BY name
+        LIMIT $page_size
+        """
+
+        try:
+            driver = Neo4jClient.get_driver()
+            with driver.session(database=settings.neo4j_database) as session:
+                result = run_cypher(
+                    session,
+                    cypher,
+                    {
+                        "catalog": catalog.strip(),
+                        "schema": schema.strip(),
+                        "keyword": kw,
+                        "cursor": cur,
+                        "page_size": safe_limit + 1,
+                    },
+                )
+                rows = [convert_neo4j_types(r) for r in (result.data() or [])]
+                items = rows[:safe_limit]
+                has_more = len(rows) > safe_limit
+                next_cursor = None
+                if has_more and items:
+                    next_cursor = str(items[-1].get("name") or "").strip() or None
+                return [
+                    {
+                        **item,
+                        "has_more": has_more,
+                        "next_cursor": next_cursor,
+                    }
+                    for item in items
+                ]
+        except Exception as e:
+            logger.error(f"列出 Table 失败: {e}")
+            return []
+
+    @classmethod
     def get_table_info(
         cls,
         catalog: str,

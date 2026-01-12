@@ -11,8 +11,9 @@ import time
 from typing import Any
 
 import httpx
-from langchain_core.tools import tool
 from pydantic import BaseModel, Field
+
+from src.modules.oneagentic import tool
 
 logger = logging.getLogger(__name__)
 

@@ -8,10 +8,10 @@
 import json
 import logging
 
-from langchain_core.tools import tool
 from pydantic import BaseModel
 
 from src.infrastructure.repository import Component
+from src.modules.oneagentic import tool
 
 logger = logging.getLogger(__name__)
 

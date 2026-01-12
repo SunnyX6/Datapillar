@@ -15,11 +15,12 @@ export type SseEventType =
   | 'interrupt'
   | 'result'
   | 'error'
+  | 'aborted'  // 用户主动打断
 
 /**
  * SSE 事件状态（用于前端渲染 icon/颜色）
  */
-export type SseState = 'thinking' | 'invoking' | 'waiting' | 'done' | 'error'
+export type SseState = 'thinking' | 'invoking' | 'waiting' | 'done' | 'error' | 'aborted'
 
 /**
  * SSE 严重级别（用于前端映射颜色）
@@ -46,11 +47,27 @@ export interface SseEventInterrupt {
   kind: string
   message: string
   questions?: string[]
-  options?: Array<{ value: string; label: string; type?: string }>
+  options?: Array<{
+    // 新格式（CatalogAgent 返回）
+    type?: string
+    name?: string
+    path?: string
+    description?: string
+    tools?: string[]
+    extra?: Record<string, unknown>
+    // 旧格式兼容
+    value?: string
+    label?: string
+    catalog_name?: string
+    schema_name?: string
+    table_name?: string
+    payload?: unknown
+  }>
 }
 
 export interface SseEventResult {
-  workflow?: WorkflowResponse
+  deliverable?: unknown
+  deliverable_type?: string
 }
 
 export interface SseEventError {
@@ -171,7 +188,7 @@ export function createWorkflowStream(
         try {
           const sseEvent = JSON.parse(event.data) as SseEvent
           callbacks.onEvent(sseEvent)
-          if (sseEvent.event === 'interrupt' || sseEvent.event === 'result' || sseEvent.event === 'error') {
+          if (sseEvent.event === 'interrupt' || sseEvent.event === 'result' || sseEvent.event === 'error' || sseEvent.event === 'aborted') {
             eventSource?.close()
             eventSource = null
           }
@@ -225,4 +242,27 @@ export function createWorkflowStream(
     eventSource?.close()
     eventSource = null
   }
+}
+
+/**
+ * 打断当前 run
+ *
+ * 打断的是 run（当前执行），不是 session（对话历史）。
+ * 用户可以在打断后继续在同一个 session 发送新消息。
+ */
+export async function abortWorkflow(sessionId: string): Promise<{ success: boolean; aborted: boolean; message: string }> {
+  const response = await fetch('/api/ai/etl/workflow/abort', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ sessionId }),
+    credentials: 'include'
+  })
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+  }
+
+  return response.json()
 }

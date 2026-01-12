@@ -54,6 +54,10 @@ dependencies = [
     "json-repair>=0.30.0",
     # 高性能哈希（内容去重）
     "xxhash>=3.4.0",
+    "langgraph-swarm>=0.1.0",
+    "opentelemetry-api>=1.39.1",
+    "opentelemetry-sdk>=1.39.1",
+    "opentelemetry-exporter-otlp-proto-http>=1.39.1",
 ]
 
 [project.optional-dependencies]
@@ -72,6 +76,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+
+# Agent 模块自动发现（新增模块只需在此加一行）
+[project.entry-points."oneagentic.agents"]
+etl = "src.modules.etl.agents"
 
 [tool.ruff]
 line-length = 100

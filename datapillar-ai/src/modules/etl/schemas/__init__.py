@@ -1,80 +1,53 @@
 """
-ETL 多智能体系统数据结构
+ETL Agent 产出定义
+
+Agent 产出是 Agent 工作的结果，通过 AgentResult.deliverable 交付。
+
+已定义产出：
+- CatalogResult: 元数据问答结果
+- AnalysisResult: 需求分析结果
+- Workflow: 工作流定义
+- DeveloperSqlOutput: SQL 生成结果
+- ReviewResult: 评审结果
 """
 
-from src.modules.etl.schemas.agent_result import (
-    AgentResult,
-    AgentResultStatus,
-    ClarificationRequest,
-    DelegationRequest,
-)
 from src.modules.etl.schemas.analyst import (
     AnalysisResult,
+    AnalysisResultOutput,
     DataTarget,
     Step,
 )
-from src.modules.etl.schemas.dag import (
-    JobDependencyResponse,
-    JobResponse,
-    WorkflowResponse,
+from src.modules.etl.schemas.catalog import (
+    CatalogResult,
+    CatalogResultOutput,
+    OptionItem,
 )
-from src.modules.etl.schemas.requests import BlackboardRequest
-from src.modules.etl.schemas.review import (
-    ReviewResult,
-)
-from src.modules.etl.schemas.sse_msg import (
-    SseAgent,
-    SseError,
-    SseEvent,
-    SseEventType,
-    SseInterrupt,
-    SseLevel,
-    SseLlm,
-    SseMessage,
-    SseResult,
-    SseSpan,
-    SseState,
-    SseTool,
-)
+from src.modules.etl.schemas.developer import DeveloperSqlOutput
+from src.modules.etl.schemas.review import ReviewResult
 from src.modules.etl.schemas.workflow import (
     Job,
     Stage,
     Workflow,
+    WorkflowOutput,
 )
 
 __all__ = [
-    # Agent Result - Agent 执行结果
-    "AgentResult",
-    "AgentResultStatus",
-    "ClarificationRequest",
-    "DelegationRequest",
-    # Requirement - 需求分析
+    # CatalogAgent 产出
+    "CatalogResult",
+    "CatalogResultOutput",
+    "OptionItem",
+    # AnalystAgent 产出
     "AnalysisResult",
+    "AnalysisResultOutput",
     "Step",
     "DataTarget",
-    # Workflow - 工作流
+    # ArchitectAgent 产出
     "Workflow",
+    "WorkflowOutput",
     "Job",
     "Stage",
-    # Review - 评审
+    # DeveloperAgent 产出
+    "DeveloperSqlOutput",
+    # ReviewerAgent 产出
     "ReviewResult",
-    # DAG / Workflow Response
-    "WorkflowResponse",
-    "JobResponse",
-    "JobDependencyResponse",
-    # Blackboard Requests
-    "BlackboardRequest",
-    # SSE Message - 消息流协议
-    "SseEvent",
-    "SseEventType",
-    "SseState",
-    "SseLevel",
-    "SseAgent",
-    "SseSpan",
-    "SseMessage",
-    "SseTool",
-    "SseLlm",
-    "SseInterrupt",
-    "SseResult",
-    "SseError",
 ]

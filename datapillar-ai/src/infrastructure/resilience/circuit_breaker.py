@@ -11,6 +11,7 @@ CLOSED → (连续失败达阈值) → OPEN → (等待恢复时间) → HALF_OP
 
 import asyncio
 import logging
+import threading
 import time
 from collections.abc import Awaitable, Callable
 from enum import Enum
@@ -116,14 +117,19 @@ class CircuitBreaker:
 
 # 全局熔断器注册表
 _circuit_breakers: dict[str, CircuitBreaker] = {}
-_registry_lock = asyncio.Lock()
+_registry_lock = threading.Lock()  # 线程锁，防止并发创建
 
 
 def get_circuit_breaker(name: str) -> CircuitBreaker:
-    """获取或创建熔断器（按名称隔离）"""
-    if name not in _circuit_breakers:
-        _circuit_breakers[name] = CircuitBreaker(name)
-    return _circuit_breakers[name]
+    """获取或创建熔断器（按名称隔离，线程安全）"""
+    # 双重检查锁定模式
+    if name in _circuit_breakers:
+        return _circuit_breakers[name]
+
+    with _registry_lock:
+        if name not in _circuit_breakers:
+            _circuit_breakers[name] = CircuitBreaker(name)
+        return _circuit_breakers[name]
 
 
 def with_circuit_breaker(name: str):

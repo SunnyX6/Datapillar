@@ -1,0 +1,88 @@
+"""
+LLM 提供者模块
+
+支持多种 LLM 后端：
+- OpenAI
+- Anthropic
+- GLM
+- OpenRouter
+- Ollama
+
+特性：
+- 统一接口 call_llm
+- 内置弹性机制（超时 + 重试 + 熔断）
+- 可选缓存
+- Token 使用量追踪
+
+使用示例：
+```python
+from datapillar_oneagentic import datapillar_configure
+from datapillar_oneagentic.providers.llm import call_llm
+
+# 必须先配置
+datapillar_configure(
+    llm={"api_key": "sk-xxx", "model": "gpt-4o"},
+)
+
+# 获取 LLM（自动带弹性保护）
+llm = call_llm()
+result = await llm.ainvoke(messages)
+
+# 带 structured output
+from pydantic import BaseModel
+class Output(BaseModel):
+    answer: str
+
+llm = call_llm(output_schema=Output)
+```
+"""
+
+from datapillar_oneagentic.providers.llm.client import (
+    call_llm,
+    clear_llm_cache,
+    ResilientChatModel,
+)
+from datapillar_oneagentic.providers.llm.model_manager import (
+    model_manager,
+    ModelConfig,
+)
+from datapillar_oneagentic.providers.llm.token_counter import (
+    estimate_text_tokens,
+    estimate_messages_tokens,
+)
+from datapillar_oneagentic.providers.llm.usage_tracker import (
+    NormalizedTokenUsage,
+    ModelPricingUsd,
+    UsageCostUsd,
+    extract_usage,
+    estimate_usage,
+    estimate_cost_usd,
+    parse_pricing,
+)
+from datapillar_oneagentic.providers.llm.llm_cache import (
+    create_llm_cache,
+    InMemoryLLMCache,
+    RedisLLMCache,
+)
+
+
+__all__ = [
+    # 统一接口（业务侧使用）
+    "call_llm",
+    "clear_llm_cache",
+    # Token 计数
+    "estimate_text_tokens",
+    "estimate_messages_tokens",
+    # Usage 追踪
+    "NormalizedTokenUsage",
+    "ModelPricingUsd",
+    "UsageCostUsd",
+    "extract_usage",
+    "estimate_usage",
+    "estimate_cost_usd",
+    "parse_pricing",
+    # 缓存
+    "create_llm_cache",
+    "InMemoryLLMCache",
+    "RedisLLMCache",
+]

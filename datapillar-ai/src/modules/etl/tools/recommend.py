@@ -10,8 +10,9 @@ TODO: 推荐表功能后续在 search_table.py 中实现
 import json
 import logging
 
-from langchain_core.tools import tool
 from pydantic import BaseModel, Field
+
+from src.modules.oneagentic import tool
 
 logger = logging.getLogger(__name__)
 
