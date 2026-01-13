@@ -1,19 +1,49 @@
 """
 A2A (Agent-to-Agent) 协议模块
 
-实现 Google 提出的 A2A 协议，支持跨服务 Agent 互操作。
+基于 Google 官方 a2a-sdk 实现，支持跨服务调用远程 Agent。
 
 核心组件：
-- A2AConfig: 远程 Agent 配置
-- AgentCard: Agent 自描述（能力、技能、认证）
-- A2AClient: 调用远程 Agent
+- A2AConfig: 远程 Agent 连接配置
 - create_a2a_tool: 创建 A2A 委派工具
-- a2a_router: A2A Server 网关路由（单独导入避免循环依赖）
+- create_a2a_tools: 批量创建 A2A 工具
 
-使用 A2A Server:
+使用示例（Agent 粒度）：
 ```python
-from datapillar_oneagentic.a2a.server import a2a_router
-app.include_router(a2a_router)
+from datapillar_oneagentic import agent
+from datapillar_oneagentic.a2a import A2AConfig, APIKeyAuth
+
+@agent(
+    id="analyst",
+    name="分析师",
+    deliverable_schema=AnalysisOutput,
+    a2a_agents=[
+        A2AConfig(
+            endpoint="https://remote-agent.example.com/.well-known/agent.json",
+            auth=APIKeyAuth(api_key="sk-xxx"),
+        ),
+    ],
+)
+class AnalystAgent:
+    ...
+```
+
+使用示例（Team 粒度）：
+```python
+from datapillar_oneagentic import Datapillar
+from datapillar_oneagentic.a2a import A2AConfig
+
+dp = Datapillar(
+    agents=["analyst", "coder"],
+    a2a_agents=[
+        A2AConfig(endpoint="https://shared-agent.example.com/.well-known/agent.json"),
+    ],
+)
+```
+
+安装 A2A 支持：
+```bash
+pip install datapillar-oneagentic[a2a]
 ```
 """
 
@@ -22,21 +52,12 @@ from datapillar_oneagentic.a2a.config import (
     AuthScheme,
     APIKeyAuth,
     BearerAuth,
+    AuthType,
 )
-from datapillar_oneagentic.a2a.card import AgentCard, AgentSkill
-from datapillar_oneagentic.a2a.client import (
-    A2AClient,
-    A2AResult,
-    A2AMessage,
-    TaskState,
-    A2AError,
-    A2AConnectionError,
-    A2AAuthError,
+from datapillar_oneagentic.a2a.tool import (
+    create_a2a_tool,
+    create_a2a_tools,
 )
-from datapillar_oneagentic.a2a.tool import create_a2a_tool, create_a2a_tools_from_configs
-
-# 注意：a2a_router 不在这里导出，避免循环导入
-# 使用时请直接导入: from datapillar_oneagentic.a2a.server import a2a_router
 
 __all__ = [
     # 配置
@@ -44,19 +65,8 @@ __all__ = [
     "AuthScheme",
     "APIKeyAuth",
     "BearerAuth",
-    # AgentCard
-    "AgentCard",
-    "AgentSkill",
-    # Client
-    "A2AClient",
-    "A2AResult",
-    "A2AMessage",
-    "TaskState",
-    # 异常
-    "A2AError",
-    "A2AConnectionError",
-    "A2AAuthError",
+    "AuthType",
     # 工具
     "create_a2a_tool",
-    "create_a2a_tools_from_configs",
+    "create_a2a_tools",
 ]

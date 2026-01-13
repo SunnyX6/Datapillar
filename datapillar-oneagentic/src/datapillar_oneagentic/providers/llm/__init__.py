@@ -5,11 +5,12 @@ LLM 提供者模块
 - OpenAI
 - Anthropic
 - GLM
+- DeepSeek
 - OpenRouter
 - Ollama
 
 特性：
-- 统一接口 call_llm
+- 统一接口 call_llm / call_embedding
 - 内置弹性机制（超时 + 重试 + 熔断）
 - 可选缓存
 - Token 使用量追踪
@@ -17,16 +18,21 @@ LLM 提供者模块
 使用示例：
 ```python
 from datapillar_oneagentic import datapillar_configure
-from datapillar_oneagentic.providers.llm import call_llm
+from datapillar_oneagentic.providers.llm import call_llm, call_embedding
 
 # 必须先配置
 datapillar_configure(
-    llm={"api_key": "sk-xxx", "model": "gpt-4o"},
+    llm={"provider": "openai", "api_key": "sk-xxx", "model": "gpt-4o"},
+    embedding={"provider": "openai", "api_key": "sk-xxx", "model": "text-embedding-3-small"},
 )
 
 # 获取 LLM（自动带弹性保护）
 llm = call_llm()
 result = await llm.ainvoke(messages)
+
+# 获取 Embedding
+embeddings = call_embedding()
+vector = await embeddings.aembed_query("hello")
 
 # 带 structured output
 from pydantic import BaseModel
@@ -37,14 +43,23 @@ llm = call_llm(output_schema=Output)
 ```
 """
 
-from datapillar_oneagentic.providers.llm.client import (
+from datapillar_oneagentic.providers.llm.llm import (
     call_llm,
     clear_llm_cache,
     ResilientChatModel,
+    LLMFactory,
+    LLMProviderConfig,
 )
-from datapillar_oneagentic.providers.llm.model_manager import (
-    model_manager,
-    ModelConfig,
+from datapillar_oneagentic.providers.llm.config import (
+    Provider,
+    EmbeddingProvider,
+)
+from datapillar_oneagentic.providers.llm.embedding import (
+    call_embedding,
+    embed_text,
+    embed_texts,
+    clear_embedding_cache,
+    EmbeddingFactory,
 )
 from datapillar_oneagentic.providers.llm.token_counter import (
     estimate_text_tokens,
@@ -67,9 +82,21 @@ from datapillar_oneagentic.providers.llm.llm_cache import (
 
 
 __all__ = [
-    # 统一接口（业务侧使用）
+    # LLM
     "call_llm",
     "clear_llm_cache",
+    "ResilientChatModel",
+    "LLMFactory",
+    "LLMProviderConfig",
+    # Embedding
+    "call_embedding",
+    "embed_text",
+    "embed_texts",
+    "clear_embedding_cache",
+    "EmbeddingFactory",
+    # Provider 枚举
+    "Provider",
+    "EmbeddingProvider",
     # Token 计数
     "estimate_text_tokens",
     "estimate_messages_tokens",

@@ -11,7 +11,6 @@ class TimeTravelRequest(BaseModel):
     """时间旅行请求"""
 
     session_id: str = Field(..., description="会话 ID")
-    team_id: str = Field(..., description="团队 ID")
     target_checkpoint_id: str = Field(..., description="目标检查点 ID")
     create_branch: bool = Field(
         default=False,

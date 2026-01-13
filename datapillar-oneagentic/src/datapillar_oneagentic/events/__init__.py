@@ -16,8 +16,10 @@ from datapillar_oneagentic.events.types import (
     ToolCompletedEvent,
     ToolFailedEvent,
     # LLM 事件
+    LLMThinkingEvent,
     LLMCallStartedEvent,
     LLMCallCompletedEvent,
+    LLMCallFailedEvent,
     LLMStreamChunkEvent,
     # 委派事件
     DelegationStartedEvent,
@@ -41,8 +43,10 @@ __all__ = [
     "ToolCompletedEvent",
     "ToolFailedEvent",
     # LLM 事件
+    "LLMThinkingEvent",
     "LLMCallStartedEvent",
     "LLMCallCompletedEvent",
+    "LLMCallFailedEvent",
     "LLMStreamChunkEvent",
     # 委派事件
     "DelegationStartedEvent",

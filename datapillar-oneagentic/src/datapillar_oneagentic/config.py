@@ -1,11 +1,11 @@
 """
 Datapillar OneAgentic 配置系统
 
-支持多种配置方式（优先级从低到高）：
-1. 代码默认值
-2. 配置文件（toml/yaml/json）
-3. 环境变量
-4. 代码直接传入
+支持多种配置方式（优先级从高到低）：
+1. 配置文件（toml/yaml/json）
+2. 环境变量
+3. 代码直接传入
+4. 代码默认值
 
 配置文件示例（config.toml）：
 ```toml
@@ -50,7 +50,6 @@ from typing import Any, ClassVar
 from pydantic import Field
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
-from datapillar_oneagentic.cache.config import CacheConfig
 from datapillar_oneagentic.core.config import AgentConfig, ContextConfig
 from datapillar_oneagentic.experience.config import LearningConfig
 from datapillar_oneagentic.providers.llm.config import EmbeddingConfig, LLMConfig
@@ -119,7 +118,6 @@ class FileConfigSource(PydanticBaseSettingsSource):
         if self._config_file and self._config_file.exists():
             try:
                 self._file_data = _load_config_file(self._config_file)
-                logger.debug(f"已加载配置文件: {self._config_file}")
             except Exception as e:
                 logger.warning(f"加载配置文件失败: {self._config_file}, 错误: {e}")
 
@@ -132,7 +130,6 @@ class FileConfigSource(PydanticBaseSettingsSource):
 
 
 # === 主配置类 ===
-
 
 class DatapillarConfig(BaseSettings):
     """
@@ -168,9 +165,6 @@ class DatapillarConfig(BaseSettings):
     learning: LearningConfig = Field(default_factory=LearningConfig)
     """经验学习配置"""
 
-    cache: CacheConfig = Field(default_factory=CacheConfig)
-    """缓存配置"""
-
     telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
     """遥测配置"""
 
@@ -183,11 +177,18 @@ class DatapillarConfig(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """自定义配置源优先级（后者覆盖前者）"""
+        """
+        自定义配置源优先级（前者覆盖后者）
+
+        优先级从高到低：
+        1. 配置文件（FileConfigSource）- 最高优先级
+        2. 环境变量（env_settings）
+        3. 代码传入（init_settings）- 最低优先级
+        """
         return (
-            FileConfigSource(settings_cls, cls.config_file),  # 配置文件
+            FileConfigSource(settings_cls, cls.config_file),  # 配置文件（最高优先级）
             env_settings,  # 环境变量
-            init_settings,  # 代码传入
+            init_settings,  # 代码传入（最低优先级）
         )
 
     def is_llm_configured(self) -> bool:
@@ -243,25 +244,31 @@ def datapillar_configure(
     """
     配置框架
 
+    优先级（从高到低）：
+    1. 配置文件（config.toml）
+    2. 环境变量（DATAPILLAR_ 前缀）
+    3. 代码传入（**kwargs）
+    4. 默认值
+
     参数：
         config_file: 配置文件路径（可选，支持 toml/yaml/json）
-        **kwargs: 配置项（会覆盖配置文件和环境变量）
+        **kwargs: 配置项（作为默认值，会被配置文件和环境变量覆盖）
 
     示例：
     ```python
-    # 方式1：指定配置文件
+    # 方式1：指定配置文件（最高优先级）
     datapillar_configure(config_file="config.toml")
 
-    # 方式2：代码直接配置
+    # 方式2：代码直接配置（作为默认值）
     datapillar_configure(
         llm={"api_key": "sk-xxx", "model": "gpt-4o"},
         agent={"max_steps": 50},
     )
 
-    # 方式3：混合使用（代码覆盖配置文件）
+    # 方式3：混合使用（配置文件会覆盖代码传入）
     datapillar_configure(
         config_file="config.toml",
-        llm={"api_key": "sk-xxx"},  # 覆盖配置文件中的 api_key
+        llm={"api_key": "sk-default"},  # 如果配置文件有 api_key，会被覆盖
     )
     ```
     """

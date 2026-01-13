@@ -1,24 +1,28 @@
 """
 MCP (Model Context Protocol) 客户端模块
 
-提供 MCP 服务器连接能力，支持：
+基于官方 MCP SDK 实现，提供 MCP 服务器连接能力。
+
+支持传输方式：
 - Stdio 传输（本地进程）
-- HTTP 传输（远程服务）
+- HTTP 传输（Streamable HTTP）
 - SSE 传输（流式服务）
 
 使用示例：
 ```python
-from datapillar_oneagentic.mcp import MCPClient, MCPServerStdio
+from datapillar_oneagentic.mcp import MCPServerStdio, MCPToolkit
 
-# 连接本地 MCP 服务器
-config = MCPServerStdio(
-    command="npx",
-    args=["-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"],
-)
+# 推荐：使用 MCPToolkit 管理连接生命周期
+servers = [
+    MCPServerStdio(
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+    ),
+]
 
-async with MCPClient(config) as client:
-    tools = await client.list_tools()
-    result = await client.call_tool("read_file", {"path": "/path/to/file.txt"})
+async with MCPToolkit(servers) as toolkit:
+    tools = toolkit.get_tools()
+    # 使用工具...
 ```
 """
 
@@ -28,16 +32,16 @@ from datapillar_oneagentic.mcp.config import (
     MCPServerHTTP,
     MCPServerSSE,
 )
-from datapillar_oneagentic.mcp.client import MCPClient
-from datapillar_oneagentic.mcp.tool import create_mcp_tools
-from datapillar_oneagentic.mcp.servers import (
-    filesystem_server,
-    git_server,
-    memory_server,
-    postgres_server,
-    sqlite_server,
-    fetch_server,
-    sequential_thinking_server,
+from datapillar_oneagentic.mcp.client import (
+    MCPClient,
+    MCPTool,
+    ToolAnnotations,
+    MCPError,
+    MCPConnectionError,
+    MCPTimeoutError,
+)
+from datapillar_oneagentic.mcp.tool import (
+    MCPToolkit,
 )
 
 __all__ = [
@@ -48,14 +52,12 @@ __all__ = [
     "MCPServerSSE",
     # 客户端
     "MCPClient",
-    # 工具
-    "create_mcp_tools",
-    # 预配置服务器
-    "filesystem_server",
-    "git_server",
-    "memory_server",
-    "postgres_server",
-    "sqlite_server",
-    "fetch_server",
-    "sequential_thinking_server",
+    "MCPTool",
+    "ToolAnnotations",
+    # 异常
+    "MCPError",
+    "MCPConnectionError",
+    "MCPTimeoutError",
+    # 工具包
+    "MCPToolkit",
 ]

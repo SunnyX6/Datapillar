@@ -27,8 +27,39 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from datapillar_oneagentic.core.agent import AgentRegistry, AgentSpec
 from datapillar_oneagentic.react.schemas import Plan, PlannerOutput
+from datapillar_oneagentic.utils.structured_output import parse_structured_output
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_planner_output(result: Any) -> PlannerOutput:
+    """
+    解析 Planner 输出（带 fallback）
+
+    优先使用 LangChain 解析结果，失败时用内部解析器兜底。
+    """
+    # 1. 直接是目标类型
+    if isinstance(result, PlannerOutput):
+        return result
+
+    # 2. dict 格式（include_raw=True）
+    if isinstance(result, dict):
+        parsed = result.get("parsed")
+        if isinstance(parsed, PlannerOutput):
+            return parsed
+
+        # parsed 是 dict
+        if isinstance(parsed, dict):
+            return PlannerOutput.model_validate(parsed)
+
+        # 从 raw 提取
+        raw = result.get("raw")
+        if raw:
+            content = getattr(raw, "content", None)
+            if content:
+                return parse_structured_output(content, PlannerOutput)
+
+    raise ValueError(f"无法解析 Planner 输出: {type(result)}")
 
 
 PLANNER_SYSTEM_PROMPT = """你是一个智能规划器，负责将用户目标分解为可执行的任务。
@@ -119,8 +150,11 @@ async def create_plan(
     # 调用 LLM
     logger.info(f"Planner 开始规划: {goal[:100]}...")
 
-    structured_llm = llm.with_structured_output(PlannerOutput)
-    output: PlannerOutput = await structured_llm.ainvoke(messages)
+    structured_llm = llm.with_structured_output(PlannerOutput, method="json_mode", include_raw=True)
+    result = await structured_llm.ainvoke(messages)
+
+    # 解析结果（带 fallback）
+    output = _parse_planner_output(result)
 
     # 构建 Plan
     plan = Plan(goal=goal, status="executing")
@@ -193,8 +227,11 @@ async def replan(
 
     logger.info(f"Planner 重新规划: {plan.goal[:100]}...")
 
-    structured_llm = llm.with_structured_output(PlannerOutput)
-    output: PlannerOutput = await structured_llm.ainvoke(messages)
+    structured_llm = llm.with_structured_output(PlannerOutput, method="json_mode", include_raw=True)
+    result = await structured_llm.ainvoke(messages)
+
+    # 解析结果（带 fallback）
+    output = _parse_planner_output(result)
 
     # 构建新 Plan
     new_plan = Plan(

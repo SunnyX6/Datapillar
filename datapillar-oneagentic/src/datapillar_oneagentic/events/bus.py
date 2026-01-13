@@ -54,7 +54,7 @@ class EventBus:
         print(f"Agent {event.agent_name} started")
 
     # 发送事件
-    event_bus.emit(self, AgentStartedEvent(agent_id="analyst", agent_name="分析师"))
+    await event_bus.emit(self, AgentStartedEvent(agent_id="analyst", agent_name="分析师"))
     ```
     """
 
@@ -83,20 +83,6 @@ class EventBus:
             max_workers=5,
             thread_name_prefix="EventBusSync",
         )
-
-        # 异步事件循环
-        self._loop = asyncio.new_event_loop()
-        self._loop_thread = threading.Thread(
-            target=self._run_loop,
-            name="EventBusLoop",
-            daemon=True,
-        )
-        self._loop_thread.start()
-
-    def _run_loop(self) -> None:
-        """运行异步事件循环"""
-        asyncio.set_event_loop(self._loop)
-        self._loop.run_forever()
 
     def on(
         self,
@@ -140,31 +126,6 @@ class EventBus:
                 if event_type in self._sync_handlers:
                     self._sync_handlers[event_type].discard(handler)
 
-    def emit(self, source: Any, event: BaseEvent) -> None:
-        """发送事件"""
-        if self._shutting_down:
-            return
-
-        event_type = type(event)
-
-        with self._lock:
-            sync_handlers = set(self._sync_handlers.get(event_type, set()))
-            async_handlers = set(self._async_handlers.get(event_type, set()))
-
-        # 执行同步处理器
-        for handler in sync_handlers:
-            try:
-                self._executor.submit(self._call_sync_handler, handler, source, event)
-            except Exception as e:
-                logger.error(f"提交同步处理器失败: {handler.__name__}, 错误: {e}")
-
-        # 执行异步处理器
-        if async_handlers:
-            asyncio.run_coroutine_threadsafe(
-                self._call_async_handlers(source, event, async_handlers),
-                self._loop,
-            )
-
     def _call_sync_handler(
         self,
         handler: SyncHandler,
@@ -184,17 +145,19 @@ class EventBus:
         handlers: set[AsyncHandler],
     ) -> None:
         """调用异步处理器"""
-        coros = [handler(source, event) for handler in handlers]
+        # 转为 list 保证顺序一致（set 无序，两次迭代顺序可能不同）
+        handlers_list = list(handlers)
+        coros = [handler(source, event) for handler in handlers_list]
         results = await asyncio.gather(*coros, return_exceptions=True)
 
-        for handler, result in zip(handlers, results, strict=False):
+        for handler, result in zip(handlers_list, results, strict=False):
             if isinstance(result, Exception):
                 logger.error(
                     f"异步处理器错误: {getattr(handler, '__name__', handler)}, 错误: {result}"
                 )
 
-    async def aemit(self, source: Any, event: BaseEvent) -> None:
-        """异步发送事件"""
+    async def emit(self, source: Any, event: BaseEvent) -> None:
+        """发送事件"""
         if self._shutting_down:
             return
 
@@ -204,15 +167,27 @@ class EventBus:
             sync_handlers = set(self._sync_handlers.get(event_type, set()))
             async_handlers = set(self._async_handlers.get(event_type, set()))
 
-        # 执行同步处理器
-        for handler in sync_handlers:
-            try:
-                handler(source, event)
-            except Exception as e:
-                logger.error(f"同步处理器错误: {handler.__name__}, 错误: {e}")
+        loop = asyncio.get_running_loop()
 
-        # 执行异步处理器
-        await self._call_async_handlers(source, event, async_handlers)
+        # 执行同步处理器（在线程池中执行，避免阻塞主事件循环）
+        sync_tasks = [
+            loop.run_in_executor(
+                self._executor,
+                self._call_sync_handler,
+                handler,
+                source,
+                event,
+            )
+            for handler in sync_handlers
+        ]
+
+        # 并发执行同步和异步处理器
+        all_tasks: list[Any] = sync_tasks
+        if async_handlers:
+            all_tasks.append(self._call_async_handlers(source, event, async_handlers))
+
+        if all_tasks:
+            await asyncio.gather(*all_tasks, return_exceptions=True)
 
     @contextmanager
     def scoped_handlers(self) -> Generator[None, Any, None]:
@@ -252,12 +227,6 @@ class EventBus:
         """关闭事件总线"""
         with self._lock:
             self._shutting_down = True
-
-        if hasattr(self, "_loop") and self._loop and not self._loop.is_closed():
-            self._loop.call_soon_threadsafe(self._loop.stop)
-            if hasattr(self, "_loop_thread"):
-                self._loop_thread.join(timeout=5)
-            self._loop.close()
 
         if hasattr(self, "_executor"):
             self._executor.shutdown(wait=wait)

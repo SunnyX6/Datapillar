@@ -19,17 +19,14 @@ import inspect
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
     from datapillar_oneagentic.a2a.config import A2AConfig
+    from datapillar_oneagentic.mcp.config import MCPServerConfig
 
 logger = logging.getLogger(__name__)
-
-
-# Agent run 方法的类型签名
-AgentRunFn = Callable[[Any], Awaitable[Any]]
 
 
 @dataclass
@@ -61,12 +58,13 @@ class AgentSpec:
     can_delegate_to: list[str] = field(default_factory=list)
     """可委派的目标 Agent ID 列表（由 Team 在 DYNAMIC 模式下自动设置）"""
 
+    # === 并行执行依赖（PARALLEL 模式）===
+    depends_on: list[str] = field(default_factory=list)
+    """依赖的 Agent ID 列表（PARALLEL 模式下，等待这些 Agent 完成后才执行）"""
+
     # === 交付物契约 ===
     deliverable_schema: type[BaseModel] | None = None
     """交付物数据结构（Pydantic 模型，框架自动处理 LLM 结构化输出）"""
-
-    deliverable_key: str = ""
-    """交付物标识 key（如 analysis, plan，用于存储和下游获取）"""
 
     # === 执行配置 ===
     temperature: float = 0.0
@@ -90,9 +88,13 @@ class AgentSpec:
     a2a_agents: list[A2AConfig] = field(default_factory=list)
     """远程 A2A Agent 配置列表（框架自动创建委派工具）"""
 
+    # === MCP 服务器 ===
+    mcp_servers: list[MCPServerConfig] = field(default_factory=list)
+    """MCP 服务器配置列表（框架自动将 MCP 工具转换为 Agent 可调用的工具）"""
+
     # === 运行时（框架填充）===
-    run_fn: AgentRunFn | None = None
-    """Agent 的 run() 方法"""
+    agent_class: type | None = None
+    """Agent 类引用（执行时按需创建实例，避免单例共享）"""
 
 
 class AgentRegistry:
@@ -189,9 +191,12 @@ def _validate_run_method(cls: type) -> None:
 
 
 def _validate_deliverable_schema(schema: type | None, class_name: str) -> None:
-    """校验 deliverable_schema"""
+    """校验 deliverable_schema（必填）"""
     if schema is None:
-        return
+        raise ValueError(
+            f"Agent {class_name} 必须声明 deliverable_schema，"
+            f"框架统一使用结构化 JSON 输出"
+        )
 
     # 检查是否是 Pydantic 模型
     from pydantic import BaseModel
@@ -207,14 +212,15 @@ def agent(
     id: str,
     name: str,
     *,
+    deliverable_schema: type,
     description: str = "",
     tools: list[str] | None = None,
+    mcp_servers: list[MCPServerConfig] | None = None,
     a2a_agents: list[A2AConfig] | None = None,
-    deliverable_schema: type | None = None,
-    deliverable_key: str = "",
     temperature: float = 0.0,
     max_steps: int | None = None,
     knowledge_domains: list[str] | None = None,
+    depends_on: list[str] | None = None,
 ):
     """
     Agent 定义装饰器
@@ -224,12 +230,19 @@ def agent(
 
     使用示例：
     ```python
+    from datapillar_oneagentic.mcp import MCPServerStdio
+
     @agent(
         id="analyst",
         name="需求分析师",
-        tools=["search_tables"],
         deliverable_schema=AnalysisOutput,
-        deliverable_key="analysis",
+        tools=["search_tables"],
+        mcp_servers=[
+            MCPServerStdio(
+                command="npx",
+                args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+            ),
+        ],
     )
     class AnalystAgent:
         SYSTEM_PROMPT = "你是需求分析师..."
@@ -244,19 +257,21 @@ def agent(
     参数：
     - id: Agent 唯一标识（小写字母开头，只能包含小写字母、数字、下划线）
     - name: 显示名称
+    - deliverable_schema: 交付物数据结构（Pydantic 模型，必填）
     - description: 能力描述
     - tools: 工具名称列表
+    - mcp_servers: MCP 服务器配置列表（框架自动将 MCP 工具转换为可调用工具）
     - a2a_agents: 远程 A2A Agent 配置列表（跨服务调用）
-    - deliverable_schema: 交付物数据结构（Pydantic 模型）
-    - deliverable_key: 交付物标识 key
     - temperature: LLM 温度
     - max_steps: Agent 最大执行步数（None 时读全局配置 datapillar.agent.max_steps）
     - knowledge_domains: 需要的知识领域 ID 列表
+    - depends_on: 依赖的 Agent ID 列表（PARALLEL 模式下使用）
 
     注意：
     - 入口 Agent 由 Team 的 agents 列表第一个决定
     - 委派关系由 Team 在 DYNAMIC 模式下自动推断
     - 经验学习由 Datapillar(enable_learning=True) 统一控制
+    - 交付物统一用 agent_id 存储和获取
     """
 
     def decorator(cls: type) -> type:
@@ -278,22 +293,21 @@ def agent(
                 f"当前是 {temperature}"
             )
 
-        # === 创建实例和规格 ===
-
-        instance = cls()
+        # === 保存类引用（执行时按需创建实例）===
 
         spec = AgentSpec(
             id=id,
             name=name,
             description=description,
             tools=tools or [],
+            mcp_servers=mcp_servers or [],
             a2a_agents=a2a_agents or [],
             deliverable_schema=deliverable_schema,
-            deliverable_key=deliverable_key,
             temperature=temperature,
             max_steps=max_steps,
             knowledge_domains=knowledge_domains or [],
-            run_fn=instance.run,
+            depends_on=depends_on or [],
+            agent_class=cls,
         )
 
         # 注册

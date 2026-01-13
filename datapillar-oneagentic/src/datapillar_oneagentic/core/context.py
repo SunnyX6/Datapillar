@@ -4,12 +4,14 @@ Agent 执行上下文
 AgentContext 是框架提供给业务 Agent 的接口：
 - 只读信息：query, session_id
 - 工作方法：build_messages, invoke_tools, get_output, clarify
+- 依赖获取：get_deliverable
 
 设计原则：
 - 业务侧只能使用公开的方法和属性
 - 框架内部对象私有化，防止业务侧越权
 - 记忆、LLM、工具等由框架自动管理
 - 委派由框架内部处理，业务侧无需关心
+- Store 操作封装在框架内部，业务侧通过简洁 API 访问
 """
 
 from __future__ import annotations
@@ -18,17 +20,84 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langgraph.prebuilt import ToolNode
 from langgraph.types import Command
 
 from datapillar_oneagentic.core.types import Clarification
-from datapillar_oneagentic.events import event_bus, ToolCalledEvent
+from datapillar_oneagentic.events import event_bus, ToolCalledEvent, ToolCompletedEvent, ToolFailedEvent, LLMThinkingEvent
+from datapillar_oneagentic.utils.structured_output import parse_structured_output
 
 if TYPE_CHECKING:
     from datapillar_oneagentic.core.agent import AgentSpec
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_agent_output(result: Any, schema: type) -> Any:
+    """
+    解析 Agent 输出（带 fallback）
+
+    优先使用 LangChain 解析结果，失败时用内部解析器兜底。
+
+    Args:
+        result: LLM 返回的结果（可能是 dict、Pydantic 对象等）
+        schema: 期望的 Pydantic schema
+
+    Returns:
+        解析后的 schema 实例
+    """
+    # 1. 直接是目标类型
+    if isinstance(result, schema):
+        return result
+
+    # 2. dict 格式（include_raw=True）
+    if isinstance(result, dict):
+        parsed = result.get("parsed")
+        if isinstance(parsed, schema):
+            return parsed
+
+        # parsed 是 dict
+        if isinstance(parsed, dict):
+            return schema.model_validate(parsed)
+
+        # 从 raw 提取
+        raw = result.get("raw")
+        if raw:
+            # 尝试从 content 提取
+            content = getattr(raw, "content", None)
+            if content:
+                return parse_structured_output(content, schema)
+
+            # 尝试从 tool_calls 提取
+            tool_calls = getattr(raw, "tool_calls", None)
+            if tool_calls and isinstance(tool_calls, list) and tool_calls:
+                args = (
+                    tool_calls[0].get("args")
+                    if isinstance(tool_calls[0], dict)
+                    else getattr(tool_calls[0], "args", None)
+                )
+                if isinstance(args, dict):
+                    return schema.model_validate(args)
+                if isinstance(args, str):
+                    return parse_structured_output(args, schema)
+
+    # 生成清晰的错误信息
+    expected_fields = []
+    for name, field_info in schema.model_fields.items():
+        field_type = (
+            field_info.annotation.__name__
+            if hasattr(field_info.annotation, "__name__")
+            else str(field_info.annotation)
+        )
+        desc = field_info.description or ""
+        expected_fields.append(f"  - {name}: {field_type}" + (f" ({desc})" if desc else ""))
+
+    raise ValueError(
+        f"无法解析结构化输出。\n\n"
+        f"期望的 JSON 字段:\n" + "\n".join(expected_fields) + "\n\n"
+        f"建议: 请确保 SYSTEM_PROMPT 中明确指定了 JSON 输出格式，字段名需与上述定义一致。"
+    )
 
 
 class DelegationSignal(Exception):
@@ -60,10 +129,14 @@ class AgentContext:
     - invoke_tools(messages): 执行工具调用循环
     - get_output(messages): 获取结构化输出
     - clarify(message, questions): 请求用户澄清
+    - get_deliverable(key): 获取其他 Agent 的产出
 
     使用示例：
     ```python
     async def run(self, ctx: AgentContext) -> AnalysisOutput | Clarification:
+        # 获取上游 Agent 的产出（通过 agent_id）
+        upstream_data = await ctx.get_deliverable("data_extractor")
+
         # 1. 构建消息
         messages = ctx.build_messages(self.SYSTEM_PROMPT)
 
@@ -82,6 +155,9 @@ class AgentContext:
     """
 
     # === 公开属性（只读）===
+    namespace: str
+    """命名空间"""
+
     session_id: str
     """会话 ID"""
 
@@ -92,11 +168,11 @@ class AgentContext:
     _spec: AgentSpec = field(default=None, repr=False)
     """Agent 规格（框架内部）"""
 
-    _memory: Any = field(default=None, repr=False)
-    """会话记忆（框架自动管理）"""
-
     _knowledge_prompt: str = field(default="", repr=False)
-    """知识上下文（框架自动注入）"""
+    """知识上下文（使用者传入的静态知识）"""
+
+    _experience_prompt: str = field(default="", repr=False)
+    """经验上下文（框架自动检索注入）"""
 
     _llm: Any = field(default=None, repr=False)
     """LLM 实例（框架内部）"""
@@ -121,8 +197,9 @@ class AgentContext:
 
         自动注入：
         - 系统提示词
-        - 记忆上下文（对话历史）
+        - 上游 Agent 执行上下文（enable_share_context=True 时）
         - 知识上下文
+        - 经验上下文
         - 用户查询
 
         参数：
@@ -136,22 +213,28 @@ class AgentContext:
         # 注入上下文
         context_parts = []
 
-        # 会话记忆（框架自动管理）
-        if self._memory:
-            memory_prompt = self._memory.to_prompt()
-            if memory_prompt:
-                context_parts.append(memory_prompt)
+        # 上游 Agent 执行上下文（enable_share_context=True 时由框架注入到 state.messages）
+        # 只共享 HumanMessage 和 AIMessage，不共享 SystemMessage 和 ToolMessage
+        upstream_messages = self._state.get("messages", [])
+        if upstream_messages:
+            for msg in upstream_messages:
+                if isinstance(msg, (HumanMessage, AIMessage)):
+                    messages.append(msg)
 
-        # 知识上下文（框架自动注入）
+        # 知识上下文（使用者传入的静态知识）
         if self._knowledge_prompt:
             context_parts.append(self._knowledge_prompt)
+
+        # 经验上下文（框架自动检索注入）
+        if self._experience_prompt:
+            context_parts.append(self._experience_prompt)
 
         if context_parts:
             context_content = "\n\n".join(context_parts)
             messages.append(SystemMessage(content=context_content))
 
-        # 用户查询
-        if self.query:
+        # 用户查询（如果上游没有 messages，才添加 HumanMessage）
+        if self.query and not upstream_messages:
             messages.append(HumanMessage(content=self.query))
 
         self._messages = messages
@@ -164,6 +247,11 @@ class AgentContext:
         执行 LLM 调用和工具调用的循环，直到 LLM 不再调用工具。
         如果调用了委派工具，会抛出 DelegationSignal 由框架处理。
 
+        关键优化：
+        - bind_tools 时传入 response_format=deliverable_schema
+        - 当 LLM 不再调用工具时，直接返回符合 schema 的 JSON
+        - 无需额外调用 get_output
+
         参数：
         - messages: build_messages() 返回的消息对象
 
@@ -173,15 +261,20 @@ class AgentContext:
         异常：
         - DelegationSignal: 当调用委派工具时（框架内部处理）
         """
+        schema = self._spec.deliverable_schema
+
         if not self._tools:
-            # 没有工具，直接调用 LLM
-            response = await self._llm.ainvoke(messages)
+            # 没有工具，直接调用 LLM（带结构化输出）
+            llm_structured = self._llm.with_structured_output(schema, method="json_mode")
+            response = await llm_structured.ainvoke(messages)
             messages.append(response)
             self._messages = messages
             return messages
 
         # 创建 ToolNode
         tool_node = ToolNode(self._tools)
+
+        # bind_tools 绑定工具
         llm_with_tools = self._llm.bind_tools(self._tools)
 
         # 准备状态
@@ -191,6 +284,17 @@ class AgentContext:
             # LLM 调用
             response = await llm_with_tools.ainvoke(messages)
 
+            # 提取并发送思考内容（如果有）
+            thinking_content = self._extract_thinking(response)
+            if thinking_content:
+                await event_bus.emit(
+                    self,
+                    LLMThinkingEvent(
+                        agent_id=self._spec.id,
+                        thinking_content=thinking_content,
+                    ),
+                )
+
             if not response.tool_calls:
                 # 没有工具调用，结束
                 messages.append(response)
@@ -198,10 +302,16 @@ class AgentContext:
 
             messages.append(response)
 
-            # 发送工具调用事件
+            # 记录工具调用信息（用于后续发送完成/失败事件）
+            tool_calls_info = []
             for tc in response.tool_calls:
                 logger.info(f"🔧 [{self._spec.name}] 调用工具: {tc['name']}")
-                await event_bus.aemit(
+                tool_calls_info.append({
+                    "name": tc["name"],
+                    "args": tc.get("args", {}),
+                    "id": tc.get("id", ""),
+                })
+                await event_bus.emit(
                     self,
                     ToolCalledEvent(
                         agent_id=self._spec.id,
@@ -210,9 +320,27 @@ class AgentContext:
                     ),
                 )
 
-            # 执行工具
+            # 执行工具（记录耗时）
+            import time
+            tool_start_time = time.time()
             current_state["messages"] = messages
-            result = await tool_node.ainvoke(current_state)
+            tool_error = None
+            try:
+                result = await tool_node.ainvoke(current_state)
+            except Exception as e:
+                tool_error = str(e)
+                # 发送所有工具的失败事件
+                for tc_info in tool_calls_info:
+                    await event_bus.emit(
+                        self,
+                        ToolFailedEvent(
+                            agent_id=self._spec.id,
+                            tool_name=tc_info["name"],
+                            error=tool_error,
+                        ),
+                    )
+                raise
+            tool_duration_ms = (time.time() - tool_start_time) * 1000
 
             # 检查是否是委派命令
             if isinstance(result, list) and result and isinstance(result[0], Command):
@@ -228,6 +356,24 @@ class AgentContext:
             else:
                 new_messages = result if isinstance(result, list) else []
 
+            # 发送工具完成事件（从 ToolMessage 中提取结果）
+            tool_outputs = {}
+            for msg in new_messages:
+                if hasattr(msg, "tool_call_id") and hasattr(msg, "content"):
+                    tool_outputs[msg.tool_call_id] = msg.content
+
+            for tc_info in tool_calls_info:
+                tool_output = tool_outputs.get(tc_info["id"], "")
+                await event_bus.emit(
+                    self,
+                    ToolCompletedEvent(
+                        agent_id=self._spec.id,
+                        tool_name=tc_info["name"],
+                        tool_output=tool_output,
+                        duration_ms=tool_duration_ms / len(tool_calls_info) if tool_calls_info else 0,
+                    ),
+                )
+
             messages.extend(new_messages)
 
         self._messages = messages
@@ -237,7 +383,9 @@ class AgentContext:
         """
         获取结构化输出
 
-        根据 Agent 声明的 deliverable_schema 生成结构化输出。
+        优化逻辑：
+        1. 先尝试从最后一条 AIMessage 直接解析 JSON（省一次 LLM 调用）
+        2. 如果解析失败，再调用 LLM 生成结构化输出
 
         参数：
         - messages: invoke_tools() 返回的消息对象
@@ -245,72 +393,63 @@ class AgentContext:
         返回：
         - deliverable_schema 实例
         """
-        from datapillar_oneagentic.utils.structured_output import parse_structured_output
+        schema = self._spec.deliverable_schema
 
-        if not self._spec.deliverable_schema:
-            # 没有 schema，返回最后一条消息内容
-            if messages:
-                last_msg = messages[-1]
-                if hasattr(last_msg, "content"):
-                    return last_msg.content
-            return None
+        # 优化：先尝试从最后一条 AIMessage 直接解析
+        last_ai_content = self._get_last_ai_content(messages)
+        if last_ai_content:
+            try:
+                result = parse_structured_output(last_ai_content, schema)
+                return result
+            except Exception:
+                pass  # 解析失败，回退到 LLM
 
-        # 使用 with_structured_output（json_mode 方法）
+        # 回退：调用 LLM 生成结构化输出
         llm_structured = self._llm.with_structured_output(
-            self._spec.deliverable_schema,
+            schema,
             method="json_mode",
             include_raw=True,
         )
         result = await llm_structured.ainvoke(messages)
 
-        # 1. 直接是目标类型
-        if isinstance(result, self._spec.deliverable_schema):
-            return result
+        # 解析结果（带 fallback）
+        return _parse_agent_output(result, schema)
 
-        # 2. dict 格式（include_raw=True 的返回）
-        if isinstance(result, dict):
-            # 优先使用已解析的结果
-            parsed = result.get("parsed")
-            if isinstance(parsed, self._spec.deliverable_schema):
-                return parsed
+    def _get_last_ai_content(self, messages: list) -> str | None:
+        """获取最后一条 AIMessage 的 content"""
+        for msg in reversed(messages):
+            if isinstance(msg, AIMessage) and msg.content:
+                return msg.content
+        return None
 
-            # parsed 是 dict，用 model_validate 转换
-            if isinstance(parsed, dict):
-                return self._spec.deliverable_schema.model_validate(parsed)
+    def _extract_thinking(self, response: AIMessage) -> str | None:
+        """
+        从 LLM 响应中提取思考内容
 
-            # 从 raw 提取文本，用 parse_structured_output 解析
-            raw = result.get("raw")
-            if raw:
-                content = getattr(raw, "content", None)
-                if content:
-                    return parse_structured_output(content, self._spec.deliverable_schema)
+        支持多种模型的思考格式：
+        - GLM: additional_kwargs.reasoning_content
+        - Claude: content 中的 thinking blocks
+        - DeepSeek: additional_kwargs.reasoning_content
+        """
+        if not isinstance(response, AIMessage):
+            return None
 
-                # 尝试从 tool_calls 提取
-                tool_calls = getattr(raw, "tool_calls", None)
-                if tool_calls and isinstance(tool_calls, list) and tool_calls:
-                    args = (
-                        tool_calls[0].get("args")
-                        if isinstance(tool_calls[0], dict)
-                        else getattr(tool_calls[0], "args", None)
-                    )
-                    if isinstance(args, dict):
-                        return self._spec.deliverable_schema.model_validate(args)
-                    if isinstance(args, str):
-                        return parse_structured_output(args, self._spec.deliverable_schema)
+        # 1. GLM / DeepSeek 格式（reasoning_content）
+        reasoning = response.additional_kwargs.get("reasoning_content")
+        if reasoning:
+            return reasoning
 
-        # 生成清晰的错误信息
-        schema = self._spec.deliverable_schema
-        expected_fields = []
-        for name, field in schema.model_fields.items():
-            field_type = field.annotation.__name__ if hasattr(field.annotation, "__name__") else str(field.annotation)
-            desc = field.description or ""
-            expected_fields.append(f"  - {name}: {field_type}" + (f" ({desc})" if desc else ""))
+        # 2. Claude 格式（content 是 list，包含 thinking blocks）
+        content = response.content
+        if isinstance(content, list):
+            thinking_parts = []
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "thinking":
+                    thinking_parts.append(block.get("thinking", ""))
+            if thinking_parts:
+                return "\n".join(thinking_parts)
 
-        raise ValueError(
-            f"无法获取结构化输出。\n\n"
-            f"期望的 JSON 字段:\n" + "\n".join(expected_fields) + "\n\n"
-            f"建议: 请确保 SYSTEM_PROMPT 中明确指定了 JSON 输出格式，字段名需与上述定义一致。"
-        )
+        return None
 
     def clarify(
         self, message: str, questions: list[str], options: list[dict] | None = None
@@ -334,3 +473,50 @@ class AgentContext:
             questions=questions,
             options=options or [],
         )
+
+    async def get_deliverable(self, agent_id: str) -> Any | None:
+        """
+        获取其他 Agent 的产出
+
+        通过 agent_id 获取上游 Agent 产出的交付物。
+        常用于有依赖关系的 Agent 之间传递数据。
+
+        参数：
+        - agent_id: 上游 Agent 的 ID
+
+        返回：
+        - 交付物内容（dict），如果不存在则返回 None
+
+        使用示例：
+        ```python
+        async def run(self, ctx: AgentContext) -> ReportOutput | Clarification:
+            # 获取数据分析 Agent 的产出
+            analysis = await ctx.get_deliverable("analyst")
+            if not analysis:
+                return ctx.clarify("缺少分析数据", ["请先运行数据分析"])
+
+            # 使用分析结果生成报告
+            ...
+        ```
+        """
+        from langgraph.config import get_store
+
+        store = get_store()
+        if not store:
+            logger.warning("Store 未配置，无法获取 deliverable")
+            return None
+
+        store_namespaces = [
+            ("deliverables", self.namespace, self.session_id, "latest"),
+            ("deliverables", self.namespace, self.session_id),
+        ]
+
+        try:
+            for store_namespace in store_namespaces:
+                item = await store.aget(store_namespace, agent_id)
+                if item:
+                    return item.value
+            return None
+        except Exception as e:
+            logger.error(f"获取 deliverable 失败: {e}")
+            return None

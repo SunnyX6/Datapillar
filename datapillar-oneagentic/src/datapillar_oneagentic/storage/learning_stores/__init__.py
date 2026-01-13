@@ -1,71 +1,43 @@
 """
-Learning Stores - 向量存储
+Learning Stores - 经验向量存储
 
-提供多种向量数据库后端：
-- LanceVectorStore: LanceDB（默认，嵌入式）
-- ChromaVectorStore: Chroma（支持 local/remote）
-- MilvusVectorStore: Milvus（支持 local/remote）
+提供多种向量数据库后端，统一使用 ExperienceStore 抽象接口。
+数据结构统一使用 ExperienceRecord。
+
+实现类：
+- LanceExperienceStore: LanceDB（默认，嵌入式）
+- ChromaExperienceStore: Chroma（可选）
+- MilvusExperienceStore: Milvus（可选）
 
 使用示例：
 ```python
-from datapillar_oneagentic import Datapillar
 from datapillar_oneagentic.storage.learning_stores import (
-    LanceVectorStore,
-    ChromaVectorStore,
-    MilvusVectorStore,
+    ExperienceStore,
+    LanceExperienceStore,
 )
 
-# 使用 LanceDB（默认，嵌入式）
-team = Datapillar(
-    name="分析团队",
-    agents=[...],
-    learning_store=LanceVectorStore(path="./data/experience"),
+# 使用 LanceDB
+store = LanceExperienceStore(
+    path="./data/experience",
+    namespace="my_app",
 )
+await store.initialize()
 
-# 使用 Chroma（本地）
-team = Datapillar(
-    name="分析团队",
-    agents=[...],
-    learning_store=ChromaVectorStore(path="./data/chroma"),
-)
-
-# 使用 Chroma（远程）
-team = Datapillar(
-    name="分析团队",
-    agents=[...],
-    learning_store=ChromaVectorStore(host="localhost", port=8000),
-)
-
-# 使用 Milvus（本地 Lite）
-team = Datapillar(
-    name="分析团队",
-    agents=[...],
-    learning_store=MilvusVectorStore(uri="./data/milvus.db"),
-)
-
-# 使用 Milvus（远程）
-team = Datapillar(
-    name="分析团队",
-    agents=[...],
-    learning_store=MilvusVectorStore(uri="http://localhost:19530", token="root:Milvus"),
-)
+# 所有操作使用 ExperienceRecord
+from datapillar_oneagentic.experience import ExperienceRecord
+record = ExperienceRecord(...)
+await store.add(record)
 ```
 """
 
-from datapillar_oneagentic.storage.learning_stores.base import (
-    VectorStore,
-    VectorRecord,
-    VectorSearchResult,
-)
-from datapillar_oneagentic.storage.learning_stores.lance import LanceVectorStore
-from datapillar_oneagentic.storage.learning_stores.chroma import ChromaVectorStore
-from datapillar_oneagentic.storage.learning_stores.milvus import MilvusVectorStore
+from datapillar_oneagentic.storage.learning_stores.base import ExperienceStore
+from datapillar_oneagentic.storage.learning_stores.lance import LanceExperienceStore
+from datapillar_oneagentic.storage.learning_stores.chroma import ChromaExperienceStore
+from datapillar_oneagentic.storage.learning_stores.milvus import MilvusExperienceStore
 
 __all__ = [
-    "VectorStore",
-    "VectorRecord",
-    "VectorSearchResult",
-    "LanceVectorStore",
-    "ChromaVectorStore",
-    "MilvusVectorStore",
+    "ExperienceStore",
+    "LanceExperienceStore",
+    "ChromaExperienceStore",
+    "MilvusExperienceStore",
 ]

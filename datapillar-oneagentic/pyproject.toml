@@ -40,7 +40,7 @@ dependencies = [
 # LLM 提供者
 openai = ["langchain-openai>=0.2.0", "openai>=1.0.0"]
 anthropic = ["langchain-anthropic>=0.2.0", "anthropic>=0.39.0"]
-litellm = ["litellm>=1.0.0"]
+glm = ["langchain-community>=0.4.1", "zhipuai>=2.1.5.20250825"]
 
 # 存储提供者
 redis = ["langgraph-checkpoint-redis>=0.2.1", "redis>=5.2.1"]
@@ -56,6 +56,9 @@ vectordb = ["datapillar-oneagentic[lance,chroma,milvus]"]
 # MCP 协议支持
 mcp = ["mcp>=0.1.0"]
 
+# A2A 协议支持（Google Agent2Agent）
+a2a = ["a2a-sdk>=0.2.0"]
+
 # 遥测（可观测性）
 telemetry = [
     "opentelemetry-api>=1.39.1",
@@ -68,7 +71,7 @@ sse = ["sse-starlette>=1.6.5"]
 
 # 全部依赖
 all = [
-    "datapillar-oneagentic[openai,anthropic,litellm,redis,postgres,sqlite,lance,chroma,milvus,mcp,telemetry,sse]"
+    "datapillar-oneagentic[openai,anthropic,glm,redis,postgres,sqlite,lance,chroma,milvus,mcp,a2a,telemetry,sse]"
 ]
 
 # 开发依赖
@@ -79,6 +82,8 @@ dev = [
     "black>=24.0.0",
     "pyright>=1.1.0",
     "pre-commit>=4.5.0",
+    "langchain-community>=0.4.1",
+    "zhipuai>=2.1.5.20250825",
 ]
 
 [project.urls]

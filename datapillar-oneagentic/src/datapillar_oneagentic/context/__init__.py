@@ -2,16 +2,16 @@
 Context 模块 - 统一的上下文管理
 
 提供：
-- ContextBuilder: 统一的上下文构建器（协调 memory 和 timeline）
-- EventType: 统一的事件类型
+- ContextBuilder: 统一的上下文管理器（管理 messages、timeline、压缩）
 - Timeline: 执行时间线
-- CheckpointManager: 检查点管理
-- Memory: 会话记忆（重导出）
+- Compaction: 上下文压缩
+- Knowledge: 知识注册
 
 设计原则：
-- session_id, team_id, user_id 由 Blackboard 管理（单一来源）
-- memory 和 timeline 在 Blackboard 中独立存储
-- ContextBuilder 从 Blackboard 恢复，提供统一操作 API
+- 所有上下文操作通过 ContextBuilder
+- messages 是 LangGraph 的短期记忆
+- Timeline 记录执行历史
+- 压缩在 ContextBuilder 中自动触发
 """
 
 from datapillar_oneagentic.context.types import (
@@ -28,20 +28,18 @@ from datapillar_oneagentic.context.timeline import (
     TimeTravelResult,
 )
 from datapillar_oneagentic.context.checkpoint import CheckpointManager
-from datapillar_oneagentic.context.memory import (
-    SessionMemory,
-    ConversationEntry,
-    ConversationMemory,
-    EntryType,
-    PinnedContext,
-    Decision,
-    ArtifactRef,
+from datapillar_oneagentic.context.compaction import (
     CompactPolicy,
     CompactResult,
     Compactor,
     get_compactor,
     clear_compactor_cache,
-    EntryCategory,
+)
+from datapillar_oneagentic.context.knowledge import (
+    KnowledgeRegistry,
+    KnowledgeDomain,
+    KnowledgeLevel,
+    AgentKnowledgeContribution,
 )
 
 __all__ = [
@@ -59,19 +57,15 @@ __all__ = [
     "TimeTravelResult",
     # 检查点
     "CheckpointManager",
-    # 记忆
-    "SessionMemory",
-    "ConversationEntry",
-    "ConversationMemory",
-    "EntryType",
-    "PinnedContext",
-    "Decision",
-    "ArtifactRef",
     # 压缩
     "CompactPolicy",
     "CompactResult",
     "Compactor",
     "get_compactor",
     "clear_compactor_cache",
-    "EntryCategory",
+    # 知识
+    "KnowledgeRegistry",
+    "KnowledgeDomain",
+    "KnowledgeLevel",
+    "AgentKnowledgeContribution",
 ]

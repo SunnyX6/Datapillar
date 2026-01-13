@@ -26,8 +26,39 @@ from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from datapillar_oneagentic.react.schemas import Plan, Reflection, ReflectorOutput
+from datapillar_oneagentic.utils.structured_output import parse_structured_output
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_reflector_output(result: Any) -> ReflectorOutput:
+    """
+    解析 Reflector 输出（带 fallback）
+
+    优先使用 LangChain 解析结果，失败时用内部解析器兜底。
+    """
+    # 1. 直接是目标类型
+    if isinstance(result, ReflectorOutput):
+        return result
+
+    # 2. dict 格式（include_raw=True）
+    if isinstance(result, dict):
+        parsed = result.get("parsed")
+        if isinstance(parsed, ReflectorOutput):
+            return parsed
+
+        # parsed 是 dict
+        if isinstance(parsed, dict):
+            return ReflectorOutput.model_validate(parsed)
+
+        # 从 raw 提取
+        raw = result.get("raw")
+        if raw:
+            content = getattr(raw, "content", None)
+            if content:
+                return parse_structured_output(content, ReflectorOutput)
+
+    raise ValueError(f"无法解析 Reflector 输出: {type(result)}")
 
 
 REFLECTOR_SYSTEM_PROMPT = """你是一个智能反思器，负责评估任务执行结果并决定下一步行动。
@@ -120,8 +151,11 @@ async def reflect(
 
     logger.info("Reflector 开始反思...")
 
-    structured_llm = llm.with_structured_output(ReflectorOutput)
-    output: ReflectorOutput = await structured_llm.ainvoke(messages)
+    structured_llm = llm.with_structured_output(ReflectorOutput, method="json_mode", include_raw=True)
+    result = await structured_llm.ainvoke(messages)
+
+    # 解析结果（带 fallback）
+    output = _parse_reflector_output(result)
 
     reflection = Reflection(
         goal_achieved=output.goal_achieved,

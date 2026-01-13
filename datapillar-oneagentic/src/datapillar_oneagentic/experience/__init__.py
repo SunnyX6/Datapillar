@@ -1,85 +1,63 @@
 """
 Experience 模块 - 经验学习系统
 
-从执行历史中学习，提供：
-- Episode: 经验片段记录
-- ExperienceRetriever: 经验检索器
-- ExperienceLearner: 经验学习器
-
-存储使用 storage/learning_stores 的 VectorStore。
+职责：
+1. 自动记录执行过程
+2. 使用者调用 save_experience 保存（包含 feedback）
+3. 检索相似经验，自动拼接上下文
 
 使用示例：
 ```python
-from datapillar_oneagentic.experience import (
-    Episode,
-    ExperienceRetriever,
-    ExperienceLearner,
+from datapillar_oneagentic import Datapillar
+
+team = Datapillar(
+    agents=[...],
+    enable_learning=True,
 )
-from datapillar_oneagentic.storage.learning_stores import LanceVectorStore
 
-# 初始化存储
-store = LanceVectorStore(path="./data/experience")
-await store.initialize()
+# 执行任务（框架自动记录）
+async for event in team.stream(query="分析销售数据", session_id="s001"):
+    ...
 
-# 检索相似经验
-retriever = ExperienceRetriever(store=store)
-advice = await retriever.get_advice_for_task("分析销售数据")
-
-# 学习新经验
-learner = ExperienceLearner(store=store, llm=llm)
-episode = learner.start_episode(
-    session_id="...",
-    user_id="...",
-    goal="分析销售数据",
+# 保存经验（包含用户反馈）
+await team.save_experience(
+    session_id="s001",
+    feedback={"stars": 5, "comment": "很好用"},
 )
-# ... 执行任务 ...
-await learner.complete_and_learn(episode, outcome=Outcome.SUCCESS)
+
+# 不调用 save_experience = 不保存
+```
+
+数据模型：
+```python
+ExperienceRecord:
+    id: str               # 记录 ID
+    namespace: str        # 命名空间（隔离不同团队）
+    session_id: str       # 会话 ID
+    goal: str             # 用户目标
+    outcome: str          # 执行结果
+    result_summary: str   # 结果摘要
+    tools_used: list      # 使用的工具
+    agents_involved: list # 参与的 Agent
+    duration_ms: int      # 执行时长
+    feedback: dict        # 用户反馈
+    created_at: int       # 创建时间
 ```
 """
 
-from datapillar_oneagentic.experience.episode import (
-    Episode,
-    EpisodeStep,
-    Outcome,
-    ValidationStatus,
-)
-from datapillar_oneagentic.experience.learner import ExperienceLearner, LearningResult
-from datapillar_oneagentic.experience.policy import (
-    AlwaysSavePolicy,
-    CompositePolicy,
-    DefaultSedimentationPolicy,
-    FeedbackAwareSedimentationPolicy,
-    NeverSavePolicy,
-    QualityThresholdPolicy,
-    SedimentationDecision,
-    SedimentationPolicy,
-    TaskTypePolicy,
+from datapillar_oneagentic.experience.learner import (
+    ExperienceLearner,
+    ExperienceRecord,
 )
 from datapillar_oneagentic.experience.retriever import (
     ExperienceRetriever,
-    TaskAdvice,
 )
 
 __all__ = [
-    # 数据模型
-    "Episode",
-    "EpisodeStep",
-    "Outcome",
-    "ValidationStatus",
-    # 检索
-    "ExperienceRetriever",
-    "TaskAdvice",
-    # 学习
+    # 数据结构
+    "ExperienceRecord",
+    # 学习器
     "ExperienceLearner",
-    "LearningResult",
-    # 沉淀策略
-    "SedimentationPolicy",
-    "SedimentationDecision",
-    "DefaultSedimentationPolicy",
-    "FeedbackAwareSedimentationPolicy",
-    "AlwaysSavePolicy",
-    "NeverSavePolicy",
-    "CompositePolicy",
-    "TaskTypePolicy",
-    "QualityThresholdPolicy",
+    # 检索器
+    "ExperienceRetriever",
 ]

@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import threading
 from typing import Any
 
 from langchain_core.caches import RETURN_VAL_TYPE, BaseCache
@@ -140,6 +141,7 @@ class InMemoryLLMCache(BaseCache):
     - 规范化处理：去除动态 ID
     - 内存存储：简单可靠
     - 支持 TTL（通过定期清理）
+    - 线程安全
     """
 
     def __init__(
@@ -151,6 +153,7 @@ class InMemoryLLMCache(BaseCache):
         self.ttl_seconds = ttl_seconds
         self.max_size = max_size
         self._cache: dict[str, tuple[str, float]] = {}  # key -> (value, timestamp)
+        self._lock = threading.RLock()  # 可重入锁，保证线程安全
 
     def lookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
         """查询缓存"""
@@ -158,19 +161,18 @@ class InMemoryLLMCache(BaseCache):
 
         cache_key = _compute_cache_key(prompt, llm_string)
 
-        if cache_key not in self._cache:
-            return None
+        with self._lock:
+            if cache_key not in self._cache:
+                return None
 
-        data, timestamp = self._cache[cache_key]
+            data, timestamp = self._cache[cache_key]
 
-        # 检查 TTL
-        if time.time() - timestamp > self.ttl_seconds:
-            del self._cache[cache_key]
-            return None
+            # 检查 TTL
+            if time.time() - timestamp > self.ttl_seconds:
+                del self._cache[cache_key]
+                return None
 
         result = _deserialize_return_val(data)
-        if result is not None:
-            logger.debug(f"[LLM 缓存命中] key={cache_key[:20]}...")
         return result
 
     def update(self, prompt: str, llm_string: str, return_val: RETURN_VAL_TYPE) -> None:
@@ -194,24 +196,24 @@ class InMemoryLLMCache(BaseCache):
         if not has_content:
             return
 
-        # 清理过期和超限
-        self._cleanup()
-
         cache_key = _compute_cache_key(prompt, llm_string)
         data = _serialize_return_val(return_val)
 
-        self._cache[cache_key] = (data, time.time())
-        logger.debug(f"[LLM 缓存写入] key={cache_key[:20]}...")
+        with self._lock:
+            # 清理过期和超限
+            self._cleanup()
+            self._cache[cache_key] = (data, time.time())
+
 
     def _cleanup(self) -> None:
-        """清理过期和超限的缓存"""
+        """清理过期和超限的缓存（调用方需持有锁）"""
         import time
 
         current_time = time.time()
 
-        # 清理过期
+        # 清理过期：先复制 keys 避免迭代时修改
         expired_keys = [
-            k for k, (_, ts) in self._cache.items()
+            k for k, (_, ts) in list(self._cache.items())
             if current_time - ts > self.ttl_seconds
         ]
         for k in expired_keys:
@@ -220,7 +222,7 @@ class InMemoryLLMCache(BaseCache):
         # 清理超限（LRU 简化版：按时间戳排序删除最旧的）
         if len(self._cache) > self.max_size:
             sorted_keys = sorted(
-                self._cache.keys(),
+                list(self._cache.keys()),
                 key=lambda k: self._cache[k][1]
             )
             to_remove = len(self._cache) - self.max_size
@@ -229,7 +231,8 @@ class InMemoryLLMCache(BaseCache):
 
     def clear(self, **kwargs: Any) -> None:
         """清空缓存"""
-        self._cache.clear()
+        with self._lock:
+            self._cache.clear()
         logger.info("LLM 缓存已清空")
 
 
@@ -271,8 +274,6 @@ class RedisLLMCache(BaseCache):
                 return None
 
             result = _deserialize_return_val(data)
-            if result is not None:
-                logger.debug(f"[LLM Redis 缓存命中] key={cache_key[:20]}...")
             return result
 
         except Exception as e:
@@ -304,7 +305,6 @@ class RedisLLMCache(BaseCache):
             data = _serialize_return_val(return_val)
 
             client.set(cache_key, data, ex=self.ttl_seconds)
-            logger.debug(f"[LLM Redis 缓存写入] key={cache_key[:20]}..., ttl={self.ttl_seconds}s")
 
         except Exception as e:
             logger.warning(f"Redis 缓存写入失败: {e}")
@@ -331,30 +331,38 @@ def create_llm_cache() -> BaseCache | None:
     """
     创建 LLM 缓存实例（从配置读取）
 
-    配置项（configure 时设置 cache）：
-    - enabled: 是否启用缓存（默认 False）
+    配置项（在 llm.cache 下）：
+    - enabled: 是否启用缓存（默认 True）
+    - backend: 缓存后端 memory 或 redis（默认 memory）
     - ttl_seconds: TTL 秒（默认 300）
+    - max_size: 内存缓存最大条目数（默认 1000）
+    - redis_url: Redis URL（backend=redis 时必填）
     - key_prefix: Redis key 前缀（默认 llm_cache:）
-    - redis_url: Redis URL（设置则使用 Redis，否则使用内存）
     """
-    # 延迟导入避免循环依赖
     from datapillar_oneagentic.config import datapillar
 
-    cache_config = datapillar.cache
+    cache_config = datapillar.llm.cache
 
     if not cache_config.enabled:
-        logger.debug("LLM 缓存已禁用")
         return None
 
-    ttl_seconds = cache_config.ttl_seconds
-    key_prefix = cache_config.key_prefix
-    redis_url = datapillar.model_extra.get("redis_url") if datapillar.model_extra else None
+    backend = cache_config.backend.lower()
 
-    if redis_url:
+    if backend == "redis":
+        if not cache_config.redis_url:
+            logger.warning("LLM 缓存配置 backend=redis，但未设置 redis_url，降级为内存缓存")
+            return InMemoryLLMCache(
+                ttl_seconds=cache_config.ttl_seconds,
+                max_size=cache_config.max_size,
+            )
+
         return RedisLLMCache(
-            redis_url=redis_url,
-            ttl_seconds=ttl_seconds,
-            key_prefix=key_prefix,
+            redis_url=cache_config.redis_url,
+            ttl_seconds=cache_config.ttl_seconds,
+            key_prefix=cache_config.key_prefix,
         )
     else:
-        return InMemoryLLMCache(ttl_seconds=ttl_seconds)
+        return InMemoryLLMCache(
+            ttl_seconds=cache_config.ttl_seconds,
+            max_size=cache_config.max_size,
+        )
