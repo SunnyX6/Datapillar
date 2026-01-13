@@ -67,7 +67,6 @@ class ToolRegistry:
             logger.warning(f"工具 {name} 已存在，将被覆盖")
 
         cls._tools[name] = tool_instance
-        logger.debug(f"🔧 工具注册: {name}")
 
     @classmethod
     def get(cls, name: str) -> BaseTool | None:

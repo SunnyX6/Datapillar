@@ -4,17 +4,18 @@ SSE 流管理器
 目标：
 - 多智能体输出以 SSE/JSON 事件流方式推送
 - 支持断线重连后的事件重放（基于 Last-Event-ID）
-- 明确区分：
-  - transport resume：断线续传（Last-Event-ID / seq）
-  - orchestrator resume_value：人机交互 interrupt 的继续执行
+- 支持人机交互（interrupt/resume）
 
 SSE 架构说明：
-- Orchestrator.stream() 使用 LangGraph 的 astream_events 获取所有事件
-- Orchestrator.stream() 直接 yield SSE 事件（dict 格式）
+- Orchestrator.stream() 支持三种场景：
+  1. 新会话/续聊：query 不为空
+  2. interrupt 恢复：resume_value 不为空
+  3. 前端需要根据 interrupt 事件决定如何恢复
 - StreamManager 负责：
   - 管理订阅者（多客户端）
   - 事件缓冲和重放
   - 断线重连
+  - 用户主动打断（abort）
 
 使用示例：
 ```python
@@ -23,19 +24,28 @@ from datapillar_oneagentic.sse import StreamManager
 # 创建管理器
 stream_manager = StreamManager()
 
-# 启动流
+# 场景 1: 新会话或续聊
 await stream_manager.chat(
     orchestrator=orchestrator,
-    user_query="请帮我查询...",
+    query="请帮我查询...",
     session_id="session123",
-    user_id="user456",
 )
+
+# 场景 2: 恢复 interrupt（用户回答 Agent 的问题）
+await stream_manager.chat(
+    orchestrator=orchestrator,
+    query=None,  # 可选，作为上下文
+    session_id="session123",
+    resume_value="是的，我确认继续",  # 用户对 interrupt 的回答
+)
+
+# 场景 3: 用户主动打断
+await stream_manager.abort(session_id="session123")
 
 # 订阅流
 async for event in stream_manager.subscribe(
     request=request,
     session_id="session123",
-    user_id="user456",
     last_event_id=None,
 ):
     yield event
@@ -81,19 +91,30 @@ class OrchestratorProtocol(Protocol):
     """
     Orchestrator 协议
 
-    stream() 方法直接 yield SSE 事件（dict 格式），
-    SSE 事件由 Orchestrator 内部通过 astream_events 获取并转换。
+    stream() 方法支持三种场景：
+    1. 新会话/续聊：query 不为空，resume_value 为空
+    2. interrupt 恢复：resume_value 不为空
+    3. 纯续聊：query 不为空，已有会话状态
     """
 
     async def stream(
         self,
         *,
-        query: str,
+        query: str | None = None,
         session_id: str,
-        user_id: str,
         resume_value: Any | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
-        """流式执行，直接 yield SSE 事件"""
+        """
+        流式执行
+
+        参数：
+        - query: 用户输入（新问题或续聊内容）
+        - session_id: 会话 ID
+        - resume_value: interrupt 恢复值（用户对 interrupt 的回答）
+
+        返回：
+        - SSE 事件流
+        """
         ...
 
 
@@ -118,7 +139,6 @@ class _SessionRun:
     打断只影响当前 run，不影响 session。
     """
 
-    user_id: str
     session_id: str
     created_at_ms: int = field(default_factory=_now_ms)
     last_activity_ms: int = field(default_factory=_now_ms)
@@ -156,13 +176,13 @@ class StreamManager:
         - subscriber_queue_size: 订阅者队列大小
         - session_ttl_seconds: 会话过期时间（秒）
         """
-        self._runs: dict[tuple[str, str], _SessionRun] = {}
+        self._runs: dict[str, _SessionRun] = {}
         self._buffer_size = max(100, buffer_size)
         self._subscriber_queue_size = max(50, subscriber_queue_size)
         self._session_ttl_seconds = max(60, session_ttl_seconds)
 
-    def _key(self, user_id: str, session_id: str) -> tuple[str, str]:
-        return user_id, session_id
+    def _key(self, session_id: str) -> str:
+        return session_id
 
     def _cleanup_expired(self) -> None:
         """清理过期会话"""
@@ -213,7 +233,6 @@ class StreamManager:
         orchestrator: OrchestratorProtocol,
         query: str | None,
         session_id: str,
-        user_id: str,
         resume_value: Any | None,
     ) -> None:
         """
@@ -222,17 +241,23 @@ class StreamManager:
         Orchestrator.stream() 直接 yield SSE 事件，
         StreamManager 将这些事件发送给订阅者。
 
+        参数：
+        - orchestrator: 编排器实例
+        - query: 用户输入（新问题或续聊）
+        - session_id: 会话 ID
+        - resume_value: interrupt 恢复值
+
         打断处理：
         - CancelledError 表示用户主动打断
         - 发送 aborted 事件通知前端
         """
-        run = self._runs[self._key(user_id, session_id)]
+        run = self._runs[self._key(session_id)]
 
         try:
             async for msg in orchestrator.stream(
-                query=query or "",
+                query=query,
                 session_id=session_id,
-                user_id=user_id,
+                resume_value=resume_value,
             ):
                 await self._emit(run, msg)
         except asyncio.CancelledError:
@@ -258,7 +283,6 @@ class StreamManager:
         orchestrator: OrchestratorProtocol,
         query: str | None,
         session_id: str,
-        user_id: str,
         resume_value: Any | None = None,
     ) -> None:
         """
@@ -273,11 +297,11 @@ class StreamManager:
         - 打断的是 run，不是 session（对话历史保留）
         """
         self._cleanup_expired()
-        key = self._key(user_id, session_id)
+        key = self._key(session_id)
         run = self._runs.get(key)
 
         if run is None:
-            run = _SessionRun(user_id=user_id, session_id=session_id)
+            run = _SessionRun(session_id=session_id)
             self._runs[key] = run
         else:
             async with run.lock:
@@ -299,7 +323,6 @@ class StreamManager:
                 orchestrator=orchestrator,
                 query=query,
                 session_id=session_id,
-                user_id=user_id,
                 resume_value=resume_value,
             )
         )
@@ -309,7 +332,6 @@ class StreamManager:
         *,
         request: Request,
         session_id: str,
-        user_id: str,
         last_event_id: int | None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """
@@ -318,17 +340,16 @@ class StreamManager:
         参数：
         - request: HTTP 请求（用于检测断开）
         - session_id: 会话 ID
-        - user_id: 用户 ID
         - last_event_id: 上次事件 ID（用于断线重连）
 
         生成：
         - SSE 事件字典 {"id": str, "data": str}
         """
         self._cleanup_expired()
-        key = self._key(user_id, session_id)
+        key = self._key(session_id)
         run = self._runs.get(key)
         if run is None:
-            run = _SessionRun(user_id=user_id, session_id=session_id)
+            run = _SessionRun(session_id=session_id)
             self._runs[key] = run
 
         queue: asyncio.Queue[StreamRecord | object] = asyncio.Queue(
@@ -390,7 +411,7 @@ class StreamManager:
                 run.subscribers.discard(queue)
                 run.last_activity_ms = _now_ms()
 
-    def clear_session(self, *, user_id: str, session_id: str) -> bool:
+    def clear_session(self, *, session_id: str) -> bool:
         """
         清理会话缓冲
 
@@ -398,12 +419,12 @@ class StreamManager:
         - True: 存在并已清理
         - False: 不存在
         """
-        key = self._key(user_id, session_id)
+        key = self._key(session_id)
         existed = key in self._runs
         self._runs.pop(key, None)
         return existed
 
-    async def abort(self, *, user_id: str, session_id: str) -> bool:
+    async def abort(self, *, session_id: str) -> bool:
         """
         打断当前 run
 
@@ -414,7 +435,7 @@ class StreamManager:
         - True: 成功打断
         - False: 没有正在运行的 run
         """
-        key = self._key(user_id, session_id)
+        key = self._key(session_id)
         run = self._runs.get(key)
 
         if run is None:

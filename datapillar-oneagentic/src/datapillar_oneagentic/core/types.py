@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, Field
 
 
@@ -60,26 +61,28 @@ class AgentResult(BaseModel):
     - error: 系统异常（技术故障）
     """
 
+    model_config = {"arbitrary_types_allowed": True}
+
     status: AgentResultStatus = Field(..., description="执行状态")
-    summary: str = Field(..., description="一句话总结")
     deliverable: Any | None = Field(None, description="交付物")
     deliverable_type: str | None = Field(None, description="交付物类型")
     clarification: Clarification | None = Field(None, description="澄清请求")
     error: str | None = Field(None, description="错误信息")
+    messages: list[BaseMessage] = Field(default_factory=list, description="Agent 执行过程中的消息")
 
     @classmethod
     def completed(
         cls,
-        summary: str,
         deliverable: Any,
         deliverable_type: str,
+        messages: list[BaseMessage] | None = None,
     ) -> AgentResult:
         """创建成功结果"""
         return cls(
             status="completed",
-            summary=summary,
             deliverable=deliverable,
             deliverable_type=deliverable_type,
+            messages=messages or [],
         )
 
     @classmethod
@@ -87,16 +90,15 @@ class AgentResult(BaseModel):
         """创建需要澄清的结果"""
         return cls(
             status="needs_clarification",
-            summary="需要用户澄清",
             clarification=clarification,
         )
 
     @classmethod
-    def failed(cls, summary: str, error: str) -> AgentResult:
+    def failed(cls, error: str) -> AgentResult:
         """创建业务失败结果"""
-        return cls(status="failed", summary=summary, error=error)
+        return cls(status="failed", error=error)
 
     @classmethod
-    def system_error(cls, summary: str, error: str) -> AgentResult:
+    def system_error(cls, error: str) -> AgentResult:
         """创建系统异常结果"""
-        return cls(status="error", summary=summary, error=error)
+        return cls(status="error", error=error)

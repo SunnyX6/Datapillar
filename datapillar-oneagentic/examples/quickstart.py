@@ -12,6 +12,7 @@ Datapillar OneAgentic 快速入门示例
 """
 
 import asyncio
+import os
 from pydantic import BaseModel, Field
 
 from datapillar_oneagentic import (
@@ -25,21 +26,25 @@ from datapillar_oneagentic import (
     Clarification,
     # 配置
     datapillar_configure,
-    # A2A 远程调用（可选）
-    A2AConfig,
-    APIKeyAuth,
-    # 存储后端（可选）
-    MemoryCheckpointer,
-    InMemoryDeliverableStore,
 )
 
 
 # ============================================================================
-# GLM 配置
+# LLM 配置
 # ============================================================================
-GLM_API_KEY = "da90d1098b0d4126848881f56ee2197c.B77DUfAuh4To29o7"
-GLM_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
-GLM_MODEL = "glm-4.7"
+# GLM 配置（开启思考模式）
+LLM_PROVIDER = "glm"
+LLM_API_KEY = os.environ.get("GLM_API_KEY", "da90d1098b0d4126848881f56ee2197c.B77DUfAuh4To29o7")
+LLM_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
+LLM_MODEL = "glm-4.7"
+LLM_ENABLE_THINKING = False  # 关闭思考模式
+
+# Claude 配置（备用）
+# LLM_PROVIDER = "openai"
+# LLM_API_KEY = "sk-siTBGIFGanUBJfmZRJ407v7MLxW6MDTojdo1vGrQnF1JtNj7"
+# LLM_BASE_URL = "https://privnode.com/v1"
+# LLM_MODEL = "claude-opus-4-5-20251101"
+# LLM_ENABLE_THINKING = False
 
 
 # ============================================================================
@@ -160,7 +165,7 @@ class OrderResult(BaseModel):
 
     # === 交付物契约 ===
     deliverable_schema=ProductAnalysis,        # 交付物数据结构（Pydantic 模型）
-    deliverable_key="analysis",                # 交付物标识（用于存储和下游获取）
+    # 注意：交付物统一用 agent_id 存储和获取，无需单独指定 key
 
     # === 执行配置 ===
     temperature=0.3,                           # LLM 温度（0-2，越高越有创造性）
@@ -198,14 +203,24 @@ class ShoppingAdvisorAgent:
 5. 综合分析，给出推荐
 
 ## 输出要求
-请以 JSON 格式输出，包含以下字段：
+完成分析后，你必须以纯 JSON 格式输出结果，不要包含任何其他文字：
+```json
+{
+  "recommended_products": ["商品1", "商品2"],
+  "reason": "推荐理由",
+  "price_range": "价格区间如 1000-2000元",
+  "confidence": 0.8
+}
+```
+
+字段说明：
 - recommended_products: 推荐商品列表（字符串数组）
 - reason: 推荐理由（字符串）
 - price_range: 价格区间（字符串）
-- confidence: 推荐置信度（0-1 的数字）
+- confidence: 推荐置信度（0-1 的数字，需求明确时 > 0.5）
 
 ## 注意事项
-- 如果需求不明确，置信度设为 0.5 以下
+- 如果需求不明确，confidence 设为 0.5 以下
 - 优先推荐库存充足的商品
 - 考虑性价比
 """
@@ -237,29 +252,66 @@ class ShoppingAdvisorAgent:
     description="协助用户完成下单",
     tools=["create_order", "check_inventory"],
     deliverable_schema=OrderResult,
-    deliverable_key="order",
     temperature=0.0,  # 下单需要精确，温度设为 0
     max_steps=5,
 )
 class OrderAgent:
-    """订单助手 Agent"""
+    """订单助手 Agent - 演示如何获取上游 Agent 的产出"""
 
     SYSTEM_PROMPT = """你是订单助手，负责协助用户完成下单。
 
-## 工作流程
-1. 确认用户要购买的商品
-2. 使用 check_inventory 确认库存
-3. 使用 create_order 创建订单
+## 上游推荐结果
+{upstream_result}
 
-## 输出要求
-请以 JSON 格式输出：
-- success: 是否成功（布尔值）
-- order_id: 订单号（字符串，失败时为 null）
-- message: 结果说明（字符串）
-"""
+## 工作流程
+1. 根据上游推荐的商品，使用 check_inventory 确认库存
+2. 使用 create_order 创建订单（商品名、数量1、用户提供的收货地址）
+
+## 输出格式
+完成下单后，输出 JSON：
+
+{{
+  "success": true,
+  "order_id": "订单号",
+  "message": "订单创建成功说明"
+}}"""
 
     async def run(self, ctx: AgentContext) -> OrderResult | Clarification:
-        """订单处理逻辑"""
+        """订单处理逻辑 - 演示获取上游 Agent 产出"""
+
+        # === 从 store 获取上游 Agent 的产出 ===
+        analysis = await ctx.get_deliverable("shopping_advisor")
+
+        if analysis:
+            print(f"\n📥 获取到上游 Agent [shopping_advisor] 的产出:")
+            print(f"   推荐商品: {analysis.get('recommended_products', [])}")
+            print(f"   推荐理由: {analysis.get('reason', '')[:50]}...")
+
+            # 构建上游结果描述，传给 LLM
+            upstream_result = (
+                f"推荐商品: {analysis.get('recommended_products', [])}\n"
+                f"推荐理由: {analysis.get('reason', '')}\n"
+                f"价格区间: {analysis.get('price_range', '')}"
+            )
+        else:
+            print("\n⚠️ 未获取到上游 Agent [shopping_advisor] 的产出")
+            return ctx.clarify(
+                message="没有找到推荐商品",
+                questions=["请先让购物顾问推荐商品"],
+            )
+
+        # 构建消息，注入上游产物信息
+        prompt = self.SYSTEM_PROMPT.format(upstream_result=upstream_result)
+        messages = ctx.build_messages(prompt)
+
+        # 打印 messages 验证上下文共享
+        print(f"\n🔍 验证跨 Agent 消息共享:")
+        print(f"   消息数量: {len(messages)}")
+        for i, msg in enumerate(messages):
+            msg_type = type(msg).__name__
+            content_preview = str(msg.content)[:80] if hasattr(msg, 'content') else ''
+            print(f"   [{i}] {msg_type}: {content_preview}...")
+
         # 检查是否有收货地址
         if "地址" not in ctx.query and "送到" not in ctx.query and "配送" not in ctx.query:
             return ctx.clarify(
@@ -267,7 +319,6 @@ class OrderAgent:
                 questions=["您的收货地址是？"],
             )
 
-        messages = ctx.build_messages(self.SYSTEM_PROMPT)
         messages = await ctx.invoke_tools(messages)
         return await ctx.get_output(messages)
 
@@ -282,25 +333,21 @@ def create_shopping_team() -> Datapillar:
     创建购物助手团队
 
     展示 Datapillar 的所有配置参数
+    演示两个 Agent 顺序执行，下游 Agent 获取上游产出
     """
     team = Datapillar(
         # === 必填参数 ===
-        name="购物助手团队",                    # 团队名称（全局唯一）
-        agents=[ShoppingAdvisorAgent],         # 单 Agent 演示（简化流程）
+        namespace="shopping_demo",                 # 命名空间（数据隔离边界）
+        name="购物助手团队",                        # 团队名称
+        agents=[ShoppingAdvisorAgent, OrderAgent],  # 两个 Agent 顺序执行
 
         # === 执行模式 ===
         process=Process.SEQUENTIAL,            # SEQUENTIAL: 顺序执行
                                                # DYNAMIC: 动态委派（Agent 自主决定）
 
-        # === 存储后端（可选，不传则用内存）===
-        checkpointer=MemoryCheckpointer(),          # 状态持久化（支持 Redis/Postgres/SQLite）
-        deliverable_store=InMemoryDeliverableStore(),  # 交付物存储（支持 Redis/Postgres）
-        # learning_store=LanceVectorStore(path="./data/experience"),  # 经验学习存储
-
         # === 功能开关 ===
-        enable_memory=True,                    # 启用对话记忆（默认 True）
-        enable_learning=False,                 # 启用经验学习（默认 False，需配置 learning_store）
-        enable_react=False,                    # 启用 ReAct 规划模式（默认 False）
+        enable_share_context=True,             # 启用 Agent 间上下文共享（默认 True）
+        enable_learning=False,                 # 启用经验学习（默认 False）
 
         # === 调试 ===
         verbose=True,                          # 输出详细日志
@@ -315,13 +362,15 @@ def create_shopping_team() -> Datapillar:
 
 async def main():
     """主函数"""
-    # 配置 LLM（使用 GLM）
+    # 配置 LLM
     datapillar_configure(
         llm={
-            "api_key": GLM_API_KEY,
-            "base_url": GLM_BASE_URL,
-            "model": GLM_MODEL,
-            "timeout_seconds": 60,
+            "provider": LLM_PROVIDER,
+            "api_key": LLM_API_KEY,
+            "base_url": LLM_BASE_URL,
+            "model": LLM_MODEL,
+            "enable_thinking": LLM_ENABLE_THINKING,
+            "timeout_seconds": 120,
             "retry": {"max_retries": 2},
         }
     )
@@ -331,8 +380,9 @@ async def main():
 
     print("=" * 60)
     print("🛒 购物助手团队已就绪")
-    print(f"   模型: {GLM_MODEL}")
-    print(f"   成员: 购物顾问")
+    print(f"   模型: {LLM_MODEL}")
+    print(f"   成员: 购物顾问 -> 订单助手（顺序执行）")
+    print("   演示: 下游 Agent 通过 ctx.get_deliverable() 获取上游产出")
     print("=" * 60)
 
     # 示例查询
@@ -345,13 +395,22 @@ async def main():
     async for event in team.stream(
         query=query,
         session_id="demo_001",
-        user_id="test_user",
     ):
         event_type = event.get("event")
         data = event.get("data", {})
 
         if event_type == "agent_start":
             print(f"\n🤖 [{data.get('agent_name')}] 开始工作...")
+        elif event_type == "thinking":
+            # 显示思考过程
+            thinking = data.get("thinking_content", "")
+            if thinking:
+                print(f"\n🧠 [{data.get('agent_id')}] 思考中...")
+                # 截取前 200 字符显示
+                if len(thinking) > 200:
+                    print(f"   {thinking[:200]}...")
+                else:
+                    print(f"   {thinking}")
         elif event_type == "tool_call":
             print(f"   🔧 调用: {data.get('tool_name')}")
         elif event_type == "tool_result":
@@ -376,6 +435,16 @@ async def main():
                         print(f"  {k}: {v}")
                 else:
                     print(f"  {value}")
+
+            # === 验证 deliverable 存储 ===
+            print("\n" + "-" * 60)
+            print("🧪 验证 deliverable 存储（统一用 agent_id）:")
+            if "shopping_advisor" in deliverables:
+                print("  ✅ 正确：deliverable key 是 agent_id (shopping_advisor)")
+            elif "analysis" in deliverables:
+                print("  ❌ 错误：deliverable key 仍是旧的 deliverable_key (analysis)")
+            else:
+                print(f"  ⚠️ deliverable keys: {list(deliverables.keys())}")
         elif event_type == "error":
             print(f"\n❌ 错误: {data.get('detail')}")
 

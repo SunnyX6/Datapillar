@@ -2,6 +2,10 @@
 A2A 配置模型
 
 定义远程 Agent 的连接配置、认证方式等。
+
+安全说明：
+    URL 会进行 SSRF 防护校验，默认禁止访问内网地址。
+    参考：https://modelcontextprotocol.io/specification/draft/basic/security_best_practices
 """
 
 from __future__ import annotations
@@ -9,6 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
+
+from datapillar_oneagentic.security import validate_url
 
 
 class AuthType(str, Enum):
@@ -73,6 +79,9 @@ class A2AConfig:
     - fail_fast: 连接失败时是否立即报错
     - trust_remote_completion: 是否信任远程 Agent 的完成状态
 
+    安全说明：
+        URL 会进行 SSRF 防护校验，默认禁止访问内网地址。
+
     使用示例：
     ```python
     config = A2AConfig(
@@ -93,17 +102,20 @@ class A2AConfig:
     timeout: int = 120
     """请求超时（秒）"""
 
-    max_turns: int = 10
-    """最大对话轮次"""
-
     fail_fast: bool = True
     """连接失败时是否立即报错，False 则跳过该 Agent"""
 
     trust_remote_completion: bool = False
     """是否信任远程 Agent 的完成状态，True 则直接返回远程结果"""
 
+    require_confirmation: bool = True
+    """调用前是否需要用户确认（外部 Agent 行为不可预测）"""
+
     metadata: dict[str, Any] = field(default_factory=dict)
     """额外元数据"""
+
+    skip_security_check: bool = False
+    """跳过安全检查（仅用于测试，生产环境禁止）"""
 
     def __post_init__(self):
         """校验配置"""
@@ -116,5 +128,6 @@ class A2AConfig:
         if self.timeout <= 0:
             raise ValueError(f"timeout 必须大于 0: {self.timeout}")
 
-        if self.max_turns <= 0:
-            raise ValueError(f"max_turns 必须大于 0: {self.max_turns}")
+        # SSRF 防护校验
+        if not self.skip_security_check:
+            validate_url(self.endpoint)

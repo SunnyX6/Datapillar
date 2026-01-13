@@ -5,12 +5,39 @@
 # LLM 配置
 # ============================================================================
 [llm]
-# 基础配置（敏感信息建议用环境变量: DATAPILLAR_LLM__API_KEY）
-# api_key = "sk-xxx"
-model = "glm-4.7"
-base_url = "https://open.bigmodel.cn/api/paas/v4"
+# 基础配置
+# api_key = "sk-xxx"  # 敏感信息建议用环境变量: DATAPILLAR_LLM__API_KEY
+# provider: 支持 openai, anthropic, glm, deepseek, openrouter, ollama
+provider = "openai"
+model = "gpt-4o"
+# base_url = "https://api.openai.com/v1"  # 可选，使用自定义端点时设置
 temperature = 0.0
 timeout_seconds = 120
+
+# --- 其他 Provider 配置示例 ---
+# GLM (智谱):
+#   provider = "glm"
+#   model = "glm-4.7"
+#   base_url = "https://open.bigmodel.cn/api/paas/v4"
+#
+# Anthropic (Claude):
+#   provider = "anthropic"
+#   model = "claude-3-opus-20240229"
+#
+# DeepSeek:
+#   provider = "deepseek"
+#   model = "deepseek-chat"
+#   base_url = "https://api.deepseek.com/v1"
+#
+# OpenRouter:
+#   provider = "openrouter"
+#   model = "anthropic/claude-3-opus"
+#   base_url = "https://openrouter.ai/api/v1"
+#
+# Ollama (本地):
+#   provider = "ollama"
+#   model = "llama3"
+#   base_url = "http://localhost:11434/v1"
 
 # 重试配置
 retry.max_retries = 3
@@ -32,21 +59,66 @@ rate_limit.default.max_concurrent = 10
 # rate_limit.providers.glm.rpm = 10
 # rate_limit.providers.glm.max_concurrent = 3
 
+# LLM 响应缓存配置
+[llm.cache]
+enabled = true
+backend = "memory"  # "memory" 或 "redis"
+ttl_seconds = 300
+max_size = 1000
+
+# --- Redis 缓存配置示例 ---
+# backend = "redis"
+# redis_url = "redis://localhost:6379/0"
+# key_prefix = "llm_cache:"
+
 # ============================================================================
 # Embedding 配置（经验学习需要）
 # ============================================================================
 [embedding]
-# api_key = "sk-xxx"  # 敏感信息建议用环境变量
+# 基础配置
+# api_key = "sk-xxx"  # 敏感信息建议用环境变量: DATAPILLAR_EMBEDDING__API_KEY
+# provider: 支持 openai, glm
+provider = "openai"
 model = "text-embedding-3-small"
+# base_url = "https://api.openai.com/v1"  # 可选，使用自定义端点时设置
 dimension = 1536
+
+# --- 其他 Provider 配置示例 ---
+# GLM (智谱):
+#   provider = "glm"
+#   model = "embedding-3"
+#   dimension = 2048
 
 # ============================================================================
 # Agent 配置
 # ============================================================================
 [agent]
-max_steps = 25
-timeout_seconds = 300.0
-tool_timeout_seconds = 30.0
+max_steps = 50
+timeout_seconds = 300
+tool_timeout_seconds = 30
+checkpoint_ttl_seconds = 604800  # 7天
+
+# Checkpointer 配置（状态持久化）
+[agent.checkpointer]
+type = "memory"  # memory | sqlite | postgres | redis
+# path = "./data/checkpoint.db"  # sqlite 专用
+# url = "redis://localhost:6379"  # postgres/redis 专用
+# ttl_minutes = 10080  # redis 专用
+
+# DeliverableStore 配置（Agent 交付物存储）
+[agent.deliverable_store]
+type = "memory"  # memory | postgres | redis
+# url = "redis://localhost:6379"  # postgres/redis 专用
+
+# LearningStore 配置（经验学习向量数据库）
+[agent.learning_store]
+type = "lance"  # lance | chroma | milvus
+path = "./data/vectors"  # lance/chroma 本地模式
+# uri = "./data/milvus.db"  # milvus 本地模式
+# uri = "http://localhost:19530"  # milvus 远程模式
+# token = "root:Milvus"  # milvus 远程认证
+# host = "localhost"  # chroma 远程模式
+# port = 8000  # chroma 远程端口
 
 # ============================================================================
 # 上下文配置
@@ -55,14 +127,6 @@ tool_timeout_seconds = 30.0
 window_size = 200000
 compact_trigger_threshold = 0.95
 compact_target_ratio = 0.6
-
-# ============================================================================
-# 缓存配置
-# ============================================================================
-[cache]
-enabled = true
-ttl_seconds = 300
-key_prefix = "llm_cache:"
 
 # ============================================================================
 # 遥测配置（可观测性）

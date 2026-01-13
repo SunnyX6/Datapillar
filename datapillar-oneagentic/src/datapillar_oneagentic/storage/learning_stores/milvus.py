@@ -1,45 +1,27 @@
 """
-MilvusVectorStore - Milvus 向量存储
+MilvusExperienceStore - Milvus 实现
 
 支持本地和远程两种模式：
 - 本地模式：使用 Milvus Lite，嵌入式存储
 - 远程模式：连接 Milvus Server
 
 依赖：pip install pymilvus>=2.5.3
-
-使用示例：
-```python
-from datapillar_oneagentic.storage.learning_stores import (
-    LearningStore,
-    MilvusVectorStore,
-)
-
-# 本地模式 (Milvus Lite)
-vector_store = MilvusVectorStore(uri="./data/milvus.db")
-
-# 远程模式
-vector_store = MilvusVectorStore(uri="http://localhost:19530", token="root:Milvus")
-
-learning_store = LearningStore(vector_store=vector_store)
-await learning_store.initialize()
-```
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-from datapillar_oneagentic.storage.learning_stores.base import (
-    VectorRecord,
-    VectorSearchResult,
-    VectorStore,
-)
+from datapillar_oneagentic.storage.learning_stores.base import ExperienceStore
+
+if TYPE_CHECKING:
+    from datapillar_oneagentic.experience.learner import ExperienceRecord
 
 logger = logging.getLogger(__name__)
 
-COLLECTION_NAME = "vectors"
+_BASE_COLLECTION_NAME = "experiences"
 
 
 def _get_embedding_dimension() -> int:
@@ -48,9 +30,9 @@ def _get_embedding_dimension() -> int:
     return datapillar.embedding.dimension
 
 
-class MilvusVectorStore(VectorStore):
+class MilvusExperienceStore(ExperienceStore):
     """
-    Milvus 向量存储
+    Milvus 经验存储实现
 
     支持本地（Milvus Lite）和远程（Milvus Server）两种模式。
     """
@@ -61,6 +43,7 @@ class MilvusVectorStore(VectorStore):
         uri: str = "./data/milvus.db",
         token: str | None = None,
         dim: int | None = None,
+        namespace: str = "default",
     ):
         """
         初始化 Milvus 存储
@@ -71,12 +54,24 @@ class MilvusVectorStore(VectorStore):
                 - 远程模式：服务器地址，如 "http://localhost:19530"
             token: 认证令牌（远程模式需要，如 "root:Milvus"）
             dim: 向量维度（None 时读全局配置 datapillar.embedding.dimension）
+            namespace: 命名空间（用于隔离经验数据）
         """
-        self._uri = uri
+        import os
+
+        self._namespace = namespace
+        self._is_remote = uri.startswith("http")
+
+        if not self._is_remote:
+            base_path = os.path.dirname(uri) or "."
+            filename = os.path.basename(uri)
+            self._uri = os.path.join(base_path, namespace, filename)
+        else:
+            self._uri = uri
+
         self._token = token
         self._dim = dim
-        self._is_remote = uri.startswith("http")
         self._client = None
+        self._collection_name = f"{namespace}_{_BASE_COLLECTION_NAME}"
 
     async def initialize(self) -> None:
         """初始化数据库和集合"""
@@ -86,27 +81,34 @@ class MilvusVectorStore(VectorStore):
             raise ImportError("需要安装 Milvus 依赖：pip install pymilvus>=2.5.3")
 
         if self._is_remote:
-            logger.info(f"初始化 MilvusVectorStore (远程): {self._uri}")
+            logger.info(f"初始化 MilvusExperienceStore (远程): {self._uri}, namespace={self._namespace}")
             self._client = AsyncMilvusClient(uri=self._uri, token=self._token)
         else:
-            logger.info(f"初始化 MilvusVectorStore (本地): {self._uri}")
+            logger.info(f"初始化 MilvusExperienceStore (本地): {self._uri}")
+            import os
+            os.makedirs(os.path.dirname(self._uri), exist_ok=True)
             self._client = AsyncMilvusClient(uri=self._uri)
 
-        # 检查集合是否存在
-        has_collection = await self._client.has_collection(COLLECTION_NAME)
+        has_collection = await self._client.has_collection(self._collection_name)
 
         if not has_collection:
-            # 创建集合
             from pymilvus import MilvusClient
 
-            # 获取向量维度
             dim = self._dim if self._dim is not None else _get_embedding_dimension()
 
             schema = MilvusClient.create_schema(auto_id=False, enable_dynamic_field=True)
             schema.add_field("id", DataType.VARCHAR, is_primary=True, max_length=128)
-            schema.add_field("text", DataType.VARCHAR, max_length=65535)
+            schema.add_field("namespace", DataType.VARCHAR, max_length=128)
+            schema.add_field("session_id", DataType.VARCHAR, max_length=128)
+            schema.add_field("goal", DataType.VARCHAR, max_length=65535)
+            schema.add_field("outcome", DataType.VARCHAR, max_length=32)
+            schema.add_field("result_summary", DataType.VARCHAR, max_length=65535)
+            schema.add_field("tools_used", DataType.VARCHAR, max_length=65535)
+            schema.add_field("agents_involved", DataType.VARCHAR, max_length=65535)
+            schema.add_field("duration_ms", DataType.INT64)
+            schema.add_field("feedback", DataType.VARCHAR, max_length=65535)
+            schema.add_field("created_at", DataType.INT64)
             schema.add_field("vector", DataType.FLOAT_VECTOR, dim=dim)
-            schema.add_field("metadata", DataType.VARCHAR, max_length=65535)
 
             index_params = MilvusClient.prepare_index_params()
             index_params.add_index(
@@ -116,84 +118,79 @@ class MilvusVectorStore(VectorStore):
             )
 
             await self._client.create_collection(
-                collection_name=COLLECTION_NAME,
+                collection_name=self._collection_name,
                 schema=schema,
                 index_params=index_params,
             )
-            logger.info(f"创建集合: {COLLECTION_NAME}")
+            logger.info(f"创建集合: {self._collection_name}")
         else:
-            logger.info(f"打开已存在的集合: {COLLECTION_NAME}")
+            logger.info(f"打开已存在的集合: {self._collection_name}")
 
-        logger.info("MilvusVectorStore 初始化完成")
+        logger.info("MilvusExperienceStore 初始化完成")
 
     async def close(self) -> None:
         """关闭连接"""
         if self._client:
             await self._client.close()
         self._client = None
-        logger.info("MilvusVectorStore 已关闭")
+        logger.info("MilvusExperienceStore 已关闭")
+
+    def _record_to_milvus(self, record: "ExperienceRecord") -> dict[str, Any]:
+        """将 ExperienceRecord 转换为 Milvus 格式"""
+        return {
+            "id": record.id,
+            "namespace": record.namespace,
+            "session_id": record.session_id,
+            "goal": record.goal,
+            "outcome": record.outcome,
+            "result_summary": record.result_summary,
+            "tools_used": json.dumps(record.tools_used, ensure_ascii=False),
+            "agents_involved": json.dumps(record.agents_involved, ensure_ascii=False),
+            "duration_ms": record.duration_ms,
+            "feedback": json.dumps(record.feedback, ensure_ascii=False),
+            "created_at": record.created_at,
+            "vector": record.vector,
+        }
+
+    def _milvus_to_record(self, row: dict[str, Any]) -> "ExperienceRecord":
+        """将 Milvus 格式转换为 ExperienceRecord"""
+        from datapillar_oneagentic.experience.learner import ExperienceRecord
+
+        return ExperienceRecord(
+            id=row["id"],
+            namespace=row.get("namespace", ""),
+            session_id=row.get("session_id", ""),
+            goal=row.get("goal", ""),
+            outcome=row.get("outcome", "pending"),
+            result_summary=row.get("result_summary", ""),
+            tools_used=json.loads(row.get("tools_used", "[]")),
+            agents_involved=json.loads(row.get("agents_involved", "[]")),
+            duration_ms=row.get("duration_ms", 0),
+            feedback=json.loads(row.get("feedback", "{}")),
+            created_at=row.get("created_at", 0),
+            vector=row.get("vector", []),
+        )
 
     # ==================== 写操作 ====================
 
-    async def add(self, record: VectorRecord) -> str:
+    async def add(self, record: "ExperienceRecord") -> str:
         """添加记录"""
-        data = {
-            "id": record.id,
-            "text": record.text,
-            "vector": record.vector,
-            "metadata": json.dumps(record.metadata, ensure_ascii=False),
-        }
+        data = self._record_to_milvus(record)
 
         await self._client.insert(
-            collection_name=COLLECTION_NAME,
+            collection_name=self._collection_name,
             data=[data],
         )
 
-        logger.debug(f"添加记录: {record.id}")
         return record.id
-
-    async def add_batch(self, records: list[VectorRecord]) -> list[str]:
-        """批量添加记录"""
-        if not records:
-            return []
-
-        data = [
-            {
-                "id": r.id,
-                "text": r.text,
-                "vector": r.vector,
-                "metadata": json.dumps(r.metadata, ensure_ascii=False),
-            }
-            for r in records
-        ]
-
-        await self._client.insert(
-            collection_name=COLLECTION_NAME,
-            data=data,
-        )
-
-        logger.info(f"批量添加 {len(records)} 条记录")
-        return [r.id for r in records]
-
-    async def update(self, record: VectorRecord) -> bool:
-        """更新记录"""
-        try:
-            await self.delete(record.id)
-            await self.add(record)
-            logger.debug(f"更新记录: {record.id}")
-            return True
-        except Exception as e:
-            logger.error(f"更新记录失败: {e}")
-            return False
 
     async def delete(self, record_id: str) -> bool:
         """删除记录"""
         try:
             await self._client.delete(
-                collection_name=COLLECTION_NAME,
+                collection_name=self._collection_name,
                 filter=f'id == "{record_id}"',
             )
-            logger.debug(f"删除记录: {record_id}")
             return True
         except Exception as e:
             logger.error(f"删除记录失败: {e}")
@@ -201,171 +198,60 @@ class MilvusVectorStore(VectorStore):
 
     # ==================== 读操作 ====================
 
-    async def get(self, record_id: str) -> VectorRecord | None:
+    async def get(self, record_id: str) -> "ExperienceRecord | None":
         """获取记录"""
         result = await self._client.get(
-            collection_name=COLLECTION_NAME,
+            collection_name=self._collection_name,
             ids=[record_id],
-            output_fields=["id", "text", "vector", "metadata"],
+            output_fields=["*"],
         )
 
         if not result:
             return None
 
-        row = result[0]
-        return VectorRecord(
-            id=row["id"],
-            text=row.get("text", ""),
-            vector=row.get("vector", []),
-            metadata=json.loads(row.get("metadata", "{}")),
-        )
+        return self._milvus_to_record(result[0])
 
-    def _build_filter_expr(self, filter: dict[str, Any] | None) -> str | None:
-        """构建 Milvus 过滤表达式"""
-        if not filter:
-            return None
-
-        conditions = []
-
-        for key, value in filter.items():
-            if isinstance(value, dict):
-                for op, val in value.items():
-                    if op == "$eq":
-                        if isinstance(val, str):
-                            conditions.append(f'json_contains(metadata, \'"{key}": "{val}"\')')
-                        else:
-                            conditions.append(f'json_contains(metadata, \'"{key}": {val}\')')
-                    elif op == "$gte":
-                        conditions.append(f'JSON_EXTRACT(metadata, "$.{key}") >= {val}')
-                    elif op == "$lte":
-                        conditions.append(f'JSON_EXTRACT(metadata, "$.{key}") <= {val}')
-                    elif op == "$gt":
-                        conditions.append(f'JSON_EXTRACT(metadata, "$.{key}") > {val}')
-                    elif op == "$lt":
-                        conditions.append(f'JSON_EXTRACT(metadata, "$.{key}") < {val}')
-                    elif op == "$contains":
-                        conditions.append(f'metadata like "%{val}%"')
-            else:
-                if isinstance(value, str):
-                    conditions.append(f'json_contains(metadata, \'"{key}": "{value}"\')')
-                else:
-                    conditions.append(f'json_contains(metadata, \'"{key}": {value}\')')
-
-        if not conditions:
-            return None
-
-        return " and ".join(conditions)
-
-    async def search_by_vector(
+    async def search(
         self,
-        vector: list[float],
+        query_vector: list[float],
         k: int = 5,
-        filter: dict[str, Any] | None = None,
-    ) -> list[VectorSearchResult]:
-        """向量相似度搜索"""
-        filter_expr = self._build_filter_expr(filter)
+        outcome: str | None = None,
+    ) -> list["ExperienceRecord"]:
+        """
+        向量相似度搜索
+
+        Args:
+            query_vector: 查询向量
+            k: 返回数量
+            outcome: 过滤条件（success / failure / None=全部）
+
+        Returns:
+            ExperienceRecord 列表（按相似度排序）
+        """
+        filter_expr = None
+        if outcome:
+            filter_expr = f'outcome == "{outcome}"'
 
         result = await self._client.search(
-            collection_name=COLLECTION_NAME,
-            data=[vector],
+            collection_name=self._collection_name,
+            data=[query_vector],
             limit=k,
             filter=filter_expr,
-            output_fields=["id", "text", "metadata"],
+            output_fields=["*"],
         )
 
-        results = []
+        records = []
         if result and result[0]:
             for hit in result[0]:
-                distance = hit.get("distance", 0)
-                score = 1.0 - distance  # cosine distance -> similarity
-                metadata = json.loads(hit["entity"].get("metadata", "{}"))
+                entity = hit.get("entity", {})
+                entity["id"] = hit.get("id", entity.get("id"))
+                records.append(self._milvus_to_record(entity))
 
-                results.append(VectorSearchResult(
-                    id=hit["entity"]["id"],
-                    score=max(0, score),
-                    distance=distance,
-                    metadata=metadata,
-                    text=hit["entity"].get("text", ""),
-                ))
-
-        return results
-
-    async def search_by_text(
-        self,
-        query: str,
-        k: int = 5,
-        filter: dict[str, Any] | None = None,
-    ) -> list[VectorSearchResult]:
-        """
-        全文搜索
-
-        注意：Milvus 原生不支持全文搜索，这里通过 text 字段模糊匹配实现。
-        如需真正的全文搜索，建议使用 LanceDB 或 Chroma。
-        """
-        filter_expr = self._build_filter_expr(filter)
-
-        # 添加文本模糊匹配条件
-        text_filter = f'text like "%{query}%"'
-        if filter_expr:
-            filter_expr = f"({filter_expr}) and ({text_filter})"
-        else:
-            filter_expr = text_filter
-
-        result = await self._client.query(
-            collection_name=COLLECTION_NAME,
-            filter=filter_expr,
-            limit=k,
-            output_fields=["id", "text", "vector", "metadata"],
-        )
-
-        results = []
-        for row in result:
-            metadata = json.loads(row.get("metadata", "{}"))
-
-            results.append(VectorSearchResult(
-                id=row["id"],
-                score=1.0,  # 模糊匹配无相似度分数
-                distance=None,
-                metadata=metadata,
-                text=row.get("text", ""),
-            ))
-
-        return results
+        return records
 
     # ==================== 统计操作 ====================
 
-    async def count(self, filter: dict[str, Any] | None = None) -> int:
+    async def count(self) -> int:
         """统计记录数量"""
-        filter_expr = self._build_filter_expr(filter)
-
-        if filter_expr:
-            result = await self._client.query(
-                collection_name=COLLECTION_NAME,
-                filter=filter_expr,
-                output_fields=["id"],
-            )
-            return len(result)
-
-        # 无过滤条件时使用 count
-        stats = await self._client.get_collection_stats(COLLECTION_NAME)
+        stats = await self._client.get_collection_stats(self._collection_name)
         return stats.get("row_count", 0)
-
-    async def distinct(self, field: str) -> list[Any]:
-        """获取字段的去重值列表"""
-        result = await self._client.query(
-            collection_name=COLLECTION_NAME,
-            filter="id != ''",
-            output_fields=["metadata"],
-        )
-
-        values = set()
-        for row in result:
-            metadata = json.loads(row.get("metadata", "{}"))
-            if field in metadata:
-                value = metadata[field]
-                if isinstance(value, list):
-                    values.update(value)
-                else:
-                    values.add(value)
-
-        return list(values)

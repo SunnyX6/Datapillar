@@ -20,7 +20,8 @@ from datapillar_oneagentic.core.agent import agent
 from datapillar_oneagentic.core.context import AgentContext
 from datapillar_oneagentic.core.types import Clarification
 from datapillar_oneagentic.core.process import Process
-from datapillar_oneagentic.core.datapillar import Datapillar, DatapillarResult
+from datapillar_oneagentic.core.datapillar import Datapillar
+from datapillar_oneagentic.core.result import DatapillarResult
 
 # === 框架内部（不在 __all__ 中，但仍可导入）===
 from datapillar_oneagentic.core.agent import AgentRegistry, AgentSpec

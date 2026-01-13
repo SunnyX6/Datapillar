@@ -10,10 +10,16 @@ from datapillar_oneagentic.context.timeline.time_travel import (
     TimeTravelRequest,
     TimeTravelResult,
 )
+from datapillar_oneagentic.context.timeline.recorder import (
+    TimelineRecorder,
+    timeline_recorder,
+)
 
 __all__ = [
     "TimelineEntry",
     "Timeline",
     "TimeTravelRequest",
     "TimeTravelResult",
+    "TimelineRecorder",
+    "timeline_recorder",
 ]

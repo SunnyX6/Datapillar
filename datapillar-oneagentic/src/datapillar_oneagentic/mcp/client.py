@@ -1,17 +1,17 @@
 """
 MCP 客户端
 
-提供与 MCP 服务器通信的能力。
+基于官方 MCP SDK 实现，提供与 MCP 服务器通信的能力。
+
+官方 SDK: https://github.com/modelcontextprotocol/python-sdk
 """
 
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
-import subprocess
+from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Self
 
 from datapillar_oneagentic.mcp.config import (
     MCPServerConfig,
@@ -24,33 +24,94 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class ToolAnnotations:
+    """
+    MCP 工具安全标注
+
+    基于 MCP 规范的 Tool Annotations：
+    https://modelcontextprotocol.io/specification
+
+    这些标注帮助 Host 判断工具的风险等级，决定是否需要用户确认。
+    """
+
+    destructive_hint: bool | None = None
+    """
+    破坏性提示：工具可能执行破坏性操作（删除数据、修改状态等）
+
+    - True: 工具可能有破坏性（如 delete_file, drop_table）
+    - False: 工具明确无破坏性
+    - None: 未知（保守起见视为可能有破坏性）
+    """
+
+    idempotent_hint: bool | None = None
+    """
+    幂等性提示：多次调用是否产生相同结果
+
+    - True: 幂等操作（如 read_file, get_status）
+    - False: 非幂等操作（如 send_email, create_record）
+    - None: 未知
+    """
+
+    open_world_hint: bool | None = None
+    """
+    开放世界提示：工具是否会与外部系统交互
+
+    - True: 会访问外部网络/服务（如 http_request, send_notification）
+    - False: 仅本地操作
+    - None: 未知
+    """
+
+    read_only_hint: bool | None = None
+    """
+    只读提示：工具是否只读取数据
+
+    - True: 只读操作（如 list_files, query_database）
+    - False: 可能写入数据
+    - None: 未知
+    """
+
+    @property
+    def is_dangerous(self) -> bool:
+        """
+        判断工具是否危险（需要用户确认）
+
+        危险条件（任一满足）：
+        1. 明确标记为破坏性
+        2. 明确标记为非幂等
+        3. 会访问外部网络
+        4. 未标记为只读且未标记为非破坏性
+        """
+        if self.destructive_hint is True:
+            return True
+        if self.idempotent_hint is False:
+            return True
+        if self.open_world_hint is True:
+            return True
+        if self.read_only_hint is not True and self.destructive_hint is not False:
+            return True
+        return False
+
+
+@dataclass
 class MCPTool:
-    """MCP 工具描述"""
+    """MCP 工具定义"""
 
     name: str
     """工具名称"""
 
-    description: str = ""
+    description: str
     """工具描述"""
 
     input_schema: dict[str, Any] = field(default_factory=dict)
-    """输入参数 schema"""
+    """输入参数 JSON Schema"""
 
+    annotations: ToolAnnotations = field(default_factory=ToolAnnotations)
+    """安全标注"""
 
-@dataclass
-class MCPResource:
-    """MCP 资源描述"""
+    title: str | None = None
+    """工具显示标题"""
 
-    uri: str
-    """资源 URI"""
-
-    name: str = ""
-    """资源名称"""
-
-    description: str = ""
-    """资源描述"""
-
-    mime_type: str = ""
+    mime_type: str | None = None
     """MIME 类型"""
 
 
@@ -58,7 +119,8 @@ class MCPClient:
     """
     MCP 客户端
 
-    支持 Stdio、HTTP、SSE 三种传输方式。
+    基于官方 MCP SDK，支持 Stdio、HTTP、SSE 三种传输方式。
+    使用 async context manager 自动管理连接生命周期。
 
     使用示例：
     ```python
@@ -86,215 +148,141 @@ class MCPClient:
         - config: MCP 服务器配置
         """
         self.config = config
-        self._process: subprocess.Popen | None = None
-        self._http_client: Any = None
+        self._session: Any = None
+        self._exit_stack: AsyncExitStack | None = None
         self._connected = False
-        self._request_id = 0
-        self._pending_requests: dict[int, asyncio.Future] = {}
-        self._reader_task: asyncio.Task | None = None
 
-    async def __aenter__(self) -> MCPClient:
-        """异步上下文管理器入口"""
+    async def __aenter__(self) -> Self:
+        """进入上下文，建立连接"""
         await self.connect()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        """异步上下文管理器出口"""
+        """退出上下文，关闭连接"""
         await self.close()
 
-    @property
-    def connected(self) -> bool:
-        """是否已连接"""
-        return self._connected
-
     async def connect(self) -> None:
-        """连接到 MCP 服务器"""
+        """
+        建立与 MCP 服务器的连接
+
+        根据配置类型选择传输方式：
+        - MCPServerStdio: 启动子进程，通过 stdin/stdout 通信
+        - MCPServerHTTP: HTTP 传输（Streamable HTTP）
+        - MCPServerSSE: SSE 传输
+        """
         if self._connected:
             return
 
-        if isinstance(self.config, MCPServerStdio):
-            await self._connect_stdio()
-        elif isinstance(self.config, MCPServerHTTP):
-            await self._connect_http()
-        elif isinstance(self.config, MCPServerSSE):
-            await self._connect_sse()
-        else:
-            raise ValueError(f"不支持的配置类型: {type(self.config)}")
+        try:
+            from mcp import ClientSession, StdioServerParameters
+            from mcp.client.stdio import stdio_client
+        except ImportError:
+            raise ImportError(
+                "mcp SDK 未安装。请运行: pip install mcp"
+            )
 
-        self._connected = True
-        logger.info(f"MCP 客户端已连接: {self._get_server_name()}")
+        self._exit_stack = AsyncExitStack()
+        await self._exit_stack.__aenter__()
+
+        try:
+            if isinstance(self.config, MCPServerStdio):
+                await self._connect_stdio()
+            elif isinstance(self.config, MCPServerHTTP):
+                await self._connect_http()
+            elif isinstance(self.config, MCPServerSSE):
+                await self._connect_sse()
+            else:
+                raise MCPConnectionError(f"不支持的配置类型: {type(self.config)}")
+
+            self._connected = True
+            logger.info(f"MCP 客户端已连接: {self.config}")
+
+        except Exception as e:
+            await self._exit_stack.__aexit__(type(e), e, e.__traceback__)
+            self._exit_stack = None
+            raise MCPConnectionError(f"连接失败: {e}") from e
 
     async def _connect_stdio(self) -> None:
-        """Stdio 连接"""
+        """Stdio 传输连接"""
+        from mcp import ClientSession, StdioServerParameters
+        from mcp.client.stdio import stdio_client
+
         config: MCPServerStdio = self.config
 
-        cmd = [config.command] + config.args
-        env = config.env
+        server_params = StdioServerParameters(
+            command=config.command,
+            args=list(config.args) if config.args else [],
+            env=dict(config.env) if config.env else None,
+        )
 
-        try:
-            self._process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=env,
-                cwd=config.cwd,
-            )
+        read, write = await self._exit_stack.enter_async_context(
+            stdio_client(server_params)
+        )
 
-            # 发送初始化请求
-            await self._send_jsonrpc("initialize", {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {
-                    "name": "oneagentic",
-                    "version": "1.0.0",
-                },
-            })
+        self._session = await self._exit_stack.enter_async_context(
+            ClientSession(read, write)
+        )
 
-            # 发送 initialized 通知
-            await self._send_notification("notifications/initialized", {})
-
-            # 启动读取任务
-            self._reader_task = asyncio.create_task(self._read_stdout())
-
-        except Exception as e:
-            raise MCPConnectionError(f"Stdio 连接失败: {e}") from e
+        await self._session.initialize()
 
     async def _connect_http(self) -> None:
-        """HTTP 连接"""
-        try:
+        """HTTP 传输连接（Streamable HTTP）"""
+        from mcp import ClientSession
+        from mcp.client.streamable_http import streamablehttp_client
+
+        config: MCPServerHTTP = self.config
+
+        # 构建 httpx 客户端工厂（传递 headers 和 timeout）
+        def httpx_client_factory(**kwargs):
             import httpx
-            config: MCPServerHTTP = self.config
-            self._http_client = httpx.AsyncClient(
-                base_url=config.url,
-                headers=config.headers or {},
-                timeout=config.timeout,
-            )
-        except ImportError:
-            raise MCPConnectionError("需要安装 httpx: pip install datapillar-oneagentic[mcp]")
-        except Exception as e:
-            raise MCPConnectionError(f"HTTP 连接失败: {e}") from e
+            merged_headers = {**(kwargs.get("headers") or {}), **(config.headers or {})}
+            timeout = httpx.Timeout(config.timeout)
+            return httpx.AsyncClient(headers=merged_headers, timeout=timeout, **{k: v for k, v in kwargs.items() if k not in ("headers", "timeout")})
+
+        read, write, _ = await self._exit_stack.enter_async_context(
+            streamablehttp_client(config.url, httpx_client_factory=httpx_client_factory)
+        )
+
+        self._session = await self._exit_stack.enter_async_context(
+            ClientSession(read, write)
+        )
+
+        await self._session.initialize()
 
     async def _connect_sse(self) -> None:
-        """SSE 连接"""
-        # SSE 实现类似 HTTP，但使用 SSE 流
-        await self._connect_http()
+        """SSE 传输连接"""
+        from mcp import ClientSession
+        from mcp.client.sse import sse_client
+
+        config: MCPServerSSE = self.config
+
+        read, write = await self._exit_stack.enter_async_context(
+            sse_client(
+                config.url,
+                headers=config.headers,
+                timeout=float(config.timeout),
+            )
+        )
+
+        self._session = await self._exit_stack.enter_async_context(
+            ClientSession(read, write)
+        )
+
+        await self._session.initialize()
 
     async def close(self) -> None:
         """关闭连接"""
-        if self._reader_task:
-            self._reader_task.cancel()
-            try:
-                await self._reader_task
-            except asyncio.CancelledError:
-                pass
+        if self._exit_stack:
+            await self._exit_stack.__aexit__(None, None, None)
+            self._exit_stack = None
 
-        if self._process:
-            self._process.terminate()
-            try:
-                await asyncio.wait_for(self._process.wait(), timeout=5)
-            except asyncio.TimeoutError:
-                self._process.kill()
-            self._process = None
-
-        if self._http_client:
-            await self._http_client.aclose()
-            self._http_client = None
-
+        self._session = None
         self._connected = False
-        logger.info(f"MCP 客户端已断开: {self._get_server_name()}")
 
-    def _get_server_name(self) -> str:
-        """获取服务器名称"""
-        if isinstance(self.config, MCPServerStdio):
-            return f"{self.config.command} {' '.join(self.config.args[:2])}"
-        elif isinstance(self.config, (MCPServerHTTP, MCPServerSSE)):
-            return self.config.url
-        return "unknown"
-
-    async def _send_jsonrpc(self, method: str, params: dict) -> Any:
-        """发送 JSON-RPC 请求"""
-        self._request_id += 1
-        request = {
-            "jsonrpc": "2.0",
-            "id": self._request_id,
-            "method": method,
-            "params": params,
-        }
-
-        if isinstance(self.config, MCPServerStdio) and self._process:
-            # Stdio 传输
-            message = json.dumps(request) + "\n"
-            self._process.stdin.write(message.encode())
-            await self._process.stdin.drain()
-
-            # 等待响应
-            future = asyncio.get_event_loop().create_future()
-            self._pending_requests[self._request_id] = future
-
-            try:
-                result = await asyncio.wait_for(future, timeout=self.config.timeout)
-                return result
-            except asyncio.TimeoutError:
-                self._pending_requests.pop(self._request_id, None)
-                raise MCPTimeoutError(f"请求超时: {method}")
-
-        elif self._http_client:
-            # HTTP 传输
-            response = await self._http_client.post("/", json=request)
-            response.raise_for_status()
-            data = response.json()
-
-            if "error" in data:
-                raise MCPError(f"RPC 错误: {data['error']}")
-
-            return data.get("result")
-
-        raise MCPConnectionError("未连接到服务器")
-
-    async def _send_notification(self, method: str, params: dict) -> None:
-        """发送通知（无需响应）"""
-        notification = {
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": params,
-        }
-
-        if isinstance(self.config, MCPServerStdio) and self._process:
-            message = json.dumps(notification) + "\n"
-            self._process.stdin.write(message.encode())
-            await self._process.stdin.drain()
-
-    async def _read_stdout(self) -> None:
-        """读取 stdout 响应"""
-        if not self._process or not self._process.stdout:
-            return
-
-        try:
-            while True:
-                line = await self._process.stdout.readline()
-                if not line:
-                    break
-
-                try:
-                    data = json.loads(line.decode())
-                    request_id = data.get("id")
-
-                    if request_id and request_id in self._pending_requests:
-                        future = self._pending_requests.pop(request_id)
-
-                        if "error" in data:
-                            future.set_exception(MCPError(str(data["error"])))
-                        else:
-                            future.set_result(data.get("result"))
-
-                except json.JSONDecodeError:
-                    continue
-
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            logger.error(f"读取 stdout 失败: {e}")
+    @property
+    def is_connected(self) -> bool:
+        """是否已连接"""
+        return self._connected
 
     async def list_tools(self) -> list[MCPTool]:
         """
@@ -303,19 +291,35 @@ class MCPClient:
         返回：
         - 工具列表
         """
-        result = await self._send_jsonrpc("tools/list", {})
+        if not self._session:
+            raise MCPConnectionError("客户端未连接")
+
+        result = await self._session.list_tools()
         tools = []
 
-        for tool_data in result.get("tools", []):
+        for tool in result.tools:
+            # 解析 annotations
+            annotations = ToolAnnotations()
+            if hasattr(tool, 'annotations') and tool.annotations:
+                ann = tool.annotations
+                annotations = ToolAnnotations(
+                    destructive_hint=getattr(ann, 'destructiveHint', None),
+                    idempotent_hint=getattr(ann, 'idempotentHint', None),
+                    open_world_hint=getattr(ann, 'openWorldHint', None),
+                    read_only_hint=getattr(ann, 'readOnlyHint', None),
+                )
+
             tools.append(MCPTool(
-                name=tool_data.get("name", ""),
-                description=tool_data.get("description", ""),
-                input_schema=tool_data.get("inputSchema", {}),
+                name=tool.name,
+                description=tool.description or "",
+                input_schema=tool.inputSchema if hasattr(tool, 'inputSchema') else {},
+                annotations=annotations,
+                title=getattr(tool, 'title', None),
             ))
 
         return tools
 
-    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+    async def call_tool(self, name: str, arguments: dict[str, Any] | None = None) -> Any:
         """
         调用工具
 
@@ -326,40 +330,48 @@ class MCPClient:
         返回：
         - 工具执行结果
         """
-        result = await self._send_jsonrpc("tools/call", {
-            "name": name,
-            "arguments": arguments,
-        })
+        if not self._session:
+            raise MCPConnectionError("客户端未连接")
 
-        # 解析结果
-        content = result.get("content", [])
-        if content and len(content) > 0:
-            first_content = content[0]
-            if first_content.get("type") == "text":
-                return first_content.get("text", "")
-            return first_content
+        result = await self._session.call_tool(name, arguments or {})
 
-        return result
+        # 提取结果内容
+        if result.content:
+            contents = []
+            for item in result.content:
+                if hasattr(item, 'text'):
+                    contents.append(item.text)
+                elif hasattr(item, 'data'):
+                    contents.append(item.data)
+                else:
+                    contents.append(str(item))
 
-    async def list_resources(self) -> list[MCPResource]:
+            if len(contents) == 1:
+                return contents[0]
+            return contents
+
+        return result.structuredContent if hasattr(result, 'structuredContent') else None
+
+    async def list_resources(self) -> list[dict[str, Any]]:
         """
         列出可用资源
 
         返回：
         - 资源列表
         """
-        result = await self._send_jsonrpc("resources/list", {})
-        resources = []
+        if not self._session:
+            raise MCPConnectionError("客户端未连接")
 
-        for res_data in result.get("resources", []):
-            resources.append(MCPResource(
-                uri=res_data.get("uri", ""),
-                name=res_data.get("name", ""),
-                description=res_data.get("description", ""),
-                mime_type=res_data.get("mimeType", ""),
-            ))
-
-        return resources
+        result = await self._session.list_resources()
+        return [
+            {
+                "uri": str(r.uri),
+                "name": r.name,
+                "description": getattr(r, 'description', None),
+                "mimeType": getattr(r, 'mimeType', None),
+            }
+            for r in result.resources
+        ]
 
     async def read_resource(self, uri: str) -> Any:
         """
@@ -371,19 +383,85 @@ class MCPClient:
         返回：
         - 资源内容
         """
-        result = await self._send_jsonrpc("resources/read", {"uri": uri})
-        contents = result.get("contents", [])
+        if not self._session:
+            raise MCPConnectionError("客户端未连接")
 
-        if contents and len(contents) > 0:
-            first_content = contents[0]
-            if "text" in first_content:
-                return first_content["text"]
-            return first_content
+        from pydantic import AnyUrl
 
-        return result
+        result = await self._session.read_resource(AnyUrl(uri))
+
+        if result.contents:
+            contents = []
+            for item in result.contents:
+                if hasattr(item, 'text'):
+                    contents.append(item.text)
+                elif hasattr(item, 'blob'):
+                    contents.append(item.blob)
+                else:
+                    contents.append(str(item))
+
+            if len(contents) == 1:
+                return contents[0]
+            return contents
+
+        return None
+
+    async def list_prompts(self) -> list[dict[str, Any]]:
+        """
+        列出可用提示词模板
+
+        返回：
+        - 提示词列表
+        """
+        if not self._session:
+            raise MCPConnectionError("客户端未连接")
+
+        result = await self._session.list_prompts()
+        return [
+            {
+                "name": p.name,
+                "description": getattr(p, 'description', None),
+                "arguments": [
+                    {
+                        "name": arg.name,
+                        "description": getattr(arg, 'description', None),
+                        "required": getattr(arg, 'required', False),
+                    }
+                    for arg in (p.arguments or [])
+                ],
+            }
+            for p in result.prompts
+        ]
+
+    async def get_prompt(self, name: str, arguments: dict[str, str] | None = None) -> list[dict[str, Any]]:
+        """
+        获取提示词
+
+        参数：
+        - name: 提示词名称
+        - arguments: 提示词参数
+
+        返回：
+        - 消息列表
+        """
+        if not self._session:
+            raise MCPConnectionError("客户端未连接")
+
+        result = await self._session.get_prompt(name, arguments or {})
+        return [
+            {
+                "role": msg.role,
+                "content": msg.content.text if hasattr(msg.content, 'text') else str(msg.content),
+            }
+            for msg in result.messages
+        ]
+
+    def __repr__(self) -> str:
+        status = "connected" if self._connected else "disconnected"
+        return f"MCPClient({self.config}, {status})"
 
 
-# === 异常类 ===
+# ==================== 异常定义 ====================
 
 
 class MCPError(Exception):

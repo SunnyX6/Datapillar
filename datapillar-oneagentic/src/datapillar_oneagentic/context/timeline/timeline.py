@@ -2,7 +2,7 @@
 Context Timeline 子模块 - 时间线管理
 
 记录执行事件序列，支持时间旅行。
-注意：session_id, team_id, user_id 由 Blackboard 管理，不在此存储。
+注意：namespace, session_id 由 Blackboard 管理，不在此存储。
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ class Timeline(BaseModel):
     时间线
 
     记录一次会话的完整事件序列，支持时间旅行。
-    注意：session_id, team_id, user_id 由 Blackboard 管理。
+    注意：namespace, session_id 由 Blackboard 管理。
     """
 
     # 标识
@@ -211,6 +211,23 @@ class Timeline(BaseModel):
             "total_duration_ms": self.total_duration_ms,
             "type_counts": type_counts,
         }
+
+    def add_entry_from_dict(self, data: dict) -> TimelineEntry:
+        """从字典添加事件（用于 TimelineRecorder 刷新）"""
+        event_type = data.get("event_type")
+        if isinstance(event_type, str):
+            event_type = EventType.from_string(event_type)
+
+        return self.add_entry(
+            event_type=event_type,
+            content=data.get("content", ""),
+            agent_id=data.get("agent_id"),
+            metadata=data.get("metadata"),
+            duration_ms=data.get("duration_ms"),
+            checkpoint_id=data.get("checkpoint_id"),
+            checkpoint_type=data.get("checkpoint_type"),
+            is_checkpoint=data.get("is_checkpoint", False),
+        )
 
     def to_dict(self) -> dict:
         """序列化为字典"""

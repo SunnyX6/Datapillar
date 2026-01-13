@@ -37,21 +37,18 @@ class CheckpointManager:
         self,
         *,
         session_id: str,
-        team_id: str,
         checkpointer=None,
     ):
         """
         创建检查点管理器
 
         参数：
-        - session_id: 会话 ID
-        - team_id: 团队 ID
+        - session_id: 会话 ID（直接作为 thread_id，由调用方控制）
         - checkpointer: Checkpointer 实例（可选）
         """
         self.session_id = session_id
-        self.team_id = team_id
         self._checkpointer = checkpointer
-        self._thread_id = f"{team_id}:{session_id}"
+        self._thread_id = session_id  # 直接用 session_id
 
     @property
     def thread_id(self) -> str:
@@ -94,7 +91,7 @@ class CheckpointManager:
             if state_snapshot and state_snapshot.values:
                 return dict(state_snapshot.values)
         except Exception as e:
-            logger.debug(f"获取状态失败: {e}")
+            logger.error(f"获取状态失败: {e}")
         return None
 
     async def update_state(
@@ -147,7 +144,7 @@ class CheckpointManager:
                 if len(checkpoints) >= limit:
                     break
         except Exception as e:
-            logger.debug(f"列出检查点失败: {e}")
+            logger.error(f"列出检查点失败: {e}")
         return checkpoints
 
     async def delete(self) -> bool:

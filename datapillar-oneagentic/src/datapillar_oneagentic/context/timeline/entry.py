@@ -2,7 +2,7 @@
 Context Timeline 子模块 - 时间线条目
 
 记录单个执行事件。
-注意：session_id, team_id, user_id 由 Blackboard 管理，不在此存储。
+注意：namespace, session_id 由 Blackboard 管理，不在此存储。
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ class TimelineEntry(BaseModel):
     时间线条目
 
     记录单个事件，关联 checkpoint 支持时间旅行。
-    注意：session_id, team_id, user_id 由 Blackboard 管理。
+    注意：namespace, session_id 由 Blackboard 管理。
     """
 
     # 标识

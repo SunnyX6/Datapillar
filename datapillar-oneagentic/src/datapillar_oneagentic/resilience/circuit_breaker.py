@@ -118,6 +118,7 @@ class CircuitBreaker:
 # 全局熔断器注册表
 _circuit_breakers: dict[str, CircuitBreaker] = {}
 _registry_lock = threading.Lock()  # 线程锁，防止并发创建
+_CIRCUIT_BREAKER_MAX_SIZE = 50
 
 
 def get_circuit_breaker(name: str) -> CircuitBreaker:
@@ -128,6 +129,12 @@ def get_circuit_breaker(name: str) -> CircuitBreaker:
 
     with _registry_lock:
         if name not in _circuit_breakers:
+            # 缓存超限时清理（熔断器一般不多，这只是保险措施）
+            if len(_circuit_breakers) >= _CIRCUIT_BREAKER_MAX_SIZE:
+                keys = list(_circuit_breakers.keys())
+                for key in keys[: len(keys) // 2]:
+                    _circuit_breakers.pop(key, None)
+
             _circuit_breakers[name] = CircuitBreaker(name)
         return _circuit_breakers[name]
 

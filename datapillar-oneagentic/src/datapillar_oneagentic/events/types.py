@@ -82,6 +82,14 @@ class ToolFailedEvent(BaseEvent):
 
 
 @dataclass
+class LLMThinkingEvent(BaseEvent):
+    """LLM 思考过程（开启 thinking 模式时）"""
+
+    agent_id: str = ""
+    thinking_content: str = ""
+
+
+@dataclass
 class LLMCallStartedEvent(BaseEvent):
     """LLM 调用开始"""
 
@@ -98,6 +106,16 @@ class LLMCallCompletedEvent(BaseEvent):
     model: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
+    duration_ms: float = 0.0
+
+
+@dataclass
+class LLMCallFailedEvent(BaseEvent):
+    """LLM 调用失败"""
+
+    agent_id: str = ""
+    model: str = ""
+    error: str = ""
     duration_ms: float = 0.0
 
 
@@ -141,7 +159,6 @@ class SessionStartedEvent(BaseEvent):
     """会话开始"""
 
     session_id: str = ""
-    user_id: str = ""
     query: str = ""
 
 
@@ -150,7 +167,6 @@ class SessionCompletedEvent(BaseEvent):
     """会话完成"""
 
     session_id: str = ""
-    user_id: str = ""
     result: Any = None
     duration_ms: float = 0.0
     agent_count: int = 0
