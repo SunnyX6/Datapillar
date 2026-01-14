@@ -21,12 +21,35 @@ from typing import TYPE_CHECKING, Any
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.config import get_store
 from langgraph.store.base import BaseStore
-from langgraph.types import Command, interrupt
+from langgraph.types import Command
 
 from datapillar_oneagentic.context import ContextBuilder
+from datapillar_oneagentic.core.types import SessionKey
 
 if TYPE_CHECKING:
     from datapillar_oneagentic.core.agent import AgentSpec
+
+
+def _extract_text(content: str | list | None) -> str:
+    """
+    从 Message.content 提取纯文本
+
+    LangChain 的 Message.content 类型是 Union[str, List[Union[str, Dict]]]，
+    多模态消息时 content 可能是 list。此函数统一提取文本内容。
+    """
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        texts = []
+        for item in content:
+            if isinstance(item, str):
+                texts.append(item)
+            elif isinstance(item, dict) and item.get("type") == "text":
+                texts.append(item.get("text", ""))
+        return "\n".join(texts)
+    return str(content)
 
 logger = logging.getLogger(__name__)
 
@@ -38,15 +61,15 @@ def _extract_latest_task_id(state: dict) -> str | None:
         if (
             isinstance(msg, AIMessage)
             and getattr(msg, "name", None) == "react_controller"
-            and isinstance(msg.content, str)
-            and msg.content.startswith("【TASK ")
         ):
-            # 期望格式: 【TASK t1】...
-            try:
-                header = msg.content.split("】", 1)[0]  # 【TASK t1
-                return header.replace("【TASK ", "").strip()
-            except Exception:
-                return None
+            text = _extract_text(msg.content)
+            if text.startswith("【TASK "):
+                # 期望格式: 【TASK t1】...
+                try:
+                    header = text.split("】", 1)[0]  # 【TASK t1
+                    return header.replace("【TASK ", "").strip()
+                except Exception:
+                    return None
     return None
 
 
@@ -84,7 +107,7 @@ class NodeFactory:
     def __init__(
         self,
         *,
-        agent_specs: list["AgentSpec"],
+        agent_specs: list[AgentSpec],
         agent_ids: list[str],
         get_executor,
         enable_share_context: bool = True,
@@ -114,29 +137,8 @@ class NodeFactory:
             节点函数
         """
         async def agent_node(state) -> Command:
-            session_id = state.get("session_id", "")
-
             # 获取 store（通过 get_store() 获取编译时传入的 store）
             store = get_store()
-
-            # 第二轮：检测到 pending_clarification，执行 interrupt 等待用户回答
-            pending = state.get("pending_clarification")
-            if pending and pending.get("agent_id") == agent_id:
-                user_reply = interrupt({
-                    "type": "clarification",
-                    "agent_id": pending["agent_id"],
-                    "message": pending["message"],
-                    "questions": pending["questions"],
-                    "options": pending["options"],
-                })
-                # 用户回答后，写入 HumanMessage，清除标记，继续执行当前 Agent
-                return Command(
-                    update={
-                        "messages": [HumanMessage(content=user_reply)],
-                        "pending_clarification": None,
-                        "active_agent": agent_id,
-                    }
-                )
 
             # 从 messages 获取输入
             messages = state.get("messages", [])
@@ -148,16 +150,16 @@ class NodeFactory:
                     if (
                         isinstance(msg, AIMessage)
                         and getattr(msg, "name", None) == "react_controller"
-                        and (msg.content or "").startswith("【TASK ")
+                        and _extract_text(msg.content).startswith("【TASK ")
                     ):
-                        query = msg.content or ""
+                        query = _extract_text(msg.content)
                         break
 
             # 非 ReAct 或未找到 TASK：回退到最后一条用户输入
             if not query:
                 for msg in reversed(messages):
                     if isinstance(msg, HumanMessage):
-                        query = msg.content
+                        query = _extract_text(msg.content)
                         break
 
             # 获取执行器
@@ -210,39 +212,6 @@ class NodeFactory:
         # 使用 ContextBuilder 统一管理上下文
         ctx_builder = ContextBuilder.from_state(state)
 
-        # 处理 Clarification（第一轮：写入问题 + 标记，下一轮再 interrupt）
-        if result and hasattr(result, "status") and result.status == "needs_clarification":
-            clarification = result.clarification
-            logger.info(
-                f"⏸️ [{agent_id}] 需要澄清: {clarification.message if clarification else ''}"
-            )
-
-            # 构建 Agent 的问题消息
-            clarify_content = clarification.message if clarification else ""
-            if clarification and clarification.questions:
-                clarify_content += "\n" + "\n".join(
-                    f"- {q}" for q in clarification.questions
-                )
-
-            # 第一轮：写入 AIMessage（问题）+ 设置 pending_clarification 标记
-            # 下一轮进入节点时会检测到标记，执行 interrupt
-            messages_to_add = []
-            if clarify_content:
-                messages_to_add.append(AIMessage(content=clarify_content, name=agent_id))
-
-            return Command(
-                update={
-                    "messages": messages_to_add,
-                    "active_agent": agent_id,  # 保持当前 Agent，下一轮继续执行
-                    "pending_clarification": {
-                        "agent_id": agent_id,
-                        "message": clarification.message if clarification else "",
-                        "questions": clarification.questions if clarification else [],
-                        "options": clarification.options if clarification else [],
-                    },
-                }
-            )
-
         # 构建更新字典
         update_dict: dict = {}
         deliverable_version: int | None = None
@@ -272,24 +241,23 @@ class NodeFactory:
                 except Exception as e:
                     logger.error(f"存储 deliverable 失败: {e}")
                 else:
+                    # 只有写入成功才更新 versions 和 keys
                     update_dict["deliverable_versions"] = deliverable_versions
                     deliverable_version = version
 
-            # state 只存引用
-            deliverable_keys = list(state.get("deliverable_keys") or [])
-            if key not in deliverable_keys:
-                deliverable_keys.append(key)
-            update_dict["deliverable_keys"] = deliverable_keys
+                    deliverable_keys = list(state.get("deliverable_keys") or [])
+                    if key not in deliverable_keys:
+                        deliverable_keys.append(key)
+                    update_dict["deliverable_keys"] = deliverable_keys
 
-            # 启用上下文共享时，把 Agent 执行过程中的 messages 添加到 ContextBuilder
-            # 排除最后一条 AIMessage（Agent 的结构化输出），因为 deliverable 已通过 get_deliverable() 获取
-            if self._enable_share_context and result.messages:
-                messages_to_share = result.messages
-                # 如果最后一条是 AIMessage，排除它（这是 Agent 的 JSON 输出）
-                if messages_to_share and isinstance(messages_to_share[-1], AIMessage):
-                    messages_to_share = messages_to_share[:-1]
-                if messages_to_share:
-                    ctx_builder.add_messages(messages_to_share)
+        # 启用上下文共享时，把 Agent 执行过程中的 messages 添加到 ContextBuilder
+        # completed 场景排除最后一条 AIMessage（结构化输出），其余场景保留全部
+        if self._enable_share_context and result and result.messages:
+            messages_to_share = result.messages
+            if result.status == "completed" and messages_to_share and isinstance(messages_to_share[-1], AIMessage):
+                messages_to_share = messages_to_share[:-1]
+            if messages_to_share:
+                ctx_builder.add_messages(messages_to_share)
 
         # 更新 Agent 执行状态
         if result and hasattr(result, "status"):
@@ -302,7 +270,8 @@ class NodeFactory:
 
         # 刷新 Timeline 事件（通过 ContextBuilder）
         from datapillar_oneagentic.context.timeline.recorder import timeline_recorder
-        recorded_events = timeline_recorder.flush(session_id)
+        key = SessionKey(namespace=namespace, session_id=session_id)
+        recorded_events = timeline_recorder.flush(key)
         if recorded_events:
             ctx_builder.record_events(recorded_events)
 
@@ -318,9 +287,6 @@ class NodeFactory:
                 )
             ]
         )
-
-        # 检查并压缩（通过 ContextBuilder）
-        await ctx_builder.compact_if_needed()
 
         # 合并 ContextBuilder 的更新
         ctx_update = ctx_builder.to_state_update()
@@ -357,7 +323,7 @@ class NodeFactory:
             query = ""
             for msg in reversed(messages):
                 if isinstance(msg, HumanMessage):
-                    query = msg.content
+                    query = _extract_text(msg.content)
                     break
 
             if not query:
@@ -409,10 +375,12 @@ class NodeFactory:
                             logger.error(f"存储 deliverable 失败: {e}")
 
                 # 收集 messages（通过 ContextBuilder）
-                # 排除最后一条 AIMessage（Agent 的结构化输出）
+                # completed 场景排除最后一条 AIMessage（结构化输出），其余场景保留全部
                 if self._enable_share_context and hasattr(result, "messages") and result.messages:
                     messages_to_share = result.messages
-                    if messages_to_share and isinstance(messages_to_share[-1], AIMessage):
+                    if getattr(result, "status", None) == "completed" and messages_to_share and isinstance(
+                        messages_to_share[-1], AIMessage
+                    ):
                         messages_to_share = messages_to_share[:-1]
                     if messages_to_share:
                         ctx_builder.add_messages(messages_to_share)
@@ -429,9 +397,6 @@ class NodeFactory:
                         )
                     ]
                 )
-
-            # 检查并压缩
-            await ctx_builder.compact_if_needed()
 
             # 构建更新
             ctx_update = ctx_builder.to_state_update()

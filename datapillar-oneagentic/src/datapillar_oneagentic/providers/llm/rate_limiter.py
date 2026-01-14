@@ -25,13 +25,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING
 
 from langchain_core.rate_limiters import InMemoryRateLimiter
 
-from datapillar_oneagentic.providers.llm.config import ProviderRateLimitConfig
+if TYPE_CHECKING:
+    from datapillar_oneagentic.providers.llm.config import RateLimitConfig
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +159,7 @@ class RateLimitManager:
         self._lock = threading.Lock()
         self._enabled = True
 
-    def _get_config(self) -> "RateLimitConfig":
+    def _get_config(self) -> RateLimitConfig:
         """获取限流配置"""
         from datapillar_oneagentic.config import get_config
 

@@ -47,9 +47,6 @@ class MCPServerStdio:
     cwd: str | None = None
     """工作目录"""
 
-    timeout: int = 30
-    """连接超时（秒）"""
-
     def __post_init__(self):
         if not self.command:
             raise ValueError("command 不能为空")

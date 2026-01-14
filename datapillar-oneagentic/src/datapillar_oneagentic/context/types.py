@@ -67,7 +67,7 @@ class EventType(str, Enum):
     TIMEOUT = "timeout"
 
     @classmethod
-    def from_string(cls, value: str) -> "EventType":
+    def from_string(cls, value: str) -> EventType:
         """从字符串解析事件类型"""
         for event_type in cls:
             if event_type.value == value:

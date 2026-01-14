@@ -8,12 +8,13 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from datapillar_oneagentic.context.types import CheckpointType
+from datapillar_oneagentic.core.types import SessionKey
 
 if TYPE_CHECKING:
-    from langgraph.checkpoint.base import BaseCheckpointSaver
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -36,30 +37,34 @@ class CheckpointManager:
     def __init__(
         self,
         *,
-        session_id: str,
+        key: SessionKey,
         checkpointer=None,
     ):
         """
         创建检查点管理器
 
         参数：
-        - session_id: 会话 ID（直接作为 thread_id，由调用方控制）
+        - key: SessionKey（namespace + session_id 组合）
         - checkpointer: Checkpointer 实例（可选）
         """
-        self.session_id = session_id
+        self._key = key
         self._checkpointer = checkpointer
-        self._thread_id = session_id  # 直接用 session_id
+
+    @property
+    def key(self) -> SessionKey:
+        """获取会话标识"""
+        return self._key
 
     @property
     def thread_id(self) -> str:
-        """获取线程 ID"""
-        return self._thread_id
+        """获取线程 ID（用于 LangGraph）"""
+        return str(self._key)
 
     def get_config(self, checkpoint_id: str | None = None) -> dict:
         """获取 LangGraph 配置"""
         config: dict[str, Any] = {
             "configurable": {
-                "thread_id": self._thread_id,
+                "thread_id": self.thread_id,
             }
         }
         if checkpoint_id:
@@ -152,7 +157,15 @@ class CheckpointManager:
         if not self._checkpointer:
             return False
         try:
-            await self._checkpointer.delete_thread(self._thread_id)
+            import asyncio
+            import inspect
+            delete_method = getattr(self._checkpointer, "delete_thread", None)
+            if delete_method is None:
+                return False
+            if asyncio.iscoroutinefunction(delete_method) or inspect.isasyncgenfunction(delete_method):
+                await delete_method(self.thread_id)
+            else:
+                delete_method(self.thread_id)
             return True
         except Exception as e:
             logger.error(f"删除检查点失败: {e}")

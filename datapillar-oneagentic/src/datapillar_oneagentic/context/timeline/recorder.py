@@ -3,7 +3,7 @@ Timeline Recorder
 
 将 EventBus 事件记录到 Timeline。
 
-使用 session_id 作为 key 存储事件，在 agent_node 执行完成后刷新到 Timeline。
+使用 SessionKey 作为 key 存储事件，在 agent_node 执行完成后刷新到 Timeline。
 """
 
 from __future__ import annotations
@@ -14,19 +14,19 @@ from collections import defaultdict
 from typing import Any
 
 from datapillar_oneagentic.context.types import EventType
-from datapillar_oneagentic.context.timeline.entry import TimelineEntry
+from datapillar_oneagentic.core.types import SessionKey
 from datapillar_oneagentic.events import event_bus
 from datapillar_oneagentic.events.types import (
-    AgentStartedEvent,
     AgentCompletedEvent,
     AgentFailedEvent,
+    AgentStartedEvent,
+    DelegationCompletedEvent,
+    DelegationStartedEvent,
+    SessionCompletedEvent,
+    SessionStartedEvent,
     ToolCalledEvent,
     ToolCompletedEvent,
     ToolFailedEvent,
-    SessionStartedEvent,
-    SessionCompletedEvent,
-    DelegationStartedEvent,
-    DelegationCompletedEvent,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class TimelineRecorder:
     """
     Timeline 记录器
 
-    将 EventBus 事件记录到内存缓冲区，按 session_id 分组。
+    将 EventBus 事件记录到内存缓冲区，按 SessionKey 分组。
     在 agent_node 执行完成后，调用 flush() 将事件刷新到 Timeline。
 
     使用示例：
@@ -47,7 +47,8 @@ class TimelineRecorder:
     # 事件自动记录到缓冲区...
 
     # 获取并清空指定 session 的事件
-    entries = recorder.flush(session_id)
+    key = SessionKey(namespace="etl", session_id="abc123")
+    entries = recorder.flush(key)
     for entry in entries:
         timeline.add_entry_from_dict(entry)
     ```
@@ -97,29 +98,29 @@ class TimelineRecorder:
 
         self._registered = True
 
-    def _record(self, session_id: str, entry_data: dict) -> None:
+    def _record(self, key: SessionKey | None, entry_data: dict) -> None:
         """记录事件到缓冲区"""
-        if not session_id:
+        if not key:
             return
         with self._buffer_lock:
-            self._buffer[session_id].append(entry_data)
+            self._buffer[str(key)].append(entry_data)
 
-    def flush(self, session_id: str) -> list[dict]:
+    def flush(self, key: SessionKey) -> list[dict]:
         """获取并清空指定 session 的事件"""
         with self._buffer_lock:
-            entries = self._buffer.pop(session_id, [])
+            entries = self._buffer.pop(str(key), [])
         return entries
 
-    def peek(self, session_id: str) -> list[dict]:
+    def peek(self, key: SessionKey) -> list[dict]:
         """查看指定 session 的事件（不清空）"""
         with self._buffer_lock:
-            return list(self._buffer.get(session_id, []))
+            return list(self._buffer.get(str(key), []))
 
-    def clear(self, session_id: str | None = None) -> None:
+    def clear(self, key: SessionKey | None = None) -> None:
         """清空缓冲区"""
         with self._buffer_lock:
-            if session_id:
-                self._buffer.pop(session_id, None)
+            if key:
+                self._buffer.pop(str(key), None)
             else:
                 self._buffer.clear()
 
@@ -128,7 +129,7 @@ class TimelineRecorder:
     def _on_agent_started(self, source: Any, event: AgentStartedEvent) -> None:
         """Agent 开始"""
         self._record(
-            event.session_id,
+            event.key,
             {
                 "event_type": EventType.AGENT_START.value,
                 "agent_id": event.agent_id,
@@ -140,7 +141,7 @@ class TimelineRecorder:
     def _on_agent_completed(self, source: Any, event: AgentCompletedEvent) -> None:
         """Agent 完成"""
         self._record(
-            event.session_id,
+            event.key,
             {
                 "event_type": EventType.AGENT_END.value,
                 "agent_id": event.agent_id,
@@ -153,7 +154,7 @@ class TimelineRecorder:
     def _on_agent_failed(self, source: Any, event: AgentFailedEvent) -> None:
         """Agent 失败"""
         self._record(
-            event.session_id,
+            event.key,
             {
                 "event_type": EventType.AGENT_FAILED.value,
                 "agent_id": event.agent_id,
@@ -164,16 +165,8 @@ class TimelineRecorder:
 
     def _on_tool_called(self, source: Any, event: ToolCalledEvent) -> None:
         """工具调用"""
-        # ToolCalledEvent 没有 session_id，需要从 source 获取
-        session_id = getattr(source, "session_id", "") if source else ""
-        if not session_id:
-            # 尝试从 AgentContext 获取
-            ctx = getattr(source, "_context", None)
-            if ctx:
-                session_id = getattr(ctx, "session_id", "")
-
         self._record(
-            session_id,
+            event.key,
             {
                 "event_type": EventType.TOOL_CALL.value,
                 "agent_id": event.agent_id,
@@ -184,9 +177,8 @@ class TimelineRecorder:
 
     def _on_tool_completed(self, source: Any, event: ToolCompletedEvent) -> None:
         """工具完成"""
-        session_id = getattr(source, "session_id", "") if source else ""
         self._record(
-            session_id,
+            event.key,
             {
                 "event_type": EventType.TOOL_RESULT.value,
                 "agent_id": event.agent_id,
@@ -201,9 +193,8 @@ class TimelineRecorder:
 
     def _on_tool_failed(self, source: Any, event: ToolFailedEvent) -> None:
         """工具失败"""
-        session_id = getattr(source, "session_id", "") if source else ""
         self._record(
-            session_id,
+            event.key,
             {
                 "event_type": EventType.TOOL_ERROR.value,
                 "agent_id": event.agent_id,
@@ -215,7 +206,7 @@ class TimelineRecorder:
     def _on_session_started(self, source: Any, event: SessionStartedEvent) -> None:
         """会话开始"""
         self._record(
-            event.session_id,
+            event.key,
             {
                 "event_type": EventType.SESSION_START.value,
                 "content": f"会话开始: {event.query[:100] if event.query else ''}",
@@ -226,7 +217,7 @@ class TimelineRecorder:
     def _on_session_completed(self, source: Any, event: SessionCompletedEvent) -> None:
         """会话完成"""
         self._record(
-            event.session_id,
+            event.key,
             {
                 "event_type": EventType.SESSION_END.value,
                 "content": "会话完成",
@@ -240,9 +231,8 @@ class TimelineRecorder:
 
     def _on_delegation_started(self, source: Any, event: DelegationStartedEvent) -> None:
         """委派开始"""
-        session_id = getattr(source, "session_id", "") if source else ""
         self._record(
-            session_id,
+            event.key,
             {
                 "event_type": EventType.DELEGATION_START.value,
                 "agent_id": event.from_agent_id,
@@ -258,9 +248,8 @@ class TimelineRecorder:
 
     def _on_delegation_completed(self, source: Any, event: DelegationCompletedEvent) -> None:
         """委派完成"""
-        session_id = getattr(source, "session_id", "") if source else ""
         self._record(
-            session_id,
+            event.key,
             {
                 "event_type": EventType.DELEGATION_END.value,
                 "agent_id": event.from_agent_id,

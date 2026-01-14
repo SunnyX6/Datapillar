@@ -40,7 +40,8 @@ class QueryAgent:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Union
+from collections.abc import Callable
+from typing import Any
 
 from langchain_core.tools import BaseTool
 from langchain_core.tools import tool as _langchain_tool
@@ -105,7 +106,7 @@ class ToolRegistry:
 
 
 def tool(
-    name_or_func: Union[str, Callable, None] = None,
+    name_or_func: str | Callable | None = None,
     *,
     args_schema: Any = None,
     return_direct: bool = False,

@@ -12,17 +12,16 @@ A2A 委派工具
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
 from datapillar_oneagentic.a2a.config import A2AConfig
 from datapillar_oneagentic.security import (
-    get_security_config,
     ConfirmationRequest,
-    UserRejectedError,
     NoConfirmationCallbackError,
+    UserRejectedError,
+    get_security_config,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,6 +32,74 @@ class A2ADelegateInput(BaseModel):
 
     task: str = Field(description="要委派给远程 Agent 的任务描述")
     context: str = Field(default="", description="额外的上下文信息")
+
+
+def _check_a2a_confirmation(config: A2AConfig, task: str, context: str) -> None:
+    """安全校验，不通过则抛出异常"""
+    if not config.require_confirmation:
+        return
+
+    security_config = get_security_config()
+    if not security_config.require_confirmation:
+        return
+
+    confirmation_request = ConfirmationRequest(
+        operation_type="a2a_delegate",
+        name=f"A2A Agent ({config.endpoint})",
+        description="委派任务到远程 A2A Agent",
+        parameters={"task": task, "context": context},
+        risk_level="high",
+        warnings=[
+            "此操作将调用外部 Agent，行为不可预测",
+            "任务内容将发送到远程服务器",
+            "远程 Agent 可能执行任意操作",
+        ],
+        source=config.endpoint,
+        metadata={
+            "endpoint": config.endpoint,
+            "require_confirmation": config.require_confirmation,
+            "fail_fast": config.fail_fast,
+        },
+    )
+
+    if not security_config.confirmation_callback:
+        raise NoConfirmationCallbackError(
+            f"调用远程 Agent {config.endpoint} 需要用户确认，但未配置 confirmation_callback。\n"
+            f"请配置 configure_security(confirmation_callback=...) 或设置 require_confirmation=False"
+        )
+
+    if not security_config.confirmation_callback(confirmation_request):
+        raise UserRejectedError(f"用户拒绝调用远程 Agent: {config.endpoint}")
+
+
+async def _call_a2a_remote_agent(endpoint: str, full_task: str) -> str:
+    """执行 A2A 调用"""
+    from a2a.client import ClientConfig, ClientFactory, create_text_message_object
+    from a2a.types import TaskState
+
+    client = await ClientFactory.connect(endpoint, client_config=ClientConfig(streaming=True))
+    try:
+        message = create_text_message_object(content=full_task)
+
+        async for event in client.send_message(message):
+            if not isinstance(event, tuple):
+                continue
+
+            task_obj, _ = event
+            state = task_obj.status.state
+
+            if state == TaskState.failed:
+                return f"远程 Agent 错误: {task_obj.status.message}"
+
+            if state == TaskState.completed:
+                msg = task_obj.status.message
+                if msg and msg.parts:
+                    return msg.parts[0].root.text
+                break
+
+        return "远程 Agent 未返回结果"
+    finally:
+        await client.close()
 
 
 def create_a2a_tool(config: A2AConfig, name: str | None = None) -> StructuredTool:
@@ -65,101 +132,16 @@ def create_a2a_tool(config: A2AConfig, name: str | None = None) -> StructuredToo
     async def delegate_to_a2a(task: str, context: str = "") -> str:
         """委派任务到远程 A2A Agent（带安全校验）"""
         try:
-            import httpx
-            from a2a.client import A2AClient
-            from a2a.types import MessageSendParams, SendMessageRequest
-        except ImportError:
-            raise ImportError(
-                "a2a-sdk 未安装。请运行: pip install a2a-sdk"
-            )
+            from a2a.client import ClientFactory  # noqa: F401 - 检查依赖是否安装
+        except ImportError as err:
+            raise ImportError("a2a-sdk 未安装。请运行: pip install a2a-sdk") from err
 
-        # 安全校验 - 外部 Agent 行为不可预测
-        if config.require_confirmation:
-            security_config = get_security_config()
+        _check_a2a_confirmation(config, task, context)
 
-            if security_config.require_confirmation:
-                warnings = [
-                    "此操作将调用外部 Agent，行为不可预测",
-                    "任务内容将发送到远程服务器",
-                    "远程 Agent 可能执行任意操作",
-                ]
-
-                # 构建确认请求
-                confirmation_request = ConfirmationRequest(
-                    operation_type="a2a_delegate",
-                    name=f"A2A Agent ({config.endpoint})",
-                    description="委派任务到远程 A2A Agent",
-                    parameters={
-                        "task": task,
-                        "context": context,
-                    },
-                    risk_level="high",  # 外部 Agent 默认高风险
-                    warnings=warnings,
-                    source=config.endpoint,
-                    metadata={
-                        "endpoint": config.endpoint,
-                        "require_confirmation": config.require_confirmation,
-                        "fail_fast": config.fail_fast,
-                    },
-                )
-
-                # 请求用户确认
-                if security_config.confirmation_callback:
-                    confirmed = security_config.confirmation_callback(confirmation_request)
-                    if not confirmed:
-                        raise UserRejectedError(f"用户拒绝调用远程 Agent: {config.endpoint}")
-                else:
-                    # 无确认回调 = 无法获得用户同意 = 拒绝执行
-                    raise NoConfirmationCallbackError(
-                        f"调用远程 Agent {config.endpoint} 需要用户确认，但未配置 confirmation_callback。\n"
-                        f"请配置 configure_security(confirmation_callback=...) 或设置 require_confirmation=False"
-                    )
-
-        # 构建完整任务描述
-        full_task = task
-        if context:
-            full_task = f"{task}\n\n上下文信息：\n{context}"
+        full_task = f"{task}\n\n上下文信息：\n{context}" if context else task
 
         try:
-            # 构建 httpx 客户端（传递 timeout 和 auth headers）
-            headers = {}
-            if config.auth and config.auth.scheme:
-                if config.auth.scheme == "bearer" and config.auth.credentials:
-                    headers["Authorization"] = f"Bearer {config.auth.credentials}"
-                elif config.auth.scheme == "api_key" and config.auth.credentials:
-                    headers["X-API-Key"] = config.auth.credentials
-
-            httpx_client = httpx.AsyncClient(
-                headers=headers,
-                timeout=httpx.Timeout(float(config.timeout)),
-            )
-
-            # 创建 A2A Client
-            client = A2AClient(httpx_client=httpx_client, url=config.endpoint)
-
-            # 获取 Agent Card（可选，用于日志）
-            try:
-                agent_card = await client.get_agent_card()
-                logger.info(f"委派任务到: {agent_card.name}")
-            except Exception:
-                logger.info(f"委派任务到: {config.endpoint}")
-
-            # 发送消息（带轮次限制）
-            request = SendMessageRequest(
-                params=MessageSendParams(message=full_task)
-            )
-            response = await client.send_message(request)
-
-            # 处理响应
-            if config.trust_remote_completion and response.result:
-                # 信任远程完成状态，直接返回
-                return str(response.result)
-            if response.result:
-                return str(response.result)
-            if response.error:
-                return f"远程 Agent 错误: {response.error}"
-            return "远程 Agent 未返回结果"
-
+            return await _call_a2a_remote_agent(config.endpoint, full_task)
         except Exception as e:
             if config.fail_fast:
                 raise
@@ -214,20 +196,23 @@ async def create_a2a_tools(configs: list[A2AConfig]) -> list[StructuredTool]:
     ```
     """
     try:
-        from a2a.client import A2AClient
-    except ImportError:
+        from a2a.client import ClientConfig, ClientFactory
+    except ImportError as err:
         raise ImportError(
             "a2a-sdk 未安装。请运行: pip install a2a-sdk"
-        )
+        ) from err
 
     tools = []
 
     for config in configs:
+        client = None
         try:
-            # 尝试获取 AgentCard 以确定工具名称
-            client = A2AClient(url=config.endpoint)
+            # 使用 ClientFactory 连接获取 AgentCard
+            client_config = ClientConfig(streaming=True)
+            client = await ClientFactory.connect(config.endpoint, client_config=client_config)
+
             try:
-                card = await client.get_agent_card()
+                card = await client.get_card()
                 tool_name = f"delegate_to_{card.name.lower().replace(' ', '_').replace('-', '_')}"
             except Exception:
                 tool_name = f"delegate_to_{_endpoint_to_name(config.endpoint)}"
@@ -245,5 +230,8 @@ async def create_a2a_tools(configs: list[A2AConfig]) -> list[StructuredTool]:
             if config.fail_fast:
                 raise
             logger.warning(f"跳过不可用的 A2A Agent: {config.endpoint}, 错误: {e}")
+        finally:
+            if client:
+                await client.close()
 
     return tools

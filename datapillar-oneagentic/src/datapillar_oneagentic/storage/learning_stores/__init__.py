@@ -31,8 +31,8 @@ await store.add(record)
 """
 
 from datapillar_oneagentic.storage.learning_stores.base import ExperienceStore
-from datapillar_oneagentic.storage.learning_stores.lance import LanceExperienceStore
 from datapillar_oneagentic.storage.learning_stores.chroma import ChromaExperienceStore
+from datapillar_oneagentic.storage.learning_stores.lance import LanceExperienceStore
 from datapillar_oneagentic.storage.learning_stores.milvus import MilvusExperienceStore
 
 __all__ = [

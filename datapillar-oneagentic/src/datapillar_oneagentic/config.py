@@ -53,7 +53,6 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, Settings
 from datapillar_oneagentic.core.config import AgentConfig, ContextConfig
 from datapillar_oneagentic.experience.config import LearningConfig
 from datapillar_oneagentic.providers.llm.config import EmbeddingConfig, LLMConfig
-from datapillar_oneagentic.telemetry.config import TelemetryConfig
 
 logger = logging.getLogger(__name__)
 
@@ -165,8 +164,11 @@ class DatapillarConfig(BaseSettings):
     learning: LearningConfig = Field(default_factory=LearningConfig)
     """经验学习配置"""
 
-    telemetry: TelemetryConfig = Field(default_factory=TelemetryConfig)
-    """遥测配置"""
+    verbose: bool = Field(default=False, description="是否输出详细日志")
+    """详细日志开关"""
+
+    log_level: str = Field(default="INFO", description="日志级别")
+    """日志级别"""
 
     @classmethod
     def settings_customise_sources(
@@ -282,11 +284,11 @@ def datapillar_configure(
     _config = DatapillarConfig(**kwargs)
 
     # 设置日志级别
-    if _config.telemetry.verbose:
+    if _config.verbose:
         logging.getLogger("datapillar_oneagentic").setLevel(logging.DEBUG)
     else:
         logging.getLogger("datapillar_oneagentic").setLevel(
-            getattr(logging, _config.telemetry.log_level.upper(), logging.INFO)
+            getattr(logging, _config.log_level.upper(), logging.INFO)
         )
 
     # 日志输出配置状态

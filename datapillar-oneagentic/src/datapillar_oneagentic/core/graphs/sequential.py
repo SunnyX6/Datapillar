@@ -3,9 +3,9 @@
 
 Agent 按定义顺序依次执行：A → B → C → END
 
-支持 Clarification 暂停：
+支持 interrupt 暂停：
 - 正常完成 → 下一个 Agent
-- 需要澄清 → interrupt 暂停，用户回复后重新执行当前 Agent
+- interrupt 暂停 → 用户回复后继续执行当前 Agent
 """
 
 from langgraph.graph import END, StateGraph

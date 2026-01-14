@@ -23,7 +23,6 @@ from datapillar_oneagentic import (
     Datapillar,
     Process,
     AgentContext,
-    Clarification,
     # 配置
     datapillar_configure,
 )
@@ -225,7 +224,7 @@ class ShoppingAdvisorAgent:
 - 考虑性价比
 """
 
-    async def run(self, ctx: AgentContext) -> ProductAnalysis | Clarification:
+    async def run(self, ctx: AgentContext) -> ProductAnalysis:
         """Agent 核心执行方法"""
         # 1. 构建消息（自动注入上下文）
         messages = ctx.build_messages(self.SYSTEM_PROMPT)
@@ -234,14 +233,12 @@ class ShoppingAdvisorAgent:
         messages = await ctx.invoke_tools(messages)
 
         # 3. 获取结构化输出
-        output: ProductAnalysis = await ctx.get_output(messages)
+        output: ProductAnalysis = await ctx.get_structured_output(messages)
 
         # 4. 业务判断：置信度低时请求澄清
         if output.confidence < 0.5:
-            return ctx.clarify(
-                message="需求不够明确，请补充信息",
-                questions=["您的预算范围是多少？", "有品牌偏好吗？"],
-            )
+            ctx.interrupt("需求不够明确，请补充信息")
+            output = await ctx.get_structured_output(messages)
 
         return output
 
@@ -276,29 +273,29 @@ class OrderAgent:
   "message": "订单创建成功说明"
 }}"""
 
-    async def run(self, ctx: AgentContext) -> OrderResult | Clarification:
+    async def run(self, ctx: AgentContext) -> OrderResult:
         """订单处理逻辑 - 演示获取上游 Agent 产出"""
 
         # === 从 store 获取上游 Agent 的产出 ===
-        analysis = await ctx.get_deliverable("shopping_advisor")
+        analysis = await ctx.get_deliverable(agent_id="shopping_advisor")
 
         if analysis:
             print(f"\n📥 获取到上游 Agent [shopping_advisor] 的产出:")
             print(f"   推荐商品: {analysis.get('recommended_products', [])}")
             print(f"   推荐理由: {analysis.get('reason', '')[:50]}...")
-
-            # 构建上游结果描述，传给 LLM
-            upstream_result = (
-                f"推荐商品: {analysis.get('recommended_products', [])}\n"
-                f"推荐理由: {analysis.get('reason', '')}\n"
-                f"价格区间: {analysis.get('price_range', '')}"
-            )
         else:
             print("\n⚠️ 未获取到上游 Agent [shopping_advisor] 的产出")
-            return ctx.clarify(
-                message="没有找到推荐商品",
-                questions=["请先让购物顾问推荐商品"],
-            )
+            ctx.interrupt("没有找到推荐商品，请先让购物顾问推荐商品")
+            analysis = await ctx.get_deliverable(agent_id="shopping_advisor")
+            if not analysis:
+                return OrderResult(success=False, order_id=None, message="未获取到推荐商品")
+
+        # 构建上游结果描述，传给 LLM
+        upstream_result = (
+            f"推荐商品: {analysis.get('recommended_products', [])}\n"
+            f"推荐理由: {analysis.get('reason', '')}\n"
+            f"价格区间: {analysis.get('price_range', '')}"
+        )
 
         # 构建消息，注入上游产物信息
         prompt = self.SYSTEM_PROMPT.format(upstream_result=upstream_result)
@@ -314,13 +311,10 @@ class OrderAgent:
 
         # 检查是否有收货地址
         if "地址" not in ctx.query and "送到" not in ctx.query and "配送" not in ctx.query:
-            return ctx.clarify(
-                message="请提供收货信息",
-                questions=["您的收货地址是？"],
-            )
+            ctx.interrupt("请提供收货信息")
 
         messages = await ctx.invoke_tools(messages)
-        return await ctx.get_output(messages)
+        return await ctx.get_structured_output(messages)
 
 
 # ============================================================================
@@ -397,37 +391,37 @@ async def main():
         session_id="demo_001",
     ):
         event_type = event.get("event")
-        data = event.get("data", {})
-
-        if event_type == "agent_start":
-            print(f"\n🤖 [{data.get('agent_name')}] 开始工作...")
-        elif event_type == "thinking":
-            # 显示思考过程
-            thinking = data.get("thinking_content", "")
+        if event_type == "agent.start":
+            agent = event.get("agent", {})
+            print(f"\n🤖 [{agent.get('name')}] 开始工作...")
+        elif event_type == "agent.thinking":
+            message = event.get("message", {})
+            thinking = message.get("content", "")
             if thinking:
-                print(f"\n🧠 [{data.get('agent_id')}] 思考中...")
-                # 截取前 200 字符显示
+                agent = event.get("agent", {})
+                print(f"\n🧠 [{agent.get('id')}] 思考中...")
                 if len(thinking) > 200:
                     print(f"   {thinking[:200]}...")
                 else:
                     print(f"   {thinking}")
-        elif event_type == "tool_call":
-            print(f"   🔧 调用: {data.get('tool_name')}")
-        elif event_type == "tool_result":
-            result = data.get("result", "")
+        elif event_type == "tool.start":
+            tool = event.get("tool", {})
+            print(f"   🔧 调用: {tool.get('name')}")
+        elif event_type == "tool.end":
+            tool = event.get("tool", {})
+            result = str(tool.get("output", ""))
             if len(result) > 100:
                 result = result[:100] + "..."
             print(f"   📋 结果: {result}")
-        elif event_type == "agent_complete":
-            print(f"   ✅ 完成")
-        elif event_type == "clarification":
-            print(f"\n❓ 需要澄清: {data.get('message')}")
-            for q in data.get("questions", []):
-                print(f"   - {q}")
+        elif event_type == "agent.end":
+            print("   ✅ 完成")
+        elif event_type == "agent.interrupt":
+            interrupt_payload = event.get("interrupt", {}).get("payload")
+            print(f"\n❓ 需要用户输入: {interrupt_payload}")
         elif event_type == "result":
             print(f"\n{'=' * 60}")
             print("📦 最终结果:")
-            deliverables = data.get("deliverables", {})
+            deliverables = event.get("result", {}).get("deliverable", {})
             for key, value in deliverables.items():
                 print(f"\n[{key}]")
                 if isinstance(value, dict):
@@ -446,7 +440,8 @@ async def main():
             else:
                 print(f"  ⚠️ deliverable keys: {list(deliverables.keys())}")
         elif event_type == "error":
-            print(f"\n❌ 错误: {data.get('detail')}")
+            error = event.get("error", {})
+            print(f"\n❌ 错误: {error.get('detail') or error.get('message')}")
 
     print("\n" + "=" * 60)
     print("✨ 演示完成")

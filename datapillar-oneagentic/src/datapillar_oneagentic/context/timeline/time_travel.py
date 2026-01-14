@@ -42,7 +42,7 @@ class TimeTravelResult(BaseModel):
         message: str = "时间旅行成功",
         is_branch: bool = False,
         branch_name: str | None = None,
-    ) -> "TimeTravelResult":
+    ) -> TimeTravelResult:
         """创建成功结果"""
         return cls(
             success=True,
@@ -60,7 +60,7 @@ class TimeTravelResult(BaseModel):
         session_id: str,
         checkpoint_id: str,
         message: str = "时间旅行失败",
-    ) -> "TimeTravelResult":
+    ) -> TimeTravelResult:
         """创建失败结果"""
         return cls(
             success=False,

@@ -62,8 +62,6 @@ class Blackboard(TypedDict, total=False):
     last_agent_status: str | None
     last_agent_error: str | None
 
-    # Clarification 中断状态（两轮流程：第一轮写入问题，第二轮 interrupt 等待回答）
-    pending_clarification: dict | None
 
     # ReAct 模式
     goal: str | None
@@ -90,7 +88,6 @@ def create_blackboard(
         experience_context=experience_context,
         last_agent_status=None,
         last_agent_error=None,
-        pending_clarification=None,
         # ReAct 模式
         goal=None,
         plan=None,

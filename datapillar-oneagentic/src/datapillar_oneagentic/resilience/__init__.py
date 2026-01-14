@@ -37,6 +37,10 @@ from datapillar_oneagentic.resilience.errors import (
     RecoveryAction,
     RetryableError,
 )
+from datapillar_oneagentic.resilience.exception_mapping import (
+    ContextLengthExceededError,
+    ExceptionMapper,
+)
 from datapillar_oneagentic.resilience.retry import with_retry
 
 __all__ = [
@@ -51,6 +55,9 @@ __all__ = [
     "ErrorClassifier",
     "RetryableError",
     "NonRetryableError",
+    # 异常映射
+    "ContextLengthExceededError",
+    "ExceptionMapper",
     # 重试
     "with_retry",
     # 熔断

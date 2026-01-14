@@ -14,8 +14,9 @@ from __future__ import annotations
 import ipaddress
 import logging
 import socket
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -113,16 +114,16 @@ class ConfirmationRequest:
         """生成人类可读的确认信息"""
         lines = [
             f"{'=' * 50}",
-            f"⚠️  危险操作确认请求",
+            "⚠️  危险操作确认请求",
             f"{'=' * 50}",
-            f"",
+            "",
             f"操作类型: {self.operation_type}",
             f"名称: {self.name}",
             f"描述: {self.description}",
             f"来源: {self.source}",
             f"风险等级: {self.risk_level}",
-            f"",
-            f"调用参数:",
+            "",
+            "调用参数:",
         ]
 
         for key, value in self.parameters.items():
@@ -271,7 +272,7 @@ def is_private_ip(hostname: str) -> bool:
     # DNS 解析后检查（防止 DNS rebinding）
     try:
         addr_info = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
-        for family, _, _, _, sockaddr in addr_info:
+        for _family, _, _, _, sockaddr in addr_info:
             ip_str = sockaddr[0]
             if _check_ip_in_private_ranges(ip_str):
                 logger.warning(f"DNS 解析发现内网 IP: {hostname} -> {ip_str}")
@@ -318,13 +319,12 @@ def validate_url(url: str) -> None:
         )
 
     # 检查域名白名单
-    if config.allowed_domains:
-        if not any(
-            hostname == domain or hostname.endswith(f".{domain}")
-            for domain in config.allowed_domains
-        ):
-            raise URLNotAllowedError(
-                f"域名不在白名单中: {hostname}\n"
-                f"允许的域名: {', '.join(config.allowed_domains)}"
-            )
+    if config.allowed_domains and not any(
+        hostname == domain or hostname.endswith(f".{domain}")
+        for domain in config.allowed_domains
+    ):
+        raise URLNotAllowedError(
+            f"域名不在白名单中: {hostname}\n"
+            f"允许的域名: {', '.join(config.allowed_domains)}"
+        )
 

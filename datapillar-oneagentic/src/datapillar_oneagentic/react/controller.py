@@ -27,9 +27,10 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
 
+from datapillar_oneagentic.core.agent import AgentRegistry
 from datapillar_oneagentic.react.planner import create_plan, replan
 from datapillar_oneagentic.react.reflector import decide_next_action, reflect
-from datapillar_oneagentic.react.schemas import Plan, Reflection
+from datapillar_oneagentic.react.schemas import Plan
 from datapillar_oneagentic.state.blackboard import Blackboard
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,10 @@ async def react_controller_node(
         plan = Plan.model_validate(plan_data)
     else:
         logger.info(f"ReAct: 开始规划 - {goal[:100]}...")
-        plan = await create_plan(goal=goal, llm=llm)
+        # 获取当前团队的 Agent 列表
+        available_agents = [AgentRegistry.get(aid) for aid in agent_ids]
+        available_agents = [a for a in available_agents if a is not None]
+        plan = await create_plan(goal=goal, llm=llm, available_agents=available_agents)
         logger.info(f"ReAct: 规划完成，共 {len(plan.tasks)} 个任务")
 
     # 3. 迭代决定下一步（避免递归）
@@ -137,10 +141,14 @@ async def react_controller_node(
                 }
 
             logger.info(f"ReAct: 重新规划 ({replan_count}/{MAX_REPLAN_DEPTH})...")
+            # 获取当前团队的 Agent 列表
+            available_agents = [AgentRegistry.get(aid) for aid in agent_ids]
+            available_agents = [a for a in available_agents if a is not None]
             plan = await replan(
                 plan=plan,
                 reflection_summary=reflection.summary,
                 llm=llm,
+                available_agents=available_agents,
             )
             # 继续循环，基于新计划决定下一步
             continue
@@ -251,10 +259,6 @@ def _decide_next_step(
             elif last_status == "failed":
                 current_task.mark_failed(last_error or "业务失败")
                 logger.warning(f"ReAct: 任务 {current_task.id} 业务失败: {last_error}")
-                error_retry_count = 0
-
-            elif last_status == "needs_clarification":
-                logger.info(f"ReAct: 任务 {current_task.id} 需要澄清")
                 error_retry_count = 0
 
             else:

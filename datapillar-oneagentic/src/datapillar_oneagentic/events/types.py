@@ -9,8 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from datapillar_oneagentic.core.types import SessionKey
 from datapillar_oneagentic.events.base import BaseEvent
-
 
 # === Agent 事件 ===
 
@@ -21,7 +21,7 @@ class AgentStartedEvent(BaseEvent):
 
     agent_id: str = ""
     agent_name: str = ""
-    session_id: str = ""
+    key: SessionKey | None = None
     query: str = ""
 
 
@@ -31,7 +31,7 @@ class AgentCompletedEvent(BaseEvent):
 
     agent_id: str = ""
     agent_name: str = ""
-    session_id: str = ""
+    key: SessionKey | None = None
     result: Any = None
     duration_ms: float = 0.0
 
@@ -42,7 +42,7 @@ class AgentFailedEvent(BaseEvent):
 
     agent_id: str = ""
     agent_name: str = ""
-    session_id: str = ""
+    key: SessionKey | None = None
     error: str = ""
     error_type: str = ""
 
@@ -55,6 +55,7 @@ class ToolCalledEvent(BaseEvent):
     """工具被调用"""
 
     agent_id: str = ""
+    key: SessionKey | None = None
     tool_name: str = ""
     tool_input: dict[str, Any] = field(default_factory=dict)
 
@@ -64,6 +65,7 @@ class ToolCompletedEvent(BaseEvent):
     """工具执行完成"""
 
     agent_id: str = ""
+    key: SessionKey | None = None
     tool_name: str = ""
     tool_output: Any = None
     duration_ms: float = 0.0
@@ -74,6 +76,7 @@ class ToolFailedEvent(BaseEvent):
     """工具执行失败"""
 
     agent_id: str = ""
+    key: SessionKey | None = None
     tool_name: str = ""
     error: str = ""
 
@@ -137,6 +140,7 @@ class DelegationStartedEvent(BaseEvent):
 
     from_agent_id: str = ""
     to_agent_id: str = ""
+    key: SessionKey | None = None
     task: str = ""
     is_a2a: bool = False
 
@@ -147,6 +151,7 @@ class DelegationCompletedEvent(BaseEvent):
 
     from_agent_id: str = ""
     to_agent_id: str = ""
+    key: SessionKey | None = None
     result: Any = None
     duration_ms: float = 0.0
 
@@ -158,7 +163,7 @@ class DelegationCompletedEvent(BaseEvent):
 class SessionStartedEvent(BaseEvent):
     """会话开始"""
 
-    session_id: str = ""
+    key: SessionKey | None = None
     query: str = ""
 
 
@@ -166,7 +171,7 @@ class SessionStartedEvent(BaseEvent):
 class SessionCompletedEvent(BaseEvent):
     """会话完成"""
 
-    session_id: str = ""
+    key: SessionKey | None = None
     result: Any = None
     duration_ms: float = 0.0
     agent_count: int = 0

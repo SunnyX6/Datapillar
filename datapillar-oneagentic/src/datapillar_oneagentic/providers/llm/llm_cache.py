@@ -222,7 +222,7 @@ class InMemoryLLMCache(BaseCache):
         # 清理超限（LRU 简化版：按时间戳排序删除最旧的）
         if len(self._cache) > self.max_size:
             sorted_keys = sorted(
-                list(self._cache.keys()),
+                self._cache.keys(),
                 key=lambda k: self._cache[k][1]
             )
             to_remove = len(self._cache) - self.max_size

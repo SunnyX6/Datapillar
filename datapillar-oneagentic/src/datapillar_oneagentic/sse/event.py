@@ -22,13 +22,11 @@ event = SseEvent.tool_start(
     tool_input={"keyword": "orders"},
 )
 
-# 需要用户澄清
-event = SseEvent.interrupt_event(
+# 需要用户输入
+event = SseEvent.agent_interrupt(
     agent_id="analyst",
     agent_name="需求分析师",
-    kind="clarification",
-    message="请问您想查询哪个数据库？",
-    options=[{"label": "MySQL", "value": "mysql"}],
+    payload={"prompt": "请问您想查询哪个数据库？"},
 )
 ```
 """
@@ -51,11 +49,12 @@ class SseEventType(str, Enum):
 
     AGENT_START = "agent.start"
     AGENT_END = "agent.end"
+    AGENT_THINKING = "agent.thinking"
     LLM_START = "llm.start"
     LLM_END = "llm.end"
     TOOL_START = "tool.start"
     TOOL_END = "tool.end"
-    INTERRUPT = "interrupt"
+    AGENT_INTERRUPT = "agent.interrupt"
     RESULT = "result"
     ERROR = "error"
     ABORTED = "aborted"
@@ -121,10 +120,7 @@ class SseLlm(BaseModel):
 class SseInterrupt(BaseModel):
     """中断信息"""
 
-    kind: str = Field(..., description="clarification/feedback_request 等")
-    message: str = Field(..., description="提示文案")
-    questions: list[str] | None = None
-    options: list[dict[str, Any]] | None = None
+    payload: Any | None = Field(default=None, description="中断 payload（可选）")
 
 
 class SseResult(BaseModel):
@@ -157,6 +153,10 @@ class SseEvent(BaseModel):
     event: SseEventType = Field(..., description="事件类型")
     state: SseState = Field(..., description="事件状态")
     level: SseLevel = Field(..., description="严重级别")
+    namespace: str | None = Field(default=None, description="命名空间")
+    session_id: str | None = Field(default=None, description="会话 ID")
+    duration_ms: int | None = Field(default=None, description="耗时（毫秒）")
+    timeline: dict[str, Any] | None = Field(default=None, description="时间线数据")
 
     agent: SseAgent | None = None
     span: SseSpan | None = None
@@ -171,6 +171,10 @@ class SseEvent(BaseModel):
     def to_dict(self) -> dict[str, Any]:
         """转换为 dict（剔除 None 字段）"""
         return self.model_dump(exclude_none=True)
+
+    def with_session(self, *, namespace: str, session_id: str) -> SseEvent:
+        """补充会话信息"""
+        return self.model_copy(update={"namespace": namespace, "session_id": session_id})
 
     # ==================== 工厂方法 ====================
 
@@ -210,6 +214,26 @@ class SseEvent(BaseModel):
             agent=SseAgent(id=agent_id, name=agent_name),
             span=SseSpan(run_id=run_id, parent_run_id=parent_run_id),
             message=SseMessage(role="assistant", content=summary) if summary else None,
+        )
+
+    @classmethod
+    def agent_thinking(
+        cls,
+        *,
+        agent_id: str,
+        agent_name: str,
+        content: str,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+    ) -> SseEvent:
+        """Agent 思考内容"""
+        return cls(
+            event=SseEventType.AGENT_THINKING,
+            state=SseState.THINKING,
+            level=SseLevel.INFO,
+            agent=SseAgent(id=agent_id, name=agent_name),
+            span=SseSpan(run_id=run_id, parent_run_id=parent_run_id),
+            message=SseMessage(role="assistant", content=content),
         )
 
     @classmethod
@@ -297,25 +321,23 @@ class SseEvent(BaseModel):
         )
 
     @classmethod
-    def interrupt_event(
+    def agent_interrupt(
         cls,
         *,
         agent_id: str,
         agent_name: str,
-        kind: str,
-        message: str,
-        questions: list[str] | None = None,
-        options: list[dict[str, Any]] | None = None,
+        payload: Any | None = None,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
     ) -> SseEvent:
         """需要用户输入"""
         return cls(
-            event=SseEventType.INTERRUPT,
+            event=SseEventType.AGENT_INTERRUPT,
             state=SseState.WAITING,
             level=SseLevel.WARNING,
             agent=SseAgent(id=agent_id, name=agent_name),
-            interrupt=SseInterrupt(
-                kind=kind, message=message, questions=questions, options=options
-            ),
+            span=SseSpan(run_id=run_id, parent_run_id=parent_run_id),
+            interrupt=SseInterrupt(payload=payload),
         )
 
     @classmethod

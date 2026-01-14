@@ -32,7 +32,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from datapillar_oneagentic.storage.learning_stores.base import ExperienceStore
@@ -155,7 +155,7 @@ class ExperienceRecord:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ExperienceRecord":
+    def from_dict(cls, data: dict[str, Any]) -> ExperienceRecord:
         """从字典反序列化"""
         return cls(
             id=data.get("id", ""),
@@ -184,7 +184,7 @@ class ExperienceLearner:
 
     def __init__(
         self,
-        store: "ExperienceStore",
+        store: ExperienceStore,
         namespace: str,
     ):
         """

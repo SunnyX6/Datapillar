@@ -4,42 +4,42 @@ Context 模块 - 统一的上下文管理
 提供：
 - ContextBuilder: 统一的上下文管理器（管理 messages、timeline、压缩）
 - Timeline: 执行时间线
-- Compaction: 上下文压缩
+- Compaction: 上下文压缩（由 ContextLengthExceededError 触发）
 - Knowledge: 知识注册
 
 设计原则：
 - 所有上下文操作通过 ContextBuilder
 - messages 是 LangGraph 的短期记忆
 - Timeline 记录执行历史
-- 压缩在 ContextBuilder 中自动触发
+- 压缩由 LLM 上下文超限异常触发
 """
 
-from datapillar_oneagentic.context.types import (
-    EventType,
-    EventLevel,
-    AgentStatus,
-    CheckpointType,
-)
 from datapillar_oneagentic.context.builder import ContextBuilder
+from datapillar_oneagentic.context.checkpoint import CheckpointManager
+from datapillar_oneagentic.context.compaction import (
+    Compactor,
+    CompactPolicy,
+    CompactResult,
+    clear_compactor_cache,
+    get_compactor,
+)
+from datapillar_oneagentic.context.knowledge import (
+    AgentKnowledgeContribution,
+    KnowledgeDomain,
+    KnowledgeLevel,
+    KnowledgeRegistry,
+)
 from datapillar_oneagentic.context.timeline import (
     Timeline,
     TimelineEntry,
     TimeTravelRequest,
     TimeTravelResult,
 )
-from datapillar_oneagentic.context.checkpoint import CheckpointManager
-from datapillar_oneagentic.context.compaction import (
-    CompactPolicy,
-    CompactResult,
-    Compactor,
-    get_compactor,
-    clear_compactor_cache,
-)
-from datapillar_oneagentic.context.knowledge import (
-    KnowledgeRegistry,
-    KnowledgeDomain,
-    KnowledgeLevel,
-    AgentKnowledgeContribution,
+from datapillar_oneagentic.context.types import (
+    AgentStatus,
+    CheckpointType,
+    EventLevel,
+    EventType,
 )
 
 __all__ = [
