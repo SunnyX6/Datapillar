@@ -1,7 +1,7 @@
 """
 Context Compaction 子模块
 
-上下文压缩，当 messages token 超过阈值时自动压缩历史消息。
+上下文压缩，由 ContextLengthExceededError 异常触发。
 
 核心组件：
 - Compactor: 压缩器，直接操作 list[BaseMessage]
@@ -11,12 +11,15 @@ Context Compaction 子模块
 使用示例：
 ```python
 from datapillar_oneagentic.context.compaction import get_compactor
+from datapillar_oneagentic.resilience import ContextLengthExceededError
 
 compactor = get_compactor()
 
-# 检查是否需要压缩
-if compactor.needs_compact(messages):
+try:
+    result = await llm.ainvoke(messages)
+except ContextLengthExceededError:
     compressed_messages, result = await compactor.compact(messages)
+    # 用压缩后的 messages 重试
 ```
 """
 
@@ -26,8 +29,8 @@ from datapillar_oneagentic.context.compaction.compact_policy import (
 )
 from datapillar_oneagentic.context.compaction.compactor import (
     Compactor,
-    get_compactor,
     clear_compactor_cache,
+    get_compactor,
 )
 
 __all__ = [

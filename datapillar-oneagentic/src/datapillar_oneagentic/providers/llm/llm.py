@@ -14,8 +14,8 @@ import asyncio
 import logging
 import os
 import threading
-from dataclasses import dataclass, field
-from typing import Any, Dict, Type, TypeVar, cast
+from dataclasses import dataclass
+from typing import Any, TypeVar, cast
 
 from langchain_core.globals import set_llm_cache
 from langchain_core.language_models import BaseChatModel
@@ -30,12 +30,11 @@ from langchain_core.messages import (
 from langchain_core.runnables import Runnable
 from pydantic import BaseModel
 
-
 # ==================== GLM Thinking 模式 Monkey-Patch ====================
 
 
 def _patched_convert_delta_to_message_chunk(
-    dct: Dict[str, Any], default_class: Type[BaseMessageChunk]
+    dct: dict[str, Any], default_class: type[BaseMessageChunk]
 ) -> BaseMessageChunk:
     """
     修复版本（流式）：解析 GLM thinking 模式的 reasoning_content 字段
@@ -53,10 +52,10 @@ def _patched_convert_delta_to_message_chunk(
     """
     role = dct.get("role")
     content = dct.get("content", "")
-    additional_kwargs: Dict[str, Any] = {}
+    additional_kwargs: dict[str, Any] = {}
 
     # 解析 tool_calls
-    tool_calls = dct.get("tool_calls", None)
+    tool_calls = dct.get("tool_calls")
     if tool_calls is not None:
         additional_kwargs["tool_calls"] = tool_calls
 
@@ -76,7 +75,7 @@ def _patched_convert_delta_to_message_chunk(
     return default_class(content=content)  # type: ignore[call-arg]
 
 
-def _patched_convert_dict_to_message(dct: Dict[str, Any]) -> BaseMessage:
+def _patched_convert_dict_to_message(dct: dict[str, Any]) -> BaseMessage:
     """
     修复版本（非流式）：解析 GLM thinking 模式的 reasoning_content 字段
 
@@ -107,8 +106,8 @@ def _patched_convert_dict_to_message(dct: Dict[str, Any]) -> BaseMessage:
     if role == "user":
         return HumanMessage(content=content)
     if role == "assistant":
-        additional_kwargs: Dict[str, Any] = {}
-        tool_calls = dct.get("tool_calls", None)
+        additional_kwargs: dict[str, Any] = {}
+        tool_calls = dct.get("tool_calls")
         if tool_calls is not None:
             additional_kwargs["tool_calls"] = tool_calls
         # 解析 reasoning_content（GLM thinking 模式）
@@ -140,15 +139,12 @@ def _patch_zhipuai_thinking() -> None:
 
 from datapillar_oneagentic.providers.llm.config import LLMConfig
 from datapillar_oneagentic.providers.llm.llm_cache import create_llm_cache
-from datapillar_oneagentic.providers.llm.usage_tracker import (
-    estimate_cost_usd,
-    estimate_usage,
-    extract_usage,
-    parse_pricing,
-)
+from datapillar_oneagentic.providers.llm.usage_tracker import extract_usage
 from datapillar_oneagentic.resilience import (
     CircuitBreakerError,
+    ContextLengthExceededError,
     ErrorClassifier,
+    ExceptionMapper,
     get_circuit_breaker,
     get_llm_timeout,
     with_retry,
@@ -175,7 +171,6 @@ class LLMProviderConfig:
     base_url: str | None = None
     enable_thinking: bool = False
     thinking_budget_tokens: int | None = None
-    config_json: dict[str, Any] = field(default_factory=dict)
 
 
 # ==================== 全局 LLM 缓存（懒加载）====================
@@ -243,14 +238,11 @@ class ResilientChatModel:
         *,
         provider: str | None = None,
         model_name: str | None = None,
-        config_json: dict | None = None,
     ):
         self._llm = llm
         self._circuit_breaker = get_circuit_breaker("llm")
         self._provider = provider or "unknown"
         self._model_name = model_name
-        self._config_json = config_json
-        self._pricing = parse_pricing(config_json) if config_json else None
 
     @property
     def timeout(self) -> float:
@@ -285,7 +277,7 @@ class ResilientChatModel:
                 timeout=self.timeout,
             )
             await self._circuit_breaker.record_success()
-            asyncio.create_task(self._track_usage_async(input, result))
+            asyncio.create_task(self._track_usage_async(result))
             return result
 
         except TimeoutError:
@@ -293,12 +285,20 @@ class ResilientChatModel:
             raise TimeoutError(f"LLM 调用超时（{self.timeout}s）") from None
 
         except Exception as e:
+            # 检查是否为上下文超限错误
+            if ExceptionMapper.is_context_length_exceeded(e):
+                raise ContextLengthExceededError(
+                    message=str(e),
+                    provider=self._provider,
+                    model=self._model_name,
+                ) from e
+
             if ErrorClassifier.is_retryable(e):
                 await self._circuit_breaker.record_failure()
             raise
 
-    async def _track_usage_async(self, input: Any, result: Any) -> None:
-        """异步追踪 Token 使用量"""
+    async def _track_usage_async(self, result: Any) -> None:
+        """异步追踪 Token 使用量，发出事件通知使用者"""
         try:
             usage = extract_usage(result)
 
@@ -308,21 +308,18 @@ class ResilientChatModel:
                     usage = extract_usage(raw)
 
             if usage is None:
-                prompt_messages = input if isinstance(input, list) else None
-                completion_text = None
-                if isinstance(result, dict):
-                    raw = result.get("raw")
-                    if raw:
-                        completion_text = getattr(raw, "content", None)
-                else:
-                    completion_text = getattr(result, "content", None)
+                return
 
-                usage = estimate_usage(
-                    prompt_messages=prompt_messages,
-                    completion_text=completion_text,
-                )
+            from datapillar_oneagentic.events import LLMCallCompletedEvent, event_bus
 
-            cost = estimate_cost_usd(usage=usage, pricing=self._pricing)
+            await event_bus.emit(
+                self,
+                LLMCallCompletedEvent(
+                    model=self._model_name or "",
+                    input_tokens=usage.input_tokens,
+                    output_tokens=usage.output_tokens,
+                ),
+            )
 
         except Exception as e:
             logger.warning(f"Usage 追踪失败（不影响主流程）: {e}")
@@ -355,7 +352,6 @@ class ResilientChatModel:
                 bound,
                 provider=self._provider,
                 model_name=self._model_name,
-                config_json=self._config_json,
             )
         return self
 
@@ -377,7 +373,6 @@ class ResilientChatModel:
                 bound,
                 provider=self._provider,
                 model_name=self._model_name,
-                config_json=self._config_json,
             )
         return self
 
@@ -400,7 +395,6 @@ class ResilientChatModel:
                 bound,
                 provider=self._provider,
                 model_name=self._model_name,
-                config_json=self._config_json,
             )
         return self
 
@@ -649,7 +643,6 @@ def call_llm(
             llm,
             provider=config.provider,
             model_name=config.model_name,
-            config_json=config.config_json,
         )
 
         _cleanup_llm_cache_if_needed()

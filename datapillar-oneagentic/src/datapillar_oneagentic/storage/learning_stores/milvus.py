@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from datapillar_oneagentic.storage.learning_stores.base import ExperienceStore
 
@@ -77,8 +77,8 @@ class MilvusExperienceStore(ExperienceStore):
         """初始化数据库和集合"""
         try:
             from pymilvus import AsyncMilvusClient, DataType
-        except ImportError:
-            raise ImportError("需要安装 Milvus 依赖：pip install pymilvus>=2.5.3")
+        except ImportError as err:
+            raise ImportError("需要安装 Milvus 依赖：pip install pymilvus>=2.5.3") from err
 
         if self._is_remote:
             logger.info(f"初始化 MilvusExperienceStore (远程): {self._uri}, namespace={self._namespace}")
@@ -135,7 +135,7 @@ class MilvusExperienceStore(ExperienceStore):
         self._client = None
         logger.info("MilvusExperienceStore 已关闭")
 
-    def _record_to_milvus(self, record: "ExperienceRecord") -> dict[str, Any]:
+    def _record_to_milvus(self, record: ExperienceRecord) -> dict[str, Any]:
         """将 ExperienceRecord 转换为 Milvus 格式"""
         return {
             "id": record.id,
@@ -152,7 +152,7 @@ class MilvusExperienceStore(ExperienceStore):
             "vector": record.vector,
         }
 
-    def _milvus_to_record(self, row: dict[str, Any]) -> "ExperienceRecord":
+    def _milvus_to_record(self, row: dict[str, Any]) -> ExperienceRecord:
         """将 Milvus 格式转换为 ExperienceRecord"""
         from datapillar_oneagentic.experience.learner import ExperienceRecord
 
@@ -173,8 +173,12 @@ class MilvusExperienceStore(ExperienceStore):
 
     # ==================== 写操作 ====================
 
-    async def add(self, record: "ExperienceRecord") -> str:
+    async def add(self, record: ExperienceRecord) -> str:
         """添加记录"""
+        # 确保已初始化
+        if self._client is None:
+            await self.initialize()
+
         data = self._record_to_milvus(record)
 
         await self._client.insert(
@@ -186,6 +190,10 @@ class MilvusExperienceStore(ExperienceStore):
 
     async def delete(self, record_id: str) -> bool:
         """删除记录"""
+        # 确保已初始化
+        if self._client is None:
+            await self.initialize()
+
         try:
             await self._client.delete(
                 collection_name=self._collection_name,
@@ -198,8 +206,12 @@ class MilvusExperienceStore(ExperienceStore):
 
     # ==================== 读操作 ====================
 
-    async def get(self, record_id: str) -> "ExperienceRecord | None":
+    async def get(self, record_id: str) -> ExperienceRecord | None:
         """获取记录"""
+        # 确保已初始化
+        if self._client is None:
+            await self.initialize()
+
         result = await self._client.get(
             collection_name=self._collection_name,
             ids=[record_id],
@@ -216,7 +228,7 @@ class MilvusExperienceStore(ExperienceStore):
         query_vector: list[float],
         k: int = 5,
         outcome: str | None = None,
-    ) -> list["ExperienceRecord"]:
+    ) -> list[ExperienceRecord]:
         """
         向量相似度搜索
 
@@ -228,6 +240,10 @@ class MilvusExperienceStore(ExperienceStore):
         Returns:
             ExperienceRecord 列表（按相似度排序）
         """
+        # 确保已初始化
+        if self._client is None:
+            await self.initialize()
+
         filter_expr = None
         if outcome:
             filter_expr = f'outcome == "{outcome}"'
@@ -253,5 +269,9 @@ class MilvusExperienceStore(ExperienceStore):
 
     async def count(self) -> int:
         """统计记录数量"""
+        # 确保已初始化
+        if self._client is None:
+            await self.initialize()
+
         stats = await self._client.get_collection_stats(self._collection_name)
         return stats.get("row_count", 0)

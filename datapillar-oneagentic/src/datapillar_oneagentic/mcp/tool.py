@@ -24,11 +24,10 @@ from pydantic import BaseModel, Field, create_model
 from datapillar_oneagentic.mcp.client import MCPClient, MCPTool
 from datapillar_oneagentic.mcp.config import MCPServerConfig
 from datapillar_oneagentic.security import (
-    get_security_config,
     ConfirmationRequest,
-    SecurityError,
-    UserRejectedError,
     NoConfirmationCallbackError,
+    UserRejectedError,
+    get_security_config,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,11 +87,11 @@ def _build_tool_description(mcp_tool: MCPTool) -> str:
     desc = mcp_tool.description
 
     warnings = []
-    if mcp_tool.annotations.destructive_hint:
+    if mcp_tool.annotations.destructive_hint is True:
         warnings.append("⚠️ 破坏性操作")
-    if mcp_tool.annotations.open_world_hint:
+    if mcp_tool.annotations.open_world_hint is True:
         warnings.append("🌐 访问外部网络")
-    if not mcp_tool.annotations.idempotent_hint:
+    if mcp_tool.annotations.idempotent_hint is False:
         warnings.append("🔄 非幂等操作")
 
     if warnings:
@@ -128,18 +127,18 @@ def _create_mcp_tool(
             if config.require_confirmation:
                 # 构建警告信息
                 warnings = []
-                if mcp_tool.annotations.destructive_hint:
+                if mcp_tool.annotations.destructive_hint is True:
                     warnings.append("此工具可能执行破坏性操作（删除、修改数据）")
-                if mcp_tool.annotations.open_world_hint:
+                if mcp_tool.annotations.open_world_hint is True:
                     warnings.append("此工具会访问外部网络")
-                if not mcp_tool.annotations.idempotent_hint:
+                if mcp_tool.annotations.idempotent_hint is False:
                     warnings.append("此操作不可撤销，重复执行可能产生不同结果")
 
                 # 确定风险等级
                 risk_level = "medium"
-                if mcp_tool.annotations.destructive_hint:
+                if mcp_tool.annotations.destructive_hint is True:
                     risk_level = "high"
-                if mcp_tool.annotations.destructive_hint and mcp_tool.annotations.open_world_hint:
+                if mcp_tool.annotations.destructive_hint is True and mcp_tool.annotations.open_world_hint is True:
                     risk_level = "critical"
 
                 # 构建确认请求
@@ -227,7 +226,7 @@ class MCPToolkit:
         self._tools: list[StructuredTool] = []
         self._exit_stack: AsyncExitStack | None = None
 
-    async def __aenter__(self) -> "MCPToolkit":
+    async def __aenter__(self) -> MCPToolkit:
         """进入上下文，连接所有服务器"""
         await self.connect()
         return self

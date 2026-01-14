@@ -3,7 +3,7 @@ Storage 模块 - 统一存储管理
 
 所有存储都按 namespace 隔离，namespace 是最高层级的数据隔离边界。
 
-提供工厂函数：
+提供上下文管理器工厂函数：
 1. create_checkpointer(namespace) - 创建 LangGraph Checkpointer
 2. create_store(namespace) - 创建 LangGraph Store
 3. create_learning_store(namespace) - 创建经验向量库
@@ -16,12 +16,14 @@ from datapillar_oneagentic.storage import (
     create_learning_store,
 )
 
-# 同一个 namespace 下的所有存储都隔离
+# 使用 async with 确保资源正确关闭
 namespace = "sales_app"
 
-checkpointer = create_checkpointer(namespace)
-store = create_store(namespace)
-learning_store = create_learning_store(namespace)
+async with create_checkpointer(namespace) as checkpointer:
+    async with create_store(namespace) as store:
+        graph = builder.compile(checkpointer=checkpointer, store=store)
+        # 使用 graph...
+# 退出 with 自动关闭连接
 ```
 
 配置示例（config.toml）：
@@ -45,6 +47,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -54,14 +58,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def create_checkpointer(namespace: str) -> "BaseCheckpointSaver":
+@asynccontextmanager
+async def create_checkpointer(namespace: str) -> AsyncGenerator[BaseCheckpointSaver, None]:
     """
     根据配置创建 LangGraph Checkpointer 实例
+
+    使用 async with 确保资源正确关闭：
+    ```python
+    async with create_checkpointer(namespace) as checkpointer:
+        graph = builder.compile(checkpointer=checkpointer)
+        # 使用 graph...
+    # 自动关闭连接
+    ```
 
     Args:
         namespace: 命名空间（用于数据隔离）
 
-    Returns:
+    Yields:
         LangGraph BaseCheckpointSaver 实例
     """
     from datapillar_oneagentic.config import get_config
@@ -71,71 +84,75 @@ def create_checkpointer(namespace: str) -> "BaseCheckpointSaver":
 
     if checkpointer_type == "memory":
         from langgraph.checkpoint.memory import MemorySaver
-        # memory 类型每次创建新实例，通过 namespace 区分
-        # 注意：memory 类型重启后数据丢失
-        return MemorySaver()
+        yield MemorySaver()
 
     elif checkpointer_type == "sqlite":
         base_path = config.path or "./data/checkpoints"
-        # 每个 namespace 独立数据库文件
         db_path = os.path.join(base_path, f"{namespace}.db")
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
         try:
             from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "使用 sqlite checkpointer 需要安装依赖：\n"
                 "  pip install datapillar-oneagentic[sqlite]"
-            )
+            ) from err
         logger.info(f"创建 sqlite checkpointer: {db_path}")
-        return AsyncSqliteSaver.from_conn_string(db_path)
+        async with AsyncSqliteSaver.from_conn_string(db_path) as saver:
+            yield saver
 
     elif checkpointer_type == "postgres":
         if not config.url:
             raise ValueError("postgres checkpointer 需要配置 url")
         try:
             from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "使用 postgres checkpointer 需要安装依赖：\n"
                 "  pip install datapillar-oneagentic[postgres]"
-            )
-        # postgres 通过 schema 前缀隔离
-        # 注意：LangGraph 的 postgres saver 暂不支持自定义 schema
-        # 这里通过 thread_id 前缀实现软隔离
+            ) from err
         logger.info(f"创建 postgres checkpointer, namespace={namespace}")
-        return AsyncPostgresSaver.from_conn_string(config.url)
+        async with AsyncPostgresSaver.from_conn_string(config.url) as saver:
+            yield saver
 
     elif checkpointer_type == "redis":
         if not config.url:
             raise ValueError("redis checkpointer 需要配置 url")
         try:
             from langgraph.checkpoint.redis.aio import AsyncRedisSaver
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "使用 redis checkpointer 需要安装依赖：\n"
                 "  pip install datapillar-oneagentic[redis]"
-            )
-        # redis 通过 key 前缀隔离
-        saver = AsyncRedisSaver.from_conn_string(config.url)
-        if config.ttl_minutes and config.ttl_minutes > 0:
-            saver.ttl = {"default": config.ttl_minutes}
+            ) from err
         logger.info(f"创建 redis checkpointer, namespace={namespace}")
-        return saver
+        async with AsyncRedisSaver.from_conn_string(config.url) as saver:
+            if config.ttl_minutes and config.ttl_minutes > 0:
+                saver.ttl = {"default": config.ttl_minutes}
+            yield saver
 
     else:
         raise ValueError(f"不支持的 checkpointer 类型: {checkpointer_type}")
 
 
-def create_store(namespace: str) -> "BaseStore":
+@asynccontextmanager
+async def create_store(namespace: str) -> AsyncGenerator[BaseStore, None]:
     """
     根据配置创建 LangGraph Store 实例
+
+    使用 async with 确保资源正确关闭：
+    ```python
+    async with create_store(namespace) as store:
+        graph = builder.compile(store=store)
+        # 使用 graph...
+    # 自动关闭连接
+    ```
 
     Args:
         namespace: 命名空间（用于数据隔离）
 
-    Returns:
+    Yields:
         LangGraph BaseStore 实例
     """
     from datapillar_oneagentic.config import get_config
@@ -145,34 +162,35 @@ def create_store(namespace: str) -> "BaseStore":
 
     if store_type == "memory":
         from langgraph.store.memory import InMemoryStore
-        # memory 类型每次创建新实例
-        return InMemoryStore()
+        yield InMemoryStore()
 
     elif store_type == "postgres":
         if not config.url:
             raise ValueError("postgres store 需要配置 url")
         try:
             from langgraph.store.postgres.aio import AsyncPostgresStore
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "使用 postgres store 需要安装依赖：\n"
                 "  pip install datapillar-oneagentic[postgres]"
-            )
+            ) from err
         logger.info(f"创建 postgres store, namespace={namespace}")
-        return AsyncPostgresStore.from_conn_string(config.url)
+        async with AsyncPostgresStore.from_conn_string(config.url) as store:
+            yield store
 
     elif store_type == "redis":
         if not config.url:
             raise ValueError("redis store 需要配置 url")
         try:
             from langgraph.store.redis.aio import AsyncRedisStore
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "使用 redis store 需要安装依赖：\n"
                 "  pip install datapillar-oneagentic[redis]"
-            )
+            ) from err
         logger.info(f"创建 redis store, namespace={namespace}")
-        return AsyncRedisStore.from_conn_string(config.url)
+        async with AsyncRedisStore.from_conn_string(config.url) as store:
+            yield store
 
     else:
         raise ValueError(f"不支持的 store 类型: {store_type}")
@@ -196,22 +214,22 @@ def create_learning_store(namespace: str):
     if store_type == "lance":
         try:
             from datapillar_oneagentic.storage.learning_stores.lance import LanceExperienceStore
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "使用 lance learning_store 需要安装依赖：\n"
                 "  pip install datapillar-oneagentic[lance]"
-            )
+            ) from err
         path = config.path or "./data/experience"
         return LanceExperienceStore(path=path, namespace=namespace)
 
     elif store_type == "chroma":
         try:
             from datapillar_oneagentic.storage.learning_stores.chroma import ChromaExperienceStore
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "使用 chroma learning_store 需要安装依赖：\n"
                 "  pip install datapillar-oneagentic[chroma]"
-            )
+            ) from err
         path = config.path or "./data/chroma"
         host = getattr(config, "host", None)
         port = getattr(config, "port", 8000)
@@ -220,11 +238,11 @@ def create_learning_store(namespace: str):
     elif store_type == "milvus":
         try:
             from datapillar_oneagentic.storage.learning_stores.milvus import MilvusExperienceStore
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "使用 milvus learning_store 需要安装依赖：\n"
                 "  pip install datapillar-oneagentic[milvus]"
-            )
+            ) from err
         uri = config.uri or "./data/milvus.db"
         token = getattr(config, "token", None)
         return MilvusExperienceStore(uri=uri, token=token, namespace=namespace)

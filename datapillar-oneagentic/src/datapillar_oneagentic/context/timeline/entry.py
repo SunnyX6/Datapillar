@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from datapillar_oneagentic.context.types import EventType, CheckpointType
+from datapillar_oneagentic.context.types import CheckpointType, EventType
 
 
 def _now_ms() -> int:
@@ -76,6 +76,6 @@ class TimelineEntry(BaseModel):
         return self.model_dump(mode="json")
 
     @classmethod
-    def from_dict(cls, data: dict) -> "TimelineEntry":
+    def from_dict(cls, data: dict) -> TimelineEntry:
         """从字典创建"""
         return cls.model_validate(data)

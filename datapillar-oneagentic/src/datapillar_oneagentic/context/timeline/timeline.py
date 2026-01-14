@@ -11,8 +11,8 @@ import uuid
 
 from pydantic import BaseModel, Field
 
-from datapillar_oneagentic.context.types import EventType, CheckpointType
 from datapillar_oneagentic.context.timeline.entry import TimelineEntry
+from datapillar_oneagentic.context.types import CheckpointType, EventType
 
 
 def _generate_id() -> str:
@@ -234,6 +234,6 @@ class Timeline(BaseModel):
         return self.model_dump(mode="json")
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Timeline":
+    def from_dict(cls, data: dict) -> Timeline:
         """从字典恢复"""
         return cls.model_validate(data)

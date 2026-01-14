@@ -19,10 +19,11 @@ import inspect
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
+
     from datapillar_oneagentic.a2a.config import A2AConfig
     from datapillar_oneagentic.mcp.config import MCPServerConfig
 
@@ -73,12 +74,32 @@ class AgentSpec:
     max_steps: int | None = None
     """Agent 最大执行步数（None 时读全局配置 datapillar.agent.max_steps）"""
 
+    timeout_seconds: float | None = None
+    """Agent 单次执行超时（None 时读全局配置 datapillar.agent.timeout_seconds）"""
+
+    tool_timeout_seconds: float | None = None
+    """工具单次调用超时（None 时读全局配置 datapillar.agent.tool_timeout_seconds）"""
+
     def get_max_steps(self) -> int:
         """获取最大执行步数"""
         if self.max_steps is not None:
             return self.max_steps
         from datapillar_oneagentic.config import datapillar
         return datapillar.agent.max_steps
+
+    def get_timeout_seconds(self) -> float:
+        """获取 Agent 执行超时（秒）"""
+        if self.timeout_seconds is not None:
+            return self.timeout_seconds
+        from datapillar_oneagentic.config import datapillar
+        return datapillar.agent.timeout_seconds
+
+    def get_tool_timeout_seconds(self) -> float:
+        """获取工具调用超时（秒）"""
+        if self.tool_timeout_seconds is not None:
+            return self.tool_timeout_seconds
+        from datapillar_oneagentic.config import datapillar
+        return datapillar.agent.tool_timeout_seconds
 
     # === 知识配置 ===
     knowledge_domains: list[str] = field(default_factory=list)
@@ -159,7 +180,7 @@ def _validate_run_method(cls: type) -> None:
     if not hasattr(cls, "run"):
         raise ValueError(f"Agent {cls.__name__} 必须实现 run(self, ctx) 方法")
 
-    run_method = getattr(cls, "run")
+    run_method = cls.run
 
     # 检查是否是方法
     if not callable(run_method):
@@ -247,11 +268,11 @@ def agent(
     class AnalystAgent:
         SYSTEM_PROMPT = "你是需求分析师..."
 
-        async def run(self, ctx: AgentContext) -> AnalysisOutput | Clarification:
+        async def run(self, ctx: AgentContext) -> AnalysisOutput:
             messages = ctx.build_messages(self.SYSTEM_PROMPT)
             messages = await ctx.invoke_tools(messages)
 
-            return await ctx.get_output(messages)
+            return await ctx.get_structured_output(messages)
     ```
 
     参数：

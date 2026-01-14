@@ -20,32 +20,36 @@ SSE 架构说明：
 使用示例：
 ```python
 from datapillar_oneagentic.sse import StreamManager
+from datapillar_oneagentic.core.types import SessionKey
 
 # 创建管理器
 stream_manager = StreamManager()
+
+# 构建 SessionKey
+key = SessionKey(namespace="etl_team", session_id="session123")
 
 # 场景 1: 新会话或续聊
 await stream_manager.chat(
     orchestrator=orchestrator,
     query="请帮我查询...",
-    session_id="session123",
+    key=key,
 )
 
 # 场景 2: 恢复 interrupt（用户回答 Agent 的问题）
 await stream_manager.chat(
     orchestrator=orchestrator,
     query=None,  # 可选，作为上下文
-    session_id="session123",
+    key=key,
     resume_value="是的，我确认继续",  # 用户对 interrupt 的回答
 )
 
 # 场景 3: 用户主动打断
-await stream_manager.abort(session_id="session123")
+await stream_manager.abort(key=key)
 
 # 订阅流
 async for event in stream_manager.subscribe(
     request=request,
-    session_id="session123",
+    key=key,
     last_event_id=None,
 ):
     yield event
@@ -65,6 +69,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic import BaseModel
 
+from datapillar_oneagentic.core.types import SessionKey
 from datapillar_oneagentic.sse.event import SseEvent
 
 if TYPE_CHECKING:
@@ -101,7 +106,7 @@ class OrchestratorProtocol(Protocol):
         self,
         *,
         query: str | None = None,
-        session_id: str,
+        key: SessionKey,
         resume_value: Any | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """
@@ -109,7 +114,7 @@ class OrchestratorProtocol(Protocol):
 
         参数：
         - query: 用户输入（新问题或续聊内容）
-        - session_id: 会话 ID
+        - key: SessionKey（namespace + session_id）
         - resume_value: interrupt 恢复值（用户对 interrupt 的回答）
 
         返回：
@@ -139,7 +144,7 @@ class _SessionRun:
     打断只影响当前 run，不影响 session。
     """
 
-    session_id: str
+    key: SessionKey
     created_at_ms: int = field(default_factory=_now_ms)
     last_activity_ms: int = field(default_factory=_now_ms)
     next_seq: int = 1
@@ -180,9 +185,6 @@ class StreamManager:
         self._buffer_size = max(100, buffer_size)
         self._subscriber_queue_size = max(50, subscriber_queue_size)
         self._session_ttl_seconds = max(60, session_ttl_seconds)
-
-    def _key(self, session_id: str) -> str:
-        return session_id
 
     def _cleanup_expired(self) -> None:
         """清理过期会话"""
@@ -232,7 +234,7 @@ class StreamManager:
         *,
         orchestrator: OrchestratorProtocol,
         query: str | None,
-        session_id: str,
+        key: SessionKey,
         resume_value: Any | None,
     ) -> None:
         """
@@ -244,35 +246,39 @@ class StreamManager:
         参数：
         - orchestrator: 编排器实例
         - query: 用户输入（新问题或续聊）
-        - session_id: 会话 ID
+        - key: SessionKey
         - resume_value: interrupt 恢复值
 
         打断处理：
         - CancelledError 表示用户主动打断
         - 发送 aborted 事件通知前端
         """
-        run = self._runs[self._key(session_id)]
+        run = self._runs[str(key)]
 
         try:
             async for msg in orchestrator.stream(
                 query=query,
-                session_id=session_id,
+                key=key,
                 resume_value=resume_value,
             ):
                 await self._emit(run, msg)
         except asyncio.CancelledError:
-            logger.info(f"Run 被用户打断: session={session_id}")
+            logger.info(f"Run 被用户打断: key={key}")
 
             await self._emit(
                 run,
-                SseEvent.aborted_event(message="已停止").to_dict(),
+                SseEvent.aborted_event(message="已停止")
+                .with_session(namespace=key.namespace, session_id=key.session_id)
+                .to_dict(),
             )
             raise
         except Exception as exc:
             logger.error("SSE 推送失败: %s", exc, exc_info=True)
             await self._emit(
                 run,
-                SseEvent.error_event(message="执行失败", detail=str(exc)).to_dict(),
+                SseEvent.error_event(message="执行失败", detail=str(exc))
+                .with_session(namespace=key.namespace, session_id=key.session_id)
+                .to_dict(),
             )
         finally:
             await self._complete(run)
@@ -282,7 +288,7 @@ class StreamManager:
         *,
         orchestrator: OrchestratorProtocol,
         query: str | None,
-        session_id: str,
+        key: SessionKey,
         resume_value: Any | None = None,
     ) -> None:
         """
@@ -297,21 +303,19 @@ class StreamManager:
         - 打断的是 run，不是 session（对话历史保留）
         """
         self._cleanup_expired()
-        key = self._key(session_id)
-        run = self._runs.get(key)
+        storage_key = str(key)
+        run = self._runs.get(storage_key)
 
         if run is None:
-            run = _SessionRun(session_id=session_id)
-            self._runs[key] = run
+            run = _SessionRun(key=key)
+            self._runs[storage_key] = run
         else:
             async with run.lock:
                 if run.running_task and not run.running_task.done():
-                    logger.info(f"打断旧 run: session={session_id}")
+                    logger.info(f"打断旧 run: key={key}")
                     run.running_task.cancel()
-                    try:
+                    with contextlib.suppress(asyncio.CancelledError):
                         await run.running_task
-                    except asyncio.CancelledError:
-                        pass
 
                 run.completed = False
                 run.last_activity_ms = _now_ms()
@@ -322,7 +326,7 @@ class StreamManager:
             self._run_orchestrator_stream(
                 orchestrator=orchestrator,
                 query=query,
-                session_id=session_id,
+                key=key,
                 resume_value=resume_value,
             )
         )
@@ -331,7 +335,7 @@ class StreamManager:
         self,
         *,
         request: Request,
-        session_id: str,
+        key: SessionKey,
         last_event_id: int | None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """
@@ -339,18 +343,18 @@ class StreamManager:
 
         参数：
         - request: HTTP 请求（用于检测断开）
-        - session_id: 会话 ID
+        - key: SessionKey
         - last_event_id: 上次事件 ID（用于断线重连）
 
         生成：
         - SSE 事件字典 {"id": str, "data": str}
         """
         self._cleanup_expired()
-        key = self._key(session_id)
-        run = self._runs.get(key)
+        storage_key = str(key)
+        run = self._runs.get(storage_key)
         if run is None:
-            run = _SessionRun(session_id=session_id)
-            self._runs[key] = run
+            run = _SessionRun(key=key)
+            self._runs[storage_key] = run
 
         queue: asyncio.Queue[StreamRecord | object] = asyncio.Queue(
             maxsize=self._subscriber_queue_size
@@ -411,7 +415,7 @@ class StreamManager:
                 run.subscribers.discard(queue)
                 run.last_activity_ms = _now_ms()
 
-    def clear_session(self, *, session_id: str) -> bool:
+    def clear_session(self, *, key: SessionKey) -> bool:
         """
         清理会话缓冲
 
@@ -419,12 +423,12 @@ class StreamManager:
         - True: 存在并已清理
         - False: 不存在
         """
-        key = self._key(session_id)
-        existed = key in self._runs
-        self._runs.pop(key, None)
+        storage_key = str(key)
+        existed = storage_key in self._runs
+        self._runs.pop(storage_key, None)
         return existed
 
-    async def abort(self, *, session_id: str) -> bool:
+    async def abort(self, *, key: SessionKey) -> bool:
         """
         打断当前 run
 
@@ -435,24 +439,22 @@ class StreamManager:
         - True: 成功打断
         - False: 没有正在运行的 run
         """
-        key = self._key(session_id)
-        run = self._runs.get(key)
+        storage_key = str(key)
+        run = self._runs.get(storage_key)
 
         if run is None:
-            logger.warning(f"Abort 失败：session 不存在: {session_id}")
+            logger.warning(f"Abort 失败：session 不存在: {key}")
             return False
 
         async with run.lock:
             if run.running_task is None or run.running_task.done():
-                logger.info(f"Abort 跳过：没有正在运行的 run: {session_id}")
+                logger.info(f"Abort 跳过：没有正在运行的 run: {key}")
                 return False
 
-            logger.info(f"Abort run: session={session_id}")
+            logger.info(f"Abort run: key={key}")
             run.running_task.cancel()
 
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await run.running_task
-        except asyncio.CancelledError:
-            pass
 
         return True

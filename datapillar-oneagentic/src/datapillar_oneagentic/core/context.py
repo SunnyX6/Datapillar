@@ -3,7 +3,7 @@ Agent 执行上下文
 
 AgentContext 是框架提供给业务 Agent 的接口：
 - 只读信息：query, session_id
-- 工作方法：build_messages, invoke_tools, get_output, clarify
+- 工作方法：build_messages, invoke_tools, get_structured_output, interrupt
 - 依赖获取：get_deliverable
 
 设计原则：
@@ -16,16 +16,23 @@ AgentContext 是框架提供给业务 Agent 的接口：
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langgraph.prebuilt import ToolNode
-from langgraph.types import Command
+from langgraph.types import Command, interrupt
 
-from datapillar_oneagentic.core.types import Clarification
-from datapillar_oneagentic.events import event_bus, ToolCalledEvent, ToolCompletedEvent, ToolFailedEvent, LLMThinkingEvent
+from datapillar_oneagentic.events import (
+    LLMThinkingEvent,
+    ToolCalledEvent,
+    ToolCompletedEvent,
+    ToolFailedEvent,
+    event_bus,
+)
 from datapillar_oneagentic.utils.structured_output import parse_structured_output
 
 if TYPE_CHECKING:
@@ -94,9 +101,9 @@ def _parse_agent_output(result: Any, schema: type) -> Any:
         expected_fields.append(f"  - {name}: {field_type}" + (f" ({desc})" if desc else ""))
 
     raise ValueError(
-        f"无法解析结构化输出。\n\n"
-        f"期望的 JSON 字段:\n" + "\n".join(expected_fields) + "\n\n"
-        f"建议: 请确保 SYSTEM_PROMPT 中明确指定了 JSON 输出格式，字段名需与上述定义一致。"
+        "无法解析结构化输出。\n\n"
+        "期望的 JSON 字段:\n" + "\n".join(expected_fields) + "\n\n"
+        "建议: 请确保 SYSTEM_PROMPT 中明确指定了 JSON 输出格式，字段名需与上述定义一致。"
     )
 
 
@@ -127,15 +134,15 @@ class AgentContext:
     公开方法：
     - build_messages(system_prompt): 构建 LLM 消息
     - invoke_tools(messages): 执行工具调用循环
-    - get_output(messages): 获取结构化输出
-    - clarify(message, questions): 请求用户澄清
-    - get_deliverable(key): 获取其他 Agent 的产出
+    - get_structured_output(messages): 获取结构化输出
+    - interrupt(payload): 中断等待用户回复
+    - get_deliverable(agent_id): 获取其他 Agent 的产出
 
     使用示例：
     ```python
-    async def run(self, ctx: AgentContext) -> AnalysisOutput | Clarification:
+    async def run(self, ctx: AgentContext) -> AnalysisOutput:
         # 获取上游 Agent 的产出（通过 agent_id）
-        upstream_data = await ctx.get_deliverable("data_extractor")
+        upstream_data = await ctx.get_deliverable(agent_id="data_extractor")
 
         # 1. 构建消息
         messages = ctx.build_messages(self.SYSTEM_PROMPT)
@@ -144,11 +151,12 @@ class AgentContext:
         messages = await ctx.invoke_tools(messages)
 
         # 3. 获取结构化输出
-        output = await ctx.get_output(messages)
+        output = await ctx.get_structured_output(messages)
 
         # 4. 业务判断
         if output.confidence < 0.7:
-            return ctx.clarify("需求不够明确", output.ambiguities)
+            user_reply = ctx.interrupt("需求不够明确")
+            # 可根据 user_reply 补充上下文后继续
 
         return output
     ```
@@ -250,7 +258,7 @@ class AgentContext:
         关键优化：
         - bind_tools 时传入 response_format=deliverable_schema
         - 当 LLM 不再调用工具时，直接返回符合 schema 的 JSON
-        - 无需额外调用 get_output
+        - 无需额外调用 get_structured_output
 
         参数：
         - messages: build_messages() 返回的消息对象
@@ -267,7 +275,13 @@ class AgentContext:
             # 没有工具，直接调用 LLM（带结构化输出）
             llm_structured = self._llm.with_structured_output(schema, method="json_mode")
             response = await llm_structured.ainvoke(messages)
-            messages.append(response)
+            # 将 Pydantic 对象序列化为 JSON 字符串，包装成 AIMessage
+            if hasattr(response, "model_dump_json"):
+                content = response.model_dump_json()
+            else:
+                import json
+                content = json.dumps(response) if isinstance(response, dict) else str(response)
+            messages.append(AIMessage(content=content))
             self._messages = messages
             return messages
 
@@ -280,7 +294,7 @@ class AgentContext:
         # 准备状态
         current_state = self._state.copy()
 
-        for iteration in range(1, self._spec.get_max_steps() + 1):
+        for _iteration in range(1, self._spec.get_max_steps() + 1):
             # LLM 调用
             response = await llm_with_tools.ainvoke(messages)
 
@@ -305,28 +319,52 @@ class AgentContext:
             # 记录工具调用信息（用于后续发送完成/失败事件）
             tool_calls_info = []
             for tc in response.tool_calls:
-                logger.info(f"🔧 [{self._spec.name}] 调用工具: {tc['name']}")
+                tool_name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
+                tool_args = tc.get("args", {}) if isinstance(tc, dict) else getattr(tc, "args", {})
+                tool_call_id = tc.get("id", "") if isinstance(tc, dict) else getattr(tc, "id", "")
+
+                if not tool_name:
+                    continue
+
+                logger.info(f"🔧 [{self._spec.name}] 调用工具: {tool_name}")
                 tool_calls_info.append({
-                    "name": tc["name"],
-                    "args": tc.get("args", {}),
-                    "id": tc.get("id", ""),
+                    "name": tool_name,
+                    "args": tool_args if isinstance(tool_args, dict) else {},
+                    "id": tool_call_id or "",
                 })
                 await event_bus.emit(
                     self,
                     ToolCalledEvent(
                         agent_id=self._spec.id,
-                        tool_name=tc["name"],
-                        tool_input=tc.get("args", {}),
+                        tool_name=tool_name,
+                        tool_input=tool_args if isinstance(tool_args, dict) else {},
                     ),
                 )
 
-            # 执行工具（记录耗时）
+            # 执行工具（带超时控制）
             import time
             tool_start_time = time.time()
             current_state["messages"] = messages
             tool_error = None
+            tool_timeout = self._spec.get_tool_timeout_seconds()
             try:
-                result = await tool_node.ainvoke(current_state)
+                result = await asyncio.wait_for(
+                    tool_node.ainvoke(current_state),
+                    timeout=tool_timeout,
+                )
+            except asyncio.TimeoutError:
+                tool_error = f"工具调用超时（{tool_timeout}秒）"
+                logger.error(f"⏰ [{self._spec.name}] {tool_error}")
+                for tc_info in tool_calls_info:
+                    await event_bus.emit(
+                        self,
+                        ToolFailedEvent(
+                            agent_id=self._spec.id,
+                            tool_name=tc_info["name"],
+                            error=tool_error,
+                        ),
+                    )
+                raise TimeoutError(tool_error)
             except Exception as e:
                 tool_error = str(e)
                 # 发送所有工具的失败事件
@@ -342,19 +380,30 @@ class AgentContext:
                 raise
             tool_duration_ms = (time.time() - tool_start_time) * 1000
 
-            # 检查是否是委派命令
-            if isinstance(result, list) and result and isinstance(result[0], Command):
-                self._delegation_command = result[0]
+            # 解析工具结果：分离 Command 和普通消息
+            delegation_command = None
+            new_messages = []
+
+            if isinstance(result, dict):
+                new_messages = result.get("messages", [])
+            elif isinstance(result, list):
+                for item in result:
+                    if isinstance(item, Command):
+                        # 只取第一个 Command（多个委派不合理）
+                        if delegation_command is None:
+                            delegation_command = item
+                        else:
+                            logger.warning(f"🔄 [{self._spec.name}] 忽略多余的委派命令")
+                    else:
+                        new_messages.append(item)
+
+            # 处理委派命令
+            if delegation_command is not None:
+                self._delegation_command = delegation_command
                 logger.info(f"🔄 [{self._spec.name}] 委派给 {self._delegation_command.goto}")
                 self._messages = messages
                 # 抛出委派信号，由框架处理
                 raise DelegationSignal(self._delegation_command)
-
-            # 普通工具结果
-            if isinstance(result, dict):
-                new_messages = result.get("messages", [])
-            else:
-                new_messages = result if isinstance(result, list) else []
 
             # 发送工具完成事件（从 ToolMessage 中提取结果）
             tool_outputs = {}
@@ -379,7 +428,7 @@ class AgentContext:
         self._messages = messages
         return messages
 
-    async def get_output(self, messages: Any) -> Any:
+    async def get_structured_output(self, messages: Any) -> Any:
         """
         获取结构化输出
 
@@ -451,28 +500,37 @@ class AgentContext:
 
         return None
 
-    def clarify(
-        self, message: str, questions: list[str], options: list[dict] | None = None
-    ) -> Clarification:
+    def interrupt(self, payload: Any | None = None) -> Any:
         """
-        请求用户澄清
+        中断并等待用户回复
 
-        当业务判断需要更多信息时使用。
-        框架会暂停流程，等待用户回复。
-
-        参数：
-        - message: 提示信息
-        - questions: 需要回答的问题列表
-        - options: 可选项（可选）
-
-        返回：
-        - Clarification 对象
+        payload 是可序列化的提示信息（可选）。
+        恢复后返回用户输入，并自动写入上下文消息。
         """
-        return Clarification(
-            message=message,
-            questions=questions,
-            options=options or [],
-        )
+        resume_value = interrupt(payload)
+        self._append_user_reply(resume_value)
+        return resume_value
+
+    def _append_user_reply(self, resume_value: Any) -> None:
+        """将用户回复追加为 HumanMessage（统一结构）"""
+        content = self._serialize_user_reply(resume_value)
+        message = HumanMessage(content=content)
+
+        self._messages.append(message)
+        state_messages = self._state.get("messages")
+        if isinstance(state_messages, list):
+            state_messages.append(message)
+        else:
+            self._state["messages"] = [message]
+
+    def _serialize_user_reply(self, resume_value: Any) -> str:
+        """统一序列化用户回复，保证可写入消息"""
+        if isinstance(resume_value, str):
+            return resume_value
+        try:
+            return json.dumps(resume_value, ensure_ascii=False)
+        except Exception:
+            return str(resume_value)
 
     async def get_deliverable(self, agent_id: str) -> Any | None:
         """
@@ -489,11 +547,12 @@ class AgentContext:
 
         使用示例：
         ```python
-        async def run(self, ctx: AgentContext) -> ReportOutput | Clarification:
+        async def run(self, ctx: AgentContext) -> ReportOutput:
             # 获取数据分析 Agent 的产出
-            analysis = await ctx.get_deliverable("analyst")
+            analysis = await ctx.get_deliverable(agent_id="analyst")
             if not analysis:
-                return ctx.clarify("缺少分析数据", ["请先运行数据分析"])
+                user_reply = ctx.interrupt("缺少分析数据")
+                # 可根据 user_reply 获取数据后继续
 
             # 使用分析结果生成报告
             ...

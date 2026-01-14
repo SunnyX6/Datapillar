@@ -49,10 +49,10 @@ pip install datapillar-oneagentic[a2a]
 
 from datapillar_oneagentic.a2a.config import (
     A2AConfig,
-    AuthScheme,
     APIKeyAuth,
-    BearerAuth,
+    AuthScheme,
     AuthType,
+    BearerAuth,
 )
 from datapillar_oneagentic.a2a.tool import (
     create_a2a_tool,

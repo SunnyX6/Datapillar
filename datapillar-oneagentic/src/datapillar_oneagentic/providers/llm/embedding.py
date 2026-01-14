@@ -17,7 +17,7 @@ from typing import Any
 
 from langchain_core.embeddings import Embeddings
 
-from datapillar_oneagentic.providers.llm.config import EmbeddingConfig, EmbeddingProvider
+from datapillar_oneagentic.providers.llm.config import EmbeddingConfig
 
 logger = logging.getLogger(__name__)
 

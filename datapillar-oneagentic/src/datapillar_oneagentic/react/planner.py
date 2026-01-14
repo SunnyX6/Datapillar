@@ -131,9 +131,6 @@ async def create_plan(
         available_agents = [AgentRegistry.get(aid) for aid in AgentRegistry.list_ids()]
         available_agents = [a for a in available_agents if a is not None]
 
-    # 过滤掉入口 Agent
-    available_agents = [a for a in available_agents if not getattr(a, 'is_entry', False)]
-
     if not available_agents:
         logger.warning("没有可用的 Agent，无法创建计划")
         return Plan(goal=goal, status="failed")
@@ -197,8 +194,6 @@ async def replan(
     if available_agents is None:
         available_agents = [AgentRegistry.get(aid) for aid in AgentRegistry.list_ids()]
         available_agents = [a for a in available_agents if a is not None]
-
-    available_agents = [a for a in available_agents if not getattr(a, 'is_entry', False)]
 
     # 构建 prompt
     agent_list = _format_agent_list(available_agents)

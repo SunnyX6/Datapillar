@@ -15,9 +15,9 @@ from typing import Any, Self
 
 from datapillar_oneagentic.mcp.config import (
     MCPServerConfig,
-    MCPServerStdio,
     MCPServerHTTP,
     MCPServerSSE,
+    MCPServerStdio,
 )
 
 logger = logging.getLogger(__name__)
@@ -87,9 +87,7 @@ class ToolAnnotations:
             return True
         if self.open_world_hint is True:
             return True
-        if self.read_only_hint is not True and self.destructive_hint is not False:
-            return True
-        return False
+        return self.read_only_hint is not True and self.destructive_hint is not False
 
 
 @dataclass
@@ -173,13 +171,10 @@ class MCPClient:
         if self._connected:
             return
 
-        try:
-            from mcp import ClientSession, StdioServerParameters
-            from mcp.client.stdio import stdio_client
-        except ImportError:
-            raise ImportError(
-                "mcp SDK 未安装。请运行: pip install mcp"
-            )
+        import importlib.util
+
+        if importlib.util.find_spec("mcp") is None:
+            raise ImportError("mcp SDK 未安装。请运行: pip install mcp")
 
         self._exit_stack = AsyncExitStack()
         await self._exit_stack.__aenter__()
@@ -213,6 +208,7 @@ class MCPClient:
             command=config.command,
             args=list(config.args) if config.args else [],
             env=dict(config.env) if config.env else None,
+            cwd=config.cwd,
         )
 
         read, write = await self._exit_stack.enter_async_context(

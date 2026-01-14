@@ -284,8 +284,8 @@ def parse_structured_output(
         expected_fields.append(f"    - {name}: {field_type}" + (f" ({desc})" if desc else ""))
 
     raise ValueError(
-        f"结构化输出解析失败。\n\n"
-        f"期望的 JSON 字段:\n" + "\n".join(expected_fields) + "\n\n"
+        "结构化输出解析失败。\n\n"
+        "期望的 JSON 字段:\n" + "\n".join(expected_fields) + "\n\n"
         f"建议: 请确保 SYSTEM_PROMPT 中明确指定了 JSON 输出格式，字段名需与上述定义一致。\n\n"
         f"解析尝试:\n{error_summary}\n\n"
         f"原始文本: {text[:300]}"

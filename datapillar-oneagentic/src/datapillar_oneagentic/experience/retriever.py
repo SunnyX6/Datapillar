@@ -40,7 +40,7 @@ class ExperienceRetriever:
     2. 自动拼接成可注入 prompt 的上下文
     """
 
-    def __init__(self, store: "ExperienceStore"):
+    def __init__(self, store: ExperienceStore):
         """
         初始化检索器
 
@@ -54,7 +54,7 @@ class ExperienceRetriever:
         goal: str,
         k: int = 5,
         outcome: str | None = None,
-    ) -> list["ExperienceRecord"]:
+    ) -> list[ExperienceRecord]:
         """
         检索相似经验
 

@@ -17,7 +17,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 StepStatus = Literal["pending", "in_progress", "completed", "skipped", "failed"]
 
 

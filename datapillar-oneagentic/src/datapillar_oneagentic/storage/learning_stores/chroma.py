@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from datapillar_oneagentic.storage.learning_stores.base import ExperienceStore
 
@@ -71,8 +71,8 @@ class ChromaExperienceStore(ExperienceStore):
         """初始化数据库和集合"""
         try:
             import chromadb
-        except ImportError:
-            raise ImportError("需要安装 Chroma 依赖：pip install chromadb")
+        except ImportError as err:
+            raise ImportError("需要安装 Chroma 依赖：pip install chromadb") from err
 
         if self._is_remote:
             logger.info(f"初始化 ChromaExperienceStore (远程): {self._host}:{self._port}, namespace={self._namespace}")
@@ -137,7 +137,7 @@ class ChromaExperienceStore(ExperienceStore):
         else:
             return self._collection.count()
 
-    def _record_to_chroma(self, record: "ExperienceRecord") -> tuple[str, list[float], str, dict]:
+    def _record_to_chroma(self, record: ExperienceRecord) -> tuple[str, list[float], str, dict]:
         """将 ExperienceRecord 转换为 Chroma 格式"""
         metadata = {
             "namespace": record.namespace,
@@ -158,7 +158,7 @@ class ChromaExperienceStore(ExperienceStore):
         embedding: list[float] | None,
         document: str | None,
         metadata: dict[str, Any] | None,
-    ) -> "ExperienceRecord":
+    ) -> ExperienceRecord:
         """将 Chroma 格式转换为 ExperienceRecord"""
         from datapillar_oneagentic.experience.learner import ExperienceRecord
 
@@ -191,8 +191,12 @@ class ChromaExperienceStore(ExperienceStore):
 
     # ==================== 写操作 ====================
 
-    async def add(self, record: "ExperienceRecord") -> str:
+    async def add(self, record: ExperienceRecord) -> str:
         """添加记录"""
+        # 确保已初始化
+        if self._collection is None:
+            await self.initialize()
+
         record_id, embedding, document, metadata = self._record_to_chroma(record)
 
         await self._add(
@@ -206,6 +210,10 @@ class ChromaExperienceStore(ExperienceStore):
 
     async def delete(self, record_id: str) -> bool:
         """删除记录"""
+        # 确保已初始化
+        if self._collection is None:
+            await self.initialize()
+
         try:
             await self._delete(ids=[record_id])
             return True
@@ -215,8 +223,12 @@ class ChromaExperienceStore(ExperienceStore):
 
     # ==================== 读操作 ====================
 
-    async def get(self, record_id: str) -> "ExperienceRecord | None":
+    async def get(self, record_id: str) -> ExperienceRecord | None:
         """获取记录"""
+        # 确保已初始化
+        if self._collection is None:
+            await self.initialize()
+
         result = await self._get(
             ids=[record_id],
             include=["embeddings", "documents", "metadatas"],
@@ -237,7 +249,7 @@ class ChromaExperienceStore(ExperienceStore):
         query_vector: list[float],
         k: int = 5,
         outcome: str | None = None,
-    ) -> list["ExperienceRecord"]:
+    ) -> list[ExperienceRecord]:
         """
         向量相似度搜索
 
@@ -249,6 +261,10 @@ class ChromaExperienceStore(ExperienceStore):
         Returns:
             ExperienceRecord 列表（按相似度排序）
         """
+        # 确保已初始化
+        if self._collection is None:
+            await self.initialize()
+
         where = None
         if outcome:
             where = {"outcome": {"$eq": outcome}}
@@ -276,4 +292,8 @@ class ChromaExperienceStore(ExperienceStore):
 
     async def count(self) -> int:
         """统计记录数量"""
+        # 确保已初始化
+        if self._collection is None:
+            await self.initialize()
+
         return await self._count()

@@ -6,6 +6,7 @@ Datapillar 团队类
 核心概念：
 - namespace: 最高层级的数据隔离边界（必传）
 - session_id: 会话标识
+- SessionKey: namespace + session_id 的组合，确保全系统隔离
 - 所有存储（会话、经验、知识）都按 namespace 隔离
 
 使用示例：
@@ -48,7 +49,7 @@ from datapillar_oneagentic.core.agent import AgentRegistry, AgentSpec
 from datapillar_oneagentic.core.graphs import build_graph
 from datapillar_oneagentic.core.nodes import NodeFactory
 from datapillar_oneagentic.core.process import Process
-from datapillar_oneagentic.core.result import DatapillarResult
+from datapillar_oneagentic.core.types import SessionKey
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,7 @@ class Datapillar:
     - 委派约束：只能在团队内委派
     - 记忆管理：可选启用会话记忆
     - 经验学习：可选启用经验记录
+    - 资源安全：连接在每次执行时创建，执行完自动关闭
     """
 
     @classmethod
@@ -112,6 +114,7 @@ class Datapillar:
         # 解析 Agent 类，获取 AgentSpec
         self._agent_specs = self._resolve_agents(agents)
         self._agent_ids = [spec.id for spec in self._agent_specs]
+        self._agent_name_map = {spec.id: spec.name for spec in self._agent_specs}
 
         # 将团队级别的 A2A 配置合并到每个 Agent
         if self.a2a_agents:
@@ -127,22 +130,14 @@ class Datapillar:
         # 创建执行器缓存（团队内）
         self._executors: dict[str, Any] = {}
 
-        # 创建存储实例（所有存储都用 namespace 隔离）
-        from datapillar_oneagentic.storage import (
-            create_checkpointer,
-            create_store,
-            create_learning_store,
-        )
-
-        self._checkpointer = create_checkpointer(namespace)
-        self._store = create_store(namespace)
-
         # 创建经验学习相关组件（如果启用）
+        # 注意：learning_store 是本地文件存储，不需要 async with
         self._learning_store = None
         self._experience_learner = None
         self._experience_retriever = None
         if enable_learning:
             from datapillar_oneagentic.experience import ExperienceLearner, ExperienceRetriever
+            from datapillar_oneagentic.storage import create_learning_store
 
             self._learning_store = create_learning_store(namespace)
             self._experience_learner = ExperienceLearner(
@@ -167,13 +162,13 @@ class Datapillar:
         )
 
         # 获取 LLM（ReAct 模式需要）
-        react_llm = None
+        self._react_llm = None
         if process == Process.REACT:
             from datapillar_oneagentic.providers.llm import call_llm
-            react_llm = call_llm()
+            self._react_llm = call_llm()
             logger.info("ReAct 模式已启用")
 
-        # 构建执行图
+        # 构建执行图（StateGraph，还未编译）
         self._graph = build_graph(
             process=process,
             agent_specs=self._agent_specs,
@@ -181,23 +176,7 @@ class Datapillar:
             agent_ids=self._agent_ids,
             create_agent_node=self._node_factory.create_agent_node,
             create_parallel_layer_node=self._node_factory.create_parallel_layer_node,
-            llm=react_llm,
-        )
-
-        # 创建 Orchestrator（基建层）
-        from datapillar_oneagentic.runtime.orchestrator import Orchestrator
-
-        self._orchestrator = Orchestrator(
-            namespace=namespace,
-            name=name,
-            graph=self._graph,
-            entry_agent_id=self._entry_agent_id,
-            agent_ids=self._agent_ids,
-            checkpointer=self._checkpointer,
-            store=self._store,
-            experience_learner=self._experience_learner,
-            experience_retriever=self._experience_retriever,
-            process=process,
+            llm=self._react_llm,
         )
 
         logger.info(
@@ -276,16 +255,12 @@ class Datapillar:
         """
         流式执行
 
-        委托给 Orchestrator 处理，自带：
-        - 断点恢复
-        - 经验记录（如果启用）
-        - EventBus 事件
-        - 会话管理
+        每次执行时创建数据库连接，执行完自动关闭，确保资源不泄漏。
 
         参数：
         - query: 用户输入（新会话或续聊时必传）
         - session_id: 会话 ID
-        - resume_value: interrupt 恢复值（用户对 clarification 的回答）
+        - resume_value: interrupt 恢复值（用户输入）
 
         返回：
         - SSE 事件流
@@ -301,72 +276,110 @@ class Datapillar:
             print(event)
         ```
         """
-        async for event in self._orchestrator.stream(
-            query=query,
-            session_id=session_id,
-            resume_value=resume_value,
+        from datapillar_oneagentic.runtime.orchestrator import Orchestrator
+        from datapillar_oneagentic.storage import create_checkpointer, create_store
+
+        key = SessionKey(namespace=self.namespace, session_id=session_id)
+
+        # 使用 async with 确保连接正确关闭
+        async with (
+            create_checkpointer(self.namespace) as checkpointer,
+            create_store(self.namespace) as store,
         ):
-            yield event
+            # 创建 Orchestrator（每次 stream 时创建，绑定当前连接）
+            orchestrator = Orchestrator(
+                namespace=self.namespace,
+                name=self.name,
+                graph=self._graph,
+                entry_agent_id=self._entry_agent_id,
+                agent_ids=self._agent_ids,
+                agent_name_map=self._agent_name_map,
+                checkpointer=checkpointer,
+                store=store,
+                experience_learner=self._experience_learner,
+                experience_retriever=self._experience_retriever,
+                process=self.process,
+            )
 
-    async def kickoff(
-        self,
-        *,
-        inputs: dict[str, Any],
-        session_id: str | None = None,
-    ) -> DatapillarResult:
-        """
-        同步执行（收集所有结果）
-
-        参数：
-        - inputs: 输入参数（需包含 'query' 或 'requirement' 键）
-        - session_id: 会话 ID（可选，不传则自动生成）
-
-        返回：
-        - DatapillarResult
-        """
-        import uuid
-
-        query = inputs.get("query") or inputs.get("requirement") or str(inputs)
-        session_id = session_id or f"kickoff_{uuid.uuid4().hex[:8]}"
-
-        start_time = _now_ms()
-        deliverables: dict[str, Any] = {}
-        error = None
-
-        try:
-            async for event in self.stream(
+            async for event in orchestrator.stream(
                 query=query,
-                session_id=session_id,
+                key=key,
+                resume_value=resume_value,
             ):
-                event_type = event.get("event")
-                if event_type == "result":
-                    deliverables = event.get("data", {}).get("deliverables", {})
-                elif event_type == "error":
-                    error = event.get("data", {}).get("detail")
-
-        except Exception as e:
-            error = str(e)
-
-        duration_ms = _now_ms() - start_time
-
-        return DatapillarResult(
-            success=error is None,
-            deliverables=deliverables,
-            duration_ms=duration_ms,
-            error=error,
-        )
+                yield event
+        # 退出 with，连接自动关闭
 
     async def compact_session(self, session_id: str) -> dict:
         """手动压缩会话记忆"""
-        return await self._orchestrator.compact_session(session_id)
+        from datapillar_oneagentic.runtime.orchestrator import Orchestrator
+        from datapillar_oneagentic.storage import create_checkpointer, create_store
+
+        async with (
+            create_checkpointer(self.namespace) as checkpointer,
+            create_store(self.namespace) as store,
+        ):
+            orchestrator = Orchestrator(
+                namespace=self.namespace,
+                name=self.name,
+                graph=self._graph,
+                entry_agent_id=self._entry_agent_id,
+                agent_ids=self._agent_ids,
+                agent_name_map=self._agent_name_map,
+                checkpointer=checkpointer,
+                store=store,
+                experience_learner=self._experience_learner,
+                experience_retriever=self._experience_retriever,
+                process=self.process,
+            )
+            return await orchestrator.compact_session(session_id)
 
     async def delete_session(self, session_id: str) -> None:
         """删除会话"""
-        await self._orchestrator.delete_session(session_id)
+        from datapillar_oneagentic.runtime.orchestrator import Orchestrator
+        from datapillar_oneagentic.storage import create_checkpointer, create_store
+
+        async with (
+            create_checkpointer(self.namespace) as checkpointer,
+            create_store(self.namespace) as store,
+        ):
+            orchestrator = Orchestrator(
+                namespace=self.namespace,
+                name=self.name,
+                graph=self._graph,
+                entry_agent_id=self._entry_agent_id,
+                agent_ids=self._agent_ids,
+                agent_name_map=self._agent_name_map,
+                checkpointer=checkpointer,
+                store=store,
+                experience_learner=self._experience_learner,
+                experience_retriever=self._experience_retriever,
+                process=self.process,
+            )
+            await orchestrator.delete_session(session_id)
 
     async def get_session_stats(self, session_id: str) -> dict:
         """获取会话统计信息"""
-        return await self._orchestrator.get_session_stats(session_id)
+        from datapillar_oneagentic.runtime.orchestrator import Orchestrator
+        from datapillar_oneagentic.storage import create_checkpointer, create_store
+
+        async with (
+            create_checkpointer(self.namespace) as checkpointer,
+            create_store(self.namespace) as store,
+        ):
+            orchestrator = Orchestrator(
+                namespace=self.namespace,
+                name=self.name,
+                graph=self._graph,
+                entry_agent_id=self._entry_agent_id,
+                agent_ids=self._agent_ids,
+                agent_name_map=self._agent_name_map,
+                checkpointer=checkpointer,
+                store=store,
+                experience_learner=self._experience_learner,
+                experience_retriever=self._experience_retriever,
+                process=self.process,
+            )
+            return await orchestrator.get_session_stats(session_id)
 
     async def save_experience(
         self,

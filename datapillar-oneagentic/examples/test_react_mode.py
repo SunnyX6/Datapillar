@@ -138,7 +138,7 @@ class DataFetcherAgent:
     async def run(self, ctx: AgentContext) -> DataFetchResult:
         messages = ctx.build_messages(self.SYSTEM_PROMPT)
         messages = await ctx.invoke_tools(messages)
-        return await ctx.get_output(messages)
+        return await ctx.get_structured_output(messages)
 
 
 @agent(
@@ -172,7 +172,7 @@ class DataAnalystAgent:
 
     async def run(self, ctx: AgentContext) -> AnalysisResult:
         # 获取上游数据
-        upstream = await ctx.get_deliverable("data_fetcher")
+        upstream = await ctx.get_deliverable(agent_id="data_fetcher")
         if upstream:
             upstream_data = f"数据摘要: {upstream.get('data_summary', '')}\n周期: {upstream.get('period', '')}"
         else:
@@ -181,7 +181,7 @@ class DataAnalystAgent:
         prompt = self.SYSTEM_PROMPT.format(upstream_data=upstream_data)
         messages = ctx.build_messages(prompt)
         messages = await ctx.invoke_tools(messages)
-        return await ctx.get_output(messages)
+        return await ctx.get_structured_output(messages)
 
 
 @agent(
@@ -213,7 +213,7 @@ class ReportGeneratorAgent:
 
     async def run(self, ctx: AgentContext) -> ReportResult:
         # 获取上游分析结果
-        upstream = await ctx.get_deliverable("data_analyst")
+        upstream = await ctx.get_deliverable(agent_id="data_analyst")
         if upstream:
             analysis_result = f"趋势: {upstream.get('trend', '')}\n洞察: {upstream.get('insights', [])}"
         else:
@@ -222,7 +222,7 @@ class ReportGeneratorAgent:
         prompt = self.SYSTEM_PROMPT.format(analysis_result=analysis_result)
         messages = ctx.build_messages(prompt)
         messages = await ctx.invoke_tools(messages)
-        return await ctx.get_output(messages)
+        return await ctx.get_structured_output(messages)
 
 
 def create_react_team() -> Datapillar:
@@ -266,22 +266,25 @@ async def main():
         async for event in team.stream(query=query, session_id=session_id):
             event_type = event.get("event")
 
-            if event_type == "start":
-                print(f"🚀 开始执行")
-                print(f"   入口 Agent: {event['data'].get('entry_agent')}")
+            if event_type == "agent.start":
+                agent = event.get("agent", {})
+                print(f"\n📍 Agent 执行: {agent.get('id')}")
 
-            elif event_type == "agent":
-                agent_id = event["data"].get("agent_id")
-                status = event["data"].get("status")
-                print(f"\n📍 Agent 执行: {agent_id}")
-                print(f"   状态: {status}")
-                if event["data"].get("error"):
-                    print(f"   错误: {event['data']['error']}")
+            elif event_type == "agent.end":
+                state = event.get("state")
+                message = event.get("message", {}).get("content")
+                print(f"   状态: {state}")
+                if message:
+                    print(f"   信息: {message}")
+
+            elif event_type == "agent.interrupt":
+                payload = event.get("interrupt", {}).get("payload")
+                print(f"\n❓ 需要用户输入: {payload}")
 
             elif event_type == "result":
                 print("\n" + "=" * 60)
                 print("📦 最终结果:")
-                deliverables = event["data"].get("deliverables", {})
+                deliverables = event.get("result", {}).get("deliverable", {})
                 for key, value in deliverables.items():
                     print(f"\n[{key}]")
                     if isinstance(value, dict):
@@ -290,10 +293,11 @@ async def main():
                             print(f"  {k}: {v_str}")
                     else:
                         print(f"  {value}")
-                print(f"\n⏱️ 耗时: {event['data'].get('duration_ms')}ms")
+                print(f"\n⏱️ 耗时: {event.get('duration_ms')}ms")
 
             elif event_type == "error":
-                print(f"\n❌ 错误: {event['data'].get('detail')}")
+                error = event.get("error", {})
+                print(f"\n❌ 错误: {error.get('detail') or error.get('message')}")
 
     except Exception as e:
         print(f"\n❌ 执行异常: {e}")

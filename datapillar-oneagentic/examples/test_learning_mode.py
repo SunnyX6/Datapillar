@@ -112,7 +112,7 @@ class CustomerServiceAgent:
     async def run(self, ctx: AgentContext) -> CustomerServiceResult:
         messages = ctx.build_messages(self.SYSTEM_PROMPT)
         messages = await ctx.invoke_tools(messages)
-        return await ctx.get_output(messages)
+        return await ctx.get_structured_output(messages)
 
 
 def create_learning_team() -> Datapillar:
@@ -142,12 +142,12 @@ async def test_first_execution(team: Datapillar):
     async for event in team.stream(query=query, session_id=session_id):
         event_type = event.get("event")
 
-        if event_type == "agent":
-            agent_id = event["data"].get("agent_id")
+        if event_type == "agent.start":
+            agent_id = event.get("agent", {}).get("id")
             print(f"📍 Agent 执行: {agent_id}")
 
         elif event_type == "result":
-            deliverables = event["data"].get("deliverables", {})
+            deliverables = event.get("result", {}).get("deliverable", {})
             for key, value in deliverables.items():
                 print(f"\n[{key}] 回答:")
                 if isinstance(value, dict):
@@ -184,16 +184,12 @@ async def test_second_execution(team: Datapillar):
     async for event in team.stream(query=query, session_id=session_id):
         event_type = event.get("event")
 
-        if event_type == "start":
-            # 检查是否注入了经验上下文
-            print("🚀 开始执行")
-
-        elif event_type == "agent":
-            agent_id = event["data"].get("agent_id")
+        if event_type == "agent.start":
+            agent_id = event.get("agent", {}).get("id")
             print(f"📍 Agent 执行: {agent_id}")
 
         elif event_type == "result":
-            deliverables = event["data"].get("deliverables", {})
+            deliverables = event.get("result", {}).get("deliverable", {})
             for key, value in deliverables.items():
                 print(f"\n[{key}] 回答:")
                 if isinstance(value, dict):

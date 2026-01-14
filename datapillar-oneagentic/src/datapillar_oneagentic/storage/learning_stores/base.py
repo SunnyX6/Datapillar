@@ -53,7 +53,7 @@ class ExperienceStore(ABC):
     # ==================== 写操作 ====================
 
     @abstractmethod
-    async def add(self, record: "ExperienceRecord") -> str:
+    async def add(self, record: ExperienceRecord) -> str:
         """
         添加经验记录
 
@@ -81,7 +81,7 @@ class ExperienceStore(ABC):
     # ==================== 读操作 ====================
 
     @abstractmethod
-    async def get(self, record_id: str) -> "ExperienceRecord | None":
+    async def get(self, record_id: str) -> ExperienceRecord | None:
         """
         获取记录
 
@@ -99,7 +99,7 @@ class ExperienceStore(ABC):
         query_vector: list[float],
         k: int = 5,
         outcome: str | None = None,
-    ) -> list["ExperienceRecord"]:
+    ) -> list[ExperienceRecord]:
         """
         向量相似度搜索
 

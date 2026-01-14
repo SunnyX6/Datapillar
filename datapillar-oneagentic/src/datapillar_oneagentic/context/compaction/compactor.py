@@ -1,13 +1,14 @@
 """
 上下文压缩器
 
-直接操作 LangGraph 的 messages 列表，当 token 超过阈值时压缩历史消息。
+直接操作 LangGraph 的 messages 列表，将历史消息压缩为摘要。
 
 压缩流程：
-1. 检查 token 是否超过阈值
-2. 保留最近 N 条消息 + 用户消息
-3. 将其他消息压缩为摘要
-4. 返回压缩后的 messages 列表
+1. 保留最近 N 条消息 + 用户消息
+2. 将其他消息压缩为摘要
+3. 返回压缩后的 messages 列表
+
+触发时机：由 ContextLengthExceededError 异常触发，不再主动检查 token。
 """
 
 from __future__ import annotations
@@ -23,7 +24,6 @@ from langchain_core.messages import (
     ToolMessage,
 )
 
-from datapillar_oneagentic.providers.token_counter import get_token_counter
 from datapillar_oneagentic.context.compaction.compact_policy import CompactPolicy, CompactResult
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,6 @@ class Compactor:
     上下文压缩器
 
     直接操作 LangGraph 的 messages 列表，包括：
-    - 检查是否需要压缩
     - 调用 LLM 生成摘要
     - 返回压缩后的 messages
     """
@@ -49,24 +48,6 @@ class Compactor:
         """
         self.llm = llm
         self.policy = policy or CompactPolicy()
-        self._token_counter = get_token_counter()
-
-    def estimate_tokens(self, messages: list[BaseMessage]) -> int:
-        """估算 messages 的 token 数"""
-        if not messages:
-            return 0
-
-        total = 0
-        for msg in messages:
-            content = msg.content if isinstance(msg.content, str) else str(msg.content)
-            total += self._token_counter.count(content) + 10  # 消息元数据开销
-        return total
-
-    def needs_compact(self, messages: list[BaseMessage]) -> bool:
-        """判断是否需要压缩"""
-        current_tokens = self.estimate_tokens(messages)
-        trigger_tokens = self.policy.get_trigger_tokens()
-        return current_tokens > trigger_tokens
 
     async def compact(
         self,
@@ -83,12 +64,6 @@ class Compactor:
         """
         if not messages:
             return messages, CompactResult.no_action("没有消息")
-
-        tokens_before = self.estimate_tokens(messages)
-
-        # 检查是否需要压缩
-        if not self.needs_compact(messages):
-            return messages, CompactResult.no_action(f"当前 {tokens_before} tokens，无需压缩")
 
         # 分类消息：保留 vs 压缩
         keep_messages, compress_messages = self._classify_messages(messages)
@@ -109,12 +84,9 @@ class Compactor:
             *keep_messages,
         ]
 
-        tokens_after = self.estimate_tokens(compressed_messages)
-
         logger.info(
             f"📦 压缩完成: {len(compress_messages)} 条 → 摘要，"
-            f"保留 {len(keep_messages)} 条，"
-            f"节省 {tokens_before - tokens_after} tokens"
+            f"保留 {len(keep_messages)} 条"
         )
 
         return compressed_messages, CompactResult(
@@ -122,9 +94,6 @@ class Compactor:
             summary=summary,
             kept_count=len(keep_messages),
             removed_count=len(compress_messages),
-            tokens_before=tokens_before,
-            tokens_after=tokens_after,
-            tokens_saved=tokens_before - tokens_after,
         )
 
     def _classify_messages(
@@ -153,10 +122,7 @@ class Compactor:
 
         for msg in older_messages:
             # 用户消息始终保留
-            if isinstance(msg, HumanMessage):
-                keep_messages.append(msg)
-            # SystemMessage 保留（通常是 system prompt）
-            elif isinstance(msg, SystemMessage):
+            if isinstance(msg, (HumanMessage, SystemMessage)):
                 keep_messages.append(msg)
             else:
                 compress_messages.append(msg)
@@ -191,15 +157,6 @@ class Compactor:
 
         response = await self.llm.ainvoke(llm_messages)
         summary = response.content.strip()
-
-        # 限制摘要长度
-        max_tokens = self.policy.get_max_summary_tokens()
-        while self._token_counter.count(summary) > max_tokens:
-            paragraphs = summary.split("\n\n")
-            if len(paragraphs) <= 1:
-                summary = summary[: max_tokens * 2]
-                break
-            summary = "\n\n".join(paragraphs[:-1])
 
         return summary
 

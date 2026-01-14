@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from datapillar_oneagentic.storage.learning_stores.base import ExperienceStore
 
@@ -89,7 +89,7 @@ class LanceExperienceStore(ExperienceStore):
         self._table = None
         logger.info("LanceExperienceStore 已关闭")
 
-    def _record_to_row(self, record: "ExperienceRecord") -> dict[str, Any]:
+    def _record_to_row(self, record: ExperienceRecord) -> dict[str, Any]:
         """将 ExperienceRecord 转换为表行"""
         return {
             "id": record.id,
@@ -106,7 +106,7 @@ class LanceExperienceStore(ExperienceStore):
             "vector": record.vector,
         }
 
-    def _row_to_record(self, row: dict[str, Any]) -> "ExperienceRecord":
+    def _row_to_record(self, row: dict[str, Any]) -> ExperienceRecord:
         """将表行转换为 ExperienceRecord"""
         from datapillar_oneagentic.experience.learner import ExperienceRecord
 
@@ -161,7 +161,7 @@ class LanceExperienceStore(ExperienceStore):
 
     # ==================== 写操作 ====================
 
-    async def add(self, record: "ExperienceRecord") -> str:
+    async def add(self, record: ExperienceRecord) -> str:
         """添加记录"""
         row = self._record_to_row(record)
 
@@ -185,7 +185,7 @@ class LanceExperienceStore(ExperienceStore):
 
     # ==================== 读操作 ====================
 
-    async def get(self, record_id: str) -> "ExperienceRecord | None":
+    async def get(self, record_id: str) -> ExperienceRecord | None:
         """获取记录"""
         if self._table is None:
             return None
@@ -207,7 +207,7 @@ class LanceExperienceStore(ExperienceStore):
         query_vector: list[float],
         k: int = 5,
         outcome: str | None = None,
-    ) -> list["ExperienceRecord"]:
+    ) -> list[ExperienceRecord]:
         """
         向量相似度搜索
 

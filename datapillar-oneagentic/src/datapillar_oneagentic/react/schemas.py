@@ -14,7 +14,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 # ==================== 状态枚举 ====================
 
 TaskStatus = Literal["pending", "in_progress", "completed", "failed", "skipped"]
