@@ -3,7 +3,7 @@
  * 基于 BaseEditor 骨架构建
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import Editor from '@monaco-editor/react'
 import type * as Monaco from 'monaco-editor'
@@ -144,6 +144,13 @@ export function SqlEditor() {
   const [requestOpenDatabase, setRequestOpenDatabase] = useState(false)
   const catalogPickerRef = useRef<HTMLDivElement>(null)
   const catalogButtonRef = useRef<HTMLButtonElement>(null)
+  const [catalogPickerStyle, setCatalogPickerStyle] = useState<{
+    top?: number
+    bottom?: number
+    right: number
+    maxHeight: number
+    listMaxHeight: number
+  } | null>(null)
 
   const activeWorksheet = worksheets.find(w => w.id === activeTabId) || worksheets[0]
 
@@ -264,6 +271,50 @@ export function SqlEditor() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showCatalogPicker])
 
+  useLayoutEffect(() => {
+    if (!showCatalogPicker) {
+      setCatalogPickerStyle(null)
+      return
+    }
+    const updatePosition = () => {
+      const btn = catalogButtonRef.current
+      if (!btn) return
+      const rect = btn.getBoundingClientRect()
+      const margin = 12
+      const spaceBelow = window.innerHeight - rect.bottom - margin
+      const spaceAbove = rect.top - margin
+      const openUp = spaceAbove > spaceBelow
+      const availableSpace = Math.max(0, openUp ? spaceAbove : spaceBelow)
+      const maxHeight = Math.min(availableSpace, 420)
+      const headerHeight = 28
+      const listMaxHeight = Math.max(0, maxHeight - headerHeight)
+      const right = window.innerWidth - rect.right
+
+      if (openUp) {
+        setCatalogPickerStyle({
+          bottom: window.innerHeight - rect.top + 4,
+          right,
+          maxHeight,
+          listMaxHeight
+        })
+      } else {
+        setCatalogPickerStyle({
+          top: rect.bottom + 4,
+          right,
+          maxHeight,
+          listMaxHeight
+        })
+      }
+    }
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [showCatalogPicker])
+
   // 监听主题变化，切换 Monaco Editor 主题
   useEffect(() => {
     if (monacoInstance) {
@@ -349,32 +400,31 @@ export function SqlEditor() {
       </button>
 
       {/* Catalog/Schema 下拉选择器 */}
-      {showCatalogPicker && createPortal(
+      {showCatalogPicker && catalogPickerStyle && createPortal(
         <div
           ref={catalogPickerRef}
-          className="fixed z-[100000] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl dark:shadow-2xl overflow-hidden min-w-80"
+          className="fixed z-[100000] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl dark:shadow-2xl overflow-hidden min-w-80 max-h-[var(--catalog-picker-max-height)]"
           style={{
-            top: catalogButtonRef.current
-              ? catalogButtonRef.current.getBoundingClientRect().bottom + 4
-              : 0,
-            right: catalogButtonRef.current
-              ? window.innerWidth - catalogButtonRef.current.getBoundingClientRect().right
-              : 0
-          }}
+            ...(catalogPickerStyle.top !== undefined ? { top: catalogPickerStyle.top } : {}),
+            ...(catalogPickerStyle.bottom !== undefined ? { bottom: catalogPickerStyle.bottom } : {}),
+            right: catalogPickerStyle.right,
+            '--catalog-picker-max-height': `${catalogPickerStyle.maxHeight}px`,
+            '--catalog-picker-list-max-height': `${catalogPickerStyle.listMaxHeight}px`
+          } as React.CSSProperties}
         >
           <div className="flex">
             {/* Catalog 列表 */}
             <div className="w-40 border-r border-slate-100 dark:border-slate-700">
               <div className="px-2.5 py-1.5 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-                <span className="text-tiny font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Catalog</span>
+                <span className="text-nano font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Catalog</span>
               </div>
-              <div className="max-h-64 overflow-y-auto py-1">
+              <div className="overflow-y-auto py-1 max-h-[var(--catalog-picker-list-max-height)]">
                 {loadingCatalogs ? (
                   <div className="flex items-center justify-center py-4">
                     <Loader2 size={14} className="animate-spin text-slate-400 dark:text-slate-500" />
                   </div>
                 ) : catalogs.length === 0 ? (
-                  <div className="px-2.5 py-3 text-micro text-slate-400 dark:text-slate-500 text-center">暂无数据</div>
+                  <div className="px-2.5 py-3 text-nano text-slate-400 dark:text-slate-500 text-center">暂无数据</div>
                 ) : (
                   catalogs.map((cat) => {
                     const isHovered = hoveredCatalog === cat.name
@@ -382,14 +432,14 @@ export function SqlEditor() {
                       <div
                         key={cat.id}
                         onMouseEnter={() => handleCatalogHover(cat.name)}
-                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition-colors cursor-pointer ${
+                        className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-left transition-colors cursor-pointer ${
                           isHovered
                             ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
                             : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                         }`}
                       >
                         {getCatalogIcon(mapProviderToIcon(cat.provider))}
-                        <span className="text-micro font-medium truncate flex-1">{cat.name}</span>
+                        <span className="text-micro leading-4 font-semibold truncate flex-1">{cat.name}</span>
                         {isHovered && <Check size={10} className="text-indigo-500 dark:text-indigo-400 shrink-0" />}
                       </div>
                     )
@@ -401,17 +451,17 @@ export function SqlEditor() {
             {/* Schema 列表 */}
             <div className="w-40">
               <div className="px-2.5 py-1.5 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-                <span className="text-tiny font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Schema</span>
+                <span className="text-nano font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Schema</span>
               </div>
-              <div className="max-h-64 overflow-y-auto py-1">
+              <div className="overflow-y-auto py-1 max-h-[var(--catalog-picker-list-max-height)]">
                 {!hoveredCatalog ? (
-                  <div className="px-2.5 py-3 text-micro text-slate-400 dark:text-slate-500 text-center">请先选择 Catalog</div>
+                  <div className="px-2.5 py-3 text-nano text-slate-400 dark:text-slate-500 text-center">请先选择 Catalog</div>
                 ) : loadingSchemas ? (
                   <div className="flex items-center justify-center py-4">
                     <Loader2 size={14} className="animate-spin text-slate-400 dark:text-slate-500" />
                   </div>
                 ) : schemas.length === 0 ? (
-                  <div className="px-2.5 py-3 text-micro text-slate-400 dark:text-slate-500 text-center">暂无 Schema</div>
+                  <div className="px-2.5 py-3 text-nano text-slate-400 dark:text-slate-500 text-center">暂无 Schema</div>
                 ) : (
                   schemas.map((schema) => {
                     const isSelected = activeWorksheet.catalog === hoveredCatalog && activeWorksheet.schema === schema.name
@@ -419,14 +469,14 @@ export function SqlEditor() {
                       <button
                         key={schema.id}
                         onClick={() => handleSchemaChange(schema.name)}
-                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition-colors ${
+                        className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-left transition-colors ${
                           isSelected
                             ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
                             : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                         }`}
                       >
                         <Database size={10} className="text-amber-500" />
-                        <span className="text-micro font-medium truncate flex-1">{schema.name}</span>
+                        <span className="text-micro leading-4 font-semibold truncate flex-1">{schema.name}</span>
                         {isSelected && <Check size={10} className="text-indigo-500 dark:text-indigo-400 shrink-0" />}
                       </button>
                     )

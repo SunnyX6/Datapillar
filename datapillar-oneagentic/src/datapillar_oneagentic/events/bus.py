@@ -1,10 +1,9 @@
 """
 事件总线
 
-提供全局事件发布/订阅机制。
+提供事件发布/订阅机制。
 
 特点：
-- 单例模式
 - 支持同步/异步处理器
 - 线程安全
 - 作用域隔离（用于测试）
@@ -13,13 +12,12 @@
 from __future__ import annotations
 
 import asyncio
-import atexit
 import logging
 import threading
 from collections.abc import Callable, Generator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
-from typing import Any, Final, TypeVar
+from typing import Any, TypeVar
 
 from datapillar_oneagentic.events.base import BaseEvent
 
@@ -40,15 +38,14 @@ def _is_async_handler(handler: Handler) -> bool:
 
 class EventBus:
     """
-    全局事件总线
-
-    单例模式，管理事件的发布和订阅。
+    事件总线
 
     使用示例：
     ```python
-    from datapillar_oneagentic.events import event_bus, AgentStartedEvent
+    from datapillar_oneagentic.events import EventBus, AgentStartedEvent
 
-    # 注册处理器
+    event_bus = EventBus()
+
     @event_bus.on(AgentStartedEvent)
     def on_agent_started(source, event):
         print(f"Agent {event.agent_name} started")
@@ -58,20 +55,7 @@ class EventBus:
     ```
     """
 
-    _instance: EventBus | None = None
-    _instance_lock: threading.RLock = threading.RLock()
-
-    def __new__(cls) -> EventBus:
-        """单例模式"""
-        if cls._instance is None:
-            with cls._instance_lock:
-                if cls._instance is None:
-                    instance = super().__new__(cls)
-                    instance._initialize()
-                    cls._instance = instance
-        return cls._instance
-
-    def _initialize(self) -> None:
+    def __init__(self) -> None:
         """初始化"""
         self._lock = threading.RLock()
         self._sync_handlers: dict[type[BaseEvent], set[SyncHandler]] = {}
@@ -234,10 +218,3 @@ class EventBus:
         with self._lock:
             self._sync_handlers.clear()
             self._async_handlers.clear()
-
-
-# 全局单例
-event_bus: Final[EventBus] = EventBus()
-
-# 程序退出时关闭
-atexit.register(event_bus.shutdown)

@@ -160,8 +160,12 @@ function UnitSelector({
       {open && dropdownPos && createPortal(
         <div
           ref={dropdownRef}
-          style={{ top: dropdownPos.top, left: dropdownPos.left }}
-          className="fixed z-[1000000] w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl"
+          style={{
+            '--unit-dropdown-top': `${dropdownPos.top}px`,
+            '--unit-dropdown-left': `${dropdownPos.left}px`,
+            '--unit-dropdown-width': `${dropdownPos.width}px`
+          } as React.CSSProperties}
+          className="fixed z-[1000000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl top-[var(--unit-dropdown-top)] left-[var(--unit-dropdown-left)] w-[var(--unit-dropdown-width)]"
         >
           <div ref={listRef} className="max-h-60 overflow-y-auto p-1">
             {loading ? (

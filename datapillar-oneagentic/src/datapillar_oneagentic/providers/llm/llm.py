@@ -10,9 +10,10 @@ LLM 统一调用层
 - Token 使用量追踪
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
-import os
 import threading
 from dataclasses import dataclass
 from typing import Any, TypeVar, cast
@@ -29,6 +30,24 @@ from langchain_core.messages import (
 )
 from langchain_core.runnables import Runnable
 from pydantic import BaseModel
+
+from datapillar_oneagentic.events import EventBus, LLMCallCompletedEvent
+from datapillar_oneagentic.providers.llm.config import LLMConfig, RetryConfig
+from datapillar_oneagentic.providers.llm.llm_cache import create_llm_cache
+from datapillar_oneagentic.providers.llm.rate_limiter import RateLimitManager
+from datapillar_oneagentic.providers.llm.usage_tracker import extract_usage
+from datapillar_oneagentic.exception import (
+    CircuitBreaker,
+    CircuitBreakerRegistry,
+    ExceptionMapper,
+    LLMError,
+    LLMErrorCategory,
+    LLMErrorClassifier,
+    RecoveryAction,
+    calculate_retry_delay,
+)
+
+logger = logging.getLogger(__name__)
 
 # ==================== GLM Thinking 模式 Monkey-Patch ====================
 
@@ -47,19 +66,15 @@ def _patched_convert_delta_to_message_chunk(
             "content": "最终回答..."
         }
     }
-
-    将 reasoning_content 放入 additional_kwargs.reasoning_content
     """
     role = dct.get("role")
     content = dct.get("content", "")
     additional_kwargs: dict[str, Any] = {}
 
-    # 解析 tool_calls
     tool_calls = dct.get("tool_calls")
     if tool_calls is not None:
         additional_kwargs["tool_calls"] = tool_calls
 
-    # 解析 reasoning_content（GLM thinking 模式）
     reasoning_content = dct.get("reasoning_content")
     if reasoning_content:
         additional_kwargs["reasoning_content"] = reasoning_content
@@ -87,8 +102,6 @@ def _patched_convert_dict_to_message(dct: dict[str, Any]) -> BaseMessage:
             "content": "最终回答..."
         }
     }
-
-    将 reasoning_content 放入 additional_kwargs.reasoning_content
     """
     from langchain_core.messages import (
         AIMessage,
@@ -110,7 +123,6 @@ def _patched_convert_dict_to_message(dct: dict[str, Any]) -> BaseMessage:
         tool_calls = dct.get("tool_calls")
         if tool_calls is not None:
             additional_kwargs["tool_calls"] = tool_calls
-        # 解析 reasoning_content（GLM thinking 模式）
         reasoning_content = dct.get("reasoning_content")
         if reasoning_content:
             additional_kwargs["reasoning_content"] = reasoning_content
@@ -137,25 +149,38 @@ def _patch_zhipuai_thinking() -> None:
         pass
 
 
-from datapillar_oneagentic.providers.llm.config import LLMConfig
-from datapillar_oneagentic.providers.llm.llm_cache import create_llm_cache
-from datapillar_oneagentic.providers.llm.usage_tracker import extract_usage
-from datapillar_oneagentic.resilience import (
-    CircuitBreakerError,
-    ContextLengthExceededError,
-    ErrorClassifier,
-    ExceptionMapper,
-    get_circuit_breaker,
-    get_llm_timeout,
-    with_retry,
-)
-
-logger = logging.getLogger(__name__)
-
 # 模块加载时自动应用 GLM thinking patch
 _patch_zhipuai_thinking()
 
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T", bound=BaseModel)
+
+def extract_thinking(message: Any) -> str | None:
+    """
+    从 LLM 消息中提取思考内容
+
+    统一处理多模型格式：
+    - GLM/DeepSeek: additional_kwargs.reasoning_content
+    - Claude: content 中的 thinking blocks
+    """
+    if not hasattr(message, "additional_kwargs"):
+        return None
+
+    additional_kwargs = getattr(message, "additional_kwargs", None)
+    if isinstance(additional_kwargs, dict):
+        reasoning = additional_kwargs.get("reasoning_content")
+        if reasoning:
+            return reasoning
+
+    content = getattr(message, "content", None)
+    if isinstance(content, list):
+        thinking_parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "thinking":
+                thinking_parts.append(block.get("thinking", ""))
+        if thinking_parts:
+            return "\n".join(thinking_parts)
+
+    return None
 
 
 # ==================== LLM 配置数据类 ====================
@@ -173,48 +198,6 @@ class LLMProviderConfig:
     thinking_budget_tokens: int | None = None
 
 
-# ==================== 全局 LLM 缓存（懒加载）====================
-
-
-_llm_cache_initialized = False
-_llm_cache_init_lock = threading.Lock()
-
-
-def _init_llm_cache() -> None:
-    """初始化 LLM 缓存（懒加载，线程安全）"""
-    global _llm_cache_initialized
-    if _llm_cache_initialized:
-        return
-
-    with _llm_cache_init_lock:
-        if _llm_cache_initialized:
-            return
-
-        cache_instance = create_llm_cache()
-        if cache_instance is not None:
-            set_llm_cache(cache_instance)
-            logger.info("LLM 缓存已启用")
-
-        # 只有初始化成功后才设置标志位
-        _llm_cache_initialized = True
-
-
-# ==================== LLM 实例缓存 ====================
-
-_llm_instance_cache: dict[tuple, Any] = {}
-_llm_instance_cache_lock = threading.Lock()
-_LLM_CACHE_MAX_SIZE = 50  # 最大缓存实例数
-
-
-def _cleanup_llm_cache_if_needed() -> None:
-    """如果缓存超限，清理最旧的一半（需持有锁）"""
-    if len(_llm_instance_cache) >= _LLM_CACHE_MAX_SIZE:
-        keys = list(_llm_instance_cache.keys())
-        for key in keys[: len(keys) // 2]:
-            _llm_instance_cache.pop(key, None)
-        logger.info(f"LLM 实例缓存清理: {len(keys) // 2} 个实例")
-
-
 # ==================== 弹性包装器 ====================
 
 
@@ -228,8 +211,6 @@ class ResilientChatModel:
     - 自动重试（可重试错误）
     - 熔断保护
     - Token 使用量追踪
-
-    对上层透明，保持 LangChain Runnable 接口。
     """
 
     def __init__(
@@ -238,15 +219,24 @@ class ResilientChatModel:
         *,
         provider: str | None = None,
         model_name: str | None = None,
+        event_bus: EventBus | None = None,
+        rate_limit_manager: RateLimitManager | None = None,
+        circuit_breaker: CircuitBreaker | None = None,
+        timeout_seconds: float | None = None,
+        retry_config: RetryConfig | None = None,
     ):
         self._llm = llm
-        self._circuit_breaker = get_circuit_breaker("llm")
         self._provider = provider or "unknown"
         self._model_name = model_name
+        self._event_bus = event_bus
+        self._rate_limit_manager = rate_limit_manager
+        self._circuit_breaker = circuit_breaker
+        self._timeout_seconds = timeout_seconds or 120.0
+        self._retry_config = retry_config or RetryConfig()
 
     @property
     def timeout(self) -> float:
-        return get_llm_timeout()
+        return self._timeout_seconds
 
     async def ainvoke(
         self,
@@ -255,12 +245,12 @@ class ResilientChatModel:
         **kwargs,
     ) -> Any:
         """异步调用 LLM（带弹性保护）"""
-        from datapillar_oneagentic.providers.llm.rate_limiter import rate_limit_manager
-
-        async with rate_limit_manager.acquire(self._provider):
+        if self._rate_limit_manager is None:
             return await self._invoke_with_resilience(input, config, **kwargs)
 
-    @with_retry()
+        async with self._rate_limit_manager.acquire(self._provider):
+            return await self._invoke_with_resilience(input, config, **kwargs)
+
     async def _invoke_with_resilience(
         self,
         input: list[BaseMessage] | Any,
@@ -268,37 +258,94 @@ class ResilientChatModel:
         **kwargs,
     ) -> Any:
         """带重试的调用（内部方法）"""
-        if not await self._circuit_breaker.allow_request():
-            raise CircuitBreakerError("llm", "LLM 服务熔断中")
+        retries = self._retry_config.max_retries
+        last_error: Exception | None = None
 
-        try:
-            result = await asyncio.wait_for(
-                self._llm.ainvoke(input, config, **kwargs),
-                timeout=self.timeout,
-            )
-            await self._circuit_breaker.record_success()
-            asyncio.create_task(self._track_usage_async(result))
-            return result
-
-        except TimeoutError:
-            await self._circuit_breaker.record_failure()
-            raise TimeoutError(f"LLM 调用超时（{self.timeout}s）") from None
-
-        except Exception as e:
-            # 检查是否为上下文超限错误
-            if ExceptionMapper.is_context_length_exceeded(e):
-                raise ContextLengthExceededError(
-                    message=str(e),
+        for attempt in range(retries + 1):
+            if self._circuit_breaker and not await self._circuit_breaker.allow_request():
+                raise LLMError(
+                    "LLM 服务熔断中",
+                    category=LLMErrorCategory.CIRCUIT_OPEN,
+                    action=RecoveryAction.CIRCUIT_BREAK,
                     provider=self._provider,
                     model=self._model_name,
-                ) from e
+                )
 
-            if ErrorClassifier.is_retryable(e):
-                await self._circuit_breaker.record_failure()
-            raise
+            try:
+                result = await asyncio.wait_for(
+                    self._llm.ainvoke(input, config, **kwargs),
+                    timeout=self.timeout,
+                )
+                if self._circuit_breaker:
+                    await self._circuit_breaker.record_success()
+                asyncio.create_task(self._track_usage_async(result))
+                return result
+
+            except TimeoutError as e:
+                last_error = LLMError(
+                    f"LLM 调用超时（{self.timeout}s）",
+                    category=LLMErrorCategory.TIMEOUT,
+                    action=RecoveryAction.RETRY,
+                    provider=self._provider,
+                    model=self._model_name,
+                    original=e,
+                )
+                if self._circuit_breaker:
+                    await self._circuit_breaker.record_failure()
+                if attempt >= retries:
+                    raise last_error from None
+
+            except Exception as e:
+                if isinstance(e, LLMError):
+                    last_error = e
+                    if e.action == RecoveryAction.RETRY:
+                        if self._circuit_breaker:
+                            await self._circuit_breaker.record_failure()
+                        if attempt >= retries:
+                            raise
+                    else:
+                        raise
+                elif ExceptionMapper.is_context_length_exceeded(e):
+                    raise LLMError(
+                        str(e),
+                        category=LLMErrorCategory.CONTEXT,
+                        action=RecoveryAction.FAIL_FAST,
+                        provider=self._provider,
+                        model=self._model_name,
+                        original=e,
+                    ) from e
+                else:
+                    category, action = LLMErrorClassifier.classify(e)
+                    last_error = LLMError(
+                        str(e),
+                        category=category,
+                        action=action,
+                        provider=self._provider,
+                        model=self._model_name,
+                        original=e,
+                    )
+                    if action == RecoveryAction.RETRY:
+                        if self._circuit_breaker:
+                            await self._circuit_breaker.record_failure()
+                        if attempt >= retries:
+                            raise last_error from None
+                    else:
+                        raise last_error from None
+
+            delay = calculate_retry_delay(self._retry_config, attempt)
+            logger.warning(
+                f"[Retry] 第 {attempt + 1}/{retries} 次失败，"
+                f"{delay:.2f}s 后重试 | provider={self._provider} | error={last_error}"
+            )
+            await asyncio.sleep(delay)
+
+        raise last_error or RuntimeError("Retry exhausted unexpectedly")
 
     async def _track_usage_async(self, result: Any) -> None:
         """异步追踪 Token 使用量，发出事件通知使用者"""
+        if self._event_bus is None:
+            return
+
         try:
             usage = extract_usage(result)
 
@@ -310,9 +357,7 @@ class ResilientChatModel:
             if usage is None:
                 return
 
-            from datapillar_oneagentic.events import LLMCallCompletedEvent, event_bus
-
-            await event_bus.emit(
+            await self._event_bus.emit(
                 self,
                 LLMCallCompletedEvent(
                     model=self._model_name or "",
@@ -352,20 +397,23 @@ class ResilientChatModel:
                 bound,
                 provider=self._provider,
                 model_name=self._model_name,
+                event_bus=self._event_bus,
+                rate_limit_manager=self._rate_limit_manager,
+                circuit_breaker=self._circuit_breaker,
+                timeout_seconds=self._timeout_seconds,
+                retry_config=self._retry_config,
             )
         return self
 
     def bind_tools(self, tools: list, **kwargs) -> "ResilientChatModel":
         """绑定工具（保留原有的 thinking 等参数）"""
         if hasattr(self._llm, "bind_tools"):
-            # 保留原有的 kwargs（如 thinking）
             original_kwargs = {}
             if hasattr(self._llm, "kwargs"):
                 original_kwargs = dict(self._llm.kwargs)
 
             bound = self._llm.bind_tools(tools, **kwargs)
 
-            # 如果原来有 thinking 参数，重新绑定
             if "thinking" in original_kwargs and hasattr(bound, "bind"):
                 bound = bound.bind(thinking=original_kwargs["thinking"])
 
@@ -373,6 +421,11 @@ class ResilientChatModel:
                 bound,
                 provider=self._provider,
                 model_name=self._model_name,
+                event_bus=self._event_bus,
+                rate_limit_manager=self._rate_limit_manager,
+                circuit_breaker=self._circuit_breaker,
+                timeout_seconds=self._timeout_seconds,
+                retry_config=self._retry_config,
             )
         return self
 
@@ -385,7 +438,6 @@ class ResilientChatModel:
         if hasattr(self._llm, "with_structured_output"):
             method = kwargs.get("method", "function_calling")
 
-            # GLM (ChatZhipuAI) 只支持 function_calling，自动转换
             if self._provider and self._provider.lower() == "glm" and method == "json_mode":
                 kwargs["method"] = "function_calling"
 
@@ -395,6 +447,11 @@ class ResilientChatModel:
                 bound,
                 provider=self._provider,
                 model_name=self._model_name,
+                event_bus=self._event_bus,
+                rate_limit_manager=self._rate_limit_manager,
+                circuit_breaker=self._circuit_breaker,
+                timeout_seconds=self._timeout_seconds,
+                retry_config=self._retry_config,
             )
         return self
 
@@ -424,7 +481,7 @@ class LLMFactory:
                 streaming=False,
             )
 
-        elif provider in ("claude", "anthropic"):
+        if provider in ("claude", "anthropic"):
             from langchain_anthropic import ChatAnthropic as _ChatAnthropic
             ChatAnthropic = cast(Any, _ChatAnthropic)
             llm = ChatAnthropic(
@@ -433,7 +490,6 @@ class LLMFactory:
                 model=config.model_name,
                 streaming=False,
             )
-            # Claude thinking 模式
             if config.enable_thinking:
                 thinking_config = {"type": "enabled"}
                 if config.thinking_budget_tokens:
@@ -441,18 +497,17 @@ class LLMFactory:
                 return llm.bind(thinking=thinking_config)
             return llm
 
-        elif provider == "glm":
+        if provider == "glm":
             from langchain_community.chat_models import ChatZhipuAI
             llm = ChatZhipuAI(
                 zhipuai_api_key=config.api_key,
                 model_name=config.model_name,
                 streaming=False,
             )
-            # GLM thinking 模式
             thinking_type = "enabled" if config.enable_thinking else "disabled"
             return llm.bind(thinking={"type": thinking_type})
 
-        elif provider == "deepseek":
+        if provider == "deepseek":
             from langchain_openai import ChatOpenAI as _ChatOpenAI
             ChatOpenAI = cast(Any, _ChatOpenAI)
             llm = ChatOpenAI(
@@ -461,12 +516,11 @@ class LLMFactory:
                 model=config.model_name,
                 streaming=False,
             )
-            # DeepSeek thinking 模式（通过 extra_body）
             if config.enable_thinking:
                 return llm.bind(extra_body={"enable_thinking": True})
             return llm
 
-        elif provider == "openrouter":
+        if provider == "openrouter":
             from langchain_openai import ChatOpenAI as _ChatOpenAI
             ChatOpenAI = cast(Any, _ChatOpenAI)
             return ChatOpenAI(
@@ -476,7 +530,7 @@ class LLMFactory:
                 streaming=False,
             )
 
-        elif provider == "ollama":
+        if provider == "ollama":
             from langchain_openai import ChatOpenAI as _ChatOpenAI
             ChatOpenAI = cast(Any, _ChatOpenAI)
             return ChatOpenAI(
@@ -486,172 +540,117 @@ class LLMFactory:
                 streaming=False,
             )
 
-        else:
-            raise ValueError(f"不支持的 LLM 提供商: {provider}")
+        raise ValueError(f"不支持的 LLM 提供商: {provider}")
 
 
-# ==================== 配置获取 ====================
+# ==================== Provider ====================
 
 
-def _get_llm_config() -> LLMProviderConfig | None:
-    """
-    获取 LLM 配置
+class LLMProvider:
+    """LLM Provider（团队内使用）"""
 
-    优先级：
-    1. datapillar_configure() 配置
-    2. 环境变量
-    """
-    # 1. 从 datapillar 配置获取
-    try:
-        from datapillar_oneagentic.config import datapillar
+    _CACHE_MAX_SIZE = 50
 
-        llm_config: LLMConfig = datapillar.llm
-        if llm_config.is_configured():
-            return LLMProviderConfig(
-                provider=llm_config.provider,
-                model_name=llm_config.model,
-                api_key=llm_config.api_key,
-                base_url=llm_config.base_url,
-                enable_thinking=llm_config.enable_thinking,
-                thinking_budget_tokens=llm_config.thinking_budget_tokens,
+    def __init__(self, config: LLMConfig, *, event_bus: EventBus | None = None) -> None:
+        if not config.is_configured():
+            raise ValueError("LLM 未配置，无法创建 LLMProvider")
+
+        self._config = config
+        self._event_bus = event_bus
+        self._rate_limit_manager = RateLimitManager(config.rate_limit)
+        self._circuit_breakers = CircuitBreakerRegistry(config.circuit_breaker)
+        self._instance_cache: dict[tuple, ResilientChatModel] = {}
+        self._cache_lock = threading.Lock()
+
+        cache_instance = create_llm_cache(config.cache)
+        if cache_instance is not None:
+            set_llm_cache(cache_instance)
+
+    def _build_provider_config(self) -> LLMProviderConfig:
+        return LLMProviderConfig(
+            provider=self._config.provider,
+            model_name=self._config.model,
+            api_key=self._config.api_key,
+            base_url=self._config.base_url,
+            enable_thinking=self._config.enable_thinking,
+            thinking_budget_tokens=self._config.thinking_budget_tokens,
+        )
+
+    def _cleanup_cache_if_needed(self) -> None:
+        if len(self._instance_cache) < self._CACHE_MAX_SIZE:
+            return
+        keys = list(self._instance_cache.keys())
+        for key in keys[: len(keys) // 2]:
+            self._instance_cache.pop(key, None)
+
+    def get_llm(
+        self,
+        output_schema: type[T] | None = None,
+        **kwargs,
+    ) -> ResilientChatModel:
+        """
+        获取带弹性能力的 LLM 实例
+        """
+        temperature = kwargs.get("temperature", self._config.temperature)
+        max_tokens = kwargs.get("max_tokens")
+        schema_key = f"{output_schema.__module__}.{output_schema.__qualname__}" if output_schema else None
+
+        provider_config = self._build_provider_config()
+        cache_key = (
+            provider_config.provider,
+            provider_config.model_name,
+            provider_config.api_key,
+            provider_config.base_url,
+            provider_config.enable_thinking,
+            provider_config.thinking_budget_tokens,
+            temperature,
+            max_tokens,
+            schema_key,
+        )
+
+        if cache_key in self._instance_cache:
+            return self._instance_cache[cache_key]
+
+        with self._cache_lock:
+            if cache_key in self._instance_cache:
+                return self._instance_cache[cache_key]
+
+            llm = LLMFactory.create_chat_model(provider_config)
+            logger.info(
+                f"创建 LLM 实例: provider={provider_config.provider}, "
+                f"model={provider_config.model_name}"
             )
-    except Exception:
-        pass
 
-    # 2. 从环境变量获取
-    # OpenAI
-    openai_key = os.environ.get("OPENAI_API_KEY")
-    if openai_key:
-        return LLMProviderConfig(
-            provider="openai",
-            model_name=os.environ.get("OPENAI_MODEL", "gpt-4o"),
-            api_key=openai_key,
-            base_url=os.environ.get("OPENAI_BASE_URL"),
-        )
+            bind_kwargs = {}
+            if temperature is not None:
+                bind_kwargs["temperature"] = temperature
+            if max_tokens is not None:
+                bind_kwargs["max_tokens"] = max_tokens
+            if bind_kwargs and hasattr(llm, "bind"):
+                llm = llm.bind(**bind_kwargs)
 
-    # Anthropic
-    anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
-    if anthropic_key:
-        return LLMProviderConfig(
-            provider="anthropic",
-            model_name=os.environ.get("ANTHROPIC_MODEL", "claude-3-opus-20240229"),
-            api_key=anthropic_key,
-            base_url=os.environ.get("ANTHROPIC_BASE_URL"),
-        )
+            if output_schema is not None:
+                llm = llm.with_structured_output(output_schema, method="function_calling")
 
-    # GLM
-    glm_key = os.environ.get("GLM_API_KEY") or os.environ.get("ZHIPU_API_KEY")
-    if glm_key:
-        return LLMProviderConfig(
-            provider="glm",
-            model_name=os.environ.get("GLM_MODEL", "glm-4.7"),
-            api_key=glm_key,
-            base_url=os.environ.get("GLM_BASE_URL", "https://open.bigmodel.cn/api/paas/v4/"),
-        )
+            resilient_llm = ResilientChatModel(
+                llm,
+                provider=provider_config.provider,
+                model_name=provider_config.model_name,
+                event_bus=self._event_bus,
+                rate_limit_manager=self._rate_limit_manager,
+                circuit_breaker=self._circuit_breakers.get("llm"),
+                timeout_seconds=self._config.timeout_seconds,
+                retry_config=self._config.retry,
+            )
 
-    # DeepSeek
-    deepseek_key = os.environ.get("DEEPSEEK_API_KEY")
-    if deepseek_key:
-        return LLMProviderConfig(
-            provider="deepseek",
-            model_name=os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
-            api_key=deepseek_key,
-            base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
-        )
+            self._cleanup_cache_if_needed()
+            self._instance_cache[cache_key] = resilient_llm
+            return resilient_llm
 
-    return None
+    def clear_cache(self) -> None:
+        """清空 LLM 实例缓存（测试用）"""
+        with self._cache_lock:
+            self._instance_cache.clear()
 
-
-# ==================== 统一调用接口 ====================
-
-
-def call_llm(
-    output_schema: type[T] | None = None,
-    **kwargs,
-) -> ResilientChatModel:
-    """
-    统一的 LLM 获取接口
-
-    返回带弹性能力的 LLM 实例：
-    - 超时控制（默认 120s）
-    - 自动重试（可重试错误最多 3 次）
-    - 熔断保护（连续失败 5 次后熔断 60s）
-    - Token 使用量追踪
-
-    Args:
-        output_schema: Pydantic 模型类，启用 structured output
-        **kwargs: temperature, max_tokens 等额外参数
-
-    Returns:
-        ResilientChatModel 实例
-    """
-    _init_llm_cache()
-
-    # 获取配置
-    config = _get_llm_config()
-    if not config:
-        raise ValueError(
-            "LLM 未配置！请通过以下方式配置：\n"
-            "1. datapillar_configure(llm={...})\n"
-            "2. 环境变量 OPENAI_API_KEY 等"
-        )
-
-    temperature = kwargs.get("temperature")
-    max_tokens = kwargs.get("max_tokens")
-    schema_key = f"{output_schema.__module__}.{output_schema.__qualname__}" if output_schema else None
-
-    # 缓存 key 包含所有影响实例的参数
-    cache_key = (
-        config.provider,
-        config.model_name,
-        config.api_key,
-        config.base_url,
-        config.enable_thinking,
-        temperature,
-        max_tokens,
-        schema_key,
-    )
-
-    # 双重检查锁定
-    if cache_key in _llm_instance_cache:
-        return _llm_instance_cache[cache_key]
-
-    with _llm_instance_cache_lock:
-        if cache_key in _llm_instance_cache:
-            return _llm_instance_cache[cache_key]
-
-        # 创建 LLM
-        llm = LLMFactory.create_chat_model(config)
-        logger.info(f"创建 LLM 实例: provider={config.provider}, model={config.model_name}")
-
-        # 绑定参数
-        bind_kwargs = {}
-        if temperature is not None:
-            bind_kwargs["temperature"] = temperature
-        if max_tokens is not None:
-            bind_kwargs["max_tokens"] = max_tokens
-
-        if bind_kwargs and hasattr(llm, "bind"):
-            llm = llm.bind(**bind_kwargs)
-
-        # 应用 structured output
-        if output_schema is not None:
-            llm = llm.with_structured_output(output_schema, method="function_calling")
-
-        # 包装为弹性模型
-        resilient_llm = ResilientChatModel(
-            llm,
-            provider=config.provider,
-            model_name=config.model_name,
-        )
-
-        _cleanup_llm_cache_if_needed()
-        _llm_instance_cache[cache_key] = resilient_llm
-        return resilient_llm
-
-
-def clear_llm_cache() -> None:
-    """清空 LLM 实例缓存（测试用）"""
-    global _llm_instance_cache
-    with _llm_instance_cache_lock:
-        _llm_instance_cache.clear()
+    def __call__(self, output_schema: type[T] | None = None, **kwargs) -> ResilientChatModel:
+        return self.get_llm(output_schema=output_schema, **kwargs)

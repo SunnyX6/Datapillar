@@ -65,6 +65,9 @@ public class MetricRegisterRequest implements RESTRequest {
   @JsonProperty("calculationFormula")
   private String calculationFormula;
 
+  @JsonProperty("refTableId")
+  private Long refTableId;
+
   @JsonProperty("refCatalogName")
   private String refCatalogName;
 
@@ -74,11 +77,11 @@ public class MetricRegisterRequest implements RESTRequest {
   @JsonProperty("refTableName")
   private String refTableName;
 
-  @JsonProperty("measureColumns")
-  private String measureColumns;
+  @JsonProperty("measureColumnIds")
+  private String measureColumnIds;
 
-  @JsonProperty("filterColumns")
-  private String filterColumns;
+  @JsonProperty("filterColumnIds")
+  private String filterColumnIds;
 
   /** 允许的数值数据类型 */
   private static final java.util.Set<String> NUMERIC_DATA_TYPES =
@@ -111,8 +114,7 @@ public class MetricRegisterRequest implements RESTRequest {
     // ATOMIC 类型必须指定数据源引用
     if (type == Metric.Type.ATOMIC) {
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(refTableName),
-          "\"refTableName\" is required for ATOMIC metric type");
+          refTableId != null, "\"refTableId\" is required for ATOMIC metric type");
     }
 
     // DERIVED 和 COMPOSITE 类型必须指定 parentMetricCodes

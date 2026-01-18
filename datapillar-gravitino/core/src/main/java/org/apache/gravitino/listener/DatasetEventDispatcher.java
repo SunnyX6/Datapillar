@@ -105,11 +105,12 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
       String unit,
       String[] parentMetricCodes,
       String calculationFormula,
+      Long refTableId,
       String refCatalogName,
       String refSchemaName,
       String refTableName,
-      String measureColumns,
-      String filterColumns)
+      String measureColumnIds,
+      String filterColumnIds)
       throws NoSuchSchemaException, MetricAlreadyExistsException {
     String user = PrincipalUtils.getCurrentUserName();
 
@@ -126,11 +127,12 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
               unit,
               parentMetricCodes,
               calculationFormula,
+              refTableId,
               refCatalogName,
               refSchemaName,
               refTableName,
-              measureColumns,
-              filterColumns);
+              measureColumnIds,
+              filterColumnIds);
 
       MetricInfo registeredMetricInfo =
           new MetricInfo(
@@ -141,8 +143,8 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
               refCatalogName,
               refSchemaName,
               refTableName,
-              measureColumns,
-              filterColumns);
+              measureColumnIds,
+              filterColumnIds);
       eventBus.dispatchEvent(new RegisterMetricEvent(user, ident, registeredMetricInfo));
       return metric;
     } catch (Exception e) {
@@ -184,8 +186,8 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
               currentVersionInfo.refCatalogName(),
               currentVersionInfo.refSchemaName(),
               currentVersionInfo.refTableName(),
-              currentVersionInfo.measureColumns(),
-              currentVersionInfo.filterColumns());
+              currentVersionInfo.measureColumnIds(),
+              currentVersionInfo.filterColumnIds());
 
       eventBus.dispatchEvent(new AlterMetricEvent(user, ident, updatedMetricInfo));
 
@@ -236,8 +238,8 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
               metricVersion.refCatalogName(),
               metricVersion.refSchemaName(),
               metricVersion.refTableName(),
-              metricVersion.measureColumns(),
-              metricVersion.filterColumns());
+              metricVersion.measureColumnIds(),
+              metricVersion.filterColumnIds());
 
       eventBus.dispatchEvent(new AlterMetricEvent(user, ident, updatedMetricInfo));
 
@@ -260,11 +262,9 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
       String unitName,
       String[] parentMetricCodes,
       String calculationFormula,
-      String refCatalogName,
-      String refSchemaName,
-      String refTableName,
-      String measureColumns,
-      String filterColumns)
+      Long refTableId,
+      String measureColumnIds,
+      String filterColumnIds)
       throws NoSuchMetricVersionException {
     String user = PrincipalUtils.getCurrentUserName();
 
@@ -282,11 +282,9 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
               unitName,
               parentMetricCodes,
               calculationFormula,
-              refCatalogName,
-              refSchemaName,
-              refTableName,
-              measureColumns,
-              filterColumns);
+              refTableId,
+              measureColumnIds,
+              filterColumnIds);
 
       // 获取最新的 Metric 信息
       Metric metric = dispatcher.getMetric(ident);
@@ -300,8 +298,8 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
               metricVersion.refCatalogName(),
               metricVersion.refSchemaName(),
               metricVersion.refTableName(),
-              metricVersion.measureColumns(),
-              metricVersion.filterColumns());
+              metricVersion.measureColumnIds(),
+              metricVersion.filterColumnIds());
 
       eventBus.dispatchEvent(new AlterMetricEvent(user, ident, updatedMetricInfo));
 

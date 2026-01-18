@@ -77,6 +77,14 @@ export interface DataTypeSelectorProps {
   triggerClassName?: string
   /** 触发按钮文案额外样式（用于统一字号/截断） */
   labelClassName?: string
+  /** 下拉宽度：'trigger' 跟随触发按钮 | 'auto' 自适应 | number 指定像素 */
+  dropdownWidth?: 'trigger' | 'auto' | number
+  /** 下拉容器额外样式 */
+  dropdownClassName?: string
+  /** 下拉列表额外样式 */
+  dropdownListClassName?: string
+  /** 选项按钮额外样式 */
+  optionClassName?: string
 }
 
 /** 精度选择卡片 */
@@ -174,7 +182,11 @@ export function DataTypeSelector({
   filter = 'all',
   size = 'default',
   triggerClassName,
-  labelClassName
+  labelClassName,
+  dropdownWidth = 'trigger',
+  dropdownClassName,
+  dropdownListClassName,
+  optionClassName
 }: DataTypeSelectorProps) {
   const [open, setOpen] = useState(false)
   const [hoveredType, setHoveredType] = useState<string | null>(null)
@@ -182,12 +194,23 @@ export function DataTypeSelector({
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const paramCardRef = useRef<HTMLDivElement>(null)
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width?: number } | null>(null)
   const [paramCardPos, setParamCardPos] = useState<{ top: number; left: number } | null>(null)
   const hoverItemRef = useRef<HTMLButtonElement | null>(null)
   const leaveTimerRef = useRef<number | null>(null)
 
   const isSmall = size === 'small'
+  const dropdownMinWidth = isSmall ? 160 : 176
+  const dropdownHeight = isSmall ? 252 : 272
+  const dropdownRadiusClass = isSmall ? 'rounded-lg shadow-lg' : 'rounded-xl shadow-xl'
+  const dropdownListClass = isSmall ? 'max-h-60 p-1' : 'max-h-64 p-1.5'
+  const itemSizeClass = isSmall ? 'gap-2 px-2 py-1.5 rounded-md' : 'gap-2.5 px-2.5 py-2 rounded-lg'
+  const itemTextClass = isSmall ? 'text-caption' : 'text-body-sm'
+  const itemIconSize = isSmall ? 14 : 16
+  const itemCheckSize = isSmall ? 12 : 14
+  const itemChevronSize = isSmall ? 10 : 12
+  const triggerIconSize = isSmall ? 12 : 16
+  const triggerChevronSize = isSmall ? 12 : 14
 
   const filteredTypes = DATA_TYPE_CONFIGS.filter((config) => {
     if (filter === 'all') return true
@@ -227,15 +250,28 @@ export function DataTypeSelector({
       const btn = triggerRef.current
       if (!btn) return
       const rect = btn.getBoundingClientRect()
-      const dropdownHeight = 300 // 预估下拉高度 max-h-72 = 288px + padding
       const spaceBelow = window.innerHeight - rect.bottom - 20
       const spaceAbove = rect.top - 20
 
+      const resolvedWidth = dropdownWidth === 'auto'
+        ? undefined
+        : typeof dropdownWidth === 'number'
+          ? dropdownWidth
+          : Math.max(rect.width, dropdownMinWidth)
+
       // 如果下方空间不够且上方空间更大，则向上展开
       if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
-        setDropdownPos({ top: rect.top - Math.min(dropdownHeight, spaceAbove) - 4, left: rect.left })
+        const top = rect.top - Math.min(dropdownHeight, spaceAbove) - 4
+        const left = typeof resolvedWidth === 'number'
+          ? Math.max(12, Math.min(rect.left, window.innerWidth - resolvedWidth - 12))
+          : rect.left
+        setDropdownPos({ top, left, width: resolvedWidth })
       } else {
-        setDropdownPos({ top: rect.bottom + 4, left: rect.left })
+        const top = rect.bottom + 4
+        const left = typeof resolvedWidth === 'number'
+          ? Math.max(12, Math.min(rect.left, window.innerWidth - resolvedWidth - 12))
+          : rect.left
+        setDropdownPos({ top, left, width: resolvedWidth })
       }
     }
     updatePosition()
@@ -245,7 +281,7 @@ export function DataTypeSelector({
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [open])
+  }, [open, dropdownMinWidth, dropdownWidth, dropdownHeight])
 
   useLayoutEffect(() => {
     const updatePos = () => {
@@ -347,6 +383,14 @@ export function DataTypeSelector({
   const showParamCard = open && paramCardPos && activeHoveredType &&
     DATA_TYPE_CONFIGS.find((c) => c.type === activeHoveredType)?.hasParams
 
+  const dropdownStyle = dropdownPos
+    ? {
+        top: dropdownPos.top,
+        left: dropdownPos.left,
+        ...(typeof dropdownPos.width === 'number' ? { width: dropdownPos.width } : {})
+      }
+    : undefined
+
   return (
     <>
       <button
@@ -359,7 +403,7 @@ export function DataTypeSelector({
           isSmall ? 'gap-1.5 px-2 py-1 rounded-lg' : 'gap-2 px-3 py-2 rounded-xl'
         } ${triggerClassName ?? ''}`}
       >
-        <IconComponent size={isSmall ? 14 : 16} className="text-slate-500" />
+        <IconComponent size={triggerIconSize} className="text-slate-500" />
         <span
           className={`flex-1 min-w-0 truncate font-medium text-slate-700 dark:text-slate-200 ${
             isSmall ? 'text-xs' : 'text-body-sm'
@@ -368,7 +412,7 @@ export function DataTypeSelector({
           {displayLabel}
         </span>
         <ChevronDown
-          size={14}
+          size={triggerChevronSize}
           className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
@@ -378,11 +422,11 @@ export function DataTypeSelector({
         createPortal(
           <div
             ref={dropdownRef}
-            style={{ top: dropdownPos.top, left: dropdownPos.left }}
-            className="fixed z-[1000000] w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl"
+            style={dropdownStyle}
+            className={`fixed z-[1000000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 ${dropdownRadiusClass} ${dropdownClassName ?? ''}`}
           >
             <div
-              className="max-h-72 overflow-y-auto overscroll-contain p-1.5"
+              className={`overflow-y-auto overscroll-contain ${dropdownListClass} ${dropdownListClassName ?? ''}`}
               style={{ scrollbarWidth: 'thin' }}
               onWheel={(e) => e.stopPropagation()}
             >
@@ -397,18 +441,18 @@ export function DataTypeSelector({
                     onClick={() => handleSelect(config)}
                     onMouseEnter={() => handleItemMouseEnter(config.type)}
                     onMouseLeave={handleItemMouseLeave}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
+                    className={`w-full flex items-center text-left transition-all ${itemSizeClass} ${
                       isSelected
                         ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                         : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                    }`}
+                    } ${optionClassName ?? ''}`}
                   >
-                    <Icon size={16} className={isSelected ? 'text-blue-500' : 'text-slate-400'} />
-                    <span className="flex-1 text-body-sm font-medium">{config.label}</span>
+                    <Icon size={itemIconSize} className={isSelected ? 'text-blue-500' : 'text-slate-400'} />
+                    <span className={`flex-1 font-medium ${itemTextClass}`}>{config.label}</span>
                     {config.hasParams && (
-                      <ChevronDown size={12} className="-rotate-90 text-slate-400" />
+                      <ChevronDown size={itemChevronSize} className="-rotate-90 text-slate-400" />
                     )}
-                    {isSelected && <Check size={14} className="text-blue-500" />}
+                    {isSelected && <Check size={itemCheckSize} className="text-blue-500" />}
                   </button>
                 )
               })}

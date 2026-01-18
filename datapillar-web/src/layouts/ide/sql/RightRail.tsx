@@ -110,8 +110,8 @@ export function RightRail({ selectedCatalog, selectedSchema, requestOpenDatabase
     if (requestOpenDatabase) {
       const frameId = requestAnimationFrame(() => {
         setActivePanel('database')
+        onResetOpenRequest?.()
       })
-      onResetOpenRequest?.()
       return () => cancelAnimationFrame(frameId)
     }
   }, [requestOpenDatabase, onResetOpenRequest])
@@ -208,6 +208,61 @@ function DatabasePanel({
     loadTables()
   }, [selectedCatalog, selectedSchema])
 
+  // 创建拖拽预览卡片
+  const createDragPreview = (tableName: string): HTMLElement => {
+    const isDark = document.documentElement.classList.contains('dark')
+
+    const preview = document.createElement('div')
+    preview.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: -9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: ${isDark ? '#1e293b' : '#ffffff'};
+      border: 1px solid ${isDark ? '#6366f1' : '#a5b4fc'};
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      font-family: system-ui, -apple-system, sans-serif;
+    `
+
+    // 表图标
+    const tableIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    tableIcon.setAttribute('width', '14')
+    tableIcon.setAttribute('height', '14')
+    tableIcon.setAttribute('viewBox', '0 0 24 24')
+    tableIcon.setAttribute('fill', 'none')
+    tableIcon.setAttribute('stroke', isDark ? '#a5b4fc' : '#6366f1')
+    tableIcon.setAttribute('stroke-width', '2')
+    tableIcon.innerHTML = '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M12 3v18"/>'
+
+    // 表名
+    const nameEl = document.createElement('span')
+    nameEl.style.cssText = `
+      font-size: 12px;
+      font-weight: 500;
+      color: ${isDark ? '#e2e8f0' : '#334155'};
+      white-space: nowrap;
+    `
+    nameEl.textContent = tableName
+
+    // 拖拽指示图标 (GripVertical)
+    const gripIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    gripIcon.setAttribute('width', '10')
+    gripIcon.setAttribute('height', '10')
+    gripIcon.setAttribute('viewBox', '0 0 24 24')
+    gripIcon.setAttribute('fill', isDark ? '#64748b' : '#94a3b8')
+    gripIcon.innerHTML = '<circle cx="9" cy="5" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="9" cy="19" r="2"/><circle cx="15" cy="5" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="15" cy="19" r="2"/>'
+
+    preview.appendChild(tableIcon)
+    preview.appendChild(nameEl)
+    preview.appendChild(gripIcon)
+
+    return preview
+  }
+
   // 切换表的展开/折叠状态
   const toggleTable = async (table: TableItem) => {
     const isExpanded = expandedTables.has(table.id)
@@ -278,23 +333,26 @@ function DatabasePanel({
                 className="flex items-center gap-1.5 px-2 py-1 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md cursor-pointer transition-colors"
               >
                 <ChevronRight
-                  size={11}
+                  size={12}
                   className={`text-slate-400 dark:text-slate-500 shrink-0 transition-transform ${expandedSchema ? 'rotate-90' : ''}`}
                 />
-                <Database size={11} className="text-amber-500 shrink-0" />
-                <span className="text-xs truncate">{selectedSchema}</span>
+                <Database size={12} className="text-amber-500 shrink-0" />
+                <span className="text-body-sm truncate">{selectedSchema}</span>
+                {!loadingTables && tables.length > 0 && (
+                  <span className="text-micro text-slate-400 dark:text-slate-500">{tables.length}</span>
+                )}
               </div>
 
               {/* Tables */}
               {expandedSchema && (
                 <div className="ml-4 border-l border-slate-100 dark:border-slate-800 pl-2 mt-0.5">
                 {loadingTables ? (
-                  <div className="flex items-center gap-2 px-2 py-1 text-xs text-slate-400 dark:text-slate-500">
-                    <Loader2 size={11} className="animate-spin" />
+                  <div className="flex items-center gap-2 px-2 py-1 text-caption text-slate-400 dark:text-slate-500">
+                    <Loader2 size={12} className="animate-spin" />
                     <span>加载中...</span>
                   </div>
                 ) : tables.length === 0 ? (
-                  <div className="px-2 py-1 text-xs text-slate-400 dark:text-slate-500">暂无表</div>
+                  <div className="px-2 py-1 text-caption text-slate-400 dark:text-slate-500">暂无表</div>
                 ) : (
                   tables.map(table => {
                     const isExpanded = expandedTables.has(table.id)
@@ -314,18 +372,30 @@ function DatabasePanel({
                               table: table.name
                             }))
                             e.dataTransfer.effectAllowed = 'copy'
+
+                            // 创建科技感拖拽预览卡片
+                            const preview = createDragPreview(table.name)
+                            document.body.appendChild(preview)
+                            e.dataTransfer.setDragImage(preview, 20, 20)
+
+                            // 延迟移除预览元素
+                            requestAnimationFrame(() => {
+                              setTimeout(() => {
+                                document.body.removeChild(preview)
+                              }, 0)
+                            })
                           }}
                           onClick={() => toggleTable(table)}
                           className="flex items-center gap-1.5 px-2 py-1 rounded-md text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-grab active:cursor-grabbing transition-colors"
                           title={`${selectedCatalog}.${selectedSchema}.${table.name}`}
                         >
                           <ChevronRight
-                            size={11}
+                            size={12}
                             className={`text-slate-400 dark:text-slate-500 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                           />
-                          <Table size={11} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                          <span className="text-xs truncate flex-1">{table.name}</span>
-                          {isLoadingThis && <Loader2 size={11} className="animate-spin text-slate-400 dark:text-slate-500" />}
+                          <Table size={12} className="text-slate-400 dark:text-slate-500 shrink-0" />
+                          <span className="text-caption truncate flex-1">{table.name}</span>
+                          {isLoadingThis && <Loader2 size={12} className="animate-spin text-slate-400 dark:text-slate-500" />}
                         </div>
 
                         {/* Columns */}
@@ -333,7 +403,7 @@ function DatabasePanel({
                           <div className="ml-4 border-l border-slate-100 dark:border-slate-800 pl-2 mt-0.5">
                             {isLoadingThis ? (
                               <div className="flex items-center gap-2 px-2 py-0.5 text-legal text-slate-400 dark:text-slate-500">
-                                <Loader2 size={9} className="animate-spin" />
+                                <Loader2 size={10} className="animate-spin" />
                                 <span>加载列...</span>
                               </div>
                             ) : detail?.columns && detail.columns.length > 0 ? (
@@ -343,7 +413,7 @@ function DatabasePanel({
                                   className="flex items-center gap-1.5 px-2 py-0.5 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded transition-colors"
                                   title={col.comment || col.name}
                                 >
-                                  <Columns size={10} className="text-slate-300 dark:text-slate-600 shrink-0" />
+                                  <Columns size={11} className="text-slate-300 dark:text-slate-600 shrink-0" />
                                   <span className="text-legal truncate">{col.name}</span>
                                   <span className="text-legal text-slate-300 dark:text-slate-600 truncate">{col.dataType}</span>
                                 </div>

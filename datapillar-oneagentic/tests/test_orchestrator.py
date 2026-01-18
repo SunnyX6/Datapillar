@@ -9,28 +9,32 @@
 from __future__ import annotations
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from dataclasses import dataclass
 
 from datapillar_oneagentic.core.types import SessionKey
+from datapillar_oneagentic.events import EventBus
 from datapillar_oneagentic.runtime.orchestrator import Orchestrator
+from datapillar_oneagentic.sse import SseEventType
 
 
 class _MockStateGraph:
     """Mock StateGraph"""
 
-    def __init__(self, events: list[dict] | None = None):
+    def __init__(self, events: list[dict] | None = None, state=None):
         self._events = events or []
+        self._state = state
 
     def compile(self, checkpointer=None, store=None):
-        return _MockCompiledGraph(self._events)
+        return _MockCompiledGraph(self._events, state=self._state)
 
 
 class _MockCompiledGraph:
     """Mock CompiledGraph"""
 
-    def __init__(self, events: list[dict]):
+    def __init__(self, events: list[dict], state=None):
         self._events = events
-        self._state = None
+        self._state = state
+        self.updated: list[dict] = []
 
     async def aget_state(self, config):
         return self._state
@@ -38,6 +42,39 @@ class _MockCompiledGraph:
     async def astream(self, input_data, config):
         for event in self._events:
             yield event
+
+    async def aupdate_state(self, config, updates):
+        self.updated.append(updates)
+
+
+@dataclass(slots=True)
+class _StoreItem:
+    key: str
+    value: object
+
+
+class _StubStore:
+    def __init__(self) -> None:
+        self._data: dict[tuple[tuple, str], object] = {}
+
+    async def aput(self, namespace: tuple, key: str, value: object) -> None:
+        self._data[(namespace, key)] = value
+
+    async def aget(self, namespace: tuple, key: str) -> _StoreItem | None:
+        value = self._data.get((namespace, key))
+        if value is None:
+            return None
+        return _StoreItem(key=key, value=value)
+
+    async def asearch(self, namespace: tuple) -> list[_StoreItem]:
+        return [
+            _StoreItem(key=key, value=value)
+            for (ns, key), value in self._data.items()
+            if ns == namespace
+        ]
+
+    async def adelete(self, namespace: tuple, key: str) -> None:
+        self._data.pop((namespace, key), None)
 
 
 @pytest.mark.asyncio
@@ -53,6 +90,7 @@ async def test_orchestrator_stream_should_error_when_no_query_and_no_resume_valu
         agent_ids=["agent1"],
         checkpointer=None,
         store=None,
+        event_bus=EventBus(),
     )
 
     key = SessionKey(namespace="test", session_id="s1")
@@ -62,13 +100,13 @@ async def test_orchestrator_stream_should_error_when_no_query_and_no_resume_valu
         events.append(event)
 
     assert len(events) == 1
-    assert events[0]["event"] == "error"
-    assert "无效调用" in events[0]["data"]["detail"]
+    assert events[0]["event"] == SseEventType.ERROR
+    assert "无效调用" in events[0]["error"]["message"]
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_stream_should_emit_start_event_with_query() -> None:
-    """有 query 时应发送 start 事件"""
+async def test_orchestrator_stream_should_emit_result_event_with_query() -> None:
+    """有 query 时应发送 result 事件"""
     graph = _MockStateGraph(events=[])
 
     orchestrator = Orchestrator(
@@ -79,6 +117,7 @@ async def test_orchestrator_stream_should_emit_start_event_with_query() -> None:
         agent_ids=["agent1"],
         checkpointer=None,
         store=None,
+        event_bus=EventBus(),
     )
 
     key = SessionKey(namespace="test", session_id="s1")
@@ -87,15 +126,14 @@ async def test_orchestrator_stream_should_emit_start_event_with_query() -> None:
     async for event in orchestrator.stream(query="hello", key=key):
         events.append(event)
 
-    # 应该有 start 和 result 事件
+    # 应该只有 result 事件
     event_types = [e["event"] for e in events]
-    assert "start" in event_types
-    assert "result" in event_types
+    assert event_types == [SseEventType.RESULT]
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_stream_start_event_should_contain_session_info() -> None:
-    """start 事件应包含会话信息"""
+async def test_orchestrator_stream_result_event_should_contain_session_info() -> None:
+    """result 事件应包含会话信息"""
     graph = _MockStateGraph(events=[])
 
     orchestrator = Orchestrator(
@@ -106,6 +144,7 @@ async def test_orchestrator_stream_start_event_should_contain_session_info() -> 
         agent_ids=["entry"],
         checkpointer=None,
         store=None,
+        event_bus=EventBus(),
     )
 
     key = SessionKey(namespace="ns1", session_id="session123")
@@ -114,8 +153,57 @@ async def test_orchestrator_stream_start_event_should_contain_session_info() -> 
     async for event in orchestrator.stream(query="test", key=key):
         events.append(event)
 
-    start_event = next(e for e in events if e["event"] == "start")
-    assert start_event["data"]["session_id"] == "session123"
-    assert start_event["data"]["namespace"] == "ns1"
-    assert start_event["data"]["team"] == "my_team"
-    assert start_event["data"]["entry_agent"] == "entry"
+    result_event = next(e for e in events if e["event"] == SseEventType.RESULT)
+    assert result_event["session_id"] == "session123"
+    assert result_event["namespace"] == "ns1"
+
+
+@dataclass(slots=True)
+class _MockStateSnapshot:
+    values: dict
+    tasks: list | None = None
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_stream_should_cleanup_store_and_state_on_result() -> None:
+    """完成后应清理 deliverables Store，并清空 state 引用"""
+    store = _StubStore()
+    await store.aput(("deliverables", "test", "s1", "latest"), "agent1", {"ok": True})
+
+    state = _MockStateSnapshot(
+        values={
+            "deliverable_keys": ["agent1"],
+            "deliverable_versions": {"agent1": 1},
+            "todo": {"items": [{"id": "t1"}]},
+        },
+        tasks=[],
+    )
+    graph = _MockStateGraph(events=[], state=state)
+
+    orchestrator = Orchestrator(
+        namespace="test",
+        name="test_team",
+        graph=graph,
+        entry_agent_id="agent1",
+        agent_ids=["agent1"],
+        checkpointer=None,
+        store=store,
+        event_bus=EventBus(),
+    )
+
+    key = SessionKey(namespace="test", session_id="s1")
+    events = []
+    async for event in orchestrator.stream(query="hello", key=key):
+        events.append(event)
+
+    event_types = [e["event"] for e in events]
+    assert "result" in event_types
+
+    assert await store.asearch(("deliverables", "test", "s1", "latest")) == []
+
+    compiled = orchestrator._compiled_graph
+    assert compiled.updated
+    last_update = compiled.updated[-1]
+    assert last_update["todo"] is None
+    assert last_update["deliverable_keys"] == []
+    assert last_update["deliverable_versions"] == {}

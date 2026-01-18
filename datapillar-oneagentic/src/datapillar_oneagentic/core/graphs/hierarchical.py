@@ -36,9 +36,9 @@ def build_hierarchical_graph(
     manager_id = entry_agent_id
     subordinate_ids = [aid for aid in agent_ids if aid != manager_id]
 
-    # Manager 节点：可以委派到任何下属
+    # Manager 节点：通过 Command.goto 委派到下属或结束
     manager_node = create_agent_node(manager_id)
-    graph.add_node(manager_id, manager_node, destinations=tuple(subordinate_ids))
+    graph.add_node(manager_id, manager_node, destinations=(*subordinate_ids, END))
 
     # 下属节点：执行完返回 Manager
     for sub_id in subordinate_ids:
@@ -50,24 +50,7 @@ def build_hierarchical_graph(
     # 入口：从 Manager 开始
     graph.set_entry_point(manager_id)
 
-    # Manager 执行后的路由：继续委派、再次执行、或结束
-    route_map = {sub_id: sub_id for sub_id in subordinate_ids}
-    route_map[manager_id] = manager_id  # Manager 可以再次执行自己
-    route_map["end"] = END
-    graph.add_conditional_edges(
-        manager_id,
-        _route_by_active_agent(agent_ids),
-        route_map,
-    )
+    # Manager 未委派时默认结束
+    graph.add_edge(manager_id, END)
 
     return graph
-
-
-def _route_by_active_agent(agent_ids: list[str]):
-    """创建根据 active_agent 路由的函数"""
-    def router(state) -> str:
-        active = state.get("active_agent")
-        if active and active in agent_ids:
-            return active
-        return "end"
-    return router

@@ -545,6 +545,7 @@ function EditValueDomainModal({
                 { value: 'BUILTIN', label: '内置级 (BUILTIN)' }
               ]}
               dropdownHeader="选择值域级别"
+              size="sm"
             />
           </div>
         </div>

@@ -31,9 +31,9 @@ export DATAPILLAR_EMBEDDING__API_KEY="sk-xxx"
 
 代码配置示例：
 ```python
-from datapillar_oneagentic import datapillar_configure
+from datapillar_oneagentic import DatapillarConfig
 
-datapillar_configure(
+config = DatapillarConfig(
     llm={"api_key": "sk-xxx", "model": "gpt-4o"},
     agent={"max_steps": 50},
 )
@@ -45,14 +45,16 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from datapillar_oneagentic.core.config import AgentConfig, ContextConfig
 from datapillar_oneagentic.experience.config import LearningConfig
+from datapillar_oneagentic.knowledge.config import KnowledgeConfig
 from datapillar_oneagentic.providers.llm.config import EmbeddingConfig, LLMConfig
+from datapillar_oneagentic.storage.config import VectorStoreConfig
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +149,7 @@ class DatapillarConfig(BaseSettings):
     )
 
     # 配置文件路径（可选，不指定则自动查找）
-    config_file: ClassVar[Path | None] = None
+    config_file: Path | None = Field(default=None, exclude=True)
 
     llm: LLMConfig = Field(default_factory=LLMConfig)
     """LLM 配置"""
@@ -158,11 +160,17 @@ class DatapillarConfig(BaseSettings):
     context: ContextConfig = Field(default_factory=ContextConfig)
     """上下文配置"""
 
+    vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
+    """向量数据库配置（知识/经验共用）"""
+
     agent: AgentConfig = Field(default_factory=AgentConfig)
     """Agent 执行配置"""
 
     learning: LearningConfig = Field(default_factory=LearningConfig)
     """经验学习配置"""
+
+    knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
+    """知识配置"""
 
     verbose: bool = Field(default=False, description="是否输出详细日志")
     """详细日志开关"""
@@ -187,8 +195,13 @@ class DatapillarConfig(BaseSettings):
         2. 环境变量（env_settings）
         3. 代码传入（init_settings）- 最低优先级
         """
+        init_data = init_settings()
+        config_file = init_data.get("config_file")
         return (
-            FileConfigSource(settings_cls, cls.config_file),  # 配置文件（最高优先级）
+            FileConfigSource(
+                settings_cls,
+                Path(config_file) if config_file else None,
+            ),  # 配置文件（最高优先级）
             env_settings,  # 环境变量
             init_settings,  # 代码传入（最低优先级）
         )
@@ -234,11 +247,6 @@ class ConfigurationError(Exception):
     pass
 
 
-# === 全局配置实例 ===
-
-_config: DatapillarConfig | None = None
-
-
 def datapillar_configure(
     config_file: str | Path | None = None,
     **kwargs,
@@ -256,75 +264,43 @@ def datapillar_configure(
         config_file: 配置文件路径（可选，支持 toml/yaml/json）
         **kwargs: 配置项（作为默认值，会被配置文件和环境变量覆盖）
 
-    示例：
+    示例（显式传递给 Datapillar）：
     ```python
     # 方式1：指定配置文件（最高优先级）
-    datapillar_configure(config_file="config.toml")
+    config = datapillar_configure(config_file="config.toml")
 
     # 方式2：代码直接配置（作为默认值）
-    datapillar_configure(
+    config = datapillar_configure(
         llm={"api_key": "sk-xxx", "model": "gpt-4o"},
         agent={"max_steps": 50},
     )
 
     # 方式3：混合使用（配置文件会覆盖代码传入）
-    datapillar_configure(
+    config = datapillar_configure(
         config_file="config.toml",
         llm={"api_key": "sk-default"},  # 如果配置文件有 api_key，会被覆盖
     )
     ```
     """
-    global _config
-
-    # 设置配置文件路径
-    if config_file:
-        DatapillarConfig.config_file = Path(config_file)
-
-    # 创建配置实例
-    _config = DatapillarConfig(**kwargs)
+    config = DatapillarConfig(
+        config_file=Path(config_file) if config_file else None,
+        **kwargs,
+    )
 
     # 设置日志级别
-    if _config.verbose:
+    if config.verbose:
         logging.getLogger("datapillar_oneagentic").setLevel(logging.DEBUG)
     else:
         logging.getLogger("datapillar_oneagentic").setLevel(
-            getattr(logging, _config.log_level.upper(), logging.INFO)
+            getattr(logging, config.log_level.upper(), logging.INFO)
         )
 
     # 日志输出配置状态
-    llm_status = "✓" if _config.is_llm_configured() else "✗"
-    embedding_status = "✓" if _config.is_embedding_configured() else "✗"
+    llm_status = "已配置" if config.is_llm_configured() else "未配置"
+    embedding_status = "已配置" if config.is_embedding_configured() else "未配置"
     logger.info(
-        f"配置已加载: LLM[{llm_status}] model={_config.llm.model}, "
-        f"Embedding[{embedding_status}] model={_config.embedding.model}"
+        f"配置已加载: LLM={llm_status} model={config.llm.model}, "
+        f"Embedding={embedding_status} model={config.embedding.model}"
     )
 
-    return _config
-
-
-def get_config() -> DatapillarConfig:
-    """获取配置（自动从配置文件和环境变量加载）"""
-    global _config
-    if _config is None:
-        _config = DatapillarConfig()
-    return _config
-
-
-def reset_config() -> None:
-    """重置配置（仅用于测试）"""
-    global _config
-    _config = None
-    DatapillarConfig.config_file = None
-
-
-class _DatapillarProxy:
-    """配置代理，支持属性访问"""
-
-    def __getattr__(self, name: str):
-        return getattr(get_config(), name)
-
-    def __repr__(self) -> str:
-        return repr(get_config())
-
-
-datapillar = _DatapillarProxy()
+    return config

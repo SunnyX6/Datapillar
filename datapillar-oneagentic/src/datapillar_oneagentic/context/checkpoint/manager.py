@@ -10,7 +10,7 @@ import logging
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from datapillar_oneagentic.context.types import CheckpointType
+from datapillar_oneagentic.context.checkpoint.types import CheckpointType
 from datapillar_oneagentic.core.types import SessionKey
 
 if TYPE_CHECKING:

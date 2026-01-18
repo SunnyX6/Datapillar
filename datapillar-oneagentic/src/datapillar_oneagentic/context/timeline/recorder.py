@@ -13,9 +13,9 @@ import threading
 from collections import defaultdict
 from typing import Any
 
-from datapillar_oneagentic.context.types import EventType
+from datapillar_oneagentic.events.constants import EventType
 from datapillar_oneagentic.core.types import SessionKey
-from datapillar_oneagentic.events import event_bus
+from datapillar_oneagentic.events import EventBus
 from datapillar_oneagentic.events.types import (
     AgentCompletedEvent,
     AgentFailedEvent,
@@ -24,9 +24,6 @@ from datapillar_oneagentic.events.types import (
     DelegationStartedEvent,
     SessionCompletedEvent,
     SessionStartedEvent,
-    ToolCalledEvent,
-    ToolCompletedEvent,
-    ToolFailedEvent,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,7 +38,7 @@ class TimelineRecorder:
 
     使用示例：
     ```python
-    recorder = TimelineRecorder()
+    recorder = TimelineRecorder(event_bus)
     recorder.register()  # 注册 EventBus 处理器
 
     # 事件自动记录到缓冲区...
@@ -54,21 +51,9 @@ class TimelineRecorder:
     ```
     """
 
-    _instance: TimelineRecorder | None = None
-    _lock = threading.Lock()
-
-    def __new__(cls) -> TimelineRecorder:
-        """单例模式"""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    instance = super().__new__(cls)
-                    instance._initialize()
-                    cls._instance = instance
-        return cls._instance
-
-    def _initialize(self) -> None:
+    def __init__(self, event_bus: EventBus) -> None:
         """初始化"""
+        self._event_bus = event_bus
         self._buffer: dict[str, list[dict]] = defaultdict(list)
         self._buffer_lock = threading.Lock()
         self._registered = False
@@ -79,22 +64,17 @@ class TimelineRecorder:
             return
 
         # Agent 事件
-        event_bus.register(AgentStartedEvent, self._on_agent_started)
-        event_bus.register(AgentCompletedEvent, self._on_agent_completed)
-        event_bus.register(AgentFailedEvent, self._on_agent_failed)
-
-        # 工具事件
-        event_bus.register(ToolCalledEvent, self._on_tool_called)
-        event_bus.register(ToolCompletedEvent, self._on_tool_completed)
-        event_bus.register(ToolFailedEvent, self._on_tool_failed)
+        self._event_bus.register(AgentStartedEvent, self._on_agent_started)
+        self._event_bus.register(AgentCompletedEvent, self._on_agent_completed)
+        self._event_bus.register(AgentFailedEvent, self._on_agent_failed)
 
         # 会话事件
-        event_bus.register(SessionStartedEvent, self._on_session_started)
-        event_bus.register(SessionCompletedEvent, self._on_session_completed)
+        self._event_bus.register(SessionStartedEvent, self._on_session_started)
+        self._event_bus.register(SessionCompletedEvent, self._on_session_completed)
 
         # 委派事件
-        event_bus.register(DelegationStartedEvent, self._on_delegation_started)
-        event_bus.register(DelegationCompletedEvent, self._on_delegation_completed)
+        self._event_bus.register(DelegationStartedEvent, self._on_delegation_started)
+        self._event_bus.register(DelegationCompletedEvent, self._on_delegation_completed)
 
         self._registered = True
 
@@ -163,46 +143,6 @@ class TimelineRecorder:
             },
         )
 
-    def _on_tool_called(self, source: Any, event: ToolCalledEvent) -> None:
-        """工具调用"""
-        self._record(
-            event.key,
-            {
-                "event_type": EventType.TOOL_CALL.value,
-                "agent_id": event.agent_id,
-                "content": f"调用工具 [{event.tool_name}]",
-                "metadata": {"tool_name": event.tool_name, "tool_input": event.tool_input},
-            },
-        )
-
-    def _on_tool_completed(self, source: Any, event: ToolCompletedEvent) -> None:
-        """工具完成"""
-        self._record(
-            event.key,
-            {
-                "event_type": EventType.TOOL_RESULT.value,
-                "agent_id": event.agent_id,
-                "content": f"工具 [{event.tool_name}] 执行完成",
-                "duration_ms": int(event.duration_ms),
-                "metadata": {
-                    "tool_name": event.tool_name,
-                    "output": str(event.tool_output)[:200] if event.tool_output else "",
-                },
-            },
-        )
-
-    def _on_tool_failed(self, source: Any, event: ToolFailedEvent) -> None:
-        """工具失败"""
-        self._record(
-            event.key,
-            {
-                "event_type": EventType.TOOL_ERROR.value,
-                "agent_id": event.agent_id,
-                "content": f"工具 [{event.tool_name}] 执行失败: {event.error}",
-                "metadata": {"tool_name": event.tool_name, "error": event.error},
-            },
-        )
-
     def _on_session_started(self, source: Any, event: SessionStartedEvent) -> None:
         """会话开始"""
         self._record(
@@ -261,7 +201,3 @@ class TimelineRecorder:
                 },
             },
         )
-
-
-# 全局单例
-timeline_recorder = TimelineRecorder()

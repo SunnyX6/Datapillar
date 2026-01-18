@@ -661,7 +661,7 @@ export function MetadataView() {
       )}
 
       <aside
-        className={`flex-shrink-0 h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden transition-[width,opacity] duration-300 ${
+        className={`flex-shrink-0 h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden transition-[width,opacity] duration-300 flex flex-col min-h-0 ${
           isSideCollapsed ? 'w-0 min-w-0 opacity-0 pointer-events-none' : 'w-panel-responsive opacity-100'
         }`}
       >
@@ -679,7 +679,7 @@ export function MetadataView() {
             <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">元数据中心</span>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto custom-scrollbar py-2">
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar py-2">
           <Tree
             catalogs={filteredCatalogs}
             expandedNodes={expandedNodes}

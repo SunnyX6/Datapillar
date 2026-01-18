@@ -99,4 +99,8 @@ public class MetricVersionMetaSQLProviderFactory {
       @Param("oldMetricVersionMeta") MetricVersionPO oldMetricVersionPO) {
     return getProvider().updateMetricVersionMeta(newMetricVersionPO, oldMetricVersionPO);
   }
+
+  public static String countMetricVersionsByRefTableId(@Param("refTableId") Long refTableId) {
+    return getProvider().countMetricVersionsByRefTableId(refTableId);
+  }
 }

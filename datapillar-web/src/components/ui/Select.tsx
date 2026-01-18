@@ -19,6 +19,7 @@ export interface SelectProps {
   /** 下拉卡片头部提示文字 */
   dropdownHeader?: string
   disabled?: boolean
+  size?: 'md' | 'sm'
   className?: string
 }
 
@@ -29,12 +30,20 @@ export function Select({
   placeholder = '请选择',
   dropdownHeader,
   disabled = false,
+  size = 'md',
   className = ''
 }: SelectProps) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const isSmall = size === 'sm'
+  const triggerSizeClass = isSmall
+    ? 'px-3 py-2 text-body-sm rounded-xl border-slate-300 dark:border-slate-600'
+    : 'px-3 py-1.5 text-sm rounded-md border-slate-200 dark:border-slate-700'
+  const optionSizeClass = isSmall ? 'px-3 py-2 text-body-sm' : 'px-3 py-2 text-sm'
+  const headerTextClass = isSmall ? 'text-caption' : 'text-xs'
+  const iconSize = isSmall ? 12 : 14
 
   const selectedOption = options.find((opt) => opt.value === value)
 
@@ -84,12 +93,12 @@ export function Select({
         type="button"
         disabled={disabled}
         onClick={() => setOpen(!open)}
-        className={`w-full flex items-center justify-between px-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all ${className}`}
+        className={`w-full flex items-center justify-between bg-white dark:bg-slate-800 border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all ${triggerSizeClass} ${className}`}
       >
         <span className={`truncate ${selectedOption ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'}`}>
           {selectedOption?.label || placeholder}
         </span>
-        <ChevronDown size={14} className={`text-slate-400 transition-transform flex-shrink-0 ml-2 ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown size={iconSize} className={`text-slate-400 transition-transform flex-shrink-0 ml-2 ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && dropdownPos && createPortal(
@@ -100,7 +109,7 @@ export function Select({
         >
           {dropdownHeader && (
             <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{dropdownHeader}</span>
+              <span className={`${headerTextClass} font-medium text-slate-500 dark:text-slate-400`}>{dropdownHeader}</span>
             </div>
           )}
           <div className="max-h-48 overflow-y-auto py-1">
@@ -114,7 +123,7 @@ export function Select({
                     onChange(option.value)
                     setOpen(false)
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${
+                  className={`w-full flex items-center justify-between text-left transition-colors ${optionSizeClass} ${
                     isSelected
                       ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
                       : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'

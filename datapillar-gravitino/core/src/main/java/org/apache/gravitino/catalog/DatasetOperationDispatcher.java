@@ -93,11 +93,12 @@ public class DatasetOperationDispatcher extends OperationDispatcher implements D
       String unit,
       String[] parentMetricCodes,
       String calculationFormula,
+      Long refTableId,
       String refCatalogName,
       String refSchemaName,
       String refTableName,
-      String measureColumns,
-      String filterColumns)
+      String measureColumnIds,
+      String filterColumnIds)
       throws NoSuchSchemaException, MetricAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     // 确保 properties 不为 null，以便生成 StringIdentifier
@@ -126,11 +127,12 @@ public class DatasetOperationDispatcher extends OperationDispatcher implements D
                                 unit,
                                 parentMetricCodes,
                                 calculationFormula,
+                                refTableId,
                                 refCatalogName,
                                 refSchemaName,
                                 refTableName,
-                                measureColumns,
-                                filterColumns)),
+                                measureColumnIds,
+                                filterColumnIds)),
                 NoSuchSchemaException.class,
                 MetricAlreadyExistsException.class));
   }
@@ -237,11 +239,9 @@ public class DatasetOperationDispatcher extends OperationDispatcher implements D
       String unitName,
       String[] parentMetricCodes,
       String calculationFormula,
-      String refCatalogName,
-      String refSchemaName,
-      String refTableName,
-      String measureColumns,
-      String filterColumns)
+      Long refTableId,
+      String measureColumnIds,
+      String filterColumnIds)
       throws NoSuchMetricVersionException {
     return TreeLockUtils.doWithTreeLock(
         ident,
@@ -264,11 +264,9 @@ public class DatasetOperationDispatcher extends OperationDispatcher implements D
                                 unitName,
                                 parentMetricCodes,
                                 calculationFormula,
-                                refCatalogName,
-                                refSchemaName,
-                                refTableName,
-                                measureColumns,
-                                filterColumns)),
+                                refTableId,
+                                measureColumnIds,
+                                filterColumnIds)),
                 NoSuchMetricVersionException.class));
   }
 

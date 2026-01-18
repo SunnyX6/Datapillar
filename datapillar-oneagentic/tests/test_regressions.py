@@ -6,9 +6,13 @@ from pydantic import BaseModel, Field
 
 from datapillar_oneagentic.core.agent import AgentSpec
 from datapillar_oneagentic.core.context import AgentContext
+from datapillar_oneagentic.exception import AgentError, AgentErrorCategory
 from datapillar_oneagentic.core.nodes import NodeFactory
+from datapillar_oneagentic.core.status import FailureKind
 from datapillar_oneagentic.core.types import AgentResult
 from datapillar_oneagentic.context.compaction.compact_policy import CompactResult
+from datapillar_oneagentic.context.timeline.recorder import TimelineRecorder
+from datapillar_oneagentic.events import EventBus
 
 
 class _OutputSchema(BaseModel):
@@ -72,13 +76,16 @@ class _DummyCompactor:
 
 
 @pytest.mark.asyncio
-async def test_node_factory_should_share_messages_on_failed_result(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "datapillar_oneagentic.context.builder.get_compactor",
-        lambda _policy=None: _DummyCompactor(),
+async def test_node_factory_should_fail_fast_on_failed_result() -> None:
+    event_bus = EventBus()
+    timeline_recorder = TimelineRecorder(event_bus)
+    nf = NodeFactory(
+        agent_specs=[],
+        agent_ids=["a1"],
+        get_executor=lambda _aid: None,
+        compactor=_DummyCompactor(),
+        timeline_recorder=timeline_recorder,
     )
-
-    nf = NodeFactory(agent_specs=[], agent_ids=["a1"], get_executor=lambda _aid: None)
 
     state = {
         "namespace": "ns",
@@ -89,12 +96,9 @@ async def test_node_factory_should_share_messages_on_failed_result(monkeypatch) 
     }
 
     result = AgentResult.failed(error="需要补充信息", messages=[HumanMessage(content="补充内容")])
-    cmd = await nf._handle_result(state=state, agent_id="a1", result=result, store=None)  # type: ignore[arg-type]
+    with pytest.raises(AgentError) as exc_info:
+        await nf._handle_result(state=state, agent_id="a1", result=result, store=None)  # type: ignore[arg-type]
 
-    update = getattr(cmd, "update", None)
-    assert isinstance(update, dict)
-    assert update.get("last_agent_status") == "failed"
-    assert any(
-        isinstance(msg, HumanMessage) and msg.content == "补充内容"
-        for msg in update.get("messages", [])
-    )
+    error = exc_info.value
+    assert error.category == AgentErrorCategory.BUSINESS
+    assert error.failure_kind == FailureKind.BUSINESS

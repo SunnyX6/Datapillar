@@ -1,7 +1,7 @@
 """
 Context Compaction 子模块
 
-上下文压缩，由 ContextLengthExceededError 异常触发。
+上下文压缩，由 LLM 上下文超限触发。
 
 核心组件：
 - Compactor: 压缩器，直接操作 list[BaseMessage]
@@ -11,15 +11,16 @@ Context Compaction 子模块
 使用示例：
 ```python
 from datapillar_oneagentic.context.compaction import get_compactor
-from datapillar_oneagentic.resilience import ContextLengthExceededError
+from datapillar_oneagentic.exception import LLMError, LLMErrorCategory
 
-compactor = get_compactor()
+compactor = get_compactor(llm=llm)
 
 try:
     result = await llm.ainvoke(messages)
-except ContextLengthExceededError:
-    compressed_messages, result = await compactor.compact(messages)
-    # 用压缩后的 messages 重试
+except LLMError as exc:
+    if exc.category == LLMErrorCategory.CONTEXT:
+        compressed_messages, result = await compactor.compact(messages)
+        # 用压缩后的 messages 重试
 ```
 """
 
@@ -29,7 +30,6 @@ from datapillar_oneagentic.context.compaction.compact_policy import (
 )
 from datapillar_oneagentic.context.compaction.compactor import (
     Compactor,
-    clear_compactor_cache,
     get_compactor,
 )
 
@@ -37,7 +37,6 @@ __all__ = [
     # 压缩器
     "Compactor",
     "get_compactor",
-    "clear_compactor_cache",
     # 策略和结果
     "CompactPolicy",
     "CompactResult",

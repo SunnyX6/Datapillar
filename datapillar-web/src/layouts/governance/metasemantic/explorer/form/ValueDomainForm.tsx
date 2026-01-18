@@ -155,6 +155,7 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
               onChange={(value) => setForm({ ...form, domainType: value as ValueDomainType })}
               options={DOMAIN_TYPE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
               dropdownHeader="选择值域类型"
+              size="sm"
             />
           </div>
           <div>
@@ -166,6 +167,7 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
               onChange={(value) => setForm({ ...form, domainLevel: value as ValueDomainLevel })}
               options={DOMAIN_LEVEL_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
               dropdownHeader="选择值域级别"
+              size="sm"
             />
           </div>
         </div>

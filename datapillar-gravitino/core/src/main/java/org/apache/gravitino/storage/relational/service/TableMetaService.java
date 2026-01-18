@@ -31,7 +31,9 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.storage.relational.mapper.MetricVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
@@ -212,6 +214,17 @@ public class TableMetaService {
         CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
     Long tableId = getTableIdBySchemaIdAndName(schemaId, tableName);
+
+    // 检查是否有指标版本引用该表
+    Integer metricRefCount =
+        SessionUtils.getWithoutCommit(
+            MetricVersionMetaMapper.class,
+            mapper -> mapper.countMetricVersionsByRefTableId(tableId));
+    if (metricRefCount != null && metricRefCount > 0) {
+      throw new NonEmptyEntityException(
+          "Table %s is referenced by %d metric version(s), please remove the metric references first",
+          identifier, metricRefCount);
+    }
 
     AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(

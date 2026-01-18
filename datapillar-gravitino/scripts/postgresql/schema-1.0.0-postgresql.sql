@@ -932,11 +932,9 @@ CREATE TABLE IF NOT EXISTS metric_version_info (
     metric_unit VARCHAR(64) DEFAULT NULL,
     parent_metric_ids TEXT DEFAULT NULL,
     calculation_formula TEXT DEFAULT NULL,
-    ref_catalog_name VARCHAR(128) DEFAULT NULL,
-    ref_schema_name VARCHAR(128) DEFAULT NULL,
-    ref_table_name VARCHAR(128) DEFAULT NULL,
-    measure_columns TEXT DEFAULT NULL,
-    filter_columns TEXT DEFAULT NULL,
+    ref_table_id BIGINT DEFAULT NULL,
+    measure_column_ids TEXT DEFAULT NULL,
+    filter_column_ids TEXT DEFAULT NULL,
     version_properties TEXT DEFAULT NULL,
     audit_info TEXT NOT NULL,
     deleted_at BIGINT NOT NULL DEFAULT 0,
@@ -948,6 +946,7 @@ CREATE INDEX IF NOT EXISTS metric_version_info_idx_metric_id ON metric_version_i
 CREATE INDEX IF NOT EXISTS metric_version_info_idx_metalake ON metric_version_info (metalake_id);
 CREATE INDEX IF NOT EXISTS metric_version_info_idx_catalog ON metric_version_info (catalog_id);
 CREATE INDEX IF NOT EXISTS metric_version_info_idx_schema ON metric_version_info (schema_id);
+CREATE INDEX IF NOT EXISTS metric_version_info_idx_ref_table ON metric_version_info (ref_table_id);
 COMMENT ON TABLE metric_version_info IS '指标版本快照表';
 COMMENT ON COLUMN metric_version_info.id IS 'auto increment id';
 COMMENT ON COLUMN metric_version_info.metalake_id IS 'metalake id';
@@ -963,10 +962,8 @@ COMMENT ON COLUMN metric_version_info.metric_comment IS 'metric comment snapshot
 COMMENT ON COLUMN metric_version_info.metric_unit IS 'metric unit, e.g., 元, 个, %';
 COMMENT ON COLUMN metric_version_info.parent_metric_ids IS 'parent metric ids in JSON array format, e.g., [123, 456]';
 COMMENT ON COLUMN metric_version_info.calculation_formula IS 'calculation formula, e.g., metric1 / metric2 * 100';
-COMMENT ON COLUMN metric_version_info.ref_catalog_name IS 'referenced catalog name for ATOMIC metric';
-COMMENT ON COLUMN metric_version_info.ref_schema_name IS 'referenced schema name for ATOMIC metric';
-COMMENT ON COLUMN metric_version_info.ref_table_name IS 'referenced table name for ATOMIC metric';
-COMMENT ON COLUMN metric_version_info.measure_columns IS 'measure columns JSON array, e.g., [{name, type, comment}]';
-COMMENT ON COLUMN metric_version_info.filter_columns IS 'filter columns JSON array, e.g., [{name, type, values:[{key,label}]}]';
+COMMENT ON COLUMN metric_version_info.ref_table_id IS 'referenced table id for ATOMIC metric';
+COMMENT ON COLUMN metric_version_info.measure_column_ids IS 'measure column ids JSON array, e.g., [123, 456]';
+COMMENT ON COLUMN metric_version_info.filter_column_ids IS 'filter column ids JSON array, e.g., [789, 012]';
 COMMENT ON COLUMN metric_version_info.version_properties IS 'version properties in JSON format';
 COMMENT ON COLUMN metric_version_info.deleted_at IS 'version deleted at';

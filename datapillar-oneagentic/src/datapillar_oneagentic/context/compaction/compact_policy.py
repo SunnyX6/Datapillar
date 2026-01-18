@@ -2,7 +2,7 @@
 压缩策略配置
 
 定义压缩的保留规则、摘要模板等。
-配置项从全局 datapillar.context 读取，也可手动覆盖。
+配置由调用方显式传入。
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ class CompactPolicy(BaseModel):
     压缩策略配置
 
     控制如何压缩。
-    默认值从全局配置读取，也可手动覆盖。
+    默认值由调用方传入，也可手动覆盖。
     """
 
     min_keep_entries: int | None = Field(
@@ -53,16 +53,11 @@ class CompactPolicy(BaseModel):
         description="压缩提示词模板",
     )
 
-    def _get_context_config(self):
-        """获取全局上下文配置"""
-        from datapillar_oneagentic.config import datapillar
-        return datapillar.context
-
     def get_min_keep_entries(self) -> int:
         """获取最少保留消息数"""
-        if self.min_keep_entries is not None:
-            return self.min_keep_entries
-        return self._get_context_config().compact_min_keep_entries
+        if self.min_keep_entries is None:
+            raise ValueError("compact_min_keep_entries 未配置")
+        return self.min_keep_entries
 
 
 class CompactResult(BaseModel):
@@ -83,4 +78,3 @@ class CompactResult(BaseModel):
     def no_action(cls, reason: str = "无需压缩") -> CompactResult:
         """创建无操作结果"""
         return cls(success=True, error=reason)
-

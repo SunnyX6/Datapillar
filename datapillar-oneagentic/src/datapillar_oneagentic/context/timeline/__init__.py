@@ -5,10 +5,7 @@ Context Timeline 子模块
 """
 
 from datapillar_oneagentic.context.timeline.entry import TimelineEntry
-from datapillar_oneagentic.context.timeline.recorder import (
-    TimelineRecorder,
-    timeline_recorder,
-)
+from datapillar_oneagentic.context.timeline.recorder import TimelineRecorder
 from datapillar_oneagentic.context.timeline.time_travel import (
     TimeTravelRequest,
     TimeTravelResult,
@@ -21,5 +18,4 @@ __all__ = [
     "TimeTravelRequest",
     "TimeTravelResult",
     "TimelineRecorder",
-    "timeline_recorder",
 ]

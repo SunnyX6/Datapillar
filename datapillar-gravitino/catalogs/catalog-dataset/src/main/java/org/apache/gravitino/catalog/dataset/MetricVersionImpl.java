@@ -42,8 +42,8 @@ public class MetricVersionImpl implements MetricVersion, Auditable {
   private String refCatalogName;
   private String refSchemaName;
   private String refTableName;
-  private String measureColumns;
-  private String filterColumns;
+  private String measureColumnIds;
+  private String filterColumnIds;
   private Map<String, String> properties;
   private AuditInfo auditInfo;
 
@@ -125,13 +125,13 @@ public class MetricVersionImpl implements MetricVersion, Auditable {
   }
 
   @Override
-  public String measureColumns() {
-    return measureColumns;
+  public String measureColumnIds() {
+    return measureColumnIds;
   }
 
   @Override
-  public String filterColumns() {
-    return filterColumns;
+  public String filterColumnIds() {
+    return filterColumnIds;
   }
 
   @Override
@@ -227,13 +227,13 @@ public class MetricVersionImpl implements MetricVersion, Auditable {
       return this;
     }
 
-    public Builder withMeasureColumns(String measureColumns) {
-      metricVersion.measureColumns = measureColumns;
+    public Builder withMeasureColumnIds(String measureColumnIds) {
+      metricVersion.measureColumnIds = measureColumnIds;
       return this;
     }
 
-    public Builder withFilterColumns(String filterColumns) {
-      metricVersion.filterColumns = filterColumns;
+    public Builder withFilterColumnIds(String filterColumnIds) {
+      metricVersion.filterColumnIds = filterColumnIds;
       return this;
     }
 

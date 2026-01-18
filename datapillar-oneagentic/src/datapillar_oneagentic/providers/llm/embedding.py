@@ -6,11 +6,12 @@ Embedding 统一调用层
 特性：
 - 统一接口，屏蔽模型差异
 - 支持批量向量化
-- 自动从配置获取参数
+- 基于团队配置创建实例
 """
 
+from __future__ import annotations
+
 import logging
-import os
 import threading
 from dataclasses import dataclass
 from typing import Any
@@ -63,7 +64,7 @@ class EmbeddingFactory:
 
             return OpenAIEmbeddings(**kwargs)
 
-        elif provider == "glm":
+        if provider == "glm":
             from langchain_community.embeddings import ZhipuAIEmbeddings
 
             kwargs = {
@@ -75,140 +76,68 @@ class EmbeddingFactory:
 
             return ZhipuAIEmbeddings(**kwargs)
 
-        else:
-            raise ValueError(f"不支持的 Embedding 提供商: {provider}")
+        raise ValueError(f"不支持的 Embedding 提供商: {provider}")
 
 
-# ==================== Embedding 实例缓存 ====================
-_embedding_cache: dict[tuple, Embeddings] = {}
-_embedding_cache_lock = threading.Lock()
-_EMBEDDING_CACHE_MAX_SIZE = 20
-
-
-def _cleanup_embedding_cache_if_needed() -> None:
-    """如果缓存超限，清理最旧的一半（需持有锁）"""
-    if len(_embedding_cache) >= _EMBEDDING_CACHE_MAX_SIZE:
-        keys = list(_embedding_cache.keys())
-        for key in keys[: len(keys) // 2]:
-            _embedding_cache.pop(key, None)
-
-
-def call_embedding() -> Embeddings:
+class EmbeddingProviderClient:
     """
-    统一的 Embedding 获取接口
+    Embedding 提供者（团队内使用）
 
-    返回 LangChain Embeddings 实例，可用于：
-    - embed_query(text): 向量化单个文本
-    - embed_documents(texts): 批量向量化
-
-    配置来源优先级：
-    1. datapillar_configure() 配置
-    2. 环境变量
-
-    Returns:
-        LangChain Embeddings 实例
-
-    Raises:
-        ValueError: 未找到可用配置
+    负责按配置创建 Embeddings 实例并做本地缓存。
     """
-    # 尝试从配置获取
-    config = _get_embedding_config()
 
-    if not config:
-        raise ValueError(
-            "Embedding 未配置！请通过以下方式配置：\n"
-            "1. datapillar_configure(embedding={...})\n"
-            "2. 环境变量 OPENAI_API_KEY + OPENAI_EMBEDDING_MODEL"
+    def __init__(self, config: EmbeddingConfig) -> None:
+        if not config.is_configured():
+            raise ValueError("Embedding 未配置，无法创建 EmbeddingProviderClient")
+        self._config = config
+        self._cache: dict[tuple, Embeddings] = {}
+        self._lock = threading.Lock()
+
+    def _build_model_config(self) -> EmbeddingModelConfig:
+        return EmbeddingModelConfig(
+            provider=self._config.provider,
+            model_name=self._config.model,
+            api_key=self._config.api_key,
+            base_url=self._config.base_url,
+            dimension=self._config.dimension,
         )
 
-    cache_key = (config.provider, config.model_name, config.api_key, config.base_url)
+    def get_embeddings(self) -> Embeddings:
+        """获取 Embeddings 实例（带缓存）"""
+        config = self._build_model_config()
+        cache_key = (
+            config.provider,
+            config.model_name,
+            config.api_key,
+            config.base_url,
+            config.dimension,
+        )
 
-    # 双重检查锁定
-    if cache_key in _embedding_cache:
-        return _embedding_cache[cache_key]
+        if cache_key in self._cache:
+            return self._cache[cache_key]
 
-    with _embedding_cache_lock:
-        if cache_key in _embedding_cache:
-            return _embedding_cache[cache_key]
+        with self._lock:
+            if cache_key in self._cache:
+                return self._cache[cache_key]
 
-        embeddings = EmbeddingFactory.create_embeddings(config)
-        logger.info(f"创建 Embedding 实例: provider={config.provider}, model={config.model_name}")
-
-        _cleanup_embedding_cache_if_needed()
-        _embedding_cache[cache_key] = embeddings
-        return embeddings
-
-
-def _get_embedding_config() -> EmbeddingModelConfig | None:
-    """获取 Embedding 配置"""
-    # 1. 尝试从 datapillar 配置获取
-    try:
-        from datapillar_oneagentic.config import datapillar
-
-        embedding_config: EmbeddingConfig = datapillar.embedding
-        if embedding_config.is_configured():
-            return EmbeddingModelConfig(
-                provider=embedding_config.provider,
-                model_name=embedding_config.model,
-                api_key=embedding_config.api_key,
-                base_url=embedding_config.base_url,
-                dimension=embedding_config.dimension,
+            embeddings = EmbeddingFactory.create_embeddings(config)
+            logger.info(
+                f"创建 Embedding 实例: provider={config.provider}, model={config.model_name}"
             )
-    except Exception:
-        pass
+            self._cache[cache_key] = embeddings
+            return embeddings
 
-    # 2. 尝试从环境变量获取（OpenAI）
-    openai_key = os.environ.get("OPENAI_API_KEY")
-    if openai_key:
-        return EmbeddingModelConfig(
-            provider="openai",
-            model_name=os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"),
-            api_key=openai_key,
-            base_url=os.environ.get("OPENAI_BASE_URL"),
-        )
+    async def embed_text(self, text: str) -> list[float]:
+        """向量化单个文本"""
+        embeddings = self.get_embeddings()
+        return await embeddings.aembed_query(text)
 
-    # 3. 尝试从环境变量获取（GLM）
-    glm_key = os.environ.get("GLM_API_KEY") or os.environ.get("ZHIPU_API_KEY")
-    if glm_key:
-        return EmbeddingModelConfig(
-            provider="glm",
-            model_name=os.environ.get("GLM_EMBEDDING_MODEL", "embedding-3"),
-            api_key=glm_key,
-        )
+    async def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        """批量向量化文本"""
+        embeddings = self.get_embeddings()
+        return await embeddings.aembed_documents(texts)
 
-    return None
-
-
-async def embed_text(text: str) -> list[float]:
-    """
-    向量化单个文本（异步便捷接口）
-
-    Args:
-        text: 待向量化的文本
-
-    Returns:
-        向量列表
-    """
-    embeddings = call_embedding()
-    return await embeddings.aembed_query(text)
-
-
-async def embed_texts(texts: list[str]) -> list[list[float]]:
-    """
-    批量向量化文本（异步便捷接口）
-
-    Args:
-        texts: 待向量化的文本列表
-
-    Returns:
-        向量列表的列表
-    """
-    embeddings = call_embedding()
-    return await embeddings.aembed_documents(texts)
-
-
-def clear_embedding_cache() -> None:
-    """清空 Embedding 实例缓存（测试用）"""
-    global _embedding_cache
-    with _embedding_cache_lock:
-        _embedding_cache.clear()
+    def clear_cache(self) -> None:
+        """清空 Embedding 实例缓存"""
+        with self._lock:
+            self._cache.clear()

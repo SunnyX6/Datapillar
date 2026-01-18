@@ -191,11 +191,12 @@ public class MetricOperations {
                     request.getUnit(),
                     request.getParentMetricCodes(),
                     request.getCalculationFormula(),
+                    request.getRefTableId(),
                     request.getRefCatalogName(),
                     request.getRefSchemaName(),
                     request.getRefTableName(),
-                    request.getMeasureColumns(),
-                    request.getFilterColumns());
+                    request.getMeasureColumnIds(),
+                    request.getFilterColumnIds());
             return Utils.ok(new MetricResponse(DTOConverters.toDTO(m)));
           });
 
@@ -404,11 +405,9 @@ public class MetricOperations {
                     request.getUnitName(),
                     request.getParentMetricCodes(),
                     request.getCalculationFormula(),
-                    request.getRefCatalogName(),
-                    request.getRefSchemaName(),
-                    request.getRefTableName(),
-                    request.getMeasureColumns(),
-                    request.getFilterColumns());
+                    request.getRefTableId(),
+                    request.getMeasureColumnIds(),
+                    request.getFilterColumnIds());
             return Utils.ok(new MetricVersionResponse(DTOConverters.toDTO(mv)));
           });
 

@@ -725,9 +725,9 @@ export function MetricFormRight({
               measureColumns={form.measureColumns}
               filterColumns={form.filterColumns}
               initialRef={{
-                catalog: form.refCatalog,
-                schema: form.refSchema,
-                table: form.refTable
+                catalog: form.refCatalogName,
+                schema: form.refSchemaName,
+                table: form.refTableName
               }}
               aiSuggestedMeasures={aiSuggestedMeasures}
               aiSuggestedFilters={aiSuggestedFilters}
@@ -756,9 +756,9 @@ export function MetricFormRight({
               measureColumns={form.measureColumns}
               filterColumns={form.filterColumns}
               initialRef={{
-                catalog: form.refCatalog,
-                schema: form.refSchema,
-                table: form.refTable
+                catalog: form.refCatalogName,
+                schema: form.refSchemaName,
+                table: form.refTableName
               }}
               aiSuggestedFilters={aiSuggestedFilters}
             />

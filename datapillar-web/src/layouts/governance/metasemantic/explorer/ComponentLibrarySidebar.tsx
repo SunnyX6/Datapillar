@@ -163,10 +163,10 @@ function CreateUnitModal({
         setSymbolDropdownPos({
           top: rect.top - Math.min(dropdownHeight, spaceAbove) - 4,
           left: rect.left,
-          width: Math.max(rect.width, 280)
+          width: rect.width
         })
       } else {
-        setSymbolDropdownPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 280) })
+        setSymbolDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
       }
     }
     updatePosition()
@@ -291,8 +291,12 @@ function CreateUnitModal({
       {symbolDropdownOpen && symbolDropdownPos && createPortal(
         <div
           ref={symbolDropdownRef}
-          style={{ top: symbolDropdownPos.top, left: symbolDropdownPos.left }}
-          className="fixed z-[1000000] min-w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden"
+          style={{
+            '--symbol-dropdown-top': `${symbolDropdownPos.top}px`,
+            '--symbol-dropdown-left': `${symbolDropdownPos.left}px`,
+            '--symbol-dropdown-width': `${symbolDropdownPos.width}px`
+          } as React.CSSProperties}
+          className="fixed z-[1000000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden top-[var(--symbol-dropdown-top)] left-[var(--symbol-dropdown-left)] w-[var(--symbol-dropdown-width)]"
         >
           {/* 自定义输入 */}
           <div className="p-3 border-b border-slate-100 dark:border-slate-800">
@@ -679,7 +683,7 @@ function CreateModifierModal({
                           : 'hover:bg-slate-50 dark:hover:bg-slate-800'
                     }`}
                   >
-                    <Tag size={16} className={isHovered ? 'text-blue-500' : 'text-slate-400'} />
+                    <Tag size={iconSizeToken.small} className={isHovered ? 'text-blue-500' : 'text-slate-400'} />
                     <span className={`flex-1 text-body-sm font-medium ${
                       isHovered ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'
                     }`}>
@@ -687,7 +691,7 @@ function CreateModifierModal({
                     </span>
                     <div className="flex items-center gap-1">
                       <span className="text-micro text-slate-400">{domain.items.length}</span>
-                      <ChevronRight size={14} className={isHovered ? 'text-blue-400' : 'text-slate-400'} />
+                      <ChevronRight size={iconSizeToken.tiny} className={isHovered ? 'text-blue-400' : 'text-slate-400'} />
                     </div>
                   </div>
                 )
@@ -921,10 +925,10 @@ function EditUnitModal({
         setSymbolDropdownPos({
           top: rect.top - Math.min(dropdownHeight, spaceAbove) - 4,
           left: rect.left,
-          width: Math.max(rect.width, 280)
+          width: rect.width
         })
       } else {
-        setSymbolDropdownPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 280) })
+        setSymbolDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
       }
     }
     updatePosition()
@@ -1045,8 +1049,12 @@ function EditUnitModal({
       {symbolDropdownOpen && symbolDropdownPos && createPortal(
         <div
           ref={symbolDropdownRef}
-          style={{ top: symbolDropdownPos.top, left: symbolDropdownPos.left }}
-          className="fixed z-[1000000] min-w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden"
+          style={{
+            '--symbol-dropdown-top': `${symbolDropdownPos.top}px`,
+            '--symbol-dropdown-left': `${symbolDropdownPos.left}px`,
+            '--symbol-dropdown-width': `${symbolDropdownPos.width}px`
+          } as React.CSSProperties}
+          className="fixed z-[1000000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden top-[var(--symbol-dropdown-top)] left-[var(--symbol-dropdown-left)] w-[var(--symbol-dropdown-width)]"
         >
           {/* 自定义输入 */}
           <div className="p-3 border-b border-slate-100 dark:border-slate-800">

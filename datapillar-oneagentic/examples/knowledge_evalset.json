@@ -1,0 +1,68 @@
+{
+  "evalset_id": "knowledge_eval_v1",
+  "documents": [
+    {
+      "doc_id": "dp_overview",
+      "source_id": "datapillar_docs",
+      "title": "产品总览",
+      "text": "Datapillar 是一个数据开发 SaaS 平台，覆盖数据接入、建模、指标、调度与质量管理。它强调标准化与复用，支持团队级协作与权限隔离。",
+      "metadata": {
+        "topic": "overview"
+      }
+    },
+    {
+      "doc_id": "dp_knowledge",
+      "source_id": "datapillar_docs",
+      "title": "知识框架",
+      "text": "知识框架提供文档解析、切分、向量化与检索增强能力，作为基座可挂载到团队或 Agent，并支持参数覆盖与上下文注入。",
+      "metadata": {
+        "topic": "knowledge"
+      }
+    },
+    {
+      "doc_id": "dp_retrieval",
+      "source_id": "datapillar_docs",
+      "title": "检索流程",
+      "text": "检索流程包括召回、重排、证据治理与上下文格式化。证据治理会进行分组、去重与单文档限制，保证输出稳定可控。",
+      "metadata": {
+        "topic": "retrieval"
+      }
+    },
+    {
+      "doc_id": "dp_process",
+      "source_id": "datapillar_docs",
+      "title": "流程模式",
+      "text": "Datapillar 支持 SEQUENTIAL、DYNAMIC、HIERARCHICAL、MAPREDUCE、REACT 等流程模式，用于任务拆解、委派与协作。",
+      "metadata": {
+        "topic": "process"
+      }
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "q_overview",
+      "query": "Datapillar 覆盖哪些核心能力？",
+      "expected_doc_ids": ["dp_overview"],
+      "expected_chunk_ids": ["dp_overview:0"]
+    },
+    {
+      "query_id": "q_knowledge",
+      "query": "知识框架提供哪些能力？",
+      "expected_doc_ids": ["dp_knowledge"],
+      "expected_chunk_ids": ["dp_knowledge:0"]
+    },
+    {
+      "query_id": "q_retrieval",
+      "query": "检索流程有哪些步骤？",
+      "expected_doc_ids": ["dp_retrieval"],
+      "expected_chunk_ids": ["dp_retrieval:0"]
+    },
+    {
+      "query_id": "q_process",
+      "query": "系统支持哪些流程模式？",
+      "expected_doc_ids": ["dp_process"],
+      "expected_chunk_ids": ["dp_process:0"]
+    }
+  ],
+  "k_values": [1, 3, 5]
+}

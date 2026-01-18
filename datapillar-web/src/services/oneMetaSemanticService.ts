@@ -146,12 +146,13 @@ export interface RegisterMetricRequest {
   aggregationLogic?: string
   parentMetricCodes?: string[]
   calculationFormula?: string
-  // 原子指标数据源配置
+  // 原子指标数据源配置（使用 ID 引用）
+  refTableId?: number
   refCatalogName?: string
   refSchemaName?: string
   refTableName?: string
-  measureColumns?: string
-  filterColumns?: string
+  measureColumnIds?: string
+  filterColumnIds?: string
 }
 
 /** 更新指标请求 */
@@ -253,12 +254,12 @@ export interface MetricVersionItem {
   unitSymbol?: string
   aggregationLogic?: string
   calculationFormula?: string
+  refTableId?: number
   refCatalogName?: string
   refSchemaName?: string
   refTableName?: string
-  refColumnName?: string
-  measureColumns?: string
-  filterColumns?: string
+  measureColumnIds?: string
+  filterColumnIds?: string
   parentMetricCodes?: string[]
   properties?: Record<string, string>
   audit?: {
@@ -310,11 +311,9 @@ export interface AlterMetricVersionRequest {
   unitName?: string
   parentMetricCodes?: string[]
   calculationFormula?: string
-  refCatalogName?: string
-  refSchemaName?: string
-  refTableName?: string
-  measureColumns?: string
-  filterColumns?: string
+  refTableId?: number
+  measureColumnIds?: string
+  filterColumnIds?: string
 }
 
 /**

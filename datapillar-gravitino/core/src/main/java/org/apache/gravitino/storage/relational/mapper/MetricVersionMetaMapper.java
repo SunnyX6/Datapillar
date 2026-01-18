@@ -89,4 +89,9 @@ public interface MetricVersionMetaMapper {
   Integer updateMetricVersionMeta(
       @Param("newMetricVersionMeta") MetricVersionPO newMetricVersionPO,
       @Param("oldMetricVersionMeta") MetricVersionPO oldMetricVersionPO);
+
+  @SelectProvider(
+      type = MetricVersionMetaSQLProviderFactory.class,
+      method = "countMetricVersionsByRefTableId")
+  Integer countMetricVersionsByRefTableId(@Param("refTableId") Long refTableId);
 }

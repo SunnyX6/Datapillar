@@ -91,11 +91,12 @@ public interface DatasetCatalog {
    * @param unit 指标单位，可选，可为 null
    * @param parentMetricCodes 父指标编码数组（用于派生/复合指标），可选，可为 null
    * @param calculationFormula 计算公式（用于复合指标），可选，可为 null
-   * @param refCatalogName 引用的数据源名称（原子指标用），可选，可为 null
-   * @param refSchemaName 引用的数据库名称（原子指标用），可选，可为 null
-   * @param refTableName 引用的表名称（原子指标用），可选，可为 null
-   * @param measureColumns 度量列JSON数组，可选，可为 null
-   * @param filterColumns 过滤列JSON数组，可选，可为 null
+   * @param refTableId 引用的Table ID（原子指标用），可选，可为 null
+   * @param refCatalogName 引用的Catalog名称（用于事件发送），可选，可为 null
+   * @param refSchemaName 引用的Schema名称（用于事件发送），可选，可为 null
+   * @param refTableName 引用的Table名称（用于事件发送），可选，可为 null
+   * @param measureColumnIds 度量列ID JSON数组，可选，可为 null
+   * @param filterColumnIds 过滤列ID JSON数组，可选，可为 null
    * @return 注册的指标对象
    * @throws NoSuchSchemaException 如果 schema 不存在
    * @throws MetricAlreadyExistsException 如果指标已存在
@@ -111,11 +112,12 @@ public interface DatasetCatalog {
       String unit,
       String[] parentMetricCodes,
       String calculationFormula,
+      Long refTableId,
       String refCatalogName,
       String refSchemaName,
       String refTableName,
-      String measureColumns,
-      String filterColumns)
+      String measureColumnIds,
+      String filterColumnIds)
       throws NoSuchSchemaException, MetricAlreadyExistsException;
 
   /**
@@ -221,11 +223,9 @@ public interface DatasetCatalog {
    * @param unitName 指标单位名称
    * @param parentMetricCodes 父指标编码数组
    * @param calculationFormula 计算公式
-   * @param refCatalogName 引用的Catalog名称
-   * @param refSchemaName 引用的Schema名称
-   * @param refTableName 引用的Table名称
-   * @param measureColumns 度量列JSON
-   * @param filterColumns 过滤列JSON
+   * @param refTableId 引用的Table ID
+   * @param measureColumnIds 度量列ID JSON数组
+   * @param filterColumnIds 过滤列ID JSON数组
    * @return 更新后的版本
    * @throws NoSuchMetricVersionException 如果版本不存在
    */
@@ -241,11 +241,9 @@ public interface DatasetCatalog {
       String unitName,
       String[] parentMetricCodes,
       String calculationFormula,
-      String refCatalogName,
-      String refSchemaName,
-      String refTableName,
-      String measureColumns,
-      String filterColumns)
+      Long refTableId,
+      String measureColumnIds,
+      String filterColumnIds)
       throws NoSuchMetricVersionException;
 
   // ============================= MetricModifier 管理 =============================

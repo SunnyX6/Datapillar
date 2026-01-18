@@ -11,33 +11,24 @@ from __future__ import annotations
 
 import asyncio
 import time
-from unittest.mock import patch
-
 import pytest
 
-from datapillar_oneagentic.resilience.circuit_breaker import (
+from datapillar_oneagentic.exception import (
     CircuitBreaker,
     CircuitBreakerError,
+    CircuitBreakerRegistry,
     CircuitState,
-    get_circuit_breaker,
     with_circuit_breaker,
 )
-
-
-class _MockConfig:
-    failure_threshold = 3
-    recovery_seconds = 0.1  # 100ms，测试用
+from datapillar_oneagentic.providers.llm.config import CircuitBreakerConfig
 
 
 @pytest.fixture
 def circuit_breaker():
     """创建测试用熔断器"""
-    with patch(
-        "datapillar_oneagentic.resilience.circuit_breaker.get_llm_circuit_breaker_config",
-        return_value=_MockConfig(),
-    ):
-        cb = CircuitBreaker("test")
-        yield cb
+    config = CircuitBreakerConfig(failure_threshold=3, recovery_seconds=1)
+    cb = CircuitBreaker("test", config)
+    yield cb
 
 
 @pytest.mark.asyncio
@@ -83,7 +74,7 @@ async def test_circuit_breaker_should_transition_to_half_open_after_recovery_tim
     assert circuit_breaker.state == CircuitState.OPEN
 
     # 等待恢复时间
-    await asyncio.sleep(0.15)
+    await asyncio.sleep(1.1)
 
     # 触发状态检查
     await circuit_breaker.allow_request()
@@ -101,7 +92,7 @@ async def test_circuit_breaker_should_transition_to_closed_on_success_in_half_op
         await circuit_breaker.record_failure()
 
     # 等待进入 HALF_OPEN
-    await asyncio.sleep(0.15)
+    await asyncio.sleep(1.1)
     await circuit_breaker.allow_request()
 
     assert circuit_breaker.state == CircuitState.HALF_OPEN
@@ -122,7 +113,7 @@ async def test_circuit_breaker_should_transition_to_open_on_failure_in_half_open
         await circuit_breaker.record_failure()
 
     # 等待进入 HALF_OPEN
-    await asyncio.sleep(0.15)
+    await asyncio.sleep(1.1)
     await circuit_breaker.allow_request()
 
     assert circuit_breaker.state == CircuitState.HALF_OPEN
@@ -148,22 +139,20 @@ async def test_circuit_breaker_should_reset_failure_count_on_success(circuit_bre
 async def test_with_circuit_breaker_decorator_should_raise_error_when_open() -> None:
     """装饰器在 OPEN 状态应抛出 CircuitBreakerError"""
 
-    with patch(
-        "datapillar_oneagentic.resilience.circuit_breaker.get_llm_circuit_breaker_config",
-        return_value=_MockConfig(),
-    ):
-        cb = get_circuit_breaker("test_decorator")
-        cb.reset()
+    config = CircuitBreakerConfig(failure_threshold=3, recovery_seconds=1)
+    registry = CircuitBreakerRegistry(config)
+    cb = registry.get("test_decorator")
+    cb.reset()
 
-        @with_circuit_breaker("test_decorator")
-        async def failing_func():
-            raise RuntimeError("失败")
+    @with_circuit_breaker("test_decorator", registry)
+    async def failing_func():
+        raise RuntimeError("失败")
 
-        # 触发熔断
-        for _ in range(3):
-            with pytest.raises(RuntimeError):
-                await failing_func()
-
-        # 熔断后应抛出 CircuitBreakerError
-        with pytest.raises(CircuitBreakerError):
+    # 触发熔断
+    for _ in range(3):
+        with pytest.raises(RuntimeError):
             await failing_func()
+
+    # 熔断后应抛出 CircuitBreakerError
+    with pytest.raises(CircuitBreakerError):
+        await failing_func()

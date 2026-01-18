@@ -22,24 +22,26 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.prebuilt import ToolNode
 from langgraph.types import Command, interrupt
 
+from datapillar_oneagentic.context import ContextBuilder
 from datapillar_oneagentic.events import (
+    EventBus,
     LLMThinkingEvent,
     ToolCalledEvent,
     ToolCompletedEvent,
     ToolFailedEvent,
-    event_bus,
 )
+from datapillar_oneagentic.providers.llm.llm import extract_thinking
 from datapillar_oneagentic.utils.structured_output import parse_structured_output
 
 if TYPE_CHECKING:
     from datapillar_oneagentic.core.agent import AgentSpec
+    from datapillar_oneagentic.core.config import AgentConfig
 
 logger = logging.getLogger(__name__)
-
 
 def _parse_agent_output(result: Any, schema: type) -> Any:
     """
@@ -176,12 +178,6 @@ class AgentContext:
     _spec: AgentSpec = field(default=None, repr=False)
     """Agent 规格（框架内部）"""
 
-    _knowledge_prompt: str = field(default="", repr=False)
-    """知识上下文（使用者传入的静态知识）"""
-
-    _experience_prompt: str = field(default="", repr=False)
-    """经验上下文（框架自动检索注入）"""
-
     _llm: Any = field(default=None, repr=False)
     """LLM 实例（框架内部）"""
 
@@ -195,6 +191,8 @@ class AgentContext:
     """委派命令（框架内部）"""
 
     _messages: list[BaseMessage] = field(default_factory=list, repr=False)
+    _agent_config: AgentConfig | None = field(default=None, repr=False)
+    _event_bus: EventBus | None = field(default=None, repr=False)
     """消息历史（框架内部）"""
 
     # === 公开方法 ===
@@ -216,37 +214,29 @@ class AgentContext:
         返回：
         - 消息对象（业务侧不需要了解具体类型，只需传递）
         """
-        messages: list[BaseMessage] = [SystemMessage(content=system_prompt)]
-
-        # 注入上下文
-        context_parts = []
-
-        # 上游 Agent 执行上下文（enable_share_context=True 时由框架注入到 state.messages）
-        # 只共享 HumanMessage 和 AIMessage，不共享 SystemMessage 和 ToolMessage
-        upstream_messages = self._state.get("messages", [])
-        if upstream_messages:
-            for msg in upstream_messages:
-                if isinstance(msg, (HumanMessage, AIMessage)):
-                    messages.append(msg)
-
-        # 知识上下文（使用者传入的静态知识）
-        if self._knowledge_prompt:
-            context_parts.append(self._knowledge_prompt)
-
-        # 经验上下文（框架自动检索注入）
-        if self._experience_prompt:
-            context_parts.append(self._experience_prompt)
-
-        if context_parts:
-            context_content = "\n\n".join(context_parts)
-            messages.append(SystemMessage(content=context_content))
-
-        # 用户查询（如果上游没有 messages，才添加 HumanMessage）
-        if self.query and not upstream_messages:
-            messages.append(HumanMessage(content=self.query))
-
+        include_knowledge_tool_prompt = (
+            self._spec is not None
+            and self._spec.knowledge is not None
+            and self._has_tool("knowledge_retrieve")
+        )
+        messages = ContextBuilder.build_llm_messages(
+            system_prompt=system_prompt,
+            query=self.query,
+            state=self._state,
+            include_knowledge_tool_prompt=include_knowledge_tool_prompt,
+            output_schema=self._spec.deliverable_schema if self._spec else None,
+        )
         self._messages = messages
         return messages
+
+    def _has_tool(self, tool_name: str) -> bool:
+        for tool in self._tools or []:
+            name = getattr(tool, "name", None)
+            if not name and callable(tool):
+                name = getattr(tool, "__name__", "")
+            if name == tool_name:
+                return True
+        return False
 
     async def invoke_tools(self, messages: Any) -> Any:
         """
@@ -255,10 +245,10 @@ class AgentContext:
         执行 LLM 调用和工具调用的循环，直到 LLM 不再调用工具。
         如果调用了委派工具，会抛出 DelegationSignal 由框架处理。
 
-        关键优化：
-        - bind_tools 时传入 response_format=deliverable_schema
-        - 当 LLM 不再调用工具时，直接返回符合 schema 的 JSON
-        - 无需额外调用 get_structured_output
+        关键说明：
+        - 有工具时仅使用 bind_tools 进行工具调用循环，不强制结构化输出
+        - 无工具时使用结构化输出，避免额外调用 get_structured_output
+        - 工具路径最终仍需调用 get_structured_output 解析结果
 
         参数：
         - messages: build_messages() 返回的消息对象
@@ -294,19 +284,19 @@ class AgentContext:
         # 准备状态
         current_state = self._state.copy()
 
-        for _iteration in range(1, self._spec.get_max_steps() + 1):
+        max_steps = self._spec.get_max_steps(self._agent_config)
+        for _iteration in range(1, max_steps + 1):
             # LLM 调用
             response = await llm_with_tools.ainvoke(messages)
 
             # 提取并发送思考内容（如果有）
             thinking_content = self._extract_thinking(response)
             if thinking_content:
-                await event_bus.emit(
-                    self,
+                await self._emit_event(
                     LLMThinkingEvent(
                         agent_id=self._spec.id,
                         thinking_content=thinking_content,
-                    ),
+                    )
                 )
 
             if not response.tool_calls:
@@ -332,13 +322,12 @@ class AgentContext:
                     "args": tool_args if isinstance(tool_args, dict) else {},
                     "id": tool_call_id or "",
                 })
-                await event_bus.emit(
-                    self,
+                await self._emit_event(
                     ToolCalledEvent(
                         agent_id=self._spec.id,
                         tool_name=tool_name,
                         tool_input=tool_args if isinstance(tool_args, dict) else {},
-                    ),
+                    )
                 )
 
             # 执行工具（带超时控制）
@@ -346,7 +335,7 @@ class AgentContext:
             tool_start_time = time.time()
             current_state["messages"] = messages
             tool_error = None
-            tool_timeout = self._spec.get_tool_timeout_seconds()
+            tool_timeout = self._spec.get_tool_timeout_seconds(self._agent_config)
             try:
                 result = await asyncio.wait_for(
                     tool_node.ainvoke(current_state),
@@ -356,26 +345,24 @@ class AgentContext:
                 tool_error = f"工具调用超时（{tool_timeout}秒）"
                 logger.error(f"⏰ [{self._spec.name}] {tool_error}")
                 for tc_info in tool_calls_info:
-                    await event_bus.emit(
-                        self,
+                    await self._emit_event(
                         ToolFailedEvent(
                             agent_id=self._spec.id,
                             tool_name=tc_info["name"],
                             error=tool_error,
-                        ),
+                        )
                     )
                 raise TimeoutError(tool_error)
             except Exception as e:
                 tool_error = str(e)
                 # 发送所有工具的失败事件
                 for tc_info in tool_calls_info:
-                    await event_bus.emit(
-                        self,
+                    await self._emit_event(
                         ToolFailedEvent(
                             agent_id=self._spec.id,
                             tool_name=tc_info["name"],
                             error=tool_error,
-                        ),
+                        )
                     )
                 raise
             tool_duration_ms = (time.time() - tool_start_time) * 1000
@@ -413,14 +400,13 @@ class AgentContext:
 
             for tc_info in tool_calls_info:
                 tool_output = tool_outputs.get(tc_info["id"], "")
-                await event_bus.emit(
-                    self,
+                await self._emit_event(
                     ToolCompletedEvent(
                         agent_id=self._spec.id,
                         tool_name=tc_info["name"],
                         tool_output=tool_output,
                         duration_ms=tool_duration_ms / len(tool_calls_info) if tool_calls_info else 0,
-                    ),
+                    )
                 )
 
             messages.extend(new_messages)
@@ -432,10 +418,6 @@ class AgentContext:
         """
         获取结构化输出
 
-        优化逻辑：
-        1. 先尝试从最后一条 AIMessage 直接解析 JSON（省一次 LLM 调用）
-        2. 如果解析失败，再调用 LLM 生成结构化输出
-
         参数：
         - messages: invoke_tools() 返回的消息对象
 
@@ -443,17 +425,7 @@ class AgentContext:
         - deliverable_schema 实例
         """
         schema = self._spec.deliverable_schema
-
-        # 优化：先尝试从最后一条 AIMessage 直接解析
-        last_ai_content = self._get_last_ai_content(messages)
-        if last_ai_content:
-            try:
-                result = parse_structured_output(last_ai_content, schema)
-                return result
-            except Exception:
-                pass  # 解析失败，回退到 LLM
-
-        # 回退：调用 LLM 生成结构化输出
+        # 直接调用 LLM 生成结构化输出，避免共享上下文中的非输出消息干扰解析
         llm_structured = self._llm.with_structured_output(
             schema,
             method="json_mode",
@@ -464,12 +436,11 @@ class AgentContext:
         # 解析结果（带 fallback）
         return _parse_agent_output(result, schema)
 
-    def _get_last_ai_content(self, messages: list) -> str | None:
-        """获取最后一条 AIMessage 的 content"""
-        for msg in reversed(messages):
-            if isinstance(msg, AIMessage) and msg.content:
-                return msg.content
-        return None
+    async def _emit_event(self, event: Any) -> None:
+        """安全发送事件（允许 event_bus 为空）"""
+        if self._event_bus is None:
+            return
+        await self._event_bus.emit(self, event)
 
     def _extract_thinking(self, response: AIMessage) -> str | None:
         """
@@ -482,23 +453,7 @@ class AgentContext:
         """
         if not isinstance(response, AIMessage):
             return None
-
-        # 1. GLM / DeepSeek 格式（reasoning_content）
-        reasoning = response.additional_kwargs.get("reasoning_content")
-        if reasoning:
-            return reasoning
-
-        # 2. Claude 格式（content 是 list，包含 thinking blocks）
-        content = response.content
-        if isinstance(content, list):
-            thinking_parts = []
-            for block in content:
-                if isinstance(block, dict) and block.get("type") == "thinking":
-                    thinking_parts.append(block.get("thinking", ""))
-            if thinking_parts:
-                return "\n".join(thinking_parts)
-
-        return None
+        return extract_thinking(response)
 
     def interrupt(self, payload: Any | None = None) -> Any:
         """

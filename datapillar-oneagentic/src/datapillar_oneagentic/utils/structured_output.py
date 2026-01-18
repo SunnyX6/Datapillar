@@ -15,7 +15,7 @@
 import json
 import logging
 import re
-from typing import Any, TypeVar
+from typing import Annotated, Any, TypeVar, get_args, get_origin
 
 import json_repair
 from pydantic import BaseModel, TypeAdapter, ValidationError
@@ -210,6 +210,8 @@ def parse_structured_output(
     2. 用 json_repair 修复后解析
     3. 从文本中提取 JSON 后解析
     4. 处理数组包裹（取第一个 dict 元素）
+    5. Markdown 兜底解析（按字段名匹配）
+    6. 单字段文本兜底（将 Markdown/纯文本封装为结构化输出）
 
     Args:
         text: LLM 返回的原始文本
@@ -273,6 +275,22 @@ def parse_structured_output(
     except (json.JSONDecodeError, ValidationError) as e:
         errors.append(f"数组解包失败: {e}")
 
+    # 策略 5：Markdown 兜底解析（按字段名匹配）
+    markdown_parsed, markdown_error = _try_parse_markdown_fields(text, schema)
+    if markdown_parsed is not None:
+        logger.warning("Structured output 使用 Markdown 兜底解析，可能存在 JSON 格式不一致。")
+        return markdown_parsed
+    if markdown_error:
+        errors.append(markdown_error)
+
+    # 策略 6：单字段文本兜底（仅对单字符串字段）
+    coerced, coercion_error = _try_coerce_single_text_field(text, schema)
+    if coerced is not None:
+        logger.warning("Structured output 使用单字段文本兜底解析，可能存在 JSON 格式不一致。")
+        return coerced
+    if coercion_error:
+        errors.append(coercion_error)
+
     # 所有策略都失败，生成清晰的错误信息
     error_summary = "\n".join(f"  - {e}" for e in errors)
 
@@ -290,6 +308,160 @@ def parse_structured_output(
         f"解析尝试:\n{error_summary}\n\n"
         f"原始文本: {text[:300]}"
     )
+
+
+def _try_coerce_single_text_field(text: str, schema: type[T]) -> tuple[T | None, str | None]:
+    fields = list(schema.model_fields.items())
+    if len(fields) != 1:
+        return None, None
+    field_name, field = fields[0]
+    if not _is_string_annotation(field.annotation):
+        return None, None
+    try:
+        return schema.model_validate({field_name: text.strip()}), None
+    except ValidationError as exc:
+        return None, f"文本兜底解析失败: {exc}"
+
+
+def _try_parse_markdown_fields(text: str, schema: type[T]) -> tuple[T | None, str | None]:
+    candidates = _extract_markdown_candidates(text)
+    if not candidates:
+        return None, None
+
+    field_map = {_normalize_field_name(name): name for name in schema.model_fields.keys()}
+    result: dict[str, Any] = {}
+    matched_fields: set[str] = set()
+
+    for key, value in candidates:
+        normalized_key = _normalize_field_name(key)
+        field_name = field_map.get(normalized_key)
+        if not field_name:
+            continue
+        field = schema.model_fields[field_name]
+        if _is_string_annotation(field.annotation):
+            parsed_value = value.strip()
+        else:
+            try:
+                parsed_value = json.loads(value)
+            except json.JSONDecodeError as exc:
+                return None, f"Markdown 兜底解析失败: 字段 {field_name} 不是合法 JSON 值: {exc}"
+        result[field_name] = parsed_value
+        matched_fields.add(field_name)
+
+    if not matched_fields:
+        return None, None
+
+    missing_fields = [
+        name
+        for name, field in schema.model_fields.items()
+        if field.is_required() and name not in result
+    ]
+    if missing_fields:
+        return None, f"Markdown 兜底解析失败: 缺少必填字段: {', '.join(missing_fields)}"
+
+    try:
+        return schema.model_validate(result), None
+    except ValidationError as exc:
+        return None, f"Markdown 兜底解析失败: {exc}"
+
+
+def _extract_markdown_candidates(text: str) -> list[tuple[str, str]]:
+    lines = text.splitlines()
+    candidates: list[tuple[str, str]] = []
+    in_code_block = False
+    i = 0
+
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
+            i += 1
+            continue
+
+        if not in_code_block and _is_heading_line(stripped):
+            key = stripped[3:].strip()
+            body_lines: list[str] = []
+            j = i + 1
+            block_in_code = False
+            while j < len(lines):
+                next_line = lines[j]
+                next_stripped = next_line.strip()
+                if next_stripped.startswith("```"):
+                    block_in_code = not block_in_code
+                    j += 1
+                    continue
+                if not block_in_code and _is_heading_line(next_stripped):
+                    break
+                if not block_in_code:
+                    body_lines.append(next_line)
+                j += 1
+            value = "\n".join(body_lines).strip()
+            if key and value:
+                candidates.append((key, value))
+            i = j
+            continue
+
+        if not in_code_block:
+            kv = _extract_key_value_line(stripped)
+            if kv:
+                candidates.append(kv)
+
+        i += 1
+
+    return candidates
+
+
+def _extract_key_value_line(line: str) -> tuple[str, str] | None:
+    if not line:
+        return None
+    if line.startswith("#"):
+        return None
+    for prefix in ("- ", "* ", "• "):
+        if line.startswith(prefix):
+            line = line[len(prefix) :].strip()
+            break
+    if ":" not in line:
+        return None
+    key, value = line.split(":", 1)
+    key = key.strip()
+    value = value.strip()
+    if not key or not value:
+        return None
+    return key, value
+
+
+def _is_heading_line(line: str) -> bool:
+    return line.startswith("## ") and len(line) > 3
+
+
+def _normalize_field_name(name: str) -> str:
+    name = name.strip()
+    name = _strip_markdown_wrappers(name)
+    return name.strip().lower()
+
+
+def _strip_markdown_wrappers(text: str) -> str:
+    for wrapper in ("**", "__", "`", "*"):
+        if text.startswith(wrapper) and text.endswith(wrapper) and len(text) > len(wrapper) * 2:
+            text = text[len(wrapper) : -len(wrapper)].strip()
+    return text
+
+
+def _is_string_annotation(annotation: Any) -> bool:
+    origin = get_origin(annotation)
+    if origin is Annotated:
+        args = get_args(annotation)
+        if not args:
+            return False
+        return _is_string_annotation(args[0])
+    if annotation is str:
+        return True
+    args = get_args(annotation)
+    if not args:
+        return False
+    return any(_is_string_annotation(arg) for arg in args if arg is not type(None))
 
 
 def parse_args(
@@ -320,3 +492,19 @@ def parse_args(
     raise ValueError(f"无法解析 tool call arguments: {type(args)}")
 
 
+def build_output_instructions(schema: type[BaseModel]) -> str:
+    """
+    构建统一的结构化输出约束提示词（JSON-only）
+
+    目标：
+    - 强制输出 JSON
+    - 禁止 Markdown/代码块/额外说明
+    """
+    return (
+        "## 重要\n"
+        "必须输出严格 JSON（单个对象），不得输出 Markdown、代码块或解释性文字。\n"
+        "允许调用工具，但最终输出必须是 JSON。\n"
+        "必须严格遵循交付物结构定义。\n"
+        "## 禁止\n"
+        "禁止输出非 JSON 内容，禁止添加未定义字段。"
+    )

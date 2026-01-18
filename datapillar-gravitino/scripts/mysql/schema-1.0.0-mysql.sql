@@ -534,11 +534,9 @@ CREATE TABLE IF NOT EXISTS `metric_version_info` (
     `metric_unit` VARCHAR(64) DEFAULT NULL COMMENT 'metric unit, e.g., 元, 个, %',
     `parent_metric_ids` TEXT DEFAULT NULL COMMENT 'parent metric ids in JSON array format, e.g., [123, 456]',
     `calculation_formula` TEXT DEFAULT NULL COMMENT 'calculation formula, e.g., metric1 / metric2 * 100',
-    `ref_catalog_name` VARCHAR(128) DEFAULT NULL COMMENT 'referenced catalog name for ATOMIC metric',
-    `ref_schema_name` VARCHAR(128) DEFAULT NULL COMMENT 'referenced schema name for ATOMIC metric',
-    `ref_table_name` VARCHAR(128) DEFAULT NULL COMMENT 'referenced table name for ATOMIC metric',
-    `measure_columns` TEXT DEFAULT NULL COMMENT 'measure columns JSON array, e.g., [{name, type, comment}]',
-    `filter_columns` TEXT DEFAULT NULL COMMENT 'filter columns JSON array, e.g., [{name, type, values:[{key,label}]}]',
+    `ref_table_id` BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'referenced table id for ATOMIC metric',
+    `measure_column_ids` TEXT DEFAULT NULL COMMENT 'measure column ids JSON array, e.g., [123, 456]',
+    `filter_column_ids` TEXT DEFAULT NULL COMMENT 'filter column ids JSON array, e.g., [789, 012]',
     `version_properties` MEDIUMTEXT DEFAULT NULL COMMENT 'version properties in JSON format',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'version audit info in JSON format',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
@@ -547,5 +545,6 @@ CREATE TABLE IF NOT EXISTS `metric_version_info` (
     KEY `idx_metric_id` (`metric_id`),
     KEY `idx_metalake` (`metalake_id`),
     KEY `idx_catalog` (`catalog_id`),
-    KEY `idx_schema` (`schema_id`)
+    KEY `idx_schema` (`schema_id`),
+    KEY `idx_ref_table` (`ref_table_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '指标版本快照表';

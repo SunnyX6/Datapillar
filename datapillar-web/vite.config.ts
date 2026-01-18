@@ -7,17 +7,35 @@ import path from 'path'
 export default defineConfig(({ mode }) => {
   // 加载环境变量
   const env = loadEnv(mode, process.cwd(), '')
+  const graphlibLodashShim = path.resolve(__dirname, './src/compat/graphlib-lodash.cjs')
+  const lodashShim = path.resolve(__dirname, './src/compat/lodash.cjs')
 
   return {
     plugins: [
+      {
+        name: 'graphlib-lodash-shim',
+        enforce: 'pre',
+        resolveId(source, importer) {
+          if (!importer) return
+          const normalizedImporter = importer.replace(/\\/g, '/')
+          if (
+            (source === './lodash' || source === './lodash.js') &&
+            normalizedImporter.includes('/node_modules/graphlib/lib/')
+          ) {
+            return graphlibLodashShim
+          }
+        }
+      },
       tailwindcss(),
       react()
     ],
 
     resolve: {
-      alias: {
-        '@': path.resolve(__dirname, './src')
-      }
+      alias: [
+        { find: '@', replacement: path.resolve(__dirname, './src') },
+        { find: /^lodash$/, replacement: lodashShim },
+        { find: 'graphlib/lib/lodash', replacement: graphlibLodashShim }
+      ]
     },
 
     server: {

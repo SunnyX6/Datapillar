@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.tools import BaseTool, tool
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
@@ -56,6 +56,13 @@ def create_delegation_tool(
         # 从 state 获取 tool_call_id
         messages = state.get("messages", [])
         tool_call_id = _extract_tool_call_id(messages, tool_name)
+        user_message = _extract_last_user_message(messages)
+        assistant_message = _extract_last_tool_call_message(messages, tool_name)
+
+        if user_message and user_message not in task_description:
+            task_description = (
+                f"{task_description}\n\n## 用户原始输入\n{user_message}"
+            )
 
         # 创建确认消息
         tool_message = ToolMessage(
@@ -66,13 +73,19 @@ def create_delegation_tool(
 
         logger.info(f"🔄 委派: → {target_agent_id}, 任务: {task_description[:100]}...")
 
+        update_messages = []
+        if assistant_message is not None:
+            update_messages.append(assistant_message)
+        update_messages.append(tool_message)
+
         # 返回 Command 跳转到目标 Agent
         # 注意：不使用 graph=Command.PARENT，因为我们的节点不是子图
         return Command(
             goto=target_agent_id,
             update={
-                "messages": [tool_message],
+                "messages": update_messages,
                 "active_agent": target_agent_id,
+                "assigned_task": task_description,
             },
         )
 
@@ -86,6 +99,29 @@ def _extract_tool_call_id(messages: list, tool_name: str) -> str | None:
             for tc in msg.tool_calls:
                 if tc.get("name") == tool_name:
                     return tc.get("id")
+    return None
+
+
+def _extract_last_user_message(messages: list) -> str | None:
+    """提取最后一条用户输入，用于补全委派任务上下文"""
+    for msg in reversed(messages):
+        if isinstance(msg, HumanMessage):
+            content = getattr(msg, "content", "")
+            if content:
+                return str(content)
+    return None
+
+
+def _extract_last_tool_call_message(messages: list, tool_name: str) -> AIMessage | None:
+    """提取包含指定工具调用的最后一条 AIMessage"""
+    for msg in reversed(messages):
+        if not isinstance(msg, AIMessage):
+            continue
+        tool_calls = getattr(msg, "tool_calls", None) or []
+        for tc in tool_calls:
+            name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
+            if name == tool_name:
+                return msg
     return None
 
 

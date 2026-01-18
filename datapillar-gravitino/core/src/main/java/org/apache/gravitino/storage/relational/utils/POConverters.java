@@ -1860,11 +1860,12 @@ public class POConverters {
           .withUnitSymbol(metricVersionPO.getUnitSymbol())
           .withParentMetricCodes(parentMetricCodes)
           .withCalculationFormula(metricVersionPO.getCalculationFormula())
+          .withRefTableId(metricVersionPO.getRefTableId())
           .withRefCatalogName(metricVersionPO.getRefCatalogName())
           .withRefSchemaName(metricVersionPO.getRefSchemaName())
           .withRefTableName(metricVersionPO.getRefTableName())
-          .withMeasureColumns(metricVersionPO.getMeasureColumns())
-          .withFilterColumns(metricVersionPO.getFilterColumns())
+          .withMeasureColumnIds(metricVersionPO.getMeasureColumnIds())
+          .withFilterColumnIds(metricVersionPO.getFilterColumnIds())
           .withProperties(properties)
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(metricVersionPO.getAuditInfo(), AuditInfo.class))
@@ -1920,11 +1921,9 @@ public class POConverters {
           .withMetricUnit(versionEntity.unit())
           .withParentMetricCodes(parentMetricCodesJson)
           .withCalculationFormula(versionEntity.calculationFormula())
-          .withRefCatalogName(versionEntity.refCatalogName())
-          .withRefSchemaName(versionEntity.refSchemaName())
-          .withRefTableName(versionEntity.refTableName())
-          .withMeasureColumns(versionEntity.measureColumns())
-          .withFilterColumns(versionEntity.filterColumns())
+          .withRefTableId(versionEntity.refTableId())
+          .withMeasureColumnIds(versionEntity.measureColumnIds())
+          .withFilterColumnIds(versionEntity.filterColumnIds())
           .withVersionProperties(propertiesJson)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(versionEntity.auditInfo()))
           .withDeletedAt(DEFAULT_DELETED_AT)
@@ -1971,6 +1970,9 @@ public class POConverters {
           .withMetricUnit(newVersion.unit())
           .withParentMetricCodes(parentMetricCodesJson)
           .withCalculationFormula(newVersion.calculationFormula())
+          .withRefTableId(newVersion.refTableId())
+          .withMeasureColumnIds(newVersion.measureColumnIds())
+          .withFilterColumnIds(newVersion.filterColumnIds())
           .withVersionProperties(propertiesJson)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newVersion.auditInfo()))
           .withDeletedAt(DEFAULT_DELETED_AT)
@@ -1987,7 +1989,7 @@ public class POConverters {
    * @return MetricVersionEntity 对象
    */
   public static MetricVersionEntity createInitialMetricVersion(MetricEntity metricEntity) {
-    return createInitialMetricVersion(metricEntity, null, null, null, null, null, null, null, null);
+    return createInitialMetricVersion(metricEntity, null, null, null, null, null, null);
   }
 
   public static MetricVersionEntity createInitialMetricVersion(
@@ -1995,11 +1997,9 @@ public class POConverters {
       String unit,
       String[] parentMetricCodes,
       String calculationFormula,
-      String refCatalogName,
-      String refSchemaName,
-      String refTableName,
-      String measureColumns,
-      String filterColumns) {
+      Long refTableId,
+      String measureColumnIds,
+      String filterColumnIds) {
     return MetricVersionEntity.builder()
         .withMetricIdentifier(metricEntity.nameIdentifier())
         .withVersion(1)
@@ -2011,11 +2011,9 @@ public class POConverters {
         .withUnit(unit)
         .withParentMetricCodes(parentMetricCodes)
         .withCalculationFormula(calculationFormula)
-        .withRefCatalogName(refCatalogName)
-        .withRefSchemaName(refSchemaName)
-        .withRefTableName(refTableName)
-        .withMeasureColumns(measureColumns)
-        .withFilterColumns(filterColumns)
+        .withRefTableId(refTableId)
+        .withMeasureColumnIds(measureColumnIds)
+        .withFilterColumnIds(filterColumnIds)
         .withProperties(metricEntity.properties())
         .withAuditInfo(metricEntity.auditInfo())
         .build();

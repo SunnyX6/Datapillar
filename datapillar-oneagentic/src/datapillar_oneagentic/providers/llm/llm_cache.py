@@ -20,6 +20,7 @@ from typing import Any
 from langchain_core.caches import RETURN_VAL_TYPE, BaseCache
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, Generation
+from datapillar_oneagentic.providers.llm.config import LLMCacheConfig
 
 logger = logging.getLogger(__name__)
 
@@ -327,9 +328,9 @@ class RedisLLMCache(BaseCache):
             logger.warning(f"Redis 缓存清空失败: {e}")
 
 
-def create_llm_cache() -> BaseCache | None:
+def create_llm_cache(cache_config: LLMCacheConfig) -> BaseCache | None:
     """
-    创建 LLM 缓存实例（从配置读取）
+    创建 LLM 缓存实例（基于传入配置）
 
     配置项（在 llm.cache 下）：
     - enabled: 是否启用缓存（默认 True）
@@ -339,10 +340,6 @@ def create_llm_cache() -> BaseCache | None:
     - redis_url: Redis URL（backend=redis 时必填）
     - key_prefix: Redis key 前缀（默认 llm_cache:）
     """
-    from datapillar_oneagentic.config import datapillar
-
-    cache_config = datapillar.llm.cache
-
     if not cache_config.enabled:
         return None
 
