@@ -72,7 +72,7 @@ max_size = 1000
 # key_prefix = "llm_cache:"
 
 # ============================================================================
-# Embedding 配置（经验学习需要）
+# Embedding 配置（经验学习/知识检索需要）
 # ============================================================================
 [embedding]
 # 基础配置
@@ -110,8 +110,10 @@ type = "memory"  # memory | sqlite | postgres | redis
 type = "memory"  # memory | postgres | redis
 # url = "redis://localhost:6379"  # postgres/redis 专用
 
-# LearningStore 配置（经验学习向量数据库）
-[agent.learning_store]
+# ============================================================================
+# VectorStore 配置（经验/知识共用）
+# ============================================================================
+[vector_store]
 type = "lance"  # lance | chroma | milvus
 path = "./data/vectors"  # lance/chroma 本地模式
 # uri = "./data/milvus.db"  # milvus 本地模式
@@ -119,3 +121,56 @@ path = "./data/vectors"  # lance/chroma 本地模式
 # token = "root:Milvus"  # milvus 远程认证
 # host = "localhost"  # chroma 远程模式
 # port = 8000  # chroma 远程端口
+
+# ============================================================================
+# 经验学习配置
+# ============================================================================
+[learning]
+verify_threshold = 0.7
+reject_threshold = 0.3
+retrieval_k = 5
+
+# ============================================================================
+# 知识配置
+# ============================================================================
+[knowledge.chunk]
+mode = "general"  # general | parent_child | qa
+preprocess = ["normalize_newlines", "remove_control", "collapse_whitespace"]
+
+[knowledge.chunk.general]
+max_tokens = 800
+overlap = 120
+# delimiter = "\n\n"  # 可选固定分隔符
+
+[knowledge.retrieve]
+method = "hybrid"  # semantic | hybrid
+top_k = 8
+# score_threshold = 0.2
+
+[knowledge.retrieve.tuning]
+pool_k = 32
+rrf_k = 60
+
+[knowledge.retrieve.quality]
+dedupe = true
+dedupe_threshold = 0.92
+max_per_document = 2
+
+[knowledge.retrieve.rerank]
+mode = "off"  # off | model | weighted
+provider = "sentence_transformers"
+model = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+score_mode = "rank"  # rank | normalize | raw
+
+[knowledge.retrieve.rerank.params]
+# batch_size = 16
+# device = "cuda"
+
+[knowledge.retrieve.inject]
+# mode=system: 每次 Agent 执行前自动检索并注入 SystemMessage
+# mode=tool: 暴露 knowledge_retrieve 工具，Agent 按需调用检索（上下文更省）
+# 注意：MapReduce reducer 不注入知识，仅汇总 Map 结果
+mode = "tool"  # system | tool
+max_tokens = 1200
+max_chunks = 6
+format = "markdown"  # markdown | json

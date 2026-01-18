@@ -67,41 +67,16 @@ class DeliverableStoreConfig(BaseModel):
         return v.lower()
 
 
-class LearningStoreConfig(BaseModel):
-    """LearningStore 配置（经验学习向量数据库）"""
 
-    type: str = Field(
-        default="lance",
-        description="类型: lance | chroma | milvus",
-    )
-    path: str | None = Field(
-        default=None,
-        description="本地存储路径（lance/chroma）",
-    )
-    uri: str | None = Field(
-        default=None,
-        description="Milvus 连接 URI",
-    )
-    host: str | None = Field(
-        default=None,
-        description="Chroma 远程服务器地址",
-    )
-    port: int = Field(
-        default=8000,
-        description="Chroma 远程服务器端口",
-    )
-    token: str | None = Field(
-        default=None,
-        description="Milvus 认证令牌",
-    )
 
-    @field_validator("type")
-    @classmethod
-    def validate_type(cls, v: str) -> str:
-        supported = {"lance", "chroma", "milvus"}
-        if v.lower() not in supported:
-            raise ValueError(f"不支持的 learning_store 类型: '{v}'。支持: {', '.join(sorted(supported))}")
-        return v.lower()
+class AgentRetryConfig(BaseModel):
+    """Agent 重试配置"""
+
+    max_retries: int = Field(default=0, ge=0, description="最大重试次数")
+    initial_delay_ms: int = Field(default=500, gt=0, description="初始重试延迟（毫秒）")
+    max_delay_ms: int = Field(default=30000, gt=0, description="最大重试延迟（毫秒）")
+    exponential_base: float = Field(default=2.0, gt=1.0, description="指数退避基数")
+    jitter: bool = Field(default=True, description="是否启用抖动")
 
 
 class AgentConfig(BaseModel):
@@ -125,6 +100,11 @@ class AgentConfig(BaseModel):
         description="工具单次调用超时（秒）",
     )
 
+    retry: AgentRetryConfig = Field(
+        default_factory=AgentRetryConfig,
+        description="Agent 重试配置",
+    )
+
     checkpoint_ttl_seconds: int = Field(
         default=60 * 60 * 24 * 7,
         gt=0,
@@ -140,9 +120,4 @@ class AgentConfig(BaseModel):
     deliverable_store: DeliverableStoreConfig = Field(
         default_factory=DeliverableStoreConfig,
         description="DeliverableStore 配置",
-    )
-
-    learning_store: LearningStoreConfig = Field(
-        default_factory=LearningStoreConfig,
-        description="LearningStore 配置",
     )

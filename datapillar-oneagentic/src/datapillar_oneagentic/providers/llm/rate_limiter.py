@@ -12,10 +12,10 @@ LLM 限流器
 
 使用示例：
 ```python
-from datapillar_oneagentic.providers.llm.rate_limiter import rate_limit_manager
+from datapillar_oneagentic.providers.llm.rate_limiter import RateLimitManager
 
-# 获取限流器并执行
-async with rate_limit_manager.acquire("openai"):
+manager = RateLimitManager(config)
+async with manager.acquire("openai"):
     response = await llm.ainvoke(messages)
 ```
 """
@@ -128,42 +128,16 @@ class RateLimitManager:
 
     使用示例：
     ```python
-    # 获取管理器
-    manager = get_rate_limit_manager()
-
-    # 使用限流器
+    manager = RateLimitManager(config)
     async with manager.acquire("openai"):
         response = await llm.ainvoke(messages)
-
-    # 查看统计
-    print(manager.stats())
     ```
     """
 
-    _instance: RateLimitManager | None = None
-    _instance_lock: threading.Lock = threading.Lock()
-
-    def __new__(cls) -> RateLimitManager:
-        """单例模式"""
-        if cls._instance is None:
-            with cls._instance_lock:
-                if cls._instance is None:
-                    instance = super().__new__(cls)
-                    instance._initialize()
-                    cls._instance = instance
-        return cls._instance
-
-    def _initialize(self) -> None:
-        """初始化"""
+    def __init__(self, config: RateLimitConfig) -> None:
         self._limiters: dict[str, ProviderRateLimiter] = {}
         self._lock = threading.Lock()
-        self._enabled = True
-
-    def _get_config(self) -> RateLimitConfig:
-        """获取限流配置"""
-        from datapillar_oneagentic.config import get_config
-
-        return get_config().llm.rate_limit
+        self._config = config
 
     def _get_or_create_limiter(self, provider: str) -> ProviderRateLimiter:
         """获取或创建 Provider 限流器"""
@@ -175,8 +149,7 @@ class RateLimitManager:
 
         with self._lock:
             if provider_lower not in self._limiters:
-                config = self._get_config()
-                provider_config = config.get_provider_config(provider_lower)
+                provider_config = self._config.get_provider_config(provider_lower)
 
                 self._limiters[provider_lower] = ProviderRateLimiter(
                     provider=provider_lower,
@@ -196,9 +169,7 @@ class RateLimitManager:
         参数：
         - provider: Provider 名称（openai, anthropic, glm 等）
         """
-        config = self._get_config()
-
-        if not config.enabled:
+        if not self._config.enabled:
             yield
             return
 
@@ -209,7 +180,7 @@ class RateLimitManager:
     def stats(self) -> dict:
         """获取所有 Provider 的统计信息"""
         return {
-            "enabled": self._get_config().enabled,
+            "enabled": self._config.enabled,
             "providers": {
                 name: limiter.stats() for name, limiter in self._limiters.items()
             },
@@ -226,18 +197,3 @@ class RateLimitManager:
         """重置所有限流器（仅用于测试）"""
         with self._lock:
             self._limiters.clear()
-
-    @classmethod
-    def _reset_instance(cls) -> None:
-        """重置单例（仅用于测试）"""
-        with cls._instance_lock:
-            cls._instance = None
-
-
-# 全局单例
-rate_limit_manager = RateLimitManager()
-
-
-def get_rate_limit_manager() -> RateLimitManager:
-    """获取限流管理器"""
-    return rate_limit_manager

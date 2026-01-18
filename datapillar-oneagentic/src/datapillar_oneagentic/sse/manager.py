@@ -62,7 +62,6 @@ import asyncio
 import contextlib
 import json
 import logging
-import time
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
@@ -71,6 +70,7 @@ from pydantic import BaseModel
 
 from datapillar_oneagentic.core.types import SessionKey
 from datapillar_oneagentic.sse.event import SseEvent
+from datapillar_oneagentic.utils.time import now_ms
 
 if TYPE_CHECKING:
     from starlette.requests import Request
@@ -79,10 +79,6 @@ logger = logging.getLogger(__name__)
 
 
 _SENTINEL = object()
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
 
 
 def _json_serializer(obj: Any) -> Any:
@@ -145,8 +141,8 @@ class _SessionRun:
     """
 
     key: SessionKey
-    created_at_ms: int = field(default_factory=_now_ms)
-    last_activity_ms: int = field(default_factory=_now_ms)
+    created_at_ms: int = field(default_factory=now_ms)
+    last_activity_ms: int = field(default_factory=now_ms)
     next_seq: int = 1
     buffer: list[StreamRecord] = field(default_factory=list)
     subscribers: set[asyncio.Queue[StreamRecord | object]] = field(default_factory=set)
@@ -188,8 +184,8 @@ class StreamManager:
 
     def _cleanup_expired(self) -> None:
         """清理过期会话"""
-        now_ms = _now_ms()
-        expire_before_ms = now_ms - self._session_ttl_seconds * 1000
+        current_ms = now_ms()
+        expire_before_ms = current_ms - self._session_ttl_seconds * 1000
         expired_keys = [
             key for key, run in self._runs.items() if run.last_activity_ms < expire_before_ms
         ]
@@ -201,9 +197,9 @@ class StreamManager:
         async with run.lock:
             seq = run.next_seq
             run.next_seq += 1
-            run.last_activity_ms = _now_ms()
+            run.last_activity_ms = now_ms()
 
-            record = StreamRecord(seq=seq, payload=payload, created_at_ms=_now_ms())
+            record = StreamRecord(seq=seq, payload=payload, created_at_ms=now_ms())
             run.buffer.append(record)
             if len(run.buffer) > self._buffer_size:
                 run.buffer = run.buffer[-self._buffer_size :]
@@ -224,7 +220,7 @@ class StreamManager:
         """标记会话完成"""
         async with run.lock:
             run.completed = True
-            run.last_activity_ms = _now_ms()
+            run.last_activity_ms = now_ms()
             for queue in list(run.subscribers):
                 with contextlib.suppress(Exception):
                     queue.put_nowait(_SENTINEL)
@@ -318,7 +314,7 @@ class StreamManager:
                         await run.running_task
 
                 run.completed = False
-                run.last_activity_ms = _now_ms()
+                run.last_activity_ms = now_ms()
                 run.buffer.clear()
                 run.next_seq = 1
 
@@ -361,7 +357,7 @@ class StreamManager:
         )
         async with run.lock:
             run.subscribers.add(queue)
-            run.last_activity_ms = _now_ms()
+            run.last_activity_ms = now_ms()
             replay = list(run.buffer)
             is_completed = run.completed
 
@@ -413,7 +409,7 @@ class StreamManager:
         finally:
             async with run.lock:
                 run.subscribers.discard(queue)
-                run.last_activity_ms = _now_ms()
+                run.last_activity_ms = now_ms()
 
     def clear_session(self, *, key: SessionKey) -> bool:
         """

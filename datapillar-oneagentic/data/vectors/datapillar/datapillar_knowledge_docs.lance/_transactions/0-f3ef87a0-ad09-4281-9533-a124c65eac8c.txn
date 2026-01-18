@@ -1,0 +1,7 @@
+$f3ef87a0-ad09-4281-9533-a124c65eac8c²¬ doc_key ÿÿÿÿÿÿÿÿÿ*string08$	namespace ÿÿÿÿÿÿÿÿÿ*string08!doc_id ÿÿÿÿÿÿÿÿÿ*string08$	source_id ÿÿÿÿÿÿÿÿÿ*string08%
+source_uri ÿÿÿÿÿÿÿÿÿ*string08 title ÿÿÿÿÿÿÿÿÿ*string08"version ÿÿÿÿÿÿÿÿÿ*string08'content_hash ÿÿÿÿÿÿÿÿÿ*string08!status ÿÿÿÿÿÿÿÿÿ*string08#language	 ÿÿÿÿÿÿÿÿÿ*string08tags
+ ÿÿÿÿÿÿÿÿÿ*string08#metadata ÿÿÿÿÿÿÿÿÿ*string08&content_ref ÿÿÿÿÿÿÿÿÿ*string08$
+created_at ÿÿÿÿÿÿÿÿÿ*int6408$
+updated_at ÿÿÿÿÿÿÿÿÿ*int64085vector ÿÿÿÿÿÿÿÿÿ*fixed_size_list:float:204808"!
+lance.auto_cleanup.interval20"'
+lance.auto_cleanup.older_than14days

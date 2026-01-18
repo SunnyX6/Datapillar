@@ -207,9 +207,10 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
             formula: versionData.calculationFormula || '',
             measureColumns,
             filterColumns,
-            refCatalog: versionData.refCatalogName,
-            refSchema: versionData.refSchemaName,
-            refTable: versionData.refTableName,
+            refTableId: versionData.refTableId,
+            refCatalogName: versionData.refCatalogName,
+            refSchemaName: versionData.refSchemaName,
+            refTableName: versionData.refTableName,
             compositeMetrics
           })
         })

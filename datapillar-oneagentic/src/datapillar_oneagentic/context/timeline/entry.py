@@ -7,17 +7,14 @@ Context Timeline 子模块 - 时间线条目
 
 from __future__ import annotations
 
-import time
 import uuid
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from datapillar_oneagentic.context.types import CheckpointType, EventType
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
+from datapillar_oneagentic.context.checkpoint.types import CheckpointType
+from datapillar_oneagentic.events.constants import EventType
+from datapillar_oneagentic.utils.time import now_ms
 
 
 def _generate_id() -> str:
@@ -43,7 +40,7 @@ class TimelineEntry(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict, description="额外数据")
 
     # 时间
-    timestamp_ms: int = Field(default_factory=_now_ms, description="事件时间")
+    timestamp_ms: int = Field(default_factory=now_ms, description="事件时间")
     duration_ms: int | None = Field(default=None, description="事件耗时")
 
     # 检查点支持

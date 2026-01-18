@@ -11,11 +11,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, Self
+from typing import Any, Self
 
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, Field
 
+from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
 
 @dataclass(frozen=True, slots=True)
 class SessionKey:
@@ -61,8 +62,6 @@ class SessionKey:
 
 # ==================== 框架内部类型 ====================
 
-AgentResultStatus = Literal["completed", "failed", "error"]
-
 
 class AgentResult(BaseModel):
     """
@@ -72,13 +71,13 @@ class AgentResult(BaseModel):
 
     状态语义：
     - completed: Agent 正确完成任务
-    - failed: 业务失败（逻辑错误，非技术故障）
-    - error: 系统异常（技术故障）
+    - failed: 执行失败（通过 failure_kind 区分业务/系统）
     """
 
     model_config = {"arbitrary_types_allowed": True}
 
-    status: AgentResultStatus = Field(..., description="执行状态")
+    status: ExecutionStatus = Field(..., description="执行状态")
+    failure_kind: FailureKind | None = Field(None, description="失败类型（status=failed 时有效）")
     deliverable: Any | None = Field(None, description="交付物")
     deliverable_type: str | None = Field(None, description="交付物类型")
     error: str | None = Field(None, description="错误信息")
@@ -93,7 +92,7 @@ class AgentResult(BaseModel):
     ) -> AgentResult:
         """创建成功结果"""
         return cls(
-            status="completed",
+            status=ExecutionStatus.COMPLETED,
             deliverable=deliverable,
             deliverable_type=deliverable_type,
             messages=messages or [],
@@ -104,9 +103,15 @@ class AgentResult(BaseModel):
         cls,
         error: str,
         messages: list[BaseMessage] | None = None,
+        failure_kind: FailureKind = FailureKind.BUSINESS,
     ) -> AgentResult:
         """创建业务失败结果"""
-        return cls(status="failed", error=error, messages=messages or [])
+        return cls(
+            status=ExecutionStatus.FAILED,
+            failure_kind=failure_kind,
+            error=error,
+            messages=messages or [],
+        )
 
     @classmethod
     def system_error(
@@ -114,5 +119,5 @@ class AgentResult(BaseModel):
         error: str,
         messages: list[BaseMessage] | None = None,
     ) -> AgentResult:
-        """创建系统异常结果"""
-        return cls(status="error", error=error, messages=messages or [])
+        """兼容入口：系统异常结果（等价于 failed + system）"""
+        return cls.failed(error=error, messages=messages, failure_kind=FailureKind.SYSTEM)

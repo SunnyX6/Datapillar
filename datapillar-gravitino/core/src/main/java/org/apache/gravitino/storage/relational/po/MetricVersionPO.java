@@ -43,11 +43,12 @@ public class MetricVersionPO {
   private String unitSymbol;
   private String parentMetricCodes;
   private String calculationFormula;
+  private Long refTableId;
   private String refCatalogName;
   private String refSchemaName;
   private String refTableName;
-  private String measureColumns;
-  private String filterColumns;
+  private String measureColumnIds;
+  private String filterColumnIds;
   private String versionProperties;
   private String auditInfo;
   private Long deletedAt;
@@ -146,6 +147,11 @@ public class MetricVersionPO {
       return this;
     }
 
+    public Builder withRefTableId(Long refTableId) {
+      metricVersionPO.refTableId = refTableId;
+      return this;
+    }
+
     public Builder withRefCatalogName(String refCatalogName) {
       metricVersionPO.refCatalogName = refCatalogName;
       return this;
@@ -161,13 +167,13 @@ public class MetricVersionPO {
       return this;
     }
 
-    public Builder withMeasureColumns(String measureColumns) {
-      metricVersionPO.measureColumns = measureColumns;
+    public Builder withMeasureColumnIds(String measureColumnIds) {
+      metricVersionPO.measureColumnIds = measureColumnIds;
       return this;
     }
 
-    public Builder withFilterColumns(String filterColumns) {
-      metricVersionPO.filterColumns = filterColumns;
+    public Builder withFilterColumnIds(String filterColumnIds) {
+      metricVersionPO.filterColumnIds = filterColumnIds;
       return this;
     }
 

@@ -2,7 +2,7 @@
 工具系统
 
 业务侧使用：
-- @tool 装饰器定义工具（自动注册）
+- @tool 装饰器定义工具（返回可注入的工具对象）
 
 使用示例：
 ```python
@@ -25,11 +25,11 @@ def search(keyword: str) -> str:
     return ...
 ```
 
-Agent 使用工具名引用：
+Agent 使用工具对象：
 ```python
 @agent(
     id="query_agent",
-    tools=["search_tables", "table_search"],
+    tools=[search_tables, search],
     ...
 )
 class QueryAgent:
@@ -39,70 +39,14 @@ class QueryAgent:
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
 from typing import Any
 
 from langchain_core.tools import BaseTool
 from langchain_core.tools import tool as _langchain_tool
 
-logger = logging.getLogger(__name__)
 
-
-# === 工具注册中心（框架内部）===
-
-
-class ToolRegistry:
-    """
-    工具注册中心（框架内部使用）
-
-    业务侧不需要直接使用此类，@tool 装饰器会自动注册。
-    """
-
-    _tools: dict[str, BaseTool] = {}
-
-    @classmethod
-    def register(cls, name: str, tool_instance: Any) -> None:
-        """注册工具（框架内部）"""
-        if name in cls._tools:
-            logger.warning(f"工具 {name} 已存在，将被覆盖")
-
-        cls._tools[name] = tool_instance
-
-    @classmethod
-    def get(cls, name: str) -> BaseTool | None:
-        """获取工具（框架内部）"""
-        return cls._tools.get(name)
-
-    @classmethod
-    def resolve(cls, names: list[str]) -> list[BaseTool]:
-        """解析工具名称列表（框架内部）"""
-        tools = []
-        for name in names:
-            tool_instance = cls._tools.get(name)
-            if tool_instance:
-                tools.append(tool_instance)
-            else:
-                logger.warning(f"工具 {name} 不存在，跳过")
-        return tools
-
-    @classmethod
-    def list_names(cls) -> list[str]:
-        """列出所有工具名称"""
-        return list(cls._tools.keys())
-
-    @classmethod
-    def count(cls) -> int:
-        """返回工具数量"""
-        return len(cls._tools)
-
-    @classmethod
-    def clear(cls) -> None:
-        """清空（仅测试用）"""
-        cls._tools.clear()
-
-
-# === 对外 API：@tool 装饰器（自动注册）===
+# === 对外 API：@tool 装饰器 ===
 
 
 def tool(
@@ -113,9 +57,9 @@ def tool(
     infer_schema: bool = True,
 ) -> Any:
     """
-    工具定义装饰器（自动注册）
+    工具定义装饰器
 
-    功能等同于 LangChain 的 @tool，额外增加自动注册功能。
+    功能等同于 LangChain 的 @tool，返回可注入的工具对象。
 
     使用示例：
     ```python
@@ -149,8 +93,8 @@ def tool(
     - infer_schema: 从类型注解推断 Schema（默认 True）
     """
 
-    def _create_and_register(func: Callable, custom_name: str | None = None) -> BaseTool:
-        """创建工具并自动注册"""
+    def _create_tool(func: Callable, custom_name: str | None = None) -> BaseTool:
+        """创建工具"""
         # 自动判断：有 args_schema 就不解析 docstring，没有就解析
         parse_docstring = args_schema is None
 
@@ -171,27 +115,15 @@ def tool(
                 infer_schema=infer_schema,
             )
 
-        # 自动注册
-        tool_name = tool_instance.name or func.__name__
-        ToolRegistry.register(tool_name, tool_instance)
-
         return tool_instance
 
     # 情况 1: @tool（无参数）
     if callable(name_or_func):
-        return _create_and_register(name_or_func, None)
+        return _create_tool(name_or_func, None)
 
     # 情况 2: @tool("name") 或 @tool(args_schema=..., ...)
     def decorator(func: Callable) -> BaseTool:
         custom_name = name_or_func if isinstance(name_or_func, str) else None
-        return _create_and_register(func, custom_name)
+        return _create_tool(func, custom_name)
 
     return decorator
-
-
-# === 便捷函数（框架内部使用）===
-
-
-def resolve_tools(tool_names: list[str]) -> list[Any]:
-    """解析工具名称列表（框架内部）"""
-    return ToolRegistry.resolve(tool_names)

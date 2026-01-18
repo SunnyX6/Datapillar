@@ -254,9 +254,9 @@ export function BaseEditor({
                 {groupIndex > 0 && (
                   <div className="my-1.5 border-t border-slate-100/50 dark:border-slate-700/50" />
                 )}
-                <div className="px-3 py-2 flex items-center justify-between">
+                <div className="px-3 py-1.5 flex items-center justify-between">
                   <span className={cn(
-                    'text-nano font-black uppercase tracking-[0.1em]',
+                    'text-nano font-semibold uppercase tracking-[0.08em]',
                     group.highlight ? 'text-indigo-500/70' : 'text-slate-400 dark:text-slate-500'
                   )}>
                     {group.title}
@@ -281,7 +281,7 @@ export function BaseEditor({
                             {item.icon}
                           </span>
                         )}
-                        <span className="text-xs font-medium">{item.label}</span>
+                        <span className="text-micro">{item.label}</span>
                       </div>
                       {group.highlight && (
                         <ArrowRight size={10} className="opacity-0 group-hover:opacity-40 -translate-x-2 group-hover:translate-x-0 transition-all" />

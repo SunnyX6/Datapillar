@@ -47,15 +47,15 @@ class Process(str, Enum):
     - 适用于复杂的多任务场景
     """
 
-    PARALLEL = "parallel"
+    MAPREDUCE = "mapreduce"
     """
-    并行执行
+    MapReduce 执行
 
-    无依赖的任务并行执行：
-    - 分析 Agent 间的依赖关系
-    - 无依赖的 Agent 并行执行
-    - 有依赖的 Agent 等待前置完成
-    - 适用于可并行化的场景
+    任务分解 → 并行执行 → 统一汇总：
+    - Planner 拆分独立任务并分配 Agent
+    - Map 阶段并行执行任务
+    - Reducer 汇总结果生成最终交付（默认使用最后一个 Agent 的 schema）
+    - 适用于可并行化且需要汇总的场景
     """
 
     REACT = "react"

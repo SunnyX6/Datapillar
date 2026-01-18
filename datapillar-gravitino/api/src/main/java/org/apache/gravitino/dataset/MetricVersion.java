@@ -102,37 +102,44 @@ public interface MetricVersion extends Auditable {
   }
 
   /**
-   * @return 引用的 Catalog 名称，用于原子指标关联数据源，如果未设置则返回 null
+   * @return 引用的 Table ID，用于原子指标关联数据源，如果未设置则返回 null
+   */
+  default Long refTableId() {
+    return null;
+  }
+
+  /**
+   * @return 引用的 Catalog 名称（只读，JOIN 查询），如果未设置则返回 null
    */
   default String refCatalogName() {
     return null;
   }
 
   /**
-   * @return 引用的 Schema 名称，用于原子指标关联数据源，如果未设置则返回 null
+   * @return 引用的 Schema 名称（只读，JOIN 查询），如果未设置则返回 null
    */
   default String refSchemaName() {
     return null;
   }
 
   /**
-   * @return 引用的 Table 名称，用于原子指标关联数据源，如果未设置则返回 null
+   * @return 引用的 Table 名称（只读，JOIN 查询），如果未设置则返回 null
    */
   default String refTableName() {
     return null;
   }
 
   /**
-   * @return 度量列 JSON 数组，格式：[{name, type, comment}]，如果未设置则返回 null
+   * @return 度量列 ID JSON 数组，格式：[123, 456]，如果未设置则返回 null
    */
-  default String measureColumns() {
+  default String measureColumnIds() {
     return null;
   }
 
   /**
-   * @return 过滤列 JSON 数组，格式：[{name, type, comment, values:[{key, label}]}]，如果未设置则返回 null
+   * @return 过滤列 ID JSON 数组，格式：[789, 012]，如果未设置则返回 null
    */
-  default String filterColumns() {
+  default String filterColumnIds() {
     return null;
   }
 

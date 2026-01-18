@@ -8,9 +8,15 @@ Experience 模块 - 经验学习系统
 
 使用示例：
 ```python
-from datapillar_oneagentic import Datapillar
+from datapillar_oneagentic import Datapillar, DatapillarConfig
+
+config = DatapillarConfig(
+    llm={"api_key": "sk-xxx", "model": "gpt-4o"},
+    embedding={"api_key": "sk-xxx", "model": "text-embedding-3-small"},
+)
 
 team = Datapillar(
+    config=config,
     agents=[...],
     enable_learning=True,
 )

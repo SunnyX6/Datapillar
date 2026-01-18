@@ -33,16 +33,14 @@ event = SseEvent.agent_interrupt(
 
 from __future__ import annotations
 
-import time
 from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
+from datapillar_oneagentic.core.status import ExecutionStatus, is_failed
 
-def _now_ms() -> int:
-    return int(time.time() * 1000)
-
+from datapillar_oneagentic.utils.time import now_ms
 
 class SseEventType(str, Enum):
     """事件类型（前端据此做稳定状态机）"""
@@ -55,6 +53,7 @@ class SseEventType(str, Enum):
     TOOL_START = "tool.start"
     TOOL_END = "tool.end"
     AGENT_INTERRUPT = "agent.interrupt"
+    TODO_UPDATE = "todo.update"
     RESULT = "result"
     ERROR = "error"
     ABORTED = "aborted"
@@ -149,7 +148,7 @@ class SseEvent(BaseModel):
     """
 
     v: int = Field(default=1, description="协议版本")
-    ts: int = Field(default_factory=_now_ms, description="毫秒时间戳")
+    ts: int = Field(default_factory=now_ms, description="毫秒时间戳")
     event: SseEventType = Field(..., description="事件类型")
     state: SseState = Field(..., description="事件状态")
     level: SseLevel = Field(..., description="严重级别")
@@ -166,6 +165,7 @@ class SseEvent(BaseModel):
     llm: SseLlm | None = None
     interrupt: SseInterrupt | None = None
     result: SseResult | None = None
+    todo: dict[str, Any] | None = None
     error: SseError | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -341,6 +341,16 @@ class SseEvent(BaseModel):
         )
 
     @classmethod
+    def todo_update(cls, *, todo: dict[str, Any]) -> SseEvent:
+        """Todo 更新"""
+        return cls(
+            event=SseEventType.TODO_UPDATE,
+            state=SseState.DONE,
+            level=SseLevel.INFO,
+            todo=todo,
+        )
+
+    @classmethod
     def result_event(
         cls,
         *,
@@ -396,3 +406,16 @@ class SseEvent(BaseModel):
             agent=SseAgent(id=agent_id, name=agent_name) if agent_id and agent_name else None,
             message=SseMessage(role="system", content=message),
         )
+
+
+def map_execution_status_to_sse(
+    status: ExecutionStatus | str | None,
+) -> tuple[SseState, SseLevel]:
+    """
+    执行状态 -> SSE 状态/级别 映射
+    - FAILED -> ERROR/ERROR
+    - 其他 -> DONE/SUCCESS
+    """
+    if is_failed(status):
+        return (SseState.ERROR, SseLevel.ERROR)
+    return (SseState.DONE, SseLevel.SUCCESS)

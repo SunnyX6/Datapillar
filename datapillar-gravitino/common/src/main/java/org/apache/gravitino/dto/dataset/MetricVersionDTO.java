@@ -73,6 +73,9 @@ public class MetricVersionDTO implements MetricVersion {
   @JsonProperty("calculationFormula")
   private String calculationFormula;
 
+  @JsonProperty("refTableId")
+  private Long refTableId;
+
   @JsonProperty("refCatalogName")
   private String refCatalogName;
 
@@ -82,11 +85,11 @@ public class MetricVersionDTO implements MetricVersion {
   @JsonProperty("refTableName")
   private String refTableName;
 
-  @JsonProperty("measureColumns")
-  private String measureColumns;
+  @JsonProperty("measureColumnIds")
+  private String measureColumnIds;
 
-  @JsonProperty("filterColumns")
-  private String filterColumns;
+  @JsonProperty("filterColumnIds")
+  private String filterColumnIds;
 
   @JsonProperty("properties")
   private Map<String, String> properties;
@@ -155,6 +158,11 @@ public class MetricVersionDTO implements MetricVersion {
   }
 
   @Override
+  public Long refTableId() {
+    return refTableId;
+  }
+
+  @Override
   public String refCatalogName() {
     return refCatalogName;
   }
@@ -170,13 +178,13 @@ public class MetricVersionDTO implements MetricVersion {
   }
 
   @Override
-  public String measureColumns() {
-    return measureColumns;
+  public String measureColumnIds() {
+    return measureColumnIds;
   }
 
   @Override
-  public String filterColumns() {
-    return filterColumns;
+  public String filterColumnIds() {
+    return filterColumnIds;
   }
 
   @Override
@@ -207,11 +215,12 @@ public class MetricVersionDTO implements MetricVersion {
     private String unitSymbol;
     private String[] parentMetricCodes;
     private String calculationFormula;
+    private Long refTableId;
     private String refCatalogName;
     private String refSchemaName;
     private String refTableName;
-    private String measureColumns;
-    private String filterColumns;
+    private String measureColumnIds;
+    private String filterColumnIds;
     private Map<String, String> properties;
     private AuditDTO audit;
 
@@ -275,6 +284,11 @@ public class MetricVersionDTO implements MetricVersion {
       return this;
     }
 
+    public Builder withRefTableId(Long refTableId) {
+      this.refTableId = refTableId;
+      return this;
+    }
+
     public Builder withRefCatalogName(String refCatalogName) {
       this.refCatalogName = refCatalogName;
       return this;
@@ -290,13 +304,13 @@ public class MetricVersionDTO implements MetricVersion {
       return this;
     }
 
-    public Builder withMeasureColumns(String measureColumns) {
-      this.measureColumns = measureColumns;
+    public Builder withMeasureColumnIds(String measureColumnIds) {
+      this.measureColumnIds = measureColumnIds;
       return this;
     }
 
-    public Builder withFilterColumns(String filterColumns) {
-      this.filterColumns = filterColumns;
+    public Builder withFilterColumnIds(String filterColumnIds) {
+      this.filterColumnIds = filterColumnIds;
       return this;
     }
 
@@ -330,11 +344,12 @@ public class MetricVersionDTO implements MetricVersion {
           unitSymbol,
           parentMetricCodes,
           calculationFormula,
+          refTableId,
           refCatalogName,
           refSchemaName,
           refTableName,
-          measureColumns,
-          filterColumns,
+          measureColumnIds,
+          filterColumnIds,
           properties,
           audit);
     }

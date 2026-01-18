@@ -14,12 +14,14 @@ LangGraph StateGraph 的状态定义。
 
 from __future__ import annotations
 
+import operator
 from typing import Annotated
 
 from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
+from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
 
 class Blackboard(TypedDict, total=False):
     """
@@ -29,6 +31,7 @@ class Blackboard(TypedDict, total=False):
     - messages: 对话消息列表（短期记忆，LangGraph 标准，通过 add_messages reducer 自动合并）
     - session_id: 会话标识
     - active_agent: 当前活跃的 Agent ID
+    - assigned_task: Manager 下发给当前 Agent 的任务内容
     - deliverable_keys: 已产出的交付物 key 列表（实际内容存在 Store）
     - timeline: 执行时间线（Timeline.model_dump()）
 
@@ -48,6 +51,9 @@ class Blackboard(TypedDict, total=False):
     # Agent 控制
     active_agent: str | None
 
+    # Manager 下发给当前 Agent 的任务内容（层级模式）
+    assigned_task: str | None
+
     # 执行时间线（支持时间旅行）
     timeline: dict | None
 
@@ -58,10 +64,24 @@ class Blackboard(TypedDict, total=False):
     # 经验上下文（框架自动检索注入）
     experience_context: str | None
 
+    # 知识上下文（框架检索注入）
+    knowledge_context: str | None
+
     # Agent 执行状态
-    last_agent_status: str | None
+    last_agent_status: ExecutionStatus | None
+    last_agent_failure_kind: FailureKind | None
     last_agent_error: str | None
 
+    # 会话级 Todo（团队级进度跟踪）
+    todo: dict | None
+    todo_context: str | None
+
+    # MapReduce 模式
+    mapreduce_goal: str | None
+    mapreduce_understanding: str | None
+    mapreduce_tasks: list[dict]
+    mapreduce_task: dict | None
+    mapreduce_results: Annotated[list[dict], operator.add]
 
     # ReAct 模式
     goal: str | None
@@ -75,6 +95,7 @@ def create_blackboard(
     namespace: str = "",
     session_id: str = "",
     experience_context: str | None = None,
+    knowledge_context: str | None = None,
 ) -> Blackboard:
     """创建新的 Blackboard"""
     return Blackboard(
@@ -82,12 +103,23 @@ def create_blackboard(
         namespace=namespace,
         session_id=session_id,
         active_agent=None,
+        assigned_task=None,
         timeline=None,
         deliverable_keys=[],
         deliverable_versions={},
         experience_context=experience_context,
+        knowledge_context=knowledge_context,
         last_agent_status=None,
+        last_agent_failure_kind=None,
         last_agent_error=None,
+        todo=None,
+        todo_context=None,
+        # MapReduce 模式
+        mapreduce_goal=None,
+        mapreduce_understanding=None,
+        mapreduce_tasks=[],
+        mapreduce_task=None,
+        mapreduce_results=[],
         # ReAct 模式
         goal=None,
         plan=None,

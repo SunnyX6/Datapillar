@@ -53,16 +53,18 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
       Field.optional("parent_metric_codes", String[].class, "父指标编码数组");
   public static final Field CALCULATION_FORMULA =
       Field.optional("calculation_formula", String.class, "计算公式");
+  public static final Field REF_TABLE_ID =
+      Field.optional("ref_table_id", Long.class, "引用的Table ID（原子指标）");
   public static final Field REF_CATALOG_NAME =
-      Field.optional("ref_catalog_name", String.class, "引用的Catalog名称（原子指标）");
+      Field.optional("ref_catalog_name", String.class, "引用的Catalog名称（只读，JOIN查询）");
   public static final Field REF_SCHEMA_NAME =
-      Field.optional("ref_schema_name", String.class, "引用的Schema名称（原子指标）");
+      Field.optional("ref_schema_name", String.class, "引用的Schema名称（只读，JOIN查询）");
   public static final Field REF_TABLE_NAME =
-      Field.optional("ref_table_name", String.class, "引用的Table名称（原子指标）");
-  public static final Field MEASURE_COLUMNS =
-      Field.optional("measure_columns", String.class, "度量列JSON数组");
-  public static final Field FILTER_COLUMNS =
-      Field.optional("filter_columns", String.class, "过滤列JSON数组");
+      Field.optional("ref_table_name", String.class, "引用的Table名称（只读，JOIN查询）");
+  public static final Field MEASURE_COLUMN_IDS =
+      Field.optional("measure_column_ids", String.class, "度量列ID JSON数组");
+  public static final Field FILTER_COLUMN_IDS =
+      Field.optional("filter_column_ids", String.class, "过滤列ID JSON数组");
   public static final Field PROPERTIES = Field.optional("properties", Map.class, "版本属性");
   public static final Field AUDIT_INFO = Field.required("audit_info", AuditInfo.class, "审计信息");
 
@@ -79,11 +81,12 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
   private String unitSymbol;
   private String[] parentMetricCodes;
   private String calculationFormula;
+  private Long refTableId;
   private String refCatalogName;
   private String refSchemaName;
   private String refTableName;
-  private String measureColumns;
-  private String filterColumns;
+  private String measureColumnIds;
+  private String filterColumnIds;
   private AuditInfo auditInfo;
   private Map<String, String> properties;
 
@@ -103,11 +106,12 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
     fields.put(UNIT, unit);
     fields.put(PARENT_METRIC_CODES, parentMetricCodes);
     fields.put(CALCULATION_FORMULA, calculationFormula);
+    fields.put(REF_TABLE_ID, refTableId);
     fields.put(REF_CATALOG_NAME, refCatalogName);
     fields.put(REF_SCHEMA_NAME, refSchemaName);
     fields.put(REF_TABLE_NAME, refTableName);
-    fields.put(MEASURE_COLUMNS, measureColumns);
-    fields.put(FILTER_COLUMNS, filterColumns);
+    fields.put(MEASURE_COLUMN_IDS, measureColumnIds);
+    fields.put(FILTER_COLUMN_IDS, filterColumnIds);
     fields.put(PROPERTIES, properties);
     fields.put(AUDIT_INFO, auditInfo);
     return Collections.unmodifiableMap(fields);
@@ -178,6 +182,11 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
   }
 
   @Override
+  public Long refTableId() {
+    return refTableId;
+  }
+
+  @Override
   public String refCatalogName() {
     return refCatalogName;
   }
@@ -193,13 +202,13 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
   }
 
   @Override
-  public String measureColumns() {
-    return measureColumns;
+  public String measureColumnIds() {
+    return measureColumnIds;
   }
 
   @Override
-  public String filterColumns() {
-    return filterColumns;
+  public String filterColumnIds() {
+    return filterColumnIds;
   }
 
   @Override
@@ -249,11 +258,9 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
         && Objects.equals(unit, that.unit)
         && Objects.deepEquals(parentMetricCodes, that.parentMetricCodes)
         && Objects.equals(calculationFormula, that.calculationFormula)
-        && Objects.equals(refCatalogName, that.refCatalogName)
-        && Objects.equals(refSchemaName, that.refSchemaName)
-        && Objects.equals(refTableName, that.refTableName)
-        && Objects.equals(measureColumns, that.measureColumns)
-        && Objects.equals(filterColumns, that.filterColumns)
+        && Objects.equals(refTableId, that.refTableId)
+        && Objects.equals(measureColumnIds, that.measureColumnIds)
+        && Objects.equals(filterColumnIds, that.filterColumnIds)
         && Objects.equals(properties, that.properties)
         && Objects.equals(auditInfo, that.auditInfo);
   }
@@ -272,11 +279,9 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
             comment,
             unit,
             calculationFormula,
-            refCatalogName,
-            refSchemaName,
-            refTableName,
-            measureColumns,
-            filterColumns,
+            refTableId,
+            measureColumnIds,
+            filterColumnIds,
             properties,
             auditInfo);
     result = 31 * result + Arrays.hashCode(parentMetricCodes);
@@ -359,6 +364,11 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
       return this;
     }
 
+    public Builder withRefTableId(Long refTableId) {
+      metricVersion.refTableId = refTableId;
+      return this;
+    }
+
     public Builder withRefCatalogName(String refCatalogName) {
       metricVersion.refCatalogName = refCatalogName;
       return this;
@@ -374,13 +384,13 @@ public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, Me
       return this;
     }
 
-    public Builder withMeasureColumns(String measureColumns) {
-      metricVersion.measureColumns = measureColumns;
+    public Builder withMeasureColumnIds(String measureColumnIds) {
+      metricVersion.measureColumnIds = measureColumnIds;
       return this;
     }
 
-    public Builder withFilterColumns(String filterColumns) {
-      metricVersion.filterColumns = filterColumns;
+    public Builder withFilterColumnIds(String filterColumnIds) {
+      metricVersion.filterColumnIds = filterColumnIds;
       return this;
     }
 

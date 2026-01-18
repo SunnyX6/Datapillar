@@ -1,0 +1,85 @@
+"""
+Knowledge 模块
+"""
+
+from datapillar_oneagentic.knowledge.config import (
+    KnowledgeConfig,
+    KnowledgeInjectConfig,
+    KnowledgeChunkConfig,
+    KnowledgeRetrieveConfig,
+)
+from datapillar_oneagentic.knowledge.models import (
+    Attachment,
+    DocumentInput,
+    Knowledge,
+    KnowledgeChunk,
+    KnowledgeDocument,
+    KnowledgeInject,
+    KnowledgeSearchHit,
+    KnowledgeRef,
+    KnowledgeRetrieve,
+    KnowledgeRetrieveResult,
+    KnowledgeSource,
+    KnowledgeScope,
+    ParsedDocument,
+    SparseEmbeddingProvider,
+    SourceSpan,
+    merge_knowledge,
+)
+from datapillar_oneagentic.knowledge.retriever.retriever import KnowledgeRetriever
+from datapillar_oneagentic.knowledge.ingest.pipeline import KnowledgeIngestor
+from datapillar_oneagentic.knowledge.chunker import KnowledgeChunker
+from datapillar_oneagentic.knowledge.evaluation import (
+    ChunkingDocReport,
+    ChunkingReport,
+    ChunkingSummaryReport,
+    EvalDocument,
+    EvalQuery,
+    EvalSet,
+    EvaluationReport,
+    KnowledgeEvaluator,
+    LengthStats,
+    RetrievalQueryReport,
+    RetrievalReport,
+    RetrievalSummaryReport,
+    load_eval_set,
+)
+
+__all__ = [
+    "Knowledge",
+    "KnowledgeSource",
+    "KnowledgeScope",
+    "KnowledgeRetrieve",
+    "KnowledgeInject",
+    "DocumentInput",
+    "ParsedDocument",
+    "Attachment",
+    "SourceSpan",
+    "KnowledgeDocument",
+    "KnowledgeChunk",
+    "KnowledgeSearchHit",
+    "KnowledgeRef",
+    "KnowledgeRetrieveResult",
+    "merge_knowledge",
+    "SparseEmbeddingProvider",
+    "KnowledgeConfig",
+    "KnowledgeChunkConfig",
+    "KnowledgeRetrieveConfig",
+    "KnowledgeInjectConfig",
+    "KnowledgeRetriever",
+    "KnowledgeIngestor",
+    "KnowledgeChunker",
+    "EvalDocument",
+    "EvalQuery",
+    "EvalSet",
+    "LengthStats",
+    "ChunkingDocReport",
+    "ChunkingSummaryReport",
+    "ChunkingReport",
+    "RetrievalQueryReport",
+    "RetrievalSummaryReport",
+    "RetrievalReport",
+    "EvaluationReport",
+    "KnowledgeEvaluator",
+    "load_eval_set",
+]

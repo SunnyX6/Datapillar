@@ -162,11 +162,12 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       String unit,
       String[] parentMetricCodes,
       String calculationFormula,
+      Long refTableId,
       String refCatalogName,
       String refSchemaName,
       String refTableName,
-      String measureColumns,
-      String filterColumns)
+      String measureColumnIds,
+      String filterColumnIds)
       throws MetricAlreadyExistsException {
     NameIdentifierUtil.checkMetric(ident);
 
@@ -214,11 +215,9 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
               unit,
               parentMetricCodes,
               calculationFormula,
-              refCatalogName,
-              refSchemaName,
-              refTableName,
-              measureColumns,
-              filterColumns);
+              refTableId,
+              measureColumnIds,
+              filterColumnIds);
     } catch (IOException e) {
       throw new RuntimeException("Failed to register metric " + ident, e);
     } catch (EntityAlreadyExistsException e) {
@@ -437,11 +436,9 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       String unitName,
       String[] parentMetricCodes,
       String calculationFormula,
-      String refCatalogName,
-      String refSchemaName,
-      String refTableName,
-      String measureColumns,
-      String filterColumns)
+      Long refTableId,
+      String measureColumnIds,
+      String filterColumnIds)
       throws NoSuchMetricVersionException {
     NameIdentifierUtil.checkMetric(ident);
 
@@ -460,11 +457,9 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                   unitName,
                   parentMetricCodes,
                   calculationFormula,
-                  refCatalogName,
-                  refSchemaName,
-                  refTableName,
-                  measureColumns,
-                  filterColumns);
+                  refTableId,
+                  measureColumnIds,
+                  filterColumnIds);
       return toMetricVersionImpl(updatedVersion);
 
     } catch (NoSuchEntityException e) {
@@ -511,8 +506,8 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
         .withRefCatalogName(entity.refCatalogName())
         .withRefSchemaName(entity.refSchemaName())
         .withRefTableName(entity.refTableName())
-        .withMeasureColumns(entity.measureColumns())
-        .withFilterColumns(entity.filterColumns())
+        .withMeasureColumnIds(entity.measureColumnIds())
+        .withFilterColumnIds(entity.filterColumnIds())
         .withProperties(entity.properties())
         .withAuditInfo(entity.auditInfo())
         .build();

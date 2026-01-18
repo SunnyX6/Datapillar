@@ -31,16 +31,16 @@ public class MetricVersionMetaBaseSQLProvider {
         + MetricVersionMetaMapper.TABLE_NAME
         + " (metric_id, metalake_id, catalog_id, schema_id, version, metric_name, metric_code,"
         + " metric_type, data_type, metric_comment, metric_unit, parent_metric_codes,"
-        + " calculation_formula, ref_catalog_name, ref_schema_name, ref_table_name, measure_columns, filter_columns,"
+        + " calculation_formula, ref_table_id, measure_column_ids, filter_column_ids,"
         + " version_properties, audit_info, deleted_at)"
         + " VALUES (#{metricVersionMeta.metricId}, #{metricVersionMeta.metalakeId},"
         + " #{metricVersionMeta.catalogId}, #{metricVersionMeta.schemaId}, #{metricVersionMeta.version},"
         + " #{metricVersionMeta.metricName}, #{metricVersionMeta.metricCode}, #{metricVersionMeta.metricType},"
         + " #{metricVersionMeta.dataType}, #{metricVersionMeta.metricComment}, #{metricVersionMeta.metricUnit},"
         + " #{metricVersionMeta.parentMetricCodes},"
-        + " #{metricVersionMeta.calculationFormula}, #{metricVersionMeta.refCatalogName},"
-        + " #{metricVersionMeta.refSchemaName}, #{metricVersionMeta.refTableName}, #{metricVersionMeta.measureColumns},"
-        + " #{metricVersionMeta.filterColumns}, #{metricVersionMeta.versionProperties}, #{metricVersionMeta.auditInfo}, #{metricVersionMeta.deletedAt})";
+        + " #{metricVersionMeta.calculationFormula}, #{metricVersionMeta.refTableId},"
+        + " #{metricVersionMeta.measureColumnIds}, #{metricVersionMeta.filterColumnIds},"
+        + " #{metricVersionMeta.versionProperties}, #{metricVersionMeta.auditInfo}, #{metricVersionMeta.deletedAt})";
   }
 
   public String listMetricVersionMetasByMetricId(@Param("metricId") Long metricId) {
@@ -49,12 +49,16 @@ public class MetricVersionMetaBaseSQLProvider {
         + " mv.metric_type AS metricType, mv.data_type AS dataType, mv.metric_comment AS metricComment,"
         + " mv.metric_unit AS metricUnit, u.unit_name AS unitName, u.unit_symbol AS unitSymbol,"
         + " mv.parent_metric_codes AS parentMetricCodes,"
-        + " mv.calculation_formula AS calculationFormula, mv.ref_catalog_name AS refCatalogName,"
-        + " mv.ref_schema_name AS refSchemaName, mv.ref_table_name AS refTableName, mv.measure_columns AS measureColumns,"
-        + " mv.filter_columns AS filterColumns, mv.version_properties AS versionProperties, mv.audit_info AS auditInfo, mv.deleted_at AS deletedAt"
+        + " mv.calculation_formula AS calculationFormula, mv.ref_table_id AS refTableId,"
+        + " t.table_name AS refTableName, s.schema_name AS refSchemaName, c.catalog_name AS refCatalogName,"
+        + " mv.measure_column_ids AS measureColumnIds, mv.filter_column_ids AS filterColumnIds,"
+        + " mv.version_properties AS versionProperties, mv.audit_info AS auditInfo, mv.deleted_at AS deletedAt"
         + " FROM "
         + MetricVersionMetaMapper.TABLE_NAME
         + " mv LEFT JOIN unit_meta u ON mv.schema_id = u.schema_id AND mv.metric_unit = u.unit_code AND u.deleted_at = 0"
+        + " LEFT JOIN table_meta t ON mv.ref_table_id = t.table_id AND t.deleted_at = 0"
+        + " LEFT JOIN schema_meta s ON t.schema_id = s.schema_id AND s.deleted_at = 0"
+        + " LEFT JOIN catalog_meta c ON t.catalog_id = c.catalog_id AND c.deleted_at = 0"
         + " WHERE mv.metric_id = #{metricId} AND mv.deleted_at = 0"
         + " ORDER BY mv.version DESC";
   }
@@ -65,12 +69,16 @@ public class MetricVersionMetaBaseSQLProvider {
         + " mv.metric_type AS metricType, mv.data_type AS dataType, mv.metric_comment AS metricComment,"
         + " mv.metric_unit AS metricUnit, u.unit_name AS unitName, u.unit_symbol AS unitSymbol,"
         + " mv.parent_metric_codes AS parentMetricCodes,"
-        + " mv.calculation_formula AS calculationFormula, mv.ref_catalog_name AS refCatalogName,"
-        + " mv.ref_schema_name AS refSchemaName, mv.ref_table_name AS refTableName, mv.measure_columns AS measureColumns,"
-        + " mv.filter_columns AS filterColumns, mv.version_properties AS versionProperties, mv.audit_info AS auditInfo, mv.deleted_at AS deletedAt"
+        + " mv.calculation_formula AS calculationFormula, mv.ref_table_id AS refTableId,"
+        + " t.table_name AS refTableName, s.schema_name AS refSchemaName, c.catalog_name AS refCatalogName,"
+        + " mv.measure_column_ids AS measureColumnIds, mv.filter_column_ids AS filterColumnIds,"
+        + " mv.version_properties AS versionProperties, mv.audit_info AS auditInfo, mv.deleted_at AS deletedAt"
         + " FROM "
         + MetricVersionMetaMapper.TABLE_NAME
         + " mv LEFT JOIN unit_meta u ON mv.schema_id = u.schema_id AND mv.metric_unit = u.unit_code AND u.deleted_at = 0"
+        + " LEFT JOIN table_meta t ON mv.ref_table_id = t.table_id AND t.deleted_at = 0"
+        + " LEFT JOIN schema_meta s ON t.schema_id = s.schema_id AND s.deleted_at = 0"
+        + " LEFT JOIN catalog_meta c ON t.catalog_id = c.catalog_id AND c.deleted_at = 0"
         + " WHERE mv.id = #{id} AND mv.deleted_at = 0";
   }
 
@@ -81,12 +89,16 @@ public class MetricVersionMetaBaseSQLProvider {
         + " mv.metric_type AS metricType, mv.data_type AS dataType, mv.metric_comment AS metricComment,"
         + " mv.metric_unit AS metricUnit, u.unit_name AS unitName, u.unit_symbol AS unitSymbol,"
         + " mv.parent_metric_codes AS parentMetricCodes,"
-        + " mv.calculation_formula AS calculationFormula, mv.ref_catalog_name AS refCatalogName,"
-        + " mv.ref_schema_name AS refSchemaName, mv.ref_table_name AS refTableName, mv.measure_columns AS measureColumns,"
-        + " mv.filter_columns AS filterColumns, mv.version_properties AS versionProperties, mv.audit_info AS auditInfo, mv.deleted_at AS deletedAt"
+        + " mv.calculation_formula AS calculationFormula, mv.ref_table_id AS refTableId,"
+        + " t.table_name AS refTableName, s.schema_name AS refSchemaName, c.catalog_name AS refCatalogName,"
+        + " mv.measure_column_ids AS measureColumnIds, mv.filter_column_ids AS filterColumnIds,"
+        + " mv.version_properties AS versionProperties, mv.audit_info AS auditInfo, mv.deleted_at AS deletedAt"
         + " FROM "
         + MetricVersionMetaMapper.TABLE_NAME
         + " mv LEFT JOIN unit_meta u ON mv.schema_id = u.schema_id AND mv.metric_unit = u.unit_code AND u.deleted_at = 0"
+        + " LEFT JOIN table_meta t ON mv.ref_table_id = t.table_id AND t.deleted_at = 0"
+        + " LEFT JOIN schema_meta s ON t.schema_id = s.schema_id AND s.deleted_at = 0"
+        + " LEFT JOIN catalog_meta c ON t.catalog_id = c.catalog_id AND c.deleted_at = 0"
         + " WHERE mv.metric_id = #{metricId} AND mv.version = #{version} AND mv.deleted_at = 0";
   }
 
@@ -161,15 +173,19 @@ public class MetricVersionMetaBaseSQLProvider {
         + "metric_unit = #{newMetricVersionMeta.metricUnit}, "
         + "parent_metric_codes = #{newMetricVersionMeta.parentMetricCodes}, "
         + "calculation_formula = #{newMetricVersionMeta.calculationFormula}, "
-        + "ref_catalog_name = #{newMetricVersionMeta.refCatalogName}, "
-        + "ref_schema_name = #{newMetricVersionMeta.refSchemaName}, "
-        + "ref_table_name = #{newMetricVersionMeta.refTableName}, "
-        + "measure_columns = #{newMetricVersionMeta.measureColumns}, "
-        + "filter_columns = #{newMetricVersionMeta.filterColumns}, "
+        + "ref_table_id = #{newMetricVersionMeta.refTableId}, "
+        + "measure_column_ids = #{newMetricVersionMeta.measureColumnIds}, "
+        + "filter_column_ids = #{newMetricVersionMeta.filterColumnIds}, "
         + "version_properties = #{newMetricVersionMeta.versionProperties}, "
         + "audit_info = #{newMetricVersionMeta.auditInfo}, "
         + "deleted_at = #{newMetricVersionMeta.deletedAt} "
         + "WHERE id = #{oldMetricVersionMeta.id} "
         + "AND deleted_at = 0";
+  }
+
+  public String countMetricVersionsByRefTableId(@Param("refTableId") Long refTableId) {
+    return "SELECT COUNT(*) FROM "
+        + MetricVersionMetaMapper.TABLE_NAME
+        + " WHERE ref_table_id = #{refTableId} AND deleted_at = 0";
   }
 }

@@ -3,8 +3,7 @@ Agent 定义
 
 核心类：
 - AgentSpec: Agent 规格（声明式配置）
-- AgentRegistry: Agent 注册中心（全局单例）
-- @agent: 装饰器，定义即注册
+- @agent: 装饰器，定义即绑定规格
 
 设计原则：
 - 声明式配置是契约
@@ -19,12 +18,14 @@ import inspect
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from datapillar_oneagentic.a2a.config import A2AConfig
+    from datapillar_oneagentic.core.config import AgentConfig, AgentRetryConfig
+    from datapillar_oneagentic.knowledge import Knowledge
     from datapillar_oneagentic.mcp.config import MCPServerConfig
 
 logger = logging.getLogger(__name__)
@@ -52,16 +53,12 @@ class AgentSpec:
     description: str = ""
     """一句话描述 Agent 能做什么"""
 
-    tools: list[str] = field(default_factory=list)
-    """工具名称列表（框架会解析为实际工具）"""
+    tools: list[Any] = field(default_factory=list)
+    """工具对象列表（BaseTool 或兼容工具）"""
 
     # === 委派配置（框架自动填充）===
     can_delegate_to: list[str] = field(default_factory=list)
     """可委派的目标 Agent ID 列表（由 Team 在 DYNAMIC 模式下自动设置）"""
-
-    # === 并行执行依赖（PARALLEL 模式）===
-    depends_on: list[str] = field(default_factory=list)
-    """依赖的 Agent ID 列表（PARALLEL 模式下，等待这些 Agent 完成后才执行）"""
 
     # === 交付物契约 ===
     deliverable_schema: type[BaseModel] | None = None
@@ -72,38 +69,36 @@ class AgentSpec:
     """LLM 温度"""
 
     max_steps: int | None = None
-    """Agent 最大执行步数（None 时读全局配置 datapillar.agent.max_steps）"""
+    """Agent 最大执行步数（None 时读团队 AgentConfig.max_steps）"""
+
+    retry_config: "AgentRetryConfig | None" = None
+    """Agent 重试配置（None 时读团队 AgentConfig.retry）"""
 
     timeout_seconds: float | None = None
-    """Agent 单次执行超时（None 时读全局配置 datapillar.agent.timeout_seconds）"""
+    """Agent 单次执行超时（None 时读团队 AgentConfig.timeout_seconds）"""
 
     tool_timeout_seconds: float | None = None
-    """工具单次调用超时（None 时读全局配置 datapillar.agent.tool_timeout_seconds）"""
+    """工具单次调用超时（None 时读团队 AgentConfig.tool_timeout_seconds）"""
 
-    def get_max_steps(self) -> int:
+    def get_max_steps(self, config: AgentConfig) -> int:
         """获取最大执行步数"""
-        if self.max_steps is not None:
-            return self.max_steps
-        from datapillar_oneagentic.config import datapillar
-        return datapillar.agent.max_steps
+        return self.max_steps if self.max_steps is not None else config.max_steps
 
-    def get_timeout_seconds(self) -> float:
+    def get_timeout_seconds(self, config: AgentConfig) -> float:
         """获取 Agent 执行超时（秒）"""
-        if self.timeout_seconds is not None:
-            return self.timeout_seconds
-        from datapillar_oneagentic.config import datapillar
-        return datapillar.agent.timeout_seconds
+        return self.timeout_seconds if self.timeout_seconds is not None else config.timeout_seconds
 
-    def get_tool_timeout_seconds(self) -> float:
+    def get_retry_config(self, config: AgentConfig) -> "AgentRetryConfig":
+        """获取 Agent 重试配置"""
+        return self.retry_config if self.retry_config is not None else config.retry
+
+    def get_tool_timeout_seconds(self, config: AgentConfig) -> float:
         """获取工具调用超时（秒）"""
-        if self.tool_timeout_seconds is not None:
-            return self.tool_timeout_seconds
-        from datapillar_oneagentic.config import datapillar
-        return datapillar.agent.tool_timeout_seconds
+        return self.tool_timeout_seconds if self.tool_timeout_seconds is not None else config.tool_timeout_seconds
 
     # === 知识配置 ===
-    knowledge_domains: list[str] = field(default_factory=list)
-    """需要的知识领域 ID 列表（框架自动注入到 Context）"""
+    knowledge: "Knowledge | None" = None
+    """知识配置（RAG 检索注入）"""
 
     # === A2A 远程 Agent ===
     a2a_agents: list[A2AConfig] = field(default_factory=list)
@@ -120,43 +115,37 @@ class AgentSpec:
 
 class AgentRegistry:
     """
-    Agent 注册中心（全局单例）
+    Agent 注册中心（团队内使用）
 
-    管理所有已注册的 Agent。
-
-    注意：此类是框架内部使用，业务侧不应直接操作。
+    每个团队独立持有一个 Registry，避免全局污染。
     """
 
-    _agents: dict[str, AgentSpec] = {}
+    def __init__(self) -> None:
+        self._agents: dict[str, AgentSpec] = {}
 
-    @classmethod
-    def register(cls, spec: AgentSpec) -> None:
+    def register(self, spec: AgentSpec) -> None:
         """注册 Agent"""
-        if spec.id in cls._agents:
+        if spec.id in self._agents:
             logger.warning(f"Agent {spec.id} 已存在，将被覆盖")
 
-        cls._agents[spec.id] = spec
+        self._agents[spec.id] = spec
         logger.info(f"📦 Agent 注册: {spec.name} ({spec.id})")
 
-    @classmethod
-    def get(cls, agent_id: str) -> AgentSpec | None:
+    def get(self, agent_id: str) -> AgentSpec | None:
         """获取 Agent 规格"""
-        return cls._agents.get(agent_id)
+        return self._agents.get(agent_id)
 
-    @classmethod
-    def list_ids(cls) -> list[str]:
+    def list_ids(self) -> list[str]:
         """列出所有 Agent ID"""
-        return list(cls._agents.keys())
+        return list(self._agents.keys())
 
-    @classmethod
-    def count(cls) -> int:
+    def list_specs(self) -> list[AgentSpec]:
+        """列出所有 Agent 规格"""
+        return list(self._agents.values())
+
+    def count(self) -> int:
         """返回 Agent 数量"""
-        return len(cls._agents)
-
-    @classmethod
-    def clear(cls) -> None:
-        """清空（仅测试用）"""
-        cls._agents.clear()
+        return len(self._agents)
 
 
 # === ID 格式校验 ===
@@ -229,19 +218,22 @@ def _validate_deliverable_schema(schema: type | None, class_name: str) -> None:
         )
 
 
+_AGENT_SPEC_ATTR = "__datapillar_spec__"
+
+
 def agent(
     id: str,
     name: str,
     *,
     deliverable_schema: type,
     description: str = "",
-    tools: list[str] | None = None,
+    tools: list[Any] | None = None,
     mcp_servers: list[MCPServerConfig] | None = None,
     a2a_agents: list[A2AConfig] | None = None,
     temperature: float = 0.0,
     max_steps: int | None = None,
-    knowledge_domains: list[str] | None = None,
-    depends_on: list[str] | None = None,
+    retry_config: "AgentRetryConfig | None" = None,
+    knowledge: "Knowledge | None" = None,
 ):
     """
     Agent 定义装饰器
@@ -257,7 +249,7 @@ def agent(
         id="analyst",
         name="需求分析师",
         deliverable_schema=AnalysisOutput,
-        tools=["search_tables"],
+        tools=[search_tables],
         mcp_servers=[
             MCPServerStdio(
                 command="npx",
@@ -280,14 +272,13 @@ def agent(
     - name: 显示名称
     - deliverable_schema: 交付物数据结构（Pydantic 模型，必填）
     - description: 能力描述
-    - tools: 工具名称列表
+    - tools: 工具对象列表（BaseTool 或兼容工具）
     - mcp_servers: MCP 服务器配置列表（框架自动将 MCP 工具转换为可调用工具）
     - a2a_agents: 远程 A2A Agent 配置列表（跨服务调用）
     - temperature: LLM 温度
-    - max_steps: Agent 最大执行步数（None 时读全局配置 datapillar.agent.max_steps）
-    - knowledge_domains: 需要的知识领域 ID 列表
-    - depends_on: 依赖的 Agent ID 列表（PARALLEL 模式下使用）
-
+    - max_steps: Agent 最大执行步数（None 时读团队 AgentConfig.max_steps）
+    - retry_config: Agent 重试配置（None 时读团队 AgentConfig.retry）
+    - knowledge: 知识配置（RAG 检索注入）
     注意：
     - 入口 Agent 由 Team 的 agents 列表第一个决定
     - 委派关系由 Team 在 DYNAMIC 模式下自动推断
@@ -326,14 +317,19 @@ def agent(
             deliverable_schema=deliverable_schema,
             temperature=temperature,
             max_steps=max_steps,
-            knowledge_domains=knowledge_domains or [],
-            depends_on=depends_on or [],
+            retry_config=retry_config,
+            knowledge=knowledge,
             agent_class=cls,
         )
 
-        # 注册
-        AgentRegistry.register(spec)
+        # 绑定规格到类
+        setattr(cls, _AGENT_SPEC_ATTR, spec)
 
         return cls
 
     return decorator
+
+
+def get_agent_spec(agent_class: type) -> AgentSpec | None:
+    """获取 Agent 类绑定的规格"""
+    return getattr(agent_class, _AGENT_SPEC_ATTR, None)

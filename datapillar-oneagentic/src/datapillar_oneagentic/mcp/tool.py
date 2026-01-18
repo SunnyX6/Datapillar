@@ -70,7 +70,7 @@ def _create_input_model(mcp_tool: MCPTool) -> type[BaseModel]:
         # 无参数工具，创建带占位符的模型
         return create_model(
             f"{mcp_tool.name}Input",
-            _placeholder=(str | None, Field(default=None, description="占位参数")),
+            placeholder=(str | None, Field(default=None, description="占位参数")),
         )
 
     fields = {}
@@ -118,7 +118,7 @@ def _create_mcp_tool(
     async def call_mcp_tool(**kwargs: Any) -> str:
         """调用 MCP 工具（带安全校验）"""
         # 移除占位参数
-        kwargs.pop("_placeholder", None)
+        kwargs.pop("placeholder", None)
 
         # 安全校验
         if mcp_tool.annotations.is_dangerous:

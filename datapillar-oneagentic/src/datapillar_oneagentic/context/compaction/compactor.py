@@ -8,7 +8,7 @@
 2. 将其他消息压缩为摘要
 3. 返回压缩后的 messages 列表
 
-触发时机：由 ContextLengthExceededError 异常触发，不再主动检查 token。
+触发时机：由 LLM 上下文超限触发，不再主动检查 token。
 """
 
 from __future__ import annotations
@@ -174,33 +174,18 @@ class Compactor:
         return "未知"
 
 
-# === 全局压缩器工厂 ===
-
-_compactor_cache: Compactor | None = None
+# === 压缩器工厂 ===
 
 
-def get_compactor(policy: CompactPolicy | None = None) -> Compactor:
+def get_compactor(*, llm: Any, policy: CompactPolicy | None = None) -> Compactor:
     """
-    获取压缩器实例（带缓存）
+    获取压缩器实例
 
     Args:
+        llm: LLM 实例
         policy: 压缩策略（可选）
 
     Returns:
         Compactor 实例
     """
-    global _compactor_cache
-
-    if _compactor_cache is None:
-        from datapillar_oneagentic.providers.llm import call_llm
-
-        llm = call_llm(temperature=0.0)
-        _compactor_cache = Compactor(llm=llm, policy=policy or CompactPolicy())
-
-    return _compactor_cache
-
-
-def clear_compactor_cache() -> None:
-    """清空压缩器缓存（仅测试用）"""
-    global _compactor_cache
-    _compactor_cache = None
+    return Compactor(llm=llm, policy=policy or CompactPolicy())

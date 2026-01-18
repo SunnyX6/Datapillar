@@ -6,6 +6,7 @@ import type { MetricType } from '@/types/metric'
 
 /** 度量列 */
 export interface MeasureColumn {
+  id?: number
   name: string
   type: string
   comment?: string
@@ -13,6 +14,7 @@ export interface MeasureColumn {
 
 /** 过滤列（含值域） */
 export interface FilterColumn {
+  id?: number
   name: string
   type: string
   comment?: string
@@ -48,9 +50,13 @@ export interface MetricFormData {
   measureColumns: MeasureColumn[]
   filterColumns: FilterColumn[]
   /** 原子指标的物理表引用 */
-  refCatalog?: string
-  refSchema?: string
-  refTable?: string
+  refTableId?: number
+  /** 引用的 Catalog 名称（只读，用于显示） */
+  refCatalogName?: string
+  /** 引用的 Schema 名称（只读，用于显示） */
+  refSchemaName?: string
+  /** 引用的 Table 名称（只读，用于显示） */
+  refTableName?: string
   /** 复合指标引用的指标列表 */
   compositeMetrics?: Array<{ code: string; name: string; comment?: string }>
 }

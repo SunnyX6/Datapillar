@@ -320,14 +320,12 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
         unit: form.unit.trim() || undefined,
         calculationFormula: form.formula.trim() || undefined,
         parentMetricCodes,
-        refCatalogName: (form.type === 'ATOMIC' || form.type === 'DERIVED') ? form.refCatalog || undefined : undefined,
-        refSchemaName: (form.type === 'ATOMIC' || form.type === 'DERIVED') ? form.refSchema || undefined : undefined,
-        refTableName: (form.type === 'ATOMIC' || form.type === 'DERIVED') ? form.refTable || undefined : undefined,
-        measureColumns: form.type === 'ATOMIC' && form.measureColumns.length > 0
-          ? JSON.stringify(form.measureColumns)
+        refTableId: (form.type === 'ATOMIC' || form.type === 'DERIVED') ? form.refTableId : undefined,
+        measureColumnIds: form.type === 'ATOMIC' && form.measureColumns.length > 0
+          ? JSON.stringify(form.measureColumns.map(c => c.id).filter(Boolean))
           : undefined,
-        filterColumns: (form.type === 'ATOMIC' || form.type === 'DERIVED') && form.filterColumns.length > 0
-          ? JSON.stringify(form.filterColumns)
+        filterColumnIds: (form.type === 'ATOMIC' || form.type === 'DERIVED') && form.filterColumns.length > 0
+          ? JSON.stringify(form.filterColumns.map(c => c.id).filter(Boolean))
           : undefined
       })
       // 构造新指标对象，直接添加到列表
@@ -388,11 +386,9 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
         unitName: form.unitName || undefined,
         parentMetricCodes,
         calculationFormula: form.formula.trim() || undefined,
-        refCatalogName: form.refCatalog || undefined,
-        refSchemaName: form.refSchema || undefined,
-        refTableName: form.refTable || undefined,
-        measureColumns: form.measureColumns.length > 0 ? JSON.stringify(form.measureColumns) : undefined,
-        filterColumns: form.filterColumns.length > 0 ? JSON.stringify(form.filterColumns) : undefined
+        refTableId: form.refTableId,
+        measureColumnIds: form.measureColumns.length > 0 ? JSON.stringify(form.measureColumns.map(c => c.id).filter(Boolean)) : undefined,
+        filterColumnIds: form.filterColumns.length > 0 ? JSON.stringify(form.filterColumns.map(c => c.id).filter(Boolean)) : undefined
       })
 
       // 用后端返回的版本数据更新列表

@@ -8,9 +8,15 @@
 
 使用示例：
 ```python
-from datapillar_oneagentic import Datapillar
+from datapillar_oneagentic import Datapillar, DatapillarConfig
+
+config = DatapillarConfig(
+    llm={"api_key": "sk-xxx", "model": "gpt-4o"},
+    embedding={"api_key": "sk-xxx", "model": "text-embedding-3-small"},
+)
 
 team = Datapillar(
+    config=config,
     agents=[...],
     enable_learning=True,
 )
@@ -30,18 +36,16 @@ await team.save_experience(
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from datapillar_oneagentic.utils.time import now_ms
+
 if TYPE_CHECKING:
     from datapillar_oneagentic.storage.learning_stores.base import ExperienceStore
+    from datapillar_oneagentic.providers.llm.embedding import EmbeddingProviderClient
 
 logger = logging.getLogger(__name__)
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
 
 
 @dataclass
@@ -83,7 +87,10 @@ class ExperienceRecord:
     feedback: dict[str, Any] = field(default_factory=dict)
     """用户反馈（结构由使用者定义）"""
 
-    created_at: int = field(default_factory=_now_ms)
+    knowledge_refs: list[dict[str, Any]] = field(default_factory=list)
+    """关联知识引用"""
+
+    created_at: int = field(default_factory=now_ms)
     """创建时间"""
 
     vector: list[float] = field(default_factory=list)
@@ -135,6 +142,9 @@ class ExperienceRecord:
             feedback_str = ", ".join(f"{k}={v}" for k, v in self.feedback.items())
             lines.append(f"- 反馈: {feedback_str}")
 
+        if self.knowledge_refs:
+            lines.append(f"- 知识引用: {len(self.knowledge_refs)} 条")
+
         return "\n".join(lines)
 
     def to_dict(self) -> dict[str, Any]:
@@ -150,6 +160,7 @@ class ExperienceRecord:
             "agents_involved": self.agents_involved,
             "duration_ms": self.duration_ms,
             "feedback": self.feedback,
+            "knowledge_refs": self.knowledge_refs,
             "created_at": self.created_at,
             "vector": self.vector,
         }
@@ -168,6 +179,7 @@ class ExperienceRecord:
             agents_involved=data.get("agents_involved", []),
             duration_ms=data.get("duration_ms", 0),
             feedback=data.get("feedback", {}),
+            knowledge_refs=data.get("knowledge_refs", []) or [],
             created_at=data.get("created_at", 0),
             vector=data.get("vector", []),
         )
@@ -186,6 +198,7 @@ class ExperienceLearner:
         self,
         store: ExperienceStore,
         namespace: str,
+        embedding_provider: "EmbeddingProviderClient",
     ):
         """
         初始化学习器
@@ -193,9 +206,11 @@ class ExperienceLearner:
         Args:
             store: 经验存储（ExperienceStore 抽象接口）
             namespace: 命名空间（用于隔离不同团队的经验）
+            embedding_provider: Embedding 提供者（用于向量化）
         """
         self._store = store
         self._namespace = namespace
+        self._embedding_provider = embedding_provider
         self._pending: dict[str, ExperienceRecord] = {}  # 临时记录
 
     # ==================== 框架内部调用 ====================
@@ -221,6 +236,17 @@ class ExperienceLearner:
         if record and agent_id not in record.agents_involved:
             record.agents_involved.append(agent_id)
 
+    def record_knowledge(self, session_id: str, refs: list[dict[str, Any]]) -> None:
+        """记录知识引用（框架内部调用）"""
+        record = self._pending.get(session_id)
+        if not record or not refs:
+            return
+        existing = {r.get("chunk_id") for r in record.knowledge_refs}
+        for ref in refs:
+            if ref.get("chunk_id") in existing:
+                continue
+            record.knowledge_refs.append(ref)
+
     def complete_recording(
         self,
         session_id: str,
@@ -234,7 +260,7 @@ class ExperienceLearner:
 
         record.outcome = outcome
         record.result_summary = result_summary
-        record.duration_ms = _now_ms() - record.created_at
+        record.duration_ms = now_ms() - record.created_at
 
     # ==================== 使用者调用 ====================
 
@@ -265,11 +291,9 @@ class ExperienceLearner:
             record.feedback = feedback
 
         # 生成 embedding（向量化完整经验信息）
-        from datapillar_oneagentic.providers.llm.embedding import embed_text
-
         embed_content = record.to_embed_text()
         try:
-            record.vector = await embed_text(embed_content)
+            record.vector = await self._embedding_provider.embed_text(embed_content)
         except Exception as e:
             logger.error(f"生成 embedding 失败，无法保存经验: {e}")
             self._pending[session_id] = record

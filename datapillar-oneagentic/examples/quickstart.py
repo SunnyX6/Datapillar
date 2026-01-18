@@ -24,8 +24,9 @@ from datapillar_oneagentic import (
     Process,
     AgentContext,
     # 配置
-    datapillar_configure,
+    DatapillarConfig,
 )
+from datapillar_oneagentic.knowledge import Knowledge, KnowledgeSource
 
 
 # ============================================================================
@@ -33,17 +34,17 @@ from datapillar_oneagentic import (
 # ============================================================================
 # GLM 配置（开启思考模式）
 LLM_PROVIDER = "glm"
-LLM_API_KEY = os.environ.get("GLM_API_KEY", "da90d1098b0d4126848881f56ee2197c.B77DUfAuh4To29o7")
-LLM_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
-LLM_MODEL = "glm-4.7"
-LLM_ENABLE_THINKING = False  # 关闭思考模式
+LLM_API_KEY = os.environ.get("GLM_API_KEY")
+LLM_BASE_URL = os.environ.get("GLM_BASE_URL")
+LLM_MODEL = os.environ.get("GLM_MODEL")
+LLM_ENABLE_THINKING = os.environ.get("GLM_ENABLE_THINKING", "false").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
-# Claude 配置（备用）
-# LLM_PROVIDER = "openai"
-# LLM_API_KEY = "sk-siTBGIFGanUBJfmZRJ407v7MLxW6MDTojdo1vGrQnF1JtNj7"
-# LLM_BASE_URL = "https://privnode.com/v1"
-# LLM_MODEL = "claude-opus-4-5-20251101"
-# LLM_ENABLE_THINKING = False
+if not LLM_API_KEY or not LLM_MODEL:
+    raise RuntimeError("请设置 GLM_API_KEY 和 GLM_MODEL（可选 GLM_BASE_URL/GLM_ENABLE_THINKING）")
 
 
 # ============================================================================
@@ -160,7 +161,7 @@ class OrderResult(BaseModel):
 
     # === 能力声明 ===
     description="根据用户需求推荐商品",         # 能力描述（用于团队协作时的介绍）
-    tools=["search_products", "get_product_detail", "check_inventory"],  # 工具列表
+    tools=[search_products, fetch_detail, check_inventory],  # 工具列表
 
     # === 交付物契约 ===
     deliverable_schema=ProductAnalysis,        # 交付物数据结构（Pydantic 模型）
@@ -171,7 +172,16 @@ class OrderResult(BaseModel):
     max_steps=10,                              # 最大工具调用次数
 
     # === 知识配置（可选）===
-    knowledge_domains=[],                      # 知识领域 ID 列表（需要先注册知识）
+    # 注意：启用知识检索需要配置 embedding
+    knowledge=Knowledge(
+        sources=[
+            KnowledgeSource(
+                source_id="kb_demo",
+                name="示例知识库",
+                source_type="doc",
+            )
+        ],
+    ),
 
     # === A2A 远程 Agent（可选）===
     # a2a_agents=[                             # 可调用的远程 Agent
@@ -247,7 +257,7 @@ class ShoppingAdvisorAgent:
     id="order_agent",
     name="订单助手",
     description="协助用户完成下单",
-    tools=["create_order", "check_inventory"],
+    tools=[create_order, check_inventory],
     deliverable_schema=OrderResult,
     temperature=0.0,  # 下单需要精确，温度设为 0
     max_steps=5,
@@ -322,7 +332,7 @@ class OrderAgent:
 # ============================================================================
 
 
-def create_shopping_team() -> Datapillar:
+def create_shopping_team(config: DatapillarConfig) -> Datapillar:
     """
     创建购物助手团队
 
@@ -331,6 +341,7 @@ def create_shopping_team() -> Datapillar:
     """
     team = Datapillar(
         # === 必填参数 ===
+        config=config,
         namespace="shopping_demo",                 # 命名空间（数据隔离边界）
         name="购物助手团队",                        # 团队名称
         agents=[ShoppingAdvisorAgent, OrderAgent],  # 两个 Agent 顺序执行
@@ -357,20 +368,21 @@ def create_shopping_team() -> Datapillar:
 async def main():
     """主函数"""
     # 配置 LLM
-    datapillar_configure(
-        llm={
-            "provider": LLM_PROVIDER,
-            "api_key": LLM_API_KEY,
-            "base_url": LLM_BASE_URL,
-            "model": LLM_MODEL,
-            "enable_thinking": LLM_ENABLE_THINKING,
-            "timeout_seconds": 120,
-            "retry": {"max_retries": 2},
-        }
-    )
+    llm_config = {
+        "provider": LLM_PROVIDER,
+        "api_key": LLM_API_KEY,
+        "model": LLM_MODEL,
+        "enable_thinking": LLM_ENABLE_THINKING,
+        "timeout_seconds": 120,
+        "retry": {"max_retries": 2},
+    }
+    if LLM_BASE_URL:
+        llm_config["base_url"] = LLM_BASE_URL
+
+    config = DatapillarConfig(llm=llm_config)
 
     # 创建团队
-    team = create_shopping_team()
+    team = create_shopping_team(config)
 
     print("=" * 60)
     print("🛒 购物助手团队已就绪")

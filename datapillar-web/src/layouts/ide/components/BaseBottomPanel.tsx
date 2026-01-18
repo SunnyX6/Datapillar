@@ -134,13 +134,37 @@ export function BaseBottomPanel({
           }`}
         />
 
+        {/* Tab 栏 - 位于内容区顶部 */}
+        <div className="h-7 flex items-center border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+          {tabs.map((tab) => {
+            const isActive = activeTabId === tab.id
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabClick(tab.id)}
+                className={`h-full px-2 flex items-center gap-1.5 text-tiny font-bold uppercase tracking-wider relative transition-all ${
+                  isActive
+                    ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800'
+                    : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+                {isActive && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />
+                )}
+              </button>
+            )
+          })}
+        </div>
+
         {/* 内容 */}
-        <div className="h-full overflow-auto bg-white dark:bg-slate-900">
+        <div className="h-[calc(100%-1.75rem)] overflow-auto bg-white dark:bg-slate-900">
           {children}
         </div>
       </div>
 
-      {/* 状态栏 + Tab 栏 */}
+      {/* 状态栏 */}
       <div className="h-7 flex items-center justify-between px-2 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 shrink-0 z-50">
         <div className="flex items-center gap-2 h-full">
           {/* 折叠按钮 */}
@@ -157,30 +181,6 @@ export function BaseBottomPanel({
 
           {/* 状态栏左侧 */}
           {statusLeft}
-
-          {/* Tab 列表 */}
-          <div className="flex items-center h-full">
-            {tabs.map((tab) => {
-              const isActive = activeTabId === tab.id && !isCollapsed
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabClick(tab.id)}
-                  className={`h-full px-2 flex items-center gap-1.5 text-tiny font-bold uppercase tracking-wider relative transition-all ${
-                    isActive
-                      ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800'
-                      : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
-                  }`}
-                >
-                  {tab.icon}
-                  {tab.label}
-                  {isActive && (
-                    <div className="absolute top-0 left-0 right-0 h-px bg-indigo-500" />
-                  )}
-                </button>
-              )
-            })}
-          </div>
         </div>
 
         {/* 状态栏右侧 */}

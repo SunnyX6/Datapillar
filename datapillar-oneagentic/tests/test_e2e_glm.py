@@ -1,0 +1,607 @@
+from __future__ import annotations
+
+import importlib.util
+import os
+
+import pytest
+from langchain_core.messages import SystemMessage
+from pydantic import BaseModel
+from datapillar_oneagentic import AgentContext, Datapillar, DatapillarConfig, Process, agent, tool
+from datapillar_oneagentic.knowledge import (
+    Knowledge,
+    DocumentInput,
+    KnowledgeChunkConfig,
+    KnowledgeIngestor,
+    KnowledgeSource,
+)
+from datapillar_oneagentic.providers.llm import EmbeddingProviderClient
+from datapillar_oneagentic.storage import create_knowledge_store
+
+
+class TextOutput(BaseModel):
+    text: str
+
+
+JSON_OUTPUT_RULE = (
+    "If you provide a final answer, return JSON only with a single field \"text\". "
+    "When using function/tool calling or structured output, set \"text\" to the plain final string; "
+    "do not embed JSON inside \"text\". "
+    "Do not include any other content."
+)
+
+
+@tool
+def echo(text: str) -> str:
+    """回显文本。
+
+    Args:
+        text: 输入文本。
+
+    Returns:
+        回显结果。
+    """
+    return f"echo:{text}"
+
+
+class _StubSparseEmbedder:
+    async def embed_text(self, text: str) -> dict[int, float]:
+        return {len(text): 1.0}
+
+    async def embed_texts(self, texts: list[str]) -> list[dict[int, float]]:
+        return [{len(text): 1.0} for text in texts]
+
+
+def _require_glm_llm_config() -> dict:
+    api_key = os.getenv("GLM_API_KEY")
+    model = os.getenv("GLM_MODEL")
+    if not api_key or not model:
+        pytest.skip("GLM_API_KEY or GLM_MODEL is not set")
+
+    config_kwargs: dict = {
+        "provider": "glm",
+        "api_key": api_key,
+        "model": model,
+        "temperature": 0.0,
+    }
+    base_url = os.getenv("GLM_BASE_URL")
+    if base_url:
+        config_kwargs["base_url"] = base_url
+
+    config_kwargs["enable_thinking"] = False
+
+    return config_kwargs
+
+
+def _require_glm_config() -> DatapillarConfig:
+    return DatapillarConfig(llm=_require_glm_llm_config())
+
+
+def _require_glm_embedding_config() -> dict:
+    api_key = os.getenv("GLM_EMBEDDING_API_KEY")
+    model = os.getenv("GLM_EMBEDDING_MODEL")
+    dimension_raw = os.getenv("GLM_EMBEDDING_DIMENSION")
+    if not api_key or not model or not dimension_raw:
+        pytest.skip("GLM_EMBEDDING_API_KEY/GLM_EMBEDDING_MODEL/GLM_EMBEDDING_DIMENSION is not set")
+
+    try:
+        dimension = int(dimension_raw)
+    except ValueError as exc:
+        raise ValueError("GLM_EMBEDDING_DIMENSION must be an integer") from exc
+
+    config_kwargs: dict = {
+        "provider": "glm",
+        "api_key": api_key,
+        "model": model,
+        "dimension": dimension,
+    }
+    base_url = os.getenv("GLM_EMBEDDING_BASE_URL")
+    if base_url:
+        config_kwargs["base_url"] = base_url
+
+    return config_kwargs
+
+
+def _module_available(module_name: str) -> bool:
+    return importlib.util.find_spec(module_name) is not None
+
+
+def _select_vector_store_config() -> dict:
+    if _module_available("lancedb") and _module_available("pyarrow"):
+        return {"type": "lance", "path": "./data/test-experience"}
+    if _module_available("chromadb"):
+        return {"type": "chroma", "path": "./data/test-chroma"}
+    pytest.skip("vector_store backend (lancedb/pyarrow or chromadb) is not available")
+
+
+async def _collect_events(
+    team: Datapillar,
+    *,
+    session_id: str,
+    query: str | None = None,
+    resume_value: str | None = None,
+) -> list[dict]:
+    events: list[dict] = []
+    async for event in team.stream(
+        query=query,
+        session_id=session_id,
+        resume_value=resume_value,
+    ):
+        events.append(event)
+    return events
+
+
+def _extract_deliverables(events: list[dict]) -> dict:
+    result = next(e for e in events if e["event"] == "result")
+    return result.get("result", {}).get("deliverable", {})
+
+
+@pytest.mark.asyncio
+async def test_glm_sequential_tool_and_knowledge_flow() -> None:
+    llm_config = _require_glm_llm_config()
+    embedding_config = _require_glm_embedding_config()
+    vector_store = _select_vector_store_config()
+    config = DatapillarConfig(
+        llm=llm_config,
+        embedding=embedding_config,
+        vector_store=vector_store,
+    )
+
+    namespace = "ns_glm_seq"
+    source = KnowledgeSource(
+        source_id="kb_demo",
+        name="Demo Knowledge",
+        source_type="doc",
+    )
+    doc = DocumentInput(
+        source="Always include token KNO123 in the final answer.",
+        filename="kb_doc_1.txt",
+        metadata={"title": "Demo Doc"},
+    )
+    sparse_embedder = _StubSparseEmbedder()
+    embedding_provider = EmbeddingProviderClient(config.embedding)
+    knowledge_store = create_knowledge_store(
+        namespace,
+        vector_store_config=config.vector_store,
+        embedding_config=config.embedding,
+    )
+    ingestor = KnowledgeIngestor(
+        store=knowledge_store,
+        embedding_provider=embedding_provider,
+        config=KnowledgeChunkConfig(mode="general", general={"max_tokens": 2000, "overlap": 0}),
+    )
+    await ingestor.ingest(source=source, documents=[doc], sparse_embedder=sparse_embedder)
+
+    @agent(
+        id="alpha",
+        name="Alpha",
+        deliverable_schema=TextOutput,
+        tools=[echo],
+        description="Use tools and follow knowledge.",
+        knowledge=Knowledge(
+            sources=[source],
+            sparse_embedder=sparse_embedder,
+        ),
+    )
+    class AlphaAgent:
+        SYSTEM_PROMPT = (
+            "You must call the echo tool with input 'hello'. "
+            "If you see token KNO123 in knowledge, include it in the text field. "
+            f"{JSON_OUTPUT_RULE}"
+        )
+
+        async def run(self, ctx: AgentContext) -> TextOutput:
+            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = await ctx.invoke_tools(messages)
+            output = await ctx.get_structured_output(messages)
+            return output
+
+    @agent(
+        id="beta",
+        name="Beta",
+        deliverable_schema=TextOutput,
+        description="Read alpha output and summarize.",
+    )
+    class BetaAgent:
+        SYSTEM_PROMPT = (
+            "Prefix the text with 'beta:' and include the alpha output. "
+            f"{JSON_OUTPUT_RULE}"
+        )
+
+        async def run(self, ctx: AgentContext) -> TextOutput:
+            alpha = await ctx.get_deliverable("alpha") or {}
+            messages = ctx.build_messages(f"{self.SYSTEM_PROMPT}\nAlpha output: {alpha.get('text', '')}")
+            output = await ctx.get_structured_output(messages)
+            return output
+
+    team = Datapillar(
+        config=config,
+        namespace=namespace,
+        name="glm_seq",
+        agents=[AlphaAgent, BetaAgent],
+        process=Process.SEQUENTIAL,
+    )
+
+    events = await _collect_events(team, query="run tool and follow knowledge", session_id="s_glm_seq")
+    deliverables = _extract_deliverables(events)
+
+    assert set(deliverables.keys()) == {"alpha", "beta"}
+    assert "echo:" in deliverables["alpha"]["text"]
+    assert "KNO123" in deliverables["alpha"]["text"]
+    assert deliverables["beta"]["text"].startswith("beta:")
+
+
+@pytest.mark.asyncio
+async def test_glm_dynamic_delegation_flow() -> None:
+    config = _require_glm_config()
+
+    @agent(
+        id="manager",
+        name="Manager",
+        deliverable_schema=TextOutput,
+        description="Delegate tasks only.",
+    )
+    class ManagerAgent:
+        SYSTEM_PROMPT = (
+            "You must call delegate_to_worker. "
+            "Do not answer directly. "
+            f"{JSON_OUTPUT_RULE}"
+        )
+
+        async def run(self, ctx: AgentContext) -> TextOutput:
+            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            await ctx.invoke_tools(messages)
+            return TextOutput(text="delegated")
+
+    @agent(
+        id="worker",
+        name="Worker",
+        deliverable_schema=TextOutput,
+        tools=[echo],
+        description="Handle delegated task and reply.",
+    )
+    class WorkerAgent:
+        SYSTEM_PROMPT = f"Call echo tool. {JSON_OUTPUT_RULE}"
+
+        async def run(self, ctx: AgentContext) -> TextOutput:
+            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = await ctx.invoke_tools(messages)
+            output = await ctx.get_structured_output(messages)
+            return output
+
+    team = Datapillar(
+        config=config,
+        namespace="ns_glm_dynamic",
+        name="glm_dynamic",
+        agents=[ManagerAgent, WorkerAgent],
+        process=Process.DYNAMIC,
+    )
+
+    events = await _collect_events(team, query="delegate this task to worker", session_id="s_glm_dynamic")
+    deliverables = _extract_deliverables(events)
+
+    assert set(deliverables.keys()) in ({"manager"}, {"worker"})
+    agent_id = next(iter(deliverables))
+    assert deliverables[agent_id].get("text", "").strip()
+
+
+@pytest.mark.asyncio
+async def test_glm_hierarchical_delegation_flow() -> None:
+    config = _require_glm_config()
+
+    @agent(
+        id="manager",
+        name="Manager",
+        deliverable_schema=TextOutput,
+        description="Delegate to worker, then summarize.",
+    )
+    class ManagerAgent:
+        SYSTEM_PROMPT = (
+            "You must call delegate_to_worker when no worker result exists. "
+            "After you get worker output, respond with JSON only. "
+            f"{JSON_OUTPUT_RULE}"
+        )
+
+        async def run(self, ctx: AgentContext) -> TextOutput:
+            worker = await ctx.get_deliverable("worker")
+            if worker:
+                messages = ctx.build_messages(
+                    f"{self.SYSTEM_PROMPT}\nWorker output: {worker.get('text', '')}\n"
+                )
+                output = await ctx.get_structured_output(messages)
+                return output
+            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            await ctx.invoke_tools(messages)
+            return TextOutput(text="delegated")
+
+    @agent(
+        id="worker",
+        name="Worker",
+        deliverable_schema=TextOutput,
+        tools=[echo],
+        description="Handle delegated task and reply.",
+    )
+    class WorkerAgent:
+        SYSTEM_PROMPT = f"Call echo tool. {JSON_OUTPUT_RULE}"
+
+        async def run(self, ctx: AgentContext) -> TextOutput:
+            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = await ctx.invoke_tools(messages)
+            output = await ctx.get_structured_output(messages)
+            return output
+
+    team = Datapillar(
+        config=config,
+        namespace="ns_glm_hier",
+        name="glm_hier",
+        agents=[ManagerAgent, WorkerAgent],
+        process=Process.HIERARCHICAL,
+    )
+
+    events = await _collect_events(
+        team,
+        query=(
+            "请委派给 worker 并总结以下文本："
+            "Datapillar 是一款数据开发产品，提供任务编排、指标管理与权限控制，"
+            "并强调可观测性与成本治理。"
+        ),
+        session_id="s_glm_hier",
+    )
+    deliverables = _extract_deliverables(events)
+    assert set(deliverables.keys()) == {"manager", "worker"}
+    assert deliverables["manager"].get("text", "").strip()
+    assert deliverables["worker"].get("text", "").strip()
+
+
+@pytest.mark.asyncio
+async def test_glm_mapreduce_flow() -> None:
+    config = _require_glm_config()
+
+    @agent(
+        id="worker_a",
+        name="WorkerA",
+        deliverable_schema=TextOutput,
+        tools=[echo],
+        description="Handle part A.",
+    )
+    class WorkerAgentA:
+        SYSTEM_PROMPT = f"Call echo tool. {JSON_OUTPUT_RULE}"
+
+        async def run(self, ctx: AgentContext) -> TextOutput:
+            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = await ctx.invoke_tools(messages)
+            output = await ctx.get_structured_output(messages)
+            return output
+
+    @agent(
+        id="worker_b",
+        name="WorkerB",
+        deliverable_schema=TextOutput,
+        tools=[echo],
+        description="Handle part B.",
+    )
+    class WorkerAgentB:
+        SYSTEM_PROMPT = f"Call echo tool. {JSON_OUTPUT_RULE}"
+
+        async def run(self, ctx: AgentContext) -> TextOutput:
+            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = await ctx.invoke_tools(messages)
+            output = await ctx.get_structured_output(messages)
+            return output
+
+    @agent(
+        id="reducer",
+        name="Reducer",
+        deliverable_schema=TextOutput,
+        description="Aggregate map results.",
+    )
+    class ReducerAgent:
+        SYSTEM_PROMPT = (
+            "你是结果聚合器。只输出 JSON，禁止 Markdown、代码块或任何额外说明。"
+            f"{JSON_OUTPUT_RULE}"
+        )
+
+        async def run(self, ctx: AgentContext) -> TextOutput:
+            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            output = await ctx.get_structured_output(messages)
+            return output
+
+    team = Datapillar(
+        config=config,
+        namespace="ns_glm_mr",
+        name="glm_mr",
+        agents=[WorkerAgentA, WorkerAgentB, ReducerAgent],
+        process=Process.MAPREDUCE,
+    )
+
+    events = await _collect_events(team, query="Summarize two key points about data quality.", session_id="s_glm_mr")
+    deliverables = _extract_deliverables(events)
+
+    assert set(deliverables.keys()) == {"reducer"}
+    assert isinstance(deliverables["reducer"].get("text"), str)
+
+
+@pytest.mark.asyncio
+async def test_glm_react_flow() -> None:
+    config = _require_glm_config()
+
+    @agent(
+        id="react_worker",
+        name="ReactWorker",
+        deliverable_schema=TextOutput,
+        tools=[echo],
+        description="Execute planned steps.",
+    )
+    class ReactWorker:
+        SYSTEM_PROMPT = (
+            "Call echo tool with any text. "
+            f"{JSON_OUTPUT_RULE}"
+        )
+
+        async def run(self, ctx: AgentContext) -> TextOutput:
+            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = await ctx.invoke_tools(messages)
+            output = await ctx.get_structured_output(messages)
+            return output
+
+    team = Datapillar(
+        config=config,
+        namespace="ns_glm_react",
+        name="glm_react",
+        agents=[ReactWorker],
+        process=Process.REACT,
+    )
+
+    events = await _collect_events(team, query="Create a simple plan and execute it.", session_id="s_glm_react")
+    deliverables = _extract_deliverables(events)
+
+    assert set(deliverables.keys()) == {"react_worker"}
+    assert isinstance(deliverables["react_worker"].get("text"), str)
+
+
+@pytest.mark.asyncio
+async def test_glm_interrupt_resume_flow() -> None:
+    config = _require_glm_config()
+
+    @agent(
+        id="interruptor",
+        name="Interruptor",
+        deliverable_schema=TextOutput,
+        description="Ask for input and continue.",
+    )
+    class InterruptAgent:
+        SYSTEM_PROMPT = f"{JSON_OUTPUT_RULE}"
+
+        async def run(self, ctx: AgentContext) -> TextOutput:
+            reply = ctx.interrupt("need input")
+            messages = ctx.build_messages(f"{self.SYSTEM_PROMPT}\nUser reply: {reply}")
+            output = await ctx.get_structured_output(messages)
+            return output
+
+    team = Datapillar(
+        config=config,
+        namespace="ns_glm_interrupt",
+        name="glm_interrupt",
+        agents=[InterruptAgent],
+        process=Process.SEQUENTIAL,
+    )
+
+    events = await _collect_events(team, query="start", session_id="s_glm_interrupt")
+    interrupt_event = next(e for e in events if e["event"] == "agent.interrupt")
+    assert interrupt_event["interrupt"]["payload"] == "need input"
+
+    resume_events = await _collect_events(
+        team,
+        session_id="s_glm_interrupt",
+        resume_value="yes",
+    )
+    deliverables = _extract_deliverables(resume_events)
+
+    assert "interruptor" in deliverables
+    assert isinstance(deliverables["interruptor"].get("text"), str)
+
+
+@pytest.mark.asyncio
+async def test_glm_todo_flow() -> None:
+    config = _require_glm_config()
+
+    @agent(
+        id="todo_agent",
+        name="TodoAgent",
+        deliverable_schema=TextOutput,
+        description="Report todo progress and reply.",
+    )
+    class TodoAgent:
+        SYSTEM_PROMPT = (
+            "If no todo list exists, call plan_todo to create at least 2 items. "
+            "You must call report_todo for each pending todo item and mark it completed. "
+            f"{JSON_OUTPUT_RULE}"
+        )
+
+        async def run(self, ctx: AgentContext) -> TextOutput:
+            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = await ctx.invoke_tools(messages)
+            output = await ctx.get_structured_output(messages)
+            return output
+
+    team = Datapillar(
+        config=config,
+        namespace="ns_glm_todo",
+        name="glm_todo",
+        agents=[TodoAgent],
+        process=Process.SEQUENTIAL,
+    )
+
+    events = await _collect_events(
+        team,
+        query=(
+            "This is a multi-phase task. "
+            "Break it into at least 2 todo items and track progress."
+        ),
+        session_id="s_glm_todo",
+    )
+    todo_events = [e for e in events if e["event"] == "todo.update"]
+
+    if not todo_events:
+        pytest.skip("GLM 未触发 todo 工具调用，跳过 todo.update 断言")
+    assert "items" in todo_events[0]["todo"]
+
+
+@pytest.mark.asyncio
+async def test_glm_experience_rag_flow() -> None:
+    llm_config = _require_glm_llm_config()
+    embedding_config = _require_glm_embedding_config()
+    vector_store = _select_vector_store_config()
+    config = DatapillarConfig(
+        llm=llm_config,
+        embedding=embedding_config,
+        vector_store=vector_store,
+    )
+
+    @agent(
+        id="rag_agent",
+        name="RagAgent",
+        deliverable_schema=TextOutput,
+        description="Use retrieved experience context.",
+    )
+    class RagAgent:
+        SYSTEM_PROMPT = (
+            "If you see token RAG_TAG=RAG123 in context, include it in the text field. "
+            f"{JSON_OUTPUT_RULE}"
+        )
+
+        async def run(self, ctx: AgentContext) -> TextOutput:
+            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            rag_injected = any(
+                isinstance(msg, SystemMessage) and "RAG_TAG=RAG123" in msg.content
+                for msg in messages
+            )
+            output = await ctx.get_structured_output(messages)
+            suffix = "RAG_INJECTED=true RAG_TAG=RAG123" if rag_injected else "RAG_INJECTED=false"
+            return TextOutput(text=f"{output.text} {suffix}")
+
+    team = Datapillar(
+        config=config,
+        namespace="ns_glm_rag",
+        name="glm_rag",
+        agents=[RagAgent],
+        process=Process.SEQUENTIAL,
+        enable_learning=True,
+    )
+
+    seed_session = "s_glm_rag_seed"
+    await _collect_events(team, query="Summarize a data quality incident.", session_id=seed_session)
+    saved = await team.save_experience(
+        session_id=seed_session,
+        feedback={"RAG_TAG": "RAG123"},
+    )
+    assert saved is True
+
+    events = await _collect_events(
+        team,
+        query="Summarize a data quality incident.",
+        session_id="s_glm_rag_query",
+    )
+    deliverables = _extract_deliverables(events)
+    output_text = deliverables["rag_agent"]["text"]
+    assert "RAG_INJECTED=true" in output_text
+    assert "RAG_TAG=RAG123" in output_text

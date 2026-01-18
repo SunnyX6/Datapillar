@@ -134,8 +134,7 @@ public class MetricMetaService {
    * @throws IOException 如果插入失败
    */
   public void insertMetric(MetricEntity metricEntity, boolean overwrite) throws IOException {
-    insertMetricWithVersion(
-        metricEntity, overwrite, null, null, null, null, null, null, null, null);
+    insertMetricWithVersion(metricEntity, overwrite, null, null, null, null, null, null);
   }
 
   /**
@@ -145,11 +144,9 @@ public class MetricMetaService {
    * @param unit 单位
    * @param parentMetricCodes 父指标编码数组
    * @param calculationFormula 计算公式
-   * @param refCatalogName 引用的数据源名称
-   * @param refSchemaName 引用的数据库名称
-   * @param refTableName 引用的表名称
-   * @param measureColumns 度量列JSON
-   * @param filterColumns 过滤列JSON
+   * @param refTableId 引用的Table ID
+   * @param measureColumnIds 度量列ID JSON数组
+   * @param filterColumnIds 过滤列ID JSON数组
    * @throws IOException 如果插入失败
    */
   public void insertMetricWithVersion(
@@ -157,11 +154,9 @@ public class MetricMetaService {
       String unit,
       String[] parentMetricCodes,
       String calculationFormula,
-      String refCatalogName,
-      String refSchemaName,
-      String refTableName,
-      String measureColumns,
-      String filterColumns)
+      Long refTableId,
+      String measureColumnIds,
+      String filterColumnIds)
       throws IOException {
     insertMetricWithVersion(
         metricEntity,
@@ -169,11 +164,9 @@ public class MetricMetaService {
         unit,
         parentMetricCodes,
         calculationFormula,
-        refCatalogName,
-        refSchemaName,
-        refTableName,
-        measureColumns,
-        filterColumns);
+        refTableId,
+        measureColumnIds,
+        filterColumnIds);
   }
 
   /**
@@ -184,11 +177,9 @@ public class MetricMetaService {
    * @param unit 单位
    * @param parentMetricCodes 父指标编码数组
    * @param calculationFormula 计算公式
-   * @param refCatalogName 引用的数据源名称
-   * @param refSchemaName 引用的数据库名称
-   * @param refTableName 引用的表名称
-   * @param measureColumns 度量列JSON
-   * @param filterColumns 过滤列JSON
+   * @param refTableId 引用的Table ID
+   * @param measureColumnIds 度量列ID JSON数组
+   * @param filterColumnIds 过滤列ID JSON数组
    * @throws IOException 如果插入失败
    */
   private void insertMetricWithVersion(
@@ -197,11 +188,9 @@ public class MetricMetaService {
       String unit,
       String[] parentMetricCodes,
       String calculationFormula,
-      String refCatalogName,
-      String refSchemaName,
-      String refTableName,
-      String measureColumns,
-      String filterColumns)
+      Long refTableId,
+      String measureColumnIds,
+      String filterColumnIds)
       throws IOException {
     NameIdentifierUtil.checkMetric(metricEntity.nameIdentifier());
 
@@ -230,11 +219,9 @@ public class MetricMetaService {
                     unit,
                     parentMetricCodes,
                     calculationFormula,
-                    refCatalogName,
-                    refSchemaName,
-                    refTableName,
-                    measureColumns,
-                    filterColumns);
+                    refTableId,
+                    measureColumnIds,
+                    filterColumnIds);
             MetricPO metricPO = builder.build();
             MetricVersionPO versionPO =
                 POConverters.initializeMetricVersionPO(
@@ -499,11 +486,9 @@ public class MetricMetaService {
    * @param unit 单位
    * @param parentMetricCodes 父指标编码数组
    * @param calculationFormula 计算公式
-   * @param refCatalogName 引用的Catalog名称
-   * @param refSchemaName 引用的Schema名称
-   * @param refTableName 引用的Table名称
-   * @param measureColumns 度量列JSON
-   * @param filterColumns 过滤列JSON
+   * @param refTableId 引用的Table ID
+   * @param measureColumnIds 度量列ID JSON数组
+   * @param filterColumnIds 过滤列ID JSON数组
    * @return 新创建的版本实体
    * @throws IOException 如果创建失败
    */
@@ -519,11 +504,9 @@ public class MetricMetaService {
       String unitName,
       String[] parentMetricCodes,
       String calculationFormula,
-      String refCatalogName,
-      String refSchemaName,
-      String refTableName,
-      String measureColumns,
-      String filterColumns)
+      Long refTableId,
+      String measureColumnIds,
+      String filterColumnIds)
       throws IOException {
     // 调用 createMetricVersion 创建新版本
     return createMetricVersion(
@@ -537,11 +520,9 @@ public class MetricMetaService {
         unitName,
         parentMetricCodes,
         calculationFormula,
-        refCatalogName,
-        refSchemaName,
-        refTableName,
-        measureColumns,
-        filterColumns);
+        refTableId,
+        measureColumnIds,
+        filterColumnIds);
   }
 
   /**
@@ -672,11 +653,9 @@ public class MetricMetaService {
    * @param unit 单位
    * @param parentMetricCodes 父指标编码数组
    * @param calculationFormula 计算公式
-   * @param refCatalogName 引用的Catalog名称
-   * @param refSchemaName 引用的Schema名称
-   * @param refTableName 引用的Table名称
-   * @param measureColumns 度量列JSON
-   * @param filterColumns 过滤列JSON
+   * @param refTableId 引用的Table ID
+   * @param measureColumnIds 度量列ID JSON数组
+   * @param filterColumnIds 过滤列ID JSON数组
    * @return 新创建的版本实体
    * @throws IOException 如果创建失败
    */
@@ -691,11 +670,9 @@ public class MetricMetaService {
       String unitName,
       String[] parentMetricCodes,
       String calculationFormula,
-      String refCatalogName,
-      String refSchemaName,
-      String refTableName,
-      String measureColumns,
-      String filterColumns)
+      Long refTableId,
+      String measureColumnIds,
+      String filterColumnIds)
       throws IOException {
     NameIdentifierUtil.checkMetric(metricIdent);
 
@@ -719,11 +696,9 @@ public class MetricMetaService {
             .withUnitName(unitName)
             .withParentMetricCodes(parentMetricCodes)
             .withCalculationFormula(calculationFormula)
-            .withRefCatalogName(refCatalogName)
-            .withRefSchemaName(refSchemaName)
-            .withRefTableName(refTableName)
-            .withMeasureColumns(measureColumns)
-            .withFilterColumns(filterColumns)
+            .withRefTableId(refTableId)
+            .withMeasureColumnIds(measureColumnIds)
+            .withFilterColumnIds(filterColumnIds)
             .withProperties(metricEntity.properties())
             .withAuditInfo(
                 AuditInfo.builder()
@@ -787,11 +762,9 @@ public class MetricMetaService {
         .withUnitName(newVersionEntity.unitName())
         .withParentMetricCodes(newVersionEntity.parentMetricCodes())
         .withCalculationFormula(newVersionEntity.calculationFormula())
-        .withRefCatalogName(newVersionEntity.refCatalogName())
-        .withRefSchemaName(newVersionEntity.refSchemaName())
-        .withRefTableName(newVersionEntity.refTableName())
-        .withMeasureColumns(newVersionEntity.measureColumns())
-        .withFilterColumns(newVersionEntity.filterColumns())
+        .withRefTableId(newVersionEntity.refTableId())
+        .withMeasureColumnIds(newVersionEntity.measureColumnIds())
+        .withFilterColumnIds(newVersionEntity.filterColumnIds())
         .withProperties(newVersionEntity.properties())
         .withAuditInfo(newVersionEntity.auditInfo())
         .build();

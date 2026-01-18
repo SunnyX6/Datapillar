@@ -4,19 +4,20 @@ ExperienceStore 抽象接口
 所有向量数据库实现此接口，数据结构统一使用 ExperienceRecord。
 
 实现类：
-- LanceExperienceStore (默认，嵌入式)
-- ChromaExperienceStore (可选)
-- MilvusExperienceStore (可选)
+- VectorExperienceStore（基于 VectorStore 的统一实现）
 
 使用示例：
 ```python
-from datapillar_oneagentic.storage.learning_stores import create_experience_store
+from datapillar_oneagentic.storage import create_learning_store
+from datapillar_oneagentic.storage.config import VectorStoreConfig
+from datapillar_oneagentic.providers.llm.config import EmbeddingConfig
 
-# 使用默认的 LanceDB
-store = create_experience_store(namespace="my_app")
-
-# 或指定其他实现
-store = create_experience_store(namespace="my_app", backend="chroma")
+embedding_config = EmbeddingConfig(model="text-embedding-3-small", api_key="sk-xxx")
+store = create_learning_store(
+    namespace="my_app",
+    vector_store_config=VectorStoreConfig(type="lance", path="./data/vectors"),
+    embedding_config=embedding_config,
+)
 ```
 """
 

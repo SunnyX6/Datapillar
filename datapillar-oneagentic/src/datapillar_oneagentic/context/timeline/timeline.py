@@ -12,7 +12,8 @@ import uuid
 from pydantic import BaseModel, Field
 
 from datapillar_oneagentic.context.timeline.entry import TimelineEntry
-from datapillar_oneagentic.context.types import CheckpointType, EventType
+from datapillar_oneagentic.context.checkpoint.types import CheckpointType
+from datapillar_oneagentic.events.constants import EventType
 
 
 def _generate_id() -> str:

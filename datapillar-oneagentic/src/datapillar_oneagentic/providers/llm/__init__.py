@@ -10,36 +10,27 @@ LLM 提供者模块
 - Ollama
 
 特性：
-- 统一接口 call_llm / call_embedding
+- 团队级 LLMProvider / EmbeddingProviderClient
 - 内置弹性机制（超时 + 重试 + 熔断）
 - 可选缓存
 - Token 使用量追踪
 
 使用示例：
 ```python
-from datapillar_oneagentic import datapillar_configure
-from datapillar_oneagentic.providers.llm import call_llm, call_embedding
+from datapillar_oneagentic import DatapillarConfig
+from datapillar_oneagentic.providers.llm import LLMProvider, EmbeddingProviderClient
 
-# 必须先配置
-datapillar_configure(
+config = DatapillarConfig(
     llm={"provider": "openai", "api_key": "sk-xxx", "model": "gpt-4o"},
     embedding={"provider": "openai", "api_key": "sk-xxx", "model": "text-embedding-3-small"},
 )
 
-# 获取 LLM（自动带弹性保护）
-llm = call_llm()
+llm_provider = LLMProvider(config.llm)
+llm = llm_provider()
 result = await llm.ainvoke(messages)
 
-# 获取 Embedding
-embeddings = call_embedding()
-vector = await embeddings.aembed_query("hello")
-
-# 带 structured output
-from pydantic import BaseModel
-class Output(BaseModel):
-    answer: str
-
-llm = call_llm(output_schema=Output)
+embedding_provider = EmbeddingProviderClient(config.embedding)
+vector = await embedding_provider.embed_text("hello")
 ```
 """
 
@@ -49,17 +40,13 @@ from datapillar_oneagentic.providers.llm.config import (
 )
 from datapillar_oneagentic.providers.llm.embedding import (
     EmbeddingFactory,
-    call_embedding,
-    clear_embedding_cache,
-    embed_text,
-    embed_texts,
+    EmbeddingProviderClient,
 )
 from datapillar_oneagentic.providers.llm.llm import (
     LLMFactory,
     LLMProviderConfig,
     ResilientChatModel,
-    call_llm,
-    clear_llm_cache,
+    LLMProvider,
 )
 from datapillar_oneagentic.providers.llm.llm_cache import (
     InMemoryLLMCache,
@@ -73,16 +60,12 @@ from datapillar_oneagentic.providers.llm.usage_tracker import (
 
 __all__ = [
     # LLM
-    "call_llm",
-    "clear_llm_cache",
+    "LLMProvider",
     "ResilientChatModel",
     "LLMFactory",
     "LLMProviderConfig",
     # Embedding
-    "call_embedding",
-    "embed_text",
-    "embed_texts",
-    "clear_embedding_cache",
+    "EmbeddingProviderClient",
     "EmbeddingFactory",
     # Provider 枚举
     "Provider",

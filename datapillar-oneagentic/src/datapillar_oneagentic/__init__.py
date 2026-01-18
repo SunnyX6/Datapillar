@@ -4,10 +4,10 @@ Datapillar OneAgentic - 声明式多智能体协作框架
 快速开始：
 ```python
 from pydantic import BaseModel
-from datapillar_oneagentic import agent, tool, Datapillar, Process, datapillar_configure
+from datapillar_oneagentic import agent, tool, Datapillar, Process, DatapillarConfig
 
 # 配置 LLM
-datapillar_configure(
+config = DatapillarConfig(
     llm={"api_key": "sk-xxx", "model": "gpt-4o"}
 )
 
@@ -27,7 +27,7 @@ class AnalysisOutput(BaseModel):
     id="analyst",
     name="数据分析师",
     deliverable_schema=AnalysisOutput,
-    tools=["search_database"],
+    tools=[search_database],
 )
 class AnalystAgent:
     SYSTEM_PROMPT = "你是数据分析师..."
@@ -37,7 +37,7 @@ class AnalystAgent:
         return await ctx.get_structured_output(messages)
 
 # 组建团队并执行（流式）
-team = Datapillar(namespace="my_project", name="分析团队", agents=[AnalystAgent])
+team = Datapillar(config=config, namespace="my_project", name="分析团队", agents=[AnalystAgent])
 async for event in team.stream(query="分析销售数据", session_id="session_001"):
     if event["event"] == "result":
         print(event["result"]["deliverable"])
@@ -49,10 +49,10 @@ async for event in team.stream(query="分析销售数据", session_id="session_0
 ```
 
 高级功能按需从子模块导入：
-- 知识系统: `from datapillar_oneagentic.context.knowledge import KnowledgeRegistry`
+- 知识系统: `from datapillar_oneagentic.knowledge import Knowledge, KnowledgeSource, KnowledgeIngestor`
 - A2A 协议: `from datapillar_oneagentic.a2a import A2AConfig, create_a2a_tool`
 - MCP 协议: `from datapillar_oneagentic.mcp import MCPClient, MCPServerConfig`
-- 事件订阅: `from datapillar_oneagentic.events import event_bus`
+- 事件订阅: `team.event_bus`
 - 经验学习: `from datapillar_oneagentic.experience import ExperienceLearner`
 - SSE 推送: `from datapillar_oneagentic.sse import StreamManager`
 """
@@ -62,7 +62,7 @@ __version__ = "0.1.0"
 # === 核心 API ===
 
 # 配置
-from datapillar_oneagentic.config import datapillar_configure
+from datapillar_oneagentic.config import DatapillarConfig
 
 # 装饰器
 from datapillar_oneagentic.core.agent import agent
@@ -78,7 +78,7 @@ __all__ = [
     # 版本
     "__version__",
     # 配置
-    "datapillar_configure",
+    "DatapillarConfig",
     # 装饰器
     "agent",
     "tool",

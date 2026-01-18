@@ -10,7 +10,6 @@ Orchestrator - 编排器
 from __future__ import annotations
 
 import logging
-import time
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import Any
@@ -19,24 +18,26 @@ from langchain_core.messages import HumanMessage
 from langgraph.graph import StateGraph
 from langgraph.types import Command
 
+from datapillar_oneagentic.exception import AgentError
 from datapillar_oneagentic.core.process import Process
+from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
 from datapillar_oneagentic.core.types import SessionKey
-from datapillar_oneagentic.events import SessionCompletedEvent, SessionStartedEvent, event_bus
+from datapillar_oneagentic.events import EventBus, SessionCompletedEvent, SessionStartedEvent
+from datapillar_oneagentic.providers.llm.llm import extract_thinking
 from datapillar_oneagentic.sse.event import (
     SseAgent,
+    SseError,
     SseEvent,
     SseEventType,
-    SseLevel,
     SseMessage,
     SseState,
+    map_execution_status_to_sse,
 )
 from datapillar_oneagentic.state.blackboard import create_blackboard
+from datapillar_oneagentic.utils.time import now_ms
+from datapillar_oneagentic.exception import LLMError
 
 logger = logging.getLogger(__name__)
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
 
 
 @dataclass
@@ -69,6 +70,7 @@ class Orchestrator:
         experience_learner=None,
         experience_retriever=None,
         process: Process = Process.SEQUENTIAL,
+        event_bus: EventBus,
     ):
         """
         创建编排器
@@ -84,6 +86,7 @@ class Orchestrator:
         - experience_learner: ExperienceLearner 实例（可选）
         - experience_retriever: ExperienceRetriever 实例（可选）
         - process: 执行模式
+        - event_bus: EventBus 实例
         """
         self.namespace = namespace
         self.name = name
@@ -100,6 +103,7 @@ class Orchestrator:
         # 经验学习
         self._experience_learner = experience_learner
         self._experience_retriever = experience_retriever
+        self._event_bus = event_bus
 
         # 编译图（延迟编译）
         self._compiled_graph = None
@@ -131,6 +135,49 @@ class Orchestrator:
         """补充会话信息并转换为 dict"""
         return event.with_session(namespace=key.namespace, session_id=key.session_id).to_dict()
 
+    async def _delete_store_artifacts(self, session_id: str) -> None:
+        """清理 deliverables 的 Store 数据（不清理 checkpointer）"""
+        if not self._store:
+            return
+
+        store_namespaces = [
+            ("deliverables", self.namespace, session_id, "latest"),
+            ("deliverables", self.namespace, session_id, "versions"),
+            ("deliverables", self.namespace, session_id),
+        ]
+        for store_namespace in store_namespaces:
+            try:
+                items = await self._store.asearch(store_namespace)
+                for item in items:
+                    await self._store.adelete(store_namespace, item.key)
+            except Exception as e:
+                logger.error(f"清理 Store 失败: {e}")
+
+    async def _clear_state_artifacts(self, compiled, config: dict) -> None:
+        """清理 blackboard 中的 todo/deliverables 引用"""
+        if not hasattr(compiled, "aupdate_state"):
+            return
+
+        updates = {
+            "todo": None,
+            "deliverable_keys": [],
+            "deliverable_versions": {},
+        }
+        try:
+            await compiled.aupdate_state(config, updates)
+        except Exception as e:
+            logger.warning(f"清理状态失败: {e}")
+
+    async def _cleanup_session_artifacts(
+        self,
+        *,
+        session_id: str,
+        compiled,
+        config: dict,
+    ) -> None:
+        await self._delete_store_artifacts(session_id)
+        await self._clear_state_artifacts(compiled, config)
+
     def _extract_thinking_from_message(self, msg: Any) -> str | None:
         """
         从消息中提取思考内容
@@ -140,25 +187,54 @@ class Orchestrator:
         - Claude: content 中的 thinking blocks
         - DeepSeek: additional_kwargs.reasoning_content
         """
-        if not hasattr(msg, "additional_kwargs"):
-            return None
+        return extract_thinking(msg)
 
-        # 1. GLM / DeepSeek 格式（reasoning_content）
-        reasoning = msg.additional_kwargs.get("reasoning_content")
-        if reasoning:
-            return reasoning
+    def _build_error_event(self, error: Exception, *, key: SessionKey, start_time: int) -> dict:
+        """构建错误 SSE 事件（异常不被吞掉）"""
+        if isinstance(error, LLMError):
+            agent_id = error.agent_id
+            agent_name = self._get_agent_name(agent_id) if agent_id else None
+            detail_parts = [
+                f"category={error.category.value}",
+                f"action={error.action.value}",
+            ]
+            if error.provider:
+                detail_parts.append(f"provider={error.provider}")
+            if error.model:
+                detail_parts.append(f"model={error.model}")
+            if agent_id:
+                detail_parts.append(f"agent_id={agent_id}")
+            detail_parts.append(f"error={str(error)}")
+            event = SseEvent.error_event(
+                message="LLM 执行失败",
+                detail="; ".join(detail_parts),
+                agent_id=agent_id,
+                agent_name=agent_name,
+            ).model_copy(update={"duration_ms": now_ms() - start_time})
+            return self._to_sse_dict(event, key)
 
-        # 2. Claude 格式（content 是 list，包含 thinking blocks）
-        content = getattr(msg, "content", None)
-        if isinstance(content, list):
-            thinking_parts = []
-            for block in content:
-                if isinstance(block, dict) and block.get("type") == "thinking":
-                    thinking_parts.append(block.get("thinking", ""))
-            if thinking_parts:
-                return "\n".join(thinking_parts)
+        if isinstance(error, AgentError):
+            agent_id = error.agent_id
+            detail_parts = [
+                f"category={error.category.value}",
+                f"action={error.action.value}",
+                f"failure_kind={error.failure_kind.value}",
+                f"agent_id={agent_id}",
+                f"error={str(error)}",
+            ]
+            event = SseEvent.error_event(
+                message="Agent 执行失败",
+                detail="; ".join(detail_parts),
+                agent_id=agent_id,
+                agent_name=self._get_agent_name(agent_id),
+            ).model_copy(update={"duration_ms": now_ms() - start_time})
+            return self._to_sse_dict(event, key)
 
-        return None
+        event = SseEvent.error_event(
+            message="执行失败",
+            detail=str(error),
+        ).model_copy(update={"duration_ms": now_ms() - start_time})
+        return self._to_sse_dict(event, key)
 
     async def _ensure_compiled(self):
         """确保图已编译"""
@@ -279,6 +355,19 @@ class Orchestrator:
                     if tool_name and self._experience_learner:
                         self._experience_learner.record_tool(key.session_id, tool_name)
 
+        if "todo" in node_output:
+            todo_data = node_output.get("todo")
+            if todo_data is None:
+                todo_payload = {"cleared": True, "items": []}
+            else:
+                todo_payload = todo_data
+            events.append(
+                self._to_sse_dict(
+                    SseEvent.todo_update(todo=todo_payload),
+                    key,
+                )
+            )
+
         return events, tool_count
 
     async def _build_final_result(
@@ -306,7 +395,7 @@ class Orchestrator:
                         agent_id=agent_id,
                         agent_name=agent_name,
                         payload=payload,
-                    ).model_copy(update={"duration_ms": _now_ms() - start_time})
+                    ).model_copy(update={"duration_ms": now_ms() - start_time})
                     return self._to_sse_dict(event, key)
 
         # 读取 deliverables
@@ -339,7 +428,7 @@ class Orchestrator:
             deliverable_type=None,
         ).model_copy(
             update={
-                "duration_ms": _now_ms() - start_time,
+                "duration_ms": now_ms() - start_time,
                 "timeline": timeline_data,
             }
         )
@@ -368,11 +457,11 @@ class Orchestrator:
         返回：
         - SSE 事件流
         """
-        start_time = _now_ms()
+        start_time = now_ms()
         agent_count = 0
         tool_count = 0
 
-        await event_bus.emit(self, SessionStartedEvent(key=key, query=query or ""))
+        await self._event_bus.emit(self, SessionStartedEvent(key=key, query=query or ""))
 
         config = {"configurable": {"thread_id": str(key)}}
         compiled = await self._ensure_compiled()
@@ -400,6 +489,16 @@ class Orchestrator:
             yield self._to_sse_dict(error_event, key)
             return
 
+        # Todo 初始化（已有 Todo 时通知前端）
+        if isinstance(input_for_stream, dict) and session_state.existing_state:
+            todo_snapshot = session_state.existing_state.get("todo")
+            if todo_snapshot:
+                input_for_stream["todo"] = todo_snapshot
+                yield self._to_sse_dict(
+                    SseEvent.todo_update(todo=todo_snapshot),
+                    key,
+                )
+
         try:
             # Phase 3: 执行流
             async for event in compiled.astream(input_for_stream, config):
@@ -424,21 +523,32 @@ class Orchestrator:
                     tool_count += node_tool_count
 
                     # 构建 agent.end 事件
-                    agent_status = "completed"
+                    agent_status = ExecutionStatus.COMPLETED
                     agent_error = None
+                    agent_failure_kind = None
                     if isinstance(node_output, dict):
-                        agent_status = node_output.get("last_agent_status", "completed")
+                        agent_status = node_output.get("last_agent_status", ExecutionStatus.COMPLETED)
                         agent_error = node_output.get("last_agent_error")
+                        agent_failure_kind = node_output.get("last_agent_failure_kind")
 
-                    if agent_status in {"failed", "error"}:
+                    state, level = map_execution_status_to_sse(agent_status)
+                    if state == SseState.ERROR:
+                        failure_tag = None
+                        if agent_failure_kind in (FailureKind.BUSINESS, FailureKind.SYSTEM):
+                            failure_tag = agent_failure_kind.value
                         event = SseEvent(
                             event=SseEventType.AGENT_END,
-                            state=SseState.ERROR,
-                            level=SseLevel.ERROR,
+                            state=state,
+                            level=level,
                             agent=SseAgent(id=node_name, name=agent_name),
                             message=SseMessage(
                                 role="assistant",
                                 content=agent_error or "执行失败",
+                            ),
+                            error=(
+                                None
+                                if failure_tag is None
+                                else SseError(message="失败类型", detail=failure_tag)
                             ),
                         )
                     else:
@@ -458,30 +568,37 @@ class Orchestrator:
                 result_data = final_event.get("result")
                 if isinstance(result_data, dict):
                     deliverables = result_data.get("deliverable") or {}
-                await event_bus.emit(
+                await self._event_bus.emit(
                     self,
                     SessionCompletedEvent(
                         key=key,
                         result=deliverables,
-                        duration_ms=_now_ms() - start_time,
+                        duration_ms=now_ms() - start_time,
                         agent_count=agent_count,
                         tool_count=tool_count,
                     ),
                 )
                 if self._experience_learner:
                     self._experience_learner.complete_recording(session_id=key.session_id, outcome="success")
+                await self._cleanup_session_artifacts(
+                    session_id=key.session_id,
+                    compiled=compiled,
+                    config=config,
+                )
 
         except Exception as e:
             logger.error(f"执行失败: {e}", exc_info=True)
-            error_event = SseEvent.error_event(
-                message="执行失败",
-                detail=str(e),
-            ).model_copy(update={"duration_ms": _now_ms() - start_time})
-            yield self._to_sse_dict(error_event, key)
+            yield self._build_error_event(e, key=key, start_time=start_time)
             if self._experience_learner:
                 self._experience_learner.complete_recording(
                     session_id=key.session_id, outcome="failure", result_summary=str(e)
                 )
+            await self._cleanup_session_artifacts(
+                session_id=key.session_id,
+                compiled=compiled,
+                config=config,
+            )
+            raise
 
     async def compact_session(self, session_id: str) -> dict:
         """手动压缩会话（暂不可用，待实现基于 messages 的压缩）"""
@@ -498,19 +615,7 @@ class Orchestrator:
         elif hasattr(self._checkpointer, "delete_thread"):
             self._checkpointer.delete_thread(thread_id)
 
-        # 删除 deliverables
-        store_namespaces = [
-            ("deliverables", self.namespace, session_id, "latest"),
-            ("deliverables", self.namespace, session_id, "versions"),
-            ("deliverables", self.namespace, session_id),
-        ]
-        for store_namespace in store_namespaces:
-            try:
-                items = await self._store.asearch(store_namespace)
-                for item in items:
-                    await self._store.adelete(store_namespace, item.key)
-            except Exception as e:
-                logger.error(f"删除 deliverables 失败: {e}")
+        await self._delete_store_artifacts(session_id)
 
 
     async def get_session_stats(self, session_id: str) -> dict:
@@ -543,6 +648,38 @@ class Orchestrator:
 
         except Exception as e:
             logger.error(f"获取会话统计失败: {e}")
+            return {
+                "session_id": session_id,
+                "namespace": self.namespace,
+                "error": str(e),
+            }
+
+    async def get_session_todo(self, session_id: str) -> dict:
+        """获取会话 Todo（快照）"""
+        key = self._make_key(session_id)
+        thread_id = str(key)
+        config = {"configurable": {"thread_id": thread_id}}
+
+        compiled = await self._ensure_compiled()
+
+        try:
+            state_snapshot = await compiled.aget_state(config)
+            if not state_snapshot or not state_snapshot.values:
+                return {
+                    "session_id": session_id,
+                    "namespace": self.namespace,
+                    "exists": False,
+                }
+
+            todo_data = state_snapshot.values.get("todo")
+            return {
+                "session_id": session_id,
+                "namespace": self.namespace,
+                "exists": True,
+                "todo": todo_data,
+            }
+        except Exception as e:
+            logger.error(f"获取会话 Todo 失败: {e}")
             return {
                 "session_id": session_id,
                 "namespace": self.namespace,

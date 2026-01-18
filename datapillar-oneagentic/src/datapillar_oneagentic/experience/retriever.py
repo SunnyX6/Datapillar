@@ -9,7 +9,7 @@
 ```python
 from datapillar_oneagentic.experience import ExperienceRetriever
 
-retriever = ExperienceRetriever(store=store)
+retriever = ExperienceRetriever(store=store, embedding_provider=embedding_provider)
 
 # 检索相似经验
 records = await retriever.search(goal="分析销售数据", k=5)
@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from datapillar_oneagentic.experience.learner import ExperienceRecord
     from datapillar_oneagentic.storage.learning_stores.base import ExperienceStore
+    from datapillar_oneagentic.providers.llm.embedding import EmbeddingProviderClient
 
 logger = logging.getLogger(__name__)
 
@@ -40,14 +41,16 @@ class ExperienceRetriever:
     2. 自动拼接成可注入 prompt 的上下文
     """
 
-    def __init__(self, store: ExperienceStore):
+    def __init__(self, store: ExperienceStore, embedding_provider: "EmbeddingProviderClient"):
         """
         初始化检索器
 
         Args:
             store: 经验存储（ExperienceStore 抽象接口）
+            embedding_provider: Embedding 提供者（用于向量化）
         """
         self._store = store
+        self._embedding_provider = embedding_provider
 
     async def search(
         self,
@@ -66,11 +69,9 @@ class ExperienceRetriever:
         Returns:
             经验记录列表
         """
-        from datapillar_oneagentic.providers.llm.embedding import embed_text
-
         # 向量化查询文本
         try:
-            query_vector = await embed_text(goal)
+            query_vector = await self._embedding_provider.embed_text(goal)
         except Exception as e:
             logger.warning(f"向量化查询失败: {e}")
             return []
