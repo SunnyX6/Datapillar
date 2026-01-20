@@ -19,7 +19,7 @@ export interface SelectProps {
   /** 下拉卡片头部提示文字 */
   dropdownHeader?: string
   disabled?: boolean
-  size?: 'md' | 'sm'
+  size?: 'md' | 'sm' | 'xs'
   className?: string
 }
 
@@ -38,12 +38,19 @@ export function Select({
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
   const isSmall = size === 'sm'
-  const triggerSizeClass = isSmall
-    ? 'px-3 py-2 text-body-sm rounded-xl border-slate-300 dark:border-slate-600'
-    : 'px-3 py-1.5 text-sm rounded-md border-slate-200 dark:border-slate-700'
-  const optionSizeClass = isSmall ? 'px-3 py-2 text-body-sm' : 'px-3 py-2 text-sm'
-  const headerTextClass = isSmall ? 'text-caption' : 'text-xs'
-  const iconSize = isSmall ? 12 : 14
+  const isExtraSmall = size === 'xs'
+  const triggerSizeClass = isExtraSmall
+    ? 'px-2 py-1.5 text-caption rounded-lg border-slate-300 dark:border-slate-600'
+    : isSmall
+      ? 'px-3 py-2 text-body-sm rounded-xl border-slate-300 dark:border-slate-600'
+      : 'px-3 py-1.5 text-sm rounded-md border-slate-200 dark:border-slate-700'
+  const optionSizeClass = isExtraSmall
+    ? 'px-2 py-1.5 text-caption'
+    : isSmall
+      ? 'px-3 py-2 text-body-sm'
+      : 'px-3 py-2 text-sm'
+  const headerTextClass = isExtraSmall ? 'text-micro' : isSmall ? 'text-caption' : 'text-xs'
+  const iconSize = isExtraSmall ? 12 : isSmall ? 12 : 14
 
   const selectedOption = options.find((opt) => opt.value === value)
 

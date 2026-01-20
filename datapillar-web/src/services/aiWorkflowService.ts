@@ -7,87 +7,93 @@
 /**
  * SSE 事件类型
  */
-export type SseEventType =
-  | 'agent.start'
-  | 'agent.end'
-  | 'tool.start'
-  | 'tool.end'
-  | 'interrupt'
-  | 'result'
-  | 'error'
-  | 'aborted'  // 用户主动打断
+export type SseEventType = 'process' | 'reply'
 
-/**
- * SSE 事件状态（用于前端渲染 icon/颜色）
- */
-export type SseState = 'thinking' | 'invoking' | 'waiting' | 'done' | 'error' | 'aborted'
+export type ProcessPhase = 'analysis' | 'catalog' | 'design' | 'develop' | 'review'
 
-/**
- * SSE 严重级别（用于前端映射颜色）
- */
-export type SseLevel = 'info' | 'success' | 'warning' | 'error'
+export type ProcessStatus = 'running' | 'waiting' | 'done' | 'error' | 'aborted'
 
-export interface SseEventAgent {
+export interface ProcessActivity {
   id: string
-  name: string
-}
-
-export interface SseEventMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool'
-  content: string
-}
-
-export interface SseEventTool {
-  name: string
-  input?: unknown
-  output?: unknown
-}
-
-export interface SseEventInterrupt {
-  kind: string
-  message: string
-  questions?: string[]
-  options?: Array<{
-    // 新格式（CatalogAgent 返回）
-    type?: string
-    name?: string
-    path?: string
-    description?: string
-    tools?: string[]
-    extra?: Record<string, unknown>
-    // 旧格式兼容
-    value?: string
-    label?: string
-    catalog_name?: string
-    schema_name?: string
-    table_name?: string
-    payload?: unknown
-  }>
-}
-
-export interface SseEventResult {
-  deliverable?: unknown
-  deliverable_type?: string
-}
-
-export interface SseEventError {
-  message: string
+  phase: ProcessPhase
+  status: ProcessStatus
+  actor?: string
+  title: string
   detail?: string
+  progress?: number
 }
 
-export interface SseEvent {
+export interface ProcessEvent {
   v: number
   ts: number
-  event: SseEventType
-  state: SseState
-  level: SseLevel
-  agent?: SseEventAgent
-  message?: SseEventMessage
-  tool?: SseEventTool
-  interrupt?: SseEventInterrupt
-  result?: SseEventResult
-  error?: SseEventError
+  event: 'process'
+  run_id: string
+  activity: ProcessActivity
 }
+
+export type ReplyStatus = 'done' | 'waiting' | 'error' | 'aborted'
+
+export interface ReplyRender {
+  type: 'workflow' | 'ui'
+  schema: string
+}
+
+export type UiKind = 'form' | 'actions' | 'info'
+
+export interface UiFormFieldOption {
+  label: string
+  value: string
+}
+
+export interface UiFormField {
+  id: string
+  label: string
+  type: 'text' | 'select' | 'textarea'
+  required?: boolean
+  placeholder?: string
+  options?: UiFormFieldOption[]
+}
+
+export interface UiFormPayload {
+  kind: 'form'
+  fields: UiFormField[]
+  submit: { label: string }
+}
+
+export interface UiAction {
+  type: 'button' | 'link'
+  label: string
+  value?: string
+  url?: string
+}
+
+export interface UiActionsPayload {
+  kind: 'actions'
+  actions: UiAction[]
+}
+
+export interface UiInfoPayload {
+  kind: 'info'
+  level?: 'info' | 'warning' | 'error'
+  items: string[]
+}
+
+export type UiPayload = UiFormPayload | UiActionsPayload | UiInfoPayload
+
+export interface ReplyEvent {
+  v: number
+  ts: number
+  event: 'reply'
+  run_id: string
+  reply: {
+    status: ReplyStatus
+    message: string
+    render: ReplyRender
+    payload?: WorkflowResponse | UiPayload | null
+  }
+}
+
+export type SseEvent = ProcessEvent | ReplyEvent
 
 /**
  * Job 响应
@@ -149,7 +155,7 @@ export function generateSessionId(): string {
  * 创建 AI 工作流消息流
  */
 export function createWorkflowStream(
-  userInput: string,
+  userInput: string | null,
   sessionId: string,
   callbacks: StreamCallbacks,
   resumeValue?: unknown
@@ -159,6 +165,25 @@ export function createWorkflowStream(
 
   const request = async () => {
     try {
+      const emitLocalError = (message: string, detail?: string) => {
+        callbacks.onEvent({
+          v: 2,
+          ts: Date.now(),
+          event: 'reply',
+          run_id: `local-${Date.now()}`,
+          reply: {
+            status: 'error',
+            message: detail ? `${message}：${detail}` : message,
+            render: { type: 'ui', schema: 'v1' },
+            payload: {
+              kind: 'info',
+              level: 'error',
+              items: [detail ? `${message}：${detail}` : message]
+            }
+          }
+        })
+      }
+
       // 统一使用 /workflow/chat 端点
       const response = await fetch('/api/ai/etl/workflow/chat', {
         method: 'POST',
@@ -174,7 +199,8 @@ export function createWorkflowStream(
       })
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        emitLocalError('请求失败', `HTTP ${response.status}: ${response.statusText}`)
+        return
       }
 
       if (closed) return
@@ -188,20 +214,12 @@ export function createWorkflowStream(
         try {
           const sseEvent = JSON.parse(event.data) as SseEvent
           callbacks.onEvent(sseEvent)
-          if (sseEvent.event === 'interrupt' || sseEvent.event === 'result' || sseEvent.event === 'error' || sseEvent.event === 'aborted') {
+          if (sseEvent.event === 'reply') {
             eventSource?.close()
             eventSource = null
           }
         } catch (error) {
-          callbacks.onEvent({
-            v: 1,
-            ts: Date.now(),
-            event: 'error',
-            state: 'error',
-            level: 'error',
-            error: { message: '解析 SSE 消息失败', detail: error instanceof Error ? error.message : String(error) },
-            message: { role: 'system', content: '解析 SSE 消息失败' }
-          })
+          emitLocalError('解析 SSE 消息失败', error instanceof Error ? error.message : String(error))
           eventSource?.close()
           eventSource = null
         }
@@ -211,26 +229,26 @@ export function createWorkflowStream(
         if (closed) return
         // 交给 EventSource 自动重连；只有当连接被显式关闭时才停止
         if (eventSource && eventSource.readyState === EventSource.CLOSED) {
-          callbacks.onEvent({
-            v: 1,
-            ts: Date.now(),
-            event: 'error',
-            state: 'error',
-            level: 'error',
-            error: { message: 'SSE 连接已关闭' },
-            message: { role: 'system', content: 'SSE 连接已关闭' }
-          })
+          emitLocalError('SSE 连接已关闭')
         }
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
       callbacks.onEvent({
-        v: 1,
+        v: 2,
         ts: Date.now(),
-        event: 'error',
-        state: 'error',
-        level: 'error',
-        error: { message: '连接失败', detail: error instanceof Error ? error.message : String(error) },
-        message: { role: 'system', content: '连接失败' }
+        event: 'reply',
+        run_id: `local-${Date.now()}`,
+        reply: {
+          status: 'error',
+          message: `连接失败：${message}`,
+          render: { type: 'ui', schema: 'v1' },
+          payload: {
+            kind: 'info',
+            level: 'error',
+            items: [`连接失败：${message}`]
+          }
+        }
       })
     }
   }

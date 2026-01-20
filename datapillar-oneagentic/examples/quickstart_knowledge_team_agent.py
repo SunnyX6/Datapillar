@@ -17,6 +17,13 @@
        export GLM_EMBEDDING_API_KEY="sk-xxx"
        export GLM_EMBEDDING_MODEL="embedding-3"
        export GLM_EMBEDDING_DIMENSION="1024"
+
+说明：
+    - source_id 由系统生成，不需要传入。
+    - content 可选；传了 content 就不会读取 source_uri 的内容。
+    - source_uri 写本地完整路径且文件存在时，会自动读取文件内容；filename/mime_type 可选。
+    - namespace 必须显式传入（由 Datapillar 与 ingest/retrieve 内部创建 store 绑定）。
+    - 检索默认只在当前 namespace 内进行，跨 namespace 检索暂不支持。
 """
 
 import asyncio
@@ -26,16 +33,15 @@ from pydantic import BaseModel
 
 from datapillar_oneagentic import AgentContext, Datapillar, DatapillarConfig, Process, agent
 from datapillar_oneagentic.knowledge import (
-    DocumentInput,
     Knowledge,
     KnowledgeChunkConfig,
+    KnowledgeConfig,
     KnowledgeInject,
-    KnowledgeIngestor,
+    KnowledgeInjectConfig,
     KnowledgeRetrieve,
+    KnowledgeRetrieveConfig,
     KnowledgeSource,
 )
-from datapillar_oneagentic.providers.llm import EmbeddingProviderClient
-from datapillar_oneagentic.storage import create_knowledge_store
 
 
 # ============================================================================
@@ -72,51 +78,36 @@ class AnswerOutput(BaseModel):
     answer: str
 
 
-async def _prepare_demo_knowledge(namespace: str, config: DatapillarConfig) -> None:
-    knowledge_store = create_knowledge_store(
-        namespace,
-        vector_store_config=config.vector_store,
-        embedding_config=config.embedding,
-    )
-    await knowledge_store.initialize()
-
-    embedding_provider = EmbeddingProviderClient(config.embedding)
-    ingestor = KnowledgeIngestor(
-        store=knowledge_store,
-        embedding_provider=embedding_provider,
-        config=KnowledgeChunkConfig(
-            mode="general",
-            general={"max_tokens": 200, "overlap": 40},
-        ),
-    )
+async def _prepare_demo_knowledge(namespace: str, knowledge_config: KnowledgeConfig) -> None:
 
     team_source = KnowledgeSource(
-        source_id="kb_team",
         name="团队知识库",
         source_type="doc",
-    )
-    agent_source = KnowledgeSource(
-        source_id="kb_agent",
-        name="个人知识库",
-        source_type="doc",
-    )
-
-    team_doc = DocumentInput(
-        source=(
+        source_uri="team.txt",
+        content=(
             "Datapillar 是一个数据开发 SaaS 平台，提供知识切分与检索增强能力。\n"
             "知识框架是基座能力，可挂载到团队或 Agent。"
         ),
         filename="team.txt",
         metadata={"title": "团队知识示例"},
     )
-    agent_doc = DocumentInput(
-        source="Agent 可以在团队知识之上叠加个人知识，并覆盖检索参数。",
+    agent_source = KnowledgeSource(
+        name="个人知识库",
+        source_type="doc",
+        source_uri="agent.txt",
+        content="Agent 可以在团队知识之上叠加个人知识，并覆盖检索参数。",
         filename="agent.txt",
         metadata={"title": "个人知识示例"},
     )
 
-    await ingestor.ingest(source=team_source, documents=[team_doc])
-    await ingestor.ingest(source=agent_source, documents=[agent_doc])
+    await team_source.ingest(
+        namespace=namespace,
+        config=knowledge_config,
+    )
+    await agent_source.ingest(
+        namespace=namespace,
+        config=knowledge_config,
+    )
 
 
 @agent(
@@ -145,7 +136,7 @@ class TeamAgent:
     deliverable_schema=AnswerOutput,
     knowledge=Knowledge(
         sources=[
-            KnowledgeSource(source_id="kb_agent", name="个人知识库", source_type="doc"),
+            KnowledgeSource(name="个人知识库", source_type="doc", source_uri="agent.txt"),
         ],
         retrieve=KnowledgeRetrieve(
             method="semantic",
@@ -186,10 +177,26 @@ async def main() -> None:
         "model": EMBEDDING_MODEL,
         "dimension": EMBEDDING_DIMENSION,
     }
-    config = DatapillarConfig(llm=llm_config, embedding=embedding_config)
+    knowledge_config = KnowledgeConfig(
+        base_config={
+            "embedding": embedding_config,
+            "vector_store": {"type": "lance", "path": "./data/vectors"},
+        },
+        chunk_config=KnowledgeChunkConfig(
+            mode="general",
+            general={"max_tokens": 200, "overlap": 40},
+        ),
+        retrieve_config=KnowledgeRetrieveConfig(
+            method="semantic",
+            top_k=4,
+            inject=KnowledgeInjectConfig(mode="system", max_tokens=800),
+        ),
+    )
+    config = DatapillarConfig(llm=llm_config, knowledge=knowledge_config)
 
+    # namespace 必填，用于知识隔离，需与 Datapillar 保持一致
     namespace = "demo_knowledge_team"
-    await _prepare_demo_knowledge(namespace, config)
+    await _prepare_demo_knowledge(namespace, knowledge_config)
 
     team = Datapillar(
         config=config,
@@ -198,7 +205,7 @@ async def main() -> None:
         agents=[TeamAgent, SpecialistAgent],
         process=Process.SEQUENTIAL,
         knowledge=Knowledge(
-            sources=[KnowledgeSource(source_id="kb_team", name="团队知识库", source_type="doc")],
+            sources=[KnowledgeSource(name="团队知识库", source_type="doc", source_uri="team.txt")],
             retrieve=KnowledgeRetrieve(
                 method="semantic",
                 top_k=4,
@@ -208,8 +215,10 @@ async def main() -> None:
     )
 
     async for event in team.stream(query="Datapillar 的知识框架能做什么？", session_id="s1"):
-        if event.get("event") == "result":
-            print(event["result"]["deliverable"])
+        if event.get("event") == "agent.end":
+            deliverable = event.get("data", {}).get("deliverable")
+            if deliverable is not None:
+                print(deliverable)
 
 
 if __name__ == "__main__":

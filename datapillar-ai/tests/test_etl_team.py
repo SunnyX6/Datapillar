@@ -1,185 +1,122 @@
 """
 ETL 团队集成测试
 
-测试覆盖：
+验证：
 1. 团队创建和配置
-2. DYNAMIC 模式下的委派自动设置
-3. Agent 规格验证
+2. Agent 规格与交付物 Schema
+3. 动态模式下委派范围自动设置
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# 在测试开始前导入，触发 Agent 注册（只执行一次）
-from src.modules.etl.agents import create_etl_team
-from src.modules.oneagentic import Process
-from src.modules.oneagentic.core.agent import AgentRegistry
-from src.modules.oneagentic.core.datapillar import Datapillar
-from src.modules.oneagentic.runtime.executor import clear_executor_cache
+from datapillar_oneagentic import DatapillarConfig, Process
+from datapillar_oneagentic.core.agent import get_agent_spec
 
-# ==================== Fixtures ====================
+from src.modules.etl.agents import create_etl_team
+from src.modules.etl.agents.analyst_agent import AnalystAgent, AnalysisOutput
+from src.modules.etl.agents.architect_agent import ArchitectAgent
+from src.modules.etl.agents.catalog_agent import CatalogAgent, CatalogOutput
+from src.modules.etl.agents.developer_agent import DeveloperAgent
+from src.modules.etl.agents.reviewer_agent import ReviewerAgent
+from src.modules.etl.schemas.developer import DeveloperSqlOutput
+from src.modules.etl.schemas.review import ReviewResult
+from src.modules.etl.schemas.workflow import WorkflowOutput
 
 
 @pytest.fixture
-def etl_team():
-    """创建 ETL 团队"""
-    # 清空 Executor 缓存
-    clear_executor_cache()
-    # 清空 Datapillar 注册表（允许重新创建同名团队）
-    Datapillar._clear_registry()
-    return create_etl_team()
+def _llm_stub():
+    llm = MagicMock()
+    llm.ainvoke = AsyncMock()
+    return llm
 
 
-# ==================== 团队创建测试 ====================
+@pytest.fixture
+def etl_team(_llm_stub):
+    config = DatapillarConfig(llm={"api_key": "test-key", "model": "gpt-4o"})
+    with patch(
+        "datapillar_oneagentic.providers.llm.llm.LLMProvider.__call__",
+        return_value=_llm_stub,
+    ):
+        yield create_etl_team(config=config, namespace="test_etl")
 
 
 class TestEtlTeamCreation:
     """测试 ETL 团队创建"""
 
     def test_create_team_success(self, etl_team):
-        """测试团队创建成功"""
-        assert etl_team is not None
         assert etl_team.name == "ETL 智能团队"
         assert etl_team.process == Process.DYNAMIC
+        assert etl_team.namespace == "test_etl"
 
     def test_team_has_correct_members(self, etl_team):
-        """测试团队成员正确"""
-        agent_ids = etl_team._agent_ids
-
-        assert "analyst" in agent_ids
-        assert "catalog" in agent_ids
-        assert "architect" in agent_ids
-        assert "developer" in agent_ids
-        assert "reviewer" in agent_ids
+        agent_ids = set(etl_team._agent_ids)
+        assert agent_ids == {"analyst", "catalog", "architect", "developer", "reviewer"}
 
     def test_entry_agent_is_analyst(self, etl_team):
-        """测试入口 Agent 是 AnalystAgent"""
         assert etl_team._entry_agent_id == "analyst"
 
     def test_dynamic_mode_sets_can_delegate_to(self, etl_team):
-        """测试 DYNAMIC 模式自动设置 can_delegate_to"""
-        # 获取 analyst 的执行器（会触发 can_delegate_to 设置）
-        with patch("src.modules.oneagentic.runtime.executor.call_llm") as mock_call_llm:
-            mock_call_llm.return_value = MagicMock()
-            executor = etl_team._get_executor("analyst")
-
-        # analyst 应该可以委派给其他所有团队成员
-        can_delegate = executor.spec.can_delegate_to
-
-        assert "catalog" in can_delegate
-        assert "architect" in can_delegate
-        assert "developer" in can_delegate
-        assert "reviewer" in can_delegate
-        assert "analyst" not in can_delegate  # 不能委派给自己
-
-
-# ==================== Agent 规格测试 ====================
+        executor = etl_team._get_executor("analyst")
+        expected = set(etl_team._agent_ids) - {"analyst"}
+        assert set(executor.spec.can_delegate_to) == expected
 
 
 class TestAgentSpecs:
-    """测试各 Agent 规格正确"""
+    """测试 Agent 规格与工具配置"""
 
     def test_analyst_spec(self):
-        """测试 AnalystAgent 规格"""
-        spec = AgentRegistry.get("analyst")
-
+        spec = get_agent_spec(AnalystAgent)
         assert spec is not None
         assert spec.name == "需求分析师"
-        assert "search_tables" in spec.tools
-        assert "get_table_detail" in spec.tools
-        assert spec.deliverable_key == "analysis"
+        assert spec.deliverable_schema is AnalysisOutput
+        tool_names = {tool.name for tool in spec.tools}
+        assert tool_names == {"search_tables", "get_table_detail"}
 
     def test_catalog_spec(self):
-        """测试 CatalogAgent 规格"""
-        spec = AgentRegistry.get("catalog")
-
+        spec = get_agent_spec(CatalogAgent)
         assert spec is not None
         assert spec.name == "元数据专员"
-        assert "list_catalogs" in spec.tools
-        assert "search_tables" in spec.tools
-        assert spec.deliverable_key == "catalog_result"
+        assert spec.deliverable_schema is CatalogOutput
+        tool_names = {tool.name for tool in spec.tools}
+        assert tool_names == {
+            "count_catalogs",
+            "count_schemas",
+            "count_tables",
+            "list_catalogs",
+            "list_schemas",
+            "list_tables",
+            "search_tables",
+            "search_columns",
+            "get_table_detail",
+            "get_table_lineage",
+        }
 
     def test_architect_spec(self):
-        """测试 ArchitectAgent 规格"""
-        spec = AgentRegistry.get("architect")
-
+        spec = get_agent_spec(ArchitectAgent)
         assert spec is not None
         assert spec.name == "数据架构师"
-        assert "get_table_lineage" in spec.tools
-        assert spec.deliverable_key == "workflow"
+        assert spec.deliverable_schema is WorkflowOutput
+        tool_names = {tool.name for tool in spec.tools}
+        assert tool_names == {"get_table_lineage", "search_tables", "list_component"}
 
     def test_developer_spec(self):
-        """测试 DeveloperAgent 规格"""
-        spec = AgentRegistry.get("developer")
-
+        spec = get_agent_spec(DeveloperAgent)
         assert spec is not None
         assert spec.name == "数据开发工程师"
-        assert spec.deliverable_key == "sql"
+        assert spec.deliverable_schema is DeveloperSqlOutput
+        tool_names = {tool.name for tool in spec.tools}
+        assert tool_names == {
+            "get_table_detail",
+            "get_table_lineage",
+            "get_lineage_sql",
+            "search_tables",
+        }
 
     def test_reviewer_spec(self):
-        """测试 ReviewerAgent 规格"""
-        spec = AgentRegistry.get("reviewer")
-
+        spec = get_agent_spec(ReviewerAgent)
         assert spec is not None
         assert spec.name == "代码评审员"
-        assert spec.deliverable_key == "review"
-        assert spec.tools == []  # 评审不需要工具
-
-
-# ==================== 委派工具测试 ====================
-
-
-class TestDelegationTools:
-    """测试委派工具生成"""
-
-    def test_analyst_has_delegation_tools(self, etl_team):
-        """测试 AnalystAgent 有委派工具"""
-        with patch("src.modules.oneagentic.runtime.executor.call_llm") as mock_call_llm:
-            mock_call_llm.return_value = MagicMock()
-            executor = etl_team._get_executor("analyst")
-
-        # 检查委派工具
-        delegation_tool_names = [t.name for t in executor.delegation_tools]
-
-        assert "delegate_to_catalog" in delegation_tool_names
-        assert "delegate_to_architect" in delegation_tool_names
-        assert "delegate_to_developer" in delegation_tool_names
-        assert "delegate_to_reviewer" in delegation_tool_names
-
-    def test_reviewer_has_no_delegation_by_default(self):
-        """测试 ReviewerAgent 原始规格中没有委派目标"""
-        # 直接获取原始 spec（不通过团队）
-        # 注意：DYNAMIC 模式下团队会自动设置 can_delegate_to
-        # 这里测试的是原始 spec
-        spec = AgentRegistry.get("reviewer")
-        assert spec is not None
-        # 原始 spec 的 can_delegate_to 默认为空列表
-        # 但 DYNAMIC 模式会在 _get_executor 时自动设置
-
-
-# ==================== 执行图测试 ====================
-
-
-class TestExecutionGraph:
-    """测试执行图构建"""
-
-    def test_graph_built_correctly(self, etl_team):
-        """测试执行图构建正确"""
-        graph = etl_team._graph
-
-        assert graph is not None
-        # DYNAMIC 模式应该有条件入口
-        assert etl_team.process == Process.DYNAMIC
-
-    def test_all_agents_in_graph(self, etl_team):
-        """测试所有 Agent 都在图中"""
-        # 图的节点应该包含所有 Agent
-        graph = etl_team._graph
-        nodes = set(graph.nodes.keys())
-
-        assert "analyst" in nodes
-        assert "catalog" in nodes
-        assert "architect" in nodes
-        assert "developer" in nodes
-        assert "reviewer" in nodes
+        assert spec.deliverable_schema is ReviewResult
+        assert spec.tools == []

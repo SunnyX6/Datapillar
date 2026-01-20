@@ -26,6 +26,8 @@ const LazyDashboardPage = lazy(() => import('@/pages/dashboard').then(m => ({ de
 
 const LazyWorkflowStudioPage = lazy(() => import('@/pages/workflow').then(m => ({ default: m.WorkflowStudioPage })))
 
+const LazyWikiPage = lazy(() => import('@/pages/wiki').then(m => ({ default: m.WikiPage })))
+
 const LazyOneIdePage = lazy(() => import('@/pages/ide').then(m => ({ default: m.OneIdePage })))
 
 const LazySqlEditorPage = lazy(() => import('@/pages/ide').then(m => ({ default: m.SqlEditorPage })))
@@ -69,6 +71,10 @@ export const router = createBrowserRouter([
           {
             path: '/workflow',
             element: withSuspense(LazyWorkflowStudioPage)
+          },
+          {
+            path: '/wiki',
+            element: withSuspense(LazyWikiPage)
           },
           {
             path: '/ide',

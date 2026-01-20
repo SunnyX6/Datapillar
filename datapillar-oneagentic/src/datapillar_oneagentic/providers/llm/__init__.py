@@ -10,7 +10,7 @@ LLM 提供者模块
 - Ollama
 
 特性：
-- 团队级 LLMProvider / EmbeddingProviderClient
+- 团队级 LLMProvider / EmbeddingProvider
 - 内置弹性机制（超时 + 重试 + 熔断）
 - 可选缓存
 - Token 使用量追踪
@@ -18,7 +18,7 @@ LLM 提供者模块
 使用示例：
 ```python
 from datapillar_oneagentic import DatapillarConfig
-from datapillar_oneagentic.providers.llm import LLMProvider, EmbeddingProviderClient
+from datapillar_oneagentic.providers.llm import LLMProvider, EmbeddingProvider
 
 config = DatapillarConfig(
     llm={"provider": "openai", "api_key": "sk-xxx", "model": "gpt-4o"},
@@ -29,18 +29,18 @@ llm_provider = LLMProvider(config.llm)
 llm = llm_provider()
 result = await llm.ainvoke(messages)
 
-embedding_provider = EmbeddingProviderClient(config.embedding)
+embedding_provider = EmbeddingProvider(config.embedding)
 vector = await embedding_provider.embed_text("hello")
 ```
 """
 
 from datapillar_oneagentic.providers.llm.config import (
-    EmbeddingProvider,
+    EmbeddingBackend,
     Provider,
 )
 from datapillar_oneagentic.providers.llm.embedding import (
     EmbeddingFactory,
-    EmbeddingProviderClient,
+    EmbeddingProvider,
 )
 from datapillar_oneagentic.providers.llm.llm import (
     LLMFactory,
@@ -65,11 +65,11 @@ __all__ = [
     "LLMFactory",
     "LLMProviderConfig",
     # Embedding
-    "EmbeddingProviderClient",
+    "EmbeddingProvider",
     "EmbeddingFactory",
     # Provider 枚举
     "Provider",
-    "EmbeddingProvider",
+    "EmbeddingBackend",
     # Usage 追踪
     "TokenUsage",
     "extract_usage",

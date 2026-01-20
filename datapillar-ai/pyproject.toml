@@ -2,7 +2,7 @@
 name = "datapillar-ai"
 version = "1.0.0"
 description = "数仓工作流Agent - GraphRAG + Neo4j知识库"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     # FastAPI框架
     "fastapi>=0.109.0",
@@ -18,46 +18,25 @@ dependencies = [
     "pymysql>=1.1.0",
     # Redis（Checkpoint & Memory）
     "redis>=5.2.1",
-    "redisvl>=0.5.1",
-    # LangGraph (Agent工作流编排)
-    "langgraph>=1.0.3",
-    "langgraph-checkpoint>=2.0.4",
-    "langgraph-checkpoint-redis>=0.2.1",
-    "litellm>=1.0.0",
-    # LangChain - ChatModel包装器（支持结构化输出）
+    "datapillar-oneagentic[glm,openai,redis,sse]>=0.1.0",
+    # LangChain - 核心消息结构（业务侧直接使用）
     "langchain-core>=1.0.5",
-    "langchain-openai>=0.2.0",
-    "langchain-anthropic>=0.2.0",
-    "langchain-community>=0.3.0",
-    # SSE 响应
-    "sse-starlette>=1.6.5",
     # 二进制序列化
     "msgpack>=1.0.8",
-    # 多LLM原生SDK
-    "openai==2.8.0",
-    "anthropic>=0.39.0",
-    "zai-sdk>=0.2.0",
     # 工具库
     "dynaconf>=3.2.0",
     "httpx>=0.26.0,<0.28.0",
     "pyyaml>=6.0.1",
-    "tenacity>=8.2.3",
     "structlog>=23.0.0",
     # SQL 解析（血缘分析）
     "sqlglot>=26.0.0",
     # JWT认证
     "pyjwt>=2.8.0",
     "sqlalchemy>=2.0.0",
-    # OpenAI 兼容 token 计数（用于上下文预算/记忆裁剪的 token 口径）
-    "tiktoken>=0.7.0",
     # JSON 修复（处理 LLM 输出的畸形 JSON）
     "json-repair>=0.30.0",
     # 高性能哈希（内容去重）
     "xxhash>=3.4.0",
-    "langgraph-swarm>=0.1.0",
-    "opentelemetry-api>=1.39.1",
-    "opentelemetry-sdk>=1.39.1",
-    "opentelemetry-exporter-otlp-proto-http>=1.39.1",
 ]
 
 [project.optional-dependencies]
@@ -153,3 +132,7 @@ max-statements = 90
 line-length = 100
 target-version = ["py311"]
 skip-string-normalization = true
+
+# 上线前需要去掉
+[tool.uv.sources]
+datapillar-oneagentic = { path = "../datapillar-oneagentic", editable = true }

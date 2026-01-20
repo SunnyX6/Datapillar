@@ -13,7 +13,6 @@ class EvalDocument(BaseModel):
     """评估文档定义"""
 
     doc_id: str = Field(..., min_length=1, description="文档 ID")
-    source_id: str = Field(..., min_length=1, description="数据源 ID")
     text: str = Field(..., min_length=1, description="原文内容")
     title: str | None = Field(default=None, description="文档标题")
     metadata: dict[str, Any] = Field(default_factory=dict, description="扩展元数据")

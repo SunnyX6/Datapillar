@@ -121,6 +121,8 @@ def test_ingestor_preview_returns_attachments() -> None:
             return [[0.1, 0.2] for _ in texts]
 
     class _StubStore:
+        namespace = "ns_preview"
+
         async def upsert_sources(self, sources):
             return None
 
@@ -129,6 +131,15 @@ def test_ingestor_preview_returns_attachments() -> None:
 
         async def upsert_chunks(self, chunks):
             return None
+
+        async def get_doc(self, doc_id: str):
+            return None
+
+        async def delete_doc(self, doc_id: str) -> int:
+            return 0
+
+        async def delete_chunks_by_doc_id(self, doc_id: str) -> int:
+            return 0
 
     ingestor = KnowledgeIngestor(
         store=_StubStore(),

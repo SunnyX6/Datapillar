@@ -7,12 +7,14 @@ ETL 模块 API 路由
 import logging
 from typing import Any
 
+from datapillar_oneagentic import Datapillar
+from datapillar_oneagentic.core.types import SessionKey
+from datapillar_oneagentic.sse import StreamManager
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
-from src.modules.oneagentic import Orchestrator
-from src.modules.oneagentic.sse import StreamManager
+from src.modules.etl.sse_protocol import RunRegistry, adapt_sse_stream
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +22,7 @@ router = APIRouter()
 
 # 全局 SSE 流管理器
 etl_stream_manager = StreamManager()
+etl_run_registry = RunRegistry()
 
 
 class WorkflowRequest(BaseModel):
@@ -33,12 +36,35 @@ class WorkflowRequest(BaseModel):
         populate_by_name = True
 
 
-def _get_orchestrator(request: Request) -> Orchestrator:
-    """获取 Orchestrator 实例"""
-    orchestrator: Orchestrator | None = getattr(request.app.state, "orchestrator", None)
-    if orchestrator is None:
-        raise HTTPException(status_code=503, detail="Orchestrator 尚未就绪")
-    return orchestrator
+def _get_team(request: Request) -> Datapillar:
+    """获取 ETL 团队实例"""
+    team: Datapillar | None = getattr(request.app.state, "etl_team", None)
+    if team is None:
+        raise HTTPException(status_code=503, detail="ETL 团队尚未就绪")
+    return team
+
+
+def _build_session_key(team: Datapillar, session_id: str, user_id: str) -> SessionKey:
+    return SessionKey(namespace=team.namespace, session_id=f"{user_id}:{session_id}")
+
+
+class _TeamOrchestratorAdapter:
+    def __init__(self, team: Datapillar) -> None:
+        self._team = team
+
+    async def stream(
+        self,
+        *,
+        query: str | None = None,
+        key: SessionKey,
+        resume_value: Any | None = None,
+    ):
+        async for event in self._team.stream(
+            query=query,
+            session_id=key.session_id,
+            resume_value=resume_value,
+        ):
+            yield event
 
 
 @router.post("/workflow/chat")
@@ -51,36 +77,38 @@ async def chat(payload: WorkflowRequest, request: Request):
     - 有 user_input：新消息（后端自动判断是新会话还是续聊）
     """
     current_user = request.state.current_user
-    orchestrator = _get_orchestrator(request)
+    team = _get_team(request)
 
     if not payload.session_id:
         raise HTTPException(status_code=400, detail="sessionId 不能为空")
 
     user_id = str(current_user.user_id)
+    key = _build_session_key(team, payload.session_id, user_id)
+    orchestrator = _TeamOrchestratorAdapter(team)
 
     if payload.resume_value is not None:
+        etl_run_registry.start_run(str(key))
         logger.info(
             f"[ETL Resume] user={current_user.username}, userId={user_id}, sessionId={payload.session_id}"
         )
         await etl_stream_manager.chat(
             orchestrator=orchestrator,
-            user_query=None,
-            session_id=payload.session_id,
-            user_id=user_id,
+            query=None,
+            key=key,
             resume_value=payload.resume_value,
         )
     else:
         if not payload.user_input:
             raise HTTPException(status_code=400, detail="userInput 不能为空")
 
+        etl_run_registry.start_run(str(key))
         logger.info(
             f"[ETL Chat] user={current_user.username}, userId={user_id}, sessionId={payload.session_id}"
         )
         await etl_stream_manager.chat(
             orchestrator=orchestrator,
-            user_query=payload.user_input,
-            session_id=payload.session_id,
-            user_id=user_id,
+            query=payload.user_input,
+            key=key,
             resume_value=None,
         )
 
@@ -94,6 +122,7 @@ async def chat(payload: WorkflowRequest, request: Request):
 async def workflow_sse(request: Request, session_id: str = Query(..., alias="sessionId")):
     """SSE/JSON 事件流：前端可用 Last-Event-ID 重连重放（断线续传）"""
     current_user = request.state.current_user
+    team = _get_team(request)
 
     last_event_id_raw = request.headers.get("Last-Event-ID")
     last_event_id: int | None = None
@@ -103,12 +132,22 @@ async def workflow_sse(request: Request, session_id: str = Query(..., alias="ses
         except ValueError:
             last_event_id = None
 
+    key = _build_session_key(team, session_id, str(current_user.user_id))
+    storage_key = str(key)
+    run_id = etl_run_registry.get_run(storage_key) or etl_run_registry.start_run(storage_key)
+
+    def _finish_run() -> None:
+        etl_run_registry.finish_run(storage_key)
+
     return EventSourceResponse(
-        etl_stream_manager.subscribe(
-            request=request,
-            session_id=session_id,
-            user_id=str(current_user.user_id),
-            last_event_id=last_event_id,
+        adapt_sse_stream(
+            source=etl_stream_manager.subscribe(
+                request=request,
+                key=key,
+                last_event_id=last_event_id,
+            ),
+            run_id=run_id,
+            on_run_complete=_finish_run,
         ),
         ping=15,
         headers={
@@ -124,7 +163,7 @@ async def workflow_sse(request: Request, session_id: str = Query(..., alias="ses
 async def clear_session(payload: WorkflowRequest, request: Request):
     """清除会话历史"""
     current_user = request.state.current_user
-    orchestrator = _get_orchestrator(request)
+    team = _get_team(request)
 
     if not payload.session_id:
         raise HTTPException(status_code=400, detail="sessionId 不能为空")
@@ -134,19 +173,16 @@ async def clear_session(payload: WorkflowRequest, request: Request):
         f"sessionId={payload.session_id}"
     )
 
+    key = _build_session_key(team, payload.session_id, str(current_user.user_id))
+
     try:
-        await orchestrator.clear_session(
-            session_id=payload.session_id,
-            user_id=str(current_user.user_id),
-        )
+        await team.clear_session(session_id=key.session_id)
     except Exception as exc:
         logger.error("清理 checkpoint 失败: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="清理会话失败") from exc
 
-    etl_stream_manager.clear_session(
-        user_id=str(current_user.user_id),
-        session_id=payload.session_id,
-    )
+    etl_stream_manager.clear_session(key=key)
+    etl_run_registry.finish_run(str(key))
 
     return {
         "success": True,
@@ -168,6 +204,8 @@ async def abort_workflow(payload: WorkflowRequest, request: Request):
         raise HTTPException(status_code=400, detail="sessionId 不能为空")
 
     user_id = str(current_user.user_id)
+    team = _get_team(request)
+    key = _build_session_key(team, payload.session_id, user_id)
 
     logger.info(
         f"[Abort] user={current_user.username}, userId={user_id}, "
@@ -175,9 +213,10 @@ async def abort_workflow(payload: WorkflowRequest, request: Request):
     )
 
     aborted = await etl_stream_manager.abort(
-        user_id=user_id,
-        session_id=payload.session_id,
+        key=key,
     )
+    if aborted:
+        etl_run_registry.finish_run(str(key))
 
     return {
         "success": True,
@@ -192,20 +231,16 @@ async def compact_session(payload: WorkflowRequest, request: Request):
     手动压缩会话记忆
 
     类似 Claude Code 的 /compact 命令。
-    当对话历史过长时，可以手动触发压缩以释放上下文空间。
-
-    压缩策略：
-    - 保留固定上下文（决策、约束、TODO）
-    - 保留用户消息和澄清对话
-    - 压缩 Agent 响应和工具结果为摘要
+    当前框架暂未启用压缩能力，会返回 not_implemented。
     """
     current_user = request.state.current_user
-    orchestrator = _get_orchestrator(request)
+    team = _get_team(request)
 
     if not payload.session_id:
         raise HTTPException(status_code=400, detail="sessionId 不能为空")
 
     user_id = str(current_user.user_id)
+    key = _build_session_key(team, payload.session_id, user_id)
 
     logger.info(
         f"[Compact] user={current_user.username}, userId={user_id}, "
@@ -213,10 +248,7 @@ async def compact_session(payload: WorkflowRequest, request: Request):
     )
 
     try:
-        result = await orchestrator.compact_session(
-            session_id=payload.session_id,
-            user_id=user_id,
-        )
+        result = await team.compact_session(session_id=key.session_id)
     except Exception as exc:
         logger.error("压缩失败: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="压缩失败") from exc
@@ -233,24 +265,19 @@ async def get_session_stats(
     获取会话统计信息
 
     返回：
-    - total_entries: 对话条目数
-    - total_decisions: 决策数
-    - total_constraints: 约束数
-    - current_tokens: 当前 token 数
-    - needs_compact: 是否需要压缩
-    - total_compactions: 压缩次数
-    - total_tokens_saved: 累计节省的 token 数
+    - session_id: 会话 ID
+    - namespace: 命名空间
+    - exists: 是否存在
+    - message_count: 消息数量
+    - deliverables_count: 交付物数量
+    - active_agent: 当前活跃 Agent
     """
     current_user = request.state.current_user
-    orchestrator = _get_orchestrator(request)
-
-    user_id = str(current_user.user_id)
+    team = _get_team(request)
+    key = _build_session_key(team, session_id, str(current_user.user_id))
 
     try:
-        stats = await orchestrator.get_session_stats(
-            session_id=session_id,
-            user_id=user_id,
-        )
+        stats = await team.get_session_stats(session_id=key.session_id)
     except Exception as exc:
         logger.error("获取统计信息失败: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="获取统计信息失败") from exc

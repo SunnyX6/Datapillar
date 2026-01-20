@@ -10,10 +10,11 @@
 import json
 import logging
 import time
+from functools import lru_cache
 
+from datapillar_oneagentic.providers.llm import LLMProvider
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-
-from src.infrastructure.llm.client import call_llm
+from src.infrastructure.llm.config import get_datapillar_config
 from src.infrastructure.repository.kg import (
     Neo4jMetricSearch,
     Neo4jSemanticSearch,
@@ -27,6 +28,12 @@ from src.modules.governance.metric.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _get_llm_provider() -> LLMProvider:
+    config = get_datapillar_config()
+    return LLMProvider(config.llm)
 
 
 # ============================================================================
@@ -153,7 +160,11 @@ class MetricAIService:
         user_message = self._build_user_message(request)
 
         # 6. 调用 LLM（使用 structured output）
-        llm = call_llm(temperature=0.3, max_tokens=4096, output_schema=AIFillOutput)
+        llm = _get_llm_provider()(
+            output_schema=AIFillOutput,
+            temperature=0.3,
+            max_tokens=4096,
+        )
 
         messages = [
             SystemMessage(content=system_prompt),

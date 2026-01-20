@@ -104,43 +104,36 @@ class WorkerAgent:
 
 def _render_event(event: dict) -> None:
     event_type = event.get("event")
+    data = event.get("data", {})
     if event_type == "agent.start":
         agent_info = event.get("agent", {})
         print(f"\n🤖 [{agent_info.get('name')}] 开始工作...")
     elif event_type == "agent.thinking":
-        message = event.get("message", {})
+        message = data.get("message", {})
         thinking = message.get("content", "")
         if thinking:
             agent_info = event.get("agent", {})
             print(f"\n🧠 [{agent_info.get('id')}] 思考中...")
             print(f"   {thinking[:200]}..." if len(thinking) > 200 else f"   {thinking}")
-    elif event_type == "tool.start":
-        tool_info = event.get("tool", {})
+    elif event_type == "tool.call":
+        tool_info = data.get("tool", {})
         print(f"   🔧 调用: {tool_info.get('name')}")
-    elif event_type == "tool.end":
-        tool_info = event.get("tool", {})
+    elif event_type == "tool.result":
+        tool_info = data.get("tool", {})
         result = str(tool_info.get("output", ""))
         if len(result) > 100:
             result = result[:100] + "..."
         print(f"   📋 结果: {result}")
     elif event_type == "agent.end":
-        print("   ✅ 完成")
+        deliverable = data.get("deliverable")
+        if deliverable is not None:
+            print("   ✅ 完成")
+            print(f"   📦 交付物: {deliverable}")
     elif event_type == "agent.interrupt":
-        interrupt_payload = event.get("interrupt", {}).get("payload")
+        interrupt_payload = data.get("interrupt", {}).get("payload")
         print(f"\n❓ 需要用户输入: {interrupt_payload}")
-    elif event_type == "result":
-        print(f"\n{'=' * 60}")
-        print("📦 最终结果:")
-        deliverables = event.get("result", {}).get("deliverable", {})
-        for key, value in deliverables.items():
-            print(f"\n[{key}]")
-            if isinstance(value, dict):
-                for k, v in value.items():
-                    print(f"  {k}: {v}")
-            else:
-                print(f"  {value}")
-    elif event_type == "error":
-        error = event.get("error", {})
+    elif event_type == "agent.failed":
+        error = data.get("error", {})
         print(f"\n❌ 错误: {error.get('detail') or error.get('message')}")
 
 

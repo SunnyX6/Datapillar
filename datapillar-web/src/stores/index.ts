@@ -27,7 +27,7 @@ export {
 } from './i18nStore'
 
 // Workflow Studio Store
-export { useWorkflowStudioStore, type AgentActivity, type ChatMessage } from './workflowStudioStore'
+export { useWorkflowStudioStore, type AgentActivity, type ProcessActivity, type ChatMessage } from './workflowStudioStore'
 
 // Layout Store - 布局偏好
 export { useLayoutStore } from './layoutStore'

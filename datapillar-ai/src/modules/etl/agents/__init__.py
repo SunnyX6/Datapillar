@@ -17,7 +17,8 @@ ETL 智能团队
 
 # 显式导入工具模块，触发 @tool 装饰器注册
 from src.modules.etl import tools as _tools  # noqa: F401
-from src.modules.oneagentic import Datapillar, Process
+from datapillar_oneagentic import Datapillar, DatapillarConfig, Process
+from src.infrastructure.llm.config import get_datapillar_config
 
 # 显式导入所有 agent 模块，触发 @agent 装饰器注册
 from . import (
@@ -28,28 +29,11 @@ from . import (
     reviewer_agent,
 )
 
-# 注册知识领域
-from .analyst_agent import register_analyst_knowledge
-from .architect_agent import register_architect_knowledge
-from .catalog_agent import register_catalog_knowledge
-from .developer_agent import register_developer_knowledge
-from .reviewer_agent import register_reviewer_knowledge
-
-
-def _init_knowledge() -> None:
-    """初始化知识领域"""
-    register_catalog_knowledge()
-    register_analyst_knowledge()
-    register_architect_knowledge()
-    register_developer_knowledge()
-    register_reviewer_knowledge()
-
-
-# 模块加载时初始化知识
-_init_knowledge()
-
-
-def create_etl_team() -> Datapillar:
+def create_etl_team(
+    *,
+    config: DatapillarConfig | None = None,
+    namespace: str | None = None,
+) -> Datapillar:
     """创建 ETL 智能团队
 
     Returns:
@@ -57,10 +41,10 @@ def create_etl_team() -> Datapillar:
 
     协作流程（DYNAMIC 模式）：
     1. AnalystAgent 接收请求，判断意图
-       - 元数据查询 → delegate_to_catalog
-       - ETL 需求 → 分析后 delegate_to_architect
-    2. ArchitectAgent 设计 Job/Stage → delegate_to_developer
-    3. DeveloperAgent 生成 SQL → delegate_to_reviewer
+       - 元数据查询 → 委派给 CatalogAgent
+       - ETL 需求 → 分析后委派给 ArchitectAgent
+    2. ArchitectAgent 设计 Job/Stage → 委派给 DeveloperAgent
+    3. DeveloperAgent 生成 SQL → 委派给 ReviewerAgent
     4. ReviewerAgent 评审代码 → 返回结果
     """
     from .analyst_agent import AnalystAgent
@@ -69,7 +53,14 @@ def create_etl_team() -> Datapillar:
     from .developer_agent import DeveloperAgent
     from .reviewer_agent import ReviewerAgent
 
+    if config is None:
+        config = get_datapillar_config()
+    if not namespace:
+        namespace = "etl_team"
+
     return Datapillar(
+        config=config,
+        namespace=namespace,
         name="ETL 智能团队",
         agents=[
             AnalystAgent,  # 入口：需求分析 + 智能分发

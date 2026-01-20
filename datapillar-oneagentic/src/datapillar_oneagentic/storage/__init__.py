@@ -153,8 +153,9 @@ async def create_checkpointer(
             ) from err
         logger.info(f"创建 redis checkpointer, namespace={namespace}")
         async with AsyncRedisSaver.from_conn_string(config.url) as saver:
-            if config.ttl_minutes and config.ttl_minutes > 0:
-                saver.ttl = {"default": config.ttl_minutes}
+            ttl_minutes = config.ttl_minutes
+            if ttl_minutes and ttl_minutes > 0:
+                saver.ttl = {"default": ttl_minutes}
             yield saver
 
     else:

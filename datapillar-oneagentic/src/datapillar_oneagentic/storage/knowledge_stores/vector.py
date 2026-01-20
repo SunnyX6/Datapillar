@@ -42,6 +42,10 @@ class VectorKnowledgeStore(KnowledgeStore):
         self._namespace = namespace
         self._register_schemas()
 
+    @property
+    def namespace(self) -> str:
+        return self._namespace
+
     def _register_schemas(self) -> None:
         self._vector_store.register_schema(
             VectorCollectionSchema(
@@ -127,6 +131,8 @@ class VectorKnowledgeStore(KnowledgeStore):
     async def upsert_sources(self, sources: list[KnowledgeSource]) -> None:
         if not sources:
             return
+        source_keys = [self._build_key(source.source_id) for source in sources]
+        await self._vector_store.delete(_SOURCES, source_keys)
         now = now_ms()
         records = []
         for source in sources:
@@ -259,6 +265,24 @@ class VectorKnowledgeStore(KnowledgeStore):
         keys = [self._build_key(chunk_id) for chunk_id in chunk_ids]
         rows = await self._vector_store.get(_CHUNKS, keys)
         return [_row_to_chunk(row) for row in rows]
+
+    async def delete_doc(self, doc_id: str) -> int:
+        key = self._build_key(doc_id)
+        return await self._vector_store.delete(_DOCS, [key])
+
+    async def delete_chunks_by_doc_id(self, doc_id: str) -> int:
+        rows = await self._vector_store.query(
+            _CHUNKS,
+            filters={"namespace": self._namespace, "doc_id": doc_id},
+        )
+        chunk_keys = []
+        for row in rows:
+            chunk_key = row.get("chunk_key") or row.get("id")
+            if chunk_key:
+                chunk_keys.append(str(chunk_key))
+        if not chunk_keys:
+            return 0
+        return await self._vector_store.delete(_CHUNKS, chunk_keys)
 
     def _build_key(self, raw_id: str) -> str:
         return f"{self._namespace}{_KEY_SEPARATOR}{raw_id}"

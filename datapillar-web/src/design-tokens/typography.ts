@@ -67,6 +67,9 @@ export const TYPOGRAPHY = {
   /** 超小徽标：9px / 600 / 行高 12px */
   nano: 'text-nano',
 
+  /** 右键菜单标题：8px / 600 / 行高 10px（>=1920：9px / 11px） */
+  contextMenuTitle: 'context-menu-title',
+
   /** 极微徽标：8px / 600 / 行高 10px */
   tiny: 'text-tiny',
 
@@ -89,6 +92,7 @@ export const FONT_SIZE = {
   micro: 10,
   legal: 11,
   nano: 9,
+  contextMenuTitle: 8,
   tiny: 8,
   mini: 7
 } as const
@@ -107,6 +111,7 @@ export const LINE_HEIGHT = {
   micro: 14,
   legal: 14,
   nano: 12,
+  contextMenuTitle: 10,
   tiny: 10,
   mini: 9
 } as const
@@ -125,6 +130,7 @@ export const FONT_WEIGHT = {
   micro: 600,
   legal: 600,
   nano: 600,
+  contextMenuTitle: 600,
   tiny: 600,
   mini: 600
 } as const
@@ -155,7 +161,10 @@ export const TYPOGRAPHY_USE_CASES = {
   hint: TYPOGRAPHY.caption,
 
   /** 标签、徽章、角标 */
-  badge: TYPOGRAPHY.micro
+  badge: TYPOGRAPHY.micro,
+
+  /** 右键菜单标题 */
+  contextMenuTitle: TYPOGRAPHY.contextMenuTitle
 } as const
 
 /**

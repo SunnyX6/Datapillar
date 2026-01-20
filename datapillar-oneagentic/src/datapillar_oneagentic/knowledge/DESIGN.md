@@ -12,15 +12,40 @@
 - namespace：逻辑隔离边界，写入表字段并作为检索过滤条件。
 - scope：检索范围选择器，V1 仅支持单 namespace（跨 namespace 规划）。
 - 团队级 knowledge：Datapillar(knowledge=...) 作为团队默认知识入口。
-- DocumentInput：用户输入（text/path/bytes/url + metadata）。
+- DocumentInput：框架内部输入（由 KnowledgeSource 构造，用户不直接使用）。
 - Chunk：块是一等公民，支持编辑与排序。
 - Draft：草稿块集合，发布后形成索引版本。
 
+## 简化 API（使用者视角）
+- 仅使用 KnowledgeSource（source_uri + 可选 content/metadata）。
+- source.chunk(chunk_config=...) 直接切分并返回预览。
+- source.ingest(namespace=..., config=KnowledgeConfig, sparse_embedder=...) 直接入库（内部创建并初始化 store）。
+- KnowledgeRetriever.from_config(namespace=..., config=KnowledgeConfig) 构建检索器，无需手动创建 store。
+- 框架根据 source_uri 读取内容并补充源元信息（文件/HTTP），写入文档 metadata 的 source_info；
+  若用户已提供 source_info，则自动写入 source_info_auto。
+- source_uri 支持本地路径与 HTTP/HTTPS；如提供 content，则以 content 作为解析输入。
+- KnowledgeConfig 统一承载 base_config/chunk_config/retrieve_config。
+
+## 身份与隔离规则
+- namespace：上传必填；调用方显式传入，用于创建 KnowledgeStore 并作为表字段与主键前缀，实现硬隔离。
+- source_id：入库时由系统生成并覆盖；source_id = sha256(namespace + source_type + source_uri + canonical_metadata)。
+  调用方预置 source_id 仅用于 Knowledge 合并/引用，不影响入库结果。
+- canonical_metadata：对 metadata 做稳定化：dict 按 key 排序；list/tuple 按值排序；
+  JSON 固定序列化（sort_keys=True, separators=(",", ":")）。
+- doc_id：全局确定性；doc_id = sha256(normalized_text)，normalized_text 复用 preprocess 规则。
+- chunk_id：由 doc_id 派生，沿用现有切分规则（general/parent_child/qa）。
+- 重建策略：同 namespace 下 doc_id 已存在时，先删该 doc 的 doc/chunks，再写入新版本。
+- 检索过滤：默认仅按 namespace；document_ids 只做收敛；source_id 仅用于展示与溯源，不参与过滤。
+- source_uri：作为内容读取入口与来源标识；文件/HTTP 元信息不参与 source_id 计算，仅写入文档 metadata。
+  文档表的 source_uri 字段优先使用 filename，其次 doc_input.source（可能是文本或路径），最后回退原始 source_uri。
+
 ## 用户使用流程
 ### 1) 直接发布（跳过预览）
+- 上传（namespace + source 信息 + 文档内容）
 - 解析 -> 清洗 -> 切分 -> 向量化 -> 入库
 
 ### 2) 预览 -> 草稿编辑 -> 发布
+- 上传（namespace + source 信息 + 文档内容）
 - 预览无状态，仅返回切分结果
 - 草稿显式创建，支持块级编辑
 - 发布触发索引
@@ -28,9 +53,10 @@
 ### 3) 检索（解耦 Agent）
 - 任何调用方都可使用检索增强能力
 - 不指定 scope 时默认使用 namespace
+- source_id 仅用于展示与溯源，不作为检索过滤条件
 
 ## 检索流水线（含 rerank 与证据治理）
-1) 召回：V1 支持 semantic/hybrid，keyword/full_text 规划后续接入。
+1) 召回：V1 支持 semantic/hybrid（hybrid 需要 sparse_embedder），按 namespace 过滤，document_ids 仅做收敛。
 2) 重排：可选 rerank（model 或 weighted），默认按 rank 处理分数差异，必要时做归一化。
 3) Evidence Grouping：内部按 document_id + parent_id 分组，用户仅配置 max_per_document。
 4) 去重：先 exact hash，再 semantic 阈值去重。
@@ -41,7 +67,7 @@
 ## 质量评估（切分 / 检索）
 ### 评估集格式（JSON）
 - evalset_id: 评估集标识
-- documents: 文档列表（doc_id/source_id/text/title/metadata）
+- documents: 文档列表（doc_id/text/title/metadata）
 - queries: 查询列表（query_id/query/expected_doc_ids/expected_chunk_ids/relevance_doc/relevance_chunk）
 - k_values: 评估 K 值（如 [1,3,5,10]）
 
@@ -50,7 +76,7 @@
 {
   "evalset_id": "kb_eval_v1",
   "documents": [
-    {"doc_id": "d1", "source_id": "kb", "text": "alpha beta", "title": "文档1"}
+    {"doc_id": "d1", "text": "alpha beta", "title": "文档1"}
   ],
   "queries": [
     {
@@ -68,6 +94,7 @@
 注意：
 - expected_doc_ids 必须来自 documents。
 - expected_chunk_ids 需与切分配置产出的 chunk_id 对齐（默认规则为 doc_id:idx）。
+- 评估集不需要提供 source_id，评估阶段会根据 doc_id 派生。
 
 ### 切分质量指标
 - 覆盖率：SourceSpan 覆盖文档内容的比例（无 span 时记为 None）。
@@ -86,14 +113,13 @@
 from datapillar_oneagentic.knowledge.evaluation import load_eval_set, KnowledgeEvaluator
 
 evalset = load_eval_set("tests/data/knowledge_evalset.json")
-evaluator = KnowledgeEvaluator(
-    store=knowledge_store,
-    embedding_provider=embedding_provider,
-    chunk_config=chunk_config,
-    retrieve_config=retrieve_config,
+evaluator = await KnowledgeEvaluator.from_config(
+    namespace="demo_eval",
+    config=knowledge_config,
 )
 report = await evaluator.evaluate(evalset)
 print(report.summary())
+await evaluator.close()
 ```
 
 ## 底层表结构（仅 3 表）
@@ -106,7 +132,7 @@ print(report.summary())
 - source_id
 - name
 - source_type
-- source_uri
+- source_uri（来源标识，保持原始输入）
 - tags (json)
 - metadata (json)
 - created_at
@@ -118,7 +144,7 @@ print(report.summary())
 - namespace
 - doc_id
 - source_id (FK)
-- source_uri
+- source_uri（优先 filename；其次 doc_input.source，可能是文本或路径；最后回退原始 source_uri）
 - title
 - version
 - status: draft | published | archived
@@ -153,8 +179,13 @@ print(report.summary())
 - updated_at
 - vector（必需，支持 semantic/hybrid）
 
+补充约束：
+- source_key/doc_key/chunk_key = namespace::source_id/doc_id/chunk_id。
+- source_id/doc_id/chunk_id 生成规则见“身份与隔离规则”。
+
 ## 运行时模型（非表）
 ### DocumentInput
+- 内部模型，不对外暴露。
 - source: text | path | bytes | url
 - filename: str | None
 - mime_type: str | None
@@ -191,7 +222,7 @@ print(report.summary())
 - tags: list[str] | None
 
 ### RetrievalConfig
-- method: semantic | full_text | hybrid | keyword
+- method: semantic | hybrid
 - top_k
 - score_threshold
 - rerank: RerankConfig | None
@@ -211,7 +242,7 @@ print(report.summary())
 
 ### ParsedDocument
 - document_id
-- source_type: text | file | url
+- source_type: text | file
 - mime_type
 - text
 - pages: list[str]
@@ -311,32 +342,40 @@ src/datapillar_oneagentic/knowledge/
 
 ## 接口形态（库级）
 ```python
+knowledge_config = KnowledgeConfig(...)
+source = KnowledgeSource(source_uri="/path/to/doc.md", content="...")
+
 # 预览（无状态）
-parsed = parser_registry.parse(doc_input)
-preview = chunker.preview(parsed)
+preview = source.chunk(chunk_config=knowledge_config.chunk_config)
 
 # 直接发布（跳过预览）
-await ingestor.ingest(source=source, documents=[doc_input], sparse_embedder=sparse_embedder)
+await source.ingest(namespace="demo_ns", config=knowledge_config, sparse_embedder=sparse_embedder)
 
 # 检索（scope 可选，不传默认使用 namespace）
+retriever = KnowledgeRetriever.from_config(namespace="demo_ns", config=knowledge_config)
 result = await retriever.retrieve(query=query, knowledge=knowledge, scope=None)
 inject_config = retriever.resolve_inject_config(knowledge)
 context = ContextBuilder.build_knowledge_context(
     chunks=[chunk for chunk, _ in result.hits],
     inject=inject_config,
 )
+await retriever.close()
 ```
 
 
-## 配置结构（仅两类）
-### knowledge.chunk
+## 配置结构（统一 KnowledgeConfig）
+### knowledge.base_config
+- embedding: provider, api_key, model, base_url, dimension
+- vector_store: type, path/uri/host/port/token
+
+### knowledge.chunk_config
 - mode: general | parent_child | qa
 - preprocess: list[str]
 - general: delimiter, max_tokens, overlap
 - parent_child: parent{...}, child{...}
 
-### knowledge.retrieve
-- method: semantic | full_text | hybrid | keyword
+### knowledge.retrieve_config
+- method: semantic | hybrid
 - top_k
 - score_threshold
 - rerank
@@ -360,7 +399,7 @@ context = ContextBuilder.build_knowledge_context(
 - scope 只影响检索范围，不改变存储隔离策略。
 
 ## 与现有实现对齐
-- 复用 EmbeddingProviderClient 与 KnowledgeStore。
+- 复用 EmbeddingProvider 与 KnowledgeStore。
 - 上下文格式化由 ContextBuilder 统一处理。
 - 拆分 KnowledgeIngestor：Parser/Chunker/Indexer 独立。
 - 复用配置合并模式（全局默认 + Agent 覆盖）。

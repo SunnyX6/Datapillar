@@ -26,6 +26,7 @@ import {
   SiRedis
 } from 'react-icons/si'
 import { BaseRightRail, type RightRailButton } from '../components'
+import { panelWidthClassMap } from '@/design-tokens/dimensions'
 import {
   fetchCatalogs,
   fetchTables,
@@ -130,6 +131,7 @@ export function RightRail({ selectedCatalog, selectedSchema, requestOpenDatabase
       onPanelChange={setActivePanel}
       panelTitle={panelTitle}
       panelWidth={320}
+      panelWidthClassName={panelWidthClassMap.responsive}
     >
       {activePanel === 'database' && (
         <DatabasePanel

@@ -1,0 +1,1 @@
+export { WikiView } from './WikiView'

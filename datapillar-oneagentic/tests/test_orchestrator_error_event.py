@@ -7,7 +7,7 @@ from datapillar_oneagentic.core.config import AgentConfig
 from datapillar_oneagentic.exception import AgentError, AgentErrorCategory
 from datapillar_oneagentic.core.status import FailureKind
 from datapillar_oneagentic.core.types import SessionKey
-from datapillar_oneagentic.events import EventBus
+from datapillar_oneagentic.events import EventBus, EventType
 from datapillar_oneagentic.exception import RecoveryAction
 from datapillar_oneagentic.runtime.orchestrator import Orchestrator
 from datapillar_oneagentic.state.blackboard import Blackboard
@@ -48,7 +48,10 @@ async def test_orchestrator_emits_error_event_and_raises() -> None:
             stream = orchestrator.stream(query="hello", key=key)
 
             first_event = await anext(stream)
-            assert first_event["event"] == "error"
+            assert first_event["event"] == EventType.AGENT_FAILED.value
+            error = first_event.get("data", {}).get("error", {})
+            assert error.get("message") == "Agent 执行失败"
+            assert error.get("error_type") == "agent"
 
             with pytest.raises(AgentError):
                 await anext(stream)

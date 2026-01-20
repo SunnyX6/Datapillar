@@ -5,9 +5,12 @@
 from __future__ import annotations
 
 import copy
+import os
 from dataclasses import dataclass, field, fields
 from typing import Any, Protocol
+from urllib.parse import urlparse
 
+from datapillar_oneagentic.knowledge.identity import canonicalize_metadata
 
 class SparseEmbeddingProvider(Protocol):
     """稀疏向量化接口（由使用者提供实现）"""
@@ -70,12 +73,70 @@ class SourceSpan:
 class KnowledgeSource:
     """知识来源定义（注册用）"""
 
-    source_id: str
-    name: str
-    source_type: str
+    name: str | None = None
+    source_type: str = "doc"
+    source_id: str | None = None
     source_uri: str | None = None
     tags: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    content: str | bytes | None = None
+    filename: str | None = None
+    mime_type: str | None = None
+    parser_hint: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.name:
+            self.name = self.source_uri or "未命名"
+
+    def chunk(
+        self,
+        *,
+        chunk_config: "KnowledgeChunkConfig",
+        parser_registry: "ParserRegistry | None" = None,
+    ) -> "ChunkPreview":
+        if not self.source_uri:
+            raise ValueError("source_uri 不能为空")
+        if chunk_config is None:
+            raise ValueError("chunk_config 不能为空")
+        from datapillar_oneagentic.knowledge.chunker import KnowledgeChunker
+        from datapillar_oneagentic.knowledge.parser import default_registry
+
+        doc_input = _build_document_input(self)
+        registry = parser_registry or default_registry()
+        parsed = registry.parse(doc_input)
+        chunker = KnowledgeChunker(config=chunk_config)
+        return chunker.preview(parsed)
+
+    async def ingest(
+        self,
+        *,
+        namespace: str,
+        config: "KnowledgeConfig",
+        sparse_embedder: "SparseEmbeddingProvider | None" = None,
+        parser_registry: "ParserRegistry | None" = None,
+    ) -> None:
+        if not self.source_uri:
+            raise ValueError("source_uri 不能为空")
+        if not namespace:
+            raise ValueError("namespace 不能为空")
+        if config is None:
+            raise ValueError("config 不能为空")
+        from datapillar_oneagentic.knowledge.ingest.pipeline import KnowledgeIngestor
+        from datapillar_oneagentic.knowledge.parser import default_registry
+        from datapillar_oneagentic.knowledge.runtime import build_runtime
+
+        runtime = build_runtime(namespace=namespace, base_config=config.base_config)
+        await runtime.initialize()
+        doc_input = _build_document_input(self)
+        registry = parser_registry or default_registry()
+        ingestor = KnowledgeIngestor(
+            store=runtime.store,
+            embedding_provider=runtime.embedding_provider,
+            config=config.chunk_config,
+            parser_registry=registry,
+        )
+        await ingestor.ingest(source=self, documents=[doc_input], sparse_embedder=sparse_embedder)
+        await runtime.store.close()
 
 
 @dataclass
@@ -244,16 +305,164 @@ def _merge_sources(
 
     for source in base_sources:
         merged.append(copy.deepcopy(source))
-        index[source.source_id] = len(merged) - 1
+        source_key = _source_merge_key(source)
+        index[source_key] = len(merged) - 1
 
     for source in override_sources:
-        if source.source_id in index:
-            merged[index[source.source_id]] = copy.deepcopy(source)
+        source_key = _source_merge_key(source)
+        if source_key in index:
+            merged[index[source_key]] = copy.deepcopy(source)
         else:
-            index[source.source_id] = len(merged)
+            index[source_key] = len(merged)
             merged.append(copy.deepcopy(source))
 
     return merged
+
+
+def _source_merge_key(source: KnowledgeSource) -> str:
+    if source.source_id:
+        return source.source_id
+    canonical = canonicalize_metadata(source.metadata)
+    return f"{source.source_type}|{source.source_uri or ''}|{canonical}"
+
+
+def _build_document_input(source: KnowledgeSource) -> DocumentInput:
+    source_uri = source.source_uri
+    if not source_uri:
+        raise ValueError("source_uri 不能为空")
+    payload, filename, mime_type, source_info = _resolve_source_payload(source)
+    source_info.setdefault("source_type", source.source_type)
+    source_info.setdefault("source_uri", source_uri)
+    metadata = dict(source.metadata)
+    _merge_source_info(metadata, source_info)
+    return DocumentInput(
+        source=payload,
+        filename=filename,
+        mime_type=mime_type,
+        parser_hint=source.parser_hint,
+        metadata=metadata,
+    )
+
+
+def _resolve_source_payload(
+    source: KnowledgeSource,
+) -> tuple[str | bytes, str | None, str | None, dict[str, Any]]:
+    source_uri = source.source_uri or ""
+    if source.content is not None:
+        return _load_from_inline(source.content, source)
+    if _is_url(source_uri):
+        return _load_from_url(source_uri, source)
+    if os.path.exists(source_uri):
+        return _load_from_file(source_uri, source)
+    return _load_from_text(source_uri, source)
+
+
+def _load_from_url(
+    source_uri: str,
+    source: KnowledgeSource,
+) -> tuple[bytes, str | None, str | None, dict[str, Any]]:
+    import httpx
+
+    response = httpx.get(source_uri, follow_redirects=True, timeout=30.0)
+    response.raise_for_status()
+    headers = response.headers
+    content_type = headers.get("content-type")
+    mime_type = source.mime_type or _normalize_content_type(content_type)
+    filename = source.filename or _extract_filename(headers.get("content-disposition"))
+    if not filename:
+        filename = _filename_from_url(str(response.url)) or source.filename
+    info = {
+        "source_kind": "url",
+        "final_url": str(response.url),
+        "http_status": response.status_code,
+        "http_content_type": content_type,
+        "http_content_length": _to_int(headers.get("content-length")),
+        "http_last_modified": headers.get("last-modified"),
+        "http_etag": headers.get("etag"),
+    }
+    return response.content, filename, mime_type, info
+
+
+def _load_from_file(
+    source_uri: str,
+    source: KnowledgeSource,
+) -> tuple[str, str | None, str | None, dict[str, Any]]:
+    stat = os.stat(source_uri)
+    info = {
+        "source_kind": "file",
+        "file_size": stat.st_size,
+        "file_mtime": int(stat.st_mtime),
+        "file_ctime": int(stat.st_ctime),
+        "file_path": os.path.abspath(source_uri),
+    }
+    filename = source.filename or os.path.basename(source_uri)
+    return source_uri, filename, source.mime_type, info
+
+
+def _load_from_text(
+    content: str,
+    source: KnowledgeSource,
+) -> tuple[str, str | None, str | None, dict[str, Any]]:
+    info = {
+        "source_kind": "text",
+        "text_length": len(content),
+    }
+    return content, source.filename, source.mime_type, info
+
+
+def _load_from_inline(
+    content: str | bytes,
+    source: KnowledgeSource,
+) -> tuple[str | bytes, str | None, str | None, dict[str, Any]]:
+    length = len(content) if isinstance(content, (bytes, str)) else 0
+    info = {
+        "source_kind": "inline",
+        "content_length": length,
+    }
+    return content, source.filename, source.mime_type, info
+
+
+def _merge_source_info(metadata: dict[str, Any], info: dict[str, Any]) -> None:
+    if "source_info" in metadata:
+        metadata["source_info_auto"] = info
+    else:
+        metadata["source_info"] = info
+
+
+def _extract_filename(value: str | None) -> str | None:
+    if not value:
+        return None
+    parts = [part.strip() for part in value.split(";") if part.strip()]
+    for part in parts:
+        if part.lower().startswith("filename="):
+            return part.split("=", 1)[1].strip().strip('"')
+    return None
+
+
+def _filename_from_url(url: str) -> str | None:
+    parsed = urlparse(url)
+    if not parsed.path:
+        return None
+    name = parsed.path.split("/")[-1]
+    return name or None
+
+
+def _normalize_content_type(value: str | None) -> str | None:
+    if not value:
+        return None
+    return value.split(";", 1)[0].strip().lower() or None
+
+
+def _to_int(value: str | None) -> int | None:
+    if not value:
+        return None
+    if not value.isdigit():
+        return None
+    return int(value)
+
+
+def _is_url(value: str) -> bool:
+    return value.startswith("http://") or value.startswith("https://")
 
 
 def _merge_inject(

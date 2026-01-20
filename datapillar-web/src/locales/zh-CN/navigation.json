@@ -31,6 +31,7 @@
       "observe": "观测"
     },
     "items": {
+      "wiki": "知识 Wiki",
       "workflow": "工作流构建",
       "ide": "统一开发 IDE",
       "catalog": "数据目录",

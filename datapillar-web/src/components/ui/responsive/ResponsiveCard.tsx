@@ -44,6 +44,8 @@ const paddingMap = {
 const cardSizeClassMap: Record<CardSize, string> = {
   responsive: `${cardWidthClassMap.normal} lg:max-w-2xl`,
   narrow: cardWidthClassMap.narrow,
+  compact: cardWidthClassMap.compact,
+  half: cardWidthClassMap.half,
   normal: cardWidthClassMap.normal,
   medium: cardWidthClassMap.medium,
   wide: cardWidthClassMap.wide,

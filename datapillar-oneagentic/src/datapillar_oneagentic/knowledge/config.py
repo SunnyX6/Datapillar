@@ -6,6 +6,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from datapillar_oneagentic.providers.llm.config import EmbeddingConfig
+from datapillar_oneagentic.storage.config import VectorStoreConfig
+
 from pydantic import BaseModel, Field
 
 
@@ -88,7 +91,7 @@ class RetrieveQualityConfig(BaseModel):
 class KnowledgeRetrieveConfig(BaseModel):
     """知识检索配置（默认值）"""
 
-    method: str = Field(default="hybrid", description="检索方式: semantic | hybrid | keyword | full_text")
+    method: str = Field(default="hybrid", description="检索方式: semantic | hybrid")
     top_k: int = Field(default=8, ge=1, description="最终返回数量")
     score_threshold: float | None = Field(default=None, description="最低分数阈值")
     rerank: RerankConfig = Field(default_factory=RerankConfig)
@@ -97,8 +100,16 @@ class KnowledgeRetrieveConfig(BaseModel):
     inject: KnowledgeInjectConfig = Field(default_factory=KnowledgeInjectConfig)
 
 
+class KnowledgeBaseConfig(BaseModel):
+    """知识基础配置（Embedding + VectorStore）"""
+
+    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
+    vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
+
+
 class KnowledgeConfig(BaseModel):
     """知识配置"""
 
-    chunk: KnowledgeChunkConfig = Field(default_factory=KnowledgeChunkConfig)
-    retrieve: KnowledgeRetrieveConfig = Field(default_factory=KnowledgeRetrieveConfig)
+    base_config: KnowledgeBaseConfig = Field(default_factory=KnowledgeBaseConfig)
+    chunk_config: KnowledgeChunkConfig = Field(default_factory=KnowledgeChunkConfig)
+    retrieve_config: KnowledgeRetrieveConfig = Field(default_factory=KnowledgeRetrieveConfig)

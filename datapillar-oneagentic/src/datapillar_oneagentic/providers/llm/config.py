@@ -199,7 +199,7 @@ class LLMConfig(BaseModel):
         return self.api_key is not None and self.model is not None
 
 
-class EmbeddingProvider(str, Enum):
+class EmbeddingBackend(str, Enum):
     """
     支持的 Embedding 提供商
 
@@ -230,8 +230,8 @@ class EmbeddingConfig(BaseModel):
     """
 
     provider: str = Field(
-        default=EmbeddingProvider.OPENAI.value,
-        description=f"Embedding 提供商，支持: {', '.join(EmbeddingProvider.list_supported())}"
+        default=EmbeddingBackend.OPENAI.value,
+        description=f"Embedding 提供商，支持: {', '.join(EmbeddingBackend.list_supported())}"
     )
     api_key: str | None = Field(default=None, description="API Key")
     model: str | None = Field(default=None, description="模型名称")
@@ -242,7 +242,7 @@ class EmbeddingConfig(BaseModel):
     @classmethod
     def validate_provider(cls, v: str) -> str:
         """校验 embedding provider 是否支持"""
-        supported = EmbeddingProvider.list_supported()
+        supported = EmbeddingBackend.list_supported()
         if v.lower() not in supported:
             raise ValueError(
                 f"不支持的 embedding provider: '{v}'。"

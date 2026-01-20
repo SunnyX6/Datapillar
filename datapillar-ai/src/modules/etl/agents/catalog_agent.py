@@ -12,11 +12,22 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from src.modules.oneagentic import Clarification, agent
-from src.modules.oneagentic.knowledge import KnowledgeDomain, KnowledgeLevel, KnowledgeStore
+from datapillar_oneagentic import agent
+from src.modules.etl.tools.table import (
+    count_catalogs,
+    count_schemas,
+    count_tables,
+    get_table_detail,
+    get_table_lineage,
+    list_catalogs,
+    list_schemas,
+    list_tables,
+    search_columns,
+    search_tables,
+)
 
 if TYPE_CHECKING:
-    from src.modules.oneagentic import AgentContext
+    from datapillar_oneagentic import AgentContext
 
 
 # ==================== 输出 Schema ====================
@@ -49,22 +60,20 @@ class CatalogOutput(BaseModel):
     name="元数据专员",
     description="回答元数据相关问题（数据目录、表结构、字段、血缘）",
     tools=[
-        "count_catalogs",
-        "count_schemas",
-        "count_tables",
-        "list_catalogs",
-        "list_schemas",
-        "list_tables",
-        "search_tables",
-        "search_columns",
-        "get_table_detail",
-        "get_table_lineage",
+        count_catalogs,
+        count_schemas,
+        count_tables,
+        list_catalogs,
+        list_schemas,
+        list_tables,
+        search_tables,
+        search_columns,
+        get_table_detail,
+        get_table_lineage,
     ],
     deliverable_schema=CatalogOutput,
-    deliverable_key="catalog_result",
-    knowledge_domains=["catalog_query_methodology"],
     temperature=0.0,
-    max_iterations=5,
+    max_steps=5,
 )
 class CatalogAgent:
     """元数据问答专员"""
@@ -113,36 +122,8 @@ class CatalogAgent:
 2. 工具返回的路径始终是完整的 catalog.schema.table 格式，直接使用
 3. 如果用户问题范围不明确（如"有哪些表"但未指定 catalog/schema），设置 confidence < 0.7 并在 ambiguities 中询问
 4. **必须返回完整的 JSON 格式，包含所有字段**
-"""
 
-    async def run(self, ctx: AgentContext) -> CatalogOutput | Clarification:
-        """执行查询"""
-        # 1. 构建消息
-        messages = ctx.build_messages(self.SYSTEM_PROMPT)
-
-        # 2. 工具调用循环
-        messages = await ctx.invoke_tools(messages)
-
-        # 3. 获取结构化输出
-        output = await ctx.get_output(messages)
-
-        # 4. 业务判断：需要澄清？
-        if isinstance(output, CatalogOutput) and output.confidence < 0.7 and output.ambiguities:
-            return ctx.clarify(
-                message="需要更多信息",
-                questions=output.ambiguities,
-            )
-
-        return output
-
-
-# ==================== 知识领域 ====================
-
-CATALOG_QUERY_METHODOLOGY = KnowledgeDomain(
-    domain_id="catalog_query_methodology",
-    name="元数据查询方法论",
-    level=KnowledgeLevel.DOMAIN,
-    content="""## 元数据查询方法论
+## 元数据查询方法论
 
 ### 查询层级（三级钻取）
 1. **第一层：Catalog** - 数据目录
@@ -161,11 +142,22 @@ CATALOG_QUERY_METHODOLOGY = KnowledgeDomain(
 ### 澄清原则
 - 用户只说"有哪些表"但未指定 catalog/schema 时，需要澄清
 - 用户指定了明确范围时，直接查询
-""",
-    tags=["元数据", "查询方法论", "catalog"],
-)
+"""
 
+    async def run(self, ctx: AgentContext) -> CatalogOutput:
+        """执行查询"""
+        # 1. 构建消息
+        messages = ctx.build_messages(self.SYSTEM_PROMPT)
 
-def register_catalog_knowledge() -> None:
-    """注册 CatalogAgent 相关的知识领域"""
-    KnowledgeStore.register_domain(CATALOG_QUERY_METHODOLOGY)
+        # 2. 工具调用循环
+        messages = await ctx.invoke_tools(messages)
+
+        # 3. 获取结构化输出
+        output = await ctx.get_structured_output(messages)
+
+        # 4. 业务判断：需要澄清？
+        if output.confidence < 0.7 and output.ambiguities:
+            ctx.interrupt({"message": "需要更多信息", "questions": output.ambiguities})
+            output = await ctx.get_structured_output(messages)
+
+        return output

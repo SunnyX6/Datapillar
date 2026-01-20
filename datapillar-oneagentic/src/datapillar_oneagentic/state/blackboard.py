@@ -29,6 +29,7 @@ class Blackboard(TypedDict, total=False):
 
     核心字段：
     - messages: 对话消息列表（短期记忆，LangGraph 标准，通过 add_messages reducer 自动合并）
+    - namespace: 命名空间
     - session_id: 会话标识
     - active_agent: 当前活跃的 Agent ID
     - assigned_task: Manager 下发给当前 Agent 的任务内容
@@ -59,7 +60,6 @@ class Blackboard(TypedDict, total=False):
 
     # 交付物 keys（实际内容存在 Store 中）
     deliverable_keys: list[str]
-    deliverable_versions: dict[str, int]
 
     # 经验上下文（框架自动检索注入）
     experience_context: str | None
@@ -106,7 +106,6 @@ def create_blackboard(
         assigned_task=None,
         timeline=None,
         deliverable_keys=[],
-        deliverable_versions={},
         experience_context=experience_context,
         knowledge_context=knowledge_context,
         last_agent_status=None,

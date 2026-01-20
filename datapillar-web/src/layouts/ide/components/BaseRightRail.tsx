@@ -30,6 +30,8 @@ interface BaseRightRailProps {
   children?: ReactNode
   /** 面板宽度 */
   panelWidth?: number
+  /** 面板宽度样式类（优先于 panelWidth） */
+  panelWidthClassName?: string
   /** 底部固定按钮 */
   bottomButtons?: RightRailButton[]
 }
@@ -41,6 +43,7 @@ export function BaseRightRail({
   panelTitle,
   children,
   panelWidth = 320,
+  panelWidthClassName,
   bottomButtons,
 }: BaseRightRailProps) {
   const togglePanel = (id: string) => {
@@ -58,7 +61,7 @@ export function BaseRightRail({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 20, opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="absolute right-10 top-0 bottom-0 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-[-8px_0_24px_rgba(0,0,0,0.06)] dark:shadow-[-8px_0_24px_rgba(0,0,0,0.3)] flex flex-col w-[var(--panel-width)]"
+            className={`absolute right-10 top-0 bottom-0 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-[-8px_0_24px_rgba(0,0,0,0.06)] dark:shadow-[-8px_0_24px_rgba(0,0,0,0.3)] flex flex-col ${panelWidthClassName ?? 'w-[var(--panel-width)]'}`}
             style={{ '--panel-width': `${panelWidth}px` } as React.CSSProperties}
           >
             {/* 面板头部 */}

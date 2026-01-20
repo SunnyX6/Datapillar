@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from datapillar_oneagentic.experience.learner import ExperienceRecord
     from datapillar_oneagentic.storage.learning_stores.base import ExperienceStore
-    from datapillar_oneagentic.providers.llm.embedding import EmbeddingProviderClient
+    from datapillar_oneagentic.providers.llm.embedding import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class ExperienceRetriever:
     2. 自动拼接成可注入 prompt 的上下文
     """
 
-    def __init__(self, store: ExperienceStore, embedding_provider: "EmbeddingProviderClient"):
+    def __init__(self, store: ExperienceStore, embedding_provider: "EmbeddingProvider"):
         """
         初始化检索器
 

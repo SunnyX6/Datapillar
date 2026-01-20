@@ -1,14 +1,11 @@
 """
 LLM 集成层
 
-提供统一的 LLM 调用接口，支持 OpenAI、Claude、GLM、OpenRouter、Ollama
+提供 Embedding 能力（用于图谱语义检索）。
 """
 
-from src.infrastructure.llm.client import LLMFactory, call_llm
 from src.infrastructure.llm.embeddings import UnifiedEmbedder
 
 __all__ = [
-    "LLMFactory",
-    "call_llm",
     "UnifiedEmbedder",
 ]

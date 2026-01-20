@@ -15,7 +15,6 @@ team = create_etl_team()
 async for event in team.stream(
     query="创建用户宽表",
     session_id="session_001",
-    user_id="user_001",
 ):
     print(event)
 ```

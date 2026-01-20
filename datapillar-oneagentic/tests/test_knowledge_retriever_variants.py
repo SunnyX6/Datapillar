@@ -28,7 +28,18 @@ class _StubSparseEmbedder:
 
 class _StubKnowledgeStore:
     def __init__(self, *, search_results: list[KnowledgeSearchHit]) -> None:
+        self._namespace = "ns_stub"
         self.search_results = list(search_results)
+
+    @property
+    def namespace(self) -> str:
+        return self._namespace
+
+    async def initialize(self) -> None:
+        return None
+
+    async def close(self) -> None:
+        return None
 
     async def search_chunks(
         self,
@@ -41,6 +52,15 @@ class _StubKnowledgeStore:
 
     async def get_chunks(self, chunk_ids: list[str]) -> list[KnowledgeChunk]:
         return []
+
+    async def get_doc(self, doc_id: str):
+        return None
+
+    async def delete_doc(self, doc_id: str) -> int:
+        return 0
+
+    async def delete_chunks_by_doc_id(self, doc_id: str) -> int:
+        return 0
 
 
 @pytest.mark.asyncio
@@ -71,7 +91,7 @@ async def test_retriever_applies_score_threshold() -> None:
     ]
     store = _StubKnowledgeStore(search_results=hits)
     config = KnowledgeConfig(
-        retrieve=KnowledgeRetrieveConfig(
+        retrieve_config=KnowledgeRetrieveConfig(
             method="semantic",
             top_k=5,
             score_threshold=0.5,
@@ -132,7 +152,7 @@ async def test_retriever_hybrid_rrf_uses_sparse_rank() -> None:
     ]
     store = _StubKnowledgeStore(search_results=hits)
     config = KnowledgeConfig(
-        retrieve=KnowledgeRetrieveConfig(
+        retrieve_config=KnowledgeRetrieveConfig(
             method="hybrid",
             top_k=3,
             tuning={"rrf_k": 1},
@@ -179,7 +199,7 @@ async def test_retriever_filters_by_document_ids() -> None:
     ]
     store = _StubKnowledgeStore(search_results=hits)
     config = KnowledgeConfig(
-        retrieve=KnowledgeRetrieveConfig(
+        retrieve_config=KnowledgeRetrieveConfig(
             method="semantic",
             top_k=2,
         )
@@ -204,7 +224,7 @@ async def test_retriever_filters_by_document_ids() -> None:
 @pytest.mark.asyncio
 async def test_retriever_scope_tags_not_supported() -> None:
     store = _StubKnowledgeStore(search_results=[])
-    config = KnowledgeConfig(retrieve=KnowledgeRetrieveConfig(method="semantic"))
+    config = KnowledgeConfig(retrieve_config=KnowledgeRetrieveConfig(method="semantic"))
     retriever = KnowledgeRetriever(
         store=store, embedding_provider=_StubEmbeddingProvider(), config=config
     )
@@ -224,7 +244,7 @@ async def test_retriever_scope_tags_not_supported() -> None:
 @pytest.mark.asyncio
 async def test_retriever_scope_multiple_namespaces_not_supported() -> None:
     store = _StubKnowledgeStore(search_results=[])
-    config = KnowledgeConfig(retrieve=KnowledgeRetrieveConfig(method="semantic"))
+    config = KnowledgeConfig(retrieve_config=KnowledgeRetrieveConfig(method="semantic"))
     retriever = KnowledgeRetriever(
         store=store, embedding_provider=_StubEmbeddingProvider(), config=config
     )
@@ -281,7 +301,7 @@ async def test_rerank_weighted_prefers_rerank_scores(monkeypatch) -> None:
 
     store = _StubKnowledgeStore(search_results=hits)
     config = KnowledgeConfig(
-        retrieve=KnowledgeRetrieveConfig(
+        retrieve_config=KnowledgeRetrieveConfig(
             method="semantic",
             top_k=2,
             rerank=RerankConfig(
@@ -344,7 +364,7 @@ async def test_rerank_normalize_minmax_outputs_normalized_scores(monkeypatch) ->
 
     store = _StubKnowledgeStore(search_results=hits)
     config = KnowledgeConfig(
-        retrieve=KnowledgeRetrieveConfig(
+        retrieve_config=KnowledgeRetrieveConfig(
             method="semantic",
             top_k=2,
             rerank=RerankConfig(

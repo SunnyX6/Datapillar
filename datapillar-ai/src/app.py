@@ -137,7 +137,7 @@ def create_app() -> FastAPI:
             logger.info("恢复 EventProcessor 事件消费...")
             event_processor.resume()
 
-            # 创建 ETL 团队
+            # 创建 ETL 智能团队
             etl_team = create_etl_team()
             app.state.etl_team = etl_team
 
@@ -204,11 +204,6 @@ def create_app() -> FastAPI:
 
     # 注册 API 路由
     app.include_router(api_router, prefix="/api")
-
-    # 注册 A2A 网关路由（根路径，用于 Agent 协议）
-    from src.modules.oneagentic.a2a import a2a_router
-
-    app.include_router(a2a_router)
 
     # 健康检查
     @app.get("/health")

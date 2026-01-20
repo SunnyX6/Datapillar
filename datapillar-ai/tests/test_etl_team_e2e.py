@@ -8,7 +8,11 @@ ETL 团队端到端测试
 
 import asyncio
 
-from src.modules.oneagentic.sse.event import SseEventType
+import pytest
+
+from datapillar_oneagentic.sse import SseEventType
+
+pytestmark = pytest.mark.skip(reason="需要真实 LLM API Key，手动运行")
 
 
 async def test_catalog_query():
@@ -28,7 +32,6 @@ async def test_catalog_query():
     async for event in team.stream(
         query="有哪些表？",
         session_id="test_catalog_001",
-        user_id="test_user",
     ):
         event_type = event.get("event")
         data = event.get("data", {})
@@ -58,13 +61,15 @@ async def test_catalog_query():
 
         elif event_type == SseEventType.RESULT:
             result = event.get("result", {})
-            message = result.get("summary", "")
-            print(f"\n📋 最终结果: {message[:200]}...")
+            deliverable = result.get("deliverable", {}) if isinstance(result, dict) else {}
+            summary = deliverable.get("summary", "")
+            print(f"\n📋 最终结果: {summary[:200]}...")
 
         elif event_type == SseEventType.ERROR:
             error = event.get("error", {})
+            message = error.get("message", "")
             detail = error.get("detail", "")
-            print(f"❌ 错误: {detail}")
+            print(f"❌ 错误: {message} {detail}")
 
     print(f"\n路由轨迹: {' → '.join(agent_trace)}")
     print("=" * 60)
@@ -105,7 +110,6 @@ async def test_etl_generation():
     async for event in team.stream(
         query="帮我设计一个 ETL 流程：从 hive_catalog.datapillar.t_order 读取订单数据，按用户汇总订单金额，写入 hive_catalog.datapillar.dws_user_order_summary，使用 overwrite 模式",
         session_id="test_etl_006",
-        user_id="test_user",
     ):
         event_type = event.get("event")
 
@@ -133,13 +137,15 @@ async def test_etl_generation():
 
         elif event_type == SseEventType.RESULT:
             result = event.get("result", {})
-            message = result.get("summary", "")
-            print(f"\n📋 最终结果: {message[:100]}...")
+            deliverable = result.get("deliverable", {}) if isinstance(result, dict) else {}
+            summary = deliverable.get("summary", "")
+            print(f"\n📋 最终结果: {summary[:100]}...")
 
         elif event_type == SseEventType.ERROR:
             error = event.get("error", {})
+            message = error.get("message", "")
             detail = error.get("detail", "")
-            print(f"❌ 错误: {detail}")
+            print(f"❌ 错误: {message} {detail}")
 
     print(f"\n路由轨迹: {' → '.join(agent_trace)}")
     print("=" * 60)

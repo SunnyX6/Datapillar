@@ -25,7 +25,7 @@ import { useI18nStore, useSearchStore, type Language, type SearchContext } from 
 import { useTranslation } from 'react-i18next'
 import { iconSizeToken } from '@/design-tokens/dimensions'
 
-type View = 'dashboard' | 'workflow' | 'profile'
+type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide'
 
 const LANGUAGE_OPTIONS: { id: Language; label: string }[] = [
   { id: 'zh-CN', label: '简体中文' },

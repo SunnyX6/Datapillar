@@ -26,7 +26,7 @@ from datapillar_oneagentic import (
     # 配置
     DatapillarConfig,
 )
-from datapillar_oneagentic.knowledge import Knowledge, KnowledgeSource
+from datapillar_oneagentic.knowledge import Knowledge, KnowledgeConfig, KnowledgeSource
 
 
 # ============================================================================
@@ -45,6 +45,20 @@ LLM_ENABLE_THINKING = os.environ.get("GLM_ENABLE_THINKING", "false").lower() in 
 
 if not LLM_API_KEY or not LLM_MODEL:
     raise RuntimeError("请设置 GLM_API_KEY 和 GLM_MODEL（可选 GLM_BASE_URL/GLM_ENABLE_THINKING）")
+
+# Embedding 配置（知识检索需要）
+EMBEDDING_PROVIDER = "glm"
+EMBEDDING_API_KEY = os.environ.get("GLM_EMBEDDING_API_KEY")
+EMBEDDING_MODEL = os.environ.get("GLM_EMBEDDING_MODEL")
+EMBEDDING_DIMENSION_RAW = os.environ.get("GLM_EMBEDDING_DIMENSION")
+
+if not EMBEDDING_API_KEY or not EMBEDDING_MODEL or not EMBEDDING_DIMENSION_RAW:
+    raise RuntimeError("请设置 GLM_EMBEDDING_API_KEY、GLM_EMBEDDING_MODEL、GLM_EMBEDDING_DIMENSION")
+
+try:
+    EMBEDDING_DIMENSION = int(EMBEDDING_DIMENSION_RAW)
+except ValueError as exc:
+    raise RuntimeError("GLM_EMBEDDING_DIMENSION 必须为整数") from exc
 
 
 # ============================================================================
@@ -172,13 +186,13 @@ class OrderResult(BaseModel):
     max_steps=10,                              # 最大工具调用次数
 
     # === 知识配置（可选）===
-    # 注意：启用知识检索需要配置 embedding
+    # 注意：启用知识检索需要配置 knowledge.base_config.embedding
     knowledge=Knowledge(
         sources=[
             KnowledgeSource(
-                source_id="kb_demo",
                 name="示例知识库",
                 source_type="doc",
+                source_uri="kb_demo",
             )
         ],
     ),
@@ -379,7 +393,18 @@ async def main():
     if LLM_BASE_URL:
         llm_config["base_url"] = LLM_BASE_URL
 
-    config = DatapillarConfig(llm=llm_config)
+    knowledge_config = KnowledgeConfig(
+        base_config={
+            "embedding": {
+                "provider": EMBEDDING_PROVIDER,
+                "api_key": EMBEDDING_API_KEY,
+                "model": EMBEDDING_MODEL,
+                "dimension": EMBEDDING_DIMENSION,
+            },
+            "vector_store": {"type": "lance", "path": "./data/vectors"},
+        }
+    )
+    config = DatapillarConfig(llm=llm_config, knowledge=knowledge_config)
 
     # 创建团队
     team = create_shopping_team(config)
@@ -397,17 +422,20 @@ async def main():
     print(f"\n📝 用户需求: {query}\n")
     print("-" * 60)
 
+    deliverables: dict[str, dict] = {}
+
     # 流式执行
     async for event in team.stream(
         query=query,
         session_id="demo_001",
     ):
         event_type = event.get("event")
+        data = event.get("data", {})
         if event_type == "agent.start":
             agent = event.get("agent", {})
             print(f"\n🤖 [{agent.get('name')}] 开始工作...")
         elif event_type == "agent.thinking":
-            message = event.get("message", {})
+            message = data.get("message", {})
             thinking = message.get("content", "")
             if thinking:
                 agent = event.get("agent", {})
@@ -416,44 +444,49 @@ async def main():
                     print(f"   {thinking[:200]}...")
                 else:
                     print(f"   {thinking}")
-        elif event_type == "tool.start":
-            tool = event.get("tool", {})
+        elif event_type == "tool.call":
+            tool = data.get("tool", {})
             print(f"   🔧 调用: {tool.get('name')}")
-        elif event_type == "tool.end":
-            tool = event.get("tool", {})
+        elif event_type == "tool.result":
+            tool = data.get("tool", {})
             result = str(tool.get("output", ""))
             if len(result) > 100:
                 result = result[:100] + "..."
             print(f"   📋 结果: {result}")
         elif event_type == "agent.end":
-            print("   ✅ 完成")
+            agent = event.get("agent", {})
+            agent_id = agent.get("id")
+            deliverable = data.get("deliverable")
+            if agent_id and deliverable is not None:
+                deliverables[agent_id] = deliverable
+                print("   ✅ 完成")
+                print(f"   📦 交付物: {deliverable}")
         elif event_type == "agent.interrupt":
-            interrupt_payload = event.get("interrupt", {}).get("payload")
+            interrupt_payload = data.get("interrupt", {}).get("payload")
             print(f"\n❓ 需要用户输入: {interrupt_payload}")
-        elif event_type == "result":
-            print(f"\n{'=' * 60}")
-            print("📦 最终结果:")
-            deliverables = event.get("result", {}).get("deliverable", {})
-            for key, value in deliverables.items():
-                print(f"\n[{key}]")
-                if isinstance(value, dict):
-                    for k, v in value.items():
-                        print(f"  {k}: {v}")
-                else:
-                    print(f"  {value}")
-
-            # === 验证 deliverable 存储 ===
-            print("\n" + "-" * 60)
-            print("🧪 验证 deliverable 存储（统一用 agent_id）:")
-            if "shopping_advisor" in deliverables:
-                print("  ✅ 正确：deliverable key 是 agent_id (shopping_advisor)")
-            elif "analysis" in deliverables:
-                print("  ❌ 错误：deliverable key 仍是旧的 deliverable_key (analysis)")
-            else:
-                print(f"  ⚠️ deliverable keys: {list(deliverables.keys())}")
-        elif event_type == "error":
-            error = event.get("error", {})
+        elif event_type == "agent.failed":
+            error = data.get("error", {})
             print(f"\n❌ 错误: {error.get('detail') or error.get('message')}")
+
+    print(f"\n{'=' * 60}")
+    print("📦 最终结果:")
+    for key, value in deliverables.items():
+        print(f"\n[{key}]")
+        if isinstance(value, dict):
+            for k, v in value.items():
+                print(f"  {k}: {v}")
+        else:
+            print(f"  {value}")
+
+    # === 验证 deliverable 存储 ===
+    print("\n" + "-" * 60)
+    print("🧪 验证 deliverable 存储（统一用 agent_id）:")
+    if "shopping_advisor" in deliverables:
+        print("  ✅ 正确：deliverable key 是 agent_id (shopping_advisor)")
+    elif "analysis" in deliverables:
+        print("  ❌ 错误：deliverable key 仍是旧的 deliverable_key (analysis)")
+    else:
+        print(f"  ⚠️ deliverable keys: {list(deliverables.keys())}")
 
     print("\n" + "=" * 60)
     print("✨ 演示完成")

@@ -12,7 +12,7 @@ import logging
 
 from pydantic import BaseModel, Field
 
-from src.modules.oneagentic import tool
+from datapillar_oneagentic import tool
 
 logger = logging.getLogger(__name__)
 

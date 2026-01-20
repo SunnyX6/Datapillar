@@ -13,6 +13,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from datapillar_oneagentic.knowledge.chunker.cleaner import apply_preprocess
 from datapillar_oneagentic.knowledge.chunker.models import ChunkDraft, ChunkPreview
 from datapillar_oneagentic.knowledge.config import KnowledgeChunkConfig
+from datapillar_oneagentic.knowledge.identity import build_doc_id
 from datapillar_oneagentic.knowledge.models import ParsedDocument, SourceSpan
 
 
@@ -24,18 +25,20 @@ class KnowledgeChunker:
 
     def preview(self, parsed: ParsedDocument) -> ChunkPreview:
         text = apply_preprocess(parsed.text, self._config.preprocess)
+        doc_id = build_doc_id(text)
+        parsed.document_id = doc_id
         mode = (self._config.mode or "general").lower()
         if mode == "general":
-            chunks = _split_general(parsed.document_id, text, self._config.general)
+            chunks = _split_general(doc_id, text, self._config.general)
         elif mode == "parent_child":
-            chunks = _split_parent_child(parsed.document_id, text, self._config.parent_child)
+            chunks = _split_parent_child(doc_id, text, self._config.parent_child)
         elif mode == "qa":
-            chunks = _split_qa(parsed.document_id, text, self._config.qa.pattern)
+            chunks = _split_qa(doc_id, text, self._config.qa.pattern)
         else:
             raise ValueError(f"不支持的切分模式: {mode}")
 
         return ChunkPreview(
-            document_id=parsed.document_id,
+            document_id=doc_id,
             chunks=chunks,
             attachments=parsed.attachments,
         )

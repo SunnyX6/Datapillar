@@ -99,7 +99,8 @@ function ColumnRow({
   onDragStart,
   onDragOver,
   onDrop,
-  isDragging
+  isDragging,
+  isLeftCollapsed
 }: {
   column: TableColumn
   index: number
@@ -110,6 +111,7 @@ function ColumnRow({
   onDragOver: (e: React.DragEvent) => void
   onDrop: (e: React.DragEvent, index: number) => void
   isDragging: boolean
+  isLeftCollapsed: boolean
 }) {
   const [hoveredDomain, setHoveredDomain] = useState<string | null>(null)
   const [cardPos, setCardPos] = useState<{ top: number; left: number } | null>(null)
@@ -179,6 +181,10 @@ function ColumnRow({
 
   const activeHoveredDomain = valueDomains.find((d) => d.domainCode === hoveredDomain)
 
+  const gridTemplateClass = isLeftCollapsed
+    ? 'grid-cols-[auto_minmax(0,1fr)_11rem_auto_minmax(0,1.4fr)_auto] xl:grid-cols-[auto_minmax(0,16rem)_11.5rem_auto_minmax(0,1fr)_auto]'
+    : 'grid-cols-[auto_minmax(0,1fr)_7.5rem_auto_minmax(0,1.4fr)_auto] xl:grid-cols-[auto_minmax(0,16rem)_11rem_auto_minmax(0,1fr)_auto]'
+
   return (
     <div
       onDragOver={onDragOver}
@@ -202,7 +208,7 @@ function ColumnRow({
         </div>
       )}
 
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_8.5rem_auto_auto_minmax(0,1fr)_auto_auto] items-center gap-1.5">
+      <div className={`grid ${gridTemplateClass} items-center gap-1.5`}>
         {/* 拖拽手柄 - 只有这个元素可拖拽 */}
         <div
           draggable
@@ -233,31 +239,33 @@ function ColumnRow({
           />
         </div>
 
-        {/* 主键 */}
-        <button
-          type="button"
-          onClick={() => onUpdate('isPrimaryKey', !column.isPrimaryKey)}
-          className={`h-7 w-7 inline-flex items-center justify-center rounded-md transition-colors ${
-            column.isPrimaryKey
-              ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/30'
-              : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700'
-          }`}
-          title="主键"
-          aria-label="主键"
-        >
-          <Key size={12} />
-        </button>
+        <div className="flex items-center gap-0.5">
+          {/* 主键 */}
+          <button
+            type="button"
+            onClick={() => onUpdate('isPrimaryKey', !column.isPrimaryKey)}
+            className={`h-7 w-7 inline-flex items-center justify-center rounded-md transition-colors ${
+              column.isPrimaryKey
+                ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/30'
+                : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700'
+            }`}
+            title="主键"
+            aria-label="主键"
+          >
+            <Key size={12} />
+          </button>
 
-        {/* 可空 */}
-        <label className="h-7 inline-flex items-center justify-center gap-0.5 px-0.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap select-none">
-          <input
-            type="checkbox"
-            checked={!column.nullable}
-            onChange={(e) => onUpdate('nullable', !e.target.checked)}
-            className="w-3.5 h-3.5 text-blue-600 rounded border-slate-300 dark:border-slate-600 focus:ring-blue-500"
-          />
-          <span>必填</span>
-        </label>
+          {/* 可空 */}
+          <label className="h-7 inline-flex items-center justify-center gap-0.5 px-0.5 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap select-none">
+            <input
+              type="checkbox"
+              checked={!column.nullable}
+              onChange={(e) => onUpdate('nullable', !e.target.checked)}
+              className="w-3.5 h-3.5 text-blue-600 rounded border-slate-300 dark:border-slate-600 focus:ring-blue-500"
+            />
+            <span>必填</span>
+          </label>
+        </div>
 
         {/* 列注释 */}
         <input
@@ -269,85 +277,87 @@ function ColumnRow({
           className="h-7 w-full min-w-0 px-2 text-xs text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
         />
 
-        {/* 值域图钉 */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={(e) => {
-              const dropdown = e.currentTarget.nextElementSibling as HTMLDivElement
-              if (dropdown) {
-                dropdown.classList.toggle('hidden')
-              }
-            }}
-            className={`h-7 w-7 inline-flex items-center justify-center rounded-md transition-colors ${
-              column.valueDomainCode
-                ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30'
-                : 'text-slate-400 dark:text-slate-500 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
-            title="关联值域"
-            aria-label="关联值域"
-          >
-            <Pin size={12} />
-          </button>
-          <div
-            className="hidden absolute right-0 top-full mt-1 z-50 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden"
-            onMouseLeave={(e) => {
-              e.currentTarget.classList.add('hidden')
-              setHoveredDomain(null)
-            }}
-          >
-            {/* 头部 */}
-            <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">选择值域</span>
-            </div>
-            {/* 列表 */}
-            <div className="max-h-40 overflow-y-auto py-1">
-              {valueDomains.map((domain) => (
-                <div
-                  key={domain.domainCode}
-                  ref={hoveredDomain === domain.domainCode ? hoverItemRef : null}
-                  onMouseEnter={() => handleItemMouseEnter(domain.domainCode)}
-                  onMouseLeave={handleItemMouseLeave}
-                  className={`flex items-center justify-between px-3 py-1.5 text-xs cursor-pointer transition-colors ${
-                    hoveredDomain === domain.domainCode
-                      ? 'bg-blue-50 dark:bg-blue-900/30'
-                      : column.valueDomainCode === domain.domainCode
-                        ? 'text-blue-600 font-medium bg-blue-50/50 dark:bg-blue-900/20'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  }`}
-                  onClick={(e) => {
-                    // 校验数据类型是否匹配
-                    if (!domain.dataType) {
-                      toast.error(`值域 ${domain.domainName} 未指定数据类型，无法关联`)
-                      return
-                    }
-                    if (!isDataTypeCompatible(column.dataType, domain.dataType)) {
-                      toast.error(`数据类型不匹配：列类型为 ${column.dataType.toUpperCase()}，值域类型为 ${domain.dataType.toUpperCase()}`)
-                      return
-                    }
-                    onUpdate('valueDomainCode', domain.domainCode)
-                    ;(e.currentTarget.parentElement?.parentElement as HTMLDivElement).classList.add('hidden')
-                    setHoveredDomain(null)
-                  }}
-                >
-                  <span className="truncate">{domain.domainName}</span>
-                  <ChevronRight size={12} className={`flex-shrink-0 ml-1 ${hoveredDomain === domain.domainCode ? 'text-blue-400' : 'text-slate-300'}`} />
-                </div>
-              ))}
+        <div className="flex items-center gap-0.5 justify-self-end">
+          {/* 值域图钉 */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={(e) => {
+                const dropdown = e.currentTarget.nextElementSibling as HTMLDivElement
+                if (dropdown) {
+                  dropdown.classList.toggle('hidden')
+                }
+              }}
+              className={`h-7 w-7 inline-flex items-center justify-center rounded-md transition-colors ${
+                column.valueDomainCode
+                  ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30'
+                  : 'text-slate-400 dark:text-slate-500 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-700'
+              }`}
+              title="关联值域"
+              aria-label="关联值域"
+            >
+              <Pin size={12} />
+            </button>
+            <div
+              className="hidden absolute right-0 top-full mt-1 z-50 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden"
+              onMouseLeave={(e) => {
+                e.currentTarget.classList.add('hidden')
+                setHoveredDomain(null)
+              }}
+            >
+              {/* 头部 */}
+              <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">选择值域</span>
+              </div>
+              {/* 列表 */}
+              <div className="max-h-40 overflow-y-auto py-1">
+                {valueDomains.map((domain) => (
+                  <div
+                    key={domain.domainCode}
+                    ref={hoveredDomain === domain.domainCode ? hoverItemRef : null}
+                    onMouseEnter={() => handleItemMouseEnter(domain.domainCode)}
+                    onMouseLeave={handleItemMouseLeave}
+                    className={`flex items-center justify-between px-3 py-1.5 text-xs cursor-pointer transition-colors ${
+                      hoveredDomain === domain.domainCode
+                        ? 'bg-blue-50 dark:bg-blue-900/30'
+                        : column.valueDomainCode === domain.domainCode
+                          ? 'text-blue-600 font-medium bg-blue-50/50 dark:bg-blue-900/20'
+                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                    }`}
+                    onClick={(e) => {
+                      // 校验数据类型是否匹配
+                      if (!domain.dataType) {
+                        toast.error(`值域 ${domain.domainName} 未指定数据类型，无法关联`)
+                        return
+                      }
+                      if (!isDataTypeCompatible(column.dataType, domain.dataType)) {
+                        toast.error(`数据类型不匹配：列类型为 ${column.dataType.toUpperCase()}，值域类型为 ${domain.dataType.toUpperCase()}`)
+                        return
+                      }
+                      onUpdate('valueDomainCode', domain.domainCode)
+                      ;(e.currentTarget.parentElement?.parentElement as HTMLDivElement).classList.add('hidden')
+                      setHoveredDomain(null)
+                    }}
+                  >
+                    <span className="truncate">{domain.domainName}</span>
+                    <ChevronRight size={12} className={`flex-shrink-0 ml-1 ${hoveredDomain === domain.domainCode ? 'text-blue-400' : 'text-slate-300'}`} />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* 删除 */}
-        <button
-          type="button"
-          onClick={onDelete}
-          className="h-7 w-7 inline-flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors opacity-0 group-hover:opacity-100"
-          title="删除"
-          aria-label="删除"
-        >
-          <Trash2 size={12} />
-        </button>
+          {/* 删除 */}
+          <button
+            type="button"
+            onClick={onDelete}
+            className="h-7 w-7 inline-flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+            title="删除"
+            aria-label="删除"
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
       </div>
 
       {/* 值域详情卡片 - Portal */}
@@ -609,8 +619,9 @@ export const CreateTableForm = forwardRef<TableFormHandle, CreateTableFormProps>
     setProperties((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)))
   }
 
-  // 编辑模式：隐藏左侧面板，专注于列编辑
+  // 编辑模式：保留左右面板，比例与指标详情保持一致
   const isEditMode = !!initialData
+  const rightContentClassName = 'flex flex-col min-h-0 flex-1 w-full'
 
   return (
     <div className="flex flex-col min-h-[500px]">
@@ -628,167 +639,168 @@ export const CreateTableForm = forwardRef<TableFormHandle, CreateTableFormProps>
       )}
 
       <div className="flex flex-1 min-h-0">
-      {/* 左侧：配置面板（编辑模式时隐藏） */}
-      {!isEditMode && (
-        isLeftCollapsed ? (
-        <div className="w-12 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center py-4">
-          <button
-            type="button"
-            onClick={() => setIsLeftCollapsed(false)}
-            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
-            title="展开配置"
-            aria-label="展开配置"
-          >
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      ) : (
-        <div className="relative w-72 flex-shrink-0 pr-6 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          <button
-            type="button"
-            onClick={() => setIsLeftCollapsed(true)}
-            className="absolute top-2 -right-2 w-5 h-8 flex items-center justify-center bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg shadow-sm transition-colors z-20"
-            title="收起配置"
-            aria-label="收起配置"
-          >
-            <ChevronLeft size={14} className="text-slate-400" />
-          </button>
+        {/* 左侧：配置面板 */}
+        {isLeftCollapsed ? (
+          <div className="w-12 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center py-4">
+            <button
+              type="button"
+              onClick={() => setIsLeftCollapsed(false)}
+              className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+              title="展开配置"
+              aria-label="展开配置"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        ) : (
+          <div className="relative flex-[4_1_0%] xl:flex-[4_1_0%] min-w-0 pr-6 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <button
+              type="button"
+              onClick={() => setIsLeftCollapsed(true)}
+              className="absolute top-2 -right-2 w-5 h-8 flex items-center justify-center bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg shadow-sm transition-colors z-20"
+              title="收起配置"
+              aria-label="收起配置"
+            >
+              <ChevronLeft size={14} className="text-slate-400" />
+            </button>
 
-          <div className="space-y-4 overflow-y-auto custom-scrollbar h-full">
-            {/* 物理表名 */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                物理表名 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={tableName}
-                onChange={(e) => setTableName(e.target.value)}
-                placeholder="例如: fact_order_sales"
-                className="w-full px-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
-              />
-            </div>
-
-            {/* 描述信息 */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">描述信息</label>
-              <textarea
-                value={tableComment}
-                onChange={(e) => setTableComment(e.target.value)}
-                placeholder="描述表的数据来源与核心业务用途..."
-                rows={3}
-                className="w-full px-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none placeholder:text-slate-400 dark:placeholder:text-slate-600"
-              />
-            </div>
-
-            {/* 表参数 */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">表参数</label>
-                <button
-                  type="button"
-                  onClick={handleAddProperty}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-                >
-                  + 添加
-                </button>
+            <div className="space-y-4 overflow-y-auto custom-scrollbar h-full">
+              {/* 物理表名 */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  物理表名 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={tableName}
+                  onChange={(e) => setTableName(e.target.value)}
+                  placeholder="例如: fact_order_sales"
+                  className="w-full px-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                />
               </div>
-              {properties.length === 0 ? (
-                <div className="py-3 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
-                  暂无表参数
+
+              {/* 描述信息 */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">描述信息</label>
+                <textarea
+                  value={tableComment}
+                  onChange={(e) => setTableComment(e.target.value)}
+                  placeholder="描述表的数据来源与核心业务用途..."
+                  rows={3}
+                  className="w-full px-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                />
+              </div>
+
+              {/* 表参数 */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">表参数</label>
+                  <button
+                    type="button"
+                    onClick={handleAddProperty}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                  >
+                    + 添加
+                  </button>
                 </div>
-              ) : (
-                <div className="space-y-1.5 max-h-32 overflow-y-auto custom-scrollbar">
-                  {properties.map((prop) => (
-                    <div key={prop.id} className="flex items-center gap-1">
-                      <input
-                        type="text"
-                        placeholder="参数名"
-                        value={prop.key}
-                        onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)}
-                        className="w-[45%] min-w-0 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 truncate"
-                      />
-                      <span className="text-slate-300 flex-shrink-0">=</span>
-                      <input
-                        type="text"
-                        placeholder="参数值"
-                        value={prop.value}
-                        onChange={(e) => handlePropertyChange(prop.id, 'value', e.target.value)}
-                        className="w-[45%] min-w-0 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 truncate"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteProperty(prop.id)}
-                        className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors flex-shrink-0"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  ))}
+                {properties.length === 0 ? (
+                  <div className="py-3 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                    暂无表参数
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto custom-scrollbar">
+                    {properties.map((prop) => (
+                      <div key={prop.id} className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          placeholder="参数名"
+                          value={prop.key}
+                          onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)}
+                          className="w-[45%] min-w-0 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 truncate"
+                        />
+                        <span className="text-slate-300 flex-shrink-0">=</span>
+                        <input
+                          type="text"
+                          placeholder="参数值"
+                          value={prop.value}
+                          onChange={(e) => handlePropertyChange(prop.id, 'value', e.target.value)}
+                          className="w-[45%] min-w-0 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 truncate"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteProperty(prop.id)}
+                          className="p-1 text-slate-300 hover:text-red-500 rounded transition-colors flex-shrink-0"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 智能提示卡片 */}
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">
+                <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 mb-1.5">
+                  <Sparkles size={14} />
+                  <span className="text-xs font-semibold">智能提示</span>
+                </div>
+                <p className="text-xs text-blue-600/80 dark:text-blue-400/80 leading-relaxed">
+                  输入列名时，系统将自动匹配 One Meta 语义标准并建议最合适的物理类型。
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 右侧：列定义 */}
+        <div className={`flex flex-col min-w-0 ${isLeftCollapsed ? 'flex-1' : 'flex-[8_1_0%] xl:flex-[8_1_0%]'} pl-6`}>
+          <div className={rightContentClassName}>
+            {/* 列定义头部 */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <Layers size={14} className="text-blue-600" />
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">列定义</span>
+                <span className="text-xs text-slate-400">({columns.length})</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddColumn}
+                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                <Plus size={12} />
+                添加物理列
+              </button>
+            </div>
+
+            {/* 列列表 */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1.5 pr-1 custom-scrollbar">
+              {columns.map((column, index) => (
+                <ColumnRow
+                  key={column.id}
+                  column={column}
+                  index={index}
+                  valueDomains={valueDomains}
+                  onUpdate={(field, value) => handleColumnChange(column.id, field, value)}
+                  onDelete={() => handleDeleteColumn(column.id)}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  isDragging={draggedIndex === index}
+                  isLeftCollapsed={isLeftCollapsed}
+                />
+              ))}
+
+              {columns.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                  <Layers size={28} className="mb-2 opacity-50" />
+                  <p className="text-xs">暂无列定义</p>
+                  <p className="text-xs mt-1">点击"添加物理列"或使用 DDL 快速导入</p>
                 </div>
               )}
             </div>
-
-            {/* 智能提示卡片 */}
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">
-              <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 mb-1.5">
-                <Sparkles size={14} />
-                <span className="text-xs font-semibold">智能提示</span>
-              </div>
-              <p className="text-xs text-blue-600/80 dark:text-blue-400/80 leading-relaxed">
-                输入列名时，系统将自动匹配 One Meta 语义标准并建议最合适的物理类型。
-              </p>
-            </div>
           </div>
         </div>
-      )
-      )}
-
-      {/* 右侧：列定义 */}
-      <div className={`flex-1 flex flex-col min-w-0 ${isEditMode ? '' : 'pl-6'}`}>
-        {/* 列定义头部 */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5">
-            <Layers size={14} className="text-blue-600" />
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">列定义</span>
-            <span className="text-xs text-slate-400">({columns.length})</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleAddColumn}
-            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={12} />
-            添加物理列
-          </button>
-        </div>
-
-        {/* 列列表 */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-1.5 pr-1 custom-scrollbar">
-          {columns.map((column, index) => (
-            <ColumnRow
-              key={column.id}
-              column={column}
-              index={index}
-              valueDomains={valueDomains}
-              onUpdate={(field, value) => handleColumnChange(column.id, field, value)}
-              onDelete={() => handleDeleteColumn(column.id)}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-              isDragging={draggedIndex === index}
-            />
-          ))}
-
-          {columns.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-10 text-slate-400">
-              <Layers size={28} className="mb-2 opacity-50" />
-              <p className="text-xs">暂无列定义</p>
-              <p className="text-xs mt-1">点击"添加物理列"或使用 DDL 快速导入</p>
-            </div>
-          )}
-        </div>
-      </div>
       </div>
     </div>
   )

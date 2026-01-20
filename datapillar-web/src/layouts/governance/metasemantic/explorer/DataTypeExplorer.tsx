@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { ArrowLeft, Hash, Database, Type, Calendar, Check, Braces, Binary, Clock, ToggleLeft, FileCode, Layers, List, Map, Fingerprint } from 'lucide-react'
 import { iconSizeToken } from '@/design-tokens/dimensions'
+import { DEFAULT_LENGTH, DEFAULT_MAX_LENGTH, getMaxLengthForType } from '@/layouts/governance/utils/dataType'
 import type { DataTypeItem } from '@/pages/governance/DataTypePage'
 
 /** 数据类型分组 - 基于 Gravitino Types.java */
@@ -94,7 +95,7 @@ const DATA_TYPES: DataTypeItem[] = [
     icon: 'type',
     description: '可变长度字符串，需指定最大长度，适用于已知长度上限的文本数据。',
     hasLength: true,
-    maxLength: 65535
+    maxLength: getMaxLengthForType('VARCHAR')
   },
   {
     id: 'fixedchar',
@@ -104,7 +105,7 @@ const DATA_TYPES: DataTypeItem[] = [
     icon: 'type',
     description: '固定长度字符串，需指定长度，不足部分用空格填充。',
     hasLength: true,
-    maxLength: 255
+    maxLength: getMaxLengthForType('FIXEDCHAR')
   },
   {
     id: 'binary',
@@ -208,7 +209,7 @@ interface DataTypeExplorerProps {
 export function DataTypeExplorer({ onBack, selectedType, onSelectType }: DataTypeExplorerProps) {
   const [precision, setPrecision] = useState(18)
   const [scale, setScale] = useState(2)
-  const [length, setLength] = useState(255)
+  const [length, setLength] = useState(DEFAULT_LENGTH)
 
   // 按分组整理数据类型
   const groupedTypes = useMemo(() => {
@@ -222,6 +223,7 @@ export function DataTypeExplorer({ onBack, selectedType, onSelectType }: DataTyp
   const currentType = selectedType || DATA_TYPES.find((t) => t.id === 'decimal')!
 
   const IconComponent = ICON_MAP[currentType.icon] || Hash
+  const lengthMax = currentType.maxLength ?? DEFAULT_MAX_LENGTH
 
   return (
     <div className="flex h-full w-full">
@@ -259,7 +261,12 @@ export function DataTypeExplorer({ onBack, selectedType, onSelectType }: DataTyp
                   return (
                     <button
                       key={type.id}
-                      onClick={() => onSelectType(type)}
+                      onClick={() => {
+                        if (type.id !== currentType.id) {
+                          setLength(DEFAULT_LENGTH)
+                        }
+                        onSelectType(type)
+                      }}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-200 ${
                         isSelected
                           ? 'bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700'
@@ -436,7 +443,7 @@ export function DataTypeExplorer({ onBack, selectedType, onSelectType }: DataTyp
                   <input
                     type="range"
                     min={1}
-                    max={currentType.maxLength || 255}
+                    max={lengthMax}
                     value={length}
                     onChange={(e) => setLength(Number(e.target.value))}
                     className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
@@ -444,7 +451,7 @@ export function DataTypeExplorer({ onBack, selectedType, onSelectType }: DataTyp
                 </div>
                 <div className="flex items-center gap-1.5 w-24 justify-end">
                   <span className="text-body font-semibold text-blue-600 dark:text-blue-400">{length}</span>
-                  <span className="text-micro text-slate-400">/ {currentType.maxLength || 255}</span>
+                  <span className="text-micro text-slate-400">/ {lengthMax}</span>
                 </div>
               </div>
             </>

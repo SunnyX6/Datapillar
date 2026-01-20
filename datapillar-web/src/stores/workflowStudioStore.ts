@@ -1,17 +1,11 @@
 import { create } from 'zustand'
+import type { ProcessActivity as SseProcessActivity, UiPayload } from '@/services/aiWorkflowService'
 import { emptyWorkflowGraph, type WorkflowGraph } from '@/services/workflowStudioService'
 
 export type ChatRole = 'user' | 'assistant'
 
-export interface AgentActivity {
-  id: string
-  type: 'thought' | 'tool' | 'result' | 'error'
-  state: 'thinking' | 'invoking' | 'waiting' | 'done' | 'error'
-  level: 'info' | 'success' | 'warning' | 'error'
-  agent: string
-  message: string
-  timestamp: number
-}
+export type ProcessActivity = SseProcessActivity & { timestamp: number }
+export type AgentActivity = ProcessActivity
 
 export interface ChatMessageOption {
   type: string
@@ -30,9 +24,11 @@ export interface ChatMessage {
   role: ChatRole
   content: string
   timestamp: number
-  agentRows?: AgentActivity[]
+  processRows?: ProcessActivity[]
+  agentRows?: ProcessActivity[]
   isStreaming?: boolean
   options?: ChatMessageOption[]
+  uiPayload?: UiPayload
 }
 
 interface WorkflowStudioState {

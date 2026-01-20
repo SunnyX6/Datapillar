@@ -13,11 +13,11 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from src.modules.oneagentic import Clarification, agent
-from src.modules.oneagentic.knowledge import KnowledgeDomain, KnowledgeLevel, KnowledgeStore
+from datapillar_oneagentic import agent
+from src.modules.etl.tools.table import get_table_detail, search_tables
 
 if TYPE_CHECKING:
-    from src.modules.oneagentic import AgentContext
+    from datapillar_oneagentic import AgentContext
 
 
 # ==================== 输出 Schema ====================
@@ -61,12 +61,10 @@ class AnalysisOutput(BaseModel):
     id="analyst",
     name="需求分析师",
     description="入口接待、智能分发、ETL 需求分析",
-    tools=["search_tables", "get_table_detail"],
+    tools=[search_tables, get_table_detail],
     deliverable_schema=AnalysisOutput,
-    deliverable_key="analysis",
-    knowledge_domains=["analyst_methodology"],
     temperature=0.0,
-    max_iterations=5,
+    max_steps=5,
 )
 class AnalystAgent:
     """需求分析师（入口 Agent）"""
@@ -76,16 +74,16 @@ class AnalystAgent:
 ## 你的职责
 
 1. **智能分发**：识别用户意图，将请求交给合适的专家
-   - 元数据查询（查表、查字段、查血缘）→ 调用 delegate_to_catalog
-   - ETL 需求（创建表、数据加工）→ 自己分析后调用 delegate_to_architect
+   - 元数据查询（查表、查字段、查血缘）→ 委派给元数据专员
+   - ETL 需求（创建表、数据加工）→ 完成分析后委派给数据架构师
 
 2. **ETL 需求分析**：将 ETL 需求拆分为可执行的业务步骤
 
 ## 工作流程
 
 1. 判断用户意图
-2. 元数据查询 → 调用 delegate_to_catalog
-3. ETL 需求 → 调用工具验证表 → 拆分步骤 → 调用 delegate_to_architect
+2. 元数据查询 → 委派给元数据专员
+3. ETL 需求 → 调用工具验证表 → 拆分步骤 → 委派给数据架构师
 4. 信息不足 → 输出 JSON 并在 ambiguities 中列出问题
 
 ## 输出格式（始终使用此 JSON 格式）
@@ -125,40 +123,13 @@ class AnalystAgent:
 
 ## 重要约束
 
-1. **始终输出 JSON 格式**，不要输出纯文本
-2. 元数据查询直接调用 delegate_to_catalog，不需要输出 JSON
+1. **除委派场景外必须输出 JSON 格式**，不要输出纯文本
+2. 元数据查询直接委派给元数据专员，不需要输出 JSON
 3. 不允许臆造表名，必须通过工具验证
-4. confidence >= 0.7 时调用 delegate_to_architect
-"""
+4. confidence >= 0.7 时委派给数据架构师
+5. **委派时必须在任务描述中携带分析结论**（summary/steps/final_target/ambiguities）
 
-    async def run(self, ctx: AgentContext) -> AnalysisOutput | Clarification:
-        """执行分析"""
-        # 1. 构建消息
-        messages = ctx.build_messages(self.SYSTEM_PROMPT)
-
-        # 2. 工具调用循环（委派由框架自动处理）
-        messages = await ctx.invoke_tools(messages)
-
-        # 3. 获取结构化输出
-        output = await ctx.get_output(messages)
-
-        # 4. 业务判断：需要澄清？
-        if isinstance(output, AnalysisOutput) and output.confidence < 0.7 and output.ambiguities:
-            return ctx.clarify(
-                message="需求不够明确，请补充以下信息",
-                questions=output.ambiguities,
-            )
-
-        return output
-
-
-# ==================== 知识领域 ====================
-
-ANALYST_METHODOLOGY = KnowledgeDomain(
-    domain_id="analyst_methodology",
-    name="需求分析方法论",
-    level=KnowledgeLevel.DOMAIN,
-    content="""## 需求分析方法论
+## 需求分析方法论
 
 ### 分析原则
 1. **收敛优先**：需求必须在此阶段收敛，不允许模糊需求往后传
@@ -175,11 +146,27 @@ ANALYST_METHODOLOGY = KnowledgeDomain(
 - 表名不完整或不存在
 - 业务逻辑有多种理解方式
 - 缺少关键信息（如目标表、写入模式等）
-""",
-    tags=["需求分析", "方法论", "ETL"],
-)
+"""
 
+    async def run(self, ctx: AgentContext) -> AnalysisOutput:
+        """执行分析"""
+        # 1. 构建消息
+        messages = ctx.build_messages(self.SYSTEM_PROMPT)
 
-def register_analyst_knowledge() -> None:
-    """注册 AnalystAgent 相关的知识领域"""
-    KnowledgeStore.register_domain(ANALYST_METHODOLOGY)
+        # 2. 工具调用循环（委派由框架自动处理）
+        messages = await ctx.invoke_tools(messages)
+
+        # 3. 获取结构化输出
+        output = await ctx.get_structured_output(messages)
+
+        # 4. 业务判断：需要澄清？
+        if output.confidence < 0.7 and output.ambiguities:
+            ctx.interrupt(
+                {
+                    "message": "需求不够明确，请补充以下信息",
+                    "questions": output.ambiguities,
+                }
+            )
+            output = await ctx.get_structured_output(messages)
+
+        return output

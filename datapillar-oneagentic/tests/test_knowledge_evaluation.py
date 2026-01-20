@@ -4,8 +4,10 @@ import json
 
 import pytest
 
+from datapillar_oneagentic.knowledge.chunker.cleaner import apply_preprocess
 from datapillar_oneagentic.knowledge.config import KnowledgeChunkConfig, KnowledgeRetrieveConfig
 from datapillar_oneagentic.knowledge.evaluation import EvalDocument, EvalQuery, EvalSet, KnowledgeEvaluator, load_eval_set
+from datapillar_oneagentic.knowledge.identity import build_doc_id
 from datapillar_oneagentic.knowledge.models import KnowledgeChunk, KnowledgeDocument, KnowledgeSearchHit, KnowledgeSource
 from datapillar_oneagentic.storage.knowledge_stores.base import KnowledgeStore
 
@@ -27,9 +29,14 @@ class _StubEmbeddingProvider:
 
 class _InMemoryKnowledgeStore(KnowledgeStore):
     def __init__(self) -> None:
+        self._namespace = "ns_eval"
         self.sources: dict[str, KnowledgeSource] = {}
         self.docs: dict[str, KnowledgeDocument] = {}
         self.chunks: dict[str, KnowledgeChunk] = {}
+
+    @property
+    def namespace(self) -> str:
+        return self._namespace
 
     async def initialize(self) -> None:
         return None
@@ -71,26 +78,42 @@ class _InMemoryKnowledgeStore(KnowledgeStore):
     async def get_chunks(self, chunk_ids: list[str]) -> list[KnowledgeChunk]:
         return [self.chunks[chunk_id] for chunk_id in chunk_ids if chunk_id in self.chunks]
 
+    async def delete_doc(self, doc_id: str) -> int:
+        if doc_id in self.docs:
+            del self.docs[doc_id]
+            return 1
+        return 0
+
+    async def delete_chunks_by_doc_id(self, doc_id: str) -> int:
+        to_delete = [key for key, chunk in self.chunks.items() if chunk.doc_id == doc_id]
+        for key in to_delete:
+            del self.chunks[key]
+        return len(to_delete)
+
 
 def _build_evalset() -> EvalSet:
+    doc1_text = "alpha alpha"
+    doc2_text = "beta beta"
+    doc1_id = build_doc_id(apply_preprocess(doc1_text, []))
+    doc2_id = build_doc_id(apply_preprocess(doc2_text, []))
     return EvalSet(
         evalset_id="demo_eval",
         documents=[
-            EvalDocument(doc_id="d1", source_id="kb", text="alpha alpha"),
-            EvalDocument(doc_id="d2", source_id="kb", text="beta beta"),
+            EvalDocument(doc_id=doc1_id, text=doc1_text),
+            EvalDocument(doc_id=doc2_id, text=doc2_text),
         ],
         queries=[
             EvalQuery(
                 query_id="q1",
                 query="alpha",
-                expected_doc_ids=["d1"],
-                expected_chunk_ids=["d1:0"],
+                expected_doc_ids=[doc1_id],
+                expected_chunk_ids=[f"{doc1_id}:0"],
             ),
             EvalQuery(
                 query_id="q2",
                 query="beta",
-                expected_doc_ids=["d2"],
-                expected_chunk_ids=["d2:0"],
+                expected_doc_ids=[doc2_id],
+                expected_chunk_ids=[f"{doc2_id}:0"],
             ),
         ],
         k_values=[1, 3],

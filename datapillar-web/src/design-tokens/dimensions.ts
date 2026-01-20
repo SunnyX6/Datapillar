@@ -69,6 +69,12 @@ export const cardWidthClassMap = {
   /** 窄卡片：384px（适合简单表单）*/
   narrow: 'max-w-sm',
 
+  /** 紧凑卡片：448px（适合搜索框等中等宽度场景）*/
+  compact: 'max-w-[28rem]',
+
+  /** 半宽卡片：500px（适合搜索框等场景）*/
+  half: 'max-w-[31.25rem]',
+
   /** 标准卡片：448px（最常用）*/
   normal: 'max-w-md',
 
@@ -77,6 +83,9 @@ export const cardWidthClassMap = {
 
   /** 宽卡片：672px（适合复杂表单）*/
   wide: 'max-w-2xl',
+
+  /** 加宽卡片：720px（适合长列表/检索结果）*/
+  superWide: 'max-w-[45rem]',
 
   /** 超宽卡片：896px */
   extraWide: 'max-w-4xl'
@@ -210,7 +219,7 @@ export const modalWidthClassMap = {
   extraLarge: 'max-w-[840px]',
 
   /** 特大模态：1000px（适合复杂表单）*/
-  huge: 'max-w-[1000px]',
+  huge: 'max-w-[1000px] xl:max-w-[1120px] 2xl:max-w-[1280px]',
 
   /** 响应式模态：大屏幕自动变宽（560px → 680px → 800px）*/
   responsive: 'max-w-[560px] @xl:max-w-[680px] @2xl:max-w-[800px]'

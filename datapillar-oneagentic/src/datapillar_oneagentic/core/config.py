@@ -105,12 +105,6 @@ class AgentConfig(BaseModel):
         description="Agent 重试配置",
     )
 
-    checkpoint_ttl_seconds: int = Field(
-        default=60 * 60 * 24 * 7,
-        gt=0,
-        description="Checkpoint TTL（默认 7 天）",
-    )
-
     # 存储配置
     checkpointer: CheckpointerConfig = Field(
         default_factory=CheckpointerConfig,

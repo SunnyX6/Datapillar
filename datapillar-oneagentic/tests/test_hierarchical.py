@@ -108,7 +108,6 @@ async def test_node_factory_should_use_assigned_task_and_clear(monkeypatch) -> N
         "messages": [HumanMessage(content="用户输入")],
         "assigned_task": "处理下发任务",
         "deliverable_keys": [],
-        "deliverable_versions": {},
     }
 
     node = node_factory.create_agent_node("worker")

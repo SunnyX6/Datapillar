@@ -20,7 +20,7 @@ from datapillar_oneagentic.knowledge.models import (
 )
 from datapillar_oneagentic.knowledge.retriever.evidence import dedupe_hits, group_hits
 from datapillar_oneagentic.knowledge.retriever.reranker import build_reranker, rerank_scores
-from datapillar_oneagentic.providers.llm.embedding import EmbeddingProviderClient
+from datapillar_oneagentic.providers.llm.embedding import EmbeddingProvider
 from datapillar_oneagentic.storage.knowledge_stores.base import KnowledgeStore
 
 
@@ -31,12 +31,29 @@ class KnowledgeRetriever:
         self,
         *,
         store: KnowledgeStore,
-        embedding_provider: EmbeddingProviderClient,
+        embedding_provider: EmbeddingProvider,
         config: KnowledgeConfig,
     ) -> None:
         self._store = store
         self._embedding_provider = embedding_provider
         self._config = config
+        self._initialized = False
+
+    @classmethod
+    def from_config(
+        cls,
+        *,
+        namespace: str,
+        config: KnowledgeConfig,
+    ) -> "KnowledgeRetriever":
+        from datapillar_oneagentic.knowledge.runtime import build_runtime
+
+        runtime = build_runtime(namespace=namespace, base_config=config.base_config)
+        return cls(
+            store=runtime.store,
+            embedding_provider=runtime.embedding_provider,
+            config=config,
+        )
 
     async def retrieve(
         self,
@@ -45,10 +62,11 @@ class KnowledgeRetriever:
         knowledge: Knowledge,
         scope: KnowledgeScope | None = None,
     ) -> KnowledgeRetrieveResult:
-        if not query or not knowledge.sources:
+        if not query:
             return KnowledgeRetrieveResult()
 
-        retrieve = _merge_retrieve(self._config.retrieve, knowledge.retrieve, knowledge.inject)
+        await self._ensure_initialized()
+        retrieve = _merge_retrieve(self._config.retrieve_config, knowledge.retrieve, knowledge.inject)
         inject = retrieve.inject
 
         method = (retrieve.method or "hybrid").lower()
@@ -65,9 +83,8 @@ class KnowledgeRetriever:
         if method == "hybrid" and knowledge.sparse_embedder is not None:
             sparse_query = await knowledge.sparse_embedder.embed_text(query)
 
-        hits = await self._search_by_sources(
+        hits = await self._search_in_namespace(
             query_vector=query_vector,
-            sources=[s.source_id for s in knowledge.sources],
             pool_k=_resolve_pool_k(retrieve),
             scope=scope,
         )
@@ -108,34 +125,37 @@ class KnowledgeRetriever:
         return KnowledgeRetrieveResult(hits=context_hits, refs=refs)
 
     def resolve_inject_config(self, knowledge: Knowledge) -> KnowledgeInjectConfig:
-        retrieve = _merge_retrieve(self._config.retrieve, knowledge.retrieve, knowledge.inject)
+        retrieve = _merge_retrieve(self._config.retrieve_config, knowledge.retrieve, knowledge.inject)
         return retrieve.inject
 
-    async def _search_by_sources(
+    async def close(self) -> None:
+        await self._store.close()
+
+    async def _ensure_initialized(self) -> None:
+        if self._initialized:
+            return
+        await self._store.initialize()
+        self._initialized = True
+
+    async def _search_in_namespace(
         self,
         *,
         query_vector: list[float],
-        sources: list[str],
         pool_k: int,
         scope: KnowledgeScope | None,
     ) -> list[KnowledgeSearchHit]:
         results: list[KnowledgeSearchHit] = []
-        if not sources:
-            return results
         if scope and scope.namespaces and len(scope.namespaces) > 1:
             raise ValueError("跨 namespace 检索尚未支持")
         if scope and scope.tags:
             raise ValueError("暂不支持按 tags 过滤")
-        per_source = max(1, pool_k)
-        for source_id in sources:
-            hits = await self._store.search_chunks(
-                query_vector=query_vector,
-                k=per_source,
-                filters={"source_id": source_id},
-            )
-            if scope and scope.document_ids:
-                hits = [hit for hit in hits if hit.chunk.doc_id in set(scope.document_ids)]
-            results.extend(hits)
+        hits = await self._store.search_chunks(
+            query_vector=query_vector,
+            k=max(1, pool_k),
+        )
+        if scope and scope.document_ids:
+            hits = [hit for hit in hits if hit.chunk.doc_id in set(scope.document_ids)]
+        results.extend(hits)
 
         return _dedupe_by_chunk_id(results)
 

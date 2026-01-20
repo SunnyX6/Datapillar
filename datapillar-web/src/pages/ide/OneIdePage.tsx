@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Zap
 } from 'lucide-react'
+import { contentMaxWidthClassMap, paddingClassMap } from '@/design-tokens/dimensions'
 
 interface LanguageOption {
   id: string
@@ -65,13 +66,13 @@ export function OneIdePage() {
       <div className="absolute bottom-0 left-0 size-[25vw] bg-purple-50 dark:bg-purple-950/50 blur-[80px] translate-y-1/2 -translate-x-1/2 rounded-full pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-20 pointer-events-none" />
 
-      <div className="w-full max-w-7xl mx-auto px-4 py-6 lg:px-8 lg:py-8 xl:px-12 relative z-10">
+      <div className={`${contentMaxWidthClassMap.full} ${paddingClassMap.md} w-full mx-auto relative z-10`}>
 
         {/* Header Section - 相对于左侧区域居中 */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 text-center lg:pr-[12%]"
+          className="mb-6 lg:mb-10 xl:mb-12 text-center lg:pr-[12%]"
         >
           <div className="flex justify-center items-center gap-2 mb-3">
             <div className="px-3 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/50 border border-indigo-100 dark:border-indigo-800 flex items-center gap-1.5">
@@ -100,7 +101,7 @@ export function OneIdePage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 xl:gap-5 2xl:gap-6">
               {LANGUAGES.map((lang, idx) => (
                 <motion.button
                   key={lang.id}
@@ -108,7 +109,7 @@ export function OneIdePage() {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: idx * 0.05 }}
                   onClick={() => handleStart(lang.id)}
-                  className={`group relative p-4 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl text-left hover:shadow-xl hover:shadow-indigo-500/10 dark:hover:shadow-indigo-500/5 transition-all active:scale-[0.98] ${lang.borderColor}`}
+                  className={`group relative xl:min-h-[192px] 2xl:min-h-[208px] p-4 xl:p-5 2xl:p-6 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl text-left hover:shadow-xl hover:shadow-indigo-500/10 dark:hover:shadow-indigo-500/5 transition-all active:scale-[0.98] ${lang.borderColor}`}
                 >
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 bg-slate-50 dark:bg-slate-700 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-900/50 transition-colors shadow-sm">
                     <lang.icon size={20} className={`${lang.color} group-hover:scale-110 transition-transform`} />
@@ -128,7 +129,7 @@ export function OneIdePage() {
 
           {/* Side Info Panel - Code Style */}
           <div className="lg:col-span-4">
-            <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-3.5 space-y-3 border border-slate-200 dark:border-slate-700">
+            <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-3.5 space-y-3 border border-slate-200 dark:border-slate-700 flex flex-col h-[320px] md:h-[320px] xl:h-[480px] 2xl:h-[520px]">
               {/* Quick Search */}
               <div className="bg-white dark:bg-slate-900 rounded-lg p-2.5 focus-within:ring-1 focus-within:ring-indigo-500/30 transition-all group border border-slate-200 dark:border-slate-700">
                 <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
@@ -138,11 +139,11 @@ export function OneIdePage() {
               </div>
 
               {/* Resume Coding */}
-              <div className="space-y-2.5">
+              <div className="space-y-2.5 flex-1 min-h-0 flex flex-col">
                 <h3 className="text-micro font-semibold text-orange-500 uppercase tracking-wider flex items-center gap-1">
                   <Clock size={12} /> Resume Coding
                 </h3>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
                   {RECENT_FILES.map((file, i) => (
                     <div key={i} onClick={() => navigate(file.route)} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 group">
                       <div className={`w-9 h-9 ${file.bgColor} dark:opacity-80 rounded-lg flex items-center justify-center transition-transform group-hover:scale-105`}>

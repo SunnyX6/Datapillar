@@ -47,6 +47,26 @@ class AgentFailedEvent(BaseEvent):
     error_type: str = ""
 
 
+@dataclass
+class AgentThinkingEvent(BaseEvent):
+    """Agent 思考内容"""
+
+    agent_id: str = ""
+    agent_name: str = ""
+    key: SessionKey | None = None
+    content: str = ""
+
+
+@dataclass
+class AgentInterruptedEvent(BaseEvent):
+    """Agent 中断（等待用户输入）"""
+
+    agent_id: str = ""
+    agent_name: str = ""
+    key: SessionKey | None = None
+    payload: Any = None
+
+
 # === 工具事件 ===
 
 
@@ -57,6 +77,7 @@ class ToolCalledEvent(BaseEvent):
     agent_id: str = ""
     key: SessionKey | None = None
     tool_name: str = ""
+    tool_call_id: str = ""
     tool_input: dict[str, Any] = field(default_factory=dict)
 
 
@@ -67,6 +88,7 @@ class ToolCompletedEvent(BaseEvent):
     agent_id: str = ""
     key: SessionKey | None = None
     tool_name: str = ""
+    tool_call_id: str = ""
     tool_output: Any = None
     duration_ms: float = 0.0
 
@@ -78,6 +100,7 @@ class ToolFailedEvent(BaseEvent):
     agent_id: str = ""
     key: SessionKey | None = None
     tool_name: str = ""
+    tool_call_id: str = ""
     error: str = ""
 
 
@@ -89,6 +112,7 @@ class LLMThinkingEvent(BaseEvent):
     """LLM 思考过程（开启 thinking 模式时）"""
 
     agent_id: str = ""
+    key: SessionKey | None = None
     thinking_content: str = ""
 
 
@@ -97,6 +121,7 @@ class LLMCallStartedEvent(BaseEvent):
     """LLM 调用开始"""
 
     agent_id: str = ""
+    key: SessionKey | None = None
     model: str = ""
     message_count: int = 0
 
@@ -106,6 +131,7 @@ class LLMCallCompletedEvent(BaseEvent):
     """LLM 调用完成"""
 
     agent_id: str = ""
+    key: SessionKey | None = None
     model: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
@@ -117,6 +143,7 @@ class LLMCallFailedEvent(BaseEvent):
     """LLM 调用失败"""
 
     agent_id: str = ""
+    key: SessionKey | None = None
     model: str = ""
     error: str = ""
     duration_ms: float = 0.0
@@ -127,6 +154,7 @@ class LLMStreamChunkEvent(BaseEvent):
     """LLM 流式输出块"""
 
     agent_id: str = ""
+    key: SessionKey | None = None
     chunk: str = ""
     is_final: bool = False
 

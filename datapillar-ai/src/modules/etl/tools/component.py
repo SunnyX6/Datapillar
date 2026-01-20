@@ -11,7 +11,7 @@ import logging
 from pydantic import BaseModel
 
 from src.infrastructure.repository import Component
-from src.modules.oneagentic import tool
+from datapillar_oneagentic import tool
 
 logger = logging.getLogger(__name__)
 
