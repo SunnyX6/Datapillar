@@ -33,6 +33,7 @@ class EventType(str, Enum):
     AGENT_HANDOVER = "agent.handover"
     AGENT_FAILED = "agent.failed"
     AGENT_THINKING = "agent.thinking"
+    AGENT_INTERRUPT = "agent.interrupt"
 
     # === 工具事件 ===
     TOOL_CALL = "tool.call"

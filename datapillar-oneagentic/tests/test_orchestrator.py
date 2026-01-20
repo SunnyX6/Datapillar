@@ -12,9 +12,10 @@ import pytest
 from dataclasses import dataclass
 
 from datapillar_oneagentic.core.types import SessionKey
+from datapillar_oneagentic.core.status import ExecutionStatus
 from datapillar_oneagentic.events import EventBus
 from datapillar_oneagentic.runtime.orchestrator import Orchestrator
-from datapillar_oneagentic.sse import SseEventType
+from datapillar_oneagentic.events import EventType
 
 
 class _MockStateGraph:
@@ -100,14 +101,14 @@ async def test_orchestrator_stream_should_error_when_no_query_and_no_resume_valu
         events.append(event)
 
     assert len(events) == 1
-    assert events[0]["event"] == SseEventType.ERROR
-    assert "无效调用" in events[0]["error"]["message"]
+    assert events[0]["event"] == EventType.AGENT_FAILED.value
+    assert "无效调用" in events[0]["data"]["error"]["message"]
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_stream_should_emit_result_event_with_query() -> None:
-    """有 query 时应发送 result 事件"""
-    graph = _MockStateGraph(events=[])
+async def test_orchestrator_stream_should_emit_agent_events_with_query() -> None:
+    """有 query 时应发送 agent 事件"""
+    graph = _MockStateGraph(events=[{"agent1": {"last_agent_status": ExecutionStatus.COMPLETED}}])
 
     orchestrator = Orchestrator(
         namespace="test",
@@ -126,15 +127,15 @@ async def test_orchestrator_stream_should_emit_result_event_with_query() -> None
     async for event in orchestrator.stream(query="hello", key=key):
         events.append(event)
 
-    # 应该只有 result 事件
+    # 应该只有 agent.start/agent.end 事件
     event_types = [e["event"] for e in events]
-    assert event_types == [SseEventType.RESULT]
+    assert event_types == [EventType.AGENT_START.value, EventType.AGENT_END.value]
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_stream_result_event_should_contain_session_info() -> None:
-    """result 事件应包含会话信息"""
-    graph = _MockStateGraph(events=[])
+async def test_orchestrator_stream_agent_event_should_contain_session_info() -> None:
+    """agent 事件应包含会话信息"""
+    graph = _MockStateGraph(events=[{"entry": {"last_agent_status": ExecutionStatus.COMPLETED}}])
 
     orchestrator = Orchestrator(
         namespace="ns1",
@@ -153,9 +154,9 @@ async def test_orchestrator_stream_result_event_should_contain_session_info() ->
     async for event in orchestrator.stream(query="test", key=key):
         events.append(event)
 
-    result_event = next(e for e in events if e["event"] == SseEventType.RESULT)
-    assert result_event["session_id"] == "session123"
-    assert result_event["namespace"] == "ns1"
+    agent_event = next(e for e in events if e["event"] == EventType.AGENT_START.value)
+    assert agent_event["session_id"] == "session123"
+    assert agent_event["namespace"] == "ns1"
 
 
 @dataclass(slots=True)
@@ -165,15 +166,14 @@ class _MockStateSnapshot:
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_stream_should_cleanup_store_and_state_on_result() -> None:
+async def test_orchestrator_stream_should_cleanup_store_and_state_on_completion() -> None:
     """完成后应清理 deliverables Store，并清空 state 引用"""
     store = _StubStore()
-    await store.aput(("deliverables", "test", "s1", "latest"), "agent1", {"ok": True})
+    await store.aput(("deliverables", "test", "s1"), "agent1", {"ok": True})
 
     state = _MockStateSnapshot(
         values={
             "deliverable_keys": ["agent1"],
-            "deliverable_versions": {"agent1": 1},
             "todo": {"items": [{"id": "t1"}]},
         },
         tasks=[],
@@ -196,14 +196,10 @@ async def test_orchestrator_stream_should_cleanup_store_and_state_on_result() ->
     async for event in orchestrator.stream(query="hello", key=key):
         events.append(event)
 
-    event_types = [e["event"] for e in events]
-    assert "result" in event_types
-
-    assert await store.asearch(("deliverables", "test", "s1", "latest")) == []
+    assert await store.aget(("deliverables", "test", "s1"), "agent1") is None
 
     compiled = orchestrator._compiled_graph
     assert compiled.updated
     last_update = compiled.updated[-1]
     assert last_update["todo"] is None
     assert last_update["deliverable_keys"] == []
-    assert last_update["deliverable_versions"] == {}

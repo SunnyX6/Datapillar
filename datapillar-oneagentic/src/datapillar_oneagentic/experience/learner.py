@@ -43,7 +43,7 @@ from datapillar_oneagentic.utils.time import now_ms
 
 if TYPE_CHECKING:
     from datapillar_oneagentic.storage.learning_stores.base import ExperienceStore
-    from datapillar_oneagentic.providers.llm.embedding import EmbeddingProviderClient
+    from datapillar_oneagentic.providers.llm.embedding import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +198,7 @@ class ExperienceLearner:
         self,
         store: ExperienceStore,
         namespace: str,
-        embedding_provider: "EmbeddingProviderClient",
+        embedding_provider: "EmbeddingProvider",
     ):
         """
         初始化学习器

@@ -10,7 +10,7 @@ SSE 架构说明：
 - Orchestrator.stream() 支持三种场景：
   1. 新会话/续聊：query 不为空
   2. interrupt 恢复：resume_value 不为空
-  3. 前端需要根据 interrupt 事件决定如何恢复
+  3. 客户端需要根据 interrupt 事件决定如何恢复
 - StreamManager 负责：
   - 管理订阅者（多客户端）
   - 事件缓冲和重放
@@ -69,7 +69,6 @@ from typing import TYPE_CHECKING, Any, Protocol
 from pydantic import BaseModel
 
 from datapillar_oneagentic.core.types import SessionKey
-from datapillar_oneagentic.sse.event import SseEvent
 from datapillar_oneagentic.utils.time import now_ms
 
 if TYPE_CHECKING:
@@ -247,7 +246,6 @@ class StreamManager:
 
         打断处理：
         - CancelledError 表示用户主动打断
-        - 发送 aborted 事件通知前端
         """
         run = self._runs[str(key)]
 
@@ -260,22 +258,9 @@ class StreamManager:
                 await self._emit(run, msg)
         except asyncio.CancelledError:
             logger.info(f"Run 被用户打断: key={key}")
-
-            await self._emit(
-                run,
-                SseEvent.aborted_event(message="已停止")
-                .with_session(namespace=key.namespace, session_id=key.session_id)
-                .to_dict(),
-            )
             raise
         except Exception as exc:
             logger.error("SSE 推送失败: %s", exc, exc_info=True)
-            await self._emit(
-                run,
-                SseEvent.error_event(message="执行失败", detail=str(exc))
-                .with_session(namespace=key.namespace, session_id=key.session_id)
-                .to_dict(),
-            )
         finally:
             await self._complete(run)
 

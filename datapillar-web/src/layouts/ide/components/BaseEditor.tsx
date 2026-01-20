@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom'
 import { Plus, FileCode, X, MoreVertical, ArrowRight, Fingerprint } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { TYPOGRAPHY } from '@/design-tokens/typography'
 
 export interface EditorTab {
   id: string
@@ -144,7 +145,7 @@ export function BaseEditor({
 
         {/* 1. TOP TAB BAR */}
         <div className="h-10 flex items-center bg-white dark:bg-slate-900 border-b border-slate-200/60 dark:border-slate-700/60 shrink-0 overflow-hidden relative">
-          <div className="flex items-end h-full flex-1 overflow-x-auto scrollbar-hide px-2">
+          <div className="flex items-end h-full flex-1 overflow-x-auto overflow-y-hidden scrollbar-invisible px-2">
             {tabs.map((tab, index) => {
               const isActive = activeTabId === tab.id
               return (
@@ -256,7 +257,8 @@ export function BaseEditor({
                 )}
                 <div className="px-3 py-1.5 flex items-center justify-between">
                   <span className={cn(
-                    'text-nano font-semibold uppercase tracking-[0.08em]',
+                    TYPOGRAPHY.contextMenuTitle,
+                    'uppercase tracking-[0.08em]',
                     group.highlight ? 'text-indigo-500/70' : 'text-slate-400 dark:text-slate-500'
                   )}>
                     {group.title}

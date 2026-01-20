@@ -3,12 +3,27 @@ import { createPortal } from 'react-dom'
 import { ChatPanel } from '@/layouts/workflow/Chat'
 import { useLayout } from '@/layouts/responsive'
 
-const MIN_CHAT_WIDTH = 300
-const MAX_CHAT_WIDTH = 520
-const CHAT_WIDTH_RATIO = 0.32
+const LARGE_SCREEN_WIDTH = 1440
+const DEFAULT_MIN_CHAT_WIDTH = 380
+const DEFAULT_MAX_CHAT_WIDTH = 520
+const LARGE_MIN_CHAT_WIDTH = DEFAULT_MAX_CHAT_WIDTH
+const LARGE_MAX_CHAT_WIDTH = 680
 const HANDLE_ICON_HEIGHT = 48
 
-const clampWidth = (value: number) => Math.max(MIN_CHAT_WIDTH, Math.min(MAX_CHAT_WIDTH, value))
+type ChatWidthLimits = {
+  min: number
+  max: number
+}
+
+const getChatWidthLimits = (containerWidth: number): ChatWidthLimits => {
+  if (containerWidth >= LARGE_SCREEN_WIDTH) {
+    return { min: LARGE_MIN_CHAT_WIDTH, max: LARGE_MAX_CHAT_WIDTH }
+  }
+  return { min: DEFAULT_MIN_CHAT_WIDTH, max: DEFAULT_MAX_CHAT_WIDTH }
+}
+
+const clampWidth = (value: number, limits: ChatWidthLimits) =>
+  Math.max(limits.min, Math.min(limits.max, value))
 
 const LazyWorkflowCanvasPanel = lazy(async () => {
   const module = await import('@/layouts/workflow/WorkflowStudio')
@@ -23,7 +38,7 @@ export function WorkflowStudioPage() {
     minScale: 0.5,
     maxScale: 2
   })
-  const [chatWidth, setChatWidth] = useState(360)
+  const [chatWidth, setChatWidth] = useState(() => getChatWidthLimits(containerWidth).min)
   const [isResizing, setIsResizing] = useState(false)
   const [hasManualResize, setHasManualResize] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
@@ -33,6 +48,7 @@ export function WorkflowStudioPage() {
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null)
+  const chatWidthLimits = useMemo(() => getChatWidthLimits(containerWidth), [containerWidth])
 
   const bumpViewportVersion = () => setCanvasViewportVersion((version) => version + 1)
   useEffect(() => {
@@ -43,7 +59,7 @@ export function WorkflowStudioPage() {
       const newWidth = e.clientX - containerRect.left
 
       // 限制最小和最大宽度
-      if (newWidth >= MIN_CHAT_WIDTH && newWidth <= MAX_CHAT_WIDTH) {
+      if (newWidth >= chatWidthLimits.min && newWidth <= chatWidthLimits.max) {
         if (!hasManualResize) {
           setHasManualResize(true)
         }
@@ -69,7 +85,7 @@ export function WorkflowStudioPage() {
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
     }
-  }, [isResizing, hasManualResize])
+  }, [isResizing, hasManualResize, chatWidthLimits])
 
   useLayoutEffect(() => {
     let rafId: number | null = null
@@ -108,7 +124,7 @@ export function WorkflowStudioPage() {
   const handleMouseDown = () => {
     if (isCollapsed) {
       setIsCollapsed(false)
-      setChatWidth(lastExpandedWidthRef.current)
+      setChatWidth(clampWidth(lastExpandedWidthRef.current, chatWidthLimits))
       bumpViewportVersion()
     }
     setIsResizing(true)
@@ -117,12 +133,12 @@ export function WorkflowStudioPage() {
   const handleDoubleClick = () => {
     if (isCollapsed) {
       setIsCollapsed(false)
-      setChatWidth(lastExpandedWidthRef.current)
+      setChatWidth(clampWidth(lastExpandedWidthRef.current, chatWidthLimits))
       setHasManualResize(true)
       bumpViewportVersion()
       return
     }
-    lastExpandedWidthRef.current = clampWidth(chatWidth)
+    lastExpandedWidthRef.current = clampWidth(chatWidth, chatWidthLimits)
     setIsCollapsed(true)
     setIsResizing(true)
     if (animationTimeoutRef.current) {
@@ -156,7 +172,7 @@ export function WorkflowStudioPage() {
     let widthFrame: number | null = null
 
     if (!isCollapsed && !hasManualResize && containerWidth > 0) {
-      const nextWidth = clampWidth(containerWidth * CHAT_WIDTH_RATIO)
+      const nextWidth = chatWidthLimits.min
       widthFrame = requestAnimationFrame(() => {
         setChatWidth((prev) => (Math.abs(prev - nextWidth) < 0.5 ? prev : nextWidth))
       })
@@ -168,15 +184,18 @@ export function WorkflowStudioPage() {
       if (rafId) cancelAnimationFrame(rafId)
       if (widthFrame) cancelAnimationFrame(widthFrame)
     }
-  }, [layoutReady, containerWidth, isCollapsed, hasManualResize])
+  }, [layoutReady, containerWidth, isCollapsed, hasManualResize, chatWidthLimits])
 
-  const effectiveChatWidth = useMemo(() => (isCollapsed ? 0 : clampWidth(chatWidth)), [chatWidth, isCollapsed])
+  const effectiveChatWidth = useMemo(
+    () => (isCollapsed ? 0 : clampWidth(chatWidth, chatWidthLimits)),
+    [chatWidth, isCollapsed, chatWidthLimits]
+  )
 
   useEffect(() => {
     if (!isCollapsed) {
-      lastExpandedWidthRef.current = clampWidth(effectiveChatWidth || chatWidth)
+      lastExpandedWidthRef.current = clampWidth(effectiveChatWidth || chatWidth, chatWidthLimits)
     }
-  }, [isCollapsed, effectiveChatWidth, chatWidth])
+  }, [isCollapsed, effectiveChatWidth, chatWidth, chatWidthLimits])
 
   const handlePosition = effectiveChatWidth <= 0 ? 0 : effectiveChatWidth
   const handleTop = containerRect?.top ?? 0

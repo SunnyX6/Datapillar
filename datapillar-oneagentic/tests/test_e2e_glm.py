@@ -7,14 +7,16 @@ import pytest
 from langchain_core.messages import SystemMessage
 from pydantic import BaseModel
 from datapillar_oneagentic import AgentContext, Datapillar, DatapillarConfig, Process, agent, tool
+from datapillar_oneagentic.events import EventType
 from datapillar_oneagentic.knowledge import (
-    Knowledge,
     DocumentInput,
+    Knowledge,
     KnowledgeChunkConfig,
+    KnowledgeConfig,
     KnowledgeIngestor,
     KnowledgeSource,
 )
-from datapillar_oneagentic.providers.llm import EmbeddingProviderClient
+from datapillar_oneagentic.providers.llm import EmbeddingProvider
 from datapillar_oneagentic.storage import create_knowledge_store
 
 
@@ -131,8 +133,16 @@ async def _collect_events(
 
 
 def _extract_deliverables(events: list[dict]) -> dict:
-    result = next(e for e in events if e["event"] == "result")
-    return result.get("result", {}).get("deliverable", {})
+    deliverables: dict[str, dict] = {}
+    for event in events:
+        if event.get("event") != EventType.AGENT_END.value:
+            continue
+        agent = event.get("agent") or {}
+        agent_id = agent.get("id")
+        deliverable = event.get("data", {}).get("deliverable")
+        if agent_id and deliverable is not None:
+            deliverables[agent_id] = deliverable
+    return deliverables
 
 
 @pytest.mark.asyncio
@@ -140,10 +150,15 @@ async def test_glm_sequential_tool_and_knowledge_flow() -> None:
     llm_config = _require_glm_llm_config()
     embedding_config = _require_glm_embedding_config()
     vector_store = _select_vector_store_config()
+    knowledge_config = KnowledgeConfig(
+        base_config={
+            "embedding": embedding_config,
+            "vector_store": vector_store,
+        }
+    )
     config = DatapillarConfig(
         llm=llm_config,
-        embedding=embedding_config,
-        vector_store=vector_store,
+        knowledge=knowledge_config,
     )
 
     namespace = "ns_glm_seq"
@@ -158,11 +173,11 @@ async def test_glm_sequential_tool_and_knowledge_flow() -> None:
         metadata={"title": "Demo Doc"},
     )
     sparse_embedder = _StubSparseEmbedder()
-    embedding_provider = EmbeddingProviderClient(config.embedding)
+    embedding_provider = EmbeddingProvider(knowledge_config.base_config.embedding)
     knowledge_store = create_knowledge_store(
         namespace,
-        vector_store_config=config.vector_store,
-        embedding_config=config.embedding,
+        vector_store_config=knowledge_config.base_config.vector_store,
+        embedding_config=knowledge_config.base_config.embedding,
     )
     ingestor = KnowledgeIngestor(
         store=knowledge_store,
@@ -487,7 +502,7 @@ async def test_glm_interrupt_resume_flow() -> None:
 
     events = await _collect_events(team, query="start", session_id="s_glm_interrupt")
     interrupt_event = next(e for e in events if e["event"] == "agent.interrupt")
-    assert interrupt_event["interrupt"]["payload"] == "need input"
+    assert interrupt_event["data"]["interrupt"]["payload"] == "need input"
 
     resume_events = await _collect_events(
         team,
@@ -539,11 +554,10 @@ async def test_glm_todo_flow() -> None:
         ),
         session_id="s_glm_todo",
     )
-    todo_events = [e for e in events if e["event"] == "todo.update"]
+    deliverables = _extract_deliverables(events)
 
-    if not todo_events:
-        pytest.skip("GLM 未触发 todo 工具调用，跳过 todo.update 断言")
-    assert "items" in todo_events[0]["todo"]
+    assert "todo_agent" in deliverables
+    assert isinstance(deliverables["todo_agent"].get("text"), str)
 
 
 @pytest.mark.asyncio

@@ -9,6 +9,12 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const graphlibLodashShim = path.resolve(__dirname, './src/compat/graphlib-lodash.cjs')
   const lodashShim = path.resolve(__dirname, './src/compat/lodash.cjs')
+  const lodashShimPlugin = {
+    name: 'force-lodash-shim',
+    setup(build: { onResolve: (options: { filter: RegExp }, callback: () => { path: string }) => void }) {
+      build.onResolve({ filter: /^lodash$/ }, () => ({ path: lodashShim }))
+    }
+  }
 
   return {
     plugins: [
@@ -112,6 +118,9 @@ export default defineConfig(({ mode }) => {
         '@neo4j-bloom/dagre',
         'graphlib'
       ],
+      esbuildOptions: {
+        plugins: [lodashShimPlugin]
+      },
       exclude: ['monaco-editor'] // Monaco 按需加载，不预构建
     }
   }

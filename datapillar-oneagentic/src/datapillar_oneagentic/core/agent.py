@@ -115,9 +115,10 @@ class AgentSpec:
 
 class AgentRegistry:
     """
-    Agent 注册中心（团队内使用）
+    Agent 注册中心（预留接口）
 
-    每个团队独立持有一个 Registry，避免全局污染。
+    当前框架通过 @agent 装饰器绑定 AgentSpec，未在 Datapillar 解析流程中使用。
+    该 Registry 仅用于扩展或测试场景。
     """
 
     def __init__(self) -> None:

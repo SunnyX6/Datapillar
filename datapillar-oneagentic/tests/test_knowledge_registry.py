@@ -51,11 +51,16 @@ class _StubSparseEmbedder:
 
 class _StubKnowledgeStore:
     def __init__(self, *, search_results: list[KnowledgeSearchHit] | None = None) -> None:
+        self._namespace = "ns_stub"
         self.sources: list[KnowledgeSource] = []
         self.docs: list[KnowledgeDocument] = []
         self.chunks: list[KnowledgeChunk] = []
         self.search_results = list(search_results or [])
         self.last_search: tuple[list[float], int, dict | None] | None = None
+
+    @property
+    def namespace(self) -> str:
+        return self._namespace
 
     async def initialize(self) -> None:
         return None
@@ -87,6 +92,16 @@ class _StubKnowledgeStore:
 
     async def get_chunks(self, chunk_ids: list[str]) -> list[KnowledgeChunk]:
         return [chunk for chunk in self.chunks if chunk.chunk_id in set(chunk_ids)]
+
+    async def delete_doc(self, doc_id: str) -> int:
+        before = len(self.docs)
+        self.docs = [doc for doc in self.docs if doc.doc_id != doc_id]
+        return before - len(self.docs)
+
+    async def delete_chunks_by_doc_id(self, doc_id: str) -> int:
+        before = len(self.chunks)
+        self.chunks = [chunk for chunk in self.chunks if chunk.doc_id != doc_id]
+        return before - len(self.chunks)
 
 
 @pytest.mark.asyncio
@@ -164,7 +179,7 @@ async def test_knowledge_retriever_builds_json_context_and_refs() -> None:
     store = _StubKnowledgeStore(search_results=hits)
     embedder = _StubEmbeddingProvider()
     config = KnowledgeConfig(
-        retrieve=KnowledgeRetrieveConfig(
+        retrieve_config=KnowledgeRetrieveConfig(
             method="semantic",
             top_k=2,
             inject=KnowledgeInjectConfig(mode="system", max_tokens=200, max_chunks=1, format="json"),
@@ -180,7 +195,7 @@ async def test_knowledge_retriever_builds_json_context_and_refs() -> None:
     result = await retriever.retrieve(query="query", knowledge=knowledge)
     context = ContextBuilder.build_knowledge_context(
         chunks=[chunk for chunk, _ in result.hits],
-        inject=config.retrieve.inject,
+        inject=config.retrieve_config.inject,
     )
     payload = json.loads(context)
 
@@ -211,7 +226,7 @@ async def test_knowledge_retriever_allows_tool_mode() -> None:
     store = _StubKnowledgeStore(search_results=hits)
     embedder = _StubEmbeddingProvider()
     config = KnowledgeConfig(
-        retrieve=KnowledgeRetrieveConfig(
+        retrieve_config=KnowledgeRetrieveConfig(
             method="semantic",
             top_k=1,
             inject=KnowledgeInjectConfig(mode="tool", max_tokens=200, max_chunks=1, format="markdown"),
@@ -227,7 +242,7 @@ async def test_knowledge_retriever_allows_tool_mode() -> None:
     result = await retriever.retrieve(query="query", knowledge=knowledge)
     context = ContextBuilder.build_knowledge_context(
         chunks=[chunk for chunk, _ in result.hits],
-        inject=config.retrieve.inject,
+        inject=config.retrieve_config.inject,
     )
     assert "知识上下文" in context
 
@@ -445,7 +460,7 @@ async def test_knowledge_retriever_applies_rerank(monkeypatch) -> None:
     store = _StubKnowledgeStore(search_results=hits)
     embedder = _StubEmbeddingProvider()
     config = KnowledgeConfig(
-        retrieve=KnowledgeRetrieveConfig(
+        retrieve_config=KnowledgeRetrieveConfig(
             method="semantic",
             top_k=2,
             rerank=RerankConfig(mode="model", provider="sentence_transformers"),

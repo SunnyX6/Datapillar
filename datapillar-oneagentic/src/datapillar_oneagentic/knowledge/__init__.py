@@ -5,6 +5,7 @@ Knowledge 模块
 from datapillar_oneagentic.knowledge.config import (
     KnowledgeConfig,
     KnowledgeInjectConfig,
+    KnowledgeBaseConfig,
     KnowledgeChunkConfig,
     KnowledgeRetrieveConfig,
 )
@@ -63,6 +64,7 @@ __all__ = [
     "merge_knowledge",
     "SparseEmbeddingProvider",
     "KnowledgeConfig",
+    "KnowledgeBaseConfig",
     "KnowledgeChunkConfig",
     "KnowledgeRetrieveConfig",
     "KnowledgeInjectConfig",

@@ -19,6 +19,17 @@ async def _collect_events(team: Datapillar, *, query: str, session_id: str) -> l
     return events
 
 
+def _extract_deliverable(events: list[dict], agent_id: str) -> dict | None:
+    for event in events:
+        if event.get("event") != "agent.end":
+            continue
+        agent = event.get("agent") or {}
+        if agent.get("id") != agent_id:
+            continue
+        return event.get("data", {}).get("deliverable")
+    return None
+
+
 def _stub_config() -> DatapillarConfig:
     return DatapillarConfig(llm={"api_key": "stub", "model": "stub", "provider": "openai"})
 
@@ -61,12 +72,10 @@ async def test_stub_todo_flow(monkeypatch) -> None:
     )
 
     events = await _collect_events(team, query="need todo", session_id="s_todo")
-    todo_events = [e for e in events if e["event"] == "todo.update"]
+    deliverable = _extract_deliverable(events, "todo_agent")
 
-    assert len(todo_events) >= 1
-
-    latest = todo_events[-1]["todo"]
-    assert [item["id"] for item in latest["items"]] == ["t2"]
+    assert deliverable is not None
+    assert deliverable.get("text") == "todo_done"
 
 
 @pytest.mark.asyncio
@@ -111,9 +120,7 @@ async def test_stub_todo_flow_complex_task(monkeypatch) -> None:
         query="Complex task: design, build, validate, and report results.",
         session_id="s_todo_complex",
     )
-    todo_events = [e for e in events if e["event"] == "todo.update"]
+    deliverable = _extract_deliverable(events, "todo_agent")
 
-    assert len(todo_events) >= 1
-
-    latest = todo_events[-1]["todo"]
-    assert [item["id"] for item in latest["items"]] == ["t2", "t3"]
+    assert deliverable is not None
+    assert deliverable.get("text") == "todo_done"

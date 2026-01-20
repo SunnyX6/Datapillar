@@ -4,6 +4,7 @@ import {
   Cpu,
   GitBranch,
   History,
+  BookOpen,
   Play,
   Settings,
   Sparkles,
@@ -20,7 +21,7 @@ import {
 } from '@/design-tokens/dimensions'
 import { ExpandToggle } from './ExpandToggle'
 
-type View = 'dashboard' | 'workflow' | 'profile' | 'ide'
+type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide'
 
 interface SidebarProps {
   onNavigate: (view: View) => void
@@ -34,16 +35,17 @@ export function Sidebar({ onNavigate, currentView, collapsed, onToggleCollapse }
   const sidebarWidth = collapsed ? sidebarWidthClassMap.collapsed : sidebarWidthClassMap.normal
   const sectionPadding = collapsed ? sidebarPaddingClassMap.collapsed : sidebarPaddingClassMap.normal
   const stackSpacing = collapsed ? sidebarSpacingClassMap.collapsed : sidebarSpacingClassMap.normal
-  const logoHeight = collapsed ? 'h-14' : 'h-[72px]'
+  const logoHeight = collapsed ? 'h-14' : 'h-[4.5rem]'
   const logoSpacing = collapsed ? 'mb-0' : 'mb-3'
   const contentPaddingY = collapsed ? 'py-0' : 'py-2'
+  const topOffset = collapsed ? '' : 'xl:pt-[7px]'
 
   const brandNameClass = collapsed
     ? undefined
     : 'text-lg font-bold leading-tight tracking-tight text-indigo-600 dark:text-indigo-200'
 
   return (
-    <aside className={`${sidebarWidth} flex-shrink-0 bg-[#F9FAFB] dark:bg-[#0B1120] border-r border-slate-200 dark:border-slate-800 flex flex-col h-full z-30 overflow-visible relative transition-[width] duration-200 ease-out`}>
+    <aside className={`${sidebarWidth} ${topOffset} flex-shrink-0 bg-[#F9FAFB] dark:bg-[#0B1120] border-r border-slate-200 dark:border-slate-800 flex flex-col h-full z-30 overflow-visible relative transition-[width] duration-200 ease-out`}>
       {/* 品牌 Logo 区域 */}
       <div className={`${sectionPadding} relative ${logoHeight} flex items-center ${logoSpacing}`}>
         <div
@@ -62,13 +64,14 @@ export function Sidebar({ onNavigate, currentView, collapsed, onToggleCollapse }
           <ExpandToggle
             variant="sidebar"
             onToggle={onToggleCollapse}
-            className="absolute right-0 bottom-4"
+            className="absolute right-0 bottom-4 xl:-translate-y-[7px]"
           />
         )}
       </div>
 
       <div className={`flex-1 overflow-y-auto ${sectionPadding} ${contentPaddingY} ${stackSpacing} scrollbar-invisible`}>
         <NavSection title={t('side.sections.build', { ns: 'navigation' })} collapsed={collapsed}>
+          <NavItem collapsed={collapsed} icon={<BookOpen size={iconSizeToken.normal} />} label={t('side.items.wiki', { ns: 'navigation' })} active={currentView === 'wiki'} onClick={() => onNavigate('wiki')} />
           <NavItem collapsed={collapsed} icon={<Workflow size={iconSizeToken.normal} />} label={t('side.items.workflow', { ns: 'navigation' })} active={currentView === 'workflow'} onClick={() => onNavigate('workflow')} shortcut="W" />
           <NavItem collapsed={collapsed} icon={<Code2 size={iconSizeToken.normal} />} label={t('side.items.ide', { ns: 'navigation' })} active={currentView === 'ide'} onClick={() => onNavigate('ide')} shortcut="I" />
         </NavSection>

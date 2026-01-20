@@ -11,6 +11,9 @@ Embedding 配置：
     export GLM_EMBEDDING_API_KEY="sk-xxx"
     export GLM_EMBEDDING_MODEL="embedding-3"
     export GLM_EMBEDDING_DIMENSION="1024"
+
+说明：
+    - 评估集文档无需传 source_id，系统根据 doc_id 自动派生。
 """
 
 import asyncio
@@ -18,15 +21,13 @@ import json
 import os
 from pathlib import Path
 
-from datapillar_oneagentic import DatapillarConfig
 from datapillar_oneagentic.knowledge import (
     KnowledgeChunkConfig,
+    KnowledgeConfig,
     KnowledgeEvaluator,
     KnowledgeRetrieveConfig,
     load_eval_set,
 )
-from datapillar_oneagentic.providers.llm import EmbeddingProviderClient
-from datapillar_oneagentic.storage import create_knowledge_store
 
 
 async def main() -> None:
@@ -48,8 +49,6 @@ async def main() -> None:
         "model": embedding_model,
         "dimension": embedding_dimension,
     }
-    config = DatapillarConfig(embedding=embedding_config)
-
     evalset_path = Path(__file__).with_name("knowledge_evalset.json")
     evalset = load_eval_set(evalset_path)
 
@@ -62,26 +61,24 @@ async def main() -> None:
         top_k=max(evalset.k_values),
     )
 
-    knowledge_store = create_knowledge_store(
-        "demo_knowledge_eval",
-        vector_store_config=config.vector_store,
-        embedding_config=config.embedding,
-    )
-    await knowledge_store.initialize()
-
-    embedding_provider = EmbeddingProviderClient(config.embedding)
-    evaluator = KnowledgeEvaluator(
-        store=knowledge_store,
-        embedding_provider=embedding_provider,
+    knowledge_config = KnowledgeConfig(
+        base_config={
+            "embedding": embedding_config,
+            "vector_store": {"type": "lance", "path": "./data/vectors"},
+        },
         chunk_config=chunk_config,
         retrieve_config=retrieve_config,
+    )
+    evaluator = await KnowledgeEvaluator.from_config(
+        namespace="demo_knowledge_eval",
+        config=knowledge_config,
     )
 
     report = await evaluator.evaluate(evalset)
     print("评估摘要：")
     print(json.dumps(report.summary(), ensure_ascii=False, indent=2))
 
-    await knowledge_store.close()
+    await evaluator.close()
 
 
 if __name__ == "__main__":

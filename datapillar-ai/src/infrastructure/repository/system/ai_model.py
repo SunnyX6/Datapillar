@@ -13,6 +13,22 @@ from src.infrastructure.database.mysql import MySQLClient
 
 logger = logging.getLogger(__name__)
 
+_MODEL_FIELDS = (
+    "id, "
+    "name, "
+    "provider, "
+    "model_name, "
+    "model_type, "
+    "api_key, "
+    "base_url, "
+    "is_enabled, "
+    "is_default, "
+    "embedding_dimension, "
+    "supports_function_calling, "
+    "supports_structured_output, "
+    "scope"
+)
+
 
 class Model:
     """AI 模型查询（ai_model）"""
@@ -20,8 +36,8 @@ class Model:
     @staticmethod
     def get_chat_default() -> dict[str, Any] | None:
         query = text(
-            """
-            SELECT * FROM ai_model
+            f"""
+            SELECT {_MODEL_FIELDS} FROM ai_model
             WHERE is_enabled = 1 AND is_default = 1 AND model_type = 'chat'
             LIMIT 1
         """
@@ -39,9 +55,11 @@ class Model:
     @staticmethod
     def get_embedding_default() -> dict[str, Any] | None:
         query = text(
-            """
-            SELECT * FROM ai_model
-            WHERE is_enabled = 1 AND is_default = 1 AND model_type = 'embedding'
+            f"""
+            SELECT {_MODEL_FIELDS} FROM ai_model
+            WHERE is_enabled = 1 AND is_default = 1
+              AND model_type = 'embedding'
+              AND scope = 'SYSTEM'
             LIMIT 1
         """
         )
@@ -58,8 +76,8 @@ class Model:
     @staticmethod
     def get_model(model_id: int) -> dict[str, Any] | None:
         query = text(
-            """
-            SELECT * FROM ai_model
+            f"""
+            SELECT {_MODEL_FIELDS} FROM ai_model
             WHERE id = :id AND is_enabled = 1
         """
         )
@@ -77,8 +95,8 @@ class Model:
     def list_enabled_models(model_type: str | None = None) -> list[dict[str, Any]]:
         if model_type:
             query = text(
-                """
-                SELECT * FROM ai_model
+                f"""
+                SELECT {_MODEL_FIELDS} FROM ai_model
                 WHERE is_enabled = 1 AND model_type = :model_type
                 ORDER BY is_default DESC, created_at DESC
             """
@@ -86,8 +104,8 @@ class Model:
             params: dict[str, Any] = {"model_type": model_type}
         else:
             query = text(
-                """
-                SELECT * FROM ai_model
+                f"""
+                SELECT {_MODEL_FIELDS} FROM ai_model
                 WHERE is_enabled = 1
                 ORDER BY model_type, is_default DESC, created_at DESC
             """

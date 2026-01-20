@@ -8,14 +8,20 @@ DeveloperAgent - 数据开发工程师
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
+from datapillar_oneagentic import agent
 from src.modules.etl.schemas.developer import DeveloperSqlOutput
-from src.modules.oneagentic import Clarification, agent
-from src.modules.oneagentic.knowledge import KnowledgeDomain, KnowledgeLevel, KnowledgeStore
+from src.modules.etl.tools.table import (
+    get_lineage_sql,
+    get_table_detail,
+    get_table_lineage,
+    search_tables,
+)
 
 if TYPE_CHECKING:
-    from src.modules.oneagentic import AgentContext
+    from datapillar_oneagentic import AgentContext
 
 
 # ==================== Agent 定义 ====================
@@ -25,12 +31,10 @@ if TYPE_CHECKING:
     id="developer",
     name="数据开发工程师",
     description="为每个 Job 的 Stage 生成 SQL 脚本",
-    tools=["get_table_detail", "get_table_lineage", "get_lineage_sql", "search_tables"],
+    tools=[get_table_detail, get_table_lineage, get_lineage_sql, search_tables],
     deliverable_schema=DeveloperSqlOutput,
-    deliverable_key="sql",
-    knowledge_domains=["developer_methodology"],
     temperature=0.0,
-    max_iterations=5,
+    max_steps=5,
 )
 class DeveloperAgent:
     """数据开发工程师"""
@@ -52,7 +56,7 @@ class DeveloperAgent:
 3. 调用 get_table_detail 获取输入/输出表结构
 4. 调用 get_lineage_sql 参考历史 SQL
 5. 生成 SQL 脚本
-6. 完成后调用 delegate_to_reviewer
+6. 完成后委派给代码评审员
 
 ## SQL 编写规范
 
@@ -76,37 +80,10 @@ class DeveloperAgent:
 1. 不允许臆造字段名，必须通过工具验证
 2. 所有字段必须有明确的来源
 3. confidence < 0.8 且有 issues 时需要澄清
-4. 完成后调用 delegate_to_reviewer
-"""
+4. 完成后委派给代码评审员
+5. **委派时必须在任务描述中携带 SQL 输出与疑点列表**
 
-    async def run(self, ctx: AgentContext) -> DeveloperSqlOutput | Clarification:
-        """执行开发"""
-        # 1. 构建消息
-        messages = ctx.build_messages(self.SYSTEM_PROMPT)
-
-        # 2. 工具调用循环（委派由框架自动处理）
-        messages = await ctx.invoke_tools(messages)
-
-        # 3. 获取结构化输出
-        output = await ctx.get_output(messages)
-
-        # 4. 业务判断：需要澄清？
-        if isinstance(output, DeveloperSqlOutput) and output.confidence < 0.8 and output.issues:
-            return ctx.clarify(
-                message="SQL 生成存在不确定性，请确认以下问题",
-                questions=output.issues,
-            )
-
-        return output
-
-
-# ==================== 知识领域 ====================
-
-DEVELOPER_METHODOLOGY = KnowledgeDomain(
-    domain_id="developer_methodology",
-    name="数据开发方法论",
-    level=KnowledgeLevel.DOMAIN,
-    content="""## 数据开发方法论
+## 数据开发方法论
 
 ### SQL 编写原则
 1. **字段溯源**：每个输出字段必须有明确的来源
@@ -126,11 +103,32 @@ DEVELOPER_METHODOLOGY = KnowledgeDomain(
 - 字段数量匹配
 - 类型兼容
 - NULL 值处理
-""",
-    tags=["数据开发", "SQL", "方法论"],
-)
+"""
 
+    async def run(self, ctx: AgentContext) -> DeveloperSqlOutput:
+        """执行开发"""
+        workflow = await ctx.get_deliverable("architect")
+        if workflow:
+            try:
+                upstream_context = json.dumps(workflow, ensure_ascii=False, indent=2)
+            except TypeError:
+                upstream_context = str(workflow)
+        else:
+            upstream_context = f"未获取到结构化架构设计，请基于下发任务/用户输入生成 SQL。\n用户输入: {ctx.query}"
 
-def register_developer_knowledge() -> None:
-    """注册 DeveloperAgent 相关的知识领域"""
-    KnowledgeStore.register_domain(DEVELOPER_METHODOLOGY)
+        # 1. 构建消息
+        prompt = f"{self.SYSTEM_PROMPT}\n\n## 上游架构设计\n{upstream_context}"
+        messages = ctx.build_messages(prompt)
+
+        # 2. 工具调用循环（委派由框架自动处理）
+        messages = await ctx.invoke_tools(messages)
+
+        # 3. 获取结构化输出
+        output = await ctx.get_structured_output(messages)
+
+        # 4. 业务判断：需要澄清？
+        if output.confidence < 0.8 and output.issues:
+            ctx.interrupt({"message": "SQL 生成存在不确定性，请确认以下问题", "questions": output.issues})
+            output = await ctx.get_structured_output(messages)
+
+        return output

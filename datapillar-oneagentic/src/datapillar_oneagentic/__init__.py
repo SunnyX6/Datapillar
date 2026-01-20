@@ -39,17 +39,20 @@ class AnalystAgent:
 # 组建团队并执行（流式）
 team = Datapillar(config=config, namespace="my_project", name="分析团队", agents=[AnalystAgent])
 async for event in team.stream(query="分析销售数据", session_id="session_001"):
-    if event["event"] == "result":
-        print(event["result"]["deliverable"])
+    if event["event"] == "agent.end":
+        deliverable = event.get("data", {}).get("deliverable")
+        if deliverable is not None:
+            print(deliverable)
     elif event["event"] == "agent.interrupt":
         # Agent 需要用户输入，获取用户输入后恢复
-        user_input = input(str(event.get("interrupt", {}).get("payload", "")))
+        payload = event.get("data", {}).get("interrupt", {}).get("payload", "")
+        user_input = input(str(payload))
         async for e in team.stream(session_id="session_001", resume_value=user_input):
             ...
 ```
 
 高级功能按需从子模块导入：
-- 知识系统: `from datapillar_oneagentic.knowledge import Knowledge, KnowledgeSource, KnowledgeIngestor`
+- 知识系统: `from datapillar_oneagentic.knowledge import Knowledge, KnowledgeSource, KnowledgeRetriever`
 - A2A 协议: `from datapillar_oneagentic.a2a import A2AConfig, create_a2a_tool`
 - MCP 协议: `from datapillar_oneagentic.mcp import MCPClient, MCPServerConfig`
 - 事件订阅: `team.event_bus`

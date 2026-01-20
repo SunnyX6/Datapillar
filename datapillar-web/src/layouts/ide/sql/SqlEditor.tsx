@@ -403,7 +403,7 @@ export function SqlEditor() {
       {showCatalogPicker && catalogPickerStyle && createPortal(
         <div
           ref={catalogPickerRef}
-          className="fixed z-[100000] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl dark:shadow-2xl overflow-hidden min-w-80 max-h-[var(--catalog-picker-max-height)]"
+          className="fixed z-[100000] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl dark:shadow-2xl overflow-hidden w-panel-responsive max-h-[var(--catalog-picker-max-height)]"
           style={{
             ...(catalogPickerStyle.top !== undefined ? { top: catalogPickerStyle.top } : {}),
             ...(catalogPickerStyle.bottom !== undefined ? { bottom: catalogPickerStyle.bottom } : {}),
@@ -414,7 +414,7 @@ export function SqlEditor() {
         >
           <div className="flex">
             {/* Catalog 列表 */}
-            <div className="w-40 border-r border-slate-100 dark:border-slate-700">
+            <div className="flex-1 min-w-40 border-r border-slate-100 dark:border-slate-700">
               <div className="px-2.5 py-1.5 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
                 <span className="text-nano font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Catalog</span>
               </div>
@@ -449,7 +449,7 @@ export function SqlEditor() {
             </div>
 
             {/* Schema 列表 */}
-            <div className="w-40">
+            <div className="flex-1 min-w-40">
               <div className="px-2.5 py-1.5 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
                 <span className="text-nano font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Schema</span>
               </div>
@@ -692,10 +692,10 @@ export function SqlEditor() {
                 verticalSliderSize: 6,
               },
               padding: { top: 12 },
-              lineHeight: 1.6,
               lineNumbersMinChars: 3,
               renderLineHighlight: 'none',
               scrollBeyondLastLine: false,
+              cursorHeight: 16,
               automaticLayout: true,
             }}
           />

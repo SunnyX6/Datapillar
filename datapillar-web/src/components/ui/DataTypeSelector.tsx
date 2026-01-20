@@ -26,7 +26,7 @@ import {
   ChevronDown,
   Check
 } from 'lucide-react'
-import type { DataTypeValue } from '@/layouts/governance/utils/dataType'
+import { DEFAULT_LENGTH, getMaxLengthForType, type DataTypeValue } from '@/layouts/governance/utils/dataType'
 
 /** 数据类型配置 */
 interface DataTypeConfig {
@@ -146,9 +146,13 @@ function DecimalPrecisionCard({
 /** 长度选择卡片 */
 function LengthCard({
   length,
+  min,
+  max,
   onChange
 }: {
   length: number
+  min: number
+  max: number
   onChange: (l: number) => void
 }) {
   return (
@@ -162,14 +166,14 @@ function LengthCard({
       </div>
       <input
         type="range"
-        min={1}
-        max={65535}
+        min={min}
+        max={max}
         value={length}
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full h-1.5 bg-slate-200 dark:bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white"
       />
       <div className="mt-1.5 text-micro text-slate-400 dark:text-slate-500">
-        范围: 1 - 65535
+        范围: {min} - {max}
       </div>
     </div>
   )
@@ -322,7 +326,7 @@ export function DataTypeSelector({
       newValue.precision = value.type === 'DECIMAL' ? (value.precision ?? 10) : 10
       newValue.scale = value.type === 'DECIMAL' ? (value.scale ?? 2) : 2
     } else if (config.hasParams === 'length') {
-      newValue.length = value.length ?? 255
+      newValue.length = config.type === value.type ? (value.length ?? DEFAULT_LENGTH) : DEFAULT_LENGTH
     }
     onChange(newValue)
     if (!config.hasParams) {
@@ -373,7 +377,7 @@ export function DataTypeSelector({
     ? currentConfig.hasParams === 'decimal'
       ? `${currentConfig.label}(${value.precision ?? 10},${value.scale ?? 2})`
       : currentConfig.hasParams === 'length'
-        ? `${currentConfig.label}(${value.length ?? 255})`
+        ? `${currentConfig.label}(${value.length ?? DEFAULT_LENGTH})`
         : currentConfig.label
     : value.type
 
@@ -485,7 +489,9 @@ export function DataTypeSelector({
             )}
             {(activeHoveredType === 'VARCHAR' || activeHoveredType === 'FIXEDCHAR' || activeHoveredType === 'FIXED') && (
               <LengthCard
-                length={value.type === activeHoveredType ? (value.length ?? 255) : 255}
+                length={value.type === activeHoveredType ? (value.length ?? DEFAULT_LENGTH) : DEFAULT_LENGTH}
+                min={DEFAULT_LENGTH}
+                max={getMaxLengthForType(activeHoveredType)}
                 onChange={(l) => {
                   if (value.type !== activeHoveredType) {
                     onChange({ type: activeHoveredType, length: l })

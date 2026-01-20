@@ -19,7 +19,7 @@ import logging
 from pydantic import BaseModel, Field
 
 from src.infrastructure.repository.kg import Neo4jTableSearch
-from src.modules.oneagentic import tool
+from datapillar_oneagentic import tool
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,13 @@ from pydantic import BaseModel
 
 import datapillar_oneagentic.storage as storage_module
 from datapillar_oneagentic import AgentContext, Datapillar, DatapillarConfig, Process, agent
-from datapillar_oneagentic.knowledge import Knowledge, KnowledgeInject, KnowledgeRetrieve, KnowledgeSource
+from datapillar_oneagentic.knowledge import (
+    Knowledge,
+    KnowledgeConfig,
+    KnowledgeInject,
+    KnowledgeRetrieve,
+    KnowledgeSource,
+)
 
 
 class _Output(BaseModel):
@@ -36,14 +42,20 @@ def test_datapillar_merges_team_knowledge(monkeypatch) -> None:
 
     monkeypatch.setattr(storage_module, "create_knowledge_store", lambda *args, **kwargs: object())
 
+    knowledge_config = KnowledgeConfig(
+        base_config={
+            "embedding": {
+                "api_key": "stub",
+                "model": "text-embedding-3-small",
+                "provider": "openai",
+                "dimension": 2,
+            },
+            "vector_store": {"type": "lance", "path": "./data/vectors"},
+        }
+    )
     config = DatapillarConfig(
         llm={"api_key": "stub", "model": "stub", "provider": "openai"},
-        embedding={
-            "api_key": "stub",
-            "model": "text-embedding-3-small",
-            "provider": "openai",
-            "dimension": 2,
-        },
+        knowledge=knowledge_config,
     )
     team_knowledge = Knowledge(
         sources=[KnowledgeSource(source_id="kb_team", name="TeamKB", source_type="doc")],

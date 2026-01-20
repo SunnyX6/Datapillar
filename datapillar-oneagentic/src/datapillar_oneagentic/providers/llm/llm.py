@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
+import time
 from dataclasses import dataclass
 from typing import Any, TypeVar, cast
 
@@ -31,7 +32,13 @@ from langchain_core.messages import (
 from langchain_core.runnables import Runnable
 from pydantic import BaseModel
 
-from datapillar_oneagentic.events import EventBus, LLMCallCompletedEvent
+from datapillar_oneagentic.core.types import SessionKey
+from datapillar_oneagentic.events import (
+    EventBus,
+    LLMCallCompletedEvent,
+    LLMCallFailedEvent,
+    LLMCallStartedEvent,
+)
 from datapillar_oneagentic.providers.llm.config import LLMConfig, RetryConfig
 from datapillar_oneagentic.providers.llm.llm_cache import create_llm_cache
 from datapillar_oneagentic.providers.llm.rate_limiter import RateLimitManager
@@ -220,6 +227,8 @@ class ResilientChatModel:
         provider: str | None = None,
         model_name: str | None = None,
         event_bus: EventBus | None = None,
+        event_agent_id: str | None = None,
+        event_key: SessionKey | None = None,
         rate_limit_manager: RateLimitManager | None = None,
         circuit_breaker: CircuitBreaker | None = None,
         timeout_seconds: float | None = None,
@@ -229,6 +238,8 @@ class ResilientChatModel:
         self._provider = provider or "unknown"
         self._model_name = model_name
         self._event_bus = event_bus
+        self._event_agent_id = event_agent_id
+        self._event_key = event_key
         self._rate_limit_manager = rate_limit_manager
         self._circuit_breaker = circuit_breaker
         self._timeout_seconds = timeout_seconds or 120.0
@@ -237,6 +248,26 @@ class ResilientChatModel:
     @property
     def timeout(self) -> float:
         return self._timeout_seconds
+
+    def with_event_context(
+        self,
+        *,
+        agent_id: str | None,
+        key: SessionKey | None,
+    ) -> "ResilientChatModel":
+        """绑定事件上下文（Agent + Session）"""
+        return ResilientChatModel(
+            self._llm,
+            provider=self._provider,
+            model_name=self._model_name,
+            event_bus=self._event_bus,
+            event_agent_id=agent_id,
+            event_key=key,
+            rate_limit_manager=self._rate_limit_manager,
+            circuit_breaker=self._circuit_breaker,
+            timeout_seconds=self._timeout_seconds,
+            retry_config=self._retry_config,
+        )
 
     async def ainvoke(
         self,
@@ -260,6 +291,7 @@ class ResilientChatModel:
         """带重试的调用（内部方法）"""
         retries = self._retry_config.max_retries
         last_error: Exception | None = None
+        message_count = len(input) if isinstance(input, list) else 0
 
         for attempt in range(retries + 1):
             if self._circuit_breaker and not await self._circuit_breaker.allow_request():
@@ -271,6 +303,18 @@ class ResilientChatModel:
                     model=self._model_name,
                 )
 
+            start_time = time.time()
+            if self._event_bus is not None:
+                await self._event_bus.emit(
+                    self,
+                    LLMCallStartedEvent(
+                        agent_id=self._event_agent_id or "",
+                        key=self._event_key,
+                        model=self._model_name or "",
+                        message_count=message_count,
+                    ),
+                )
+
             try:
                 result = await asyncio.wait_for(
                     self._llm.ainvoke(input, config, **kwargs),
@@ -278,10 +322,11 @@ class ResilientChatModel:
                 )
                 if self._circuit_breaker:
                     await self._circuit_breaker.record_success()
-                asyncio.create_task(self._track_usage_async(result))
+                asyncio.create_task(self._track_usage_async(result, start_time=start_time))
                 return result
 
             except TimeoutError as e:
+                await self._emit_llm_failed(e, start_time=start_time)
                 last_error = LLMError(
                     f"LLM 调用超时（{self.timeout}s）",
                     category=LLMErrorCategory.TIMEOUT,
@@ -297,6 +342,7 @@ class ResilientChatModel:
 
             except Exception as e:
                 if isinstance(e, LLMError):
+                    await self._emit_llm_failed(e, start_time=start_time)
                     last_error = e
                     if e.action == RecoveryAction.RETRY:
                         if self._circuit_breaker:
@@ -306,6 +352,7 @@ class ResilientChatModel:
                     else:
                         raise
                 elif ExceptionMapper.is_context_length_exceeded(e):
+                    await self._emit_llm_failed(e, start_time=start_time)
                     raise LLMError(
                         str(e),
                         category=LLMErrorCategory.CONTEXT,
@@ -315,6 +362,7 @@ class ResilientChatModel:
                         original=e,
                     ) from e
                 else:
+                    await self._emit_llm_failed(e, start_time=start_time)
                     category, action = LLMErrorClassifier.classify(e)
                     last_error = LLMError(
                         str(e),
@@ -341,7 +389,7 @@ class ResilientChatModel:
 
         raise last_error or RuntimeError("Retry exhausted unexpectedly")
 
-    async def _track_usage_async(self, result: Any) -> None:
+    async def _track_usage_async(self, result: Any, *, start_time: float) -> None:
         """异步追踪 Token 使用量，发出事件通知使用者"""
         if self._event_bus is None:
             return
@@ -354,20 +402,39 @@ class ResilientChatModel:
                 if raw:
                     usage = extract_usage(raw)
 
-            if usage is None:
-                return
+            input_tokens = usage.input_tokens if usage else 0
+            output_tokens = usage.output_tokens if usage else 0
+            duration_ms = (time.time() - start_time) * 1000
 
             await self._event_bus.emit(
                 self,
                 LLMCallCompletedEvent(
+                    agent_id=self._event_agent_id or "",
+                    key=self._event_key,
                     model=self._model_name or "",
-                    input_tokens=usage.input_tokens,
-                    output_tokens=usage.output_tokens,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    duration_ms=duration_ms,
                 ),
             )
 
         except Exception as e:
             logger.warning(f"Usage 追踪失败（不影响主流程）: {e}")
+
+    async def _emit_llm_failed(self, error: Exception, *, start_time: float) -> None:
+        if self._event_bus is None:
+            return
+        duration_ms = (time.time() - start_time) * 1000
+        await self._event_bus.emit(
+            self,
+            LLMCallFailedEvent(
+                agent_id=self._event_agent_id or "",
+                key=self._event_key,
+                model=self._model_name or "",
+                error=str(error),
+                duration_ms=duration_ms,
+            ),
+        )
 
     def invoke(
         self,
@@ -398,6 +465,8 @@ class ResilientChatModel:
                 provider=self._provider,
                 model_name=self._model_name,
                 event_bus=self._event_bus,
+                event_agent_id=self._event_agent_id,
+                event_key=self._event_key,
                 rate_limit_manager=self._rate_limit_manager,
                 circuit_breaker=self._circuit_breaker,
                 timeout_seconds=self._timeout_seconds,
@@ -422,6 +491,8 @@ class ResilientChatModel:
                 provider=self._provider,
                 model_name=self._model_name,
                 event_bus=self._event_bus,
+                event_agent_id=self._event_agent_id,
+                event_key=self._event_key,
                 rate_limit_manager=self._rate_limit_manager,
                 circuit_breaker=self._circuit_breaker,
                 timeout_seconds=self._timeout_seconds,
@@ -448,6 +519,8 @@ class ResilientChatModel:
                 provider=self._provider,
                 model_name=self._model_name,
                 event_bus=self._event_bus,
+                event_agent_id=self._event_agent_id,
+                event_key=self._event_key,
                 rate_limit_manager=self._rate_limit_manager,
                 circuit_breaker=self._circuit_breaker,
                 timeout_seconds=self._timeout_seconds,

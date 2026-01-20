@@ -4,6 +4,7 @@ import pytest
 from pydantic import BaseModel
 
 from datapillar_oneagentic import AgentContext, Datapillar, DatapillarConfig, Process, agent, tool
+from datapillar_oneagentic.events import EventType
 from datapillar_oneagentic.providers.llm.llm import LLMFactory
 from tests.stub_llm import StubLlmConfig, make_stub_factory
 
@@ -35,6 +36,19 @@ async def _collect_events(
 
 def _stub_config() -> DatapillarConfig:
     return DatapillarConfig(llm={"api_key": "stub", "model": "stub", "provider": "openai"})
+
+
+def _extract_deliverables(events: list[dict]) -> dict:
+    deliverables: dict[str, dict] = {}
+    for event in events:
+        if event.get("event") != EventType.AGENT_END.value:
+            continue
+        agent = event.get("agent") or {}
+        agent_id = agent.get("id")
+        deliverable = event.get("data", {}).get("deliverable")
+        if agent_id and deliverable is not None:
+            deliverables[agent_id] = deliverable
+    return deliverables
 
 
 @tool
@@ -94,8 +108,7 @@ async def test_stub_sequential_flow(monkeypatch) -> None:
     )
 
     events = await _collect_events(team, query="go", session_id="s1")
-    result = next(e for e in events if e["event"] == "result")
-    deliverables = result.get("result", {}).get("deliverable", {})
+    deliverables = _extract_deliverables(events)
 
     assert set(deliverables.keys()) == {"alpha", "beta"}
     assert deliverables["alpha"]["text"] == "tool_result"
@@ -151,8 +164,7 @@ async def test_stub_dynamic_flow(monkeypatch) -> None:
     )
 
     events = await _collect_events(team, query="run", session_id="s2")
-    result = next(e for e in events if e["event"] == "result")
-    deliverables = result.get("result", {}).get("deliverable", {})
+    deliverables = _extract_deliverables(events)
 
     assert set(deliverables.keys()) == {"worker"}
     assert deliverables["worker"]["text"] == "worker_done"
@@ -210,8 +222,7 @@ async def test_stub_hierarchical_flow(monkeypatch) -> None:
     )
 
     events = await _collect_events(team, query="run", session_id="s3")
-    result = next(e for e in events if e["event"] == "result")
-    deliverables = result.get("result", {}).get("deliverable", {})
+    deliverables = _extract_deliverables(events)
 
     assert set(deliverables.keys()) == {"manager", "worker"}
     assert deliverables["worker"]["text"] == "worker_done"
@@ -272,8 +283,7 @@ async def test_stub_mapreduce_flow(monkeypatch) -> None:
     )
 
     events = await _collect_events(team, query="summarize", session_id="s4")
-    result = next(e for e in events if e["event"] == "result")
-    deliverables = result.get("result", {}).get("deliverable", {})
+    deliverables = _extract_deliverables(events)
 
     assert set(deliverables.keys()) == {"reducer"}
     assert deliverables["reducer"]["text"] == "ok"
@@ -310,8 +320,7 @@ async def test_stub_react_flow(monkeypatch) -> None:
     )
 
     events = await _collect_events(team, query="plan", session_id="s5")
-    result = next(e for e in events if e["event"] == "result")
-    deliverables = result.get("result", {}).get("deliverable", {})
+    deliverables = _extract_deliverables(events)
 
     assert set(deliverables.keys()) == {"react_worker"}
     assert deliverables["react_worker"]["text"] == "ok"
@@ -343,10 +352,9 @@ async def test_stub_interrupt_resume(monkeypatch) -> None:
 
     events = await _collect_events(team, query="start", session_id="s6")
     interrupt_event = next(e for e in events if e["event"] == "agent.interrupt")
-    assert interrupt_event["interrupt"]["payload"] == "need input"
+    assert interrupt_event["data"]["interrupt"]["payload"] == "need input"
 
     resume_events = await _collect_events(team, session_id="s6", resume_value="yes")
-    result = next(e for e in resume_events if e["event"] == "result")
-    deliverables = result.get("result", {}).get("deliverable", {})
+    deliverables = _extract_deliverables(resume_events)
 
     assert deliverables["interruptor"]["text"] == "reply:yes"

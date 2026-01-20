@@ -710,7 +710,7 @@ export function MetricFormRight({
   // 原子指标：选择物理资产（度量列 + 过滤列）
   if (form.type === 'ATOMIC') {
     return (
-      <div className="col-span-7 flex h-full min-h-0 flex-col">
+      <div className="col-span-7 xl:col-span-8 flex h-full min-h-0 flex-col">
         <div className="h-full min-h-0 flex flex-col gap-1.5">
           <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-2 shrink-0">
             <Database size={14} className="text-blue-500" />
@@ -741,7 +741,7 @@ export function MetricFormRight({
   // 派生指标：选择物理资产（仅维度过滤列）
   if (form.type === 'DERIVED') {
     return (
-      <div className="col-span-7 flex h-full min-h-0 flex-col">
+      <div className="col-span-7 xl:col-span-8 flex h-full min-h-0 flex-col">
         <div className="h-full min-h-0 flex flex-col gap-1.5">
           <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-2 shrink-0">
             <Database size={14} className="text-amber-500" />
@@ -770,7 +770,7 @@ export function MetricFormRight({
 
   // 复合指标：选择指标列表
   return (
-    <div className="col-span-7 flex h-full min-h-0 flex-col">
+    <div className="col-span-7 xl:col-span-8 flex h-full min-h-0 flex-col">
       <div className="h-full min-h-0 flex flex-col gap-1.5">
         <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-2 shrink-0">
           <Target size={14} className="text-emerald-500" />

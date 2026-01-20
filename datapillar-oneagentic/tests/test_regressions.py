@@ -92,7 +92,6 @@ async def test_node_factory_should_fail_fast_on_failed_result() -> None:
         "session_id": "s1",
         "messages": [],
         "deliverable_keys": [],
-        "deliverable_versions": {},
     }
 
     result = AgentResult.failed(error="需要补充信息", messages=[HumanMessage(content="补充内容")])

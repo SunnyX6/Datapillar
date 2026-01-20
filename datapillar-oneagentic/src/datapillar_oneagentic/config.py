@@ -170,7 +170,7 @@ class DatapillarConfig(BaseSettings):
     """经验学习配置"""
 
     knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
-    """知识配置"""
+    """知识配置（含 base_config）"""
 
     verbose: bool = Field(default=False, description="是否输出详细日志")
     """详细日志开关"""

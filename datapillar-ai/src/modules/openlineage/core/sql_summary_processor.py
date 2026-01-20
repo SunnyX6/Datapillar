@@ -15,20 +15,28 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from functools import lru_cache
 from typing import Any
 
 import structlog
 import xxhash
+from datapillar_oneagentic.providers.llm import LLMProvider
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
-from src.infrastructure.llm.client import call_llm
 from src.infrastructure.llm.embeddings import UnifiedEmbedder
+from src.infrastructure.llm.config import get_datapillar_config
 from src.infrastructure.repository.neo4j_uow import neo4j_async_session
 from src.modules.openlineage.core.queue import AsyncEventQueue, QueueConfig
 from src.shared.config.settings import settings
 
 logger = structlog.get_logger()
+
+
+@lru_cache(maxsize=1)
+def _get_llm_provider() -> LLMProvider:
+    config = get_datapillar_config()
+    return LLMProvider(config.llm)
 
 
 # ==================== 配置 ====================
@@ -292,7 +300,7 @@ class SQLSummaryProcessor:
         """批量调用 LLM 生成摘要（使用结构化输出）"""
         prompt = self._build_batch_prompt(tasks)
 
-        llm = call_llm(output_schema=BatchSummaryResult)
+        llm = _get_llm_provider()(output_schema=BatchSummaryResult)
         messages = [
             SystemMessage(content=self._get_system_prompt()),
             HumanMessage(content=prompt),

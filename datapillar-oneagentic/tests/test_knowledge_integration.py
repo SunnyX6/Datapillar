@@ -78,7 +78,7 @@ async def test_knowledge_ingest_and_retrieve_integration() -> None:
             store=store,
             embedding_provider=embedder,
             config=KnowledgeConfig(
-                retrieve=KnowledgeRetrieveConfig(
+                retrieve_config=KnowledgeRetrieveConfig(
                     method="semantic",
                     top_k=1,
                 )

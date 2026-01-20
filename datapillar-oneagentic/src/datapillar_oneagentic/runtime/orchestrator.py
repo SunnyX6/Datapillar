@@ -9,6 +9,7 @@ Orchestrator - 编排器
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
@@ -20,19 +21,24 @@ from langgraph.types import Command
 
 from datapillar_oneagentic.exception import AgentError
 from datapillar_oneagentic.core.process import Process
-from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
+from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind, is_failed
 from datapillar_oneagentic.core.types import SessionKey
-from datapillar_oneagentic.events import EventBus, SessionCompletedEvent, SessionStartedEvent
-from datapillar_oneagentic.providers.llm.llm import extract_thinking
-from datapillar_oneagentic.sse.event import (
-    SseAgent,
-    SseError,
-    SseEvent,
-    SseEventType,
-    SseMessage,
-    SseState,
-    map_execution_status_to_sse,
+from datapillar_oneagentic.events import (
+    AgentStartedEvent,
+    EventBus,
+    EventType,
+    LLMCallCompletedEvent,
+    LLMCallFailedEvent,
+    LLMCallStartedEvent,
+    LLMStreamChunkEvent,
+    SessionCompletedEvent,
+    SessionStartedEvent,
+    ToolCalledEvent,
+    ToolCompletedEvent,
+    ToolFailedEvent,
+    build_event_payload,
 )
+from datapillar_oneagentic.providers.llm.llm import extract_thinking
 from datapillar_oneagentic.state.blackboard import create_blackboard
 from datapillar_oneagentic.utils.time import now_ms
 from datapillar_oneagentic.exception import LLMError
@@ -131,27 +137,82 @@ class Orchestrator:
                 return first.split(":", 1)[0]
         return None
 
-    def _to_sse_dict(self, event: SseEvent, key: SessionKey) -> dict:
-        """补充会话信息并转换为 dict"""
-        return event.with_session(namespace=key.namespace, session_id=key.session_id).to_dict()
-
-    async def _delete_store_artifacts(self, session_id: str) -> None:
+    async def _clear_store_artifacts(
+        self,
+        session_id: str,
+        deliverable_keys: list[str],
+    ) -> None:
         """清理 deliverables 的 Store 数据（不清理 checkpointer）"""
-        if not self._store:
+        if not self._store or not deliverable_keys:
             return
 
-        store_namespaces = [
-            ("deliverables", self.namespace, session_id, "latest"),
-            ("deliverables", self.namespace, session_id, "versions"),
-            ("deliverables", self.namespace, session_id),
-        ]
-        for store_namespace in store_namespaces:
+        deliverable_namespace = ("deliverables", self.namespace, session_id)
+        for deliverable_key in set(deliverable_keys):
+            if not deliverable_key:
+                continue
             try:
-                items = await self._store.asearch(store_namespace)
-                for item in items:
-                    await self._store.adelete(store_namespace, item.key)
+                await self._store.adelete(deliverable_namespace, deliverable_key)
             except Exception as e:
-                logger.error(f"清理 Store 失败: {e}")
+                logger.error(f"清理 Store 失败: key={deliverable_key}, error={e}")
+
+    async def _load_deliverable(self, session_id: str, agent_id: str) -> Any | None:
+        """读取指定 Agent 的交付物"""
+        if not self._store:
+            return None
+        deliverable_namespace = ("deliverables", self.namespace, session_id)
+        try:
+            item = await self._store.aget(deliverable_namespace, agent_id)
+        except Exception as e:
+            logger.error(f"读取 deliverable 失败: agent={agent_id}, error={e}")
+            return None
+        if not item:
+            return None
+        return item.value
+
+    async def _load_deliverable_keys(self, compiled, config: dict) -> list[str]:
+        if not hasattr(compiled, "aget_state"):
+            return []
+        try:
+            state_snapshot = await compiled.aget_state(config)
+        except Exception as e:
+            logger.warning(f"读取会话状态失败: {e}")
+            return []
+        if not state_snapshot or not state_snapshot.values:
+            return []
+        return list(state_snapshot.values.get("deliverable_keys") or [])
+
+    async def _load_deliverables_map(
+        self,
+        *,
+        session_id: str,
+        deliverable_keys: list[str],
+    ) -> dict[str, Any]:
+        if not self._store or not deliverable_keys:
+            return {}
+        deliverables: dict[str, Any] = {}
+        deliverable_namespace = ("deliverables", self.namespace, session_id)
+        for deliverable_key in deliverable_keys:
+            if not deliverable_key:
+                continue
+            try:
+                item = await self._store.aget(deliverable_namespace, deliverable_key)
+            except Exception as e:
+                logger.error(f"读取 deliverable 失败: key={deliverable_key}, error={e}")
+                continue
+            if item:
+                deliverables[deliverable_key] = item.value
+        return deliverables
+
+    async def _clear_deliverable_refs(self, compiled, config: dict) -> None:
+        if not hasattr(compiled, "aupdate_state"):
+            return
+        updates = {
+            "deliverable_keys": [],
+        }
+        try:
+            await compiled.aupdate_state(config, updates)
+        except Exception as e:
+            logger.warning(f"清理交付物引用失败: {e}")
 
     async def _clear_state_artifacts(self, compiled, config: dict) -> None:
         """清理 blackboard 中的 todo/deliverables 引用"""
@@ -161,7 +222,6 @@ class Orchestrator:
         updates = {
             "todo": None,
             "deliverable_keys": [],
-            "deliverable_versions": {},
         }
         try:
             await compiled.aupdate_state(config, updates)
@@ -175,7 +235,8 @@ class Orchestrator:
         compiled,
         config: dict,
     ) -> None:
-        await self._delete_store_artifacts(session_id)
+        deliverable_keys = await self._load_deliverable_keys(compiled, config)
+        await self._clear_store_artifacts(session_id, deliverable_keys)
         await self._clear_state_artifacts(compiled, config)
 
     def _extract_thinking_from_message(self, msg: Any) -> str | None:
@@ -205,13 +266,20 @@ class Orchestrator:
             if agent_id:
                 detail_parts.append(f"agent_id={agent_id}")
             detail_parts.append(f"error={str(error)}")
-            event = SseEvent.error_event(
-                message="LLM 执行失败",
-                detail="; ".join(detail_parts),
-                agent_id=agent_id,
-                agent_name=agent_name,
-            ).model_copy(update={"duration_ms": now_ms() - start_time})
-            return self._to_sse_dict(event, key)
+            return build_event_payload(
+                event=EventType.AGENT_FAILED,
+                key=key,
+                agent_id=agent_id or "system",
+                agent_name=agent_name or "系统",
+                duration_ms=now_ms() - start_time,
+                data={
+                    "error": {
+                        "message": "LLM 执行失败",
+                        "detail": "; ".join(detail_parts),
+                        "error_type": "llm",
+                    }
+                },
+            )
 
         if isinstance(error, AgentError):
             agent_id = error.agent_id
@@ -222,19 +290,35 @@ class Orchestrator:
                 f"agent_id={agent_id}",
                 f"error={str(error)}",
             ]
-            event = SseEvent.error_event(
-                message="Agent 执行失败",
-                detail="; ".join(detail_parts),
-                agent_id=agent_id,
-                agent_name=self._get_agent_name(agent_id),
-            ).model_copy(update={"duration_ms": now_ms() - start_time})
-            return self._to_sse_dict(event, key)
+            return build_event_payload(
+                event=EventType.AGENT_FAILED,
+                key=key,
+                agent_id=agent_id or "system",
+                agent_name=self._get_agent_name(agent_id) if agent_id else "系统",
+                duration_ms=now_ms() - start_time,
+                data={
+                    "error": {
+                        "message": "Agent 执行失败",
+                        "detail": "; ".join(detail_parts),
+                        "error_type": "agent",
+                    }
+                },
+            )
 
-        event = SseEvent.error_event(
-            message="执行失败",
-            detail=str(error),
-        ).model_copy(update={"duration_ms": now_ms() - start_time})
-        return self._to_sse_dict(event, key)
+        return build_event_payload(
+            event=EventType.AGENT_FAILED,
+            key=key,
+            agent_id="system",
+            agent_name="系统",
+            duration_ms=now_ms() - start_time,
+            data={
+                "error": {
+                    "message": "执行失败",
+                    "detail": str(error),
+                    "error_type": "system",
+                }
+            },
+        )
 
     async def _ensure_compiled(self):
         """确保图已编译"""
@@ -337,13 +421,17 @@ class Orchestrator:
             thinking_content = self._extract_thinking_from_message(msg)
             if thinking_content:
                 events.append(
-                    self._to_sse_dict(
-                        SseEvent.agent_thinking(
-                            agent_id=node_name,
-                            agent_name=self._get_agent_name(node_name),
-                            content=thinking_content,
-                        ),
-                        key,
+                    build_event_payload(
+                        event=EventType.AGENT_THINKING,
+                        key=key,
+                        agent_id=node_name,
+                        agent_name=self._get_agent_name(node_name),
+                        data={
+                            "message": {
+                                "role": "assistant",
+                                "content": thinking_content,
+                            }
+                        },
                     )
                 )
 
@@ -355,25 +443,12 @@ class Orchestrator:
                     if tool_name and self._experience_learner:
                         self._experience_learner.record_tool(key.session_id, tool_name)
 
-        if "todo" in node_output:
-            todo_data = node_output.get("todo")
-            if todo_data is None:
-                todo_payload = {"cleared": True, "items": []}
-            else:
-                todo_payload = todo_data
-            events.append(
-                self._to_sse_dict(
-                    SseEvent.todo_update(todo=todo_payload),
-                    key,
-                )
-            )
-
         return events, tool_count
 
-    async def _build_final_result(
+    async def _build_interrupt_event(
         self, compiled, config: dict, key: SessionKey, start_time: int
-    ) -> dict:
-        """构建最终结果或中断信息"""
+    ) -> dict | None:
+        """检测中断并构建事件（未中断返回 None）"""
         final_state = await compiled.aget_state(config)
 
         # 检测中断
@@ -391,48 +466,20 @@ class Orchestrator:
                         or "unknown"
                     )
                     agent_name = self._get_agent_name(agent_id)
-                    event = SseEvent.agent_interrupt(
+                    return build_event_payload(
+                        event=EventType.AGENT_INTERRUPT,
+                        key=key,
                         agent_id=agent_id,
                         agent_name=agent_name,
-                        payload=payload,
-                    ).model_copy(update={"duration_ms": now_ms() - start_time})
-                    return self._to_sse_dict(event, key)
+                        duration_ms=now_ms() - start_time,
+                        data={
+                            "interrupt": {
+                                "payload": payload,
+                            }
+                        },
+                    )
 
-        # 读取 deliverables
-        deliverables = {}
-        deliverable_keys = []
-        if final_state and final_state.values:
-            deliverable_keys = final_state.values.get("deliverable_keys", [])
-
-        if self._store and deliverable_keys:
-            store_namespaces = [
-                ("deliverables", self.namespace, key.session_id, "latest"),
-                ("deliverables", self.namespace, key.session_id),
-            ]
-            for dk in deliverable_keys:
-                try:
-                    for store_namespace in store_namespaces:
-                        item = await self._store.aget(store_namespace, dk)
-                        if item:
-                            deliverables[dk] = item.value
-                            break
-                except Exception as e:
-                    logger.error(f"读取 deliverable {dk} 失败: {e}")
-
-        timeline_data = None
-        if final_state and final_state.values:
-            timeline_data = final_state.values.get("timeline")
-
-        event = SseEvent.result_event(
-            deliverable=deliverables,
-            deliverable_type=None,
-        ).model_copy(
-            update={
-                "duration_ms": now_ms() - start_time,
-                "timeline": timeline_data,
-            }
-        )
-        return self._to_sse_dict(event, key)
+        return None
 
     async def stream(
         self,
@@ -482,26 +529,199 @@ class Orchestrator:
 
         if input_for_stream is None:
             logger.error(f"无效调用：query 和 resume_value 都为空: key={key}")
-            error_event = SseEvent.error_event(
-                message="无效调用：必须提供 query 或 resume_value",
-                detail="query 和 resume_value 均为空",
-            ).model_copy(update={"duration_ms": 0})
-            yield self._to_sse_dict(error_event, key)
+            yield build_event_payload(
+                event=EventType.AGENT_FAILED,
+                key=key,
+                agent_id="system",
+                agent_name="系统",
+                duration_ms=0,
+                data={
+                    "error": {
+                        "message": "无效调用：必须提供 query 或 resume_value",
+                        "detail": "query 和 resume_value 均为空",
+                        "error_type": "system",
+                    }
+                },
+            )
             return
 
-        # Todo 初始化（已有 Todo 时通知前端）
-        if isinstance(input_for_stream, dict) and session_state.existing_state:
-            todo_snapshot = session_state.existing_state.get("todo")
-            if todo_snapshot:
-                input_for_stream["todo"] = todo_snapshot
-                yield self._to_sse_dict(
-                    SseEvent.todo_update(todo=todo_snapshot),
-                    key,
+        event_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        started_agents: set[str] = set()
+
+        async def _handle_agent_started(_source, event: AgentStartedEvent) -> None:
+            if event.key is None or event.key != key:
+                return
+            agent_id = event.agent_id or ""
+            if agent_id in started_agents:
+                return
+            started_agents.add(agent_id)
+            await event_queue.put(
+                build_event_payload(
+                    event=EventType.AGENT_START,
+                    key=event.key,
+                    agent_id=agent_id,
+                    agent_name=event.agent_name or self._get_agent_name(agent_id),
                 )
+            )
+
+        async def _handle_tool_called(_source, event: ToolCalledEvent) -> None:
+            if event.key is None or event.key != key:
+                return
+            data = {
+                "tool": {
+                    "name": event.tool_name,
+                    "input": event.tool_input,
+                }
+            }
+            if event.tool_call_id:
+                data["tool"]["call_id"] = event.tool_call_id
+            await event_queue.put(
+                build_event_payload(
+                    event=EventType.TOOL_CALL,
+                    key=event.key,
+                    agent_id=event.agent_id,
+                    agent_name=self._get_agent_name(event.agent_id),
+                    data=data,
+                )
+            )
+
+        async def _handle_tool_completed(_source, event: ToolCompletedEvent) -> None:
+            if event.key is None or event.key != key:
+                return
+            data = {
+                "tool": {
+                    "name": event.tool_name,
+                    "output": event.tool_output,
+                }
+            }
+            if event.tool_call_id:
+                data["tool"]["call_id"] = event.tool_call_id
+            await event_queue.put(
+                build_event_payload(
+                    event=EventType.TOOL_RESULT,
+                    key=event.key,
+                    agent_id=event.agent_id,
+                    agent_name=self._get_agent_name(event.agent_id),
+                    duration_ms=event.duration_ms if event.duration_ms else None,
+                    data=data,
+                )
+            )
+
+        async def _handle_tool_failed(_source, event: ToolFailedEvent) -> None:
+            if event.key is None or event.key != key:
+                return
+            data = {
+                "tool": {
+                    "name": event.tool_name,
+                    "error": event.error,
+                }
+            }
+            if event.tool_call_id:
+                data["tool"]["call_id"] = event.tool_call_id
+            await event_queue.put(
+                build_event_payload(
+                    event=EventType.TOOL_ERROR,
+                    key=event.key,
+                    agent_id=event.agent_id,
+                    agent_name=self._get_agent_name(event.agent_id),
+                    data=data,
+                )
+            )
+
+        async def _handle_llm_started(_source, event: LLMCallStartedEvent) -> None:
+            if event.key is None or event.key != key:
+                return
+            await event_queue.put(
+                build_event_payload(
+                    event=EventType.LLM_START,
+                    key=event.key,
+                    agent_id=event.agent_id,
+                    agent_name=self._get_agent_name(event.agent_id),
+                    data={
+                        "model": event.model,
+                        "message_count": event.message_count,
+                    },
+                )
+            )
+
+        async def _handle_llm_completed(_source, event: LLMCallCompletedEvent) -> None:
+            if event.key is None or event.key != key:
+                return
+            await event_queue.put(
+                build_event_payload(
+                    event=EventType.LLM_END,
+                    key=event.key,
+                    agent_id=event.agent_id,
+                    agent_name=self._get_agent_name(event.agent_id),
+                    duration_ms=event.duration_ms if event.duration_ms else None,
+                    data={
+                        "model": event.model,
+                        "usage": {
+                            "input_tokens": event.input_tokens,
+                            "output_tokens": event.output_tokens,
+                        },
+                    },
+                )
+            )
+
+        async def _handle_llm_failed(_source, event: LLMCallFailedEvent) -> None:
+            if event.key is None or event.key != key:
+                return
+            await event_queue.put(
+                build_event_payload(
+                    event=EventType.LLM_END,
+                    key=event.key,
+                    agent_id=event.agent_id,
+                    agent_name=self._get_agent_name(event.agent_id),
+                    duration_ms=event.duration_ms if event.duration_ms else None,
+                    data={
+                        "model": event.model,
+                        "error": {
+                            "message": event.error,
+                        },
+                    },
+                )
+            )
+
+        async def _handle_llm_chunk(_source, event: LLMStreamChunkEvent) -> None:
+            if event.key is None or event.key != key:
+                return
+            await event_queue.put(
+                build_event_payload(
+                    event=EventType.LLM_CHUNK,
+                    key=event.key,
+                    agent_id=event.agent_id,
+                    agent_name=self._get_agent_name(event.agent_id),
+                    data={
+                        "chunk": event.chunk,
+                        "is_final": event.is_final,
+                    },
+                )
+            )
+
+        handlers = [
+            (AgentStartedEvent, _handle_agent_started),
+            (ToolCalledEvent, _handle_tool_called),
+            (ToolCompletedEvent, _handle_tool_completed),
+            (ToolFailedEvent, _handle_tool_failed),
+            (LLMCallStartedEvent, _handle_llm_started),
+            (LLMCallCompletedEvent, _handle_llm_completed),
+            (LLMCallFailedEvent, _handle_llm_failed),
+            (LLMStreamChunkEvent, _handle_llm_chunk),
+        ]
+        for event_type, handler in handlers:
+            self._event_bus.register(event_type, handler)
 
         try:
             # Phase 3: 执行流
             async for event in compiled.astream(input_for_stream, config):
+                while not event_queue.empty():
+                    try:
+                        queued = event_queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+                    yield queued
+
                 for node_name, node_output in event.items():
                     if node_name == "__end__":
                         continue
@@ -511,10 +731,14 @@ class Orchestrator:
                         self._experience_learner.record_agent(key.session_id, node_name)
 
                     agent_name = self._get_agent_name(node_name)
-                    yield self._to_sse_dict(
-                        SseEvent.agent_start(agent_id=node_name, agent_name=agent_name),
-                        key,
-                    )
+                    if node_name not in started_agents:
+                        started_agents.add(node_name)
+                        yield build_event_payload(
+                            event=EventType.AGENT_START,
+                            key=key,
+                            agent_id=node_name,
+                            agent_name=agent_name,
+                        )
 
                     # 处理节点输出
                     node_events, node_tool_count = self._process_node_output(node_name, node_output, key)
@@ -522,7 +746,7 @@ class Orchestrator:
                         yield evt
                     tool_count += node_tool_count
 
-                    # 构建 agent.end 事件
+                    # 构建 agent 结束事件
                     agent_status = ExecutionStatus.COMPLETED
                     agent_error = None
                     agent_failure_kind = None
@@ -531,60 +755,76 @@ class Orchestrator:
                         agent_error = node_output.get("last_agent_error")
                         agent_failure_kind = node_output.get("last_agent_failure_kind")
 
-                    state, level = map_execution_status_to_sse(agent_status)
-                    if state == SseState.ERROR:
-                        failure_tag = None
-                        if agent_failure_kind in (FailureKind.BUSINESS, FailureKind.SYSTEM):
-                            failure_tag = agent_failure_kind.value
-                        event = SseEvent(
-                            event=SseEventType.AGENT_END,
-                            state=state,
-                            level=level,
-                            agent=SseAgent(id=node_name, name=agent_name),
-                            message=SseMessage(
-                                role="assistant",
-                                content=agent_error or "执行失败",
-                            ),
-                            error=(
-                                None
-                                if failure_tag is None
-                                else SseError(message="失败类型", detail=failure_tag)
-                            ),
+                    if is_failed(agent_status):
+                        error_type = (
+                            agent_failure_kind.value
+                            if isinstance(agent_failure_kind, FailureKind)
+                            else "agent"
                         )
-                    else:
-                        event = SseEvent.agent_end(
+                        yield build_event_payload(
+                            event=EventType.AGENT_FAILED,
+                            key=key,
                             agent_id=node_name,
                             agent_name=agent_name,
+                            data={
+                                "error": {
+                                    "message": "Agent 执行失败",
+                                    "detail": agent_error or "执行失败",
+                                    "error_type": error_type,
+                                }
+                            },
                         )
-                    yield self._to_sse_dict(event, key)
+                    else:
+                        deliverable = await self._load_deliverable(key.session_id, node_name)
+                        data: dict[str, Any] | None = None
+                        if deliverable is not None:
+                            data = {
+                                "deliverable": deliverable,
+                            }
+                        yield build_event_payload(
+                            event=EventType.AGENT_END,
+                            key=key,
+                            agent_id=node_name,
+                            agent_name=agent_name,
+                            data=data,
+                        )
 
-            # Phase 5: 构建最终结果
-            final_event = await self._build_final_result(compiled, config, key, start_time)
-            yield final_event
+            while not event_queue.empty():
+                try:
+                    queued = event_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                yield queued
+
+            # Phase 5: 检测中断
+            interrupt_event = await self._build_interrupt_event(compiled, config, key, start_time)
+            if interrupt_event is not None:
+                yield interrupt_event
+                return
 
             # 完成事件和经验记录
-            if final_event["event"] == "result":
-                deliverables = {}
-                result_data = final_event.get("result")
-                if isinstance(result_data, dict):
-                    deliverables = result_data.get("deliverable") or {}
-                await self._event_bus.emit(
-                    self,
-                    SessionCompletedEvent(
-                        key=key,
-                        result=deliverables,
-                        duration_ms=now_ms() - start_time,
-                        agent_count=agent_count,
-                        tool_count=tool_count,
-                    ),
-                )
-                if self._experience_learner:
-                    self._experience_learner.complete_recording(session_id=key.session_id, outcome="success")
-                await self._cleanup_session_artifacts(
-                    session_id=key.session_id,
-                    compiled=compiled,
-                    config=config,
-                )
+            deliverable_keys = await self._load_deliverable_keys(compiled, config)
+            deliverables = await self._load_deliverables_map(
+                session_id=key.session_id,
+                deliverable_keys=deliverable_keys,
+            )
+            await self._event_bus.emit(
+                self,
+                SessionCompletedEvent(
+                    key=key,
+                    result=deliverables,
+                    duration_ms=now_ms() - start_time,
+                    agent_count=agent_count,
+                    tool_count=tool_count,
+                ),
+            )
+            if self._experience_learner:
+                self._experience_learner.complete_recording(session_id=key.session_id, outcome="success")
+            await self._cleanup_session_artifacts(
+                session_id=key.session_id,
+                compiled=compiled,
+                config=config,
+            )
 
         except Exception as e:
             logger.error(f"执行失败: {e}", exc_info=True)
@@ -599,13 +839,16 @@ class Orchestrator:
                 config=config,
             )
             raise
+        finally:
+            for event_type, handler in handlers:
+                self._event_bus.unregister(event_type, handler)
 
     async def compact_session(self, session_id: str) -> dict:
         """手动压缩会话（暂不可用，待实现基于 messages 的压缩）"""
         return {"status": "not_implemented", "message": "压缩功能待重构"}
 
-    async def delete_session(self, session_id: str) -> None:
-        """删除会话"""
+    async def clear_session(self, session_id: str) -> None:
+        """清理会话记忆（删除 checkpointer 状态）"""
         key = self._make_key(session_id)
         thread_id = str(key)
 
@@ -615,7 +858,19 @@ class Orchestrator:
         elif hasattr(self._checkpointer, "delete_thread"):
             self._checkpointer.delete_thread(thread_id)
 
-        await self._delete_store_artifacts(session_id)
+    async def clear_session_store(self, session_id: str) -> None:
+        """清理会话交付物（Store）"""
+        if not self._store:
+            return
+
+        key = self._make_key(session_id)
+        thread_id = str(key)
+        config = {"configurable": {"thread_id": thread_id}}
+
+        compiled = await self._ensure_compiled()
+        deliverable_keys = await self._load_deliverable_keys(compiled, config)
+        await self._clear_store_artifacts(session_id, deliverable_keys)
+        await self._clear_deliverable_refs(compiled, config)
 
 
     async def get_session_stats(self, session_id: str) -> dict:

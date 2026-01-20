@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "声明式多智能体协作框架 - Declarative Multi-Agent Collaboration Framework"
 readme = "README.md"
 license = {text = "Apache-2.0"}
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 authors = [
     {name = "Datapillar Team", email = "team@datapillar.com"}
 ]
@@ -98,10 +98,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/datapillar/oneagentic"
-Documentation = "https://oneagentic.dev"
-Repository = "https://github.com/datapillar/oneagentic"
-Issues = "https://github.com/datapillar/oneagentic/issues"
+Homepage = "https://github.com/SunnyX6/Datapillar"
+Documentation = "https://github.com/SunnyX6/Datapillar"
+Repository = "https://github.com/SunnyX6/Datapillar"
+Issues = "https://github.com/SunnyX6/Datapillar/issues"
 
 [build-system]
 requires = ["hatchling"]

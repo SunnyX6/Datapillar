@@ -11,6 +11,19 @@ export interface DataTypeValue {
   length?: number
 }
 
+export const DEFAULT_LENGTH = 1
+export const DEFAULT_MAX_LENGTH = 65535
+
+const MAX_LENGTH_BY_TYPE = {
+  VARCHAR: DEFAULT_MAX_LENGTH,
+  FIXEDCHAR: 255,
+  FIXED: DEFAULT_MAX_LENGTH
+} as const
+
+export function getMaxLengthForType(type: string): number {
+  return MAX_LENGTH_BY_TYPE[type as keyof typeof MAX_LENGTH_BY_TYPE] ?? DEFAULT_MAX_LENGTH
+}
+
 /**
  * 解析 dataType 字符串为 DataTypeValue 对象
  * 例如: "DECIMAL(18,4)" -> { type: "DECIMAL", precision: 18, scale: 4 }

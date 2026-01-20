@@ -35,7 +35,7 @@ from datapillar_oneagentic.knowledge.models import (
     SparseEmbeddingProvider,
 )
 from datapillar_oneagentic.knowledge.retriever import KnowledgeRetriever
-from datapillar_oneagentic.providers.llm.embedding import EmbeddingProviderClient
+from datapillar_oneagentic.providers.llm.embedding import EmbeddingProvider
 from datapillar_oneagentic.storage.knowledge_stores.base import KnowledgeStore
 
 
@@ -46,7 +46,7 @@ class KnowledgeEvaluator:
         self,
         *,
         store: KnowledgeStore,
-        embedding_provider: EmbeddingProviderClient,
+        embedding_provider: EmbeddingProvider,
         chunk_config: KnowledgeChunkConfig,
         retrieve_config: KnowledgeRetrieveConfig,
         sparse_embedder: SparseEmbeddingProvider | None = None,
@@ -60,8 +60,31 @@ class KnowledgeEvaluator:
         self._retriever = KnowledgeRetriever(
             store=store,
             embedding_provider=embedding_provider,
-            config=KnowledgeConfig(chunk=chunk_config, retrieve=retrieve_config),
+            config=KnowledgeConfig(chunk_config=chunk_config, retrieve_config=retrieve_config),
         )
+
+    @classmethod
+    async def from_config(
+        cls,
+        *,
+        namespace: str,
+        config: KnowledgeConfig,
+        sparse_embedder: SparseEmbeddingProvider | None = None,
+    ) -> "KnowledgeEvaluator":
+        from datapillar_oneagentic.knowledge.runtime import build_runtime
+
+        runtime = build_runtime(namespace=namespace, base_config=config.base_config)
+        await runtime.initialize()
+        return cls(
+            store=runtime.store,
+            embedding_provider=runtime.embedding_provider,
+            chunk_config=config.chunk_config,
+            retrieve_config=config.retrieve_config,
+            sparse_embedder=sparse_embedder,
+        )
+
+    async def close(self) -> None:
+        await self._store.close()
 
     async def evaluate(self, evalset: EvalSet) -> EvaluationReport:
         if evalset.k_values and max(evalset.k_values) > self._retrieve_config.top_k:
@@ -82,6 +105,7 @@ class KnowledgeEvaluator:
     def evaluate_chunking(self, evalset: EvalSet) -> ChunkingReport:
         doc_reports: list[ChunkingDocReport] = []
         for doc in evalset.documents:
+            source_id = _eval_source_id(doc)
             parsed = _build_parsed_document(doc)
             preview = self._chunker.preview(parsed)
             contents = [chunk.content for chunk in preview.chunks]
@@ -93,7 +117,7 @@ class KnowledgeEvaluator:
             doc_reports.append(
                 ChunkingDocReport(
                     doc_id=doc.doc_id,
-                    source_id=doc.source_id,
+                    source_id=source_id,
                     chunk_count=len(preview.chunks),
                     length_stats=compute_length_stats(lengths),
                     duplicate_ratio=compute_duplicate_ratio(contents),
@@ -152,7 +176,8 @@ class KnowledgeEvaluator:
         all_docs = []
         all_chunks: list[KnowledgeChunk] = []
         for doc in documents:
-            source = sources_map[doc.source_id]
+            source_id = _eval_source_id(doc)
+            source = sources_map[source_id]
             parsed = _build_parsed_document(doc)
             preview = self._chunker.preview(parsed)
             if not preview.chunks:
@@ -198,13 +223,18 @@ def _build_parsed_document(doc: EvalDocument) -> ParsedDocument:
     )
 
 
+def _eval_source_id(doc: EvalDocument) -> str:
+    return doc.doc_id
+
+
 def _build_sources(documents: Iterable[EvalDocument]) -> list[KnowledgeSource]:
     sources: dict[str, KnowledgeSource] = {}
     for doc in documents:
-        if doc.source_id not in sources:
-            sources[doc.source_id] = KnowledgeSource(
-                source_id=doc.source_id,
-                name=doc.source_id,
+        source_id = _eval_source_id(doc)
+        if source_id not in sources:
+            sources[source_id] = KnowledgeSource(
+                source_id=source_id,
+                name=source_id,
                 source_type="doc",
             )
     return list(sources.values())

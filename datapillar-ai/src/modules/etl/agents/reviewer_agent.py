@@ -8,14 +8,14 @@ ReviewerAgent - 代码评审员
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
+from datapillar_oneagentic import agent
 from src.modules.etl.schemas.review import ReviewResult
-from src.modules.oneagentic import Clarification, agent
-from src.modules.oneagentic.knowledge import KnowledgeDomain, KnowledgeLevel, KnowledgeStore
 
 if TYPE_CHECKING:
-    from src.modules.oneagentic import AgentContext
+    from datapillar_oneagentic import AgentContext
 
 
 # ==================== Agent 定义 ====================
@@ -27,10 +27,8 @@ if TYPE_CHECKING:
     description="评审架构设计和 SQL 代码，给出通过/不通过的判断",
     tools=[],  # 评审不需要工具，纯 LLM 判断
     deliverable_schema=ReviewResult,
-    deliverable_key="review",
-    knowledge_domains=["reviewer_methodology"],
     temperature=0.0,
-    max_iterations=3,
+    max_steps=3,
 )
 class ReviewerAgent:
     """代码评审员"""
@@ -82,29 +80,8 @@ class ReviewerAgent:
 1. **客观公正**：基于事实评价，不偏袒
 2. **问题具体**：issues 中描述具体问题和位置
 3. **passed 规则**：有 issues 时 passed 必须为 false
-"""
 
-    async def run(self, ctx: AgentContext) -> ReviewResult | Clarification:
-        """执行评审"""
-        # 1. 构建消息
-        messages = ctx.build_messages(self.SYSTEM_PROMPT)
-
-        # 2. 工具调用循环（评审一般不需要工具）
-        messages = await ctx.invoke_tools(messages)
-
-        # 3. 获取结构化输出
-        output = await ctx.get_output(messages)
-
-        return output
-
-
-# ==================== 知识领域 ====================
-
-REVIEWER_METHODOLOGY = KnowledgeDomain(
-    domain_id="reviewer_methodology",
-    name="代码评审方法论",
-    level=KnowledgeLevel.DOMAIN,
-    content="""## 代码评审方法论
+## 代码评审方法论
 
 ### 评审原则
 1. **客观公正**：基于事实评价
@@ -129,11 +106,41 @@ REVIEWER_METHODOLOGY = KnowledgeDomain(
 ### 问题分级
 - **阻断级(issues)**：必须修复才能通过
 - **警告级(warnings)**：建议修复，不强制
-""",
-    tags=["代码评审", "方法论", "质量"],
-)
+"""
 
+    async def run(self, ctx: AgentContext) -> ReviewResult:
+        """执行评审"""
+        sections: list[str] = []
+        analysis = await ctx.get_deliverable("analyst")
+        workflow = await ctx.get_deliverable("architect")
+        sql_result = await ctx.get_deliverable("developer")
 
-def register_reviewer_knowledge() -> None:
-    """注册 ReviewerAgent 相关的知识领域"""
-    KnowledgeStore.register_domain(REVIEWER_METHODOLOGY)
+        def _append_section(title: str, data: object | None) -> None:
+            if not data:
+                return
+            try:
+                payload = json.dumps(data, ensure_ascii=False, indent=2)
+            except TypeError:
+                payload = str(data)
+            sections.append(f"## {title}\n{payload}")
+
+        _append_section("需求分析结果", analysis)
+        _append_section("架构设计结果", workflow)
+        _append_section("SQL 开发结果", sql_result)
+
+        if not sections:
+            sections.append(
+                f"未获取到结构化交付物，请基于下发任务/用户输入进行评审。\n用户输入: {ctx.query}"
+            )
+
+        # 1. 构建消息
+        prompt = f"{self.SYSTEM_PROMPT}\n\n" + "\n\n".join(sections)
+        messages = ctx.build_messages(prompt)
+
+        # 2. 工具调用循环（评审一般不需要工具）
+        messages = await ctx.invoke_tools(messages)
+
+        # 3. 获取结构化输出
+        output = await ctx.get_structured_output(messages)
+
+        return output

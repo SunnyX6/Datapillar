@@ -99,7 +99,7 @@ def _build_step_result_message(
     status: ExecutionStatus | str | None,
     failure_kind: FailureKind | str | None,
     error: str | None,
-    deliverable_version: int | None,
+    deliverable_key: str | None,
 ) -> AIMessage:
     """构建框架写入的执行结果事件（用于稳定给 Reflector/回放提供证据）"""
     task_id = _extract_latest_task_id(state)
@@ -113,8 +113,8 @@ def _build_step_result_message(
     if failure_kind:
         kind_value = failure_kind.value if hasattr(failure_kind, "value") else failure_kind
         parts.append(f"failure_kind={kind_value}")
-    if deliverable_version is not None:
-        parts.append(f"deliverable={agent_id}:{deliverable_version}")
+    if deliverable_key:
+        parts.append(f"deliverable={deliverable_key}")
     if error:
         parts.append(f"error={error}")
 
@@ -276,22 +276,21 @@ class NodeFactory:
         store: BaseStore,
         namespace: str,
         session_id: str,
-        deliverable_versions: dict[str, int],
         deliverable_keys: list[str],
         require_completed: bool = True,
-    ) -> int | None:
-        """写入 deliverable 到 Store，成功时返回版本号"""
+    ) -> bool:
+        """写入 deliverable 到 Store，成功时返回是否写入"""
         if not result:
-            return None
+            return False
         if require_completed:
             if not hasattr(result, "status") or result.status != ExecutionStatus.COMPLETED:
-                return None
+                return False
 
         deliverable = getattr(result, "deliverable", None)
         if not deliverable:
-            return None
+            return False
         if not store:
-            return None
+            return False
 
         deliverable_value = (
             deliverable.model_dump(mode="json")
@@ -299,23 +298,17 @@ class NodeFactory:
             else deliverable
         )
 
-        latest_namespace = ("deliverables", namespace, session_id, "latest")
-        versions_namespace = ("deliverables", namespace, session_id, "versions")
-
-        version = int(deliverable_versions.get(agent_id, 0)) + 1
-        deliverable_versions[agent_id] = version
+        deliverable_namespace = ("deliverables", namespace, session_id)
 
         try:
-            versioned_key = f"{agent_id}:{version}"
-            await store.aput(versions_namespace, versioned_key, deliverable_value)
-            await store.aput(latest_namespace, agent_id, deliverable_value)
+            await store.aput(deliverable_namespace, agent_id, deliverable_value)
         except Exception as e:
             logger.error(f"存储 deliverable 失败: {e}")
-            return None
+            return False
 
         if agent_id not in deliverable_keys:
             deliverable_keys.append(agent_id)
-        return version
+        return True
 
     async def _apply_todo_updates(
         self,
@@ -495,23 +488,20 @@ class NodeFactory:
 
         # 构建更新字典
         update_dict: dict = {}
-        deliverable_version: int | None = None
+        deliverable_saved = False
 
         # 存储 Agent 交付物到 Store
-        deliverable_versions = dict(state.get("deliverable_versions") or {})
         deliverable_keys = list(state.get("deliverable_keys") or [])
-        deliverable_version = await self._persist_deliverable(
+        deliverable_saved = await self._persist_deliverable(
             agent_id=agent_id,
             result=result,
             store=store,
             namespace=namespace,
             session_id=session_id,
-            deliverable_versions=deliverable_versions,
             deliverable_keys=deliverable_keys,
             require_completed=True,
         )
-        if deliverable_version is not None:
-            update_dict["deliverable_versions"] = deliverable_versions
+        if deliverable_saved:
             update_dict["deliverable_keys"] = deliverable_keys
 
         # Todo 变更与进度更新（基于工具上报或审计兜底）
@@ -580,7 +570,7 @@ class NodeFactory:
                     status=getattr(result, "status", None) if result else None,
                     failure_kind=getattr(result, "failure_kind", None) if result else None,
                     error=getattr(result, "error", None) if result else None,
-                    deliverable_version=deliverable_version,
+                    deliverable_key=agent_id if deliverable_saved else None,
                 )
             ]
         )
@@ -759,23 +749,20 @@ class NodeFactory:
                 messages=[],
             )
 
-            deliverable_versions = dict(state.get("deliverable_versions") or {})
             deliverable_keys = list(state.get("deliverable_keys") or [])
 
-            deliverable_version = await self._persist_deliverable(
+            await self._persist_deliverable(
                 agent_id=reducer_agent_id,
                 result=reducer_result,
                 store=store,
                 namespace=namespace,
                 session_id=session_id,
-                deliverable_versions=deliverable_versions,
                 deliverable_keys=deliverable_keys,
                 require_completed=True,
             )
 
             update: dict[str, Any] = {
                 "deliverable_keys": deliverable_keys,
-                "deliverable_versions": deliverable_versions,
                 "active_agent": None,
             }
 

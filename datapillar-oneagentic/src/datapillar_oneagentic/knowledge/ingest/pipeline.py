@@ -10,14 +10,11 @@ from typing import Iterable, TYPE_CHECKING
 from datapillar_oneagentic.knowledge.chunker import KnowledgeChunker
 from datapillar_oneagentic.knowledge.chunker.models import ChunkPreview
 from datapillar_oneagentic.knowledge.config import KnowledgeChunkConfig
-from datapillar_oneagentic.knowledge.ingest.builder import (
-    average_vectors,
-    build_chunks,
-    build_document,
-)
+from datapillar_oneagentic.knowledge.identity import build_source_id
+from datapillar_oneagentic.knowledge.ingest.builder import average_vectors, build_chunks, build_document
 from datapillar_oneagentic.knowledge.models import DocumentInput, KnowledgeSource, SparseEmbeddingProvider
 from datapillar_oneagentic.knowledge.parser import ParserRegistry, default_registry
-from datapillar_oneagentic.providers.llm.embedding import EmbeddingProviderClient
+from datapillar_oneagentic.providers.llm.embedding import EmbeddingProvider
 from datapillar_oneagentic.storage.knowledge_stores.base import KnowledgeStore
 
 if TYPE_CHECKING:
@@ -32,7 +29,7 @@ class KnowledgeIngestor:
         self,
         *,
         store: KnowledgeStore,
-        embedding_provider: EmbeddingProviderClient,
+        embedding_provider: EmbeddingProvider,
         config: KnowledgeChunkConfig,
         parser_registry: ParserRegistry | None = None,
     ) -> None:
@@ -60,18 +57,23 @@ class KnowledgeIngestor:
         if not inputs:
             return
 
-        await self._store.upsert_sources([source])
+        resolved_source = self._resolve_source(source)
+        await self._store.upsert_sources([resolved_source])
 
-        all_docs: list[KnowledgeDocument] = []
-        all_chunks: list[KnowledgeChunk] = []
+        all_docs: dict[str, KnowledgeDocument] = {}
+        all_chunks: dict[str, list[KnowledgeChunk]] = {}
+        seen_doc_ids: set[str] = set()
 
         for doc_input in inputs:
             parsed = self._parser_registry.parse(doc_input)
             preview = self._chunker.preview(parsed)
             if not preview.chunks:
                 continue
-            doc = build_document(source=source, parsed=parsed, doc_input=doc_input)
-            chunks = build_chunks(source=source, doc=doc, drafts=preview.chunks)
+            if parsed.document_id not in seen_doc_ids:
+                await self._rebuild_doc(parsed.document_id)
+                seen_doc_ids.add(parsed.document_id)
+            doc = build_document(source=resolved_source, parsed=parsed, doc_input=doc_input)
+            chunks = build_chunks(source=resolved_source, doc=doc, drafts=preview.chunks)
 
             vectors = await self._embedding_provider.embed_texts([c.content for c in chunks])
             sparse_vectors = None
@@ -84,9 +86,34 @@ class KnowledgeIngestor:
                     chunk.sparse_vector = sparse_vectors[idx]
 
             doc.vector = average_vectors(vectors)
-            all_docs.append(doc)
-            all_chunks.extend(chunks)
+            all_docs[doc.doc_id] = doc
+            all_chunks[doc.doc_id] = chunks
 
-        await self._store.upsert_docs(all_docs)
-        await self._store.upsert_chunks(all_chunks)
-        logger.info(f"知识入库完成: source_id={source.source_id}, docs={len(all_docs)}, chunks={len(all_chunks)}")
+        await self._store.upsert_docs(list(all_docs.values()))
+        flat_chunks: list[KnowledgeChunk] = []
+        for chunks in all_chunks.values():
+            flat_chunks.extend(chunks)
+        await self._store.upsert_chunks(flat_chunks)
+        logger.info(
+            "知识入库完成: source_id=%s, docs=%s, chunks=%s",
+            resolved_source.source_id,
+            len(all_docs),
+            len(flat_chunks),
+        )
+
+    def _resolve_source(self, source: KnowledgeSource) -> KnowledgeSource:
+        source_id = build_source_id(
+            namespace=self._store.namespace,
+            source_type=source.source_type,
+            source_uri=source.source_uri,
+            metadata=source.metadata,
+        )
+        source.source_id = source_id
+        return source
+
+    async def _rebuild_doc(self, doc_id: str) -> None:
+        existing = await self._store.get_doc(doc_id)
+        if not existing:
+            return
+        await self._store.delete_chunks_by_doc_id(doc_id)
+        await self._store.delete_doc(doc_id)

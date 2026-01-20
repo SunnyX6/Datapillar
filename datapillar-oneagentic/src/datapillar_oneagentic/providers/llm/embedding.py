@@ -79,7 +79,7 @@ class EmbeddingFactory:
         raise ValueError(f"不支持的 Embedding 提供商: {provider}")
 
 
-class EmbeddingProviderClient:
+class EmbeddingProvider:
     """
     Embedding 提供者（团队内使用）
 
@@ -88,7 +88,7 @@ class EmbeddingProviderClient:
 
     def __init__(self, config: EmbeddingConfig) -> None:
         if not config.is_configured():
-            raise ValueError("Embedding 未配置，无法创建 EmbeddingProviderClient")
+            raise ValueError("Embedding 未配置，无法创建 EmbeddingProvider")
         self._config = config
         self._cache: dict[tuple, Embeddings] = {}
         self._lock = threading.Lock()

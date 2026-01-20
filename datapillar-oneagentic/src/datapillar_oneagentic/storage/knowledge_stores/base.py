@@ -18,6 +18,11 @@ from datapillar_oneagentic.knowledge.models import (
 class KnowledgeStore(ABC):
     """知识存储抽象接口"""
 
+    @property
+    @abstractmethod
+    def namespace(self) -> str:
+        """命名空间（隔离边界）"""
+
     @abstractmethod
     async def initialize(self) -> None:
         """初始化存储"""
@@ -55,3 +60,11 @@ class KnowledgeStore(ABC):
     @abstractmethod
     async def get_chunks(self, chunk_ids: list[str]) -> list[KnowledgeChunk]:
         """按 ID 获取分片"""
+
+    @abstractmethod
+    async def delete_doc(self, doc_id: str) -> int:
+        """删除文档元数据"""
+
+    @abstractmethod
+    async def delete_chunks_by_doc_id(self, doc_id: str) -> int:
+        """按文档 ID 删除分片"""

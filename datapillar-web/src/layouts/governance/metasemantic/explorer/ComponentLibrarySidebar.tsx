@@ -106,6 +106,42 @@ const SYMBOL_GROUPS = [
   }
 ]
 
+const normalizeText = (value: string) => value.trim().toLowerCase()
+
+const findSymbolByName = (name: string) => {
+  const normalized = normalizeText(name)
+  if (!normalized) return null
+  for (const group of SYMBOL_GROUPS) {
+    const item = group.items.find((i) => normalizeText(i.label ?? '') === normalized)
+    if (item) return item.symbol
+  }
+  return null
+}
+
+const filterSymbolGroups = (query: string) => {
+  const normalized = normalizeText(query)
+  if (!normalized) return SYMBOL_GROUPS
+  return SYMBOL_GROUPS
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        const labelText = normalizeText(item.label ?? '')
+        return labelText.includes(normalized) || item.symbol.includes(query.trim())
+      })
+    }))
+    .filter((group) => group.items.length > 0)
+}
+
+const findSymbolMeta = (symbol: string) => {
+  const normalized = symbol.trim()
+  if (!normalized) return null
+  for (const group of SYMBOL_GROUPS) {
+    const item = group.items.find((i) => i.symbol === normalized)
+    if (item) return { ...item, color: group.color }
+  }
+  return null
+}
+
 /** 创建单位模态框 */
 function CreateUnitModal({
   isOpen,
@@ -118,40 +154,35 @@ function CreateUnitModal({
 }) {
   const [form, setForm] = useState({ code: '', name: '', symbol: '', comment: '' })
   const [saving, setSaving] = useState(false)
-  const [symbolDropdownOpen, setSymbolDropdownOpen] = useState(false)
-  const symbolTriggerRef = useRef<HTMLButtonElement>(null)
-  const symbolDropdownRef = useRef<HTMLDivElement>(null)
-  const [symbolDropdownPos, setSymbolDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
-
-  // 获取当前选中符号的信息
-  const getSelectedSymbolInfo = () => {
-    for (const group of SYMBOL_GROUPS) {
-      const item = group.items.find((i) => i.symbol === form.symbol)
-      if (item) return { ...item, color: group.color }
-    }
-    return null
-  }
-
-  const selectedInfo = getSelectedSymbolInfo()
+  const [nameDropdownOpen, setNameDropdownOpen] = useState(false)
+  const nameTriggerRef = useRef<HTMLInputElement>(null)
+  const nameDropdownRef = useRef<HTMLDivElement>(null)
+  const [nameDropdownPos, setNameDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const [nameFilterActive, setNameFilterActive] = useState(false)
+  const nameFilterQuery = nameFilterActive ? form.name : ''
+  const filteredNameGroups = filterSymbolGroups(nameFilterQuery)
+  const symbolMeta = findSymbolMeta(form.symbol)
+  const hasSymbol = !!form.symbol.trim()
 
   // 点击外部关闭
   useEffect(() => {
-    if (!symbolDropdownOpen) return
+    if (!nameDropdownOpen) return
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node
-      if (symbolTriggerRef.current?.contains(target)) return
-      if (symbolDropdownRef.current?.contains(target)) return
-      setSymbolDropdownOpen(false)
+      if (nameTriggerRef.current?.contains(target)) return
+      if (nameDropdownRef.current?.contains(target)) return
+      setNameDropdownOpen(false)
+      setNameFilterActive(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [symbolDropdownOpen])
+  }, [nameDropdownOpen])
 
   // 计算下拉位置
   useLayoutEffect(() => {
-    if (!symbolDropdownOpen) return
+    if (!nameDropdownOpen) return
     const updatePosition = () => {
-      const btn = symbolTriggerRef.current
+      const btn = nameTriggerRef.current
       if (!btn) return
       const rect = btn.getBoundingClientRect()
       const dropdownHeight = 340
@@ -160,13 +191,13 @@ function CreateUnitModal({
 
       // 如果下方空间不够且上方空间更大，则向上展开
       if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
-        setSymbolDropdownPos({
+        setNameDropdownPos({
           top: rect.top - Math.min(dropdownHeight, spaceAbove) - 4,
           left: rect.left,
           width: rect.width
         })
       } else {
-        setSymbolDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+        setNameDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
       }
     }
     updatePosition()
@@ -176,7 +207,7 @@ function CreateUnitModal({
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [symbolDropdownOpen])
+  }, [nameDropdownOpen])
 
   const handleSave = async () => {
     if (!form.code.trim() || !form.name.trim() || saving) return
@@ -198,9 +229,26 @@ function CreateUnitModal({
     }
   }
 
-  const handleSelectSymbol = (symbol: string) => {
-    setForm({ ...form, symbol })
-    setSymbolDropdownOpen(false)
+  const handleNameChange = (name: string) => {
+    const matchedSymbol = findSymbolByName(name)
+    setNameFilterActive(true)
+    setNameDropdownOpen(true)
+    setForm((prev) => ({
+      ...prev,
+      name,
+      symbol: matchedSymbol ?? prev.symbol
+    }))
+  }
+
+  const handleSelectName = (symbol: string, name?: string) => {
+    const nextName = name ?? symbol
+    setForm((prev) => ({
+      ...prev,
+      name: nextName,
+      symbol
+    }))
+    setNameDropdownOpen(false)
+    setNameFilterActive(false)
   }
 
   return (
@@ -235,45 +283,52 @@ function CreateUnitModal({
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">名称 *</label>
-          <input
-            type="text"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="如: 人民币"
-            className="w-full px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
-          />
+          <div className="relative">
+            {hasSymbol && (
+              <span
+                className={`absolute left-3 top-1/2 -translate-y-1/2 size-6 flex items-center justify-center rounded text-sm font-bold ${
+                  symbolMeta
+                    ? symbolMeta.color
+                    : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                }`}
+              >
+                {form.symbol}
+              </span>
+            )}
+            <input
+              ref={nameTriggerRef}
+              type="text"
+              value={form.name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              onFocus={() => {
+                setNameDropdownOpen(true)
+                setNameFilterActive(false)
+              }}
+              placeholder="如: 人民币"
+              className={`w-full ${hasSymbol ? 'pl-12 pr-10' : 'px-4 pr-10'} py-2.5 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600`}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setNameFilterActive(false)
+                setNameDropdownOpen((open) => !open)
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-500 transition-colors"
+              aria-label="打开单位名称列表"
+            >
+              <ChevronDown size={14} className={`transition-transform ${nameDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">符号</label>
-          <button
-            ref={symbolTriggerRef}
-            type="button"
-            onClick={() => setSymbolDropdownOpen(!symbolDropdownOpen)}
-            className={`w-full flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 border rounded-xl transition-all ${
-              symbolDropdownOpen
-                ? 'border-amber-400 ring-2 ring-amber-100 dark:ring-amber-900/50'
-                : 'border-slate-200 dark:border-slate-700 hover:border-amber-300'
-            }`}
-          >
-            {selectedInfo ? (
-              <>
-                <span className={`w-6 h-6 flex items-center justify-center rounded text-sm font-bold ${selectedInfo.color}`}>
-                  {selectedInfo.symbol}
-                </span>
-                <span className="flex-1 text-left text-sm text-slate-800 dark:text-slate-200">{selectedInfo.label}</span>
-              </>
-            ) : form.symbol ? (
-              <>
-                <span className="w-6 h-6 flex items-center justify-center rounded text-sm font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                  {form.symbol}
-                </span>
-                <span className="flex-1 text-left text-sm text-slate-800 dark:text-slate-200">自定义符号</span>
-              </>
-            ) : (
-              <span className="flex-1 text-left text-sm text-slate-400">选择或输入符号</span>
-            )}
-            <ChevronDown size={14} className={`text-slate-400 transition-transform ${symbolDropdownOpen ? 'rotate-180' : ''}`} />
-          </button>
+          <input
+            type="text"
+            value={form.symbol}
+            onChange={(e) => setForm({ ...form, symbol: e.target.value })}
+            placeholder="可选，支持自定义符号"
+            className="w-full px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">描述</label>
@@ -287,64 +342,47 @@ function CreateUnitModal({
         </div>
       </div>
 
-      {/* 符号选择下拉 */}
-      {symbolDropdownOpen && symbolDropdownPos && createPortal(
+      {/* 名称选择下拉 */}
+      {nameDropdownOpen && nameDropdownPos && createPortal(
         <div
-          ref={symbolDropdownRef}
+          ref={nameDropdownRef}
           style={{
-            '--symbol-dropdown-top': `${symbolDropdownPos.top}px`,
-            '--symbol-dropdown-left': `${symbolDropdownPos.left}px`,
-            '--symbol-dropdown-width': `${symbolDropdownPos.width}px`
+            '--symbol-dropdown-top': `${nameDropdownPos.top}px`,
+            '--symbol-dropdown-left': `${nameDropdownPos.left}px`,
+            '--symbol-dropdown-width': `${nameDropdownPos.width}px`
           } as React.CSSProperties}
           className="fixed z-[1000000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden top-[var(--symbol-dropdown-top)] left-[var(--symbol-dropdown-left)] w-[var(--symbol-dropdown-width)]"
         >
-          {/* 自定义输入 */}
-          <div className="p-3 border-b border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={form.symbol}
-                onChange={(e) => setForm({ ...form, symbol: e.target.value })}
-                placeholder="输入自定义符号"
-                className="flex-1 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
-              />
-              {form.symbol && (
-                <button
-                  type="button"
-                  onClick={() => setSymbolDropdownOpen(false)}
-                  className="px-3 py-2 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors"
-                >
-                  确定
-                </button>
-              )}
-            </div>
-          </div>
           {/* 分组列表 */}
           <div className="max-h-64 overflow-y-auto p-2 custom-scrollbar">
-            {SYMBOL_GROUPS.map((group) => (
-              <div key={group.name} className="mb-2 last:mb-0">
-                <div className="px-2 py-1 text-micro font-semibold text-slate-400 uppercase">{group.name}</div>
-                <div className="grid grid-cols-3 gap-1">
-                  {group.items.map((item) => (
-                    <button
-                      key={item.symbol}
-                      type="button"
-                      onClick={() => handleSelectSymbol(item.symbol)}
-                      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all ${
-                        form.symbol === item.symbol
-                          ? 'bg-amber-100 dark:bg-amber-900/50 ring-1 ring-amber-400'
-                          : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      <span className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold ${group.color}`}>
-                        {item.symbol}
-                      </span>
-                      <span className="text-caption text-slate-600 dark:text-slate-400 truncate">{item.label}</span>
-                    </button>
-                  ))}
+            {filteredNameGroups.length === 0 ? (
+              <div className="py-6 text-center text-caption text-slate-400">暂无匹配名称</div>
+            ) : (
+              filteredNameGroups.map((group) => (
+                <div key={group.name} className="mb-2 last:mb-0">
+                  <div className="px-2 py-1 text-micro font-semibold text-slate-400 uppercase">{group.name}</div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {group.items.map((item) => (
+                      <button
+                        key={item.symbol}
+                        type="button"
+                        onClick={() => handleSelectName(item.symbol, item.label)}
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all ${
+                          form.name === item.label
+                            ? 'bg-amber-100 dark:bg-amber-900/50 ring-1 ring-amber-400'
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <span className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold ${group.color}`}>
+                          {item.symbol}
+                        </span>
+                        <span className="text-caption text-slate-600 dark:text-slate-400 truncate">{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>,
         document.body
@@ -871,21 +909,15 @@ function EditUnitModal({
 }) {
   const [form, setForm] = useState({ name: '', symbol: '', comment: '' })
   const [saving, setSaving] = useState(false)
-  const [symbolDropdownOpen, setSymbolDropdownOpen] = useState(false)
-  const symbolTriggerRef = useRef<HTMLButtonElement>(null)
-  const symbolDropdownRef = useRef<HTMLDivElement>(null)
-  const [symbolDropdownPos, setSymbolDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
-
-  // 获取当前选中符号的信息
-  const getSelectedSymbolInfo = () => {
-    for (const group of SYMBOL_GROUPS) {
-      const item = group.items.find((i) => i.symbol === form.symbol)
-      if (item) return { ...item, color: group.color }
-    }
-    return null
-  }
-
-  const selectedInfo = getSelectedSymbolInfo()
+  const [nameDropdownOpen, setNameDropdownOpen] = useState(false)
+  const nameTriggerRef = useRef<HTMLInputElement>(null)
+  const nameDropdownRef = useRef<HTMLDivElement>(null)
+  const [nameDropdownPos, setNameDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const [nameFilterActive, setNameFilterActive] = useState(false)
+  const nameFilterQuery = nameFilterActive ? form.name : ''
+  const filteredNameGroups = filterSymbolGroups(nameFilterQuery)
+  const symbolMeta = findSymbolMeta(form.symbol)
+  const hasSymbol = !!form.symbol.trim()
 
   useEffect(() => {
     if (isOpen && unit) {
@@ -894,27 +926,29 @@ function EditUnitModal({
         symbol: unit.symbol || '',
         comment: unit.comment || ''
       })
+      setNameFilterActive(false)
     }
   }, [isOpen, unit])
 
   // 点击外部关闭符号下拉
   useEffect(() => {
-    if (!symbolDropdownOpen) return
+    if (!nameDropdownOpen) return
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node
-      if (symbolTriggerRef.current?.contains(target)) return
-      if (symbolDropdownRef.current?.contains(target)) return
-      setSymbolDropdownOpen(false)
+      if (nameTriggerRef.current?.contains(target)) return
+      if (nameDropdownRef.current?.contains(target)) return
+      setNameDropdownOpen(false)
+      setNameFilterActive(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [symbolDropdownOpen])
+  }, [nameDropdownOpen])
 
   // 计算下拉位置
   useLayoutEffect(() => {
-    if (!symbolDropdownOpen) return
+    if (!nameDropdownOpen) return
     const updatePosition = () => {
-      const btn = symbolTriggerRef.current
+      const btn = nameTriggerRef.current
       if (!btn) return
       const rect = btn.getBoundingClientRect()
       const dropdownHeight = 340
@@ -922,13 +956,13 @@ function EditUnitModal({
       const spaceAbove = rect.top - 20
 
       if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
-        setSymbolDropdownPos({
+        setNameDropdownPos({
           top: rect.top - Math.min(dropdownHeight, spaceAbove) - 4,
           left: rect.left,
           width: rect.width
         })
       } else {
-        setSymbolDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+        setNameDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
       }
     }
     updatePosition()
@@ -938,7 +972,7 @@ function EditUnitModal({
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [symbolDropdownOpen])
+  }, [nameDropdownOpen])
 
   const handleSave = async () => {
     if (!unit || saving || !form.name.trim()) return
@@ -958,9 +992,26 @@ function EditUnitModal({
     }
   }
 
-  const handleSelectSymbol = (symbol: string) => {
-    setForm({ ...form, symbol })
-    setSymbolDropdownOpen(false)
+  const handleNameChange = (name: string) => {
+    const matchedSymbol = findSymbolByName(name)
+    setNameFilterActive(true)
+    setNameDropdownOpen(true)
+    setForm((prev) => ({
+      ...prev,
+      name,
+      symbol: matchedSymbol ?? prev.symbol
+    }))
+  }
+
+  const handleSelectName = (symbol: string, name?: string) => {
+    const nextName = name ?? symbol
+    setForm((prev) => ({
+      ...prev,
+      name: nextName,
+      symbol
+    }))
+    setNameDropdownOpen(false)
+    setNameFilterActive(false)
   }
 
   if (!unit) return null
@@ -993,45 +1044,52 @@ function EditUnitModal({
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">名称 *</label>
-          <input
-            type="text"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="如: 人民币"
-            className="w-full px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
-          />
+          <div className="relative">
+            {hasSymbol && (
+              <span
+                className={`absolute left-3 top-1/2 -translate-y-1/2 size-6 flex items-center justify-center rounded text-sm font-bold ${
+                  symbolMeta
+                    ? symbolMeta.color
+                    : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                }`}
+              >
+                {form.symbol}
+              </span>
+            )}
+            <input
+              ref={nameTriggerRef}
+              type="text"
+              value={form.name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              onFocus={() => {
+                setNameDropdownOpen(true)
+                setNameFilterActive(false)
+              }}
+              placeholder="如: 人民币"
+              className={`w-full ${hasSymbol ? 'pl-12 pr-10' : 'px-4 pr-10'} py-2.5 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600`}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setNameFilterActive(false)
+                setNameDropdownOpen((open) => !open)
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-500 transition-colors"
+              aria-label="打开单位名称列表"
+            >
+              <ChevronDown size={14} className={`transition-transform ${nameDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">符号</label>
-          <button
-            ref={symbolTriggerRef}
-            type="button"
-            onClick={() => setSymbolDropdownOpen(!symbolDropdownOpen)}
-            className={`w-full flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 border rounded-xl transition-all ${
-              symbolDropdownOpen
-                ? 'border-amber-400 ring-2 ring-amber-100 dark:ring-amber-900/50'
-                : 'border-slate-200 dark:border-slate-700 hover:border-amber-300'
-            }`}
-          >
-            {selectedInfo ? (
-              <>
-                <span className={`w-6 h-6 flex items-center justify-center rounded text-sm font-bold ${selectedInfo.color}`}>
-                  {selectedInfo.symbol}
-                </span>
-                <span className="flex-1 text-left text-sm text-slate-800 dark:text-slate-200">{selectedInfo.label}</span>
-              </>
-            ) : form.symbol ? (
-              <>
-                <span className="w-6 h-6 flex items-center justify-center rounded text-sm font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                  {form.symbol}
-                </span>
-                <span className="flex-1 text-left text-sm text-slate-800 dark:text-slate-200">自定义符号</span>
-              </>
-            ) : (
-              <span className="flex-1 text-left text-sm text-slate-400">选择或输入符号</span>
-            )}
-            <ChevronDown size={14} className={`text-slate-400 transition-transform ${symbolDropdownOpen ? 'rotate-180' : ''}`} />
-          </button>
+          <input
+            type="text"
+            value={form.symbol}
+            onChange={(e) => setForm({ ...form, symbol: e.target.value })}
+            placeholder="可选，支持自定义符号"
+            className="w-full px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">描述</label>
@@ -1045,64 +1103,47 @@ function EditUnitModal({
         </div>
       </div>
 
-      {/* 符号选择下拉 */}
-      {symbolDropdownOpen && symbolDropdownPos && createPortal(
+      {/* 名称选择下拉 */}
+      {nameDropdownOpen && nameDropdownPos && createPortal(
         <div
-          ref={symbolDropdownRef}
+          ref={nameDropdownRef}
           style={{
-            '--symbol-dropdown-top': `${symbolDropdownPos.top}px`,
-            '--symbol-dropdown-left': `${symbolDropdownPos.left}px`,
-            '--symbol-dropdown-width': `${symbolDropdownPos.width}px`
+            '--symbol-dropdown-top': `${nameDropdownPos.top}px`,
+            '--symbol-dropdown-left': `${nameDropdownPos.left}px`,
+            '--symbol-dropdown-width': `${nameDropdownPos.width}px`
           } as React.CSSProperties}
           className="fixed z-[1000000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden top-[var(--symbol-dropdown-top)] left-[var(--symbol-dropdown-left)] w-[var(--symbol-dropdown-width)]"
         >
-          {/* 自定义输入 */}
-          <div className="p-3 border-b border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={form.symbol}
-                onChange={(e) => setForm({ ...form, symbol: e.target.value })}
-                placeholder="输入自定义符号"
-                className="flex-1 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
-              />
-              {form.symbol && (
-                <button
-                  type="button"
-                  onClick={() => setSymbolDropdownOpen(false)}
-                  className="px-3 py-2 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors"
-                >
-                  确定
-                </button>
-              )}
-            </div>
-          </div>
           {/* 分组列表 */}
           <div className="max-h-64 overflow-y-auto p-2 custom-scrollbar">
-            {SYMBOL_GROUPS.map((group) => (
-              <div key={group.name} className="mb-2 last:mb-0">
-                <div className="px-2 py-1 text-micro font-semibold text-slate-400 uppercase">{group.name}</div>
-                <div className="grid grid-cols-3 gap-1">
-                  {group.items.map((item) => (
-                    <button
-                      key={item.symbol}
-                      type="button"
-                      onClick={() => handleSelectSymbol(item.symbol)}
-                      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all ${
-                        form.symbol === item.symbol
-                          ? 'bg-amber-100 dark:bg-amber-900/50 ring-1 ring-amber-400'
-                          : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      <span className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold ${group.color}`}>
-                        {item.symbol}
-                      </span>
-                      <span className="text-caption text-slate-600 dark:text-slate-400 truncate">{item.label}</span>
-                    </button>
-                  ))}
+            {filteredNameGroups.length === 0 ? (
+              <div className="py-6 text-center text-caption text-slate-400">暂无匹配名称</div>
+            ) : (
+              filteredNameGroups.map((group) => (
+                <div key={group.name} className="mb-2 last:mb-0">
+                  <div className="px-2 py-1 text-micro font-semibold text-slate-400 uppercase">{group.name}</div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {group.items.map((item) => (
+                      <button
+                        key={item.symbol}
+                        type="button"
+                        onClick={() => handleSelectName(item.symbol, item.label)}
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all ${
+                          form.name === item.label
+                            ? 'bg-amber-100 dark:bg-amber-900/50 ring-1 ring-amber-400'
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <span className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold ${group.color}`}>
+                          {item.symbol}
+                        </span>
+                        <span className="text-caption text-slate-600 dark:text-slate-400 truncate">{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>,
         document.body

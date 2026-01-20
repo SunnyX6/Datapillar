@@ -2,7 +2,7 @@
 Agent 执行上下文
 
 AgentContext 是框架提供给业务 Agent 的接口：
-- 只读信息：query, session_id
+- 只读信息：namespace, query, session_id
 - 工作方法：build_messages, invoke_tools, get_structured_output, interrupt
 - 依赖获取：get_deliverable
 
@@ -35,6 +35,7 @@ from datapillar_oneagentic.events import (
     ToolFailedEvent,
 )
 from datapillar_oneagentic.providers.llm.llm import extract_thinking
+from datapillar_oneagentic.core.types import SessionKey
 from datapillar_oneagentic.utils.structured_output import parse_structured_output
 
 if TYPE_CHECKING:
@@ -130,6 +131,7 @@ class AgentContext:
     业务 Agent 通过此上下文与框架交互。
 
     公开属性（只读）：
+    - namespace: 命名空间
     - session_id: 会话 ID
     - query: 用户输入
 
@@ -285,6 +287,7 @@ class AgentContext:
         current_state = self._state.copy()
 
         max_steps = self._spec.get_max_steps(self._agent_config)
+        key = SessionKey(namespace=self.namespace, session_id=self.session_id)
         for _iteration in range(1, max_steps + 1):
             # LLM 调用
             response = await llm_with_tools.ainvoke(messages)
@@ -295,6 +298,7 @@ class AgentContext:
                 await self._emit_event(
                     LLMThinkingEvent(
                         agent_id=self._spec.id,
+                        key=key,
                         thinking_content=thinking_content,
                     )
                 )
@@ -325,7 +329,9 @@ class AgentContext:
                 await self._emit_event(
                     ToolCalledEvent(
                         agent_id=self._spec.id,
+                        key=key,
                         tool_name=tool_name,
+                        tool_call_id=tool_call_id or "",
                         tool_input=tool_args if isinstance(tool_args, dict) else {},
                     )
                 )
@@ -348,7 +354,9 @@ class AgentContext:
                     await self._emit_event(
                         ToolFailedEvent(
                             agent_id=self._spec.id,
+                            key=key,
                             tool_name=tc_info["name"],
+                            tool_call_id=tc_info["id"],
                             error=tool_error,
                         )
                     )
@@ -360,7 +368,9 @@ class AgentContext:
                     await self._emit_event(
                         ToolFailedEvent(
                             agent_id=self._spec.id,
+                            key=key,
                             tool_name=tc_info["name"],
+                            tool_call_id=tc_info["id"],
                             error=tool_error,
                         )
                     )
@@ -403,7 +413,9 @@ class AgentContext:
                 await self._emit_event(
                     ToolCompletedEvent(
                         agent_id=self._spec.id,
+                        key=key,
                         tool_name=tc_info["name"],
+                        tool_call_id=tc_info["id"],
                         tool_output=tool_output,
                         duration_ms=tool_duration_ms / len(tool_calls_info) if tool_calls_info else 0,
                     )
@@ -520,16 +532,12 @@ class AgentContext:
             logger.warning("Store 未配置，无法获取 deliverable")
             return None
 
-        store_namespaces = [
-            ("deliverables", self.namespace, self.session_id, "latest"),
-            ("deliverables", self.namespace, self.session_id),
-        ]
+        store_namespace = ("deliverables", self.namespace, self.session_id)
 
         try:
-            for store_namespace in store_namespaces:
-                item = await store.aget(store_namespace, agent_id)
-                if item:
-                    return item.value
+            item = await store.aget(store_namespace, agent_id)
+            if item:
+                return item.value
             return None
         except Exception as e:
             logger.error(f"获取 deliverable 失败: {e}")

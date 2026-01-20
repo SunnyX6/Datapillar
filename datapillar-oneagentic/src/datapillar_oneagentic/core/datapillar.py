@@ -59,7 +59,7 @@ from datapillar_oneagentic.core.types import SessionKey
 from datapillar_oneagentic.context.compaction import CompactPolicy, get_compactor
 from datapillar_oneagentic.context.timeline.recorder import TimelineRecorder
 from datapillar_oneagentic.events import EventBus
-from datapillar_oneagentic.providers.llm import EmbeddingProviderClient, LLMProvider
+from datapillar_oneagentic.providers.llm import EmbeddingProvider, LLMProvider
 
 if TYPE_CHECKING:
     from datapillar_oneagentic.knowledge import Knowledge
@@ -85,7 +85,7 @@ class Datapillar:
 
     @classmethod
     def _clear_registry(cls) -> None:
-        """清空注册表（仅用于测试，保留接口兼容）"""
+        """保留接口兼容（框架当前无全局注册表，无需处理）"""
         pass
 
     def __init__(
@@ -182,17 +182,16 @@ class Datapillar:
         self._executors: dict[str, Any] = {}
 
         # 创建经验学习/知识相关组件
-        self._embedding_provider = None
+        self._learning_embedding_provider = None
+        self._knowledge_embedding_provider = None
         self._learning_store = None
         self._experience_learner = None
         self._experience_retriever = None
         self._knowledge_store = None
         self._knowledge_retriever = None
 
-        if enable_learning or self._has_knowledge:
-            self._embedding_provider = EmbeddingProviderClient(self._config.embedding)
-
         if enable_learning:
+            self._learning_embedding_provider = EmbeddingProvider(self._config.embedding)
             from datapillar_oneagentic.experience import ExperienceLearner, ExperienceRetriever
             from datapillar_oneagentic.storage import create_learning_store
 
@@ -204,11 +203,11 @@ class Datapillar:
             self._experience_learner = ExperienceLearner(
                 store=self._learning_store,
                 namespace=namespace,
-                embedding_provider=self._embedding_provider,
+                embedding_provider=self._learning_embedding_provider,
             )
             self._experience_retriever = ExperienceRetriever(
                 store=self._learning_store,
-                embedding_provider=self._embedding_provider,
+                embedding_provider=self._learning_embedding_provider,
             )
             logger.info(f"经验学习已启用: namespace={namespace}")
 
@@ -216,14 +215,20 @@ class Datapillar:
             from datapillar_oneagentic.knowledge import KnowledgeRetriever
             from datapillar_oneagentic.storage import create_knowledge_store
 
+            if not self._config.knowledge.base_config.embedding.is_configured():
+                raise ValueError("知识功能需要配置 knowledge.base_config.embedding")
+
+            self._knowledge_embedding_provider = EmbeddingProvider(
+                self._config.knowledge.base_config.embedding
+            )
             self._knowledge_store = create_knowledge_store(
                 namespace,
-                vector_store_config=self._config.vector_store,
-                embedding_config=self._config.embedding,
+                vector_store_config=self._config.knowledge.base_config.vector_store,
+                embedding_config=self._config.knowledge.base_config.embedding,
             )
             self._knowledge_retriever = KnowledgeRetriever(
                 store=self._knowledge_store,
-                embedding_provider=self._embedding_provider,
+                embedding_provider=self._knowledge_embedding_provider,
                 config=self._config.knowledge,
             )
             logger.info(f"知识检索已启用: namespace={namespace}")
@@ -424,8 +429,16 @@ class Datapillar:
             )
             return await orchestrator.compact_session(session_id)
 
-    async def delete_session(self, session_id: str) -> None:
-        """删除会话"""
+    async def clear_session(self, session_id: str) -> None:
+        """清理会话记忆"""
+        from datapillar_oneagentic.storage import create_checkpointer
+
+        async with create_checkpointer(self.namespace, agent_config=self._config.agent) as checkpointer:
+            orchestrator = self._build_orchestrator(checkpointer=checkpointer, store=None)
+            await orchestrator.clear_session(session_id)
+
+    async def clear_session_store(self, session_id: str) -> None:
+        """清理会话交付物"""
         from datapillar_oneagentic.storage import create_checkpointer, create_store
 
         async with (
@@ -436,7 +449,7 @@ class Datapillar:
                 checkpointer=checkpointer,
                 store=store,
             )
-            await orchestrator.delete_session(session_id)
+            await orchestrator.clear_session_store(session_id)
 
     async def get_session_stats(self, session_id: str) -> dict:
         """获取会话统计信息"""

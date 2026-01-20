@@ -1,4 +1,4 @@
-import type { AgentActivity } from '@/stores'
+import type { ProcessActivity } from '@/stores'
 
 const findLastIndex = <T,>(list: T[], predicate: (value: T) => boolean) => {
   for (let index = list.length - 1; index >= 0; index -= 1) {
@@ -10,17 +10,17 @@ const findLastIndex = <T,>(list: T[], predicate: (value: T) => boolean) => {
 }
 
 /**
- * 以 agent 为粒度做“滚动替换”：
- * - 同一 agent 只保留一行，后续事件覆盖该行
- * - 不依赖 event/tool 类型，避免后端新增事件导致前端改逻辑
+ * 以活动 id 为粒度做“滚动替换”：
+ * - 同一阶段只保留一行，后续事件覆盖该行
+ * - 不依赖 agent/tool 事件结构，避免前端解析细节
  */
 export const upsertAgentActivityByAgent = (
-  rows: AgentActivity[] | undefined,
-  nextActivity: AgentActivity,
+  rows: ProcessActivity[] | undefined,
+  nextActivity: ProcessActivity,
   maxRows: number
-): AgentActivity[] => {
+): ProcessActivity[] => {
   const currentRows = rows ?? []
-  const index = findLastIndex(currentRows, (row) => row.agent === nextActivity.agent)
+  const index = findLastIndex(currentRows, (row) => row.id === nextActivity.id)
 
   if (index < 0) {
     const nextRows = [...currentRows, nextActivity]
@@ -32,4 +32,3 @@ export const upsertAgentActivityByAgent = (
   nextRows[index] = { ...existing, ...nextActivity, id: existing.id }
   return nextRows
 }
-

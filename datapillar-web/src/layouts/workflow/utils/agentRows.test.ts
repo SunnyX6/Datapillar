@@ -3,53 +3,51 @@ import type { AgentActivity } from '@/stores'
 import { upsertAgentActivityByAgent } from './agentRows'
 
 const buildActivity = (overrides: Partial<AgentActivity>): AgentActivity => ({
-  id: 'row-1',
-  type: 'thought',
-  state: 'thinking',
-  level: 'info',
-  agent: 'agent-a',
-  message: 'm1',
+  id: 'phase:analysis',
+  phase: 'analysis',
+  status: 'running',
+  actor: '需求分析师',
+  title: '需求分析',
+  detail: '进行中',
   timestamp: 1,
   ...overrides
 })
 
 describe('upsertAgentActivityByAgent', () => {
-  it('appends a new agent row when agent does not exist', () => {
-    const rows: AgentActivity[] = [buildActivity({ id: 'row-a', agent: 'agent-a' })]
-    const next = buildActivity({ id: 'row-b', agent: 'agent-b', message: 'b1' })
+  it('新增活动 id 时追加行', () => {
+    const rows: AgentActivity[] = [buildActivity({ id: 'phase:analysis', title: '需求分析' })]
+    const next = buildActivity({ id: 'phase:design', phase: 'design', title: '架构设计', detail: '开始设计' })
     const result = upsertAgentActivityByAgent(rows, next, 200)
     expect(result).toHaveLength(2)
-    expect(result[1].agent).toBe('agent-b')
-    expect(result[1].message).toBe('b1')
+    expect(result[1].id).toBe('phase:design')
+    expect(result[1].detail).toBe('开始设计')
   })
 
-  it('replaces the existing row for the same agent (keeps stable id)', () => {
+  it('同一活动 id 时覆盖行且保持 id', () => {
     const rows: AgentActivity[] = [
-      buildActivity({ id: 'row-a', agent: 'agent-a', message: 'old', timestamp: 1 }),
-      buildActivity({ id: 'row-b', agent: 'agent-b', message: 'b1', timestamp: 2 })
+      buildActivity({ id: 'phase:analysis', title: '需求分析', detail: '旧内容', timestamp: 1 }),
+      buildActivity({ id: 'phase:design', phase: 'design', title: '架构设计', detail: 'b1', timestamp: 2 })
     ]
 
-    const next = buildActivity({ id: 'row-a-new', agent: 'agent-a', message: 'new', timestamp: 10, state: 'done' })
+    const next = buildActivity({ id: 'phase:analysis', detail: '新内容', timestamp: 10, status: 'done' })
     const result = upsertAgentActivityByAgent(rows, next, 200)
 
     expect(result).toHaveLength(2)
-    expect(result[0].agent).toBe('agent-a')
-    expect(result[0].message).toBe('new')
-    expect(result[0].state).toBe('done')
-    expect(result[0].id).toBe('row-a')
+    expect(result[0].id).toBe('phase:analysis')
+    expect(result[0].detail).toBe('新内容')
+    expect(result[0].status).toBe('done')
     expect(result[1]).toEqual(rows[1])
   })
 
-  it('enforces maxRows on append', () => {
+  it('追加时遵守最大行数限制', () => {
     const rows: AgentActivity[] = [
-      buildActivity({ id: 'row-a', agent: 'agent-a' }),
-      buildActivity({ id: 'row-b', agent: 'agent-b' })
+      buildActivity({ id: 'phase:analysis', title: '需求分析' }),
+      buildActivity({ id: 'phase:catalog', phase: 'catalog', title: '元数据检索' })
     ]
-    const next = buildActivity({ id: 'row-c', agent: 'agent-c' })
+    const next = buildActivity({ id: 'phase:design', phase: 'design', title: '架构设计' })
     const result = upsertAgentActivityByAgent(rows, next, 2)
     expect(result).toHaveLength(2)
-    expect(result[0].agent).toBe('agent-b')
-    expect(result[1].agent).toBe('agent-c')
+    expect(result[0].id).toBe('phase:catalog')
+    expect(result[1].id).toBe('phase:design')
   })
 })
-

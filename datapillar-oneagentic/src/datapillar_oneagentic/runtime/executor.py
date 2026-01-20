@@ -149,6 +149,7 @@ class AgentExecutor:
         deliverable: Any,
         error: str | None,
         messages: list,
+        llm: ResilientChatModel,
     ) -> None:
         """没有上报时，追加 Todo 审计结果到消息中"""
         todo_data = state.get("todo")
@@ -173,7 +174,7 @@ class AgentExecutor:
                 agent_status=result_status,
                 deliverable=deliverable,
                 error=error,
-                llm=self._todo_audit_llm,
+                llm=llm,
             )
         except Exception as exc:
             logger.warning(f"Todo 审计失败: {exc}")
@@ -209,6 +210,8 @@ class AgentExecutor:
         """
         spec = self.spec
         key = SessionKey(namespace=state["namespace"], session_id=state["session_id"])
+        llm_with_context = self.llm.with_event_context(agent_id=spec.id, key=key)
+        todo_audit_llm = self._todo_audit_llm.with_event_context(agent_id=spec.id, key=key)
         start_time = time.time()
 
         if not query:
@@ -263,7 +266,7 @@ class AgentExecutor:
                         session_id=run_state["session_id"],
                         query=query,
                         _spec=spec,
-                        _llm=self.llm,
+                        _llm=llm_with_context,
                         _tools=all_tools,
                         _state=run_state,
                         _agent_config=self._agent_config,
@@ -431,6 +434,7 @@ class AgentExecutor:
                         deliverable=deliverable,
                         error=None,
                         messages=result_messages,
+                        llm=todo_audit_llm,
                     )
 
                     return AgentResult.completed(

@@ -35,83 +35,17 @@ redis_host = "127.0.0.1"
 redis_port = 6379
 redis_db = 0
 redis_password = ""
-redis_checkpoint_ttl_seconds = 604800  # 7天
 
 # ==================== JWT 认证配置 ====================
 jwt_issuer = "datapillar-auth"
 auth_enabled = true  # 是否启用认证，开发调试时可设为 false
 
-# ==================== 弹性机制配置（通用） ====================
-# 说明：
-# - 适用于所有智能体、所有 LLM 调用场景
-# - 技术故障（超时、网络抖动）自动重试，用户无感知
-[default.resilience]
-# 重试配置
-max_retries = 3                    # 最大重试次数
-initial_delay_ms = 500             # 初始延迟（毫秒）
-max_delay_ms = 30000               # 最大延迟（毫秒）
-exponential_base = 2               # 指数基数
-jitter = true                      # 是否添加抖动（避免惊群效应）
+# ==================== Agent 配置 ====================
+[default.agent]
 
-# 超时配置
-llm_timeout_seconds = 120          # LLM 调用超时
-tool_timeout_seconds = 30          # 工具调用超时
+[default.agent.checkpointer]
+ttl_minutes = 10080  # 7天
 
-# Agent 执行配置
-max_iterations = 10                # LLM 调用轮次上限（每轮可调用多个工具）
-
-# 熔断配置
-circuit_failure_threshold = 5      # 连续失败次数触发熔断
-circuit_recovery_timeout_seconds = 60  # 熔断恢复等待时间
-
-# ==================== ETL 多智能体配置 ====================
-# 说明：
-# - 该模块的默认交付物是"ETL 工作流（Job/Stage/SQL）"
-# - 阈值允许按环境/租户通过环境变量覆盖（DATAPILLAR_*）
-etl_review_retry_threshold = 3     # Review 打回阈值（连续失败几次后暂停请求用户介入）
-
-# ==================== ETL 对话记忆与上下文压缩 ====================
-# 说明：
-# - 对话记忆存放在 AgentState.messages，并由 LangGraph checkpoint（Redis）持久化
-# - 这里的参数只影响“喂给 LLM 的历史对话窗口”，不影响持久化的数据本身
-etl_conversation_history_max_messages = 8
-# 统一用 token 口径（估算 token；真实 token 以厂商 usage 为准）
-etl_conversation_history_max_tokens = 4096
-# OpenAI 兼容模型建议使用 cl100k_base；如需更贴近 gpt-4o 系列，可切到 o200k_base
-etl_tokenizer_encoding = "cl100k_base"
-
-# 说明：
-# - 对话短记忆（agent_conversations）也会进入 checkpoint，为避免 session 膨胀需要做存储上限
-# - 该上限只影响“记忆存储”，不影响 requirement_todo_store / artifact_store 等结构化长期记忆
-etl_agent_conversation_max_turns_per_agent = 200
-# 单条 turn 的上限同样用 token 口径（估算 token）
-etl_agent_conversation_max_content_tokens_per_turn = 800
-
-# ==================== ETL 语义指挥官（用户输入语义分流）====================
-# 说明：
-# - 前端不传 agent_id，由系统在无 pending human request 时做语义分流
-# - 低置信（< 阈值）不允许随便路由：必须转为澄清（clarification）
-etl_semantic_router_min_confidence = 0.7
-
-# ==================== ETL 记忆存储配置 ====================
-# 说明：
-# - BossMemory: Boss 的工作日志（Timeline），记录所有关键事件
-# - WorkerMemory: Worker 的短期工作记忆，任务完成后可丢弃
-# - 存储在 Redis，通过 TTL 自动清理
-[default.etl_memory]
-boss_memory_ttl_seconds = 604800      # Boss 记忆 TTL（7天）
-worker_memory_ttl_seconds = 3600      # Worker 记忆 TTL（1小时）
-timeline_max_entries = 100            # Timeline 最大条目数
-timeline_compress_threshold = 80      # 触发压缩的阈值
-timeline_compress_keep_recent = 15    # 压缩后保留最近多少条
-timeline_entry_max_length = 500       # 单条 Timeline 内容最大长度
-worker_turn_max_length = 2000         # Worker 对话单条最大长度
-worker_compress_threshold = 20        # Worker 对话压缩阈值（对话轮次超过此值时触发压缩）
-worker_keep_recent = 5                # Worker 对话压缩后保留最近多少轮
-
-# ==================== OpenLineage Sink 配置 ====================
-# Sink 端负责接收事件并写入 Neo4j
-# retry、rate_limit、filter 等配置由 Producer 端（Flink/Spark/Airflow）在 openlineage.yml 中配置
 [default.openlineage_sink]
 graceful_shutdown_timeout = 30.0
 

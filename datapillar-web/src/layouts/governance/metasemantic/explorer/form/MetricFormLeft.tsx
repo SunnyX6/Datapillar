@@ -400,7 +400,7 @@ export function MetricFormLeft({
   )
 
   return (
-    <div className="col-span-5 flex flex-col gap-4 h-full">
+    <div className="col-span-5 xl:col-span-4 flex flex-col gap-4 h-full">
       <div className="flex-1 min-h-0 flex flex-col gap-4">
         <div className="space-y-1.5">
           <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide">指标名称 *</label>
