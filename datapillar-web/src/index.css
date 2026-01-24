@@ -26,6 +26,19 @@
   --container-xl: 1920px;
   --container-2xl: 2560px;
   --container-3xl: 3840px;
+
+  /* 品牌色：项目内大量使用 `*-brand-*`，这里直接复用 Tailwind 默认 indigo 调色板作为 brand。 */
+  --color-brand-50: var(--color-indigo-50);
+  --color-brand-100: var(--color-indigo-100);
+  --color-brand-200: var(--color-indigo-200);
+  --color-brand-300: var(--color-indigo-300);
+  --color-brand-400: var(--color-indigo-400);
+  --color-brand-500: var(--color-indigo-500);
+  --color-brand-600: var(--color-indigo-600);
+  --color-brand-700: var(--color-indigo-700);
+  --color-brand-800: var(--color-indigo-800);
+  --color-brand-900: var(--color-indigo-900);
+  --color-brand-950: var(--color-indigo-950);
 }
 
 /* 配置样式层级顺序 */
@@ -49,7 +62,7 @@
     min-height: 100dvh;
     background-color: #020617;
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: hidden;
   }
 
   /* Shimmer 动画 - 光泽划过效果 */
@@ -78,6 +91,7 @@
     --font-subtitle: 600 calc(16px * var(--ui-scale)) / calc(22px * var(--ui-scale)) var(--font-family-sans);
     --font-body: 500 calc(14px * var(--ui-scale)) / calc(20px * var(--ui-scale)) var(--font-family-sans);
     --font-body-sm: 500 calc(13px * var(--ui-scale)) / calc(18px * var(--ui-scale)) var(--font-family-sans);
+    --font-body-xs: 500 calc(12.5px * var(--ui-scale)) / calc(17px * var(--ui-scale)) var(--font-family-sans);
     --font-caption: 500 calc(12px * var(--ui-scale)) / calc(16px * var(--ui-scale)) var(--font-family-sans);
     --font-micro: 600 calc(10px * var(--ui-scale)) / calc(14px * var(--ui-scale)) var(--font-family-sans);
     --font-context-menu-title: 600 calc(8px * var(--ui-scale)) / calc(10px * var(--ui-scale)) var(--font-family-sans);
@@ -202,6 +216,10 @@
     font: var(--font-body-sm);
   }
 
+  .text-body-xs {
+    font: var(--font-body-xs);
+  }
+
   .text-caption {
     font: var(--font-caption);
   }
@@ -241,6 +259,17 @@
     @media (width >= 1440px) {
       width: calc(400px * var(--ui-scale));
     }
+    @media (width >= 1920px) {
+      width: calc(420px * var(--ui-scale));
+    }
+    @media (width >= 2560px) {
+      width: calc(480px * var(--ui-scale));
+    }
+  }
+
+  /* 工单列表宽度（响应式） */
+  .w-collaboration-list-responsive {
+    width: calc(384px * var(--ui-scale));
     @media (width >= 1920px) {
       width: calc(420px * var(--ui-scale));
     }

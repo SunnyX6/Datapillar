@@ -20,7 +20,6 @@ from src.modules.etl.agents.architect_agent import ArchitectAgent
 from src.modules.etl.agents.catalog_agent import CatalogAgent, CatalogOutput
 from src.modules.etl.agents.developer_agent import DeveloperAgent
 from src.modules.etl.agents.reviewer_agent import ReviewerAgent
-from src.modules.etl.schemas.developer import DeveloperSqlOutput
 from src.modules.etl.schemas.review import ReviewResult
 from src.modules.etl.schemas.workflow import WorkflowOutput
 
@@ -105,7 +104,7 @@ class TestAgentSpecs:
         spec = get_agent_spec(DeveloperAgent)
         assert spec is not None
         assert spec.name == "数据开发工程师"
-        assert spec.deliverable_schema is DeveloperSqlOutput
+        assert spec.deliverable_schema is WorkflowOutput
         tool_names = {tool.name for tool in spec.tools}
         assert tool_names == {
             "get_table_detail",

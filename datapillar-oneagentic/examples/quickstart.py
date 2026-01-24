@@ -9,11 +9,40 @@ Datapillar OneAgentic 快速入门示例
 
 运行命令：
     uv run python examples/quickstart.py
+
+配置要求：
+    1) LLM（团队执行需要）
+       export DATAPILLAR_LLM_PROVIDER="openai"              # openai | anthropic | glm | deepseek | openrouter | ollama
+       export DATAPILLAR_LLM_API_KEY="sk-xxx"
+       export DATAPILLAR_LLM_MODEL="gpt-4o"
+       # 可选：export DATAPILLAR_LLM_BASE_URL="https://api.openai.com/v1"
+       # 可选：export DATAPILLAR_LLM_ENABLE_THINKING="false"
+    2) Embedding（知识检索需要）
+       export DATAPILLAR_EMBEDDING_PROVIDER="openai"        # openai | glm
+       export DATAPILLAR_EMBEDDING_API_KEY="sk-xxx"
+       export DATAPILLAR_EMBEDDING_MODEL="text-embedding-3-small"
+       export DATAPILLAR_EMBEDDING_DIMENSION="1536"
+       # 可选：export DATAPILLAR_EMBEDDING_BASE_URL="https://api.openai.com/v1"
 """
 
 import asyncio
-import os
+import json
+import logging
 from pydantic import BaseModel, Field
+
+def _setup_example_logging() -> None:
+    """示例脚本负责配置日志输出（不要在框架里改 root logger）。"""
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    dp_logger = logging.getLogger("datapillar_oneagentic")
+    dp_logger.handlers.clear()
+    dp_logger.addHandler(handler)
+    # 默认不打开 DEBUG：避免 stream 场景下重复刷堆栈；结构化输出失败会用 ERROR 打印原始 LLM 输出用于调试。
+    dp_logger.setLevel(logging.INFO)
+    dp_logger.propagate = False
+
+
+_setup_example_logging()
 
 from datapillar_oneagentic import (
     # 装饰器
@@ -27,38 +56,7 @@ from datapillar_oneagentic import (
     DatapillarConfig,
 )
 from datapillar_oneagentic.knowledge import Knowledge, KnowledgeConfig, KnowledgeSource
-
-
-# ============================================================================
-# LLM 配置
-# ============================================================================
-# GLM 配置（开启思考模式）
-LLM_PROVIDER = "glm"
-LLM_API_KEY = os.environ.get("GLM_API_KEY")
-LLM_BASE_URL = os.environ.get("GLM_BASE_URL")
-LLM_MODEL = os.environ.get("GLM_MODEL")
-LLM_ENABLE_THINKING = os.environ.get("GLM_ENABLE_THINKING", "false").lower() in {
-    "1",
-    "true",
-    "yes",
-}
-
-if not LLM_API_KEY or not LLM_MODEL:
-    raise RuntimeError("请设置 GLM_API_KEY 和 GLM_MODEL（可选 GLM_BASE_URL/GLM_ENABLE_THINKING）")
-
-# Embedding 配置（知识检索需要）
-EMBEDDING_PROVIDER = "glm"
-EMBEDDING_API_KEY = os.environ.get("GLM_EMBEDDING_API_KEY")
-EMBEDDING_MODEL = os.environ.get("GLM_EMBEDDING_MODEL")
-EMBEDDING_DIMENSION_RAW = os.environ.get("GLM_EMBEDDING_DIMENSION")
-
-if not EMBEDDING_API_KEY or not EMBEDDING_MODEL or not EMBEDDING_DIMENSION_RAW:
-    raise RuntimeError("请设置 GLM_EMBEDDING_API_KEY、GLM_EMBEDDING_MODEL、GLM_EMBEDDING_DIMENSION")
-
-try:
-    EMBEDDING_DIMENSION = int(EMBEDDING_DIMENSION_RAW)
-except ValueError as exc:
-    raise RuntimeError("GLM_EMBEDDING_DIMENSION 必须为整数") from exc
+from datapillar_oneagentic.providers.llm import EmbeddingBackend, Provider
 
 
 # ============================================================================
@@ -182,7 +180,8 @@ class OrderResult(BaseModel):
     # 注意：交付物统一用 agent_id 存储和获取，无需单独指定 key
 
     # === 执行配置 ===
-    temperature=0.3,                           # LLM 温度（0-2，越高越有创造性）
+    # 结构化输出示例不要赌运气：温度设为 0，避免时好时坏。
+    temperature=0.0,
     max_steps=10,                              # 最大工具调用次数
 
     # === 知识配置（可选）===
@@ -288,14 +287,24 @@ class OrderAgent:
 1. 根据上游推荐的商品，使用 check_inventory 确认库存
 2. 使用 create_order 创建订单（商品名、数量1、用户提供的收货地址）
 
-## 输出格式
-完成下单后，输出 JSON：
-
+## 输出要求
+完成下单后，你必须以纯 JSON 格式输出结果，不要包含任何其他文字：
+```json
 {{
   "success": true,
   "order_id": "订单号",
   "message": "订单创建成功说明"
-}}"""
+}}
+```
+
+失败时也必须输出同结构 JSON（order_id 为 null）：
+```json
+{{
+  "success": false,
+  "order_id": null,
+  "message": "失败原因"
+}}
+```"""
 
     async def run(self, ctx: AgentContext) -> OrderResult:
         """订单处理逻辑 - 演示获取上游 Agent 产出"""
@@ -381,37 +390,45 @@ def create_shopping_team(config: DatapillarConfig) -> Datapillar:
 
 async def main():
     """主函数"""
-    # 配置 LLM
-    llm_config = {
-        "provider": LLM_PROVIDER,
-        "api_key": LLM_API_KEY,
-        "model": LLM_MODEL,
-        "enable_thinking": LLM_ENABLE_THINKING,
-        "timeout_seconds": 120,
-        "retry": {"max_retries": 2},
-    }
-    if LLM_BASE_URL:
-        llm_config["base_url"] = LLM_BASE_URL
+    config = DatapillarConfig()
+    if not config.llm.is_configured():
+        supported = ", ".join(Provider.list_supported())
+        raise RuntimeError(
+            "请先配置 LLM：\n"
+            "  export DATAPILLAR_LLM_PROVIDER=\"openai\"\n"
+            "  export DATAPILLAR_LLM_API_KEY=\"sk-xxx\"\n"
+            "  export DATAPILLAR_LLM_MODEL=\"gpt-4o\"\n"
+            "可选：export DATAPILLAR_LLM_BASE_URL=\"https://api.openai.com/v1\"\n"
+            "可选：export DATAPILLAR_LLM_ENABLE_THINKING=\"false\"\n"
+            f"支持 provider: {supported}"
+        )
 
-    knowledge_config = KnowledgeConfig(
+    if not config.embedding.is_configured():
+        supported = ", ".join(EmbeddingBackend.list_supported())
+        raise RuntimeError(
+            "请先配置 Embedding：\n"
+            "  export DATAPILLAR_EMBEDDING_PROVIDER=\"openai\"\n"
+            "  export DATAPILLAR_EMBEDDING_API_KEY=\"sk-xxx\"\n"
+            "  export DATAPILLAR_EMBEDDING_MODEL=\"text-embedding-3-small\"\n"
+            "  export DATAPILLAR_EMBEDDING_DIMENSION=\"1536\"\n"
+            "可选：export DATAPILLAR_EMBEDDING_BASE_URL=\"https://api.openai.com/v1\"\n"
+            f"支持 provider: {supported}"
+        )
+
+    # quickstart.py 固定使用 Lance 本地向量库，避免用户还要额外配 vector_store。
+    config.knowledge = KnowledgeConfig(
         base_config={
-            "embedding": {
-                "provider": EMBEDDING_PROVIDER,
-                "api_key": EMBEDDING_API_KEY,
-                "model": EMBEDDING_MODEL,
-                "dimension": EMBEDDING_DIMENSION,
-            },
+            "embedding": config.embedding.model_dump(),
             "vector_store": {"type": "lance", "path": "./data/vectors"},
         }
     )
-    config = DatapillarConfig(llm=llm_config, knowledge=knowledge_config)
 
     # 创建团队
     team = create_shopping_team(config)
 
     print("=" * 60)
     print("🛒 购物助手团队已就绪")
-    print(f"   模型: {LLM_MODEL}")
+    print(f"   模型: {config.llm.model}")
     print(f"   成员: 购物顾问 -> 订单助手（顺序执行）")
     print("   演示: 下游 Agent 通过 ctx.get_deliverable() 获取上游产出")
     print("=" * 60)
@@ -460,7 +477,7 @@ async def main():
             if agent_id and deliverable is not None:
                 deliverables[agent_id] = deliverable
                 print("   ✅ 完成")
-                print(f"   📦 交付物: {deliverable}")
+                print(f"   📦 交付物: {json.dumps(deliverable, ensure_ascii=False)}")
         elif event_type == "agent.interrupt":
             interrupt_payload = data.get("interrupt", {}).get("payload")
             print(f"\n❓ 需要用户输入: {interrupt_payload}")

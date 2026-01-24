@@ -15,7 +15,6 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import Any
 
-from langchain_core.messages import HumanMessage
 from langgraph.graph import StateGraph
 from langgraph.types import Command
 
@@ -39,7 +38,8 @@ from datapillar_oneagentic.events import (
     build_event_payload,
 )
 from datapillar_oneagentic.providers.llm.llm import extract_thinking
-from datapillar_oneagentic.state.blackboard import create_blackboard
+from datapillar_oneagentic.context import ContextBuilder
+from datapillar_oneagentic.state import StateBuilder
 from datapillar_oneagentic.utils.time import now_ms
 from datapillar_oneagentic.exception import LLMError
 
@@ -50,9 +50,8 @@ logger = logging.getLogger(__name__)
 class _SessionState:
     """会话状态检测结果"""
 
-    existing_state: dict | None
+    state: dict | None
     is_interrupted: bool
-    experience_context: str | None
 
 
 class Orchestrator:
@@ -128,15 +127,6 @@ class Orchestrator:
         """获取 Agent 展示名（无映射时回退为 ID）"""
         return self._agent_name_map.get(agent_id, agent_id)
 
-    def _extract_agent_id_from_interrupt(self, interrupt_obj: Any) -> str | None:
-        """从 interrupt 对象中解析节点名"""
-        namespaces = getattr(interrupt_obj, "ns", None)
-        if isinstance(namespaces, list) and namespaces:
-            first = namespaces[0]
-            if isinstance(first, str):
-                return first.split(":", 1)[0]
-        return None
-
     async def _clear_store_artifacts(
         self,
         session_id: str,
@@ -169,17 +159,16 @@ class Orchestrator:
             return None
         return item.value
 
-    async def _load_deliverable_keys(self, compiled, config: dict) -> list[str]:
-        if not hasattr(compiled, "aget_state"):
-            return []
+    async def _load_deliverable_keys(self, compiled, checkpoint_manager) -> list[str]:
         try:
-            state_snapshot = await compiled.aget_state(config)
+            state = await checkpoint_manager.get_state(compiled)
         except Exception as e:
             logger.warning(f"读取会话状态失败: {e}")
             return []
-        if not state_snapshot or not state_snapshot.values:
+        if not state:
             return []
-        return list(state_snapshot.values.get("deliverable_keys") or [])
+        sb = StateBuilder(state)
+        return sb.deliverables.snapshot().keys
 
     async def _load_deliverables_map(
         self,
@@ -203,28 +192,35 @@ class Orchestrator:
                 deliverables[deliverable_key] = item.value
         return deliverables
 
-    async def _clear_deliverable_refs(self, compiled, config: dict) -> None:
-        if not hasattr(compiled, "aupdate_state"):
-            return
-        updates = {
-            "deliverable_keys": [],
-        }
+    async def _clear_deliverable_refs(self, compiled, checkpoint_manager) -> None:
         try:
-            await compiled.aupdate_state(config, updates)
+            state = await checkpoint_manager.get_state(compiled)
+        except Exception as e:
+            logger.warning(f"读取会话状态失败: {e}")
+            return
+        if not state:
+            return
+        sb = StateBuilder(state)
+        sb.deliverables.clear()
+        try:
+            await checkpoint_manager.update_state(compiled, sb.patch())
         except Exception as e:
             logger.warning(f"清理交付物引用失败: {e}")
 
-    async def _clear_state_artifacts(self, compiled, config: dict) -> None:
+    async def _clear_state_artifacts(self, compiled, checkpoint_manager) -> None:
         """清理 blackboard 中的 todo/deliverables 引用"""
-        if not hasattr(compiled, "aupdate_state"):
-            return
-
-        updates = {
-            "todo": None,
-            "deliverable_keys": [],
-        }
         try:
-            await compiled.aupdate_state(config, updates)
+            state = await checkpoint_manager.get_state(compiled)
+        except Exception as e:
+            logger.warning(f"读取会话状态失败: {e}")
+            return
+        if not state:
+            return
+        sb = StateBuilder(state)
+        sb.todo.clear()
+        sb.deliverables.clear()
+        try:
+            await checkpoint_manager.update_state(compiled, sb.patch())
         except Exception as e:
             logger.warning(f"清理状态失败: {e}")
 
@@ -233,11 +229,11 @@ class Orchestrator:
         *,
         session_id: str,
         compiled,
-        config: dict,
+        checkpoint_manager,
     ) -> None:
-        deliverable_keys = await self._load_deliverable_keys(compiled, config)
+        deliverable_keys = await self._load_deliverable_keys(compiled, checkpoint_manager)
         await self._clear_store_artifacts(session_id, deliverable_keys)
-        await self._clear_state_artifacts(compiled, config)
+        await self._clear_state_artifacts(compiled, checkpoint_manager)
 
     def _extract_thinking_from_message(self, msg: Any) -> str | None:
         """
@@ -251,7 +247,7 @@ class Orchestrator:
         return extract_thinking(msg)
 
     def _build_error_event(self, error: Exception, *, key: SessionKey, start_time: int) -> dict:
-        """构建错误 SSE 事件（异常不被吞掉）"""
+        """构建错误 SSE 事件（用于 stream 场景返回错误给调用方）"""
         if isinstance(error, LLMError):
             agent_id = error.agent_id
             agent_name = self._get_agent_name(agent_id) if agent_id else None
@@ -331,41 +327,33 @@ class Orchestrator:
         return self._compiled_graph
 
     async def _detect_session_state(
-        self, compiled, config: dict, query: str | None, key: SessionKey
+        self,
+        *,
+        compiled,
+        query: str | None,
+        key: SessionKey,
+        checkpoint_manager,
     ) -> _SessionState:
         """检测会话状态：是否存在、是否中断、经验上下文"""
-        existing_state = None
+        state = None
         is_interrupted = False
 
         try:
-            state_snapshot = await compiled.aget_state(config)
-            if state_snapshot and state_snapshot.values:
-                existing_state = state_snapshot.values
-                if hasattr(state_snapshot, "tasks") and state_snapshot.tasks:
-                    for task in state_snapshot.tasks:
-                        if hasattr(task, "interrupts") and task.interrupts:
-                            is_interrupted = True
-                            logger.info(f"⏸️ 检测到中断状态: key={key}")
-                            break
-                if not is_interrupted and existing_state:
-                    logger.info(f"🔄 恢复会话状态: key={key}")
+            snapshot = await checkpoint_manager.get_snapshot(compiled)
+            interrupts = ContextBuilder.extract_interrupts(snapshot)
+            if interrupts:
+                is_interrupted = True
+                logger.info(f"⏸️ 检测到中断状态: key={key}")
+            values = getattr(snapshot, "values", None) if snapshot else None
+            if values and not is_interrupted:
+                state = dict(values)
+                logger.info(f"🔄 恢复会话状态: key={key}")
         except Exception as e:
             logger.error(f"获取会话状态失败: {e}")
 
-        # 检索经验上下文（仅在新会话且有 query 时）
-        experience_context = None
-        if self._experience_retriever and not existing_state and not is_interrupted and query:
-            try:
-                experience_context = await self._experience_retriever.build_context(query)
-                if experience_context:
-                    logger.info("📚 检索到相似经验，已注入上下文")
-            except Exception as e:
-                logger.warning(f"检索经验失败: {e}")
-
         return _SessionState(
-            existing_state=existing_state,
+            state=state,
             is_interrupted=is_interrupted,
-            experience_context=experience_context,
         )
 
     def _build_stream_input(
@@ -378,30 +366,29 @@ class Orchestrator:
     ) -> dict | Command | None:
         """根据场景构建 stream 输入"""
         if session_state.is_interrupted and resume_value is not None:
-            logger.info(f"▶️ 使用 Command(resume) 恢复中断: key={key}")
+            logger.info(f"使用 Command(resume) 恢复中断: key={key}")
             return Command(resume=resume_value)
 
         if session_state.is_interrupted and query:
-            logger.warning(f"⚠️ 中断恢复使用 query 作为 resume_value: key={key}")
+            logger.warning(f"中断恢复使用 query 作为 resume_value: key={key}")
             return Command(resume=query)
 
-        if session_state.existing_state and query:
-            logger.info(f"💬 续聊模式: key={key}")
-            return {
-                "messages": [HumanMessage(content=query)],
-                "active_agent": self.entry_agent_id,
-            }
+        if session_state.state and query:
+            logger.info(f"续聊模式: key={key}")
+            return StateBuilder.build_resume_update(
+                state=session_state.state,
+                query=query,
+                entry_agent_id=self.entry_agent_id,
+            )
 
         if query:
-            logger.info(f"🆕 新会话: key={key}")
-            input_data = create_blackboard(
+            logger.info(f"新会话: key={key}")
+            return StateBuilder.build_initial_state(
                 namespace=self.namespace,
                 session_id=key.session_id,
-                experience_context=session_state.experience_context,
+                query=query,
+                entry_agent_id=self.entry_agent_id,
             )
-            input_data["messages"] = [HumanMessage(content=query)]
-            input_data["active_agent"] = self.entry_agent_id
-            return input_data
 
         return None
 
@@ -446,40 +433,41 @@ class Orchestrator:
         return events, tool_count
 
     async def _build_interrupt_event(
-        self, compiled, config: dict, key: SessionKey, start_time: int
+        self,
+        *,
+        compiled,
+        checkpoint_manager,
+        key: SessionKey,
+        start_time: int,
     ) -> dict | None:
         """检测中断并构建事件（未中断返回 None）"""
-        final_state = await compiled.aget_state(config)
+        try:
+            snapshot = await checkpoint_manager.get_snapshot(compiled)
+            interrupts = ContextBuilder.extract_interrupts(snapshot)
+        except Exception as e:
+            logger.error(f"检测中断失败: {e}")
+            return None
 
-        # 检测中断
-        if hasattr(final_state, "tasks") and final_state.tasks:
-            for task in final_state.tasks:
-                if hasattr(task, "interrupts") and task.interrupts:
-                    logger.info(f"⏸️ 执行被中断: key={key}")
-                    payloads = [getattr(i, "value", None) for i in task.interrupts]
-                    payload = payloads[0] if len(payloads) == 1 else payloads
-                    interrupt_obj = task.interrupts[0]
-                    agent_id = (
-                        getattr(task, "name", None)
-                        or getattr(task, "node", None)
-                        or self._extract_agent_id_from_interrupt(interrupt_obj)
-                        or "unknown"
-                    )
-                    agent_name = self._get_agent_name(agent_id)
-                    return build_event_payload(
-                        event=EventType.AGENT_INTERRUPT,
-                        key=key,
-                        agent_id=agent_id,
-                        agent_name=agent_name,
-                        duration_ms=now_ms() - start_time,
-                        data={
-                            "interrupt": {
-                                "payload": payload,
-                            }
-                        },
-                    )
+        if not interrupts:
+            return None
 
-        return None
+        first_interrupt = interrupts[0]
+        agent_id = first_interrupt.get("agent_id", "unknown")
+        agent_name = self._get_agent_name(agent_id)
+        payload = first_interrupt.get("payload")
+        logger.info(f"执行被中断: key={key}")
+        return build_event_payload(
+            event=EventType.AGENT_INTERRUPT,
+            key=key,
+            agent_id=agent_id,
+            agent_name=agent_name,
+            duration_ms=now_ms() - start_time,
+            data={
+                "interrupt": {
+                    "payload": payload,
+                }
+            },
+        )
 
     async def stream(
         self,
@@ -512,12 +500,21 @@ class Orchestrator:
 
         config = {"configurable": {"thread_id": str(key)}}
         compiled = await self._ensure_compiled()
+        checkpoint_manager = ContextBuilder.create_checkpoint_manager(
+            key=key,
+            checkpointer=self._checkpointer,
+        )
 
         if self._experience_learner and query:
             self._experience_learner.start_recording(key.session_id, query)
 
         # Phase 1: 检测会话状态
-        session_state = await self._detect_session_state(compiled, config, query, key)
+        session_state = await self._detect_session_state(
+            compiled=compiled,
+            query=query,
+            key=key,
+            checkpoint_manager=checkpoint_manager,
+        )
 
         # Phase 2: 构建输入
         input_for_stream = self._build_stream_input(
@@ -659,6 +656,7 @@ class Orchestrator:
                         "usage": {
                             "input_tokens": event.input_tokens,
                             "output_tokens": event.output_tokens,
+                            "cached_tokens": event.cached_tokens,
                         },
                     },
                 )
@@ -797,13 +795,18 @@ class Orchestrator:
                 yield queued
 
             # Phase 5: 检测中断
-            interrupt_event = await self._build_interrupt_event(compiled, config, key, start_time)
+            interrupt_event = await self._build_interrupt_event(
+                compiled=compiled,
+                checkpoint_manager=checkpoint_manager,
+                key=key,
+                start_time=start_time,
+            )
             if interrupt_event is not None:
                 yield interrupt_event
                 return
 
             # 完成事件和经验记录
-            deliverable_keys = await self._load_deliverable_keys(compiled, config)
+            deliverable_keys = await self._load_deliverable_keys(compiled, checkpoint_manager)
             deliverables = await self._load_deliverables_map(
                 session_id=key.session_id,
                 deliverable_keys=deliverable_keys,
@@ -823,12 +826,23 @@ class Orchestrator:
             await self._cleanup_session_artifacts(
                 session_id=key.session_id,
                 compiled=compiled,
-                config=config,
+                checkpoint_manager=checkpoint_manager,
             )
 
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
-            logger.error(f"执行失败: {e}", exc_info=True)
-            yield self._build_error_event(e, key=key, start_time=start_time)
+            # stream 场景下错误通过 SSE 事件返回给调用方；默认不额外刷一遍堆栈，避免重复输出。
+            logger.debug("执行失败: %s", e, exc_info=True)
+            # 如果异常发生在 compiled.astream() 迭代过程中，event_queue 里可能已经积攒了事件（start/tool 等）。
+            # 先把队列里的事件尽量吐出去，避免调用方只能看到最后一条 failed 事件。
+            while not event_queue.empty():
+                try:
+                    queued = event_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                yield queued
+            error_event = self._build_error_event(e, key=key, start_time=start_time)
             if self._experience_learner:
                 self._experience_learner.complete_recording(
                     session_id=key.session_id, outcome="failure", result_summary=str(e)
@@ -836,9 +850,10 @@ class Orchestrator:
             await self._cleanup_session_artifacts(
                 session_id=key.session_id,
                 compiled=compiled,
-                config=config,
+                checkpoint_manager=checkpoint_manager,
             )
-            raise
+            yield error_event
+            return
         finally:
             for event_type, handler in handlers:
                 self._event_bus.unregister(event_type, handler)
@@ -850,13 +865,11 @@ class Orchestrator:
     async def clear_session(self, session_id: str) -> None:
         """清理会话记忆（删除 checkpointer 状态）"""
         key = self._make_key(session_id)
-        thread_id = str(key)
-
-        # 删除 checkpointer 状态
-        if hasattr(self._checkpointer, "adelete_thread"):
-            await self._checkpointer.adelete_thread(thread_id)
-        elif hasattr(self._checkpointer, "delete_thread"):
-            self._checkpointer.delete_thread(thread_id)
+        checkpoint_manager = ContextBuilder.create_checkpoint_manager(
+            key=key,
+            checkpointer=self._checkpointer,
+        )
+        await ContextBuilder.delete_checkpoints(checkpoint_manager=checkpoint_manager)
 
     async def clear_session_store(self, session_id: str) -> None:
         """清理会话交付物（Store）"""
@@ -864,41 +877,42 @@ class Orchestrator:
             return
 
         key = self._make_key(session_id)
-        thread_id = str(key)
-        config = {"configurable": {"thread_id": thread_id}}
-
         compiled = await self._ensure_compiled()
-        deliverable_keys = await self._load_deliverable_keys(compiled, config)
+        checkpoint_manager = ContextBuilder.create_checkpoint_manager(
+            key=key,
+            checkpointer=self._checkpointer,
+        )
+        deliverable_keys = await self._load_deliverable_keys(compiled, checkpoint_manager)
         await self._clear_store_artifacts(session_id, deliverable_keys)
-        await self._clear_deliverable_refs(compiled, config)
+        await self._clear_deliverable_refs(compiled, checkpoint_manager)
 
 
     async def get_session_stats(self, session_id: str) -> dict:
         """获取会话统计"""
         key = self._make_key(session_id)
-        thread_id = str(key)
-        config = {"configurable": {"thread_id": thread_id}}
-
         compiled = await self._ensure_compiled()
+        checkpoint_manager = ContextBuilder.create_checkpoint_manager(
+            key=key,
+            checkpointer=self._checkpointer,
+        )
 
         try:
-            state_snapshot = await compiled.aget_state(config)
-            if not state_snapshot or not state_snapshot.values:
+            state = await checkpoint_manager.get_state(compiled)
+            if not state:
                 return {
                     "session_id": session_id,
                     "namespace": self.namespace,
                     "exists": False,
                 }
 
-            state = state_snapshot.values
-
+            sb = StateBuilder(state)
             return {
                 "session_id": session_id,
                 "namespace": self.namespace,
                 "exists": True,
-                "message_count": len(state.get("messages", [])),
-                "deliverables_count": len(state.get("deliverable_keys", [])),
-                "active_agent": state.get("active_agent"),
+                "message_count": len(sb.memory.snapshot()),
+                "deliverables_count": len(sb.deliverables.snapshot().keys),
+                "active_agent": sb.routing.snapshot().active_agent,
             }
 
         except Exception as e:
@@ -912,21 +926,23 @@ class Orchestrator:
     async def get_session_todo(self, session_id: str) -> dict:
         """获取会话 Todo（快照）"""
         key = self._make_key(session_id)
-        thread_id = str(key)
-        config = {"configurable": {"thread_id": thread_id}}
-
         compiled = await self._ensure_compiled()
+        checkpoint_manager = ContextBuilder.create_checkpoint_manager(
+            key=key,
+            checkpointer=self._checkpointer,
+        )
 
         try:
-            state_snapshot = await compiled.aget_state(config)
-            if not state_snapshot or not state_snapshot.values:
+            state = await checkpoint_manager.get_state(compiled)
+            if not state:
                 return {
                     "session_id": session_id,
                     "namespace": self.namespace,
                     "exists": False,
                 }
 
-            todo_data = state_snapshot.values.get("todo")
+            sb = StateBuilder(state)
+            todo_data = sb.todo.snapshot().todo
             return {
                 "session_id": session_id,
                 "namespace": self.namespace,

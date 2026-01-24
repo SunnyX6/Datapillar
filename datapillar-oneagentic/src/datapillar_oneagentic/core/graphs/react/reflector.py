@@ -23,10 +23,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from datapillar_oneagentic.context import ContextBuilder
 
 from datapillar_oneagentic.core.status import ExecutionStatus
 from datapillar_oneagentic.core.graphs.react.schemas import Plan, Reflection, ReflectorOutput
+from datapillar_oneagentic.utils.prompt_format import format_code_block, format_markdown
 from datapillar_oneagentic.utils.structured_output import parse_structured_output
 
 logger = logging.getLogger(__name__)
@@ -34,74 +35,69 @@ logger = logging.getLogger(__name__)
 
 def _parse_reflector_output(result: Any) -> ReflectorOutput:
     """
-    解析 Reflector 输出（带 fallback）
-
-    优先使用 LangChain 解析结果，失败时用内部解析器兜底。
+    解析 Reflector 输出（严格模式）
     """
-    # 1. 直接是目标类型
-    if isinstance(result, ReflectorOutput):
-        return result
-
-    # 2. dict 格式（include_raw=True）
-    if isinstance(result, dict):
-        parsed = result.get("parsed")
-        if isinstance(parsed, ReflectorOutput):
-            return parsed
-
-        # parsed 是 dict
-        if isinstance(parsed, dict):
-            return ReflectorOutput.model_validate(parsed)
-
-        # 从 raw 提取
-        raw = result.get("raw")
-        if raw:
-            content = getattr(raw, "content", None)
-            if content:
-                return parse_structured_output(content, ReflectorOutput)
-
-    raise ValueError(f"无法解析 Reflector 输出: {type(result)}")
+    return parse_structured_output(result, ReflectorOutput, strict=False)
 
 
-REFLECTOR_SYSTEM_PROMPT = """你是一个智能反思器，负责评估任务执行结果并决定下一步行动。
-
-## 你的职责
-1. 评估当前执行进度
-2. 判断用户目标是否达成
-3. 分析存在的问题
-4. 决定下一步行动
-
-## 评估原则
-1. 客观评估：基于实际执行结果，不要臆测
-2. 关注目标：最终目的是达成用户目标，不是完成所有任务
-3. 合理重试：如果是临时错误，可以重试；如果是方案问题，需要重新规划
-4. 及时止损：如果多次失败且无法恢复，应该放弃
-
-## 下一步行动选项（next_action）
-- **continue**: 继续执行下一个任务（当前任务成功，还有待执行任务）
-- **retry**: 重试当前任务（当前任务失败，但可能是临时错误）
-- **replan**: 重新规划（当前方案有问题，需要调整计划）
-- **complete**: 完成（目标已达成）
-- **fail**: 失败（无法达成目标，放弃）
-
-## 决策逻辑
-1. 如果所有任务都完成，且目标达成 -> complete
-2. 如果有任务失败，但重试次数未达上限 -> retry
-3. 如果重试多次仍失败，且可以调整方案 -> replan
-4. 如果重新规划次数达上限，或无法调整 -> fail
-5. 如果当前任务完成，还有待执行任务 -> continue
-
-## 输出格式
-你必须输出以下 JSON 格式：
-{{
+REFLECTOR_OUTPUT_SCHEMA = """{
   "goal_achieved": false,
   "confidence": 0.8,
-  "summary": "当前进度总结",
-  "issues": ["问题1", "问题2"],
-  "suggestions": ["建议1", "建议2"],
+  "summary": "...",
+  "issues": ["..."],
+  "suggestions": ["..."],
   "next_action": "continue",
-  "reason": "决策理由说明"
-}}
-"""
+  "reason": "..."
+}"""
+
+REFLECTOR_SYSTEM_PROMPT = format_markdown(
+    title=None,
+    sections=[
+        (
+            "Role",
+            "You are a reflection agent that evaluates execution results and decides the next action.",
+        ),
+        (
+            "Responsibilities",
+            [
+                "Evaluate the current progress.",
+                "Decide whether the goal is achieved.",
+                "Identify issues based on evidence.",
+                "Choose the next action.",
+            ],
+        ),
+        (
+            "Rules",
+            [
+                "Base decisions on observed results, not speculation.",
+                "Focus on achieving the user goal, not completing every task.",
+                "Retry for transient errors; replan for strategy issues.",
+                "Fail fast if recovery is unlikely.",
+            ],
+        ),
+        (
+            "Next Action Options",
+            [
+                "continue: current task succeeded and there are remaining tasks.",
+                "retry: current task failed but may be transient.",
+                "replan: the plan needs adjustment.",
+                "complete: the goal is achieved.",
+                "fail: the goal cannot be achieved.",
+            ],
+        ),
+        (
+            "Decision Logic",
+            [
+                "All tasks complete and goal achieved -> complete.",
+                "Failed task and retries remain -> retry.",
+                "Repeated failures but plan can be adjusted -> replan.",
+                "Replan limit reached or no viable adjustment -> fail.",
+                "Current task done and tasks remain -> continue.",
+            ],
+        ),
+        ("Output (JSON)", format_code_block("json", REFLECTOR_OUTPUT_SCHEMA)),
+    ],
+)
 
 
 async def reflect(
@@ -124,35 +120,51 @@ async def reflect(
         Reflection: 反思结果
     """
     # 构建上下文
-    context_parts = [
-        f"## 用户目标\n{goal}",
-        f"\n## 当前计划和执行状态\n{plan.to_prompt()}",
-        f"\n## 重试信息\n- 已重试: {plan.retry_count} 次\n- 最大重试: {plan.max_retries} 次",
+    context_sections: list[tuple[str, str | list[str]]] = [
+        ("User Goal", goal),
+        ("Plan Status", plan.to_prompt(include_title=False)),
+        (
+            "Retry Info",
+            [
+                f"Retried: {plan.retry_count}",
+                f"Max retries: {plan.max_retries}",
+            ],
+        ),
     ]
 
     if last_result_summary:
-        context_parts.append(f"\n## 最近执行结果\n{last_result_summary}")
+        context_sections.append(("Latest Result", last_result_summary))
 
     # 添加状态摘要
     completed_count = sum(1 for t in plan.tasks if t.status == ExecutionStatus.COMPLETED)
     failed_count = sum(1 for t in plan.tasks if t.status == ExecutionStatus.FAILED)
     pending_count = sum(1 for t in plan.tasks if t.status == ExecutionStatus.PENDING)
 
-    context_parts.append(
-        f"\n## 进度摘要\n- 完成: {completed_count}/{len(plan.tasks)}\n"
-        f"- 失败: {failed_count}\n- 待执行: {pending_count}"
+    context_sections.append(
+        (
+            "Progress Summary",
+            [
+                f"Completed: {completed_count}/{len(plan.tasks)}",
+                f"Failed: {failed_count}",
+                f"Pending: {pending_count}",
+            ],
+        )
     )
 
-    context = "\n".join(context_parts)
+    context = format_markdown(title=None, sections=context_sections)
 
-    messages = [
-        SystemMessage(content=REFLECTOR_SYSTEM_PROMPT),
-        HumanMessage(content=context),
-    ]
+    messages = ContextBuilder.build_react_reflector_messages(
+        system_prompt=REFLECTOR_SYSTEM_PROMPT,
+        context=context,
+    )
 
     logger.info("Reflector 开始反思...")
 
-    structured_llm = llm.with_structured_output(ReflectorOutput, method="json_mode", include_raw=True)
+    structured_llm = llm.with_structured_output(
+        ReflectorOutput,
+        method="function_calling",
+        include_raw=True,
+    )
     result = await structured_llm.ainvoke(messages)
 
     # 解析结果（带 fallback）

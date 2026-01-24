@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
 from langgraph.types import Send
 
-from datapillar_oneagentic.core.nodes import _extract_text
+from datapillar_oneagentic.context import ContextCollector, ContextScenario
+from datapillar_oneagentic.state import StateBuilder
 from datapillar_oneagentic.core.graphs.mapreduce.planner import create_mapreduce_plan
 from datapillar_oneagentic.core.graphs.mapreduce.schemas import MapReduceTask
 from datapillar_oneagentic.state.blackboard import Blackboard
@@ -26,6 +26,7 @@ def build_mapreduce_graph(
     create_mapreduce_worker_node,
     create_mapreduce_reducer_node,
     llm: Any,
+    context_collector: ContextCollector | None = None,
 ) -> StateGraph:
     """
     构建 MapReduce 执行图
@@ -50,56 +51,59 @@ def build_mapreduce_graph(
     graph = StateGraph(Blackboard)
 
     async def planner_node(state: Blackboard) -> dict:
-        messages = state.get("messages", [])
-        query = ""
-        for msg in reversed(messages):
-            if isinstance(msg, HumanMessage):
-                query = _extract_text(msg.content)
-                break
+        sb = StateBuilder(state)
+        query = sb.memory.latest_user_text() or ""
 
         if not query:
             raise ValueError("MapReduce Planner 未找到用户输入")
 
-        experience_context = state.get("experience_context")
+        contexts: dict[str, str] = {}
+        if context_collector is not None:
+            contexts = await context_collector.collect(
+                scenario=ContextScenario.MAPREDUCE_PLANNER,
+                state=state,
+                query=query,
+                session_id=sb.session_id,
+                spec=None,
+            )
         plan = await create_mapreduce_plan(
             goal=query,
             llm=llm,
             available_agents=worker_specs,
-            experience_context=experience_context,
+            contexts=contexts,
         )
-
-        return {
-            "mapreduce_goal": plan.goal,
-            "mapreduce_understanding": plan.understanding,
-            "mapreduce_tasks": [task.model_dump(mode="json") for task in plan.tasks],
-            "mapreduce_results": [],
-        }
+        sb.mapreduce.init_plan(
+            goal=plan.goal,
+            understanding=plan.understanding,
+            tasks=[task.model_dump(mode="json") for task in plan.tasks],
+        )
+        return sb.patch()
 
     graph.add_node("mapreduce_planner", planner_node)
 
     worker_node = create_mapreduce_worker_node(worker_ids)
     graph.add_node("mapreduce_worker", worker_node)
 
+    reducer_node_name = reducer_spec.id
     reducer_node = create_mapreduce_reducer_node(
         reducer_agent_id=reducer_spec.id,
         reducer_llm=llm,
         reducer_schema=reducer_spec.deliverable_schema,
     )
-    graph.add_node("mapreduce_reducer", reducer_node)
+    graph.add_node(reducer_node_name, reducer_node)
 
     graph.set_entry_point("mapreduce_planner")
 
     def fan_out(state: Blackboard):
-        tasks = state.get("mapreduce_tasks") or []
+        sb = StateBuilder(state)
+        tasks = sb.mapreduce.snapshot().tasks
         if not tasks:
-            return "mapreduce_reducer"
+            return reducer_node_name
 
         sends = []
         base_payload = {
-            "namespace": state.get("namespace"),
-            "session_id": state.get("session_id"),
-            "experience_context": state.get("experience_context"),
-            "todo": state.get("todo"),
+            "namespace": sb.namespace,
+            "session_id": sb.session_id,
         }
         for task_data in tasks:
             task = MapReduceTask.model_validate(task_data)
@@ -109,7 +113,6 @@ def build_mapreduce_graph(
                     {
                         **base_payload,
                         "mapreduce_task": task.model_dump(mode="json"),
-                        "mapreduce_results": [],
                     },
                 )
             )
@@ -118,10 +121,10 @@ def build_mapreduce_graph(
     graph.add_conditional_edges(
         "mapreduce_planner",
         fan_out,
-        ["mapreduce_worker", "mapreduce_reducer"],
+        ["mapreduce_worker", reducer_node_name],
     )
 
-    graph.add_edge("mapreduce_worker", "mapreduce_reducer")
-    graph.add_edge("mapreduce_reducer", END)
+    graph.add_edge("mapreduce_worker", reducer_node_name)
+    graph.add_edge(reducer_node_name, END)
 
     return graph

@@ -24,6 +24,10 @@ const LazyMainLayout = lazy(() => import('@/layouts/MainLayout').then(m => ({ de
 
 const LazyDashboardPage = lazy(() => import('@/pages/dashboard').then(m => ({ default: m.DashboardPage })))
 
+const LazyProjectsPage = lazy(() => import('@/pages/projects').then(m => ({ default: m.ProjectPage })))
+
+const LazyCollaborationPage = lazy(() => import('@/pages/collaboration').then(m => ({ default: m.CollaborationPage })))
+
 const LazyWorkflowStudioPage = lazy(() => import('@/pages/workflow').then(m => ({ default: m.WorkflowStudioPage })))
 
 const LazyWikiPage = lazy(() => import('@/pages/wiki').then(m => ({ default: m.WikiPage })))
@@ -67,6 +71,14 @@ export const router = createBrowserRouter([
           {
             path: '/home',
             element: withSuspense(LazyDashboardPage)
+          },
+          {
+            path: '/projects',
+            element: withSuspense(LazyProjectsPage)
+          },
+          {
+            path: '/collaboration',
+            element: withSuspense(LazyCollaborationPage)
           },
           {
             path: '/workflow',

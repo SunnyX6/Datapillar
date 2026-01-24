@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Loader2 } from 'lucide-react'
+import { Button } from './Button'
 
 /** 默认每页加载数量 */
 const DEFAULT_PAGE_SIZE = 8
@@ -205,15 +206,17 @@ export function InfiniteSelect({
 
   return (
     <>
-      <button
+      <Button
         ref={triggerRef}
         type="button"
         onClick={handleOpen}
+        variant="link"
+        size="tiny"
         className={`shrink-0 inline-flex items-center gap-1 bg-transparent border-b border-dashed ${styles.trigger} text-caption px-1 py-0.5 ${triggerClassName}`}
       >
         <span>{placeholder}</span>
         <ChevronDown size={12} className={open ? 'rotate-180' : ''} />
-      </button>
+      </Button>
 
       {open && dropdownPos && createPortal(
         <div
@@ -234,10 +237,12 @@ export function InfiniteSelect({
             ) : (
               <>
                 {filteredItems.map((item) => (
-                  <button
+                  <Button
                     key={item.key}
                     type="button"
                     onClick={() => handleSelect(item)}
+                    variant="ghost"
+                    size="small"
                     className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-left hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
                     <span className="flex items-center gap-1.5">
@@ -245,7 +250,7 @@ export function InfiniteSelect({
                       <span className="text-caption text-slate-500 font-mono">{item.code}</span>
                     </span>
                     <span className="text-caption text-slate-600 dark:text-slate-400 truncate">{item.name}</span>
-                  </button>
+                  </Button>
                 ))}
                 {loadingMore && (
                   <div className="flex items-center justify-center py-2">

@@ -27,6 +27,7 @@ import {
   Check
 } from 'lucide-react'
 import { DEFAULT_LENGTH, getMaxLengthForType, type DataTypeValue } from '@/layouts/governance/utils/dataType'
+import { Button } from './Button'
 
 /** 数据类型配置 */
 interface DataTypeConfig {
@@ -397,12 +398,14 @@ export function DataTypeSelector({
 
   return (
     <>
-      <button
+      <Button
         ref={triggerRef}
         type="button"
         disabled={disabled}
         onClick={() => setOpen(!open)}
         title={displayLabel}
+        variant="outline"
+        size={isSmall ? 'small' : 'normal'}
         className={`flex items-center min-w-0 max-w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
           isSmall ? 'gap-1.5 px-2 py-1 rounded-lg' : 'gap-2 px-3 py-2 rounded-xl'
         } ${triggerClassName ?? ''}`}
@@ -419,7 +422,7 @@ export function DataTypeSelector({
           size={triggerChevronSize}
           className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
         />
-      </button>
+      </Button>
 
       {open &&
         dropdownPos &&
@@ -438,13 +441,15 @@ export function DataTypeSelector({
                 const isSelected = value.type === config.type
                 const Icon = config.icon
                 return (
-                  <button
+                  <Button
                     key={config.type}
-                    ref={hoveredType === config.type ? hoverItemRef : null}
+                    ref={hoveredType === config.type ? hoverItemRef : undefined}
                     type="button"
                     onClick={() => handleSelect(config)}
                     onMouseEnter={() => handleItemMouseEnter(config.type)}
                     onMouseLeave={handleItemMouseLeave}
+                    variant="ghost"
+                    size={isSmall ? 'small' : 'normal'}
                     className={`w-full flex items-center text-left transition-all ${itemSizeClass} ${
                       isSelected
                         ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
@@ -457,7 +462,7 @@ export function DataTypeSelector({
                       <ChevronDown size={itemChevronSize} className="-rotate-90 text-slate-400" />
                     )}
                     {isSelected && <Check size={itemCheckSize} className="text-blue-500" />}
-                  </button>
+                  </Button>
                 )
               })}
             </div>

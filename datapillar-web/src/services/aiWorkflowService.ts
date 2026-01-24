@@ -2,12 +2,13 @@
  * AI 工作流服务
  *
  * 使用 SSE/JSON 事件流进行传输（浏览器端可断线重连并基于 Last-Event-ID 重放）
+ * 协议版本：v3（统一 stream 事件）
  */
 
 /**
  * SSE 事件类型
  */
-export type SseEventType = 'process' | 'reply'
+export type SseEventType = 'stream'
 
 export type ProcessPhase = 'analysis' | 'catalog' | 'design' | 'develop' | 'review'
 
@@ -23,77 +24,29 @@ export interface ProcessActivity {
   progress?: number
 }
 
-export interface ProcessEvent {
+export type StreamStatus = 'running' | 'interrupt' | 'done' | 'error' | 'aborted'
+
+export interface StreamInterrupt {
+  text: string
+  options: string[]
+}
+
+export interface StreamEvent {
   v: number
   ts: number
-  event: 'process'
+  event: 'stream'
   run_id: string
-  activity: ProcessActivity
+  message_id: string
+  status: StreamStatus
+  phase: ProcessPhase
+  activity?: ProcessActivity | null
+  message: string
+  interrupt: StreamInterrupt
+  workflow?: WorkflowResponse | null
+  recommendations?: string[]
 }
 
-export type ReplyStatus = 'done' | 'waiting' | 'error' | 'aborted'
-
-export interface ReplyRender {
-  type: 'workflow' | 'ui'
-  schema: string
-}
-
-export type UiKind = 'form' | 'actions' | 'info'
-
-export interface UiFormFieldOption {
-  label: string
-  value: string
-}
-
-export interface UiFormField {
-  id: string
-  label: string
-  type: 'text' | 'select' | 'textarea'
-  required?: boolean
-  placeholder?: string
-  options?: UiFormFieldOption[]
-}
-
-export interface UiFormPayload {
-  kind: 'form'
-  fields: UiFormField[]
-  submit: { label: string }
-}
-
-export interface UiAction {
-  type: 'button' | 'link'
-  label: string
-  value?: string
-  url?: string
-}
-
-export interface UiActionsPayload {
-  kind: 'actions'
-  actions: UiAction[]
-}
-
-export interface UiInfoPayload {
-  kind: 'info'
-  level?: 'info' | 'warning' | 'error'
-  items: string[]
-}
-
-export type UiPayload = UiFormPayload | UiActionsPayload | UiInfoPayload
-
-export interface ReplyEvent {
-  v: number
-  ts: number
-  event: 'reply'
-  run_id: string
-  reply: {
-    status: ReplyStatus
-    message: string
-    render: ReplyRender
-    payload?: WorkflowResponse | UiPayload | null
-  }
-}
-
-export type SseEvent = ProcessEvent | ReplyEvent
+export type SseEvent = StreamEvent
 
 /**
  * Job 响应
@@ -167,20 +120,17 @@ export function createWorkflowStream(
     try {
       const emitLocalError = (message: string, detail?: string) => {
         callbacks.onEvent({
-          v: 2,
+          v: 3,
           ts: Date.now(),
-          event: 'reply',
+          event: 'stream',
           run_id: `local-${Date.now()}`,
-          reply: {
-            status: 'error',
-            message: detail ? `${message}：${detail}` : message,
-            render: { type: 'ui', schema: 'v1' },
-            payload: {
-              kind: 'info',
-              level: 'error',
-              items: [detail ? `${message}：${detail}` : message]
-            }
-          }
+          message_id: `msg-local-${Date.now()}`,
+          status: 'error',
+          phase: 'analysis',
+          activity: null,
+          message: detail ? `${message}：${detail}` : message,
+          interrupt: { text: '', options: [] },
+          workflow: null
         })
       }
 
@@ -214,7 +164,7 @@ export function createWorkflowStream(
         try {
           const sseEvent = JSON.parse(event.data) as SseEvent
           callbacks.onEvent(sseEvent)
-          if (sseEvent.event === 'reply') {
+          if (sseEvent.status !== 'running') {
             eventSource?.close()
             eventSource = null
           }
@@ -235,20 +185,17 @@ export function createWorkflowStream(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       callbacks.onEvent({
-        v: 2,
+        v: 3,
         ts: Date.now(),
-        event: 'reply',
+        event: 'stream',
         run_id: `local-${Date.now()}`,
-        reply: {
-          status: 'error',
-          message: `连接失败：${message}`,
-          render: { type: 'ui', schema: 'v1' },
-          payload: {
-            kind: 'info',
-            level: 'error',
-            items: [`连接失败：${message}`]
-          }
-        }
+        message_id: `msg-local-${Date.now()}`,
+        status: 'error',
+        phase: 'analysis',
+        activity: null,
+        message: `连接失败：${message}`,
+        interrupt: { text: '', options: [] },
+        workflow: null
       })
     }
   }

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from datapillar_oneagentic import agent
 from src.modules.etl.schemas.workflow import WorkflowOutput
 from src.modules.etl.tools.component import list_component
-from src.modules.etl.tools.table import get_table_lineage, search_tables
+from src.modules.etl.tools.table import get_table_lineage
 
 if TYPE_CHECKING:
     from datapillar_oneagentic import AgentContext
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     id="architect",
     name="数据架构师",
     description="根据需求分析结果设计技术实现方案，规划 Job 和 Stage",
-    tools=[get_table_lineage, search_tables, list_component],
+    tools=[get_table_lineage, list_component],
     deliverable_schema=WorkflowOutput,
     temperature=0.0,
     max_steps=5,
@@ -40,7 +40,7 @@ class ArchitectAgent:
 
 ## 你的任务
 
-根据需求分析结果，设计技术实现方案：
+根据需求分析结果，负责工作流的设计，设计技术实现方案：
 1. 决定需要几个 Job（前端节点）
 2. 规划每个 Job 的 Stage（SQL 执行单元）
 3. 确定 Job 之间的调度依赖
@@ -68,7 +68,6 @@ class ArchitectAgent:
 
 ## 输出格式（JSON）
 
-```json
 {
   "name": "工作流名称",
   "description": "工作流描述",
@@ -84,19 +83,19 @@ class ArchitectAgent:
           "stage_id": 1,
           "name": "Stage名称",
           "description": "Stage描述",
-          "input_tables": ["schema.table"],
-          "output_table": "schema.output",
-          "is_temp_table": false
+          "input_tables": ["catalog.schema.table"],
+          "output_table": "catalog.schema.output",
+          "is_temp_table": false,
+          "sql": null
         }
       ],
-      "input_tables": ["schema.table"],
-      "output_table": "schema.output"
+      "input_tables": ["catalog.schema.table"],
+      "output_table": "catalog.schema.output"
     }
   ],
   "risks": ["风险点"],
   "confidence": 0.8
 }
-```
 
 ## 重要约束
 
@@ -105,6 +104,7 @@ class ArchitectAgent:
 3. 不允许臆造表名，使用工具验证或上下文中的表名
 4. 设计完成后委派给数据开发工程师
 5. **委派时必须在任务描述中携带完整设计输出**（Workflow JSON）
+6. sql 由开发工程师填写，可省略或置空
 
 ## 架构设计方法论
 
@@ -143,8 +143,8 @@ class ArchitectAgent:
             upstream_context = f"未获取到结构化需求分析，请基于下发任务/用户输入进行设计。\n用户输入: {ctx.query}"
 
         # 1. 构建消息
-        prompt = f"{self.SYSTEM_PROMPT}\n\n## 上游需求分析\n{upstream_context}"
-        messages = ctx.build_messages(prompt)
+        human_message = f"## 上游需求分析\n{upstream_context}"
+        messages = ctx.build_messages(self.SYSTEM_PROMPT, human_message=human_message)
 
         # 2. 工具调用循环（委派由框架自动处理）
         messages = await ctx.invoke_tools(messages)

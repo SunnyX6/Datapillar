@@ -7,7 +7,7 @@ import { useSearchStore, useSemanticStatsStore } from '@/stores'
 import { useInfiniteScroll } from '@/hooks'
 import { fetchMetrics, deleteMetric, registerMetric, alterMetricVersion } from '@/services/oneMetaSemanticService'
 import { MetricFormModal, type MetricFormData } from './form/MetricForm'
-import { buildDataTypeString, type DataTypeValue } from '@/components/ui'
+import { Button, Card, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, buildDataTypeString, type DataTypeValue } from '@/components/ui'
 import { ComponentLibrarySidebar } from './ComponentLibrarySidebar'
 import { formatTime } from '@/lib/utils'
 
@@ -54,9 +54,11 @@ function MetricCard({
   const typeVariant = TYPE_VARIANTS[metric.type?.toUpperCase()] || 'blue'
 
   return (
-    <div
+    <Card
       onClick={onClick}
-      className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all cursor-pointer relative overflow-hidden"
+      size="narrow"
+      padding="sm"
+      className="group cursor-pointer relative overflow-hidden"
     >
       <div className="flex justify-between items-start mb-2">
         <div className="flex-1 min-w-0">
@@ -80,27 +82,33 @@ function MetricCard({
             {metric.audit?.creator?.[0] || 'U'}
           </div>
           <span className="text-micro font-medium text-slate-600 dark:text-slate-400">{metric.audit?.creator || '-'}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={handleEdit}
-            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-            title="编辑"
-          >
-            <Pencil size={iconSizeToken.small} />
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors disabled:opacity-50"
-            title="删除"
-          >
-            {deleting ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Trash2 size={iconSizeToken.small} />}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+	        </div>
+	        <div className="flex items-center gap-1">
+	          <Button
+	            type="button"
+	            variant="ghost"
+	            size="iconSm"
+	            onClick={handleEdit}
+	            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+	            title="编辑"
+	          >
+	            <Pencil size={iconSizeToken.small} />
+	          </Button>
+	          <Button
+	            type="button"
+	            variant="ghost"
+	            size="iconSm"
+	            onClick={handleDelete}
+	            disabled={deleting}
+	            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors disabled:opacity-50"
+	            title="删除"
+	          >
+	            {deleting ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Trash2 size={iconSizeToken.small} />}
+	          </Button>
+	        </div>
+	      </div>
+	    </Card>
+	  )
 }
 
 function MetricRow({
@@ -136,11 +144,11 @@ function MetricRow({
   const typeVariant = TYPE_VARIANTS[metric.type?.toUpperCase()] || 'blue'
 
   return (
-    <tr
+    <TableRow
       onClick={onClick}
       className="group hover:bg-blue-50/40 dark:hover:bg-blue-900/20 transition-colors cursor-pointer border-b border-slate-100 dark:border-slate-800 last:border-0"
     >
-      <td className="px-4 py-3">
+      <TableCell>
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
             <Target size={iconSizeToken.small} />
@@ -152,53 +160,59 @@ function MetricRow({
             <div className="text-micro font-mono text-slate-400 dark:text-slate-500 uppercase tracking-tight truncate">{metric.code}</div>
           </div>
         </div>
-      </td>
-      <td className="px-3 py-3 text-center">
+      </TableCell>
+      <TableCell className="px-3 text-center">
         <Badge variant={typeVariant}>{metric.type?.toUpperCase()}</Badge>
-      </td>
-      <td className="px-3 py-3 text-center">
+      </TableCell>
+      <TableCell className="px-3 text-center">
         <span className="font-mono text-micro text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/30 px-2 py-0.5 rounded border border-cyan-100 dark:border-cyan-800">
           {metric.dataType || '-'}
         </span>
-      </td>
-      <td className="px-3 py-3 text-center">
+      </TableCell>
+      <TableCell className="px-3 text-center">
         <span className="text-caption text-slate-600 dark:text-slate-400">
           {metric.unitName || '-'}
         </span>
-      </td>
-      <td className="px-3 py-3">
+      </TableCell>
+      <TableCell className="px-3">
         <div className="text-caption text-slate-500 dark:text-slate-400 line-clamp-1">{metric.comment || '-'}</div>
-      </td>
-      <td className="px-3 py-3 text-center">
+      </TableCell>
+      <TableCell className="px-3 text-center">
         <span className="text-micro font-mono text-slate-600 dark:text-slate-400">v{metric.currentVersion}</span>
-      </td>
-      <td className="px-3 py-3">
+      </TableCell>
+      <TableCell className="px-3">
         <div className="text-caption text-slate-500 dark:text-slate-400 truncate">{metric.audit?.creator || '-'}</div>
-      </td>
-      <td className="px-3 py-3">
+      </TableCell>
+      <TableCell className="px-3">
         <div className="text-caption text-slate-500 dark:text-slate-400">{formatTime(metric.audit?.createTime)}</div>
-      </td>
-      <td className="px-3 py-3">
-        <div className="flex items-center justify-center gap-1">
-          <button
-            onClick={handleEdit}
-            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-            title="编辑"
-          >
-            <Pencil size={iconSizeToken.small} />
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors disabled:opacity-50"
-            title="删除"
-          >
-            {deleting ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Trash2 size={iconSizeToken.small} />}
-          </button>
-        </div>
-      </td>
-    </tr>
-  )
+      </TableCell>
+	      <TableCell className="px-3">
+	        <div className="flex items-center justify-center gap-1">
+	          <Button
+	            type="button"
+	            variant="ghost"
+	            size="iconSm"
+	            onClick={handleEdit}
+	            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+	            title="编辑"
+	          >
+	            <Pencil size={iconSizeToken.small} />
+	          </Button>
+	          <Button
+	            type="button"
+	            variant="ghost"
+	            size="iconSm"
+	            onClick={handleDelete}
+	            disabled={deleting}
+	            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors disabled:opacity-50"
+	            title="删除"
+	          >
+	            {deleting ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Trash2 size={iconSizeToken.small} />}
+	          </Button>
+	        </div>
+	      </TableCell>
+	    </TableRow>
+	  )
 }
 
 interface MetricExplorerProps {
@@ -418,41 +432,51 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
     <div className="flex-1 flex overflow-hidden bg-slate-50/40 dark:bg-slate-950/50 animate-in slide-in-from-right-4 duration-300">
       {/* 主内容区域 */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <div className="h-12 @md:h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 @md:px-6 flex items-center justify-between shadow-sm z-10 flex-shrink-0">
-          <div className="flex items-center gap-2 @md:gap-3">
-            <button onClick={onBack} className="p-1 @md:p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 transition-all">
-              <ArrowLeft size={iconSizeToken.large} />
-            </button>
-            <div className="flex items-center gap-2">
-              <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">指标中心</h2>
-              <Badge variant="blue">
+	        <div className="h-12 @md:h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 @md:px-6 flex items-center justify-between shadow-sm z-10 flex-shrink-0">
+	          <div className="flex items-center gap-2 @md:gap-3">
+	            <Button
+	              type="button"
+	              variant="ghost"
+	              size="iconSm"
+	              onClick={onBack}
+	              className="p-1 @md:p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 transition-all"
+	            >
+	              <ArrowLeft size={iconSizeToken.large} />
+	            </Button>
+	            <div className="flex items-center gap-2">
+	              <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">指标中心</h2>
+	              <Badge variant="blue">
                 {filteredMetrics.length} / {total}
               </Badge>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 @md:gap-3">
-            <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
-              <button
-                onClick={() => setViewMode('LIST')}
-                className={`p-1 @md:p-1.5 rounded-md transition-all ${viewMode === 'LIST' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-              >
-                <List size={iconSizeToken.medium} />
-              </button>
-              <button
-                onClick={() => setViewMode('CARD')}
-                className={`p-1 @md:p-1.5 rounded-md transition-all ${viewMode === 'CARD' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-              >
-                <Grid size={iconSizeToken.medium} />
-              </button>
-            </div>
+	          <div className="flex items-center gap-2 @md:gap-3">
+	            <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+	              <Button
+	                type="button"
+	                variant="ghost"
+	                size="iconSm"
+	                onClick={() => setViewMode('LIST')}
+	                className={`size-6 p-0.5 rounded-md transition-all ${viewMode === 'LIST' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+	              >
+	                <List size={iconSizeToken.medium} />
+	              </Button>
+	              <Button
+	                type="button"
+	                variant="ghost"
+	                size="iconSm"
+	                onClick={() => setViewMode('CARD')}
+	                className={`size-6 p-0.5 rounded-md transition-all ${viewMode === 'CARD' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+	              >
+	                <Grid size={iconSizeToken.medium} />
+	              </Button>
+	            </div>
 
-            <button
-              onClick={() => setShowNewModal(true)}
-              className="bg-slate-900 dark:bg-blue-600 text-white px-3 @md:px-4 py-1 @md:py-1.5 rounded-lg text-caption @md:text-body-sm font-medium flex items-center gap-1 @md:gap-1.5 shadow-md hover:bg-blue-600 dark:hover:bg-blue-500 transition-all"
-            >
-              <Plus size={iconSizeToken.medium} /> <span className="hidden @md:inline">新建指标</span>
-            </button>
+            <Button onClick={() => setShowNewModal(true)} size="header">
+              <Plus size={iconSizeToken.medium} />
+              <span className="hidden @md:inline">新建指标</span>
+            </Button>
           </div>
         </div>
 
@@ -485,42 +509,45 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
               )}
             </>
           ) : (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
-              <table className="w-full text-left border-collapse table-fixed min-w-table-wide">
-                <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-semibold text-micro uppercase tracking-wider">
-                  <tr>
-                    <th className="px-4 py-3 w-52">指标名称 / 编码</th>
-                    <th className="px-3 py-3 w-16 text-center">类型</th>
-                    <th className="px-3 py-3 w-32 text-center">数据类型</th>
-                    <th className="px-3 py-3 w-16 text-center">单位</th>
-                    <th className="px-3 py-3">描述</th>
-                    <th className="px-3 py-3 w-14 text-center">版本</th>
-                    <th className="px-3 py-3 w-20">创建人</th>
-                    <th className="px-3 py-3 w-40">创建时间</th>
-                    <th className="px-3 py-3 w-16 text-center">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredMetrics.map((m) => (
-                    <MetricRow key={m.code} metric={m} onClick={() => onOpenDrawer(m)} onDelete={handleDelete} onEdit={setEditingMetric} />
-                  ))}
-                  {filteredMetrics.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-12 @md:py-16 text-center text-slate-400 text-caption @md:text-body-sm">
-                        未找到匹配的指标
-                      </td>
-                    </tr>
+            <Table
+              footer={
+                <>
+                  {/* 哨兵元素 + 加载更多 */}
+                  <div ref={sentinelRef} className="h-1" />
+                  {loadingMore && (
+                    <div className="flex justify-center py-4 border-t border-slate-100 dark:border-slate-800">
+                      <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                    </div>
                   )}
-                </tbody>
-              </table>
-              {/* 哨兵元素 + 加载更多 */}
-              <div ref={sentinelRef} className="h-1" />
-              {loadingMore && (
-                <div className="flex justify-center py-4 border-t border-slate-100 dark:border-slate-800">
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                </div>
-              )}
-            </div>
+                </>
+              }
+            >
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-52">指标名称 / 编码</TableHead>
+                  <TableHead className="px-3 w-16 text-center">类型</TableHead>
+                  <TableHead className="px-3 w-32 text-center">数据类型</TableHead>
+                  <TableHead className="px-3 w-16 text-center">单位</TableHead>
+                  <TableHead className="px-3">描述</TableHead>
+                  <TableHead className="px-3 w-14 text-center">版本</TableHead>
+                  <TableHead className="px-3 w-20">创建人</TableHead>
+                  <TableHead className="px-3 w-40">创建时间</TableHead>
+                  <TableHead className="px-3 w-16 text-center">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredMetrics.map((m) => (
+                  <MetricRow key={m.code} metric={m} onClick={() => onOpenDrawer(m)} onDelete={handleDelete} onEdit={setEditingMetric} />
+                ))}
+                {filteredMetrics.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="py-12 @md:py-16 text-center text-slate-400 text-caption @md:text-body-sm">
+                      未找到匹配的指标
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           )}
         </div>
       </div>

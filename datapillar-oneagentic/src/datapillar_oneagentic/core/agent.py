@@ -259,7 +259,7 @@ def agent(
         ],
     )
     class AnalystAgent:
-        SYSTEM_PROMPT = "你是需求分析师..."
+        SYSTEM_PROMPT = "You are a requirements analyst."
 
         async def run(self, ctx: AgentContext) -> AnalysisOutput:
             messages = ctx.build_messages(self.SYSTEM_PROMPT)

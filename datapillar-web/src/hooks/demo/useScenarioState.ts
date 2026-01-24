@@ -8,7 +8,7 @@
  * 4. 使用 useReducer 避免级联渲染
  */
 
-import { useReducer, useEffect, useMemo, useRef } from 'react'
+import { useReducer, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrameScheduler } from '../useFrameScheduler'
 import type { Scenario } from './useScenario'
 
@@ -206,7 +206,7 @@ export function useScenarioState(
 ): ScenarioState {
   const [state, dispatch] = useReducer(scenarioReducer, initialState)
   const isActive = options?.isActive ?? true
-  const { setFrameTimeout, setFrameInterval, clearFrameTask } = useFrameScheduler(isActive)
+  const { setFrameTimeout, setFrameInterval, clearFrameTask, clearAllTasks } = useFrameScheduler(isActive)
 
   const normalizedInputSteps = useMemo(() => {
     const steps = scenario.inputSteps
@@ -302,23 +302,30 @@ export function useScenarioState(
     return result
   }, [scenario.inputSteps])
 
-  const scenarioIdRef = useRef(scenario.id)
+  const scenarioRef = useRef(scenario)
   const leftLogLengthRef = useRef(scenario.leftLogs.join('').length)
   const rightLogLengthRef = useRef(scenario.rightLogs.join('').length)
   const completionHandledRef = useRef(false)
   const completionTimerRef = useRef<number | null>(null)
 
-  // 监听场景变化，重置状态
-  useEffect(() => {
-    if (scenario.id !== scenarioIdRef.current) {
-      scenarioIdRef.current = scenario.id
+  // 监听场景变化，重置状态（用 useLayoutEffect 避免语言切换时短暂显示旧语言）
+  useLayoutEffect(() => {
+    // 不能只用 scenario.id 判断：同一个场景在中英两套数据里 id 相同，但内容不同。
+    // 语言切换时需要把输入/日志/节点等状态一起重置，否则会出现“页面已切到新语言，但输入框仍是旧语言”的不一致。
+    if (scenarioRef.current !== scenario) {
+      scenarioRef.current = scenario
       leftLogLengthRef.current = scenario.leftLogs.join('').length
       rightLogLengthRef.current = scenario.rightLogs.join('').length
+
+      // 立即清掉上一场景的帧任务，避免旧任务继续写入状态导致语言不一致/闪烁。
+      clearAllTasks()
+      completionTimerRef.current = null
+      completionHandledRef.current = false
 
       // 使用 reducer 一次性重置所有状态
       dispatch({ type: 'RESET' })
     }
-  }, [scenario.id, scenario.leftLogs, scenario.rightLogs])
+  }, [scenario, clearAllTasks])
 
   // 阶段1：用户输入（按照 inputSteps 逐步显示）
   useEffect(() => {

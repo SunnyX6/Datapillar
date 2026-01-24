@@ -12,6 +12,10 @@ export function GovernanceMetricPage() {
     navigate('/governance/semantic')
   }
 
+  const handleMetricSelect = (metric: Metric) => {
+    setSelectedMetric((prev) => (prev?.code === metric.code ? null : metric))
+  }
+
   const handleVersionSwitch = (metric: Metric) => {
     setUpdatedMetric(metric)
     setSelectedMetric(metric)
@@ -19,7 +23,7 @@ export function GovernanceMetricPage() {
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-white dark:bg-slate-900 @container">
-      <MetricExplorer onBack={handleBack} onOpenDrawer={setSelectedMetric} updatedMetric={updatedMetric} />
+      <MetricExplorer onBack={handleBack} onOpenDrawer={handleMetricSelect} updatedMetric={updatedMetric} />
       {selectedMetric && (
         <MetricOverview
           metric={selectedMetric}

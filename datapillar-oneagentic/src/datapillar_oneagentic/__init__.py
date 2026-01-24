@@ -30,7 +30,7 @@ class AnalysisOutput(BaseModel):
     tools=[search_database],
 )
 class AnalystAgent:
-    SYSTEM_PROMPT = "你是数据分析师..."
+    SYSTEM_PROMPT = "You are a data analyst."
 
     async def run(self, ctx):
         messages = ctx.build_messages(self.SYSTEM_PROMPT)

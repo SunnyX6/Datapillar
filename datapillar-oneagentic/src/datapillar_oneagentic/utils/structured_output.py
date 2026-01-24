@@ -20,6 +20,10 @@ from typing import Annotated, Any, TypeVar, get_args, get_origin
 import json_repair
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
+from datapillar_oneagentic.exception.base import RecoveryAction
+from datapillar_oneagentic.exception.llm.categories import LLMErrorCategory
+from datapillar_oneagentic.exception.llm.errors import LLMError
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
@@ -55,7 +59,7 @@ class ModelCapabilities:
         "glm": {
             "supports_function_calling": True,
             "supports_structured_output": True,
-            "supports_tool_choice": True,  # 通过 ChatOpenAI 兼容层
+            "supports_tool_choice": False,  
         },
         "deepseek": {
             "supports_function_calling": True,
@@ -195,9 +199,78 @@ def extract_json(text: str) -> str:
 
 # ==================== 渐进式解析器 ====================
 
+def _maybe_parse_jsonish(text: str) -> object:
+    stripped = text.strip()
+    if not stripped:
+        return text
+    lowered = stripped.lower()
+    if lowered in {"null", "true", "false"}:
+        try:
+            return json.loads(lowered)
+        except json.JSONDecodeError:
+            return text
+    if (stripped.startswith("{") and stripped.endswith("}")) or (
+        stripped.startswith("[") and stripped.endswith("]")
+    ):
+        try:
+            return json.loads(stripped)
+        except json.JSONDecodeError:
+            return text
+    return text
+
+def normalize_jsonish(value: object) -> object:
+    if isinstance(value, dict):
+        return {key: normalize_jsonish(val) for key, val in value.items()}
+    if isinstance(value, list):
+        return [normalize_jsonish(item) for item in value]
+    if isinstance(value, str):
+        return _maybe_parse_jsonish(value)
+    return value
+
+
+def _build_expected_fields(schema: type[BaseModel]) -> str:
+    fields = []
+    for name, field in schema.model_fields.items():
+        field_type = field.annotation.__name__ if hasattr(field.annotation, "__name__") else str(field.annotation)
+        desc = field.description or ""
+        fields.append(f"- {name}: {field_type}" + (f" ({desc})" if desc else ""))
+    return "\n".join(fields)
+
+
+def _build_structured_error_message(schema: type[BaseModel], *, detail: str | None = None) -> str:
+    lines = [
+        "结构化输出解析失败。",
+        "可能原因：schema 定义与提示词输出字段不一致，或模型未严格输出 JSON。",
+    ]
+    if detail:
+        lines.append(f"错误详情：{detail}")
+    lines.append("期望的 JSON 字段:")
+    lines.append(_build_expected_fields(schema))
+    lines.append("建议：请确保 SYSTEM_PROMPT 明确要求 JSON 输出，字段名与 schema 一致。")
+    return "\n".join(lines)
+
+
+def _extract_raw_text(raw: Any) -> str | None:
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        return raw
+    content = getattr(raw, "content", None)
+    if isinstance(content, str):
+        return content
+    return None
+
+
+def _log_final_structured_failure(raw: Any, parsing_error: Any) -> None:
+    logger.error(
+        "LLM 结构化输出最终解析失败 raw=%r parsing_error=%r",
+        raw,
+        parsing_error,
+    )
+
 
 def parse_structured_output(
-    text: str,
+    text: Any,
     schema: type[T],
     *,
     strict: bool = False,
@@ -214,7 +287,7 @@ def parse_structured_output(
     6. 单字段文本兜底（将 Markdown/纯文本封装为结构化输出）
 
     Args:
-        text: LLM 返回的原始文本
+        text: LLM 返回结果（可能是文本、结构化结果或已解析模型）
         schema: Pydantic 模型类
         strict: 是否使用严格模式（失败直接抛异常）
 
@@ -222,10 +295,99 @@ def parse_structured_output(
         解析后的 Pydantic 模型实例
 
     Raises:
-        ValueError: 所有策略都失败时
+        LLMError: 解析失败时抛出
     """
+    if isinstance(text, schema):
+        return text
+
+    if isinstance(text, dict):
+        parsed = text.get("parsed")
+        parsing_error = text.get("parsing_error")
+        raw = text.get("raw")
+        if {"raw", "parsed", "parsing_error"} <= text.keys():
+            raw_text = _extract_raw_text(raw)
+            if isinstance(parsed, schema):
+                return parsed
+            if isinstance(parsed, dict):
+                try:
+                    return schema.model_validate(normalize_jsonish(parsed))
+                except ValidationError as e:
+                    if not strict and raw_text:
+                        try:
+                            return parse_structured_output(raw_text, schema, strict=False)
+                        except LLMError as fallback_error:
+                            detail = f"Schema 校验失败: {e}; 兜底解析失败: {fallback_error}"
+                            _log_final_structured_failure(raw, parsing_error)
+                            raise LLMError(
+                                _build_structured_error_message(schema, detail=detail),
+                                category=LLMErrorCategory.STRUCTURED_OUTPUT,
+                                action=RecoveryAction.FAIL_FAST,
+                                original=e,
+                                raw=raw,
+                                parsing_error=parsing_error,
+                            ) from fallback_error
+                    _log_final_structured_failure(raw, parsing_error)
+                    raise LLMError(
+                        _build_structured_error_message(schema, detail=f"Schema 校验失败: {e}"),
+                        category=LLMErrorCategory.STRUCTURED_OUTPUT,
+                        action=RecoveryAction.FAIL_FAST,
+                        original=e,
+                        raw=raw,
+                        parsing_error=parsing_error,
+                    ) from e
+            if parsing_error is not None or parsed is None:
+                detail = "解析器未返回有效的 parsed"
+                if parsing_error:
+                    detail = f"解析器错误: {parsing_error}"
+                if not strict and raw_text:
+                    try:
+                        return parse_structured_output(raw_text, schema, strict=False)
+                    except LLMError as fallback_error:
+                        detail = f"{detail}; 兜底解析失败: {fallback_error}"
+                _log_final_structured_failure(raw, parsing_error)
+                raise LLMError(
+                    _build_structured_error_message(schema, detail=detail),
+                    category=LLMErrorCategory.STRUCTURED_OUTPUT,
+                    action=RecoveryAction.FAIL_FAST,
+                    original=parsing_error if isinstance(parsing_error, Exception) else None,
+                    raw=raw,
+                    parsing_error=parsing_error,
+                )
+            _log_final_structured_failure(raw, parsing_error)
+            raise LLMError(
+                _build_structured_error_message(schema, detail="解析器未返回有效的 parsed"),
+                category=LLMErrorCategory.STRUCTURED_OUTPUT,
+                action=RecoveryAction.FAIL_FAST,
+                raw=raw,
+                parsing_error=parsing_error,
+            )
+
+        try:
+            return schema.model_validate(normalize_jsonish(text))
+        except ValidationError as e:
+            raise LLMError(
+                _build_structured_error_message(schema, detail=f"Schema 校验失败: {e}"),
+                category=LLMErrorCategory.STRUCTURED_OUTPUT,
+                action=RecoveryAction.FAIL_FAST,
+                original=e,
+                raw=text,
+            ) from e
+
+    if not isinstance(text, str):
+        raise LLMError(
+            _build_structured_error_message(schema, detail=f"输出类型不支持: {type(text)}"),
+            category=LLMErrorCategory.STRUCTURED_OUTPUT,
+            action=RecoveryAction.FAIL_FAST,
+            raw=text,
+        )
+
     if not text or not text.strip():
-        raise ValueError("输入文本为空")
+        raise LLMError(
+            _build_structured_error_message(schema, detail="输出文本为空"),
+            category=LLMErrorCategory.STRUCTURED_OUTPUT,
+            action=RecoveryAction.FAIL_FAST,
+            raw=text,
+        )
 
     errors: list[str] = []
     adapter = TypeAdapter(schema)
@@ -236,7 +398,13 @@ def parse_structured_output(
     except ValidationError as e:
         errors.append(f"直接解析失败: {e}")
         if strict:
-            raise ValueError(f"Structured output 解析失败: {e}") from e
+            raise LLMError(
+                _build_structured_error_message(schema, detail=f"Schema 校验失败: {e}"),
+                category=LLMErrorCategory.STRUCTURED_OUTPUT,
+                action=RecoveryAction.FAIL_FAST,
+                original=e,
+                raw=text,
+            ) from e
 
     # 策略 2：json_repair 修复
     repaired = repair_json_text(text)
@@ -267,11 +435,13 @@ def parse_structured_output(
     final_text = repaired_extracted or extracted or repaired
     try:
         parsed = json.loads(final_text)
+        if isinstance(parsed, dict):
+            return schema.model_validate(normalize_jsonish(parsed))
         if isinstance(parsed, list) and parsed:
             # 取第一个 dict 元素
             first_dict = next((item for item in parsed if isinstance(item, dict)), None)
             if first_dict:
-                return schema.model_validate(first_dict)
+                return schema.model_validate(normalize_jsonish(first_dict))
     except (json.JSONDecodeError, ValidationError) as e:
         errors.append(f"数组解包失败: {e}")
 
@@ -291,22 +461,12 @@ def parse_structured_output(
     if coercion_error:
         errors.append(coercion_error)
 
-    # 所有策略都失败，生成清晰的错误信息
-    error_summary = "\n".join(f"  - {e}" for e in errors)
-
-    # 提取期望字段信息
-    expected_fields = []
-    for name, field in schema.model_fields.items():
-        field_type = field.annotation.__name__ if hasattr(field.annotation, "__name__") else str(field.annotation)
-        desc = field.description or ""
-        expected_fields.append(f"    - {name}: {field_type}" + (f" ({desc})" if desc else ""))
-
-    raise ValueError(
-        "结构化输出解析失败。\n\n"
-        "期望的 JSON 字段:\n" + "\n".join(expected_fields) + "\n\n"
-        f"建议: 请确保 SYSTEM_PROMPT 中明确指定了 JSON 输出格式，字段名需与上述定义一致。\n\n"
-        f"解析尝试:\n{error_summary}\n\n"
-        f"原始文本: {text[:300]}"
+    error_summary = "; ".join(errors)
+    raise LLMError(
+        _build_structured_error_message(schema, detail=f"解析尝试失败: {error_summary}"),
+        category=LLMErrorCategory.STRUCTURED_OUTPUT,
+        action=RecoveryAction.FAIL_FAST,
+        raw=text,
     )
 
 
@@ -342,7 +502,7 @@ def _try_parse_markdown_fields(text: str, schema: type[T]) -> tuple[T | None, st
             parsed_value = value.strip()
         else:
             try:
-                parsed_value = json.loads(value)
+                parsed_value = normalize_jsonish(json.loads(value))
             except json.JSONDecodeError as exc:
                 return None, f"Markdown 兜底解析失败: 字段 {field_name} 不是合法 JSON 值: {exc}"
         result[field_name] = parsed_value
@@ -484,12 +644,17 @@ def parse_args(
         解析后的 Pydantic 模型实例
     """
     if isinstance(args, dict):
-        return schema.model_validate(args)
+        return schema.model_validate(normalize_jsonish(args))
 
     if isinstance(args, str):
         return parse_structured_output(args, schema)
 
-    raise ValueError(f"无法解析 tool call arguments: {type(args)}")
+    raise LLMError(
+        _build_structured_error_message(schema, detail=f"Tool arguments 类型不支持: {type(args)}"),
+        category=LLMErrorCategory.INVALID_INPUT,
+        action=RecoveryAction.FAIL_FAST,
+        raw=args,
+    )
 
 
 def build_output_instructions(schema: type[BaseModel]) -> str:

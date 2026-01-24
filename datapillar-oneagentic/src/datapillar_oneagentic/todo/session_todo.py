@@ -11,6 +11,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from datapillar_oneagentic.core.status import ExecutionStatus, TERMINAL_STATUSES
+from datapillar_oneagentic.utils.prompt_format import format_markdown
 from datapillar_oneagentic.utils.time import now_ms
 StepStatus = ExecutionStatus
 TodoStatus = StepStatus
@@ -177,24 +178,34 @@ class SessionTodoList(BaseModel):
             return False
         return all(item.status in TERMINAL_STATUSES for item in self.items)
 
-    def to_prompt(self) -> str:
+    def to_prompt(self, *, include_title: bool = True) -> str:
         """生成 Todo 提示词"""
         if not self.items:
             return ""
 
-        lines = ["## 团队 Todo"]
+        team_lines: list[str] = []
         if self.goal:
-            lines.append(f"目标：{self.goal}")
+            team_lines.append(f"Goal: {self.goal}")
 
         for item in self.items:
             status_marker = f"[{item.status.value}]"
-            line = f"- {status_marker} [{item.id}] {item.description}"
+            line = f"{status_marker} [{item.id}] {item.description}"
             if item.result:
                 line += f" -> {item.result}"
-            lines.append(line)
+            team_lines.append(line)
 
         focus_item = self.get_next_pending_item()
-        if focus_item:
-            lines.append(f"\n当前关注项：[{focus_item.id}] {focus_item.description}")
+        if not include_title:
+            lines = [f"- {item}" for item in team_lines]
+            if focus_item:
+                lines.append(f"- Current Focus: [{focus_item.id}] {focus_item.description}")
+            return "\n".join(lines).strip()
 
-        return "\n".join(lines)
+        sections: list[tuple[str, str | list[str]]] = [("Team Todo", team_lines)]
+        if focus_item:
+            sections.append(("Current Focus", f"[{focus_item.id}] {focus_item.description}"))
+
+        return format_markdown(
+            title="Todo Context",
+            sections=sections,
+        )

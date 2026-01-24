@@ -1,0 +1,1 @@
+export { CollaborationPage } from './CollaborationPage'

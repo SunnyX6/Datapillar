@@ -9,6 +9,7 @@
  */
 
 import { Sun, Moon } from 'lucide-react'
+import { Button } from '@/components/ui'
 import { useThemeStore } from '@/stores'
 
 /**
@@ -24,13 +25,15 @@ export function ThemeToggle() {
   }
 
   return (
-    <button
+    <Button
       onClick={toggleTheme}
-      className="relative overflow-hidden h-8 w-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 active:bg-slate-300 dark:active:bg-white/15 active:scale-90 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 transition-all duration-150 border border-slate-200 dark:border-white/5"
+      variant="ghost"
+      size="iconSm"
+      className="relative size-6! overflow-hidden rounded-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 active:bg-slate-300 dark:active:bg-white/15 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 transition-colors duration-150 border border-slate-200 dark:border-white/5"
       aria-label={mode === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
       title={mode === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
     >
-      {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-    </button>
+      {mode === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+    </Button>
   )
 }

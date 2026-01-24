@@ -48,6 +48,7 @@ from datapillar_oneagentic.todo.tool import (
     create_todo_tools,
     extract_todo_updates,
 )
+from datapillar_oneagentic.state import StateBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +153,8 @@ class AgentExecutor:
         llm: ResilientChatModel,
     ) -> None:
         """没有上报时，追加 Todo 审计结果到消息中"""
-        todo_data = state.get("todo")
+        sb = StateBuilder(state)
+        todo_data = sb.todo.snapshot().todo
         if not todo_data:
             return
 
@@ -209,7 +211,8 @@ class AgentExecutor:
         - Store 通过 LangGraph 的 get_store() 自动获取，无需手动传递
         """
         spec = self.spec
-        key = SessionKey(namespace=state["namespace"], session_id=state["session_id"])
+        sb = StateBuilder(state)
+        key = sb.key()
         llm_with_context = self.llm.with_event_context(agent_id=spec.id, key=key)
         todo_audit_llm = self._todo_audit_llm.with_event_context(agent_id=spec.id, key=key)
         start_time = time.time()
@@ -261,9 +264,10 @@ class AgentExecutor:
 
             while True:
                 try:
+                    run_sb = StateBuilder(run_state)
                     ctx = AgentContext(
-                        namespace=run_state["namespace"],
-                        session_id=run_state["session_id"],
+                        namespace=run_sb.namespace,
+                        session_id=run_sb.session_id,
                         query=query,
                         _spec=spec,
                         _llm=llm_with_context,
@@ -503,20 +507,21 @@ class AgentExecutor:
         Returns:
             包含压缩后 messages 的新 state
         """
-        messages = state.get("messages", [])
+        sb = StateBuilder(state)
+        messages = sb.memory.snapshot()
         if not messages:
+            return state
+        if self._compactor is None:
             return state
 
         compressed_messages, result = await self._compactor.compact(messages)
 
         if result.success and result.removed_count > 0:
-            logger.info(
-                f"📦 消息压缩完成: 移除 {result.removed_count} 条, "
-                f"保留 {result.kept_count} 条"
-            )
-            new_state = state.copy()
-            new_state["messages"] = compressed_messages
-            return new_state
+            if result.summary:
+                sb.compression.set_runtime_compression(result.summary)
+            # runtime-only：只需要让下一次 LLM 调用变短，不写入 checkpoint。
+            sb.memory.replace_runtime_only(compressed_messages)
+            return state
 
         if not result.success:
             logger.warning(f"📦 消息压缩失败: {result.error}")

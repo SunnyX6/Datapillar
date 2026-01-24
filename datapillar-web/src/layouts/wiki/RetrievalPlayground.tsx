@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Search, Database, ChevronRight, FileText, Sliders, Zap, Layers, Command, Globe } from 'lucide-react'
+import { Card } from '@/components/ui'
 import { Select, type SelectOption } from '@/components/ui/Select'
 import { cardWidthClassMap, contentMaxWidthClassMap } from '@/design-tokens/dimensions'
-import { RESPONSIVE_TYPOGRAPHY, TYPOGRAPHY } from '@/design-tokens/typography'
+import { TYPOGRAPHY } from '@/design-tokens/typography'
 import type { SearchResult } from './types'
 
 interface Props {
@@ -68,14 +69,14 @@ export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }:
     <div className="flex flex-col h-full bg-slate-50/50 dark:bg-slate-950/40 relative overflow-visible">
       <div className="absolute top-0 inset-x-0 h-64 bg-gradient-to-b from-indigo-50/50 to-transparent dark:from-indigo-500/10 pointer-events-none" />
 
-      <div className={`relative z-10 flex flex-col h-full ${contentMaxWidthClassMap.extraWide} mx-auto w-full p-6`}>
-        <div className="flex flex-col items-center justify-center pt-8 pb-6 space-y-6 flex-shrink-0">
+      <div className={`relative z-10 flex flex-col h-full ${contentMaxWidthClassMap.extraWide} mx-auto w-full p-4`}>
+        <div className="flex flex-col items-center justify-center pt-6 pb-4 space-y-5 flex-shrink-0">
           <div className="text-center space-y-2">
-            <h3 className={`${RESPONSIVE_TYPOGRAPHY.cardTitle} font-bold text-slate-900 dark:text-slate-100 tracking-tight flex items-center justify-center`}>
-              <Zap className="mr-2 text-indigo-500" size={24} />
+            <h3 className={`${TYPOGRAPHY.subtitle} font-bold text-slate-900 dark:text-slate-100 tracking-tight flex items-center justify-center`}>
+              <Zap className="mr-2 text-indigo-500" size={20} />
               检索召回测试
             </h3>
-            <p className={`${RESPONSIVE_TYPOGRAPHY.body} text-slate-500 dark:text-slate-400`}>模拟 Agent 运行时环境，调试混合检索与重排序效果</p>
+            <p className={`${TYPOGRAPHY.bodySm} text-slate-500 dark:text-slate-400`}>模拟 Agent 运行时环境，调试混合检索与重排序效果</p>
             <p className={`${TYPOGRAPHY.caption} text-slate-400`}>当前空间：{spaceName}</p>
           </div>
 
@@ -88,7 +89,7 @@ export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }:
                     {isSearching ? (
                       <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                     ) : (
-                      <Search size={20} />
+                      <Search size={18} />
                     )}
                   </div>
                   <input
@@ -96,7 +97,7 @@ export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }:
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    className={`w-full h-full px-4 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none bg-transparent ${RESPONSIVE_TYPOGRAPHY.body}`}
+                    className={`w-full h-full px-4 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none bg-transparent ${TYPOGRAPHY.caption}`}
                     placeholder="输入测试问题，按回车键发起检索..."
                   />
 
@@ -106,7 +107,7 @@ export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }:
                       className={`p-2 rounded-lg transition-all duration-200 ${showConfig ? 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-200' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600'}`}
                       title="参数配置"
                     >
-                      <Sliders size={18} />
+                      <Sliders size={16} />
                     </button>
                   </div>
                 </div>
@@ -114,8 +115,11 @@ export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }:
             </div>
 
             {showConfig && (
-              <div className={`mt-3 ${searchWidthClass} p-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-30 animate-in fade-in slide-in-from-top-2 duration-200`}>
-                <div className="bg-slate-50/50 dark:bg-slate-800/60 rounded-xl p-6 space-y-6">
+              <Card
+                padding="none"
+                className={`mt-3 ${searchWidthClass} p-1 shadow-xl z-30 animate-in fade-in slide-in-from-top-2 duration-200`}
+              >
+                <div className="bg-slate-50/50 dark:bg-slate-800/60 rounded-xl p-4 space-y-5">
                   <div className="flex items-center justify-between">
                     <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase tracking-wider flex items-center shrink-0`}>
                       <Globe size={12} className="mr-1.5" /> 检索范围
@@ -133,7 +137,7 @@ export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }:
 
                   <div className="h-px bg-slate-200/60 dark:bg-slate-700/60"></div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="flex items-center justify-between">
                       <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase tracking-wider flex items-center shrink-0`}>
                         <Database size={12} className="mr-1.5" /> 检索模式
@@ -204,7 +208,7 @@ export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }:
                     </div>
                   </div>
                 </div>
-              </div>
+              </Card>
             )}
           </div>
         </div>
@@ -215,11 +219,11 @@ export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }:
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-4 shadow-sm">
                 <Command className="text-slate-300" size={24} />
               </div>
-              <p className={`${TYPOGRAPHY.body} text-slate-400`}>准备就绪，输入问题并回车</p>
+              <p className={`${TYPOGRAPHY.bodySm} text-slate-400`}>准备就绪，输入问题并回车</p>
             </div>
           ) : (
             <div className="space-y-4">
-              <div className={`${resultsWidthClass} flex items-center justify-between ${RESPONSIVE_TYPOGRAPHY.body} px-1`}>
+              <div className={`${resultsWidthClass} flex items-center justify-between ${TYPOGRAPHY.bodySm} px-1`}>
                 <div className="flex items-center space-x-2">
                   <span className="font-semibold text-slate-700 dark:text-slate-200 flex items-center">
                     召回结果 ({results ? results.length : 0})
@@ -238,7 +242,11 @@ export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }:
               </div>
 
               {results?.map((result) => (
-                <div key={result.chunkId} className={`${resultsWidthClass} bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group relative overflow-hidden`}>
+                <Card
+                  key={result.chunkId}
+                  padding="none"
+                  className={`${resultsWidthClass} p-5 shadow-sm hover:shadow-md group relative overflow-hidden`}
+                >
                   <div className={`absolute left-0 top-0 bottom-0 w-1 transition-opacity ${result.similarity > threshold ? 'bg-indigo-500 opacity-100' : 'bg-slate-300 opacity-30'}`}></div>
 
                   <div className="flex justify-between items-start mb-3">
@@ -253,14 +261,14 @@ export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }:
                     <div className="flex items-center space-x-3">
                       <div className="text-right">
                         <div className={`${TYPOGRAPHY.micro} text-slate-400 uppercase font-bold`}>Similarity</div>
-                        <div className={`${TYPOGRAPHY.body} font-bold font-mono ${result.similarity > 0.8 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        <div className={`${TYPOGRAPHY.bodySm} font-bold font-mono ${result.similarity > 0.8 ? 'text-emerald-600' : 'text-amber-600'}`}>
                           {result.similarity.toFixed(4)}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className={`bg-slate-50 dark:bg-slate-800 rounded-lg p-3 ${TYPOGRAPHY.body} text-slate-800 dark:text-slate-100 leading-relaxed border border-slate-100 dark:border-slate-700 group-hover:border-indigo-100 group-hover:bg-indigo-50/30 dark:group-hover:bg-indigo-500/10 transition-colors`}>
+                  <div className={`bg-slate-50 dark:bg-slate-800 rounded-lg p-3 ${TYPOGRAPHY.bodySm} text-slate-800 dark:text-slate-100 leading-relaxed border border-slate-100 dark:border-slate-700 group-hover:border-indigo-100 group-hover:bg-indigo-50/30 dark:group-hover:bg-indigo-500/10 transition-colors`}>
                     {result.content}
                   </div>
 
@@ -272,7 +280,7 @@ export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }:
                       上下文预览 <ChevronRight size={12} />
                     </button>
                   </div>
-                </div>
+                </Card>
               ))}
             </div>
           )}

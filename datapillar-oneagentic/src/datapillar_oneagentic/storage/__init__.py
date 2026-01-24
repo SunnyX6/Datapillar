@@ -141,6 +141,23 @@ async def create_checkpointer(
         async with AsyncPostgresSaver.from_conn_string(config.url) as saver:
             yield saver
 
+    elif checkpointer_type == "redis_shallow":
+        if not config.url:
+            raise ValueError("redis_shallow checkpointer 需要配置 url")
+        try:
+            from langgraph.checkpoint.redis.ashallow import AsyncShallowRedisSaver
+        except ImportError as err:
+            raise ImportError(
+                "使用 redis_shallow checkpointer 需要安装依赖：\n"
+                "  pip install datapillar-oneagentic[redis]"
+            ) from err
+        logger.info(f"创建 redis_shallow checkpointer, namespace={namespace}")
+        async with AsyncShallowRedisSaver.from_conn_string(config.url) as saver:
+            ttl_minutes = config.ttl_minutes
+            if ttl_minutes and ttl_minutes > 0:
+                saver.ttl = {"default": ttl_minutes}
+            yield saver
+
     elif checkpointer_type == "redis":
         if not config.url:
             raise ValueError("redis checkpointer 需要配置 url")

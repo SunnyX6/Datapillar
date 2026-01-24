@@ -40,10 +40,11 @@ class StageOutput(BaseModel):
     name: str = Field(..., description="Stage 名称，简洁描述这个阶段做什么")
     description: str = Field(..., description="Stage 详细描述，说明数据处理逻辑")
     input_tables: list[str] = Field(
-        default_factory=list, description="读取的表列表，格式为 schema.table"
+        default_factory=list, description="读取的表列表，格式为 catalog.schema.table"
     )
-    output_table: str = Field(..., description="输出表名，格式为 schema.table")
+    output_table: str = Field(..., description="输出表名，格式为 catalog.schema.table")
     is_temp_table: bool = Field(default=True, description="是否是临时表，临时表只在当前 Job 内有效")
+    sql: str | None = Field(default=None, description="SQL 语句（开发阶段补充）")
 
     @field_validator("input_tables", mode="before")
     @classmethod
@@ -247,7 +248,7 @@ class Workflow(BaseModel):
                     input_tables=s.input_tables,
                     output_table=s.output_table,
                     is_temp_table=s.is_temp_table,
-                    sql=None,
+                    sql=s.sql,
                 )
                 for s in job_output.stages
             ]

@@ -10,11 +10,12 @@ import json
 import logging
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from datapillar_oneagentic.context import ContextBuilder
 from pydantic import BaseModel, Field
 
 from datapillar_oneagentic.core.status import ExecutionStatus
 from datapillar_oneagentic.todo.session_todo import SessionTodoList, TodoUpdate
+from datapillar_oneagentic.utils.prompt_format import format_code_block, format_markdown
 from datapillar_oneagentic.utils.structured_output import parse_structured_output
 
 logger = logging.getLogger(__name__)
@@ -23,47 +24,38 @@ logger = logging.getLogger(__name__)
 class TodoAuditOutput(BaseModel):
     """Todo 审计输出"""
 
-    updates: list[TodoUpdate] = Field(default_factory=list, description="需要更新的 Todo 列表")
-    reason: str = Field(default="", description="审计说明")
+    updates: list[TodoUpdate] = Field(default_factory=list, description="Todo updates")
+    reason: str = Field(default="", description="Audit note")
 
 
 def _parse_audit_output(result: Any) -> TodoAuditOutput:
-    """解析 Todo 审计输出（带 fallback）"""
-    if isinstance(result, TodoAuditOutput):
-        return result
-
-    if isinstance(result, dict):
-        parsed = result.get("parsed")
-        if isinstance(parsed, TodoAuditOutput):
-            return parsed
-        if isinstance(parsed, dict):
-            return TodoAuditOutput.model_validate(parsed)
-
-        raw = result.get("raw")
-        if raw:
-            content = getattr(raw, "content", None)
-            if content:
-                return parse_structured_output(content, TodoAuditOutput)
-
-    raise ValueError(f"无法解析 Todo 审计输出: {type(result)}")
+    """解析 Todo 审计输出（严格模式）"""
+    return parse_structured_output(result, TodoAuditOutput, strict=False)
 
 
-TODO_AUDIT_PROMPT = """你是 Todo 审计器，负责根据最新执行结果更新 Todo 状态。
-
-## 审计原则
-1. 只基于已知结果判断，不要臆测
-2. 可以更新多个条目，也可以不更新
-3. 状态只能是：pending / running / completed / failed / skipped
-4. result 字段写简短结果，不要长篇解释
-
-## 输出格式（必须是 JSON）
-{
+TODO_AUDIT_OUTPUT_SCHEMA = """{
   "updates": [
-    {"id": "t1", "status": "completed", "result": "完成的简要结果"}
+    {"id": "t1", "status": "completed", "result": "short result"}
   ],
-  "reason": "审计说明"
-}
-"""
+  "reason": "audit note"
+}"""
+
+TODO_AUDIT_PROMPT = format_markdown(
+    title=None,
+    sections=[
+        ("Role", "You are a todo auditor that aligns todo status with execution results."),
+        (
+            "Rules",
+            [
+                "Use only observed results; do not speculate.",
+                "You may update multiple items or none.",
+                "Status must be: pending / running / completed / failed / skipped.",
+                "Keep result short and factual.",
+            ],
+        ),
+        ("Output (JSON)", format_code_block("json", TODO_AUDIT_OUTPUT_SCHEMA)),
+    ],
+)
 
 
 def _normalize_deliverable(deliverable: Any) -> str:
@@ -108,24 +100,28 @@ async def audit_todo_updates(
     error_text = error or ""
 
     status_value = agent_status.value if hasattr(agent_status, "value") else agent_status
-    context_parts = [
-        todo.to_prompt(),
-        f"\n## 执行状态\n{status_value}",
+    context_sections: list[tuple[str, str | list[str]]] = [
+        ("Todo", todo.to_prompt(include_title=False)),
+        ("Execution Status", status_value),
     ]
     if deliverable_text:
-        context_parts.append(f"\n## 交付物摘要\n{deliverable_text[:2000]}")
+        context_sections.append(("Deliverable Summary", deliverable_text[:2000]))
     if error_text:
-        context_parts.append(f"\n## 错误信息\n{error_text[:500]}")
+        context_sections.append(("Error", error_text[:500]))
 
-    context = "\n".join(context_parts)
+    context = format_markdown(title=None, sections=context_sections)
 
-    messages = [
-        SystemMessage(content=TODO_AUDIT_PROMPT),
-        HumanMessage(content=context),
-    ]
+    messages = ContextBuilder.build_todo_audit_messages(
+        system_prompt=TODO_AUDIT_PROMPT,
+        context=context,
+    )
 
     logger.info("Todo 审计开始...")
-    structured_llm = llm.with_structured_output(TodoAuditOutput, method="json_mode", include_raw=True)
+    structured_llm = llm.with_structured_output(
+        TodoAuditOutput,
+        method="function_calling",
+        include_raw=True,
+    )
     result = await structured_llm.ainvoke(messages)
     output = _parse_audit_output(result)
 

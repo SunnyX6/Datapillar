@@ -29,6 +29,9 @@ export {
 // Workflow Studio Store
 export { useWorkflowStudioStore, type AgentActivity, type ProcessActivity, type ChatMessage } from './workflowStudioStore'
 
+// Workflow Studio Cache Store
+export { useWorkflowStudioCacheStore } from './workflowStudioCacheStore'
+
 // Layout Store - 布局偏好
 export { useLayoutStore } from './layoutStore'
 

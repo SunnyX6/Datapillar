@@ -14,6 +14,7 @@ from typing import Any
 
 from langgraph.graph import END, StateGraph
 
+from datapillar_oneagentic.state import StateBuilder
 from datapillar_oneagentic.state.blackboard import Blackboard
 
 
@@ -59,9 +60,9 @@ def build_react_graph(
     # 3. 添加 finalize 节点（整理最终输出）
     def finalize_node(state: Blackboard) -> dict:
         """整理最终输出"""
-        return {
-            "active_agent": None,
-        }
+        sb = StateBuilder(state)
+        sb.routing.clear_active()
+        return sb.patch()
 
     graph.add_node("finalize", finalize_node)
 
@@ -99,7 +100,8 @@ def _react_controller_router(agent_ids: list[str]):
     - 否则 → finalize
     """
     def router(state: Blackboard) -> str:
-        active = state.get("active_agent")
+        sb = StateBuilder(state)
+        active = sb.routing.snapshot().active_agent
         if active and active in agent_ids:
             return active
         return "finalize"

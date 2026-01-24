@@ -8,7 +8,7 @@ Datapillar OneAgentic MapReduce 模式示例
 from __future__ import annotations
 
 import asyncio
-import os
+import json
 
 from pydantic import BaseModel
 
@@ -20,27 +20,25 @@ from datapillar_oneagentic import (
     agent,
     tool,
 )
+from datapillar_oneagentic.providers.llm import Provider
 
 
-# ============================================================================
-# LLM 配置
-# ============================================================================
-LLM_PROVIDER = "glm"
-LLM_API_KEY = os.environ.get("GLM_API_KEY")
-LLM_BASE_URL = os.environ.get("GLM_BASE_URL")
-LLM_MODEL = os.environ.get("GLM_MODEL")
-LLM_ENABLE_THINKING = os.environ.get("GLM_ENABLE_THINKING", "false").lower() in {
-    "1",
-    "true",
-    "yes",
-}
-
-if not LLM_API_KEY or not LLM_MODEL:
-    raise RuntimeError("请设置 GLM_API_KEY 和 GLM_MODEL（可选 GLM_BASE_URL/GLM_ENABLE_THINKING）")
+class CapabilityPoint(BaseModel):
+    category: str
+    capabilities: list[str]
 
 
-class TextOutput(BaseModel):
-    text: str
+class KeyPointsOutput(BaseModel):
+    points: list[CapabilityPoint]
+
+
+class ConclusionOutput(BaseModel):
+    conclusion: str
+
+
+class SummaryOutput(BaseModel):
+    points: list[CapabilityPoint]
+    conclusion: str
 
 
 @tool
@@ -59,20 +57,20 @@ def echo(text: str) -> str:
 @agent(
     id="worker_a",
     name="分析者",
-    deliverable_schema=TextOutput,
+    deliverable_schema=KeyPointsOutput,
     tools=[echo],
     description="提取任务的关键信息与要点",
 )
 class WorkerAgentA:
     SYSTEM_PROMPT = """你是分析者。
-使用 echo 工具提炼用户输入的关键信息并给出结论。
+使用 echo 工具提炼用户输入的关键信息并给出要点。
 
 ## 输出要求
 只能输出 JSON（单个对象），不得输出解释或 Markdown：
-{"text": "你的结果"}
+{"points": [{"category": "类别", "capabilities": ["能力1", "能力2"]}]}
 """
 
-    async def run(self, ctx: AgentContext) -> TextOutput:
+    async def run(self, ctx: AgentContext) -> KeyPointsOutput:
         messages = ctx.build_messages(self.SYSTEM_PROMPT)
         messages = await ctx.invoke_tools(messages)
         return await ctx.get_structured_output(messages)
@@ -81,7 +79,7 @@ class WorkerAgentA:
 @agent(
     id="worker_b",
     name="总结者",
-    deliverable_schema=TextOutput,
+    deliverable_schema=ConclusionOutput,
     tools=[echo],
     description="根据输入输出总结性结论",
 )
@@ -91,10 +89,10 @@ class WorkerAgentB:
 
 ## 输出要求
 只能输出 JSON（单个对象），不得输出解释或 Markdown：
-{"text": "你的结果"}
+{"conclusion": "你的结论"}
 """
 
-    async def run(self, ctx: AgentContext) -> TextOutput:
+    async def run(self, ctx: AgentContext) -> ConclusionOutput:
         messages = ctx.build_messages(self.SYSTEM_PROMPT)
         messages = await ctx.invoke_tools(messages)
         return await ctx.get_structured_output(messages)
@@ -103,7 +101,7 @@ class WorkerAgentB:
 @agent(
     id="reducer",
     name="汇总者",
-    deliverable_schema=TextOutput,
+    deliverable_schema=SummaryOutput,
     description="汇总多路结果并输出最终答案",
 )
 class ReducerAgent:
@@ -112,10 +110,10 @@ class ReducerAgent:
 
 ## 输出要求
 只能输出 JSON（单个对象），不得输出解释或 Markdown：
-{"text": "你的结果"}
+{"points": [{"category": "类别", "capabilities": ["能力1"]}], "conclusion": "你的结论"}
 """
 
-    async def run(self, ctx: AgentContext) -> TextOutput:
+    async def run(self, ctx: AgentContext) -> SummaryOutput:
         messages = ctx.build_messages(self.SYSTEM_PROMPT)
         return await ctx.get_structured_output(messages)
 
@@ -146,7 +144,7 @@ def _render_event(event: dict) -> None:
         deliverable = data.get("deliverable")
         if deliverable is not None:
             print("   ✅ 完成")
-            print(f"   📦 交付物: {deliverable}")
+            print(f"   📦 交付物: {json.dumps(deliverable, ensure_ascii=False)}")
     elif event_type == "agent.interrupt":
         interrupt_payload = data.get("interrupt", {}).get("payload")
         print(f"\n❓ 需要用户输入: {interrupt_payload}")
@@ -169,23 +167,23 @@ def create_mapreduce_team(config: DatapillarConfig) -> Datapillar:
 
 
 async def main() -> None:
-    llm_config = {
-        "provider": LLM_PROVIDER,
-        "api_key": LLM_API_KEY,
-        "model": LLM_MODEL,
-        "enable_thinking": LLM_ENABLE_THINKING,
-        "timeout_seconds": 120,
-        "retry": {"max_retries": 2},
-    }
-    if LLM_BASE_URL:
-        llm_config["base_url"] = LLM_BASE_URL
-
-    config = DatapillarConfig(llm=llm_config)
+    config = DatapillarConfig()
+    if not config.llm.is_configured():
+        supported = ", ".join(Provider.list_supported())
+        raise RuntimeError(
+            "请先配置 LLM：\n"
+            "  export DATAPILLAR_LLM_PROVIDER=\"openai\"\n"
+            "  export DATAPILLAR_LLM_API_KEY=\"sk-xxx\"\n"
+            "  export DATAPILLAR_LLM_MODEL=\"gpt-4o\"\n"
+            "可选：export DATAPILLAR_LLM_BASE_URL=\"https://api.openai.com/v1\"\n"
+            "可选：export DATAPILLAR_LLM_ENABLE_THINKING=\"false\"\n"
+            f"支持 provider: {supported}"
+        )
     team = create_mapreduce_team(config)
 
     print("=" * 60)
     print("🧩 MapReduce 模式示例已就绪")
-    print(f"   模型: {LLM_MODEL}")
+    print(f"   模型: {config.llm.model}")
     print("   成员: 分析者 + 总结者 -> 汇总者")
     print("=" * 60)
 

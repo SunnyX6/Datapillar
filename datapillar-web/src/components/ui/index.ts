@@ -1,4 +1,8 @@
 export { Modal, ModalCancelButton, ModalPrimaryButton } from './Modal'
+export { Tooltip } from './Tooltip'
+export { Card } from './Card'
+export { Button, type ButtonProps } from './Button'
+export { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, type TableInfiniteScrollProps } from './Table'
 export { DataTypeSelector } from './DataTypeSelector'
 export { parseDataTypeString, buildDataTypeString, type DataTypeValue } from '@/layouts/governance/utils/dataType'
 export { InfiniteSelect, type InfiniteSelectProps, type InfiniteSelectItem } from './InfiniteSelect'

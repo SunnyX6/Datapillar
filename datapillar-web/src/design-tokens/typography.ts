@@ -55,6 +55,9 @@ export const TYPOGRAPHY = {
   /** 小正文：13px / 500 中等 / 行高 18px */
   bodySm: 'text-body-sm',
 
+  /** 超小正文：12.5px / 500 中等 / 行高 17px（介于 bodySm 与 caption 之间） */
+  bodyXs: 'text-body-xs',
+
   /** 说明文字：12px / 500 中等 / 行高 16px */
   caption: 'text-caption',
 
@@ -88,6 +91,7 @@ export const FONT_SIZE = {
   subtitle: 16,
   body: 14,
   bodySm: 13,
+  bodyXs: 12.5,
   caption: 12,
   micro: 10,
   legal: 11,
@@ -107,6 +111,7 @@ export const LINE_HEIGHT = {
   subtitle: 22,
   body: 20,
   bodySm: 18,
+  bodyXs: 17,
   caption: 16,
   micro: 14,
   legal: 14,
@@ -126,6 +131,7 @@ export const FONT_WEIGHT = {
   subtitle: 600,
   body: 500,
   bodySm: 500,
+  bodyXs: 500,
   caption: 500,
   micro: 600,
   legal: 600,

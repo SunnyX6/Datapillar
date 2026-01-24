@@ -5,6 +5,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Check } from 'lucide-react'
+import { Button } from './Button'
 
 export interface SelectOption {
   value: string
@@ -95,18 +96,20 @@ export function Select({
 
   return (
     <>
-      <button
+      <Button
         ref={triggerRef}
         type="button"
         disabled={disabled}
         onClick={() => setOpen(!open)}
+        variant="outline"
+        size={isExtraSmall ? 'tiny' : 'small'}
         className={`w-full flex items-center justify-between bg-white dark:bg-slate-800 border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all ${triggerSizeClass} ${className}`}
       >
         <span className={`truncate ${selectedOption ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'}`}>
           {selectedOption?.label || placeholder}
         </span>
         <ChevronDown size={iconSize} className={`text-slate-400 transition-transform flex-shrink-0 ml-2 ${open ? 'rotate-180' : ''}`} />
-      </button>
+      </Button>
 
       {open && dropdownPos && createPortal(
         <div
@@ -123,13 +126,15 @@ export function Select({
             {options.map((option) => {
               const isSelected = value === option.value
               return (
-                <button
+                <Button
                   key={option.value}
                   type="button"
                   onClick={() => {
                     onChange(option.value)
                     setOpen(false)
                   }}
+                  variant="ghost"
+                  size={isExtraSmall ? 'tiny' : isSmall ? 'small' : 'small'}
                   className={`w-full flex items-center justify-between text-left transition-colors ${optionSizeClass} ${
                     isSelected
                       ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
@@ -138,7 +143,7 @@ export function Select({
                 >
                   <span>{option.label}</span>
                   {isSelected && <Check size={14} className="text-indigo-500 flex-shrink-0" />}
-                </button>
+                </Button>
               )
             })}
           </div>

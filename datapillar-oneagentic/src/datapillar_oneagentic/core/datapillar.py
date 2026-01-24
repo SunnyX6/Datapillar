@@ -56,6 +56,7 @@ from datapillar_oneagentic.core.graphs import build_graph
 from datapillar_oneagentic.core.nodes import NodeFactory
 from datapillar_oneagentic.core.process import Process
 from datapillar_oneagentic.core.types import SessionKey
+from datapillar_oneagentic.context import ContextCollector
 from datapillar_oneagentic.context.compaction import CompactPolicy, get_compactor
 from datapillar_oneagentic.context.timeline.recorder import TimelineRecorder
 from datapillar_oneagentic.events import EventBus
@@ -96,8 +97,8 @@ class Datapillar:
         name: str,
         agents: list[type],
         process: Process = Process.SEQUENTIAL,
-        enable_share_context: bool = True,
         enable_learning: bool = False,
+        enable_share_context: bool = True,
         a2a_agents: list | None = None,
         verbose: bool = False,
         knowledge: "Knowledge | None" = None,
@@ -112,8 +113,8 @@ class Datapillar:
         - agents: Agent 类列表（必须使用 @agent 装饰器定义）
         - process: 执行模式（SEQUENTIAL/DYNAMIC/HIERARCHICAL/MAPREDUCE/REACT）
           - MAPREDUCE 模式下最后一个 Agent 仅提供输出 schema，不参与执行
-        - enable_share_context: 是否启用 Agent 间上下文共享（默认 True，通过 messages 字段共享）
         - enable_learning: 是否启用经验学习（默认 False）
+        - enable_share_context: 是否启用共享 Agent 上下文（默认 True）
         - a2a_agents: 团队级别的 A2A 远程 Agent 配置列表
         - verbose: 是否输出详细日志（默认 False）
         - knowledge: 团队级知识配置（可选，作为所有 Agent 的默认知识入口）
@@ -122,16 +123,17 @@ class Datapillar:
         self.namespace = namespace
         self.name = name
         self.process = process
-        self.enable_share_context = enable_share_context
         self.enable_learning = enable_learning
+        self.enable_share_context = enable_share_context
         self.a2a_agents = a2a_agents or []
-        self.verbose = verbose
+        # verbose 参数应该生效：示例里会传 verbose=True 来打开调试信息。
+        self.verbose = verbose or self._config.verbose
 
         # 校验配置
         self._config.validate_llm()
 
         # 应用日志级别
-        if self._config.verbose:
+        if self.verbose:
             logging.getLogger("datapillar_oneagentic").setLevel(logging.DEBUG)
         else:
             logging.getLogger("datapillar_oneagentic").setLevel(
@@ -149,7 +151,7 @@ class Datapillar:
         self._agent_name_map = {spec.id: spec.name for spec in self._agent_specs}
         self._has_knowledge = any(spec.knowledge is not None for spec in self._agent_specs)
 
-        if enable_learning or self._has_knowledge:
+        if enable_learning:
             self._config.validate_embedding()
 
         # 将团队级别的 A2A 配置合并到每个 Agent
@@ -233,16 +235,22 @@ class Datapillar:
             )
             logger.info(f"知识检索已启用: namespace={namespace}")
 
+        self._context_collector = ContextCollector(
+            knowledge_retriever=self._knowledge_retriever,
+            experience_retriever=self._experience_retriever,
+            experience_learner=self._experience_learner,
+            share_agent_context=self.enable_share_context,
+        )
+
         # 创建节点工厂
         self._node_factory = NodeFactory(
             agent_specs=self._agent_specs,
             agent_ids=self._agent_ids,
             get_executor=self._get_executor,
-            enable_share_context=enable_share_context,
-            compactor=self._compactor,
             timeline_recorder=self._timeline_recorder,
             knowledge_retriever=self._knowledge_retriever,
             experience_learner=self._experience_learner,
+            context_collector=self._context_collector,
         )
 
         # 获取 LLM（ReAct 模式需要）
@@ -267,6 +275,7 @@ class Datapillar:
             create_mapreduce_worker_node=self._node_factory.create_mapreduce_worker_node,
             create_mapreduce_reducer_node=self._node_factory.create_mapreduce_reducer_node,
             llm=self._react_llm or self._mapreduce_llm,
+            context_collector=self._context_collector,
         )
 
         logger.info(

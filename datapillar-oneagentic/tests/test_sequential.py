@@ -7,6 +7,7 @@ from langgraph.types import Command
 
 from datapillar_oneagentic.core.graphs.sequential import build_sequential_graph
 from datapillar_oneagentic.core.status import ExecutionStatus
+from datapillar_oneagentic.state import StateBuilder
 from datapillar_oneagentic.state.blackboard import create_blackboard
 
 
@@ -19,18 +20,17 @@ class _Spec:
 async def test_sequential_should_stop_when_failed() -> None:
     executed: list[str] = []
 
-    async def node_failed(_state):
+    async def node_failed(state):
         executed.append("a1")
-        return Command(
-            update={
-                "active_agent": None,
-                "last_agent_status": ExecutionStatus.FAILED,
-            }
-        )
+        sb = StateBuilder(state)
+        sb.routing.finish_agent(status=ExecutionStatus.FAILED, failure_kind=None, error=None)
+        return Command(update=sb.patch())
 
-    async def node_should_not_run(_state):
+    async def node_should_not_run(state):
         executed.append("a2")
-        return Command(update={"active_agent": None})
+        sb = StateBuilder(state)
+        sb.routing.clear_active()
+        return Command(update=sb.patch())
 
     specs = [_Spec(id="a1"), _Spec(id="a2")]
     nodes = {"a1": node_failed, "a2": node_should_not_run}
@@ -43,7 +43,7 @@ async def test_sequential_should_stop_when_failed() -> None:
     compiled = graph.compile()
 
     state = create_blackboard(namespace="ns", session_id="s1")
-    state["active_agent"] = "a1"
+    StateBuilder(state).routing.activate("a1")
 
     async for _ in compiled.astream(state, {"configurable": {"thread_id": "t1"}}):
         pass

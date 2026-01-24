@@ -23,11 +23,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from datapillar_oneagentic.context import ContextBuilder
 
 from datapillar_oneagentic.core.agent import AgentSpec
 from datapillar_oneagentic.core.status import ExecutionStatus, ProcessStage
 from datapillar_oneagentic.core.graphs.react.schemas import Plan, PlannerOutput
+from datapillar_oneagentic.utils.prompt_format import format_code_block, format_markdown
 from datapillar_oneagentic.utils.structured_output import parse_structured_output
 
 logger = logging.getLogger(__name__)
@@ -35,78 +36,60 @@ logger = logging.getLogger(__name__)
 
 def _parse_planner_output(result: Any) -> PlannerOutput:
     """
-    解析 Planner 输出（带 fallback）
-
-    优先使用 LangChain 解析结果，失败时用内部解析器兜底。
+    解析 Planner 输出（严格模式）
     """
-    # 1. 直接是目标类型
-    if isinstance(result, PlannerOutput):
-        return result
-
-    # 2. dict 格式（include_raw=True）
-    if isinstance(result, dict):
-        parsed = result.get("parsed")
-        if isinstance(parsed, PlannerOutput):
-            return parsed
-
-        # parsed 是 dict
-        if isinstance(parsed, dict):
-            return PlannerOutput.model_validate(parsed)
-
-        # 从 raw 提取
-        raw = result.get("raw")
-        if raw:
-            content = getattr(raw, "content", None)
-            if content:
-                return parse_structured_output(content, PlannerOutput)
-
-    raise ValueError(f"无法解析 Planner 输出: {type(result)}")
+    return parse_structured_output(result, PlannerOutput, strict=False)
 
 
-PLANNER_SYSTEM_PROMPT = """你是一个智能规划器，负责将用户目标分解为可执行的任务。
-
-## 你的职责
-1. 理解用户目标
-2. 分析需要哪些步骤来完成目标
-3. 将步骤分配给合适的 Agent
-4. 确定任务之间的依赖关系
-
-## 可用的 Agent
-{agent_list}
-
-## 规划原则
-1. 任务粒度适中：不要太细（一个 API 调用），也不要太粗（整个需求）
-2. 依赖关系明确：如果任务 B 需要任务 A 的结果，必须声明依赖
-3. 分配合理：根据 Agent 的能力选择最合适的 Agent
-4. 顺序合理：考虑任务的逻辑顺序
-
-## 输出格式
-- understanding: 你对用户目标的理解
-- tasks: 任务列表，每个任务包含：
-  - description: 任务描述
-  - assigned_agent: 分配给哪个 Agent（使用 agent_id）
-  - depends_on: 依赖的任务序号列表（从 1 开始，如 ["1", "2"] 表示依赖第 1 和第 2 个任务）
-
-## 示例
-用户目标："帮我分析销售数据并生成报告"
-
-输出：
-{{
-  "understanding": "用户想要分析销售数据并生成报告，需要先收集数据，然后分析，最后生成报告",
+PLANNER_OUTPUT_SCHEMA = """{
+  "understanding": "...",
   "tasks": [
-    {{"description": "收集和整理销售数据，确认数据范围和指标", "assigned_agent": "analyst", "depends_on": []}},
-    {{"description": "对销售数据进行统计分析，发现趋势和异常", "assigned_agent": "analyst", "depends_on": ["1"]}},
-    {{"description": "根据分析结果生成可视化报告", "assigned_agent": "reporter", "depends_on": ["2"]}}
+    {
+      "description": "...",
+      "assigned_agent": "...",
+      "depends_on": []
+    }
   ]
-}}
-"""
+}"""
+
+
+def _build_planner_system_prompt(agent_list: str) -> str:
+    return format_markdown(
+        title=None,
+        sections=[
+            (
+                "Role",
+                "You are a planning agent that breaks a user goal into executable tasks.",
+            ),
+            (
+                "Responsibilities",
+                [
+                    "Understand the user goal.",
+                    "Break the goal into executable tasks.",
+                    "Assign each task to the best agent.",
+                    "Define task dependencies when needed.",
+                ],
+            ),
+            ("Available Agents", agent_list),
+            (
+                "Rules",
+                [
+                    "Keep task granularity reasonable.",
+                    "Dependencies must be explicit.",
+                    "Use agent_id from the list.",
+                    "Order tasks logically.",
+                ],
+            ),
+            ("Output (JSON)", format_code_block("json", PLANNER_OUTPUT_SCHEMA)),
+        ],
+    )
 
 
 def _format_agent_list(agents: list[AgentSpec]) -> str:
     """格式化 Agent 列表"""
     lines = []
     for agent in agents:
-        lines.append(f"- **{agent.id}** ({agent.name}): {agent.description or '无描述'}")
+        lines.append(f"- **{agent.id}** ({agent.name}): {agent.description or 'No description'}")
     return "\n".join(lines)
 
 
@@ -133,17 +116,21 @@ async def create_plan(
 
     # 构建 prompt
     agent_list = _format_agent_list(available_agents)
-    system_prompt = PLANNER_SYSTEM_PROMPT.format(agent_list=agent_list)
+    system_prompt = _build_planner_system_prompt(agent_list)
 
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=f"用户目标：{goal}"),
-    ]
+    messages = ContextBuilder.build_react_planner_messages(
+        system_prompt=system_prompt,
+        goal=goal,
+    )
 
     # 调用 LLM
     logger.info(f"Planner 开始规划: {goal[:100]}...")
 
-    structured_llm = llm.with_structured_output(PlannerOutput, method="json_mode", include_raw=True)
+    structured_llm = llm.with_structured_output(
+        PlannerOutput,
+        method="function_calling",
+        include_raw=True,
+    )
     result = await structured_llm.ainvoke(messages)
 
     # 解析结果（带 fallback）
@@ -188,32 +175,38 @@ async def replan(
     """
     # 构建 prompt
     agent_list = _format_agent_list(available_agents)
-    system_prompt = PLANNER_SYSTEM_PROMPT.format(agent_list=agent_list)
+    system_prompt = _build_planner_system_prompt(agent_list)
 
     # 添加原计划和反思信息
-    context = f"""用户目标：{plan.goal}
+    context = format_markdown(
+        title=None,
+        sections=[
+            ("User Goal", plan.goal),
+            ("Current Plan", plan.to_prompt(include_title=False)),
+            ("Reflection Summary", reflection_summary),
+            (
+                "Replan Request",
+                [
+                    "Adjust task order if needed.",
+                    "Add or remove tasks if needed.",
+                    "Change assigned agents if needed.",
+                ],
+            ),
+        ],
+    )
 
-## 原计划执行情况
-{plan.to_prompt()}
-
-## 反思结果
-{reflection_summary}
-
-## 请重新规划
-根据反思结果，重新规划任务。可以：
-- 调整任务顺序
-- 增加/删除任务
-- 更换 Agent
-"""
-
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=context),
-    ]
+    messages = ContextBuilder.build_react_replan_messages(
+        system_prompt=system_prompt,
+        context=context,
+    )
 
     logger.info(f"Planner 重新规划: {plan.goal[:100]}...")
 
-    structured_llm = llm.with_structured_output(PlannerOutput, method="json_mode", include_raw=True)
+    structured_llm = llm.with_structured_output(
+        PlannerOutput,
+        method="function_calling",
+        include_raw=True,
+    )
     result = await structured_llm.ainvoke(messages)
 
     # 解析结果（带 fallback）

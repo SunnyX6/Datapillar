@@ -12,6 +12,7 @@ import {
   ChevronRight,
   type LucideIcon
 } from 'lucide-react'
+import { Button, Card } from '@/components/ui'
 import { contentMaxWidthClassMap, iconSizeToken, paddingClassMap } from '@/design-tokens/dimensions'
 import { RESPONSIVE_TYPOGRAPHY, TYPOGRAPHY } from '@/design-tokens/typography'
 import type { KnowledgeSpace, WikiTab } from './types'
@@ -153,7 +154,7 @@ export function WikiView() {
 
           <div className="h-full overflow-y-auto custom-scrollbar">
             <div
-              className={`${contentMaxWidthClassMap.full} ${paddingClassMap.sm} w-full mx-auto ${
+              className={`${contentMaxWidthClassMap.full} ${paddingClassMap.sm} py-4 lg:py-6 w-full mx-auto ${
                 isNamespaceCollapsed ? 'pl-10' : ''
               }`}
             >
@@ -165,26 +166,30 @@ export function WikiView() {
                       <span>/</span>
                       <span className="text-slate-600 dark:text-slate-300">{currentSpace.name}</span>
                     </div>
-                    <h2 className={`${RESPONSIVE_TYPOGRAPHY.cardTitle} font-bold text-slate-900 dark:text-slate-100 tracking-tight flex items-center`}>
+                    <h2 className={`${TYPOGRAPHY.subtitle} font-bold text-slate-900 dark:text-slate-100 tracking-tight flex items-center`}>
                       {currentSpace.name}
                       <button className="ml-3 text-slate-300 hover:text-slate-500"><Settings size={16} /></button>
                     </h2>
-                    <p className={`${RESPONSIVE_TYPOGRAPHY.body} text-slate-500 dark:text-slate-400 mt-1`}>{currentSpace.description}</p>
+                    <p className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400 mt-1`}>{currentSpace.description}</p>
                   </div>
                   <div className="flex space-x-3">
-                    <button className={`px-4 py-2 bg-indigo-600 text-white rounded-lg ${RESPONSIVE_TYPOGRAPHY.body} font-medium hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center shadow-sm`}>
-                      <Plus className="w-4 h-4 mr-2" />
+                    <Button variant="primary" size="small" className="shadow-sm hover:shadow-lg">
+                      <Plus size={14} />
                       上传文档至空间
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 flex-shrink-0">
                   {currentStats.map((stat) => (
-                    <div key={stat.label} className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group">
+                    <Card
+                      key={stat.label}
+                      padding="sm"
+                      className="shadow-sm hover:shadow-md group"
+                    >
                       <div className="flex justify-between items-start mb-4">
                         <div className={`p-2 rounded-lg ${stat.bg} ${stat.color} group-hover:scale-110 transition-transform`}>
-                          <stat.icon size={20} />
+                          <stat.icon size={18} />
                         </div>
                         <span className={`flex items-center ${RESPONSIVE_TYPOGRAPHY.badge} font-medium px-2 py-1 rounded-full ${stat.trend === 'up' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200' : 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200'}`}>
                           {stat.trend === 'up' ? <TrendingUp size={12} className="mr-1" /> : <TrendingUp size={12} className="mr-1 transform rotate-180" />}
@@ -192,16 +197,16 @@ export function WikiView() {
                         </span>
                       </div>
                       <div className="flex items-baseline space-x-1">
-                        <div className={`${RESPONSIVE_TYPOGRAPHY.metricValue} font-bold text-slate-900 dark:text-slate-100 tracking-tight`}>{stat.value}</div>
+                        <div className={`${TYPOGRAPHY.subtitle} font-bold text-slate-900 dark:text-slate-100 tracking-tight`}>{stat.value}</div>
                         <div className={`${TYPOGRAPHY.caption} text-slate-400 font-medium`}>{stat.unit}</div>
                       </div>
                       <div className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wide font-medium opacity-80`}>{stat.label}</div>
-                    </div>
+                    </Card>
                   ))}
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col min-h-[500px]">
-                  <div className="border-b border-slate-200 dark:border-slate-800 px-6 flex items-center justify-between flex-shrink-0 bg-white dark:bg-slate-900 rounded-t-xl">
+                <Card padding="none" className="shadow-sm flex flex-col min-h-[500px] overflow-hidden">
+                  <div className="border-b border-slate-200 dark:border-slate-800 px-5 flex items-center justify-between flex-shrink-0">
                     <div className="flex space-x-6">
                       <TabButton
                         active={activeTab === 'DOCUMENTS'}
@@ -223,13 +228,13 @@ export function WikiView() {
                       />
                     </div>
                     <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-400">
-                      <MoreHorizontal size={20} />
+                      <MoreHorizontal size={18} />
                     </button>
                   </div>
 
-                  <div className={`p-0 bg-slate-50/50 dark:bg-slate-950/40 flex flex-col relative rounded-b-xl ${activeTab === 'DOCUMENTS' ? 'overflow-hidden' : 'overflow-visible'}`}>
+                  <div className={`p-0 bg-slate-50/50 dark:bg-slate-950/40 flex flex-col relative ${activeTab === 'DOCUMENTS' ? 'overflow-hidden' : 'overflow-visible'}`}>
                     {activeTab === 'DOCUMENTS' && (
-                      <div className="p-6">
+                      <div className="p-4">
                         <DocList spaceId={currentSpace.id} />
                       </div>
                     )}
@@ -243,7 +248,7 @@ export function WikiView() {
                       />
                     )}
                   </div>
-                </div>
+                </Card>
               </div>
             </div>
           </div>
@@ -264,13 +269,13 @@ function TabButton({ active, onClick, label, icon: Icon }: TabButtonProps) {
   return (
     <button
       onClick={onClick}
-      className={`py-4 ${RESPONSIVE_TYPOGRAPHY.body} font-medium border-b-2 transition-colors duration-200 flex items-center ${
+      className={`py-3 ${TYPOGRAPHY.caption} font-medium border-b-2 transition-colors duration-200 flex items-center ${
         active
           ? 'border-indigo-600 text-indigo-600'
           : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
       }`}
     >
-      <Icon size={16} className={`mr-2 ${active ? 'text-indigo-500' : 'text-slate-400'}`} />
+      <Icon size={12} className={`mr-2 ${active ? 'text-indigo-500' : 'text-slate-400'}`} />
       {label}
     </button>
   )

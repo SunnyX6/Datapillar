@@ -39,6 +39,8 @@ class LLMError(Exception):
         model: str | None = None,
         agent_id: str | None = None,
         original: Exception | None = None,
+        raw: Any | None = None,
+        parsing_error: Any | None = None,
     ) -> None:
         super().__init__(message)
         self.category = category
@@ -47,6 +49,8 @@ class LLMError(Exception):
         self.model = model
         self.agent_id = agent_id
         self.original = original
+        self.raw = raw
+        self.parsing_error = parsing_error
 
     def attach_agent_id(self, agent_id: str) -> None:
         """补充 Agent ID（LLM 层默认未知）"""

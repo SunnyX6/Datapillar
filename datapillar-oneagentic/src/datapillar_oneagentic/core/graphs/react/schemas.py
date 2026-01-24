@@ -13,6 +13,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from datapillar_oneagentic.utils.prompt_format import format_markdown
 from datapillar_oneagentic.utils.time import now_ms
 from datapillar_oneagentic.core.status import ExecutionStatus, ProcessStage
 # ==================== 状态枚举 ====================
@@ -143,23 +144,32 @@ class Plan(BaseModel):
         self.retry_count += 1
         self.updated_at_ms = now_ms()
 
-    def to_prompt(self) -> str:
+    def to_prompt(self, *, include_title: bool = True) -> str:
         """生成 prompt 格式"""
-        lines = [f"## 目标：{self.goal}", "", "## 任务列表："]
-
+        task_lines: list[str] = []
         for task in self.tasks:
             status_marker = f"[{task.status.value}]"
-            deps = f" (依赖: {', '.join(task.depends_on)})" if task.depends_on else ""
+            deps = f" (depends on: {', '.join(task.depends_on)})" if task.depends_on else ""
             line = f"- {status_marker} [{task.id}] {task.description} -> {task.assigned_agent}{deps}"
-
             if task.result:
-                line += f"\n  结果: {task.result}"
+                line += f" | Result: {task.result}"
             if task.error:
-                line += f"\n  错误: {task.error}"
+                line += f" | Error: {task.error}"
+            task_lines.append(line)
 
-            lines.append(line)
+        if not include_title:
+            lines = [f"- Goal: {self.goal}"]
+            lines.extend(task_lines)
+            return "\n".join(lines).strip()
 
-        return "\n".join(lines)
+        tasks_text = "\n".join(task_lines).strip()
+        return format_markdown(
+            title="Plan",
+            sections=[
+                ("Goal", self.goal),
+                ("Tasks", tasks_text),
+            ],
+        )
 
 
 # ==================== Reflection ====================
@@ -207,25 +217,25 @@ class Reflection(BaseModel):
 class PlanTaskOutput(BaseModel):
     """Planner LLM 输出的任务"""
 
-    description: str = Field(..., description="任务描述")
-    assigned_agent: str = Field(..., description="分配给哪个 Agent")
-    depends_on: list[str] = Field(default_factory=list, description="依赖的任务序号（从1开始）")
+    description: str = Field(..., description="Task description")
+    assigned_agent: str = Field(..., description="Assigned agent_id")
+    depends_on: list[str] = Field(default_factory=list, description="Dependent task indices (1-based)")
 
 
 class PlannerOutput(BaseModel):
     """Planner LLM 输出"""
 
-    understanding: str = Field(..., description="对用户目标的理解")
-    tasks: list[PlanTaskOutput] = Field(..., description="任务列表")
+    understanding: str = Field(..., description="Understanding of the user goal")
+    tasks: list[PlanTaskOutput] = Field(..., description="Task list")
 
 
 class ReflectorOutput(BaseModel):
     """Reflector LLM 输出"""
 
-    goal_achieved: bool = Field(..., description="目标是否达成")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="置信度 0-1")
-    summary: str = Field(..., description="评估总结")
-    issues: list[str] = Field(default_factory=list, description="发现的问题")
-    suggestions: list[str] = Field(default_factory=list, description="改进建议")
-    next_action: NextAction = Field(..., description="下一步：continue/retry/replan/complete/fail")
-    reason: str = Field(..., description="决策理由")
+    goal_achieved: bool = Field(..., description="Whether the goal is achieved")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence 0-1")
+    summary: str = Field(..., description="Evaluation summary")
+    issues: list[str] = Field(default_factory=list, description="Identified issues")
+    suggestions: list[str] = Field(default_factory=list, description="Improvement suggestions")
+    next_action: NextAction = Field(..., description="Next action: continue/retry/replan/complete/fail")
+    reason: str = Field(..., description="Decision rationale")

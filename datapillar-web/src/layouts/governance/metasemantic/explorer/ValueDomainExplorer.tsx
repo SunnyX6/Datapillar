@@ -1,10 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Plus, Users, Trash2, Loader2, Pencil, Clock } from 'lucide-react'
+import { ArrowLeft, Plus, Users, Trash2, Loader2, Pencil, Clock, ChevronsRight } from 'lucide-react'
 import { iconSizeToken } from '@/design-tokens/dimensions'
 import { Badge } from '../components'
 import { useSearchStore } from '@/stores'
 import { useInfiniteScroll } from '@/hooks'
-import { Modal, ModalCancelButton, ModalPrimaryButton, Select } from '@/components/ui'
+import {
+  Card,
+  DataTypeSelector,
+  Modal,
+  ModalCancelButton,
+  ModalPrimaryButton,
+  Select,
+  parseDataTypeString,
+  buildDataTypeString,
+  type DataTypeValue
+} from '@/components/ui'
 import {
   fetchValueDomains,
   createValueDomain,
@@ -15,11 +25,12 @@ import {
   type CreateValueDomainRequest
 } from '@/services/oneMetaSemanticService'
 import { ValueDomainFormModal, type ValueDomainFormData } from './form/ValueDomainForm'
-import { formatTime } from '@/lib/utils'
-import { DataTypeSelector, parseDataTypeString, buildDataTypeString, type DataTypeValue } from '@/components/ui'
+import { cn, formatTime } from '@/lib/utils'
 
 /** 每页加载数量 */
 const PAGE_SIZE = 20
+/** 枚举值卡片预览每页展示数量（保持卡片尺寸稳定） */
+const ENUM_PREVIEW_PAGE_SIZE = 6
 
 /** 类型标签配置 */
 const TYPE_CONFIG: Record<ValueDomainType, { label: string; color: string }> = {
@@ -54,6 +65,13 @@ function ValueDomainCard({
   const levelConfig = LEVEL_CONFIG[normalizedLevel] || LEVEL_CONFIG.BUSINESS
   const isBuiltin = normalizedLevel === 'BUILTIN'
   const [deleting, setDeleting] = useState(false)
+  const [previewPageIndex, setPreviewPageIndex] = useState(0)
+
+  const enumItems = domain.items || []
+  const previewPageCount = Math.max(1, Math.ceil(enumItems.length / ENUM_PREVIEW_PAGE_SIZE))
+  const hasMultiplePreviewPages = previewPageCount > 1
+  const showPreviewControls = enumItems.length > 0
+  const clampedPreviewPageIndex = Math.min(previewPageIndex, previewPageCount - 1)
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -73,8 +91,27 @@ function ValueDomainCard({
     onEdit(domain)
   }
 
+  const handleMorePreview = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!hasMultiplePreviewPages) return
+    setPreviewPageIndex((prev) => (prev + 1) % previewPageCount)
+  }
+
+  const handleSelectPreviewPage = (e: React.MouseEvent, index: number) => {
+    e.stopPropagation()
+    setPreviewPageIndex(index)
+  }
+
+  const previewPages = Array.from({ length: previewPageCount }, (_, index) =>
+    enumItems.slice(index * ENUM_PREVIEW_PAGE_SIZE, (index + 1) * ENUM_PREVIEW_PAGE_SIZE)
+  )
+
   return (
-    <div className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-200">
+    <Card
+      padding="sm"
+      variant="default"
+      className="w-full group hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 duration-200"
+    >
       {/* 头部：类型标签 + 数据类型标签 + 级别标签 + 操作按钮 */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
@@ -116,24 +153,77 @@ function ValueDomainCard({
       <p className="text-micro font-mono text-slate-400 dark:text-slate-500 uppercase tracking-tight mb-3">{domain.domainCode}</p>
 
       {/* 枚举值预览区 */}
-      <div className="bg-slate-900 dark:bg-slate-800 rounded-lg px-3 py-2.5 mb-3 max-h-32 overflow-y-auto custom-scrollbar">
-        {domain.items?.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {domain.items.map((item) => (
-              <span
-                key={item.value}
-                className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-800 dark:bg-slate-700 rounded text-micro"
-                title={item.label || item.value}
-              >
-                <code className="text-emerald-400 font-mono">{item.value}</code>
-                {item.label && <span className="text-slate-500">({item.label})</span>}
-              </span>
-            ))}
+      <div className="bg-slate-900 dark:bg-slate-800 rounded-lg mb-2 h-14 flex overflow-hidden">
+        <div className="flex-1 px-3 py-2 overflow-hidden">
+          <div className="relative w-full h-full overflow-hidden">
+            <div
+              className="absolute inset-0 flex transition-transform duration-500 ease-in-out"
+              style={{ transform: `translateX(-${clampedPreviewPageIndex * 100}%)` }}
+            >
+              {previewPages.map((pageItems, pageIndex) => (
+                <div key={pageIndex} className="w-full flex-shrink-0">
+                  {pageItems.length > 0 ? (
+                    <div className="flex flex-nowrap items-center gap-1.5 h-full">
+                      {pageItems.map((item) => (
+                        <span
+                          key={item.value}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-800 dark:bg-slate-700 rounded text-micro whitespace-nowrap"
+                          title={item.label || item.value}
+                        >
+                          <code className="text-emerald-400 font-mono">{item.value}</code>
+                          {item.label && <span className="text-slate-500">({item.label})</span>}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center">
+                      <span className="text-slate-500 text-micro">无枚举值</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        ) : (
-          <span className="text-slate-500 text-micro">无枚举值</span>
+        </div>
+
+        {showPreviewControls && (
+          <button
+            type="button"
+            onClick={handleMorePreview}
+            disabled={!hasMultiplePreviewPages}
+            className={cn(
+              'w-14 flex flex-col items-center justify-center border-l border-dashed border-slate-700/70 transition-colors flex-shrink-0',
+              hasMultiplePreviewPages
+                ? 'hover:border-emerald-400/80 text-slate-300 hover:text-emerald-300'
+                : 'text-slate-300 cursor-default opacity-50'
+            )}
+            title={hasMultiplePreviewPages ? '更多' : '无更多枚举值'}
+            aria-label={hasMultiplePreviewPages ? '更多枚举值' : '无更多枚举值'}
+          >
+            <ChevronsRight size={iconSizeToken.extraLarge} className="mb-1" />
+            <span className="text-micro font-semibold tracking-wide">更多</span>
+          </button>
         )}
       </div>
+      {showPreviewControls && (
+        <div className="mb-3 flex justify-center gap-2">
+          {previewPages.map((_, index) => (
+            <button
+              key={index}
+              type="button"
+              onClick={(e) => handleSelectPreviewPage(e, index)}
+              className={cn(
+                'rounded-full transition-all duration-300',
+                index === clampedPreviewPageIndex
+                  ? 'w-2 h-2 bg-emerald-500 dark:bg-emerald-400'
+                  : 'w-1.5 h-1.5 bg-slate-200 dark:bg-slate-700'
+              )}
+              aria-label={`切换到第 ${index + 1} 页`}
+              title={`第 ${index + 1} 页`}
+            />
+          ))}
+        </div>
+      )}
 
       {/* 底部：创建人 + 创建时间 + 枚举数量 */}
       <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
@@ -150,7 +240,7 @@ function ValueDomainCard({
         </div>
         <span className="text-micro text-slate-400">{domain.items?.length || 0} 个枚举值</span>
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -322,7 +412,7 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 @md:gap-5">
+            <div className="grid grid-cols-1 @md:grid-cols-3 gap-3 @md:gap-4 items-start">
               {filteredDomains.map((domain) => (
                 <ValueDomainCard
                   key={domain.domainCode}

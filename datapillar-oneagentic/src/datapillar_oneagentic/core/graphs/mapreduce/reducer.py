@@ -12,12 +12,13 @@ import json
 import logging
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from datapillar_oneagentic.context import ContextBuilder
 from pydantic import BaseModel
 
 from datapillar_oneagentic.exception import AgentErrorClassifier
 from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
 from datapillar_oneagentic.core.graphs.mapreduce.schemas import MapReducePlan, MapReduceResult
+from datapillar_oneagentic.utils.prompt_format import format_markdown
 from datapillar_oneagentic.utils.structured_output import parse_structured_output
 
 logger = logging.getLogger(__name__)
@@ -25,64 +26,62 @@ logger = logging.getLogger(__name__)
 
 def _parse_reducer_output(result: Any, schema: type[BaseModel]) -> BaseModel:
     """
-    解析 Reducer 输出（带 fallback）
-
-    优先使用 LangChain 解析结果，失败时用内部解析器兜底。
+    解析 Reducer 输出（严格模式）
     """
-    if isinstance(result, schema):
-        return result
-
-    if isinstance(result, dict):
-        parsed = result.get("parsed")
-        if isinstance(parsed, schema):
-            return parsed
-        if isinstance(parsed, dict):
-            return schema.model_validate(parsed)
-
-        raw = result.get("raw")
-        if raw:
-            content = getattr(raw, "content", None)
-            if content:
-                return parse_structured_output(content, schema)
-
-    raise ValueError(f"无法解析 MapReduce Reducer 输出: {type(result)}")
+    return parse_structured_output(result, schema, strict=False)
 
 
-MAPREDUCE_REDUCER_SYSTEM_PROMPT = """你是 MapReduce 的最终聚合器，负责汇总多个 Agent 的结果并输出最终交付物。
-
-## 你的职责
-1. 综合所有任务结果
-2. 解决冲突与重复
-3. 输出最终结构化结果
-
-## 规则
-1. 只基于已给出的结果，不要编造
-2. 若存在冲突，以证据更充分者为准，并在结果中体现谨慎
-3. 输出必须严格符合目标 Schema（JSON）
-"""
+MAPREDUCE_REDUCER_SYSTEM_PROMPT = format_markdown(
+    title=None,
+    sections=[
+        (
+            "Role",
+            "You are the final reducer that aggregates map results into a structured deliverable.",
+        ),
+        (
+            "Responsibilities",
+            [
+                "Combine all task results.",
+                "Resolve conflicts and duplication.",
+                "Produce the final structured output.",
+            ],
+        ),
+        (
+            "Rules",
+            [
+                "Use only the provided results; do not fabricate.",
+                "If results conflict, prefer better-supported evidence and be cautious.",
+                "Output must strictly match the target schema (JSON).",
+            ],
+        ),
+    ],
+)
 
 
 def _format_results(plan: MapReducePlan, results: list[MapReduceResult]) -> str:
     """格式化 Map 阶段结果"""
-    lines = [
-        f"用户目标：{plan.goal}",
-        f"规划理解：{plan.understanding}",
-        "",
-        "## Map 结果汇总",
-    ]
+    lines: list[str] = []
 
     for result in results:
-        lines.append(f"- 任务 {result.task_id} / {result.agent_id} / {result.description}")
-        lines.append(f"  输入：{result.input}")
+        lines.append(f"- Task {result.task_id} / {result.agent_id} / {result.description}")
+        lines.append(f"  Input: {result.input}")
         status_value = result.status.value if hasattr(result.status, "value") else result.status
-        lines.append(f"  状态：{status_value}")
+        lines.append(f"  Status: {status_value}")
         if result.output is not None:
-            lines.append(f"  输出：{json.dumps(result.output, ensure_ascii=False)}")
+            lines.append(f"  Output: {json.dumps(result.output, ensure_ascii=False)}")
         if result.error:
-            lines.append(f"  错误：{result.error}")
+            lines.append(f"  Error: {result.error}")
         lines.append("")
 
-    return "\n".join(lines)
+    body = "\n".join(lines).strip()
+    return format_markdown(
+        title=None,
+        sections=[
+            ("User Goal", plan.goal),
+            ("Plan Understanding", plan.understanding),
+            ("Map Results", body),
+        ],
+    )
 
 
 async def reduce_map_results(
@@ -91,7 +90,7 @@ async def reduce_map_results(
     results: list[MapReduceResult],
     llm: Any,
     output_schema: type[BaseModel],
-    experience_context: str | None = None,
+    contexts: dict[str, str] | None = None,
 ) -> BaseModel:
     """
     汇总 Map 阶段结果并输出最终交付物
@@ -101,7 +100,7 @@ async def reduce_map_results(
         results: Map 阶段结果列表
         llm: LLM 实例
         output_schema: 最终交付物 Schema
-        experience_context: 经验上下文（可选）
+        contexts: __context 分层块（可选）
     """
     if not results:
         raise ValueError("MapReduce Reducer 没有可用结果")
@@ -121,16 +120,17 @@ async def reduce_map_results(
 
     content = _format_results(plan, results)
 
-    messages = [SystemMessage(content=MAPREDUCE_REDUCER_SYSTEM_PROMPT)]
-    if experience_context:
-        messages.append(SystemMessage(content=experience_context))
-    messages.append(HumanMessage(content=content))
+    messages = ContextBuilder.build_mapreduce_reducer_messages(
+        system_prompt=MAPREDUCE_REDUCER_SYSTEM_PROMPT,
+        content=content,
+        contexts=contexts or {},
+    )
 
     logger.info("MapReduce Reducer 开始汇总结果...")
 
     structured_llm = llm.with_structured_output(
         output_schema,
-        method="json_mode",
+        method="function_calling",
         include_raw=True,
     )
     result = await structured_llm.ainvoke(messages)

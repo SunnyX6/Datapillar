@@ -6,7 +6,7 @@
 # ============================================================================
 [llm]
 # 基础配置
-# api_key = "sk-xxx"  # 敏感信息建议用环境变量: DATAPILLAR_LLM__API_KEY
+# api_key = "sk-xxx"  # 敏感信息建议用环境变量: DATAPILLAR_LLM_API_KEY
 # provider: 支持 openai, anthropic, glm, deepseek, openrouter, ollama
 provider = "openai"
 model = "gpt-4o"
@@ -76,7 +76,7 @@ max_size = 1000
 # ============================================================================
 [embedding]
 # 基础配置
-# api_key = "sk-xxx"  # 敏感信息建议用环境变量: DATAPILLAR_EMBEDDING__API_KEY
+# api_key = "sk-xxx"  # 敏感信息建议用环境变量: DATAPILLAR_EMBEDDING_API_KEY
 # provider: 支持 openai, glm
 provider = "openai"
 model = "text-embedding-3-small"
@@ -134,7 +134,7 @@ retrieval_k = 5
 # ============================================================================
 [knowledge.base_config.embedding]
 # 基础配置
-# api_key = "sk-xxx"  # 敏感信息建议用环境变量: DATAPILLAR_KNOWLEDGE__BASE_CONFIG__EMBEDDING__API_KEY
+# api_key = "sk-xxx"  # 敏感信息建议用环境变量: DATAPILLAR_EMBEDDING_API_KEY（默认会复用全局 embedding）
 # provider: 支持 openai, glm
 provider = "openai"
 model = "text-embedding-3-small"

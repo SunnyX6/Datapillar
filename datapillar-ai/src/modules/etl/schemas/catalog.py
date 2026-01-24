@@ -55,6 +55,10 @@ class CatalogResultOutput(BaseModel):
         default_factory=list,
         description="需要澄清的问题列表（当信息不足时）",
     )
+    recommendations: list[str] = Field(
+        default_factory=list,
+        description="推荐引导（可选）",
+    )
     confidence: float = Field(
         default=1.0,
         ge=0.0,
@@ -75,6 +79,7 @@ class CatalogResult(BaseModel):
     answer: str = Field(..., description="详细文字回答")
     options: list[OptionItem] = Field(default_factory=list, description="结构化选项")
     ambiguities: list[str] = Field(default_factory=list, description="需要澄清的问题")
+    recommendations: list[str] = Field(default_factory=list, description="推荐引导")
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
 
     @classmethod
@@ -86,6 +91,7 @@ class CatalogResult(BaseModel):
             answer=output.answer,
             options=output.options,
             ambiguities=output.ambiguities,
+            recommendations=output.recommendations,
             confidence=output.confidence,
         )
 

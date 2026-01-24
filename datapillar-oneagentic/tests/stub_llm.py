@@ -5,7 +5,7 @@ import re
 from types import UnionType
 from typing import Any, Sequence, Union, get_args, get_origin
 
-from langchain_core.messages import AIMessage, BaseMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
 from pydantic import BaseModel
 
 from datapillar_oneagentic.core.graphs.mapreduce.schemas import (
@@ -249,4 +249,25 @@ class StubChatModel:
             ]
             return MapReducePlannerOutput(understanding="stub", tasks=tasks)
 
+        if _has_tool_messages(messages):
+            return _build_schema_with_text(schema, self._config.tool_text)
+
         return _build_default_schema(schema)
+
+
+def _has_tool_messages(messages: Sequence[BaseMessage]) -> bool:
+    for msg in messages:
+        if isinstance(msg, ToolMessage):
+            return True
+    return False
+
+
+def _build_schema_with_text(schema: type[BaseModel], text: str) -> BaseModel:
+    try:
+        return schema(text=text)
+    except Exception:
+        fields = getattr(schema, "model_fields", None) or getattr(schema, "__fields__", {})
+        if "text" not in fields:
+            return _build_default_schema(schema)
+        data = {"text": text}
+        return schema.model_validate(data)

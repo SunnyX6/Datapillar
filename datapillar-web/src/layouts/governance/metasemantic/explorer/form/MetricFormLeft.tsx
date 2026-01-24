@@ -173,7 +173,7 @@ function UnitSelector({
                 <Loader2 size={16} className="animate-spin text-slate-400" />
               </div>
             ) : units.length === 0 ? (
-              <div className="py-4 text-center text-caption text-slate-400">暂无单位数据</div>
+              <div className="py-4 text-center text-xs text-slate-400">暂无单位数据</div>
             ) : (
               <>
                 {units.map((unit) => (
@@ -192,10 +192,10 @@ function UnitSelector({
                   >
                     <span className="flex items-center gap-1.5">
                       <Scale size={10} className="text-amber-400" />
-                      <span className="text-caption text-slate-500 font-mono">{unit.code}</span>
+                      <span className="text-xs text-slate-500 font-mono">{unit.code}</span>
                     </span>
                     <span className="flex items-center gap-1">
-                      <span className="text-caption text-slate-600 dark:text-slate-400">{unit.name}</span>
+                      <span className="text-xs text-slate-600 dark:text-slate-400">{unit.name}</span>
                       {value === unit.code ? <Check size={12} className="text-blue-500" /> : <span className="w-3" />}
                     </span>
                   </button>
@@ -403,7 +403,7 @@ export function MetricFormLeft({
     <div className="col-span-5 xl:col-span-4 flex flex-col gap-4 h-full">
       <div className="flex-1 min-h-0 flex flex-col gap-4">
         <div className="space-y-1.5">
-          <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide">指标名称 *</label>
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">指标名称 *</label>
           <input
             type="text"
             placeholder="例如：累计订单金额"
@@ -416,8 +416,8 @@ export function MetricFormLeft({
         {/* 指标编码区域 */}
         <div className="space-y-2">
           <div className="flex items-center justify-between h-5">
-            <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide">指标编码 *</label>
-            <span className={`font-mono text-caption text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded ${!isEditMode && form.code ? 'visible' : 'invisible'}`}>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">指标编码 *</label>
+            <span className={`font-mono text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded ${!isEditMode && form.code ? 'visible' : 'invisible'}`}>
               {form.code || '-'}
             </span>
           </div>
@@ -446,14 +446,14 @@ export function MetricFormLeft({
                     />
                   </div>
                   {form.baseCode && (
-                    <span className="shrink-0 inline-flex items-center text-caption font-mono text-slate-700 dark:text-slate-300 border-b border-dashed border-slate-300 px-1 py-0.5">
+                    <span className="shrink-0 inline-flex items-center text-xs font-mono text-slate-700 dark:text-slate-300 border-b border-dashed border-slate-300 px-1 py-0.5">
                       {form.baseCode}
                       <button type="button" onClick={() => updateDerivedCode('', form.modifiers)} className="text-slate-400 hover:text-red-500 ml-0.5"><X size={10} /></button>
                     </span>
                   )}
                 </div>
                 {form.modifiers.map((mod) => (
-                  <span key={mod} className="shrink-0 inline-flex items-center text-caption font-mono text-blue-600 dark:text-blue-400">
+                  <span key={mod} className="shrink-0 inline-flex items-center text-xs font-mono text-blue-600 dark:text-blue-400">
                     <span className="text-slate-400 mx-1">_</span>
                     {mod}
                     <button type="button" onClick={() => updateDerivedCode(form.baseCode, form.modifiers.filter((m) => m !== mod))} className="text-slate-400 hover:text-red-500 ml-0.5"><X size={10} /></button>
@@ -486,7 +486,7 @@ export function MetricFormLeft({
                   <input
                     type="text"
                     placeholder="自定义后缀"
-                    className="w-20 shrink-0 bg-transparent border-b border-dashed border-slate-400 px-1 py-0.5 text-caption font-mono uppercase placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
+                    className="w-20 shrink-0 bg-transparent border-b border-dashed border-slate-400 px-1 py-0.5 text-xs font-mono uppercase placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
                     value={form.customSuffix}
                     onChange={(e) => updateDerivedCustomSuffix(e.target.value.toUpperCase())}
                   />
@@ -506,7 +506,7 @@ export function MetricFormLeft({
                   form.wordRoots.forEach((root) =>
                     addSeg(
                       (
-                        <span className="shrink-0 inline-flex items-center text-caption font-mono text-purple-600 dark:text-purple-400 border-b border-dashed border-slate-300 px-1 py-0.5">
+                        <span className="shrink-0 inline-flex items-center text-xs font-mono text-purple-600 dark:text-purple-400 border-b border-dashed border-slate-300 px-1 py-0.5">
                           {root}
                           <button type="button" onClick={() => removeWordRoot(root)} className="text-slate-400 hover:text-red-500 ml-0.5"><X size={10} /></button>
                         </span>
@@ -537,7 +537,7 @@ export function MetricFormLeft({
                           ref={aggInputRef}
                           type="text"
                           placeholder="聚合函数"
-                          className="w-20 shrink-0 bg-transparent border-b border-dashed border-emerald-400 px-1 py-0.5 text-caption font-mono uppercase text-emerald-600 placeholder:text-emerald-400 dark:placeholder:text-emerald-600 focus:outline-none focus:border-emerald-500"
+                          className="w-20 shrink-0 bg-transparent border-b border-dashed border-emerald-400 px-1 py-0.5 text-xs font-mono uppercase text-emerald-600 placeholder:text-emerald-400 dark:placeholder:text-emerald-600 focus:outline-none focus:border-emerald-500"
                           value={form.aggregation}
                           onChange={(e) => updateAggregation(e.target.value.toUpperCase())}
                           onFocus={() => setAggOpen(true)}
@@ -559,7 +559,7 @@ export function MetricFormLeft({
                                   }}
                                   className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-all hover:bg-slate-50 dark:hover:bg-slate-800"
                                 >
-                                  <span className="text-caption text-emerald-600 font-mono">{agg}</span>
+                                  <span className="text-xs text-emerald-600 font-mono">{agg}</span>
                                 </button>
                               ))}
                             </div>
@@ -577,7 +577,7 @@ export function MetricFormLeft({
                       <input
                         type="text"
                         placeholder="自定义后缀"
-                        className="w-20 shrink-0 bg-transparent border-b border-dashed border-slate-400 px-1 py-0.5 text-caption font-mono uppercase placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
+                        className="w-20 shrink-0 bg-transparent border-b border-dashed border-slate-400 px-1 py-0.5 text-xs font-mono uppercase placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
                         value={form.customSuffix}
                         onChange={(e) => updateCustomSuffix(e.target.value.toUpperCase())}
                       />
@@ -595,16 +595,17 @@ export function MetricFormLeft({
 
         <div className="grid grid-cols-[200px_1fr] gap-3">
           <div className="space-y-1.5">
-            <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide">数据类型</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">数据类型</label>
             <DataTypeSelector
               value={toDataTypeValue(form)}
               onChange={(value) => setForm((prev) => ({ ...prev, ...fromDataTypeValue(value) }))}
               filter="numeric"
               triggerClassName="w-full !border-2 !border-slate-100 dark:!border-slate-700 !py-2.5 !px-4"
+              labelClassName="text-body-sm text-slate-800 dark:text-slate-200"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide">单位</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">单位</label>
             <UnitSelector
               value={form.unit}
               unitName={form.unitName}
@@ -615,7 +616,7 @@ export function MetricFormLeft({
         </div>
 
         <div className="flex flex-col gap-1.5 flex-1 min-h-0">
-          <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide">业务描述</label>
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">业务描述</label>
           <textarea
             placeholder="描述该指标的业务含义..."
             className="w-full flex-1 min-h-[60px] bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-all resize-none"
@@ -626,24 +627,24 @@ export function MetricFormLeft({
 
         {/* 公式表达式 */}
         <div className="flex flex-col gap-1.5 flex-1 min-h-0">
-          <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-2">
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
             <Code size={14} className="text-emerald-500" /> 公式表达式 *
           </label>
           <div className="relative flex-1 min-h-[60px]">
             <Code size={14} className="absolute top-3.5 left-4 text-emerald-500/50 pointer-events-none" />
-            <textarea
-              ref={formulaRef}
-              placeholder={
-                form.type === 'ATOMIC'
-                  ? "SUM(orders.amount) WHERE status = 'paid'"
-                  : form.type === 'DERIVED'
-                    ? "{SALES_AMOUNT} WHERE region = '北京'"
-                    : '({SALES_AMOUNT} - {COST}) / {SALES_AMOUNT} * 100'
-              }
-              className="w-full h-full bg-slate-900 text-emerald-400 font-mono border-2 border-slate-100 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 text-body-sm focus:outline-none focus:border-emerald-500 shadow-lg resize-none"
-              value={form.formula}
-              onChange={(e) => setForm((prev) => ({ ...prev, formula: e.target.value }))}
-            />
+              <textarea
+                ref={formulaRef}
+                placeholder={
+                  form.type === 'ATOMIC'
+                    ? "SUM(orders.amount) WHERE status = 'paid'"
+                    : form.type === 'DERIVED'
+                      ? "{SALES_AMOUNT} WHERE region = '北京'"
+                      : '({SALES_AMOUNT} - {COST}) / {SALES_AMOUNT} * 100'
+                }
+                className="w-full h-full bg-slate-900 text-emerald-400 font-mono border-2 border-slate-100 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 text-body-sm focus:outline-none focus:border-emerald-500 shadow-lg resize-none"
+                value={form.formula}
+                onChange={(e) => setForm((prev) => ({ ...prev, formula: e.target.value }))}
+              />
           </div>
         </div>
       </div>

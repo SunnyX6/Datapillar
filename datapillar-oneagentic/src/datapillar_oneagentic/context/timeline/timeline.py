@@ -12,6 +12,7 @@ import uuid
 from pydantic import BaseModel, Field
 
 from datapillar_oneagentic.context.timeline.entry import TimelineEntry
+from datapillar_oneagentic.utils.prompt_format import format_markdown
 from datapillar_oneagentic.context.checkpoint.types import CheckpointType
 from datapillar_oneagentic.events.constants import EventType
 
@@ -181,17 +182,18 @@ class Timeline(BaseModel):
         if not self.entries:
             return ""
 
-        lines = ["## 执行时间线"]
-
         recent_entries = self.entries[-max_entries:]
-
+        lines: list[str] = []
+        if len(self.entries) > max_entries:
+            lines.append(f"(showing last {max_entries} of {len(self.entries)})")
         for entry in recent_entries:
             lines.append(f"- {entry.to_display()}")
 
-        if len(self.entries) > max_entries:
-            lines.insert(1, f"(显示最近 {max_entries} 条，共 {len(self.entries)} 条)")
-
-        return "\n".join(lines)
+        body = "\n".join(lines).strip()
+        return format_markdown(
+            title="Execution Timeline",
+            sections=[("Timeline", body)],
+        )
 
     def get_stats(self) -> dict:
         """获取统计信息"""

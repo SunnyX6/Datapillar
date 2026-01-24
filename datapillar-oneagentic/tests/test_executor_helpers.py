@@ -111,6 +111,7 @@ async def test_executor_appends_todo_audit_when_missing_updates(monkeypatch) -> 
         deliverable={"ok": True},
         error=None,
         messages=messages,
+        llm=object(),
     )
 
     parsed = extract_todo_updates(messages)

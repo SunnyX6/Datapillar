@@ -115,6 +115,34 @@ const createNewWorksheet = (id: string, index: number): Worksheet => ({
   schema: ''
 })
 
+function defineDatapillarMonacoThemes(monaco: typeof Monaco) {
+  monaco.editor.defineTheme('datapillar-light', {
+    base: 'vs',
+    inherit: true,
+    rules: [],
+    colors: {
+      'editor.background': '#ffffff',
+      'editorLineNumber.foreground': '#6b7280',
+      'editorLineNumber.activeForeground': '#1f2937',
+      'editorGutter.background': '#ffffff',
+      'editor.foldBackground': '#ffffff00'
+    }
+  })
+
+  monaco.editor.defineTheme('datapillar-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [],
+    colors: {
+      'editor.background': '#0f172a',
+      'editorLineNumber.foreground': '#64748b',
+      'editorLineNumber.activeForeground': '#e2e8f0',
+      'editorGutter.background': '#0f172a',
+      'editor.foldBackground': '#0f172a00'
+    }
+  })
+}
+
 export function SqlEditor() {
   const isDark = useIsDark()
   const [activeDialect, setActiveDialect] = useState(DIALECTS[0])
@@ -314,13 +342,6 @@ export function SqlEditor() {
       window.removeEventListener('scroll', updatePosition, true)
     }
   }, [showCatalogPicker])
-
-  // 监听主题变化，切换 Monaco Editor 主题
-  useEffect(() => {
-    if (monacoInstance) {
-      monacoInstance.editor.setTheme(isDark ? 'datapillar-dark' : 'datapillar-light')
-    }
-  }, [isDark, monacoInstance])
 
   // 切换 Tab 时重置 Sticky Scroll 状态（通过禁用再启用强制刷新）
   useEffect(() => {
@@ -603,6 +624,16 @@ export function SqlEditor() {
           <Editor
             height="100%"
             defaultLanguage="sql"
+            theme={isDark ? 'datapillar-dark' : 'datapillar-light'}
+            beforeMount={(monaco) => {
+              // Monaco 默认主题是 light；在 mount 前注册自定义主题并交给 theme prop 管控，避免深色模式进入时闪白。
+              defineDatapillarMonacoThemes(monaco)
+            }}
+            loading={
+              <div className={`h-full w-full flex items-center justify-center ${isDark ? 'bg-slate-900 text-slate-400' : 'bg-white text-slate-500'}`}>
+                <span className="text-xs tracking-[0.3em] uppercase">Loading...</span>
+              </div>
+            }
             value={activeWorksheet.code}
             onChange={(value) => {
               setWorksheets(prev => prev.map(w =>
@@ -648,36 +679,6 @@ export function SqlEditor() {
                   }
                 })
               }
-
-              // 定义自定义主题 - 设置行号和折叠区域背景色
-              monaco.editor.defineTheme('datapillar-light', {
-                base: 'vs',
-                inherit: true,
-                rules: [],
-                colors: {
-                  'editor.background': '#ffffff',
-                  'editorLineNumber.foreground': '#6b7280',
-                  'editorLineNumber.activeForeground': '#1f2937',
-                  'editorGutter.background': '#ffffff',
-                  'editor.foldBackground': '#ffffff00',
-                }
-              })
-
-              monaco.editor.defineTheme('datapillar-dark', {
-                base: 'vs-dark',
-                inherit: true,
-                rules: [],
-                colors: {
-                  'editor.background': '#0f172a',
-                  'editorLineNumber.foreground': '#64748b',
-                  'editorLineNumber.activeForeground': '#e2e8f0',
-                  'editorGutter.background': '#0f172a',
-                  'editor.foldBackground': '#0f172a00',
-                }
-              })
-
-              // 应用当前主题
-              monaco.editor.setTheme(isDark ? 'datapillar-dark' : 'datapillar-light')
             }}
             options={{
               fontSize: 14,

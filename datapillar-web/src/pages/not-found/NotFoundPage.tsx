@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { AlertTriangle, Home, RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui'
 
 export function NotFoundPage() {
   return (
@@ -38,19 +39,21 @@ export function NotFoundPage() {
         <div className="mt-10 flex flex-wrap gap-4 justify-center">
           <Link
             to="/home"
-            className="flex items-center gap-2 px-6 py-2 bg-white text-black hover:bg-slate-200 rounded-sm text-xs font-bold uppercase tracking-wide transition-all"
+            className="flex items-center gap-2 px-6 py-2 bg-white text-black hover:bg-slate-200 rounded-lg text-xs font-bold uppercase tracking-wide transition-all"
           >
             <Home size={14} />
             返回 Home
           </Link>
-          <button
+          <Button
             type="button"
             onClick={() => window.location.reload()}
-            className="flex items-center gap-2 px-6 py-2 bg-transparent border border-white/10 text-slate-400 hover:text-white hover:border-white/30 rounded-sm text-xs font-bold uppercase tracking-wide transition-all"
+            variant="ghost"
+            size="small"
+            className="flex items-center gap-2 px-6 py-2 bg-transparent border border-white/10 text-slate-400 hover:text-white hover:border-white/30 text-xs font-bold uppercase tracking-wide transition-all"
           >
             <RefreshCw size={14} />
             重新拉取
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -71,4 +74,3 @@ export function NotFoundPage() {
     </div>
   )
 }
-

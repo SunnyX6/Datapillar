@@ -246,17 +246,23 @@ export const modalHeightClassMap = {
  * ⚠️  按钮尺寸包含高度 + 内边距 + 字体大小，需要配合 TYPOGRAPHY 使用
  */
 export const buttonSizeClassMap = {
-  /** 极小按钮 */
-  tiny: 'h-6 px-2 text-micro',
+  /** 极小按钮（用于角落操作、标签按钮等） */
+  tiny: 'px-2 py-1 text-micro',
+
+  /** 紧凑按钮（比 tiny 更“可点”，但字体仍保持 micro） */
+  compact: 'px-3 py-1.5 text-micro',
 
   /** 小按钮 */
-  small: 'h-8 px-3 text-body-sm',
+  small: 'px-3 py-1.5 text-body-sm',
 
   /** 标准按钮 */
-  normal: 'h-10 px-4 text-body',
+  normal: 'px-4 py-2 text-body',
 
   /** 大按钮 */
-  large: 'h-12 px-6 text-body',
+  large: 'px-6 py-2.5 text-body',
+
+  /** 小图标按钮（正方形）*/
+  iconSm: 'size-8',
 
   /** 图标按钮（正方形）*/
   icon: 'size-10'
