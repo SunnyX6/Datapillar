@@ -12,8 +12,13 @@
       "team": "团队协作"
     },
     "dropdown": {
+      "governanceHeader": "数据治理 & OneMeta",
       "metadata": "元数据",
-      "knowledge": "知识图谱RAG"
+      "metadataDesc": "统一物理资产元数据",
+      "semantic": "元语义",
+      "semanticDesc": "指标、词根、API等语义资产空间",
+      "knowledge": "知识图谱RAG",
+      "knowledgeDesc": "知识图谱可视化与关系探索"
     },
     "actions": {
       "search": "搜索..."

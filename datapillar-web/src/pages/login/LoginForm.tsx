@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { useThemeMode, useAuthStore } from '@/stores'
 import { BrandLogo } from '@/components'
+import { Button } from '@/components/ui'
 import { paddingClassMap } from '@/design-tokens/dimensions'
 import { cn } from '@/lib/utils'
 
@@ -209,14 +210,16 @@ export function LoginForm({ scale, ready }: LoginFormProps) {
                   placeholder="••••••••"
                   disabled={loading}
                 />
-                <button
+                <Button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
+                  variant="ghost"
+                  size="tiny"
                   className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 dark:text-slate-500 hover:text-indigo-500 transition-colors"
                   aria-label={showPassword ? '隐藏密码' : '显示密码'}
                 >
                   {showPassword ? <EyeOff size={SIZES.input.iconSize} /> : <Eye size={SIZES.input.iconSize} />}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -246,10 +249,23 @@ export function LoginForm({ scale, ready }: LoginFormProps) {
           </label>
 
           {/* 登录按钮 */}
-          <button
+          <Button
             type="submit"
             disabled={loading}
-            className={`relative isolate overflow-hidden w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:bg-indigo-400 text-white ${SIZES.button.text} font-semibold ${SIZES.button.py} rounded-lg transition-all duration-150 shadow-md shadow-indigo-500/20 hover:-translate-y-0.5 active:translate-y-0.5 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 flex items-center justify-center gap-2 mt-1 disabled:cursor-not-allowed before:absolute before:inset-0 before:bg-black/20 before:opacity-0 before:transition-opacity before:duration-150 active:before:opacity-30`}
+            // 登录页按钮不应该继承 Button 的默认 header 尺寸（含 @md:py-* 容器断点），否则会覆盖这里自定义的 py-*。
+            size="normal"
+            className={cn(
+              'w-full text-white rounded-lg shadow-md shadow-indigo-500/20 disabled:cursor-not-allowed',
+              'flex items-center justify-center gap-2',
+              'bg-indigo-500 hover:bg-indigo-600 active:bg-indigo-700 disabled:bg-indigo-400',
+              'dark:bg-indigo-500 dark:hover:bg-indigo-600 dark:active:bg-indigo-700 dark:disabled:bg-indigo-400',
+              'transition-colors duration-150',
+              SIZES.button.text,
+              SIZES.button.py,
+              'font-semibold',
+              '-mt-1',
+              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400'
+            )}
           >
             {loading ? (
               <>
@@ -262,7 +278,7 @@ export function LoginForm({ scale, ready }: LoginFormProps) {
                 <ArrowRight size={SIZES.button.iconSize} />
               </>
             )}
-          </button>
+          </Button>
           <div className="border-t border-slate-100 dark:border-white/10 mt-6" />
           </form>
         </div>

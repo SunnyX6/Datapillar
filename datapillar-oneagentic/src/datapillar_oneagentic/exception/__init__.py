@@ -3,12 +3,7 @@
 """
 
 from datapillar_oneagentic.exception.base import RecoveryAction
-from datapillar_oneagentic.exception.retry import (
-    RetryConfigLike,
-    calculate_retry_delay,
-    with_retry,
-    with_retry_sync,
-)
+from datapillar_oneagentic.exception.retry import calculate_retry_delay, with_retry, with_retry_sync
 from datapillar_oneagentic.exception.agent import AgentError, AgentErrorCategory, AgentErrorClassifier
 from datapillar_oneagentic.exception.llm import (
     CircuitBreaker,
@@ -27,7 +22,6 @@ from datapillar_oneagentic.exception.llm import (
 
 __all__ = [
     "RecoveryAction",
-    "RetryConfigLike",
     "calculate_retry_delay",
     "with_retry",
     "with_retry_sync",

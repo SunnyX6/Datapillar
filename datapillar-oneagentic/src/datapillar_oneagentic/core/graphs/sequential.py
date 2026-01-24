@@ -10,6 +10,7 @@ Agent 按定义顺序依次执行：A → B → C → END
 
 from langgraph.graph import END, StateGraph
 
+from datapillar_oneagentic.state import StateBuilder
 from datapillar_oneagentic.state.blackboard import Blackboard
 from datapillar_oneagentic.core.status import ExecutionStatus
 
@@ -47,11 +48,13 @@ def build_sequential_graph(
 
         def make_router(current_id: str, next_id: str):
             def router(state) -> str:
-                active = state.get("active_agent")
+                sb = StateBuilder(state)
+                routing = sb.routing.snapshot()
+                active = routing.active_agent
                 # 如果 active_agent 仍是当前 Agent（clarification 后重试），返回当前
                 if active == current_id:
                     return current_id
-                if state.get("last_agent_status") == ExecutionStatus.FAILED:
+                if routing.last_status == ExecutionStatus.FAILED:
                     return "end"
                 # 否则继续下一个
                 return next_id
@@ -68,10 +71,12 @@ def build_sequential_graph(
         last_spec = agent_specs[-1]
 
         def last_router(state) -> str:
-            active = state.get("active_agent")
+            sb = StateBuilder(state)
+            routing = sb.routing.snapshot()
+            active = routing.active_agent
             if active == last_spec.id:
                 return last_spec.id
-            if state.get("last_agent_status") == ExecutionStatus.FAILED:
+            if routing.last_status == ExecutionStatus.FAILED:
                 return "end"
             return "end"
 

@@ -11,11 +11,12 @@ import logging
 import random
 from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import ParamSpec, Protocol, TypeVar
-
-from datapillar_oneagentic.providers.llm.config import RetryConfig
+from typing import TYPE_CHECKING, ParamSpec, TypeVar
 from datapillar_oneagentic.exception.base import RecoveryAction
 from datapillar_oneagentic.exception.llm.classifier import LLMErrorClassifier
+
+if TYPE_CHECKING:
+    from datapillar_oneagentic.providers.llm.config import RetryConfig
 
 logger = logging.getLogger(__name__)
 
@@ -23,16 +24,7 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-class RetryConfigLike(Protocol):
-    """支持重试延迟计算的配置协议"""
-
-    initial_delay_ms: int
-    max_delay_ms: int
-    exponential_base: float
-    jitter: bool
-
-
-def calculate_retry_delay(config: RetryConfigLike, attempt: int) -> float:
+def calculate_retry_delay(config: "RetryConfig", attempt: int) -> float:
     """
     计算第 N 次重试的延迟（秒）
 
@@ -51,7 +43,7 @@ def calculate_retry_delay(config: RetryConfigLike, attempt: int) -> float:
 def with_retry(
     max_retries: int | None = None,
     on_retry: Callable[[int, Exception], None] | None = None,
-    retry_config: RetryConfig | None = None,
+    retry_config: "RetryConfig" | None = None,
 ):
     """
     异步重试装饰器
@@ -117,7 +109,7 @@ def with_retry(
 def with_retry_sync(
     max_retries: int | None = None,
     on_retry: Callable[[int, Exception], None] | None = None,
-    retry_config: RetryConfig | None = None,
+    retry_config: "RetryConfig" | None = None,
 ):
     """
     同步重试装饰器（用于非异步场景）

@@ -544,8 +544,8 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
     return (
       <Modal isOpen={isOpen} onClose={handleClose} size="sm">
         <div className="text-center mb-6">
-          <h2 className="text-title font-bold text-slate-900 dark:text-white">指标注册向导</h2>
-          <p className="text-body-sm text-slate-500 mt-1">请选择您要创建的指标类型</p>
+          <h2 className="text-subtitle font-bold text-slate-900 dark:text-white">指标注册向导</h2>
+          <p className="text-caption text-slate-500 mt-1">请选择您要创建的指标类型</p>
         </div>
 
         <div className="space-y-3">
@@ -561,13 +561,13 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
                   <config.icon size={24} />
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-slate-900 dark:text-white">{config.label}</span>
-                    <div className="w-7 h-7 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300 group-hover:bg-slate-900 dark:group-hover:bg-white group-hover:text-white dark:group-hover:text-slate-900 transition-all">
-                      <ArrowRight size={14} />
-                    </div>
+                  <div className="flex items-center mb-1">
+                    <span className="text-body-sm font-bold text-slate-900 dark:text-white">{config.label}</span>
                   </div>
                   <p className="text-caption text-slate-500">{config.desc}</p>
+                </div>
+                <div className="self-center w-7 h-7 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300 group-hover:bg-slate-900 dark:group-hover:bg-white group-hover:text-white dark:group-hover:text-slate-900 transition-all">
+                  <ArrowRight size={14} />
                 </div>
               </button>
             )
@@ -586,12 +586,16 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
       title={
         <div className="flex items-center gap-3">
           {!isEditMode && (
-            <button onClick={handleBack} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 transition-all">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="w-8 h-8 inline-flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 transition-all"
+            >
               <ChevronLeft size={18} />
             </button>
           )}
           <span>{isEditMode ? '编辑指标' : '配置指标详情'}</span>
-          <span className={`text-caption font-medium px-2 py-0.5 rounded ${typeConfig.bg} ${typeConfig.color}`}>
+          <span className={`text-xs font-medium px-2 py-0.5 rounded ${typeConfig.bg} ${typeConfig.color}`}>
             {typeConfig.label}
           </span>
         </div>
@@ -605,12 +609,12 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
         </>
       }
     >
-      <div className="flex flex-col gap-6 min-h-0 flex-1 overflow-hidden">
+      <div className="flex flex-col gap-6">
         {/* AI 帮写 */}
         <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-2xl border border-purple-100 dark:border-purple-800/50 shrink-0">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles size={16} className="text-purple-500" />
-            <span className="text-caption font-semibold text-purple-700 dark:text-purple-300">AI 帮写</span>
+            <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">AI 帮写</span>
           </div>
           <div className="flex gap-2">
             <input
@@ -620,7 +624,7 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
                   ? '先在右侧选择度量列，然后描述指标，例如：单价和数量相乘，累加订单总金额'
                   : form.type === 'DERIVED'
                     ? '先在左侧编码区选择原子指标，右侧选择维度过滤列，例如：统计北京地区的月度累计值'
-                    : '先在右侧选择至少两个指标，然后描述运算规则，例如：销售额减成本再除以销售额'
+                  : '先在右侧选择至少两个指标，然后描述运算规则，例如：销售额减成本再除以销售额'
               }
               className="flex-1 bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-purple-500 transition-all"
               value={aiInput}
@@ -641,7 +645,7 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
             </button>
           </div>
           {aiError && (
-            <div className="mt-2 text-caption text-red-600 dark:text-red-400 flex items-center gap-1">
+            <div className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
               <AlertTriangle size={14} />
               {aiError}
             </div>
@@ -658,7 +662,7 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
                 ) : (
                   <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
                 )}
-                <span className={`text-caption ${
+                <span className={`text-xs ${
                   aiMessage.success
                     ? 'text-emerald-700 dark:text-emerald-300'
                     : 'text-amber-700 dark:text-amber-300'
@@ -667,7 +671,7 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
               {/* 失败时显示推荐列表 */}
               {!aiMessage.success && aiMessage.recommendations && aiMessage.recommendations.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-700">
-                  <div className="text-caption font-medium text-amber-700 dark:text-amber-300 mb-2">
+                  <div className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-2">
                     {(() => {
                       const hasMetric = aiMessage.recommendations.some((r) => r.msgType === 'metric')
                       const hasTable = aiMessage.recommendations.some((r) => r.msgType === 'table')
@@ -680,7 +684,7 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
                     {aiMessage.recommendations.map((rec, idx) => (
                       rec.msgType === 'table' ? (
                         <div key={idx} className="space-y-1">
-                          <div className="flex items-center gap-2 text-caption">
+                          <div className="flex items-center gap-2 text-xs">
                             <span className="px-1.5 py-0.5 rounded text-micro font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">表</span>
                             <code className="text-slate-700 dark:text-slate-300 font-mono">{rec.fullPath}</code>
                             {rec.description && (
@@ -690,7 +694,7 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
                           {rec.columns && rec.columns.length > 0 && (
                             <div className="ml-6 space-y-0.5">
                               {rec.columns.map((col, colIdx) => (
-                                <div key={colIdx} className="flex items-center gap-2 text-caption">
+                                <div key={colIdx} className="flex items-center gap-2 text-xs">
                                   <span className="px-1.5 py-0.5 rounded text-micro font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">列</span>
                                   <code className="text-slate-600 dark:text-slate-400 font-mono text-legal">{col.name}</code>
                                   {col.dataType && (
@@ -705,7 +709,7 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
                           )}
                         </div>
                       ) : (
-                        <div key={idx} className="flex items-center gap-2 text-caption">
+                        <div key={idx} className="flex items-center gap-2 text-xs">
                           <span className="px-1.5 py-0.5 rounded text-micro font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">指标</span>
                           <code className="text-slate-700 dark:text-slate-300 font-mono">{rec.code}</code>
                           <span className="text-slate-600 dark:text-slate-400">{rec.name}</span>
@@ -726,12 +730,12 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
         {loadingVersion ? (
           <div className="flex flex-col items-center justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-            <div className="text-slate-400 text-caption mt-3">加载指标详情...</div>
+            <div className="text-slate-400 text-xs mt-3">加载指标详情...</div>
           </div>
         ) : (
           <div className="flex-1 min-h-0">
             {/* 表单内容 - 两栏布局 */}
-            <div className="grid grid-cols-12 gap-6 min-h-[520px] h-full overflow-y-auto custom-scrollbar items-stretch">
+            <div className="grid grid-cols-12 gap-6 min-h-[520px] items-stretch">
               <MetricFormLeft
                 form={form}
                 setForm={setForm}

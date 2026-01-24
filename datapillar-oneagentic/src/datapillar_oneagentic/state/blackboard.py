@@ -61,11 +61,8 @@ class Blackboard(TypedDict, total=False):
     # 交付物 keys（实际内容存在 Store 中）
     deliverable_keys: list[str]
 
-    # 经验上下文（框架自动检索注入）
-    experience_context: str | None
-
-    # 知识上下文（框架检索注入）
-    knowledge_context: str | None
+    # 压缩上下文（历史摘要）
+    compression__context: str | None
 
     # Agent 执行状态
     last_agent_status: ExecutionStatus | None
@@ -74,7 +71,6 @@ class Blackboard(TypedDict, total=False):
 
     # 会话级 Todo（团队级进度跟踪）
     todo: dict | None
-    todo_context: str | None
 
     # MapReduce 模式
     mapreduce_goal: str | None
@@ -94,8 +90,6 @@ def create_blackboard(
     *,
     namespace: str = "",
     session_id: str = "",
-    experience_context: str | None = None,
-    knowledge_context: str | None = None,
 ) -> Blackboard:
     """创建新的 Blackboard"""
     return Blackboard(
@@ -106,13 +100,11 @@ def create_blackboard(
         assigned_task=None,
         timeline=None,
         deliverable_keys=[],
-        experience_context=experience_context,
-        knowledge_context=knowledge_context,
+        compression__context=None,
         last_agent_status=None,
         last_agent_failure_kind=None,
         last_agent_error=None,
         todo=None,
-        todo_context=None,
         # MapReduce 模式
         mapreduce_goal=None,
         mapreduce_understanding=None,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
 from datapillar_oneagentic.core.agent import AgentSpec
@@ -10,9 +10,9 @@ from datapillar_oneagentic.exception import AgentError, AgentErrorCategory
 from datapillar_oneagentic.core.nodes import NodeFactory
 from datapillar_oneagentic.core.status import FailureKind
 from datapillar_oneagentic.core.types import AgentResult
-from datapillar_oneagentic.context.compaction.compact_policy import CompactResult
 from datapillar_oneagentic.context.timeline.recorder import TimelineRecorder
 from datapillar_oneagentic.events import EventBus
+from datapillar_oneagentic.state import StateBuilder
 
 
 class _OutputSchema(BaseModel):
@@ -70,11 +70,6 @@ async def test_checkpoint_manager_delete_should_work_with_sync_checkpointer() ->
     assert ok is True
 
 
-class _DummyCompactor:
-    async def compact(self, messages):
-        return messages, CompactResult.no_action("无需压缩")
-
-
 @pytest.mark.asyncio
 async def test_node_factory_should_fail_fast_on_failed_result() -> None:
     event_bus = EventBus()
@@ -83,7 +78,6 @@ async def test_node_factory_should_fail_fast_on_failed_result() -> None:
         agent_specs=[],
         agent_ids=["a1"],
         get_executor=lambda _aid: None,
-        compactor=_DummyCompactor(),
         timeline_recorder=timeline_recorder,
     )
 
@@ -96,8 +90,32 @@ async def test_node_factory_should_fail_fast_on_failed_result() -> None:
 
     result = AgentResult.failed(error="需要补充信息", messages=[HumanMessage(content="补充内容")])
     with pytest.raises(AgentError) as exc_info:
-        await nf._handle_result(state=state, agent_id="a1", result=result, store=None)  # type: ignore[arg-type]
+        await nf._handle_result(  # type: ignore[arg-type]
+            state=state,
+            agent_id="a1",
+            result=result,
+            store=None,
+            compression_context=None,
+        )
 
     error = exc_info.value
     assert error.category == AgentErrorCategory.BUSINESS
     assert error.failure_kind == FailureKind.BUSINESS
+
+
+def test_state_builder_should_drop_system_messages() -> None:
+    state = {
+        "session_id": "s1",
+        "messages": [
+            SystemMessage(content="sys"),
+            HumanMessage(content="hi"),
+            AIMessage(content="ok"),
+        ],
+    }
+    sb = StateBuilder(state)
+
+    assert all(not isinstance(m, SystemMessage) for m in sb.memory.snapshot())
+
+    sb.memory.append([SystemMessage(content="sys2"), HumanMessage(content="hi2")])
+
+    assert all(not isinstance(m, SystemMessage) for m in sb.memory.snapshot())

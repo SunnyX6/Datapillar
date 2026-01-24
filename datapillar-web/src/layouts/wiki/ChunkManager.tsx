@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { cardWidthClassMap, progressWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
+import { Button, Card } from '@/components/ui'
 import type { Chunk, Document } from './types'
 
 const mockDocuments: Document[] = [
@@ -134,10 +135,10 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 relative rounded-b-xl">
-      <div className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 bg-white dark:bg-slate-900 flex-shrink-0 z-20 shadow-sm relative">
+      <div className="h-14 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-5 bg-white dark:bg-slate-900 flex-shrink-0 z-20 shadow-sm relative">
         <div className="flex items-center gap-3 min-w-0">
           <div className={`relative group min-w-0 ${cardWidthClassMap.superWide}`}>
-            <button className={`flex items-center ${TYPOGRAPHY.body} font-semibold text-slate-900 dark:text-slate-100 px-2 py-1.5 rounded-lg transition-all text-left`}>
+            <button className={`flex items-center ${TYPOGRAPHY.bodySm} font-semibold text-slate-900 dark:text-slate-100 px-2 py-1.5 rounded-lg transition-all text-left`}>
               <span className="flex items-center gap-1.5 min-w-0">
                 <FileText size={16} className="text-indigo-600 shrink-0" />
                 <span className={`min-w-0 truncate ${currentDoc ? '' : `${TYPOGRAPHY.caption} text-slate-400`}`}>
@@ -155,7 +156,7 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
                     <div
                       key={doc.id}
                       onClick={() => handleDocSelect(doc.id)}
-                      className={`flex items-center px-3 py-2.5 ${TYPOGRAPHY.body} rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${activeDocId === doc.id ? 'bg-indigo-50 text-indigo-700 font-medium dark:bg-indigo-500/10 dark:text-indigo-200' : 'text-slate-700 dark:text-slate-300'}`}
+                      className={`flex items-center px-3 py-2.5 ${TYPOGRAPHY.bodySm} rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${activeDocId === doc.id ? 'bg-indigo-50 text-indigo-700 font-medium dark:bg-indigo-500/10 dark:text-indigo-200' : 'text-slate-700 dark:text-slate-300'}`}
                     >
                       <FileText size={16} className={`mr-3 ${activeDocId === doc.id ? 'text-indigo-500' : 'text-slate-400'}`} />
                       <span className="truncate">{doc.title}</span>
@@ -184,7 +185,7 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
         <div className="relative">
           <button
             onClick={() => setShowConfig(!showConfig)}
-            className="flex items-center h-10 px-4 rounded-lg transition-all group"
+            className="flex items-center h-9 px-4 rounded-lg transition-all group"
           >
             <Settings size={16} className={`mr-3 ${showConfig ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'}`} />
 
@@ -287,12 +288,14 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
               <div className={`${TYPOGRAPHY.micro} text-slate-500`}>
                 预计生成: <span className="font-bold text-slate-900 dark:text-slate-100">~{Math.ceil((currentDoc?.tokenCount || 0) / config.chunkSize)} chunks</span>
               </div>
-              <button
+              <Button
                 onClick={() => setShowConfig(false)}
-                className={`px-4 py-2 bg-slate-900 hover:bg-black text-white ${TYPOGRAPHY.caption} font-bold rounded-lg transition-colors shadow-sm`}
+                variant="primary"
+                size="normal"
+                className={`${TYPOGRAPHY.caption} font-bold`}
               >
                 应用配置并重新切分
-              </button>
+              </Button>
             </div>
             </div>
           )}
@@ -316,7 +319,7 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
               <div
                 key={chunk.id}
                 onClick={() => handleChunkSelect(chunk)}
-                className={`p-4 border-b border-slate-50 dark:border-slate-800 cursor-pointer transition-all hover:bg-slate-50 dark:hover:bg-slate-800 ${activeChunk?.id === chunk.id ? 'bg-indigo-50/60 dark:bg-indigo-500/10 border-l-4 border-l-indigo-600' : 'border-l-4 border-l-transparent'}`}
+                className={`p-3 border-b border-slate-50 dark:border-slate-800 cursor-pointer transition-all hover:bg-slate-50 dark:hover:bg-slate-800 ${activeChunk?.id === chunk.id ? 'bg-indigo-50/60 dark:bg-indigo-500/10 border-l-4 border-l-indigo-600' : 'border-l-4 border-l-transparent'}`}
               >
                 <div className="flex justify-between items-center mb-1.5">
                   <span className={`${TYPOGRAPHY.micro} font-mono font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded`}>#{idx + 1}</span>
@@ -336,9 +339,9 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
         <div className="flex-1 flex flex-col bg-slate-50/30 dark:bg-slate-950/40 rounded-br-xl">
           {activeChunk ? (
             <>
-              <div className="px-8 py-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center shadow-sm z-10">
+              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center shadow-sm z-10">
                 <div>
-                  <h2 className={`${TYPOGRAPHY.body} font-bold text-slate-900 dark:text-slate-100 flex items-center`}>
+                  <h2 className={`${TYPOGRAPHY.bodySm} font-bold text-slate-900 dark:text-slate-100 flex items-center`}>
                     切片内容详情
                     <span className={`ml-2 px-2 py-0.5 bg-slate-100 dark:bg-slate-800 ${TYPOGRAPHY.micro} text-slate-500 rounded-full font-normal`}>ID: {activeChunk.id}</span>
                   </h2>
@@ -354,7 +357,10 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
               </div>
 
               <div className="flex-1 p-8 overflow-y-auto rounded-br-xl">
-                <div className="bg-white dark:bg-slate-900 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 ring-4 ring-slate-50/50 dark:ring-slate-900/60">
+                <Card
+                  padding="none"
+                  className="p-1 shadow-sm ring-4 ring-slate-50/50 dark:ring-slate-900/60"
+                >
                   <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2 border-b border-slate-100 dark:border-slate-700 rounded-t-lg flex justify-between items-center">
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></div>
@@ -365,13 +371,13 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
                   <textarea
                     value={editContent}
                     onChange={(e) => handleEditContentChange(e.target.value)}
-                    className={`w-full h-[320px] p-6 ${TYPOGRAPHY.body} text-slate-800 dark:text-slate-100 focus:outline-none resize-none font-mono leading-relaxed bg-white dark:bg-slate-900 rounded-b-lg selection:bg-indigo-100 selection:text-indigo-900`}
+                    className={`w-full h-[320px] p-5 ${TYPOGRAPHY.bodySm} text-slate-800 dark:text-slate-100 focus:outline-none resize-none font-mono leading-relaxed bg-white dark:bg-slate-900 rounded-b-lg selection:bg-indigo-100 selection:text-indigo-900`}
                     spellCheck={false}
                   />
-                </div>
+                </Card>
 
                 <div className="mt-6 grid grid-cols-2 gap-6">
-                  <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                  <Card padding="sm" className="shadow-sm">
                     <h4 className={`${TYPOGRAPHY.legal} font-bold text-slate-400 uppercase tracking-wider mb-3`}>Source Metadata</h4>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center pb-2 border-b border-dashed border-slate-100 dark:border-slate-800">
@@ -386,8 +392,8 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
                         <div className={`bg-indigo-500 h-1.5 rounded-full ${progressWidthClass}`}></div>
                       </div>
                     </div>
-                  </div>
-                  <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                  </Card>
+                  <Card padding="sm" className="shadow-sm">
                     <h4 className={`${TYPOGRAPHY.legal} font-bold text-slate-400 uppercase tracking-wider mb-3`}>Embedding Status</h4>
                     <div className="flex flex-col space-y-2">
                       <div className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400`}>
@@ -401,19 +407,23 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
                         Vector Synced
                       </div>
                     </div>
-                  </div>
+                  </Card>
                 </div>
               </div>
 
-              <div className="px-8 py-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center rounded-br-xl">
+              <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center rounded-br-xl">
                 <div className={`flex items-center ${TYPOGRAPHY.caption} text-slate-400`}>
                   <Info size={12} className="mr-1.5" />
                   <span>手动修改内容会触发向量重新计算</span>
                 </div>
-                <button className={`flex items-center px-6 py-2.5 bg-slate-900 hover:bg-black text-white ${TYPOGRAPHY.caption} font-bold rounded-lg shadow-lg shadow-slate-200 transition-all transform hover:-translate-y-0.5`}>
-                  <Save size={14} className="mr-2" />
+                <Button
+                  variant="primary"
+                  size="normal"
+                  className={`px-5 py-2 ${TYPOGRAPHY.caption} font-bold hover:-translate-y-0.5`}
+                >
+                  <Save size={14} />
                   保存并更新索引
-                </button>
+                </Button>
               </div>
             </>
           ) : (
@@ -421,7 +431,7 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
               <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
                 <Edit2 size={24} className="text-slate-300" />
               </div>
-              <p className={`${TYPOGRAPHY.body} font-medium text-slate-500`}>请从左侧列表选择一个切片</p>
+              <p className={`${TYPOGRAPHY.bodySm} font-medium text-slate-500`}>请从左侧列表选择一个切片</p>
               <p className={`${TYPOGRAPHY.caption} text-slate-400 mt-1`}>您可以查看详情或手动优化内容</p>
             </div>
           )}

@@ -8,6 +8,7 @@ Agent 自主决定是否委派：
 
 from langgraph.graph import END, StateGraph
 
+from datapillar_oneagentic.state import StateBuilder
 from datapillar_oneagentic.state.blackboard import Blackboard
 
 
@@ -52,7 +53,8 @@ def build_dynamic_graph(
 def _route_by_active_agent(agent_ids: list[str]):
     """创建根据 active_agent 路由的函数"""
     def router(state) -> str:
-        active = state.get("active_agent")
+        sb = StateBuilder(state)
+        active = sb.routing.snapshot().active_agent
         if active and active in agent_ids:
             return active
         return "end"

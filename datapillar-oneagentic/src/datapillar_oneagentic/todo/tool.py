@@ -19,11 +19,11 @@ TODO_TOOL_NAME = "report_todo"
 TODO_PLAN_TOOL_NAME = "plan_todo"
 
 
-@tool(TODO_TOOL_NAME, description="上报团队 Todo 进度（内部使用）")
+@tool(TODO_TOOL_NAME, description="Report team todo progress (internal use).")
 def report_todo(
-    todo_id: Annotated[str, "Todo ID（t1, t2...）"],
-    status: Annotated[str, "状态：pending/running/completed/failed/skipped"],
-    result: Annotated[str | None, "简短结果说明（可选）"] = None,
+    todo_id: Annotated[str, "Todo ID (t1, t2, ...)"],
+    status: Annotated[str, "Status: pending/running/completed/failed/skipped"],
+    result: Annotated[str | None, "Short result note (optional)"] = None,
 ) -> dict:
     """上报 Todo 进度"""
     return {
@@ -32,12 +32,12 @@ def report_todo(
         "result": result,
     }
 
-@tool(TODO_PLAN_TOOL_NAME, description="规划/调整团队 Todo（内部使用）")
+@tool(TODO_PLAN_TOOL_NAME, description="Plan or adjust team todo (internal use).")
 def plan_todo(
-    op: Annotated[str, "操作类型：add/remove/replace"],
-    items: Annotated[list[str] | None, "add/replace 的条目列表"] = None,
-    todo_ids: Annotated[list[str] | None, "remove 的条目 ID 列表"] = None,
-    goal: Annotated[str | None, "可选目标"] = None,
+    op: Annotated[str, "Operation: add/remove/replace"],
+    items: Annotated[list[str] | None, "Items for add/replace"] = None,
+    todo_ids: Annotated[list[str] | None, "Todo IDs for remove"] = None,
+    goal: Annotated[str | None, "Optional goal"] = None,
 ) -> dict:
     """规划 Todo 列表"""
     return {

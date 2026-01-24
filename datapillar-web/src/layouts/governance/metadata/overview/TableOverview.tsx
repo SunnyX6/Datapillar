@@ -30,6 +30,7 @@ import { type TableAsset } from '../type/types'
 import { getTable, associateObjectTags, getObjectTags, createTag } from '@/services/oneMetaService'
 import { fetchValueDomains, type ValueDomainDTO } from '@/services/oneMetaSemanticService'
 import type { GravitinoIndexDTO } from '@/types/oneMeta'
+import { Card, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui'
 
 const VALUE_DOMAIN_TAG_PREFIX = 'vd:'
 
@@ -673,7 +674,7 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
           {activeTab === 'OVERVIEW' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 @md:grid-cols-3 gap-4">
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
+                <Card>
                   <h4 className={`${TYPOGRAPHY.legal} font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-4`}>Technical Specs</h4>
                   <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
                     {tableSpecs.length > 0 ? (
@@ -684,18 +685,18 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                       <span className="text-slate-400">Loading...</span>
                     )}
                   </div>
-                </div>
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm @md:col-span-2">
+                </Card>
+                <Card className="@md:col-span-2">
                   <h4 className={`${TYPOGRAPHY.legal} font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-4`}>Governance & Usage</h4>
                   <div className="grid grid-cols-3 gap-4">
                     <UsageStat label="Weekly Queries" value="1.2k" />
                     <UsageStat label="Downstream Jobs" value="42" />
                     <UsageStat label="SLA Met" value="99.9%" tone="text-green-600" />
                   </div>
-                </div>
+                </Card>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+              <Card padding="none" className="overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
                   <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
                     <Book size={16} className="text-slate-400" />
@@ -715,22 +716,22 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                     <li>Returns are processed in <code className={`px-1 py-0.5 bg-slate-100 dark:bg-slate-800 rounded ${TYPOGRAPHY.legal}`}>fact_returns</code> and must be joined for net revenue.</li>
                   </ul>
                 </div>
-              </div>
+              </Card>
             </div>
           )}
 
           {activeTab === 'COLUMNS' && (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-700">
-                  <tr>
-                    <th className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Column Name</th>
-                    <th className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Data Type</th>
-                    <th className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Comment</th>
-                    <th className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Tags</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <>
+              <Table layout="auto" minWidth="none">
+                <TableHeader className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
+                  <TableRow>
+                    <TableHead className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Column Name</TableHead>
+                    <TableHead className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Data Type</TableHead>
+                    <TableHead className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Comment</TableHead>
+                    <TableHead className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Tags</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {columns.map((col) => {
                     const indexTypes = columnIndexMap.get(col.name)
                     const isPrimaryKey = indexTypes?.has('PRIMARY_KEY') ?? false
@@ -739,8 +740,8 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                     const currentDomain = valueDomains.find((d) => d.domainCode === currentDomainCode)
 
                     return (
-                      <tr key={col.name} className="group hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
-                        <td className="px-6 py-3 font-mono text-xs text-slate-800 dark:text-slate-100">
+                      <TableRow key={col.name} className="group hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                        <TableCell className="px-6 py-3 font-mono text-caption text-slate-800 dark:text-slate-100">
                           <div className="flex items-center gap-2">
                             {/* 列名 + 值域标记容器 */}
                             <span className="relative inline-flex items-center">
@@ -789,22 +790,22 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                               </span>
                             )}
                           </div>
-                        </td>
-                        <td className="px-6 py-3 font-mono text-xs text-slate-500 dark:text-slate-300">{col.dataType}</td>
-                        <td className="px-6 py-3 text-slate-600 dark:text-slate-300">{col.comment ?? '-'}</td>
-                        <td className="px-6 py-3">
+                        </TableCell>
+                        <TableCell className="px-6 py-3 font-mono text-caption text-slate-500 dark:text-slate-300">{col.dataType}</TableCell>
+                        <TableCell className="px-6 py-3 text-caption text-slate-600 dark:text-slate-300">{col.comment ?? '-'}</TableCell>
+                        <TableCell className="px-6 py-3 text-caption">
                           {col.piiTag && (
                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded ${TYPOGRAPHY.micro} font-bold bg-rose-50 text-rose-600 border border-rose-100`}>
                               <Lock size={10} />
                               {col.piiTag}
                             </span>
                           )}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
               {/* 值域选择下拉 - Portal 到 body */}
               {openDropdown && dropdownPos && createPortal(
                 <div
@@ -909,12 +910,12 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                 </div>,
                 document.body
               )}
-            </div>
+            </>
           )}
 
           {activeTab === 'QUALITY' && (
             <div className="space-y-6">
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
+              <Card>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-slate-800 dark:text-slate-100">Quality Metrics Trend</h3>
                   <span className="text-xs font-medium text-slate-500 dark:text-slate-400 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded">Last 30 Days</span>
@@ -922,9 +923,9 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                 <div className="h-56 rounded-lg border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-center text-sm text-slate-400 dark:text-slate-500">
                   Trend chart placeholder
                 </div>
-              </div>
+              </Card>
 
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+              <Card padding="none" className="overflow-hidden">
                 <table className="w-full text-sm">
                 <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 font-semibold">
                   <tr>
@@ -958,15 +959,15 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </Card>
             </div>
           )}
 
           {activeTab === 'LINEAGE' && (
-            <div className="h-[420px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm flex items-center justify-center relative overflow-hidden">
+            <Card padding="none" className="h-[420px] flex items-center justify-center relative overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:18px_18px] opacity-50" />
               <div className="z-10 text-sm text-slate-500 dark:text-slate-400">Lineage graph placeholder</div>
-            </div>
+            </Card>
           )}
         </div>
       </div>

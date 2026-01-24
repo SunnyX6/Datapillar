@@ -13,7 +13,8 @@ import {
   Sparkles,
   Users
 } from 'lucide-react'
-import { contentMaxWidthClassMap, paddingClassMap } from '@/design-tokens/dimensions'
+import { Button, Card } from '@/components/ui'
+import { contentMaxWidthClassMap } from '@/design-tokens/dimensions'
 
 const PROFILE_TAGS = ['Data Reliability', 'AI Copilot', 'Cost Guardrails']
 
@@ -147,20 +148,18 @@ const CONTACTS: Contact[] = [
 
 export function ProfileLayout() {
   return (
-    <section className="h-full bg-slate-50 dark:bg-[#050816] selection:bg-indigo-500/30">
-      <div className="h-full overflow-y-auto custom-scrollbar">
-        <div
-          className={`${contentMaxWidthClassMap.full} ${paddingClassMap.md} w-full mx-auto space-y-6 @container`}
-        >
+    <section className="flex h-full w-full overflow-hidden bg-white dark:bg-slate-900 selection:bg-indigo-500/30 @container">
+      <div className="flex-1 overflow-auto p-4 @md:p-6 @xl:p-8 custom-scrollbar">
+        <div className={`${contentMaxWidthClassMap.full} w-full mx-auto flex flex-col gap-4 @md:gap-6 text-body`}>
           <ProfileHeader />
-          <div className="grid grid-cols-12 gap-4 @lg:gap-5 auto-rows-[minmax(0,1fr)]">
+          <div className="grid grid-cols-12 gap-4 @md:gap-6 auto-rows-[minmax(0,1fr)]">
             {STAT_METRICS.map((metric) => (
               <BentoCard key={metric.label} className="col-span-12 @md:col-span-4">
                 <StatCard metric={metric} />
               </BentoCard>
             ))}
           </div>
-          <div className="grid grid-cols-12 gap-4 @lg:gap-5 auto-rows-[minmax(0,1fr)]">
+          <div className="grid grid-cols-12 gap-4 @md:gap-6 auto-rows-[minmax(0,1fr)]">
             <BentoCard className="col-span-12 @lg:col-span-6">
               <JourneyTimeline />
             </BentoCard>
@@ -168,7 +167,7 @@ export function ProfileLayout() {
               <ProjectFocusPanel />
             </BentoCard>
           </div>
-          <div className="grid grid-cols-12 gap-4 @lg:gap-5 auto-rows-[minmax(0,1fr)]">
+          <div className="grid grid-cols-12 gap-4 @md:gap-6 auto-rows-[minmax(0,1fr)]">
             <BentoCard className="col-span-12 @lg:col-span-7">
               <ObjectiveHighlights />
             </BentoCard>
@@ -184,19 +183,22 @@ export function ProfileLayout() {
 
 function ProfileHeader() {
   return (
-    <div className="bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-700 rounded-3xl overflow-hidden shadow-lg shadow-indigo-500/5">
-      <div className="px-6 @md:px-8 py-6 flex flex-col gap-5">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+    <Card
+      padding="md"
+      className="rounded-3xl @md:rounded-3xl overflow-hidden"
+    >
+      <div className="flex flex-col gap-4 @md:gap-5">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 @md:gap-5">
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 @md:w-20 @md:h-20 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-rose-500 p-0.5">
-              <div className="w-full h-full rounded-[1rem] bg-white dark:bg-[#030712] flex items-center justify-center text-xl font-black text-transparent bg-clip-text bg-gradient-to-br from-slate-900 to-slate-600 dark:from-white dark:to-slate-300">
+            <div className="w-14 h-14 @md:w-16 @md:h-16 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-rose-500 p-0.5">
+              <div className="w-full h-full rounded-[1rem] bg-white dark:bg-[#030712] flex items-center justify-center text-lg font-black text-transparent bg-clip-text bg-gradient-to-br from-slate-900 to-slate-600 dark:from-white dark:to-slate-300">
                 SE
               </div>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500 font-semibold">Principal Builder</p>
-              <h1 className="text-2xl @md:text-display-sm font-semibold text-slate-900 dark:text-white tracking-tight mt-1">Sunny Engineer</h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-3xl">
+              <p className="text-legal uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">Principal Builder</p>
+              <h1 className="text-heading @md:text-title font-semibold text-slate-900 dark:text-white tracking-tight mt-1">Sunny Engineer</h1>
+              <p className="text-body-sm text-slate-500 dark:text-slate-400 mt-2 max-w-3xl">
                 Owns the federated data operating model for <span className="font-medium text-indigo-600 dark:text-indigo-300">Acme Corp</span>, orchestrating ingestion, AI quality guardrails, and governed activation layers.
               </p>
               <div className="flex flex-wrap gap-2 mt-3">
@@ -209,14 +211,14 @@ function ProfileHeader() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-300 hover:border-indigo-400/60 hover:text-indigo-600 transition-colors flex items-center gap-2">
+            <button type="button" className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-body-sm font-medium text-slate-600 dark:text-slate-300 hover:border-indigo-400/60 hover:text-indigo-600 transition-colors flex items-center gap-2">
               <Mail size={14} />
               Share Brief
             </button>
-            <button type="button" className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-md shadow-indigo-500/40 flex items-center gap-2">
+            <Button type="button" variant="primary">
               <ArrowUpRight size={14} />
               Update Profile
-            </button>
+            </Button>
           </div>
         </div>
         <div className="grid grid-cols-1 @md:grid-cols-2 @lg:grid-cols-4 gap-3">
@@ -226,19 +228,19 @@ function ProfileHeader() {
           <QuickStat label="Escalation SLA" value="< 45 min" icon={<Clock3 size={14} className="text-rose-500" />} />
         </div>
       </div>
-    </div>
+    </Card>
   )
 }
 
 function QuickStat({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
   return (
-    <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-white/5">
-      <div className="w-9 h-9 rounded-2xl bg-white dark:bg-slate-900 flex items-center justify-center shadow-sm">
+    <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-white/5">
+      <div className="w-8 h-8 rounded-2xl bg-white dark:bg-slate-900 flex items-center justify-center shadow-sm">
         {icon}
       </div>
       <div>
         <p className="text-legal uppercase tracking-widest text-slate-400">{label}</p>
-        <p className="text-sm font-semibold text-slate-900 dark:text-white">{value}</p>
+        <p className="text-body-sm font-semibold text-slate-900 dark:text-white">{value}</p>
       </div>
     </div>
   )
@@ -246,13 +248,13 @@ function QuickStat({ label, value, icon }: { label: string; value: string; icon:
 
 function StatCard({ metric }: { metric: StatMetric }) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-caption uppercase tracking-widest text-slate-400">{metric.label}</p>
           <div className="flex items-end gap-2 mt-1">
-            <span className="text-2xl font-semibold text-slate-900 dark:text-white">{metric.value}</span>
-            <span className="text-xs text-slate-500">{metric.subLabel}</span>
+            <span className="text-title text-slate-900 dark:text-white">{metric.value}</span>
+            <span className="text-legal text-slate-500">{metric.subLabel}</span>
           </div>
         </div>
         <div className={`px-2 py-1 rounded-full text-legal font-semibold ${metric.isPositive ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10' : 'text-rose-600 bg-rose-50 dark:bg-rose-500/10'}`}>
@@ -260,8 +262,8 @@ function StatCard({ metric }: { metric: StatMetric }) {
         </div>
       </div>
       <Sparkline data={metric.data} color={metric.color} />
-      <div className="flex items-center gap-2 text-slate-500 text-sm">
-        <div className="w-9 h-9 rounded-2xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
+      <div className="flex items-center gap-2 text-slate-500 text-body-sm">
+        <div className="w-8 h-8 rounded-2xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
           {metric.icon}
         </div>
         <span>Trend monitored by Datapillar AI</span>
@@ -273,24 +275,24 @@ function StatCard({ metric }: { metric: StatMetric }) {
 function JourneyTimeline() {
   return (
     <div>
-      <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+      <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2 text-body-sm @md:text-subtitle">
         <ShieldCheck size={18} className="text-indigo-500" />
         Execution Journey
       </h3>
-      <p className="text-sm text-slate-500 mt-1">Milestones for the unified data operating model.</p>
-      <div className="mt-5 space-y-5">
+      <p className="text-body-sm text-slate-500 mt-1">Milestones for the unified data operating model.</p>
+      <div className="mt-4 space-y-4">
         {JOURNEY_STEPS.map((step, index) => (
           <div key={step.title} className="flex gap-4">
             <div className="flex flex-col items-center">
               <div className={`w-4 h-4 rounded-full border-2 ${step.status === 'done' ? 'bg-emerald-500 border-emerald-500' : step.status === 'in-progress' ? 'bg-amber-400 border-amber-400 animate-pulse' : 'border-slate-400 bg-slate-50'}`} />
               {index !== JOURNEY_STEPS.length - 1 && <div className="flex-1 w-px bg-slate-200 dark:bg-slate-800" />}
             </div>
-            <div className="flex-1 bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-white/5 rounded-2xl p-4">
+            <div className="flex-1 bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-white/5 rounded-2xl p-3">
               <div className="flex items-center justify-between">
                 <p className="font-semibold text-slate-900 dark:text-white">{step.title}</p>
                 <span className="text-xs text-slate-500">{step.time}</span>
               </div>
-              <p className="text-sm text-slate-500 mt-1">{step.detail}</p>
+              <p className="text-body-sm text-slate-500 mt-1">{step.detail}</p>
             </div>
           </div>
         ))}
@@ -303,16 +305,16 @@ function ProjectFocusPanel() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+        <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2 text-body-sm @md:text-subtitle">
           <Layers size={18} className="text-purple-500" />
           Strategic focus
         </h3>
         <button type="button" className="text-xs font-semibold text-indigo-600 hover:text-indigo-400">View roadmap</button>
       </div>
-      <p className="text-sm text-slate-500 mt-1">Pods owning impact-critical surfaces.</p>
+      <p className="text-body-sm text-slate-500 mt-1">Pods owning impact-critical surfaces.</p>
       <div className="mt-4 space-y-3">
         {PROJECT_FOCUS.map((project) => (
-          <div key={project.name} className="p-4 rounded-2xl border border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-900/40">
+          <div key={project.name} className="p-3 rounded-2xl border border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-900/40">
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-semibold text-slate-900 dark:text-white">{project.name}</p>
@@ -322,7 +324,7 @@ function ProjectFocusPanel() {
                 {project.health}
               </span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-slate-500 mt-3">
+            <div className="flex items-center gap-2 text-body-sm text-slate-500 mt-3">
               <MessageSquare size={14} className="text-slate-400" />
               {project.risk}
             </div>
@@ -336,12 +338,12 @@ function ProjectFocusPanel() {
 function ObjectiveHighlights() {
   return (
     <div>
-      <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+      <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2 text-body-sm @md:text-subtitle">
         <Award size={18} className="text-rose-500" />
         Objective Highlights
       </h3>
-      <p className="text-sm text-slate-500 mt-1">North-star signals tracked for the lead builder.</p>
-      <div className="mt-5 grid @md:grid-cols-2 gap-3">
+      <p className="text-body-sm text-slate-500 mt-1">North-star signals tracked for the lead builder.</p>
+      <div className="mt-4 grid @md:grid-cols-2 gap-3">
         <HighlightCard
           title="Reliability posture"
           value="99.92%"
@@ -373,13 +375,13 @@ function ObjectiveHighlights() {
 
 function HighlightCard({ title, value, description, pill }: { title: string; value: string; description: string; pill: string }) {
   return (
-    <div className="p-4 rounded-2xl border border-slate-100 dark:border-white/5 bg-white dark:bg-slate-900/60 shadow-sm">
+    <div className="p-3 rounded-2xl border border-slate-100 dark:border-white/5 bg-white dark:bg-slate-900/60 shadow-sm">
       <div className="flex items-center justify-between">
         <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{title}</p>
         <span className="text-micro font-semibold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-200">{pill}</span>
       </div>
-      <p className="text-2xl font-semibold text-slate-900 dark:text-white mt-3">{value}</p>
-      <p className="text-sm text-slate-500 mt-1">{description}</p>
+      <p className="text-title text-slate-900 dark:text-white mt-3">{value}</p>
+      <p className="text-body-sm text-slate-500 mt-1">{description}</p>
     </div>
   )
 }
@@ -387,14 +389,14 @@ function HighlightCard({ title, value, description, pill }: { title: string; val
 function SupportContacts() {
   return (
     <div>
-      <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+      <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2 text-body-sm @md:text-subtitle">
         <Users size={18} className="text-sky-500" />
         Support graph
       </h3>
-      <p className="text-sm text-slate-500 mt-1">Who keeps Sunny unblocked.</p>
+      <p className="text-body-sm text-slate-500 mt-1">Who keeps Sunny unblocked.</p>
       <div className="mt-4 space-y-3">
         {CONTACTS.map((contact) => (
-          <div key={contact.name} className="p-4 rounded-2xl border border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-900/40">
+          <div key={contact.name} className="p-3 rounded-2xl border border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-900/40">
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-semibold text-slate-900 dark:text-white">{contact.name}</p>
@@ -402,7 +404,7 @@ function SupportContacts() {
               </div>
               <span className="text-legal font-semibold text-slate-500">{contact.eta}</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-slate-500 mt-3">
+            <div className="flex items-center gap-2 text-body-sm text-slate-500 mt-3">
               <MessageSquare size={14} className="text-indigo-500" />
               {contact.channel}
             </div>
@@ -447,8 +449,11 @@ interface BentoCardProps {
 
 function BentoCard({ children, className = '' }: BentoCardProps) {
   return (
-    <div className={`bg-white dark:bg-[#1e293b] rounded-2xl p-5 @lg:p-6 border border-slate-200 dark:border-slate-700/60 shadow-sm hover:shadow-lg transition-all duration-300 dark:shadow-black/20 flex flex-col ${className}`}>
+    <Card
+      padding="md"
+      className={`rounded-2xl flex flex-col ${className}`}
+    >
       {children}
-    </div>
+    </Card>
   )
 }

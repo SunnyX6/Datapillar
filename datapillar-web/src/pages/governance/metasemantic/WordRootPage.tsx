@@ -11,9 +11,13 @@ export function GovernanceWordRootPage() {
     navigate('/governance/semantic')
   }
 
+  const handleWordRootSelect = (root: WordRoot) => {
+    setSelectedWordRoot((prev) => (prev?.code === root.code ? null : root))
+  }
+
   return (
     <div className="flex h-full w-full overflow-hidden bg-white dark:bg-slate-900 @container">
-      <WordRootExplorer onBack={handleBack} onOpenDrawer={setSelectedWordRoot} />
+      <WordRootExplorer onBack={handleBack} onOpenDrawer={handleWordRootSelect} />
       {selectedWordRoot && <WordRootOverview wordRoot={selectedWordRoot} onClose={() => setSelectedWordRoot(null)} />}
     </div>
   )

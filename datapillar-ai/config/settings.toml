@@ -40,11 +40,34 @@ redis_password = ""
 jwt_issuer = "datapillar-auth"
 auth_enabled = true  # 是否启用认证，开发调试时可设为 false
 
+# ==================== LLM 配置 ====================
+[default.llm]
+retry.max_retries = 3
+
+# ==================== LLM 缓存配置 ====================
+# 说明：
+# - 精确匹配缓存：相同输入 = 命中，任何差异 = 不命中
+# - Redis 存储，支持 TTL，分布式友好
+# - 解决 LangChain 动态 ID 问题，规范化后匹配
+[default.llm.cache]
+enabled = true
+backend = "redis"
+redis_url = "redis://127.0.0.1:6379/0"
+ttl_seconds = 300
+key_prefix = "llm_cache:"
+
 # ==================== Agent 配置 ====================
 [default.agent]
+max_steps = 5
 
 [default.agent.checkpointer]
+type = "redis_shallow"
+url = "redis://127.0.0.1:6379/0"
 ttl_minutes = 10080  # 7天
+
+[default.agent.deliverable_store]
+type = "redis"
+url = "redis://127.0.0.1:6379/0"
 
 [default.openlineage_sink]
 graceful_shutdown_timeout = 30.0
@@ -59,16 +82,6 @@ flush_interval_seconds = 3.0  # 刷新间隔（秒）
 [default.openlineage_sink.neo4j]
 batch_size = 50               # 批量写入大小
 max_concurrent = 10           # 最大并发写入数
-
-# ==================== LLM 缓存配置 ====================
-# 说明：
-# - 精确匹配缓存：相同输入 = 命中，任何差异 = 不命中
-# - Redis 存储，支持 TTL，分布式友好
-# - 解决 LangChain 动态 ID 问题，规范化后匹配
-[default.llm_cache]
-enabled = true                      # 是否启用缓存
-ttl_seconds = 300                   # 缓存 TTL（秒）
-key_prefix = "llm_cache:"           # Redis key 前缀
 
 # ==================== SQL 摘要生成配置 ====================
 # 说明：

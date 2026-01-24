@@ -9,11 +9,16 @@
       "dashboard": "Dashboard",
       "governance": "Governance",
       "projects": "Projects",
-      "team": "Team"
+      "team": "Collaboration"
     },
     "dropdown": {
-      "metadata": "Metadata",
-      "knowledge": "Knowledge Graphrag"
+      "governanceHeader": "Governance & OneMeta",
+      "metadata": "OneMeta",
+      "metadataDesc": "Unified physical asset metadata",
+      "semantic": "Metasemantic",
+      "semanticDesc": "Semantic asset space for metrics, word roots, APIs, and more",
+      "knowledge": "Knowledge Graphrag",
+      "knowledgeDesc": "Knowledge graph visualization and relationship exploration"
     },
     "actions": {
       "search": "Search..."

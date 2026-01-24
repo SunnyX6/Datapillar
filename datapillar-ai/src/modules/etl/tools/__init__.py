@@ -14,23 +14,19 @@ Agent 通过工具名引用：tools=["search_tables", "get_table_detail"]
 
 from src.modules.etl.tools.column import COLUMN_TOOLS
 from src.modules.etl.tools.component import COMPONENT_TOOLS
-from src.modules.etl.tools.doc import DOC_TOOLS
-from src.modules.etl.tools.recommend import RECOMMEND_TOOLS
 from src.modules.etl.tools.table import TABLE_TOOLS
 
 # 核心工具：按需查询细节
 DETAIL_TOOLS = TABLE_TOOLS + COLUMN_TOOLS
 
 # 所有工具
-ALL_TOOLS = DETAIL_TOOLS + COMPONENT_TOOLS + RECOMMEND_TOOLS + DOC_TOOLS
+ALL_TOOLS = DETAIL_TOOLS + COMPONENT_TOOLS 
 
 
 __all__ = [
     "TABLE_TOOLS",
     "COLUMN_TOOLS",
     "COMPONENT_TOOLS",
-    "RECOMMEND_TOOLS",
-    "DOC_TOOLS",
     "DETAIL_TOOLS",
     "ALL_TOOLS",
 ]

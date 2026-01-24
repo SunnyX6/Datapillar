@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useRef, useEffect, useMemo, useLayoutEffect, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { ChatPanel } from '@/layouts/workflow/Chat'
+import { ChatPanel } from '@/layouts/workflow/chat/Chat'
 import { useLayout } from '@/layouts/responsive'
 
 const LARGE_SCREEN_WIDTH = 1440
@@ -109,7 +109,7 @@ export function WorkflowStudioPage() {
     }
 
     window.addEventListener('resize', updateRect)
-    window.addEventListener('scroll', updateRect, true)
+    window.addEventListener('scroll', updateRect, { passive: true })
 
     return () => {
       if (rafId) {
@@ -117,7 +117,7 @@ export function WorkflowStudioPage() {
       }
       resizeObserver?.disconnect()
       window.removeEventListener('resize', updateRect)
-      window.removeEventListener('scroll', updateRect, true)
+      window.removeEventListener('scroll', updateRect)
     }
   }, [])
 
@@ -256,10 +256,10 @@ export function WorkflowStudioPage() {
             className="relative h-full flex-shrink-0 [width:var(--chat-panel-width)]"
           >
             <ChatPanel />
-            <div className="pointer-events-none absolute top-0 right-0 h-full w-0.5 bg-gradient-to-r from-slate-900/20 via-transparent dark:from-white/25" />
           </div>
 
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden relative">
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-slate-200/70 via-slate-200/30 to-transparent dark:from-slate-950/70 dark:via-slate-950/30" />
             <Suspense fallback={<div className="flex flex-1 items-center justify-center bg-[#f1f5f9] dark:bg-slate-900"><div className="rounded-full border-2 border-indigo-200 border-t-indigo-500 size-10 animate-spin" /></div>}>
               <LazyWorkflowCanvasPanel viewportVersion={canvasViewportVersion} />
             </Suspense>

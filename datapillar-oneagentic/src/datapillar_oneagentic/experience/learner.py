@@ -125,25 +125,25 @@ class ExperienceRecord:
         框架自动调用此方法，将经验拼接成上下文。
         """
         lines = [
-            f"- 目标: {self.goal}",
-            f"- 结果: {self.outcome}",
+            f"- Goal: {self.goal}",
+            f"- Outcome: {self.outcome}",
         ]
 
         if self.result_summary:
-            lines.append(f"- 摘要: {self.result_summary[:100]}")
+            lines.append(f"- Summary: {self.result_summary[:100]}")
 
         if self.tools_used:
-            lines.append(f"- 工具: {', '.join(self.tools_used)}")
+            lines.append(f"- Tools: {', '.join(self.tools_used)}")
 
         if self.agents_involved:
-            lines.append(f"- Agent: {', '.join(self.agents_involved)}")
+            lines.append(f"- Agents: {', '.join(self.agents_involved)}")
 
         if self.feedback:
             feedback_str = ", ".join(f"{k}={v}" for k, v in self.feedback.items())
-            lines.append(f"- 反馈: {feedback_str}")
+            lines.append(f"- Feedback: {feedback_str}")
 
         if self.knowledge_refs:
-            lines.append(f"- 知识引用: {len(self.knowledge_refs)} 条")
+            lines.append(f"- Knowledge References: {len(self.knowledge_refs)}")
 
         return "\n".join(lines)
 

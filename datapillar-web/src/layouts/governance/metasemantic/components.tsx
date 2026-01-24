@@ -1,6 +1,7 @@
 import { TrendingUp } from 'lucide-react'
 import type { CategoryConfig } from './types'
 import { iconSizeToken } from '@/design-tokens/dimensions'
+import { Card } from '@/components/ui'
 
 export function Badge({
   children,
@@ -42,9 +43,9 @@ export function HubAssetCard({ config, onClick, onSubEntryClick }: HubAssetCardP
   }
 
   return (
-    <div
+    <Card
       onClick={handleCardClick}
-      className={`group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl @md:rounded-2xl p-4 @md:p-6 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 transition-all relative overflow-hidden ${hasSubEntries ? 'cursor-default' : 'cursor-pointer'}`}
+      className={`group relative overflow-hidden ${hasSubEntries ? 'cursor-default' : 'cursor-pointer'}`}
     >
       <div
         className={`${config.color} w-8 h-8 @md:w-10 @md:h-10 rounded-lg @md:rounded-xl flex items-center justify-center text-white mb-3 @md:mb-4 shadow-md`}
@@ -92,6 +93,6 @@ export function HubAssetCard({ config, onClick, onSubEntryClick }: HubAssetCardP
           </div>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

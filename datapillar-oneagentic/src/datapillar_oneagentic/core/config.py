@@ -22,7 +22,7 @@ class CheckpointerConfig(BaseModel):
 
     type: str = Field(
         default="memory",
-        description="类型: memory | sqlite | postgres | redis",
+        description="类型: memory | sqlite | postgres | redis | redis_shallow",
     )
     path: str | None = Field(
         default=None,
@@ -40,7 +40,7 @@ class CheckpointerConfig(BaseModel):
     @field_validator("type")
     @classmethod
     def validate_type(cls, v: str) -> str:
-        supported = {"memory", "sqlite", "postgres", "redis"}
+        supported = {"memory", "sqlite", "postgres", "redis", "redis_shallow"}
         if v.lower() not in supported:
             raise ValueError(f"不支持的 checkpointer 类型: '{v}'。支持: {', '.join(sorted(supported))}")
         return v.lower()

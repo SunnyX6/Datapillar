@@ -9,15 +9,18 @@ CLOSED → (连续失败达阈值) → OPEN → (等待恢复时间) → HALF_OP
                                                      (探测失败) → OPEN
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
 from collections.abc import Awaitable, Callable
 from enum import Enum
 from functools import wraps
-from typing import ParamSpec, TypeVar
+from typing import TYPE_CHECKING, ParamSpec, TypeVar
 
-from datapillar_oneagentic.providers.llm.config import CircuitBreakerConfig
+if TYPE_CHECKING:
+    from datapillar_oneagentic.providers.llm.config import CircuitBreakerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +51,7 @@ class CircuitBreaker:
     使用 LLM 配置中的熔断参数，按名称隔离不同服务的熔断状态。
     """
 
-    def __init__(self, name: str, config: CircuitBreakerConfig):
+    def __init__(self, name: str, config: "CircuitBreakerConfig"):
         self.name = name
         self.failure_threshold = config.failure_threshold
         self.recovery_timeout = config.recovery_seconds
@@ -114,7 +117,7 @@ class CircuitBreaker:
 class CircuitBreakerRegistry:
     """熔断器注册表（团队内使用）"""
 
-    def __init__(self, config: CircuitBreakerConfig) -> None:
+    def __init__(self, config: "CircuitBreakerConfig") -> None:
         self._config = config
         self._circuit_breakers: dict[str, CircuitBreaker] = {}
 

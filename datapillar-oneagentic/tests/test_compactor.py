@@ -45,9 +45,9 @@ async def test_compactor_should_compress_ai_and_tool_messages() -> None:
     assert result.success is True
     assert result.removed_count > 0
     assert result.kept_count > 0
-    # 压缩后第一条应该是历史摘要
-    assert isinstance(compressed[0], SystemMessage)
-    assert "[历史摘要]" in compressed[0].content
+    assert result.summary == "测试摘要"
+    # 摘要不应直接注入 messages
+    assert all("测试摘要" not in msg.content for msg in compressed if isinstance(msg, BaseMessage))
 
 
 @pytest.mark.asyncio

@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   Cpu,
   Database,
-  Globe,
   MoreHorizontal,
   RefreshCw,
   Server,
@@ -15,58 +14,46 @@ import {
   Zap
 } from 'lucide-react'
 import {
-  contentMaxWidthClassMap,
-  paddingClassMap,
   containerHeightClassMap,
   progressWidthClassMap,
   gridColsClassMap,
   colSpanClassMap,
   autoRowsClassMap
 } from '@/design-tokens/dimensions'
-import { RESPONSIVE_TYPOGRAPHY } from '@/design-tokens/typography'
+import { Card } from '@/components/ui'
 
 export function Dashboard() {
   return (
-    <section className="h-full bg-slate-50 dark:bg-[#0f172a] selection:bg-indigo-500/30">
-      <div className="h-full overflow-y-auto custom-scrollbar">
-        <div
-          className={`${contentMaxWidthClassMap.full} ${paddingClassMap.md} w-full mx-auto space-y-6 @container`}
-        >
+    <div className="flex h-full w-full overflow-hidden bg-white dark:bg-slate-900 @container">
+      <div className="flex-1 overflow-auto p-4 @md:p-6 @xl:p-8 custom-scrollbar">
+        <div className="flex flex-col gap-4 @md:gap-6 animate-in fade-in duration-500">
           <HeaderSection />
           <MetricGrid />
           <InsightGrid />
           <ActivitySection />
         </div>
       </div>
-    </section>
+    </div>
   )
 }
 
 function HeaderSection() {
   return (
-    <div className="flex flex-col gap-4 @md:flex-row @md:items-end @md:justify-between mb-8">
-      <div className="space-y-2">
-        <div className={`flex items-center gap-2 ${RESPONSIVE_TYPOGRAPHY.badge} text-slate-500 dark:text-slate-400`}>
+    <div className="flex flex-col gap-4 @md:flex-row @md:items-end @md:justify-between">
+      <div>
+        <div className="flex items-center gap-2 text-legal font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
           <span className="inline-flex items-center px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-300 font-medium">
             PRO Plan
           </span>
           <span className="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-600" />
           <span>US-EAST-1</span>
         </div>
-        <h1 className={`${RESPONSIVE_TYPOGRAPHY.displayTitle} font-bold tracking-tight text-slate-900 dark:text-white`}>Command Center</h1>
-        <p className={`text-slate-500 dark:text-slate-400 ${RESPONSIVE_TYPOGRAPHY.sectionTitle} max-w-2xl`}>
+        <h1 className="text-heading @md:text-title @xl:text-display font-black tracking-tight text-slate-900 dark:text-slate-100 mt-2">
+          Command Center
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-2 text-body-sm @md:text-body max-w-2xl">
           Your data estate is <span className="text-emerald-600 dark:text-emerald-400 font-medium">99.9% healthy</span>. Datapillar AI has optimized 42 pipelines in the last 24h.
         </p>
-      </div>
-      <div className="flex items-center gap-3 @md:gap-4">
-        <div className="hidden @md:flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm text-xs font-medium text-slate-600 dark:text-slate-300">
-          <Globe size={14} className="text-slate-400" />
-          Global View
-        </div>
-        <button type="button" className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg shadow-lg shadow-indigo-500/20 transition-all hover:scale-[1.02] active:scale-95">
-          <RefreshCw size={14} className="animate-spin-slow" />
-          <span>Sync Metrics</span>
-        </button>
       </div>
     </div>
   )
@@ -74,28 +61,28 @@ function HeaderSection() {
 
 function MetricGrid() {
   return (
-    <div className={`${gridColsClassMap.base} gap-4 @lg:gap-5 ${autoRowsClassMap.equal}`}>
-      <BentoCard className={`${colSpanClassMap.responsive3} h-full`}>
+    <div className={`${gridColsClassMap.base} gap-4 @md:gap-6 ${autoRowsClassMap.equal}`}>
+      <Card className={`${colSpanClassMap.responsive3} h-full flex flex-col`}>
         <MetricHeader icon={<Activity size={18} className="text-blue-500" />} label="Active Pipelines" trend="+12%" isPositive />
         <MetricValue value="1,240" description="98% Success Rate" trendData={[40, 30, 45, 50, 60, 55, 70, 65, 80]} color="#3b82f6" />
-      </BentoCard>
+      </Card>
 
-      <BentoCard className={`${colSpanClassMap.responsive3} h-full`}>
+      <Card className={`${colSpanClassMap.responsive3} h-full flex flex-col`}>
         <MetricHeader icon={<Database size={18} className="text-purple-500" />} label="Data Processed (24h)" trend="+5.4%" isPositive />
         <MetricValue value="8.4 PB" description="Delta Lake Storage" trendData={[20, 25, 30, 28, 35, 40, 38, 45, 50]} color="#a855f7" />
-      </BentoCard>
+      </Card>
 
-      <BentoCard className={`${colSpanClassMap.responsive3} h-full`}>
+      <Card className={`${colSpanClassMap.responsive3} h-full flex flex-col`}>
         <MetricHeader icon={<Zap size={18} className="text-amber-500" />} label="Est. Daily Cost" trend="-18%" isPositive trendLabel="saved" />
         <MetricValue value="$4.2k" description="vs $5.1k projected" trendData={[80, 75, 70, 65, 60, 55, 50, 45, 40]} color="#f59e0b" />
-      </BentoCard>
+      </Card>
     </div>
   )
 }
 
 function InsightGrid() {
   return (
-    <div className={`${gridColsClassMap.base} gap-4 @lg:gap-5 ${autoRowsClassMap.dashboard}`}>
+    <div className={`${gridColsClassMap.base} gap-4 @md:gap-6 ${autoRowsClassMap.dashboard}`}>
       <ImpactCard className={`${colSpanClassMap.leftPanel} row-span-2`} />
       <EfficiencyCard className={`${colSpanClassMap.rightPanel} row-span-2`} />
     </div>
@@ -104,7 +91,7 @@ function InsightGrid() {
 
 function ActivitySection() {
   return (
-    <div className={`${gridColsClassMap.base} gap-4 @lg:gap-5`}>
+    <div className={`${gridColsClassMap.base} gap-4 @md:gap-6`}>
       <ActivityFeed className={colSpanClassMap.full} />
     </div>
   )
@@ -125,9 +112,9 @@ function MetricHeader({ icon, label, trend, isPositive, trendLabel }: MetricHead
         <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 ring-1 ring-slate-900/5 dark:ring-white/10">
           {icon}
         </div>
-        <span className={`${RESPONSIVE_TYPOGRAPHY.label} font-medium text-slate-500 dark:text-slate-400`}>{label}</span>
+        <span className="text-caption @md:text-body-sm font-medium text-slate-500 dark:text-slate-400">{label}</span>
       </div>
-      <div className={`flex items-center gap-1 ${RESPONSIVE_TYPOGRAPHY.badge} font-semibold px-2 py-1 rounded-full ${isPositive ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10' : 'text-rose-600 bg-rose-50 dark:bg-rose-500/10'}`}>
+      <div className={`flex items-center gap-1 text-legal font-semibold px-2 py-1 rounded-full ${isPositive ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10' : 'text-rose-600 bg-rose-50 dark:bg-rose-500/10'}`}>
         {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
         {trend} {trendLabel && <span className="font-normal opacity-80 ml-0.5">{trendLabel}</span>}
       </div>
@@ -146,8 +133,8 @@ function MetricValue({ value, description, trendData, color }: MetricValueProps)
   return (
     <div className="mt-4 flex items-end justify-between">
       <div>
-        <p className={`${RESPONSIVE_TYPOGRAPHY.metricValue} font-bold text-slate-900 dark:text-white tracking-tight`}>{value}</p>
-        <p className="text-xs text-slate-500 mt-1">{description}</p>
+        <p className="text-title @md:text-display-sm font-black text-slate-900 dark:text-slate-100 tracking-tight">{value}</p>
+        <p className="text-caption text-slate-500 dark:text-slate-400 mt-1">{description}</p>
       </div>
       <Sparkline data={trendData} color={color} />
     </div>
@@ -187,14 +174,17 @@ interface DashboardGridItemProps {
 
 function ImpactCard({ className = '' }: DashboardGridItemProps) {
   return (
-    <div className={`bg-gradient-to-b from-indigo-600 to-violet-700 rounded-2xl p-5 @md:p-6 text-white relative overflow-hidden flex flex-col justify-between group shadow-xl shadow-indigo-500/10 h-full ${className}`}>
+    <Card
+      variant="default"
+      className={`bg-gradient-to-b from-indigo-600 to-violet-700 text-white relative overflow-hidden flex flex-col justify-between group shadow-xl shadow-indigo-500/10 h-full border-0 ${className}`}
+    >
       <div className="absolute top-0 right-0 w-48 h-48 @md:w-56 @md:h-56 @lg:w-64 @lg:h-64 bg-white/10 rounded-full blur-3xl transform translate-x-1/3 -translate-y-1/3 pointer-events-none group-hover:bg-white/15 transition-colors duration-500" />
       <div>
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
             <Sparkles size={18} className="text-indigo-200" />
           </div>
-          <span className={`font-semibold tracking-wide ${RESPONSIVE_TYPOGRAPHY.subtitle}`}>AI Impact Report</span>
+          <span className="text-body-sm @md:text-subtitle font-semibold tracking-wide">AI Impact Report</span>
         </div>
         <div className="space-y-6">
           <ImpactRow label="Engineering Hours Saved" value="420h" barClass="bg-emerald-400" width="medium" />
@@ -207,18 +197,15 @@ function ImpactCard({ className = '' }: DashboardGridItemProps) {
           <div className="flex items-start gap-3">
             <span className="w-2 h-2 mt-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" />
             <div>
-              <p className={`${RESPONSIVE_TYPOGRAPHY.subtitle} font-medium text-white`}>Recommendation</p>
+              <p className="text-body-sm @md:text-subtitle font-medium text-white">Recommendation</p>
               <p className="text-legal text-indigo-200 mt-1 leading-relaxed">
                 Snowflake warehouse "COMPUTE_WH_XL" is idle 40% of the time. Downgrade to "L" to save $1,200/mo.
               </p>
             </div>
           </div>
         </div>
-        <button type="button" className={`w-full mt-4 py-2.5 bg-white text-indigo-600 font-semibold rounded-lg ${RESPONSIVE_TYPOGRAPHY.subtitle} hover:bg-indigo-50 transition-colors shadow-lg`}>
-          Apply Optimization
-        </button>
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -232,9 +219,9 @@ interface ImpactRowProps {
 function ImpactRow({ label, value, barClass, width }: ImpactRowProps) {
   return (
     <div>
-      <div className={`flex justify-between ${RESPONSIVE_TYPOGRAPHY.badge} mb-2 text-indigo-100`}>
+      <div className="flex justify-between text-legal font-semibold mb-2 text-indigo-100">
         <span>{label}</span>
-        <span className="text-sm font-semibold text-white">{value}</span>
+        <span className="text-caption font-semibold text-white">{value}</span>
       </div>
       <div className="w-full bg-black/20 h-2 rounded-full overflow-hidden backdrop-blur-sm">
         <div className={`h-full ${barClass} ${progressWidthClassMap[width]} rounded-full shadow-[0_0_10px_rgba(255,255,255,0.2)]`} />
@@ -245,25 +232,25 @@ function ImpactRow({ label, value, barClass, width }: ImpactRowProps) {
 
 function EfficiencyCard({ className = '' }: DashboardGridItemProps) {
   return (
-    <BentoCard className={`${containerHeightClassMap.compact} @md:${containerHeightClassMap.normal} h-full ${className}`}>
+    <Card className={`flex flex-col ${containerHeightClassMap.compact} @md:${containerHeightClassMap.normal} h-full ${className}`}>
       <div className="flex flex-col gap-3 @md:flex-row @md:items-center @md:justify-between mb-5">
         <div>
-          <h3 className={`font-semibold text-slate-900 dark:text-white flex items-center gap-2 ${RESPONSIVE_TYPOGRAPHY.sectionTitle}`}>
+          <h3 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2 text-body-sm @md:text-subtitle">
             <Cpu size={18} className="text-slate-400" />
             Compute Efficiency
           </h3>
-          <p className="text-xs text-slate-500 mt-1">Token consumption vs. Pipeline throughput</p>
+          <p className="text-caption text-slate-500 dark:text-slate-400 mt-1">Token consumption vs. Pipeline throughput</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <LegendItem color="bg-indigo-500" label="Tokens (M)" />
           <LegendItem color="bg-emerald-400" label="Throughput (GB/s)" />
-          <select className={`ml-auto @md:ml-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 ${RESPONSIVE_TYPOGRAPHY.badge} rounded-md px-2 py-1 text-slate-600 dark:text-slate-300 focus:ring-0 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors`}>
+          <select className="ml-auto @md:ml-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-legal rounded-md px-2 py-1 text-slate-600 dark:text-slate-300 focus:ring-0 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
             <option>Last 24 Hours</option>
             <option>Last 7 Days</option>
           </select>
         </div>
       </div>
-      <div className="w-full h-56 @md:h-60 relative -ml-2 @md:-ml-4 @lg:-ml-8 overflow-visible">
+      <div className="w-full h-56 @md:h-60 relative overflow-visible">
         <Chart />
         <div className="absolute top-[30%] left-[60%] w-px h-3/4 bg-slate-400/50 border-r border-dashed border-slate-400 dark:border-slate-500 pointer-events-none">
           <span className="absolute -top-1 -left-1 w-2 h-2 rounded-full bg-indigo-500 ring-4 ring-indigo-500/20" />
@@ -274,7 +261,7 @@ function EfficiencyCard({ className = '' }: DashboardGridItemProps) {
         </div>
         </div>
       </div>
-    </BentoCard>
+    </Card>
   )
 }
 
@@ -282,7 +269,7 @@ function LegendItem({ color, label }: { color: string; label: string }) {
   return (
     <div className="flex items-center gap-2">
       <span className={`w-3 h-3 rounded-full ${color} shadow-sm`} />
-      <span className={`${RESPONSIVE_TYPOGRAPHY.legend} text-slate-600 dark:text-slate-400`}>{label}</span>
+      <span className="text-legal text-slate-600 dark:text-slate-400">{label}</span>
     </div>
   )
 }
@@ -313,13 +300,13 @@ function Chart() {
 
 function ActivityFeed({ className = '' }: DashboardGridItemProps) {
   return (
-    <BentoCard className={`${containerHeightClassMap.compact} overflow-hidden h-full ${className}`}>
+    <Card className={`flex flex-col ${containerHeightClassMap.compact} overflow-hidden h-full ${className}`}>
       <div className="flex flex-col gap-3 @md:flex-row @md:items-center @md:justify-between mb-4">
-        <h3 className={`font-semibold text-slate-900 dark:text-white flex items-center gap-2 ${RESPONSIVE_TYPOGRAPHY.sectionTitle}`}>
+        <h3 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2 text-body-sm @md:text-subtitle">
           <MoreHorizontal size={18} className="text-slate-400" />
           Live Activity Feed
         </h3>
-        <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+        <div className="flex items-center gap-2 text-caption text-slate-500 dark:text-slate-400 font-medium">
           <span className="flex h-2 w-2 relative">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
@@ -328,9 +315,9 @@ function ActivityFeed({ className = '' }: DashboardGridItemProps) {
         </div>
       </div>
       <div className="w-full overflow-x-auto">
-        <table className={`w-full text-left ${RESPONSIVE_TYPOGRAPHY.badge}`}>
+        <table className="w-full text-left text-caption">
           <thead>
-            <tr className={`border-b border-slate-100 dark:border-slate-700/50 ${RESPONSIVE_TYPOGRAPHY.tableHeader} uppercase text-slate-500 font-medium`}>
+            <tr className="border-b border-slate-100 dark:border-slate-700/50 text-micro uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
               <th className="pb-3 pl-2">Status</th>
               <th className="pb-3">Event</th>
               <th className="pb-3">Pipeline / Source</th>
@@ -346,7 +333,7 @@ function ActivityFeed({ className = '' }: DashboardGridItemProps) {
           </tbody>
         </table>
       </div>
-    </BentoCard>
+    </Card>
   )
 }
 
@@ -368,13 +355,13 @@ function ActivityRow({ status, event, source, duration, time, tag }: ActivityRow
       <td className="py-3 pl-2">
         <div className="flex items-center gap-2">{icon}</div>
       </td>
-      <td className={`py-3 font-medium text-slate-700 dark:text-slate-200 ${RESPONSIVE_TYPOGRAPHY.badge}`}>
+      <td className="py-3 font-medium text-slate-700 dark:text-slate-200 text-caption">
         {event}
-        {tag && <span className={`ml-2 ${RESPONSIVE_TYPOGRAPHY.tag} px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 font-bold uppercase tracking-wider`}>{tag}</span>}
+        {tag && <span className="ml-2 text-nano px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 font-bold uppercase tracking-wider">{tag}</span>}
       </td>
-      <td className={`py-3 text-slate-500 ${RESPONSIVE_TYPOGRAPHY.badge}`}>{source}</td>
-      <td className={`py-3 text-slate-400 font-mono ${RESPONSIVE_TYPOGRAPHY.tableHeader}`}>{duration}</td>
-      <td className={`py-3 text-right pr-4 text-slate-400 ${RESPONSIVE_TYPOGRAPHY.tableHeader}`}>{time}</td>
+      <td className="py-3 text-slate-500 dark:text-slate-400 text-caption">{source}</td>
+      <td className="py-3 text-slate-400 font-mono text-legal">{duration}</td>
+      <td className="py-3 text-right pr-4 text-slate-400 text-legal">{time}</td>
     </tr>
   )
 }
@@ -390,17 +377,4 @@ function getStatusIcon(status: ActivityStatus) {
     default:
       return <Server size={16} className="text-slate-400" />
   }
-}
-
-interface BentoCardProps {
-  children: ReactNode
-  className?: string
-}
-
-function BentoCard({ children, className = '' }: BentoCardProps) {
-  return (
-    <div className={`bg-white dark:bg-[#1e293b] rounded-2xl p-5 @lg:p-6 border border-slate-200 dark:border-slate-700/60 shadow-sm hover:shadow-lg transition-all duration-300 dark:shadow-black/20 flex flex-col ${className}`}>
-      {children}
-    </div>
-  )
 }

@@ -8,7 +8,7 @@ Datapillar OneAgentic 层级模式示例
 from __future__ import annotations
 
 import asyncio
-import os
+import json
 
 from pydantic import BaseModel
 
@@ -20,23 +20,7 @@ from datapillar_oneagentic import (
     agent,
     tool,
 )
-
-
-# ============================================================================
-# LLM 配置
-# ============================================================================
-LLM_PROVIDER = "glm"
-LLM_API_KEY = os.environ.get("GLM_API_KEY")
-LLM_BASE_URL = os.environ.get("GLM_BASE_URL")
-LLM_MODEL = os.environ.get("GLM_MODEL")
-LLM_ENABLE_THINKING = os.environ.get("GLM_ENABLE_THINKING", "false").lower() in {
-    "1",
-    "true",
-    "yes",
-}
-
-if not LLM_API_KEY or not LLM_MODEL:
-    raise RuntimeError("请设置 GLM_API_KEY 和 GLM_MODEL（可选 GLM_BASE_URL/GLM_ENABLE_THINKING）")
+from datapillar_oneagentic.providers.llm import Provider
 
 
 class TextOutput(BaseModel):
@@ -135,7 +119,7 @@ def _render_event(event: dict) -> None:
         deliverable = data.get("deliverable")
         if deliverable is not None:
             print("   ✅ 完成")
-            print(f"   📦 交付物: {deliverable}")
+            print(f"   📦 交付物: {json.dumps(deliverable, ensure_ascii=False)}")
     elif event_type == "agent.interrupt":
         interrupt_payload = data.get("interrupt", {}).get("payload")
         print(f"\n❓ 需要用户输入: {interrupt_payload}")
@@ -158,23 +142,23 @@ def create_hierarchical_team(config: DatapillarConfig) -> Datapillar:
 
 
 async def main() -> None:
-    llm_config = {
-        "provider": LLM_PROVIDER,
-        "api_key": LLM_API_KEY,
-        "model": LLM_MODEL,
-        "enable_thinking": LLM_ENABLE_THINKING,
-        "timeout_seconds": 120,
-        "retry": {"max_retries": 2},
-    }
-    if LLM_BASE_URL:
-        llm_config["base_url"] = LLM_BASE_URL
-
-    config = DatapillarConfig(llm=llm_config)
+    config = DatapillarConfig()
+    if not config.llm.is_configured():
+        supported = ", ".join(Provider.list_supported())
+        raise RuntimeError(
+            "请先配置 LLM：\n"
+            "  export DATAPILLAR_LLM_PROVIDER=\"openai\"\n"
+            "  export DATAPILLAR_LLM_API_KEY=\"sk-xxx\"\n"
+            "  export DATAPILLAR_LLM_MODEL=\"gpt-4o\"\n"
+            "可选：export DATAPILLAR_LLM_BASE_URL=\"https://api.openai.com/v1\"\n"
+            "可选：export DATAPILLAR_LLM_ENABLE_THINKING=\"false\"\n"
+            f"支持 provider: {supported}"
+        )
     team = create_hierarchical_team(config)
 
     print("=" * 60)
     print("🏗️ 层级模式示例已就绪")
-    print(f"   模型: {LLM_MODEL}")
+    print(f"   模型: {config.llm.model}")
     print("   成员: 经理 -> 执行者（经理委派）")
     print("=" * 60)
 

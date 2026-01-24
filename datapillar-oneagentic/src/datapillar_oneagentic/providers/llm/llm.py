@@ -320,6 +320,9 @@ class ResilientChatModel:
                     self._llm.ainvoke(input, config, **kwargs),
                     timeout=self.timeout,
                 )
+                # LangChain 的 with_structured_output(include_raw=True) 会返回 dict：
+                # {"raw": BaseMessage, "parsed": ..., "parsing_error": ...}
+                # 解析失败的日志由解析器在最终失败时输出，避免兜底成功时误报。
                 if self._circuit_breaker:
                     await self._circuit_breaker.record_success()
                 asyncio.create_task(self._track_usage_async(result, start_time=start_time))
@@ -404,7 +407,20 @@ class ResilientChatModel:
 
             input_tokens = usage.input_tokens if usage else 0
             output_tokens = usage.output_tokens if usage else 0
+            cached_tokens = 0
+            if usage:
+                cached_tokens = usage.cached_tokens or 0
+                if cached_tokens == 0:
+                    cached_tokens = usage.cache_read_tokens or 0
             duration_ms = (time.time() - start_time) * 1000
+            logger.info(
+                "LLM usage | model=%s input=%s output=%s cached=%s duration_ms=%.0f",
+                self._model_name or "",
+                input_tokens,
+                output_tokens,
+                cached_tokens,
+                duration_ms,
+            )
 
             await self._event_bus.emit(
                 self,
@@ -414,6 +430,7 @@ class ResilientChatModel:
                     model=self._model_name or "",
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
+                    cached_tokens=cached_tokens,
                     duration_ms=duration_ms,
                 ),
             )
@@ -507,11 +524,6 @@ class ResilientChatModel:
     ) -> "ResilientChatModel":
         """绑定结构化输出"""
         if hasattr(self._llm, "with_structured_output"):
-            method = kwargs.get("method", "function_calling")
-
-            if self._provider and self._provider.lower() == "glm" and method == "json_mode":
-                kwargs["method"] = "function_calling"
-
             bound = self._llm.with_structured_output(schema, **kwargs)
 
             return ResilientChatModel(
@@ -590,7 +602,7 @@ class LLMFactory:
                 streaming=False,
             )
             if config.enable_thinking:
-                return llm.bind(extra_body={"enable_thinking": True})
+                return llm.bind(extra_body={"enable_thinking": False})
             return llm
 
         if provider == "openrouter":
@@ -701,9 +713,6 @@ class LLMProvider:
                 bind_kwargs["max_tokens"] = max_tokens
             if bind_kwargs and hasattr(llm, "bind"):
                 llm = llm.bind(**bind_kwargs)
-
-            if output_schema is not None:
-                llm = llm.with_structured_output(output_schema, method="function_calling")
 
             resilient_llm = ResilientChatModel(
                 llm,

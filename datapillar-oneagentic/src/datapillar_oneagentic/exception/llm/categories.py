@@ -18,6 +18,7 @@ class LLMErrorCategory(str, Enum):
     # 不可重试错误（需要干预）
     CONTEXT = "context"  # 上下文超限
     INVALID_INPUT = "invalid_input"  # 输入错误：参数格式错误
+    STRUCTURED_OUTPUT = "structured_output"  # 结构化输出解析失败
     AUTH_FAILURE = "auth_failure"  # 认证错误：API Key 无效
     NOT_FOUND = "not_found"  # 资源不存在
 

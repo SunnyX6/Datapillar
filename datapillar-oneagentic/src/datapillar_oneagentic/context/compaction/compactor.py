@@ -24,6 +24,9 @@ from langchain_core.messages import (
     ToolMessage,
 )
 
+from datapillar_oneagentic.context.builder import ContextBuilder
+from datapillar_oneagentic.utils.prompt_format import format_markdown
+
 from datapillar_oneagentic.context.compaction.compact_policy import CompactPolicy, CompactResult
 
 logger = logging.getLogger(__name__)
@@ -78,18 +81,12 @@ class Compactor:
             logger.error(f"压缩失败: {e}", exc_info=True)
             return messages, CompactResult.failed(str(e))
 
-        # 构建压缩后的 messages：摘要 + 保留的消息
-        compressed_messages = [
-            SystemMessage(content=f"[历史摘要]\n{summary}"),
-            *keep_messages,
-        ]
-
         logger.info(
             f"📦 压缩完成: {len(compress_messages)} 条 → 摘要，"
             f"保留 {len(keep_messages)} 条"
         )
 
-        return compressed_messages, CompactResult(
+        return keep_messages, CompactResult(
             success=True,
             summary=summary,
             kept_count=len(keep_messages),
@@ -150,10 +147,18 @@ class Compactor:
         prompt = self.policy.compress_prompt_template.format(history=history_text)
 
         # 调用 LLM
-        llm_messages = [
-            SystemMessage(content="你是一个对话历史压缩专家，负责生成结构化的对话摘要。"),
-            HumanMessage(content=prompt),
-        ]
+        llm_messages = ContextBuilder.build_compactor_messages(
+            system_prompt=format_markdown(
+                title=None,
+                sections=[
+                    (
+                        "Role",
+                        "You are a conversation history compressor that produces a structured summary.",
+                    ),
+                ],
+            ),
+            prompt=prompt,
+        )
 
         response = await self.llm.ainvoke(llm_messages)
         summary = response.content.strip()
@@ -163,15 +168,15 @@ class Compactor:
     def _get_role_name(self, msg: BaseMessage) -> str:
         """获取消息角色名"""
         if isinstance(msg, HumanMessage):
-            return "用户"
-        elif isinstance(msg, AIMessage):
+            return "User"
+        if isinstance(msg, AIMessage):
             name = getattr(msg, "name", None)
-            return name if name else "AI"
-        elif isinstance(msg, ToolMessage):
-            return f"工具:{getattr(msg, 'name', 'unknown')}"
-        elif isinstance(msg, SystemMessage):
-            return "系统"
-        return "未知"
+            return name if name else "Assistant"
+        if isinstance(msg, ToolMessage):
+            return f"Tool:{getattr(msg, 'name', 'unknown')}"
+        if isinstance(msg, SystemMessage):
+            return "System"
+        return "Unknown"
 
 
 # === 压缩器工厂 ===

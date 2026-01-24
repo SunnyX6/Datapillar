@@ -6,8 +6,7 @@ Agent 产出是 Agent 工作的结果，通过 AgentResult.deliverable 交付。
 已定义产出：
 - CatalogResult: 元数据问答结果
 - AnalysisResult: 需求分析结果
-- Workflow: 工作流定义
-- DeveloperSqlOutput: SQL 生成结果
+- Workflow: 工作流定义（开发阶段可包含 SQL）
 - ReviewResult: 评审结果
 """
 
@@ -22,7 +21,6 @@ from src.modules.etl.schemas.catalog import (
     CatalogResultOutput,
     OptionItem,
 )
-from src.modules.etl.schemas.developer import DeveloperSqlOutput
 from src.modules.etl.schemas.review import ReviewResult
 from src.modules.etl.schemas.workflow import (
     Job,
@@ -46,8 +44,6 @@ __all__ = [
     "WorkflowOutput",
     "Job",
     "Stage",
-    # DeveloperAgent 产出
-    "DeveloperSqlOutput",
     # ReviewerAgent 产出
     "ReviewResult",
 ]

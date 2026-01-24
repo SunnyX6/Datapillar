@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from datapillar_oneagentic.utils.prompt_format import format_markdown
+
 
 class CompactPolicy(BaseModel):
     """
@@ -25,31 +27,30 @@ class CompactPolicy(BaseModel):
     )
 
     compress_prompt_template: str = Field(
-        default="""请将以下对话历史压缩成结构化摘要。
-
-压缩要求：
-1. 保留：用户目标、关键决策、已完成的工作、重要错误信息
-2. 丢弃：探索过程、中间思考、冗余解释、重复内容
-3. 格式：使用结构化格式，分类整理
-
-输出格式：
-## 用户目标
-[用户想要完成什么]
-
-## 已完成工作
-- [已完成的事项1]
-- [已完成的事项2]
-
-## 关键决策
-- [重要的技术或业务决策]
-
-## 待解决问题
-- [如果有未解决的问题]
-
-对话历史：
-{history}
-
-请生成压缩摘要：""",
+        default=format_markdown(
+            title="Compression Task",
+            sections=[
+                (
+                    "Instructions",
+                    [
+                        "Keep: user goal, key decisions, completed work, critical errors.",
+                        "Drop: exploration, internal reasoning, repetition.",
+                        "Output as structured Markdown.",
+                    ],
+                ),
+                (
+                    "Output Sections",
+                    [
+                        "User Goal",
+                        "Completed Work",
+                        "Key Decisions",
+                        "Open Issues",
+                    ],
+                ),
+                ("Conversation History", "{history}"),
+                ("Summary", ""),
+            ],
+        ),
         description="压缩提示词模板",
     )
 

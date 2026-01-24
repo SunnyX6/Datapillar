@@ -105,8 +105,8 @@ async def test_experience_retriever_build_context_prefers_success() -> None:
     retriever = ExperienceRetriever(store=store, embedding_provider=embedder)
 
     context = await retriever.build_context("目标", k=2, prefer_success=True)
-    assert "经验 1" in context
-    assert "经验 2" in context
+    assert "Experience 1" in context
+    assert "Experience 2" in context
     assert "tool_a" in context
 
 

@@ -19,9 +19,10 @@ import {
   sidebarSpacingClassMap,
   iconSizeToken
 } from '@/design-tokens/dimensions'
+import { Tooltip } from '@/components/ui'
 import { ExpandToggle } from './ExpandToggle'
 
-type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide'
+type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide' | 'projects' | 'collaboration'
 
 interface SidebarProps {
   onNavigate: (view: View) => void
@@ -44,6 +45,10 @@ export function Sidebar({ onNavigate, currentView, collapsed, onToggleCollapse }
     ? undefined
     : 'text-lg font-bold leading-tight tracking-tight text-indigo-600 dark:text-indigo-200'
 
+  const brandTaglineClass = collapsed
+    ? undefined
+    : 'text-legal font-medium text-slate-400 dark:text-slate-500 mt-0.5 leading-snug'
+
   return (
     <aside className={`${sidebarWidth} ${topOffset} flex-shrink-0 bg-[#F9FAFB] dark:bg-[#0B1120] border-r border-slate-200 dark:border-slate-800 flex flex-col h-full z-30 overflow-visible relative transition-[width] duration-200 ease-out`}>
       {/* 品牌 Logo 区域 */}
@@ -57,6 +62,7 @@ export function Sidebar({ onNavigate, currentView, collapsed, onToggleCollapse }
             brandName={t('brand.name')}
             brandTagline={t('brand.tagline')}
             nameClassName={brandNameClass}
+            taglineClassName={brandTaglineClass}
           />
         </div>
 
@@ -154,18 +160,19 @@ function NavItem({ icon, label, active, shortcut, onClick, collapsed }: NavItemP
     ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-[0_1px_2px_rgba(0,0,0,0.05)] ring-1 ring-slate-200 dark:ring-slate-700'
     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/50'
 
-  return (
+  const button = (
     <button
       type="button"
       onClick={onClick}
-      title={collapsed ? label : undefined}
       className={`
         flex items-center transition-all duration-200 group relative overflow-hidden
         ${collapsed ? 'mx-auto size-9 justify-center rounded-2xl' : 'w-full justify-between px-3 py-2 rounded-lg'}
         ${buttonStateClass}
       `}
     >
-      <span className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} relative z-10 ${active ? 'text-indigo-500' : 'opacity-80 group-hover:opacity-100'}`}>
+      <span
+        className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} relative z-10 ${active ? 'text-indigo-500' : 'opacity-80 group-hover:opacity-100'}`}
+      >
         {icon}
         {!collapsed && <span className="text-body-sm">{label}</span>}
       </span>
@@ -175,5 +182,15 @@ function NavItem({ icon, label, active, shortcut, onClick, collapsed }: NavItemP
         </span>
       )}
     </button>
+  )
+
+  if (!collapsed) {
+    return button
+  }
+
+  return (
+    <Tooltip content={label} side="right" className="w-full flex justify-center">
+      {button}
+    </Tooltip>
   )
 }

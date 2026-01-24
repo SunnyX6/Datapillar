@@ -23,9 +23,8 @@ def test_delegation_tool_builds_command_with_tool_call_id() -> None:
     assert cmd.goto == "worker"
     assert cmd.update["active_agent"] == "worker"
     assert cmd.update["assigned_task"] == "处理任务"
-    assert isinstance(cmd.update["messages"][0], AIMessage)
-    assert isinstance(cmd.update["messages"][1], ToolMessage)
-    assert cmd.update["messages"][1].tool_call_id == "call_1"
+    assert isinstance(cmd.update["messages"][0], ToolMessage)
+    assert cmd.update["messages"][0].tool_call_id == "call_1"
 
 
 def test_delegation_tool_defaults_tool_call_id() -> None:

@@ -31,6 +31,7 @@ def build_graph(
     create_mapreduce_worker_node,
     create_mapreduce_reducer_node,
     llm=None,
+    context_collector=None,
 ):
     """
     根据 Process 类型构建执行图
@@ -67,6 +68,7 @@ def build_graph(
             create_mapreduce_worker_node=create_mapreduce_worker_node,
             create_mapreduce_reducer_node=create_mapreduce_reducer_node,
             llm=llm,
+            context_collector=context_collector,
         )
 
     if process == Process.SEQUENTIAL:

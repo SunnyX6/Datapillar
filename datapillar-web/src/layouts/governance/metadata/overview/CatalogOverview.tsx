@@ -1,4 +1,5 @@
 import { BarChart3, Database, Layers, ShieldCheck, Table as TableIcon } from 'lucide-react'
+import { Card } from '@/components/ui'
 import { contentMaxWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { type CatalogAsset } from '../type/types'
@@ -31,21 +32,20 @@ export function CatalogOverview({ catalog }: CatalogOverviewProps) {
   ] as const
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-invisible">
-      <div className={`p-6 @md:p-8 space-y-6 ${contentMaxWidthClassMap.full} mx-auto`}>
-        <div className="space-y-1">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Catalog Overview</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+    <div className="flex-1 overflow-auto custom-scrollbar">
+      <div className={`p-4 @md:p-6 @xl:p-8 space-y-6 @md:space-y-8 ${contentMaxWidthClassMap.full} mx-auto`}>
+        <div>
+          <h2 className="text-heading @md:text-title @xl:text-display font-black text-slate-900 dark:text-slate-100 tracking-tight">
+            Catalog Overview
+          </h2>
+          <p className="text-slate-500 dark:text-slate-400 mt-2 text-body-sm @md:text-body">
             Assets and quality signals for catalog <span className="font-semibold text-slate-700 dark:text-slate-200">{catalog.name}</span>.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 @md:grid-cols-2 @xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 @md:grid-cols-2 @xl:grid-cols-4 gap-4 @md:gap-6">
           {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm"
-            >
+            <Card key={stat.label}>
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
                   <p className={`${TYPOGRAPHY.legal} font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400`}>{stat.label}</p>
@@ -56,11 +56,11 @@ export function CatalogOverview({ catalog }: CatalogOverviewProps) {
                   <stat.icon size={18} />
                 </div>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
+        <Card>
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100 mb-6">
             <BarChart3 size={16} className="text-slate-400" />
             Ingestion Volume (Last 24h)
@@ -78,7 +78,7 @@ export function CatalogOverview({ catalog }: CatalogOverviewProps) {
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   )

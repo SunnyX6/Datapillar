@@ -17,16 +17,16 @@ AgentContext 是框架提供给业务 Agent 的接口：
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage
 from langgraph.prebuilt import ToolNode
 from langgraph.types import Command, interrupt
 
 from datapillar_oneagentic.context import ContextBuilder
+from datapillar_oneagentic.state import StateBuilder
 from datapillar_oneagentic.events import (
     EventBus,
     LLMThinkingEvent,
@@ -43,72 +43,6 @@ if TYPE_CHECKING:
     from datapillar_oneagentic.core.config import AgentConfig
 
 logger = logging.getLogger(__name__)
-
-def _parse_agent_output(result: Any, schema: type) -> Any:
-    """
-    解析 Agent 输出（带 fallback）
-
-    优先使用 LangChain 解析结果，失败时用内部解析器兜底。
-
-    Args:
-        result: LLM 返回的结果（可能是 dict、Pydantic 对象等）
-        schema: 期望的 Pydantic schema
-
-    Returns:
-        解析后的 schema 实例
-    """
-    # 1. 直接是目标类型
-    if isinstance(result, schema):
-        return result
-
-    # 2. dict 格式（include_raw=True）
-    if isinstance(result, dict):
-        parsed = result.get("parsed")
-        if isinstance(parsed, schema):
-            return parsed
-
-        # parsed 是 dict
-        if isinstance(parsed, dict):
-            return schema.model_validate(parsed)
-
-        # 从 raw 提取
-        raw = result.get("raw")
-        if raw:
-            # 尝试从 content 提取
-            content = getattr(raw, "content", None)
-            if content:
-                return parse_structured_output(content, schema)
-
-            # 尝试从 tool_calls 提取
-            tool_calls = getattr(raw, "tool_calls", None)
-            if tool_calls and isinstance(tool_calls, list) and tool_calls:
-                args = (
-                    tool_calls[0].get("args")
-                    if isinstance(tool_calls[0], dict)
-                    else getattr(tool_calls[0], "args", None)
-                )
-                if isinstance(args, dict):
-                    return schema.model_validate(args)
-                if isinstance(args, str):
-                    return parse_structured_output(args, schema)
-
-    # 生成清晰的错误信息
-    expected_fields = []
-    for name, field_info in schema.model_fields.items():
-        field_type = (
-            field_info.annotation.__name__
-            if hasattr(field_info.annotation, "__name__")
-            else str(field_info.annotation)
-        )
-        desc = field_info.description or ""
-        expected_fields.append(f"  - {name}: {field_type}" + (f" ({desc})" if desc else ""))
-
-    raise ValueError(
-        "无法解析结构化输出。\n\n"
-        "期望的 JSON 字段:\n" + "\n".join(expected_fields) + "\n\n"
-        "建议: 请确保 SYSTEM_PROMPT 中明确指定了 JSON 输出格式，字段名需与上述定义一致。"
-    )
-
 
 class DelegationSignal(Exception):
     """
@@ -136,7 +70,7 @@ class AgentContext:
     - query: 用户输入
 
     公开方法：
-    - build_messages(system_prompt): 构建 LLM 消息
+    - build_messages(system_prompt, human_message=None): 构建 LLM 消息
     - invoke_tools(messages): 执行工具调用循环
     - get_structured_output(messages): 获取结构化输出
     - interrupt(payload): 中断等待用户回复
@@ -199,34 +133,29 @@ class AgentContext:
 
     # === 公开方法 ===
 
-    def build_messages(self, system_prompt: str) -> Any:
+    def build_messages(self, system_prompt: str, human_message: str | None = None) -> Any:
         """
         构建 LLM 消息
 
         自动注入：
         - 系统提示词
-        - 上游 Agent 执行上下文（enable_share_context=True 时）
+        - Checkpoint 记忆（messages）
         - 知识上下文
         - 经验上下文
         - 用户查询
 
         参数：
         - system_prompt: Agent 的系统提示词
+        - human_message: 追加的人类消息（可选，仅用于当前调用）
 
         返回：
         - 消息对象（业务侧不需要了解具体类型，只需传递）
         """
-        include_knowledge_tool_prompt = (
-            self._spec is not None
-            and self._spec.knowledge is not None
-            and self._has_tool("knowledge_retrieve")
-        )
-        messages = ContextBuilder.build_llm_messages(
+        ctx_builder = ContextBuilder.from_state(self._state)
+        messages = ctx_builder.compose_llm_messages(
             system_prompt=system_prompt,
             query=self.query,
-            state=self._state,
-            include_knowledge_tool_prompt=include_knowledge_tool_prompt,
-            output_schema=self._spec.deliverable_schema if self._spec else None,
+            human_message=human_message,
         )
         self._messages = messages
         return messages
@@ -265,7 +194,7 @@ class AgentContext:
 
         if not self._tools:
             # 没有工具，直接调用 LLM（带结构化输出）
-            llm_structured = self._llm.with_structured_output(schema, method="json_mode")
+            llm_structured = self._llm.with_structured_output(schema, method="function_calling")
             response = await llm_structured.ainvoke(messages)
             # 将 Pydantic 对象序列化为 JSON 字符串，包装成 AIMessage
             if hasattr(response, "model_dump_json"):
@@ -282,9 +211,6 @@ class AgentContext:
 
         # bind_tools 绑定工具
         llm_with_tools = self._llm.bind_tools(self._tools)
-
-        # 准备状态
-        current_state = self._state.copy()
 
         max_steps = self._spec.get_max_steps(self._agent_config)
         key = SessionKey(namespace=self.namespace, session_id=self.session_id)
@@ -339,7 +265,8 @@ class AgentContext:
             # 执行工具（带超时控制）
             import time
             tool_start_time = time.time()
-            current_state["messages"] = messages
+            current_state = dict(self._state)
+            current_state["messages"] = list(messages)
             tool_error = None
             tool_timeout = self._spec.get_tool_timeout_seconds(self._agent_config)
             try:
@@ -440,13 +367,11 @@ class AgentContext:
         # 直接调用 LLM 生成结构化输出，避免共享上下文中的非输出消息干扰解析
         llm_structured = self._llm.with_structured_output(
             schema,
-            method="json_mode",
+            method="function_calling",
             include_raw=True,
         )
         result = await llm_structured.ainvoke(messages)
-
-        # 解析结果（带 fallback）
-        return _parse_agent_output(result, schema)
+        return parse_structured_output(result, schema, strict=False)
 
     async def _emit_event(self, event: Any) -> None:
         """安全发送事件（允许 event_bus 为空）"""
@@ -480,24 +405,10 @@ class AgentContext:
 
     def _append_user_reply(self, resume_value: Any) -> None:
         """将用户回复追加为 HumanMessage（统一结构）"""
-        content = self._serialize_user_reply(resume_value)
-        message = HumanMessage(content=content)
-
-        self._messages.append(message)
-        state_messages = self._state.get("messages")
-        if isinstance(state_messages, list):
-            state_messages.append(message)
-        else:
-            self._state["messages"] = [message]
-
-    def _serialize_user_reply(self, resume_value: Any) -> str:
-        """统一序列化用户回复，保证可写入消息"""
-        if isinstance(resume_value, str):
-            return resume_value
-        try:
-            return json.dumps(resume_value, ensure_ascii=False)
-        except Exception:
-            return str(resume_value)
+        sb = StateBuilder(self._state)
+        sb.append_user_reply_inplace(resume_value)
+        # interrupt 恢复后，后续调用应基于最新 checkpoint 记忆
+        self._messages = sb.memory.snapshot()
 
     async def get_deliverable(self, agent_id: str) -> Any | None:
         """

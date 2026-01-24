@@ -244,7 +244,7 @@ async def test_knowledge_retriever_allows_tool_mode() -> None:
         chunks=[chunk for chunk, _ in result.hits],
         inject=config.retrieve_config.inject,
     )
-    assert "知识上下文" in context
+    assert "Knowledge Context" in context
 
 
 def test_merge_knowledge_prefers_agent_over_team() -> None:

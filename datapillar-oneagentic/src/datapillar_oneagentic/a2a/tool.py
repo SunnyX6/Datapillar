@@ -30,8 +30,8 @@ logger = logging.getLogger(__name__)
 class A2ADelegateInput(BaseModel):
     """A2A 委派工具输入"""
 
-    task: str = Field(description="要委派给远程 Agent 的任务描述")
-    context: str = Field(default="", description="额外的上下文信息")
+    task: str = Field(description="Task description for the remote agent")
+    context: str = Field(default="", description="Additional context")
 
 
 def _check_a2a_confirmation(config: A2AConfig, task: str, context: str) -> None:
@@ -89,7 +89,7 @@ async def _call_a2a_remote_agent(endpoint: str, full_task: str) -> str:
             state = task_obj.status.state
 
             if state == TaskState.failed:
-                return f"远程 Agent 错误: {task_obj.status.message}"
+                return f"Remote agent error: {task_obj.status.message}"
 
             if state == TaskState.completed:
                 msg = task_obj.status.message
@@ -97,7 +97,7 @@ async def _call_a2a_remote_agent(endpoint: str, full_task: str) -> str:
                     return msg.parts[0].root.text
                 break
 
-        return "远程 Agent 未返回结果"
+        return "Remote agent returned no result"
     finally:
         await client.close()
 
@@ -130,7 +130,7 @@ def create_a2a_tool(config: A2AConfig, name: str | None = None) -> StructuredToo
     """
 
     async def delegate_to_a2a(task: str, context: str = "") -> str:
-        """委派任务到远程 A2A Agent（带安全校验）"""
+        """Delegate a task to a remote A2A agent (with security checks)."""
         try:
             from a2a.client import ClientFactory  # noqa: F401 - 检查依赖是否安装
         except ImportError as err:
@@ -138,22 +138,22 @@ def create_a2a_tool(config: A2AConfig, name: str | None = None) -> StructuredToo
 
         _check_a2a_confirmation(config, task, context)
 
-        full_task = f"{task}\n\n上下文信息：\n{context}" if context else task
+        full_task = f"{task}\n\nContext:\n{context}" if context else task
 
         try:
             return await _call_a2a_remote_agent(config.endpoint, full_task)
         except Exception as e:
             if config.fail_fast:
                 raise
-            return f"A2A 调用失败: {e}"
+            return f"A2A call failed: {e}"
 
     # 工具名称
     tool_name = name or f"delegate_to_{_endpoint_to_name(config.endpoint)}"
 
     # 构建描述（包含安全警告）
-    description = f"委派任务到远程 A2A Agent ({config.endpoint})"
+    description = f"Delegate a task to a remote A2A agent ({config.endpoint})"
     if config.require_confirmation:
-        description += "\n[⚠️ 外部 Agent，需要确认]"
+        description += "\n[⚠️ External agent, confirmation required]"
 
     return StructuredTool.from_function(
         func=delegate_to_a2a,

@@ -9,10 +9,13 @@
 
 Embedding 配置（二选一）：
     1) 环境变量（推荐）：
-       export GLM_EMBEDDING_API_KEY="sk-xxx"
-       export GLM_EMBEDDING_MODEL="embedding-3"
-       export GLM_EMBEDDING_DIMENSION="1024"
+       export DATAPILLAR_EMBEDDING_PROVIDER="openai"          # openai | glm
+       export DATAPILLAR_EMBEDDING_API_KEY="sk-xxx"
+       export DATAPILLAR_EMBEDDING_MODEL="text-embedding-3-small"
+       export DATAPILLAR_EMBEDDING_DIMENSION="1536"
+       # 可选：export DATAPILLAR_EMBEDDING_BASE_URL="https://api.openai.com/v1"
     2) 配置文件（参考 examples/config.example.toml）
+
 说明：
     - source_id 由系统生成，不需要传入。
     - content 可选；传了 content 就不会读取 source_uri 的内容。
@@ -22,7 +25,9 @@ Embedding 配置（二选一）：
 """
 
 import asyncio
-import os
+
+from datapillar_oneagentic import DatapillarConfig
+from datapillar_oneagentic.providers.llm import EmbeddingBackend
 
 from datapillar_oneagentic.context import ContextBuilder
 from datapillar_oneagentic.knowledge import (
@@ -36,24 +41,20 @@ from datapillar_oneagentic.knowledge import (
 
 
 async def main() -> None:
-    embedding_api_key = os.environ.get("GLM_EMBEDDING_API_KEY")
-    embedding_model = os.environ.get("GLM_EMBEDDING_MODEL")
-    embedding_dimension_raw = os.environ.get("GLM_EMBEDDING_DIMENSION")
+    config = DatapillarConfig()
+    if not config.embedding.is_configured():
+        supported = ", ".join(EmbeddingBackend.list_supported())
+        raise RuntimeError(
+            "请先配置 Embedding：\n"
+            "  export DATAPILLAR_EMBEDDING_PROVIDER=\"openai\"\n"
+            "  export DATAPILLAR_EMBEDDING_API_KEY=\"sk-xxx\"\n"
+            "  export DATAPILLAR_EMBEDDING_MODEL=\"text-embedding-3-small\"\n"
+            "  export DATAPILLAR_EMBEDDING_DIMENSION=\"1536\"\n"
+            "可选：export DATAPILLAR_EMBEDDING_BASE_URL=\"https://api.openai.com/v1\"\n"
+            f"支持 provider: {supported}"
+        )
+    embedding_config = config.embedding.model_dump()
 
-    if not embedding_api_key or not embedding_model or not embedding_dimension_raw:
-        raise RuntimeError("请先配置 GLM_EMBEDDING_API_KEY、GLM_EMBEDDING_MODEL、GLM_EMBEDDING_DIMENSION")
-
-    try:
-        embedding_dimension = int(embedding_dimension_raw)
-    except ValueError as exc:
-        raise RuntimeError("GLM_EMBEDDING_DIMENSION 必须为整数") from exc
-
-    embedding_config = {
-        "provider": "glm",
-        "api_key": embedding_api_key,
-        "model": embedding_model,
-        "dimension": embedding_dimension,
-    }
     namespace = "demo_knowledge"
     knowledge_config = KnowledgeConfig(
         base_config={

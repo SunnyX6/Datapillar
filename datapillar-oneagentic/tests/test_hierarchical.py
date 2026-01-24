@@ -5,7 +5,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
 import datapillar_oneagentic.core.nodes as nodes_module
-from datapillar_oneagentic.context.compaction.compact_policy import CompactResult
+from datapillar_oneagentic.context import ContextCollector, ContextScenario
 from datapillar_oneagentic.context.timeline.recorder import TimelineRecorder
 from datapillar_oneagentic.core.agent import AgentSpec
 from datapillar_oneagentic.core.context import AgentContext
@@ -26,12 +26,6 @@ class _DummyStore:
     async def aput(self, namespace, key, value):
         self.items.append((namespace, key, value))
 
-
-class _DummyCompactor:
-    async def compact(self, messages):
-        return messages, CompactResult.no_action("无需压缩")
-
-
 class _DummyExecutor:
     def __init__(self) -> None:
         self.last_query: str | None = None
@@ -45,14 +39,27 @@ class _DummyExecutor:
         )
 
 
-def test_agent_context_should_include_assigned_task() -> None:
+@pytest.mark.asyncio
+async def test_agent_context_should_include_assigned_task() -> None:
     spec = AgentSpec(id="demo", name="Demo", deliverable_schema=_OutputSchema)
+    state = {"messages": [], "assigned_task": "处理下发任务"}
+    collector = ContextCollector()
+    contexts = await collector.collect(
+        scenario=ContextScenario.AGENT,
+        state=state,
+        query="用户输入",
+        session_id="s1",
+        spec=spec,
+        has_knowledge_tool=False,
+    )
+    runtime_state = dict(state)
+    runtime_state.update(contexts)
     ctx = AgentContext(
         namespace="ns",
         session_id="s1",
         query="用户输入",
         _spec=spec,
-        _state={"messages": [], "assigned_task": "处理下发任务"},
+        _state=runtime_state,
     )
 
     messages = ctx.build_messages("system")
@@ -61,7 +68,8 @@ def test_agent_context_should_include_assigned_task() -> None:
     )
 
 
-def test_agent_context_should_include_knowledge_tool_prompt() -> None:
+@pytest.mark.asyncio
+async def test_agent_context_should_attach_knowledge_tool_instruction() -> None:
     class _DummyTool:
         name = "knowledge_retrieve"
 
@@ -71,13 +79,25 @@ def test_agent_context_should_include_knowledge_tool_prompt() -> None:
         deliverable_schema=_OutputSchema,
         knowledge=Knowledge(sources=[KnowledgeSource(source_id="s1", name="示例", source_type="doc")]),
     )
+    state = {"messages": []}
+    collector = ContextCollector()
+    contexts = await collector.collect(
+        scenario=ContextScenario.AGENT,
+        state=state,
+        query="用户输入",
+        session_id="s1",
+        spec=spec,
+        has_knowledge_tool=True,
+    )
+    runtime_state = dict(state)
+    runtime_state.update(contexts)
     ctx = AgentContext(
         namespace="ns",
         session_id="s1",
         query="用户输入",
         _spec=spec,
         _tools=[_DummyTool()],
-        _state={"messages": []},
+        _state=runtime_state,
     )
 
     messages = ctx.build_messages("system")
@@ -95,7 +115,6 @@ async def test_node_factory_should_use_assigned_task_and_clear(monkeypatch) -> N
         agent_specs=[],
         agent_ids=["worker"],
         get_executor=lambda _aid: executor,
-        compactor=_DummyCompactor(),
         timeline_recorder=timeline_recorder,
     )
 

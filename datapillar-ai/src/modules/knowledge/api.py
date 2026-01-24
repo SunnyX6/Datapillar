@@ -30,7 +30,6 @@ async def get_initial_graph(
     current_user = request.state.current_user
     service = _get_service()
     safe_limit = min(max(limit, 1), 2000)
-    logger.info(f"[KG] 获取初始图数据: user={current_user.username}, limit={safe_limit}")
 
     graph = service.get_initial_graph(limit=safe_limit)
     return graph.model_dump()

@@ -63,7 +63,6 @@ class ReviewerAgent:
 
 ## 输出格式
 
-```json
 {
   "passed": true,
   "score": 85,
@@ -73,7 +72,6 @@ class ReviewerAgent:
   "review_stage": "development",
   "metadata": {}
 }
-```
 
 ## 重要约束
 
@@ -134,8 +132,8 @@ class ReviewerAgent:
             )
 
         # 1. 构建消息
-        prompt = f"{self.SYSTEM_PROMPT}\n\n" + "\n\n".join(sections)
-        messages = ctx.build_messages(prompt)
+        human_message = "\n\n".join(sections)
+        messages = ctx.build_messages(self.SYSTEM_PROMPT, human_message=human_message)
 
         # 2. 工具调用循环（评审一般不需要工具）
         messages = await ctx.invoke_tools(messages)

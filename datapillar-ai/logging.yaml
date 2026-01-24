@@ -41,6 +41,11 @@ loggers:
     handlers: [console, file]
     propagate: false
 
+  datapillar_oneagentic.core.context:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+
   # 第三方库日志级别
   uvicorn:
     level: INFO

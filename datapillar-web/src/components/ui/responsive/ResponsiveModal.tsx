@@ -19,6 +19,7 @@
 import { type ReactNode, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { X } from 'lucide-react'
+import { Button } from '../Button'
 import {
   modalWidthClassMap,
   modalHeightClassMap,
@@ -99,14 +100,16 @@ export function ResponsiveModal({
       >
         {/* 关闭按钮 */}
         {showClose && (
-          <button
+          <Button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors"
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 z-10 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors"
             aria-label="关闭"
           >
             <X size={20} />
-          </button>
+          </Button>
         )}
 
         {children}
@@ -127,7 +130,8 @@ ResponsiveModal.Header = function ResponsiveModalHeader({
     <div
       className={cn(
         'px-6 py-5 border-b border-slate-200 dark:border-slate-700',
-        TYPOGRAPHY.title,
+        TYPOGRAPHY.subtitle,
+        'font-bold',
         'text-slate-900 dark:text-white',
         className
       )}

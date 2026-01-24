@@ -264,6 +264,7 @@ function CreateUnitModal({
             onClick={handleSave}
             disabled={!form.code.trim() || !form.name.trim()}
             loading={saving}
+            variant="amber"
           >
             保存
           </ModalPrimaryButton>
@@ -272,21 +273,21 @@ function CreateUnitModal({
     >
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">编码 *</label>
+          <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">编码 *</label>
           <input
             type="text"
             value={form.code}
             onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
             placeholder="如: CNY"
-            className="w-full px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">名称 *</label>
+          <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">名称 *</label>
           <div className="relative">
             {hasSymbol && (
               <span
-                className={`absolute left-3 top-1/2 -translate-y-1/2 size-6 flex items-center justify-center rounded text-sm font-bold ${
+                className={`absolute left-3 top-1/2 -translate-y-1/2 size-6 flex items-center justify-center rounded text-body-sm font-bold ${
                   symbolMeta
                     ? symbolMeta.color
                     : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
@@ -305,7 +306,7 @@ function CreateUnitModal({
                 setNameFilterActive(false)
               }}
               placeholder="如: 人民币"
-              className={`w-full ${hasSymbol ? 'pl-12 pr-10' : 'px-4 pr-10'} py-2.5 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600`}
+              className={`w-full ${hasSymbol ? 'pl-12 pr-10' : 'px-4 pr-10'} py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600`}
             />
             <button
               type="button"
@@ -321,23 +322,23 @@ function CreateUnitModal({
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">符号</label>
+          <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">符号</label>
           <input
             type="text"
             value={form.symbol}
             onChange={(e) => setForm({ ...form, symbol: e.target.value })}
             placeholder="可选，支持自定义符号"
-            className="w-full px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">描述</label>
+          <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">描述</label>
           <input
             type="text"
             value={form.comment}
             onChange={(e) => setForm({ ...form, comment: e.target.value })}
             placeholder="可选"
-            className="w-full px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
       </div>
@@ -1029,6 +1030,7 @@ function EditUnitModal({
             onClick={handleSave}
             disabled={!form.name.trim()}
             loading={saving}
+            variant="amber"
           >
             保存
           </ModalPrimaryButton>
@@ -1037,17 +1039,17 @@ function EditUnitModal({
     >
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">编码</label>
-          <div className="px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono">
+          <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">编码</label>
+          <div className="px-4 py-2.5 text-body-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono">
             {unit.code}
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">名称 *</label>
+          <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">名称 *</label>
           <div className="relative">
             {hasSymbol && (
               <span
-                className={`absolute left-3 top-1/2 -translate-y-1/2 size-6 flex items-center justify-center rounded text-sm font-bold ${
+                className={`absolute left-3 top-1/2 -translate-y-1/2 size-6 flex items-center justify-center rounded text-body-sm font-bold ${
                   symbolMeta
                     ? symbolMeta.color
                     : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
@@ -1066,7 +1068,7 @@ function EditUnitModal({
                 setNameFilterActive(false)
               }}
               placeholder="如: 人民币"
-              className={`w-full ${hasSymbol ? 'pl-12 pr-10' : 'px-4 pr-10'} py-2.5 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600`}
+              className={`w-full ${hasSymbol ? 'pl-12 pr-10' : 'px-4 pr-10'} py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600`}
             />
             <button
               type="button"
@@ -1082,23 +1084,23 @@ function EditUnitModal({
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">符号</label>
+          <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">符号</label>
           <input
             type="text"
             value={form.symbol}
             onChange={(e) => setForm({ ...form, symbol: e.target.value })}
             placeholder="可选，支持自定义符号"
-            className="w-full px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">描述</label>
+          <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">描述</label>
           <input
             type="text"
             value={form.comment}
             onChange={(e) => setForm({ ...form, comment: e.target.value })}
             placeholder="可选"
-            className="w-full px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
       </div>

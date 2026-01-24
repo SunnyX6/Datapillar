@@ -20,6 +20,9 @@ from langchain_core.tools import BaseTool, tool
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
+from datapillar_oneagentic.state import StateBuilder
+from datapillar_oneagentic.utils.prompt_format import format_markdown
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,48 +48,47 @@ def create_delegation_tool(
     """
     tool_name = f"delegate_to_{target_agent_id}"
     display_name = target_agent_name or target_agent_id
-    tool_description = description or f"将任务委派给 {display_name} 处理"
+    tool_description = description or f"Delegate the task to {display_name}."
 
     @tool(tool_name, description=tool_description)
     def delegation_tool(
-        task_description: Annotated[str, "详细描述需要委派的任务，包含所有相关上下文"],
+        task_description: Annotated[str, "Detailed task description with relevant context"],
         state: Annotated[dict, InjectedState],
     ) -> Command:
         """执行委派"""
-        # 从 state 获取 tool_call_id
-        messages = state.get("messages", [])
+        sb = StateBuilder(state)
+        messages = sb.memory.raw_snapshot()
         tool_call_id = _extract_tool_call_id(messages, tool_name)
         user_message = _extract_last_user_message(messages)
         assistant_message = _extract_last_tool_call_message(messages, tool_name)
 
         if user_message and user_message not in task_description:
-            task_description = (
-                f"{task_description}\n\n## 用户原始输入\n{user_message}"
+            user_block = format_markdown(
+                title=None,
+                sections=[("Original User Input", user_message)],
             )
+            task_description = f"{task_description}\n\n{user_block}"
 
         # 创建确认消息
         tool_message = ToolMessage(
-            content=f"已委派给 {display_name}",
+            content=f"Delegated to {display_name}",
             name=tool_name,
             tool_call_id=tool_call_id or "unknown",
         )
 
         logger.info(f"🔄 委派: → {target_agent_id}, 任务: {task_description[:100]}...")
 
-        update_messages = []
-        if assistant_message is not None:
-            update_messages.append(assistant_message)
-        update_messages.append(tool_message)
+        update_messages = [tool_message]
+        # ToolMessage 需要回写以匹配 tool_call_id（避免委派链路断裂）
+        sb.memory.append_tool_messages(update_messages)
+        sb.routing.activate(target_agent_id)
+        sb.routing.assign_task(task_description)
 
         # 返回 Command 跳转到目标 Agent
         # 注意：不使用 graph=Command.PARENT，因为我们的节点不是子图
         return Command(
             goto=target_agent_id,
-            update={
-                "messages": update_messages,
-                "active_agent": target_agent_id,
-                "assigned_task": task_description,
-            },
+            update=sb.patch(),
         )
 
     return delegation_tool
@@ -95,10 +97,9 @@ def create_delegation_tool(
 def _extract_tool_call_id(messages: list, tool_name: str) -> str | None:
     """从消息中提取 tool_call_id"""
     for msg in reversed(messages):
-        if hasattr(msg, "tool_calls") and msg.tool_calls:
-            for tc in msg.tool_calls:
-                if tc.get("name") == tool_name:
-                    return tc.get("id")
+        for tc in _iter_tool_calls(msg):
+            if tc.get("name") == tool_name:
+                return tc.get("id")
     return None
 
 
@@ -117,12 +118,19 @@ def _extract_last_tool_call_message(messages: list, tool_name: str) -> AIMessage
     for msg in reversed(messages):
         if not isinstance(msg, AIMessage):
             continue
-        tool_calls = getattr(msg, "tool_calls", None) or []
-        for tc in tool_calls:
+        for tc in _iter_tool_calls(msg):
             name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
             if name == tool_name:
                 return msg
     return None
+
+
+def _iter_tool_calls(msg: object) -> list:
+    tool_calls = getattr(msg, "tool_calls", None) or []
+    if tool_calls:
+        return tool_calls
+    extra = getattr(msg, "additional_kwargs", {}) or {}
+    return extra.get("tool_calls", []) or []
 
 
 def create_delegation_tools(

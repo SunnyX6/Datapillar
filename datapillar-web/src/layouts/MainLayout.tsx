@@ -3,7 +3,7 @@ import { Sidebar } from './navigation/Sidebar'
 import { TopNav } from './navigation/TopNav'
 import { useThemeStore, useAuthStore, useLayoutStore } from '@/stores'
 
-type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide'
+type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide' | 'projects' | 'collaboration'
 
 const MOCK_USER = {
   name: 'S. Engineer',
@@ -23,9 +23,13 @@ export function MainLayout() {
       ? 'wiki'
       : location.pathname.startsWith('/ide')
         ? 'ide'
-        : location.pathname.startsWith('/profile')
-          ? 'profile'
-          : 'dashboard'
+        : location.pathname.startsWith('/projects')
+          ? 'projects'
+          : location.pathname.startsWith('/collaboration')
+            ? 'collaboration'
+            : location.pathname.startsWith('/profile')
+              ? 'profile'
+              : 'dashboard'
   const isSidebarCollapsed = useLayoutStore((state) => state.isSidebarCollapsed)
   const toggleSidebar = useLayoutStore((state) => state.toggleSidebar)
 
@@ -50,9 +54,13 @@ export function MainLayout() {
           ? '/wiki'
           : nextView === 'ide'
             ? '/ide'
-            : nextView === 'profile'
-              ? '/profile'
-              : '/home'
+            : nextView === 'projects'
+              ? '/projects'
+              : nextView === 'collaboration'
+                ? '/collaboration'
+                : nextView === 'profile'
+                  ? '/profile'
+                  : '/home'
     if (location.pathname === targetPath) {
       return
     }

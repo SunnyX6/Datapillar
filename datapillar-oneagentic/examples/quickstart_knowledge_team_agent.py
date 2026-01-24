@@ -9,14 +9,17 @@
 
 配置要求：
     1) LLM（Datapillar 团队执行需要）
-       export GLM_API_KEY="sk-xxx"
-       export GLM_MODEL="glm-4.7"
-       # 可选：export GLM_BASE_URL="https://open.bigmodel.cn/api/paas/v4"
-       # 可选：export GLM_ENABLE_THINKING="true"
+       export DATAPILLAR_LLM_PROVIDER="openai"              # openai | anthropic | glm | deepseek | openrouter | ollama
+       export DATAPILLAR_LLM_API_KEY="sk-xxx"
+       export DATAPILLAR_LLM_MODEL="gpt-4o"
+       # 可选：export DATAPILLAR_LLM_BASE_URL="https://api.openai.com/v1"
+       # 可选：export DATAPILLAR_LLM_ENABLE_THINKING="true"
     2) Embedding（知识入库与检索需要）
-       export GLM_EMBEDDING_API_KEY="sk-xxx"
-       export GLM_EMBEDDING_MODEL="embedding-3"
-       export GLM_EMBEDDING_DIMENSION="1024"
+       export DATAPILLAR_EMBEDDING_PROVIDER="openai"        # openai | glm
+       export DATAPILLAR_EMBEDDING_API_KEY="sk-xxx"
+       export DATAPILLAR_EMBEDDING_MODEL="text-embedding-3-small"
+       export DATAPILLAR_EMBEDDING_DIMENSION="1536"
+       # 可选：export DATAPILLAR_EMBEDDING_BASE_URL="https://api.openai.com/v1"
 
 说明：
     - source_id 由系统生成，不需要传入。
@@ -27,11 +30,12 @@
 """
 
 import asyncio
-import os
+import json
 
 from pydantic import BaseModel
 
 from datapillar_oneagentic import AgentContext, Datapillar, DatapillarConfig, Process, agent
+from datapillar_oneagentic.providers.llm import EmbeddingBackend, Provider
 from datapillar_oneagentic.knowledge import (
     Knowledge,
     KnowledgeChunkConfig,
@@ -42,36 +46,6 @@ from datapillar_oneagentic.knowledge import (
     KnowledgeRetrieveConfig,
     KnowledgeSource,
 )
-
-
-# ============================================================================
-# LLM 配置
-# ============================================================================
-LLM_PROVIDER = "glm"
-LLM_API_KEY = os.environ.get("GLM_API_KEY")
-LLM_BASE_URL = os.environ.get("GLM_BASE_URL")
-LLM_MODEL = os.environ.get("GLM_MODEL")
-LLM_ENABLE_THINKING = os.environ.get("GLM_ENABLE_THINKING", "false").lower() in {
-    "1",
-    "true",
-    "yes",
-}
-
-if not LLM_API_KEY or not LLM_MODEL:
-    raise RuntimeError("请设置 GLM_API_KEY 和 GLM_MODEL（可选 GLM_BASE_URL/GLM_ENABLE_THINKING）")
-
-EMBEDDING_PROVIDER = "glm"
-EMBEDDING_API_KEY = os.environ.get("GLM_EMBEDDING_API_KEY")
-EMBEDDING_MODEL = os.environ.get("GLM_EMBEDDING_MODEL")
-EMBEDDING_DIMENSION_RAW = os.environ.get("GLM_EMBEDDING_DIMENSION")
-
-if not EMBEDDING_API_KEY or not EMBEDDING_MODEL or not EMBEDDING_DIMENSION_RAW:
-    raise RuntimeError("请设置 GLM_EMBEDDING_API_KEY、GLM_EMBEDDING_MODEL、GLM_EMBEDDING_DIMENSION")
-
-try:
-    EMBEDDING_DIMENSION = int(EMBEDDING_DIMENSION_RAW)
-except ValueError as exc:
-    raise RuntimeError("GLM_EMBEDDING_DIMENSION 必须为整数") from exc
 
 
 class AnswerOutput(BaseModel):
@@ -160,23 +134,31 @@ class SpecialistAgent:
 
 
 async def main() -> None:
-    llm_config = {
-        "provider": LLM_PROVIDER,
-        "api_key": LLM_API_KEY,
-        "model": LLM_MODEL,
-        "enable_thinking": LLM_ENABLE_THINKING,
-        "timeout_seconds": 120,
-        "retry": {"max_retries": 2},
-    }
-    if LLM_BASE_URL:
-        llm_config["base_url"] = LLM_BASE_URL
+    config = DatapillarConfig()
+    if not config.llm.is_configured():
+        supported = ", ".join(Provider.list_supported())
+        raise RuntimeError(
+            "请先配置 LLM：\n"
+            "  export DATAPILLAR_LLM_PROVIDER=\"openai\"\n"
+            "  export DATAPILLAR_LLM_API_KEY=\"sk-xxx\"\n"
+            "  export DATAPILLAR_LLM_MODEL=\"gpt-4o\"\n"
+            "可选：export DATAPILLAR_LLM_BASE_URL=\"https://api.openai.com/v1\"\n"
+            "可选：export DATAPILLAR_LLM_ENABLE_THINKING=\"true\"\n"
+            f"支持 provider: {supported}"
+        )
+    if not config.embedding.is_configured():
+        supported = ", ".join(EmbeddingBackend.list_supported())
+        raise RuntimeError(
+            "请先配置 Embedding：\n"
+            "  export DATAPILLAR_EMBEDDING_PROVIDER=\"openai\"\n"
+            "  export DATAPILLAR_EMBEDDING_API_KEY=\"sk-xxx\"\n"
+            "  export DATAPILLAR_EMBEDDING_MODEL=\"text-embedding-3-small\"\n"
+            "  export DATAPILLAR_EMBEDDING_DIMENSION=\"1536\"\n"
+            "可选：export DATAPILLAR_EMBEDDING_BASE_URL=\"https://api.openai.com/v1\"\n"
+            f"支持 provider: {supported}"
+        )
 
-    embedding_config = {
-        "provider": EMBEDDING_PROVIDER,
-        "api_key": EMBEDDING_API_KEY,
-        "model": EMBEDDING_MODEL,
-        "dimension": EMBEDDING_DIMENSION,
-    }
+    embedding_config = config.embedding.model_dump()
     knowledge_config = KnowledgeConfig(
         base_config={
             "embedding": embedding_config,
@@ -192,7 +174,7 @@ async def main() -> None:
             inject=KnowledgeInjectConfig(mode="system", max_tokens=800),
         ),
     )
-    config = DatapillarConfig(llm=llm_config, knowledge=knowledge_config)
+    config.knowledge = knowledge_config
 
     # namespace 必填，用于知识隔离，需与 Datapillar 保持一致
     namespace = "demo_knowledge_team"
@@ -218,7 +200,7 @@ async def main() -> None:
         if event.get("event") == "agent.end":
             deliverable = event.get("data", {}).get("deliverable")
             if deliverable is not None:
-                print(deliverable)
+                print(json.dumps(deliverable, ensure_ascii=False))
 
 
 if __name__ == "__main__":

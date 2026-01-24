@@ -70,7 +70,7 @@ def _create_input_model(mcp_tool: MCPTool) -> type[BaseModel]:
         # 无参数工具，创建带占位符的模型
         return create_model(
             f"{mcp_tool.name}Input",
-            placeholder=(str | None, Field(default=None, description="占位参数")),
+            placeholder=(str | None, Field(default=None, description="Placeholder parameter")),
         )
 
     fields = {}
@@ -88,14 +88,14 @@ def _build_tool_description(mcp_tool: MCPTool) -> str:
 
     warnings = []
     if mcp_tool.annotations.destructive_hint is True:
-        warnings.append("⚠️ 破坏性操作")
+        warnings.append("⚠️ Destructive operation")
     if mcp_tool.annotations.open_world_hint is True:
-        warnings.append("🌐 访问外部网络")
+        warnings.append("🌐 External network access")
     if mcp_tool.annotations.idempotent_hint is False:
-        warnings.append("🔄 非幂等操作")
+        warnings.append("🔄 Non-idempotent operation")
 
     if warnings:
-        desc = f"{desc}\n\n安全提示: {', '.join(warnings)}"
+        desc = f"{desc}\n\nSafety Notes: {', '.join(warnings)}"
 
     return desc
 

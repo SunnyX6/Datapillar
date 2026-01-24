@@ -24,6 +24,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from datapillar_oneagentic.utils.prompt_format import format_markdown
+
 if TYPE_CHECKING:
     from datapillar_oneagentic.experience.learner import ExperienceRecord
     from datapillar_oneagentic.storage.learning_stores.base import ExperienceStore
@@ -116,17 +118,18 @@ class ExperienceRetriever:
             return ""
 
         # 拼接上下文
-        lines = [
-            "## 相似经验参考",
-            "",
-        ]
+        lines: list[str] = []
 
         for i, record in enumerate(records[:k], 1):
-            lines.append(f"### 经验 {i}")
+            lines.append(f"### Experience {i}")
             lines.append(record.to_context())
             lines.append("")
 
-        return "\n".join(lines)
+        body = "\n".join(lines).strip()
+        return format_markdown(
+            title="Experience Context",
+            sections=[("Similar Experiences", body)],
+        )
 
     async def get_common_tools(self, goal: str, k: int = 10) -> list[str]:
         """

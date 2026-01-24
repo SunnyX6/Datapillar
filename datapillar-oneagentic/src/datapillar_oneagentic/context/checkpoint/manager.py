@@ -99,6 +99,21 @@ class CheckpointManager:
             logger.error(f"获取状态失败: {e}")
         return None
 
+    async def get_snapshot(self, compiled_graph, checkpoint_id: str | None = None):
+        """
+        获取原始状态快照
+
+        参数：
+        - compiled_graph: 编译后的 LangGraph
+        - checkpoint_id: 检查点 ID（可选，不传则获取最新状态）
+        """
+        config = self.get_config(checkpoint_id)
+        try:
+            return await compiled_graph.aget_state(config)
+        except Exception as e:
+            logger.error(f"获取状态快照失败: {e}")
+            return None
+
     async def update_state(
         self,
         compiled_graph,

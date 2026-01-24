@@ -15,7 +15,7 @@ from datapillar_oneagentic.storage import create_checkpointer, create_store
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_emits_error_event_and_raises() -> None:
+async def test_orchestrator_emits_error_event_and_stops() -> None:
     async def bad_node(_state: Blackboard):
         raise AgentError(
             "boom",
@@ -53,5 +53,5 @@ async def test_orchestrator_emits_error_event_and_raises() -> None:
             assert error.get("message") == "Agent 执行失败"
             assert error.get("error_type") == "agent"
 
-            with pytest.raises(AgentError):
+            with pytest.raises(StopAsyncIteration):
                 await anext(stream)

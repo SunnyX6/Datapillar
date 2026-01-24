@@ -5,6 +5,7 @@ import json
 import pytest
 from pydantic import BaseModel
 
+from datapillar_oneagentic.exception import LLMError, LLMErrorCategory
 from datapillar_oneagentic.utils.structured_output import (
     ModelCapabilities,
     extract_json,
@@ -77,13 +78,38 @@ def test_parse_structured_output_fallbacks_markdown_headings() -> None:
     assert model.count == 2
 
 
+def test_parse_structured_output_accepts_include_raw_dict() -> None:
+    result = {
+        "raw": "raw",
+        "parsed": {"foo": "bar", "count": 2},
+        "parsing_error": None,
+    }
+    model = parse_structured_output(result, _Payload, strict=True)
+    assert model.foo == "bar"
+    assert model.count == 2
+
+
+def test_parse_structured_output_raises_llm_error_on_structured_failure() -> None:
+    result = {
+        "raw": "raw",
+        "parsed": None,
+        "parsing_error": "bad",
+    }
+    with pytest.raises(LLMError) as exc:
+        parse_structured_output(result, _Payload, strict=True)
+    error = exc.value
+    assert error.category == LLMErrorCategory.STRUCTURED_OUTPUT
+    assert error.raw == "raw"
+    assert error.parsing_error == "bad"
+
+
 def test_parse_structured_output_markdown_missing_required() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(LLMError):
         parse_structured_output("- summary: ok", _MarkdownPayload)
 
 
 def test_parse_structured_output_raises_on_empty() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(LLMError):
         parse_structured_output("   ", _Payload)
 
 

@@ -95,6 +95,7 @@ class AnalysisResultOutput(BaseModel):
     steps: list[Step] = Field(default_factory=list, description="业务步骤列表")
     final_target: DataTarget | None = Field(None, description="最终数据目标")
     ambiguities: list[str] = Field(default_factory=list, description="需要澄清的问题列表")
+    recommendations: list[str] = Field(default_factory=list, description="推荐引导")
     confidence: float = Field(
         default=0.5, ge=0.0, le=1.0, description="需求明确程度，模糊需求必须 < 0.7"
     )
@@ -117,6 +118,17 @@ class AnalysisResultOutput(BaseModel):
             return []
         return v
 
+    @field_validator("recommendations", mode="before")
+    @classmethod
+    def _parse_recommendations(cls, v: object) -> object:
+        v = _try_parse_json(v)
+        if v is None:
+            return []
+        if isinstance(v, str):
+            items = [s.strip() for s in v.split(",")]
+            return [s for s in items if s]
+        return v
+
 
 class AnalysisResult(BaseModel):
     """
@@ -137,6 +149,7 @@ class AnalysisResult(BaseModel):
 
     final_target: DataTarget | None = Field(None, description="最终数据目标")
     ambiguities: list[str] = Field(default_factory=list, description="需要澄清的问题列表")
+    recommendations: list[str] = Field(default_factory=list, description="推荐引导")
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
     @classmethod
@@ -148,6 +161,7 @@ class AnalysisResult(BaseModel):
             steps=output.steps,
             final_target=output.final_target,
             ambiguities=output.ambiguities,
+            recommendations=output.recommendations,
             confidence=output.confidence,
         )
 

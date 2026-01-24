@@ -11,9 +11,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from datapillar_oneagentic import agent
+from src.modules.etl.schemas.analyst import _try_parse_json
 from src.modules.etl.tools.table import get_table_detail, search_tables
 
 if TYPE_CHECKING:
@@ -52,6 +53,12 @@ class AnalysisOutput(BaseModel):
     steps: list[StepOutput] = Field(default_factory=list, description="业务步骤列表")
     final_target: FinalTarget | None = Field(None, description="最终数据目标")
     ambiguities: list[str] = Field(default_factory=list, description="需要澄清的问题")
+    recommendations: list[str] = Field(default_factory=list, description="推荐引导")
+
+    @field_validator("final_target", mode="before")
+    @classmethod
+    def _parse_final_target(cls, v: object) -> object:
+        return _try_parse_json(v)
 
 
 # ==================== Agent 定义 ====================
@@ -72,23 +79,22 @@ class AnalystAgent:
     SYSTEM_PROMPT = """你是 Datapillar 的智能助手，同时也是需求分析师。
 
 ## 你的职责
-
-1. **智能分发**：识别用户意图，将请求交给合适的专家
+1. 处理用户闲聊，并给出友好提示
+2. **智能分发**：识别用户意图，将请求交给合适的专家
    - 元数据查询（查表、查字段、查血缘）→ 委派给元数据专员
    - ETL 需求（创建表、数据加工）→ 完成分析后委派给数据架构师
 
-2. **ETL 需求分析**：将 ETL 需求拆分为可执行的业务步骤
+3. **ETL 需求分析**：将 ETL 需求拆分为可执行的业务步骤
 
 ## 工作流程
 
 1. 判断用户意图
 2. 元数据查询 → 委派给元数据专员
-3. ETL 需求 → 调用工具验证表 → 拆分步骤 → 委派给数据架构师
+3. 当处理etl需求时，需要调用相关工具获取知识 → 拆分步骤 → 委派给数据架构师
 4. 信息不足 → 输出 JSON 并在 ambiguities 中列出问题
 
 ## 输出格式（始终使用此 JSON 格式）
 
-```json
 {
   "summary": "一句话概括（闲聊时填回复内容，ETL时填需求概括）",
   "confidence": 0.8,
@@ -107,9 +113,9 @@ class AnalystAgent:
     "write_mode": "overwrite",
     "description": "描述"
   },
-  "ambiguities": ["需要澄清的问题"]
+  "ambiguities": ["需要澄清的ETL问题"],
+  "recommendations": ["继续细化目标表口径", "确认写入模式"]
 }
-```
 
 ## 字段说明
 
@@ -119,11 +125,12 @@ class AnalystAgent:
   - < 0.7：信息不足，需要澄清
 - **steps**: ETL 需求时填写，其他情况为空数组
 - **final_target**: ETL 需求时填写，其他情况为 null
-- **ambiguities**: 需要用户澄清的问题列表
+- **ambiguities**: 需要用户澄清的ETL问题列表
+- **recommendations**: 向用户的推荐，不是问题澄清！
 
 ## 重要约束
 
-1. **除委派场景外必须输出 JSON 格式**，不要输出纯文本
+1. 必须输出 JSON 格式
 2. 元数据查询直接委派给元数据专员，不需要输出 JSON
 3. 不允许臆造表名，必须通过工具验证
 4. confidence >= 0.7 时委派给数据架构师
@@ -141,11 +148,6 @@ class AnalystAgent:
 - Step 之间通过 depends_on 建立依赖关系
 - input_tables 必须是完整路径（三段式格式）
 
-### 澄清时机
-当以下情况出现时，必须通过 ambiguities 要求澄清：
-- 表名不完整或不存在
-- 业务逻辑有多种理解方式
-- 缺少关键信息（如目标表、写入模式等）
 """
 
     async def run(self, ctx: AgentContext) -> AnalysisOutput:
@@ -163,7 +165,7 @@ class AnalystAgent:
         if output.confidence < 0.7 and output.ambiguities:
             ctx.interrupt(
                 {
-                    "message": "需求不够明确，请补充以下信息",
+                    "message": "",
                     "questions": output.ambiguities,
                 }
             )

@@ -6,7 +6,18 @@ import { iconSizeToken } from '@/design-tokens/dimensions'
 import { useSearchStore, useSemanticStatsStore } from '@/stores'
 import { useInfiniteScroll } from '@/hooks'
 import { fetchWordRoots, createWordRoot, deleteWordRoot, updateWordRoot, type CreateWordRootRequest, type UpdateWordRootRequest } from '@/services/oneMetaSemanticService'
-import { DataTypeSelector, parseDataTypeString, buildDataTypeString, type DataTypeValue } from '@/components/ui'
+import {
+  DataTypeSelector,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  parseDataTypeString,
+  buildDataTypeString,
+  type DataTypeValue
+} from '@/components/ui'
 import { formatTime } from '@/lib/utils'
 
 /** 每页加载数量 */
@@ -447,68 +458,71 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
       </div>
 
       <div className="flex-1 overflow-auto p-4 @md:p-6 custom-scrollbar">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-x-auto">
-          <table className="w-full text-left border-collapse table-fixed min-w-table-wide">
-            <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-semibold text-micro uppercase tracking-wider">
-              <tr>
-                <th className="px-4 py-3 w-56">词根名称 / 编码</th>
-                <th className="px-4 py-3 w-52 text-center">数据类型</th>
-                <th className="px-4 py-3">描述</th>
-                <th className="px-4 py-3 w-24">创建人</th>
-                <th className="px-4 py-3 w-40">创建时间</th>
-                <th className="px-4 py-3 w-24 text-center">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-500 mx-auto" />
-                    <div className="text-slate-400 text-caption mt-2">加载中...</div>
-                  </td>
-                </tr>
-              ) : (
-                <>
-                  {filteredRoots.map((root) => (
-                    <WordRootRow
-                      key={root.code}
-                      root={root}
-                      isEditing={editingCode === root.code}
-                      onStartEdit={() => setEditingCode(root.code)}
-                      onEndEdit={() => setEditingCode(null)}
-                      onClick={() => onOpenDrawer(root)}
-                      onDelete={handleDelete}
-                      onUpdate={handleUpdate}
-                    />
-                  ))}
-                  {showNewRow && (
-                    <NewWordRootRow
-                      form={newRowForm}
-                      onChange={setNewRowForm}
-                      onSave={handleSaveNewRow}
-                      onCancel={handleCancelNewRow}
-                      saving={saving}
-                    />
-                  )}
-                  {filteredRoots.length === 0 && !showNewRow && (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-12 @md:py-16 text-center text-slate-400 text-caption @md:text-body-sm">
-                        未找到匹配的词根
-                      </td>
-                    </tr>
-                  )}
-                </>
+        <Table
+          footer={
+            <>
+              {/* 哨兵元素 + 加载更多 */}
+              <div ref={sentinelRef} className="h-1" />
+              {loadingMore && (
+                <div className="flex justify-center py-4 border-t border-slate-100 dark:border-slate-800">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                </div>
               )}
-            </tbody>
-          </table>
-          {/* 哨兵元素 + 加载更多 */}
-          <div ref={sentinelRef} className="h-1" />
-          {loadingMore && (
-            <div className="flex justify-center py-4 border-t border-slate-100 dark:border-slate-800">
-              <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-            </div>
-          )}
-        </div>
+            </>
+          }
+        >
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-56">词根名称 / 编码</TableHead>
+              <TableHead className="w-52 text-center">数据类型</TableHead>
+              <TableHead>描述</TableHead>
+              <TableHead className="w-24">创建人</TableHead>
+              <TableHead className="w-40">创建时间</TableHead>
+              <TableHead className="w-24 text-center">操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-12 text-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-500 mx-auto" />
+                  <div className="text-slate-400 text-caption mt-2">加载中...</div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              <>
+                {filteredRoots.map((root) => (
+                  <WordRootRow
+                    key={root.code}
+                    root={root}
+                    isEditing={editingCode === root.code}
+                    onStartEdit={() => setEditingCode(root.code)}
+                    onEndEdit={() => setEditingCode(null)}
+                    onClick={() => onOpenDrawer(root)}
+                    onDelete={handleDelete}
+                    onUpdate={handleUpdate}
+                  />
+                ))}
+                {showNewRow && (
+                  <NewWordRootRow
+                    form={newRowForm}
+                    onChange={setNewRowForm}
+                    onSave={handleSaveNewRow}
+                    onCancel={handleCancelNewRow}
+                    saving={saving}
+                  />
+                )}
+                {filteredRoots.length === 0 && !showNewRow && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-12 @md:py-16 text-center text-slate-400 text-caption @md:text-body-sm">
+                      未找到匹配的词根
+                    </TableCell>
+                  </TableRow>
+                )}
+              </>
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   )

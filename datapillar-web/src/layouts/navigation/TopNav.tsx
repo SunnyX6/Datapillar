@@ -24,8 +24,9 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useI18nStore, useSearchStore, type Language, type SearchContext } from '@/stores'
 import { useTranslation } from 'react-i18next'
 import { iconSizeToken } from '@/design-tokens/dimensions'
+import { Button } from '@/components/ui'
 
-type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide'
+type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide' | 'projects' | 'collaboration'
 
 const LANGUAGE_OPTIONS: { id: Language; label: string }[] = [
   { id: 'zh-CN', label: '简体中文' },
@@ -149,6 +150,8 @@ export function TopNav({
 
   const isGovernanceActive = location.pathname.startsWith('/governance')
   const isDashboardActive = currentView === 'dashboard' && !isGovernanceActive
+  const isProjectsActive = currentView === 'projects'
+  const isTeamActive = currentView === 'collaboration'
   const _languageLabel = language === 'zh-CN' ? t('language.zh', { defaultValue: '简体中文' }) : t('language.en', { defaultValue: 'English' })
   const orgLabel = t('top.org', { defaultValue: 'Acme Corp' })
 
@@ -171,15 +174,19 @@ export function TopNav({
         <ExpandToggle variant="topnav" onToggle={onToggleSidebar} className="absolute left-0 bottom-0" />
       )}
       <div className="flex items-center gap-4 min-w-0 @md:min-w-40">
-        <button
+        <Button
           type="button"
-          className="flex items-center gap-2 group"
+          variant="ghost"
+          size="tiny"
+          className="flex items-center gap-2 group p-0"
           onClick={() => onNavigate('dashboard')}
         >
-        </button>
+        </Button>
 
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="small"
           className="hidden @md:flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors text-body-sm text-slate-600 dark:text-slate-400"
         >
           <div className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-micro">
@@ -187,7 +194,7 @@ export function TopNav({
           </div>
           <span>{orgLabel}</span>
           <ChevronDown size={iconSizeToken.tiny} className="opacity-50" />
-        </button>
+        </Button>
       </div>
 
       <div className="flex items-center flex-1 min-w-0 mx-2">
@@ -199,12 +206,18 @@ export function TopNav({
           onMouseEnter={handleGovernanceEnter}
           onMouseLeave={handleGovernanceLeave}
         >
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="small"
             onClick={() => setIsGovernanceOpen((prev) => !prev)}
             className={`
-              flex items-center gap-2 px-2 @md:px-3 py-1.5 rounded-md text-body transition-all duration-200 relative
-              ${isGovernanceActive ? 'text-indigo-600 dark:text-indigo-300 bg-white dark:bg-slate-800 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'}
+              flex items-center gap-2 px-2 @md:px-3 py-1.5 rounded-md text-body transition-none! duration-0! relative
+              ${
+                isGovernanceActive
+                  ? 'text-indigo-600 dark:text-indigo-300 bg-white dark:bg-slate-800 shadow-sm hover:bg-white! hover:text-indigo-600! active:bg-white! active:text-indigo-600! dark:hover:bg-slate-800! dark:hover:text-indigo-300! dark:active:bg-slate-800! dark:active:text-indigo-300!'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800! dark:hover:text-slate-200! hover:bg-white/50! dark:hover:bg-slate-800/50! active:bg-white/50! dark:active:bg-slate-800/50!'
+              }
             `}
           >
             <ShieldCheck size={iconSizeToken.small} />
@@ -214,7 +227,7 @@ export function TopNav({
               className={`transition-transform duration-200 ${isGovernanceOpen ? 'rotate-180' : ''} ${isGovernanceActive ? 'text-indigo-500' : 'text-slate-400 dark:text-slate-500'}`}
             />
             {isGovernanceActive && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo-500" />}
-          </button>
+          </Button>
           <div
             className="absolute left-0 top-full h-3 w-full"
             onMouseEnter={handleGovernanceEnter}
@@ -234,9 +247,11 @@ export function TopNav({
               </span>
             </div>
             <div className="p-2">
-              <button
+              <Button
                 type="button"
-                className="w-full px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
+                variant="ghost"
+                size="normal"
+                className="w-full whitespace-normal px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
                 onClick={() => handleNavigateGovernance('/governance/metadata')}
               >
                 <div className="p-1.5 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-purple-500 shrink-0 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/50 transition-colors">
@@ -246,10 +261,12 @@ export function TopNav({
                   <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.metadata')}</div>
                   <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.metadataDesc', { defaultValue: '统一物理资产元数据' })}</div>
                 </div>
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="w-full px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
+                variant="ghost"
+                size="normal"
+                className="w-full whitespace-normal px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
                 onClick={() => handleNavigateGovernance('/governance/semantic')}
               >
                 <div className="p-1.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-500 shrink-0 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
@@ -259,10 +276,12 @@ export function TopNav({
                   <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.semantic', { defaultValue: '元语义' })}</div>
                   <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.semanticDesc', { defaultValue: '指标、词根、API等语义资产空间' })}</div>
                 </div>
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="w-full px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
+                variant="ghost"
+                size="normal"
+                className="w-full whitespace-normal px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
                 onClick={() => handleNavigateGovernance('/governance/knowledge')}
               >
                 <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-500 shrink-0 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 transition-colors">
@@ -272,12 +291,12 @@ export function TopNav({
                   <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.knowledge')}</div>
                   <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.knowledgeDesc', { defaultValue: '知识图谱可视化与关系探索' })}</div>
                 </div>
-              </button>
+              </Button>
             </div>
           </div>
         </div>
-        <TabItem icon={<FolderKanban size={iconSizeToken.small} />} label={t('top.tabs.projects')} />
-        <TabItem icon={<Users size={iconSizeToken.small} />} label={t('top.tabs.team')} />
+        <TabItem icon={<FolderKanban size={iconSizeToken.small} />} label={t('top.tabs.projects')} active={isProjectsActive} onClick={() => onNavigate('projects')} />
+        <TabItem icon={<Users size={iconSizeToken.small} />} label={t('top.tabs.team')} active={isTeamActive} onClick={() => onNavigate('collaboration')} />
       </div>
       </div>
 
@@ -304,8 +323,10 @@ export function TopNav({
               className="flex-1 min-w-0 py-1.5 bg-transparent text-body-sm text-slate-700 dark:text-slate-200 placeholder:text-caption placeholder:text-slate-400 placeholder:truncate focus:outline-none truncate"
             />
             {searchTerm ? (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="iconSm"
                 onClick={() => {
                   setSearchTerm('')
                   searchInputRef.current?.focus()
@@ -313,7 +334,7 @@ export function TopNav({
                 className="p-1.5 mr-1 shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded transition-colors"
               >
                 <X size={iconSizeToken.small} />
-              </button>
+              </Button>
             ) : (
               <span className="flex items-center gap-0.5 shrink-0 text-micro font-mono bg-white dark:bg-slate-800 px-1.5 py-0.5 mr-2 rounded border border-slate-200 dark:border-slate-700 text-slate-400">
                 <span className="text-caption">⌘</span> K
@@ -322,31 +343,37 @@ export function TopNav({
           </div>
         </div>
 
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           onClick={toggleTheme}
           className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
         >
           {isDark ? <Sun size={iconSizeToken.large} /> : <Moon size={iconSizeToken.large} />}
-        </button>
+        </Button>
 
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors relative"
         >
           <Bell size={iconSizeToken.large} />
           <span className="absolute top-2 right-2.5 w-1.5 h-1.5 bg-rose-500 rounded-full ring-2 ring-white dark:ring-[#0B1120] animate-pulse" />
-        </button>
+        </Button>
 
         <div className="relative" ref={languageRef}>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="small"
             onClick={() => setIsLanguageOpen((prev) => !prev)}
             className="flex items-center gap-1.5 p-2 rounded-lg text-body-sm text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors"
           >
             <Globe size={iconSizeToken.large} className="shrink-0" />
             <ChevronDown size={iconSizeToken.tiny} className={`transition-transform duration-200 ${isLanguageOpen ? 'rotate-180' : ''} text-slate-400 shrink-0`} />
-          </button>
+          </Button>
 
           <div
             className={`absolute right-0 top-full mt-3 w-36 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg overflow-hidden z-[60] transition-all duration-150 origin-top-right ${
@@ -354,28 +381,30 @@ export function TopNav({
             }`}
           >
             {LANGUAGE_OPTIONS.map((option) => (
-              <button
+              <Button
                 key={option.id}
                 type="button"
+                variant="ghost"
+                size="small"
                 onClick={() => handleLanguageSelect(option.id)}
                 className="w-full px-3 py-1.5 text-left text-body-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between gap-2"
                 aria-pressed={language === option.id}
               >
                 <span>{option.label}</span>
                 {language === option.id && <Check size={iconSizeToken.small} className="text-indigo-500" />}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
 
         <div className="ml-1 pl-2.5 border-l border-slate-200 dark:border-slate-800 relative" ref={dropdownRef}>
-          <button type="button" className="flex items-center gap-2" onClick={() => setIsDropdownOpen((prev) => !prev)}>
+          <Button type="button" variant="ghost" size="iconSm" className="flex items-center gap-2" onClick={() => setIsDropdownOpen((prev) => !prev)}>
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 p-px hover:shadow-md transition-shadow">
               <div className="w-full h-full rounded-full bg-white dark:bg-slate-900 flex items-center justify-center text-caption uppercase text-slate-700 dark:text-slate-200">
                 {user.name.slice(0, 2)}
               </div>
             </div>
-          </button>
+          </Button>
 
           {isDropdownOpen && (
             <div className="absolute right-0 top-full mt-3 w-48 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden z-[60] animate-in fade-in zoom-in-95 duration-200 origin-top-right">
@@ -385,8 +414,8 @@ export function TopNav({
               </div>
 
               <div className="p-1">
-                <DropdownButton icon={<UserIcon size={iconSizeToken.small} />} label={t('top.profile.profile')} onClick={handleProfileClick} />
-                <DropdownButton icon={<CreditCard size={iconSizeToken.small} />} label={t('top.profile.billing')} />
+                <DropdownButton icon={<UserIcon size={iconSizeToken.small} className="text-indigo-500" />} label={t('top.profile.profile')} onClick={handleProfileClick} />
+                <DropdownButton icon={<CreditCard size={iconSizeToken.small} className="text-emerald-500" />} label={t('top.profile.billing')} />
               </div>
 
               <div className="p-1 border-t border-slate-100 dark:border-slate-700/50">
@@ -416,18 +445,24 @@ interface TabItemProps {
 
 function TabItem({ icon, label, active, onClick }: TabItemProps) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="small"
       onClick={onClick}
       className={`
-        flex items-center gap-2 px-2 @md:px-3 py-1.5 rounded-md text-body transition-all duration-200 relative
-        ${active ? 'text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-800 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'}
+        flex items-center gap-2 px-2 @md:px-3 py-1.5 rounded-md text-body transition-none! duration-0! relative
+        ${
+          active
+            ? 'text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-800 shadow-sm hover:bg-white! hover:text-indigo-600! active:bg-white! active:text-indigo-600! dark:hover:bg-slate-800! dark:hover:text-indigo-400! dark:active:bg-slate-800! dark:active:text-indigo-400!'
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800! dark:hover:text-slate-200! hover:bg-white/50! dark:hover:bg-slate-800/50! active:bg-white/50! dark:active:bg-slate-800/50!'
+        }
       `}
     >
       {icon}
       <span className="hidden @md:inline">{label}</span>
       {active && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo-500" />}
-    </button>
+    </Button>
   )
 }
 

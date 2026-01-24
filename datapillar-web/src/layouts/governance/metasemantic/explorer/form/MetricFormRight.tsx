@@ -113,7 +113,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
         : 'border-slate-100 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-900'
     }`}>
       <td className="px-4 py-2.5" title={colInfo.comment || ''}>
-        <div className={`flex items-center gap-1.5 text-body-sm font-medium truncate ${
+        <div className={`flex items-center gap-1.5 text-xs font-medium truncate ${
           isSelected ? 'text-blue-700 dark:text-blue-300' : 'text-slate-800 dark:text-slate-200'
         }`}>
           {colInfo.name}
@@ -128,7 +128,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
         </div>
       </td>
       <td className="px-4 py-2.5">
-        <span className="text-caption font-mono text-slate-500">{colInfo.type}</span>
+        <span className="text-xs font-mono text-slate-500 dark:text-slate-400">{colInfo.type}</span>
       </td>
       <td className="px-4 py-2.5 w-20">
         <div className="flex items-center justify-center gap-1">
@@ -173,10 +173,10 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
                 className="fixed w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[1000000]"
               >
                 <div className="p-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <span className="text-micro font-semibold text-slate-500">选择过滤值</span>
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">选择过滤值</span>
                   {loadingDomain && <Loader2 size={12} className="animate-spin text-slate-400" />}
                 </div>
-                <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                <div className="max-h-48 overflow-y-auto overscroll-contain custom-scrollbar" onWheel={(e) => e.stopPropagation()}>
                   {valueDomain.length > 0 ? (
                     valueDomain.map((val) => {
                       const checked = filterValues.some((v) => v.key === val.key)
@@ -191,15 +191,15 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
                             onChange={() => toggleValue(val)}
                             className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
                           />
-                          <span className="text-caption font-mono text-slate-700 dark:text-slate-300">{val.key}</span>
+                          <span className="text-xs font-mono text-slate-700 dark:text-slate-300">{val.key}</span>
                           {val.label && val.label !== val.key && (
-                            <span className="text-micro text-slate-400 truncate">({val.label})</span>
+                            <span className="text-xs text-slate-400 dark:text-slate-500 truncate">({val.label})</span>
                           )}
                         </label>
                       )
                     })
                   ) : !loadingDomain ? (
-                    <div className="py-4 text-center text-caption text-slate-400">暂无值域数据</div>
+                    <div className="py-4 text-center text-xs text-slate-400">暂无值域数据</div>
                   ) : null}
                 </div>
                 {filterValues.length > 0 && (
@@ -207,7 +207,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
                     <button
                       type="button"
                       onClick={() => handleFilterChange([])}
-                      className="w-full text-micro text-red-500 hover:text-red-600"
+                      className="w-full text-xs text-red-500 hover:text-red-600"
                     >
                       清除全部
                     </button>
@@ -466,7 +466,7 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
               <button
                 disabled={!canClick}
                 onClick={() => goBack(lvl.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-caption whitespace-nowrap transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all ${
                   isActive
                     ? 'bg-blue-600 text-white font-semibold'
                     : hasValue
@@ -489,14 +489,14 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
           <input
             type="text"
             placeholder={`搜索 ${levels.find((l) => l.id === level)?.label}...`}
-            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-caption placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
+            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 size={20} className="animate-spin text-slate-400" />
@@ -504,12 +504,12 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
         ) : filteredData.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-400">
             <Box size={24} className="opacity-20 mb-2" />
-            <span className="text-caption">暂无数据</span>
+            <span className="text-xs">暂无数据</span>
           </div>
         ) : level === 'COLUMN' ? (
           <table className="w-full">
             <thead className="sticky top-0 bg-slate-100 dark:bg-slate-800 z-10">
-              <tr className="text-micro font-semibold text-slate-500 uppercase">
+              <tr className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                 <th className="text-left px-4 py-2">列名</th>
                 <th className="text-left px-4 py-2">类型</th>
                 <th className="text-center px-4 py-2 w-20">操作</th>
@@ -614,7 +614,7 @@ function MetricSelector({ selectedMetrics, onMetricsChange }: {
           <input
             type="text"
             placeholder="搜索指标..."
-            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-caption placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-emerald-500"
+            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-emerald-500"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -622,7 +622,7 @@ function MetricSelector({ selectedMetrics, onMetricsChange }: {
       </div>
 
       {/* 指标列表 */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 size={20} className="animate-spin text-slate-400" />
@@ -630,7 +630,7 @@ function MetricSelector({ selectedMetrics, onMetricsChange }: {
         ) : filteredMetrics.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-400">
             <Target size={24} className="opacity-20 mb-2" />
-            <span className="text-caption">暂无可用指标</span>
+            <span className="text-xs">暂无可用指标</span>
           </div>
         ) : (
           <div className="p-3 space-y-1.5">
@@ -712,7 +712,7 @@ export function MetricFormRight({
     return (
       <div className="col-span-7 xl:col-span-8 flex h-full min-h-0 flex-col">
         <div className="h-full min-h-0 flex flex-col gap-1.5">
-          <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-2 shrink-0">
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 shrink-0">
             <Database size={14} className="text-blue-500" />
             物理资产（选择度量列或过滤列）
           </label>
@@ -743,8 +743,8 @@ export function MetricFormRight({
     return (
       <div className="col-span-7 xl:col-span-8 flex h-full min-h-0 flex-col">
         <div className="h-full min-h-0 flex flex-col gap-1.5">
-          <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-2 shrink-0">
-            <Database size={14} className="text-amber-500" />
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 shrink-0">
+            <Database size={14} className="text-blue-500" />
             物理资产（选择维度列过滤）
           </label>
           <div className="flex-1 min-h-0">
@@ -772,7 +772,7 @@ export function MetricFormRight({
   return (
     <div className="col-span-7 xl:col-span-8 flex h-full min-h-0 flex-col">
       <div className="h-full min-h-0 flex flex-col gap-1.5">
-        <label className="text-micro font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-2 shrink-0">
+        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 shrink-0">
           <Target size={14} className="text-emerald-500" />
           选择参与运算的指标
         </label>

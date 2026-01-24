@@ -149,69 +149,66 @@ export function MetricOverview({ metric, onClose, onVersionSwitch }: MetricOverv
   const typeInfo = TYPE_LABELS[typeKey] || { label: typeKey || '-', variant: 'blue' as const }
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex justify-end">
-      <div
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300"
-        onClick={onClose}
-      />
-      <div className="relative w-drawer-responsive h-full bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col animate-in slide-in-from-right duration-500">
-        {/* 头部 */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between flex-shrink-0 bg-slate-50/50 dark:bg-slate-800/50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-600 text-white rounded-xl shadow-md">
-              <Target size={iconSizeToken.large} />
-            </div>
-            <div>
-              <h2 className="font-semibold text-slate-900 dark:text-slate-100 text-body">指标详情</h2>
-              <div className="text-micro text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider">Metric Overview</div>
-            </div>
+    <aside className="fixed right-0 top-14 bottom-0 z-30 w-drawer-responsive bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col animate-in slide-in-from-right duration-500">
+      {/* 头部：高度与「指标中心」列表页头部对齐 */}
+      <div className="h-12 md:h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 md:px-6 flex items-center justify-between flex-shrink-0 shadow-sm">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-purple-600 text-white rounded-lg shadow-sm">
+            <Target size={iconSizeToken.medium} />
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors">
-            <X size={iconSizeToken.large} className="text-slate-400" />
-          </button>
+          <h2 className="text-body-sm font-semibold text-slate-800 dark:text-slate-100">指标详情</h2>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+          aria-label="关闭指标详情"
+        >
+          <X size={iconSizeToken.large} className="text-slate-400" />
+        </button>
+      </div>
+
+      {/* 内容区域 */}
+      <div className="flex-1 min-h-0 overflow-auto p-6 custom-scrollbar">
+        {/* 指标名称和类型 */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="text-heading font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
+              {loading ? <Loader2 size={20} className="animate-spin" /> : versionDetail?.name || '-'}
+            </h1>
+            {!loading && <Badge variant={typeInfo.variant}>{typeKey || '-'}</Badge>}
+          </div>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-body-xs font-mono font-semibold text-purple-600 dark:text-purple-400 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-700 px-2.5 py-0.5 rounded-lg tracking-wide">
+              {versionDetail?.code || metric.code}
+            </span>
+            <span className="text-micro font-mono text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded">
+              v{selectedVersion}
+              {selectedVersion !== metric.currentVersion && (
+                <span className="text-amber-500 ml-1">(非当前)</span>
+              )}
+            </span>
+            {selectedVersion !== metric.currentVersion && (
+              <button
+                onClick={handleSwitchVersion}
+                disabled={switching}
+                className="text-micro font-medium text-white bg-emerald-500 hover:bg-emerald-600 px-2 py-0.5 rounded transition-colors disabled:opacity-50 flex items-center gap-1"
+              >
+                {switching ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <RotateCcw size={12} />
+                )}
+                设为当前版本
+              </button>
+            )}
+          </div>
+          <p className="text-slate-500 dark:text-slate-400 text-body-sm leading-relaxed">
+            {loading ? <Loader2 size={14} className="animate-spin" /> : versionDetail?.comment || '暂无业务描述...'}
+          </p>
         </div>
 
-        {/* 内容区域 */}
-        <div className="flex-1 min-h-0 overflow-auto p-6 custom-scrollbar">
-          {/* 指标名称和类型 */}
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-2">
-              <h1 className="text-title font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-                {loading ? <Loader2 size={20} className="animate-spin" /> : versionDetail?.name || '-'}
-              </h1>
-              {!loading && <Badge variant={typeInfo.variant}>{typeKey || '-'}</Badge>}
-            </div>
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-body-sm font-mono font-semibold text-purple-600 dark:text-purple-400 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-700 px-3 py-1 rounded-lg tracking-wide">
-                {versionDetail?.code || metric.code}
-              </span>
-              <span className="text-micro font-mono text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded">
-                v{selectedVersion}
-                {selectedVersion !== metric.currentVersion && (
-                  <span className="text-amber-500 ml-1">(非当前)</span>
-                )}
-              </span>
-              {selectedVersion !== metric.currentVersion && (
-                <button
-                  onClick={handleSwitchVersion}
-                  disabled={switching}
-                  className="text-micro font-medium text-white bg-emerald-500 hover:bg-emerald-600 px-2 py-0.5 rounded transition-colors disabled:opacity-50 flex items-center gap-1"
-                >
-                  {switching ? (
-                    <Loader2 size={12} className="animate-spin" />
-                  ) : (
-                    <RotateCcw size={12} />
-                  )}
-                  设为当前版本
-                </button>
-              )}
-            </div>
-            <p className="text-slate-500 dark:text-slate-400 text-body-sm leading-relaxed">
-              {loading ? <Loader2 size={14} className="animate-spin" /> : versionDetail?.comment || '暂无业务描述...'}
-            </p>
-          </div>
-
-          <div className="space-y-6">
+        <div className="space-y-6">
             {/* 技术属性 */}
             <section>
               <div className="text-micro font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -359,8 +356,7 @@ export function MetricOverview({ metric, onClose, onVersionSwitch }: MetricOverv
             )}
           </div>
         </div>
-      </div>
-    </div>,
-    document.body
-  )
+      </aside>,
+      document.body
+    )
 }

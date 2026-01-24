@@ -25,8 +25,8 @@ max_steps = 50
 
 环境变量示例（敏感信息）：
 ```bash
-export DATAPILLAR_LLM__API_KEY="sk-xxx"
-export DATAPILLAR_EMBEDDING__API_KEY="sk-xxx"
+export DATAPILLAR_LLM_API_KEY="sk-xxx"
+export DATAPILLAR_EMBEDDING_API_KEY="sk-xxx"
 ```
 
 代码配置示例：
@@ -47,7 +47,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from datapillar_oneagentic.core.config import AgentConfig, ContextConfig
@@ -144,7 +144,11 @@ class DatapillarConfig(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="DATAPILLAR_",
-        env_nested_delimiter="__",
+        # 使用单下划线作为嵌套分隔符，并限制只拆分一层：
+        # 例：DATAPILLAR_LLM_API_KEY -> llm.api_key
+        # 如果不限制 max_split，API_KEY 会被拆成 api.key，直接导致配置失败。
+        env_nested_delimiter="_",
+        env_nested_max_split=1,
         extra="allow",
     )
 
@@ -214,6 +218,24 @@ class DatapillarConfig(BaseSettings):
         """检查 Embedding 是否已配置"""
         return self.embedding.is_configured()
 
+    @model_validator(mode="after")
+    def _inherit_knowledge_embedding(self) -> "DatapillarConfig":
+        """
+        知识模块默认复用全局 embedding 配置，避免用户重复配置两套 embedding。
+
+        规则：
+        - 如果 knowledge.base_config.embedding 没有显式配置（api_key/model 都为空）
+        - 且全局 embedding 已配置
+        则将全局 embedding 复制到 knowledge.base_config.embedding。
+        """
+        if (
+            self.knowledge.base_config.embedding.api_key is None
+            and self.knowledge.base_config.embedding.model is None
+            and self.embedding.is_configured()
+        ):
+            self.knowledge.base_config.embedding = self.embedding.model_copy(deep=True)
+        return self
+
     def validate_llm(self) -> None:
         """验证 LLM 配置"""
         if not self.is_llm_configured():
@@ -223,8 +245,8 @@ class DatapillarConfig(BaseSettings):
                 "  [llm]\n"
                 "  model = \"gpt-4o\"\n\n"
                 "环境变量示例：\n"
-                "  export DATAPILLAR_LLM__API_KEY=\"sk-xxx\"\n"
-                "  export DATAPILLAR_LLM__MODEL=\"gpt-4o\""
+                "  export DATAPILLAR_LLM_API_KEY=\"sk-xxx\"\n"
+                "  export DATAPILLAR_LLM_MODEL=\"gpt-4o\""
             )
 
     def validate_embedding(self) -> None:
@@ -236,8 +258,8 @@ class DatapillarConfig(BaseSettings):
                 "  [embedding]\n"
                 "  model = \"text-embedding-3-small\"\n\n"
                 "环境变量示例：\n"
-                "  export DATAPILLAR_EMBEDDING__API_KEY=\"sk-xxx\"\n"
-                "  export DATAPILLAR_EMBEDDING__MODEL=\"text-embedding-3-small\""
+                "  export DATAPILLAR_EMBEDDING_API_KEY=\"sk-xxx\"\n"
+                "  export DATAPILLAR_EMBEDDING_MODEL=\"text-embedding-3-small\""
             )
 
 
