@@ -1,5 +1,5 @@
 """
-LLM 异常域
+LLM error domain.
 """
 
 from datapillar_oneagentic.exception.llm.categories import LLMErrorCategory

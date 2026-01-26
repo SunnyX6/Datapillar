@@ -17,7 +17,7 @@ class _Output(BaseModel):
     answer: str
 
 
-def test_datapillar_merges_team_knowledge(monkeypatch) -> None:
+def test_datapillar_merges(monkeypatch) -> None:
     @agent(
         id="agent_alpha",
         name="Alpha",

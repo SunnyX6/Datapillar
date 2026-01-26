@@ -1,5 +1,5 @@
 """
-Agent 异常域
+Agent error domain.
 """
 
 from datapillar_oneagentic.exception.agent.categories import AgentErrorCategory

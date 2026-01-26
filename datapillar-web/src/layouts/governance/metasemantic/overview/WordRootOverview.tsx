@@ -1,6 +1,6 @@
 import { Book, X, Info, GitBranch, Layers, Share2, ExternalLink } from 'lucide-react'
 import type { WordRoot } from '../types'
-import { iconSizeToken } from '@/design-tokens/dimensions'
+import { drawerWidthClassMap, iconSizeToken } from '@/design-tokens/dimensions'
 import { formatTime } from '@/lib/utils'
 
 interface WordRootOverviewProps {
@@ -10,7 +10,7 @@ interface WordRootOverviewProps {
 
 export function WordRootOverview({ wordRoot, onClose }: WordRootOverviewProps) {
   return (
-    <aside className="fixed right-0 top-14 bottom-0 z-30 w-drawer-responsive bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col animate-in slide-in-from-right duration-500">
+    <aside className={`fixed right-0 top-14 bottom-0 z-30 ${drawerWidthClassMap.responsive} bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col animate-in slide-in-from-right duration-500`}>
       <div className="h-12 md:h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 md:px-6 flex items-center justify-between flex-shrink-0 shadow-sm">
         <div className="flex items-center gap-2">
           <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-sm">

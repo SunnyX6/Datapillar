@@ -1,6 +1,4 @@
-"""
-VectorExperienceStore - 基于 VectorStore 的经验存储
-"""
+"""VectorExperienceStore - experience storage backed by VectorStore."""
 
 from __future__ import annotations
 
@@ -24,7 +22,7 @@ _KEY_SEPARATOR = "::"
 
 
 class VectorExperienceStore(ExperienceStore):
-    """VectorStore 经验存储实现"""
+    """Experience storage implementation using VectorStore."""
 
     def __init__(self, *, vector_store: VectorStore, dimension: int, namespace: str) -> None:
         self._vector_store = vector_store
@@ -60,7 +58,7 @@ class VectorExperienceStore(ExperienceStore):
         await self._vector_store.ensure_collection(self._vector_store.get_schema(_EXPERIENCES))
 
     async def close(self) -> None:
-        # 由上层统一管理 vector_store 生命周期
+        # vector_store lifecycle is managed by the caller.
         return None
 
     async def add(self, record: ExperienceRecord) -> str:

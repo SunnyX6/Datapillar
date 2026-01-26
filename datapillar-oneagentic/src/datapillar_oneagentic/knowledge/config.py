@@ -1,6 +1,4 @@
-"""
-Knowledge 配置
-"""
+"""Knowledge configuration."""
 
 from __future__ import annotations
 
@@ -13,15 +11,15 @@ from pydantic import BaseModel, Field
 
 
 class KnowledgeChunkGeneralConfig(BaseModel):
-    """通用切分参数"""
+    """General chunking parameters."""
 
-    delimiter: str | None = Field(default=None, description="固定分隔符（可选）")
-    max_tokens: int = Field(default=800, gt=0, description="切分大小（近似 token/字符）")
-    overlap: int = Field(default=120, ge=0, description="切分重叠（近似 token/字符）")
+    delimiter: str | None = Field(default=None, description="Fixed delimiter (optional)")
+    max_tokens: int = Field(default=800, gt=0, description="Chunk size (approx tokens/characters)")
+    overlap: int = Field(default=120, ge=0, description="Chunk overlap (approx tokens/characters)")
 
 
 class KnowledgeChunkParentChildConfig(BaseModel):
-    """父子切分参数"""
+    """Parent-child chunking parameters."""
 
     parent: KnowledgeChunkGeneralConfig = Field(default_factory=KnowledgeChunkGeneralConfig)
     child: KnowledgeChunkGeneralConfig = Field(
@@ -30,70 +28,72 @@ class KnowledgeChunkParentChildConfig(BaseModel):
 
 
 class KnowledgeChunkQAConfig(BaseModel):
-    """QA 切分参数"""
+    """QA chunking parameters."""
 
     pattern: str = Field(
         default=r"Q\d+:\s*(.*?)\s*A\d+:\s*([\s\S]*?)(?=Q\d+:|$)",
-        description="QA 正则切分规则",
+        description="QA regex chunking pattern",
     )
 
 
 class KnowledgeChunkConfig(BaseModel):
-    """知识切分配置"""
+    """Knowledge chunking configuration."""
 
-    mode: str = Field(default="general", description="切分模式: general | parent_child | qa")
-    preprocess: list[str] = Field(default_factory=list, description="预处理规则")
+    mode: str = Field(default="general", description="Chunking mode: general | parent_child | qa")
+    preprocess: list[str] = Field(default_factory=list, description="Preprocessing rules")
     general: KnowledgeChunkGeneralConfig = Field(default_factory=KnowledgeChunkGeneralConfig)
     parent_child: KnowledgeChunkParentChildConfig = Field(default_factory=KnowledgeChunkParentChildConfig)
     qa: KnowledgeChunkQAConfig = Field(default_factory=KnowledgeChunkQAConfig)
 
 
 class KnowledgeInjectConfig(BaseModel):
-    """知识注入配置（默认值）"""
+    """Knowledge injection configuration (defaults)."""
 
-    mode: str = Field(default="tool", description="注入方式: system | tool")
-    max_tokens: int = Field(default=1200, ge=1, description="最大注入 token 数（粗略估算）")
-    max_chunks: int = Field(default=6, ge=1, description="最大注入片段数")
-    format: str = Field(default="markdown", description="注入格式: markdown | json")
+    mode: str = Field(default="tool", description="Injection mode: system | tool")
+    max_tokens: int = Field(default=1200, ge=1, description="Max injected tokens (rough estimate)")
+    max_chunks: int = Field(default=6, ge=1, description="Max injected chunks")
+    format: str = Field(default="markdown", description="Injection format: markdown | json")
 
 
 class RerankConfig(BaseModel):
-    """重排配置"""
+    """Rerank configuration."""
 
-    mode: str = Field(default="off", description="重排模式: off | model | weighted")
-    provider: str | None = Field(default="sentence_transformers", description="重排提供商")
+    mode: str = Field(default="off", description="Rerank mode: off | model | weighted")
+    provider: str | None = Field(default="sentence_transformers", description="Rerank provider")
     model: str | None = Field(
-        default="cross-encoder/ms-marco-MiniLM-L-6-v2", description="重排模型"
+        default="cross-encoder/ms-marco-MiniLM-L-6-v2", description="Rerank model"
     )
-    top_n: int | None = Field(default=None, description="重排候选数")
-    score_threshold: float | None = Field(default=None, description="重排分数阈值")
-    score_mode: str = Field(default="rank", description="分数策略: rank | normalize | raw")
-    normalize: str | None = Field(default=None, description="归一化方式: min_max | sigmoid | softmax | zscore")
-    params: dict[str, Any] = Field(default_factory=dict, description="额外参数透传")
+    top_n: int | None = Field(default=None, description="Rerank candidate count")
+    score_threshold: float | None = Field(default=None, description="Rerank score threshold")
+    score_mode: str = Field(default="rank", description="Score mode: rank | normalize | raw")
+    normalize: str | None = Field(
+        default=None, description="Normalization: min_max | sigmoid | softmax | zscore"
+    )
+    params: dict[str, Any] = Field(default_factory=dict, description="Extra parameters passthrough")
 
 
 class RetrieveTuningConfig(BaseModel):
-    """检索调参"""
+    """Retrieval tuning."""
 
-    pool_k: int | None = Field(default=None, description="召回候选池大小")
-    rerank_k: int | None = Field(default=None, description="重排候选池大小")
-    rrf_k: int = Field(default=60, ge=1, description="RRF 融合参数")
+    pool_k: int | None = Field(default=None, description="Recall candidate pool size")
+    rerank_k: int | None = Field(default=None, description="Rerank candidate pool size")
+    rrf_k: int = Field(default=60, ge=1, description="RRF fusion parameter")
 
 
 class RetrieveQualityConfig(BaseModel):
-    """证据治理"""
+    """Evidence quality settings."""
 
-    dedupe: bool = Field(default=True, description="是否去重")
-    dedupe_threshold: float = Field(default=0.92, ge=0, le=1, description="语义去重阈值")
-    max_per_document: int = Field(default=2, ge=1, description="单文档最大保留块数")
+    dedupe: bool = Field(default=True, description="Enable deduplication")
+    dedupe_threshold: float = Field(default=0.92, ge=0, le=1, description="Semantic dedupe threshold")
+    max_per_document: int = Field(default=2, ge=1, description="Max chunks per document")
 
 
 class KnowledgeRetrieveConfig(BaseModel):
-    """知识检索配置（默认值）"""
+    """Knowledge retrieval configuration (defaults)."""
 
-    method: str = Field(default="hybrid", description="检索方式: semantic | hybrid")
-    top_k: int = Field(default=8, ge=1, description="最终返回数量")
-    score_threshold: float | None = Field(default=None, description="最低分数阈值")
+    method: str = Field(default="hybrid", description="Retrieval method: semantic | hybrid")
+    top_k: int = Field(default=8, ge=1, description="Final result count")
+    score_threshold: float | None = Field(default=None, description="Minimum score threshold")
     rerank: RerankConfig = Field(default_factory=RerankConfig)
     tuning: RetrieveTuningConfig = Field(default_factory=RetrieveTuningConfig)
     quality: RetrieveQualityConfig = Field(default_factory=RetrieveQualityConfig)
@@ -101,14 +101,14 @@ class KnowledgeRetrieveConfig(BaseModel):
 
 
 class KnowledgeBaseConfig(BaseModel):
-    """知识基础配置（Embedding + VectorStore）"""
+    """Knowledge base configuration (Embedding + VectorStore)."""
 
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
 
 
 class KnowledgeConfig(BaseModel):
-    """知识配置"""
+    """Knowledge configuration."""
 
     base_config: KnowledgeBaseConfig = Field(default_factory=KnowledgeBaseConfig)
     chunk_config: KnowledgeChunkConfig = Field(default_factory=KnowledgeChunkConfig)

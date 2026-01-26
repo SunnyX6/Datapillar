@@ -1,6 +1,6 @@
 package com.sunny.datapillar.admin.controller;
 
-import com.sunny.datapillar.admin.response.WebAdminResponse;
+import com.sunny.datapillar.admin.web.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,7 +20,7 @@ public class HealthController {
 
     @Operation(summary = "健康检查")
     @GetMapping("/health")
-    public WebAdminResponse<String> health() {
-        return WebAdminResponse.ok("OK");
+    public ApiResponse<String> health() {
+        return ApiResponse.ok("OK");
     }
 }

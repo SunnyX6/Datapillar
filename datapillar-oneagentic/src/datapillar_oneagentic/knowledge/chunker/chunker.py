@@ -1,6 +1,4 @@
-"""
-切分执行器
-"""
+"""Chunking executor."""
 
 from __future__ import annotations
 
@@ -18,7 +16,7 @@ from datapillar_oneagentic.knowledge.models import ParsedDocument, SourceSpan
 
 
 class KnowledgeChunker:
-    """知识切分器"""
+    """Knowledge chunker."""
 
     def __init__(self, *, config: KnowledgeChunkConfig) -> None:
         self._config = config
@@ -35,7 +33,7 @@ class KnowledgeChunker:
         elif mode == "qa":
             chunks = _split_qa(doc_id, text, self._config.qa.pattern)
         else:
-            raise ValueError(f"不支持的切分模式: {mode}")
+            raise ValueError(f"Unsupported chunking mode: {mode}")
 
         return ChunkPreview(
             document_id=doc_id,

@@ -1,12 +1,12 @@
 """
-安全校验器
+Security validator.
 
-实现 MCP 官方安全规范：
-1. 基于 Tool Annotations 判断工具是否危险
-2. 危险工具调用前需要用户确认（Human-in-the-loop）
-3. URL 安全校验（SSRF 防护，含 DNS 解析校验）
+Implements MCP security requirements:
+1. Determine tool risk from Tool Annotations
+2. Require user confirmation for dangerous tools (human-in-the-loop)
+3. URL safety validation (SSRF protection with DNS checks)
 
-参考：https://modelcontextprotocol.io/specification
+Reference: https://modelcontextprotocol.io/specification
 """
 
 from __future__ import annotations
@@ -22,34 +22,34 @@ from urllib.parse import urlparse
 logger = logging.getLogger(__name__)
 
 
-# ==================== 异常定义 ====================
+# ==================== Error types ====================
 
 
 class SecurityError(Exception):
-    """安全错误基类"""
+    """Base security error."""
 
     pass
 
 
 class UserRejectedError(SecurityError):
-    """用户拒绝执行"""
+    """User rejected execution."""
 
     pass
 
 
 class NoConfirmationCallbackError(SecurityError):
-    """未配置确认回调但需要用户确认"""
+    """Confirmation callback is missing but required."""
 
     pass
 
 
 class URLNotAllowedError(SecurityError):
-    """URL 不允许错误"""
+    """URL is not allowed."""
 
     pass
 
 
-# ==================== 内网 IP 段（SSRF 防护）====================
+# ==================== Private IP ranges (SSRF protection) ====================
 
 PRIVATE_IP_RANGES = [
     ipaddress.ip_network("127.0.0.0/8"),  # localhost
@@ -63,71 +63,71 @@ PRIVATE_IP_RANGES = [
 ]
 
 
-# ==================== 确认请求 ====================
+# ==================== Confirmation request ====================
 
 
 @dataclass
 class ConfirmationRequest:
     """
-    危险操作确认请求
+    Dangerous operation confirmation request.
 
-    包含使用方做出判断所需的全部信息
+    Includes all information needed for a decision.
     """
 
-    # 操作类型
+    # Operation type.
     operation_type: str
-    """操作类型: 'mcp_tool' | 'a2a_delegate'"""
+    """Operation type: 'mcp_tool' | 'a2a_delegate'."""
 
-    # 基本信息
+    # Basic info.
     name: str
-    """工具/Agent 名称"""
+    """Tool/agent name."""
 
     description: str
-    """工具/Agent 描述"""
+    """Tool/agent description."""
 
-    # 调用详情
+    # Call details.
     parameters: dict[str, Any]
-    """调用参数（完整）"""
+    """Full call parameters."""
 
-    # 风险信息
+    # Risk metadata.
     risk_level: str
-    """风险等级: 'low' | 'medium' | 'high' | 'critical'"""
+    """Risk level: 'low' | 'medium' | 'high' | 'critical'."""
 
     warnings: list[str]
-    """风险警告列表"""
+    """Risk warning list."""
 
-    # 来源信息
+    # Source info.
     source: str
-    """来源: MCP 服务器地址 / A2A endpoint"""
+    """Source: MCP server address / A2A endpoint."""
 
-    # 额外元数据
+    # Extra metadata.
     metadata: dict[str, Any] = field(default_factory=dict)
     """
-    额外元数据，可能包含：
-    - mcp_server: MCP 服务器配置
-    - tool_annotations: MCP 工具注解
-    - a2a_config: A2A 配置
-    - agent_card: A2A Agent Card 信息
+    Extra metadata, may include:
+    - mcp_server: MCP server config
+    - tool_annotations: MCP tool annotations
+    - a2a_config: A2A config
+    - agent_card: A2A Agent Card
     """
 
     def to_display_string(self) -> str:
-        """生成人类可读的确认信息"""
+        """Generate a human-readable confirmation message."""
         lines = [
             f"{'=' * 50}",
-            "⚠️  危险操作确认请求",
+            "DANGEROUS OPERATION CONFIRMATION REQUEST",
             f"{'=' * 50}",
             "",
-            f"操作类型: {self.operation_type}",
-            f"名称: {self.name}",
-            f"描述: {self.description}",
-            f"来源: {self.source}",
-            f"风险等级: {self.risk_level}",
+            f"Operation type: {self.operation_type}",
+            f"Name: {self.name}",
+            f"Description: {self.description}",
+            f"Source: {self.source}",
+            f"Risk level: {self.risk_level}",
             "",
-            "调用参数:",
+            "Parameters:",
         ]
 
         for key, value in self.parameters.items():
-            # 截断过长的值
+            # Truncate long values.
             value_str = str(value)
             if len(value_str) > 100:
                 value_str = value_str[:100] + "..."
@@ -135,70 +135,69 @@ class ConfirmationRequest:
 
         if self.warnings:
             lines.append("")
-            lines.append("风险警告:")
+            lines.append("Warnings:")
             for w in self.warnings:
-                lines.append(f"  ⚠️ {w}")
+                lines.append(f"  - {w}")
 
         lines.append(f"{'=' * 50}")
         return "\n".join(lines)
 
 
-# ==================== 安全配置 ====================
+# ==================== Security config ====================
 
 
 @dataclass
 class SecurityConfig:
     """
-    安全配置
+    Security configuration.
 
-    属性：
-    - require_confirmation: 是否需要用户确认危险操作（MCP 规范要求）
-    - confirmation_callback: 用户确认回调函数
-    - allow_private_urls: 是否允许访问内网 URL
-    - require_https: 是否强制 HTTPS（生产环境建议开启）
-    - allowed_domains: URL 域名白名单（空表示不限制）
+    Attributes:
+    - require_confirmation: require user confirmation for dangerous ops (per MCP spec)
+    - confirmation_callback: user confirmation callback
+    - allow_private_urls: allow access to private URLs
+    - require_https: enforce HTTPS (recommended in production)
+    - allowed_domains: domain allowlist (empty = no restriction)
     """
 
     require_confirmation: bool = True
-    """是否需要用户确认危险操作"""
+    """Whether user confirmation is required for dangerous operations."""
 
     confirmation_callback: Callable[[ConfirmationRequest], bool] | None = None
     """
-    用户确认回调函数
+    User confirmation callback.
 
-    参数：
-    - request: ConfirmationRequest 对象，包含完整的确认信息
+    Args:
+        request: ConfirmationRequest containing full context
 
-    返回：
-    - True: 用户确认执行
-    - False: 用户拒绝执行
+    Returns:
+        True to confirm, False to reject.
 
-    示例：
+    Example:
     ```python
     def my_callback(request: ConfirmationRequest) -> bool:
         print(request.to_display_string())
-        print(f"风险等级: {request.risk_level}")
-        print(f"参数: {request.parameters}")
-        return input("确认？(y/N): ").lower() == "y"
+        print(f"Risk level: {request.risk_level}")
+        print(f"Parameters: {request.parameters}")
+        return input("Confirm? (y/N): ").lower() == "y"
     ```
     """
 
     allow_private_urls: bool = False
-    """是否允许访问内网 URL（SSRF 防护）"""
+    """Whether to allow private URLs (SSRF protection)."""
 
     require_https: bool = False
-    """是否强制 HTTPS"""
+    """Whether to enforce HTTPS."""
 
     allowed_domains: list[str] = field(default_factory=list)
-    """URL 域名白名单（空表示不限制）"""
+    """Domain allowlist (empty means no restriction)."""
 
 
-# 全局安全配置
+# Global security config.
 _security_config: SecurityConfig = SecurityConfig()
 
 
 def get_security_config() -> SecurityConfig:
-    """获取当前安全配置"""
+    """Return the current security configuration."""
     return _security_config
 
 
@@ -211,14 +210,14 @@ def configure_security(
     allowed_domains: list[str] | None = None,
 ) -> None:
     """
-    配置安全选项
+    Configure security options.
 
-    参数：
-    - require_confirmation: 是否需要用户确认危险操作
-    - confirmation_callback: 用户确认回调函数（接收 ConfirmationRequest）
-    - allow_private_urls: 是否允许访问内网 URL
-    - require_https: 是否强制 HTTPS
-    - allowed_domains: URL 域名白名单
+    Args:
+        require_confirmation: require user confirmation for dangerous operations
+        confirmation_callback: callback receiving ConfirmationRequest
+        allow_private_urls: allow access to private URLs
+        require_https: enforce HTTPS
+        allowed_domains: domain allowlist
     """
     global _security_config
 
@@ -235,16 +234,16 @@ def configure_security(
 
 
 def reset_security_config() -> None:
-    """重置安全配置为默认值（主要用于测试）"""
+    """Reset security config to defaults (mainly for tests)."""
     global _security_config
     _security_config = SecurityConfig()
 
 
-# ==================== URL 校验 ====================
+# ==================== URL validation ====================
 
 
-def _check_ip_in_private_ranges(ip_str: str) -> bool:
-    """检查 IP 地址是否在内网范围"""
+def _check_private_ip(ip_str: str) -> bool:
+    """Check whether an IP address is private."""
     try:
         ip = ipaddress.ip_address(ip_str)
         return any(ip in network for network in PRIVATE_IP_RANGES)
@@ -254,32 +253,32 @@ def _check_ip_in_private_ranges(ip_str: str) -> bool:
 
 def is_private_ip(hostname: str) -> bool:
     """
-    检查是否是内网 IP（含 DNS 解析）
+    Check whether a hostname resolves to a private IP (with DNS).
 
-    防护 DNS rebinding 攻击：
-    - 先检查字符串是否直接是 IP
-    - 再进行 DNS 解析，检查解析结果
+    Protects against DNS rebinding:
+    - Check literal IP first
+    - Resolve DNS and inspect results
     """
-    # 检查特殊主机名
+    # Check special hostnames.
     lower_hostname = hostname.lower()
     if lower_hostname in ("localhost", "localhost.localdomain", "ip6-localhost"):
         return True
 
-    # 检查字符串是否直接是 IP
-    if _check_ip_in_private_ranges(hostname):
+    # Check if the hostname is already an IP.
+    if _check_private_ip(hostname):
         return True
 
-    # DNS 解析后检查（防止 DNS rebinding）
+    # Resolve DNS to prevent rebinding.
     try:
         addr_info = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
         for _family, _, _, _, sockaddr in addr_info:
             ip_str = sockaddr[0]
-            if _check_ip_in_private_ranges(ip_str):
-                logger.warning(f"DNS 解析发现内网 IP: {hostname} -> {ip_str}")
+            if _check_private_ip(ip_str):
+                logger.warning(f"DNS resolved to private IP: {hostname} -> {ip_str}")
                 return True
     except socket.gaierror as e:
-        # DNS 解析失败，保守起见视为可疑
-        logger.warning(f"DNS 解析失败: {hostname}, 错误: {e}")
+        # DNS resolution failed; treat as suspicious.
+        logger.warning(f"DNS resolution failed: {hostname}, error={e}")
         return True
 
     return False
@@ -287,44 +286,43 @@ def is_private_ip(hostname: str) -> bool:
 
 def validate_url(url: str) -> None:
     """
-    校验 URL 安全性（SSRF 防护）
+    Validate URL safety (SSRF protection).
 
-    参数：
-    - url: 要校验的 URL
+    Args:
+        url: URL to validate
 
-    异常：
-    - URLNotAllowedError: URL 不符合安全要求
+    Raises:
+        URLNotAllowedError: URL does not meet security requirements.
     """
     config = get_security_config()
     parsed = urlparse(url)
 
-    # 检查协议
+    # Check scheme.
     if parsed.scheme not in ("http", "https"):
-        raise URLNotAllowedError(f"不支持的协议: {parsed.scheme}，仅允许 HTTP(S)")
+        raise URLNotAllowedError(f"Unsupported scheme: {parsed.scheme}. Only HTTP(S) is allowed.")
 
-    # 强制 HTTPS
+    # Enforce HTTPS.
     if config.require_https and parsed.scheme != "https":
-        raise URLNotAllowedError(f"安全配置要求 HTTPS: {url}")
+        raise URLNotAllowedError(f"HTTPS is required by security config: {url}")
 
-    # 获取主机名
+    # Resolve hostname.
     hostname = parsed.hostname
     if not hostname:
-        raise URLNotAllowedError(f"无效的 URL，缺少主机名: {url}")
+        raise URLNotAllowedError(f"Invalid URL: missing hostname: {url}")
 
-    # 检查内网 IP
+    # Check private IP.
     if not config.allow_private_urls and is_private_ip(hostname):
         raise URLNotAllowedError(
-            f"禁止访问内网地址: {hostname}\n"
-            f"如需访问，请配置 allow_private_urls=True"
+            f"Private address is not allowed: {hostname}\n"
+            "To allow private URLs, set allow_private_urls=True."
         )
 
-    # 检查域名白名单
+    # Check domain allowlist.
     if config.allowed_domains and not any(
         hostname == domain or hostname.endswith(f".{domain}")
         for domain in config.allowed_domains
     ):
         raise URLNotAllowedError(
-            f"域名不在白名单中: {hostname}\n"
-            f"允许的域名: {', '.join(config.allowed_domains)}"
+            f"Domain is not in allowlist: {hostname}\n"
+            f"Allowed domains: {', '.join(config.allowed_domains)}"
         )
-

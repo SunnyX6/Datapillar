@@ -1,19 +1,19 @@
 """
-ReAct - 规划-执行-反思 循环
+ReAct - plan, execute, reflect loop.
 
-实现智能体自主规划能力：
-1. Planner: 将目标分解为任务
-2. Executor: 执行任务（现有 Agent 逻辑）
-3. Reflector: 评估结果，决定下一步
+Enables agent planning:
+1. Planner: decomposes goals into tasks
+2. Executor: executes tasks (existing agent logic)
+3. Reflector: evaluates results and decides next steps
 
-使用示例：
+Example:
 ```python
 from datapillar_oneagentic.core.graphs.react import Plan, create_plan, reflect
 
-# 规划
+# Plan
 plan = await create_plan(goal="...", llm=llm, available_agents=agent_specs)
 
-# 反思
+# Reflect
 reflection = await reflect(goal="...", plan=plan, llm=llm)
 ```
 """

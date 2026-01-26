@@ -1,5 +1,6 @@
 import { Filter, Inbox, Search } from 'lucide-react'
 import { Button } from '@/components/ui'
+import { menuWidthClassMap, panelWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { cn } from '@/lib/utils'
 import type { Ticket, TicketStatus, TicketView } from './types'
@@ -47,7 +48,7 @@ export function CollaborationTicketList({
   onSelectTicket
 }: CollaborationTicketListProps) {
   return (
-    <div className="w-collaboration-list-responsive border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col flex-shrink-0">
+    <div className={cn(panelWidthClassMap.collaborationList, 'border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col flex-shrink-0')}>
       <div className="h-14 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 flex-shrink-0 sticky top-0 bg-white dark:bg-slate-900 z-10">
         <div className="relative w-full">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={14} />
@@ -74,7 +75,8 @@ export function CollaborationTicketList({
           </Button>
           <div
             className={cn(
-              'absolute right-0 top-full mt-2 w-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden z-20 transition-all duration-150 origin-top-right',
+              menuWidthClassMap.small,
+              'absolute right-0 top-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden z-20 transition-all duration-150 origin-top-right',
               isFilterOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'
             )}
           >

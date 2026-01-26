@@ -1,6 +1,4 @@
-"""
-切分结果模型
-"""
+"""Chunking result models."""
 
 from __future__ import annotations
 

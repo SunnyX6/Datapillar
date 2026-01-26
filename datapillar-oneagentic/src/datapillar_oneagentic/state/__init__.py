@@ -1,7 +1,7 @@
 """
-State 模块
+State module.
 
-图状态定义。
+Graph state definitions.
 """
 
 from datapillar_oneagentic.state.blackboard import Blackboard, create_blackboard

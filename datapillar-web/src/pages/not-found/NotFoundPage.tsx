@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { AlertTriangle, Home, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui'
+import { panelWidthClassMap, surfaceSizeClassMap } from '@/design-tokens/dimensions'
 
 export function NotFoundPage() {
   return (
@@ -14,12 +15,12 @@ export function NotFoundPage() {
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#111_1px,transparent_1px),linear-gradient(to_bottom,#111_1px,transparent_1px)] bg-[size:40px_40px] opacity-20" />
 
       <div className="relative z-10 flex flex-col items-center px-4 text-center">
-        <div className="relative w-64 h-64 mb-12 flex items-center justify-center">
+        <div className={`relative ${surfaceSizeClassMap.xl} mb-12 flex items-center justify-center`}>
           <div className="absolute inset-0 rounded-full border border-red-900/30 opacity-20 animate-[spin_10s_linear_infinite]" />
           <div className="absolute inset-4 rounded-full border border-red-500/20 opacity-40 animate-[spin_15s_linear_infinite_reverse]" />
           <div className="absolute inset-0 rounded-full bg-red-500 blur-[120px] opacity-10 animate-pulse" />
 
-          <div className="relative w-32 h-32 bg-black rounded-full border border-red-500/50 shadow-[0_0_50px_-10px_rgba(220,38,38,0.5)] flex items-center justify-center">
+          <div className={`relative ${surfaceSizeClassMap.sm} bg-black rounded-full border border-red-500/50 shadow-[0_0_50px_-10px_rgba(220,38,38,0.5)] flex items-center justify-center`}>
             <span className="text-4xl font-bold text-red-500 animate-pulse">404</span>
           </div>
         </div>
@@ -57,7 +58,7 @@ export function NotFoundPage() {
         </div>
       </div>
 
-      <div className="absolute top-8 right-8 w-64 bg-black/80 border border-red-900/30 p-4 hidden md:block text-micro text-red-500/70">
+      <div className={`absolute top-8 right-8 ${panelWidthClassMap.medium} bg-black/80 border border-red-900/30 p-4 hidden md:block text-micro text-red-500/70`}>
         <div className="mb-2 border-b border-red-900/20 pb-1 flex justify-between">
           <span>ERR_LOG_DUMP</span>
           <span>LIVE</span>

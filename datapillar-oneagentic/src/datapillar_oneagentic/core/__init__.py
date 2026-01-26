@@ -1,15 +1,15 @@
 """
-Core 模块
+Core module.
 
-对外暴露（业务侧使用）：
-- agent: 装饰器
-- AgentContext: 执行上下文
-- Process: 执行模式
-- Datapillar: 团队组织
+Public API (application use):
+- agent: decorator
+- AgentContext: execution context
+- Process: execution mode
+- Datapillar: team organization
 
-框架内部（业务侧不应直接使用）：
-- AgentSpec: Agent 规格
-- AgentResult: 执行结果
+Framework internal (not for application use):
+- AgentSpec: agent specification
+- AgentResult: execution result
 """
 
 from __future__ import annotations

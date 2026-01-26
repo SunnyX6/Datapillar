@@ -23,6 +23,13 @@
     </properties>
 
     <dependencies>
+        <!-- Datapillar Common -->
+        <dependency>
+            <groupId>com.sunny</groupId>
+            <artifactId>datapillar-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Spring Cloud Gateway (新版 WebFlux 实现) -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>

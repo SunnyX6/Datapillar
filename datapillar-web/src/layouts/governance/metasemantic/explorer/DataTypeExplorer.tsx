@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { ArrowLeft, Hash, Database, Type, Calendar, Check, Braces, Binary, Clock, ToggleLeft, FileCode, Layers, List, Map, Fingerprint } from 'lucide-react'
-import { iconSizeToken } from '@/design-tokens/dimensions'
+import { iconSizeToken, panelWidthClassMap } from '@/design-tokens/dimensions'
 import { DEFAULT_LENGTH, DEFAULT_MAX_LENGTH, getMaxLengthForType } from '@/layouts/governance/utils/dataType'
 import type { DataTypeItem } from '@/pages/governance/DataTypePage'
 
@@ -228,7 +228,7 @@ export function DataTypeExplorer({ onBack, selectedType, onSelectType }: DataTyp
   return (
     <div className="flex h-full w-full">
       {/* 左侧类型列表 */}
-      <div className="w-72 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50/50 dark:bg-slate-900/50">
+      <div className={`${panelWidthClassMap.wide} border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50/50 dark:bg-slate-900/50`}>
         {/* 头部 */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-800">
           <button

@@ -1,5 +1,5 @@
 """
-LLM 错误分类器
+LLM error classifier.
 """
 
 from __future__ import annotations
@@ -14,12 +14,12 @@ from datapillar_oneagentic.exception.llm.errors import NonRetryableError, Retrya
 
 class LLMErrorClassifier:
     """
-    LLM 错误分类器
+    LLM error classifier.
 
-    根据异常信息判断类别和恢复动作。
+    Determines category and recovery action based on error details.
     """
 
-    # 认证错误
+    # Auth errors
     AUTH_PATTERNS = [
         r"invalid\s*api\s*key",
         r"unauthorized",
@@ -29,7 +29,7 @@ class LLMErrorClassifier:
         r"permission\s*denied",
     ]
 
-    # 输入错误
+    # Invalid input errors
     INVALID_PATTERNS = [
         r"invalid\s*(request|parameter|argument)",
         r"bad\s*request",
@@ -38,13 +38,13 @@ class LLMErrorClassifier:
         r"validation\s*(error|failed)",
     ]
 
-    # 资源不存在
+    # Not found
     NOT_FOUND_PATTERNS = [
         r"not\s*found",
         r"404",
     ]
 
-    # 限流错误
+    # Rate limit errors
     RATE_LIMIT_PATTERNS = [
         r"rate\s*limit",
         r"too\s*many\s*requests",
@@ -52,7 +52,7 @@ class LLMErrorClassifier:
         r"quota\s*exceeded",
     ]
 
-    # 可重试错误
+    # Transient errors
     TRANSIENT_PATTERNS = [
         r"timed?\s*out",
         r"connection\s*(reset|refused|closed|error)",
@@ -75,7 +75,7 @@ class LLMErrorClassifier:
     @classmethod
     def classify(cls, error: Exception) -> tuple[LLMErrorCategory, RecoveryAction]:
         """
-        分类错误并返回恢复策略
+        Classify an error and return recovery action.
 
         Returns:
             (LLMErrorCategory, RecoveryAction)
@@ -124,6 +124,6 @@ class LLMErrorClassifier:
 
     @classmethod
     def is_retryable(cls, error: Exception) -> bool:
-        """判断错误是否可重试"""
+        """Return whether the error is retryable."""
         _, action = cls.classify(error)
         return action == RecoveryAction.RETRY

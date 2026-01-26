@@ -83,7 +83,7 @@ def _build_schema() -> VectorCollectionSchema:
 
 
 @pytest.mark.asyncio
-async def test_milvus_ensure_collection_create_success(monkeypatch) -> None:
+async def test_ensure_collection(monkeypatch) -> None:
     _install_fake_pymilvus(monkeypatch)
     client = _FakeAsyncMilvusClient()
     store = MilvusVectorStore(
@@ -101,7 +101,7 @@ async def test_milvus_ensure_collection_create_success(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_milvus_ensure_collection_ignores_existing(monkeypatch) -> None:
+async def test_ensure_collection2(monkeypatch) -> None:
     _install_fake_pymilvus(monkeypatch)
     client = _FakeAsyncMilvusClient(create_error=RuntimeError("collection already exists"))
     store = MilvusVectorStore(
@@ -118,7 +118,7 @@ async def test_milvus_ensure_collection_ignores_existing(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_milvus_ensure_collection_raises_on_unknown_error(monkeypatch) -> None:
+async def test_ensure_collection3(monkeypatch) -> None:
     _install_fake_pymilvus(monkeypatch)
     client = _FakeAsyncMilvusClient(create_error=RuntimeError("boom"))
     store = MilvusVectorStore(

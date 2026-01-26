@@ -23,8 +23,8 @@ import com.sunny.datapillar.admin.module.workflow.mapper.JobDependencyMapper;
 import com.sunny.datapillar.admin.module.workflow.mapper.JobInfoMapper;
 import com.sunny.datapillar.admin.module.workflow.mapper.JobWorkflowMapper;
 import com.sunny.datapillar.admin.module.workflow.service.WorkflowService;
-import com.sunny.datapillar.admin.response.WebAdminErrorCode;
-import com.sunny.datapillar.admin.response.WebAdminException;
+import com.sunny.datapillar.common.error.ErrorCode;
+import com.sunny.datapillar.common.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,7 +55,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     public WorkflowDto.Response getWorkflowDetail(Long id) {
         WorkflowDto.Response workflow = workflowMapper.selectWorkflowDetail(id);
         if (workflow == null) {
-            throw new WebAdminException(WebAdminErrorCode.WORKFLOW_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_WORKFLOW_NOT_FOUND, id);
         }
 
         List<JobDto.Response> jobs = jobInfoMapper.selectJobsByWorkflowId(id);
@@ -84,7 +84,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     public void updateWorkflow(Long id, WorkflowDto.Update dto) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new WebAdminException(WebAdminErrorCode.WORKFLOW_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_WORKFLOW_NOT_FOUND, id);
         }
 
         if (dto.getWorkflowName() != null) {
@@ -122,7 +122,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     public void deleteWorkflow(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new WebAdminException(WebAdminErrorCode.WORKFLOW_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_WORKFLOW_NOT_FOUND, id);
         }
 
         // 如果已发布，先删除Airflow DAG
@@ -151,7 +151,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     public void publishWorkflow(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new WebAdminException(WebAdminErrorCode.WORKFLOW_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_WORKFLOW_NOT_FOUND, id);
         }
 
         List<JobDto.Response> jobs = jobInfoMapper.selectJobsByWorkflowId(id);
@@ -177,11 +177,11 @@ public class WorkflowServiceImpl implements WorkflowService {
     public void pauseWorkflow(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new WebAdminException(WebAdminErrorCode.WORKFLOW_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_WORKFLOW_NOT_FOUND, id);
         }
 
         if (workflow.getStatus() != 1) {
-            throw new WebAdminException(WebAdminErrorCode.WORKFLOW_INVALID_STATUS, "只有已发布的工作流才能暂停");
+            throw new BusinessException(ErrorCode.ADMIN_WORKFLOW_INVALID_STATUS, "只有已发布的工作流才能暂停");
         }
 
         String dagId = buildDagId(workflow);
@@ -197,11 +197,11 @@ public class WorkflowServiceImpl implements WorkflowService {
     public void resumeWorkflow(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new WebAdminException(WebAdminErrorCode.WORKFLOW_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_WORKFLOW_NOT_FOUND, id);
         }
 
         if (workflow.getStatus() != 2) {
-            throw new WebAdminException(WebAdminErrorCode.WORKFLOW_INVALID_STATUS, "只有已暂停的工作流才能恢复");
+            throw new BusinessException(ErrorCode.ADMIN_WORKFLOW_INVALID_STATUS, "只有已暂停的工作流才能恢复");
         }
 
         String dagId = buildDagId(workflow);
@@ -343,7 +343,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     private JobWorkflow getWorkflowById(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new WebAdminException(WebAdminErrorCode.WORKFLOW_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_WORKFLOW_NOT_FOUND, id);
         }
         return workflow;
     }
@@ -369,7 +369,7 @@ public class WorkflowServiceImpl implements WorkflowService {
         try {
             dagBuilder.validate();
         } catch (DagValidationException e) {
-            throw new WebAdminException(WebAdminErrorCode.DAG_HAS_CYCLE);
+            throw new BusinessException(ErrorCode.ADMIN_DAG_HAS_CYCLE);
         }
     }
 

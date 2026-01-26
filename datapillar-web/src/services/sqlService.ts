@@ -4,16 +4,15 @@
  * 负责 SQL 执行相关的 API 调用
  */
 
-import axios from 'axios'
-import type { WebAdminResponse } from '@/types/webAdmin'
+import { createApiClient } from '@/lib/api/client'
+import type { ApiResponse } from '@/types/api'
 
 /**
  * SQL API 客户端
  */
-const sqlClient = axios.create({
+const sqlClient = createApiClient({
   baseURL: '/api/sql',
-  timeout: 300000, // SQL 执行可能较慢，设置 5 分钟超时
-  headers: { 'Content-Type': 'application/json' }
+  timeout: 300000
 })
 
 /**
@@ -70,18 +69,7 @@ function extractErrorMessage(error: unknown): string {
  */
 export async function executeSql(request: ExecuteRequest): Promise<ExecuteResult> {
   try {
-    const response = await sqlClient.post<WebAdminResponse<ExecuteResult>>('/execute', request)
-
-    if (response.data.code !== 'OK') {
-      return {
-        success: false,
-        error: response.data.message || '执行失败',
-        rowCount: 0,
-        hasMore: false,
-        executionTime: 0
-      }
-    }
-
+    const response = await sqlClient.post<ApiResponse<ExecuteResult>>('/execute', request)
     return response.data.data
   } catch (error) {
     return {

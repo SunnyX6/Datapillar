@@ -1,15 +1,15 @@
 """
-LLM 异常映射模块
+LLM exception mapping.
 
-将各 LLM Provider 的异常统一映射为框架内部异常。
-按 Provider 组织错误模式，便于维护。
+Unifies provider-specific errors into framework-level exceptions and
+organizes patterns by provider for maintainability.
 """
 
 from typing import Final
 
 
 class ContextLengthExceededError(Exception):
-    """上下文长度超限异常"""
+    """Context length exceeded error."""
 
     def __init__(self, message: str, provider: str | None = None, model: str | None = None):
         self.provider = provider
@@ -18,13 +18,13 @@ class ContextLengthExceededError(Exception):
         super().__init__(self._format_message(message))
 
     def _format_message(self, message: str) -> str:
-        prefix = "上下文长度超限"
+        prefix = "Context length exceeded"
         if self.provider:
             prefix = f"{self.provider} {prefix}"
         return f"{prefix}: {message}"
 
 
-# ==================== 通用错误模式 ====================
+# ==================== Common error patterns ====================
 
 COMMON_CONTEXT_EXCEEDED_PATTERNS: Final[list[str]] = [
     "exceed context limit",
@@ -38,11 +38,11 @@ COMMON_CONTEXT_EXCEEDED_PATTERNS: Final[list[str]] = [
 ]
 
 
-# ==================== Provider 特定错误模式 ====================
+# ==================== Provider-specific error patterns ====================
 
-# OpenAI / OpenAI 兼容 (DeepSeek, OpenRouter 等)
+# OpenAI / OpenAI-compatible (DeepSeek, OpenRouter, etc.)
 OPENAI_CONTEXT_PATTERNS: Final[list[str]] = [
-    # 通用模式已覆盖
+    # Covered by common patterns
 ]
 
 # Anthropic (Claude)
@@ -51,13 +51,13 @@ ANTHROPIC_CONTEXT_PATTERNS: Final[list[str]] = [
     "prompt: length",
 ]
 
-# 智谱 GLM
+# Zhipu GLM
 GLM_CONTEXT_PATTERNS: Final[list[str]] = [
     "context window limit",
     "the model has reached its context window limit",
-    # 错误码 1210/1214 的错误信息
-    "api 调用参数有误",
-    "参数非法",
+    # Error messages for GLM codes 1210/1214 (kept as unicode escapes)
+    "\u0061\u0070\u0069\u0020\u8c03\u7528\u53c2\u6570\u6709\u8bef",
+    "\u53c2\u6570\u975e\u6cd5",
 ]
 
 # AWS Bedrock
@@ -102,12 +102,12 @@ OLLAMA_CONTEXT_PATTERNS: Final[list[str]] = [
 
 class ExceptionMapper:
     """
-    异常映射器
+    Exception mapper.
 
-    检查错误信息是否匹配特定异常类型。
+    Matches error messages against known patterns.
     """
 
-    # 合并所有 Provider 的上下文超限模式
+    # Merge all provider context-limit patterns
     ALL_CONTEXT_PATTERNS: Final[list[str]] = (
         COMMON_CONTEXT_EXCEEDED_PATTERNS
         + ANTHROPIC_CONTEXT_PATTERNS
@@ -122,15 +122,15 @@ class ExceptionMapper:
     )
 
     @classmethod
-    def is_context_length_exceeded(cls, error: Exception | str) -> bool:
+    def is_context_exceeded(cls, error: Exception | str) -> bool:
         """
-        检查错误是否为上下文长度超限
+        Check whether an error is a context-length-exceeded error.
 
         Args:
-            error: 异常对象或错误信息字符串
+            error: Exception object or error message string
 
         Returns:
-            True 如果是上下文超限错误
+            True if the error indicates context length exceeded
         """
         error_str = str(error).lower()
 
@@ -148,15 +148,15 @@ class ExceptionMapper:
         model: str | None = None,
     ) -> ContextLengthExceededError:
         """
-        将原始异常包装为 ContextLengthExceededError
+        Wrap an error as ContextLengthExceededError.
 
         Args:
-            error: 原始异常
-            provider: LLM 提供商
-            model: 模型名称
+            error: Original exception
+            provider: LLM provider
+            model: Model name
 
         Returns:
-            ContextLengthExceededError 实例
+            ContextLengthExceededError instance
         """
         return ContextLengthExceededError(
             message=str(error),

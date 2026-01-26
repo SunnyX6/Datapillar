@@ -1,6 +1,4 @@
-"""
-知识检索器
-"""
+"""Knowledge retriever."""
 
 from __future__ import annotations
 
@@ -25,7 +23,7 @@ from datapillar_oneagentic.storage.knowledge_stores.base import KnowledgeStore
 
 
 class KnowledgeRetriever:
-    """知识检索器"""
+    """Knowledge retriever."""
 
     def __init__(
         self,
@@ -71,12 +69,12 @@ class KnowledgeRetriever:
 
         method = (retrieve.method or "hybrid").lower()
         if method not in {"semantic", "hybrid"}:
-            raise ValueError(f"不支持的检索方式: {method}")
+            raise ValueError(f"Unsupported retrieval method: {method}")
         if method == "hybrid" and knowledge.sparse_embedder is None:
-            raise ValueError("启用 hybrid 需要提供 sparse_embedder")
+            raise ValueError("hybrid retrieval requires sparse_embedder")
         inject_mode = (inject.mode or "tool").lower()
         if inject_mode not in {"system", "tool"}:
-            raise ValueError(f"暂不支持的知识注入模式: {inject_mode}")
+            raise ValueError(f"Unsupported knowledge injection mode: {inject_mode}")
 
         query_vector = await self._embedding_provider.embed_text(query)
         sparse_query = None
@@ -146,9 +144,9 @@ class KnowledgeRetriever:
     ) -> list[KnowledgeSearchHit]:
         results: list[KnowledgeSearchHit] = []
         if scope and scope.namespaces and len(scope.namespaces) > 1:
-            raise ValueError("跨 namespace 检索尚未支持")
+            raise ValueError("Cross-namespace retrieval is not supported")
         if scope and scope.tags:
-            raise ValueError("暂不支持按 tags 过滤")
+            raise ValueError("Tag-based filtering is not supported")
         hits = await self._store.search_chunks(
             query_vector=query_vector,
             k=max(1, pool_k),
@@ -157,7 +155,7 @@ class KnowledgeRetriever:
             hits = [hit for hit in hits if hit.chunk.doc_id in set(scope.document_ids)]
         results.extend(hits)
 
-        return _dedupe_by_chunk_id(results)
+        return _dedupe_chunk_id(results)
 
     async def _resolve_context_hits(
         self,
@@ -240,7 +238,7 @@ def _normalize_override(payload: Any) -> dict[str, Any]:
     elif isinstance(payload, dict):
         data = payload
     else:
-        raise TypeError(f"不支持的知识配置类型: {type(payload).__name__}")
+        raise TypeError(f"Unsupported knowledge config type: {type(payload).__name__}")
     return {k: v for k, v in data.items() if v is not None}
 
 
@@ -372,7 +370,7 @@ def _blend_scores(
     return blended
 
 
-def _dedupe_by_chunk_id(hits: list[KnowledgeSearchHit]) -> list[KnowledgeSearchHit]:
+def _dedupe_chunk_id(hits: list[KnowledgeSearchHit]) -> list[KnowledgeSearchHit]:
     if not hits:
         return []
     score_kind = _resolve_score_kind(hits)
@@ -388,9 +386,9 @@ def _dedupe_by_chunk_id(hits: list[KnowledgeSearchHit]) -> list[KnowledgeSearchH
 def _resolve_score_kind(hits: list[KnowledgeSearchHit]) -> str:
     kinds = {hit.score_kind for hit in hits if hit.score_kind}
     if not kinds:
-        raise ValueError("检索结果缺少 score_kind")
+        raise ValueError("Retrieval results missing score_kind")
     if len(kinds) > 1:
-        raise ValueError(f"检索结果 score_kind 不一致: {kinds}")
+        raise ValueError(f"Retrieval results have inconsistent score_kind: {kinds}")
     return kinds.pop()
 
 
@@ -399,7 +397,7 @@ def _is_better_score(a: float, b: float, score_kind: str) -> bool:
         return a < b
     if score_kind == "similarity":
         return a > b
-    raise ValueError(f"不支持的 score_kind: {score_kind}")
+    raise ValueError(f"Unsupported score_kind: {score_kind}")
 
 
 def _rank_chunks(

@@ -1,6 +1,4 @@
-"""
-事件基类
-"""
+"""Event base class."""
 
 from __future__ import annotations
 
@@ -13,32 +11,32 @@ from uuid import uuid4
 @dataclass
 class BaseEvent:
     """
-    事件基类
+    Base event class.
 
-    所有事件类型都应继承此类。
+    All event types should inherit from this class.
 
-    属性：
-    - event_id: 事件唯一标识
-    - timestamp: 事件时间戳
-    - metadata: 额外元数据
+    Attributes:
+    - event_id: Unique event identifier
+    - timestamp: Event timestamp
+    - metadata: Additional metadata
     """
 
     event_id: str = field(default_factory=lambda: str(uuid4()))
-    """事件唯一标识"""
+    """Unique event identifier."""
 
     timestamp: datetime = field(default_factory=datetime.now)
-    """事件时间戳"""
+    """Event timestamp."""
 
     metadata: dict[str, Any] = field(default_factory=dict)
-    """额外元数据"""
+    """Additional metadata."""
 
     @property
     def event_type(self) -> str:
-        """事件类型名称"""
+        """Event type name."""
         return self.__class__.__name__
 
     def to_dict(self) -> dict[str, Any]:
-        """转换为字典"""
+        """Convert to a dictionary."""
         return {
             "event_id": self.event_id,
             "event_type": self.event_type,

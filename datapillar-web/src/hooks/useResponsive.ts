@@ -1,12 +1,7 @@
 /**
  * 响应式断点检测 Hook
  *
- * 基于 PC 端断点（与 tailwind @theme 保持一致）：
- * - md: 1080px
- * - lg: 1440px
- * - xl: 1920px
- * - 2xl: 2560px
- * - 3xl: 3840px
+ * 基于 @theme 中的断点变量（src/index.css）
  *
  * 使用方式：
  * ```tsx
@@ -23,31 +18,24 @@
  */
 
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { BREAKPOINT_ORDER, getBreakpoints, getBreakpointValue, type BreakpointKey } from '@/design-tokens/breakpoints'
 
-export type Breakpoint = 'md' | 'lg' | 'xl' | '2xl' | '3xl'
-
-/** Tailwind CSS 断点配置 */
-export const BREAKPOINTS = {
-  md: 1080,
-  lg: 1440,
-  xl: 1920,
-  '2xl': 2560,
-  '3xl': 3840
-} as const
+export type Breakpoint = BreakpointKey
 
 /**
  * 获取当前断点
  */
 function getCurrentBreakpoint(): Breakpoint {
-  if (typeof window === 'undefined') return 'lg' // SSR 默认值：1440 视口
+  if (typeof window === 'undefined') return 'lg' // SSR 默认值：lg 断点
 
   const width = window.innerWidth
+  const breakpoints = getBreakpoints()
 
-  if (width >= BREAKPOINTS['3xl']) return '3xl'
-  if (width >= BREAKPOINTS['2xl']) return '2xl'
-  if (width >= BREAKPOINTS.xl) return 'xl'
-  if (width >= BREAKPOINTS.lg) return 'lg'
-  if (width >= BREAKPOINTS.md) return 'md'
+  if (width >= breakpoints['3xl']) return '3xl'
+  if (width >= breakpoints['2xl']) return '2xl'
+  if (width >= breakpoints.xl) return 'xl'
+  if (width >= breakpoints.lg) return 'lg'
+  if (width >= breakpoints.md) return 'md'
   return 'md'
 }
 
@@ -97,17 +85,18 @@ export function useResponsive() {
  *
  * 使用方式：
  * ```tsx
- * const isDesktop = useBreakpoint('lg') // >= 1440px 时为 true
- * const isSmall = useBreakpoint('md', 'max') // < 1080px 时为 true
+ * const isDesktop = useBreakpoint('lg') // >= lg 断点时为 true
+ * const isSmall = useBreakpoint('md', 'max') // < md 断点时为 true
  * ```
  */
 export function useBreakpoint(
-  breakpoint: keyof typeof BREAKPOINTS,
+  breakpoint: Breakpoint,
   type: 'min' | 'max' = 'min'
 ): boolean {
+  const breakpointValue = getBreakpointValue(breakpoint)
   const query = type === 'min'
-    ? `(min-width: ${BREAKPOINTS[breakpoint]}px)`
-    : `(max-width: ${BREAKPOINTS[breakpoint] - 1}px)`
+    ? `(min-width: ${breakpointValue}px)`
+    : `(max-width: ${breakpointValue - 1}px)`
 
   const [matches, setMatches] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -176,7 +165,7 @@ export function useBreakpointSync() {
  * ```tsx
  * const { getDimension } = useResponsiveDimension()
  *
- * <div style={{ width: getDimension({ xs: '100%', lg: '320px' }) }} />
+ * <div style={{ width: getDimension({ md: '100%', lg: '320px' }) }} />
  * ```
  */
 export function useResponsiveDimension() {
@@ -188,11 +177,10 @@ export function useResponsiveDimension() {
      */
     getDimension: (dimensions: Partial<Record<Breakpoint, string | number>>) => {
       // 从当前断点向下查找最近的定义值
-      const breakpoints: Breakpoint[] = ['3xl', '2xl', 'xl', 'lg', 'md']
-      const currentIndex = breakpoints.indexOf(breakpoint)
+      const currentIndex = BREAKPOINT_ORDER.indexOf(breakpoint)
 
-      for (let i = currentIndex; i < breakpoints.length; i++) {
-        const bp = breakpoints[i]
+      for (let i = currentIndex; i < BREAKPOINT_ORDER.length; i++) {
+        const bp = BREAKPOINT_ORDER[i]
         if (dimensions[bp] !== undefined) {
           return dimensions[bp]
         }

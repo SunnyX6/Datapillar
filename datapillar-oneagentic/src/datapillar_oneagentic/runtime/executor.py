@@ -1,11 +1,11 @@
 """
-Agent 执行器
+Agent executor.
 
-负责执行单个 Agent：
-1. 准备 AgentContext
-2. 调用 Agent 的 run() 方法
-3. 处理返回结果
-4. 发送执行事件
+Executes a single agent:
+1. Prepare AgentContext
+2. Call Agent.run()
+3. Handle return value
+4. Emit execution events
 """
 
 from __future__ import annotations
@@ -44,20 +44,21 @@ from datapillar_oneagentic.tools.delegation import create_delegation_tools
 from datapillar_oneagentic.todo.audit import audit_todo_updates
 from datapillar_oneagentic.todo.session_todo import SessionTodoList
 from datapillar_oneagentic.todo.tool import (
-    build_todo_tool_message,
+    build_todo_message,
     create_todo_tools,
     extract_todo_updates,
 )
 from datapillar_oneagentic.state import StateBuilder
+from datapillar_oneagentic.messages import Messages
 
 logger = logging.getLogger(__name__)
 
 
 class AgentExecutor:
     """
-    Agent 执行器
+    Agent executor.
 
-    负责执行单个 Agent，构建 AgentContext，处理返回结果。
+    Executes a single agent, builds AgentContext, and handles results.
     """
 
     def __init__(
@@ -71,20 +72,20 @@ class AgentExecutor:
         agent_name_map: dict[str, str] | None = None,
     ):
         """
-        创建执行器
+        Create an executor.
 
-        参数：
-        - spec: Agent 规格
+        Args:
+            spec: agent specification
         """
         self.spec = spec
         self._agent_config = agent_config
         self._event_bus = event_bus
         self._compactor = compactor
 
-        # 业务工具（显式传入）
+        # Business tools (explicitly provided).
         self.business_tools = list(spec.tools or [])
 
-        # 创建委派工具（使用正统实现）
+        # Create delegation tools (standard implementation).
         agent_name_map = agent_name_map or {}
         agent_names = {
             agent_id: agent_name_map.get(agent_id, agent_id)
@@ -95,24 +96,24 @@ class AgentExecutor:
             agent_names=agent_names,
         )
 
-        # Todo 工具（团队级进度上报）
+        # Todo tools (team-level progress reporting).
         self.todo_tools = create_todo_tools()
 
-        # 基础工具（不含 MCP/A2A，这些在执行时动态加载）
+        # Base tools (MCP/A2A loaded dynamically at runtime).
         self.base_tools = self.business_tools + self.delegation_tools + self.todo_tools
 
-        # 创建 LLM（团队级配置）
+        # Create LLM instances (team-level configuration).
         self.llm: ResilientChatModel = llm_provider(temperature=spec.temperature)
         self._todo_audit_llm: ResilientChatModel = llm_provider(temperature=0.0)
 
         logger.info(
-            f"📦 Executor 创建: {spec.name} ({spec.id}), "
-            f"工具: {len(self.business_tools)}, 委派: {len(self.delegation_tools)}, "
-            f"MCP服务器: {len(spec.mcp_servers)}, A2A代理: {len(spec.a2a_agents)}"
+            f"Executor created: {spec.name} ({spec.id}), "
+            f"tools: {len(self.business_tools)}, delegates: {len(self.delegation_tools)}, "
+            f"MCP servers: {len(spec.mcp_servers)}, A2A agents: {len(spec.a2a_agents)}"
         )
 
     async def _load_mcp_tools(self) -> tuple[list, MCPToolkit | None]:
-        """加载 MCP 工具（短连接，返回工具列表和 toolkit 引用）"""
+        """Load MCP tools (short-lived connection)."""
         spec = self.spec
         if not spec.mcp_servers:
             return [], None
@@ -121,27 +122,27 @@ class AgentExecutor:
             toolkit = MCPToolkit(spec.mcp_servers)
             await toolkit.connect()
             tools = toolkit.get_tools()
-            logger.info(f"🔌 [{spec.name}] MCP 工具加载: {len(tools)} 个")
+            logger.info(f"[{spec.name}] MCP tools loaded: {len(tools)}")
             return tools, toolkit
         except Exception as e:
-            logger.error(f"🔌 [{spec.name}] MCP 工具加载失败: {e}")
+            logger.error(f"[{spec.name}] MCP tool load failed: {e}")
             return [], None
 
     async def _load_a2a_tools(self) -> list:
-        """加载 A2A 工具"""
+        """Load A2A tools."""
         spec = self.spec
         if not spec.a2a_agents:
             return []
 
         try:
             tools = await create_a2a_tools(spec.a2a_agents)
-            logger.info(f"🔗 [{spec.name}] A2A 工具加载: {len(tools)} 个")
+            logger.info(f"[{spec.name}] A2A tools loaded: {len(tools)}")
             return tools
         except Exception as e:
-            logger.error(f"🔗 [{spec.name}] A2A 工具加载失败: {e}")
+            logger.error(f"[{spec.name}] A2A tool load failed: {e}")
             return []
 
-    async def _maybe_append_todo_audit_report(
+    async def _append_todo_audit(
         self,
         *,
         state: dict,
@@ -149,10 +150,10 @@ class AgentExecutor:
         failure_kind: FailureKind | None,
         deliverable: Any,
         error: str | None,
-        messages: list,
+        messages: Messages,
         llm: ResilientChatModel,
     ) -> None:
-        """没有上报时，追加 Todo 审计结果到消息中"""
+        """Append todo audit results to messages when no updates were reported."""
         sb = StateBuilder(state)
         todo_data = sb.todo.snapshot().todo
         if not todo_data:
@@ -167,7 +168,7 @@ class AgentExecutor:
         try:
             todo = SessionTodoList.model_validate(todo_data)
         except Exception as exc:
-            logger.warning(f"Todo 审计跳过（解析失败）: {exc}")
+            logger.warning(f"Todo audit skipped (parse failed): {exc}")
             return
 
         try:
@@ -179,11 +180,11 @@ class AgentExecutor:
                 llm=llm,
             )
         except Exception as exc:
-            logger.warning(f"Todo 审计失败: {exc}")
+            logger.warning(f"Todo audit failed: {exc}")
             return
 
         if updates:
-            messages.append(build_todo_tool_message(updates))
+            messages.append(build_todo_message(updates))
 
     async def execute(
         self,
@@ -193,22 +194,22 @@ class AgentExecutor:
         additional_tools: list[Any] | None = None,
     ) -> AgentResult | Command:
         """
-        执行 Agent
+        Execute an agent.
 
-        参数：
-        - query: 用户输入
-        - state: 共享状态（必须包含 namespace 和 session_id）
-        - additional_tools: 额外工具（框架内部注入）
+        Args:
+            query: user input
+            state: shared state (must include namespace and session_id)
+            additional_tools: additional tools injected by the framework
 
-        返回：
-        - AgentResult 或 Command（委派）
+        Returns:
+            AgentResult or Command (delegation).
 
-        异常：
-        - LLMError / AgentError：失败直接抛出，供上层处理
+        Raises:
+            LLMError / AgentError: raised on failure for upstream handling.
 
-        注意：
-        - MCP 工具采用短连接模式：执行时连接，执行完关闭
-        - Store 通过 LangGraph 的 get_store() 自动获取，无需手动传递
+        Notes:
+            - MCP tools use short-lived connections (connect per run, close after).
+            - Store is retrieved via LangGraph get_store(), no manual injection needed.
         """
         spec = self.spec
         sb = StateBuilder(state)
@@ -219,21 +220,21 @@ class AgentExecutor:
 
         if not query:
             raise AgentError(
-                "query 不能为空",
+                "query must not be empty",
                 agent_id=spec.id,
                 category=AgentErrorCategory.BUSINESS,
                 action=RecoveryAction.FAIL_FAST,
                 failure_kind=FailureKind.BUSINESS,
             )
 
-        # 加载 MCP 和 A2A 工具（短连接模式）
+        # Load MCP and A2A tools (short-lived connections).
         mcp_tools, mcp_toolkit = await self._load_mcp_tools()
         a2a_tools = await self._load_a2a_tools()
         extra_tools = additional_tools or []
         all_tools = self.base_tools + extra_tools + mcp_tools + a2a_tools
 
         try:
-            logger.info(f"📋 [{spec.name}] 开始执行: {query[:100]}...")
+            logger.info(f"[{spec.name}] Execution started: {query[:100]}...")
 
             await self._event_bus.emit(
                 self,
@@ -247,8 +248,8 @@ class AgentExecutor:
 
             if spec.agent_class is None:
                 raise AgentError(
-                    f"Agent {spec.id} 的 agent_class 为 None。"
-                    "请使用 @agent 装饰器注册 Agent，或手动设置 AgentSpec.agent_class。",
+                    f"Agent {spec.id} has agent_class=None. "
+                    "Register the agent with @agent or set AgentSpec.agent_class explicitly.",
                     agent_id=spec.id,
                     category=AgentErrorCategory.PROTOCOL,
                     action=RecoveryAction.FAIL_FAST,
@@ -284,7 +285,7 @@ class AgentExecutor:
                     )
 
                 except DelegationSignal as signal:
-                    logger.info(f"🔄 [{spec.name}] 委派给 {signal.command.goto}")
+                    logger.info(f"[{spec.name}] Delegated to {signal.command.goto}")
                     return signal.command
 
                 except LLMError as error:
@@ -292,7 +293,9 @@ class AgentExecutor:
                         error.attach_agent_id(spec.id)
 
                     if error.category == LLMErrorCategory.CONTEXT and not context_retry_used:
-                        logger.warning(f"⚠️ [{spec.name}] 上下文超限，压缩消息后重试")
+                        logger.warning(
+                            f"[{spec.name}] Context limit exceeded; compressing messages and retrying"
+                        )
                         run_state = await self._compress_state_messages(run_state)
                         context_retry_used = True
                         continue
@@ -301,8 +304,8 @@ class AgentExecutor:
                         delay = calculate_retry_delay(retry_config, retry_count)
                         retry_count += 1
                         logger.warning(
-                            f"🔁 [{spec.name}] LLM 异常重试 "
-                            f"{retry_count}/{max_retries}，{delay:.2f}s 后重试: {error}"
+                            f"[{spec.name}] LLM retry {retry_count}/{max_retries} "
+                            f"after {delay:.2f}s: {error}"
                         )
                         await asyncio.sleep(delay)
                         continue
@@ -321,8 +324,8 @@ class AgentExecutor:
                         delay = calculate_retry_delay(retry_config, retry_count)
                         retry_count += 1
                         logger.warning(
-                            f"🔁 [{spec.name}] Agent 异常重试 "
-                            f"{retry_count}/{max_retries}，{delay:.2f}s 后重试: {error}"
+                            f"[{spec.name}] Agent retry {retry_count}/{max_retries} "
+                            f"after {delay:.2f}s: {error}"
                         )
                         await asyncio.sleep(delay)
                         continue
@@ -344,8 +347,8 @@ class AgentExecutor:
                         delay = calculate_retry_delay(retry_config, retry_count)
                         retry_count += 1
                         logger.warning(
-                            f"🔁 [{spec.name}] 系统异常重试 "
-                            f"{retry_count}/{max_retries}，{delay:.2f}s 后重试: {agent_error}"
+                            f"[{spec.name}] System retry {retry_count}/{max_retries} "
+                            f"after {delay:.2f}s: {agent_error}"
                         )
                         await asyncio.sleep(delay)
                         continue
@@ -361,7 +364,7 @@ class AgentExecutor:
 
                 if result is None:
                     agent_error = AgentError(
-                        "run() 返回 None",
+                        "run() returned None",
                         agent_id=spec.id,
                         category=AgentErrorCategory.PROTOCOL,
                         action=RecoveryAction.FAIL_FAST,
@@ -381,7 +384,7 @@ class AgentExecutor:
                         failure_kind = result.failure_kind or FailureKind.BUSINESS
                         agent_error = AgentErrorClassifier.from_failure(
                             agent_id=spec.id,
-                            error=result.error or "Agent 执行失败",
+                            error=result.error or "Agent execution failed",
                             failure_kind=failure_kind,
                         )
                         await self._emit_failed_event(
@@ -395,7 +398,7 @@ class AgentExecutor:
 
                     if result.status != ExecutionStatus.COMPLETED:
                         agent_error = AgentError(
-                            f"Agent {spec.id} 返回未知状态: {result.status}",
+                            f"Agent {spec.id} returned an unknown status: {result.status}",
                             agent_id=spec.id,
                             category=AgentErrorCategory.PROTOCOL,
                             action=RecoveryAction.FAIL_FAST,
@@ -417,7 +420,7 @@ class AgentExecutor:
                     result_messages = ctx._messages
 
                 if isinstance(deliverable, spec.deliverable_schema):
-                    logger.info(f"✅ [{spec.name}] 完成")
+                    logger.info(f"[{spec.name}] Completed")
 
                     duration_ms = (time.time() - start_time) * 1000
                     await self._event_bus.emit(
@@ -431,7 +434,7 @@ class AgentExecutor:
                         ),
                     )
 
-                    await self._maybe_append_todo_audit_report(
+                    await self._append_todo_audit(
                         state=state,
                         result_status=ExecutionStatus.COMPLETED,
                         failure_kind=None,
@@ -448,9 +451,9 @@ class AgentExecutor:
                     )
 
                 agent_error = AgentError(
-                    f"Agent {spec.id} 的 run() 返回类型错误: "
-                    f"期望 {spec.deliverable_schema.__name__}, "
-                    f"实际 {type(deliverable).__name__}",
+                    f"Agent {spec.id} run() returned the wrong type: "
+                    f"expected {spec.deliverable_schema.__name__}, "
+                    f"got {type(deliverable).__name__}",
                     agent_id=spec.id,
                     category=AgentErrorCategory.PROTOCOL,
                     action=RecoveryAction.FAIL_FAST,
@@ -466,13 +469,13 @@ class AgentExecutor:
                 raise agent_error
 
         finally:
-            # 短连接模式：执行完关闭 MCP 连接
+            # Short-lived mode: close MCP connection after execution.
             if mcp_toolkit:
                 try:
                     await mcp_toolkit.close()
-                    logger.debug(f"🔌 [{spec.name}] MCP 连接已关闭")
+                    logger.debug(f"[{spec.name}] MCP connection closed")
                 except Exception as e:
-                    logger.warning(f"🔌 [{spec.name}] MCP 连接关闭失败: {e}")
+                    logger.warning(f"[{spec.name}] MCP connection close failed: {e}")
 
     async def _emit_failed_event(
         self,
@@ -482,7 +485,7 @@ class AgentExecutor:
         error: str,
         error_type: str,
     ) -> None:
-        """发送 Agent 失败事件"""
+        """Emit an AgentFailed event."""
         await self._event_bus.emit(
             self,
             AgentFailedEvent(
@@ -496,16 +499,16 @@ class AgentExecutor:
 
     async def _compress_state_messages(self, state: dict) -> dict:
         """
-        压缩 state 中的 messages
+        Compress messages in state.
 
-        当 Agent 执行因上下文超限失败时调用。
-        使用 Compactor 压缩历史消息，返回更新后的 state。
+        Called when an agent fails due to context limits.
+        Uses Compactor to shrink message history and returns updated state.
 
         Args:
-            state: 原始 state
+            state: original state
 
         Returns:
-            包含压缩后 messages 的新 state
+            Updated state with compressed messages.
         """
         sb = StateBuilder(state)
         messages = sb.memory.snapshot()
@@ -519,11 +522,11 @@ class AgentExecutor:
         if result.success and result.removed_count > 0:
             if result.summary:
                 sb.compression.set_runtime_compression(result.summary)
-            # runtime-only：只需要让下一次 LLM 调用变短，不写入 checkpoint。
+            # Runtime-only: shorten next LLM call without writing to checkpoint.
             sb.memory.replace_runtime_only(compressed_messages)
             return state
 
         if not result.success:
-            logger.warning(f"📦 消息压缩失败: {result.error}")
+            logger.warning(f"Message compaction failed: {result.error}")
 
         return state

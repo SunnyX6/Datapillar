@@ -1,7 +1,7 @@
 """
 OneAgentic 配置构建器
 
-从 ai_model 读取默认 Chat/Embedding 模型，并合并业务侧 llm/agent 配置。
+从 ai_model 读取启用的 Chat/Embedding 模型，并合并业务侧 llm/agent 配置。
 """
 
 from __future__ import annotations
@@ -28,11 +28,11 @@ def _coerce_dict(value: object) -> dict[str, object]:
 def get_datapillar_config() -> DatapillarConfig:
     chat_model = Model.get_chat_default()
     if not chat_model:
-        raise ValueError("未找到启用的默认 Chat 模型，请检查 ai_model 配置")
+        raise ValueError("未找到启用的 Chat 模型，请检查 ai_model 配置")
 
     embedding_model = Model.get_embedding_default()
     if not embedding_model:
-        raise ValueError("未找到启用的默认 Embedding 模型（scope=SYSTEM）")
+        raise ValueError("未找到启用的 Embedding 模型（scope=SYSTEM）")
 
     dimension = embedding_model.get("embedding_dimension")
     if not dimension:

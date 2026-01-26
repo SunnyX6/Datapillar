@@ -1,5 +1,5 @@
 """
-异常与弹性能力统一出口
+Unified exports for exceptions and resilience utilities.
 """
 
 from datapillar_oneagentic.exception.base import RecoveryAction

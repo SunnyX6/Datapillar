@@ -1,7 +1,7 @@
 """
-事件类型定义
+Event type definitions.
 
-定义框架中使用的各种事件类型。
+Defines the event types used by the framework.
 """
 
 from __future__ import annotations
@@ -12,12 +12,12 @@ from typing import Any
 from datapillar_oneagentic.core.types import SessionKey
 from datapillar_oneagentic.events.base import BaseEvent
 
-# === Agent 事件 ===
+# === Agent events ===
 
 
 @dataclass
 class AgentStartedEvent(BaseEvent):
-    """Agent 开始执行"""
+    """Agent execution started."""
 
     agent_id: str = ""
     agent_name: str = ""
@@ -27,7 +27,7 @@ class AgentStartedEvent(BaseEvent):
 
 @dataclass
 class AgentCompletedEvent(BaseEvent):
-    """Agent 执行完成"""
+    """Agent execution completed."""
 
     agent_id: str = ""
     agent_name: str = ""
@@ -38,7 +38,7 @@ class AgentCompletedEvent(BaseEvent):
 
 @dataclass
 class AgentFailedEvent(BaseEvent):
-    """Agent 执行失败"""
+    """Agent execution failed."""
 
     agent_id: str = ""
     agent_name: str = ""
@@ -49,7 +49,7 @@ class AgentFailedEvent(BaseEvent):
 
 @dataclass
 class AgentThinkingEvent(BaseEvent):
-    """Agent 思考内容"""
+    """Agent thinking content."""
 
     agent_id: str = ""
     agent_name: str = ""
@@ -59,7 +59,7 @@ class AgentThinkingEvent(BaseEvent):
 
 @dataclass
 class AgentInterruptedEvent(BaseEvent):
-    """Agent 中断（等待用户输入）"""
+    """Agent interrupted (waiting for user input)."""
 
     agent_id: str = ""
     agent_name: str = ""
@@ -67,12 +67,12 @@ class AgentInterruptedEvent(BaseEvent):
     payload: Any = None
 
 
-# === 工具事件 ===
+# === Tool events ===
 
 
 @dataclass
 class ToolCalledEvent(BaseEvent):
-    """工具被调用"""
+    """Tool called."""
 
     agent_id: str = ""
     key: SessionKey | None = None
@@ -83,7 +83,7 @@ class ToolCalledEvent(BaseEvent):
 
 @dataclass
 class ToolCompletedEvent(BaseEvent):
-    """工具执行完成"""
+    """Tool execution completed."""
 
     agent_id: str = ""
     key: SessionKey | None = None
@@ -95,7 +95,7 @@ class ToolCompletedEvent(BaseEvent):
 
 @dataclass
 class ToolFailedEvent(BaseEvent):
-    """工具执行失败"""
+    """Tool execution failed."""
 
     agent_id: str = ""
     key: SessionKey | None = None
@@ -104,12 +104,12 @@ class ToolFailedEvent(BaseEvent):
     error: str = ""
 
 
-# === LLM 事件 ===
+# === LLM events ===
 
 
 @dataclass
 class LLMThinkingEvent(BaseEvent):
-    """LLM 思考过程（开启 thinking 模式时）"""
+    """LLM thinking content (when thinking mode is enabled)."""
 
     agent_id: str = ""
     key: SessionKey | None = None
@@ -118,7 +118,7 @@ class LLMThinkingEvent(BaseEvent):
 
 @dataclass
 class LLMCallStartedEvent(BaseEvent):
-    """LLM 调用开始"""
+    """LLM invocation started."""
 
     agent_id: str = ""
     key: SessionKey | None = None
@@ -128,7 +128,7 @@ class LLMCallStartedEvent(BaseEvent):
 
 @dataclass
 class LLMCallCompletedEvent(BaseEvent):
-    """LLM 调用完成"""
+    """LLM invocation completed."""
 
     agent_id: str = ""
     key: SessionKey | None = None
@@ -141,7 +141,7 @@ class LLMCallCompletedEvent(BaseEvent):
 
 @dataclass
 class LLMCallFailedEvent(BaseEvent):
-    """LLM 调用失败"""
+    """LLM invocation failed."""
 
     agent_id: str = ""
     key: SessionKey | None = None
@@ -152,7 +152,7 @@ class LLMCallFailedEvent(BaseEvent):
 
 @dataclass
 class LLMStreamChunkEvent(BaseEvent):
-    """LLM 流式输出块"""
+    """LLM streaming output chunk."""
 
     agent_id: str = ""
     key: SessionKey | None = None
@@ -160,12 +160,12 @@ class LLMStreamChunkEvent(BaseEvent):
     is_final: bool = False
 
 
-# === 委派事件 ===
+# === Delegation events ===
 
 
 @dataclass
 class DelegationStartedEvent(BaseEvent):
-    """委派开始"""
+    """Delegation started."""
 
     from_agent_id: str = ""
     to_agent_id: str = ""
@@ -176,7 +176,7 @@ class DelegationStartedEvent(BaseEvent):
 
 @dataclass
 class DelegationCompletedEvent(BaseEvent):
-    """委派完成"""
+    """Delegation completed."""
 
     from_agent_id: str = ""
     to_agent_id: str = ""
@@ -185,12 +185,12 @@ class DelegationCompletedEvent(BaseEvent):
     duration_ms: float = 0.0
 
 
-# === 系统事件 ===
+# === System events ===
 
 
 @dataclass
 class SessionStartedEvent(BaseEvent):
-    """会话开始"""
+    """Session started."""
 
     key: SessionKey | None = None
     query: str = ""
@@ -198,7 +198,7 @@ class SessionStartedEvent(BaseEvent):
 
 @dataclass
 class SessionCompletedEvent(BaseEvent):
-    """会话完成"""
+    """Session completed."""
 
     key: SessionKey | None = None
     result: Any = None

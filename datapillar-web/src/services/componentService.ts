@@ -4,7 +4,8 @@
  * 调用后端获取工作流组件信息
  */
 
-import axios from 'axios'
+import { createApiClient } from '@/lib/api/client'
+import type { ApiResponse } from '@/types/api'
 
 export interface JobComponent {
   id: number
@@ -18,38 +19,46 @@ export interface JobComponent {
   sortOrder: number
 }
 
-interface WebAdminResponse<T> {
-  code: string
-  message: string
-  data: T
-}
-
-const componentClient = axios.create({
+const componentClient = createApiClient({
   baseURL: '/api/web-admin/components',
-  timeout: 30000,
-  headers: { 'Content-Type': 'application/json' }
+  timeout: 30000
 })
+
+function extractErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const axiosError = error as { response?: { data?: { message?: string } } }
+    if (axiosError.response?.data?.message) {
+      return axiosError.response.data.message
+    }
+  }
+  if (error instanceof Error) {
+    return error.message
+  }
+  return '未知错误'
+}
 
 /**
  * 获取所有可用组件
  */
 export async function getAllComponents(): Promise<JobComponent[]> {
-  const response = await componentClient.get<WebAdminResponse<JobComponent[]>>('')
-  if (response.data.code !== 'OK') {
-    throw new Error(response.data.message || '获取组件列表失败')
+  try {
+    const response = await componentClient.get<ApiResponse<JobComponent[]>>('')
+    return response.data.data
+  } catch (error) {
+    throw new Error(extractErrorMessage(error))
   }
-  return response.data.data
 }
 
 /**
  * 根据 code 获取组件信息
  */
 export async function getComponentByCode(code: string): Promise<JobComponent> {
-  const response = await componentClient.get<WebAdminResponse<JobComponent>>(`/code/${code}`)
-  if (response.data.code !== 'OK') {
-    throw new Error(response.data.message || '获取组件信息失败')
+  try {
+    const response = await componentClient.get<ApiResponse<JobComponent>>(`/code/${code}`)
+    return response.data.data
+  } catch (error) {
+    throw new Error(extractErrorMessage(error))
   }
-  return response.data.data
 }
 
 /**

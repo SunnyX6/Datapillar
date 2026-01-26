@@ -1,36 +1,34 @@
-"""
-VectorStore 配置
-"""
+"""VectorStore configuration."""
 
 from pydantic import BaseModel, Field, field_validator
 
 
 class VectorStoreConfig(BaseModel):
-    """VectorStore 配置（知识与经验共用）"""
+    """VectorStore configuration (shared by knowledge and experience)."""
 
     type: str = Field(
         default="lance",
-        description="类型: lance | chroma | milvus",
+        description="Type: lance | chroma | milvus",
     )
     path: str | None = Field(
         default=None,
-        description="本地存储路径（lance/chroma）",
+        description="Local storage path (lance/chroma)",
     )
     uri: str | None = Field(
         default=None,
-        description="Milvus 连接 URI",
+        description="Milvus connection URI",
     )
     host: str | None = Field(
         default=None,
-        description="Chroma 远程服务器地址",
+        description="Chroma remote host",
     )
     port: int = Field(
         default=8000,
-        description="Chroma 远程服务器端口",
+        description="Chroma remote port",
     )
     token: str | None = Field(
         default=None,
-        description="Milvus 认证令牌",
+        description="Milvus authentication token",
     )
 
     @field_validator("type")
@@ -38,5 +36,7 @@ class VectorStoreConfig(BaseModel):
     def validate_type(cls, v: str) -> str:
         supported = {"lance", "chroma", "milvus"}
         if v.lower() not in supported:
-            raise ValueError(f"不支持的 vector_store 类型: '{v}'。支持: {', '.join(sorted(supported))}")
+            raise ValueError(
+                f"Unsupported vector_store type: '{v}'. Supported: {', '.join(sorted(supported))}"
+            )
         return v.lower()

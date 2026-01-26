@@ -1,6 +1,4 @@
-"""
-知识模型
-"""
+"""Knowledge models."""
 
 from __future__ import annotations
 
@@ -13,18 +11,18 @@ from urllib.parse import urlparse
 from datapillar_oneagentic.knowledge.identity import canonicalize_metadata
 
 class SparseEmbeddingProvider(Protocol):
-    """稀疏向量化接口（由使用者提供实现）"""
+    """Sparse embedding interface (provided by callers)."""
 
     async def embed_text(self, text: str) -> dict[int, float]:
-        """向量化单条文本"""
+        """Embed a single text."""
 
     async def embed_texts(self, texts: list[str]) -> list[dict[int, float]]:
-        """批量向量化文本"""
+        """Embed a batch of texts."""
 
 
 @dataclass
 class DocumentInput:
-    """文档输入（解析入口）"""
+    """Document input (parser entrypoint)."""
 
     source: str | bytes
     filename: str | None = None
@@ -35,7 +33,7 @@ class DocumentInput:
 
 @dataclass
 class Attachment:
-    """附件（图片等非文本内容）"""
+    """Attachment (non-text content such as images)."""
 
     attachment_id: str
     name: str
@@ -47,7 +45,7 @@ class Attachment:
 
 @dataclass
 class ParsedDocument:
-    """解析后的文档结构"""
+    """Parsed document structure."""
 
     document_id: str
     source_type: str
@@ -61,7 +59,7 @@ class ParsedDocument:
 
 @dataclass
 class SourceSpan:
-    """文档原文定位信息"""
+    """Source span location info."""
 
     page: int | None = None
     start_offset: int | None = None
@@ -71,7 +69,7 @@ class SourceSpan:
 
 @dataclass
 class KnowledgeSource:
-    """知识来源定义（注册用）"""
+    """Knowledge source definition (for registration)."""
 
     name: str | None = None
     source_type: str = "doc"
@@ -86,7 +84,7 @@ class KnowledgeSource:
 
     def __post_init__(self) -> None:
         if not self.name:
-            self.name = self.source_uri or "未命名"
+            self.name = self.source_uri or "Untitled"
 
     def chunk(
         self,
@@ -95,9 +93,9 @@ class KnowledgeSource:
         parser_registry: "ParserRegistry | None" = None,
     ) -> "ChunkPreview":
         if not self.source_uri:
-            raise ValueError("source_uri 不能为空")
+            raise ValueError("source_uri cannot be empty")
         if chunk_config is None:
-            raise ValueError("chunk_config 不能为空")
+            raise ValueError("chunk_config cannot be empty")
         from datapillar_oneagentic.knowledge.chunker import KnowledgeChunker
         from datapillar_oneagentic.knowledge.parser import default_registry
 
@@ -116,11 +114,11 @@ class KnowledgeSource:
         parser_registry: "ParserRegistry | None" = None,
     ) -> None:
         if not self.source_uri:
-            raise ValueError("source_uri 不能为空")
+            raise ValueError("source_uri cannot be empty")
         if not namespace:
-            raise ValueError("namespace 不能为空")
+            raise ValueError("namespace cannot be empty")
         if config is None:
-            raise ValueError("config 不能为空")
+            raise ValueError("config cannot be empty")
         from datapillar_oneagentic.knowledge.ingest.pipeline import KnowledgeIngestor
         from datapillar_oneagentic.knowledge.parser import default_registry
         from datapillar_oneagentic.knowledge.runtime import build_runtime
@@ -141,7 +139,7 @@ class KnowledgeSource:
 
 @dataclass
 class KnowledgeInject:
-    """注入配置（Agent 覆盖项）"""
+    """Injection overrides (agent-level)."""
 
     mode: str | None = None
     max_tokens: int | None = None
@@ -151,7 +149,7 @@ class KnowledgeInject:
 
 @dataclass
 class KnowledgeRetrieve:
-    """检索配置（Agent 覆盖项）"""
+    """Retrieval overrides (agent-level)."""
 
     method: str | None = None
     top_k: int | None = None
@@ -168,7 +166,7 @@ class KnowledgeRetrieve:
 
 @dataclass
 class KnowledgeScope:
-    """检索范围（运行时）"""
+    """Retrieval scope (runtime)."""
 
     namespaces: list[str] | None = None
     document_ids: list[str] | None = None
@@ -177,7 +175,7 @@ class KnowledgeScope:
 
 @dataclass
 class Knowledge:
-    """Agent 知识配置（声明式）"""
+    """Agent knowledge configuration (declarative)."""
 
     sources: list[KnowledgeSource] = field(default_factory=list)
     retrieve: KnowledgeRetrieve | None = None
@@ -195,7 +193,7 @@ class Knowledge:
 
 @dataclass
 class KnowledgeDocument:
-    """知识文档（入库输入）"""
+    """Knowledge document (ingestion input)."""
 
     doc_id: str
     source_id: str
@@ -216,7 +214,7 @@ class KnowledgeDocument:
 
 @dataclass
 class KnowledgeChunk:
-    """知识分片（检索输出）"""
+    """Knowledge chunk (retrieval output)."""
 
     chunk_id: str
     doc_id: str
@@ -241,7 +239,7 @@ class KnowledgeChunk:
 
 @dataclass
 class KnowledgeSearchHit:
-    """知识检索命中结果（含分数）"""
+    """Knowledge retrieval hit (with score)."""
 
     chunk: KnowledgeChunk
     score: float
@@ -250,7 +248,7 @@ class KnowledgeSearchHit:
 
 @dataclass
 class KnowledgeRef:
-    """知识引用（写入经验）"""
+    """Knowledge reference (for experience records)."""
 
     source_id: str
     doc_id: str
@@ -272,14 +270,14 @@ class KnowledgeRef:
 
 @dataclass
 class KnowledgeRetrieveResult:
-    """知识检索结果"""
+    """Knowledge retrieval result."""
 
     hits: list[tuple[KnowledgeChunk, float]] = field(default_factory=list)
     refs: list[KnowledgeRef] = field(default_factory=list)
 
 
 def merge_knowledge(base: Knowledge | None, override: Knowledge | None) -> Knowledge | None:
-    """合并知识配置（团队为 base，Agent 为 override）"""
+    """Merge knowledge configs (team as base, agent as override)."""
     if base is None and override is None:
         return None
     if base is None:
@@ -329,7 +327,7 @@ def _source_merge_key(source: KnowledgeSource) -> str:
 def _build_document_input(source: KnowledgeSource) -> DocumentInput:
     source_uri = source.source_uri
     if not source_uri:
-        raise ValueError("source_uri 不能为空")
+        raise ValueError("source_uri cannot be empty")
     payload, filename, mime_type, source_info = _resolve_source_payload(source)
     source_info.setdefault("source_type", source.source_type)
     source_info.setdefault("source_uri", source_uri)

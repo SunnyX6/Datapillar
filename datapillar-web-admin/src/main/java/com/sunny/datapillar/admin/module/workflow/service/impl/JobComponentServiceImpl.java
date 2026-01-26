@@ -10,8 +10,8 @@ import com.sunny.datapillar.admin.module.workflow.dto.JobComponentDto;
 import com.sunny.datapillar.admin.module.workflow.entity.JobComponent;
 import com.sunny.datapillar.admin.module.workflow.mapper.JobComponentMapper;
 import com.sunny.datapillar.admin.module.workflow.service.JobComponentService;
-import com.sunny.datapillar.admin.response.WebAdminErrorCode;
-import com.sunny.datapillar.admin.response.WebAdminException;
+import com.sunny.datapillar.common.error.ErrorCode;
+import com.sunny.datapillar.common.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +40,7 @@ public class JobComponentServiceImpl implements JobComponentService {
     public JobComponentDto.Response getComponentByCode(String code) {
         JobComponent component = componentMapper.selectByCode(code);
         if (component == null) {
-            throw new WebAdminException(WebAdminErrorCode.COMPONENT_NOT_FOUND, code);
+            throw new BusinessException(ErrorCode.ADMIN_COMPONENT_NOT_FOUND, code);
         }
         return toResponse(component);
     }

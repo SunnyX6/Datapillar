@@ -1,7 +1,7 @@
 """
-LLM 提供者模块
+LLM provider module.
 
-支持多种 LLM 后端：
+Supported backends:
 - OpenAI
 - Anthropic
 - GLM
@@ -9,16 +9,17 @@ LLM 提供者模块
 - OpenRouter
 - Ollama
 
-特性：
-- 团队级 LLMProvider / EmbeddingProvider
-- 内置弹性机制（超时 + 重试 + 熔断）
-- 可选缓存
-- Token 使用量追踪
+Features:
+- Team-level LLMProvider / EmbeddingProvider
+- Built-in resilience (timeout + retry + circuit breaker)
+- Optional cache
+- Token usage tracking
 
-使用示例：
+Example:
 ```python
 from datapillar_oneagentic import DatapillarConfig
 from datapillar_oneagentic.providers.llm import LLMProvider, EmbeddingProvider
+from datapillar_oneagentic.messages import Messages, Message
 
 config = DatapillarConfig(
     llm={"provider": "openai", "api_key": "sk-xxx", "model": "gpt-4o"},
@@ -27,6 +28,7 @@ config = DatapillarConfig(
 
 llm_provider = LLMProvider(config.llm)
 llm = llm_provider()
+messages = Messages([Message.system("sys"), Message.user("hi")])
 result = await llm.ainvoke(messages)
 
 embedding_provider = EmbeddingProvider(config.embedding)
@@ -67,13 +69,13 @@ __all__ = [
     # Embedding
     "EmbeddingProvider",
     "EmbeddingFactory",
-    # Provider 枚举
+    # Provider enums
     "Provider",
     "EmbeddingBackend",
-    # Usage 追踪
+    # Usage tracking
     "TokenUsage",
     "extract_usage",
-    # 缓存
+    # Cache
     "create_llm_cache",
     "InMemoryLLMCache",
     "RedisLLMCache",

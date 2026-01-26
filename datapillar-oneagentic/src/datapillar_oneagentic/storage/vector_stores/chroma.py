@@ -1,6 +1,4 @@
-"""
-Chroma VectorStore 实现
-"""
+"""Chroma VectorStore implementation."""
 
 from __future__ import annotations
 
@@ -46,15 +44,15 @@ class ChromaVectorStore(VectorStore):
 
         if self._host:
             self._client = chromadb.HttpClient(host=self._host, port=self._port)
-            logger.info(f"初始化 ChromaVectorStore (远程): {self._host}:{self._port}")
+            logger.info(f"ChromaVectorStore initialized (remote): {self._host}:{self._port}")
         else:
             self._client = chromadb.PersistentClient(path=self._path or "./data/chroma")
-            logger.info(f"初始化 ChromaVectorStore (本地): {self._path}")
+            logger.info(f"ChromaVectorStore initialized (local): {self._path}")
 
     async def close(self) -> None:
         self._client = None
         self._collections.clear()
-        logger.info("ChromaVectorStore 已关闭")
+        logger.info("ChromaVectorStore closed")
 
     async def ensure_collection(self, schema: VectorCollectionSchema) -> None:
         if self._client is None:
@@ -82,10 +80,10 @@ class ChromaVectorStore(VectorStore):
         for record in records:
             record_id = str(record.get(schema.primary_key, ""))
             if not record_id:
-                raise ValueError(f"记录缺少主键字段: {schema.primary_key}")
+                raise ValueError(f"Record missing primary key field: {schema.primary_key}")
             embedding = record.get("vector")
             if embedding is None:
-                raise ValueError("Chroma 需要 vector 字段")
+                raise ValueError("Chroma requires a vector field")
 
             metadata, document = _split_record(record)
             ids.append(record_id)
@@ -200,14 +198,14 @@ def _merge_search_results(result: dict[str, Any]) -> list[VectorSearchResult]:
     records = _merge_records(result)
     distances = result.get("distances", [[]])
     if not distances or distances[0] is None:
-        raise ValueError("Chroma 搜索结果缺少 distances")
+        raise ValueError("Chroma search result missing distances")
     if len(distances[0]) != len(records):
-        raise ValueError("Chroma 搜索结果 distances 数量不一致")
+        raise ValueError("Chroma search result distances length mismatch")
     scored: list[VectorSearchResult] = []
     for idx, record in enumerate(records):
         distance = distances[0][idx] if distances[0] else None
         if distance is None:
-            raise ValueError("Chroma 搜索结果缺少 distance")
+            raise ValueError("Chroma search result missing distance")
         scored.append(
             VectorSearchResult(
                 record=record,

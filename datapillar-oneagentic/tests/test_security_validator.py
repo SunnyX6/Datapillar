@@ -19,12 +19,12 @@ def _reset_security_config() -> None:
     reset_security_config()
 
 
-def test_is_private_ip_detects_localhost() -> None:
+def test_private_ip() -> None:
     assert validator_module.is_private_ip("localhost") is True
     assert validator_module.is_private_ip("127.0.0.1") is True
 
 
-def test_is_private_ip_uses_dns_result(monkeypatch) -> None:
+def test_private_ip2(monkeypatch) -> None:
     def fake_getaddrinfo(_hostname, *_args, **_kwargs):
         return [(None, None, None, None, ("8.8.8.8", 0))]
 
@@ -32,19 +32,19 @@ def test_is_private_ip_uses_dns_result(monkeypatch) -> None:
     assert validator_module.is_private_ip("public.example") is False
 
 
-def test_configure_security_updates_config() -> None:
+def test_configure_security() -> None:
     configure_security(require_confirmation=False, allow_private_urls=True)
     config = get_security_config()
     assert config.require_confirmation is False
     assert config.allow_private_urls is True
 
 
-def test_validate_url_rejects_unsupported_scheme() -> None:
+def test_validate_url() -> None:
     with pytest.raises(URLNotAllowedError):
         validate_url("ftp://example.com")
 
 
-def test_validate_url_requires_https_when_configured(monkeypatch) -> None:
+def test_validate_url2(monkeypatch) -> None:
     configure_security(require_https=True)
     monkeypatch.setattr(validator_module, "is_private_ip", lambda _host: False)
 
@@ -54,13 +54,13 @@ def test_validate_url_requires_https_when_configured(monkeypatch) -> None:
     validate_url("https://example.com")
 
 
-def test_validate_url_rejects_private_when_not_allowed() -> None:
+def test_validate_url3() -> None:
     configure_security(allow_private_urls=False)
     with pytest.raises(URLNotAllowedError):
         validate_url("http://127.0.0.1")
 
 
-def test_validate_url_allows_whitelisted_domains(monkeypatch) -> None:
+def test_validate_url4(monkeypatch) -> None:
     configure_security(allowed_domains=["example.com"])
     monkeypatch.setattr(validator_module, "is_private_ip", lambda _host: False)
 

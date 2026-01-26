@@ -1,5 +1,5 @@
 """
-Agent 异常分类器
+Agent error classifier.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from datapillar_oneagentic.exception.agent.errors import AgentError
 
 
 class AgentErrorClassifier:
-    """Agent 异常分类器"""
+    """Agent error classifier."""
 
     @classmethod
     def from_failure(
@@ -40,12 +40,12 @@ class AgentErrorClassifier:
 
     @classmethod
     def from_exception(cls, *, agent_id: str, error: Exception) -> AgentError:
-        message = str(error) or "Agent 执行异常"
+        message = str(error) or "Agent execution error"
 
         if isinstance(error, (asyncio.TimeoutError, TimeoutError)):
             category = AgentErrorCategory.SYSTEM
             action = RecoveryAction.RETRY
-            message = "Agent 执行超时"
+            message = "Agent execution timeout"
         elif isinstance(error, (ConnectionError, OSError)):
             category = AgentErrorCategory.DEPENDENCY
             action = RecoveryAction.RETRY

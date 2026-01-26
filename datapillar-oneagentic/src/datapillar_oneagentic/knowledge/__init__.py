@@ -1,6 +1,4 @@
-"""
-Knowledge 模块
-"""
+"""Knowledge module."""
 
 from datapillar_oneagentic.knowledge.config import (
     KnowledgeConfig,
@@ -30,6 +28,7 @@ from datapillar_oneagentic.knowledge.models import (
 from datapillar_oneagentic.knowledge.retriever.retriever import KnowledgeRetriever
 from datapillar_oneagentic.knowledge.ingest.pipeline import KnowledgeIngestor
 from datapillar_oneagentic.knowledge.chunker import KnowledgeChunker
+from datapillar_oneagentic.knowledge.sparse_embedder import BM25SparseEmbedder
 from datapillar_oneagentic.knowledge.evaluation import (
     ChunkingDocReport,
     ChunkingReport,
@@ -71,6 +70,7 @@ __all__ = [
     "KnowledgeRetriever",
     "KnowledgeIngestor",
     "KnowledgeChunker",
+    "BM25SparseEmbedder",
     "EvalDocument",
     "EvalQuery",
     "EvalSet",

@@ -1,23 +1,21 @@
 """
-Blackboard - 图状态
+Blackboard - graph state.
 
-LangGraph StateGraph 的状态定义。
+State definition for LangGraph StateGraph.
 
-设计原则：
-- 使用 TypedDict 支持 LangGraph reducer
-- 所有会话级状态由 Checkpointer 持久化
-- active_agent=None 表示流程结束
-- 短期记忆通过 messages 字段实现（LangGraph 标准）
-- timeline 记录完整执行历史，支持时间旅行
-- deliverables 存储在 Store 中，state 只存 keys 引用
+Design principles:
+- Use TypedDict for LangGraph reducers
+- Session-level state is persisted by Checkpointer
+- active_agent=None means the flow is complete
+- Short-term memory uses messages (LangGraph standard)
+- timeline records full execution history and supports time travel
+- deliverables are stored in Store; state only keeps key references
 """
 
 from __future__ import annotations
 
 import operator
-from typing import Annotated
-
-from langchain_core.messages import AnyMessage
+from typing import Annotated, Any
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
@@ -25,61 +23,61 @@ from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
 
 class Blackboard(TypedDict, total=False):
     """
-    Blackboard - 图状态
+    Blackboard - graph state.
 
-    核心字段：
-    - messages: 对话消息列表（短期记忆，LangGraph 标准，通过 add_messages reducer 自动合并）
-    - namespace: 命名空间
-    - session_id: 会话标识
-    - active_agent: 当前活跃的 Agent ID
-    - assigned_task: Manager 下发给当前 Agent 的任务内容
-    - deliverable_keys: 已产出的交付物 key 列表（实际内容存在 Store）
-    - timeline: 执行时间线（Timeline.model_dump()）
+    Core fields:
+    - messages: chat messages (short-term memory, merged by add_messages reducer)
+    - namespace: namespace
+    - session_id: session identifier
+    - active_agent: active agent ID
+    - assigned_task: task assigned by Manager to current agent
+    - deliverable_keys: deliverable keys (contents live in Store)
+    - timeline: execution timeline (Timeline.model_dump())
 
-    ReAct 模式字段：
-    - goal: 用户目标
-    - plan: 执行计划（Plan.model_dump()）
-    - reflection: 反思结果（Reflection.model_dump()）
+    ReAct fields:
+    - goal: user goal
+    - plan: execution plan (Plan.model_dump())
+    - reflection: reflection result (Reflection.model_dump())
     """
 
-    # 对话消息（短期记忆，Agent 间通过此字段自动共享上下文）
-    messages: Annotated[list[AnyMessage], add_messages]
+    # Chat messages (short-term memory, LangGraph reducer field).
+    messages: Annotated[list[Any], add_messages]
 
-    # 会话标识
+    # Session identity
     namespace: str
     session_id: str
 
-    # Agent 控制
+    # Agent control
     active_agent: str | None
 
-    # Manager 下发给当前 Agent 的任务内容（层级模式）
+    # Task assigned by Manager to current agent (hierarchical mode)
     assigned_task: str | None
 
-    # 执行时间线（支持时间旅行）
+    # Execution timeline (supports time travel)
     timeline: dict | None
 
-    # 交付物 keys（实际内容存在 Store 中）
+    # Deliverable keys (contents stored in Store)
     deliverable_keys: list[str]
 
-    # 压缩上下文（历史摘要）
-    compression__context: str | None
+    # Compressed context (history summary)
+    compression_context: str | None
 
-    # Agent 执行状态
+    # Agent execution status
     last_agent_status: ExecutionStatus | None
     last_agent_failure_kind: FailureKind | None
     last_agent_error: str | None
 
-    # 会话级 Todo（团队级进度跟踪）
+    # Session-level Todo (team progress tracking)
     todo: dict | None
 
-    # MapReduce 模式
+    # MapReduce mode
     mapreduce_goal: str | None
     mapreduce_understanding: str | None
     mapreduce_tasks: list[dict]
     mapreduce_task: dict | None
     mapreduce_results: Annotated[list[dict], operator.add]
 
-    # ReAct 模式
+    # ReAct mode
     goal: str | None
     plan: dict | None
     reflection: dict | None
@@ -91,7 +89,7 @@ def create_blackboard(
     namespace: str = "",
     session_id: str = "",
 ) -> Blackboard:
-    """创建新的 Blackboard"""
+    """Create a new Blackboard."""
     return Blackboard(
         messages=[],
         namespace=namespace,
@@ -100,18 +98,18 @@ def create_blackboard(
         assigned_task=None,
         timeline=None,
         deliverable_keys=[],
-        compression__context=None,
+        compression_context=None,
         last_agent_status=None,
         last_agent_failure_kind=None,
         last_agent_error=None,
         todo=None,
-        # MapReduce 模式
+        # MapReduce mode
         mapreduce_goal=None,
         mapreduce_understanding=None,
         mapreduce_tasks=[],
         mapreduce_task=None,
         mapreduce_results=[],
-        # ReAct 模式
+        # ReAct mode
         goal=None,
         plan=None,
         reflection=None,

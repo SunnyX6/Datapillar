@@ -1,5 +1,6 @@
 package com.sunny.datapillar.gateway.filter;
 
+import com.sunny.datapillar.common.constant.HeaderConstants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -27,7 +28,7 @@ public class LoggingFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         long startTime = System.currentTimeMillis();
 
-        String traceId = request.getHeaders().getFirst(TraceIdFilter.TRACE_ID_HEADER);
+        String traceId = request.getHeaders().getFirst(HeaderConstants.HEADER_TRACE_ID);
         String method = request.getMethod().name();
         String path = request.getPath().value();
         String clientIp = getClientIp(request);

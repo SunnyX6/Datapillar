@@ -18,7 +18,7 @@ import com.sunny.datapillar.admin.module.user.dto.UserDto;
 import com.sunny.datapillar.admin.module.user.service.MenuService;
 import com.sunny.datapillar.admin.module.user.service.RoleService;
 import com.sunny.datapillar.admin.module.user.service.UserService;
-import com.sunny.datapillar.admin.response.WebAdminResponse;
+import com.sunny.datapillar.admin.web.response.ApiResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,60 +43,60 @@ public class UserController {
     @Operation(summary = "获取用户列表")
     @GetMapping
     @PreAuthorize("hasAuthority('ADMIN')")
-    public WebAdminResponse<List<UserDto.Response>> list() {
+    public ApiResponse<List<UserDto.Response>> list() {
         List<UserDto.Response> users = userService.getUserList();
-        return WebAdminResponse.ok(users);
+        return ApiResponse.ok(users);
     }
 
     @Operation(summary = "获取用户详情")
     @GetMapping("/{id}")
-    public WebAdminResponse<UserDto.Response> detail(@PathVariable Long id) {
+    public ApiResponse<UserDto.Response> detail(@PathVariable Long id) {
         UserDto.Response user = userService.getUserById(id);
-        return WebAdminResponse.ok(user);
+        return ApiResponse.ok(user);
     }
 
     @Operation(summary = "创建用户")
     @PostMapping
     @PreAuthorize("hasAuthority('ADMIN')")
-    public WebAdminResponse<Long> create(@Valid @RequestBody UserDto.Create dto) {
+    public ApiResponse<Long> create(@Valid @RequestBody UserDto.Create dto) {
         Long id = userService.createUser(dto);
-        return WebAdminResponse.ok(id);
+        return ApiResponse.ok(id);
     }
 
     @Operation(summary = "更新用户")
     @PutMapping("/{id}")
-    public WebAdminResponse<Void> update(@PathVariable Long id, @Valid @RequestBody UserDto.Update dto) {
+    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody UserDto.Update dto) {
         userService.updateUser(id, dto);
-        return WebAdminResponse.ok(null);
+        return ApiResponse.ok(null);
     }
 
     @Operation(summary = "删除用户")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public WebAdminResponse<Void> delete(@PathVariable Long id) {
+    public ApiResponse<Void> delete(@PathVariable Long id) {
         userService.deleteUser(id);
-        return WebAdminResponse.ok(null);
+        return ApiResponse.ok(null);
     }
 
     @Operation(summary = "获取用户的角色")
     @GetMapping("/{id}/roles")
-    public WebAdminResponse<List<RoleDto.Response>> getUserRoles(@PathVariable Long id) {
+    public ApiResponse<List<RoleDto.Response>> getUserRoles(@PathVariable Long id) {
         List<RoleDto.Response> roles = roleService.getRolesByUserId(id);
-        return WebAdminResponse.ok(roles);
+        return ApiResponse.ok(roles);
     }
 
     @Operation(summary = "为用户分配角色")
     @PutMapping("/{id}/roles")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public WebAdminResponse<Void> assignRoles(@PathVariable Long id, @RequestBody List<Long> roleIds) {
+    public ApiResponse<Void> assignRoles(@PathVariable Long id, @RequestBody List<Long> roleIds) {
         userService.assignRoles(id, roleIds);
-        return WebAdminResponse.ok(null);
+        return ApiResponse.ok(null);
     }
 
     @Operation(summary = "获取用户的菜单")
     @GetMapping("/{id}/menus")
-    public WebAdminResponse<List<MenuDto.Response>> getUserMenus(@PathVariable Long id) {
+    public ApiResponse<List<MenuDto.Response>> getUserMenus(@PathVariable Long id) {
         List<MenuDto.Response> menus = menuService.getMenusByUserId(id);
-        return WebAdminResponse.ok(menus);
+        return ApiResponse.ok(menus);
     }
 }

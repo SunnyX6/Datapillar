@@ -1,7 +1,7 @@
 """
-Context Timeline 子模块
+Context timeline submodule.
 
-提供完整的任务执行时间线记录和时间旅行能力。
+Provides full execution timeline recording and time travel support.
 """
 
 from datapillar_oneagentic.context.timeline.entry import TimelineEntry

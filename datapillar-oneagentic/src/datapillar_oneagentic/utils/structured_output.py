@@ -1,15 +1,15 @@
 """
-结构化输出解析器（多模型兼容）
+Structured output parser (multi-model compatible).
 
-渐进式降级策略：
-1. 严格 JSON 解析
-2. json_repair 修复畸形 JSON
-3. 处理特殊格式（如思维链标签、数组包裹）
-4. Pydantic validator 容错
+Progressive fallback strategy:
+1. Strict JSON parsing
+2. json_repair for malformed JSON
+3. Handle special formats (thinking tags, array-wrapped payloads)
+4. Pydantic validator tolerance
 
-支持的能力声明：
-- supports_function_calling: 是否支持 function calling
-- supports_structured_output: 是否支持 structured output
+Supported capability flags:
+- supports_function_calling: whether function calling is supported
+- supports_structured_output: whether structured output is supported
 """
 
 import json
@@ -29,17 +29,17 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 
-# ==================== 模型能力声明 ====================
+# ==================== Model capability flags ====================
 
 
 class ModelCapabilities:
     """
-    模型能力声明
+    Model capability flags.
 
-    根据 provider 自动推断默认能力，也支持从 config 覆盖。
+    Defaults are inferred by provider, with optional overrides from config.
     """
 
-    # 默认能力配置（根据 provider 推断）
+    # Default capability map (inferred by provider).
     DEFAULT_CAPABILITIES: dict[str, dict[str, bool]] = {
         "openai": {
             "supports_function_calling": True,
@@ -67,13 +67,13 @@ class ModelCapabilities:
             "supports_tool_choice": True,
         },
         "openrouter": {
-            # OpenRouter 取决于后端模型，默认保守估计
+            # OpenRouter depends on the upstream model, default to conservative values.
             "supports_function_calling": True,
             "supports_structured_output": True,
             "supports_tool_choice": False,
         },
         "ollama": {
-            # Ollama 取决于本地模型，默认保守估计
+            # Ollama depends on local models, default to conservative values.
             "supports_function_calling": False,
             "supports_structured_output": False,
             "supports_tool_choice": False,
@@ -87,9 +87,9 @@ class ModelCapabilities:
         config: dict[str, Any] | None = None,
     ) -> dict[str, bool]:
         """
-        获取模型能力
+        Resolve model capabilities.
 
-        优先从 config 读取，否则使用 provider 默认值。
+        Prefer config overrides, otherwise fall back to provider defaults.
         """
         provider_lower = provider.lower()
         defaults = cls.DEFAULT_CAPABILITIES.get(
@@ -113,7 +113,7 @@ class ModelCapabilities:
         provider: str,
         config: dict[str, Any] | None = None,
     ) -> bool:
-        """检查模型是否支持 function calling"""
+        """Return whether function calling is supported."""
         caps = cls.get_capabilities(provider, config)
         return caps.get("supports_function_calling", False)
 
@@ -123,72 +123,72 @@ class ModelCapabilities:
         provider: str,
         config: dict[str, Any] | None = None,
     ) -> bool:
-        """检查模型是否支持 structured output"""
+        """Return whether structured output is supported."""
         caps = cls.get_capabilities(provider, config)
         return caps.get("supports_structured_output", False)
 
 
-# ==================== JSON 修复工具 ====================
+# ==================== JSON repair tools ====================
 
 
 def repair_json_text(text: str) -> str:
     """
-    修复畸形 JSON
+    Repair malformed JSON.
 
-    使用 json_repair 库处理常见问题：
-    - 缺失引号
-    - 尾随逗号
-    - 单引号
-    - 注释
+    Uses json_repair for common issues:
+    - Missing quotes
+    - Trailing commas
+    - Single quotes
+    - Comments
     """
     if not text or not text.strip():
         return text
 
     try:
-        # 先尝试直接解析，如果成功就不需要修复
+        # Try plain parsing first to avoid unnecessary repair.
         json.loads(text)
         return text
     except json.JSONDecodeError:
         pass
 
     try:
-        # 使用 json_repair 修复
+        # Repair via json_repair.
         repaired = json_repair.repair_json(text, return_objects=False)
         return repaired if isinstance(repaired, str) else text
     except Exception as e:
-        logger.warning(f"json_repair 修复失败: {e}")
+        logger.warning(f"json_repair failed: {e}")
         return text
 
 
 def extract_json(text: str) -> str:
     """
-    从文本中提取 JSON
+    Extract JSON from text.
 
-    处理常见场景：
-    - Markdown 代码块包裹
-    - 前后有额外文字
-    - 思维链标签（如 <think>...</think>）
+    Common scenarios handled:
+    - Markdown code blocks
+    - Extra text before/after JSON
+    - Thinking tags (e.g., <think>...</think>)
     """
     if not text:
         return text
 
-    # 移除思维链标签（Deepseek-R1 等模型）
+    # Strip thinking tags (e.g., Deepseek-R1 style).
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
     text = re.sub(r"<thinking>.*?</thinking>", "", text, flags=re.DOTALL)
 
-    # 尝试提取 Markdown 代码块中的 JSON
+    # Extract JSON from Markdown code blocks.
     json_block_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
     if json_block_match:
         return json_block_match.group(1).strip()
 
-    # 尝试找到 JSON 对象边界
-    # 找第一个 { 和最后一个 }
+    # Find JSON object boundaries.
+    # First "{" and last "}".
     first_brace = text.find("{")
     last_brace = text.rfind("}")
     if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
         return text[first_brace : last_brace + 1]
 
-    # 找第一个 [ 和最后一个 ]
+    # First "[" and last "]".
     first_bracket = text.find("[")
     last_bracket = text.rfind("]")
     if first_bracket != -1 and last_bracket != -1 and last_bracket > first_bracket:
@@ -197,7 +197,7 @@ def extract_json(text: str) -> str:
     return text.strip()
 
 
-# ==================== 渐进式解析器 ====================
+# ==================== Progressive parser ====================
 
 def _maybe_parse_jsonish(text: str) -> object:
     stripped = text.strip()
@@ -237,16 +237,18 @@ def _build_expected_fields(schema: type[BaseModel]) -> str:
     return "\n".join(fields)
 
 
-def _build_structured_error_message(schema: type[BaseModel], *, detail: str | None = None) -> str:
+def _build_error_message(schema: type[BaseModel], *, detail: str | None = None) -> str:
     lines = [
-        "结构化输出解析失败。",
-        "可能原因：schema 定义与提示词输出字段不一致，或模型未严格输出 JSON。",
+        "Structured output parsing failed.",
+        "Possible causes: schema fields do not match the prompt output, or the model did not emit strict JSON.",
     ]
     if detail:
-        lines.append(f"错误详情：{detail}")
-    lines.append("期望的 JSON 字段:")
+        lines.append(f"Error detail: {detail}")
+    lines.append("Expected JSON fields:")
     lines.append(_build_expected_fields(schema))
-    lines.append("建议：请确保 SYSTEM_PROMPT 明确要求 JSON 输出，字段名与 schema 一致。")
+    lines.append(
+        "Suggestion: ensure the SYSTEM_PROMPT explicitly requires JSON output and field names match the schema."
+    )
     return "\n".join(lines)
 
 
@@ -261,9 +263,9 @@ def _extract_raw_text(raw: Any) -> str | None:
     return None
 
 
-def _log_final_structured_failure(raw: Any, parsing_error: Any) -> None:
+def _log_structured_failure(raw: Any, parsing_error: Any) -> None:
     logger.error(
-        "LLM 结构化输出最终解析失败 raw=%r parsing_error=%r",
+        "LLM structured output parsing failed raw=%r parsing_error=%r",
         raw,
         parsing_error,
     )
@@ -276,26 +278,26 @@ def parse_structured_output(
     strict: bool = False,
 ) -> T:
     """
-    渐进式解析 structured output
+    Progressively parse structured output.
 
-    策略（从严格到宽松）：
-    1. 直接用 Pydantic TypeAdapter 解析
-    2. 用 json_repair 修复后解析
-    3. 从文本中提取 JSON 后解析
-    4. 处理数组包裹（取第一个 dict 元素）
-    5. Markdown 兜底解析（按字段名匹配）
-    6. 单字段文本兜底（将 Markdown/纯文本封装为结构化输出）
+    Strategy (strict to permissive):
+    1. Parse with Pydantic TypeAdapter
+    2. Repair malformed JSON via json_repair
+    3. Extract JSON from text and parse
+    4. Unwrap list payloads (take first dict)
+    5. Markdown fallback (match by field name)
+    6. Single-field text fallback (wrap Markdown/plain text)
 
     Args:
-        text: LLM 返回结果（可能是文本、结构化结果或已解析模型）
-        schema: Pydantic 模型类
-        strict: 是否使用严格模式（失败直接抛异常）
+        text: LLM response (text, structured payload, or parsed model)
+        schema: Pydantic model class
+        strict: whether to fail fast without fallback
 
     Returns:
-        解析后的 Pydantic 模型实例
+        Parsed Pydantic model instance.
 
     Raises:
-        LLMError: 解析失败时抛出
+        LLMError: raised on parsing failures.
     """
     if isinstance(text, schema):
         return text
@@ -316,19 +318,19 @@ def parse_structured_output(
                         try:
                             return parse_structured_output(raw_text, schema, strict=False)
                         except LLMError as fallback_error:
-                            detail = f"Schema 校验失败: {e}; 兜底解析失败: {fallback_error}"
-                            _log_final_structured_failure(raw, parsing_error)
+                            detail = f"Schema validation failed: {e}; fallback parsing failed: {fallback_error}"
+                            _log_structured_failure(raw, parsing_error)
                             raise LLMError(
-                                _build_structured_error_message(schema, detail=detail),
+                                _build_error_message(schema, detail=detail),
                                 category=LLMErrorCategory.STRUCTURED_OUTPUT,
                                 action=RecoveryAction.FAIL_FAST,
                                 original=e,
                                 raw=raw,
                                 parsing_error=parsing_error,
                             ) from fallback_error
-                    _log_final_structured_failure(raw, parsing_error)
+                    _log_structured_failure(raw, parsing_error)
                     raise LLMError(
-                        _build_structured_error_message(schema, detail=f"Schema 校验失败: {e}"),
+                        _build_error_message(schema, detail=f"Schema validation failed: {e}"),
                         category=LLMErrorCategory.STRUCTURED_OUTPUT,
                         action=RecoveryAction.FAIL_FAST,
                         original=e,
@@ -336,26 +338,26 @@ def parse_structured_output(
                         parsing_error=parsing_error,
                     ) from e
             if parsing_error is not None or parsed is None:
-                detail = "解析器未返回有效的 parsed"
+                detail = "Parser did not return a valid parsed value"
                 if parsing_error:
-                    detail = f"解析器错误: {parsing_error}"
+                    detail = f"Parser error: {parsing_error}"
                 if not strict and raw_text:
                     try:
                         return parse_structured_output(raw_text, schema, strict=False)
                     except LLMError as fallback_error:
-                        detail = f"{detail}; 兜底解析失败: {fallback_error}"
-                _log_final_structured_failure(raw, parsing_error)
+                        detail = f"{detail}; fallback parsing failed: {fallback_error}"
+                _log_structured_failure(raw, parsing_error)
                 raise LLMError(
-                    _build_structured_error_message(schema, detail=detail),
+                    _build_error_message(schema, detail=detail),
                     category=LLMErrorCategory.STRUCTURED_OUTPUT,
                     action=RecoveryAction.FAIL_FAST,
                     original=parsing_error if isinstance(parsing_error, Exception) else None,
                     raw=raw,
                     parsing_error=parsing_error,
                 )
-            _log_final_structured_failure(raw, parsing_error)
+            _log_structured_failure(raw, parsing_error)
             raise LLMError(
-                _build_structured_error_message(schema, detail="解析器未返回有效的 parsed"),
+                _build_error_message(schema, detail="Parser did not return a valid parsed value"),
                 category=LLMErrorCategory.STRUCTURED_OUTPUT,
                 action=RecoveryAction.FAIL_FAST,
                 raw=raw,
@@ -366,7 +368,7 @@ def parse_structured_output(
             return schema.model_validate(normalize_jsonish(text))
         except ValidationError as e:
             raise LLMError(
-                _build_structured_error_message(schema, detail=f"Schema 校验失败: {e}"),
+                _build_error_message(schema, detail=f"Schema validation failed: {e}"),
                 category=LLMErrorCategory.STRUCTURED_OUTPUT,
                 action=RecoveryAction.FAIL_FAST,
                 original=e,
@@ -375,7 +377,7 @@ def parse_structured_output(
 
     if not isinstance(text, str):
         raise LLMError(
-            _build_structured_error_message(schema, detail=f"输出类型不支持: {type(text)}"),
+            _build_error_message(schema, detail=f"Unsupported output type: {type(text)}"),
             category=LLMErrorCategory.STRUCTURED_OUTPUT,
             action=RecoveryAction.FAIL_FAST,
             raw=text,
@@ -383,7 +385,7 @@ def parse_structured_output(
 
     if not text or not text.strip():
         raise LLMError(
-            _build_structured_error_message(schema, detail="输出文本为空"),
+            _build_error_message(schema, detail="Output text is empty"),
             category=LLMErrorCategory.STRUCTURED_OUTPUT,
             action=RecoveryAction.FAIL_FAST,
             raw=text,
@@ -392,85 +394,89 @@ def parse_structured_output(
     errors: list[str] = []
     adapter = TypeAdapter(schema)
 
-    # 策略 1：直接解析
+    # Strategy 1: direct JSON parsing.
     try:
         return adapter.validate_json(text)
     except ValidationError as e:
-        errors.append(f"直接解析失败: {e}")
+        errors.append(f"Direct parsing failed: {e}")
         if strict:
             raise LLMError(
-                _build_structured_error_message(schema, detail=f"Schema 校验失败: {e}"),
+                _build_error_message(schema, detail=f"Schema validation failed: {e}"),
                 category=LLMErrorCategory.STRUCTURED_OUTPUT,
                 action=RecoveryAction.FAIL_FAST,
                 original=e,
                 raw=text,
             ) from e
 
-    # 策略 2：json_repair 修复
+    # Strategy 2: repair malformed JSON via json_repair.
     repaired = repair_json_text(text)
     if repaired != text:
         try:
             return adapter.validate_json(repaired)
         except ValidationError as e:
-            errors.append(f"修复后解析失败: {e}")
+            errors.append(f"Parsing failed after repair: {e}")
 
-    # 策略 3：提取 JSON 后解析
+    # Strategy 3: extract JSON and parse.
     extracted = extract_json(text)
     repaired_extracted = None
     if extracted != text:
         try:
             return adapter.validate_json(extracted)
         except ValidationError as e:
-            errors.append(f"提取后解析失败: {e}")
+            errors.append(f"Parsing failed after extraction: {e}")
 
-        # 对提取的内容再修复一次
+        # Repair the extracted JSON once more.
         repaired_extracted = repair_json_text(extracted)
         if repaired_extracted != extracted:
             try:
                 return adapter.validate_json(repaired_extracted)
             except ValidationError as e:
-                errors.append(f"提取+修复后解析失败: {e}")
+                errors.append(f"Parsing failed after extraction + repair: {e}")
 
-    # 策略 4：处理数组包裹（有些模型会返回 [{}] 而不是 {}）
+    # Strategy 4: unwrap list payloads (some models return [{}] instead of {}).
     final_text = repaired_extracted or extracted or repaired
     try:
         parsed = json.loads(final_text)
         if isinstance(parsed, dict):
             return schema.model_validate(normalize_jsonish(parsed))
         if isinstance(parsed, list) and parsed:
-            # 取第一个 dict 元素
+            # Take the first dict element.
             first_dict = next((item for item in parsed if isinstance(item, dict)), None)
             if first_dict:
                 return schema.model_validate(normalize_jsonish(first_dict))
     except (json.JSONDecodeError, ValidationError) as e:
-        errors.append(f"数组解包失败: {e}")
+        errors.append(f"List unwrap failed: {e}")
 
-    # 策略 5：Markdown 兜底解析（按字段名匹配）
-    markdown_parsed, markdown_error = _try_parse_markdown_fields(text, schema)
+    # Strategy 5: Markdown fallback (match by field name).
+    markdown_parsed, markdown_error = _parse_markdown_fields(text, schema)
     if markdown_parsed is not None:
-        logger.warning("Structured output 使用 Markdown 兜底解析，可能存在 JSON 格式不一致。")
+        logger.warning(
+            "Structured output fallback to Markdown parsing; JSON format may be inconsistent."
+        )
         return markdown_parsed
     if markdown_error:
         errors.append(markdown_error)
 
-    # 策略 6：单字段文本兜底（仅对单字符串字段）
-    coerced, coercion_error = _try_coerce_single_text_field(text, schema)
+    # Strategy 6: single-field text fallback (only for single-string schemas).
+    coerced, coercion_error = _coerce_text_field(text, schema)
     if coerced is not None:
-        logger.warning("Structured output 使用单字段文本兜底解析，可能存在 JSON 格式不一致。")
+        logger.warning(
+            "Structured output fallback to single-field text; JSON format may be inconsistent."
+        )
         return coerced
     if coercion_error:
         errors.append(coercion_error)
 
     error_summary = "; ".join(errors)
     raise LLMError(
-        _build_structured_error_message(schema, detail=f"解析尝试失败: {error_summary}"),
+        _build_error_message(schema, detail=f"All parsing attempts failed: {error_summary}"),
         category=LLMErrorCategory.STRUCTURED_OUTPUT,
         action=RecoveryAction.FAIL_FAST,
         raw=text,
     )
 
 
-def _try_coerce_single_text_field(text: str, schema: type[T]) -> tuple[T | None, str | None]:
+def _coerce_text_field(text: str, schema: type[T]) -> tuple[T | None, str | None]:
     fields = list(schema.model_fields.items())
     if len(fields) != 1:
         return None, None
@@ -480,10 +486,10 @@ def _try_coerce_single_text_field(text: str, schema: type[T]) -> tuple[T | None,
     try:
         return schema.model_validate({field_name: text.strip()}), None
     except ValidationError as exc:
-        return None, f"文本兜底解析失败: {exc}"
+        return None, f"Text fallback parsing failed: {exc}"
 
 
-def _try_parse_markdown_fields(text: str, schema: type[T]) -> tuple[T | None, str | None]:
+def _parse_markdown_fields(text: str, schema: type[T]) -> tuple[T | None, str | None]:
     candidates = _extract_markdown_candidates(text)
     if not candidates:
         return None, None
@@ -504,7 +510,7 @@ def _try_parse_markdown_fields(text: str, schema: type[T]) -> tuple[T | None, st
             try:
                 parsed_value = normalize_jsonish(json.loads(value))
             except json.JSONDecodeError as exc:
-                return None, f"Markdown 兜底解析失败: 字段 {field_name} 不是合法 JSON 值: {exc}"
+                return None, f"Markdown fallback failed: field {field_name} is not valid JSON: {exc}"
         result[field_name] = parsed_value
         matched_fields.add(field_name)
 
@@ -517,12 +523,12 @@ def _try_parse_markdown_fields(text: str, schema: type[T]) -> tuple[T | None, st
         if field.is_required() and name not in result
     ]
     if missing_fields:
-        return None, f"Markdown 兜底解析失败: 缺少必填字段: {', '.join(missing_fields)}"
+        return None, f"Markdown fallback failed: missing required fields: {', '.join(missing_fields)}"
 
     try:
         return schema.model_validate(result), None
     except ValidationError as exc:
-        return None, f"Markdown 兜底解析失败: {exc}"
+        return None, f"Markdown fallback failed: {exc}"
 
 
 def _extract_markdown_candidates(text: str) -> list[tuple[str, str]]:
@@ -564,7 +570,7 @@ def _extract_markdown_candidates(text: str) -> list[tuple[str, str]]:
             continue
 
         if not in_code_block:
-            kv = _extract_key_value_line(stripped)
+            kv = _extract_key_value(stripped)
             if kv:
                 candidates.append(kv)
 
@@ -573,7 +579,7 @@ def _extract_markdown_candidates(text: str) -> list[tuple[str, str]]:
     return candidates
 
 
-def _extract_key_value_line(line: str) -> tuple[str, str] | None:
+def _extract_key_value(line: str) -> tuple[str, str] | None:
     if not line:
         return None
     if line.startswith("#"):
@@ -629,19 +635,19 @@ def parse_args(
     schema: type[T],
 ) -> T:
     """
-    解析 tool call 的 arguments
+    Parse tool call arguments.
 
-    处理场景：
-    - args 已经是 dict（正常情况）
-    - args 是 JSON 字符串（需要解析）
-    - args 是畸形 JSON（需要修复）
+    Scenarios:
+    - args is already a dict
+    - args is a JSON string
+    - args is malformed JSON
 
     Args:
-        args: tool call 的 arguments（可能是 dict 或 str）
-        schema: Pydantic 模型类
+        args: tool call arguments (dict or str)
+        schema: Pydantic model class
 
     Returns:
-        解析后的 Pydantic 模型实例
+        Parsed Pydantic model instance.
     """
     if isinstance(args, dict):
         return schema.model_validate(normalize_jsonish(args))
@@ -650,7 +656,7 @@ def parse_args(
         return parse_structured_output(args, schema)
 
     raise LLMError(
-        _build_structured_error_message(schema, detail=f"Tool arguments 类型不支持: {type(args)}"),
+        _build_error_message(schema, detail=f"Unsupported tool arguments type: {type(args)}"),
         category=LLMErrorCategory.INVALID_INPUT,
         action=RecoveryAction.FAIL_FAST,
         raw=args,
@@ -659,17 +665,17 @@ def parse_args(
 
 def build_output_instructions(schema: type[BaseModel]) -> str:
     """
-    构建统一的结构化输出约束提示词（JSON-only）
+    Build a unified JSON-only output instruction block.
 
-    目标：
-    - 强制输出 JSON
-    - 禁止 Markdown/代码块/额外说明
+    Goals:
+    - Enforce strict JSON output
+    - Forbid Markdown/code blocks/explanations
     """
     return (
-        "## 重要\n"
-        "必须输出严格 JSON（单个对象），不得输出 Markdown、代码块或解释性文字。\n"
-        "允许调用工具，但最终输出必须是 JSON。\n"
-        "必须严格遵循交付物结构定义。\n"
-        "## 禁止\n"
-        "禁止输出非 JSON 内容，禁止添加未定义字段。"
+        "## Important\n"
+        "Output strict JSON (single object). Do not output Markdown, code blocks, or explanatory text.\n"
+        "Tool calls are allowed, but the final output must be JSON.\n"
+        "Strictly follow the delivery schema.\n"
+        "## Forbidden\n"
+        "Do not output non-JSON content or add undefined fields."
     )

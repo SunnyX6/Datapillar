@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Target, X, Info, Code, GitBranch, Layers, Share2, History, Loader2, Check, RotateCcw } from 'lucide-react'
 import { Badge } from '../components'
 import type { Metric } from '../types'
-import { iconSizeToken } from '@/design-tokens/dimensions'
+import { drawerWidthClassMap, iconSizeToken } from '@/design-tokens/dimensions'
 import { fetchMetricVersion, fetchMetricVersionNumbers, switchMetricVersion as apiSwitchMetricVersion } from '@/services/oneMetaSemanticService'
 import { formatTime } from '@/lib/utils'
 
@@ -12,6 +12,12 @@ const TYPE_LABELS: Record<string, { label: string; variant: 'blue' | 'purple' | 
   ATOMIC: { label: '原子指标', variant: 'blue' },
   DERIVED: { label: '派生指标', variant: 'purple' },
   COMPOSITE: { label: '复合指标', variant: 'amber' }
+}
+
+const skeletonBaseClassName = 'inline-block animate-pulse rounded bg-slate-200/70 dark:bg-slate-700/40'
+
+function SkeletonBlock({ className }: { className: string }) {
+  return <span aria-hidden="true" className={`${skeletonBaseClassName} ${className}`} />
 }
 
 interface MetricVersionDetail {
@@ -149,7 +155,7 @@ export function MetricOverview({ metric, onClose, onVersionSwitch }: MetricOverv
   const typeInfo = TYPE_LABELS[typeKey] || { label: typeKey || '-', variant: 'blue' as const }
 
   return createPortal(
-    <aside className="fixed right-0 top-14 bottom-0 z-30 w-drawer-responsive bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col animate-in slide-in-from-right duration-500">
+    <aside className={`fixed right-0 top-14 bottom-0 z-30 ${drawerWidthClassMap.responsive} bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col animate-in slide-in-from-right duration-500`}>
       {/* 头部：高度与「指标中心」列表页头部对齐 */}
       <div className="h-12 md:h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 md:px-6 flex items-center justify-between flex-shrink-0 shadow-sm">
         <div className="flex items-center gap-2">
@@ -174,9 +180,9 @@ export function MetricOverview({ metric, onClose, onVersionSwitch }: MetricOverv
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
             <h1 className="text-heading font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
-              {loading ? <Loader2 size={20} className="animate-spin" /> : versionDetail?.name || '-'}
+              {loading ? <SkeletonBlock className="h-6 w-56" /> : versionDetail?.name || '-'}
             </h1>
-            {!loading && <Badge variant={typeInfo.variant}>{typeKey || '-'}</Badge>}
+            {loading ? <SkeletonBlock className="h-5 w-16 rounded-full" /> : <Badge variant={typeInfo.variant}>{typeKey || '-'}</Badge>}
           </div>
           <div className="flex items-center gap-3 mb-3">
             <span className="text-body-xs font-mono font-semibold text-purple-600 dark:text-purple-400 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-700 px-2.5 py-0.5 rounded-lg tracking-wide">
@@ -203,8 +209,8 @@ export function MetricOverview({ metric, onClose, onVersionSwitch }: MetricOverv
               </button>
             )}
           </div>
-          <p className="text-slate-500 dark:text-slate-400 text-body-sm leading-relaxed">
-            {loading ? <Loader2 size={14} className="animate-spin" /> : versionDetail?.comment || '暂无业务描述...'}
+          <p className="text-slate-500 dark:text-slate-400 text-body-sm leading-relaxed min-h-[20px]">
+            {loading ? <SkeletonBlock className="h-5 w-full max-w-[26rem]" /> : versionDetail?.comment || '暂无业务描述...'}
           </p>
         </div>
 
@@ -218,13 +224,13 @@ export function MetricOverview({ metric, onClose, onVersionSwitch }: MetricOverv
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                   <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">指标类型</div>
                   <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">
-                    {loading ? <Loader2 size={14} className="animate-spin" /> : typeKey || '-'}
+                    {loading ? <SkeletonBlock className="h-5 w-16" /> : typeKey || '-'}
                   </div>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                   <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">数据类型</div>
                   <div className="text-body-sm font-mono font-semibold text-cyan-600 dark:text-cyan-400">
-                    {loading ? <Loader2 size={14} className="animate-spin" /> : versionDetail?.dataType || '-'}
+                    {loading ? <SkeletonBlock className="h-5 w-24" /> : versionDetail?.dataType || '-'}
                   </div>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
@@ -234,7 +240,7 @@ export function MetricOverview({ metric, onClose, onVersionSwitch }: MetricOverv
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                   <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">单位</div>
                   <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">
-                    {loading ? <Loader2 size={14} className="animate-spin" /> : (
+                    {loading ? <SkeletonBlock className="h-5 w-20" /> : (
                       versionDetail?.unitName ? (
                         <>
                           {versionDetail.unitSymbol && <span className="text-amber-500 mr-1">{versionDetail.unitSymbol}</span>}
@@ -247,13 +253,13 @@ export function MetricOverview({ metric, onClose, onVersionSwitch }: MetricOverv
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                   <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">创建人</div>
                   <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">
-                    {loading ? <Loader2 size={14} className="animate-spin" /> : versionDetail?.audit?.creator || '-'}
+                    {loading ? <SkeletonBlock className="h-5 w-20" /> : versionDetail?.audit?.creator || '-'}
                   </div>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
                   <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">创建时间</div>
                   <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">
-                    {loading ? <Loader2 size={14} className="animate-spin" /> : formatTime(versionDetail?.audit?.createTime)}
+                    {loading ? <SkeletonBlock className="h-5 w-28" /> : formatTime(versionDetail?.audit?.createTime)}
                   </div>
                 </div>
               </div>
@@ -265,8 +271,10 @@ export function MetricOverview({ metric, onClose, onVersionSwitch }: MetricOverv
                 <Code size={iconSizeToken.small} className="text-blue-500" /> 计算公式
               </div>
               {loading ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 size={20} className="animate-spin text-slate-400" />
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
+                  <SkeletonBlock className="h-4 w-11/12" />
+                  <SkeletonBlock className="h-4 w-9/12 mt-2" />
+                  <SkeletonBlock className="h-4 w-10/12 mt-2" />
                 </div>
               ) : versionDetail?.calculationFormula ? (
                 <div className="p-4 rounded-xl bg-slate-900 dark:bg-slate-950 border border-slate-800 shadow-inner">

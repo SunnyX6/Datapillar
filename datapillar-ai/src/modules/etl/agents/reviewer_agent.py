@@ -133,7 +133,7 @@ class ReviewerAgent:
 
         # 1. 构建消息
         human_message = "\n\n".join(sections)
-        messages = ctx.build_messages(self.SYSTEM_PROMPT, human_message=human_message)
+        messages = ctx.messages().system(self.SYSTEM_PROMPT).user(human_message)
 
         # 2. 工具调用循环（评审一般不需要工具）
         messages = await ctx.invoke_tools(messages)

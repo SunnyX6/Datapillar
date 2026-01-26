@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Target, ArrowLeft, Plus, List, Grid, Box, Trash2, Loader2, Pencil } from 'lucide-react'
 import { Badge } from '../components'
 import type { Metric, ViewMode } from '../types'
-import { iconSizeToken } from '@/design-tokens/dimensions'
+import { iconSizeToken, tableColumnWidthClassMap } from '@/design-tokens/dimensions'
 import { useSearchStore, useSemanticStatsStore } from '@/stores'
 import { useInfiniteScroll } from '@/hooks'
 import { fetchMetrics, deleteMetric, registerMetric, alterMetricVersion } from '@/services/oneMetaSemanticService'
@@ -524,15 +524,15 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
             >
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-52">指标名称 / 编码</TableHead>
-                  <TableHead className="px-3 w-16 text-center">类型</TableHead>
-                  <TableHead className="px-3 w-32 text-center">数据类型</TableHead>
-                  <TableHead className="px-3 w-16 text-center">单位</TableHead>
+                  <TableHead className={tableColumnWidthClassMap['4xl']}>指标名称 / 编码</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>类型</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.xl} text-center`}>数据类型</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>单位</TableHead>
                   <TableHead className="px-3">描述</TableHead>
-                  <TableHead className="px-3 w-14 text-center">版本</TableHead>
-                  <TableHead className="px-3 w-20">创建人</TableHead>
-                  <TableHead className="px-3 w-40">创建时间</TableHead>
-                  <TableHead className="px-3 w-16 text-center">操作</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.xs} text-center`}>版本</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.md}`}>创建人</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap['2xl']}`}>创建时间</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

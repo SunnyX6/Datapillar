@@ -1,21 +1,21 @@
 """
-知识评估示例：切分与检索质量评估
+Knowledge evaluation example: chunking and retrieval quality.
 
-运行命令：
+Run:
     uv run python examples/quickstart_knowledge_evaluation.py
 
-依赖安装：
+Dependencies:
     pip install datapillar-oneagentic[lance,knowledge]
 
-Embedding 配置：
+Embedding configuration:
     export DATAPILLAR_EMBEDDING_PROVIDER="openai"          # openai | glm
     export DATAPILLAR_EMBEDDING_API_KEY="sk-xxx"
     export DATAPILLAR_EMBEDDING_MODEL="text-embedding-3-small"
     export DATAPILLAR_EMBEDDING_DIMENSION="1536"
-    # 可选：export DATAPILLAR_EMBEDDING_BASE_URL="https://api.openai.com/v1"
+    # Optional: export DATAPILLAR_EMBEDDING_BASE_URL="https://api.openai.com/v1"
 
-说明：
-    - 评估集文档无需传 source_id，系统根据 doc_id 自动派生。
+Notes:
+    - Evalset docs do not need source_id; it is derived from doc_id.
 """
 
 import asyncio
@@ -39,13 +39,13 @@ async def main() -> None:
     if not config.embedding.is_configured():
         supported = ", ".join(EmbeddingBackend.list_supported())
         raise RuntimeError(
-            "请先配置 Embedding：\n"
+            "Please configure embedding first:\n"
             "  export DATAPILLAR_EMBEDDING_PROVIDER=\"openai\"\n"
             "  export DATAPILLAR_EMBEDDING_API_KEY=\"sk-xxx\"\n"
             "  export DATAPILLAR_EMBEDDING_MODEL=\"text-embedding-3-small\"\n"
             "  export DATAPILLAR_EMBEDDING_DIMENSION=\"1536\"\n"
-            "可选：export DATAPILLAR_EMBEDDING_BASE_URL=\"https://api.openai.com/v1\"\n"
-            f"支持 provider: {supported}"
+            "Optional: export DATAPILLAR_EMBEDDING_BASE_URL=\"https://api.openai.com/v1\"\n"
+            f"Supported providers: {supported}"
         )
     embedding_config = config.embedding.model_dump()
 
@@ -75,7 +75,7 @@ async def main() -> None:
     )
 
     report = await evaluator.evaluate(evalset)
-    print("评估摘要：")
+    print("Evaluation summary:")
     print(json.dumps(report.summary(), ensure_ascii=False, indent=2))
 
     await evaluator.close()

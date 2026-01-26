@@ -1,6 +1,4 @@
-"""
-证据治理：分组与去重
-"""
+"""Evidence governance: grouping and deduplication."""
 
 from __future__ import annotations
 

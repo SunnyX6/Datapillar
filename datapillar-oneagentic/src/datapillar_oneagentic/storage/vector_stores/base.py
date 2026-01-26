@@ -1,6 +1,4 @@
-"""
-VectorStore 抽象接口
-"""
+"""VectorStore abstract interface."""
 
 from __future__ import annotations
 
@@ -48,7 +46,7 @@ class VectorSearchResult:
 
 
 class VectorStore(ABC):
-    """向量数据库统一接口"""
+    """Unified vector database interface."""
 
     def __init__(self, *, namespace: str) -> None:
         self._namespace = namespace
@@ -61,16 +59,16 @@ class VectorStore(ABC):
     @property
     @abstractmethod
     def capabilities(self) -> VectorStoreCapabilities:
-        """能力声明"""
+        """Capability declaration."""
 
     def register_schema(self, schema: VectorCollectionSchema) -> None:
-        """注册集合 schema"""
+        """Register collection schema."""
         self._schemas[schema.name] = schema
 
     def get_schema(self, name: str) -> VectorCollectionSchema:
         schema = self._schemas.get(name)
         if not schema:
-            raise KeyError(f"未注册集合 schema: {name}")
+            raise KeyError(f"Collection schema not registered: {name}")
         return schema
 
     def _namespaced(self, name: str) -> str:
@@ -78,27 +76,27 @@ class VectorStore(ABC):
 
     @abstractmethod
     async def initialize(self) -> None:
-        """初始化连接"""
+        """Initialize connection."""
 
     @abstractmethod
     async def close(self) -> None:
-        """关闭连接"""
+        """Close connection."""
 
     @abstractmethod
     async def ensure_collection(self, schema: VectorCollectionSchema) -> None:
-        """确保集合存在"""
+        """Ensure collection exists."""
 
     @abstractmethod
     async def add(self, collection: str, records: list[dict[str, Any]]) -> None:
-        """写入记录"""
+        """Insert records."""
 
     @abstractmethod
     async def get(self, collection: str, ids: list[str]) -> list[dict[str, Any]]:
-        """按 ID 获取记录"""
+        """Get records by ID."""
 
     @abstractmethod
     async def delete(self, collection: str, ids: list[str]) -> int:
-        """删除记录"""
+        """Delete records."""
 
     @abstractmethod
     async def search(
@@ -108,7 +106,7 @@ class VectorStore(ABC):
         k: int = 5,
         filters: dict[str, Any] | None = None,
     ) -> list[VectorSearchResult]:
-        """向量搜索"""
+        """Vector search."""
 
     @abstractmethod
     async def query(
@@ -117,8 +115,8 @@ class VectorStore(ABC):
         filters: dict[str, Any] | None = None,
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
-        """按过滤条件查询"""
+        """Query by filters."""
 
     @abstractmethod
     async def count(self, collection: str) -> int:
-        """统计集合记录数"""
+        """Count records in a collection."""

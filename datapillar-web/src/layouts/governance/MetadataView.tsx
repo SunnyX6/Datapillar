@@ -26,6 +26,7 @@ import { type CatalogFormHandle } from './metadata/form/CatalogForm'
 import { type SchemaFormHandle } from './metadata/form/SchemaForm'
 import { type CatalogAsset, type NodeType, type SchemaAsset, type TableAsset } from './metadata/type/types'
 import { Modal, ModalCancelButton, ModalPrimaryButton } from '@/components/ui'
+import { panelWidthClassMap } from '@/design-tokens/dimensions'
 import { useSearchStore, useMetadataStore } from '@/stores'
 import {
   createCatalog,
@@ -662,7 +663,7 @@ export function MetadataView() {
 
       <aside
         className={`flex-shrink-0 h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden transition-[width,opacity] duration-300 flex flex-col min-h-0 ${
-          isSideCollapsed ? 'w-0 min-w-0 opacity-0 pointer-events-none' : 'w-panel-responsive opacity-100'
+          isSideCollapsed ? 'w-0 min-w-0 opacity-0 pointer-events-none' : `${panelWidthClassMap.responsive} opacity-100`
         }`}
       >
         <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center bg-slate-50 dark:bg-slate-900">

@@ -1,8 +1,8 @@
 """
-Context Timeline 子模块 - 时间线管理
+Context timeline submodule - timeline management.
 
-记录执行事件序列，支持时间旅行。
-注意：namespace, session_id 由 Blackboard 管理，不在此存储。
+Records execution events and supports time travel.
+Note: namespace and session_id are managed by Blackboard and not stored here.
 """
 
 from __future__ import annotations
@@ -23,33 +23,33 @@ def _generate_id() -> str:
 
 class Timeline(BaseModel):
     """
-    时间线
+    Timeline.
 
-    记录一次会话的完整事件序列，支持时间旅行。
-    注意：namespace, session_id 由 Blackboard 管理。
+    Records the full event sequence for a session and supports time travel.
+    Note: namespace and session_id are managed by Blackboard.
     """
 
-    # 标识
-    id: str = Field(default_factory=_generate_id, description="时间线 ID")
+    # Identity
+    id: str = Field(default_factory=_generate_id, description="Timeline ID")
 
-    # 事件序列
-    entries: list[TimelineEntry] = Field(default_factory=list, description="事件列表")
-    next_seq: int = Field(default=1, description="下一个序号")
+    # Event sequence
+    entries: list[TimelineEntry] = Field(default_factory=list, description="Event list")
+    next_seq: int = Field(default=1, description="Next sequence")
 
-    # 检查点索引
+    # Checkpoint index
     checkpoint_ids: list[str] = Field(
         default_factory=list,
-        description="检查点 ID 列表（按时间顺序）",
+        description="Checkpoint IDs in chronological order",
     )
 
-    # 当前状态
+    # Current state
     current_checkpoint_id: str | None = Field(
         default=None,
-        description="当前检查点 ID",
+        description="Current checkpoint ID",
     )
 
-    # 统计
-    total_duration_ms: int = Field(default=0, description="总耗时")
+    # Statistics
+    total_duration_ms: int = Field(default=0, description="Total duration")
 
     def add_entry(
         self,
@@ -63,7 +63,7 @@ class Timeline(BaseModel):
         checkpoint_type: CheckpointType | None = None,
         is_checkpoint: bool = False,
     ) -> TimelineEntry:
-        """添加事件"""
+        """Add an event."""
         entry = TimelineEntry(
             seq=self.next_seq,
             event_type=event_type,
@@ -92,13 +92,13 @@ class Timeline(BaseModel):
     def add_checkpoint(
         self,
         checkpoint_id: str,
-        content: str = "检查点",
+        content: str = "Checkpoint",
         *,
         checkpoint_type: CheckpointType = CheckpointType.AUTO,
         agent_id: str | None = None,
         metadata: dict | None = None,
     ) -> TimelineEntry:
-        """添加检查点事件"""
+        """Add a checkpoint event."""
         return self.add_entry(
             event_type=EventType.CHECKPOINT_CREATE,
             content=content,
@@ -110,42 +110,42 @@ class Timeline(BaseModel):
         )
 
     def get_entry(self, entry_id: str) -> TimelineEntry | None:
-        """获取指定事件"""
+        """Get a specific entry."""
         for entry in self.entries:
             if entry.id == entry_id:
                 return entry
         return None
 
-    def get_entry_by_checkpoint(self, checkpoint_id: str) -> TimelineEntry | None:
-        """获取指定检查点的事件"""
+    def get_checkpoint_entry(self, checkpoint_id: str) -> TimelineEntry | None:
+        """Get entry for a checkpoint."""
         for entry in self.entries:
             if entry.checkpoint_id == checkpoint_id:
                 return entry
         return None
 
     def get_entries_since(self, timestamp_ms: int) -> list[TimelineEntry]:
-        """获取指定时间之后的事件"""
+        """Get entries after a timestamp."""
         return [e for e in self.entries if e.timestamp_ms >= timestamp_ms]
 
-    def get_entries_by_agent(self, agent_id: str) -> list[TimelineEntry]:
-        """获取指定 Agent 的事件"""
+    def get_agent_entries(self, agent_id: str) -> list[TimelineEntry]:
+        """Get entries for a specific agent."""
         return [e for e in self.entries if e.agent_id == agent_id]
 
-    def get_entries_by_type(self, event_type: EventType) -> list[TimelineEntry]:
-        """获取指定类型的事件"""
+    def get_type_entries(self, event_type: EventType) -> list[TimelineEntry]:
+        """Get entries of a specific type."""
         return [e for e in self.entries if e.event_type == event_type]
 
     def get_checkpoint_entries(self) -> list[TimelineEntry]:
-        """获取所有检查点事件"""
+        """Get all checkpoint entries."""
         return [e for e in self.entries if e.is_checkpoint]
 
     def get_latest_checkpoint(self) -> TimelineEntry | None:
-        """获取最新的检查点"""
+        """Get the latest checkpoint."""
         checkpoint_entries = self.get_checkpoint_entries()
         return checkpoint_entries[-1] if checkpoint_entries else None
 
     def find_checkpoint_before(self, timestamp_ms: int) -> TimelineEntry | None:
-        """查找指定时间之前最近的检查点"""
+        """Find the closest checkpoint before a timestamp."""
         checkpoints = [
             e for e in self.entries
             if e.is_checkpoint and e.timestamp_ms < timestamp_ms
@@ -153,7 +153,7 @@ class Timeline(BaseModel):
         return checkpoints[-1] if checkpoints else None
 
     def truncate_to_checkpoint(self, checkpoint_id: str) -> int:
-        """截断到指定检查点（删除之后的事件）"""
+        """Truncate to a checkpoint (delete later entries)."""
         checkpoint_idx = None
         for i, entry in enumerate(self.entries):
             if entry.checkpoint_id == checkpoint_id:
@@ -166,7 +166,7 @@ class Timeline(BaseModel):
         removed_count = len(self.entries) - checkpoint_idx - 1
         self.entries = self.entries[: checkpoint_idx + 1]
 
-        # 更新检查点列表
+        # Update checkpoint list.
         self.checkpoint_ids = [
             cid for cid in self.checkpoint_ids
             if any(e.checkpoint_id == cid for e in self.entries)
@@ -178,7 +178,7 @@ class Timeline(BaseModel):
         return removed_count
 
     def to_prompt(self, max_entries: int = 20) -> str:
-        """转换为 prompt 格式"""
+        """Convert to a prompt string."""
         if not self.entries:
             return ""
 
@@ -196,7 +196,7 @@ class Timeline(BaseModel):
         )
 
     def get_stats(self) -> dict:
-        """获取统计信息"""
+        """Return statistics."""
         type_counts: dict[str, int] = {}
         agents: set[str] = set()
 
@@ -215,8 +215,8 @@ class Timeline(BaseModel):
             "type_counts": type_counts,
         }
 
-    def add_entry_from_dict(self, data: dict) -> TimelineEntry:
-        """从字典添加事件（用于 TimelineRecorder 刷新）"""
+    def add_entry_dict(self, data: dict) -> TimelineEntry:
+        """Add an entry from a dict (used by TimelineRecorder flush)."""
         event_type = data.get("event_type")
         if isinstance(event_type, str):
             event_type = EventType.from_string(event_type)
@@ -233,10 +233,10 @@ class Timeline(BaseModel):
         )
 
     def to_dict(self) -> dict:
-        """序列化为字典"""
+        """Serialize to a dictionary."""
         return self.model_dump(mode="json")
 
     @classmethod
     def from_dict(cls, data: dict) -> Timeline:
-        """从字典恢复"""
+        """Deserialize from a dictionary."""
         return cls.model_validate(data)

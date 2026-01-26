@@ -1,9 +1,9 @@
 """
-动态执行图构建
+Dynamic execution graph builder.
 
-Agent 自主决定是否委派：
-- 返回 Command(goto="other_agent") 跳转到其他 Agent
-- 不返回 goto 或返回 Command(goto=END) 则流程结束
+Agents decide whether to delegate:
+- Return Command(goto="other_agent") to jump to another agent
+- No goto or Command(goto=END) ends the flow
 """
 
 from langgraph.graph import END, StateGraph
@@ -19,39 +19,39 @@ def build_dynamic_graph(
     create_agent_node,
 ) -> StateGraph:
     """
-    构建动态执行图
+    Build a dynamic execution graph.
 
     Args:
-        agent_specs: Agent 规格列表
-        agent_ids: 所有 Agent ID 列表
-        create_agent_node: 节点创建函数
+        agent_specs: agent spec list
+        agent_ids: all agent IDs
+        create_agent_node: node factory
 
     Returns:
-        StateGraph 实例
+        StateGraph instance
     """
     graph = StateGraph(Blackboard)
 
-    # 为每个 Agent 创建节点，声明可跳转的目标（包括 END）
+    # Create nodes for each agent with allowed destinations (including END).
     for spec in agent_specs:
         node_fn = create_agent_node(spec.id)
-        # destinations: 其他 Agent + END
+        # Destinations: other agents + END.
         other_agents = tuple(aid for aid in agent_ids if aid != spec.id)
         graph.add_node(spec.id, node_fn, destinations=(*other_agents, END))
 
-    # 条件入口：根据 active_agent 路由
+    # Conditional entry: route by active_agent.
     route_map = {agent_id: agent_id for agent_id in agent_ids}
     route_map["end"] = END
-    graph.set_conditional_entry_point(_route_by_active_agent(agent_ids), route_map)
+    graph.set_conditional_entry_point(_route_active_agent(agent_ids), route_map)
 
-    # 每个 Agent 执行后：由 Command(goto=...) 决定下一步，不委派则结束
+    # After each agent: Command(goto=...) decides next step, otherwise end.
     for spec in agent_specs:
         graph.add_edge(spec.id, END)
 
     return graph
 
 
-def _route_by_active_agent(agent_ids: list[str]):
-    """创建根据 active_agent 路由的函数"""
+def _route_active_agent(agent_ids: list[str]):
+    """Create a router based on active_agent."""
     def router(state) -> str:
         sb = StateBuilder(state)
         active = sb.routing.snapshot().active_agent

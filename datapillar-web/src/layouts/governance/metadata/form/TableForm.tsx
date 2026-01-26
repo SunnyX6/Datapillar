@@ -8,6 +8,7 @@ import { useEffect, useState, useRef, useCallback, forwardRef, useImperativeHand
 import { createPortal } from 'react-dom'
 import { GripVertical, Plus, Trash2, Key, Sparkles, Layers, List, Hash, Type, ChevronLeft, ChevronRight, Pin } from 'lucide-react'
 import { toast } from 'sonner'
+import { menuWidthClassMap } from '@/design-tokens/dimensions'
 import {
   parseDDL,
   resolveDialect,
@@ -299,7 +300,7 @@ function ColumnRow({
               <Pin size={12} />
             </button>
             <div
-              className="hidden absolute right-0 top-full mt-1 z-50 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden"
+              className={`hidden absolute right-0 top-full mt-1 z-50 ${menuWidthClassMap.medium} bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden`}
               onMouseLeave={(e) => {
                 e.currentTarget.classList.add('hidden')
                 setHoveredDomain(null)
@@ -365,7 +366,7 @@ function ColumnRow({
         <div
           ref={cardRef}
           style={{ top: cardPos.top, left: cardPos.left }}
-          className="fixed z-[1000001] w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl animate-in fade-in-0 slide-in-from-left-2 duration-150"
+          className={`fixed z-[1000001] ${menuWidthClassMap.xxlarge} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl animate-in fade-in-0 slide-in-from-left-2 duration-150`}
           onMouseEnter={handleCardMouseEnter}
           onMouseLeave={handleCardMouseLeave}
         >

@@ -1,11 +1,11 @@
 """
-A2A 配置模型
+A2A configuration models.
 
-定义远程 Agent 的连接配置、认证方式等。
+Defines remote agent connection config and authentication.
 
-安全说明：
-    URL 会进行 SSRF 防护校验，默认禁止访问内网地址。
-    参考：https://modelcontextprotocol.io/specification/draft/basic/security_best_practices
+Security:
+    URLs are validated for SSRF protection; private IPs are blocked by default.
+    Reference: https://modelcontextprotocol.io/specification/draft/basic/security_best_practices
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from datapillar_oneagentic.security import validate_url
 
 
 class AuthType(str, Enum):
-    """认证类型"""
+    """Authentication type."""
 
     NONE = "none"
     API_KEY = "api_key"
@@ -28,18 +28,18 @@ class AuthType(str, Enum):
 
 @dataclass
 class AuthScheme:
-    """认证方案基类"""
+    """Base authentication scheme."""
 
     type: AuthType = AuthType.NONE
 
     def to_headers(self) -> dict[str, str]:
-        """转换为 HTTP 头"""
+        """Convert to HTTP headers."""
         return {}
 
 
 @dataclass
 class APIKeyAuth(AuthScheme):
-    """API Key 认证"""
+    """API key authentication."""
 
     type: AuthType = field(default=AuthType.API_KEY, init=False)
     api_key: str = ""
@@ -53,7 +53,7 @@ class APIKeyAuth(AuthScheme):
 
 @dataclass
 class BearerAuth(AuthScheme):
-    """Bearer Token 认证"""
+    """Bearer token authentication."""
 
     type: AuthType = field(default=AuthType.BEARER, init=False)
     token: str = ""
@@ -67,22 +67,22 @@ class BearerAuth(AuthScheme):
 @dataclass
 class A2AConfig:
     """
-    A2A 远程 Agent 配置
+    A2A remote agent configuration.
 
-    定义如何连接和调用远程 A2A Agent。
+    Defines how to connect and call remote A2A agents.
 
-    属性：
-    - endpoint: Agent 端点 URL（AgentCard 地址）
-    - auth: 认证方案
-    - timeout: 请求超时（秒）
-    - max_turns: 最大对话轮次
-    - fail_fast: 连接失败时是否立即报错
-    - trust_remote_completion: 是否信任远程 Agent 的完成状态
+    Attributes:
+    - endpoint: Agent endpoint URL (AgentCard URL)
+    - auth: Authentication scheme
+    - timeout: Request timeout in seconds
+    - max_turns: Max conversation turns
+    - fail_fast: Fail immediately on connection errors
+    - trust_remote_completion: Trust remote completion status
 
-    安全说明：
-        URL 会进行 SSRF 防护校验，默认禁止访问内网地址。
+    Security:
+        URLs are validated for SSRF protection; private IPs are blocked by default.
 
-    使用示例：
+    Example:
     ```python
     config = A2AConfig(
         endpoint="https://api.example.com/.well-known/agent-card.json",
@@ -94,40 +94,40 @@ class A2AConfig:
     """
 
     endpoint: str
-    """Agent 端点 URL"""
+    """Agent endpoint URL."""
 
     auth: AuthScheme = field(default_factory=AuthScheme)
-    """认证方案"""
+    """Authentication scheme."""
 
     timeout: int = 120
-    """请求超时（秒）"""
+    """Request timeout in seconds."""
 
     fail_fast: bool = True
-    """连接失败时是否立即报错，False 则跳过该 Agent"""
+    """Fail immediately on connection error; False skips the agent."""
 
     trust_remote_completion: bool = False
-    """是否信任远程 Agent 的完成状态，True 则直接返回远程结果"""
+    """Trust remote agent completion status; True returns remote result directly."""
 
     require_confirmation: bool = True
-    """调用前是否需要用户确认（外部 Agent 行为不可预测）"""
+    """Require user confirmation before calling (external agent behavior is unpredictable)."""
 
     metadata: dict[str, Any] = field(default_factory=dict)
-    """额外元数据"""
+    """Additional metadata."""
 
     skip_security_check: bool = False
-    """跳过安全检查（仅用于测试，生产环境禁止）"""
+    """Skip security checks (testing only; forbidden in production)."""
 
     def __post_init__(self):
-        """校验配置"""
+        """Validate configuration."""
         if not self.endpoint:
-            raise ValueError("endpoint 不能为空")
+            raise ValueError("endpoint cannot be empty")
 
         if not self.endpoint.startswith(("http://", "https://")):
-            raise ValueError(f"endpoint 必须是 HTTP(S) URL: {self.endpoint}")
+            raise ValueError(f"endpoint must be an HTTP(S) URL: {self.endpoint}")
 
         if self.timeout <= 0:
-            raise ValueError(f"timeout 必须大于 0: {self.timeout}")
+            raise ValueError(f"timeout must be greater than 0: {self.timeout}")
 
-        # SSRF 防护校验
+        # SSRF protection check.
         if not self.skip_security_check:
             validate_url(self.endpoint)

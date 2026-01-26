@@ -1,9 +1,9 @@
 """
-Timeline Recorder
+Timeline recorder.
 
-将 EventBus 事件记录到 Timeline。
+Records EventBus events into Timeline.
 
-使用 SessionKey 作为 key 存储事件，在 agent_node 执行完成后刷新到 Timeline。
+Uses SessionKey as the storage key and flushes into Timeline after agent_node completes.
 """
 
 from __future__ import annotations
@@ -31,136 +31,136 @@ logger = logging.getLogger(__name__)
 
 class TimelineRecorder:
     """
-    Timeline 记录器
+    Timeline recorder.
 
-    将 EventBus 事件记录到内存缓冲区，按 SessionKey 分组。
-    在 agent_node 执行完成后，调用 flush() 将事件刷新到 Timeline。
+    Records EventBus events into an in-memory buffer grouped by SessionKey.
+    Call flush() after agent_node finishes to push events into Timeline.
 
-    使用示例：
+    Example:
     ```python
     recorder = TimelineRecorder(event_bus)
-    recorder.register()  # 注册 EventBus 处理器
+    recorder.register()  # Register EventBus handlers
 
-    # 事件自动记录到缓冲区...
+    # Events are recorded into the buffer automatically...
 
-    # 获取并清空指定 session 的事件
+    # Fetch and clear events for a session
     key = SessionKey(namespace="etl", session_id="abc123")
     entries = recorder.flush(key)
     for entry in entries:
-        timeline.add_entry_from_dict(entry)
+        timeline.add_entry_dict(entry)
     ```
     """
 
     def __init__(self, event_bus: EventBus) -> None:
-        """初始化"""
+        """Initialize."""
         self._event_bus = event_bus
         self._buffer: dict[str, list[dict]] = defaultdict(list)
         self._buffer_lock = threading.Lock()
         self._registered = False
 
     def register(self) -> None:
-        """注册 EventBus 处理器"""
+        """Register EventBus handlers."""
         if self._registered:
             return
 
-        # Agent 事件
+        # Agent events
         self._event_bus.register(AgentStartedEvent, self._on_agent_started)
         self._event_bus.register(AgentCompletedEvent, self._on_agent_completed)
         self._event_bus.register(AgentFailedEvent, self._on_agent_failed)
 
-        # 会话事件
+        # Session events
         self._event_bus.register(SessionStartedEvent, self._on_session_started)
         self._event_bus.register(SessionCompletedEvent, self._on_session_completed)
 
-        # 委派事件
+        # Delegation events
         self._event_bus.register(DelegationStartedEvent, self._on_delegation_started)
         self._event_bus.register(DelegationCompletedEvent, self._on_delegation_completed)
 
         self._registered = True
 
     def _record(self, key: SessionKey | None, entry_data: dict) -> None:
-        """记录事件到缓冲区"""
+        """Record an event into the buffer."""
         if not key:
             return
         with self._buffer_lock:
             self._buffer[str(key)].append(entry_data)
 
     def flush(self, key: SessionKey) -> list[dict]:
-        """获取并清空指定 session 的事件"""
+        """Fetch and clear events for the session."""
         with self._buffer_lock:
             entries = self._buffer.pop(str(key), [])
         return entries
 
     def peek(self, key: SessionKey) -> list[dict]:
-        """查看指定 session 的事件（不清空）"""
+        """Peek events for the session (without clearing)."""
         with self._buffer_lock:
             return list(self._buffer.get(str(key), []))
 
     def clear(self, key: SessionKey | None = None) -> None:
-        """清空缓冲区"""
+        """Clear the buffer."""
         with self._buffer_lock:
             if key:
                 self._buffer.pop(str(key), None)
             else:
                 self._buffer.clear()
 
-    # === EventBus 处理器 ===
+    # === EventBus handlers ===
 
     def _on_agent_started(self, source: Any, event: AgentStartedEvent) -> None:
-        """Agent 开始"""
+        """Agent started."""
         self._record(
             event.key,
             {
                 "event_type": EventType.AGENT_START.value,
                 "agent_id": event.agent_id,
-                "content": f"Agent [{event.agent_name}] 开始执行",
+                "content": f"Agent [{event.agent_name}] started",
                 "metadata": {"query": event.query[:200] if event.query else ""},
             },
         )
 
     def _on_agent_completed(self, source: Any, event: AgentCompletedEvent) -> None:
-        """Agent 完成"""
+        """Agent completed."""
         self._record(
             event.key,
             {
                 "event_type": EventType.AGENT_END.value,
                 "agent_id": event.agent_id,
-                "content": f"Agent [{event.agent_name}] 执行完成",
+                "content": f"Agent [{event.agent_name}] completed",
                 "duration_ms": int(event.duration_ms),
                 "metadata": {"result": str(event.result)[:200] if event.result else ""},
             },
         )
 
     def _on_agent_failed(self, source: Any, event: AgentFailedEvent) -> None:
-        """Agent 失败"""
+        """Agent failed."""
         self._record(
             event.key,
             {
                 "event_type": EventType.AGENT_FAILED.value,
                 "agent_id": event.agent_id,
-                "content": f"Agent [{event.agent_name}] 执行失败: {event.error}",
+                "content": f"Agent [{event.agent_name}] failed: {event.error}",
                 "metadata": {"error_type": event.error_type, "error": event.error},
             },
         )
 
     def _on_session_started(self, source: Any, event: SessionStartedEvent) -> None:
-        """会话开始"""
+        """Session started."""
         self._record(
             event.key,
             {
                 "event_type": EventType.SESSION_START.value,
-                "content": f"会话开始: {event.query[:100] if event.query else ''}",
+                "content": f"Session started: {event.query[:100] if event.query else ''}",
                 "metadata": {"query": event.query},
             },
         )
 
     def _on_session_completed(self, source: Any, event: SessionCompletedEvent) -> None:
-        """会话完成"""
+        """Session completed."""
         self._record(
             event.key,
             {
                 "event_type": EventType.SESSION_END.value,
-                "content": "会话完成",
+                "content": "Session completed",
                 "duration_ms": int(event.duration_ms),
                 "metadata": {
                     "agent_count": event.agent_count,
@@ -170,13 +170,13 @@ class TimelineRecorder:
         )
 
     def _on_delegation_started(self, source: Any, event: DelegationStartedEvent) -> None:
-        """委派开始"""
+        """Delegation started."""
         self._record(
             event.key,
             {
                 "event_type": EventType.DELEGATION_START.value,
                 "agent_id": event.from_agent_id,
-                "content": f"委派任务给 [{event.to_agent_id}]: {event.task[:100] if event.task else ''}",
+                "content": f"Delegated to [{event.to_agent_id}]: {event.task[:100] if event.task else ''}",
                 "metadata": {
                     "from_agent_id": event.from_agent_id,
                     "to_agent_id": event.to_agent_id,
@@ -187,13 +187,13 @@ class TimelineRecorder:
         )
 
     def _on_delegation_completed(self, source: Any, event: DelegationCompletedEvent) -> None:
-        """委派完成"""
+        """Delegation completed."""
         self._record(
             event.key,
             {
                 "event_type": EventType.DELEGATION_END.value,
                 "agent_id": event.from_agent_id,
-                "content": f"委派完成: [{event.to_agent_id}]",
+                "content": f"Delegation completed: [{event.to_agent_id}]",
                 "duration_ms": int(event.duration_ms),
                 "metadata": {
                     "from_agent_id": event.from_agent_id,

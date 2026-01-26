@@ -1,7 +1,7 @@
 """
-Todo 模块
+Todo module.
 
-包含会话级 Todo 模型与工具。
+Includes session-level Todo models and tools.
 """
 
 from datapillar_oneagentic.todo.session_todo import SessionTodoList, StepStatus, TodoItem, TodoUpdate

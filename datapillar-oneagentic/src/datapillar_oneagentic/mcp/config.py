@@ -1,10 +1,10 @@
 """
-MCP 服务器配置模型
+MCP server configuration models.
 
-安全说明：
-    - HTTP/SSE 模式会进行 URL 校验（SSRF 防护）
-    - 工具安全校验在运行时基于 MCP Tool Annotations 进行
-    参考：https://modelcontextprotocol.io/specification
+Security:
+    - HTTP/SSE modes validate URLs (SSRF protection)
+    - Tool safety checks use MCP Tool Annotations at runtime
+    Reference: https://modelcontextprotocol.io/specification
 """
 
 from __future__ import annotations
@@ -17,15 +17,15 @@ from datapillar_oneagentic.security import validate_url
 @dataclass
 class MCPServerStdio:
     """
-    Stdio MCP 服务器配置
+    Stdio MCP server configuration.
 
-    用于连接本地 MCP 服务器进程。
+    Used to connect to a local MCP server process.
 
-    安全说明：
-        工具的安全性由 MCP Server 通过 Tool Annotations 声明，
-        框架在运行时根据 annotations 判断是否需要用户确认。
+    Security:
+        Tool safety is declared by MCP Server via Tool Annotations;
+        the framework decides whether to request confirmation at runtime.
 
-    使用示例：
+    Example:
     ```python
     config = MCPServerStdio(
         command="npx",
@@ -36,33 +36,33 @@ class MCPServerStdio:
     """
 
     command: str
-    """命令（如 python, npx, uvx）"""
+    """Command (e.g., python, npx, uvx)."""
 
     args: list[str] = field(default_factory=list)
-    """命令参数"""
+    """Command arguments."""
 
     env: dict[str, str] | None = None
-    """环境变量"""
+    """Environment variables."""
 
     cwd: str | None = None
-    """工作目录"""
+    """Working directory."""
 
     def __post_init__(self):
         if not self.command:
-            raise ValueError("command 不能为空")
+            raise ValueError("command cannot be empty")
 
 
 @dataclass
 class MCPServerHTTP:
     """
-    HTTP MCP 服务器配置
+    HTTP MCP server configuration.
 
-    用于连接远程 HTTP MCP 服务器。
+    Used to connect to a remote HTTP MCP server.
 
-    安全说明：
-        URL 会进行 SSRF 防护校验，默认禁止访问内网地址。
+    Security:
+        URLs are validated for SSRF protection; private IPs are blocked by default.
 
-    使用示例：
+    Example:
     ```python
     config = MCPServerHTTP(
         url="https://api.example.com/mcp",
@@ -72,28 +72,28 @@ class MCPServerHTTP:
     """
 
     url: str
-    """服务器 URL"""
+    """Server URL."""
 
     headers: dict[str, str] | None = None
-    """HTTP 头"""
+    """HTTP headers."""
 
     timeout: int = 30
-    """请求超时（秒）"""
+    """Request timeout in seconds."""
 
     streamable: bool = True
-    """是否使用流式传输"""
+    """Whether to use streaming transport."""
 
     skip_security_check: bool = False
-    """跳过安全检查（仅用于测试，生产环境禁止）"""
+    """Skip security checks (testing only; forbidden in production)."""
 
     def __post_init__(self):
         if not self.url:
-            raise ValueError("url 不能为空")
+            raise ValueError("url cannot be empty")
 
         if not self.url.startswith(("http://", "https://")):
-            raise ValueError(f"url 必须是 HTTP(S) URL: {self.url}")
+            raise ValueError(f"url must be an HTTP(S) URL: {self.url}")
 
-        # SSRF 防护校验
+        # SSRF protection check.
         if not self.skip_security_check:
             validate_url(self.url)
 
@@ -101,14 +101,14 @@ class MCPServerHTTP:
 @dataclass
 class MCPServerSSE:
     """
-    SSE MCP 服务器配置
+    SSE MCP server configuration.
 
-    用于连接 Server-Sent Events MCP 服务器。
+    Used to connect to a Server-Sent Events MCP server.
 
-    安全说明：
-        URL 会进行 SSRF 防护校验，默认禁止访问内网地址。
+    Security:
+        URLs are validated for SSRF protection; private IPs are blocked by default.
 
-    使用示例：
+    Example:
     ```python
     config = MCPServerSSE(
         url="https://api.example.com/mcp/sse",
@@ -118,28 +118,28 @@ class MCPServerSSE:
     """
 
     url: str
-    """服务器 URL"""
+    """Server URL."""
 
     headers: dict[str, str] | None = None
-    """HTTP 头"""
+    """HTTP headers."""
 
     timeout: int = 30
-    """连接超时（秒）"""
+    """Connection timeout in seconds."""
 
     skip_security_check: bool = False
-    """跳过安全检查（仅用于测试，生产环境禁止）"""
+    """Skip security checks (testing only; forbidden in production)."""
 
     def __post_init__(self):
         if not self.url:
-            raise ValueError("url 不能为空")
+            raise ValueError("url cannot be empty")
 
         if not self.url.startswith(("http://", "https://")):
-            raise ValueError(f"url 必须是 HTTP(S) URL: {self.url}")
+            raise ValueError(f"url must be an HTTP(S) URL: {self.url}")
 
-        # SSRF 防护校验
+        # SSRF protection check.
         if not self.skip_security_check:
             validate_url(self.url)
 
 
-# 配置类型联合
+# Config type union
 MCPServerConfig = MCPServerStdio | MCPServerHTTP | MCPServerSSE

@@ -17,6 +17,12 @@
     <description>认证服务 - JWT Token 颁发与管理</description>
 
     <dependencies>
+        <dependency>
+            <groupId>com.sunny</groupId>
+            <artifactId>datapillar-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Spring Boot Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

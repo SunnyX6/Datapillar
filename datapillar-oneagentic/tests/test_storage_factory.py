@@ -27,7 +27,7 @@ class _StubExperienceStore:
         self.namespace = namespace
 
 
-def test_create_knowledge_store_lance(monkeypatch) -> None:
+def test_create_knowledge(monkeypatch) -> None:
     monkeypatch.setattr(storage_module, "LanceVectorStore", lambda **kwargs: _StubVectorStore(**kwargs))
     monkeypatch.setattr(storage_module, "VectorKnowledgeStore", _StubKnowledgeStore)
 
@@ -43,7 +43,7 @@ def test_create_knowledge_store_lance(monkeypatch) -> None:
     assert store.namespace == "ns1"
 
 
-def test_create_knowledge_store_chroma(monkeypatch) -> None:
+def test_create_knowledge2(monkeypatch) -> None:
     monkeypatch.setattr(storage_module, "ChromaVectorStore", lambda **kwargs: _StubVectorStore(**kwargs))
     monkeypatch.setattr(storage_module, "VectorKnowledgeStore", _StubKnowledgeStore)
 
@@ -59,7 +59,7 @@ def test_create_knowledge_store_chroma(monkeypatch) -> None:
     assert store.namespace == "ns2"
 
 
-def test_create_knowledge_store_milvus(monkeypatch) -> None:
+def test_create_knowledge3(monkeypatch) -> None:
     monkeypatch.setattr(storage_module, "MilvusVectorStore", lambda **kwargs: _StubVectorStore(**kwargs))
     monkeypatch.setattr(storage_module, "VectorKnowledgeStore", _StubKnowledgeStore)
 
@@ -75,7 +75,7 @@ def test_create_knowledge_store_milvus(monkeypatch) -> None:
     assert store.namespace == "ns3"
 
 
-def test_create_learning_store_uses_vector_store(monkeypatch) -> None:
+def test_create_learning(monkeypatch) -> None:
     monkeypatch.setattr(storage_module, "LanceVectorStore", lambda **kwargs: _StubVectorStore(**kwargs))
     monkeypatch.setattr(storage_module, "VectorExperienceStore", _StubExperienceStore)
 
@@ -90,7 +90,7 @@ def test_create_learning_store_uses_vector_store(monkeypatch) -> None:
     assert store.namespace == "ns4"
 
 
-def test_create_store_requires_dimension() -> None:
+def test_create_requires() -> None:
     with pytest.raises(ValueError):
         storage_module.create_knowledge_store(
             "ns5",

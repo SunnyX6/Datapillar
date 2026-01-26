@@ -1,12 +1,12 @@
 """
-安全模块
+Security module.
 
-提供 MCP 官方安全规范的实现：
-- 基于 Tool Annotations 的危险工具识别
-- 危险操作前的用户确认（Human-in-the-loop）
-- URL 安全校验（SSRF 防护，含 DNS 解析）
+Implements MCP security specifications:
+- Risky tool detection based on Tool Annotations
+- User confirmation before risky actions (human-in-the-loop)
+- URL safety validation (SSRF protection with DNS resolution)
 
-参考：https://modelcontextprotocol.io/specification
+Reference: https://modelcontextprotocol.io/specification
 """
 
 from datapillar_oneagentic.security.validator import (

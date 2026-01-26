@@ -1,6 +1,4 @@
-"""
-PDF 解析器
-"""
+"""PDF parser."""
 
 from __future__ import annotations
 
@@ -41,7 +39,7 @@ def _extract_pdf(data: bytes) -> tuple[str, list[str], list[Attachment]]:
         import pypdfium2.raw as pdfium_c
     except ImportError as err:
         raise ImportError(
-            "解析 PDF 需要安装依赖：\n"
+            "PDF parsing requires dependencies:\n"
             "  pip install datapillar-oneagentic[knowledge]"
         ) from err
 
@@ -77,7 +75,7 @@ def _extract_images(page, pdfium_c) -> tuple[str, list[Attachment]]:
                 obj.extract(buffer, fb_format="png")
                 img_bytes = buffer.getvalue()
             except Exception as exc:
-                logger.warning("PDF 图片抽取失败: %s", exc)
+                logger.warning("PDF image extraction failed: %s", exc)
                 continue
             if not img_bytes:
                 continue
@@ -92,6 +90,6 @@ def _extract_images(page, pdfium_c) -> tuple[str, list[Attachment]]:
             )
             image_refs.append(f"![attachment]({attachment_id})")
     except Exception as exc:
-        logger.warning("PDF 图片读取失败: %s", exc)
+        logger.warning("PDF image load failed: %s", exc)
 
     return "\n".join(image_refs), attachments

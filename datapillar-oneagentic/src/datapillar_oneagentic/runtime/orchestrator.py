@@ -1,10 +1,10 @@
 """
-Orchestrator - 编排器
+Orchestrator.
 
-负责：
-1. 流式执行
-2. 断点恢复
-3. SSE 事件流
+Responsibilities:
+1. Streamed execution
+2. Checkpoint resume
+3. SSE event streaming
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class _SessionState:
-    """会话状态检测结果"""
+    """Session state detection result."""
 
     state: dict | None
     is_interrupted: bool
@@ -56,9 +56,9 @@ class _SessionState:
 
 class Orchestrator:
     """
-    编排器
+    Orchestrator.
 
-    负责执行团队的工作流程。
+    Executes the team's workflow.
     """
 
     def __init__(
@@ -78,20 +78,20 @@ class Orchestrator:
         event_bus: EventBus,
     ):
         """
-        创建编排器
+        Create an orchestrator.
 
-        参数：
-        - namespace: 命名空间（用于数据隔离）
-        - name: 名称
-        - graph: LangGraph 状态图
-        - entry_agent_id: 入口 Agent ID
-        - agent_ids: 所有 Agent ID 列表
-        - checkpointer: Checkpointer 实例
-        - store: Store 实例
-        - experience_learner: ExperienceLearner 实例（可选）
-        - experience_retriever: ExperienceRetriever 实例（可选）
-        - process: 执行模式
-        - event_bus: EventBus 实例
+        Args:
+            namespace: namespace for data isolation
+            name: name of the team
+            graph: LangGraph state graph
+            entry_agent_id: entry agent ID
+            agent_ids: list of agent IDs
+            checkpointer: checkpointer instance
+            store: store instance
+            experience_learner: ExperienceLearner instance (optional)
+            experience_retriever: ExperienceRetriever instance (optional)
+            process: execution mode
+            event_bus: EventBus instance
         """
         self.namespace = namespace
         self.name = name
@@ -101,30 +101,30 @@ class Orchestrator:
         self._agent_name_map = agent_name_map or {}
         self.process = process
 
-        # 存储实例
+        # Storage instances.
         self._checkpointer = checkpointer
         self._store = store
 
-        # 经验学习
+        # Experience learning.
         self._experience_learner = experience_learner
         self._experience_retriever = experience_retriever
         self._event_bus = event_bus
 
-        # 编译图（延迟编译）
+        # Compile graph lazily.
         self._compiled_graph = None
 
     def _make_key(self, session_id: str) -> SessionKey:
         """
-        构建 SessionKey
+        Build a SessionKey.
 
-        使用 namespace + session_id 组合，确保：
-        - 不同 namespace 的数据隔离
-        - 同一 namespace 内不同 session 的数据隔离
+        Uses namespace + session_id to ensure:
+        - isolation across namespaces
+        - isolation across sessions within a namespace
         """
         return SessionKey(namespace=self.namespace, session_id=session_id)
 
     def _get_agent_name(self, agent_id: str) -> str:
-        """获取 Agent 展示名（无映射时回退为 ID）"""
+        """Get display name for an agent (fallback to ID)."""
         return self._agent_name_map.get(agent_id, agent_id)
 
     async def _clear_store_artifacts(
@@ -132,8 +132,8 @@ class Orchestrator:
         session_id: str,
         deliverable_keys: list[str],
     ) -> None:
-        """清理 deliverables 的 Store 数据（不清理 checkpointer）"""
-        if not self._store or not deliverable_keys:
+        """Clear deliverables in the store (checkpoint remains)."""
+        if self._store is None or not deliverable_keys:
             return
 
         deliverable_namespace = ("deliverables", self.namespace, session_id)
@@ -143,17 +143,17 @@ class Orchestrator:
             try:
                 await self._store.adelete(deliverable_namespace, deliverable_key)
             except Exception as e:
-                logger.error(f"清理 Store 失败: key={deliverable_key}, error={e}")
+                logger.error(f"Store cleanup failed: key={deliverable_key}, error={e}")
 
     async def _load_deliverable(self, session_id: str, agent_id: str) -> Any | None:
-        """读取指定 Agent 的交付物"""
-        if not self._store:
+        """Load a deliverable for a specific agent."""
+        if self._store is None:
             return None
         deliverable_namespace = ("deliverables", self.namespace, session_id)
         try:
             item = await self._store.aget(deliverable_namespace, agent_id)
         except Exception as e:
-            logger.error(f"读取 deliverable 失败: agent={agent_id}, error={e}")
+            logger.error(f"Failed to load deliverable: agent={agent_id}, error={e}")
             return None
         if not item:
             return None
@@ -163,7 +163,7 @@ class Orchestrator:
         try:
             state = await checkpoint_manager.get_state(compiled)
         except Exception as e:
-            logger.warning(f"读取会话状态失败: {e}")
+            logger.warning(f"Failed to load session state: {e}")
             return []
         if not state:
             return []
@@ -176,7 +176,7 @@ class Orchestrator:
         session_id: str,
         deliverable_keys: list[str],
     ) -> dict[str, Any]:
-        if not self._store or not deliverable_keys:
+        if self._store is None or not deliverable_keys:
             return {}
         deliverables: dict[str, Any] = {}
         deliverable_namespace = ("deliverables", self.namespace, session_id)
@@ -186,7 +186,7 @@ class Orchestrator:
             try:
                 item = await self._store.aget(deliverable_namespace, deliverable_key)
             except Exception as e:
-                logger.error(f"读取 deliverable 失败: key={deliverable_key}, error={e}")
+                logger.error(f"Failed to load deliverable: key={deliverable_key}, error={e}")
                 continue
             if item:
                 deliverables[deliverable_key] = item.value
@@ -196,7 +196,7 @@ class Orchestrator:
         try:
             state = await checkpoint_manager.get_state(compiled)
         except Exception as e:
-            logger.warning(f"读取会话状态失败: {e}")
+            logger.warning(f"Failed to load session state: {e}")
             return
         if not state:
             return
@@ -205,14 +205,14 @@ class Orchestrator:
         try:
             await checkpoint_manager.update_state(compiled, sb.patch())
         except Exception as e:
-            logger.warning(f"清理交付物引用失败: {e}")
+            logger.warning(f"Failed to clear deliverable refs: {e}")
 
     async def _clear_state_artifacts(self, compiled, checkpoint_manager) -> None:
-        """清理 blackboard 中的 todo/deliverables 引用"""
+        """Clear todo/deliverable references from the blackboard."""
         try:
             state = await checkpoint_manager.get_state(compiled)
         except Exception as e:
-            logger.warning(f"读取会话状态失败: {e}")
+            logger.warning(f"Failed to load session state: {e}")
             return
         if not state:
             return
@@ -222,7 +222,7 @@ class Orchestrator:
         try:
             await checkpoint_manager.update_state(compiled, sb.patch())
         except Exception as e:
-            logger.warning(f"清理状态失败: {e}")
+            logger.warning(f"Failed to clear state: {e}")
 
     async def _cleanup_session_artifacts(
         self,
@@ -235,19 +235,19 @@ class Orchestrator:
         await self._clear_store_artifacts(session_id, deliverable_keys)
         await self._clear_state_artifacts(compiled, checkpoint_manager)
 
-    def _extract_thinking_from_message(self, msg: Any) -> str | None:
+    def _extract_thinking(self, msg: Any) -> str | None:
         """
-        从消息中提取思考内容
+        Extract thinking content from a message.
 
-        支持多种模型的思考格式：
+        Supports multiple model formats:
         - GLM: additional_kwargs.reasoning_content
-        - Claude: content 中的 thinking blocks
+        - Claude: thinking blocks in content
         - DeepSeek: additional_kwargs.reasoning_content
         """
         return extract_thinking(msg)
 
     def _build_error_event(self, error: Exception, *, key: SessionKey, start_time: int) -> dict:
-        """构建错误 SSE 事件（用于 stream 场景返回错误给调用方）"""
+        """Build an error SSE event for streaming responses."""
         if isinstance(error, LLMError):
             agent_id = error.agent_id
             agent_name = self._get_agent_name(agent_id) if agent_id else None
@@ -266,11 +266,11 @@ class Orchestrator:
                 event=EventType.AGENT_FAILED,
                 key=key,
                 agent_id=agent_id or "system",
-                agent_name=agent_name or "系统",
+                agent_name=agent_name or "system",
                 duration_ms=now_ms() - start_time,
                 data={
                     "error": {
-                        "message": "LLM 执行失败",
+                        "message": "LLM execution failed",
                         "detail": "; ".join(detail_parts),
                         "error_type": "llm",
                     }
@@ -290,11 +290,11 @@ class Orchestrator:
                 event=EventType.AGENT_FAILED,
                 key=key,
                 agent_id=agent_id or "system",
-                agent_name=self._get_agent_name(agent_id) if agent_id else "系统",
+                agent_name=self._get_agent_name(agent_id) if agent_id else "system",
                 duration_ms=now_ms() - start_time,
                 data={
                     "error": {
-                        "message": "Agent 执行失败",
+                        "message": "Agent execution failed",
                         "detail": "; ".join(detail_parts),
                         "error_type": "agent",
                     }
@@ -305,11 +305,11 @@ class Orchestrator:
             event=EventType.AGENT_FAILED,
             key=key,
             agent_id="system",
-            agent_name="系统",
+            agent_name="system",
             duration_ms=now_ms() - start_time,
             data={
                 "error": {
-                    "message": "执行失败",
+                    "message": "Execution failed",
                     "detail": str(error),
                     "error_type": "system",
                 }
@@ -317,7 +317,7 @@ class Orchestrator:
         )
 
     async def _ensure_compiled(self):
-        """确保图已编译"""
+        """Ensure the graph is compiled."""
         if self._compiled_graph is None:
             self._compiled_graph = self.graph.compile(
                 checkpointer=self._checkpointer,
@@ -334,7 +334,7 @@ class Orchestrator:
         key: SessionKey,
         checkpoint_manager,
     ) -> _SessionState:
-        """检测会话状态：是否存在、是否中断、经验上下文"""
+        """Detect session state: existence, interruption, experience context."""
         state = None
         is_interrupted = False
 
@@ -343,13 +343,13 @@ class Orchestrator:
             interrupts = ContextBuilder.extract_interrupts(snapshot)
             if interrupts:
                 is_interrupted = True
-                logger.info(f"⏸️ 检测到中断状态: key={key}")
+                logger.info(f"Interrupt detected: key={key}")
             values = getattr(snapshot, "values", None) if snapshot else None
             if values and not is_interrupted:
                 state = dict(values)
-                logger.info(f"🔄 恢复会话状态: key={key}")
+                logger.info(f"Session state restored: key={key}")
         except Exception as e:
-            logger.error(f"获取会话状态失败: {e}")
+            logger.error(f"Failed to fetch session state: {e}")
 
         return _SessionState(
             state=state,
@@ -364,17 +364,17 @@ class Orchestrator:
         session_state: _SessionState,
         key: SessionKey,
     ) -> dict | Command | None:
-        """根据场景构建 stream 输入"""
+        """Build stream input based on the scenario."""
         if session_state.is_interrupted and resume_value is not None:
-            logger.info(f"使用 Command(resume) 恢复中断: key={key}")
+            logger.info(f"Resume with Command(resume): key={key}")
             return Command(resume=resume_value)
 
         if session_state.is_interrupted and query:
-            logger.warning(f"中断恢复使用 query 作为 resume_value: key={key}")
+            logger.warning(f"Resume uses query as resume_value: key={key}")
             return Command(resume=query)
 
         if session_state.state and query:
-            logger.info(f"续聊模式: key={key}")
+            logger.info(f"Resume chat mode: key={key}")
             return StateBuilder.build_resume_update(
                 state=session_state.state,
                 query=query,
@@ -382,7 +382,7 @@ class Orchestrator:
             )
 
         if query:
-            logger.info(f"新会话: key={key}")
+            logger.info(f"New session: key={key}")
             return StateBuilder.build_initial_state(
                 namespace=self.namespace,
                 session_id=key.session_id,
@@ -395,7 +395,7 @@ class Orchestrator:
     def _process_node_output(
         self, node_name: str, node_output: Any, key: SessionKey
     ) -> tuple[list[dict], int]:
-        """处理节点输出，返回 SSE 事件列表和工具调用数"""
+        """Process node output and return SSE events and tool call count."""
         events: list[dict] = []
         tool_count = 0
 
@@ -404,8 +404,8 @@ class Orchestrator:
 
         messages = node_output.get("messages", [])
         for msg in messages:
-            # 提取思考内容
-            thinking_content = self._extract_thinking_from_message(msg)
+            # Extract thinking content.
+            thinking_content = self._extract_thinking(msg)
             if thinking_content:
                 events.append(
                     build_event_payload(
@@ -422,11 +422,15 @@ class Orchestrator:
                     )
                 )
 
-            # 收集工具调用
-            if hasattr(msg, "tool_calls") and msg.tool_calls:
-                tool_count += len(msg.tool_calls)
-                for tc in msg.tool_calls:
-                    tool_name = tc.get("name", "") if isinstance(tc, dict) else getattr(tc, "name", "")
+            # Collect tool calls.
+            tool_calls = getattr(msg, "tool_calls", None) or []
+            if tool_calls:
+                tool_count += len(tool_calls)
+                for tc in tool_calls:
+                    if isinstance(tc, dict):
+                        tool_name = str(tc.get("name", "") or "")
+                    else:
+                        tool_name = getattr(tc, "name", "") or ""
                     if tool_name and self._experience_learner:
                         self._experience_learner.record_tool(key.session_id, tool_name)
 
@@ -440,12 +444,12 @@ class Orchestrator:
         key: SessionKey,
         start_time: int,
     ) -> dict | None:
-        """检测中断并构建事件（未中断返回 None）"""
+        """Detect interruption and build an event (None if not interrupted)."""
         try:
             snapshot = await checkpoint_manager.get_snapshot(compiled)
             interrupts = ContextBuilder.extract_interrupts(snapshot)
         except Exception as e:
-            logger.error(f"检测中断失败: {e}")
+            logger.error(f"Interrupt detection failed: {e}")
             return None
 
         if not interrupts:
@@ -455,7 +459,7 @@ class Orchestrator:
         agent_id = first_interrupt.get("agent_id", "unknown")
         agent_name = self._get_agent_name(agent_id)
         payload = first_interrupt.get("payload")
-        logger.info(f"执行被中断: key={key}")
+        logger.info(f"Execution interrupted: key={key}")
         return build_event_payload(
             event=EventType.AGENT_INTERRUPT,
             key=key,
@@ -477,20 +481,20 @@ class Orchestrator:
         resume_value: Any | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """
-        流式执行
+        Streamed execution.
 
-        支持三种场景：
-        1. 新会话/续聊：query 不为空，resume_value 为空
-        2. interrupt 恢复：resume_value 不为空（query 可选，作为上下文）
-        3. 纯续聊：query 不为空，已有会话状态
+        Supported scenarios:
+        1. New session/resume chat: query is provided, resume_value is None
+        2. Resume from interrupt: resume_value is provided (query optional as context)
+        3. Resume chat: query provided with existing session state
 
-        参数：
-        - query: 用户输入（新问题或续聊内容）
-        - key: SessionKey（namespace + session_id 组合）
-        - resume_value: interrupt 恢复值（用户对 interrupt 的回答）
+        Args:
+            query: user input (new or continued)
+            key: SessionKey (namespace + session_id)
+            resume_value: interrupt resume value (user response)
 
-        返回：
-        - SSE 事件流
+        Returns:
+            SSE event stream.
         """
         start_time = now_ms()
         agent_count = 0
@@ -508,7 +512,7 @@ class Orchestrator:
         if self._experience_learner and query:
             self._experience_learner.start_recording(key.session_id, query)
 
-        # Phase 1: 检测会话状态
+        # Phase 1: detect session state.
         session_state = await self._detect_session_state(
             compiled=compiled,
             query=query,
@@ -516,7 +520,7 @@ class Orchestrator:
             checkpoint_manager=checkpoint_manager,
         )
 
-        # Phase 2: 构建输入
+        # Phase 2: build input.
         input_for_stream = self._build_stream_input(
             query=query,
             resume_value=resume_value,
@@ -525,17 +529,17 @@ class Orchestrator:
         )
 
         if input_for_stream is None:
-            logger.error(f"无效调用：query 和 resume_value 都为空: key={key}")
+            logger.error(f"Invalid call: both query and resume_value are empty: key={key}")
             yield build_event_payload(
                 event=EventType.AGENT_FAILED,
                 key=key,
                 agent_id="system",
-                agent_name="系统",
+                agent_name="system",
                 duration_ms=0,
                 data={
                     "error": {
-                        "message": "无效调用：必须提供 query 或 resume_value",
-                        "detail": "query 和 resume_value 均为空",
+                        "message": "Invalid call: query or resume_value is required",
+                        "detail": "Both query and resume_value are empty",
                         "error_type": "system",
                     }
                 },
@@ -711,7 +715,7 @@ class Orchestrator:
             self._event_bus.register(event_type, handler)
 
         try:
-            # Phase 3: 执行流
+            # Phase 3: execute stream.
             async for event in compiled.astream(input_for_stream, config):
                 while not event_queue.empty():
                     try:
@@ -738,13 +742,13 @@ class Orchestrator:
                             agent_name=agent_name,
                         )
 
-                    # 处理节点输出
+                    # Process node output.
                     node_events, node_tool_count = self._process_node_output(node_name, node_output, key)
                     for evt in node_events:
                         yield evt
                     tool_count += node_tool_count
 
-                    # 构建 agent 结束事件
+                    # Build agent end event.
                     agent_status = ExecutionStatus.COMPLETED
                     agent_error = None
                     agent_failure_kind = None
@@ -766,8 +770,8 @@ class Orchestrator:
                             agent_name=agent_name,
                             data={
                                 "error": {
-                                    "message": "Agent 执行失败",
-                                    "detail": agent_error or "执行失败",
+                                    "message": "Agent execution failed",
+                                    "detail": agent_error or "Execution failed",
                                     "error_type": error_type,
                                 }
                             },
@@ -794,7 +798,7 @@ class Orchestrator:
                     break
                 yield queued
 
-            # Phase 5: 检测中断
+            # Phase 5: detect interruption.
             interrupt_event = await self._build_interrupt_event(
                 compiled=compiled,
                 checkpoint_manager=checkpoint_manager,
@@ -805,7 +809,7 @@ class Orchestrator:
                 yield interrupt_event
                 return
 
-            # 完成事件和经验记录
+            # Completion event and experience recording.
             deliverable_keys = await self._load_deliverable_keys(compiled, checkpoint_manager)
             deliverables = await self._load_deliverables_map(
                 session_id=key.session_id,
@@ -832,10 +836,10 @@ class Orchestrator:
         except asyncio.CancelledError:
             raise
         except Exception as e:
-            # stream 场景下错误通过 SSE 事件返回给调用方；默认不额外刷一遍堆栈，避免重复输出。
-            logger.debug("执行失败: %s", e, exc_info=True)
-            # 如果异常发生在 compiled.astream() 迭代过程中，event_queue 里可能已经积攒了事件（start/tool 等）。
-            # 先把队列里的事件尽量吐出去，避免调用方只能看到最后一条 failed 事件。
+            # In stream mode, errors are returned via SSE events; avoid duplicate stack traces.
+            logger.debug("Execution failed: %s", e, exc_info=True)
+            # If the error happens during compiled.astream(), the queue may contain start/tool events.
+            # Flush queued events first to avoid only emitting a final failure event.
             while not event_queue.empty():
                 try:
                     queued = event_queue.get_nowait()
@@ -859,11 +863,11 @@ class Orchestrator:
                 self._event_bus.unregister(event_type, handler)
 
     async def compact_session(self, session_id: str) -> dict:
-        """手动压缩会话（暂不可用，待实现基于 messages 的压缩）"""
-        return {"status": "not_implemented", "message": "压缩功能待重构"}
+        """Manually compact a session (not yet implemented)."""
+        return {"status": "not_implemented", "message": "Compaction is pending refactor."}
 
     async def clear_session(self, session_id: str) -> None:
-        """清理会话记忆（删除 checkpointer 状态）"""
+        """Clear session memory (delete checkpointer state)."""
         key = self._make_key(session_id)
         checkpoint_manager = ContextBuilder.create_checkpoint_manager(
             key=key,
@@ -872,8 +876,8 @@ class Orchestrator:
         await ContextBuilder.delete_checkpoints(checkpoint_manager=checkpoint_manager)
 
     async def clear_session_store(self, session_id: str) -> None:
-        """清理会话交付物（Store）"""
-        if not self._store:
+        """Clear session deliverables from the store."""
+        if self._store is None:
             return
 
         key = self._make_key(session_id)
@@ -888,7 +892,7 @@ class Orchestrator:
 
 
     async def get_session_stats(self, session_id: str) -> dict:
-        """获取会话统计"""
+        """Get session stats."""
         key = self._make_key(session_id)
         compiled = await self._ensure_compiled()
         checkpoint_manager = ContextBuilder.create_checkpoint_manager(
@@ -916,7 +920,7 @@ class Orchestrator:
             }
 
         except Exception as e:
-            logger.error(f"获取会话统计失败: {e}")
+            logger.error(f"Failed to fetch session metrics: {e}")
             return {
                 "session_id": session_id,
                 "namespace": self.namespace,
@@ -924,7 +928,7 @@ class Orchestrator:
             }
 
     async def get_session_todo(self, session_id: str) -> dict:
-        """获取会话 Todo（快照）"""
+        """Get session todo snapshot."""
         key = self._make_key(session_id)
         compiled = await self._ensure_compiled()
         checkpoint_manager = ContextBuilder.create_checkpoint_manager(
@@ -950,7 +954,7 @@ class Orchestrator:
                 "todo": todo_data,
             }
         except Exception as e:
-            logger.error(f"获取会话 Todo 失败: {e}")
+            logger.error(f"Failed to fetch session todo: {e}")
             return {
                 "session_id": session_id,
                 "namespace": self.namespace,

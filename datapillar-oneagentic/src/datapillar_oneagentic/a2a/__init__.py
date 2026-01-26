@@ -1,21 +1,21 @@
 """
-A2A (Agent-to-Agent) 协议模块
+A2A (Agent-to-Agent) protocol module.
 
-基于 Google 官方 a2a-sdk 实现，支持跨服务调用远程 Agent。
+Built on Google's official a2a-sdk for cross-service remote agent calls.
 
-核心组件：
-- A2AConfig: 远程 Agent 连接配置
-- create_a2a_tool: 创建 A2A 委派工具
-- create_a2a_tools: 批量创建 A2A 工具
+Core components:
+- A2AConfig: remote agent connection config
+- create_a2a_tool: create an A2A delegation tool
+- create_a2a_tools: batch create A2A tools
 
-使用示例（Agent 粒度）：
+Example (agent level):
 ```python
 from datapillar_oneagentic import agent
 from datapillar_oneagentic.a2a import A2AConfig, APIKeyAuth
 
 @agent(
     id="analyst",
-    name="分析师",
+    name="Analyst",
     deliverable_schema=AnalysisOutput,
     a2a_agents=[
         A2AConfig(
@@ -28,7 +28,7 @@ class AnalystAgent:
     ...
 ```
 
-使用示例（Team 粒度）：
+Example (team level):
 ```python
 from datapillar_oneagentic import Datapillar
 from datapillar_oneagentic.a2a import A2AConfig
@@ -41,7 +41,7 @@ dp = Datapillar(
 )
 ```
 
-安装 A2A 支持：
+Install A2A support:
 ```bash
 pip install datapillar-oneagentic[a2a]
 ```
@@ -60,13 +60,13 @@ from datapillar_oneagentic.a2a.tool import (
 )
 
 __all__ = [
-    # 配置
+    # Config
     "A2AConfig",
     "AuthScheme",
     "APIKeyAuth",
     "BearerAuth",
     "AuthType",
-    # 工具
+    # Tools
     "create_a2a_tool",
     "create_a2a_tools",
 ]

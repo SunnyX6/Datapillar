@@ -1,14 +1,14 @@
 """
-ContextBuilder - LLM 上下文构建器（V2）
+ContextBuilder - LLM context builder (V2).
 
-职责：
-- ContextCollector：从运行态收集 __context 分层块
-- ContextComposer：纯函数渲染 messages（不读写 state）
-- ContextBuilder：对外门面 + checkpoint/interrupt 工具
+Responsibilities:
+- ContextCollector: collect _context blocks at runtime
+- ContextComposer: pure function renderer for messages (no state mutation)
+- ContextBuilder: public facade + checkpoint/interrupt helpers
 
-硬约束：
-- 只有 __context 结尾的块允许注入
-- 只在 Composer 内统一拼接顺序
+Hard constraints:
+- Only keys ending with _context are injectable
+- Ordering is enforced inside the Composer
 """
 
 from __future__ import annotations
@@ -18,7 +18,8 @@ import logging
 from enum import Enum
 from typing import Any, Mapping, TYPE_CHECKING
 
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from datapillar_oneagentic.messages import Message, Messages
+from datapillar_oneagentic.messages.adapters.langchain import from_langchain
 
 from datapillar_oneagentic.context.checkpoint import CheckpointManager
 from datapillar_oneagentic.core.types import SessionKey
@@ -35,16 +36,16 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-FRAMEWORK_CONTEXT_KEY = "framework__context"
-EXPERIENCE_CONTEXT_KEY = "experience__context"
-KNOWLEDGE_CONTEXT_KEY = "knowledge__context"
-TODO_CONTEXT_KEY = "todo__context"
-COMPRESSION_CONTEXT_KEY = "compression__context"
+FRAMEWORK_CONTEXT_KEY = "framework_context"
+EXPERIENCE_CONTEXT_KEY = "experience_context"
+KNOWLEDGE_CONTEXT_KEY = "knowledge_context"
+TODO_CONTEXT_KEY = "todo_context"
+COMPRESSION_CONTEXT_KEY = "compression_context"
 
 CONTEXT_ORDER = (
     FRAMEWORK_CONTEXT_KEY,
-    EXPERIENCE_CONTEXT_KEY,
     KNOWLEDGE_CONTEXT_KEY,
+    EXPERIENCE_CONTEXT_KEY,
     TODO_CONTEXT_KEY,
     COMPRESSION_CONTEXT_KEY,
 )
@@ -57,25 +58,19 @@ class ContextScenario(str, Enum):
 
 
 class ContextComposer:
-    """纯函数：将系统提示词 + __context 块 + checkpoint_messages 组装为 messages。"""
+    """Pure function: assemble system prompt + _context blocks + checkpoint messages."""
 
     @staticmethod
     def compose_agent_messages(
         *,
         system_prompt: str,
-        query: str | None,
         contexts: Mapping[str, str],
-        checkpoint_messages: list[BaseMessage],
-        human_message: str | None = None,
-    ) -> list[BaseMessage]:
-        messages: list[BaseMessage] = [SystemMessage(content=system_prompt)]
+        checkpoint_messages: Messages,
+    ) -> Messages:
+        messages = Messages([Message.system(system_prompt, metadata={"context_key": "system_prompt"})])
         ContextComposer._append_context_messages(messages, contexts)
         if checkpoint_messages:
             messages.extend(checkpoint_messages)
-        if human_message:
-            messages.append(HumanMessage(content=human_message, additional_kwargs={"internal": True}))
-        if query and not checkpoint_messages:
-            messages.append(HumanMessage(content=query))
         return messages
 
     @staticmethod
@@ -84,20 +79,20 @@ class ContextComposer:
         system_prompt: str,
         human_content: str,
         contexts: Mapping[str, str] | None = None,
-    ) -> list[BaseMessage]:
-        messages: list[BaseMessage] = [SystemMessage(content=system_prompt)]
+    ) -> Messages:
+        messages = Messages([Message.system(system_prompt, metadata={"context_key": "system_prompt"})])
         if contexts:
             ContextComposer._append_context_messages(messages, contexts)
-        messages.append(HumanMessage(content=human_content))
+        messages.append(Message.user(human_content))
         return messages
 
     @staticmethod
-    def _append_context_messages(messages: list[BaseMessage], contexts: Mapping[str, str]) -> None:
+    def _append_context_messages(messages: Messages, contexts: Mapping[str, str]) -> None:
         if not contexts:
             return
         ordered_keys = list(CONTEXT_ORDER)
         extra_keys = sorted(
-            key for key in contexts.keys() if key not in CONTEXT_ORDER and key.endswith("__context")
+            key for key in contexts.keys() if key not in CONTEXT_ORDER and key.endswith("_context")
         )
         for key in ordered_keys + extra_keys:
             value = contexts.get(key)
@@ -105,11 +100,11 @@ class ContextComposer:
                 continue
             text = value.strip()
             if text:
-                messages.append(SystemMessage(content=text))
+                messages.append(Message.system(text, metadata={"context_key": key}))
 
 
 class ContextCollector:
-    """运行态收集 __context 分层块（不做渲染）。"""
+    """Collect _context blocks at runtime (no rendering)."""
 
     def __init__(
         self,
@@ -243,7 +238,7 @@ class ContextCollector:
             try:
                 todo = SessionTodoList.model_validate(todo_data)
             except Exception as exc:
-                logger.warning("Todo 解析失败: %s", exc)
+                logger.warning("Todo parse failed: %s", exc)
             else:
                 prompt = todo.to_prompt()
                 if prompt:
@@ -261,10 +256,10 @@ class ContextCollector:
         try:
             context = await self._experience_retriever.build_context(query)
         except Exception as exc:
-            logger.warning("经验检索失败: %s", exc)
+            logger.warning("Experience retrieval failed: %s", exc)
             return None
         if context:
-            logger.info("📚 检索到相似经验，已注入上下文")
+            logger.info("Similar experience found; context injected")
         return context or None
 
     async def _build_knowledge_context(
@@ -283,7 +278,10 @@ class ContextCollector:
             return None
         try:
             if inject_mode == "tool" and force_system:
-                logger.info("MapReduce reducer 不支持 tool 注入，已强制使用 system: %s", spec.id)
+                logger.info(
+                    "MapReduce reducer does not support tool injection; forced system mode: %s",
+                    spec.id,
+                )
             result = await self._knowledge_retriever.retrieve(
                 query=query,
                 knowledge=spec.knowledge,
@@ -299,12 +297,12 @@ class ContextCollector:
         except ValueError:
             raise
         except Exception as exc:
-            logger.warning("知识检索失败: %s", exc)
+            logger.warning("Knowledge retrieval failed: %s", exc)
             return None
 
 
 class ContextBuilder:
-    """基于 state 构造单次 LLM 调用 messages。"""
+    """Build system/context/checkpoint messages; runtime user input is provided by the caller."""
 
     def __init__(self, *, state: dict[str, Any]):
         self._state = state
@@ -317,39 +315,31 @@ class ContextBuilder:
         self,
         *,
         system_prompt: str,
-        query: str | None,
-        human_message: str | None = None,
-    ) -> list[BaseMessage]:
+    ) -> Messages:
         return self.build_llm_messages(
             system_prompt=system_prompt,
-            query=query,
             state=self._state,
-            human_message=human_message,
         )
 
     @staticmethod
     def build_llm_messages(
         *,
         system_prompt: str,
-        query: str | None,
         state: dict[str, Any],
-        human_message: str | None = None,
-    ) -> list[BaseMessage]:
+    ) -> Messages:
         checkpoint_messages = _as_messages(state.get("messages"))
         contexts = ContextBuilder.extract_context_blocks(state)
         return ContextComposer.compose_agent_messages(
             system_prompt=system_prompt,
-            query=query,
             contexts=contexts,
             checkpoint_messages=checkpoint_messages,
-            human_message=human_message,
         )
 
     @staticmethod
     def extract_context_blocks(state: Mapping[str, Any]) -> dict[str, str]:
         contexts: dict[str, str] = {}
         for key, value in state.items():
-            if not key.endswith("__context"):
+            if not key.endswith("_context"):
                 continue
             if not isinstance(value, str):
                 continue
@@ -358,7 +348,7 @@ class ContextBuilder:
                 contexts[key] = text
         return contexts
 
-    # ========== Checkpoint（编排器使用） ==========
+    # ========== Checkpoint (orchestrator use) ==========
 
     @staticmethod
     def create_checkpoint_manager(
@@ -373,8 +363,8 @@ class ContextBuilder:
         return await checkpoint_manager.delete()
 
     @staticmethod
-    def extract_agent_id_from_interrupt(interrupt_obj: object) -> str | None:
-        """从 interrupt 对象中解析节点名"""
+    def extract_interrupt_agent(interrupt_obj: object) -> str | None:
+        """Extract node name from an interrupt object."""
         namespaces = getattr(interrupt_obj, "ns", None)
         if isinstance(namespaces, list) and namespaces:
             first = namespaces[0]
@@ -384,7 +374,7 @@ class ContextBuilder:
 
     @classmethod
     def extract_interrupts(cls, snapshot: object | None) -> list[dict]:
-        """解析 snapshot 中的中断信息"""
+        """Parse interrupt information from a snapshot."""
         interrupts_info: list[dict] = []
         if not snapshot:
             return interrupts_info
@@ -399,7 +389,7 @@ class ContextBuilder:
             agent_id = (
                 getattr(task, "name", None)
                 or getattr(task, "node", None)
-                or cls.extract_agent_id_from_interrupt(interrupt_obj)
+                or cls.extract_interrupt_agent(interrupt_obj)
                 or "unknown"
             )
             interrupts_info.append(
@@ -410,7 +400,7 @@ class ContextBuilder:
             )
         return interrupts_info
 
-    # ========== 知识上下文构建 ==========
+    # ========== Knowledge context builder ==========
 
     @staticmethod
     def build_knowledge_context(
@@ -425,7 +415,7 @@ class ContextBuilder:
         max_chars = inject.max_tokens * 2
         format_value = (inject.format or "markdown").lower()
         if format_value not in {"markdown", "json"}:
-            raise ValueError(f"不支持的知识注入格式: {format_value}")
+            raise ValueError(f"Unsupported knowledge inject format: {format_value}")
 
         total_chars = 0
         selected: list[KnowledgeChunk] = []
@@ -472,36 +462,36 @@ class ContextBuilder:
             sections=[("Chunks", body)],
         )
 
-    # ========== 各类系统消息模板 ==========
+    # ========== System message builders ==========
 
     @staticmethod
-    def build_react_planner_messages(*, system_prompt: str, goal: str) -> list[BaseMessage]:
+    def build_react_planner(*, system_prompt: str, goal: str) -> Messages:
         return ContextComposer.compose_simple_messages(
             system_prompt=system_prompt,
             human_content=format_markdown(title=None, sections=[("User Goal", goal)]),
         )
 
     @staticmethod
-    def build_react_replan_messages(*, system_prompt: str, context: str) -> list[BaseMessage]:
+    def build_react_replan(*, system_prompt: str, context: str) -> Messages:
         return ContextComposer.compose_simple_messages(
             system_prompt=system_prompt,
             human_content=context,
         )
 
     @staticmethod
-    def build_react_reflector_messages(*, system_prompt: str, context: str) -> list[BaseMessage]:
+    def build_react_reflector(*, system_prompt: str, context: str) -> Messages:
         return ContextComposer.compose_simple_messages(
             system_prompt=system_prompt,
             human_content=context,
         )
 
     @staticmethod
-    def build_mapreduce_planner_messages(
+    def build_mapreduce_planner(
         *,
         system_prompt: str,
         goal: str,
         contexts: Mapping[str, str] | None = None,
-    ) -> list[BaseMessage]:
+    ) -> Messages:
         return ContextComposer.compose_simple_messages(
             system_prompt=system_prompt,
             human_content=format_markdown(title=None, sections=[("User Goal", goal)]),
@@ -509,12 +499,12 @@ class ContextBuilder:
         )
 
     @staticmethod
-    def build_mapreduce_reducer_messages(
+    def build_mapreduce_reducer(
         *,
         system_prompt: str,
         content: str,
         contexts: Mapping[str, str] | None = None,
-    ) -> list[BaseMessage]:
+    ) -> Messages:
         return ContextComposer.compose_simple_messages(
             system_prompt=system_prompt,
             human_content=content,
@@ -522,14 +512,14 @@ class ContextBuilder:
         )
 
     @staticmethod
-    def build_todo_audit_messages(*, system_prompt: str, context: str) -> list[BaseMessage]:
+    def build_todo_audit(*, system_prompt: str, context: str) -> Messages:
         return ContextComposer.compose_simple_messages(
             system_prompt=system_prompt,
             human_content=context,
         )
 
     @staticmethod
-    def build_compactor_messages(*, system_prompt: str, prompt: str) -> list[BaseMessage]:
+    def build_compactor_messages(*, system_prompt: str, prompt: str) -> Messages:
         return ContextComposer.compose_simple_messages(
             system_prompt=system_prompt,
             human_content=prompt,
@@ -547,7 +537,11 @@ def _as_str(value: Any) -> str | None:
     return text or None
 
 
-def _as_messages(value: Any) -> list[BaseMessage]:
+def _as_messages(value: Any) -> Messages:
+    if isinstance(value, Messages):
+        return value
     if isinstance(value, list):
-        return [item for item in value if isinstance(item, BaseMessage)]
-    return []
+        if value and isinstance(value[0], Message):
+            return Messages(value)
+        return Messages(from_langchain(value))
+    return Messages()

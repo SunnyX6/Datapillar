@@ -1,7 +1,7 @@
 """
-Todo 审计器
+Todo auditor.
 
-在没有上报的情况下，使用 LLM 对齐 Todo 进度。
+Uses the LLM to align Todo progress when no updates were reported.
 """
 
 from __future__ import annotations
@@ -22,14 +22,14 @@ logger = logging.getLogger(__name__)
 
 
 class TodoAuditOutput(BaseModel):
-    """Todo 审计输出"""
+    """Todo audit output."""
 
     updates: list[TodoUpdate] = Field(default_factory=list, description="Todo updates")
     reason: str = Field(default="", description="Audit note")
 
 
 def _parse_audit_output(result: Any) -> TodoAuditOutput:
-    """解析 Todo 审计输出（严格模式）"""
+    """Parse Todo audit output (strict mode)."""
     return parse_structured_output(result, TodoAuditOutput, strict=False)
 
 
@@ -59,7 +59,7 @@ TODO_AUDIT_PROMPT = format_markdown(
 
 
 def _normalize_deliverable(deliverable: Any) -> str:
-    """将交付物归一化为可读文本"""
+    """Normalize deliverable into readable text."""
     if deliverable is None:
         return ""
     if hasattr(deliverable, "model_dump"):
@@ -81,17 +81,17 @@ async def audit_todo_updates(
     llm: Any,
 ) -> list[TodoUpdate]:
     """
-    审计 Todo 更新
+    Audit Todo updates.
 
     Args:
-        todo: 当前 Todo 列表
-        agent_status: Agent 执行状态
-        deliverable: 交付物
-        error: 错误信息（可选）
-        llm: LLM 实例
+        todo: Current Todo list
+        agent_status: Agent execution status
+        deliverable: Deliverable payload
+        error: Error message (optional)
+        llm: LLM instance
 
     Returns:
-        TodoUpdate 列表（可为空）
+        TodoUpdate list (may be empty)
     """
     if not todo.items:
         return []
@@ -111,12 +111,12 @@ async def audit_todo_updates(
 
     context = format_markdown(title=None, sections=context_sections)
 
-    messages = ContextBuilder.build_todo_audit_messages(
+    messages = ContextBuilder.build_todo_audit(
         system_prompt=TODO_AUDIT_PROMPT,
         context=context,
     )
 
-    logger.info("Todo 审计开始...")
+    logger.info("Todo audit started")
     structured_llm = llm.with_structured_output(
         TodoAuditOutput,
         method="function_calling",
@@ -126,8 +126,8 @@ async def audit_todo_updates(
     output = _parse_audit_output(result)
 
     if output.updates:
-        logger.info(f"Todo 审计更新: {len(output.updates)} 条")
+        logger.info(f"Todo audit updates: {len(output.updates)}")
     else:
-        logger.info("Todo 审计无更新")
+        logger.info("Todo audit has no updates")
 
     return output.updates

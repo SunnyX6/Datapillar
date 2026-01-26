@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.sunny.datapillar.admin.module.workflow.dto.JobDto;
 import com.sunny.datapillar.admin.module.workflow.service.JobService;
-import com.sunny.datapillar.admin.response.WebAdminResponse;
+import com.sunny.datapillar.admin.web.response.ApiResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,67 +35,67 @@ public class JobController {
 
     @Operation(summary = "获取工作流下的所有任务")
     @GetMapping
-    public WebAdminResponse<List<JobDto.Response>> list(
+    public ApiResponse<List<JobDto.Response>> list(
             @PathVariable Long userId,
             @PathVariable Long projectId,
             @PathVariable Long workflowId) {
         List<JobDto.Response> result = jobService.getJobsByWorkflowId(workflowId);
-        return WebAdminResponse.ok(result);
+        return ApiResponse.ok(result);
     }
 
     @Operation(summary = "获取任务详情")
     @GetMapping("/{id}")
-    public WebAdminResponse<JobDto.Response> detail(
+    public ApiResponse<JobDto.Response> detail(
             @PathVariable Long userId,
             @PathVariable Long projectId,
             @PathVariable Long workflowId,
             @PathVariable Long id) {
         JobDto.Response result = jobService.getJobDetail(id);
-        return WebAdminResponse.ok(result);
+        return ApiResponse.ok(result);
     }
 
     @Operation(summary = "创建任务")
     @PostMapping
-    public WebAdminResponse<Long> create(
+    public ApiResponse<Long> create(
             @PathVariable Long userId,
             @PathVariable Long projectId,
             @PathVariable Long workflowId,
             @Valid @RequestBody JobDto.Create dto) {
         Long id = jobService.createJob(workflowId, dto);
-        return WebAdminResponse.ok(id);
+        return ApiResponse.ok(id);
     }
 
     @Operation(summary = "更新任务")
     @PutMapping("/{id}")
-    public WebAdminResponse<Void> update(
+    public ApiResponse<Void> update(
             @PathVariable Long userId,
             @PathVariable Long projectId,
             @PathVariable Long workflowId,
             @PathVariable Long id,
             @Valid @RequestBody JobDto.Update dto) {
         jobService.updateJob(id, dto);
-        return WebAdminResponse.ok(null);
+        return ApiResponse.ok(null);
     }
 
     @Operation(summary = "删除任务")
     @DeleteMapping("/{id}")
-    public WebAdminResponse<Void> delete(
+    public ApiResponse<Void> delete(
             @PathVariable Long userId,
             @PathVariable Long projectId,
             @PathVariable Long workflowId,
             @PathVariable Long id) {
         jobService.deleteJob(id);
-        return WebAdminResponse.ok(null);
+        return ApiResponse.ok(null);
     }
 
     @Operation(summary = "批量更新任务位置")
     @PutMapping("/layout")
-    public WebAdminResponse<Void> updateLayout(
+    public ApiResponse<Void> updateLayout(
             @PathVariable Long userId,
             @PathVariable Long projectId,
             @PathVariable Long workflowId,
             @Valid @RequestBody JobDto.LayoutSave dto) {
         jobService.updateJobPositions(workflowId, dto);
-        return WebAdminResponse.ok(null);
+        return ApiResponse.ok(null);
     }
 }

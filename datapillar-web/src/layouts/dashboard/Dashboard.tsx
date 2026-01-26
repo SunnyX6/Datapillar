@@ -18,7 +18,8 @@ import {
   progressWidthClassMap,
   gridColsClassMap,
   colSpanClassMap,
-  autoRowsClassMap
+  autoRowsClassMap,
+  surfaceSizeClassMap
 } from '@/design-tokens/dimensions'
 import { Card } from '@/components/ui'
 
@@ -178,7 +179,7 @@ function ImpactCard({ className = '' }: DashboardGridItemProps) {
       variant="default"
       className={`bg-gradient-to-b from-indigo-600 to-violet-700 text-white relative overflow-hidden flex flex-col justify-between group shadow-xl shadow-indigo-500/10 h-full border-0 ${className}`}
     >
-      <div className="absolute top-0 right-0 w-48 h-48 @md:w-56 @md:h-56 @lg:w-64 @lg:h-64 bg-white/10 rounded-full blur-3xl transform translate-x-1/3 -translate-y-1/3 pointer-events-none group-hover:bg-white/15 transition-colors duration-500" />
+      <div className={`absolute top-0 right-0 ${surfaceSizeClassMap.glow} bg-white/10 rounded-full blur-3xl transform translate-x-1/3 -translate-y-1/3 pointer-events-none group-hover:bg-white/15 transition-colors duration-500`} />
       <div>
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">

@@ -1,16 +1,16 @@
 """
-LLM 限流器
+LLM rate limiter.
 
-基于 OpenAI RPM 理念设计：
-- RPM (Requests Per Minute): 每分钟请求数限制
-- max_concurrent: 最大并发请求数限制
+Based on the OpenAI RPM idea:
+- RPM (requests per minute) limit
+- max_concurrent: max concurrent requests
 
-实现：
-- 使用 LangChain InMemoryRateLimiter 实现 RPM 控制（令牌桶算法）
-- 使用 asyncio.Semaphore 实现并发控制
-- 按 Provider 隔离限流器
+Implementation:
+- LangChain InMemoryRateLimiter for RPM (token bucket)
+- asyncio.Semaphore for concurrency
+- Rate limiters are isolated per provider
 
-使用示例：
+Example:
 ```python
 from datapillar_oneagentic.providers.llm.rate_limiter import RateLimitManager
 
@@ -41,11 +41,11 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ProviderRateLimiter:
     """
-    单个 Provider 的限流器
+    Rate limiter for a single provider.
 
-    组合使用：
-    - InMemoryRateLimiter: RPM 控制（令牌桶）
-    - Semaphore: 并发控制
+    Composition:
+    - InMemoryRateLimiter: RPM control (token bucket)
+    - Semaphore: concurrency control
     """
 
     provider: str
@@ -58,32 +58,32 @@ class ProviderRateLimiter:
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
 
     def __post_init__(self):
-        # RPM 转换为 requests_per_second
-        # rpm=60 → rps=1, rpm=600 → rps=10
+        # Convert RPM to requests_per_second.
+        # rpm=60 -> rps=1, rpm=600 -> rps=10
         requests_per_second = self.rpm / 60.0
 
         self._rate_limiter = InMemoryRateLimiter(
             requests_per_second=requests_per_second,
             check_every_n_seconds=0.1,
-            max_bucket_size=max(10, self.rpm // 6),  # 允许 10 秒的突发
+            max_bucket_size=max(10, self.rpm // 6),  # Allow 10 seconds of burst.
         )
         self._semaphore = asyncio.Semaphore(self.max_concurrent)
 
         logger.info(
-            f"限流器初始化: provider={self.provider}, "
+            f"Rate limiter initialized: provider={self.provider}, "
             f"rpm={self.rpm}, max_concurrent={self.max_concurrent}"
         )
 
     @asynccontextmanager
     async def acquire(self) -> AsyncGenerator[None, None]:
         """
-        获取请求许可
+        Acquire a request permit.
 
-        双重限流：
-        1. Semaphore 控制并发数
-        2. InMemoryRateLimiter 控制 RPM
+        Dual limiting:
+        1. Semaphore for concurrency
+        2. InMemoryRateLimiter for RPM
         """
-        # 先获取并发许可
+        # Acquire concurrency permit first.
         await self._semaphore.acquire()
 
         async with self._lock:
@@ -91,7 +91,7 @@ class ProviderRateLimiter:
             self._total_requests += 1
 
         try:
-            # 再等待 RPM 许可
+            # Then await RPM permit.
             await self._rate_limiter.aacquire()
             yield
         finally:
@@ -101,16 +101,16 @@ class ProviderRateLimiter:
 
     @property
     def active_requests(self) -> int:
-        """当前活跃请求数"""
+        """Current active request count."""
         return self._active_requests
 
     @property
     def total_requests(self) -> int:
-        """总请求数"""
+        """Total request count."""
         return self._total_requests
 
     def stats(self) -> dict:
-        """获取统计信息"""
+        """Get stats."""
         return {
             "provider": self.provider,
             "rpm": self.rpm,
@@ -122,11 +122,11 @@ class ProviderRateLimiter:
 
 class RateLimitManager:
     """
-    限流管理器
+    Rate limit manager.
 
-    按 Provider 管理限流器，线程安全。
+    Manages provider rate limiters, thread-safe.
 
-    使用示例：
+    Example:
     ```python
     manager = RateLimitManager(config)
     async with manager.acquire("openai"):
@@ -139,11 +139,11 @@ class RateLimitManager:
         self._lock = threading.Lock()
         self._config = config
 
-    def _get_or_create_limiter(self, provider: str) -> ProviderRateLimiter:
-        """获取或创建 Provider 限流器"""
+    def _ensure_limiter(self, provider: str) -> ProviderRateLimiter:
+        """Get or create a provider limiter."""
         provider_lower = provider.lower()
 
-        # 双重检查锁定
+        # Double-checked locking.
         if provider_lower in self._limiters:
             return self._limiters[provider_lower]
 
@@ -162,23 +162,23 @@ class RateLimitManager:
     @asynccontextmanager
     async def acquire(self, provider: str) -> AsyncGenerator[None, None]:
         """
-        获取指定 Provider 的请求许可
+        Acquire a permit for the provider.
 
-        如果限流未启用，直接放行。
+        If rate limiting is disabled, proceed immediately.
 
-        参数：
-        - provider: Provider 名称（openai, anthropic, glm 等）
+        Args:
+            provider: provider name (openai, anthropic, glm, etc.)
         """
         if not self._config.enabled:
             yield
             return
 
-        limiter = self._get_or_create_limiter(provider)
+        limiter = self._ensure_limiter(provider)
         async with limiter.acquire():
             yield
 
     def stats(self) -> dict:
-        """获取所有 Provider 的统计信息"""
+        """Get stats for all providers."""
         return {
             "enabled": self._config.enabled,
             "providers": {
@@ -187,13 +187,13 @@ class RateLimitManager:
         }
 
     def get_provider_stats(self, provider: str) -> dict | None:
-        """获取指定 Provider 的统计信息"""
+        """Get stats for a specific provider."""
         provider_lower = provider.lower()
         if provider_lower in self._limiters:
             return self._limiters[provider_lower].stats()
         return None
 
     def reset(self) -> None:
-        """重置所有限流器（仅用于测试）"""
+        """Reset all limiters (tests only)."""
         with self._lock:
             self._limiters.clear()

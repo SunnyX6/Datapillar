@@ -1,6 +1,4 @@
-"""
-Markdown 解析器
-"""
+"""Markdown parser."""
 
 from __future__ import annotations
 
@@ -33,7 +31,7 @@ def _markdown_to_text(text: str) -> str:
         import markdown
     except ImportError as err:
         raise ImportError(
-            "解析 Markdown 需要安装依赖：\n"
+            "Markdown parsing requires dependencies:\n"
             "  pip install datapillar-oneagentic[knowledge]"
         ) from err
 
@@ -41,7 +39,7 @@ def _markdown_to_text(text: str) -> str:
         from bs4 import BeautifulSoup
     except ImportError as err:
         raise ImportError(
-            "解析 Markdown 需要安装依赖：\n"
+            "Markdown parsing requires dependencies:\n"
             "  pip install datapillar-oneagentic[knowledge]"
         ) from err
 

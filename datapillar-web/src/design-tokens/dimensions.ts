@@ -1,3 +1,5 @@
+import type { BreakpointKey } from './breakpoints'
+
 /**
  * PC 端尺寸规范系统（1080p - 4K）
  *
@@ -344,22 +346,22 @@ export const gapClassMap = {
 } as const
 
 /**
- * PC 端专用断点（1080p - 4K）
- * 不再使用 xs、sm 等移动端断点
+ * PC 端断点语义映射（不再重复定义像素值）
+ * 具体像素值以 @theme 中的 --breakpoint-* 为准
  */
 export const PC_BREAKPOINTS = {
-  /** 2K/QHD：2560x1440 对应的布局门槛 */
-  '2k': 1440,
+  /** 2K/QHD：语义对应 lg */
+  '2k': 'lg',
 
-  /** 1080p：1920x1080（最常见基线）*/
-  fhd: 1920,
+  /** 1080p：语义对应 xl */
+  fhd: 'xl',
 
-  /** 2560p：2560x1440 */
-  qhd: 2560,
+  /** 2560p：语义对应 2xl */
+  qhd: '2xl',
 
-  /** 4K：3840x2160 */
-  '4k': 3840
-} as const
+  /** 4K：语义对应 3xl */
+  '4k': '3xl'
+} as const satisfies Record<string, BreakpointKey>
 
 /**
  * TypeScript 类型导出
@@ -398,11 +400,32 @@ export type ProgressWidth = keyof typeof progressWidthClassMap
  * 面板宽度 ClassMap（窄侧栏/信息卡）
  */
 export const panelWidthClassMap = {
+  /** 轨道：48px（折叠侧栏/工具栏） */
+  rail: 'w-12',
+
+  /** 紧凑面板：240px */
+  compact: 'w-60',
+
+  /** 中等面板：256px */
+  medium: 'w-64',
+
+  /** 宽面板：288px */
+  wide: 'w-72',
+
   /** 窄面板：320px */
   narrow: 'w-80 max-w-80',
 
   /** 标准面板：384px */
   normal: 'w-96 max-w-96',
+
+  /** 紧凑面板（响应式）：240px → 288px */
+  compactResponsive: 'w-60 lg:w-72',
+
+  /** 中等面板（响应式）：256px → 320px */
+  mediumResponsive: 'w-64 lg:w-80',
+
+  /** 协作工单列表宽度（响应式） */
+  collaborationList: 'w-collaboration-list-responsive',
 
   /** 响应式面板：大屏幕自动变宽（320px → 400px → 480px → 560px）
    * 定义在 index.css 中的 .w-panel-responsive
@@ -419,6 +442,95 @@ export const panelHeightClassMap = {
 
   /** 高度受限：≥360px，最高 55vh/60vh */
   limited: 'min-h-[360px] max-h-[55vh] xl:max-h-[60vh]'
+} as const
+
+/**
+ * 抽屉宽度 ClassMap（详情侧栏）
+ */
+export const drawerWidthClassMap = {
+  /** 响应式抽屉：480px → 540px → 600px → 680px */
+  responsive: 'w-drawer-responsive'
+} as const
+
+/**
+ * 菜单/弹层宽度 ClassMap
+ */
+export const menuWidthClassMap = {
+  /** 极小：144px */
+  compact: 'w-36',
+
+  /** 小：160px */
+  small: 'w-40',
+
+  /** 中：176px */
+  medium: 'w-44',
+
+  /** 大：192px */
+  large: 'w-48',
+
+  /** 加大：208px */
+  xlarge: 'w-52',
+
+  /** 超大：224px */
+  xxlarge: 'w-56',
+
+  /** 宽：288px */
+  wide: 'w-72',
+
+  /** 超宽：384px */
+  extraWide: 'w-96'
+} as const
+
+/**
+ * 表格列宽 ClassMap（固定列宽）
+ */
+export const tableColumnWidthClassMap = {
+  /** 极窄：56px */
+  xs: 'w-14',
+
+  /** 窄：64px */
+  sm: 'w-16',
+
+  /** 小：80px */
+  md: 'w-20',
+
+  /** 中：96px */
+  lg: 'w-24',
+
+  /** 加宽：128px */
+  xl: 'w-32',
+
+  /** 大：160px */
+  '2xl': 'w-40',
+
+  /** 特大：176px */
+  '3xl': 'w-44',
+
+  /** 超大：208px */
+  '4xl': 'w-52',
+
+  /** 极宽：224px */
+  '5xl': 'w-56'
+} as const
+
+/**
+ * 装饰性尺寸 ClassMap（非布局容器）
+ */
+export const surfaceSizeClassMap = {
+  /** 小：128px */
+  sm: 'w-32 h-32',
+
+  /** 中：160px */
+  md: 'w-40 h-40',
+
+  /** 大：192px */
+  lg: 'w-48 h-48',
+
+  /** 超大：256px */
+  xl: 'w-64 h-64',
+
+  /** 背景光晕（响应式） */
+  glow: 'w-48 h-48 @md:w-56 @md:h-56 @lg:w-64 @lg:h-64'
 } as const
 
 /**
@@ -457,6 +569,10 @@ export const inputContainerWidthClassMap = {
 
 export type PanelWidth = keyof typeof panelWidthClassMap
 export type PanelHeight = keyof typeof panelHeightClassMap
+export type DrawerWidth = keyof typeof drawerWidthClassMap
+export type MenuWidth = keyof typeof menuWidthClassMap
+export type TableColumnWidth = keyof typeof tableColumnWidthClassMap
+export type SurfaceSize = keyof typeof surfaceSizeClassMap
 export type MessageWidth = keyof typeof messageWidthClassMap
 export type InputContainerWidth = keyof typeof inputContainerWidthClassMap
 

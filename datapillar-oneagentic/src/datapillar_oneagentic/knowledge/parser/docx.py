@@ -1,6 +1,4 @@
-"""
-DOCX 解析器
-"""
+"""DOCX parser."""
 
 from __future__ import annotations
 
@@ -39,7 +37,7 @@ def _docx_to_text(data: bytes) -> str:
         from docx.text.paragraph import Paragraph
     except ImportError as err:
         raise ImportError(
-            "解析 DOCX 需要安装依赖：\n"
+            "DOCX parsing requires dependencies:\n"
             "  pip install datapillar-oneagentic[knowledge]"
         ) from err
 

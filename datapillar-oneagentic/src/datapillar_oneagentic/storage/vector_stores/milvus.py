@@ -1,6 +1,4 @@
-"""
-Milvus VectorStore 实现
-"""
+"""Milvus VectorStore implementation."""
 
 from __future__ import annotations
 
@@ -54,22 +52,22 @@ class MilvusVectorStore(VectorStore):
         try:
             from pymilvus import AsyncMilvusClient
         except ImportError as err:
-            raise ImportError("需要安装 Milvus 依赖：pip install pymilvus>=2.5.3") from err
+            raise ImportError("Milvus dependency required: pip install pymilvus>=2.5.3") from err
 
         if self._is_remote:
-            logger.info(f"初始化 MilvusVectorStore (远程): {self._uri}, namespace={self._namespace}")
+            logger.info(f"MilvusVectorStore initialized (remote): {self._uri}, namespace={self._namespace}")
             self._client = AsyncMilvusClient(uri=self._uri, token=self._token)
         else:
             import os
             os.makedirs(os.path.dirname(self._uri), exist_ok=True)
-            logger.info(f"初始化 MilvusVectorStore (本地): {self._uri}")
+            logger.info(f"MilvusVectorStore initialized (local): {self._uri}")
             self._client = AsyncMilvusClient(uri=self._uri)
 
     async def close(self) -> None:
         if self._client:
             await self._client.close()
         self._client = None
-        logger.info("MilvusVectorStore 已关闭")
+        logger.info("MilvusVectorStore closed")
 
     async def ensure_collection(self, schema: VectorCollectionSchema) -> None:
         if self._client is None:
@@ -81,7 +79,7 @@ class MilvusVectorStore(VectorStore):
             return
 
         if self._dim is None:
-            raise ValueError("Embedding dimension 未配置，无法创建 Milvus 集合")
+            raise ValueError("Embedding dimension is not configured for Milvus collection")
 
         from pymilvus import DataType, MilvusClient
 
@@ -104,7 +102,7 @@ class MilvusVectorStore(VectorStore):
             elif field.field_type == VectorFieldType.SPARSE_VECTOR:
                 milvus_schema.add_field(field.name, DataType.VARCHAR, max_length=65535)
             else:
-                raise ValueError(f"不支持的字段类型: {field.field_type}")
+                raise ValueError(f"Unsupported field type: {field.field_type}")
 
         index_params = MilvusClient.prepare_index_params()
         for field in schema.fields:
@@ -121,10 +119,10 @@ class MilvusVectorStore(VectorStore):
                 schema=milvus_schema,
                 index_params=index_params,
             )
-            logger.info(f"创建 Milvus 集合: {name}")
+            logger.info(f"Create Milvus collection: {name}")
         except Exception as exc:
-            if _is_collection_exists_error(exc):
-                logger.info(f"复用 Milvus 集合: {name}")
+            if _is_collection_exists(exc):
+                logger.info(f"Reuse Milvus collection: {name}")
                 return
             raise
 
@@ -189,7 +187,7 @@ class MilvusVectorStore(VectorStore):
                 if score is None:
                     score = hit.get("distance")
                 if score is None:
-                    raise ValueError("Milvus 搜索结果缺少 score")
+                    raise ValueError("Milvus search result missing score")
                 results.append(
                     VectorSearchResult(
                         record=entity,
@@ -237,6 +235,6 @@ def _build_milvus_filter(filters: dict[str, Any]) -> str:
     return " and ".join(parts)
 
 
-def _is_collection_exists_error(exc: Exception) -> bool:
+def _is_collection_exists(exc: Exception) -> bool:
     message = str(exc).lower()
     return "already exists" in message or "already exist" in message or "collection exists" in message

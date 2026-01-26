@@ -140,7 +140,7 @@ class DeveloperAgent:
 
         # 1. 构建消息
         human_message = f"## 上游架构设计\n{upstream_context}"
-        messages = ctx.build_messages(self.SYSTEM_PROMPT, human_message=human_message)
+        messages = ctx.messages().system(self.SYSTEM_PROMPT).user(human_message)
 
         # 2. 工具调用循环（委派由框架自动处理）
         messages = await ctx.invoke_tools(messages)

@@ -1,6 +1,4 @@
-"""
-知识入库构建器
-"""
+"""Knowledge ingestion builder."""
 
 from __future__ import annotations
 
@@ -23,7 +21,7 @@ def build_document(
     parsed: ParsedDocument,
     doc_input: DocumentInput,
 ) -> KnowledgeDocument:
-    """构建文档元数据"""
+    """Build document metadata."""
     now = now_ms()
     content_hash = hash_content(parsed.text)
     source_uri = doc_input.filename
@@ -65,7 +63,7 @@ def build_chunks(
     doc: KnowledgeDocument,
     drafts: list[ChunkDraft],
 ) -> list[KnowledgeChunk]:
-    """构建知识分片"""
+    """Build knowledge chunks."""
     now = now_ms()
     chunks: list[KnowledgeChunk] = []
     for draft in drafts:

@@ -33,7 +33,7 @@ class _StubRequest:
 
 
 @pytest.mark.asyncio
-async def test_stream_manager_replays_buffered_events() -> None:
+async def test_stream_manager() -> None:
     manager = StreamManager()
     key = SessionKey(namespace="ns", session_id="s1")
     orchestrator = _StubOrchestrator(
@@ -74,7 +74,7 @@ async def test_stream_manager_replays_buffered_events() -> None:
 
 
 @pytest.mark.asyncio
-async def test_stream_manager_abort_cancels_run() -> None:
+async def test_run_cancels() -> None:
     manager = StreamManager()
     key = SessionKey(namespace="ns", session_id="s2")
     orchestrator = _BlockingOrchestrator()

@@ -14,10 +14,10 @@
     <description>Datapillar SaaS Data Platform</description>
 
     <modules>
+        <module>datapillar-common</module>
         <module>datapillar-auth</module>
         <module>datapillar-web-admin</module>
         <module>datapillar-api-gateway</module>
-        <module>datapillar-knowledge-sdk</module>
         <module>datapillar-distribution</module>
     </modules>
 
@@ -55,6 +55,13 @@
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-jsqlparser</artifactId>
                 <version>${mybatis-plus.version}</version>
+            </dependency>
+
+            <!-- Lombok -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
             </dependency>
 
             <!-- JWT -->

@@ -1,17 +1,17 @@
 """
-Agent 执行上下文
+Agent execution context.
 
-AgentContext 是框架提供给业务 Agent 的接口：
-- 只读信息：namespace, query, session_id
-- 工作方法：build_messages, invoke_tools, get_structured_output, interrupt
-- 依赖获取：get_deliverable
+AgentContext is the interface exposed to business agents:
+- Read-only info: namespace, query, session_id
+- Methods: messages, invoke_tools, get_structured_output, interrupt
+- Dependency access: get_deliverable
 
-设计原则：
-- 业务侧只能使用公开的方法和属性
-- 框架内部对象私有化，防止业务侧越权
-- 记忆、LLM、工具等由框架自动管理
-- 委派由框架内部处理，业务侧无需关心
-- Store 操作封装在框架内部，业务侧通过简洁 API 访问
+Design principles:
+- Business code only uses public methods/properties
+- Internal objects are private to prevent escalation
+- Memory/LLM/tools are managed by the framework
+- Delegation is handled internally
+- Store access is encapsulated with a simple API
 """
 
 from __future__ import annotations
@@ -21,11 +21,10 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from langchain_core.messages import AIMessage, BaseMessage
 from langgraph.prebuilt import ToolNode
 from langgraph.types import Command, interrupt
 
-from datapillar_oneagentic.context import ContextBuilder
+from datapillar_oneagentic.context import ContextBuilder, ContextComposer
 from datapillar_oneagentic.state import StateBuilder
 from datapillar_oneagentic.events import (
     EventBus,
@@ -36,6 +35,8 @@ from datapillar_oneagentic.events import (
 )
 from datapillar_oneagentic.providers.llm.llm import extract_thinking
 from datapillar_oneagentic.core.types import SessionKey
+from datapillar_oneagentic.messages import Message, Messages
+from datapillar_oneagentic.messages.adapters.langchain import from_langchain, to_langchain
 from datapillar_oneagentic.utils.structured_output import parse_structured_output
 
 if TYPE_CHECKING:
@@ -46,10 +47,9 @@ logger = logging.getLogger(__name__)
 
 class DelegationSignal(Exception):
     """
-    委派信号（框架内部）
+    Delegation signal (framework internal).
 
-    当 Agent 调用委派工具时抛出，由 Executor 捕获处理。
-    业务侧不需要知道这个异常的存在。
+    Raised when an agent calls a delegation tool; handled by the executor.
     """
 
     def __init__(self, command: Command):
@@ -60,105 +60,152 @@ class DelegationSignal(Exception):
 @dataclass
 class AgentContext:
     """
-    Agent 执行上下文
+    Agent execution context.
 
-    业务 Agent 通过此上下文与框架交互。
+    Business agents interact with the framework through this context.
 
-    公开属性（只读）：
-    - namespace: 命名空间
-    - session_id: 会话 ID
-    - query: 用户输入
+    Public attributes (read-only):
+    - namespace: namespace
+    - session_id: session ID
+    - query: user input
 
-    公开方法：
-    - build_messages(system_prompt, human_message=None): 构建 LLM 消息
-    - invoke_tools(messages): 执行工具调用循环
-    - get_structured_output(messages): 获取结构化输出
-    - interrupt(payload): 中断等待用户回复
-    - get_deliverable(agent_id): 获取其他 Agent 的产出
+    Public methods:
+    - messages(base=None): create a Messages sequence
+    - invoke_tools(messages): run tool call loop
+    - get_structured_output(messages): parse structured output
+    - interrupt(payload): pause and wait for user response
+    - get_deliverable(agent_id): fetch another agent's deliverable
 
-    使用示例：
+    Example:
     ```python
     async def run(self, ctx: AgentContext) -> AnalysisOutput:
-        # 获取上游 Agent 的产出（通过 agent_id）
+        # Fetch upstream deliverable by agent_id
         upstream_data = await ctx.get_deliverable(agent_id="data_extractor")
 
-        # 1. 构建消息
-        messages = ctx.build_messages(self.SYSTEM_PROMPT)
+        # 1. Build messages
+        messages = ctx.messages().system(self.SYSTEM_PROMPT)
 
-        # 2. 工具调用循环（委派由框架自动处理）
+        # 2. Tool-call loop (delegation handled by framework)
         messages = await ctx.invoke_tools(messages)
 
-        # 3. 获取结构化输出
+        # 3. Get structured output
         output = await ctx.get_structured_output(messages)
 
-        # 4. 业务判断
+        # 4. Business logic
         if output.confidence < 0.7:
-            user_reply = ctx.interrupt("需求不够明确")
-            # 可根据 user_reply 补充上下文后继续
+            user_reply = ctx.interrupt("Requirements are not clear enough")
+            # Continue after enriching context with user_reply
 
         return output
     ```
     """
 
-    # === 公开属性（只读）===
+    # === Public read-only attributes ===
     namespace: str
-    """命名空间"""
+    """Namespace."""
 
     session_id: str
-    """会话 ID"""
+    """Session ID."""
 
     query: str
-    """用户输入"""
+    """User input."""
 
-    # === 框架内部（私有化）===
+    # === Framework internals (private) ===
     _spec: AgentSpec = field(default=None, repr=False)
-    """Agent 规格（框架内部）"""
+    """Agent spec (internal)."""
 
     _llm: Any = field(default=None, repr=False)
-    """LLM 实例（框架内部）"""
+    """LLM instance (internal)."""
 
     _tools: list[Any] = field(default_factory=list, repr=False)
-    """工具列表（框架内部）"""
+    """Tool list (internal)."""
 
     _state: dict = field(default_factory=dict, repr=False)
-    """共享状态（框架内部）"""
+    """Shared state (internal)."""
 
     _delegation_command: Command | None = field(default=None, repr=False)
-    """委派命令（框架内部）"""
+    """Delegation command (internal)."""
 
-    _messages: list[BaseMessage] = field(default_factory=list, repr=False)
+    _messages: Messages = field(default_factory=Messages, repr=False)
     _agent_config: AgentConfig | None = field(default=None, repr=False)
     _event_bus: EventBus | None = field(default=None, repr=False)
-    """消息历史（框架内部）"""
+    """Message history (internal)."""
 
-    # === 公开方法 ===
+    # === Public methods ===
 
-    def build_messages(self, system_prompt: str, human_message: str | None = None) -> Any:
+    def messages(self, base: Messages | None = None) -> Messages:
         """
-        构建 LLM 消息
+        Create a Messages sequence using the framework protocol.
 
-        自动注入：
-        - 系统提示词
-        - Checkpoint 记忆（messages）
-        - 知识上下文
-        - 经验上下文
-        - 用户查询
+        Args:
+            base: optional Messages instance to seed the sequence
 
-        参数：
-        - system_prompt: Agent 的系统提示词
-        - human_message: 追加的人类消息（可选，仅用于当前调用）
-
-        返回：
-        - 消息对象（业务侧不需要了解具体类型，只需传递）
+        Returns:
+            Messages instance for chaining.
         """
-        ctx_builder = ContextBuilder.from_state(self._state)
-        messages = ctx_builder.compose_llm_messages(
-            system_prompt=system_prompt,
-            query=self.query,
-            human_message=human_message,
-        )
+        if base is None:
+            messages = Messages()
+        elif isinstance(base, Messages):
+            messages = Messages(base)
+        else:
+            raise TypeError("messages only accepts Messages or None")
         self._messages = messages
         return messages
+
+    def _compose_messages(self, messages: Messages) -> Messages:
+        if not isinstance(messages, Messages):
+            raise TypeError("messages must be Messages")
+        prefix, rest = self._split_system(messages)
+        contexts = ContextBuilder.extract_context_blocks(self._state)
+        checkpoint_messages = StateBuilder(self._state).memory.snapshot()
+        if self._has_user(messages):
+            checkpoint_messages = self._trim_tail_user(checkpoint_messages, messages)
+
+        llm_messages = Messages()
+        llm_messages.extend(prefix)
+        if contexts:
+            ContextComposer._append_context_messages(llm_messages, contexts)
+        if checkpoint_messages:
+            llm_messages.extend(checkpoint_messages)
+        if rest:
+            llm_messages.extend(rest)
+        return llm_messages
+
+    @staticmethod
+    def _split_system(messages: Messages) -> tuple[Messages, Messages]:
+        prefix = Messages()
+        rest = Messages()
+        found_non_system = False
+        for msg in messages:
+            if not found_non_system and msg.role == "system":
+                prefix.append(msg)
+                continue
+            found_non_system = True
+            rest.append(msg)
+        return prefix, rest
+
+    @staticmethod
+    def _has_user(messages: Messages) -> bool:
+        return any(msg.role == "user" for msg in messages)
+
+    @staticmethod
+    def _trim_tail_user(checkpoint_messages: Messages, base_messages: Messages) -> Messages:
+        if not checkpoint_messages:
+            return checkpoint_messages
+        last = checkpoint_messages[-1]
+        if last.role != "user":
+            return checkpoint_messages
+        base_users = [
+            str(msg.content).strip()
+            for msg in base_messages
+            if msg.role == "user" and str(msg.content).strip()
+        ]
+        if not base_users:
+            return checkpoint_messages
+        last_text = str(last.content).strip()
+        if last_text and last_text in base_users:
+            return Messages(checkpoint_messages[:-1])
+        return checkpoint_messages
 
     def _has_tool(self, tool_name: str) -> bool:
         for tool in self._tools or []:
@@ -169,56 +216,60 @@ class AgentContext:
                 return True
         return False
 
-    async def invoke_tools(self, messages: Any) -> Any:
+    async def invoke_tools(self, messages: Messages) -> Messages:
         """
-        工具调用循环
+        Tool invocation loop.
 
-        执行 LLM 调用和工具调用的循环，直到 LLM 不再调用工具。
-        如果调用了委派工具，会抛出 DelegationSignal 由框架处理。
+        Runs LLM calls and tool calls until the model stops calling tools.
+        If a delegation tool is called, DelegationSignal is raised for the framework.
 
-        关键说明：
-        - 有工具时仅使用 bind_tools 进行工具调用循环，不强制结构化输出
-        - 无工具时使用结构化输出，避免额外调用 get_structured_output
-        - 工具路径最终仍需调用 get_structured_output 解析结果
+        Notes:
+        - With tools, use bind_tools for tool loop without forcing structured output
+        - Without tools, use structured output to avoid extra get_structured_output call
+        - Tool path still needs get_structured_output for parsing final output
 
-        参数：
-        - messages: build_messages() 返回的消息对象
+        Args:
+            messages: message object from ctx.messages()
 
-        返回：
-        - 更新后的消息对象
+        Returns:
+            Updated messages.
 
-        异常：
-        - DelegationSignal: 当调用委派工具时（框架内部处理）
+        Raises:
+            DelegationSignal: raised when delegation tools are called.
         """
         schema = self._spec.deliverable_schema
 
         if not self._tools:
-            # 没有工具，直接调用 LLM（带结构化输出）
+            # No tools: call LLM with structured output directly.
             llm_structured = self._llm.with_structured_output(schema, method="function_calling")
-            response = await llm_structured.ainvoke(messages)
-            # 将 Pydantic 对象序列化为 JSON 字符串，包装成 AIMessage
+            llm_messages = self._compose_messages(messages)
+            response = await llm_structured.ainvoke(llm_messages)
+            # Serialize Pydantic output as JSON string and wrap into assistant message.
             if hasattr(response, "model_dump_json"):
                 content = response.model_dump_json()
             else:
                 import json
                 content = json.dumps(response) if isinstance(response, dict) else str(response)
-            messages.append(AIMessage(content=content))
+            assistant_message = Message.assistant(content)
+            llm_messages.append(assistant_message)
+            messages.append(assistant_message)
             self._messages = messages
             return messages
 
-        # 创建 ToolNode
+        # Create ToolNode.
         tool_node = ToolNode(self._tools)
 
-        # bind_tools 绑定工具
+        # Bind tools for tool invocation loop.
         llm_with_tools = self._llm.bind_tools(self._tools)
 
+        llm_messages = self._compose_messages(messages)
         max_steps = self._spec.get_max_steps(self._agent_config)
         key = SessionKey(namespace=self.namespace, session_id=self.session_id)
         for _iteration in range(1, max_steps + 1):
-            # LLM 调用
-            response = await llm_with_tools.ainvoke(messages)
+            # LLM call.
+            response = await llm_with_tools.ainvoke(llm_messages)
 
-            # 提取并发送思考内容（如果有）
+            # Extract and emit thinking content if present.
             thinking_content = self._extract_thinking(response)
             if thinking_content:
                 await self._emit_event(
@@ -230,23 +281,25 @@ class AgentContext:
                 )
 
             if not response.tool_calls:
-                # 没有工具调用，结束
+                # No tool calls, end loop.
+                llm_messages.append(response)
                 messages.append(response)
                 break
 
+            llm_messages.append(response)
             messages.append(response)
 
-            # 记录工具调用信息（用于后续发送完成/失败事件）
+            # Track tool call info for completion/failure events.
             tool_calls_info = []
             for tc in response.tool_calls:
-                tool_name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
-                tool_args = tc.get("args", {}) if isinstance(tc, dict) else getattr(tc, "args", {})
-                tool_call_id = tc.get("id", "") if isinstance(tc, dict) else getattr(tc, "id", "")
+                tool_name = getattr(tc, "name", None)
+                tool_args = getattr(tc, "args", {})
+                tool_call_id = getattr(tc, "id", "")
 
                 if not tool_name:
                     continue
 
-                logger.info(f"🔧 [{self._spec.name}] 调用工具: {tool_name}")
+                logger.info(f"[{self._spec.name}] Tool called: {tool_name}")
                 tool_calls_info.append({
                     "name": tool_name,
                     "args": tool_args if isinstance(tool_args, dict) else {},
@@ -262,21 +315,21 @@ class AgentContext:
                     )
                 )
 
-            # 执行工具（带超时控制）
+            # Execute tools with timeout control.
             import time
             tool_start_time = time.time()
             current_state = dict(self._state)
-            current_state["messages"] = list(messages)
+            current_state["messages"] = to_langchain(messages)
             tool_error = None
-            tool_timeout = self._spec.get_tool_timeout_seconds(self._agent_config)
+            tool_timeout = self._spec.get_tool_timeout(self._agent_config)
             try:
                 result = await asyncio.wait_for(
                     tool_node.ainvoke(current_state),
                     timeout=tool_timeout,
                 )
             except asyncio.TimeoutError:
-                tool_error = f"工具调用超时（{tool_timeout}秒）"
-                logger.error(f"⏰ [{self._spec.name}] {tool_error}")
+                tool_error = f"Tool call timed out ({tool_timeout}s)"
+                logger.error(f"[{self._spec.name}] Tool error: {tool_error}")
                 for tc_info in tool_calls_info:
                     await self._emit_event(
                         ToolFailedEvent(
@@ -290,7 +343,7 @@ class AgentContext:
                 raise TimeoutError(tool_error)
             except Exception as e:
                 tool_error = str(e)
-                # 发送所有工具的失败事件
+                # Emit failure events for all tool calls.
                 for tc_info in tool_calls_info:
                     await self._emit_event(
                         ToolFailedEvent(
@@ -304,35 +357,40 @@ class AgentContext:
                 raise
             tool_duration_ms = (time.time() - tool_start_time) * 1000
 
-            # 解析工具结果：分离 Command 和普通消息
+            # Parse tool results: separate Command and messages.
             delegation_command = None
-            new_messages = []
+            new_messages = Messages()
 
             if isinstance(result, dict):
-                new_messages = result.get("messages", [])
+                raw_messages = result.get("messages", [])
+                if raw_messages:
+                    new_messages = Messages(from_langchain(raw_messages))
             elif isinstance(result, list):
                 for item in result:
                     if isinstance(item, Command):
-                        # 只取第一个 Command（多个委派不合理）
+                        # Only keep the first Command (multiple delegations are invalid).
                         if delegation_command is None:
                             delegation_command = item
                         else:
-                            logger.warning(f"🔄 [{self._spec.name}] 忽略多余的委派命令")
+                            logger.warning(f"[{self._spec.name}] Extra delegation command ignored")
                     else:
-                        new_messages.append(item)
+                        if isinstance(item, Message):
+                            new_messages.append(item)
+                        else:
+                            new_messages.append(from_langchain(item))
 
-            # 处理委派命令
+            # Handle delegation command.
             if delegation_command is not None:
                 self._delegation_command = delegation_command
-                logger.info(f"🔄 [{self._spec.name}] 委派给 {self._delegation_command.goto}")
+                logger.info(f"[{self._spec.name}] Delegated to {self._delegation_command.goto}")
                 self._messages = messages
-                # 抛出委派信号，由框架处理
+                # Raise delegation signal for the framework.
                 raise DelegationSignal(self._delegation_command)
 
-            # 发送工具完成事件（从 ToolMessage 中提取结果）
+            # Emit tool completion events (extract tool outputs from messages).
             tool_outputs = {}
             for msg in new_messages:
-                if hasattr(msg, "tool_call_id") and hasattr(msg, "content"):
+                if msg.role == "tool" and msg.tool_call_id:
                     tool_outputs[msg.tool_call_id] = msg.content
 
             for tc_info in tool_calls_info:
@@ -349,90 +407,91 @@ class AgentContext:
                 )
 
             messages.extend(new_messages)
+            llm_messages.extend(new_messages)
 
         self._messages = messages
         return messages
 
-    async def get_structured_output(self, messages: Any) -> Any:
+    async def get_structured_output(self, messages: Messages) -> Any:
         """
-        获取结构化输出
+        Get structured output.
 
-        参数：
-        - messages: invoke_tools() 返回的消息对象
+        Args:
+            messages: message object returned by invoke_tools()
 
-        返回：
-        - deliverable_schema 实例
+        Returns:
+            deliverable_schema instance.
         """
         schema = self._spec.deliverable_schema
-        # 直接调用 LLM 生成结构化输出，避免共享上下文中的非输出消息干扰解析
+        # Direct structured output call to avoid parsing interference from extra messages.
         llm_structured = self._llm.with_structured_output(
             schema,
             method="function_calling",
             include_raw=True,
         )
-        result = await llm_structured.ainvoke(messages)
+        llm_messages = self._compose_messages(messages)
+        result = await llm_structured.ainvoke(llm_messages)
         return parse_structured_output(result, schema, strict=False)
 
     async def _emit_event(self, event: Any) -> None:
-        """安全发送事件（允许 event_bus 为空）"""
+        """Safely emit an event (event_bus may be None)."""
         if self._event_bus is None:
             return
         await self._event_bus.emit(self, event)
 
-    def _extract_thinking(self, response: AIMessage) -> str | None:
+    def _extract_thinking(self, response: Message) -> str | None:
         """
-        从 LLM 响应中提取思考内容
+        Extract thinking content from an LLM response.
 
-        支持多种模型的思考格式：
+        Supported formats:
         - GLM: additional_kwargs.reasoning_content
-        - Claude: content 中的 thinking blocks
+        - Claude: thinking blocks in content
         - DeepSeek: additional_kwargs.reasoning_content
         """
-        if not isinstance(response, AIMessage):
+        if not isinstance(response, Message):
             return None
         return extract_thinking(response)
 
     def interrupt(self, payload: Any | None = None) -> Any:
         """
-        中断并等待用户回复
+        Interrupt and wait for a user reply.
 
-        payload 是可序列化的提示信息（可选）。
-        恢复后返回用户输入，并自动写入上下文消息。
+        payload is optional and should be serializable.
+        Returns the user response and appends it to context messages.
         """
         resume_value = interrupt(payload)
         self._append_user_reply(resume_value)
         return resume_value
 
     def _append_user_reply(self, resume_value: Any) -> None:
-        """将用户回复追加为 HumanMessage（统一结构）"""
+        """Append user reply as a user message (normalized structure)."""
         sb = StateBuilder(self._state)
-        sb.append_user_reply_inplace(resume_value)
-        # interrupt 恢复后，后续调用应基于最新 checkpoint 记忆
+        sb.append_reply_state(resume_value)
+        # After resuming, subsequent calls should use the latest checkpoint memory.
         self._messages = sb.memory.snapshot()
 
     async def get_deliverable(self, agent_id: str) -> Any | None:
         """
-        获取其他 Agent 的产出
+        Get another agent's deliverable.
 
-        通过 agent_id 获取上游 Agent 产出的交付物。
-        常用于有依赖关系的 Agent 之间传递数据。
+        Fetch deliverables by agent_id, typically for upstream dependencies.
 
-        参数：
-        - agent_id: 上游 Agent 的 ID
+        Args:
+            agent_id: upstream agent ID
 
-        返回：
-        - 交付物内容（dict），如果不存在则返回 None
+        Returns:
+            Deliverable content (dict) or None if not found.
 
-        使用示例：
+        Example:
         ```python
         async def run(self, ctx: AgentContext) -> ReportOutput:
-            # 获取数据分析 Agent 的产出
+            # Fetch analysis output
             analysis = await ctx.get_deliverable(agent_id="analyst")
             if not analysis:
-                user_reply = ctx.interrupt("缺少分析数据")
-                # 可根据 user_reply 获取数据后继续
+                user_reply = ctx.interrupt("Missing analysis data")
+                # Continue after providing data based on user_reply
 
-            # 使用分析结果生成报告
+            # Build report from analysis
             ...
         ```
         """
@@ -440,7 +499,7 @@ class AgentContext:
 
         store = get_store()
         if not store:
-            logger.warning("Store 未配置，无法获取 deliverable")
+            logger.warning("Store not configured; deliverable unavailable")
             return None
 
         store_namespace = ("deliverables", self.namespace, self.session_id)
@@ -451,5 +510,5 @@ class AgentContext:
                 return item.value
             return None
         except Exception as e:
-            logger.error(f"获取 deliverable 失败: {e}")
+            logger.error(f"Failed to fetch deliverable: {e}")
             return None

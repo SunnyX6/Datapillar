@@ -81,6 +81,10 @@ be/data-storage/
 coverage/
 *.lcov
 
+# Playwright 测试产物
+playwright-report/
+test-results/
+
 # 依赖分析报告
 .nyc_output/
 

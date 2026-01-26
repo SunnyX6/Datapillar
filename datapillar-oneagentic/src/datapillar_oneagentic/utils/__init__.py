@@ -1,7 +1,7 @@
 """
-Utils 模块
+Utils module.
 
-工具函数。
+Helper utilities.
 """
 
 from datapillar_oneagentic.utils.prompt_format import format_code_block, format_markdown

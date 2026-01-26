@@ -7,7 +7,7 @@ from datapillar_oneagentic.events.types import AgentStartedEvent
 
 
 @pytest.mark.asyncio
-async def test_event_bus_emits_sync_and_async_handlers() -> None:
+async def test_event_bus() -> None:
     bus = EventBus()
     calls: list[str] = []
 
@@ -26,7 +26,7 @@ async def test_event_bus_emits_sync_and_async_handlers() -> None:
     assert "async:a1" in calls
 
 
-def test_event_bus_scoped_handlers_isolated() -> None:
+def test_event_bus2() -> None:
     bus = EventBus()
     calls: list[str] = []
 

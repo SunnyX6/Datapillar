@@ -17,8 +17,8 @@ import com.sunny.datapillar.admin.module.projects.entity.Project;
 import com.sunny.datapillar.admin.module.projects.enums.ProjectStatus;
 import com.sunny.datapillar.admin.module.projects.mapper.ProjectMapper;
 import com.sunny.datapillar.admin.module.projects.service.ProjectService;
-import com.sunny.datapillar.admin.response.WebAdminErrorCode;
-import com.sunny.datapillar.admin.response.WebAdminException;
+import com.sunny.datapillar.common.error.ErrorCode;
+import com.sunny.datapillar.common.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,7 +52,7 @@ public class ProjectServiceImpl implements ProjectService {
     public ProjectDto.Response getProjectById(Long id, Long userId) {
         ProjectDto.Response project = projectMapper.selectProjectById(id, userId);
         if (project == null) {
-            throw new WebAdminException(WebAdminErrorCode.PROJECT_ACCESS_DENIED, id);
+            throw new BusinessException(ErrorCode.ADMIN_PROJECT_ACCESS_DENIED, id);
         }
         return project;
     }
@@ -95,7 +95,7 @@ public class ProjectServiceImpl implements ProjectService {
         );
 
         if (existingProject == null) {
-            throw new WebAdminException(WebAdminErrorCode.PROJECT_ACCESS_DENIED, id);
+            throw new BusinessException(ErrorCode.ADMIN_PROJECT_ACCESS_DENIED, id);
         }
 
         Project project = new Project();
@@ -139,7 +139,7 @@ public class ProjectServiceImpl implements ProjectService {
         );
 
         if (existingProject == null) {
-            throw new WebAdminException(WebAdminErrorCode.PROJECT_ACCESS_DENIED, id);
+            throw new BusinessException(ErrorCode.ADMIN_PROJECT_ACCESS_DENIED, id);
         }
 
         projectMapper.deleteById(id);

@@ -4,6 +4,8 @@
  * 知识图谱使用非 SSE 接口（一次性 JSON 返回）
  */
 
+import { fetchWithAuthRetry } from '@/lib/api/client'
+
 /**
  * 后端返回的节点结构（Neo4j 格式）
  */
@@ -110,7 +112,7 @@ export async function fetchInitialGraph(
   limit: number = 500,
   onProgress?: (current: number, total: number) => void
 ): Promise<GraphData> {
-  const response = await fetch(`/api/ai/knowledge/initial?limit=${limit}`, {
+  const response = await fetchWithAuthRetry(`/api/ai/knowledge/initial?limit=${limit}`, {
     method: 'GET',
     credentials: 'include'
   })
@@ -133,7 +135,7 @@ export async function searchGraph(
   query: string,
   topK: number = 10
 ): Promise<GraphData> {
-  const response = await fetch('/api/ai/knowledge/search', {
+  const response = await fetchWithAuthRetry('/api/ai/knowledge/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',

@@ -153,7 +153,7 @@ class AnalystAgent:
     async def run(self, ctx: AgentContext) -> AnalysisOutput:
         """执行分析"""
         # 1. 构建消息
-        messages = ctx.build_messages(self.SYSTEM_PROMPT)
+        messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
 
         # 2. 工具调用循环（委派由框架自动处理）
         messages = await ctx.invoke_tools(messages)

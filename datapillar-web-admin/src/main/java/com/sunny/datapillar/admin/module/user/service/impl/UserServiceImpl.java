@@ -12,8 +12,8 @@ import com.sunny.datapillar.admin.module.user.entity.User;
 import com.sunny.datapillar.admin.module.user.entity.UserRole;
 import com.sunny.datapillar.admin.module.user.mapper.UserMapper;
 import com.sunny.datapillar.admin.module.user.service.UserService;
-import com.sunny.datapillar.admin.response.WebAdminErrorCode;
-import com.sunny.datapillar.admin.response.WebAdminException;
+import com.sunny.datapillar.common.error.ErrorCode;
+import com.sunny.datapillar.common.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +40,7 @@ public class UserServiceImpl implements UserService {
     public UserDto.Response getUserById(Long id) {
         User user = userMapper.selectById(id);
         if (user == null) {
-            throw new WebAdminException(WebAdminErrorCode.USER_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_USER_NOT_FOUND, id);
         }
 
         UserDto.Response response = new UserDto.Response();
@@ -54,7 +54,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public Long createUser(UserDto.Create dto) {
         if (userMapper.findByUsername(dto.getUsername()) != null) {
-            throw new WebAdminException(WebAdminErrorCode.USER_ALREADY_EXISTS, dto.getUsername());
+            throw new BusinessException(ErrorCode.ADMIN_USER_ALREADY_EXISTS, dto.getUsername());
         }
 
         User user = new User();
@@ -80,13 +80,13 @@ public class UserServiceImpl implements UserService {
     public void updateUser(Long id, UserDto.Update dto) {
         User existingUser = userMapper.selectById(id);
         if (existingUser == null) {
-            throw new WebAdminException(WebAdminErrorCode.USER_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_USER_NOT_FOUND, id);
         }
 
         if (dto.getUsername() != null) {
             User userWithSameName = userMapper.findByUsername(dto.getUsername());
             if (userWithSameName != null && !userWithSameName.getId().equals(id)) {
-                throw new WebAdminException(WebAdminErrorCode.USERNAME_IN_USE, dto.getUsername());
+                throw new BusinessException(ErrorCode.ADMIN_USERNAME_IN_USE, dto.getUsername());
             }
             existingUser.setUsername(dto.getUsername());
         }
@@ -121,7 +121,7 @@ public class UserServiceImpl implements UserService {
     public void deleteUser(Long id) {
         User user = userMapper.selectById(id);
         if (user == null) {
-            throw new WebAdminException(WebAdminErrorCode.USER_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_USER_NOT_FOUND, id);
         }
 
         user.setDeleted(1);
@@ -174,7 +174,7 @@ public class UserServiceImpl implements UserService {
     public void updateProfile(Long userId, UserDto.UpdateProfile dto) {
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new WebAdminException(WebAdminErrorCode.USER_NOT_FOUND, userId);
+            throw new BusinessException(ErrorCode.ADMIN_USER_NOT_FOUND, userId);
         }
 
         if (dto.getNickname() != null) {

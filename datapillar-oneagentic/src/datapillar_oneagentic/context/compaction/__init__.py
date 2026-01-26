@@ -1,14 +1,14 @@
 """
-Context Compaction 子模块
+Context compaction submodule.
 
-上下文压缩，由 LLM 上下文超限触发。
+Compaction is triggered by LLM context overflow.
 
-核心组件：
-- Compactor: 压缩器，直接操作 list[BaseMessage]
-- CompactPolicy: 压缩策略配置
-- CompactResult: 压缩结果
+Core components:
+- Compactor: performs compaction on Messages
+- CompactPolicy: compaction policy configuration
+- CompactResult: compaction result
 
-使用示例：
+Example:
 ```python
 from datapillar_oneagentic.context.compaction import get_compactor
 from datapillar_oneagentic.exception import LLMError, LLMErrorCategory
@@ -20,7 +20,7 @@ try:
 except LLMError as exc:
     if exc.category == LLMErrorCategory.CONTEXT:
         compressed_messages, result = await compactor.compact(messages)
-        # 用压缩后的 messages 重试
+        # Retry with compressed messages
 ```
 """
 
@@ -34,10 +34,10 @@ from datapillar_oneagentic.context.compaction.compactor import (
 )
 
 __all__ = [
-    # 压缩器
+    # Compactor
     "Compactor",
     "get_compactor",
-    # 策略和结果
+    # Policy and result
     "CompactPolicy",
     "CompactResult",
 ]

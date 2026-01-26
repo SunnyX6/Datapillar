@@ -73,7 +73,7 @@ def _client_with_session(session) -> MCPClient:
 
 
 @pytest.mark.asyncio
-async def test_mcp_client_list_tools_parses_annotations() -> None:
+async def test_list_tools() -> None:
     client = _client_with_session(_StubSession())
 
     tools = await client.list_tools()
@@ -84,28 +84,28 @@ async def test_mcp_client_list_tools_parses_annotations() -> None:
 
 
 @pytest.mark.asyncio
-async def test_mcp_client_call_tool_single_content() -> None:
+async def test_call_tool() -> None:
     client = _client_with_session(_StubSession())
     result = await client.call_tool("tool", {"x": 1})
     assert result == "ok"
 
 
 @pytest.mark.asyncio
-async def test_mcp_client_call_tool_multiple_content_items() -> None:
+async def test_call_tool2() -> None:
     client = _client_with_session(_StubSessionMulti())
     result = await client.call_tool("tool", {"x": 1})
     assert result == ["a", "b"]
 
 
 @pytest.mark.asyncio
-async def test_mcp_client_call_tool_structured_content_fallback() -> None:
+async def test_call_tool3() -> None:
     client = _client_with_session(_StubSessionStructured())
     result = await client.call_tool("tool", {"x": 1})
     assert result == {"status": "ok"}
 
 
 @pytest.mark.asyncio
-async def test_mcp_client_raises_when_not_connected() -> None:
+async def test_mcp_client() -> None:
     client = MCPClient(MCPServerHTTP(url="https://example.com", skip_security_check=True))
     with pytest.raises(MCPConnectionError):
         await client.list_tools()

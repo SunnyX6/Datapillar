@@ -1,7 +1,7 @@
 """
-重试与退避策略
+Retry and backoff strategy.
 
-支持指数退避 + 抖动，只对可重试错误进行重试。
+Uses exponential backoff with optional jitter and retries only retryable errors.
 """
 
 from __future__ import annotations
@@ -26,9 +26,9 @@ T = TypeVar("T")
 
 def calculate_retry_delay(config: "RetryConfig", attempt: int) -> float:
     """
-    计算第 N 次重试的延迟（秒）
+    Calculate the delay for the N-th retry (seconds).
 
-    使用指数退避 + 可选抖动。
+    Uses exponential backoff with optional jitter.
     """
     delay_ms = config.initial_delay_ms * (config.exponential_base**attempt)
     delay_ms = min(delay_ms, config.max_delay_ms)
@@ -46,24 +46,24 @@ def with_retry(
     retry_config: "RetryConfig" | None = None,
 ):
     """
-    异步重试装饰器
+    Async retry decorator.
 
-    特性：
-    - 只对可重试错误进行重试
-    - 指数退避 + 抖动
-    - 使用 LLM 配置中的重试参数
+    Features:
+    - Retries only retryable errors
+    - Exponential backoff with jitter
+    - Uses retry config from LLM settings
 
-    参数：
-        max_retries: 最大重试次数（None 则使用配置值）
-        on_retry: 重试回调（用于日志/监控）
-        retry_config: 重试配置（必传）
+    Args:
+        max_retries: Max retry attempts (None uses config value)
+        on_retry: Retry callback (logging/monitoring)
+        retry_config: Retry configuration (required)
     """
 
     def decorator(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
         @wraps(func)
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             if retry_config is None:
-                raise ValueError("retry_config 不能为空")
+                raise ValueError("retry_config is required")
             config = retry_config
             retries = max_retries if max_retries is not None else config.max_retries
             last_error: Exception | None = None
@@ -77,21 +77,21 @@ def with_retry(
 
                     if action != RecoveryAction.RETRY:
                         logger.warning(
-                            f"[Retry] 不可重试错误，直接失败 | func={func.__name__} | error={e}"
+                            f"[Retry] Non-retryable error; failing fast | func={func.__name__} | error={e}"
                         )
                         raise
 
                     if attempt >= retries:
                         logger.error(
-                            f"[Retry] 重试耗尽 | func={func.__name__} | "
+                            f"[Retry] Retries exhausted | func={func.__name__} | "
                             f"attempts={attempt + 1} | error={e}"
                         )
                         raise
 
                     delay = calculate_retry_delay(config, attempt)
                     logger.warning(
-                        f"[Retry] 第 {attempt + 1}/{retries} 次重试失败，"
-                        f"{delay:.2f}s 后重试 | func={func.__name__} | error={e}"
+                        f"[Retry] Retry {attempt + 1}/{retries} failed; "
+                        f"retrying in {delay:.2f}s | func={func.__name__} | error={e}"
                     )
 
                     if on_retry:
@@ -112,7 +112,7 @@ def with_retry_sync(
     retry_config: "RetryConfig" | None = None,
 ):
     """
-    同步重试装饰器（用于非异步场景）
+    Sync retry decorator (for non-async usage).
     """
     import time
 
@@ -120,7 +120,7 @@ def with_retry_sync(
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             if retry_config is None:
-                raise ValueError("retry_config 不能为空")
+                raise ValueError("retry_config is required")
             config = retry_config
             retries = max_retries if max_retries is not None else config.max_retries
             last_error: Exception | None = None
@@ -140,8 +140,8 @@ def with_retry_sync(
 
                     delay = calculate_retry_delay(config, attempt)
                     logger.warning(
-                        f"[Retry] 第 {attempt + 1}/{retries} 次重试失败，"
-                        f"{delay:.2f}s 后重试 | func={func.__name__} | error={e}"
+                        f"[Retry] Retry {attempt + 1}/{retries} failed; "
+                        f"retrying in {delay:.2f}s | func={func.__name__} | error={e}"
                     )
 
                     if on_retry:

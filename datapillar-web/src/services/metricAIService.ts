@@ -4,15 +4,15 @@
  * 通过 Gateway 调用 AI 服务
  */
 
-import axios from 'axios'
+import { createApiClient } from '@/lib/api/client'
 import type { AIFillRequest, AIFillResponse } from '@/types/metric'
 
 export type { AIFillRequest, AIFillResponse }
 
-const aiClient = axios.create({
+const aiClient = createApiClient({
   baseURL: '/api/ai/governance/metric',
   timeout: 60000,
-  headers: { 'Content-Type': 'application/json' }
+  validateResponse: false
 })
 
 /**

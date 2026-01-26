@@ -1,5 +1,6 @@
 package com.sunny.datapillar.gateway.config;
 
+import com.sunny.datapillar.common.constant.HeaderConstants;
 import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -48,7 +49,7 @@ public class RateLimiterConfig {
     @Bean
     public KeyResolver userKeyResolver() {
         return exchange -> {
-            String userId = exchange.getRequest().getHeaders().getFirst("X-User-Id");
+            String userId = exchange.getRequest().getHeaders().getFirst(HeaderConstants.HEADER_USER_ID);
             if (userId != null && !userId.isEmpty()) {
                 return Mono.just("user:" + userId);
             }

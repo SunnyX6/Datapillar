@@ -11,8 +11,8 @@ import com.sunny.datapillar.admin.module.user.entity.Role;
 import com.sunny.datapillar.admin.module.user.entity.RolePermission;
 import com.sunny.datapillar.admin.module.user.mapper.RoleMapper;
 import com.sunny.datapillar.admin.module.user.service.RoleService;
-import com.sunny.datapillar.admin.response.WebAdminErrorCode;
-import com.sunny.datapillar.admin.response.WebAdminException;
+import com.sunny.datapillar.common.error.ErrorCode;
+import com.sunny.datapillar.common.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,7 +38,7 @@ public class RoleServiceImpl implements RoleService {
     public RoleDto.Response getRoleById(Long id) {
         Role role = roleMapper.selectById(id);
         if (role == null) {
-            throw new WebAdminException(WebAdminErrorCode.ROLE_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_ROLE_NOT_FOUND, id);
         }
 
         RoleDto.Response response = new RoleDto.Response();
@@ -50,7 +50,7 @@ public class RoleServiceImpl implements RoleService {
     @Transactional
     public Long createRole(RoleDto.Create dto) {
         if (roleMapper.findByCode(dto.getCode()) != null) {
-            throw new WebAdminException(WebAdminErrorCode.ROLE_ALREADY_EXISTS, dto.getCode());
+            throw new BusinessException(ErrorCode.ADMIN_ROLE_ALREADY_EXISTS, dto.getCode());
         }
 
         Role role = new Role();
@@ -71,13 +71,13 @@ public class RoleServiceImpl implements RoleService {
     public void updateRole(Long id, RoleDto.Update dto) {
         Role existingRole = roleMapper.selectById(id);
         if (existingRole == null) {
-            throw new WebAdminException(WebAdminErrorCode.ROLE_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_ROLE_NOT_FOUND, id);
         }
 
         if (dto.getCode() != null) {
             Role roleWithSameCode = roleMapper.findByCode(dto.getCode());
             if (roleWithSameCode != null && !roleWithSameCode.getId().equals(id)) {
-                throw new WebAdminException(WebAdminErrorCode.ROLE_ALREADY_EXISTS, dto.getCode());
+                throw new BusinessException(ErrorCode.ADMIN_ROLE_ALREADY_EXISTS, dto.getCode());
             }
             existingRole.setCode(dto.getCode());
         }
@@ -102,7 +102,7 @@ public class RoleServiceImpl implements RoleService {
     public void deleteRole(Long id) {
         Role role = roleMapper.selectById(id);
         if (role == null) {
-            throw new WebAdminException(WebAdminErrorCode.ROLE_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_ROLE_NOT_FOUND, id);
         }
 
         roleMapper.deleteById(id);

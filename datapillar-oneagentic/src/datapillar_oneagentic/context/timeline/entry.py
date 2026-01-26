@@ -1,8 +1,8 @@
 """
-Context Timeline 子模块 - 时间线条目
+Context timeline submodule - timeline entry.
 
-记录单个执行事件。
-注意：namespace, session_id 由 Blackboard 管理，不在此存储。
+Records a single execution event.
+Note: namespace and session_id are managed by Blackboard and not stored here.
 """
 
 from __future__ import annotations
@@ -23,56 +23,56 @@ def _generate_id() -> str:
 
 class TimelineEntry(BaseModel):
     """
-    时间线条目
+    Timeline entry.
 
-    记录单个事件，关联 checkpoint 支持时间旅行。
-    注意：namespace, session_id 由 Blackboard 管理。
+    Records a single event and links checkpoints for time travel.
+    Note: namespace and session_id are managed by Blackboard.
     """
 
-    # 标识
-    id: str = Field(default_factory=_generate_id, description="事件 ID")
-    seq: int = Field(default=0, description="序号")
+    # Identity
+    id: str = Field(default_factory=_generate_id, description="Event ID")
+    seq: int = Field(default=0, description="Sequence")
 
-    # 事件信息
-    event_type: EventType = Field(..., description="事件类型")
-    agent_id: str | None = Field(default=None, description="相关 Agent ID")
-    content: str = Field(default="", description="事件描述")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="额外数据")
+    # Event info
+    event_type: EventType = Field(..., description="Event type")
+    agent_id: str | None = Field(default=None, description="Related agent ID")
+    content: str = Field(default="", description="Event description")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Extra metadata")
 
-    # 时间
-    timestamp_ms: int = Field(default_factory=now_ms, description="事件时间")
-    duration_ms: int | None = Field(default=None, description="事件耗时")
+    # Timing
+    timestamp_ms: int = Field(default_factory=now_ms, description="Event time")
+    duration_ms: int | None = Field(default=None, description="Event duration")
 
-    # 检查点支持
+    # Checkpoint support
     checkpoint_id: str | None = Field(
         default=None,
-        description="关联的检查点 ID",
+        description="Linked checkpoint ID",
     )
     checkpoint_type: CheckpointType | None = Field(
         default=None,
-        description="检查点类型",
+        description="Checkpoint type",
     )
     parent_checkpoint_id: str | None = Field(
         default=None,
-        description="父检查点 ID（用于分支）",
+        description="Parent checkpoint ID (for branches)",
     )
     is_checkpoint: bool = Field(
         default=False,
-        description="是否为检查点事件",
+        description="Whether this is a checkpoint event",
     )
 
     def to_display(self) -> str:
-        """转换为显示格式"""
+        """Render a display string."""
         agent_part = f"[{self.agent_id}] " if self.agent_id else ""
         duration_part = f" ({self.duration_ms}ms)" if self.duration_ms else ""
-        checkpoint_part = " 📌" if self.is_checkpoint else ""
+        checkpoint_part = " [checkpoint]" if self.is_checkpoint else ""
         return f"{agent_part}{self.event_type.value}: {self.content}{duration_part}{checkpoint_part}"
 
     def to_dict(self) -> dict:
-        """转换为字典"""
+        """Convert to a dictionary."""
         return self.model_dump(mode="json")
 
     @classmethod
     def from_dict(cls, data: dict) -> TimelineEntry:
-        """从字典创建"""
+        """Create from a dictionary."""
         return cls.model_validate(data)

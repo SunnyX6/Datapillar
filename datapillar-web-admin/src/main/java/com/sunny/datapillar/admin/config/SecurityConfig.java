@@ -1,6 +1,7 @@
 package com.sunny.datapillar.admin.config;
 
 import com.sunny.datapillar.admin.security.GatewayUserAuthenticationFilter;
+import com.sunny.datapillar.admin.security.TraceIdFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -25,11 +26,17 @@ import org.springframework.web.cors.CorsConfigurationSource;
 public class SecurityConfig {
 
     private final GatewayUserAuthenticationFilter gatewayUserAuthenticationFilter;
+    private final TraceIdFilter traceIdFilter;
+    private final SecurityExceptionHandler securityExceptionHandler;
     private final CorsConfigurationSource corsConfigurationSource;
 
     public SecurityConfig(GatewayUserAuthenticationFilter gatewayUserAuthenticationFilter,
+                          TraceIdFilter traceIdFilter,
+                          SecurityExceptionHandler securityExceptionHandler,
                           CorsConfigurationSource corsConfigurationSource) {
         this.gatewayUserAuthenticationFilter = gatewayUserAuthenticationFilter;
+        this.traceIdFilter = traceIdFilter;
+        this.securityExceptionHandler = securityExceptionHandler;
         this.corsConfigurationSource = corsConfigurationSource;
     }
 
@@ -39,12 +46,16 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(securityExceptionHandler)
+                        .accessDeniedHandler(securityExceptionHandler))
                 .authorizeHttpRequests(auth -> auth
                         // 健康检查等公开端点
                         .requestMatchers("/health", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         // 所有请求都需要认证（Gateway 已验证，这里信任 Gateway）
                         .anyRequest().authenticated()
                 )
+                .addFilterBefore(traceIdFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(gatewayUserAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

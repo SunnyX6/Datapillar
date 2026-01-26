@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import { Activity, ArrowUp, Box, Cpu as ChipIcon, GitBranch, GitCommit, Network, Plus, RefreshCw, Zap } from 'lucide-react'
 import { Card } from '@/components/ui'
+import { surfaceSizeClassMap } from '@/design-tokens/dimensions'
 
 const runtimeStats = {
   cpu: 45,
@@ -47,7 +48,7 @@ export function OneIdeRightColumn() {
         </div>
 
         <Card variant="default" className="relative overflow-hidden group flex flex-col flex-1">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-brand-50 to-indigo-50 rounded-bl-[100px] opacity-50 transition-all duration-700 group-hover:scale-110"></div>
+          <div className={`absolute top-0 right-0 ${surfaceSizeClassMap.md} bg-gradient-to-br from-brand-50 to-indigo-50 rounded-bl-[100px] opacity-50 transition-all duration-700 group-hover:scale-110`}></div>
 
           <div className="relative z-10 flex flex-col flex-1 gap-6">
             <div>

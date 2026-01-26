@@ -1,14 +1,14 @@
 """
-上下文压缩器
+Context compactor.
 
-直接操作 LangGraph 的 messages 列表，将历史消息压缩为摘要。
+Operates directly on LangGraph messages and compresses history into a summary.
 
-压缩流程：
-1. 保留最近 N 条消息 + 用户消息
-2. 将其他消息压缩为摘要
-3. 返回压缩后的 messages 列表
+Compaction flow:
+1. Keep the most recent N messages plus user/system messages
+2. Compress the rest into a summary
+3. Return the compacted message list
 
-触发时机：由 LLM 上下文超限触发，不再主动检查 token。
+Triggered by LLM context overflow; no proactive token checks.
 """
 
 from __future__ import annotations
@@ -16,16 +16,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from langchain_core.messages import (
-    AIMessage,
-    BaseMessage,
-    HumanMessage,
-    SystemMessage,
-    ToolMessage,
-)
-
 from datapillar_oneagentic.context.builder import ContextBuilder
 from datapillar_oneagentic.utils.prompt_format import format_markdown
+from datapillar_oneagentic.messages import Message, Messages
 
 from datapillar_oneagentic.context.compaction.compact_policy import CompactPolicy, CompactResult
 
@@ -34,56 +27,56 @@ logger = logging.getLogger(__name__)
 
 class Compactor:
     """
-    上下文压缩器
+    Context compactor.
 
-    直接操作 LangGraph 的 messages 列表，包括：
-    - 调用 LLM 生成摘要
-    - 返回压缩后的 messages
+Operates directly on LangGraph messages:
+- Calls the LLM to generate a summary
+- Returns compacted messages
     """
 
     def __init__(self, llm: Any, policy: CompactPolicy | None = None):
         """
-        初始化压缩器
+        Initialize the compactor.
 
         Args:
-            llm: LLM 实例
-            policy: 压缩策略
+            llm: LLM instance
+            policy: Compaction policy
         """
         self.llm = llm
         self.policy = policy or CompactPolicy()
 
     async def compact(
         self,
-        messages: list[BaseMessage],
-    ) -> tuple[list[BaseMessage], CompactResult]:
+        messages: Messages,
+    ) -> tuple[Messages, CompactResult]:
         """
-        执行压缩
+        Execute compaction.
 
         Args:
-            messages: 原始消息列表
+            messages: Original message list
 
         Returns:
-            (压缩后的 messages, CompactResult)
+            (Compacted messages, CompactResult)
         """
         if not messages:
-            return messages, CompactResult.no_action("没有消息")
+            return messages, CompactResult.no_action("No messages to compact")
 
-        # 分类消息：保留 vs 压缩
+        # Classify messages: keep vs compress.
         keep_messages, compress_messages = self._classify_messages(messages)
 
         if not compress_messages:
-            return messages, CompactResult.no_action("没有可压缩的消息")
+            return messages, CompactResult.no_action("No messages to compact")
 
-        # 生成压缩摘要
+        # Generate compaction summary.
         try:
             summary = await self._generate_summary(compress_messages)
         except Exception as e:
-            logger.error(f"压缩失败: {e}", exc_info=True)
+            logger.error(f"Compaction failed: {e}", exc_info=True)
             return messages, CompactResult.failed(str(e))
 
         logger.info(
-            f"📦 压缩完成: {len(compress_messages)} 条 → 摘要，"
-            f"保留 {len(keep_messages)} 条"
+            f"Compaction completed: {len(compress_messages)} -> summary, "
+            f"kept {len(keep_messages)}"
         )
 
         return keep_messages, CompactResult(
@@ -95,58 +88,58 @@ class Compactor:
 
     def _classify_messages(
         self,
-        messages: list[BaseMessage],
-    ) -> tuple[list[BaseMessage], list[BaseMessage]]:
+        messages: Messages,
+    ) -> tuple[Messages, Messages]:
         """
-        分类消息
+        Classify messages.
 
-        规则：
-        - 最近 min_keep_entries 条消息始终保留
-        - HumanMessage（用户消息）始终保留
-        - 其他消息压缩
+        Rules:
+        - Always keep the most recent min_keep_entries
+        - Always keep user/system messages
+        - Compress the rest
         """
-        min_keep = self.policy.get_min_keep_entries()
+        min_keep = self.policy.get_min_keep()
 
         if len(messages) <= min_keep:
-            return messages.copy(), []
+            return Messages(messages), Messages()
 
-        # 最近的消息始终保留
+        # Always keep recent messages.
         recent_messages = messages[-min_keep:]
         older_messages = messages[:-min_keep]
 
-        keep_messages = []
-        compress_messages = []
+        keep_messages = Messages()
+        compress_messages = Messages()
 
         for msg in older_messages:
-            # 用户消息始终保留
-            if isinstance(msg, (HumanMessage, SystemMessage)):
+            # Always keep user/system messages.
+            if msg.role in {"user", "system"}:
                 keep_messages.append(msg)
             else:
                 compress_messages.append(msg)
 
-        # 合并：保留的 + 最近的
+        # Merge kept and recent messages.
         keep_messages.extend(recent_messages)
 
         return keep_messages, compress_messages
 
-    async def _generate_summary(self, messages: list[BaseMessage]) -> str:
-        """生成压缩摘要"""
-        # 构建历史文本
+    async def _generate_summary(self, messages: Messages) -> str:
+        """Generate compaction summary."""
+        # Build history text.
         history_lines = []
         for msg in messages:
             role = self._get_role_name(msg)
-            content = msg.content if isinstance(msg.content, str) else str(msg.content)
-            # 截断过长的单条消息
+            content = msg.content
+            # Truncate overly long messages.
             if len(content) > 500:
                 content = content[:500] + "..."
             history_lines.append(f"[{role}] {content}")
 
         history_text = "\n".join(history_lines)
 
-        # 构建压缩 prompt
+        # Build compaction prompt.
         prompt = self.policy.compress_prompt_template.format(history=history_text)
 
-        # 调用 LLM
+        # Call LLM.
         llm_messages = ContextBuilder.build_compactor_messages(
             system_prompt=format_markdown(
                 title=None,
@@ -165,32 +158,32 @@ class Compactor:
 
         return summary
 
-    def _get_role_name(self, msg: BaseMessage) -> str:
-        """获取消息角色名"""
-        if isinstance(msg, HumanMessage):
+    def _get_role_name(self, msg: Message) -> str:
+        """Return a display name for the message role."""
+        if msg.role == "user":
             return "User"
-        if isinstance(msg, AIMessage):
-            name = getattr(msg, "name", None)
+        if msg.role == "assistant":
+            name = msg.name
             return name if name else "Assistant"
-        if isinstance(msg, ToolMessage):
-            return f"Tool:{getattr(msg, 'name', 'unknown')}"
-        if isinstance(msg, SystemMessage):
+        if msg.role == "tool":
+            return f"Tool:{msg.name or 'unknown'}"
+        if msg.role == "system":
             return "System"
         return "Unknown"
 
 
-# === 压缩器工厂 ===
+# === Compactor factory ===
 
 
 def get_compactor(*, llm: Any, policy: CompactPolicy | None = None) -> Compactor:
     """
-    获取压缩器实例
+    Return a compactor instance.
 
     Args:
-        llm: LLM 实例
-        policy: 压缩策略（可选）
+        llm: LLM instance
+        policy: Optional compaction policy
 
     Returns:
-        Compactor 实例
+        Compactor instance
     """
     return Compactor(llm=llm, policy=policy or CompactPolicy())

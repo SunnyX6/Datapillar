@@ -1,21 +1,21 @@
-# Datapillar OneAgentic 配置示例
-# 将此文件保存为 datapillar.toml 或 config.toml
+# Datapillar OneAgentic config example
+# Save this file as datapillar.toml or config.toml
 
 # ============================================================================
-# LLM 配置
+# LLM configuration
 # ============================================================================
 [llm]
-# 基础配置
-# api_key = "sk-xxx"  # 敏感信息建议用环境变量: DATAPILLAR_LLM_API_KEY
-# provider: 支持 openai, anthropic, glm, deepseek, openrouter, ollama
+# Base settings
+# api_key = "sk-xxx"  # Sensitive data should use env var: DATAPILLAR_LLM_API_KEY
+# provider: supports openai, anthropic, glm, deepseek, openrouter, ollama
 provider = "openai"
 model = "gpt-4o"
-# base_url = "https://api.openai.com/v1"  # 可选，使用自定义端点时设置
+# base_url = "https://api.openai.com/v1"  # Optional, set for custom endpoint
 temperature = 0.0
 timeout_seconds = 120
 
-# --- 其他 Provider 配置示例 ---
-# GLM (智谱):
+# --- Other provider examples ---
+# GLM (Zhipu):
 #   provider = "glm"
 #   model = "glm-4.7"
 #   base_url = "https://open.bigmodel.cn/api/paas/v4"
@@ -34,95 +34,95 @@ timeout_seconds = 120
 #   model = "anthropic/claude-3-opus"
 #   base_url = "https://openrouter.ai/api/v1"
 #
-# Ollama (本地):
+# Ollama (local):
 #   provider = "ollama"
 #   model = "llama3"
 #   base_url = "http://localhost:11434/v1"
 
-# 重试配置
+# Retry settings
 retry.max_retries = 3
 retry.initial_delay_ms = 500
 retry.max_delay_ms = 30000
 retry.exponential_base = 2.0
 retry.jitter = true
 
-# 熔断配置
+# Circuit breaker settings
 circuit_breaker.failure_threshold = 5
 circuit_breaker.recovery_seconds = 60
 
-# 限流配置
+# Rate limiting
 rate_limit.enabled = true
 rate_limit.default.rpm = 60
 rate_limit.default.max_concurrent = 10
 
-# 按 Provider 覆盖（可选）
+# Provider overrides (optional)
 # rate_limit.providers.glm.rpm = 10
 # rate_limit.providers.glm.max_concurrent = 3
 
-# LLM 响应缓存配置
+# LLM response cache
 [llm.cache]
 enabled = true
-backend = "memory"  # "memory" 或 "redis"
+backend = "memory"  # "memory" or "redis"
 ttl_seconds = 300
 max_size = 1000
 
-# --- Redis 缓存配置示例 ---
+# --- Redis cache example ---
 # backend = "redis"
 # redis_url = "redis://localhost:6379/0"
 # key_prefix = "llm_cache:"
 
 # ============================================================================
-# Embedding 配置（经验学习/知识检索需要）
+# Embedding configuration (required for learning/knowledge retrieval)
 # ============================================================================
 [embedding]
-# 基础配置
-# api_key = "sk-xxx"  # 敏感信息建议用环境变量: DATAPILLAR_EMBEDDING_API_KEY
-# provider: 支持 openai, glm
+# Base settings
+# api_key = "sk-xxx"  # Sensitive data should use env var: DATAPILLAR_EMBEDDING_API_KEY
+# provider: supports openai, glm
 provider = "openai"
 model = "text-embedding-3-small"
-# base_url = "https://api.openai.com/v1"  # 可选，使用自定义端点时设置
+# base_url = "https://api.openai.com/v1"  # Optional, set for custom endpoint
 dimension = 1536
 
-# --- 其他 Provider 配置示例 ---
-# GLM (智谱):
+# --- Other provider examples ---
+# GLM (Zhipu):
 #   provider = "glm"
 #   model = "embedding-3"
 #   dimension = 2048
 
 # ============================================================================
-# Agent 配置
+# Agent configuration
 # ============================================================================
 [agent]
 max_steps = 50
 timeout_seconds = 300
 tool_timeout_seconds = 30
 
-# Checkpointer 配置（状态持久化）
+# Checkpointer (state persistence)
 [agent.checkpointer]
 type = "memory"  # memory | sqlite | postgres | redis
-# path = "./data/checkpoint.db"  # sqlite 专用
-# url = "redis://localhost:6379"  # postgres/redis 专用
-# ttl_minutes = 10080  # redis 专用（7天）
+# path = "./data/checkpoint.db"  # sqlite only
+# url = "redis://localhost:6379"  # postgres/redis only
+# ttl_minutes = 10080  # redis only (7 days)
 
-# DeliverableStore 配置（Agent 交付物存储）
+# DeliverableStore (agent outputs)
 [agent.deliverable_store]
 type = "memory"  # memory | postgres | redis
-# url = "redis://localhost:6379"  # postgres/redis 专用
+# url = "redis://localhost:6379"  # postgres/redis only
 
 # ============================================================================
-# VectorStore 配置（经验/知识共用）
+# VectorStore configuration (shared by learning and knowledge)
 # ============================================================================
 [vector_store]
 type = "lance"  # lance | chroma | milvus
-path = "./data/vectors"  # lance/chroma 本地模式
-# uri = "./data/milvus.db"  # milvus 本地模式
-# uri = "http://localhost:19530"  # milvus 远程模式
-# token = "root:Milvus"  # milvus 远程认证
-# host = "localhost"  # chroma 远程模式
-# port = 8000  # chroma 远程端口
+path = "./data/vectors"  # lance/chroma local
+# uri = "./data/milvus.db"  # milvus local
+# uri = "http://localhost:19530"  # milvus remote
+# token = "root:Milvus"  # milvus remote auth
+# host = "localhost"  # chroma remote
+# port = 8000  # chroma remote port
 
 # ============================================================================
-# 经验学习配置
+# Learning configuration
 # ============================================================================
 [learning]
 verify_threshold = 0.7
@@ -130,25 +130,25 @@ reject_threshold = 0.3
 retrieval_k = 5
 
 # ============================================================================
-# 知识配置（知识框架独立配置）
+# Knowledge configuration (knowledge module overrides)
 # ============================================================================
 [knowledge.base_config.embedding]
-# 基础配置
-# api_key = "sk-xxx"  # 敏感信息建议用环境变量: DATAPILLAR_EMBEDDING_API_KEY（默认会复用全局 embedding）
-# provider: 支持 openai, glm
+# Base settings
+# api_key = "sk-xxx"  # Sensitive data should use env var: DATAPILLAR_EMBEDDING_API_KEY (defaults to global embedding)
+# provider: supports openai, glm
 provider = "openai"
 model = "text-embedding-3-small"
-# base_url = "https://api.openai.com/v1"  # 可选，使用自定义端点时设置
+# base_url = "https://api.openai.com/v1"  # Optional, set for custom endpoint
 dimension = 1536
 
 [knowledge.base_config.vector_store]
 type = "lance"  # lance | chroma | milvus
-path = "./data/vectors"  # lance/chroma 本地模式
-# uri = "./data/milvus.db"  # milvus 本地模式
-# uri = "http://localhost:19530"  # milvus 远程模式
-# token = "root:Milvus"  # milvus 远程认证
-# host = "localhost"  # chroma 远程模式
-# port = 8000  # chroma 远程端口
+path = "./data/vectors"  # lance/chroma local
+# uri = "./data/milvus.db"  # milvus local
+# uri = "http://localhost:19530"  # milvus remote
+# token = "root:Milvus"  # milvus remote auth
+# host = "localhost"  # chroma remote
+# port = 8000  # chroma remote port
 
 [knowledge.chunk_config]
 mode = "general"  # general | parent_child | qa
@@ -157,7 +157,7 @@ preprocess = ["normalize_newlines", "remove_control", "collapse_whitespace"]
 [knowledge.chunk_config.general]
 max_tokens = 800
 overlap = 120
-# delimiter = "\n\n"  # 可选固定分隔符
+# delimiter = "\n\n"  # Optional fixed delimiter
 
 [knowledge.retrieve_config]
 method = "hybrid"  # semantic | hybrid
@@ -184,9 +184,9 @@ score_mode = "rank"  # rank | normalize | raw
 # device = "cuda"
 
 [knowledge.retrieve_config.inject]
-# mode=system: 每次 Agent 执行前自动检索并注入 SystemMessage
-# mode=tool: 暴露 knowledge_retrieve 工具，Agent 按需调用检索（上下文更省）
-# 注意：MapReduce reducer 不注入知识，仅汇总 Map 结果
+# mode=system: auto-retrieve and inject a system message before each agent run
+# mode=tool: expose a knowledge_retrieve tool so the agent can fetch on demand (smaller context)
+# Note: MapReduce reducers do not inject knowledge; they only summarize map results.
 mode = "tool"  # system | tool
 max_tokens = 1200
 max_chunks = 6

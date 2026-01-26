@@ -1,12 +1,12 @@
 """
-Embedding 统一调用层
+Embedding unified access layer.
 
-支持 OpenAI、智谱GLM
+Supports OpenAI and GLM.
 
-特性：
-- 统一接口，屏蔽模型差异
-- 支持批量向量化
-- 基于团队配置创建实例
+Features:
+- Unified interface to hide model differences
+- Batch embedding support
+- Instances created from team config
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class EmbeddingModelConfig:
-    """Embedding 模型配置"""
+    """Embedding model configuration."""
 
     provider: str
     model_name: str
@@ -35,18 +35,18 @@ class EmbeddingModelConfig:
 
 
 class EmbeddingFactory:
-    """Embedding 工厂类 - 根据配置创建 Embedding 实例"""
+    """Embedding factory - create Embeddings from config."""
 
     @staticmethod
     def create_embeddings(config: EmbeddingModelConfig) -> Embeddings:
         """
-        创建 LangChain Embeddings 实例
+        Create a LangChain Embeddings instance.
 
         Args:
-            config: Embedding 模型配置
+            config: Embedding model config
 
         Returns:
-            LangChain Embeddings 实例
+            LangChain Embeddings instance
         """
         provider = config.provider.lower()
 
@@ -76,19 +76,19 @@ class EmbeddingFactory:
 
             return ZhipuAIEmbeddings(**kwargs)
 
-        raise ValueError(f"不支持的 Embedding 提供商: {provider}")
+        raise ValueError(f"Unsupported embedding provider: {provider}")
 
 
 class EmbeddingProvider:
     """
-    Embedding 提供者（团队内使用）
+    Embedding provider (team scope).
 
-    负责按配置创建 Embeddings 实例并做本地缓存。
+    Creates Embeddings instances from config and caches locally.
     """
 
     def __init__(self, config: EmbeddingConfig) -> None:
         if not config.is_configured():
-            raise ValueError("Embedding 未配置，无法创建 EmbeddingProvider")
+            raise ValueError("Embedding is not configured; cannot create EmbeddingProvider")
         self._config = config
         self._cache: dict[tuple, Embeddings] = {}
         self._lock = threading.Lock()
@@ -103,7 +103,7 @@ class EmbeddingProvider:
         )
 
     def get_embeddings(self) -> Embeddings:
-        """获取 Embeddings 实例（带缓存）"""
+        """Get Embeddings instance with caching."""
         config = self._build_model_config()
         cache_key = (
             config.provider,
@@ -122,22 +122,22 @@ class EmbeddingProvider:
 
             embeddings = EmbeddingFactory.create_embeddings(config)
             logger.info(
-                f"创建 Embedding 实例: provider={config.provider}, model={config.model_name}"
+                f"Embedding instance created: provider={config.provider}, model={config.model_name}"
             )
             self._cache[cache_key] = embeddings
             return embeddings
 
     async def embed_text(self, text: str) -> list[float]:
-        """向量化单个文本"""
+        """Embed a single text."""
         embeddings = self.get_embeddings()
         return await embeddings.aembed_query(text)
 
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        """批量向量化文本"""
+        """Embed a batch of texts."""
         embeddings = self.get_embeddings()
         return await embeddings.aembed_documents(texts)
 
     def clear_cache(self) -> None:
-        """清空 Embedding 实例缓存"""
+        """Clear Embeddings cache."""
         with self._lock:
             self._cache.clear()

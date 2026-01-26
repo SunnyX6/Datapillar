@@ -5,6 +5,8 @@
  * 协议版本：v3（统一 stream 事件）
  */
 
+import { fetchWithAuthRetry } from '@/lib/api/client'
+
 /**
  * SSE 事件类型
  */
@@ -135,7 +137,7 @@ export function createWorkflowStream(
       }
 
       // 统一使用 /workflow/chat 端点
-      const response = await fetch('/api/ai/etl/workflow/chat', {
+      const response = await fetchWithAuthRetry('/api/ai/etl/workflow/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -216,7 +218,7 @@ export function createWorkflowStream(
  * 用户可以在打断后继续在同一个 session 发送新消息。
  */
 export async function abortWorkflow(sessionId: string): Promise<{ success: boolean; aborted: boolean; message: string }> {
-  const response = await fetch('/api/ai/etl/workflow/abort', {
+  const response = await fetchWithAuthRetry('/api/ai/etl/workflow/abort', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'

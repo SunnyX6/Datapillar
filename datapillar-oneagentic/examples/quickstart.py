@@ -1,28 +1,28 @@
 """
-Datapillar OneAgentic 快速入门示例
+Datapillar OneAgentic quickstart example.
 
-本示例展示：
-1. @tool 装饰器的使用（从简单到高级）
-2. @agent 装饰器的完整声明式使用
-3. Datapillar 团队的高级配置
-4. 两个 Agent 组成的团队协作
+This example shows:
+1. @tool decorator usage (simple to advanced)
+2. @agent decorator with full declarative spec
+3. Advanced Datapillar team configuration
+4. Two-agent collaboration
 
-运行命令：
+Run:
     uv run python examples/quickstart.py
 
-配置要求：
-    1) LLM（团队执行需要）
+Requirements:
+    1) LLM (team execution)
        export DATAPILLAR_LLM_PROVIDER="openai"              # openai | anthropic | glm | deepseek | openrouter | ollama
        export DATAPILLAR_LLM_API_KEY="sk-xxx"
        export DATAPILLAR_LLM_MODEL="gpt-4o"
-       # 可选：export DATAPILLAR_LLM_BASE_URL="https://api.openai.com/v1"
-       # 可选：export DATAPILLAR_LLM_ENABLE_THINKING="false"
-    2) Embedding（知识检索需要）
+       # Optional: export DATAPILLAR_LLM_BASE_URL="https://api.openai.com/v1"
+       # Optional: export DATAPILLAR_LLM_ENABLE_THINKING="false"
+    2) Embedding (knowledge retrieval)
        export DATAPILLAR_EMBEDDING_PROVIDER="openai"        # openai | glm
        export DATAPILLAR_EMBEDDING_API_KEY="sk-xxx"
        export DATAPILLAR_EMBEDDING_MODEL="text-embedding-3-small"
        export DATAPILLAR_EMBEDDING_DIMENSION="1536"
-       # 可选：export DATAPILLAR_EMBEDDING_BASE_URL="https://api.openai.com/v1"
+       # Optional: export DATAPILLAR_EMBEDDING_BASE_URL="https://api.openai.com/v1"
 """
 
 import asyncio
@@ -30,174 +30,193 @@ import json
 import logging
 from pydantic import BaseModel, Field
 
+from datapillar_oneagentic.log import setup_logging
+
 def _setup_example_logging() -> None:
-    """示例脚本负责配置日志输出（不要在框架里改 root logger）。"""
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(message)s"))
-    dp_logger = logging.getLogger("datapillar_oneagentic")
-    dp_logger.handlers.clear()
-    dp_logger.addHandler(handler)
-    # 默认不打开 DEBUG：避免 stream 场景下重复刷堆栈；结构化输出失败会用 ERROR 打印原始 LLM 输出用于调试。
-    dp_logger.setLevel(logging.INFO)
-    dp_logger.propagate = False
+    """Configure example logging (align with framework defaults)."""
+    setup_logging(logging.INFO)
 
 
 _setup_example_logging()
 
 from datapillar_oneagentic import (
-    # 装饰器
+    # Decorators
     agent,
     tool,
-    # 核心类
+    # Core classes
     Datapillar,
     Process,
     AgentContext,
-    # 配置
+    # Config
     DatapillarConfig,
 )
-from datapillar_oneagentic.knowledge import Knowledge, KnowledgeConfig, KnowledgeSource
+from datapillar_oneagentic.knowledge import (
+    BM25SparseEmbedder,
+    Knowledge,
+    KnowledgeConfig,
+    KnowledgeRetrieve,
+    KnowledgeSource,
+)
 from datapillar_oneagentic.providers.llm import EmbeddingBackend, Provider
 
 
 # ============================================================================
-# 第一部分：@tool 装饰器使用示例（从简单到高级）
+# Part 1: @tool decorator usage (simple to advanced)
 # ============================================================================
 
+TEAM_NAMESPACE = "shopping_demo"
 
-# --- 1. 最简单的用法：直接装饰函数 ---
-# 工具名 = 函数名，docstring 自动解析为描述和参数说明
+DEMO_KNOWLEDGE_TEXT = (
+    "Noise-canceling headphones emphasize comfort, ANC, and battery life.\n"
+    "Budget options under $200 often include multi-device pairing and USB-C charging.\n"
+    "Orders require a shipping address and preferred delivery city.\n"
+)
+
+DEMO_SPARSE_EMBEDDER = BM25SparseEmbedder()
+
+DEMO_KNOWLEDGE_SOURCE = KnowledgeSource(
+    name="Example knowledge base",
+    source_type="doc",
+    source_uri="kb_demo",
+    content=DEMO_KNOWLEDGE_TEXT,
+    filename="kb_demo.txt",
+)
+
+# --- 1. Simplest usage: decorate a function ---
+# Tool name = function name; docstring is used for description/args.
 @tool
 def search_products(keyword: str) -> str:
-    """搜索商品目录
+    """Search product catalog.
 
     Args:
-        keyword: 搜索关键词
+        keyword: search keyword
     """
     products = {
-        "手机": ["iPhone 15 Pro (¥7999)", "Pixel 8 (¥4999)", "Galaxy S24 (¥5999)"],
-        "电脑": ["MacBook Pro (¥14999)", "ThinkPad X1 (¥9999)", "Dell XPS (¥8999)"],
-        "耳机": ["AirPods Pro (¥1899)", "Sony WH-1000XM5 (¥2499)", "Bose QC (¥2299)"],
+        "phones": ["iPhone 15 Pro ($799)", "Pixel 8 ($499)", "Galaxy S24 ($599)"],
+        "laptops": ["MacBook Pro ($1499)", "ThinkPad X1 ($999)", "Dell XPS ($899)"],
+        "headphones": ["AirPods Pro ($189)", "Sony WH-1000XM5 ($249)", "Bose QC ($229)"],
     }
     for key, items in products.items():
         if key in keyword or keyword in key:
-            return f"找到 {len(items)} 个商品:\n" + "\n".join(f"  - {item}" for item in items)
-    return f"未找到与 '{keyword}' 相关的商品"
+            return f"Found {len(items)} products:\n" + "\n".join(f"  - {item}" for item in items)
+    return f"No products found for '{keyword}'"
 
 
-# --- 2. 自定义工具名称 ---
+# --- 2. Custom tool name ---
 @tool("get_product_detail")
 def fetch_detail(product_name: str) -> str:
-    """获取商品详情
+    """Get product details.
 
     Args:
-        product_name: 商品名称
+        product_name: product name
     """
     details = {
-        "iPhone 15 Pro": "6.1英寸 OLED, A17 Pro芯片, 钛金属边框, 库存充足",
-        "AirPods Pro": "主动降噪, H2芯片, 自适应音频, 库存充足",
-        "MacBook Pro": "M3 Pro芯片, 18小时续航, 液晶视网膜屏, 库存紧张",
+        "iPhone 15 Pro": "6.1-inch OLED, A17 Pro chip, titanium frame, in stock",
+        "AirPods Pro": "Active noise canceling, H2 chip, adaptive audio, in stock",
+        "MacBook Pro": "M3 Pro chip, 18-hour battery, Retina display, low stock",
     }
     if product_name in details:
         return f"{product_name}: {details[product_name]}"
-    return f"未找到 {product_name} 的详细信息"
+    return f"No details found for {product_name}"
 
 
-# --- 3. 高级用法：使用 Pydantic Schema 定义复杂参数 ---
+# --- 3. Advanced usage: Pydantic schema for complex params ---
 class OrderInput(BaseModel):
-    """下单参数 Schema"""
-    product_name: str = Field(description="商品名称")
-    quantity: int = Field(default=1, ge=1, le=10, description="购买数量（1-10）")
-    address: str = Field(description="收货地址")
+    """Order input schema."""
+    product_name: str = Field(description="Product name")
+    quantity: int = Field(default=1, ge=1, le=10, description="Quantity (1-10)")
+    address: str = Field(description="Shipping address")
 
 
 @tool(args_schema=OrderInput)
 def create_order(product_name: str, quantity: int, address: str) -> str:
-    """创建订单
+    """Create order.
 
     Args:
-        product_name: 商品名称
-        quantity: 购买数量
-        address: 收货地址
+        product_name: product name
+        quantity: quantity
+        address: shipping address
     """
     order_id = f"ORD{abs(hash(product_name + address)) % 100000:05d}"
-    return f"✅ 订单创建成功！\n  订单号: {order_id}\n  商品: {product_name} x {quantity}\n  配送至: {address}"
+    return (
+        "Order created successfully.\n"
+        f"  Order ID: {order_id}\n"
+        f"  Product: {product_name} x {quantity}\n"
+        f"  Ship to: {address}"
+    )
 
 
-# --- 4. 异步工具（适合 IO 密集型操作）---
+# --- 4. Async tool (IO-bound) ---
 @tool
 async def check_inventory(product_name: str) -> str:
-    """查询库存状态
+    """Check inventory status.
 
     Args:
-        product_name: 商品名称
+        product_name: product name
     """
-    await asyncio.sleep(0.1)  # 模拟异步 IO
+    await asyncio.sleep(0.1)  # Simulate async IO.
     inventory = {"iPhone 15 Pro": 100, "AirPods Pro": 200, "MacBook Pro": 5}
     stock = inventory.get(product_name, 0)
     if stock > 50:
-        return f"✅ {product_name} 库存充足（{stock}件）"
+        return f"{product_name} in stock ({stock} units)"
     elif stock > 0:
-        return f"⚠️ {product_name} 库存紧张（仅剩{stock}件）"
-    return f"❌ {product_name} 暂时缺货"
+        return f"{product_name} low stock (only {stock} left)"
+    return f"{product_name} out of stock"
 
 
 # ============================================================================
-# 第二部分：定义交付物 Schema（Pydantic 模型）
+# Part 2: Deliverable schemas (Pydantic models)
 # ============================================================================
 
 
 class ProductAnalysis(BaseModel):
-    """商品分析结果"""
-    recommended_products: list[str] = Field(description="推荐商品列表")
-    reason: str = Field(description="推荐理由")
-    price_range: str = Field(description="价格区间")
-    confidence: float = Field(ge=0, le=1, description="推荐置信度（0-1）")
+    """Product analysis result."""
+    recommended_products: list[str] = Field(description="Recommended products")
+    reason: str = Field(description="Recommendation rationale")
+    price_range: str = Field(description="Price range")
+    confidence: float = Field(ge=0, le=1, description="Confidence (0-1)")
 
 
 class OrderResult(BaseModel):
-    """下单结果"""
-    success: bool = Field(description="是否成功")
-    order_id: str | None = Field(default=None, description="订单号")
-    message: str = Field(description="结果说明")
+    """Order result."""
+    success: bool = Field(description="Whether order succeeded")
+    order_id: str | None = Field(default=None, description="Order ID")
+    message: str = Field(description="Result message")
 
 
 # ============================================================================
-# 第三部分：@agent 装饰器 - 展示所有参数
+# Part 3: @agent decorator - full parameter showcase
 # ============================================================================
 
 
 @agent(
-    # === 必填参数 ===
-    id="shopping_advisor",                    # 唯一标识（小写字母开头，只能含小写字母、数字、下划线）
-    name="购物顾问",                           # 显示名称
+    # === Required ===
+    id="shopping_advisor",                    # Identifier (lowercase letter start; [a-z0-9_])
+    name="Shopping Advisor",                  # Display name
 
-    # === 能力声明 ===
-    description="根据用户需求推荐商品",         # 能力描述（用于团队协作时的介绍）
-    tools=[search_products, fetch_detail, check_inventory],  # 工具列表
+    # === Capabilities ===
+    description="Recommend products based on user needs",
+    tools=[search_products, fetch_detail, check_inventory],
 
-    # === 交付物契约 ===
-    deliverable_schema=ProductAnalysis,        # 交付物数据结构（Pydantic 模型）
-    # 注意：交付物统一用 agent_id 存储和获取，无需单独指定 key
+    # === Deliverable contract ===
+    deliverable_schema=ProductAnalysis,        # Pydantic schema
+    # Deliverables are stored/retrieved by agent_id.
 
-    # === 执行配置 ===
-    # 结构化输出示例不要赌运气：温度设为 0，避免时好时坏。
+    # === Execution config ===
+    # Structured output is sensitive to randomness; keep temperature at 0.
     temperature=0.0,
-    max_steps=10,                              # 最大工具调用次数
+    max_steps=10,                              # Max tool calls
 
-    # === 知识配置（可选）===
-    # 注意：启用知识检索需要配置 knowledge.base_config.embedding
+    # === Knowledge config (optional) ===
+    # Knowledge retrieval requires knowledge.base_config.embedding.
     knowledge=Knowledge(
-        sources=[
-            KnowledgeSource(
-                name="示例知识库",
-                source_type="doc",
-                source_uri="kb_demo",
-            )
-        ],
+        sources=[DEMO_KNOWLEDGE_SOURCE],
+        retrieve=KnowledgeRetrieve(method="hybrid", top_k=4),
+        sparse_embedder=DEMO_SPARSE_EMBEDDER,
     ),
 
-    # === A2A 远程 Agent（可选）===
-    # a2a_agents=[                             # 可调用的远程 Agent
+    # === A2A remote agents (optional) ===
+    # a2a_agents=[                             # Remote agents you can delegate to
     #     A2AConfig(
     #         endpoint="https://api.example.com/.well-known/agent-card.json",
     #         auth=APIKeyAuth(api_key="sk-xxx"),
@@ -206,61 +225,61 @@ class OrderResult(BaseModel):
 )
 class ShoppingAdvisorAgent:
     """
-    购物顾问 Agent
+    Shopping advisor agent.
 
-    展示 Agent 的完整工作节奏：
-    1. 理解用户需求
-    2. 调用工具搜索商品
-    3. 查询详情和库存
-    4. 综合分析给出推荐
+    Demonstrates the full workflow:
+    1. Understand user needs
+    2. Search products via tools
+    3. Check details and inventory
+    4. Analyze and recommend
     """
 
-    SYSTEM_PROMPT = """你是一位专业的购物顾问。
+    SYSTEM_PROMPT = """You are a professional shopping advisor.
 
-## 工作流程
-1. 理解用户的购物需求
-2. 使用 search_products 搜索相关商品
-3. 使用 get_product_detail 查看详情
-4. 使用 check_inventory 确认库存
-5. 综合分析，给出推荐
+## Workflow
+1. Understand the user's shopping needs
+2. Use search_products to find relevant items
+3. Use get_product_detail for details
+4. Use check_inventory to confirm stock
+5. Analyze and recommend
 
-## 输出要求
-完成分析后，你必须以纯 JSON 格式输出结果，不要包含任何其他文字：
+## Output requirements
+Return pure JSON only, with no extra text:
 ```json
 {
-  "recommended_products": ["商品1", "商品2"],
-  "reason": "推荐理由",
-  "price_range": "价格区间如 1000-2000元",
+  "recommended_products": ["Product 1", "Product 2"],
+  "reason": "Recommendation rationale",
+  "price_range": "Price range such as $100-$200",
   "confidence": 0.8
 }
 ```
 
-字段说明：
-- recommended_products: 推荐商品列表（字符串数组）
-- reason: 推荐理由（字符串）
-- price_range: 价格区间（字符串）
-- confidence: 推荐置信度（0-1 的数字，需求明确时 > 0.5）
+Field notes:
+- recommended_products: list of product names
+- reason: recommendation rationale
+- price_range: price range as string
+- confidence: confidence between 0-1 (use > 0.5 when requirements are clear)
 
-## 注意事项
-- 如果需求不明确，confidence 设为 0.5 以下
-- 优先推荐库存充足的商品
-- 考虑性价比
+## Notes
+- If requirements are unclear, set confidence below 0.5
+- Prefer items in stock
+- Consider value for money
 """
 
     async def run(self, ctx: AgentContext) -> ProductAnalysis:
-        """Agent 核心执行方法"""
-        # 1. 构建消息（自动注入上下文）
-        messages = ctx.build_messages(self.SYSTEM_PROMPT)
+        """Core execution method."""
+        # 1. Build messages.
+        messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
 
-        # 2. 工具调用循环（ReAct 风格：思考-行动-观察）
+        # 2. Tool loop (ReAct style: think-act-observe).
         messages = await ctx.invoke_tools(messages)
 
-        # 3. 获取结构化输出
+        # 3. Get structured output.
         output: ProductAnalysis = await ctx.get_structured_output(messages)
 
-        # 4. 业务判断：置信度低时请求澄清
+        # 4. Business logic: request clarification if confidence is low.
         if output.confidence < 0.5:
-            ctx.interrupt("需求不够明确，请补充信息")
+            ctx.interrupt("Requirements are unclear. Please provide more details.")
             output = await ctx.get_structured_output(messages)
 
         return output
@@ -268,154 +287,154 @@ class ShoppingAdvisorAgent:
 
 @agent(
     id="order_agent",
-    name="订单助手",
-    description="协助用户完成下单",
+    name="Order Assistant",
+    description="Help the user place an order",
     tools=[create_order, check_inventory],
     deliverable_schema=OrderResult,
-    temperature=0.0,  # 下单需要精确，温度设为 0
+    temperature=0.0,  # Ordering requires precision.
     max_steps=5,
 )
 class OrderAgent:
-    """订单助手 Agent - 演示如何获取上游 Agent 的产出"""
+    """Order assistant agent demonstrating upstream deliverable usage."""
 
-    SYSTEM_PROMPT = """你是订单助手，负责协助用户完成下单。
+    SYSTEM_PROMPT = """You are the order assistant responsible for completing checkout.
 
-## 上游推荐结果
+## Upstream recommendation
 {upstream_result}
 
-## 工作流程
-1. 根据上游推荐的商品，使用 check_inventory 确认库存
-2. 使用 create_order 创建订单（商品名、数量1、用户提供的收货地址）
+## Workflow
+1. Use check_inventory to confirm stock for recommended products
+2. Use create_order to create the order (product name, quantity=1, user-provided address)
 
-## 输出要求
-完成下单后，你必须以纯 JSON 格式输出结果，不要包含任何其他文字：
+## Output requirements
+Return pure JSON only, with no extra text:
 ```json
 {{
   "success": true,
-  "order_id": "订单号",
-  "message": "订单创建成功说明"
+  "order_id": "ORDER_ID",
+  "message": "Order created successfully"
 }}
 ```
 
-失败时也必须输出同结构 JSON（order_id 为 null）：
+On failure, return the same JSON schema (order_id is null):
 ```json
 {{
   "success": false,
   "order_id": null,
-  "message": "失败原因"
+  "message": "Failure reason"
 }}
 ```"""
 
     async def run(self, ctx: AgentContext) -> OrderResult:
-        """订单处理逻辑 - 演示获取上游 Agent 产出"""
+        """Order handling logic using upstream agent output."""
 
-        # === 从 store 获取上游 Agent 的产出 ===
+        # === Fetch upstream agent deliverable from store ===
         analysis = await ctx.get_deliverable(agent_id="shopping_advisor")
 
         if analysis:
-            print(f"\n📥 获取到上游 Agent [shopping_advisor] 的产出:")
-            print(f"   推荐商品: {analysis.get('recommended_products', [])}")
-            print(f"   推荐理由: {analysis.get('reason', '')[:50]}...")
+            print("\nUpstream deliverable received from [shopping_advisor]:")
+            print(f"  Recommended products: {analysis.get('recommended_products', [])}")
+            print(f"  Rationale: {analysis.get('reason', '')[:50]}...")
         else:
-            print("\n⚠️ 未获取到上游 Agent [shopping_advisor] 的产出")
-            ctx.interrupt("没有找到推荐商品，请先让购物顾问推荐商品")
+            print("\nUpstream deliverable from [shopping_advisor] was not found")
+            ctx.interrupt("No recommended products found. Ask the shopping advisor to recommend products first.")
             analysis = await ctx.get_deliverable(agent_id="shopping_advisor")
             if not analysis:
-                return OrderResult(success=False, order_id=None, message="未获取到推荐商品")
+                return OrderResult(success=False, order_id=None, message="No recommended products found")
 
-        # 构建上游结果描述，传给 LLM
+        # Build upstream summary for the LLM.
         upstream_result = (
-            f"推荐商品: {analysis.get('recommended_products', [])}\n"
-            f"推荐理由: {analysis.get('reason', '')}\n"
-            f"价格区间: {analysis.get('price_range', '')}"
+            f"Recommended products: {analysis.get('recommended_products', [])}\n"
+            f"Rationale: {analysis.get('reason', '')}\n"
+            f"Price range: {analysis.get('price_range', '')}"
         )
 
-        # 构建消息，注入上游产物信息
+        # Build messages with upstream context.
         prompt = self.SYSTEM_PROMPT.format(upstream_result=upstream_result)
-        messages = ctx.build_messages(prompt)
+        messages = ctx.messages().system(prompt).user(ctx.query)
 
-        # 打印 messages 验证上下文共享
-        print(f"\n🔍 验证跨 Agent 消息共享:")
-        print(f"   消息数量: {len(messages)}")
+        # Log messages to preview the user-defined message sequence.
+        print("\nMessage sequence preview (user-defined):")
+        print(f"  Message count: {len(messages)}")
         for i, msg in enumerate(messages):
             msg_type = type(msg).__name__
             content_preview = str(msg.content)[:80] if hasattr(msg, 'content') else ''
-            print(f"   [{i}] {msg_type}: {content_preview}...")
+            print(f"  [{i}] {msg_type}: {content_preview}...")
 
-        # 检查是否有收货地址
-        if "地址" not in ctx.query and "送到" not in ctx.query and "配送" not in ctx.query:
-            ctx.interrupt("请提供收货信息")
+        # Check if shipping address is present in the user query.
+        if "address" not in ctx.query.lower() and "ship to" not in ctx.query.lower() and "deliver to" not in ctx.query.lower():
+            ctx.interrupt("Please provide a shipping address.")
 
         messages = await ctx.invoke_tools(messages)
         return await ctx.get_structured_output(messages)
 
 
 # ============================================================================
-# 第四部分：Datapillar 团队 - 展示所有高级参数
+# Part 4: Datapillar team - advanced parameters
 # ============================================================================
 
 
 def create_shopping_team(config: DatapillarConfig) -> Datapillar:
     """
-    创建购物助手团队
+    Create the shopping assistant team.
 
-    展示 Datapillar 的所有配置参数
-    演示两个 Agent 顺序执行，下游 Agent 获取上游产出
+    Demonstrates Datapillar configuration and sequential execution,
+    with downstream agents consuming upstream deliverables.
     """
     team = Datapillar(
-        # === 必填参数 ===
+        # === Required ===
         config=config,
-        namespace="shopping_demo",                 # 命名空间（数据隔离边界）
-        name="购物助手团队",                        # 团队名称
-        agents=[ShoppingAdvisorAgent, OrderAgent],  # 两个 Agent 顺序执行
+        namespace=TEAM_NAMESPACE,                  # Namespace (data isolation boundary)
+        name="Shopping Assistant Team",            # Team name
+        agents=[ShoppingAdvisorAgent, OrderAgent],  # Two agents in sequence
 
-        # === 执行模式 ===
-        process=Process.SEQUENTIAL,            # SEQUENTIAL: 顺序执行
-                                               # DYNAMIC: 动态委派（Agent 自主决定）
+        # === Execution mode ===
+        process=Process.SEQUENTIAL,            # SEQUENTIAL: ordered execution
+                                               # DYNAMIC: delegation by agents
 
-        # === 功能开关 ===
-        enable_share_context=True,             # 启用 Agent 间上下文共享（默认 True）
-        enable_learning=False,                 # 启用经验学习（默认 False）
+        # === Feature flags ===
+        enable_share_context=True,             # Share context across agents
+        enable_learning=False,                 # Experience learning
 
-        # === 调试 ===
-        verbose=True,                          # 输出详细日志
+        # === Debug ===
+        verbose=True,                          # Verbose logging
     )
     return team
 
 
 # ============================================================================
-# 第五部分：运行示例
+# Part 5: Run the example
 # ============================================================================
 
 
 async def main():
-    """主函数"""
+    """Main entry."""
     config = DatapillarConfig()
     if not config.llm.is_configured():
         supported = ", ".join(Provider.list_supported())
         raise RuntimeError(
-            "请先配置 LLM：\n"
+            "Please configure LLM first:\n"
             "  export DATAPILLAR_LLM_PROVIDER=\"openai\"\n"
             "  export DATAPILLAR_LLM_API_KEY=\"sk-xxx\"\n"
             "  export DATAPILLAR_LLM_MODEL=\"gpt-4o\"\n"
-            "可选：export DATAPILLAR_LLM_BASE_URL=\"https://api.openai.com/v1\"\n"
-            "可选：export DATAPILLAR_LLM_ENABLE_THINKING=\"false\"\n"
-            f"支持 provider: {supported}"
+            "Optional: export DATAPILLAR_LLM_BASE_URL=\"https://api.openai.com/v1\"\n"
+            "Optional: export DATAPILLAR_LLM_ENABLE_THINKING=\"false\"\n"
+            f"Supported providers: {supported}"
         )
 
     if not config.embedding.is_configured():
         supported = ", ".join(EmbeddingBackend.list_supported())
         raise RuntimeError(
-            "请先配置 Embedding：\n"
+            "Please configure embedding first:\n"
             "  export DATAPILLAR_EMBEDDING_PROVIDER=\"openai\"\n"
             "  export DATAPILLAR_EMBEDDING_API_KEY=\"sk-xxx\"\n"
             "  export DATAPILLAR_EMBEDDING_MODEL=\"text-embedding-3-small\"\n"
             "  export DATAPILLAR_EMBEDDING_DIMENSION=\"1536\"\n"
-            "可选：export DATAPILLAR_EMBEDDING_BASE_URL=\"https://api.openai.com/v1\"\n"
-            f"支持 provider: {supported}"
+            "Optional: export DATAPILLAR_EMBEDDING_BASE_URL=\"https://api.openai.com/v1\"\n"
+            f"Supported providers: {supported}"
         )
 
-    # quickstart.py 固定使用 Lance 本地向量库，避免用户还要额外配 vector_store。
+    # quickstart.py uses a local Lance vector store to avoid extra configuration.
     config.knowledge = KnowledgeConfig(
         base_config={
             "embedding": config.embedding.model_dump(),
@@ -423,25 +442,31 @@ async def main():
         }
     )
 
-    # 创建团队
+    await DEMO_KNOWLEDGE_SOURCE.ingest(
+        namespace=TEAM_NAMESPACE,
+        config=config.knowledge,
+        sparse_embedder=DEMO_SPARSE_EMBEDDER,
+    )
+
+    # Create team.
     team = create_shopping_team(config)
 
     print("=" * 60)
-    print("🛒 购物助手团队已就绪")
-    print(f"   模型: {config.llm.model}")
-    print(f"   成员: 购物顾问 -> 订单助手（顺序执行）")
-    print("   演示: 下游 Agent 通过 ctx.get_deliverable() 获取上游产出")
+    print("Shopping assistant team is ready")
+    print(f"  Model: {config.llm.model}")
+    print("  Members: Shopping Advisor -> Order Assistant (sequential)")
+    print("  Demo: downstream agent uses ctx.get_deliverable() for upstream output")
     print("=" * 60)
 
-    # 示例查询
-    query = "我想买一个降噪耳机，预算2000左右，送到北京市朝阳区望京SOHO"
+    # Example query.
+    query = "I want noise-canceling headphones with a $200 budget, ship to 123 Main St, Seattle."
 
-    print(f"\n📝 用户需求: {query}\n")
+    print(f"\nUser request: {query}\n")
     print("-" * 60)
 
     deliverables: dict[str, dict] = {}
 
-    # 流式执行
+    # Stream execution.
     async for event in team.stream(
         query=query,
         session_id="demo_001",
@@ -450,43 +475,43 @@ async def main():
         data = event.get("data", {})
         if event_type == "agent.start":
             agent = event.get("agent", {})
-            print(f"\n🤖 [{agent.get('name')}] 开始工作...")
+            print(f"\n[{agent.get('name')}] started...")
         elif event_type == "agent.thinking":
             message = data.get("message", {})
             thinking = message.get("content", "")
             if thinking:
                 agent = event.get("agent", {})
-                print(f"\n🧠 [{agent.get('id')}] 思考中...")
+                print(f"\n[{agent.get('id')}] thinking...")
                 if len(thinking) > 200:
-                    print(f"   {thinking[:200]}...")
+                    print(f"  {thinking[:200]}...")
                 else:
-                    print(f"   {thinking}")
+                    print(f"  {thinking}")
         elif event_type == "tool.call":
             tool = data.get("tool", {})
-            print(f"   🔧 调用: {tool.get('name')}")
+            print(f"  Tool call: {tool.get('name')}")
         elif event_type == "tool.result":
             tool = data.get("tool", {})
             result = str(tool.get("output", ""))
             if len(result) > 100:
                 result = result[:100] + "..."
-            print(f"   📋 结果: {result}")
+            print(f"  Tool result: {result}")
         elif event_type == "agent.end":
             agent = event.get("agent", {})
             agent_id = agent.get("id")
             deliverable = data.get("deliverable")
             if agent_id and deliverable is not None:
                 deliverables[agent_id] = deliverable
-                print("   ✅ 完成")
-                print(f"   📦 交付物: {json.dumps(deliverable, ensure_ascii=False)}")
+                print("  Completed")
+                print(f"  Deliverable: {json.dumps(deliverable, ensure_ascii=False)}")
         elif event_type == "agent.interrupt":
             interrupt_payload = data.get("interrupt", {}).get("payload")
-            print(f"\n❓ 需要用户输入: {interrupt_payload}")
+            print(f"\nUser input required: {interrupt_payload}")
         elif event_type == "agent.failed":
             error = data.get("error", {})
-            print(f"\n❌ 错误: {error.get('detail') or error.get('message')}")
+            print(f"\nError: {error.get('detail') or error.get('message')}")
 
     print(f"\n{'=' * 60}")
-    print("📦 最终结果:")
+    print("Final results:")
     for key, value in deliverables.items():
         print(f"\n[{key}]")
         if isinstance(value, dict):
@@ -495,18 +520,18 @@ async def main():
         else:
             print(f"  {value}")
 
-    # === 验证 deliverable 存储 ===
+    # === Verify deliverable storage ===
     print("\n" + "-" * 60)
-    print("🧪 验证 deliverable 存储（统一用 agent_id）:")
+    print("Verify deliverable storage (keyed by agent_id):")
     if "shopping_advisor" in deliverables:
-        print("  ✅ 正确：deliverable key 是 agent_id (shopping_advisor)")
+        print("  OK: deliverable key is agent_id (shopping_advisor)")
     elif "analysis" in deliverables:
-        print("  ❌ 错误：deliverable key 仍是旧的 deliverable_key (analysis)")
+        print("  ERROR: deliverable key is still old deliverable_key (analysis)")
     else:
-        print(f"  ⚠️ deliverable keys: {list(deliverables.keys())}")
+        print(f"  Deliverable keys: {list(deliverables.keys())}")
 
     print("\n" + "=" * 60)
-    print("✨ 演示完成")
+    print("Demo completed")
 
 
 if __name__ == "__main__":

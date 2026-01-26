@@ -1,6 +1,4 @@
-"""
-解析器基础接口
-"""
+"""Parser base interface."""
 
 from __future__ import annotations
 
@@ -10,7 +8,7 @@ from datapillar_oneagentic.knowledge.models import DocumentInput, ParsedDocument
 
 
 class DocumentParser(ABC):
-    """文档解析器接口"""
+    """Document parser interface."""
 
     supported_mime_types: set[str] = set()
     supported_extensions: set[str] = set()
@@ -18,4 +16,4 @@ class DocumentParser(ABC):
 
     @abstractmethod
     def parse(self, doc_input: DocumentInput) -> ParsedDocument:
-        """解析文档输入"""
+        """Parse a document input."""

@@ -53,19 +53,19 @@ def _extract_deliverables(events: list[dict]) -> dict:
 
 @tool
 def echo(text: str) -> str:
-    """回显文本。
+    """Echo text.
 
     Args:
-        text: 输入文本。
+        text: input text
 
     Returns:
-        回显结果。
+        echoed result
     """
     return f"echo:{text}"
 
 
 @pytest.mark.asyncio
-async def test_stub_sequential_flow(monkeypatch) -> None:
+async def test_stub_sequential(monkeypatch) -> None:
     monkeypatch.setattr(
         LLMFactory,
         "create_chat_model",
@@ -82,7 +82,7 @@ async def test_stub_sequential_flow(monkeypatch) -> None:
         SYSTEM_PROMPT = "alpha"
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output
@@ -116,7 +116,7 @@ async def test_stub_sequential_flow(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_stub_dynamic_flow(monkeypatch) -> None:
+async def test_stub_dynamic(monkeypatch) -> None:
     monkeypatch.setattr(
         LLMFactory,
         "create_chat_model",
@@ -137,7 +137,7 @@ async def test_stub_dynamic_flow(monkeypatch) -> None:
         SYSTEM_PROMPT = "manager"
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             await ctx.invoke_tools(messages)
             return TextOutput(text="delegated")
 
@@ -150,7 +150,7 @@ async def test_stub_dynamic_flow(monkeypatch) -> None:
         SYSTEM_PROMPT = "worker"
 
         async def run(self, ctx: AgentContext) -> WorkerOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output
@@ -171,7 +171,7 @@ async def test_stub_dynamic_flow(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_stub_hierarchical_flow(monkeypatch) -> None:
+async def test_stub_hierarchical(monkeypatch) -> None:
     monkeypatch.setattr(
         LLMFactory,
         "create_chat_model",
@@ -195,7 +195,7 @@ async def test_stub_hierarchical_flow(monkeypatch) -> None:
             worker = await ctx.get_deliverable("worker")
             if worker:
                 return TextOutput(text=f"manager:{worker.get('text', '')}")
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             await ctx.invoke_tools(messages)
             return TextOutput(text="delegated")
 
@@ -208,7 +208,7 @@ async def test_stub_hierarchical_flow(monkeypatch) -> None:
         SYSTEM_PROMPT = "worker"
 
         async def run(self, ctx: AgentContext) -> WorkerOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output
@@ -230,7 +230,7 @@ async def test_stub_hierarchical_flow(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_stub_mapreduce_flow(monkeypatch) -> None:
+async def test_stub_mapreduce(monkeypatch) -> None:
     monkeypatch.setattr(LLMFactory, "create_chat_model", make_stub_factory())
 
     @agent(
@@ -242,7 +242,7 @@ async def test_stub_mapreduce_flow(monkeypatch) -> None:
         SYSTEM_PROMPT = "worker_a"
 
         async def run(self, ctx: AgentContext) -> WorkerOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output
@@ -256,7 +256,7 @@ async def test_stub_mapreduce_flow(monkeypatch) -> None:
         SYSTEM_PROMPT = "worker_b"
 
         async def run(self, ctx: AgentContext) -> WorkerOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output
@@ -270,7 +270,7 @@ async def test_stub_mapreduce_flow(monkeypatch) -> None:
         SYSTEM_PROMPT = "reducer"
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             output = await ctx.get_structured_output(messages)
             return output
 
@@ -290,7 +290,7 @@ async def test_stub_mapreduce_flow(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_stub_react_flow(monkeypatch) -> None:
+async def test_stub_react(monkeypatch) -> None:
     monkeypatch.setattr(
         LLMFactory,
         "create_chat_model",
@@ -306,7 +306,7 @@ async def test_stub_react_flow(monkeypatch) -> None:
         SYSTEM_PROMPT = "react_worker"
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output
@@ -327,7 +327,7 @@ async def test_stub_react_flow(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_stub_interrupt_resume(monkeypatch) -> None:
+async def test_stub_interrupt(monkeypatch) -> None:
     monkeypatch.setattr(LLMFactory, "create_chat_model", make_stub_factory())
 
     @agent(

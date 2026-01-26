@@ -252,7 +252,8 @@ function CanvasPanel({
         ) : (
           <div
             className={cn(
-              'fixed inset-y-0 z-[100] w-80 bg-slate-900/95 backdrop-blur-xl border-white/10 shadow-2xl',
+              panelWidthClassMap.narrow,
+              'fixed inset-y-0 z-[100] bg-slate-900/95 backdrop-blur-xl border-white/10 shadow-2xl',
               position === 'left' ? 'left-0 border-r' : 'right-0 border-l'
             )}
           >

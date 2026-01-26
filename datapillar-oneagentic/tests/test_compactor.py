@@ -1,12 +1,12 @@
-"""压缩机制测试"""
+"""Compaction tests."""
 
 from __future__ import annotations
 
 import pytest
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 
 from datapillar_oneagentic.context.compaction.compact_policy import CompactPolicy, CompactResult
 from datapillar_oneagentic.context.compaction.compactor import Compactor
+from datapillar_oneagentic.messages import Message, Messages
 
 
 class _MockLLMResponse:
@@ -15,9 +15,9 @@ class _MockLLMResponse:
 
 
 class _MockLLM:
-    """Mock LLM，返回固定摘要"""
+    """Mock LLM returning a fixed summary."""
 
-    def __init__(self, summary: str = "测试摘要"):
+    def __init__(self, summary: str = "test summary"):
         self._summary = summary
 
     async def ainvoke(self, _messages):
@@ -25,74 +25,74 @@ class _MockLLM:
 
 
 @pytest.mark.asyncio
-async def test_compactor_should_compress_ai_and_tool_messages() -> None:
-    """验证压缩器正确压缩 AI 和 Tool 消息，保留 Human 和 System 消息"""
+async def test_compress_ai() -> None:
+    """Ensure compactor compresses AI/tool messages and keeps human/system messages."""
     policy = CompactPolicy(min_keep_entries=2)
     compactor = Compactor(llm=_MockLLM(), policy=policy)
 
     messages = [
-        SystemMessage(content="系统提示"),
-        HumanMessage(content="用户问题1"),
-        AIMessage(content="AI回复1"),
-        ToolMessage(content="工具结果1", tool_call_id="t1"),
-        AIMessage(content="AI回复2"),
-        HumanMessage(content="用户问题2"),
-        AIMessage(content="AI回复3"),
+        Message.system("system prompt"),
+        Message.user("user question 1"),
+        Message.assistant("assistant reply 1"),
+        Message.tool("tool result 1", tool_call_id="t1"),
+        Message.assistant("assistant reply 2"),
+        Message.user("user question 2"),
+        Message.assistant("assistant reply 3"),
     ]
 
-    compressed, result = await compactor.compact(messages)
+    compressed, result = await compactor.compact(Messages(messages))
 
     assert result.success is True
     assert result.removed_count > 0
     assert result.kept_count > 0
-    assert result.summary == "测试摘要"
-    # 摘要不应直接注入 messages
-    assert all("测试摘要" not in msg.content for msg in compressed if isinstance(msg, BaseMessage))
+    assert result.summary == "test summary"
+    # Summary should not be injected into messages.
+    assert all("test summary" not in msg.content for msg in compressed if isinstance(msg, Message))
 
 
 @pytest.mark.asyncio
-async def test_compactor_should_keep_recent_messages() -> None:
-    """验证压缩器保留最近 N 条消息"""
+async def test_compactor_keep() -> None:
+    """Ensure compactor keeps the most recent N messages."""
     policy = CompactPolicy(min_keep_entries=3)
     compactor = Compactor(llm=_MockLLM(), policy=policy)
 
     messages = [
-        HumanMessage(content="问题1"),
-        AIMessage(content="回复1"),
-        AIMessage(content="回复2"),
-        AIMessage(content="回复3"),
-        HumanMessage(content="问题2"),
-        AIMessage(content="回复4"),
+        Message.user("question 1"),
+        Message.assistant("reply 1"),
+        Message.assistant("reply 2"),
+        Message.assistant("reply 3"),
+        Message.user("question 2"),
+        Message.assistant("reply 4"),
     ]
 
-    compressed, result = await compactor.compact(messages)
+    compressed, result = await compactor.compact(Messages(messages))
 
     assert result.success is True
-    # 最后3条消息应该被保留
-    assert any(m.content == "问题2" for m in compressed)
-    assert any(m.content == "回复4" for m in compressed)
+    # The last 3 messages should be kept.
+    assert any(m.content == "question 2" for m in compressed)
+    assert any(m.content == "reply 4" for m in compressed)
 
 
 @pytest.mark.asyncio
-async def test_compactor_should_handle_llm_failure() -> None:
-    """验证 LLM 调用失败时返回失败结果"""
+async def test_handle_llm() -> None:
+    """Return failure when LLM call fails."""
 
     class _FailingLLM:
         async def ainvoke(self, _messages):
-            raise RuntimeError("LLM 调用失败")
+            raise RuntimeError("LLM call failed")
 
     policy = CompactPolicy(min_keep_entries=2)
     compactor = Compactor(llm=_FailingLLM(), policy=policy)
 
     messages = [
-        HumanMessage(content="问题1"),
-        AIMessage(content="回复1"),
-        AIMessage(content="回复2"),
-        AIMessage(content="回复3"),
+        Message.user("question 1"),
+        Message.assistant("reply 1"),
+        Message.assistant("reply 2"),
+        Message.assistant("reply 3"),
     ]
 
-    compressed, result = await compactor.compact(messages)
+    compressed, result = await compactor.compact(Messages(messages))
 
     assert result.success is False
     assert result.error is not None
-    assert "LLM 调用失败" in result.error
+    assert "LLM call failed" in result.error

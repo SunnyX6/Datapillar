@@ -1,31 +1,31 @@
 """
-工具系统
+Tool system.
 
-业务侧使用：
-- @tool 装饰器定义工具（返回可注入的工具对象）
+Application usage:
+- Use the @tool decorator to define tools (returns an injectable tool object)
 
-使用示例：
+Example:
 ```python
 from datapillar_oneagentic import tool
 
-# 基础用法（自动注册，工具名 = 函数名）
+# Basic usage (auto-register, tool name = function name)
 @tool
 def search_tables(keyword: str) -> str:
-    '''搜索数据目录中的表
+    '''Search tables in the data catalog.
 
     Args:
-        keyword: 搜索关键词
+        keyword: Search keyword
     '''
-    return f"找到表: users, orders (关键词: {keyword})"
+    return f"Found tables: users, orders (keyword: {keyword})"
 
-# 自定义名称
+# Custom name
 @tool("table_search")
 def search(keyword: str) -> str:
-    '''搜索表'''
+    '''Search tables.'''
     return ...
 ```
 
-Agent 使用工具对象：
+Agent uses tool objects:
 ```python
 @agent(
     id="query_agent",
@@ -46,7 +46,7 @@ from langchain_core.tools import BaseTool
 from langchain_core.tools import tool as _langchain_tool
 
 
-# === 对外 API：@tool 装饰器 ===
+# === Public API: @tool decorator ===
 
 
 def tool(
@@ -57,45 +57,45 @@ def tool(
     infer_schema: bool = True,
 ) -> Any:
     """
-    工具定义装饰器
+    Tool definition decorator.
 
-    功能等同于 LangChain 的 @tool，返回可注入的工具对象。
+    Equivalent to LangChain's @tool and returns an injectable tool object.
 
-    使用示例：
+    Example:
     ```python
     from datapillar_oneagentic import tool
 
-    # 基础用法（工具名 = 函数名，docstring 自动解析）
+    # Basic usage (tool name = function name, docstring parsed automatically)
     @tool
     def search_tables(keyword: str) -> str:
-        '''搜索数据目录中的表
+        '''Search tables in the data catalog.
 
         Args:
-            keyword: 搜索关键词
+            keyword: Search keyword
         '''
-        return f"找到表: users, orders"
+        return "Found tables: users, orders"
 
-    # 自定义工具名称
+    # Custom tool name
     @tool("table_search")
     def search(keyword: str) -> str:
-        '''搜索表
+        '''Search tables.
 
         Args:
-            keyword: 搜索关键词
+            keyword: Search keyword
         '''
         return ...
     ```
 
-    参数：
-    - name_or_func: 工具名称（str）或被装饰的函数
-    - args_schema: 参数 Schema（Pydantic 模型）
-    - return_direct: 是否直接返回结果给用户（默认 False）
-    - infer_schema: 从类型注解推断 Schema（默认 True）
+    Args:
+        name_or_func: Tool name (str) or the decorated function
+        args_schema: Argument schema (Pydantic model)
+        return_direct: Whether to return results directly to the user (default False)
+        infer_schema: Infer schema from type hints (default True)
     """
 
     def _create_tool(func: Callable, custom_name: str | None = None) -> BaseTool:
-        """创建工具"""
-        # 自动判断：有 args_schema 就不解析 docstring，没有就解析
+        """Create a tool."""
+        # If args_schema is provided, skip docstring parsing.
         parse_docstring = args_schema is None
 
         if custom_name:
@@ -117,11 +117,11 @@ def tool(
 
         return tool_instance
 
-    # 情况 1: @tool（无参数）
+    # Case 1: @tool (no args)
     if callable(name_or_func):
         return _create_tool(name_or_func, None)
 
-    # 情况 2: @tool("name") 或 @tool(args_schema=..., ...)
+    # Case 2: @tool("name") or @tool(args_schema=..., ...)
     def decorator(func: Callable) -> BaseTool:
         custom_name = name_or_func if isinstance(name_or_func, str) else None
         return _create_tool(func, custom_name)

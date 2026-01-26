@@ -1,15 +1,15 @@
 """
-MCP 工具集成
+MCP tool integration.
 
-将 MCP 工具转换为 LangChain 工具，并集成安全校验。
+Convert MCP tools to LangChain tools with built-in security checks.
 
-安全机制：
-- 根据 MCP 工具的 annotations 判断工具是否危险
-- 危险工具调用前需要用户确认（遵循 MCP 规范）
+Security:
+- Determine risk based on MCP tool annotations
+- Dangerous tools require user confirmation (per MCP spec)
 
-生命周期管理：
-- 使用 MCPToolkit 管理客户端连接池
-- 支持 async context manager 自动清理资源
+Lifecycle:
+- MCPToolkit manages client pools
+- async context manager for automatic cleanup
 """
 
 from __future__ import annotations
@@ -33,12 +33,12 @@ from datapillar_oneagentic.security import (
 logger = logging.getLogger(__name__)
 
 
-def _json_schema_to_pydantic_field(
+def _build_pydantic_field(
     name: str,
     schema: dict[str, Any],
     required: bool = False,
 ) -> tuple[type, Any]:
-    """将 JSON Schema 字段转换为 Pydantic 字段"""
+    """Convert a JSON Schema field into a Pydantic field."""
     json_type = schema.get("type", "string")
     description = schema.get("description", "")
     default = ... if required else None
@@ -61,13 +61,13 @@ def _json_schema_to_pydantic_field(
 
 
 def _create_input_model(mcp_tool: MCPTool) -> type[BaseModel]:
-    """根据 MCP 工具的 input_schema 创建 Pydantic 模型"""
+    """Create a Pydantic model from an MCP tool input_schema."""
     schema = mcp_tool.input_schema
     properties = schema.get("properties", {})
     required = set(schema.get("required", []))
 
     if not properties:
-        # 无参数工具，创建带占位符的模型
+        # No-arg tool: create a model with a placeholder field.
         return create_model(
             f"{mcp_tool.name}Input",
             placeholder=(str | None, Field(default=None, description="Placeholder parameter")),
@@ -75,7 +75,7 @@ def _create_input_model(mcp_tool: MCPTool) -> type[BaseModel]:
 
     fields = {}
     for name, prop_schema in properties.items():
-        fields[name] = _json_schema_to_pydantic_field(
+        fields[name] = _build_pydantic_field(
             name, prop_schema, name in required
         )
 
@@ -83,16 +83,16 @@ def _create_input_model(mcp_tool: MCPTool) -> type[BaseModel]:
 
 
 def _build_tool_description(mcp_tool: MCPTool) -> str:
-    """构建工具描述（包含安全警告）"""
+    """Build tool description with safety warnings."""
     desc = mcp_tool.description
 
     warnings = []
     if mcp_tool.annotations.destructive_hint is True:
-        warnings.append("⚠️ Destructive operation")
+        warnings.append("Destructive operation")
     if mcp_tool.annotations.open_world_hint is True:
-        warnings.append("🌐 External network access")
+        warnings.append("External network access")
     if mcp_tool.annotations.idempotent_hint is False:
-        warnings.append("🔄 Non-idempotent operation")
+        warnings.append("Non-idempotent operation")
 
     if warnings:
         desc = f"{desc}\n\nSafety Notes: {', '.join(warnings)}"
@@ -105,47 +105,47 @@ def _create_mcp_tool(
     mcp_tool: MCPTool,
 ) -> StructuredTool:
     """
-    将单个 MCP 工具转换为 LangChain 工具
+    Convert a single MCP tool into a LangChain tool.
 
-    参数：
-    - client: MCP 客户端（已连接）
-    - mcp_tool: MCP 工具定义
+    Args:
+        client: MCP client (connected)
+        mcp_tool: MCP tool definition
 
-    返回：
-    - LangChain StructuredTool
+    Returns:
+        LangChain StructuredTool
     """
 
     async def call_mcp_tool(**kwargs: Any) -> str:
-        """调用 MCP 工具（带安全校验）"""
-        # 移除占位参数
+        """Call an MCP tool with safety checks."""
+        # Remove placeholder parameter.
         kwargs.pop("placeholder", None)
 
-        # 安全校验
+        # Safety checks.
         if mcp_tool.annotations.is_dangerous:
             config = get_security_config()
 
             if config.require_confirmation:
-                # 构建警告信息
+                # Build warning messages.
                 warnings = []
                 if mcp_tool.annotations.destructive_hint is True:
-                    warnings.append("此工具可能执行破坏性操作（删除、修改数据）")
+                    warnings.append("This tool may perform destructive operations (delete or modify data).")
                 if mcp_tool.annotations.open_world_hint is True:
-                    warnings.append("此工具会访问外部网络")
+                    warnings.append("This tool will access external networks.")
                 if mcp_tool.annotations.idempotent_hint is False:
-                    warnings.append("此操作不可撤销，重复执行可能产生不同结果")
+                    warnings.append("This operation is non-idempotent and may produce different results on retry.")
 
-                # 确定风险等级
+                # Determine risk level.
                 risk_level = "medium"
                 if mcp_tool.annotations.destructive_hint is True:
                     risk_level = "high"
                 if mcp_tool.annotations.destructive_hint is True and mcp_tool.annotations.open_world_hint is True:
                     risk_level = "critical"
 
-                # 构建确认请求
+                # Build confirmation request.
                 confirmation_request = ConfirmationRequest(
                     operation_type="mcp_tool",
                     name=mcp_tool.name,
-                    description=mcp_tool.description or f"MCP 工具: {mcp_tool.name}",
+                    description=mcp_tool.description or f"MCP tool: {mcp_tool.name}",
                     parameters=kwargs.copy(),
                     risk_level=risk_level,
                     warnings=warnings,
@@ -161,23 +161,23 @@ def _create_mcp_tool(
                     },
                 )
 
-                # 请求用户确认
+                # Request user confirmation.
                 if config.confirmation_callback:
                     confirmed = config.confirmation_callback(confirmation_request)
                     if not confirmed:
-                        raise UserRejectedError(f"用户拒绝执行工具: {mcp_tool.name}")
+                        raise UserRejectedError(f"User rejected tool execution: {mcp_tool.name}")
                 else:
-                    # 无确认回调 = 无法获得用户同意 = 拒绝执行
+                    # No callback => cannot obtain consent => refuse execution.
                     raise NoConfirmationCallbackError(
-                        f"危险工具 {mcp_tool.name} 需要用户确认，但未配置 confirmation_callback。\n"
-                        f"请配置 configure_security(confirmation_callback=...) 或设置 require_confirmation=False"
+                        f"Dangerous tool {mcp_tool.name} requires confirmation, but no confirmation_callback is set.\n"
+                        "Configure configure_security(confirmation_callback=...) or set require_confirmation=False."
                     )
 
-        # 执行工具调用
+        # Execute tool call.
         result = await client.call_tool(mcp_tool.name, kwargs)
         return str(result)
 
-    # 创建输入模型
+    # Create input model.
     input_model = _create_input_model(mcp_tool)
 
     return StructuredTool.from_function(
@@ -191,11 +191,11 @@ def _create_mcp_tool(
 
 class MCPToolkit:
     """
-    MCP 工具包
+    MCP toolkit.
 
-    管理多个 MCP 服务器的连接和工具，使用 async context manager 自动清理资源。
+    Manage multiple MCP servers and tools, with async context manager cleanup.
 
-    使用示例：
+    Example:
     ```python
     servers = [
         MCPServerStdio(command="npx", args=["-y", "@mcp/server-filesystem", "/tmp"]),
@@ -204,7 +204,7 @@ class MCPToolkit:
 
     async with MCPToolkit(servers) as toolkit:
         tools = toolkit.get_tools()
-        # 使用工具...
+        # Use tools...
     ```
     """
 
@@ -214,11 +214,11 @@ class MCPToolkit:
         tool_filter: list[str] | None = None,
     ):
         """
-        初始化工具包
+        Initialize the toolkit.
 
-        参数：
-        - servers: MCP 服务器配置列表
-        - tool_filter: 工具名称过滤（None 表示全部）
+        Args:
+            servers: MCP server config list
+            tool_filter: tool name filter (None for all)
         """
         self._servers = servers
         self._tool_filter = tool_filter
@@ -227,16 +227,16 @@ class MCPToolkit:
         self._exit_stack: AsyncExitStack | None = None
 
     async def __aenter__(self) -> MCPToolkit:
-        """进入上下文，连接所有服务器"""
+        """Enter context and connect to all servers."""
         await self.connect()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        """退出上下文，关闭所有连接"""
+        """Exit context and close all connections."""
         await self.close()
 
     async def connect(self) -> None:
-        """连接所有 MCP 服务器并加载工具"""
+        """Connect to all MCP servers and load tools."""
         self._exit_stack = AsyncExitStack()
         await self._exit_stack.__aenter__()
 
@@ -246,26 +246,26 @@ class MCPToolkit:
                 await self._exit_stack.enter_async_context(client)
                 self._clients.append(client)
 
-                # 获取工具列表
+                # Get tool list.
                 mcp_tools = await client.list_tools()
 
                 for mcp_tool in mcp_tools:
-                    # 过滤
+                    # Filter tools.
                     if self._tool_filter and mcp_tool.name not in self._tool_filter:
                         continue
 
-                    # 创建 LangChain 工具
+                    # Create LangChain tool.
                     tool = _create_mcp_tool(client, mcp_tool)
                     self._tools.append(tool)
 
-                logger.info(f"MCP 服务器连接成功，加载 {len(mcp_tools)} 个工具: {config}")
+                logger.info(f"MCP server connected; loaded {len(mcp_tools)} tools: {config}")
 
             except Exception as e:
-                logger.error(f"MCP 服务器连接失败: {config}, 错误: {e}")
+                logger.error(f"MCP server connection failed: {config}, error={e}")
                 continue
 
     async def close(self) -> None:
-        """关闭所有连接"""
+        """Close all connections."""
         if self._exit_stack:
             await self._exit_stack.__aexit__(None, None, None)
             self._exit_stack = None
@@ -274,10 +274,10 @@ class MCPToolkit:
         self._tools.clear()
 
     def get_tools(self) -> list[StructuredTool]:
-        """获取所有工具"""
+        """Return all tools."""
         return self._tools.copy()
 
     @property
     def clients(self) -> list[MCPClient]:
-        """获取所有客户端"""
+        """Return all clients."""
         return self._clients.copy()

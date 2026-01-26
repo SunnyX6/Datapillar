@@ -1,6 +1,4 @@
-"""
-HTML 解析器
-"""
+"""HTML parser."""
 
 from __future__ import annotations
 
@@ -33,7 +31,7 @@ def _html_to_text(html: str) -> str:
         from readability import Document as ReadabilityDocument
     except ImportError as err:
         raise ImportError(
-            "解析 HTML 需要安装依赖：\n"
+            "HTML parsing requires dependencies:\n"
             "  pip install datapillar-oneagentic[knowledge]"
         ) from err
 
@@ -41,7 +39,7 @@ def _html_to_text(html: str) -> str:
         from bs4 import BeautifulSoup
     except ImportError as err:
         raise ImportError(
-            "解析 HTML 需要安装依赖：\n"
+            "HTML parsing requires dependencies:\n"
             "  pip install datapillar-oneagentic[knowledge]"
         ) from err
 

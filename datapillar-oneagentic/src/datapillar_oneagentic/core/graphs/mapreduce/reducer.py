@@ -1,9 +1,9 @@
 """
-MapReduce Reducer
+MapReduce reducer.
 
-职责：
-- 汇总 Map 阶段结果
-- 生成最终交付物（使用 Reducer 目标 schema）
+Responsibilities:
+- Aggregate map phase results
+- Produce the final deliverable (using reducer output schema)
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 def _parse_reducer_output(result: Any, schema: type[BaseModel]) -> BaseModel:
     """
-    解析 Reducer 输出（严格模式）
+    Parse reducer output (strict mode).
     """
     return parse_structured_output(result, schema, strict=False)
 
@@ -59,7 +59,7 @@ MAPREDUCE_REDUCER_SYSTEM_PROMPT = format_markdown(
 
 
 def _format_results(plan: MapReducePlan, results: list[MapReduceResult]) -> str:
-    """格式化 Map 阶段结果"""
+    """Format map phase results."""
     lines: list[str] = []
 
     for result in results:
@@ -93,40 +93,40 @@ async def reduce_map_results(
     contexts: dict[str, str] | None = None,
 ) -> BaseModel:
     """
-    汇总 Map 阶段结果并输出最终交付物
+    Aggregate map results and produce the final deliverable.
 
     Args:
-        plan: MapReduce 计划
-        results: Map 阶段结果列表
-        llm: LLM 实例
-        output_schema: 最终交付物 Schema
-        contexts: __context 分层块（可选）
+        plan: MapReduce plan
+        results: map phase results
+        llm: LLM instance
+        output_schema: final deliverable schema
+        contexts: _context blocks (optional)
     """
     if not results:
-        raise ValueError("MapReduce Reducer 没有可用结果")
+        raise ValueError("MapReduce reducer has no available results")
 
     failed_results = [result for result in results if result.status == ExecutionStatus.FAILED]
     if failed_results:
         failure_kind = failed_results[0].failure_kind or FailureKind.BUSINESS
         detail = "; ".join(
-            f"{item.task_id}/{item.agent_id}:{item.error or '未知错误'}"
+            f"{item.task_id}/{item.agent_id}:{item.error or 'Unknown error'}"
             for item in failed_results
         )
         raise AgentErrorClassifier.from_failure(
             agent_id=failed_results[0].agent_id,
-            error=f"MapReduce Map 阶段失败: {detail}",
+            error=f"MapReduce map phase failed: {detail}",
             failure_kind=failure_kind,
         )
 
     content = _format_results(plan, results)
 
-    messages = ContextBuilder.build_mapreduce_reducer_messages(
+    messages = ContextBuilder.build_mapreduce_reducer(
         system_prompt=MAPREDUCE_REDUCER_SYSTEM_PROMPT,
         content=content,
         contexts=contexts or {},
     )
 
-    logger.info("MapReduce Reducer 开始汇总结果...")
+    logger.info("MapReduce reducer started aggregation")
 
     structured_llm = llm.with_structured_output(
         output_schema,

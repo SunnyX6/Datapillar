@@ -1,6 +1,4 @@
-"""
-XLSX 解析器
-"""
+"""XLSX parser."""
 
 from __future__ import annotations
 
@@ -37,7 +35,7 @@ def _xlsx_to_text(data: bytes) -> str:
         from openpyxl import load_workbook
     except ImportError as err:
         raise ImportError(
-            "解析 XLSX 需要安装依赖：\n"
+            "XLSX parsing requires dependencies:\n"
             "  pip install datapillar-oneagentic[knowledge]"
         ) from err
 

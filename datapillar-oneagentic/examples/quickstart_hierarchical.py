@@ -1,7 +1,7 @@
 """
-Datapillar OneAgentic 层级模式示例
+Datapillar OneAgentic hierarchical mode example.
 
-运行命令：
+Run:
     uv run python examples/quickstart_hierarchical.py
 """
 
@@ -29,66 +29,68 @@ class TextOutput(BaseModel):
 
 @tool
 def echo(text: str) -> str:
-    """回显文本。
+    """Echo text.
 
     Args:
-        text: 输入文本。
+        text: input text
 
     Returns:
-        回显结果。
+        echoed result
     """
     return f"echo:{text}"
 
 
 @agent(
     id="manager",
-    name="经理",
+    name="Manager",
     deliverable_schema=TextOutput,
-    description="负责任务委派与结果汇总",
+    description="Delegate tasks and summarize results",
 )
 class ManagerAgent:
-    SYSTEM_PROMPT = """你是经理。
+    SYSTEM_PROMPT = """You are the manager.
 
-要求：
-1. 当没有 worker 结果时，必须调用 delegate_to_worker。
-2. 拿到 worker 输出后，输出最终结果。
+Requirements:
+1. If there is no worker output, you must call delegate_to_worker.
+2. Once worker output is available, return the final result.
 
-## 输出要求
-只能输出 JSON（单个对象），不得输出解释或 Markdown：
-{"text": "你的总结"}
+## Output requirements
+Return JSON only (single object), no explanations or Markdown:
+{"text": "Your summary"}
 """
 
     async def run(self, ctx: AgentContext) -> TextOutput:
         worker = await ctx.get_deliverable("worker")
         if worker:
-            messages = ctx.build_messages(
-                f"{self.SYSTEM_PROMPT}\nWorker 输出: {worker.get('text', '')}"
+            messages = (
+                ctx.messages()
+                .system(f"{self.SYSTEM_PROMPT}\nWorker output: {worker.get('text', '')}")
+                .user(ctx.query)
             )
             return await ctx.get_structured_output(messages)
 
-        messages = ctx.build_messages(self.SYSTEM_PROMPT)
+        messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
         await ctx.invoke_tools(messages)
         return TextOutput(text="delegated")
 
 
 @agent(
     id="worker",
-    name="执行者",
+    name="Worker",
     deliverable_schema=TextOutput,
     tools=[echo],
-    description="执行具体任务并返回结果",
+    description="Execute tasks and return results",
 )
 class WorkerAgent:
-    SYSTEM_PROMPT = """你是执行者。
-使用 echo 工具处理用户请求并给出结果。
+    SYSTEM_PROMPT = """You are the worker.
+Use the echo tool to handle user requests and respond.
 
-## 输出要求
-只能输出 JSON（单个对象），不得输出解释或 Markdown：
-{"text": "你的结果"}
+## Output requirements
+Return JSON only (single object), no explanations or Markdown:
+{"text": "Your result"}
 """
 
     async def run(self, ctx: AgentContext) -> TextOutput:
-        messages = ctx.build_messages(self.SYSTEM_PROMPT)
+        messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
         messages = await ctx.invoke_tools(messages)
         return await ctx.get_structured_output(messages)
 
@@ -98,41 +100,41 @@ def _render_event(event: dict) -> None:
     data = event.get("data", {})
     if event_type == "agent.start":
         agent = event.get("agent", {})
-        print(f"\n🤖 [{agent.get('name')}] 开始工作...")
+        print(f"\n[{agent.get('name')}] started...")
     elif event_type == "agent.thinking":
         message = data.get("message", {})
         thinking = message.get("content", "")
         if thinking:
             agent = event.get("agent", {})
-            print(f"\n🧠 [{agent.get('id')}] 思考中...")
-            print(f"   {thinking[:200]}..." if len(thinking) > 200 else f"   {thinking}")
+            print(f"\n[{agent.get('id')}] thinking...")
+            print(f"  {thinking[:200]}..." if len(thinking) > 200 else f"  {thinking}")
     elif event_type == "tool.call":
         tool_info = data.get("tool", {})
-        print(f"   🔧 调用: {tool_info.get('name')}")
+        print(f"  Tool call: {tool_info.get('name')}")
     elif event_type == "tool.result":
         tool_info = data.get("tool", {})
         result = str(tool_info.get("output", ""))
         if len(result) > 100:
             result = result[:100] + "..."
-        print(f"   📋 结果: {result}")
+        print(f"  Tool result: {result}")
     elif event_type == "agent.end":
         deliverable = data.get("deliverable")
         if deliverable is not None:
-            print("   ✅ 完成")
-            print(f"   📦 交付物: {json.dumps(deliverable, ensure_ascii=False)}")
+            print("  Completed")
+            print(f"  Deliverable: {json.dumps(deliverable, ensure_ascii=False)}")
     elif event_type == "agent.interrupt":
         interrupt_payload = data.get("interrupt", {}).get("payload")
-        print(f"\n❓ 需要用户输入: {interrupt_payload}")
+        print(f"\nUser input required: {interrupt_payload}")
     elif event_type == "agent.failed":
         error = data.get("error", {})
-        print(f"\n❌ 错误: {error.get('detail') or error.get('message')}")
+        print(f"\nError: {error.get('detail') or error.get('message')}")
 
 
 def create_hierarchical_team(config: DatapillarConfig) -> Datapillar:
     team = Datapillar(
         config=config,
         namespace="demo_hier",
-        name="层级团队示例",
+        name="Hierarchical Team Example",
         agents=[ManagerAgent, WorkerAgent],
         process=Process.HIERARCHICAL,
         enable_share_context=True,
@@ -146,34 +148,34 @@ async def main() -> None:
     if not config.llm.is_configured():
         supported = ", ".join(Provider.list_supported())
         raise RuntimeError(
-            "请先配置 LLM：\n"
+            "Please configure LLM first:\n"
             "  export DATAPILLAR_LLM_PROVIDER=\"openai\"\n"
             "  export DATAPILLAR_LLM_API_KEY=\"sk-xxx\"\n"
             "  export DATAPILLAR_LLM_MODEL=\"gpt-4o\"\n"
-            "可选：export DATAPILLAR_LLM_BASE_URL=\"https://api.openai.com/v1\"\n"
-            "可选：export DATAPILLAR_LLM_ENABLE_THINKING=\"false\"\n"
-            f"支持 provider: {supported}"
+            "Optional: export DATAPILLAR_LLM_BASE_URL=\"https://api.openai.com/v1\"\n"
+            "Optional: export DATAPILLAR_LLM_ENABLE_THINKING=\"false\"\n"
+            f"Supported providers: {supported}"
         )
     team = create_hierarchical_team(config)
 
     print("=" * 60)
-    print("🏗️ 层级模式示例已就绪")
-    print(f"   模型: {config.llm.model}")
-    print("   成员: 经理 -> 执行者（经理委派）")
+    print("Hierarchical mode example is ready")
+    print(f"  Model: {config.llm.model}")
+    print("  Members: Manager -> Worker (manager delegates)")
     print("=" * 60)
 
     query = (
-        "请总结以下内容：Datapillar 提供任务编排、指标管理与权限控制，"
-        "强调可观测性与成本治理。"
+        "Summarize the following: Datapillar provides task orchestration, "
+        "metric management, and access control, with a focus on observability and cost governance."
     )
-    print(f"\n📝 用户需求: {query}\n")
+    print(f"\nUser request: {query}\n")
     print("-" * 60)
 
     async for event in team.stream(query=query, session_id="s_demo_hier"):
         _render_event(event)
 
     print("\n" + "=" * 60)
-    print("✨ 演示完成")
+    print("Demo completed")
 
 
 if __name__ == "__main__":

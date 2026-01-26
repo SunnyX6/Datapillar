@@ -1,17 +1,17 @@
 """
-Reflector - 反思器
+Reflector.
 
-职责：
-- 评估任务执行结果
-- 判断目标是否达成
-- 决定下一步行动（继续/重试/重新规划/完成/失败）
+Responsibilities:
+- Evaluate task execution results
+- Decide whether the goal is achieved
+- Choose next action (continue/retry/replan/complete/fail)
 
-使用示例：
+Example:
 ```python
 from datapillar_oneagentic.core.graphs.react.reflector import reflect
 
 reflection = await reflect(
-    goal="帮我分析销售数据并生成报告",
+    goal="Analyze sales data and produce a report",
     plan=plan,
     llm=llm,
 )
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 def _parse_reflector_output(result: Any) -> ReflectorOutput:
     """
-    解析 Reflector 输出（严格模式）
+    Parse reflector output (strict mode).
     """
     return parse_structured_output(result, ReflectorOutput, strict=False)
 
@@ -108,18 +108,18 @@ async def reflect(
     last_result_summary: str | None = None,
 ) -> Reflection:
     """
-    反思
+    Reflect on execution status.
 
     Args:
-        goal: 用户目标
-        plan: 当前计划
-        llm: LLM 实例
-        last_result_summary: 最近一次执行结果摘要
+        goal: user goal
+        plan: current plan
+        llm: LLM instance
+        last_result_summary: last execution summary
 
     Returns:
-        Reflection: 反思结果
+        Reflection: reflection result
     """
-    # 构建上下文
+    # Build context.
     context_sections: list[tuple[str, str | list[str]]] = [
         ("User Goal", goal),
         ("Plan Status", plan.to_prompt(include_title=False)),
@@ -135,7 +135,7 @@ async def reflect(
     if last_result_summary:
         context_sections.append(("Latest Result", last_result_summary))
 
-    # 添加状态摘要
+    # Add status summary.
     completed_count = sum(1 for t in plan.tasks if t.status == ExecutionStatus.COMPLETED)
     failed_count = sum(1 for t in plan.tasks if t.status == ExecutionStatus.FAILED)
     pending_count = sum(1 for t in plan.tasks if t.status == ExecutionStatus.PENDING)
@@ -153,12 +153,12 @@ async def reflect(
 
     context = format_markdown(title=None, sections=context_sections)
 
-    messages = ContextBuilder.build_react_reflector_messages(
+    messages = ContextBuilder.build_react_reflector(
         system_prompt=REFLECTOR_SYSTEM_PROMPT,
         context=context,
     )
 
-    logger.info("Reflector 开始反思...")
+    logger.info("Reflector started")
 
     structured_llm = llm.with_structured_output(
         ReflectorOutput,
@@ -167,7 +167,7 @@ async def reflect(
     )
     result = await structured_llm.ainvoke(messages)
 
-    # 解析结果（带 fallback）
+    # Parse output (with fallback).
     output = _parse_reflector_output(result)
 
     reflection = Reflection(
@@ -181,8 +181,9 @@ async def reflect(
     )
 
     logger.info(
-        f"Reflector 完成反思: goal_achieved={reflection.goal_achieved}, "
-        f"next_action={reflection.next_action}"
+        "Reflector completed: goal_achieved=%s, next_action=%s",
+        reflection.goal_achieved,
+        reflection.next_action,
     )
 
     return reflection
@@ -194,37 +195,37 @@ def decide_next_action(
     reflection: Reflection,
 ) -> str:
     """
-    根据反思结果决定下一步
+    Decide next action based on reflection.
 
-    返回:
-    - "planner": 重新规划
-    - "executor": 继续执行
-    - "end": 结束（成功或失败）
+    Returns:
+    - "planner": replan
+    - "executor": continue execution
+    - "end": end (success or failure)
     """
     if reflection.is_complete():
-        logger.info("ReAct 循环结束: 目标达成")
+        logger.info("ReAct loop ended: goal achieved")
         return "end"
 
     if reflection.is_failed():
-        logger.info("ReAct 循环结束: 目标失败")
+        logger.info("ReAct loop ended: goal failed")
         return "end"
 
     if reflection.should_replan():
         if plan.can_retry():
-            logger.info("ReAct: 重新规划")
+            logger.info("ReAct: replanning")
             return "planner"
         else:
-            logger.info("ReAct: 重试次数已达上限，结束")
+            logger.info("ReAct: retry limit reached, ending")
             return "end"
 
     if reflection.should_retry():
-        logger.info("ReAct: 重试当前任务")
+        logger.info("ReAct: retry current task")
         return "executor"
 
     if reflection.should_continue():
-        logger.info("ReAct: 继续执行下一个任务")
+        logger.info("ReAct: continue with next task")
         return "executor"
 
-    # 默认结束
-    logger.warning("ReAct: 未知状态，默认结束")
+    # Default to ending.
+    logger.warning("ReAct: unknown state, ending by default")
     return "end"
