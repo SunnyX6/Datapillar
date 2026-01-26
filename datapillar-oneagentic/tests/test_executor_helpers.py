@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-from langchain_core.messages import AIMessage
 from pydantic import BaseModel
 
 import datapillar_oneagentic.runtime.executor as executor_module
@@ -13,6 +12,8 @@ from datapillar_oneagentic.runtime.executor import AgentExecutor
 from datapillar_oneagentic.todo.session_todo import SessionTodoList, TodoUpdate
 from datapillar_oneagentic.todo.tool import extract_todo_updates
 from datapillar_oneagentic.context.compaction.compact_policy import CompactResult
+from datapillar_oneagentic.messages import Message, Messages
+from datapillar_oneagentic.messages.adapters.langchain import to_langchain
 
 
 class _OutputSchema(BaseModel):
@@ -33,9 +34,9 @@ def _stub_llm_provider(**_kwargs):
 
 
 @pytest.mark.asyncio
-async def test_executor_compress_state_messages_updates_on_success() -> None:
-    original = [AIMessage(content="a"), AIMessage(content="b")]
-    compressed = [AIMessage(content="摘要"), AIMessage(content="b")]
+async def test_compress_state() -> None:
+    original = Messages([Message.assistant("a"), Message.assistant("b")])
+    compressed = Messages([Message.assistant("summary"), Message.assistant("b")])
     compactor = _DummyCompactor(
         compressed,
         CompactResult(success=True, summary="ok", kept_count=1, removed_count=1),
@@ -48,15 +49,15 @@ async def test_executor_compress_state_messages_updates_on_success() -> None:
         llm_provider=_stub_llm_provider,
     )
 
-    state = {"messages": original}
+    state = {"messages": to_langchain(original)}
     new_state = await executor._compress_state_messages(state)
 
-    assert new_state["messages"] == compressed
+    assert new_state["messages"] == to_langchain(compressed)
 
 
 @pytest.mark.asyncio
-async def test_executor_compress_state_messages_returns_original_on_failure() -> None:
-    original = [AIMessage(content="a")]
+async def test_compress_state2() -> None:
+    original = Messages([Message.assistant("a")])
     compactor = _DummyCompactor(
         original,
         CompactResult(
@@ -75,15 +76,15 @@ async def test_executor_compress_state_messages_returns_original_on_failure() ->
         llm_provider=_stub_llm_provider,
     )
 
-    state = {"messages": original}
+    state = {"messages": to_langchain(original)}
     new_state = await executor._compress_state_messages(state)
 
-    assert new_state["messages"] == original
+    assert new_state["messages"] == to_langchain(original)
 
 
 @pytest.mark.asyncio
-async def test_executor_appends_todo_audit_when_missing_updates(monkeypatch) -> None:
-    compactor = _DummyCompactor([], CompactResult.no_action("无需压缩"))
+async def test_audit_updates(monkeypatch) -> None:
+    compactor = _DummyCompactor([], CompactResult.no_action("no compaction needed"))
     executor = AgentExecutor(
         AgentSpec(id="a1", name="A1", deliverable_schema=_OutputSchema),
         agent_config=AgentConfig(),
@@ -92,19 +93,19 @@ async def test_executor_appends_todo_audit_when_missing_updates(monkeypatch) -> 
         llm_provider=_stub_llm_provider,
     )
 
-    todo = SessionTodoList(session_id="s1", goal="目标")
-    todo.add_item("任务1")
+    todo = SessionTodoList(session_id="s1", goal="goal")
+    todo.add_item("task 1")
     state = {"todo": todo.model_dump(mode="json")}
 
-    updates = [TodoUpdate(id="t1", status=ExecutionStatus.COMPLETED, result="完成")]
+    updates = [TodoUpdate(id="t1", status=ExecutionStatus.COMPLETED, result="completed")]
 
     async def fake_audit(*_args, **_kwargs):
         return updates
 
     monkeypatch.setattr(executor_module, "audit_todo_updates", fake_audit)
 
-    messages: list = []
-    await executor._maybe_append_todo_audit_report(
+    messages = Messages()
+    await executor._append_todo_audit(
         state=state,
         result_status=ExecutionStatus.COMPLETED,
         failure_kind=None,

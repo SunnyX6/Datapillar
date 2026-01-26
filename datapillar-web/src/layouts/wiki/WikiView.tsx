@@ -13,7 +13,7 @@ import {
   type LucideIcon
 } from 'lucide-react'
 import { Button, Card } from '@/components/ui'
-import { contentMaxWidthClassMap, iconSizeToken, paddingClassMap } from '@/design-tokens/dimensions'
+import { contentMaxWidthClassMap, iconSizeToken, paddingClassMap, panelWidthClassMap } from '@/design-tokens/dimensions'
 import { RESPONSIVE_TYPOGRAPHY, TYPOGRAPHY } from '@/design-tokens/typography'
 import type { KnowledgeSpace, WikiTab } from './types'
 import DocList from './DocList'
@@ -86,7 +86,7 @@ export function WikiView() {
       <div className="relative flex h-full">
         <div
           className={`relative flex-shrink-0 flex flex-col min-h-0 bg-transparent transition-[width,margin] duration-300 ${
-            isNamespaceCollapsed ? 'w-0 mr-0 border-transparent overflow-hidden' : 'w-64 lg:w-80 mr-4 border-r border-slate-200 dark:border-slate-800'
+            isNamespaceCollapsed ? 'w-0 mr-0 border-transparent overflow-hidden' : `${panelWidthClassMap.mediumResponsive} mr-4 border-r border-slate-200 dark:border-slate-800`
           }`}
         >
           {!isNamespaceCollapsed && (

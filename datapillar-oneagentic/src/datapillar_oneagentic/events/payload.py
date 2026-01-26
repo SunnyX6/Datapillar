@@ -1,7 +1,7 @@
 """
-事件输出结构
+Event output schema.
 
-SSE 仅传输事件数据，本模块提供统一的事件封装方法。
+SSE transports event data only; this module provides a unified payload builder.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ def build_event_payload(
     duration_ms: float | None = None,
     data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """构建统一事件结构（SSE 输出）"""
+    """Build a unified event payload (SSE output)."""
     payload: dict[str, Any] = {
         "v": 1,
         "ts": now_ms(),

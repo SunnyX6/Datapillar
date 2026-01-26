@@ -4,7 +4,6 @@ import importlib.util
 import os
 
 import pytest
-from langchain_core.messages import SystemMessage
 from pydantic import BaseModel
 from datapillar_oneagentic import AgentContext, Datapillar, DatapillarConfig, Process, agent, tool
 from datapillar_oneagentic.events import EventType
@@ -34,13 +33,13 @@ JSON_OUTPUT_RULE = (
 
 @tool
 def echo(text: str) -> str:
-    """回显文本。
+    """Echo text.
 
     Args:
-        text: 输入文本。
+        text: input text
 
     Returns:
-        回显结果。
+        echoed result
     """
     return f"echo:{text}"
 
@@ -53,7 +52,7 @@ class _StubSparseEmbedder:
         return [{len(text): 1.0} for text in texts]
 
 
-def _require_glm_llm_config() -> dict:
+def _require_glm() -> dict:
     api_key = os.getenv("GLM_API_KEY")
     model = os.getenv("GLM_MODEL")
     if not api_key or not model:
@@ -75,10 +74,10 @@ def _require_glm_llm_config() -> dict:
 
 
 def _require_glm_config() -> DatapillarConfig:
-    return DatapillarConfig(llm=_require_glm_llm_config())
+    return DatapillarConfig(llm=_require_glm())
 
 
-def _require_glm_embedding_config() -> dict:
+def _require_glm2() -> dict:
     api_key = os.getenv("GLM_EMBEDDING_API_KEY")
     model = os.getenv("GLM_EMBEDDING_MODEL")
     dimension_raw = os.getenv("GLM_EMBEDDING_DIMENSION")
@@ -107,7 +106,7 @@ def _module_available(module_name: str) -> bool:
     return importlib.util.find_spec(module_name) is not None
 
 
-def _select_vector_store_config() -> dict:
+def _select_vector() -> dict:
     if _module_available("lancedb") and _module_available("pyarrow"):
         return {"type": "lance", "path": "./data/test-experience"}
     if _module_available("chromadb"):
@@ -146,10 +145,10 @@ def _extract_deliverables(events: list[dict]) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_glm_sequential_tool_and_knowledge_flow() -> None:
-    llm_config = _require_glm_llm_config()
-    embedding_config = _require_glm_embedding_config()
-    vector_store = _select_vector_store_config()
+async def test_glm_sequential() -> None:
+    llm_config = _require_glm()
+    embedding_config = _require_glm2()
+    vector_store = _select_vector()
     knowledge_config = KnowledgeConfig(
         base_config={
             "embedding": embedding_config,
@@ -205,7 +204,7 @@ async def test_glm_sequential_tool_and_knowledge_flow() -> None:
         )
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output
@@ -224,7 +223,11 @@ async def test_glm_sequential_tool_and_knowledge_flow() -> None:
 
         async def run(self, ctx: AgentContext) -> TextOutput:
             alpha = await ctx.get_deliverable("alpha") or {}
-            messages = ctx.build_messages(f"{self.SYSTEM_PROMPT}\nAlpha output: {alpha.get('text', '')}")
+            messages = (
+                ctx.messages()
+                .system(f"{self.SYSTEM_PROMPT}\nAlpha output: {alpha.get('text', '')}")
+                .user(ctx.query)
+            )
             output = await ctx.get_structured_output(messages)
             return output
 
@@ -246,7 +249,7 @@ async def test_glm_sequential_tool_and_knowledge_flow() -> None:
 
 
 @pytest.mark.asyncio
-async def test_glm_dynamic_delegation_flow() -> None:
+async def test_glm_dynamic() -> None:
     config = _require_glm_config()
 
     @agent(
@@ -263,7 +266,7 @@ async def test_glm_dynamic_delegation_flow() -> None:
         )
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             await ctx.invoke_tools(messages)
             return TextOutput(text="delegated")
 
@@ -278,7 +281,7 @@ async def test_glm_dynamic_delegation_flow() -> None:
         SYSTEM_PROMPT = f"Call echo tool. {JSON_OUTPUT_RULE}"
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output
@@ -300,7 +303,7 @@ async def test_glm_dynamic_delegation_flow() -> None:
 
 
 @pytest.mark.asyncio
-async def test_glm_hierarchical_delegation_flow() -> None:
+async def test_glm_hierarchical() -> None:
     config = _require_glm_config()
 
     @agent(
@@ -319,12 +322,14 @@ async def test_glm_hierarchical_delegation_flow() -> None:
         async def run(self, ctx: AgentContext) -> TextOutput:
             worker = await ctx.get_deliverable("worker")
             if worker:
-                messages = ctx.build_messages(
-                    f"{self.SYSTEM_PROMPT}\nWorker output: {worker.get('text', '')}\n"
+                messages = (
+                    ctx.messages()
+                    .system(f"{self.SYSTEM_PROMPT}\nWorker output: {worker.get('text', '')}\n")
+                    .user(ctx.query)
                 )
                 output = await ctx.get_structured_output(messages)
                 return output
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             await ctx.invoke_tools(messages)
             return TextOutput(text="delegated")
 
@@ -339,7 +344,7 @@ async def test_glm_hierarchical_delegation_flow() -> None:
         SYSTEM_PROMPT = f"Call echo tool. {JSON_OUTPUT_RULE}"
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output
@@ -355,9 +360,9 @@ async def test_glm_hierarchical_delegation_flow() -> None:
     events = await _collect_events(
         team,
         query=(
-            "请委派给 worker 并总结以下文本："
-            "Datapillar 是一款数据开发产品，提供任务编排、指标管理与权限控制，"
-            "并强调可观测性与成本治理。"
+            "Please delegate to worker and summarize the following text: "
+            "Datapillar is a data development product that provides task orchestration, "
+            "metric management, and access control, with a focus on observability and cost governance."
         ),
         session_id="s_glm_hier",
     )
@@ -368,7 +373,7 @@ async def test_glm_hierarchical_delegation_flow() -> None:
 
 
 @pytest.mark.asyncio
-async def test_glm_mapreduce_flow() -> None:
+async def test_glm_mapreduce() -> None:
     config = _require_glm_config()
 
     @agent(
@@ -382,7 +387,7 @@ async def test_glm_mapreduce_flow() -> None:
         SYSTEM_PROMPT = f"Call echo tool. {JSON_OUTPUT_RULE}"
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output
@@ -398,7 +403,7 @@ async def test_glm_mapreduce_flow() -> None:
         SYSTEM_PROMPT = f"Call echo tool. {JSON_OUTPUT_RULE}"
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output
@@ -411,12 +416,12 @@ async def test_glm_mapreduce_flow() -> None:
     )
     class ReducerAgent:
         SYSTEM_PROMPT = (
-            "你是结果聚合器。只输出 JSON，禁止 Markdown、代码块或任何额外说明。"
+            "You are the result aggregator. Output JSON only; no Markdown, code blocks, or extra text. "
             f"{JSON_OUTPUT_RULE}"
         )
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             output = await ctx.get_structured_output(messages)
             return output
 
@@ -436,7 +441,7 @@ async def test_glm_mapreduce_flow() -> None:
 
 
 @pytest.mark.asyncio
-async def test_glm_react_flow() -> None:
+async def test_glm_react() -> None:
     config = _require_glm_config()
 
     @agent(
@@ -453,7 +458,7 @@ async def test_glm_react_flow() -> None:
         )
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output
@@ -474,7 +479,7 @@ async def test_glm_react_flow() -> None:
 
 
 @pytest.mark.asyncio
-async def test_glm_interrupt_resume_flow() -> None:
+async def test_glm_interrupt() -> None:
     config = _require_glm_config()
 
     @agent(
@@ -488,7 +493,7 @@ async def test_glm_interrupt_resume_flow() -> None:
 
         async def run(self, ctx: AgentContext) -> TextOutput:
             reply = ctx.interrupt("need input")
-            messages = ctx.build_messages(f"{self.SYSTEM_PROMPT}\nUser reply: {reply}")
+            messages = ctx.messages().system(f"{self.SYSTEM_PROMPT}\nUser reply: {reply}")
             output = await ctx.get_structured_output(messages)
             return output
 
@@ -516,7 +521,7 @@ async def test_glm_interrupt_resume_flow() -> None:
 
 
 @pytest.mark.asyncio
-async def test_glm_todo_flow() -> None:
+async def test_glm_todo() -> None:
     config = _require_glm_config()
 
     @agent(
@@ -533,7 +538,7 @@ async def test_glm_todo_flow() -> None:
         )
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output
@@ -561,10 +566,10 @@ async def test_glm_todo_flow() -> None:
 
 
 @pytest.mark.asyncio
-async def test_glm_experience_rag_flow() -> None:
-    llm_config = _require_glm_llm_config()
-    embedding_config = _require_glm_embedding_config()
-    vector_store = _select_vector_store_config()
+async def test_glm_experience() -> None:
+    llm_config = _require_glm()
+    embedding_config = _require_glm2()
+    vector_store = _select_vector()
     config = DatapillarConfig(
         llm=llm_config,
         embedding=embedding_config,
@@ -584,9 +589,9 @@ async def test_glm_experience_rag_flow() -> None:
         )
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             rag_injected = any(
-                isinstance(msg, SystemMessage) and "RAG_TAG=RAG123" in msg.content
+                msg.role == "system" and "RAG_TAG=RAG123" in msg.content
                 for msg in messages
             )
             output = await ctx.get_structured_output(messages)

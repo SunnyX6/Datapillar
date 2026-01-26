@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import { Archive, AtSign, GitPullRequest, Inbox, Lock, Plus, Send, Server, ShieldAlert } from 'lucide-react'
 import { Button } from '@/components/ui'
-import { iconSizeToken } from '@/design-tokens/dimensions'
+import { iconSizeToken, panelWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { cn } from '@/lib/utils'
 import type { CollaborationSidebarNav, QuickFilter, SmartView, TicketView } from './types'
@@ -123,7 +123,7 @@ export function CollaborationSidebar({
   return (
     <div
       className={cn(
-        'w-60 lg:w-72',
+        panelWidthClassMap.compactResponsive,
         'bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col flex-shrink-0'
       )}
     >

@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sunny.datapillar.admin.config.AirflowConfig;
-import com.sunny.datapillar.admin.response.WebAdminErrorCode;
-import com.sunny.datapillar.admin.response.WebAdminException;
+import com.sunny.datapillar.common.error.ErrorCode;
+import com.sunny.datapillar.common.exception.BusinessException;
 
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -76,14 +76,14 @@ public class AirflowClient {
                         return cachedToken;
                     }
                 }
-                throw new WebAdminException(WebAdminErrorCode.AIRFLOW_AUTH_FAILED,
+                throw new BusinessException(ErrorCode.ADMIN_AIRFLOW_AUTH_FAILED,
                         "Failed to get Airflow token, response code: " + response.code());
             }
-        } catch (WebAdminException e) {
+        } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
             log.error("Failed to authenticate with Airflow: {}", e.getMessage());
-            throw new WebAdminException(WebAdminErrorCode.AIRFLOW_AUTH_FAILED,
+            throw new BusinessException(ErrorCode.ADMIN_AIRFLOW_AUTH_FAILED,
                     "Airflow authentication failed: " + e.getMessage());
         }
     }
@@ -102,11 +102,11 @@ public class AirflowClient {
 
         try (Response response = httpClient.newCall(request).execute()) {
             return handleResponse(response, responseType, "GET", path);
-        } catch (WebAdminException e) {
+        } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
             log.error("Airflow GET {} failed: {}", path, e.getMessage());
-            throw new WebAdminException(WebAdminErrorCode.AIRFLOW_REQUEST_FAILED,
+            throw new BusinessException(ErrorCode.ADMIN_AIRFLOW_REQUEST_FAILED,
                     "Airflow request failed: " + e.getMessage());
         }
     }
@@ -130,11 +130,11 @@ public class AirflowClient {
             try (Response response = httpClient.newCall(request).execute()) {
                 return handleResponse(response, responseType, "POST", path);
             }
-        } catch (WebAdminException e) {
+        } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
             log.error("Airflow POST {} failed: {}", path, e.getMessage());
-            throw new WebAdminException(WebAdminErrorCode.AIRFLOW_REQUEST_FAILED,
+            throw new BusinessException(ErrorCode.ADMIN_AIRFLOW_REQUEST_FAILED,
                     "Airflow request failed: " + e.getMessage());
         }
     }
@@ -157,11 +157,11 @@ public class AirflowClient {
             try (Response response = httpClient.newCall(request).execute()) {
                 return handleResponse(response, responseType, "PATCH", path);
             }
-        } catch (WebAdminException e) {
+        } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
             log.error("Airflow PATCH {} failed: {}", path, e.getMessage());
-            throw new WebAdminException(WebAdminErrorCode.AIRFLOW_REQUEST_FAILED,
+            throw new BusinessException(ErrorCode.ADMIN_AIRFLOW_REQUEST_FAILED,
                     "Airflow request failed: " + e.getMessage());
         }
     }
@@ -180,11 +180,11 @@ public class AirflowClient {
 
         try (Response response = httpClient.newCall(request).execute()) {
             return handleResponse(response, responseType, "DELETE", path);
-        } catch (WebAdminException e) {
+        } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
             log.error("Airflow DELETE {} failed: {}", path, e.getMessage());
-            throw new WebAdminException(WebAdminErrorCode.AIRFLOW_REQUEST_FAILED,
+            throw new BusinessException(ErrorCode.ADMIN_AIRFLOW_REQUEST_FAILED,
                     "Airflow request failed: " + e.getMessage());
         }
     }
@@ -200,7 +200,7 @@ public class AirflowClient {
 
         String errorBody = response.body() != null ? response.body().string() : "";
         log.error("Airflow {} {} failed: {} {}", method, path, response.code(), errorBody);
-        throw new WebAdminException(WebAdminErrorCode.AIRFLOW_REQUEST_FAILED,
+        throw new BusinessException(ErrorCode.ADMIN_AIRFLOW_REQUEST_FAILED,
                 "Airflow request failed: " + response.code() + " " + errorBody);
     }
 }

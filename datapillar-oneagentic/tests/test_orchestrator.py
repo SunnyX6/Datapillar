@@ -1,9 +1,9 @@
-"""Orchestrator 边界测试
+"""Orchestrator edge tests.
 
-测试核心编排器的边界条件：
-1. 无效输入处理
-2. 状态恢复逻辑
-3. 中断恢复逻辑
+Core orchestrator edge cases:
+1. Invalid input handling
+2. State restoration logic
+3. Interrupt resume logic
 """
 
 from __future__ import annotations
@@ -79,8 +79,8 @@ class _StubStore:
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_stream_should_error_when_no_query_and_no_resume_value() -> None:
-    """无 query 且无 resume_value 时应返回错误事件"""
+async def test_orchestrator_stream() -> None:
+    """Should return an error event when query and resume_value are missing."""
     graph = _MockStateGraph()
 
     orchestrator = Orchestrator(
@@ -102,12 +102,12 @@ async def test_orchestrator_stream_should_error_when_no_query_and_no_resume_valu
 
     assert len(events) == 1
     assert events[0]["event"] == EventType.AGENT_FAILED.value
-    assert "无效调用" in events[0]["data"]["error"]["message"]
+    assert "Invalid call" in events[0]["data"]["error"]["message"]
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_stream_should_emit_agent_events_with_query() -> None:
-    """有 query 时应发送 agent 事件"""
+async def test_emit_agent() -> None:
+    """Should emit agent events when query is provided."""
     graph = _MockStateGraph(events=[{"agent1": {"last_agent_status": ExecutionStatus.COMPLETED}}])
 
     orchestrator = Orchestrator(
@@ -127,14 +127,14 @@ async def test_orchestrator_stream_should_emit_agent_events_with_query() -> None
     async for event in orchestrator.stream(query="hello", key=key):
         events.append(event)
 
-    # 应该只有 agent.start/agent.end 事件
+    # Should only have agent.start/agent.end events.
     event_types = [e["event"] for e in events]
     assert event_types == [EventType.AGENT_START.value, EventType.AGENT_END.value]
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_stream_agent_event_should_contain_session_info() -> None:
-    """agent 事件应包含会话信息"""
+async def test_orchestrator_stream2() -> None:
+    """Agent events should include session info."""
     graph = _MockStateGraph(events=[{"entry": {"last_agent_status": ExecutionStatus.COMPLETED}}])
 
     orchestrator = Orchestrator(
@@ -166,8 +166,8 @@ class _MockStateSnapshot:
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_stream_should_cleanup_store_and_state_on_completion() -> None:
-    """完成后应清理 deliverables Store，并清空 state 引用"""
+async def test_cleanup_state() -> None:
+    """Should clear deliverables and state references on completion."""
     store = _StubStore()
     await store.aput(("deliverables", "test", "s1"), "agent1", {"ok": True})
 

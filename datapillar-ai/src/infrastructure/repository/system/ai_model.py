@@ -22,7 +22,6 @@ _MODEL_FIELDS = (
     "api_key, "
     "base_url, "
     "is_enabled, "
-    "is_default, "
     "embedding_dimension, "
     "supports_function_calling, "
     "supports_structured_output, "
@@ -38,7 +37,8 @@ class Model:
         query = text(
             f"""
             SELECT {_MODEL_FIELDS} FROM ai_model
-            WHERE is_enabled = 1 AND is_default = 1 AND model_type = 'chat'
+            WHERE is_enabled = 1 AND model_type = 'chat'
+            ORDER BY updated_at DESC, created_at DESC, id DESC
             LIMIT 1
         """
         )
@@ -49,7 +49,7 @@ class Model:
                 row = result.mappings().fetchone()
                 return dict(row) if row else None
         except Exception as e:
-            logger.error(f"获取默认 Chat 模型失败: {e}")
+            logger.error(f"获取启用 Chat 模型失败: {e}")
             return None
 
     @staticmethod
@@ -57,9 +57,10 @@ class Model:
         query = text(
             f"""
             SELECT {_MODEL_FIELDS} FROM ai_model
-            WHERE is_enabled = 1 AND is_default = 1
+            WHERE is_enabled = 1
               AND model_type = 'embedding'
               AND scope = 'SYSTEM'
+            ORDER BY updated_at DESC, created_at DESC, id DESC
             LIMIT 1
         """
         )
@@ -70,7 +71,7 @@ class Model:
                 row = result.mappings().fetchone()
                 return dict(row) if row else None
         except Exception as e:
-            logger.error(f"获取默认 Embedding 模型失败: {e}")
+            logger.error(f"获取启用 Embedding 模型失败: {e}")
             return None
 
     @staticmethod
@@ -98,7 +99,7 @@ class Model:
                 f"""
                 SELECT {_MODEL_FIELDS} FROM ai_model
                 WHERE is_enabled = 1 AND model_type = :model_type
-                ORDER BY is_default DESC, created_at DESC
+                ORDER BY updated_at DESC, created_at DESC, id DESC
             """
             )
             params: dict[str, Any] = {"model_type": model_type}
@@ -107,7 +108,7 @@ class Model:
                 f"""
                 SELECT {_MODEL_FIELDS} FROM ai_model
                 WHERE is_enabled = 1
-                ORDER BY model_type, is_default DESC, created_at DESC
+                ORDER BY model_type, updated_at DESC, created_at DESC, id DESC
             """
             )
             params = {}

@@ -1,44 +1,44 @@
 """
-Datapillar 团队类
+Datapillar team class.
 
-组织多个 Agent 协作完成复杂任务。
+Organizes multiple agents to complete complex tasks.
 
-核心概念：
-- namespace: 最高层级的数据隔离边界（必传）
-- session_id: 会话标识
-- SessionKey: namespace + session_id 的组合，确保全系统隔离
-- 会话/交付物按 namespace 隔离；经验/知识向量库固定库名 datapillar，
-  通过表内 namespace 字段隔离
+Core concepts:
+- namespace: top-level isolation boundary (required)
+- session_id: session identifier
+- SessionKey: namespace + session_id for full isolation
+- Sessions/deliverables are isolated by namespace; experience/knowledge vector stores
+  use a fixed database and are isolated by a namespace column
 
-使用示例：
+Example:
 ```python
 from datapillar_oneagentic import Datapillar, DatapillarConfig, Process
 
-# 导入已定义的 Agent 类
+# Import defined Agent classes
 from my_agents import AnalystAgent, ReporterAgent
 
-# 组建团队（namespace 必传）
+# Build a team (namespace is required)
 config = DatapillarConfig(
     llm={"api_key": "sk-xxx", "model": "gpt-4o"},
 )
 
 team = Datapillar(
     config=config,
-    namespace="sales_app",  # 数据隔离边界
-    name="分析团队",
+    namespace="sales_app",  # data isolation boundary
+    name="Analysis Team",
     agents=[AnalystAgent, ReporterAgent],
     process=Process.DYNAMIC,
     enable_learning=True,
 )
 
-# 流式执行
+# Streamed execution
 async for event in team.stream(
-    query="分析销售数据",
+    query="Analyze sales data",
     session_id="session_001",
 ):
     print(event)
 
-# 保存经验
+# Save experience
 await team.save_experience(session_id="session_001", feedback={"stars": 5})
 ```
 """
@@ -60,6 +60,7 @@ from datapillar_oneagentic.context import ContextCollector
 from datapillar_oneagentic.context.compaction import CompactPolicy, get_compactor
 from datapillar_oneagentic.context.timeline.recorder import TimelineRecorder
 from datapillar_oneagentic.events import EventBus
+from datapillar_oneagentic.log import bind_log_context, setup_logging
 from datapillar_oneagentic.providers.llm import EmbeddingProvider, LLMProvider
 
 if TYPE_CHECKING:
@@ -70,23 +71,23 @@ logger = logging.getLogger(__name__)
 
 class Datapillar:
     """
-    Datapillar 智能体团队
+    Datapillar agent team.
 
-    组织多个 Agent 协作完成复杂任务。
+    Organizes multiple agents to complete complex tasks.
 
-    特性：
-    - namespace 隔离：会话/交付物按 namespace 隔离，向量库通过 namespace 字段隔离
-    - 多种执行模式：顺序、动态、层级、MapReduce、ReAct
-    - 委派约束：只能在团队内委派
-    - 记忆管理：可选启用会话记忆
-    - 经验学习：可选启用经验记录
-    - 资源安全：连接在每次执行时创建，执行完自动关闭
-    - 团队级知识入口：Datapillar(knowledge=...) 统一挂载
+    Features:
+    - Namespace isolation: sessions/deliverables are isolated by namespace
+    - Multiple execution modes: sequential, dynamic, hierarchical, MapReduce, ReAct
+    - Delegation constraints: delegation only within the team
+    - Memory management: optional session memory
+    - Experience learning: optional experience recording
+    - Resource safety: connections created per run and closed afterward
+    - Team-level knowledge entry: Datapillar(knowledge=...) for shared knowledge
     """
 
     @classmethod
     def _clear_registry(cls) -> None:
-        """保留接口兼容（框架当前无全局注册表，无需处理）"""
+        """Compatibility hook (no global registry in the framework)."""
         pass
 
     def __init__(
@@ -104,20 +105,20 @@ class Datapillar:
         knowledge: "Knowledge | None" = None,
     ):
         """
-        创建团队
+        Create a team.
 
-        参数：
-        - config: DatapillarConfig（必传，团队级配置）
-        - namespace: 命名空间（必传，最高层级的数据隔离边界）
-        - name: 团队名称
-        - agents: Agent 类列表（必须使用 @agent 装饰器定义）
-        - process: 执行模式（SEQUENTIAL/DYNAMIC/HIERARCHICAL/MAPREDUCE/REACT）
-          - MAPREDUCE 模式下最后一个 Agent 仅提供输出 schema，不参与执行
-        - enable_learning: 是否启用经验学习（默认 False）
-        - enable_share_context: 是否启用共享 Agent 上下文（默认 True）
-        - a2a_agents: 团队级别的 A2A 远程 Agent 配置列表
-        - verbose: 是否输出详细日志（默认 False）
-        - knowledge: 团队级知识配置（可选，作为所有 Agent 的默认知识入口）
+        Args:
+            config: DatapillarConfig (required, team-level config)
+            namespace: namespace (required, top-level isolation boundary)
+            name: team name
+            agents: list of Agent classes (must use @agent decorator)
+            process: execution mode (SEQUENTIAL/DYNAMIC/HIERARCHICAL/MAPREDUCE/REACT)
+                - In MAPREDUCE, the last agent only provides output schema
+            enable_learning: enable experience learning (default False)
+            enable_share_context: enable shared agent context (default True)
+            a2a_agents: team-level A2A remote agent configs
+            verbose: enable verbose logging (default False)
+            knowledge: team-level knowledge config (optional, default knowledge entry)
         """
         self._config = config
         self.namespace = namespace
@@ -126,21 +127,19 @@ class Datapillar:
         self.enable_learning = enable_learning
         self.enable_share_context = enable_share_context
         self.a2a_agents = a2a_agents or []
-        # verbose 参数应该生效：示例里会传 verbose=True 来打开调试信息。
+        # Ensure verbose flag is respected (examples rely on verbose=True for debug logs).
         self.verbose = verbose or self._config.verbose
 
-        # 校验配置
+        # Validate config.
         self._config.validate_llm()
 
-        # 应用日志级别
+        # Initialize logging
         if self.verbose:
-            logging.getLogger("datapillar_oneagentic").setLevel(logging.DEBUG)
+            setup_logging(logging.DEBUG)
         else:
-            logging.getLogger("datapillar_oneagentic").setLevel(
-                getattr(logging, self._config.log_level.upper(), logging.INFO)
-            )
+            setup_logging(getattr(logging, self._config.log_level.upper(), logging.INFO))
 
-        # 解析 Agent 类，获取 AgentSpec
+        # Resolve agent classes into AgentSpec.
         self._agent_specs = self._resolve_agents(agents)
         if knowledge is not None:
             from datapillar_oneagentic.knowledge import merge_knowledge
@@ -154,23 +153,23 @@ class Datapillar:
         if enable_learning:
             self._config.validate_embedding()
 
-        # 将团队级别的 A2A 配置合并到每个 Agent
+        # Merge team-level A2A config into each agent.
         if self.a2a_agents:
             for spec in self._agent_specs:
                 spec.a2a_agents = list(spec.a2a_agents) + list(self.a2a_agents)
 
-        # 校验
+        # Validate.
         self._validate()
 
-        # 设置入口 Agent（第一个）
+        # Set entry agent (first).
         self._entry_agent_id = self._agent_specs[0].id if self._agent_specs else None
 
-        # 团队级事件总线与时间线
+        # Team-level event bus and timeline.
         self._event_bus = EventBus()
         self._timeline_recorder = TimelineRecorder(self._event_bus)
         self._timeline_recorder.register()
 
-        # 团队级 LLM Provider 与上下文压缩器
+        # Team-level LLM provider and context compactor.
         self._llm_provider = LLMProvider(self._config.llm, event_bus=self._event_bus)
         compaction_policy = CompactPolicy(
             min_keep_entries=self._config.context.compact_min_keep_entries
@@ -180,10 +179,10 @@ class Datapillar:
             policy=compaction_policy,
         )
 
-        # 创建执行器缓存（团队内）
+        # Executor cache (per team).
         self._executors: dict[str, Any] = {}
 
-        # 创建经验学习/知识相关组件
+        # Experience learning and knowledge components.
         self._learning_embedding_provider = None
         self._knowledge_embedding_provider = None
         self._learning_store = None
@@ -211,14 +210,17 @@ class Datapillar:
                 store=self._learning_store,
                 embedding_provider=self._learning_embedding_provider,
             )
-            logger.info(f"经验学习已启用: namespace={namespace}")
+            logger.info(
+                "Experience learning enabled",
+                extra={"event": "experience.enabled", "namespace": namespace},
+            )
 
         if self._has_knowledge:
             from datapillar_oneagentic.knowledge import KnowledgeRetriever
             from datapillar_oneagentic.storage import create_knowledge_store
 
             if not self._config.knowledge.base_config.embedding.is_configured():
-                raise ValueError("知识功能需要配置 knowledge.base_config.embedding")
+                raise ValueError("Knowledge requires knowledge.base_config.embedding to be configured.")
 
             self._knowledge_embedding_provider = EmbeddingProvider(
                 self._config.knowledge.base_config.embedding
@@ -233,7 +235,10 @@ class Datapillar:
                 embedding_provider=self._knowledge_embedding_provider,
                 config=self._config.knowledge,
             )
-            logger.info(f"知识检索已启用: namespace={namespace}")
+            logger.info(
+                "Knowledge retrieval enabled",
+                extra={"event": "knowledge.enabled", "namespace": namespace},
+            )
 
         self._context_collector = ContextCollector(
             knowledge_retriever=self._knowledge_retriever,
@@ -242,7 +247,7 @@ class Datapillar:
             share_agent_context=self.enable_share_context,
         )
 
-        # 创建节点工厂
+        # Create node factory.
         self._node_factory = NodeFactory(
             agent_specs=self._agent_specs,
             agent_ids=self._agent_ids,
@@ -253,88 +258,102 @@ class Datapillar:
             context_collector=self._context_collector,
         )
 
-        # 获取 LLM（ReAct 模式需要）
+        # Create LLM for ReAct mode.
         self._react_llm = None
         if process == Process.REACT:
             self._react_llm = self._llm_provider()
-            logger.info("ReAct 模式已启用")
+            logger.info("ReAct mode enabled", extra={"event": "process.react.enabled"})
 
-        # 获取 LLM（MapReduce 模式需要）
+        # Create LLM for MapReduce mode.
         self._mapreduce_llm = None
         if process == Process.MAPREDUCE:
             self._mapreduce_llm = self._llm_provider()
-            logger.info("MapReduce 模式已启用")
+            logger.info("MapReduce mode enabled", extra={"event": "process.mapreduce.enabled"})
 
-        # 构建执行图（StateGraph，还未编译）
+        # Build execution graph (StateGraph, not compiled yet).
         self._graph = build_graph(
             process=process,
             agent_specs=self._agent_specs,
             entry_agent_id=self._entry_agent_id,
             agent_ids=self._agent_ids,
             create_agent_node=self._node_factory.create_agent_node,
-            create_mapreduce_worker_node=self._node_factory.create_mapreduce_worker_node,
-            create_mapreduce_reducer_node=self._node_factory.create_mapreduce_reducer_node,
+            create_mapreduce_worker=self._node_factory.create_mapreduce_worker,
+            create_mapreduce_reducer=self._node_factory.create_mapreduce_reducer,
             llm=self._react_llm or self._mapreduce_llm,
             context_collector=self._context_collector,
         )
 
         logger.info(
-            f"Datapillar 创建: {name} (namespace={namespace}), "
-            f"成员: {[s.name for s in self._agent_specs]}, "
-            f"模式: {process.value}, "
-            f"入口: {self._entry_agent_id}"
+            "Datapillar created",
+            extra={
+                "event": "team.created",
+                "namespace": namespace,
+                "data": {
+                    "name": name,
+                    "agents": [s.name for s in self._agent_specs],
+                    "process": process.value,
+                    "entry_agent_id": self._entry_agent_id,
+                },
+            },
         )
 
     def _resolve_agents(self, agent_classes: list[type]) -> list[AgentSpec]:
-        """解析 Agent 类，获取 AgentSpec"""
+        """Resolve Agent classes into AgentSpec."""
         specs = []
 
         for cls in agent_classes:
             spec = get_agent_spec(cls)
             if spec is None:
                 raise ValueError(
-                    f"Agent 类 {cls.__name__} 未注册。"
-                    f"请确保该类使用了 @agent 装饰器并已被导入。"
+                    f"Agent class {cls.__name__} is not registered. "
+                    "Ensure it uses the @agent decorator and is imported."
                 )
-            # 深拷贝，团队隔离
+            # Deep copy for team isolation.
             specs.append(copy.deepcopy(spec))
 
         return specs
 
     def _validate(self) -> None:
-        """校验配置"""
+        """Validate configuration."""
         if not self._agent_specs:
-            raise ValueError("agents 不能为空")
+            raise ValueError("agents must not be empty")
         if self.process == Process.MAPREDUCE and len(self._agent_specs) < 2:
-            raise ValueError("MAPREDUCE 模式至少需要 2 个 Agent（最后一个作为 Reducer）")
+            raise ValueError("MAPREDUCE requires at least 2 agents (last agent is reducer)")
 
-        # 校验委派约束
+        # Validate delegation constraints.
         for spec in self._agent_specs:
             for delegate_to in spec.can_delegate_to:
                 if delegate_to not in self._agent_ids:
                     logger.warning(
-                        f"Agent {spec.id} 的委派目标 {delegate_to} 不在团队内，将被忽略。"
-                        f"团队成员: {self._agent_ids}"
+                        "Delegate target not in team; ignoring",
+                        extra={
+                            "event": "agent.delegate.ignored",
+                            "agent_id": spec.id,
+                            "data": {
+                                "delegate_to": delegate_to,
+                                "team_agents": self._agent_ids,
+                            },
+                        },
                     )
 
     def _get_executor(self, agent_id: str):
-        """获取执行器（带缓存）"""
+        """Get executor (with cache)."""
         from datapillar_oneagentic.runtime.executor import AgentExecutor
 
         if agent_id not in self._executors:
             spec = next((s for s in self._agent_specs if s.id == agent_id), None)
             if not spec:
-                raise KeyError(f"Agent {agent_id} 不在团队中")
+                raise KeyError(f"Agent {agent_id} is not in the team")
 
-            # DYNAMIC 模式：自动设置 can_delegate_to
+            # DYNAMIC: auto-populate can_delegate_to.
             if self.process == Process.DYNAMIC:
                 spec.can_delegate_to = [aid for aid in self._agent_ids if aid != agent_id]
 
-            # SEQUENTIAL 模式：禁止委派
+            # SEQUENTIAL: no delegation.
             elif self.process == Process.SEQUENTIAL:
                 spec.can_delegate_to = []
 
-            # HIERARCHICAL 模式：只有 Manager 可以委派
+            # HIERARCHICAL: only Manager can delegate.
             elif self.process == Process.HIERARCHICAL:
                 if agent_id == self._entry_agent_id:
                     spec.can_delegate_to = [aid for aid in self._agent_ids if aid != agent_id]
@@ -352,7 +371,7 @@ class Datapillar:
         return self._executors[agent_id]
 
     def _build_orchestrator(self, *, checkpointer, store):
-        """创建 Orchestrator（绑定当次连接）"""
+        """Create orchestrator (bound to the current connection)."""
         from datapillar_oneagentic.runtime.orchestrator import Orchestrator
 
         return Orchestrator(
@@ -378,26 +397,26 @@ class Datapillar:
         resume_value: Any | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """
-        流式执行
+        Streamed execution.
 
-        每次执行时创建数据库连接，执行完自动关闭，确保资源不泄漏。
+        Database connections are created per run and closed automatically.
 
-        参数：
-        - query: 用户输入（新会话或续聊时必传）
-        - session_id: 会话 ID
-        - resume_value: interrupt 恢复值（用户输入）
+        Args:
+            query: user input (required for new or resumed chat)
+            session_id: session ID
+            resume_value: interrupt resume value (user input)
 
-        返回：
-        - SSE 事件流
+        Returns:
+            SSE event stream.
 
-        使用示例：
+        Example:
         ```python
-        # 新会话
-        async for event in team.stream(query="分析数据", session_id="s1"):
+        # New session
+        async for event in team.stream(query="Analyze data", session_id="s1"):
             print(event)
 
-        # interrupt 恢复
-        async for event in team.stream(session_id="s1", resume_value="确认执行"):
+        # Resume from interrupt
+        async for event in team.stream(session_id="s1", resume_value="Proceed"):
             print(event)
         ```
         """
@@ -405,27 +424,27 @@ class Datapillar:
 
         key = SessionKey(namespace=self.namespace, session_id=session_id)
 
-        # 使用 async with 确保连接正确关闭
+        # Use async with to ensure connections are closed.
         async with (
             create_checkpointer(self.namespace, agent_config=self._config.agent) as checkpointer,
             create_store(self.namespace, agent_config=self._config.agent) as store,
         ):
-            # 创建 Orchestrator（每次 stream 时创建，绑定当前连接）
+            # Create orchestrator per stream call and bind it to current connections.
             orchestrator = self._build_orchestrator(
                 checkpointer=checkpointer,
                 store=store,
             )
-
-            async for event in orchestrator.stream(
-                query=query,
-                key=key,
-                resume_value=resume_value,
-            ):
-                yield event
-        # 退出 with，连接自动关闭
+            with bind_log_context(namespace=self.namespace, session_id=key.session_id):
+                async for event in orchestrator.stream(
+                    query=query,
+                    key=key,
+                    resume_value=resume_value,
+                ):
+                    yield event
+        # Connections close on context exit.
 
     async def compact_session(self, session_id: str) -> dict:
-        """手动压缩会话记忆"""
+        """Manually compact session memory."""
         from datapillar_oneagentic.storage import create_checkpointer, create_store
 
         async with (
@@ -439,7 +458,7 @@ class Datapillar:
             return await orchestrator.compact_session(session_id)
 
     async def clear_session(self, session_id: str) -> None:
-        """清理会话记忆"""
+        """Clear session memory."""
         from datapillar_oneagentic.storage import create_checkpointer
 
         async with create_checkpointer(self.namespace, agent_config=self._config.agent) as checkpointer:
@@ -447,7 +466,7 @@ class Datapillar:
             await orchestrator.clear_session(session_id)
 
     async def clear_session_store(self, session_id: str) -> None:
-        """清理会话交付物"""
+        """Clear session deliverables."""
         from datapillar_oneagentic.storage import create_checkpointer, create_store
 
         async with (
@@ -461,7 +480,7 @@ class Datapillar:
             await orchestrator.clear_session_store(session_id)
 
     async def get_session_stats(self, session_id: str) -> dict:
-        """获取会话统计信息"""
+        """Get session stats."""
         from datapillar_oneagentic.storage import create_checkpointer, create_store
 
         async with (
@@ -475,7 +494,7 @@ class Datapillar:
             return await orchestrator.get_session_stats(session_id)
 
     async def get_session_todo(self, session_id: str) -> dict:
-        """获取会话 Todo 快照"""
+        """Get session todo snapshot."""
         from datapillar_oneagentic.storage import create_checkpointer, create_store
 
         async with (
@@ -494,24 +513,23 @@ class Datapillar:
         feedback: dict[str, Any] | None = None,
     ) -> bool:
         """
-        保存经验到向量库
+        Save an experience to the vector store.
 
-        用户觉得这次执行有价值时调用此方法保存经验。
-        不调用 = 不保存。
+        Call this when the execution is valuable. If not called, nothing is saved.
 
         Args:
-            session_id: 会话 ID
-            feedback: 用户反馈（可选，结构由使用者定义）
+            session_id: session ID
+            feedback: user feedback (optional, caller-defined structure)
 
         Returns:
-            是否保存成功
+            True if saved successfully.
         """
         if not self._experience_learner:
-            logger.warning("经验学习未启用，无法保存经验")
+            logger.warning("Experience learning is disabled; cannot save experience")
             return False
 
         if not self._experience_learner.has_pending(session_id):
-            logger.warning(f"没有待保存的记录: {session_id}")
+            logger.warning(f"No pending record to save: {session_id}")
             return False
 
         return await self._experience_learner.save_experience(
@@ -521,7 +539,7 @@ class Datapillar:
 
     @property
     def event_bus(self) -> EventBus:
-        """获取团队事件总线"""
+        """Return the team event bus."""
         return self._event_bus
 
     @property

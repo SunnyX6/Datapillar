@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Sparkles, Scale, Plus, ChevronLeft, ChevronRight, Loader2, Trash2, ChevronDown, X, Check, Tag, Pencil } from 'lucide-react'
-import { iconSizeToken } from '@/design-tokens/dimensions'
+import { iconSizeToken, menuWidthClassMap, panelWidthClassMap } from '@/design-tokens/dimensions'
 import { Modal, ModalCancelButton, ModalPrimaryButton } from '@/components/ui'
 import {
   fetchUnits,
@@ -746,7 +746,7 @@ function CreateModifierModal({
         <div
           ref={itemCardRef}
           style={{ top: itemCardPos.top, left: itemCardPos.left }}
-          className="fixed z-[1000001] w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl animate-in fade-in-0 slide-in-from-left-2 duration-150"
+          className={`fixed z-[1000001] ${menuWidthClassMap.xlarge} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl animate-in fade-in-0 slide-in-from-left-2 duration-150`}
           onMouseEnter={handleCardMouseEnter}
           onMouseLeave={handleCardMouseLeave}
         >
@@ -1274,7 +1274,7 @@ export function ComponentLibrarySidebar() {
   }
 
   return (
-    <div className="w-64 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col overflow-hidden">
+    <div className={`${panelWidthClassMap.medium} border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col overflow-hidden`}>
       {/* 标题 */}
       <div className="px-3 pt-3 pb-1.5">
         <h3 className="text-caption font-semibold text-slate-800 dark:text-slate-200">

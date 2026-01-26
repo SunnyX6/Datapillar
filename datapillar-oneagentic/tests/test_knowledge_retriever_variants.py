@@ -59,12 +59,12 @@ class _StubKnowledgeStore:
     async def delete_doc(self, doc_id: str) -> int:
         return 0
 
-    async def delete_chunks_by_doc_id(self, doc_id: str) -> int:
+    async def delete_doc_chunks(self, doc_id: str) -> int:
         return 0
 
 
 @pytest.mark.asyncio
-async def test_retriever_applies_score_threshold() -> None:
+async def test_score_threshold() -> None:
     hits = [
         KnowledgeSearchHit(
             chunk=KnowledgeChunk(
@@ -111,7 +111,7 @@ async def test_retriever_applies_score_threshold() -> None:
 
 
 @pytest.mark.asyncio
-async def test_retriever_hybrid_rrf_uses_sparse_rank() -> None:
+async def test_rank_sparse() -> None:
     hits = [
         KnowledgeSearchHit(
             chunk=KnowledgeChunk(
@@ -172,7 +172,7 @@ async def test_retriever_hybrid_rrf_uses_sparse_rank() -> None:
 
 
 @pytest.mark.asyncio
-async def test_retriever_filters_by_document_ids() -> None:
+async def test_retriever_filters() -> None:
     hits = [
         KnowledgeSearchHit(
             chunk=KnowledgeChunk(
@@ -222,7 +222,7 @@ async def test_retriever_filters_by_document_ids() -> None:
 
 
 @pytest.mark.asyncio
-async def test_retriever_scope_tags_not_supported() -> None:
+async def test_retriever_scope() -> None:
     store = _StubKnowledgeStore(search_results=[])
     config = KnowledgeConfig(retrieve_config=KnowledgeRetrieveConfig(method="semantic"))
     retriever = KnowledgeRetriever(
@@ -242,7 +242,7 @@ async def test_retriever_scope_tags_not_supported() -> None:
 
 
 @pytest.mark.asyncio
-async def test_retriever_scope_multiple_namespaces_not_supported() -> None:
+async def test_retriever_scope2() -> None:
     store = _StubKnowledgeStore(search_results=[])
     config = KnowledgeConfig(retrieve_config=KnowledgeRetrieveConfig(method="semantic"))
     retriever = KnowledgeRetriever(
@@ -262,7 +262,7 @@ async def test_retriever_scope_multiple_namespaces_not_supported() -> None:
 
 
 @pytest.mark.asyncio
-async def test_rerank_weighted_prefers_rerank_scores(monkeypatch) -> None:
+async def test_rerank_weighted(monkeypatch) -> None:
     hits = [
         KnowledgeSearchHit(
             chunk=KnowledgeChunk(
@@ -325,7 +325,7 @@ async def test_rerank_weighted_prefers_rerank_scores(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_rerank_normalize_minmax_outputs_normalized_scores(monkeypatch) -> None:
+async def test_normalize_minmax(monkeypatch) -> None:
     hits = [
         KnowledgeSearchHit(
             chunk=KnowledgeChunk(

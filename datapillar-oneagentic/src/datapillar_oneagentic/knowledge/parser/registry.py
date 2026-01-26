@@ -1,6 +1,4 @@
-"""
-解析器注册中心
-"""
+"""Parser registry."""
 
 from __future__ import annotations
 
@@ -14,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class ParserRegistry:
-    """解析器注册表"""
+    """Parser registry."""
 
     def __init__(self) -> None:
         self._by_mime: dict[str, type[DocumentParser]] = {}
@@ -42,7 +40,7 @@ class ParserRegistry:
             return self._by_ext[ext]()
         if "text/plain" in self._by_mime:
             return self._by_mime["text/plain"]()
-        raise ValueError(f"未找到可用解析器: mime_type={mime_type}, ext={ext}")
+        raise ValueError(f"No parser available: mime_type={mime_type}, ext={ext}")
 
 
 def default_registry() -> ParserRegistry:

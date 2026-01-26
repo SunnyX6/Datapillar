@@ -1,5 +1,5 @@
 """
-Agent 异常定义
+Agent error definitions.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from datapillar_oneagentic.exception.agent.categories import AgentErrorCategory
 
 
 class AgentError(Exception):
-    """Agent 异常（带分类与恢复动作）"""
+    """Agent error with category and recovery action."""
 
     def __init__(
         self,
@@ -32,7 +32,7 @@ class AgentError(Exception):
         self.original = original
 
     def to_dict(self) -> dict[str, Any]:
-        """转换为结构化字典（用于日志/SSE）"""
+        """Convert to a structured dict (for logs/SSE)."""
         return {
             "agent_id": self.agent_id,
             "category": self.category.value,

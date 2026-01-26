@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Activity,
   ArrowDownCircle,
@@ -28,6 +29,7 @@ import {
   Zap
 } from 'lucide-react'
 import { Button, Card, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui'
+import { drawerWidthClassMap, menuWidthClassMap } from '@/design-tokens/dimensions'
 import { StatusBadge } from './StackUi'
 import type { PipelineRun, StackEdge, TaskNode, TaskRunHistory, WorkflowDefinition } from './types'
 
@@ -57,6 +59,9 @@ const mockTaskHistory: TaskRunHistory[] = [
   { runId: '9815', pipelineRunId: 'run_8920', status: 'success', startTime: 'Yesterday, 10:00 AM', duration: '14m 20s', recordsProcessed: '8.1M', memoryUsage: '5.1GB' },
   { runId: '9802', pipelineRunId: 'run_8919', status: 'failed', startTime: 'Yesterday, 09:15 AM', duration: '2m 10s', recordsProcessed: '1.2M', memoryUsage: '4.9GB' }
 ]
+
+const BOTTOM_PANEL_MIN_HEIGHT = 180
+const BOTTOM_PANEL_MAX_HEIGHT_RATIO = 0.7
 
 const NodeIcon = ({ type, className, size = 14 }: { type: TaskNode['type']; className?: string; size?: number }) => {
   switch (type) {
@@ -127,7 +132,8 @@ export function StackTaskManager({ workflow, onBack }: StackTaskManagerProps) {
   const [selectedTaskRun, setSelectedTaskRun] = useState<TaskRunHistory | null>(null)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const mainPaneRef = useRef<HTMLDivElement>(null)
-  const [bottomPanelHeight, setBottomPanelHeight] = useState(224)
+  const bottomPanelManualResizeRef = useRef(false)
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(BOTTOM_PANEL_MIN_HEIGHT)
   const [isBottomPanelResizing, setIsBottomPanelResizing] = useState(false)
 
   const handleNodeSelect = (node: TaskNode) => {
@@ -178,15 +184,46 @@ export function StackTaskManager({ workflow, onBack }: StackTaskManagerProps) {
     return `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`
   }
 
-  const BOTTOM_PANEL_MIN_HEIGHT = 180
-  const BOTTOM_PANEL_MAX_HEIGHT_RATIO = 0.7
-
   const handleBottomPanelResizeStart = (e: React.MouseEvent) => {
     e.preventDefault()
+    bottomPanelManualResizeRef.current = true
     setIsBottomPanelResizing(true)
     document.body.style.userSelect = 'none'
     document.body.style.cursor = 'row-resize'
   }
+
+  useEffect(() => {
+    const pane = mainPaneRef.current
+    if (!pane) {
+      return
+    }
+
+    const updateHeight = () => {
+      if (bottomPanelManualResizeRef.current) {
+        return
+      }
+      const rect = pane.getBoundingClientRect()
+      const maxHeight = rect.height * BOTTOM_PANEL_MAX_HEIGHT_RATIO
+      const nextHeight = Math.max(BOTTOM_PANEL_MIN_HEIGHT, maxHeight)
+      setBottomPanelHeight((prev) => (Math.abs(prev - nextHeight) < 0.5 ? prev : nextHeight))
+    }
+
+    updateHeight()
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateHeight)
+      return () => {
+        window.removeEventListener('resize', updateHeight)
+      }
+    }
+
+    const observer = new ResizeObserver(() => updateHeight())
+    observer.observe(pane)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [])
 
   useEffect(() => {
     if (!isBottomPanelResizing) {
@@ -300,80 +337,84 @@ export function StackTaskManager({ workflow, onBack }: StackTaskManagerProps) {
               if (event.target === event.currentTarget) setSelectedNode(null)
             }}
           >
-              <div
-                className="absolute inset-0 min-w-[75rem] min-h-[37.5rem] pointer-events-none opacity-40 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px]"
-              />
+            <div className="min-w-full min-h-full flex items-center justify-center pointer-events-none">
+              <div className="relative min-w-[75rem] min-h-[37.5rem] pointer-events-none">
+                <div
+                  className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px]"
+                />
 
-              <div className="absolute inset-0 min-w-[75rem] min-h-[37.5rem] pointer-events-none">
-                <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none">
-                  <defs>
-                    <linearGradient id={edgeGradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#94a3b8" />
-                      <stop offset="100%" stopColor="#cbd5e1" />
-                    </linearGradient>
-                    <linearGradient id={edgeGradientActiveId} x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#3b82f6" />
-                      <stop offset="100%" stopColor="#22d3ee" />
-                    </linearGradient>
+                <div className="absolute inset-0 pointer-events-none">
+                  <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none">
+                    <defs>
+                      <linearGradient id={edgeGradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#94a3b8" />
+                        <stop offset="100%" stopColor="#cbd5e1" />
+                      </linearGradient>
+                      <linearGradient id={edgeGradientActiveId} x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#3b82f6" />
+                        <stop offset="100%" stopColor="#22d3ee" />
+                      </linearGradient>
 
-                    <marker id={arrowheadId} viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto">
-                      <path d="M0,0 L10,5 L0,10 Z" fill="currentColor" className="text-slate-400 dark:text-slate-500" />
-                    </marker>
-                    <marker id={arrowheadActiveId} viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto">
-                      <path d="M0,0 L10,5 L0,10 Z" fill="currentColor" className="text-blue-500 dark:text-cyan-300" />
-                    </marker>
-                  </defs>
+                      <marker id={arrowheadId} viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                        <path d="M0,0 L10,5 L0,10 Z" fill="currentColor" className="text-slate-400 dark:text-slate-500" />
+                      </marker>
+                      <marker id={arrowheadActiveId} viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                        <path d="M0,0 L10,5 L0,10 Z" fill="currentColor" className="text-blue-500 dark:text-cyan-300" />
+                      </marker>
+                    </defs>
 
-                  {mockEdges.map((edge) => {
-                    const path = getEdgePath(edge.source, edge.target)
-                    return (
-                      <g key={edge.id}>
-                        <path
-                          d={path}
-                          fill="none"
-                          stroke="transparent"
-                          strokeWidth="20"
-                          className="cursor-pointer pointer-events-auto hover:stroke-black/5 dark:hover:stroke-white/5 transition-colors"
-                        />
-                        <path
-                          d={path}
-                          fill="none"
-                          stroke={edge.animated ? `url(#${edgeGradientActiveId})` : 'currentColor'}
-                          strokeWidth={edge.animated ? '2' : '1.75'}
-                          markerEnd={edge.animated ? `url(#${arrowheadActiveId})` : `url(#${arrowheadId})`}
-                          strokeDasharray={edge.animated ? 'none' : 'none'}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className={edge.animated ? '' : 'text-slate-400 dark:text-slate-500'}
-                          style={{ filter: edge.animated ? 'drop-shadow(0 0 2px rgba(59,130,246,0.6))' : 'none' }}
-                        />
+                    {mockEdges.map((edge) => {
+                      const path = getEdgePath(edge.source, edge.target)
+                      return (
+                        <g key={edge.id}>
+                          <path
+                            d={path}
+                            fill="none"
+                            stroke="transparent"
+                            strokeWidth="20"
+                            className="cursor-pointer pointer-events-auto hover:stroke-black/5 dark:hover:stroke-white/5 transition-colors"
+                          />
+                          <path
+                            d={path}
+                            fill="none"
+                            stroke={edge.animated ? `url(#${edgeGradientActiveId})` : 'currentColor'}
+                            strokeWidth={edge.animated ? '2' : '1.75'}
+                            markerEnd={edge.animated ? `url(#${arrowheadActiveId})` : `url(#${arrowheadId})`}
+                            strokeDasharray={edge.animated ? 'none' : 'none'}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className={edge.animated ? '' : 'text-slate-400 dark:text-slate-500'}
+                            style={{ filter: edge.animated ? 'drop-shadow(0 0 2px rgba(59,130,246,0.6))' : 'none' }}
+                          />
 
-                        {edge.animated && (
-                          <circle r="3" fill="#3b82f6">
-                            <animateMotion dur="1.5s" repeatCount="indefinite" path={path} />
-                          </circle>
-                        )}
-                      </g>
-                    )
-                  })}
-                </svg>
+                          {edge.animated && (
+                            <circle r="3" fill="#3b82f6">
+                              <animateMotion dur="1.5s" repeatCount="indefinite" path={path} />
+                            </circle>
+                          )}
+                        </g>
+                      )
+                    })}
+                  </svg>
 
-                <div className="absolute inset-0 pointer-events-auto">
-                  {mockNodes.map((node) => (
-                    <div
-                      key={node.id}
-                      style={{ transform: `translate(${node.x}px, ${node.y}px)` }}
-                      className="absolute"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        handleNodeSelect(node)
-                      }}
-                    >
-                      <GraphNode node={node} selected={selectedNode?.id === node.id} />
-                    </div>
-                  ))}
+                  <div className="absolute inset-0 pointer-events-auto">
+                    {mockNodes.map((node) => (
+                      <div
+                        key={node.id}
+                        style={{ transform: `translate(${node.x}px, ${node.y}px)` }}
+                        className="absolute"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          handleNodeSelect(node)
+                        }}
+                      >
+                        <GraphNode node={node} selected={selectedNode?.id === node.id} />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
+            </div>
           </div>
 
           <div
@@ -452,8 +493,9 @@ export function StackTaskManager({ workflow, onBack }: StackTaskManagerProps) {
           </div>
         </div>
 
-        {selectedNode && selectedTaskRun && (
-          <div className="w-[31.25rem] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl z-40 animate-in slide-in-from-right duration-300 flex flex-col">
+        {selectedNode && selectedTaskRun &&
+          createPortal(
+            <aside className={`fixed right-0 top-14 bottom-0 z-30 ${drawerWidthClassMap.responsive} bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl animate-in slide-in-from-right duration-500 flex flex-col`}>
             <div className="h-14 px-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 flex-shrink-0 z-20 relative">
               <div className="flex items-center space-x-3">
                 <div className="p-1.5 bg-brand-50 dark:bg-brand-500/10 rounded-lg text-brand-600 dark:text-brand-300">
@@ -512,7 +554,7 @@ export function StackTaskManager({ workflow, onBack }: StackTaskManagerProps) {
                 </Button>
 
                 {isHistoryOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-50">
+                  <div className={`absolute right-0 top-full mt-2 ${menuWidthClassMap.wide} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-50`}>
                     <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-micro font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                       Select Past Execution
                     </div>
@@ -751,8 +793,10 @@ export function StackTaskManager({ workflow, onBack }: StackTaskManagerProps) {
                 </div>
               )}
             </div>
-          </div>
-        )}
+            </aside>,
+            document.body
+          )
+        }
       </div>
     </div>
   )

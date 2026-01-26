@@ -1,12 +1,12 @@
 """
-ExperienceStore 抽象接口
+ExperienceStore abstract interface.
 
-所有向量数据库实现此接口，数据结构统一使用 ExperienceRecord。
+All vector databases implement this interface; data uses ExperienceRecord.
 
-实现类：
-- VectorExperienceStore（基于 VectorStore 的统一实现）
+Implementations:
+- VectorExperienceStore (VectorStore-based implementation)
 
-使用示例：
+Example:
 ```python
 from datapillar_oneagentic.storage import create_learning_store
 from datapillar_oneagentic.storage.config import VectorStoreConfig
@@ -35,62 +35,62 @@ logger = logging.getLogger(__name__)
 
 class ExperienceStore(ABC):
     """
-    经验存储抽象接口
+    Experience storage interface.
 
-    所有向量数据库实现此接口，数据结构统一使用 ExperienceRecord。
-    切换向量库实现时，业务代码无需改动。
+    All vector databases implement this interface with ExperienceRecord schema.
+    Switching vector stores requires no business code changes.
     """
 
     @abstractmethod
     async def initialize(self) -> None:
-        """初始化存储（创建表/索引等）"""
+        """Initialize storage (create tables/indexes)."""
         pass
 
     @abstractmethod
     async def close(self) -> None:
-        """关闭存储连接"""
+        """Close storage connection."""
         pass
 
-    # ==================== 写操作 ====================
+    # ==================== Write operations ====================
 
     @abstractmethod
     async def add(self, record: ExperienceRecord) -> str:
         """
-        添加经验记录
+        Add an experience record.
 
         Args:
-            record: 经验记录（必须包含 vector）
+            record: Experience record (must include vector)
 
         Returns:
-            记录 ID
+            Record ID
         """
         pass
 
     @abstractmethod
     async def delete(self, record_id: str) -> bool:
         """
-        删除记录
+        Delete a record.
 
         Args:
-            record_id: 记录 ID
+            record_id: Record ID
 
         Returns:
-            是否成功
+            Whether deletion succeeded
         """
         pass
 
-    # ==================== 读操作 ====================
+    # ==================== Read operations ====================
 
     @abstractmethod
     async def get(self, record_id: str) -> ExperienceRecord | None:
         """
-        获取记录
+        Get a record.
 
         Args:
-            record_id: 记录 ID
+            record_id: Record ID
 
         Returns:
-            经验记录，不存在返回 None
+            Experience record or None if not found
         """
         pass
 
@@ -102,26 +102,26 @@ class ExperienceStore(ABC):
         outcome: str | None = None,
     ) -> list[ExperienceRecord]:
         """
-        向量相似度搜索
+        Vector similarity search.
 
         Args:
-            query_vector: 查询向量
-            k: 返回数量
-            outcome: 过滤条件（success / failure / None=全部）
+            query_vector: Query vector
+            k: Result count
+            outcome: Filter (success / failure / None=all)
 
         Returns:
-            经验记录列表（按相似度排序）
+            Experience records sorted by similarity
         """
         pass
 
-    # ==================== 统计操作 ====================
+    # ==================== Stats ====================
 
     @abstractmethod
     async def count(self) -> int:
         """
-        统计记录数量
+        Count records.
 
         Returns:
-            数量
+            Count
         """
         pass

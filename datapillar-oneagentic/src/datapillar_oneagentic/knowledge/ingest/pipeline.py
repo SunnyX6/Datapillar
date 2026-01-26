@@ -1,6 +1,4 @@
-"""
-知识入库管道
-"""
+"""Knowledge ingestion pipeline."""
 
 from __future__ import annotations
 
@@ -23,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class KnowledgeIngestor:
-    """知识入库器"""
+    """Knowledge ingestor."""
 
     def __init__(
         self,
@@ -95,7 +93,7 @@ class KnowledgeIngestor:
             flat_chunks.extend(chunks)
         await self._store.upsert_chunks(flat_chunks)
         logger.info(
-            "知识入库完成: source_id=%s, docs=%s, chunks=%s",
+            "Knowledge ingestion completed: source_id=%s, docs=%s, chunks=%s",
             resolved_source.source_id,
             len(all_docs),
             len(flat_chunks),
@@ -115,5 +113,5 @@ class KnowledgeIngestor:
         existing = await self._store.get_doc(doc_id)
         if not existing:
             return
-        await self._store.delete_chunks_by_doc_id(doc_id)
+        await self._store.delete_doc_chunks(doc_id)
         await self._store.delete_doc(doc_id)

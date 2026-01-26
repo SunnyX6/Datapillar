@@ -3,32 +3,32 @@
   "documents": [
     {
       "doc_id": "dp_overview",
-      "title": "产品总览",
-      "text": "Datapillar 是一个数据开发 SaaS 平台，覆盖数据接入、建模、指标、调度与质量管理。它强调标准化与复用，支持团队级协作与权限隔离。",
+      "title": "Product Overview",
+      "text": "Datapillar is a data development SaaS platform that covers data ingestion, modeling, metrics, scheduling, and quality management. It emphasizes standardization and reuse, and supports team collaboration and access isolation.",
       "metadata": {
         "topic": "overview"
       }
     },
     {
       "doc_id": "dp_knowledge",
-      "title": "知识框架",
-      "text": "知识框架提供文档解析、切分、向量化与检索增强能力，作为基座可挂载到团队或 Agent，并支持参数覆盖与上下文注入。",
+      "title": "Knowledge Framework",
+      "text": "The knowledge framework provides document parsing, chunking, vectorization, and retrieval-augmented capabilities. It can be attached to teams or agents and supports parameter overrides and context injection.",
       "metadata": {
         "topic": "knowledge"
       }
     },
     {
       "doc_id": "dp_retrieval",
-      "title": "检索流程",
-      "text": "检索流程包括召回、重排、证据治理与上下文格式化。证据治理会进行分组、去重与单文档限制，保证输出稳定可控。",
+      "title": "Retrieval Workflow",
+      "text": "The retrieval workflow includes recall, reranking, evidence governance, and context formatting. Evidence governance groups, deduplicates, and enforces per-document limits to keep outputs stable and controlled.",
       "metadata": {
         "topic": "retrieval"
       }
     },
     {
       "doc_id": "dp_process",
-      "title": "流程模式",
-      "text": "Datapillar 支持 SEQUENTIAL、DYNAMIC、HIERARCHICAL、MAPREDUCE、REACT 等流程模式，用于任务拆解、委派与协作。",
+      "title": "Process Modes",
+      "text": "Datapillar supports SEQUENTIAL, DYNAMIC, HIERARCHICAL, MAPREDUCE, REACT process modes for task decomposition, delegation, and collaboration.",
       "metadata": {
         "topic": "process"
       }
@@ -37,25 +37,25 @@
   "queries": [
     {
       "query_id": "q_overview",
-      "query": "Datapillar 覆盖哪些核心能力？",
+      "query": "What core capabilities does Datapillar cover?",
       "expected_doc_ids": ["dp_overview"],
       "expected_chunk_ids": ["dp_overview:0"]
     },
     {
       "query_id": "q_knowledge",
-      "query": "知识框架提供哪些能力？",
+      "query": "What capabilities does the knowledge framework provide?",
       "expected_doc_ids": ["dp_knowledge"],
       "expected_chunk_ids": ["dp_knowledge:0"]
     },
     {
       "query_id": "q_retrieval",
-      "query": "检索流程有哪些步骤？",
+      "query": "What steps are in the retrieval workflow?",
       "expected_doc_ids": ["dp_retrieval"],
       "expected_chunk_ids": ["dp_retrieval:0"]
     },
     {
       "query_id": "q_process",
-      "query": "系统支持哪些流程模式？",
+      "query": "What process modes does the system support?",
       "expected_doc_ids": ["dp_process"],
       "expected_chunk_ids": ["dp_process:0"]
     }

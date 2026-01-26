@@ -1,13 +1,13 @@
 """
-委派工具
+Delegation tools.
 
-创建 Agent 间的委派（delegation）工具。
-当 Agent 调用委派工具时，返回 Command 控制流程跳转。
+Create delegation tools between agents.
+When an agent calls a delegation tool, it returns a Command to route the flow.
 
-设计原则：
-- 委派工具由框架根据 spec.can_delegate_to 自动创建
-- Agent 不需要手动创建委派工具
-- 委派决策由 LLM 自主判断
+Design principles:
+- Delegation tools are auto-created based on spec.can_delegate_to
+- Agents do not create delegation tools manually
+- Delegation is decided by the LLM
 """
 
 from __future__ import annotations
@@ -15,12 +15,12 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.tools import BaseTool, tool
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
 from datapillar_oneagentic.state import StateBuilder
+from datapillar_oneagentic.messages import Message, Messages
 from datapillar_oneagentic.utils.prompt_format import format_markdown
 
 logger = logging.getLogger(__name__)
@@ -33,18 +33,18 @@ def create_delegation_tool(
     description: str | None = None,
 ) -> BaseTool:
     """
-    创建委派工具
+    Create a delegation tool.
 
-    当 LLM 决定将任务委派给其他 Agent 时调用。
-    返回 Command 控制 LangGraph 流程跳转。
+    Called when the LLM decides to delegate the task to another agent.
+    Returns a Command to control LangGraph flow routing.
 
-    参数：
-    - target_agent_id: 目标 Agent ID
-    - target_agent_name: 目标 Agent 名称（用于描述）
-    - description: 工具描述（给 LLM 看）
+    Args:
+        target_agent_id: Target agent ID
+        target_agent_name: Target agent name (for description)
+        description: Tool description (for the LLM)
 
-    返回：
-    - BaseTool: 委派工具
+    Returns:
+        BaseTool: Delegation tool
     """
     tool_name = f"delegate_to_{target_agent_id}"
     display_name = target_agent_name or target_agent_id
@@ -55,13 +55,11 @@ def create_delegation_tool(
         task_description: Annotated[str, "Detailed task description with relevant context"],
         state: Annotated[dict, InjectedState],
     ) -> Command:
-        """执行委派"""
+        """Execute delegation."""
         sb = StateBuilder(state)
         messages = sb.memory.raw_snapshot()
-        tool_call_id = _extract_tool_call_id(messages, tool_name)
-        user_message = _extract_last_user_message(messages)
-        assistant_message = _extract_last_tool_call_message(messages, tool_name)
-
+        tool_call_id = _extract_call_id(messages, tool_name)
+        user_message = _extract_last_user(messages)
         if user_message and user_message not in task_description:
             user_block = format_markdown(
                 title=None,
@@ -69,23 +67,23 @@ def create_delegation_tool(
             )
             task_description = f"{task_description}\n\n{user_block}"
 
-        # 创建确认消息
-        tool_message = ToolMessage(
+        # Create confirmation message.
+        tool_message = Message.tool(
             content=f"Delegated to {display_name}",
             name=tool_name,
             tool_call_id=tool_call_id or "unknown",
         )
 
-        logger.info(f"🔄 委派: → {target_agent_id}, 任务: {task_description[:100]}...")
+        logger.info(f"Delegation: {target_agent_id}, task: {task_description[:100]}...")
 
-        update_messages = [tool_message]
-        # ToolMessage 需要回写以匹配 tool_call_id（避免委派链路断裂）
+        update_messages = Messages([tool_message])
+        # Tool messages must be written back to match tool_call_id.
         sb.memory.append_tool_messages(update_messages)
         sb.routing.activate(target_agent_id)
         sb.routing.assign_task(task_description)
 
-        # 返回 Command 跳转到目标 Agent
-        # 注意：不使用 graph=Command.PARENT，因为我们的节点不是子图
+        # Return a Command to jump to the target agent.
+        # Note: do not use graph=Command.PARENT because nodes are not subgraphs.
         return Command(
             goto=target_agent_id,
             update=sb.patch(),
@@ -94,43 +92,36 @@ def create_delegation_tool(
     return delegation_tool
 
 
-def _extract_tool_call_id(messages: list, tool_name: str) -> str | None:
-    """从消息中提取 tool_call_id"""
+def _extract_call_id(messages: Messages, tool_name: str) -> str | None:
+    """Extract tool_call_id from messages."""
     for msg in reversed(messages):
         for tc in _iter_tool_calls(msg):
-            if tc.get("name") == tool_name:
-                return tc.get("id")
+            if tc.name == tool_name:
+                return tc.id
     return None
 
 
-def _extract_last_user_message(messages: list) -> str | None:
-    """提取最后一条用户输入，用于补全委派任务上下文"""
+def _extract_last_user(messages: Messages) -> str | None:
+    """Return the last user input to enrich delegation context."""
     for msg in reversed(messages):
-        if isinstance(msg, HumanMessage):
-            content = getattr(msg, "content", "")
-            if content:
-                return str(content)
+        if msg.role == "user" and msg.content:
+            return msg.content
     return None
 
 
-def _extract_last_tool_call_message(messages: list, tool_name: str) -> AIMessage | None:
-    """提取包含指定工具调用的最后一条 AIMessage"""
+def _extract_last_tool(messages: Messages, tool_name: str) -> Message | None:
+    """Return the last assistant message that called the tool."""
     for msg in reversed(messages):
-        if not isinstance(msg, AIMessage):
+        if msg.role != "assistant":
             continue
         for tc in _iter_tool_calls(msg):
-            name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
-            if name == tool_name:
+            if tc.name == tool_name:
                 return msg
     return None
 
 
-def _iter_tool_calls(msg: object) -> list:
-    tool_calls = getattr(msg, "tool_calls", None) or []
-    if tool_calls:
-        return tool_calls
-    extra = getattr(msg, "additional_kwargs", {}) or {}
-    return extra.get("tool_calls", []) or []
+def _iter_tool_calls(msg: Message) -> list:
+    return msg.tool_calls or []
 
 
 def create_delegation_tools(
@@ -138,14 +129,14 @@ def create_delegation_tools(
     agent_names: dict[str, str] | None = None,
 ) -> list[BaseTool]:
     """
-    批量创建委派工具
+    Create delegation tools in batch.
 
-    参数：
-    - can_delegate_to: 可委派的目标 Agent ID 列表
-    - agent_names: Agent ID → 名称的映射（可选）
+    Args:
+        can_delegate_to: Target agent IDs that can be delegated to
+        agent_names: Optional mapping of agent ID to display name
 
-    返回：
-    - 委派工具列表
+    Returns:
+        List of delegation tools
     """
     agent_names = agent_names or {}
     tools = []

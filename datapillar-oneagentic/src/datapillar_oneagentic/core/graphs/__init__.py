@@ -1,7 +1,7 @@
 """
-图构建模块
+Graph builder module.
 
-根据 Process 类型构建不同的执行图。
+Builds execution graphs based on Process type.
 """
 
 from datapillar_oneagentic.core.graphs.dynamic import build_dynamic_graph
@@ -28,30 +28,30 @@ def build_graph(
     entry_agent_id: str,
     agent_ids: list[str],
     create_agent_node,
-    create_mapreduce_worker_node,
-    create_mapreduce_reducer_node,
+    create_mapreduce_worker,
+    create_mapreduce_reducer,
     llm=None,
     context_collector=None,
 ):
     """
-    根据 Process 类型构建执行图
+    Build an execution graph based on Process.
 
     Args:
-        process: 执行模式
-        agent_specs: Agent 规格列表
-        entry_agent_id: 入口 Agent ID
-        agent_ids: 所有 Agent ID 列表
-        create_agent_node: 节点创建函数
-        create_mapreduce_worker_node: MapReduce Worker 节点创建函数
-        create_mapreduce_reducer_node: MapReduce Reducer 节点创建函数
-        llm: LLM 实例（REACT / MAPREDUCE 模式需要）
+        process: Execution mode
+        agent_specs: Agent spec list
+        entry_agent_id: Entry agent ID
+        agent_ids: All agent IDs
+        create_agent_node: Node factory
+        create_mapreduce_worker: MapReduce worker node factory
+        create_mapreduce_reducer: MapReduce reducer node factory
+        llm: LLM instance (required for REACT / MAPREDUCE)
 
     Returns:
-        StateGraph 实例
+        StateGraph instance
     """
     if process == Process.REACT:
         if llm is None:
-            raise ValueError("process=Process.REACT 时必须提供 llm 参数")
+            raise ValueError("llm is required when process=Process.REACT")
         return build_react_graph(
             agent_specs=agent_specs,
             agent_ids=agent_ids,
@@ -61,12 +61,12 @@ def build_graph(
 
     if process == Process.MAPREDUCE:
         if llm is None:
-            raise ValueError("process=Process.MAPREDUCE 时必须提供 llm 参数")
+            raise ValueError("llm is required when process=Process.MAPREDUCE")
         return build_mapreduce_graph(
             agent_specs=agent_specs,
             agent_ids=agent_ids,
-            create_mapreduce_worker_node=create_mapreduce_worker_node,
-            create_mapreduce_reducer_node=create_mapreduce_reducer_node,
+            create_mapreduce_worker=create_mapreduce_worker,
+            create_mapreduce_reducer=create_mapreduce_reducer,
             llm=llm,
             context_collector=context_collector,
         )
@@ -91,4 +91,4 @@ def build_graph(
             create_agent_node=create_agent_node,
         )
     else:
-        raise ValueError(f"不支持的执行模式: {process}")
+        raise ValueError(f"Unsupported execution mode: {process}")

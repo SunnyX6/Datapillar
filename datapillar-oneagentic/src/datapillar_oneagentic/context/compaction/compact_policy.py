@@ -1,8 +1,8 @@
 """
-压缩策略配置
+Compaction policy configuration.
 
-定义压缩的保留规则、摘要模板等。
-配置由调用方显式传入。
+Defines keep rules, summary templates, and more.
+Configurations are provided by callers explicitly.
 """
 
 from __future__ import annotations
@@ -14,16 +14,16 @@ from datapillar_oneagentic.utils.prompt_format import format_markdown
 
 class CompactPolicy(BaseModel):
     """
-    压缩策略配置
+    Compaction policy configuration.
 
-    控制如何压缩。
-    默认值由调用方传入，也可手动覆盖。
+    Controls how compaction works.
+    Defaults are provided by callers and can be overridden.
     """
 
     min_keep_entries: int | None = Field(
         default=None,
         ge=1,
-        description="最少保留的消息数",
+        description="Minimum number of messages to keep",
     )
 
     compress_prompt_template: str = Field(
@@ -51,31 +51,31 @@ class CompactPolicy(BaseModel):
                 ("Summary", ""),
             ],
         ),
-        description="压缩提示词模板",
+        description="Compaction prompt template",
     )
 
-    def get_min_keep_entries(self) -> int:
-        """获取最少保留消息数"""
+    def get_min_keep(self) -> int:
+        """Return the minimum number of messages to keep."""
         if self.min_keep_entries is None:
-            raise ValueError("compact_min_keep_entries 未配置")
+            raise ValueError("compact_min_keep_entries is not configured")
         return self.min_keep_entries
 
 
 class CompactResult(BaseModel):
-    """压缩结果"""
+    """Compaction result."""
 
-    success: bool = Field(..., description="是否成功")
-    summary: str = Field(default="", description="压缩后的摘要")
-    kept_count: int = Field(default=0, description="保留的消息数")
-    removed_count: int = Field(default=0, description="移除的消息数")
-    error: str | None = Field(default=None, description="错误信息")
+    success: bool = Field(..., description="Whether compaction succeeded")
+    summary: str = Field(default="", description="Compaction summary")
+    kept_count: int = Field(default=0, description="Number of messages kept")
+    removed_count: int = Field(default=0, description="Number of messages removed")
+    error: str | None = Field(default=None, description="Error message")
 
     @classmethod
     def failed(cls, error: str) -> CompactResult:
-        """创建失败结果"""
+        """Create a failed result."""
         return cls(success=False, error=error)
 
     @classmethod
-    def no_action(cls, reason: str = "无需压缩") -> CompactResult:
-        """创建无操作结果"""
+    def no_action(cls, reason: str = "No compaction needed") -> CompactResult:
+        """Create a no-op result."""
         return cls(success=True, error=reason)

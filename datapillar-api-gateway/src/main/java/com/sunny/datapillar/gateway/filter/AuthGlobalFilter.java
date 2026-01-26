@@ -1,5 +1,6 @@
 package com.sunny.datapillar.gateway.filter;
 
+import com.sunny.datapillar.common.constant.HeaderConstants;
 import com.sunny.datapillar.gateway.util.JwtUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,13 +42,6 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
     public AuthGlobalFilter(JwtUtil jwtUtil) {
         this.jwtUtil = jwtUtil;
     }
-
-    /**
-     * 用户信息请求头常量
-     */
-    public static final String HEADER_USER_ID = "X-User-Id";
-    public static final String HEADER_USERNAME = "X-Username";
-    public static final String HEADER_EMAIL = "X-User-Email";
 
     /**
      * Cookie 名称常量
@@ -95,9 +89,9 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
 
             // 将用户信息注入请求头，传递给下游服务
             ServerHttpRequest mutatedRequest = request.mutate()
-                    .header(HEADER_USER_ID, String.valueOf(userId))
-                    .header(HEADER_USERNAME, username)
-                    .header(HEADER_EMAIL, email != null ? email : "")
+                    .header(HeaderConstants.HEADER_USER_ID, String.valueOf(userId))
+                    .header(HeaderConstants.HEADER_USERNAME, username)
+                    .header(HeaderConstants.HEADER_EMAIL, email != null ? email : "")
                     .build();
 
             return chain.filter(exchange.mutate().request(mutatedRequest).build());

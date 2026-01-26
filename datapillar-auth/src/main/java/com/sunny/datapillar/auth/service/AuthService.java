@@ -13,10 +13,11 @@ import org.springframework.stereotype.Service;
 import com.sunny.datapillar.auth.dto.AuthDto;
 import com.sunny.datapillar.auth.entity.User;
 import com.sunny.datapillar.auth.mapper.UserMapper;
-import com.sunny.datapillar.auth.response.AuthErrorCode;
-import com.sunny.datapillar.auth.response.AuthException;
 import com.sunny.datapillar.auth.security.JwtTokenUtil;
+import com.sunny.datapillar.common.error.ErrorCode;
+import com.sunny.datapillar.common.exception.BusinessException;
 
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -48,18 +49,18 @@ public class AuthService {
     public AuthDto.LoginResponse login(AuthDto.LoginRequest request, HttpServletResponse response) {
         User user = userMapper.selectByUsername(request.getUsername());
         if (user == null) {
-            log.warn("Login failed: user not found, username={}", request.getUsername());
-            throw new AuthException(AuthErrorCode.INVALID_CREDENTIALS);
+            log.warn("登录失败: 用户不存在, username={}", request.getUsername());
+            throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            log.warn("Login failed: incorrect password, username={}", request.getUsername());
-            throw new AuthException(AuthErrorCode.INVALID_CREDENTIALS);
+            log.warn("登录失败: 密码错误, username={}", request.getUsername());
+            throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
         }
 
         if (user.getStatus() == null || user.getStatus() != 1) {
-            log.warn("Login failed: user disabled, username={}", request.getUsername());
-            throw new AuthException(AuthErrorCode.USER_DISABLED);
+            log.warn("登录失败: 用户被禁用, username={}", request.getUsername());
+            throw new BusinessException(ErrorCode.AUTH_USER_DISABLED);
         }
 
         String accessToken = jwtTokenUtil.generateAccessToken(user.getId(), user.getUsername(), user.getEmail());
@@ -77,7 +78,7 @@ public class AuthService {
         // 设置 HttpOnly Cookie
         setAuthCookies(response, accessToken, refreshToken);
 
-        log.info("Login successful: userId={}, username={}", user.getId(), user.getUsername());
+        log.info("登录成功: userId={}, username={}", user.getId(), user.getUsername());
 
         AuthDto.LoginResponse loginResponse = new AuthDto.LoginResponse();
         loginResponse.setUserId(user.getId());
@@ -94,24 +95,34 @@ public class AuthService {
      * 刷新 Access Token
      */
     public AuthDto.LoginResponse refreshToken(String refreshToken, HttpServletResponse response) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BusinessException(ErrorCode.AUTH_REFRESH_TOKEN_EXPIRED);
+        }
+
         try {
             if (!jwtTokenUtil.validateToken(refreshToken)) {
-                throw new AuthException(AuthErrorCode.TOKEN_EXPIRED);
+                throw new BusinessException(ErrorCode.AUTH_REFRESH_TOKEN_EXPIRED);
             }
 
-            String tokenType = jwtTokenUtil.getTokenType(refreshToken);
+            String tokenType;
+            try {
+                tokenType = jwtTokenUtil.getTokenType(refreshToken);
+            } catch (BusinessException e) {
+                throw new BusinessException(ErrorCode.AUTH_REFRESH_TOKEN_EXPIRED);
+            }
+
             if (!"refresh".equals(tokenType)) {
-                throw new AuthException(AuthErrorCode.TOKEN_TYPE_ERROR);
+                throw new BusinessException(ErrorCode.AUTH_TOKEN_TYPE_ERROR);
             }
 
             Long userId = jwtTokenUtil.getUserId(refreshToken);
             User user = userMapper.selectById(userId);
             if (user == null) {
-                throw new AuthException(AuthErrorCode.USER_NOT_FOUND);
+                throw new BusinessException(ErrorCode.AUTH_USER_NOT_FOUND, userId);
             }
 
             if (user.getStatus() == null || user.getStatus() != 1) {
-                throw new AuthException(AuthErrorCode.USER_DISABLED);
+                throw new BusinessException(ErrorCode.AUTH_USER_DISABLED);
             }
 
             String newAccessToken = jwtTokenUtil.generateAccessToken(user.getId(), user.getUsername(), user.getEmail());
@@ -128,7 +139,7 @@ public class AuthService {
             accessTokenCookie.setMaxAge(cookieMaxAge);
             response.addCookie(accessTokenCookie);
 
-            log.info("Token refreshed: userId={}, username={}", user.getId(), user.getUsername());
+            log.info("刷新令牌成功: userId={}, username={}", user.getId(), user.getUsername());
 
             AuthDto.LoginResponse loginResponse = new AuthDto.LoginResponse();
             loginResponse.setUserId(user.getId());
@@ -137,11 +148,11 @@ public class AuthService {
 
             return loginResponse;
 
-        } catch (AuthException e) {
+        } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("Token refresh failed: {}", e.getMessage());
-            throw new AuthException(AuthErrorCode.REFRESH_TOKEN_FAILED, e.getMessage());
+            log.error("刷新令牌失败: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.AUTH_REFRESH_TOKEN_FAILED, e.getMessage());
         }
     }
 
@@ -187,84 +198,99 @@ public class AuthService {
      * 验证 Token
      */
     public AuthDto.TokenResponse validateToken(AuthDto.TokenRequest request) {
-        try {
-            String token = request.getToken();
-            if (!jwtTokenUtil.validateToken(token)) {
-                return AuthDto.TokenResponse.failure("Token 无效或已过期");
-            }
+        String token = request.getToken();
+        Claims claims = jwtTokenUtil.parseToken(token);
 
-            String tokenType = jwtTokenUtil.getTokenType(token);
-            if (!"access".equals(tokenType)) {
-                return AuthDto.TokenResponse.failure("Token 类型错误");
-            }
-
-            Long userId = jwtTokenUtil.getUserId(token);
-            String username = jwtTokenUtil.getUsername(token);
-            String email = jwtTokenUtil.getEmail(token);
-
-            User user = userMapper.selectById(userId);
-            if (user == null) {
-                return AuthDto.TokenResponse.failure("用户不存在");
-            }
-
-            if (user.getStatus() == null || user.getStatus() != 1) {
-                return AuthDto.TokenResponse.failure("用户已被禁用");
-            }
-
-            return AuthDto.TokenResponse.success(userId, username, email);
-
-        } catch (Exception e) {
-            log.error("Token validation failed: {}", e.getMessage());
-            return AuthDto.TokenResponse.failure("Token 验证失败: " + e.getMessage());
+        String tokenType = claims.get("tokenType", String.class);
+        if (!"access".equals(tokenType)) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_TYPE_ERROR);
         }
+
+        Long userId = Long.parseLong(claims.getSubject());
+        String username = claims.get("username", String.class);
+        String email = claims.get("email", String.class);
+
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.AUTH_USER_NOT_FOUND, userId);
+        }
+
+        if (user.getStatus() == null || user.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.AUTH_USER_DISABLED);
+        }
+
+        return AuthDto.TokenResponse.success(userId, username, email);
     }
 
     /**
      * SSO Token 验证
      */
     public AuthDto.SsoValidateResponse validateSsoToken(AuthDto.SsoValidateRequest request) {
-        try {
-            String token = request.getToken();
-            if (!jwtTokenUtil.validateToken(token)) {
-                return AuthDto.SsoValidateResponse.failure("Token 无效或已过期");
-            }
+        String token = request.getToken();
+        Claims claims = jwtTokenUtil.parseToken(token);
 
-            String tokenType = jwtTokenUtil.getTokenType(token);
-            if (!"access".equals(tokenType)) {
-                return AuthDto.SsoValidateResponse.failure("Token 类型错误，需要 Access Token");
-            }
-
-            Long userId = jwtTokenUtil.getUserId(token);
-            String tokenSign = jwtTokenUtil.extractTokenSignature(token);
-
-            User user = userMapper.selectByIdAndTokenSign(userId, tokenSign);
-            if (user == null) {
-                return AuthDto.SsoValidateResponse.failure("Token 已被撤销或用户不存在");
-            }
-
-            if (user.getTokenExpireTime() != null && user.getTokenExpireTime().isBefore(LocalDateTime.now())) {
-                return AuthDto.SsoValidateResponse.failure("Token 已过期");
-            }
-
-            if (user.getStatus() == null || user.getStatus() != 1) {
-                return AuthDto.SsoValidateResponse.failure("用户已被禁用");
-            }
-
-            log.info("SSO validation successful: userId={}, username={}", user.getId(), user.getUsername());
-            return AuthDto.SsoValidateResponse.success(user.getId(), user.getUsername(), user.getEmail());
-
-        } catch (Exception e) {
-            log.error("SSO validation failed: {}", e.getMessage());
-            return AuthDto.SsoValidateResponse.failure("SSO 验证失败: " + e.getMessage());
+        String tokenType = claims.get("tokenType", String.class);
+        if (!"access".equals(tokenType)) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_TYPE_ERROR);
         }
+
+        Long userId = Long.parseLong(claims.getSubject());
+        String tokenSign = jwtTokenUtil.extractTokenSignature(token);
+
+        User user = userMapper.selectByIdAndTokenSign(userId, tokenSign);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_REVOKED);
+        }
+
+        if (user.getTokenExpireTime() != null && user.getTokenExpireTime().isBefore(LocalDateTime.now())) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_EXPIRED);
+        }
+
+        if (user.getStatus() == null || user.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.AUTH_USER_DISABLED);
+        }
+
+        log.info("SSO 校验成功: userId={}, username={}", user.getId(), user.getUsername());
+        return AuthDto.SsoValidateResponse.success(user.getId(), user.getUsername(), user.getEmail());
     }
 
     /**
      * 登出
      */
-    public void logout(Long userId) {
-        userMapper.clearTokenSign(userId);
-        log.info("User logged out: userId={}", userId);
+    public void logout(String accessToken, HttpServletResponse response) {
+        try {
+            if (accessToken != null && !accessToken.isBlank()) {
+                Long userId = jwtTokenUtil.getUserId(accessToken);
+                userMapper.clearTokenSign(userId);
+                log.info("用户退出登录: userId={}", userId);
+            }
+        } finally {
+            clearAuthCookies(response);
+        }
+    }
+
+    public AuthDto.TokenInfo getTokenInfo(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID);
+        }
+
+        Claims claims = jwtTokenUtil.parseToken(accessToken);
+
+        long expirationTime = claims.getExpiration().getTime();
+        long now = System.currentTimeMillis();
+        long remainingSeconds = Math.max(0, (expirationTime - now) / 1000);
+        if (remainingSeconds <= 0) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_EXPIRED);
+        }
+
+        return AuthDto.TokenInfo.builder()
+                .valid(true)
+                .remainingSeconds(remainingSeconds)
+                .expirationTime(expirationTime)
+                .issuedAt(claims.getIssuedAt().getTime())
+                .userId(Long.parseLong(claims.getSubject()))
+                .username(claims.get("username", String.class))
+                .build();
     }
 
     /**

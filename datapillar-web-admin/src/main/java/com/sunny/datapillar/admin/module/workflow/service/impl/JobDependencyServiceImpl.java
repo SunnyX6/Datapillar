@@ -16,8 +16,8 @@ import com.sunny.datapillar.admin.module.workflow.mapper.JobDependencyMapper;
 import com.sunny.datapillar.admin.module.workflow.mapper.JobInfoMapper;
 import com.sunny.datapillar.admin.module.workflow.mapper.JobWorkflowMapper;
 import com.sunny.datapillar.admin.module.workflow.service.JobDependencyService;
-import com.sunny.datapillar.admin.response.WebAdminErrorCode;
-import com.sunny.datapillar.admin.response.WebAdminException;
+import com.sunny.datapillar.common.error.ErrorCode;
+import com.sunny.datapillar.common.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,23 +52,23 @@ public class JobDependencyServiceImpl implements JobDependencyService {
         // 验证工作流
         JobWorkflow workflow = workflowMapper.selectById(workflowId);
         if (workflow == null) {
-            throw new WebAdminException(WebAdminErrorCode.WORKFLOW_NOT_FOUND, workflowId);
+            throw new BusinessException(ErrorCode.ADMIN_WORKFLOW_NOT_FOUND, workflowId);
         }
 
         // 验证任务
         JobInfo job = jobInfoMapper.selectById(dto.getJobId());
         if (job == null || !job.getWorkflowId().equals(workflowId)) {
-            throw new WebAdminException(WebAdminErrorCode.JOB_NOT_FOUND, dto.getJobId());
+            throw new BusinessException(ErrorCode.ADMIN_JOB_NOT_FOUND, dto.getJobId());
         }
 
         JobInfo parentJob = jobInfoMapper.selectById(dto.getParentJobId());
         if (parentJob == null || !parentJob.getWorkflowId().equals(workflowId)) {
-            throw new WebAdminException(WebAdminErrorCode.JOB_NOT_FOUND, dto.getParentJobId());
+            throw new BusinessException(ErrorCode.ADMIN_JOB_NOT_FOUND, dto.getParentJobId());
         }
 
         // 检查依赖是否已存在
         if (dependencyMapper.existsDependency(dto.getJobId(), dto.getParentJobId()) > 0) {
-            throw new WebAdminException(WebAdminErrorCode.DEPENDENCY_EXISTS);
+            throw new BusinessException(ErrorCode.ADMIN_DEPENDENCY_EXISTS);
         }
 
         // 验证添加后不会产生循环依赖
@@ -89,7 +89,7 @@ public class JobDependencyServiceImpl implements JobDependencyService {
     public void deleteDependency(Long jobId, Long parentJobId) {
         int deleted = dependencyMapper.deleteDependency(jobId, parentJobId);
         if (deleted == 0) {
-            throw new WebAdminException(WebAdminErrorCode.DEPENDENCY_NOT_FOUND);
+            throw new BusinessException(ErrorCode.ADMIN_DEPENDENCY_NOT_FOUND);
         }
         log.info("Deleted dependency: jobId={}, parentJobId={}", jobId, parentJobId);
     }
@@ -122,7 +122,7 @@ public class JobDependencyServiceImpl implements JobDependencyService {
         try {
             dagBuilder.validate();
         } catch (DagValidationException e) {
-            throw new WebAdminException(WebAdminErrorCode.DAG_HAS_CYCLE);
+            throw new BusinessException(ErrorCode.ADMIN_DAG_HAS_CYCLE);
         }
     }
 }

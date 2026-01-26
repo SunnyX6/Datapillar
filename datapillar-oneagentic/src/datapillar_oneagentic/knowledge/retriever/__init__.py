@@ -1,6 +1,4 @@
-"""
-知识检索
-"""
+"""Knowledge retrieval."""
 
 from datapillar_oneagentic.knowledge.retriever.retriever import KnowledgeRetriever
 

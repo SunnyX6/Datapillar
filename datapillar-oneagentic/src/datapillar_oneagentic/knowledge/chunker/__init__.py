@@ -1,6 +1,4 @@
-"""
-文档切分
-"""
+"""Document chunking."""
 
 from datapillar_oneagentic.knowledge.chunker.chunker import KnowledgeChunker
 from datapillar_oneagentic.knowledge.chunker.models import ChunkDraft, ChunkPreview

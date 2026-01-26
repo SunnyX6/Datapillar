@@ -35,7 +35,7 @@ def _stub_config() -> DatapillarConfig:
 
 
 @pytest.mark.asyncio
-async def test_stub_todo_flow(monkeypatch) -> None:
+async def test_stub_todo(monkeypatch) -> None:
     monkeypatch.setattr(
         LLMFactory,
         "create_chat_model",
@@ -58,7 +58,7 @@ async def test_stub_todo_flow(monkeypatch) -> None:
         SYSTEM_PROMPT = "todo_agent"
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output
@@ -79,7 +79,7 @@ async def test_stub_todo_flow(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_stub_todo_flow_complex_task(monkeypatch) -> None:
+async def test_stub_todo2(monkeypatch) -> None:
     monkeypatch.setattr(
         LLMFactory,
         "create_chat_model",
@@ -102,7 +102,7 @@ async def test_stub_todo_flow_complex_task(monkeypatch) -> None:
         SYSTEM_PROMPT = "todo_agent"
 
         async def run(self, ctx: AgentContext) -> TextOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
             messages = await ctx.invoke_tools(messages)
             output = await ctx.get_structured_output(messages)
             return output

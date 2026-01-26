@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
 from datapillar_oneagentic.core.agent import AgentSpec
@@ -12,6 +11,8 @@ from datapillar_oneagentic.core.status import FailureKind
 from datapillar_oneagentic.core.types import AgentResult
 from datapillar_oneagentic.context.timeline.recorder import TimelineRecorder
 from datapillar_oneagentic.events import EventBus
+from datapillar_oneagentic.messages import Message, Messages
+from datapillar_oneagentic.messages.adapters.langchain import to_langchain
 from datapillar_oneagentic.state import StateBuilder
 
 
@@ -33,7 +34,7 @@ class _DummyLLM:
 
 
 @pytest.mark.asyncio
-async def test_agent_context_invoke_tools_without_tools_should_not_pollute_messages() -> None:
+async def test_agent_context() -> None:
     spec = AgentSpec(id="demo_agent", name="DemoAgent", deliverable_schema=_OutputSchema)
     ctx = AgentContext(
         namespace="ns",
@@ -45,14 +46,14 @@ async def test_agent_context_invoke_tools_without_tools_should_not_pollute_messa
         _state={"messages": []},
     )
 
-    messages = [SystemMessage(content="sys"), HumanMessage(content="hi")]
+    messages = Messages([Message.system("sys"), Message.user("hi")])
     out = await ctx.invoke_tools(messages)
 
-    assert all(isinstance(m, BaseMessage) for m in out)
+    assert all(isinstance(m, Message) for m in out)
 
 
 @pytest.mark.asyncio
-async def test_checkpoint_manager_delete_should_work_with_sync_checkpointer() -> None:
+async def test_delete_work() -> None:
     from datapillar_oneagentic.context.checkpoint.manager import CheckpointManager
     from datapillar_oneagentic.core.types import SessionKey
 
@@ -71,7 +72,7 @@ async def test_checkpoint_manager_delete_should_work_with_sync_checkpointer() ->
 
 
 @pytest.mark.asyncio
-async def test_node_factory_should_fail_fast_on_failed_result() -> None:
+async def test_fail_fast() -> None:
     event_bus = EventBus()
     timeline_recorder = TimelineRecorder(event_bus)
     nf = NodeFactory(
@@ -88,7 +89,10 @@ async def test_node_factory_should_fail_fast_on_failed_result() -> None:
         "deliverable_keys": [],
     }
 
-    result = AgentResult.failed(error="需要补充信息", messages=[HumanMessage(content="补充内容")])
+    result = AgentResult.failed(
+        error="Need more information",
+        messages=Messages([Message.user("additional details")]),
+    )
     with pytest.raises(AgentError) as exc_info:
         await nf._handle_result(  # type: ignore[arg-type]
             state=state,
@@ -103,19 +107,17 @@ async def test_node_factory_should_fail_fast_on_failed_result() -> None:
     assert error.failure_kind == FailureKind.BUSINESS
 
 
-def test_state_builder_should_drop_system_messages() -> None:
+def test_state_builder() -> None:
     state = {
         "session_id": "s1",
-        "messages": [
-            SystemMessage(content="sys"),
-            HumanMessage(content="hi"),
-            AIMessage(content="ok"),
-        ],
+        "messages": to_langchain(
+            Messages([Message.system("sys"), Message.user("hi"), Message.assistant("ok")])
+        ),
     }
     sb = StateBuilder(state)
 
-    assert all(not isinstance(m, SystemMessage) for m in sb.memory.snapshot())
+    assert all(m.role != "system" for m in sb.memory.snapshot())
 
-    sb.memory.append([SystemMessage(content="sys2"), HumanMessage(content="hi2")])
+    sb.memory.append(Messages([Message.system("sys2"), Message.user("hi2")]))
 
-    assert all(not isinstance(m, SystemMessage) for m in sb.memory.snapshot())
+    assert all(m.role != "system" for m in sb.memory.snapshot())

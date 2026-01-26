@@ -1,15 +1,15 @@
 """
-LangGraph 节点工厂
+LangGraph node factory.
 
-职责：
-- 创建 Agent 节点函数（供 graphs/*.py 注册到图）
-- 执行 Agent 并处理结果
-- 存储 deliverable 到 Store
-- 通过 StateBuilder 统一写入 Blackboard（messages、timeline、routing 等）
+Responsibilities:
+- Create agent node functions (registered by graphs/*.py)
+- Execute agents and handle results
+- Persist deliverables to the store
+- Write to Blackboard via StateBuilder (messages, timeline, routing, etc.)
 
-不负责：
-- 路由决策（由 graphs/*.py 的条件边处理）
-- 执行模式判断（由具体的 graph 文件处理）
+Out of scope:
+- Routing decisions (handled by conditional edges in graphs/*.py)
+- Execution mode selection (handled by specific graph files)
 """
 
 from __future__ import annotations
@@ -37,10 +37,12 @@ from datapillar_oneagentic.todo.store import (
     apply_todo_plan,
     apply_todo_updates,
 )
-from datapillar_oneagentic.todo.tool import extract_todo_plan_ops, extract_todo_updates
+from datapillar_oneagentic.todo.tool import extract_todo_plan, extract_todo_updates
 from datapillar_oneagentic.exception import RecoveryAction
 from datapillar_oneagentic.tools.registry import tool as register_tool
 from datapillar_oneagentic.state import StateBuilder
+from datapillar_oneagentic.messages.adapters.langchain import to_langchain
+from datapillar_oneagentic.messages import Messages
 
 if TYPE_CHECKING:
     from datapillar_oneagentic.core.agent import AgentSpec
@@ -54,9 +56,9 @@ logger = logging.getLogger(__name__)
 
 class NodeFactory:
     """
-    节点工厂
+    Node factory.
 
-    创建 LangGraph 节点函数，封装 Agent 执行和结果处理逻辑。
+    Builds LangGraph node functions that wrap agent execution and result handling.
     """
 
     def __init__(
@@ -71,14 +73,14 @@ class NodeFactory:
         context_collector: ContextCollector | None = None,
     ):
         """
-        初始化节点工厂
+        Initialize the node factory.
 
         Args:
-            agent_specs: Agent 规格列表
-            agent_ids: Agent ID 列表
-            get_executor: 获取执行器的函数
-            knowledge_retriever: 知识检索器（可选）
-            experience_learner: 经验学习器（可选）
+            agent_specs: list of agent specs
+            agent_ids: list of agent IDs
+            get_executor: executor factory
+            knowledge_retriever: knowledge retriever (optional)
+            experience_learner: experience learner (optional)
         """
         self._agent_specs = agent_specs
         self._agent_ids = agent_ids
@@ -103,13 +105,16 @@ class NodeFactory:
             return []
         existing_names = {getattr(t, "name", "") for t in (spec.tools or [])}
         if "knowledge_retrieve" in existing_names:
-            logger.warning(f"工具名冲突：knowledge_retrieve 已存在，跳过注入: {spec.id}")
+            logger.warning(
+                "Tool name conflict: knowledge_retrieve already exists; skip injection: %s",
+                spec.id,
+            )
             return []
 
         class _KnowledgeRetrieveInput(BaseModel):
             query: str = Field(description="User query text")
 
-        # 这是框架内部注入的工具：显式声明 args_schema，避免 LangChain 对 docstring 的严格解析导致运行期报错。
+        # Internal injected tool: explicit args_schema avoids LangChain docstring parsing errors.
         @register_tool("knowledge_retrieve", args_schema=_KnowledgeRetrieveInput)
         async def knowledge_retrieve(query: str) -> str:
             """Retrieve knowledge and return content (call when needed)."""
@@ -137,7 +142,7 @@ class NodeFactory:
             try:
                 todo_list = SessionTodoList.model_validate(current_todo)
             except Exception as exc:
-                logger.warning(f"Todo 解析失败: {exc}")
+                logger.warning(f"Todo parse failed: {exc}")
                 return False
         else:
             todo_list = None
@@ -158,7 +163,7 @@ class NodeFactory:
         session_id: str,
         require_completed: bool = True,
     ) -> bool:
-        """写入 deliverable 到 Store，成功时返回是否写入"""
+        """Persist deliverable to the store and return success status."""
         if not result:
             return False
         if require_completed:
@@ -168,7 +173,7 @@ class NodeFactory:
         deliverable = getattr(result, "deliverable", None)
         if not deliverable:
             return False
-        if not store:
+        if store is None:
             return False
 
         deliverable_value = (
@@ -182,7 +187,7 @@ class NodeFactory:
         try:
             await store.aput(deliverable_namespace, agent_id, deliverable_value)
         except Exception as e:
-            logger.error(f"存储 deliverable 失败: {e}")
+            logger.error(f"Failed to persist deliverable: {e}")
             return False
 
         return True
@@ -193,7 +198,7 @@ class NodeFactory:
         todo_data: dict | None,
         updates: list,
     ) -> dict | None:
-        """应用 Todo 更新，返回更新后的快照"""
+        """Apply todo updates and return the updated snapshot."""
         if not todo_data or not updates:
             return None
 
@@ -203,7 +208,7 @@ class NodeFactory:
                 updates=updates,
             )
         except Exception as exc:
-            logger.warning(f"Todo 更新失败: {exc}")
+            logger.warning(f"Todo update failed: {exc}")
             return None
 
     async def _apply_todo_plan(
@@ -213,7 +218,7 @@ class NodeFactory:
         todo_data: dict | None,
         ops: list,
     ) -> dict | None:
-        """应用 Todo 规划操作，返回更新后的快照"""
+        """Apply todo planning operations and return the updated snapshot."""
         if not ops:
             return None
 
@@ -224,27 +229,27 @@ class NodeFactory:
                 ops=ops,
             )
         except Exception as exc:
-            logger.warning(f"Todo 规划失败: {exc}")
+            logger.warning(f"Todo plan failed: {exc}")
             return None
 
     def create_agent_node(self, agent_id: str):
         """
-        创建 Agent 节点
+        Create an agent node.
 
         Args:
-            agent_id: Agent ID
+            agent_id: agent ID
 
         Returns:
-            节点函数
+            Node function.
         """
         async def agent_node(state) -> Command:
-            # 获取 store（通过 get_store() 获取编译时传入的 store）
+            # Get store injected at compile time via get_store().
             store = get_store()
 
             sb = StateBuilder(state)
             query = sb.resolve_agent_query()
 
-            # 获取执行器
+            # Get executor.
             executor = self._get_executor(agent_id)
 
             spec = self._spec_by_id.get(agent_id)
@@ -263,31 +268,31 @@ class NodeFactory:
                     has_knowledge_tool=bool(knowledge_tools),
                 )
                 _apply_runtime_contexts(run_state, contexts)
-            # runtime state 仅用于本次执行，messages 使用 checkpoint 记忆（已清洗）
-            run_state["messages"] = sb.memory.snapshot()
+            # Runtime state is only for this run; messages are stored via checkpoint memory.
+            run_state["messages"] = to_langchain(sb.memory.snapshot())
 
-            # 执行（store 通过 get_store() 自动获取，无需传递）
+            # Execute (store is retrieved via get_store()).
             result = await executor.execute(
                 query=query,
                 state=run_state,
                 additional_tools=knowledge_tools,
             )
-            compression_context = _normalize_context_value(run_state.get("compression__context"))
+            compression_context = _normalize_context_value(run_state.get("compression_context"))
 
-            # 处理 Command（委派）
+            # Handle Command (delegation).
             if isinstance(result, Command):
-                # 检查委派目标是否在团队内
+                # Ensure the delegation target is within the team.
                 goto = result.goto
                 if goto and goto not in self._agent_ids:
                     logger.warning(
-                        f"Agent {agent_id} 试图委派给 {goto}，"
-                        f"但该 Agent 不在团队内，忽略委派"
+                        f"Agent {agent_id} attempted to delegate to {goto}, "
+                        "but the target is not in the team; delegation ignored"
                     )
                     sb.routing.clear_active()
                     return Command(update=sb.patch())
                 return result
 
-            # 处理 AgentResult
+            # Handle AgentResult.
             return await self._handle_result(
                 state=state,
                 agent_id=agent_id,
@@ -307,7 +312,7 @@ class NodeFactory:
         store: BaseStore,
         compression_context: str | None,
     ) -> Command:
-        """处理 Agent 结果"""
+        """Handle agent results."""
         sb = StateBuilder(state)
         namespace = sb.namespace
         session_id = sb.session_id
@@ -316,12 +321,12 @@ class NodeFactory:
             failure_kind = getattr(result, "failure_kind", None) or FailureKind.BUSINESS
             agent_error = AgentErrorClassifier.from_failure(
                 agent_id=agent_id,
-                error=getattr(result, "error", None) or "Agent 执行失败",
+                error=getattr(result, "error", None) or "Agent execution failed",
                 failure_kind=failure_kind,
             )
             raise agent_error
 
-        # 存储 Agent 交付物到 Store
+        # Persist agent deliverables to the store.
         deliverable_saved = await self._persist_deliverable(
             agent_id=agent_id,
             result=result,
@@ -336,10 +341,10 @@ class NodeFactory:
         if compression_context is not None:
             sb.compression.persist_compression(compression_context)
 
-        # Todo 变更与进度更新（基于工具上报或审计兜底）
+        # Todo updates and progress reporting (tool updates or audit fallback).
         current_todo = sb.todo.snapshot().todo
         if result and getattr(result, "messages", None):
-            plan_ops = extract_todo_plan_ops(result.messages)
+            plan_ops = extract_todo_plan(result.messages)
             if plan_ops:
                 planned_todo = await self._apply_todo_plan(
                     session_id=session_id,
@@ -364,7 +369,7 @@ class NodeFactory:
             ):
                 sb.todo.clear()
 
-        # 执行摘要
+        # Execution summary.
         sb.memory.append_execution_summary(
             agent_id=agent_id,
             execution_status=getattr(result, "status", None) if result else None,
@@ -373,7 +378,7 @@ class NodeFactory:
             deliverable_key=agent_id if deliverable_saved else None,
         )
 
-        # 更新 Agent 执行状态
+        # Update agent execution status.
         if result and hasattr(result, "status"):
             sb.routing.finish_agent(
                 status=result.status,
@@ -384,7 +389,7 @@ class NodeFactory:
             sb.routing.clear_active()
             sb.routing.clear_task()
 
-        # 刷新 Timeline 事件
+        # Flush timeline events.
         key = SessionKey(namespace=namespace, session_id=session_id)
         recorded_events = self._timeline_recorder.flush(key)
         if recorded_events:
@@ -392,24 +397,24 @@ class NodeFactory:
 
         return Command(update=sb.patch())
 
-    def create_mapreduce_worker_node(self, worker_ids: list[str]):
+    def create_mapreduce_worker(self, worker_ids: list[str]):
         """
-        创建 MapReduce Worker 节点
+        Create a MapReduce worker node.
 
         Args:
-            worker_ids: 允许执行任务的 Agent ID 列表（不含 reducer）
+            worker_ids: list of worker agent IDs (excluding reducer)
 
         Returns:
-            节点函数
+            Node function.
         """
 
         async def mapreduce_worker_node(state) -> Command:
-            """执行单个 Map 任务"""
+            """Execute a single Map task."""
             sb = StateBuilder(state)
             task_data = sb.mapreduce.snapshot().current_task
             if not task_data:
                 raise AgentError(
-                    "MapReduce Worker 未找到任务数据",
+                    "MapReduce worker did not find task data",
                     agent_id="mapreduce_worker",
                     category=AgentErrorCategory.PROTOCOL,
                     action=RecoveryAction.FAIL_FAST,
@@ -420,7 +425,7 @@ class NodeFactory:
                 task = MapReduceTask.model_validate(task_data)
             except Exception as exc:
                 raise AgentError(
-                    f"MapReduce Worker 任务解析失败: {exc}",
+                    f"MapReduce worker task parsing failed: {exc}",
                     agent_id="mapreduce_worker",
                     category=AgentErrorCategory.PROTOCOL,
                     action=RecoveryAction.FAIL_FAST,
@@ -430,7 +435,7 @@ class NodeFactory:
 
             if task.agent_id not in worker_ids:
                 raise AgentError(
-                    f"MapReduce Worker 任务指定了无效 Agent: {task.agent_id}",
+                    f"MapReduce worker task assigned invalid agent: {task.agent_id}",
                     agent_id=task.agent_id,
                     category=AgentErrorCategory.PROTOCOL,
                     action=RecoveryAction.FAIL_FAST,
@@ -455,7 +460,7 @@ class NodeFactory:
                     has_knowledge_tool=bool(knowledge_tools),
                 )
                 _apply_runtime_contexts(worker_state, contexts)
-            # MapReduce worker 不需要共享 messages
+            # MapReduce worker does not share messages.
             worker_state["messages"] = []
 
             result = await executor.execute(
@@ -463,11 +468,11 @@ class NodeFactory:
                 state=worker_state,
                 additional_tools=knowledge_tools,
             )
-            compression_context = _normalize_context_value(worker_state.get("compression__context"))
+            compression_context = _normalize_context_value(worker_state.get("compression_context"))
 
             if isinstance(result, Command):
                 raise AgentError(
-                    f"MapReduce Worker 不支持委派: {task.agent_id}",
+                    f"MapReduce worker does not support delegation: {task.agent_id}",
                     agent_id=task.agent_id,
                     category=AgentErrorCategory.PROTOCOL,
                     action=RecoveryAction.FAIL_FAST,
@@ -477,7 +482,7 @@ class NodeFactory:
                 failure_kind = getattr(result, "failure_kind", None) or FailureKind.BUSINESS
                 agent_error = AgentErrorClassifier.from_failure(
                     agent_id=task.agent_id,
-                    error=getattr(result, "error", None) or "MapReduce Worker 执行失败",
+                    error=getattr(result, "error", None) or "MapReduce worker execution failed",
                     failure_kind=failure_kind,
                 )
                 raise agent_error
@@ -512,7 +517,7 @@ class NodeFactory:
 
         return mapreduce_worker_node
 
-    def create_mapreduce_reducer_node(
+    def create_mapreduce_reducer(
         self,
         *,
         reducer_agent_id: str,
@@ -520,19 +525,19 @@ class NodeFactory:
         reducer_schema: Any,
     ):
         """
-        创建 MapReduce Reducer 节点
+        Create a MapReduce reducer node.
 
         Args:
-            reducer_agent_id: Reducer 的 Agent ID（最后一个 Agent）
-            reducer_llm: Reducer 使用的 LLM 实例
-            reducer_schema: Reducer 输出 Schema
+            reducer_agent_id: reducer agent ID (last agent)
+            reducer_llm: LLM instance for reducer
+            reducer_schema: reducer output schema
 
         Returns:
-            节点函数
+            Node function.
         """
 
         async def mapreduce_reducer_node(state) -> Command:
-            """汇总 Map 结果并产出最终交付物"""
+            """Aggregate Map results and produce final deliverable."""
             sb = StateBuilder(state)
             namespace = sb.namespace
             session_id = sb.session_id
@@ -569,7 +574,7 @@ class NodeFactory:
             reducer_result = AgentResult.completed(
                 deliverable=deliverable,
                 deliverable_type=reducer_agent_id,
-                messages=[],
+                messages=Messages(),
             )
 
             deliverable_saved = await self._persist_deliverable(
@@ -611,7 +616,7 @@ class NodeFactory:
 
 def _apply_runtime_contexts(state: dict, contexts: dict[str, str]) -> None:
     for key in list(state.keys()):
-        if key.endswith("__context"):
+        if key.endswith("_context"):
             state.pop(key, None)
     state.pop("knowledge_context", None)
     state.pop("experience_context", None)

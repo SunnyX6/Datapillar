@@ -4,17 +4,16 @@
  * 封装认证相关的 API 调用
  */
 
-import axios from 'axios'
-import type { WebAdminResponse } from '@/types/webAdmin'
+import { createApiClient } from '@/lib/api/client'
+import type { ApiResponse } from '@/types/api'
 import type { LoginRequest, LoginResponse } from '@/types/auth'
 
 /**
  * Auth API 客户端
  */
-const authClient = axios.create({
+const authClient = createApiClient({
   baseURL: '/api/auth',
-  timeout: 30000,
-  headers: { 'Content-Type': 'application/json' }
+  timeout: 30000
 })
 
 /**
@@ -38,12 +37,7 @@ function extractErrorMessage(error: unknown): string {
  */
 export async function login(request: LoginRequest): Promise<LoginResponse> {
   try {
-    const response = await authClient.post<WebAdminResponse<LoginResponse>>('/login', request)
-
-    if (response.data.code !== 'OK') {
-      throw new Error(response.data.message || '登录失败')
-    }
-
+    const response = await authClient.post<ApiResponse<LoginResponse>>('/login', request)
     return response.data.data
   } catch (error) {
     throw new Error(extractErrorMessage(error))
@@ -55,7 +49,7 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
  */
 export async function logout(): Promise<void> {
   try {
-    await authClient.post<WebAdminResponse<void>>('/logout')
+    await authClient.post<ApiResponse<void>>('/logout')
   } catch (error) {
     console.error('登出失败:', error)
   }

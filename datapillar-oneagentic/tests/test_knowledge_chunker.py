@@ -23,7 +23,7 @@ def _parsed(text: str) -> ParsedDocument:
     )
 
 
-def test_chunker_general_with_delimiter() -> None:
+def test_chunker_general() -> None:
     config = KnowledgeChunkConfig(
         mode="general",
         general={"max_tokens": 8, "overlap": 0, "delimiter": "|"},
@@ -34,7 +34,7 @@ def test_chunker_general_with_delimiter() -> None:
     assert [chunk.content for chunk in preview.chunks] == ["hello", "world", "again"]
 
 
-def test_chunker_parent_child_creates_links() -> None:
+def test_chunker_parent() -> None:
     config = KnowledgeChunkConfig(
         mode="parent_child",
         parent_child={
@@ -54,7 +54,7 @@ def test_chunker_parent_child_creates_links() -> None:
     assert all(child.parent_id in parent_ids for child in children)
 
 
-def test_chunker_qa_mode_extracts_pairs() -> None:
+def test_chunker_qa() -> None:
     config = KnowledgeChunkConfig(mode="qa")
     chunker = KnowledgeChunker(config=config)
     preview = chunker.preview(_parsed("Q1: What?\nA1: Answer.\nQ2: Why?\nA2: Because."))
@@ -63,7 +63,7 @@ def test_chunker_qa_mode_extracts_pairs() -> None:
     assert preview.chunks[0].content.startswith("Q: ")
 
 
-def test_chunker_qa_mode_fallbacks_to_general() -> None:
+def test_chunker_qa2() -> None:
     config = KnowledgeChunkConfig(mode="qa")
     chunker = KnowledgeChunker(config=config)
     preview = chunker.preview(_parsed("No QA here"))
@@ -71,7 +71,7 @@ def test_chunker_qa_mode_fallbacks_to_general() -> None:
     assert preview.chunks
 
 
-def test_chunker_applies_preprocess_rules() -> None:
+def test_chunker_applies() -> None:
     config = KnowledgeChunkConfig(
         mode="general",
         preprocess=["normalize_newlines", "collapse_whitespace", "remove_control", "strip"],
@@ -83,7 +83,7 @@ def test_chunker_applies_preprocess_rules() -> None:
     assert preview.chunks[0].content == "a\nb c"
 
 
-def test_chunker_invalid_rule_raises() -> None:
+def test_chunker_rule() -> None:
     config = KnowledgeChunkConfig(
         mode="general",
         preprocess=["unknown_rule"],
@@ -95,7 +95,7 @@ def test_chunker_invalid_rule_raises() -> None:
         chunker.preview(_parsed("text"))
 
 
-def test_ingestor_preview_returns_attachments() -> None:
+def test_ingestor_preview() -> None:
     attachment = Attachment(
         attachment_id="att1",
         name="att1.png",
@@ -138,7 +138,7 @@ def test_ingestor_preview_returns_attachments() -> None:
         async def delete_doc(self, doc_id: str) -> int:
             return 0
 
-        async def delete_chunks_by_doc_id(self, doc_id: str) -> int:
+        async def delete_doc_chunks(self, doc_id: str) -> int:
             return 0
 
     ingestor = KnowledgeIngestor(

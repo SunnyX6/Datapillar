@@ -1,12 +1,12 @@
 """
-Experience 模块 - 经验学习系统
+Experience module - learning system.
 
-职责：
-1. 自动记录执行过程
-2. 使用者调用 save_experience 保存（包含 feedback）
-3. 检索相似经验，自动拼接上下文
+Responsibilities:
+1. Automatically record executions
+2. Persist via save_experience (includes feedback)
+3. Retrieve similar experiences and compose context
 
-使用示例：
+Example:
 ```python
 from datapillar_oneagentic import Datapillar, DatapillarConfig
 
@@ -21,33 +21,33 @@ team = Datapillar(
     enable_learning=True,
 )
 
-# 执行任务（框架自动记录）
-async for event in team.stream(query="分析销售数据", session_id="s001"):
+# Execute tasks (framework records automatically)
+async for event in team.stream(query="Analyze sales data", session_id="s001"):
     ...
 
-# 保存经验（包含用户反馈）
+# Save experience (with user feedback)
 await team.save_experience(
     session_id="s001",
-    feedback={"stars": 5, "comment": "很好用"},
+    feedback={"stars": 5, "comment": "Very helpful"},
 )
 
-# 不调用 save_experience = 不保存
+# No save_experience call = no persistence
 ```
 
-数据模型：
+Data model:
 ```python
 ExperienceRecord:
-    id: str               # 记录 ID
-    namespace: str        # 命名空间（隔离不同团队）
-    session_id: str       # 会话 ID
-    goal: str             # 用户目标
-    outcome: str          # 执行结果
-    result_summary: str   # 结果摘要
-    tools_used: list      # 使用的工具
-    agents_involved: list # 参与的 Agent
-    duration_ms: int      # 执行时长
-    feedback: dict        # 用户反馈
-    created_at: int       # 创建时间
+    id: str               # Record ID
+    namespace: str        # Namespace (team isolation)
+    session_id: str       # Session ID
+    goal: str             # User goal
+    outcome: str          # Outcome
+    result_summary: str   # Result summary
+    tools_used: list      # Tools used
+    agents_involved: list # Agents involved
+    duration_ms: int      # Duration
+    feedback: dict        # User feedback
+    created_at: int       # Created time
 ```
 """
 
@@ -60,10 +60,10 @@ from datapillar_oneagentic.experience.retriever import (
 )
 
 __all__ = [
-    # 数据结构
+    # Data structures
     "ExperienceRecord",
-    # 学习器
+    # Learner
     "ExperienceLearner",
-    # 检索器
+    # Retriever
     "ExperienceRetriever",
 ]

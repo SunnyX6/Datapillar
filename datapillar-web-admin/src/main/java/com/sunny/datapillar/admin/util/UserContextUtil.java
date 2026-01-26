@@ -1,5 +1,6 @@
 package com.sunny.datapillar.admin.util;
 
+import com.sunny.datapillar.common.constant.HeaderConstants;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -10,14 +11,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * 从 Gateway 注入的请求头中提取用户信息
  */
 public final class UserContextUtil {
-
-    /**
-     * Gateway 注入的请求头常量
-     */
-    public static final String HEADER_USER_ID = "X-User-Id";
-    public static final String HEADER_USERNAME = "X-Username";
-    public static final String HEADER_EMAIL = "X-User-Email";
-    public static final String HEADER_TRACE_ID = "X-Trace-Id";
 
     private UserContextUtil() {
     }
@@ -41,7 +34,7 @@ public final class UserContextUtil {
         if (request == null) {
             return null;
         }
-        String userId = request.getHeader(HEADER_USER_ID);
+        String userId = request.getHeader(HeaderConstants.HEADER_USER_ID);
         if (userId == null || userId.isEmpty()) {
             return null;
         }
@@ -71,7 +64,7 @@ public final class UserContextUtil {
         if (request == null) {
             return null;
         }
-        return request.getHeader(HEADER_USERNAME);
+        return request.getHeader(HeaderConstants.HEADER_USERNAME);
     }
 
     /**
@@ -82,7 +75,7 @@ public final class UserContextUtil {
         if (request == null) {
             return null;
         }
-        String email = request.getHeader(HEADER_EMAIL);
+        String email = request.getHeader(HeaderConstants.HEADER_EMAIL);
         return (email == null || email.isEmpty()) ? null : email;
     }
 
@@ -94,7 +87,7 @@ public final class UserContextUtil {
         if (request == null) {
             return null;
         }
-        return request.getHeader(HEADER_TRACE_ID);
+        return request.getHeader(HeaderConstants.HEADER_TRACE_ID);
     }
 
     /**

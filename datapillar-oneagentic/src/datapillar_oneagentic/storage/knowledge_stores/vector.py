@@ -1,6 +1,4 @@
-"""
-VectorKnowledgeStore 实现
-"""
+"""VectorKnowledgeStore implementation."""
 
 from __future__ import annotations
 
@@ -34,7 +32,7 @@ _KEY_SEPARATOR = "::"
 
 
 class VectorKnowledgeStore(KnowledgeStore):
-    """基于 VectorStore 的知识存储"""
+    """Knowledge storage backed by VectorStore."""
 
     def __init__(self, *, vector_store: VectorStore, dimension: int, namespace: str) -> None:
         self._vector_store = vector_store
@@ -125,7 +123,7 @@ class VectorKnowledgeStore(KnowledgeStore):
         await self._vector_store.ensure_collection(self._vector_store.get_schema(_CHUNKS))
 
     async def close(self) -> None:
-        # 由上层统一管理 vector_store 生命周期
+        # vector_store lifecycle is managed by the caller.
         return None
 
     async def upsert_sources(self, sources: list[KnowledgeSource]) -> None:
@@ -270,7 +268,7 @@ class VectorKnowledgeStore(KnowledgeStore):
         key = self._build_key(doc_id)
         return await self._vector_store.delete(_DOCS, [key])
 
-    async def delete_chunks_by_doc_id(self, doc_id: str) -> int:
+    async def delete_doc_chunks(self, doc_id: str) -> int:
         rows = await self._vector_store.query(
             _CHUNKS,
             filters={"namespace": self._namespace, "doc_id": doc_id},

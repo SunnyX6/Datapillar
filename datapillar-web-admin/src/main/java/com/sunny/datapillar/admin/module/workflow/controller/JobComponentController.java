@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.sunny.datapillar.admin.module.workflow.dto.JobComponentDto;
 import com.sunny.datapillar.admin.module.workflow.service.JobComponentService;
-import com.sunny.datapillar.admin.response.WebAdminResponse;
+import com.sunny.datapillar.admin.web.response.ApiResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,22 +31,22 @@ public class JobComponentController {
 
     @Operation(summary = "获取所有可用组件")
     @GetMapping
-    public WebAdminResponse<List<JobComponentDto.Response>> list() {
+    public ApiResponse<List<JobComponentDto.Response>> list() {
         List<JobComponentDto.Response> result = componentService.getAllComponents();
-        return WebAdminResponse.ok(result);
+        return ApiResponse.ok(result);
     }
 
     @Operation(summary = "根据 code 获取组件信息")
     @GetMapping("/code/{code}")
-    public WebAdminResponse<JobComponentDto.Response> getByCode(@PathVariable String code) {
+    public ApiResponse<JobComponentDto.Response> getByCode(@PathVariable String code) {
         JobComponentDto.Response result = componentService.getComponentByCode(code);
-        return WebAdminResponse.ok(result);
+        return ApiResponse.ok(result);
     }
 
     @Operation(summary = "根据类型获取组件列表")
     @GetMapping("/type/{type}")
-    public WebAdminResponse<List<JobComponentDto.Response>> getByType(@PathVariable String type) {
+    public ApiResponse<List<JobComponentDto.Response>> getByType(@PathVariable String type) {
         List<JobComponentDto.Response> result = componentService.getComponentsByType(type);
-        return WebAdminResponse.ok(result);
+        return ApiResponse.ok(result);
     }
 }

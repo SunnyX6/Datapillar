@@ -19,8 +19,6 @@ dependencies = [
     # Redis（Checkpoint & Memory）
     "redis>=5.2.1",
     "datapillar-oneagentic[glm,openai,redis,sse]>=0.1.0",
-    # LangChain - 核心消息结构（业务侧直接使用）
-    "langchain-core>=1.0.5",
     # 二进制序列化
     "msgpack>=1.0.8",
     # 工具库

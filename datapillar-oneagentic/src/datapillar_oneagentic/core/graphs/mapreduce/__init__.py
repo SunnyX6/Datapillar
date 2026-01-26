@@ -1,10 +1,10 @@
 """
-MapReduce 模式模块
+MapReduce mode module.
 
-对外暴露：
+Public API:
 - create_mapreduce_plan
 - reduce_map_results
-- Schema 定义
+- Schema definitions
 """
 
 from datapillar_oneagentic.core.graphs.mapreduce.planner import create_mapreduce_plan

@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom'
 import { Plus, FileCode, X, MoreVertical, ArrowRight, Fingerprint } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { menuWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 
 export interface EditorTab {
@@ -222,17 +223,21 @@ export function BaseEditor({
         )}
 
         {/* 3. EDITOR & RESULTS CONTAINER */}
-        <div className="flex-1 flex flex-col min-h-0 relative">
+        <div className="flex-1 min-h-0 relative">
           {/* 编辑器主内容区 */}
           <div
             onContextMenu={handleContextMenu}
-            className="flex-1 relative overflow-hidden"
+            className="absolute inset-0 overflow-hidden"
           >
             {children}
           </div>
 
-          {/* 4. 底部面板 */}
-          {bottomPanel}
+          {/* 4. 底部面板（覆盖在编辑器上方，避免触发布局抖动） */}
+          {bottomPanel && (
+            <div className="absolute inset-x-0 bottom-0 z-30">
+              {bottomPanel}
+            </div>
+          )}
         </div>
       </div>
 
@@ -248,7 +253,10 @@ export function BaseEditor({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98 }}
             style={{ top: contextMenu.y, left: contextMenu.x }}
-            className="fixed z-[100000] w-56 bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-[0_24px_50px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_24px_50px_-12px_rgba(0,0,0,0.4)] p-1.5"
+            className={cn(
+              menuWidthClassMap.xxlarge,
+              'fixed z-[100000] bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-[0_24px_50px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_24px_50px_-12px_rgba(0,0,0,0.4)] p-1.5'
+            )}
           >
             {contextMenuGroups.map((group, groupIndex) => (
               <div key={group.id}>

@@ -1,7 +1,7 @@
 [project]
 name = "datapillar-oneagentic"
 version = "0.1.0"
-description = "声明式多智能体协作框架 - Declarative Multi-Agent Collaboration Framework"
+description = "Declarative multi-agent collaboration framework"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.11,<3.13"
@@ -20,28 +20,29 @@ classifiers = [
 keywords = ["agents", "llm", "multi-agent", "ai", "langchain", "langgraph", "crew", "agentic"]
 
 dependencies = [
-    # LangGraph 核心（Agent 编排）
+    # LangGraph core (agent orchestration)
     "langgraph>=1.0.3",
     "langgraph-checkpoint>=2.0.4",
-    # LangChain 核心（消息、工具接口）
+    # LangChain core (messages, tool interfaces)
     "langchain-core>=1.0.5",
     "langchain-text-splitters>=1.1.0",
-    # 数据校验
+    # Data validation
     "pydantic>=2.6.0",
-    # HTTP 客户端（A2A 协议）
+    # HTTP client (A2A protocol)
     "httpx>=0.26.0",
-    # JSON 修复（处理 LLM 畸形输出）
+    # JSON repair (handle malformed LLM output)
     "json-repair>=0.30.0",
     "pydantic-settings>=2.12.0",
+    "python-json-logger>=2.0.7",
 ]
 
 [project.optional-dependencies]
-# LLM 提供者
+# LLM providers
 openai = ["langchain-openai>=0.2.0", "openai>=1.0.0"]
 anthropic = ["langchain-anthropic>=0.2.0", "anthropic>=0.39.0"]
 glm = ["langchain-community>=0.4.1", "zhipuai>=2.1.5.20250825"]
 
-# 知识 RAG（解析/切分/重排）
+# Knowledge RAG (parse/chunk/rerank)
 knowledge = [
     "pypdfium2>=4.0.0",
     "python-docx>=1.0.0",
@@ -53,39 +54,39 @@ knowledge = [
     "sentence-transformers>=2.2.0",
 ]
 
-# 存储提供者
+# Storage providers
 redis = ["langgraph-checkpoint-redis>=0.2.1", "redis>=5.2.1"]
 postgres = ["langgraph-checkpoint-postgres>=0.2.0", "psycopg[binary]>=3.0.0"]
 sqlite = ["langgraph-checkpoint-sqlite>=0.2.0"]
 
-# 向量数据库（经验学习）
+# Vector database (experience learning)
 lance = ["lancedb>=0.20.0", "pyarrow>=18.0.0"]
 chroma = ["chromadb>=1.0.0"]
 milvus = ["pymilvus>=2.5.0"]
 vectordb = ["datapillar-oneagentic[lance,chroma,milvus]"]
 
-# MCP 协议支持
+# MCP protocol support
 mcp = ["mcp>=0.1.0"]
 
-# A2A 协议支持（Google Agent2Agent）
+# A2A protocol support (Google Agent2Agent)
 a2a = ["a2a-sdk>=0.2.0"]
 
-# 遥测（可观测性）
+# Telemetry (observability)
 telemetry = [
     "opentelemetry-api>=1.39.1",
     "opentelemetry-sdk>=1.39.1",
     "opentelemetry-exporter-otlp-proto-http>=1.39.1",
 ]
 
-# SSE 支持（用于 Web 服务）
+# SSE support (web service)
 sse = ["sse-starlette>=1.6.5"]
 
-# 全部依赖
+# Full dependencies
 all = [
     "datapillar-oneagentic[openai,anthropic,glm,knowledge,redis,postgres,sqlite,lance,chroma,milvus,mcp,a2a,telemetry,sse]"
 ]
 
-# 开发依赖
+# Development dependencies
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.23.0",
@@ -125,23 +126,23 @@ exclude = [
 [tool.ruff.lint]
 select = [
     "F",      # Pyflakes
-    "E7",     # pycodestyle 语法
-    "E9",     # pycodestyle 语法
+    "E7",     # pycodestyle syntax
+    "E9",     # pycodestyle syntax
     "B",      # flake8-bugbear
     "UP",     # pyupgrade
     "I",      # isort
     "SIM",    # flake8-simplify
     "C4",     # flake8-comprehensions
-    "N801",   # 类名 CamelCase
-    "N802",   # 函数名 snake_case
-    "N803",   # 参数名 snake_case
-    "C90",    # McCabe 复杂度
+    "N801",   # class name CamelCase
+    "N802",   # function name snake_case
+    "N803",   # argument name snake_case
+    "C90",    # McCabe complexity
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["F401"]
 "**/tests/**" = ["S"]
-"**/core/nodes.py" = ["C901"]  # 并行层节点函数复杂度略超（16 vs 15），暂时豁免
+"**/core/nodes.py" = ["C901"]  # Parallel node function complexity slightly over limit (16 vs 15).
 
 [tool.ruff.lint.isort]
 known-first-party = ["datapillar_oneagentic"]

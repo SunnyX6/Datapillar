@@ -9,6 +9,7 @@
 
 import type { LucideIcon } from 'lucide-react'
 import { FileSpreadsheet, FileText, PlusSquare, UploadCloud, X } from 'lucide-react'
+import { menuWidthClassMap } from '@/design-tokens/dimensions'
 
 type KnowledgeItem = {
   id: string
@@ -35,7 +36,7 @@ export function KnowledgeImportMenu({ open, onClose, isDark }: KnowledgeImportMe
     <div
       className={`absolute bottom-full left-4 mb-4 ${
         isDark ? 'bg-slate-900/90 border-white/10' : 'bg-white/95 border-slate-200'
-      } backdrop-blur-xl border rounded-xl shadow-2xl overflow-hidden transition-all duration-300 origin-bottom-left w-72 ${
+      } backdrop-blur-xl border rounded-xl shadow-2xl overflow-hidden transition-all duration-300 origin-bottom-left ${menuWidthClassMap.wide} ${
         open ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4 pointer-events-none'
       }`}
     >

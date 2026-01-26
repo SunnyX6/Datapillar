@@ -1,6 +1,4 @@
-"""
-知识评估数据结构
-"""
+"""Knowledge evaluation data structures."""
 
 from __future__ import annotations
 
@@ -10,62 +8,64 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class EvalDocument(BaseModel):
-    """评估文档定义"""
+    """Evaluation document definition."""
 
-    doc_id: str = Field(..., min_length=1, description="文档 ID")
-    text: str = Field(..., min_length=1, description="原文内容")
-    title: str | None = Field(default=None, description="文档标题")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="扩展元数据")
+    doc_id: str = Field(..., min_length=1, description="Document ID")
+    text: str = Field(..., min_length=1, description="Original text content")
+    title: str | None = Field(default=None, description="Document title")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Extra metadata")
 
 
 class EvalQuery(BaseModel):
-    """评估查询定义"""
+    """Evaluation query definition."""
 
-    query_id: str = Field(..., min_length=1, description="查询 ID")
-    query: str = Field(..., min_length=1, description="查询文本")
-    expected_doc_ids: list[str] = Field(default_factory=list, description="期望命中文档 ID")
-    expected_chunk_ids: list[str] = Field(default_factory=list, description="期望命中分片 ID")
-    relevance_doc: dict[str, int] = Field(default_factory=dict, description="文档级相关度标注")
-    relevance_chunk: dict[str, int] = Field(default_factory=dict, description="分片级相关度标注")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="扩展元数据")
+    query_id: str = Field(..., min_length=1, description="Query ID")
+    query: str = Field(..., min_length=1, description="Query text")
+    expected_doc_ids: list[str] = Field(default_factory=list, description="Expected document IDs")
+    expected_chunk_ids: list[str] = Field(default_factory=list, description="Expected chunk IDs")
+    relevance_doc: dict[str, int] = Field(default_factory=dict, description="Document-level relevance")
+    relevance_chunk: dict[str, int] = Field(default_factory=dict, description="Chunk-level relevance")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Extra metadata")
 
 
 class EvalSet(BaseModel):
-    """评估集定义"""
+    """Evaluation set definition."""
 
-    evalset_id: str = Field(..., min_length=1, description="评估集 ID")
-    documents: list[EvalDocument] = Field(default_factory=list, description="评估文档列表")
-    queries: list[EvalQuery] = Field(default_factory=list, description="评估查询列表")
-    k_values: list[int] = Field(default_factory=lambda: [1, 3, 5, 10], description="评估 K 值")
+    evalset_id: str = Field(..., min_length=1, description="Eval set ID")
+    documents: list[EvalDocument] = Field(default_factory=list, description="Documents")
+    queries: list[EvalQuery] = Field(default_factory=list, description="Queries")
+    k_values: list[int] = Field(default_factory=lambda: [1, 3, 5, 10], description="K values")
 
     @model_validator(mode="after")
     def _validate_evalset(self) -> "EvalSet":
         doc_ids = [doc.doc_id for doc in self.documents]
         if len(doc_ids) != len(set(doc_ids)):
-            raise ValueError("评估集文档 doc_id 必须唯一")
+            raise ValueError("Eval set doc_id must be unique")
 
         query_ids = [query.query_id for query in self.queries]
         if len(query_ids) != len(set(query_ids)):
-            raise ValueError("评估集查询 query_id 必须唯一")
+            raise ValueError("Eval set query_id must be unique")
 
         for k in self.k_values:
             if k <= 0:
-                raise ValueError("k_values 必须为正整数")
+                raise ValueError("k_values must be positive integers")
 
         doc_id_set = set(doc_ids)
         for query in self.queries:
             unknown = set(query.expected_doc_ids) - doc_id_set
             if unknown:
-                raise ValueError(f"查询 {query.query_id} 引用了未知文档: {sorted(unknown)}")
+                raise ValueError(f"Query {query.query_id} references unknown docs: {sorted(unknown)}")
             unknown_relevance = set(query.relevance_doc.keys()) - doc_id_set
             if unknown_relevance:
-                raise ValueError(f"查询 {query.query_id} relevance_doc 引用了未知文档: {sorted(unknown_relevance)}")
+                raise ValueError(
+                    f"Query {query.query_id} relevance_doc references unknown docs: {sorted(unknown_relevance)}"
+                )
 
         return self
 
 
 class LengthStats(BaseModel):
-    """长度统计"""
+    """Length statistics."""
 
     count: int
     min: int
@@ -75,7 +75,7 @@ class LengthStats(BaseModel):
 
 
 class ChunkingDocReport(BaseModel):
-    """单文档切分报告"""
+    """Per-document chunking report."""
 
     doc_id: str
     source_id: str
@@ -87,7 +87,7 @@ class ChunkingDocReport(BaseModel):
 
 
 class ChunkingSummaryReport(BaseModel):
-    """切分汇总报告"""
+    """Chunking summary report."""
 
     documents: int
     avg_chunk_count: float
@@ -98,28 +98,28 @@ class ChunkingSummaryReport(BaseModel):
 
 
 class ChunkingReport(BaseModel):
-    """切分评估报告"""
+    """Chunking evaluation report."""
 
     summary: ChunkingSummaryReport
     documents: list[ChunkingDocReport]
 
 
 class RetrievalQueryReport(BaseModel):
-    """单查询检索报告"""
+    """Per-query retrieval report."""
 
     query_id: str
     metrics: dict[str, float]
 
 
 class RetrievalSummaryReport(BaseModel):
-    """检索汇总报告"""
+    """Retrieval summary report."""
 
     total_queries: int
     metrics: dict[str, float]
 
 
 class RetrievalReport(BaseModel):
-    """检索评估报告"""
+    """Retrieval evaluation report."""
 
     target: str = Field(..., description="doc | chunk")
     summary: RetrievalSummaryReport
@@ -127,7 +127,7 @@ class RetrievalReport(BaseModel):
 
 
 class EvaluationReport(BaseModel):
-    """完整评估报告"""
+    """Full evaluation report."""
 
     evalset_id: str
     chunking: ChunkingReport

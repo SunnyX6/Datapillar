@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.sunny.datapillar.admin.module.workflow.dto.JobDependencyDto;
 import com.sunny.datapillar.admin.module.workflow.service.JobDependencyService;
-import com.sunny.datapillar.admin.response.WebAdminResponse;
+import com.sunny.datapillar.admin.web.response.ApiResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,34 +35,34 @@ public class JobDependencyController {
 
     @Operation(summary = "获取工作流下的所有依赖")
     @GetMapping
-    public WebAdminResponse<List<JobDependencyDto.Response>> list(
+    public ApiResponse<List<JobDependencyDto.Response>> list(
             @PathVariable Long userId,
             @PathVariable Long projectId,
             @PathVariable Long workflowId) {
         List<JobDependencyDto.Response> result = dependencyService.getDependenciesByWorkflowId(workflowId);
-        return WebAdminResponse.ok(result);
+        return ApiResponse.ok(result);
     }
 
     @Operation(summary = "创建依赖关系")
     @PostMapping
-    public WebAdminResponse<Long> create(
+    public ApiResponse<Long> create(
             @PathVariable Long userId,
             @PathVariable Long projectId,
             @PathVariable Long workflowId,
             @Valid @RequestBody JobDependencyDto.Create dto) {
         Long id = dependencyService.createDependency(workflowId, dto);
-        return WebAdminResponse.ok(id);
+        return ApiResponse.ok(id);
     }
 
     @Operation(summary = "删除依赖关系")
     @DeleteMapping
-    public WebAdminResponse<Void> delete(
+    public ApiResponse<Void> delete(
             @PathVariable Long userId,
             @PathVariable Long projectId,
             @PathVariable Long workflowId,
             @RequestParam Long jobId,
             @RequestParam Long parentJobId) {
         dependencyService.deleteDependency(jobId, parentJobId);
-        return WebAdminResponse.ok(null);
+        return ApiResponse.ok(null);
     }
 }

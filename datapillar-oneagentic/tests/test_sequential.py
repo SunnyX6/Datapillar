@@ -17,7 +17,7 @@ class _Spec:
 
 
 @pytest.mark.asyncio
-async def test_sequential_should_stop_when_failed() -> None:
+async def test_stop_failed() -> None:
     executed: list[str] = []
 
     async def node_failed(state):
@@ -26,14 +26,14 @@ async def test_sequential_should_stop_when_failed() -> None:
         sb.routing.finish_agent(status=ExecutionStatus.FAILED, failure_kind=None, error=None)
         return Command(update=sb.patch())
 
-    async def node_should_not_run(state):
+    async def run_node(state):
         executed.append("a2")
         sb = StateBuilder(state)
         sb.routing.clear_active()
         return Command(update=sb.patch())
 
     specs = [_Spec(id="a1"), _Spec(id="a2")]
-    nodes = {"a1": node_failed, "a2": node_should_not_run}
+    nodes = {"a1": node_failed, "a2": run_node}
 
     graph = build_sequential_graph(
         agent_specs=specs,

@@ -22,7 +22,7 @@ def _reset_security_config() -> None:
 
 
 @pytest.fixture(autouse=True)
-def _stub_a2a_client_module() -> None:
+def _stub_a2a() -> None:
     a2a_module = types.ModuleType("a2a")
     client_module = types.ModuleType("a2a.client")
     client_module.ClientFactory = object()
@@ -34,7 +34,7 @@ def _stub_a2a_client_module() -> None:
 
 
 @pytest.mark.asyncio
-async def test_a2a_tool_rejects_when_user_denies() -> None:
+async def test_a2a_tool() -> None:
     configure_security(
         require_confirmation=True,
         confirmation_callback=lambda _req: False,
@@ -47,11 +47,11 @@ async def test_a2a_tool_rejects_when_user_denies() -> None:
     tool = create_a2a_tool(config, name="delegate")
 
     with pytest.raises(UserRejectedError):
-        await tool.ainvoke({"task": "分析", "context": "上下文"})
+        await tool.ainvoke({"task": "analyze", "context": "context"})
 
 
 @pytest.mark.asyncio
-async def test_a2a_tool_returns_result_when_confirmed(monkeypatch) -> None:
+async def test_a2a_tool2(monkeypatch) -> None:
     configure_security(
         require_confirmation=True,
         confirmation_callback=lambda _req: True,
@@ -66,7 +66,7 @@ async def test_a2a_tool_returns_result_when_confirmed(monkeypatch) -> None:
     async def fake_call(_endpoint: str, _task: str) -> str:
         return "ok"
 
-    monkeypatch.setattr("datapillar_oneagentic.a2a.tool._call_a2a_remote_agent", fake_call)
+    monkeypatch.setattr("datapillar_oneagentic.a2a.tool._call_a2a_agent", fake_call)
 
-    result = await tool.ainvoke({"task": "分析", "context": ""})
+    result = await tool.ainvoke({"task": "analyze", "context": ""})
     assert result == "ok"

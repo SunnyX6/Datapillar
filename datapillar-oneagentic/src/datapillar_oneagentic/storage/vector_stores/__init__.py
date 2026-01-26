@@ -1,6 +1,4 @@
-"""
-VectorStore 实现
-"""
+"""VectorStore implementations."""
 
 from datapillar_oneagentic.storage.vector_stores.base import (
     VectorCollectionSchema,

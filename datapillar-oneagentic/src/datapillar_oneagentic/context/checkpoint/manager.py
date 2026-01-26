@@ -1,7 +1,7 @@
 """
-Context Checkpoint 子模块 - 检查点管理
+Context checkpoint submodule - checkpoint management.
 
-封装 Checkpointer，提供统一的检查点管理接口。
+Wraps the Checkpointer and provides a unified management interface.
 """
 
 from __future__ import annotations
@@ -20,18 +20,18 @@ logger = logging.getLogger(__name__)
 
 
 def _generate_checkpoint_id() -> str:
-    """生成检查点 ID"""
+    """Generate a checkpoint ID."""
     return f"cp_{uuid.uuid4().hex[:12]}"
 
 
 class CheckpointManager:
     """
-    检查点管理器
+    Checkpoint manager.
 
-    封装 LangGraph Checkpointer，提供：
-    - 统一的检查点创建接口
-    - 检查点列表查询
-    - 状态恢复
+    Wraps LangGraph Checkpointer and provides:
+    - Unified checkpoint creation
+    - Checkpoint listing
+    - State recovery
     """
 
     def __init__(
@@ -41,27 +41,27 @@ class CheckpointManager:
         checkpointer=None,
     ):
         """
-        创建检查点管理器
+        Create a checkpoint manager.
 
-        参数：
-        - key: SessionKey（namespace + session_id 组合）
-        - checkpointer: Checkpointer 实例（可选）
+        Args:
+            key: SessionKey (namespace + session_id)
+            checkpointer: Optional Checkpointer instance
         """
         self._key = key
         self._checkpointer = checkpointer
 
     @property
     def key(self) -> SessionKey:
-        """获取会话标识"""
+        """Return the session key."""
         return self._key
 
     @property
     def thread_id(self) -> str:
-        """获取线程 ID（用于 LangGraph）"""
+        """Return the thread ID (for LangGraph)."""
         return str(self._key)
 
     def get_config(self, checkpoint_id: str | None = None) -> dict:
-        """获取 LangGraph 配置"""
+        """Return LangGraph config."""
         config: dict[str, Any] = {
             "configurable": {
                 "thread_id": self.thread_id,
@@ -75,20 +75,20 @@ class CheckpointManager:
         self,
         checkpoint_type: CheckpointType = CheckpointType.AUTO,
     ) -> str:
-        """生成新的检查点 ID"""
+        """Generate a new checkpoint ID."""
         type_prefix = checkpoint_type.value[:3]
         return f"cp_{type_prefix}_{uuid.uuid4().hex[:8]}"
 
     async def get_state(self, compiled_graph, checkpoint_id: str | None = None) -> dict | None:
         """
-        获取指定检查点的状态
+        Get state for a checkpoint.
 
-        参数：
-        - compiled_graph: 编译后的 LangGraph
-        - checkpoint_id: 检查点 ID（可选，不传则获取最新状态）
+        Args:
+            compiled_graph: Compiled LangGraph
+            checkpoint_id: Optional checkpoint ID (latest when omitted)
 
-        返回：
-        - 状态字典或 None
+        Returns:
+            State dict or None
         """
         config = self.get_config(checkpoint_id)
         try:
@@ -96,22 +96,22 @@ class CheckpointManager:
             if state_snapshot and state_snapshot.values:
                 return dict(state_snapshot.values)
         except Exception as e:
-            logger.error(f"获取状态失败: {e}")
+            logger.error(f"Failed to fetch state: {e}")
         return None
 
     async def get_snapshot(self, compiled_graph, checkpoint_id: str | None = None):
         """
-        获取原始状态快照
+        Get raw state snapshot.
 
-        参数：
-        - compiled_graph: 编译后的 LangGraph
-        - checkpoint_id: 检查点 ID（可选，不传则获取最新状态）
+        Args:
+            compiled_graph: Compiled LangGraph
+            checkpoint_id: Optional checkpoint ID (latest when omitted)
         """
         config = self.get_config(checkpoint_id)
         try:
             return await compiled_graph.aget_state(config)
         except Exception as e:
-            logger.error(f"获取状态快照失败: {e}")
+            logger.error(f"Failed to fetch state snapshot: {e}")
             return None
 
     async def update_state(
@@ -121,15 +121,15 @@ class CheckpointManager:
         checkpoint_id: str | None = None,
     ) -> str | None:
         """
-        更新状态
+        Update state.
 
-        参数：
-        - compiled_graph: 编译后的 LangGraph
-        - updates: 状态更新
-        - checkpoint_id: 检查点 ID（可选）
+        Args:
+            compiled_graph: Compiled LangGraph
+            updates: State updates
+            checkpoint_id: Optional checkpoint ID
 
-        返回：
-        - 新的检查点 ID 或 None
+        Returns:
+            New checkpoint ID or None
         """
         config = self.get_config(checkpoint_id)
         try:
@@ -137,19 +137,19 @@ class CheckpointManager:
             if result and "configurable" in result:
                 return result["configurable"].get("checkpoint_id")
         except Exception as e:
-            logger.error(f"更新状态失败: {e}")
+            logger.error(f"Failed to update state: {e}")
         return None
 
     async def list_checkpoints(self, compiled_graph, limit: int = 20) -> list[dict]:
         """
-        列出检查点
+        List checkpoints.
 
-        参数：
-        - compiled_graph: 编译后的 LangGraph
-        - limit: 最大数量
+        Args:
+            compiled_graph: Compiled LangGraph
+            limit: Maximum number of checkpoints
 
-        返回：
-        - 检查点列表
+        Returns:
+            List of checkpoints
         """
         config = self.get_config()
         checkpoints = []
@@ -164,11 +164,11 @@ class CheckpointManager:
                 if len(checkpoints) >= limit:
                     break
         except Exception as e:
-            logger.error(f"列出检查点失败: {e}")
+            logger.error(f"Failed to list checkpoints: {e}")
         return checkpoints
 
     async def delete(self) -> bool:
-        """删除会话的所有检查点"""
+        """Delete all checkpoints for the session."""
         if not self._checkpointer:
             return False
         try:
@@ -183,5 +183,5 @@ class CheckpointManager:
                 delete_method(self.thread_id)
             return True
         except Exception as e:
-            logger.error(f"删除检查点失败: {e}")
+            logger.error(f"Failed to delete checkpoints: {e}")
             return False

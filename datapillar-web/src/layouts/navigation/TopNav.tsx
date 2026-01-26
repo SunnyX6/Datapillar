@@ -23,7 +23,7 @@ import { ExpandToggle } from './ExpandToggle'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useI18nStore, useSearchStore, type Language, type SearchContext } from '@/stores'
 import { useTranslation } from 'react-i18next'
-import { iconSizeToken } from '@/design-tokens/dimensions'
+import { iconSizeToken, inputContainerWidthClassMap, menuWidthClassMap } from '@/design-tokens/dimensions'
 import { Button } from '@/components/ui'
 
 type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide' | 'projects' | 'collaboration'
@@ -235,7 +235,7 @@ export function TopNav({
             aria-hidden
           />
           <div
-            className={`absolute left-0 top-[calc(100%+12px)] w-72 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden z-[60] transition-all duration-150 origin-top-left ${
+            className={`absolute left-0 top-[calc(100%+12px)] ${menuWidthClassMap.wide} bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden z-[60] transition-all duration-150 origin-top-left ${
               isGovernanceOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'
             }`}
             onMouseEnter={handleGovernanceEnter}
@@ -303,7 +303,7 @@ export function TopNav({
       <div className="flex items-center gap-2.5 min-w-0 @md:min-w-40 justify-end">
         <div className="hidden @md:flex items-center relative">
           <div
-            className={`flex items-center gap-2 w-56 bg-slate-50 dark:bg-slate-900 border rounded-lg transition-all duration-200 shadow-sm ${
+            className={`flex items-center gap-2 ${inputContainerWidthClassMap.compact} bg-slate-50 dark:bg-slate-900 border rounded-lg transition-all duration-200 shadow-sm ${
               isSearchOpen || searchTerm
                 ? 'border-indigo-500/50 bg-white dark:bg-slate-800 ring-2 ring-indigo-500/20'
                 : 'border-slate-200 dark:border-slate-800 hover:border-indigo-500/30 hover:bg-white dark:hover:bg-slate-800'
@@ -376,7 +376,7 @@ export function TopNav({
           </Button>
 
           <div
-            className={`absolute right-0 top-full mt-3 w-36 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg overflow-hidden z-[60] transition-all duration-150 origin-top-right ${
+            className={`absolute right-0 top-full mt-3 ${menuWidthClassMap.compact} bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg overflow-hidden z-[60] transition-all duration-150 origin-top-right ${
               isLanguageOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'
             }`}
           >
@@ -407,7 +407,7 @@ export function TopNav({
           </Button>
 
           {isDropdownOpen && (
-            <div className="absolute right-0 top-full mt-3 w-48 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden z-[60] animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+            <div className={`absolute right-0 top-full mt-3 ${menuWidthClassMap.large} bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden z-[60] animate-in fade-in zoom-in-95 duration-200 origin-top-right`}>
               <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#0B1120]/50">
                 <p className="text-body-sm font-semibold text-slate-800 dark:text-slate-200">{user.name}</p>
                 <p className="text-caption text-slate-500 truncate">{user.email || 'engineer@datapillar.ai'}</p>

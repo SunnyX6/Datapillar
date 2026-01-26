@@ -1,7 +1,7 @@
 """
-Context Checkpoint 子模块
+Context checkpoint submodule.
 
-检查点管理，支持状态持久化和时间旅行。
+Checkpoint management for state persistence and time travel.
 """
 
 from datapillar_oneagentic.context.checkpoint.manager import CheckpointManager

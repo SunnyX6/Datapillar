@@ -1,6 +1,4 @@
-"""
-知识身份计算
-"""
+"""Knowledge identity hashing."""
 
 from __future__ import annotations
 

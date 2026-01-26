@@ -1,27 +1,27 @@
 """
-知识 RAG 快速使用示例：文档切分 + 检索
+Knowledge RAG quickstart: document chunking + retrieval.
 
-运行命令：
+Run:
     uv run python examples/quickstart_knowledge.py
 
-依赖安装：
+Dependencies:
     pip install datapillar-oneagentic[lance,knowledge]
 
-Embedding 配置（二选一）：
-    1) 环境变量（推荐）：
+Embedding configuration (choose one):
+    1) Environment variables (recommended):
        export DATAPILLAR_EMBEDDING_PROVIDER="openai"          # openai | glm
        export DATAPILLAR_EMBEDDING_API_KEY="sk-xxx"
        export DATAPILLAR_EMBEDDING_MODEL="text-embedding-3-small"
        export DATAPILLAR_EMBEDDING_DIMENSION="1536"
-       # 可选：export DATAPILLAR_EMBEDDING_BASE_URL="https://api.openai.com/v1"
-    2) 配置文件（参考 examples/config.example.toml）
+       # Optional: export DATAPILLAR_EMBEDDING_BASE_URL="https://api.openai.com/v1"
+    2) Config file (see examples/config.example.toml)
 
-说明：
-    - source_id 由系统生成，不需要传入。
-    - content 可选；传了 content 就不会读取 source_uri 的内容。
-    - source_uri 写本地完整路径且文件存在时，会自动读取文件内容；filename/mime_type 可选。
-    - namespace 必须显式传入（由 ingest/retrieve 内部创建 store 绑定）。
-    - 检索默认只在当前 namespace 内进行，跨 namespace 检索暂不支持。
+Notes:
+    - source_id is generated automatically.
+    - content is optional; if provided, source_uri is not read.
+    - If source_uri is a valid local path, content is read automatically; filename/mime_type are optional.
+    - namespace must be provided explicitly (store is bound inside ingest/retrieve).
+    - Retrieval is scoped to the current namespace; cross-namespace retrieval is not supported.
 """
 
 import asyncio
@@ -31,6 +31,7 @@ from datapillar_oneagentic.providers.llm import EmbeddingBackend
 
 from datapillar_oneagentic.context import ContextBuilder
 from datapillar_oneagentic.knowledge import (
+    BM25SparseEmbedder,
     Knowledge,
     KnowledgeChunkConfig,
     KnowledgeConfig,
@@ -45,13 +46,13 @@ async def main() -> None:
     if not config.embedding.is_configured():
         supported = ", ".join(EmbeddingBackend.list_supported())
         raise RuntimeError(
-            "请先配置 Embedding：\n"
+            "Please configure embedding first:\n"
             "  export DATAPILLAR_EMBEDDING_PROVIDER=\"openai\"\n"
             "  export DATAPILLAR_EMBEDDING_API_KEY=\"sk-xxx\"\n"
             "  export DATAPILLAR_EMBEDDING_MODEL=\"text-embedding-3-small\"\n"
             "  export DATAPILLAR_EMBEDDING_DIMENSION=\"1536\"\n"
-            "可选：export DATAPILLAR_EMBEDDING_BASE_URL=\"https://api.openai.com/v1\"\n"
-            f"支持 provider: {supported}"
+            "Optional: export DATAPILLAR_EMBEDDING_BASE_URL=\"https://api.openai.com/v1\"\n"
+            f"Supported providers: {supported}"
         )
     embedding_config = config.embedding.model_dump()
 
@@ -67,49 +68,52 @@ async def main() -> None:
             general={"max_tokens": 80, "overlap": 10},
         ),
         retrieve_config=KnowledgeRetrieveConfig(
-            method="semantic",
+            method="hybrid",
             top_k=3,
         ),
     )
 
+    sparse_embedder = BM25SparseEmbedder()
+
     sample_text = (
-        "Datapillar 是一个数据开发 SaaS 平台，覆盖数据集成、建模与质量治理。\n"
-        "知识框架提供文档解析、预处理、切分、向量化与检索增强能力。\n"
-        "检索支持语义召回与混合召回，结果再经 rerank 与去重后注入上下文。\n"
-        "namespace 作为硬隔离边界，避免不同业务线的知识互相污染。\n"
-        "doc_id 使用确定性 hash 生成，重复入库会触发重建而不是叠加存储。\n"
-        "典型场景包括数据开发助手、团队知识库、企业文档问答与 Agent 增强。"
+        "Datapillar is a data development SaaS platform covering ingestion, modeling, and quality governance.\n"
+        "The knowledge framework provides parsing, preprocessing, chunking, vectorization, and retrieval augmentation.\n"
+        "Retrieval supports semantic and hybrid recall, with rerank and dedupe before context injection.\n"
+        "Namespace is a hard isolation boundary to prevent knowledge leakage across business lines.\n"
+        "doc_id is generated deterministically; duplicate ingest triggers rebuild rather than duplication.\n"
+        "Typical scenarios include data assistants, team knowledge bases, enterprise QA, and agent augmentation."
     )
     source = KnowledgeSource(
-        name="示例知识库",
+        name="Example knowledge base",
         source_type="doc",
         source_uri="demo.txt",
         content=sample_text,
         filename="demo.txt",
-        metadata={"title": "Datapillar 介绍"},
+        metadata={"title": "Datapillar Overview"},
     )
 
     preview = source.chunk(chunk_config=knowledge_config.chunk_config)
-    print(f"切分预览：chunks={len(preview.chunks)}, attachments={len(preview.attachments)}")
+    print(f"Chunk preview: chunks={len(preview.chunks)}, attachments={len(preview.attachments)}")
     if preview.chunks:
-        print("首个分片预览：")
+        print("First chunk preview:")
         print(preview.chunks[0].content)
 
     await source.ingest(
         namespace=namespace,
         config=knowledge_config,
+        sparse_embedder=sparse_embedder,
     )
 
     retriever = KnowledgeRetriever.from_config(namespace=namespace, config=knowledge_config)
-    knowledge = Knowledge(sources=[source])
-    result = await retriever.retrieve(query="Datapillar 的核心能力是什么？", knowledge=knowledge)
+    knowledge = Knowledge(sources=[source], sparse_embedder=sparse_embedder)
+    result = await retriever.retrieve(query="What are Datapillar's core capabilities?", knowledge=knowledge)
     inject_config = retriever.resolve_inject_config(knowledge)
     context = ContextBuilder.build_knowledge_context(
         chunks=[chunk for chunk, _ in result.hits],
         inject=inject_config,
     )
-    print("\n检索结果：")
-    print(context or "未找到相关知识。")
+    print("\nRetrieval result:")
+    print(context or "No relevant knowledge found.")
     await retriever.close()
 
 

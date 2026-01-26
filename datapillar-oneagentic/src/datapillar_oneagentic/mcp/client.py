@@ -1,9 +1,9 @@
 """
-MCP 客户端
+MCP client.
 
-基于官方 MCP SDK 实现，提供与 MCP 服务器通信的能力。
+Implemented on top of the official MCP SDK for server communication.
 
-官方 SDK: https://github.com/modelcontextprotocol/python-sdk
+Official SDK: https://github.com/modelcontextprotocol/python-sdk
 """
 
 from __future__ import annotations
@@ -26,60 +26,60 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ToolAnnotations:
     """
-    MCP 工具安全标注
+    MCP tool safety annotations.
 
-    基于 MCP 规范的 Tool Annotations：
+    Based on MCP Tool Annotations:
     https://modelcontextprotocol.io/specification
 
-    这些标注帮助 Host 判断工具的风险等级，决定是否需要用户确认。
+    These hints help the host decide tool risk and whether user confirmation is required.
     """
 
     destructive_hint: bool | None = None
     """
-    破坏性提示：工具可能执行破坏性操作（删除数据、修改状态等）
+    Destructive hint: whether the tool may perform destructive operations.
 
-    - True: 工具可能有破坏性（如 delete_file, drop_table）
-    - False: 工具明确无破坏性
-    - None: 未知（保守起见视为可能有破坏性）
+    - True: potentially destructive (e.g., delete_file, drop_table)
+    - False: explicitly non-destructive
+    - None: unknown (treated as potentially destructive)
     """
 
     idempotent_hint: bool | None = None
     """
-    幂等性提示：多次调用是否产生相同结果
+    Idempotency hint: whether repeated calls yield the same result.
 
-    - True: 幂等操作（如 read_file, get_status）
-    - False: 非幂等操作（如 send_email, create_record）
-    - None: 未知
+    - True: idempotent (e.g., read_file, get_status)
+    - False: non-idempotent (e.g., send_email, create_record)
+    - None: unknown
     """
 
     open_world_hint: bool | None = None
     """
-    开放世界提示：工具是否会与外部系统交互
+    Open-world hint: whether the tool interacts with external systems.
 
-    - True: 会访问外部网络/服务（如 http_request, send_notification）
-    - False: 仅本地操作
-    - None: 未知
+    - True: accesses external network/services (e.g., http_request, send_notification)
+    - False: local-only
+    - None: unknown
     """
 
     read_only_hint: bool | None = None
     """
-    只读提示：工具是否只读取数据
+    Read-only hint: whether the tool only reads data.
 
-    - True: 只读操作（如 list_files, query_database）
-    - False: 可能写入数据
-    - None: 未知
+    - True: read-only (e.g., list_files, query_database)
+    - False: may write data
+    - None: unknown
     """
 
     @property
     def is_dangerous(self) -> bool:
         """
-        判断工具是否危险（需要用户确认）
+        Determine whether the tool is dangerous (requires user confirmation).
 
-        危险条件（任一满足）：
-        1. 明确标记为破坏性
-        2. 明确标记为非幂等
-        3. 会访问外部网络
-        4. 未标记为只读且未标记为非破坏性
+        Dangerous if any of the following are true:
+        1. Marked as destructive
+        2. Marked as non-idempotent
+        3. Accesses the external world
+        4. Not read-only and not explicitly non-destructive
         """
         if self.destructive_hint is True:
             return True
@@ -92,35 +92,35 @@ class ToolAnnotations:
 
 @dataclass
 class MCPTool:
-    """MCP 工具定义"""
+    """MCP tool definition."""
 
     name: str
-    """工具名称"""
+    """Tool name."""
 
     description: str
-    """工具描述"""
+    """Tool description."""
 
     input_schema: dict[str, Any] = field(default_factory=dict)
-    """输入参数 JSON Schema"""
+    """Input JSON schema."""
 
     annotations: ToolAnnotations = field(default_factory=ToolAnnotations)
-    """安全标注"""
+    """Safety annotations."""
 
     title: str | None = None
-    """工具显示标题"""
+    """Tool display title."""
 
     mime_type: str | None = None
-    """MIME 类型"""
+    """MIME type."""
 
 
 class MCPClient:
     """
-    MCP 客户端
+    MCP client.
 
-    基于官方 MCP SDK，支持 Stdio、HTTP、SSE 三种传输方式。
-    使用 async context manager 自动管理连接生命周期。
+    Based on the official MCP SDK. Supports Stdio, HTTP, and SSE transports.
+    Uses an async context manager to manage connection lifecycle.
 
-    使用示例：
+    Example:
     ```python
     config = MCPServerStdio(
         command="npx",
@@ -128,22 +128,22 @@ class MCPClient:
     )
 
     async with MCPClient(config) as client:
-        # 列出工具
+        # List tools
         tools = await client.list_tools()
-        print(f"可用工具: {[t.name for t in tools]}")
+        print(f"Available tools: {[t.name for t in tools]}")
 
-        # 调用工具
+        # Call a tool
         result = await client.call_tool("read_file", {"path": "/tmp/test.txt"})
-        print(f"结果: {result}")
+        print(f"Result: {result}")
     ```
     """
 
     def __init__(self, config: MCPServerConfig):
         """
-        初始化客户端
+        Initialize the client.
 
-        参数：
-        - config: MCP 服务器配置
+        Args:
+            config: MCP server configuration
         """
         self.config = config
         self._session: Any = None
@@ -151,22 +151,22 @@ class MCPClient:
         self._connected = False
 
     async def __aenter__(self) -> Self:
-        """进入上下文，建立连接"""
+        """Enter context and establish connection."""
         await self.connect()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        """退出上下文，关闭连接"""
+        """Exit context and close connection."""
         await self.close()
 
     async def connect(self) -> None:
         """
-        建立与 MCP 服务器的连接
+        Establish a connection to the MCP server.
 
-        根据配置类型选择传输方式：
-        - MCPServerStdio: 启动子进程，通过 stdin/stdout 通信
-        - MCPServerHTTP: HTTP 传输（Streamable HTTP）
-        - MCPServerSSE: SSE 传输
+        Transport is selected based on config:
+        - MCPServerStdio: spawn subprocess with stdin/stdout
+        - MCPServerHTTP: HTTP transport (streamable HTTP)
+        - MCPServerSSE: SSE transport
         """
         if self._connected:
             return
@@ -174,7 +174,7 @@ class MCPClient:
         import importlib.util
 
         if importlib.util.find_spec("mcp") is None:
-            raise ImportError("mcp SDK 未安装。请运行: pip install mcp")
+            raise ImportError("The mcp SDK is not installed. Run: pip install mcp")
 
         self._exit_stack = AsyncExitStack()
         await self._exit_stack.__aenter__()
@@ -187,18 +187,18 @@ class MCPClient:
             elif isinstance(self.config, MCPServerSSE):
                 await self._connect_sse()
             else:
-                raise MCPConnectionError(f"不支持的配置类型: {type(self.config)}")
+                raise MCPConnectionError(f"Unsupported config type: {type(self.config)}")
 
             self._connected = True
-            logger.info(f"MCP 客户端已连接: {self.config}")
+            logger.info(f"MCP client connected: {self.config}")
 
         except Exception as e:
             await self._exit_stack.__aexit__(type(e), e, e.__traceback__)
             self._exit_stack = None
-            raise MCPConnectionError(f"连接失败: {e}") from e
+            raise MCPConnectionError(f"Connection failed: {e}") from e
 
     async def _connect_stdio(self) -> None:
-        """Stdio 传输连接"""
+        """Stdio transport connection."""
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
 
@@ -222,18 +222,22 @@ class MCPClient:
         await self._session.initialize()
 
     async def _connect_http(self) -> None:
-        """HTTP 传输连接（Streamable HTTP）"""
+        """HTTP transport connection (streamable HTTP)."""
         from mcp import ClientSession
         from mcp.client.streamable_http import streamablehttp_client
 
         config: MCPServerHTTP = self.config
 
-        # 构建 httpx 客户端工厂（传递 headers 和 timeout）
+        # Build httpx client factory with headers and timeout.
         def httpx_client_factory(**kwargs):
             import httpx
             merged_headers = {**(kwargs.get("headers") or {}), **(config.headers or {})}
             timeout = httpx.Timeout(config.timeout)
-            return httpx.AsyncClient(headers=merged_headers, timeout=timeout, **{k: v for k, v in kwargs.items() if k not in ("headers", "timeout")})
+            return httpx.AsyncClient(
+                headers=merged_headers,
+                timeout=timeout,
+                **{k: v for k, v in kwargs.items() if k not in ("headers", "timeout")},
+            )
 
         read, write, _ = await self._exit_stack.enter_async_context(
             streamablehttp_client(config.url, httpx_client_factory=httpx_client_factory)
@@ -246,7 +250,7 @@ class MCPClient:
         await self._session.initialize()
 
     async def _connect_sse(self) -> None:
-        """SSE 传输连接"""
+        """SSE transport connection."""
         from mcp import ClientSession
         from mcp.client.sse import sse_client
 
@@ -267,7 +271,7 @@ class MCPClient:
         await self._session.initialize()
 
     async def close(self) -> None:
-        """关闭连接"""
+        """Close the connection."""
         if self._exit_stack:
             await self._exit_stack.__aexit__(None, None, None)
             self._exit_stack = None
@@ -277,24 +281,24 @@ class MCPClient:
 
     @property
     def is_connected(self) -> bool:
-        """是否已连接"""
+        """Return whether the client is connected."""
         return self._connected
 
     async def list_tools(self) -> list[MCPTool]:
         """
-        列出可用工具
+        List available tools.
 
-        返回：
-        - 工具列表
+        Returns:
+            A list of tools.
         """
         if not self._session:
-            raise MCPConnectionError("客户端未连接")
+            raise MCPConnectionError("Client is not connected")
 
         result = await self._session.list_tools()
         tools = []
 
         for tool in result.tools:
-            # 解析 annotations
+            # Parse annotations.
             annotations = ToolAnnotations()
             if hasattr(tool, 'annotations') and tool.annotations:
                 ann = tool.annotations
@@ -317,21 +321,21 @@ class MCPClient:
 
     async def call_tool(self, name: str, arguments: dict[str, Any] | None = None) -> Any:
         """
-        调用工具
+        Call a tool.
 
-        参数：
-        - name: 工具名称
-        - arguments: 工具参数
+        Args:
+            name: tool name
+            arguments: tool arguments
 
-        返回：
-        - 工具执行结果
+        Returns:
+            Tool execution result.
         """
         if not self._session:
-            raise MCPConnectionError("客户端未连接")
+            raise MCPConnectionError("Client is not connected")
 
         result = await self._session.call_tool(name, arguments or {})
 
-        # 提取结果内容
+        # Extract result content.
         if result.content:
             contents = []
             for item in result.content:
@@ -350,13 +354,13 @@ class MCPClient:
 
     async def list_resources(self) -> list[dict[str, Any]]:
         """
-        列出可用资源
+        List available resources.
 
-        返回：
-        - 资源列表
+        Returns:
+            A list of resources.
         """
         if not self._session:
-            raise MCPConnectionError("客户端未连接")
+            raise MCPConnectionError("Client is not connected")
 
         result = await self._session.list_resources()
         return [
@@ -371,16 +375,16 @@ class MCPClient:
 
     async def read_resource(self, uri: str) -> Any:
         """
-        读取资源
+        Read a resource.
 
-        参数：
-        - uri: 资源 URI
+        Args:
+            uri: resource URI
 
-        返回：
-        - 资源内容
+        Returns:
+            Resource content.
         """
         if not self._session:
-            raise MCPConnectionError("客户端未连接")
+            raise MCPConnectionError("Client is not connected")
 
         from pydantic import AnyUrl
 
@@ -404,13 +408,13 @@ class MCPClient:
 
     async def list_prompts(self) -> list[dict[str, Any]]:
         """
-        列出可用提示词模板
+        List available prompt templates.
 
-        返回：
-        - 提示词列表
+        Returns:
+            A list of prompts.
         """
         if not self._session:
-            raise MCPConnectionError("客户端未连接")
+            raise MCPConnectionError("Client is not connected")
 
         result = await self._session.list_prompts()
         return [
@@ -431,17 +435,17 @@ class MCPClient:
 
     async def get_prompt(self, name: str, arguments: dict[str, str] | None = None) -> list[dict[str, Any]]:
         """
-        获取提示词
+        Fetch a prompt by name.
 
-        参数：
-        - name: 提示词名称
-        - arguments: 提示词参数
+        Args:
+            name: prompt name
+            arguments: prompt arguments
 
-        返回：
-        - 消息列表
+        Returns:
+            A list of messages.
         """
         if not self._session:
-            raise MCPConnectionError("客户端未连接")
+            raise MCPConnectionError("Client is not connected")
 
         result = await self._session.get_prompt(name, arguments or {})
         return [
@@ -457,19 +461,19 @@ class MCPClient:
         return f"MCPClient({self.config}, {status})"
 
 
-# ==================== 异常定义 ====================
+# ==================== Error types ====================
 
 
 class MCPError(Exception):
-    """MCP 基础异常"""
+    """Base MCP error."""
     pass
 
 
 class MCPConnectionError(MCPError):
-    """连接错误"""
+    """Connection error."""
     pass
 
 
 class MCPTimeoutError(MCPError):
-    """超时错误"""
+    """Timeout error."""
     pass

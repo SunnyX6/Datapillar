@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BaseBottomPanel, type BottomPanelTab } from '../components'
+import { menuWidthClassMap } from '@/design-tokens/dimensions'
 import type { ExecuteResult } from '@/services/sqlService'
 
 interface Dialect {
@@ -120,7 +121,7 @@ export function BottomPanel({
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 5 }}
-              className="absolute bottom-full right-0 mb-1.5 w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl dark:shadow-2xl z-[100] p-0.5 overflow-hidden"
+              className={`absolute bottom-full right-0 mb-1.5 ${menuWidthClassMap.compact} bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl dark:shadow-2xl z-[100] p-0.5 overflow-hidden`}
             >
               {dialects.map(d => (
                 <button

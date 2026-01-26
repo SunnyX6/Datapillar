@@ -1,7 +1,7 @@
 """
-统一状态定义
+Unified status definitions.
 
-目标：让所有执行状态在一个地方集中管理，避免散落字符串。
+Goal: keep all execution statuses centralized and avoid scattered literals.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from typing import Final
 
 
 class ExecutionStatus(StrEnum):
-    """执行状态（统一使用）"""
+    """Execution status (single source of truth)."""
 
     PENDING = "pending"
     RUNNING = "running"
@@ -21,26 +21,26 @@ class ExecutionStatus(StrEnum):
 
 
 class AgentStatus(StrEnum):
-    """Agent 状态"""
+    """Agent status."""
 
     IDLE = "idle"
     THINKING = "thinking"
-    INVOKING = "invoking"  # 调用工具
-    WAITING = "waiting"  # 等待用户
+    INVOKING = "invoking"  # Invoking tools.
+    WAITING = "waiting"  # Waiting for user input.
     DONE = "done"
     FAILED = "failed"
     ABORTED = "aborted"
 
 
 class FailureKind(StrEnum):
-    """失败类型（仅在 FAILED 时有意义）"""
+    """Failure kind (only meaningful when FAILED)."""
 
     BUSINESS = "business"
     SYSTEM = "system"
 
 
 class ProcessStage(StrEnum):
-    """流程阶段（用于 ReAct 等内部阶段，不作为状态）"""
+    """Process stage (internal stage such as ReAct, not a status)."""
 
     PLANNING = "planning"
     EXECUTING = "executing"

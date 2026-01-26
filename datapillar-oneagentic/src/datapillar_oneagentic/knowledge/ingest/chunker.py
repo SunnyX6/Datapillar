@@ -1,6 +1,4 @@
-"""
-知识切分器
-"""
+"""Knowledge chunker."""
 
 from __future__ import annotations
 
@@ -23,7 +21,7 @@ def split_text(
     chunk_overlap: int,
     min_chunk_size: int,
 ) -> list[TextChunk]:
-    """基于 RecursiveCharacterTextSplitter 的切分"""
+    """Split text using RecursiveCharacterTextSplitter."""
     if not text:
         return []
     if chunk_size <= 0:

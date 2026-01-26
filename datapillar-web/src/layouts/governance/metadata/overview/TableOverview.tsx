@@ -23,7 +23,7 @@ import {
   X
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { contentMaxWidthClassMap, iconContainerSizeClassMap } from '@/design-tokens/dimensions'
+import { contentMaxWidthClassMap, iconContainerSizeClassMap, menuWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { formatTime } from '@/lib/utils'
 import { type TableAsset } from '../type/types'
@@ -811,7 +811,7 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                 <div
                   ref={dropdownRef}
                   style={{ top: dropdownPos.top, left: dropdownPos.left }}
-                  className="fixed w-44 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[1000000]"
+                  className={`fixed ${menuWidthClassMap.medium} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[1000000]`}
                 >
                   <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 rounded-t-xl">
                     <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">选择值域</span>
@@ -864,7 +864,7 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                 <div
                   ref={domainCardRef}
                   style={{ top: domainCardPos.top, left: domainCardPos.left }}
-                  className="fixed z-[1000001] w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl animate-in fade-in-0 slide-in-from-left-2 duration-150"
+                  className={`fixed z-[1000001] ${menuWidthClassMap.xxlarge} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl animate-in fade-in-0 slide-in-from-left-2 duration-150`}
                   onMouseEnter={handleDomainCardMouseEnter}
                   onMouseLeave={handleDomainCardMouseLeave}
                 >

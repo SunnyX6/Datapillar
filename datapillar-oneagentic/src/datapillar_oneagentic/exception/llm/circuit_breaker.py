@@ -1,12 +1,12 @@
 """
-熔断器
+Circuit breaker.
 
-防止级联故障，当服务连续失败时快速失败。
+Prevents cascading failures by failing fast when a service repeatedly fails.
 
-状态机：
-CLOSED → (连续失败达阈值) → OPEN → (等待恢复时间) → HALF_OPEN → (探测成功) → CLOSED
-                                                              ↓
-                                                     (探测失败) → OPEN
+State machine:
+CLOSED -> (failures reach threshold) -> OPEN -> (recovery timeout) -> HALF_OPEN -> (probe success) -> CLOSED
+                                              |
+                                              -> (probe failure) -> OPEN
 """
 
 from __future__ import annotations
@@ -29,26 +29,26 @@ T = TypeVar("T")
 
 
 class CircuitState(str, Enum):
-    """熔断器状态"""
+    """Circuit breaker state."""
 
-    CLOSED = "closed"  # 正常状态
-    OPEN = "open"  # 熔断状态（拒绝所有请求）
-    HALF_OPEN = "half_open"  # 半开状态（允许探测请求）
+    CLOSED = "closed"  # Normal state
+    OPEN = "open"  # Open state (reject all requests)
+    HALF_OPEN = "half_open"  # Half-open state (allow probing)
 
 
 class CircuitBreakerError(Exception):
-    """熔断器打开时抛出"""
+    """Raised when the circuit breaker is open."""
 
     def __init__(self, name: str, message: str | None = None):
         self.name = name
-        super().__init__(message or f"服务 {name} 熔断中，请稍后重试")
+        super().__init__(message or f"Service {name} is circuit open; try again later")
 
 
 class CircuitBreaker:
     """
-    熔断器
+    Circuit breaker.
 
-    使用 LLM 配置中的熔断参数，按名称隔离不同服务的熔断状态。
+    Uses circuit breaker settings from LLM config and isolates state by name.
     """
 
     def __init__(self, name: str, config: "CircuitBreakerConfig"):
@@ -66,15 +66,15 @@ class CircuitBreaker:
         return self._state
 
     async def _check_state_transition(self) -> None:
-        """检查是否需要状态转换"""
+        """Check whether a state transition is needed."""
         if self._state == CircuitState.OPEN and self._last_failure_time:
             elapsed = time.time() - self._last_failure_time
             if elapsed >= self.recovery_timeout:
                 self._state = CircuitState.HALF_OPEN
-                logger.info(f"[CircuitBreaker:{self.name}] OPEN → HALF_OPEN")
+                logger.info(f"[CircuitBreaker:{self.name}] OPEN -> HALF_OPEN")
 
     async def allow_request(self) -> bool:
-        """判断是否允许请求通过"""
+        """Return whether a request is allowed."""
         async with self._lock:
             await self._check_state_transition()
 
@@ -84,45 +84,45 @@ class CircuitBreaker:
             return self._state != CircuitState.OPEN
 
     async def record_success(self) -> None:
-        """记录成功"""
+        """Record a successful call."""
         async with self._lock:
             if self._state == CircuitState.HALF_OPEN:
                 self._state = CircuitState.CLOSED
-                logger.info(f"[CircuitBreaker:{self.name}] HALF_OPEN → CLOSED (恢复)")
+                logger.info(f"[CircuitBreaker:{self.name}] HALF_OPEN -> CLOSED (recovered)")
             self._failure_count = 0
 
     async def record_failure(self) -> None:
-        """记录失败"""
+        """Record a failed call."""
         async with self._lock:
             self._failure_count += 1
             self._last_failure_time = time.time()
 
             if self._state == CircuitState.HALF_OPEN:
                 self._state = CircuitState.OPEN
-                logger.warning(f"[CircuitBreaker:{self.name}] HALF_OPEN → OPEN (探测失败)")
+                logger.warning(f"[CircuitBreaker:{self.name}] HALF_OPEN -> OPEN (probe failed)")
             elif self._failure_count >= self.failure_threshold:
                 self._state = CircuitState.OPEN
                 logger.warning(
-                    f"[CircuitBreaker:{self.name}] CLOSED → OPEN "
-                    f"(连续失败 {self._failure_count} 次)"
+                    f"[CircuitBreaker:{self.name}] CLOSED -> OPEN "
+                    f"(consecutive failures: {self._failure_count})"
                 )
 
     def reset(self) -> None:
-        """重置熔断器（测试用）"""
+        """Reset the breaker (tests only)."""
         self._state = CircuitState.CLOSED
         self._failure_count = 0
         self._last_failure_time = None
 
 
 class CircuitBreakerRegistry:
-    """熔断器注册表（团队内使用）"""
+    """Circuit breaker registry (team-scoped)."""
 
     def __init__(self, config: "CircuitBreakerConfig") -> None:
         self._config = config
         self._circuit_breakers: dict[str, CircuitBreaker] = {}
 
     def get(self, name: str) -> CircuitBreaker:
-        """获取或创建熔断器（按名称隔离）"""
+        """Get or create a breaker (name-scoped)."""
         if name in self._circuit_breakers:
             return self._circuit_breakers[name]
 
@@ -131,15 +131,15 @@ class CircuitBreakerRegistry:
         return breaker
 
     def reset(self) -> None:
-        """重置所有熔断器（仅用于测试）"""
+        """Reset all breakers (tests only)."""
         self._circuit_breakers.clear()
 
 
 def with_circuit_breaker(name: str, registry: CircuitBreakerRegistry):
     """
-    熔断器装饰器
+    Circuit breaker decorator.
 
-    使用：
+    Usage:
         registry = CircuitBreakerRegistry(config)
 
         @with_circuit_breaker("llm", registry)

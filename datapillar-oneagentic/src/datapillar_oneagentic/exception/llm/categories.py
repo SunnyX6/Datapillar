@@ -1,5 +1,5 @@
 """
-LLM 错误分类
+LLM error categories.
 """
 
 from __future__ import annotations
@@ -8,20 +8,20 @@ from enum import Enum
 
 
 class LLMErrorCategory(str, Enum):
-    """LLM 错误分类"""
+    """LLM error categories."""
 
-    # 可重试错误（系统自动处理）
-    TRANSIENT = "transient"  # 瞬态错误：网络抖动、临时不可用
-    TIMEOUT = "timeout"  # 超时错误：LLM/API 响应超时
-    RATE_LIMIT = "rate_limit"  # 限流错误：429、配额耗尽
+    # Retryable errors (handled automatically)
+    TRANSIENT = "transient"  # Transient error: network jitter, temporary outage
+    TIMEOUT = "timeout"  # Timeout error: LLM/API response timeout
+    RATE_LIMIT = "rate_limit"  # Rate limit: 429, quota exhausted
 
-    # 不可重试错误（需要干预）
-    CONTEXT = "context"  # 上下文超限
-    INVALID_INPUT = "invalid_input"  # 输入错误：参数格式错误
-    STRUCTURED_OUTPUT = "structured_output"  # 结构化输出解析失败
-    AUTH_FAILURE = "auth_failure"  # 认证错误：API Key 无效
-    NOT_FOUND = "not_found"  # 资源不存在
+    # Non-retryable errors (require intervention)
+    CONTEXT = "context"  # Context length exceeded
+    INVALID_INPUT = "invalid_input"  # Invalid input: parameter format error
+    STRUCTURED_OUTPUT = "structured_output"  # Structured output parsing failed
+    AUTH_FAILURE = "auth_failure"  # Authentication failure: invalid API key
+    NOT_FOUND = "not_found"  # Resource not found
 
-    # 系统错误
-    INTERNAL = "internal"  # 内部错误：代码 bug
-    CIRCUIT_OPEN = "circuit_open"  # 熔断中
+    # System errors
+    INTERNAL = "internal"  # Internal error: code bug
+    CIRCUIT_OPEN = "circuit_open"  # Circuit open

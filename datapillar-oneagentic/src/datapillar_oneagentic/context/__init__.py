@@ -1,18 +1,18 @@
 """
-Context 模块 - 统一的上下文管理
+Context module - unified context management.
 
-提供：
-- ContextBuilder: LLM messages 构建器（只读 state，不负责 Blackboard 写入）
-- ContextCollector: 运行态 __context 收集器
-- ContextComposer: 纯函数消息组装器
-- Timeline: 执行时间线
-- Compaction: 上下文压缩（由 LLM 上下文超限触发）
+Provides:
+- ContextBuilder: builds LLM messages (read-only state, no Blackboard writes)
+- ContextCollector: runtime _context collector
+- ContextComposer: pure functional message composer
+- Timeline: execution timeline
+- Compaction: context compaction (triggered by LLM context overflow)
 
-设计原则：
-- Blackboard 状态读写由 state/StateBuilder 统一负责
-- messages 是 LangGraph 的短期记忆
-- Timeline 记录执行历史
-- 压缩由 LLM 上下文超限触发
+Design principles:
+- Blackboard state read/write is handled by state/StateBuilder
+- messages are LangGraph short-term memory
+- Timeline records execution history
+- Compaction is triggered by LLM context overflow
 """
 
 from datapillar_oneagentic.context.builder import (
@@ -36,19 +36,19 @@ from datapillar_oneagentic.context.timeline import (
 )
 
 __all__ = [
-    # 核心
+    # Core
     "ContextBuilder",
     "ContextCollector",
     "ContextComposer",
     "ContextScenario",
-    # 时间线
+    # Timeline
     "Timeline",
     "TimelineEntry",
     "TimeTravelRequest",
     "TimeTravelResult",
-    # 检查点
+    # Checkpoint
     "CheckpointManager",
-    # 压缩
+    # Compaction
     "CompactPolicy",
     "CompactResult",
     "Compactor",

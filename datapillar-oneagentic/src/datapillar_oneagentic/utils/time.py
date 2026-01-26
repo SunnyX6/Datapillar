@@ -1,6 +1,4 @@
-"""
-时间工具
-"""
+"""Time utilities."""
 
 from __future__ import annotations
 
@@ -8,5 +6,5 @@ import time
 
 
 def now_ms() -> int:
-    """返回当前时间（毫秒）"""
+    """Return current time in milliseconds."""
     return int(time.time() * 1000)

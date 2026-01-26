@@ -1,7 +1,7 @@
 package com.sunny.datapillar.admin.security;
 
 import com.sunny.datapillar.admin.module.user.service.UserService;
-import com.sunny.datapillar.admin.util.UserContextUtil;
+import com.sunny.datapillar.common.constant.HeaderConstants;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -46,8 +46,8 @@ public class GatewayUserAuthenticationFilter extends OncePerRequestFilter {
         }
 
         // 从 Gateway 注入的请求头中提取用户信息
-        String userIdStr = request.getHeader(UserContextUtil.HEADER_USER_ID);
-        String username = request.getHeader(UserContextUtil.HEADER_USERNAME);
+        String userIdStr = request.getHeader(HeaderConstants.HEADER_USER_ID);
+        String username = request.getHeader(HeaderConstants.HEADER_USERNAME);
 
         if (userIdStr != null && !userIdStr.isEmpty() && username != null && !username.isEmpty()) {
             try {

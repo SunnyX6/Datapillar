@@ -1,7 +1,7 @@
 """
-异常基础定义
+Shared exception primitives.
 
-统一 RecoveryAction 等基础概念，供 Agent/LLM 异常共享。
+Defines RecoveryAction and other base concepts used by Agent/LLM errors.
 """
 
 from __future__ import annotations
@@ -10,8 +10,8 @@ from enum import Enum
 
 
 class RecoveryAction(str, Enum):
-    """恢复动作"""
+    """Recovery action."""
 
-    RETRY = "retry"  # 自动重试
-    FAIL_FAST = "fail_fast"  # 快速失败（不重试）
-    CIRCUIT_BREAK = "circuit_break"  # 熔断
+    RETRY = "retry"  # Automatic retry
+    FAIL_FAST = "fail_fast"  # Fail fast (no retry)
+    CIRCUIT_BREAK = "circuit_break"  # Circuit break

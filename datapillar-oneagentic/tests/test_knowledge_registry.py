@@ -98,14 +98,14 @@ class _StubKnowledgeStore:
         self.docs = [doc for doc in self.docs if doc.doc_id != doc_id]
         return before - len(self.docs)
 
-    async def delete_chunks_by_doc_id(self, doc_id: str) -> int:
+    async def delete_doc_chunks(self, doc_id: str) -> int:
         before = len(self.chunks)
         self.chunks = [chunk for chunk in self.chunks if chunk.doc_id != doc_id]
         return before - len(self.chunks)
 
 
 @pytest.mark.asyncio
-async def test_knowledge_ingestor_writes_chunks_and_sparse_vectors() -> None:
+async def test_knowledge_ingestor() -> None:
     store = _StubKnowledgeStore()
     embedder = _StubEmbeddingProvider()
     sparse = _StubSparseEmbedder()
@@ -115,7 +115,7 @@ async def test_knowledge_ingestor_writes_chunks_and_sparse_vectors() -> None:
     )
 
     ingestor = KnowledgeIngestor(store=store, embedding_provider=embedder, config=config)
-    source = KnowledgeSource(source_id="src1", name="示例", source_type="doc")
+    source = KnowledgeSource(source_id="src1", name="example", source_type="doc")
     doc = DocumentInput(source="abcdef", filename="doc1.txt")
 
     await ingestor.ingest(source=source, documents=[doc], sparse_embedder=sparse)
@@ -127,13 +127,13 @@ async def test_knowledge_ingestor_writes_chunks_and_sparse_vectors() -> None:
 
 
 @pytest.mark.asyncio
-async def test_knowledge_retriever_requires_sparse_embedder_for_hybrid() -> None:
+async def test_knowledge_retriever() -> None:
     store = _StubKnowledgeStore()
     embedder = _StubEmbeddingProvider()
     retriever = KnowledgeRetriever(store=store, embedding_provider=embedder, config=KnowledgeConfig())
 
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="src1", name="示例", source_type="doc")],
+        sources=[KnowledgeSource(source_id="src1", name="example", source_type="doc")],
         sparse_embedder=None,
     )
 
@@ -142,15 +142,15 @@ async def test_knowledge_retriever_requires_sparse_embedder_for_hybrid() -> None
 
 
 @pytest.mark.asyncio
-async def test_knowledge_retriever_builds_json_context_and_refs() -> None:
+async def test_knowledge_retriever2() -> None:
     hits = [
         KnowledgeSearchHit(
             chunk=KnowledgeChunk(
                 chunk_id="c2",
                 doc_id="d2",
                 source_id="src1",
-                doc_title="标题2",
-                content="内容2",
+                doc_title="Title 2",
+                content="Content 2",
                 vector=[1.0, 0.0],
                 sparse_vector={1: 1.0},
                 token_count=3,
@@ -164,8 +164,8 @@ async def test_knowledge_retriever_builds_json_context_and_refs() -> None:
                 chunk_id="c1",
                 doc_id="d1",
                 source_id="src1",
-                doc_title="标题1",
-                content="内容1",
+                doc_title="Title 1",
+                content="Content 1",
                 vector=[1.0, 0.0],
                 sparse_vector={1: 1.0},
                 token_count=3,
@@ -188,7 +188,7 @@ async def test_knowledge_retriever_builds_json_context_and_refs() -> None:
     retriever = KnowledgeRetriever(store=store, embedding_provider=embedder, config=config)
 
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="src1", name="示例", source_type="doc")],
+        sources=[KnowledgeSource(source_id="src1", name="example", source_type="doc")],
         sparse_embedder=_StubSparseEmbedder(),
     )
 
@@ -204,15 +204,15 @@ async def test_knowledge_retriever_builds_json_context_and_refs() -> None:
 
 
 @pytest.mark.asyncio
-async def test_knowledge_retriever_allows_tool_mode() -> None:
+async def test_knowledge_retriever3() -> None:
     hits = [
         KnowledgeSearchHit(
             chunk=KnowledgeChunk(
                 chunk_id="c1",
                 doc_id="d1",
                 source_id="src1",
-                doc_title="标题1",
-                content="内容1",
+                doc_title="Title 1",
+                content="Content 1",
                 vector=[1.0, 0.0],
                 sparse_vector={1: 1.0},
                 token_count=3,
@@ -235,7 +235,7 @@ async def test_knowledge_retriever_allows_tool_mode() -> None:
     retriever = KnowledgeRetriever(store=store, embedding_provider=embedder, config=config)
 
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="src1", name="示例", source_type="doc")],
+        sources=[KnowledgeSource(source_id="src1", name="example", source_type="doc")],
         sparse_embedder=_StubSparseEmbedder(),
     )
 
@@ -247,9 +247,9 @@ async def test_knowledge_retriever_allows_tool_mode() -> None:
     assert "Knowledge Context" in context
 
 
-def test_merge_knowledge_prefers_agent_over_team() -> None:
+def test_merge_knowledge() -> None:
     team = Knowledge(
-        sources=[KnowledgeSource(source_id="s1", name="团队库", source_type="doc")],
+        sources=[KnowledgeSource(source_id="s1", name="team knowledge", source_type="doc")],
         retrieve=KnowledgeRetrieve(
             top_k=5,
             rerank={"mode": "model", "model": "m1"},
@@ -260,8 +260,8 @@ def test_merge_knowledge_prefers_agent_over_team() -> None:
     )
     agent = Knowledge(
         sources=[
-            KnowledgeSource(source_id="s1", name="Agent库", source_type="doc"),
-            KnowledgeSource(source_id="s2", name="新增库", source_type="doc"),
+            KnowledgeSource(source_id="s1", name="agent knowledge", source_type="doc"),
+            KnowledgeSource(source_id="s2", name="new knowledge", source_type="doc"),
         ],
         retrieve=KnowledgeRetrieve(
             top_k=3,
@@ -275,7 +275,7 @@ def test_merge_knowledge_prefers_agent_over_team() -> None:
 
     assert merged is not None
     assert [source.source_id for source in merged.sources] == ["s1", "s2"]
-    assert merged.sources[0].name == "Agent库"
+    assert merged.sources[0].name == "agent knowledge"
     assert merged.retrieve is not None
     assert merged.retrieve.top_k == 3
     assert merged.retrieve.rerank is not None
@@ -290,9 +290,9 @@ def test_merge_knowledge_prefers_agent_over_team() -> None:
     assert merged.sparse_embedder is team.sparse_embedder
 
 
-def test_merge_knowledge_allows_sparse_embedder_override() -> None:
+def test_merge_knowledge2() -> None:
     team = Knowledge(
-        sources=[KnowledgeSource(source_id="s1", name="团队库", source_type="doc")],
+        sources=[KnowledgeSource(source_id="s1", name="team knowledge", source_type="doc")],
         sparse_embedder=_StubSparseEmbedder(),
     )
     override_embedder = _StubSparseEmbedder()
@@ -307,7 +307,7 @@ def test_merge_knowledge_allows_sparse_embedder_override() -> None:
     assert merged.sparse_embedder is override_embedder
 
 
-def test_group_hits_limits_per_document() -> None:
+def test_group_hits() -> None:
     hits = [
         (
             KnowledgeChunk(
@@ -363,7 +363,7 @@ def test_group_hits_limits_per_document() -> None:
     assert [chunk.chunk_id for chunk, _ in grouped] == ["c5", "c1", "c3"]
 
 
-def test_dedupe_hits_removes_exact_duplicates() -> None:
+def test_dedupe_hits() -> None:
     hits = [
         (
             KnowledgeChunk(
@@ -390,7 +390,7 @@ def test_dedupe_hits_removes_exact_duplicates() -> None:
     assert [chunk.chunk_id for chunk, _ in deduped] == ["c1"]
 
 
-def test_dedupe_hits_removes_semantic_duplicates() -> None:
+def test_dedupe_hits2() -> None:
     hits = [
         (
             KnowledgeChunk(
@@ -420,14 +420,14 @@ def test_dedupe_hits_removes_semantic_duplicates() -> None:
 
 
 @pytest.mark.asyncio
-async def test_knowledge_retriever_applies_rerank(monkeypatch) -> None:
+async def test_knowledge_retriever4(monkeypatch) -> None:
     hits = [
         KnowledgeSearchHit(
             chunk=KnowledgeChunk(
                 chunk_id="c1",
                 doc_id="d1",
                 source_id="src1",
-                content="内容1",
+                content="Content 1",
                 vector=[1.0, 0.0],
             ),
             score=0.1,
@@ -438,7 +438,7 @@ async def test_knowledge_retriever_applies_rerank(monkeypatch) -> None:
                 chunk_id="c2",
                 doc_id="d2",
                 source_id="src1",
-                content="内容2",
+                content="Content 2",
                 vector=[0.0, 1.0],
             ),
             score=0.5,
@@ -469,7 +469,7 @@ async def test_knowledge_retriever_applies_rerank(monkeypatch) -> None:
     retriever = KnowledgeRetriever(store=store, embedding_provider=embedder, config=config)
 
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="src1", name="示例", source_type="doc")],
+        sources=[KnowledgeSource(source_id="src1", name="example", source_type="doc")],
         sparse_embedder=_StubSparseEmbedder(),
     )
 

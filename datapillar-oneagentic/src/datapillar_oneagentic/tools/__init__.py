@@ -1,11 +1,11 @@
 """
-Tools 模块
+Tools module.
 
-对外暴露（业务侧使用）：
-- tool: 装饰器，定义工具
+Public API (application use):
+- tool: decorator for defining tools
 
-框架内部（业务侧不应直接使用）：
-- create_delegation_tool: 委派工具创建
+Framework internal (not for application use):
+- create_delegation_tool: delegation tool factory
 """
 
 from datapillar_oneagentic.tools.delegation import (
@@ -14,7 +14,7 @@ from datapillar_oneagentic.tools.delegation import (
 )
 from datapillar_oneagentic.tools.registry import tool
 
-# 只暴露业务侧 API
+# Expose application-facing API only.
 __all__ = [
     "tool",
 ]

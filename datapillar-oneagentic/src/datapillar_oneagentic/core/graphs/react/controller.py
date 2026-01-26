@@ -1,21 +1,21 @@
 """
-ReAct Controller - 规划-执行-反思 控制器
+ReAct controller (plan-execute-reflect).
 
-在 Orchestrator 层面控制 ReAct 循环：
-1. 规划：调用 Planner 生成任务计划
-2. 执行：按计划调度 Agent（通过设置 active_agent）
-3. 反思：调用 Reflector 评估结果，决定下一步
+Controls the ReAct loop at the orchestrator level:
+1. Plan: call Planner to generate a task plan
+2. Execute: schedule agents by setting active_agent
+3. Reflect: call Reflector to evaluate results and choose next step
 
-路由机制：
-- Controller 通过 StateBuilder 更新 active_agent 来指定下一个执行的 Agent
-- Graph 的 conditional_edges 根据 active_agent 路由到具体 Agent 节点
-- Agent 执行完后返回 react_controller，继续循环
+Routing:
+- Controller updates active_agent via StateBuilder
+- Graph conditional_edges route to the agent node
+- Agents return to react_controller after execution
 
-使用示例：
+Example:
 ```python
 from datapillar_oneagentic.core.graphs.react.controller import react_controller_node
 
-# 在 Graph 中添加节点
+# Add node in the graph
 graph.add_node("react_controller", react_controller_node)
 ```
 """
@@ -24,8 +24,6 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-
-from langchain_core.messages import AIMessage
 
 from datapillar_oneagentic.core.agent import AgentSpec
 from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind, ProcessStage
@@ -37,10 +35,10 @@ from datapillar_oneagentic.state import StateBuilder
 
 logger = logging.getLogger(__name__)
 
-# 系统异常最大快速重试次数
+# Max fast-retry count for system errors.
 MAX_ERROR_RETRIES = 3
 
-# 最大重规划次数（防止无限循环）
+# Max replan attempts to prevent infinite loops.
 MAX_REPLAN_DEPTH = 5
 
 
@@ -52,46 +50,46 @@ async def react_controller_node(
     agent_specs: list[AgentSpec],
 ) -> dict:
     """
-    ReAct 控制器节点
+    ReAct controller node.
 
-    根据当前状态决定下一步：
-    1. 没有 goal -> 提取 goal，创建计划
-    2. 有计划，有待执行任务 -> 设置 active_agent 执行下一个任务
-    3. 有计划，当前任务完成 -> 反思
-    4. 反思后 -> 根据反思结果设置下一步
+    Decide next steps based on current state:
+    1. No goal -> extract goal and create plan
+    2. Has plan and pending tasks -> set active_agent for next task
+    3. Has plan and current task completed -> reflect
+    4. After reflection -> set next action
 
     Args:
-        state: Blackboard 状态
-        llm: LLM 实例
-        agent_ids: 可用的 Agent ID 列表
-        agent_specs: 可用的 Agent 规格列表
+        state: Blackboard state
+        llm: LLM instance
+        agent_ids: available agent IDs
+        agent_specs: available agent specs
 
     Returns:
-        dict: 状态更新（通过 active_agent 控制路由）
+        dict: state patch (active_agent controls routing)
     """
     sb = StateBuilder(state)
 
-    # 1. 提取或获取 goal
+    # 1. Extract or load goal.
     goal = sb.react.snapshot().goal
     if not goal:
-        goal = _extract_goal_from_messages(sb)
+        goal = _extract_goal(sb)
         if not goal:
-            logger.warning("无法提取用户目标，结束流程")
+            logger.warning("Failed to extract user goal; ending flow")
             sb.routing.clear_active()
             return sb.patch()
     sb.react.save_goal(goal)
 
-    # 2. 获取或创建 Plan
+    # 2. Load or create plan.
     plan_data = sb.react.snapshot().plan
     if plan_data:
         plan = Plan.model_validate(plan_data)
     else:
-        logger.info(f"ReAct: 开始规划 - {goal[:100]}...")
+        logger.info(f"ReAct: planning started - {goal[:100]}...")
         plan = await create_plan(goal=goal, llm=llm, available_agents=agent_specs)
-        logger.info(f"ReAct: 规划完成，共 {len(plan.tasks)} 个任务")
+        logger.info(f"ReAct: plan created with {len(plan.tasks)} tasks")
         sb.react.save_plan(plan.model_dump(mode="json"))
 
-    # 3. 迭代决定下一步（避免递归）
+    # 3. Iteratively decide next step (avoid recursion).
     replan_count = 0
 
     while True:
@@ -101,13 +99,13 @@ async def react_controller_node(
             agent_ids=agent_ids,
         )
 
-        # 如果有明确的下一步，直接返回
+        # If next step is clear, return.
         if action != "reflect":
             sb.react.save_plan(plan.model_dump(mode="json"))
             return sb.patch()
 
-        # 需要反思
-        logger.info("ReAct: 进入反思阶段...")
+        # Reflection required.
+        logger.info("ReAct: entering reflection stage")
         last_result = _extract_result_summary(sb)
 
         reflection = await reflect(
@@ -117,56 +115,56 @@ async def react_controller_node(
             last_result_summary=last_result,
         )
 
-        logger.info(f"ReAct: 反思完成 - next_action={reflection.next_action}")
+        logger.info(f"ReAct: reflection completed - next_action={reflection.next_action}")
 
-        # 根据反思结果处理
+        # Handle reflection outcome.
         next_action = decide_next_action(plan=plan, reflection=reflection)
 
         if next_action == "end":
-            # 结束（成功或失败）
+            # End (success or failure).
             status = ExecutionStatus.COMPLETED if reflection.is_complete() else ExecutionStatus.FAILED
             plan.status = status
             plan.stage = ProcessStage.REFLECTING
-            logger.info(f"ReAct: 流程结束 - {status}")
+            logger.info(f"ReAct: flow ended - {status}")
             sb.react.save_plan(plan.model_dump(mode="json"))
             sb.react.save_reflection(reflection.model_dump(mode="json"))
             sb.routing.clear_active()
             return sb.patch()
 
         if next_action == "planner":
-            # 重新规划
+            # Replan.
             replan_count += 1
             if replan_count > MAX_REPLAN_DEPTH:
-                logger.error(f"ReAct: 重规划次数超过 {MAX_REPLAN_DEPTH} 次，强制结束")
+                logger.error(f"ReAct: replan limit exceeded ({MAX_REPLAN_DEPTH}); forced stop")
                 plan.status = ExecutionStatus.FAILED
                 plan.stage = ProcessStage.REFLECTING
                 sb.react.save_plan(plan.model_dump(mode="json"))
                 sb.routing.clear_active()
                 return sb.patch()
 
-            logger.info(f"ReAct: 重新规划 ({replan_count}/{MAX_REPLAN_DEPTH})...")
+            logger.info(f"ReAct: replan ({replan_count}/{MAX_REPLAN_DEPTH})...")
             plan = await replan(
                 plan=plan,
                 reflection_summary=reflection.summary,
                 llm=llm,
                 available_agents=agent_specs,
             )
-            # 继续循环，基于新计划决定下一步
+            # Continue loop based on new plan.
             continue
 
         if next_action == "executor":
-            # 继续执行或重试
+            # Continue or retry.
             if reflection.should_retry():
                 current_task = plan.get_current_task()
                 if current_task:
                     current_task.status = ExecutionStatus.PENDING
                     current_task.error = None
-                    logger.info(f"ReAct: 重试任务 {current_task.id}")
-            # 继续循环
+                    logger.info(f"ReAct: retry task {current_task.id}")
+            # Continue loop.
             continue
 
-        # 未知状态，结束
-        logger.warning("ReAct: 未知状态，结束流程")
+        # Unknown state: end.
+        logger.warning("ReAct: unknown state, ending flow")
         sb.react.save_plan(plan.model_dump(mode="json"))
         sb.routing.clear_active()
         return sb.patch()
@@ -179,20 +177,20 @@ def _decide_next_step(
     agent_ids: list[str],
 ) -> str:
     """
-    根据计划状态决定下一步
+    Decide next step based on plan state.
 
-    返回：
-    - "execute"  执行 Agent
-    - "finalize" 结束
-    - "reflect"  需要反思
+    Returns:
+    - "execute": execute agent
+    - "finalize": end
+    - "reflect": reflection required
     """
-    # 检查是否有进行中的任务
+    # Check running task.
     current_task = plan.get_current_task()
     if current_task and current_task.status == ExecutionStatus.RUNNING:
-        # 任务正在执行，检查是否刚完成（从 agent 返回）
+        # Task running; check if it just completed (from agent return).
         routing = sb.routing.snapshot()
         if routing.active_agent is None:
-            # Agent 执行完毕，检查执行结果
+            # Agent finished; check execution result.
             last_status = routing.last_status
             last_error = routing.last_error
             last_failure_kind = routing.last_failure_kind
@@ -201,69 +199,71 @@ def _decide_next_step(
             if last_status == ExecutionStatus.COMPLETED:
                 result_summary = _extract_result_summary(sb)
                 current_task.mark_completed(result_summary)
-                logger.info(f"ReAct: 任务 {current_task.id} 成功完成")
+                logger.info(f"ReAct: task {current_task.id} completed successfully")
                 error_retry_count = 0
-                sb.react.set_error_retry_count(error_retry_count)
+                sb.react.set_error_retry(error_retry_count)
 
             elif last_status == ExecutionStatus.FAILED and last_failure_kind == FailureKind.SYSTEM:
-                # 系统异常：快速重试
+                # System error: fast retry.
                 error_retry_count += 1
                 if error_retry_count < MAX_ERROR_RETRIES:
                     logger.warning(
-                        f"ReAct: 任务 {current_task.id} 系统异常 ({error_retry_count}/{MAX_ERROR_RETRIES})，"
-                        f"快速重试: {last_error}"
+                        f"ReAct: task {current_task.id} system error "
+                        f"({error_retry_count}/{MAX_ERROR_RETRIES}); fast retry: {last_error}"
                     )
                     current_task.status = ExecutionStatus.PENDING
-                    # 验证 agent_id 有效
+                    # Validate agent_id.
                     agent_id = current_task.assigned_agent
                     if agent_id not in agent_ids:
-                        logger.error(f"ReAct: Agent {agent_id} 不在可用列表中")
-                        current_task.mark_failed(f"Agent {agent_id} 不存在")
+                        logger.error(f"ReAct: Agent {agent_id} not in available list")
+                        current_task.mark_failed(f"Agent {agent_id} not found")
                         return "reflect"
                     sb.routing.activate(agent_id)
                     sb.memory.append_task_instruction(
                         task_id=current_task.id,
                         description=current_task.description,
                     )
-                    sb.react.set_error_retry_count(error_retry_count)
+                    sb.react.set_error_retry(error_retry_count)
                     return "execute"
                 else:
                     logger.error(
-                        f"ReAct: 任务 {current_task.id} 系统异常，重试 {MAX_ERROR_RETRIES} 次后仍失败"
+                        f"ReAct: task {current_task.id} system error; failed after {MAX_ERROR_RETRIES} retries"
                     )
-                    current_task.mark_failed(f"系统异常（重试 {MAX_ERROR_RETRIES} 次）: {last_error}")
+                    current_task.mark_failed(
+                        f"System error (retried {MAX_ERROR_RETRIES} times): {last_error}"
+                    )
                     plan.status = ExecutionStatus.FAILED
                     plan.stage = ProcessStage.REFLECTING
                     sb.routing.clear_active()
-                    sb.react.set_error_retry_count(0)
+                    sb.react.set_error_retry(0)
                     return "finalize"
 
             elif last_status == ExecutionStatus.FAILED:
-                current_task.mark_failed(last_error or "业务失败")
-                logger.warning(f"ReAct: 任务 {current_task.id} 业务失败: {last_error}")
+                current_task.mark_failed(last_error or "Business failure")
+                logger.warning(f"ReAct: task {current_task.id} business failure: {last_error}")
                 error_retry_count = 0
-                sb.react.set_error_retry_count(error_retry_count)
+                sb.react.set_error_retry(error_retry_count)
 
             else:
                 result_summary = _extract_result_summary(sb)
                 current_task.mark_completed(result_summary)
-                logger.info(f"ReAct: 任务 {current_task.id} 完成 (状态: {last_status})")
+                logger.info(f"ReAct: task {current_task.id} completed (status: {last_status})")
                 error_retry_count = 0
-                sb.react.set_error_retry_count(error_retry_count)
+                sb.react.set_error_retry(error_retry_count)
 
         else:
-            # 任务还在执行（不应该走到这里，但做个保护）
+            # Task still running (defensive guard).
             return "execute"
 
-    # 检查是否所有任务都已完成
+    # Check if all tasks completed.
     if plan.is_all_completed():
-        logger.info("ReAct: 所有任务已完成，结束流程")
+        logger.info("ReAct: all tasks completed; ending flow")
         plan.status = ExecutionStatus.COMPLETED
         plan.stage = ProcessStage.EXECUTING
         sb.routing.clear_active()
         return "finalize"
 
-    # 检查是否有待执行任务（无失败任务时才继续）
+    # Check pending tasks (only if no failures).
     if not plan.has_failed_task():
         next_task = plan.get_next_task()
         if next_task:
@@ -271,15 +271,15 @@ def _decide_next_step(
             plan.current_task_id = next_task.id
             plan.stage = ProcessStage.EXECUTING
 
-            # 验证 agent_id 有效
+            # Validate agent_id.
             agent_id = next_task.assigned_agent
             if agent_id not in agent_ids:
-                logger.error(f"ReAct: Agent {agent_id} 不在可用列表中: {agent_ids}")
-                next_task.mark_failed(f"Agent {agent_id} 不存在")
+                logger.error(f"ReAct: Agent {agent_id} not in available list: {agent_ids}")
+                next_task.mark_failed(f"Agent {agent_id} not found")
                 return "reflect"
 
-            logger.info(f"ReAct: 执行任务 {next_task.id} - {next_task.description[:50]}...")
-            logger.info(f"  分配给: {agent_id}")
+            logger.info(f"ReAct: execute task {next_task.id} - {next_task.description[:50]}...")
+            logger.info(f"Assigned to: {agent_id}")
             sb.routing.activate(agent_id)
             sb.memory.append_task_instruction(
                 task_id=next_task.id,
@@ -287,26 +287,26 @@ def _decide_next_step(
             )
             return "execute"
     else:
-        logger.info("ReAct: 检测到任务失败，跳过后续任务，进入反思阶段...")
+        logger.info("ReAct: task failure detected; skipping remaining tasks, entering reflection stage")
 
-    # 需要反思
+    # Reflection required.
     plan.stage = ProcessStage.REFLECTING
     return "reflect"
 
 
-def _extract_goal_from_messages(sb: StateBuilder) -> str | None:
-    """从 messages 中提取用户目标"""
+def _extract_goal(sb: StateBuilder) -> str | None:
+    """Extract user goal from messages."""
     return sb.memory.latest_user_text()
 
 
 def _extract_result_summary(sb: StateBuilder) -> str:
-    """从状态中提取最近执行结果摘要"""
+    """Extract the latest execution summary from state."""
     for msg in reversed(sb.memory.snapshot()):
-        if isinstance(msg, AIMessage):
+        if msg.role == "assistant":
             return msg.content or ""
 
     deliverable_keys = sb.deliverables.snapshot().keys
     if deliverable_keys:
-        return f"交付物: {deliverable_keys}"
+        return f"Deliverables: {deliverable_keys}"
 
-    return "无执行结果"
+    return "No execution result"

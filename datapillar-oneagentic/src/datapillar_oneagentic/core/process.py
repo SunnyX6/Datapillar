@@ -1,7 +1,7 @@
 """
-执行模式枚举
+Execution mode enum.
 
-定义团队的执行策略。
+Defines team execution strategies.
 """
 
 from enum import Enum
@@ -9,62 +9,62 @@ from enum import Enum
 
 class Process(str, Enum):
     """
-    执行模式
+    Execution modes.
 
-    控制团队内 Agent 的协作方式。
+    Controls how agents collaborate within a team.
     """
 
     SEQUENTIAL = "sequential"
     """
-    顺序执行
+    Sequential execution.
 
-    按 agents 列表顺序依次执行：
-    - Agent 1 执行完毕 → Agent 2 → Agent 3 → ...
-    - 每个 Agent 的输出自动作为下一个的上下文
-    - 适用于明确的流水线场景（分析→设计→开发→审核）
+    Executes agents in order:
+    - Agent 1 → Agent 2 → Agent 3 → ...
+    - Each output becomes the next agent's context
+    - Suitable for clear pipelines (analysis → design → build → review)
     """
 
     DYNAMIC = "dynamic"
     """
-    动态执行
+    Dynamic execution.
 
-    Agent 自主决定是否委派：
-    - 从第一个 Agent 开始
-    - Agent 判断自己能否完成，不能则委派给其他 Agent
-    - 通过 can_delegate_to 配置约束委派范围
-    - 适用于灵活的协作场景
+    Agents decide whether to delegate:
+    - Start from the first agent
+    - Delegate when the agent cannot finish
+    - Delegation constrained by can_delegate_to
+    - Suitable for flexible collaboration
     """
 
     HIERARCHICAL = "hierarchical"
     """
-    层级执行
+    Hierarchical execution.
 
-    Manager Agent 协调分配任务：
-    - Manager 接收用户请求，规划任务
-    - Manager 将任务分配给合适的 Agent
-    - Agent 执行完毕后汇报给 Manager
-    - Manager 汇总结果或继续分配
-    - 适用于复杂的多任务场景
+    Manager agent coordinates tasks:
+    - Manager receives requests and plans
+    - Manager assigns tasks to agents
+    - Agents report back after completion
+    - Manager aggregates or continues
+    - Suitable for complex multi-task scenarios
     """
 
     MAPREDUCE = "mapreduce"
     """
-    MapReduce 执行
+    MapReduce execution.
 
-    任务分解 → 并行执行 → 统一汇总：
-    - Planner 拆分独立任务并分配 Agent
-    - Map 阶段并行执行任务
-    - Reducer 汇总结果生成最终交付（默认使用最后一个 Agent 的 schema）
-    - 适用于可并行化且需要汇总的场景
+    Decompose → parallelize → reduce:
+    - Planner splits tasks and assigns agents
+    - Map phase executes tasks in parallel
+    - Reducer aggregates final deliverable (defaults to last agent schema)
+    - Suitable for parallelizable work with aggregation
     """
 
     REACT = "react"
     """
-    ReAct 模式（规划-执行-反思）
+    ReAct mode (plan-execute-reflect).
 
-    智能规划与反思循环：
-    - Controller 根据用户目标生成任务计划
-    - 按计划调度 Agent 执行任务
-    - 执行后反思结果，决定下一步（继续/重试/重规划/结束）
-    - 适用于复杂目标、需要动态调整的场景
+    Planning and reflection loop:
+    - Controller creates a plan from user goals
+    - Agents execute tasks per plan
+    - Reflect and decide next step (continue/retry/replan/end)
+    - Suitable for complex goals with dynamic adjustments
     """

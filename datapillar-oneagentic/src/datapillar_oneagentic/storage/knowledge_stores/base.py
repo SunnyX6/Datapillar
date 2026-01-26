@@ -1,6 +1,4 @@
-"""
-KnowledgeStore 抽象接口
-"""
+"""KnowledgeStore abstract interface."""
 
 from __future__ import annotations
 
@@ -16,32 +14,32 @@ from datapillar_oneagentic.knowledge.models import (
 
 
 class KnowledgeStore(ABC):
-    """知识存储抽象接口"""
+    """Abstract interface for knowledge storage."""
 
     @property
     @abstractmethod
     def namespace(self) -> str:
-        """命名空间（隔离边界）"""
+        """Namespace (isolation boundary)."""
 
     @abstractmethod
     async def initialize(self) -> None:
-        """初始化存储"""
+        """Initialize the store."""
 
     @abstractmethod
     async def close(self) -> None:
-        """关闭存储"""
+        """Close the store."""
 
     @abstractmethod
     async def upsert_sources(self, sources: list[KnowledgeSource]) -> None:
-        """写入知识源"""
+        """Upsert knowledge sources."""
 
     @abstractmethod
     async def upsert_docs(self, docs: list[KnowledgeDocument]) -> None:
-        """写入文档元数据"""
+        """Upsert document metadata."""
 
     @abstractmethod
     async def upsert_chunks(self, chunks: list[KnowledgeChunk]) -> None:
-        """写入知识分片"""
+        """Upsert knowledge chunks."""
 
     @abstractmethod
     async def search_chunks(
@@ -51,20 +49,20 @@ class KnowledgeStore(ABC):
         k: int,
         filters: dict[str, Any] | None = None,
     ) -> list[KnowledgeSearchHit]:
-        """检索分片"""
+        """Search chunks."""
 
     @abstractmethod
     async def get_doc(self, doc_id: str) -> KnowledgeDocument | None:
-        """获取文档元数据"""
+        """Get document metadata."""
 
     @abstractmethod
     async def get_chunks(self, chunk_ids: list[str]) -> list[KnowledgeChunk]:
-        """按 ID 获取分片"""
+        """Get chunks by ID."""
 
     @abstractmethod
     async def delete_doc(self, doc_id: str) -> int:
-        """删除文档元数据"""
+        """Delete document metadata."""
 
     @abstractmethod
-    async def delete_chunks_by_doc_id(self, doc_id: str) -> int:
-        """按文档 ID 删除分片"""
+    async def delete_doc_chunks(self, doc_id: str) -> int:
+        """Delete chunks by document ID."""

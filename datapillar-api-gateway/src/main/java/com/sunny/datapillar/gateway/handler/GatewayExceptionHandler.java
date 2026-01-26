@@ -2,6 +2,7 @@ package com.sunny.datapillar.gateway.handler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sunny.datapillar.common.constant.HeaderConstants;
 import com.sunny.datapillar.gateway.response.GatewayErrorCode;
 import com.sunny.datapillar.gateway.response.GatewayResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -44,7 +45,7 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
         }
 
         // 获取 TraceId
-        String traceId = exchange.getRequest().getHeaders().getFirst("X-Trace-Id");
+        String traceId = exchange.getRequest().getHeaders().getFirst(HeaderConstants.HEADER_TRACE_ID);
 
         // 根据异常类型构建响应
         GatewayResponse<Object> gatewayResponse;

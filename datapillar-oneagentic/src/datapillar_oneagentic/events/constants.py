@@ -1,7 +1,7 @@
 """
-事件常量定义
+Event constants.
 
-事件枚举的单一来源，供 Timeline/SSE/Events 等模块使用。
+Single source of truth for event enums used by Timeline/SSE/Events modules.
 """
 
 from __future__ import annotations
@@ -11,23 +11,23 @@ from enum import Enum
 
 class EventType(str, Enum):
     """
-    统一的事件类型
+    Unified event types.
 
-    命名规范：<模块>.<动作>
+    Naming convention: <module>.<action>
     """
 
-    # === 会话事件 ===
+    # === Session events ===
     SESSION_START = "session.start"
     SESSION_END = "session.end"
     SESSION_RESUME = "session.resume"
     SESSION_ABORT = "session.abort"
 
-    # === 用户事件 ===
+    # === User events ===
     USER_MESSAGE = "user.message"
     USER_INTERRUPT = "user.interrupt"
     USER_FEEDBACK = "user.feedback"
 
-    # === Agent 事件 ===
+    # === Agent events ===
     AGENT_START = "agent.start"
     AGENT_END = "agent.end"
     AGENT_HANDOVER = "agent.handover"
@@ -35,63 +35,63 @@ class EventType(str, Enum):
     AGENT_THINKING = "agent.thinking"
     AGENT_INTERRUPT = "agent.interrupt"
 
-    # === 工具事件 ===
+    # === Tool events ===
     TOOL_CALL = "tool.call"
     TOOL_RESULT = "tool.result"
     TOOL_ERROR = "tool.error"
 
-    # === LLM 事件 ===
+    # === LLM events ===
     LLM_START = "llm.start"
     LLM_END = "llm.end"
     LLM_CHUNK = "llm.chunk"
 
-    # === 决策事件 ===
+    # === Decision events ===
     DECISION = "decision"
     CLARIFICATION = "clarification"
     CONSTRAINT = "constraint"
 
-    # === 记忆事件 ===
+    # === Memory events ===
     MEMORY_COMPACT = "memory.compact"
     MEMORY_UPDATE = "memory.update"
 
-    # === 检查点事件 ===
+    # === Checkpoint events ===
     CHECKPOINT_CREATE = "checkpoint.create"
     CHECKPOINT_RESTORE = "checkpoint.restore"
 
-    # === 委派事件 ===
+    # === Delegation events ===
     DELEGATION_START = "delegation.start"
     DELEGATION_END = "delegation.end"
 
-    # === 系统事件 ===
+    # === System events ===
     ERROR = "error"
     RETRY = "retry"
     TIMEOUT = "timeout"
 
     @classmethod
     def from_string(cls, value: str) -> "EventType":
-        """从字符串解析事件类型"""
+        """Parse an event type from a string."""
         for event_type in cls:
             if event_type.value == value:
                 return event_type
-        raise ValueError(f"未知的事件类型: {value}")
+        raise ValueError(f"Unknown event type: {value}")
 
     @property
     def category(self) -> str:
-        """获取事件类别"""
+        """Return the event category."""
         if "." in self.value:
             return self.value.split(".")[0]
         return self.value
 
     @property
     def action(self) -> str:
-        """获取事件动作"""
+        """Return the event action."""
         if "." in self.value:
             return self.value.split(".")[1]
         return self.value
 
 
 class EventLevel(str, Enum):
-    """事件级别"""
+    """Event level."""
 
     DEBUG = "debug"
     INFO = "info"

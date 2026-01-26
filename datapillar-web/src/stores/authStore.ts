@@ -3,14 +3,15 @@
  *
  * 使用 Zustand 管理认证状态
  * - sessionStorage 持久化（会话级）
- * - 集成 token 自动刷新机制
+ * - token 刷新由请求拦截器处理
  * - 提供登录、登出、初始化认证等方法
  */
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { login as apiLogin, logout as apiLogout } from '@/lib/api/auth'
-import { startTokenRefresh, stopTokenRefresh, getTokenInfo } from '@/lib/api/token'
+import { getTokenInfo } from '@/lib/api/token'
+import { setUnauthorizedHandler } from '@/lib/api/client'
 import type { User } from '@/types/auth'
 
 /**
@@ -64,9 +65,6 @@ export const useAuthStore = create<AuthStore>()(
             error: null
           })
 
-          startTokenRefresh(() => {
-            get().logout()
-          })
         } catch (error) {
           set({
             user: null,
@@ -85,7 +83,6 @@ export const useAuthStore = create<AuthStore>()(
         try {
           await apiLogout()
         } finally {
-          stopTokenRefresh()
           set({
             user: null,
             isAuthenticated: false,
@@ -121,10 +118,6 @@ export const useAuthStore = create<AuthStore>()(
           if (tokenInfo.valid) {
             set({ isAuthenticated: true, loading: false })
 
-            // 传入剩余时间，避免重复请求
-            startTokenRefresh(() => {
-              get().logout()
-            }, tokenInfo.remainingSeconds)
           } else {
             // Token 无效，清除用户信息
             set({
@@ -167,3 +160,8 @@ export const useAuthStore = create<AuthStore>()(
     }
   )
 )
+
+setUnauthorizedHandler(() => {
+  const { logout } = useAuthStore.getState()
+  void logout()
+})

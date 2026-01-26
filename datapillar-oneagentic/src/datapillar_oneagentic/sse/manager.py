@@ -1,52 +1,52 @@
 """
-SSE 流管理器
+SSE stream manager.
 
-目标：
-- 多智能体输出以 SSE/JSON 事件流方式推送
-- 支持断线重连后的事件重放（基于 Last-Event-ID）
-- 支持人机交互（interrupt/resume）
+Goals:
+- Stream multi-agent output as SSE/JSON events
+- Replay events after reconnect (based on Last-Event-ID)
+- Support human-in-the-loop interruptions (interrupt/resume)
 
-SSE 架构说明：
-- Orchestrator.stream() 支持三种场景：
-  1. 新会话/续聊：query 不为空
-  2. interrupt 恢复：resume_value 不为空
-  3. 客户端需要根据 interrupt 事件决定如何恢复
-- StreamManager 负责：
-  - 管理订阅者（多客户端）
-  - 事件缓冲和重放
-  - 断线重连
-  - 用户主动打断（abort）
+Architecture:
+- Orchestrator.stream() supports:
+  1. New session or continued chat (query provided)
+  2. Interrupt resume (resume_value provided)
+  3. Client decides how to resume based on interrupt events
+- StreamManager is responsible for:
+  - Managing subscribers (multi-client)
+  - Event buffering and replay
+  - Reconnect handling
+  - User-initiated abort
 
-使用示例：
+Example:
 ```python
 from datapillar_oneagentic.sse import StreamManager
 from datapillar_oneagentic.core.types import SessionKey
 
-# 创建管理器
+# Create manager
 stream_manager = StreamManager()
 
-# 构建 SessionKey
+# Build SessionKey
 key = SessionKey(namespace="etl_team", session_id="session123")
 
-# 场景 1: 新会话或续聊
+# Case 1: new session or continued chat
 await stream_manager.chat(
     orchestrator=orchestrator,
-    query="请帮我查询...",
+    query="Please help me query...",
     key=key,
 )
 
-# 场景 2: 恢复 interrupt（用户回答 Agent 的问题）
+# Case 2: resume interrupt (user answers the agent's question)
 await stream_manager.chat(
     orchestrator=orchestrator,
-    query=None,  # 可选，作为上下文
+    query=None,  # optional as context
     key=key,
-    resume_value="是的，我确认继续",  # 用户对 interrupt 的回答
+    resume_value="Yes, please continue",  # user response to interrupt
 )
 
-# 场景 3: 用户主动打断
+# Case 3: user aborts
 await stream_manager.abort(key=key)
 
-# 订阅流
+# Subscribe to the stream
 async for event in stream_manager.subscribe(
     request=request,
     key=key,
@@ -81,7 +81,7 @@ _SENTINEL = object()
 
 
 def _json_serializer(obj: Any) -> Any:
-    """自定义 JSON 序列化器，处理 Pydantic 模型"""
+    """Custom JSON serializer for Pydantic models."""
     if isinstance(obj, BaseModel):
         return obj.model_dump()
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
@@ -89,12 +89,12 @@ def _json_serializer(obj: Any) -> Any:
 
 class OrchestratorProtocol(Protocol):
     """
-    Orchestrator 协议
+    Orchestrator protocol.
 
-    stream() 方法支持三种场景：
-    1. 新会话/续聊：query 不为空，resume_value 为空
-    2. interrupt 恢复：resume_value 不为空
-    3. 纯续聊：query 不为空，已有会话状态
+    stream() supports:
+    1. New session/continued chat: query provided, resume_value empty
+    2. Interrupt resume: resume_value provided
+    3. Continued chat: query provided with existing session state
     """
 
     async def stream(
@@ -105,22 +105,22 @@ class OrchestratorProtocol(Protocol):
         resume_value: Any | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """
-        流式执行
+        Stream execution.
 
-        参数：
-        - query: 用户输入（新问题或续聊内容）
-        - key: SessionKey（namespace + session_id）
-        - resume_value: interrupt 恢复值（用户对 interrupt 的回答）
+        Args:
+            query: User input (new or continued chat)
+            key: SessionKey (namespace + session_id)
+            resume_value: Resume value from interrupt (user response)
 
-        返回：
-        - SSE 事件流
+        Returns:
+            SSE event stream
         """
         ...
 
 
 @dataclass(slots=True)
 class StreamRecord:
-    """流记录"""
+    """Stream record."""
 
     seq: int
     payload: dict[str, Any]
@@ -130,13 +130,13 @@ class StreamRecord:
 @dataclass
 class _SessionRun:
     """
-    会话运行状态
+    Session run state.
 
-    概念区分：
-    - Session/Thread: 整个对话历史（由 LangGraph Checkpoint 持久化）
-    - Run: 一次图执行（可被打断）
+    Concepts:
+    - Session/Thread: full conversation history (persisted by LangGraph Checkpoint)
+    - Run: a single graph execution (interruptible)
 
-    打断只影响当前 run，不影响 session。
+    Interrupts affect only the current run, not the session.
     """
 
     key: SessionKey
@@ -152,13 +152,13 @@ class _SessionRun:
 
 class StreamManager:
     """
-    SSE 流管理器
+    SSE stream manager.
 
-    功能：
-    - 管理 SSE 流的生命周期
-    - 支持多订阅者
-    - 支持断线重连和事件重放
-    - 会话过期清理
+    Features:
+    - Manage SSE stream lifecycle
+    - Support multiple subscribers
+    - Reconnect and replay
+    - Session expiration cleanup
     """
 
     def __init__(
@@ -169,12 +169,12 @@ class StreamManager:
         session_ttl_seconds: int = 60 * 60,
     ):
         """
-        初始化流管理器
+        Initialize the stream manager.
 
-        参数：
-        - buffer_size: 事件缓冲区大小
-        - subscriber_queue_size: 订阅者队列大小
-        - session_ttl_seconds: 会话过期时间（秒）
+        Args:
+            buffer_size: Event buffer size
+            subscriber_queue_size: Subscriber queue size
+            session_ttl_seconds: Session TTL in seconds
         """
         self._runs: dict[str, _SessionRun] = {}
         self._buffer_size = max(100, buffer_size)
@@ -182,7 +182,7 @@ class StreamManager:
         self._session_ttl_seconds = max(60, session_ttl_seconds)
 
     def _cleanup_expired(self) -> None:
-        """清理过期会话"""
+        """Clean up expired sessions."""
         current_ms = now_ms()
         expire_before_ms = current_ms - self._session_ttl_seconds * 1000
         expired_keys = [
@@ -192,7 +192,7 @@ class StreamManager:
             self._runs.pop(key, None)
 
     async def _emit(self, run: _SessionRun, payload: dict[str, Any]) -> None:
-        """发送事件到所有订阅者"""
+        """Emit an event to all subscribers."""
         async with run.lock:
             seq = run.next_seq
             run.next_seq += 1
@@ -216,7 +216,7 @@ class StreamManager:
                     queue.put_nowait(_SENTINEL)
 
     async def _complete(self, run: _SessionRun) -> None:
-        """标记会话完成"""
+        """Mark the run as completed."""
         async with run.lock:
             run.completed = True
             run.last_activity_ms = now_ms()
@@ -233,19 +233,19 @@ class StreamManager:
         resume_value: Any | None,
     ) -> None:
         """
-        运行编排器流
+        Run the orchestrator stream.
 
-        Orchestrator.stream() 直接 yield SSE 事件，
-        StreamManager 将这些事件发送给订阅者。
+        Orchestrator.stream() yields SSE events and StreamManager forwards
+        them to subscribers.
 
-        参数：
-        - orchestrator: 编排器实例
-        - query: 用户输入（新问题或续聊）
-        - key: SessionKey
-        - resume_value: interrupt 恢复值
+        Args:
+            orchestrator: Orchestrator instance
+            query: User input (new or continued chat)
+            key: SessionKey
+            resume_value: Resume value from interrupt
 
-        打断处理：
-        - CancelledError 表示用户主动打断
+        Interrupt handling:
+        - CancelledError indicates a user-initiated abort
         """
         run = self._runs[str(key)]
 
@@ -257,10 +257,10 @@ class StreamManager:
             ):
                 await self._emit(run, msg)
         except asyncio.CancelledError:
-            logger.info(f"Run 被用户打断: key={key}")
+            logger.info(f"Run cancelled by user: key={key}")
             raise
         except Exception as exc:
-            logger.error("SSE 推送失败: %s", exc, exc_info=True)
+            logger.error("SSE emit failed: %s", exc, exc_info=True)
         finally:
             await self._complete(run)
 
@@ -273,15 +273,15 @@ class StreamManager:
         resume_value: Any | None = None,
     ) -> None:
         """
-        统一的聊天入口
+        Unified chat entrypoint.
 
-        场景：
-        - resume_value 不为空：interrupt 恢复
-        - query 不为空：用户消息
+        Scenarios:
+        - resume_value provided: interrupt resume
+        - query provided: user message
 
-        打断机制：
-        - 如果有旧 run 正在执行，会先打断它
-        - 打断的是 run，不是 session（对话历史保留）
+        Interrupt behavior:
+        - If a previous run is active, it is aborted first
+        - Only the run is aborted; session history is preserved
         """
         self._cleanup_expired()
         storage_key = str(key)
@@ -293,7 +293,7 @@ class StreamManager:
         else:
             async with run.lock:
                 if run.running_task and not run.running_task.done():
-                    logger.info(f"打断旧 run: key={key}")
+                    logger.info(f"Cancel previous run: key={key}")
                     run.running_task.cancel()
                     with contextlib.suppress(asyncio.CancelledError):
                         await run.running_task
@@ -320,15 +320,15 @@ class StreamManager:
         last_event_id: int | None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """
-        订阅 SSE 流
+        Subscribe to the SSE stream.
 
-        参数：
-        - request: HTTP 请求（用于检测断开）
-        - key: SessionKey
-        - last_event_id: 上次事件 ID（用于断线重连）
+        Args:
+            request: HTTP request (disconnect detection)
+            key: SessionKey
+            last_event_id: Last event ID (for reconnect)
 
-        生成：
-        - SSE 事件字典 {"id": str, "data": str}
+        Yields:
+            SSE event dict {"id": str, "data": str}
         """
         self._cleanup_expired()
         storage_key = str(key)
@@ -398,11 +398,10 @@ class StreamManager:
 
     def clear_session(self, *, key: SessionKey) -> bool:
         """
-        清理会话缓冲
+        Clear session buffer.
 
-        返回：
-        - True: 存在并已清理
-        - False: 不存在
+        Returns:
+            True if existed and cleared, False otherwise
         """
         storage_key = str(key)
         existed = storage_key in self._runs
@@ -411,25 +410,24 @@ class StreamManager:
 
     async def abort(self, *, key: SessionKey) -> bool:
         """
-        打断当前 run
+        Abort the current run.
 
-        打断的是 run（当前执行），不是 session（对话历史）。
-        checkpoint 保存 next 字段（未完成的节点），下次可从断点恢复。
+        Only the run is aborted; session history is preserved.
+        Checkpoint stores the next field (unfinished node) for resume.
 
-        返回：
-        - True: 成功打断
-        - False: 没有正在运行的 run
+        Returns:
+            True if aborted, False if no running run
         """
         storage_key = str(key)
         run = self._runs.get(storage_key)
 
         if run is None:
-            logger.warning(f"Abort 失败：session 不存在: {key}")
+            logger.warning(f"Abort failed: session not found: {key}")
             return False
 
         async with run.lock:
             if run.running_task is None or run.running_task.done():
-                logger.info(f"Abort 跳过：没有正在运行的 run: {key}")
+                logger.info(f"Abort skipped: no running run: {key}")
                 return False
 
             logger.info(f"Abort run: key={key}")

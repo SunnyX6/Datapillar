@@ -1,6 +1,4 @@
-"""
-文本预处理
-"""
+"""Text preprocessing."""
 
 from __future__ import annotations
 
@@ -23,5 +21,5 @@ def apply_preprocess(text: str, rules: list[str]) -> str:
         elif rule == "remove_control":
             output = _CONTROL_CHARS.sub("", output)
         else:
-            raise ValueError(f"不支持的预处理规则: {rule}")
+            raise ValueError(f"Unsupported preprocessing rule: {rule}")
     return output

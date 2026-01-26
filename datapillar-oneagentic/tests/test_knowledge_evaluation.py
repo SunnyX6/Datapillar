@@ -84,7 +84,7 @@ class _InMemoryKnowledgeStore(KnowledgeStore):
             return 1
         return 0
 
-    async def delete_chunks_by_doc_id(self, doc_id: str) -> int:
+    async def delete_doc_chunks(self, doc_id: str) -> int:
         to_delete = [key for key, chunk in self.chunks.items() if chunk.doc_id == doc_id]
         for key in to_delete:
             del self.chunks[key]
@@ -121,7 +121,7 @@ def _build_evalset() -> EvalSet:
 
 
 @pytest.mark.asyncio
-async def test_knowledge_evaluator_reports_metrics() -> None:
+async def test_knowledge_evaluator() -> None:
     store = _InMemoryKnowledgeStore()
     embedder = _StubEmbeddingProvider()
     chunk_config = KnowledgeChunkConfig(mode="general", general={"max_tokens": 200, "overlap": 0})
@@ -147,7 +147,7 @@ async def test_knowledge_evaluator_reports_metrics() -> None:
     assert chunk_report.summary.metrics["recall@1"] == 1.0
 
 
-def test_load_eval_set_roundtrip(tmp_path) -> None:
+def test_load_eval(tmp_path) -> None:
     evalset = _build_evalset()
     path = tmp_path / "eval.json"
     path.write_text(json.dumps(evalset.model_dump(), ensure_ascii=False), encoding="utf-8")

@@ -1,7 +1,7 @@
 """
-Todo 更新与持久化
+Todo updates and persistence.
 
-Todo 仅保留在 state 中，不再维护历史或窗口。
+Todo is stored only in state; no history or windowing is maintained.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ async def apply_todo_updates(
     try:
         todo_list = SessionTodoList.model_validate(current_todo)
     except Exception as exc:
-        logger.warning(f"Todo 解析失败: {exc}")
+        logger.warning(f"Todo parse failed: {exc}")
         return None
 
     if todo_list.apply_updates(updates):
@@ -47,7 +47,7 @@ async def apply_todo_plan(
         try:
             todo_list = SessionTodoList.model_validate(current_todo)
         except Exception as exc:
-            logger.warning(f"Todo 解析失败: {exc}")
+            logger.warning(f"Todo parse failed: {exc}")
             return None
 
     if todo_list.apply_plan(ops):

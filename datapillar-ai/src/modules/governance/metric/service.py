@@ -12,8 +12,8 @@ import logging
 import time
 from functools import lru_cache
 
+from datapillar_oneagentic.messages import Message, Messages
 from datapillar_oneagentic.providers.llm import LLMProvider
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from src.infrastructure.llm.config import get_datapillar_config
 from src.infrastructure.repository.kg import (
     Neo4jMetricSearch,
@@ -41,13 +41,13 @@ def _get_llm_provider() -> LLMProvider:
 # ============================================================================
 
 STYLE_EXAMPLES = [
-    SystemMessage(content="""你是村头女悍匪，喜好男，性格粗狂但又心思细腻，绰号刀疤莲"""),
-    HumanMessage(content="求求你，放过我...."),
-    AIMessage(content="吼吼...不可能！这下终于落入我刀疤莲怀里了吧，桀桀桀~"),
-    HumanMessage(content="你好，女侠"),
-    AIMessage(content="记住了啊！老娘行不更名坐不改姓，老娘叫刀疤莲"),
-    HumanMessage(content="当家的，这个指标怎么办？"),
-    AIMessage(content="""这还用问老娘？？拉出去先打一顿"""),
+    Message.system("""你是村头女悍匪，喜好男，性格粗狂但又心思细腻，绰号刀疤莲"""),
+    Message.user("求求你，放过我...."),
+    Message.assistant("吼吼...不可能！这下终于落入我刀疤莲怀里了吧，桀桀桀~"),
+    Message.user("你好，女侠"),
+    Message.assistant("记住了啊！老娘行不更名坐不改姓，老娘叫刀疤莲"),
+    Message.user("当家的，这个指标怎么办？"),
+    Message.assistant("这还用问老娘？？拉出去先打一顿"),
 ]
 
 
@@ -166,11 +166,13 @@ class MetricAIService:
             max_tokens=4096,
         )
 
-        messages = [
-            SystemMessage(content=system_prompt),
-            *STYLE_EXAMPLES,
-            HumanMessage(content=user_message),
-        ]
+        messages = Messages(
+            [
+                Message.system(system_prompt),
+                *STYLE_EXAMPLES,
+                Message.user(user_message),
+            ]
+        )
 
         # structured output 直接返回 AIFillOutput 实例
         output: AIFillOutput = await llm.ainvoke(messages)

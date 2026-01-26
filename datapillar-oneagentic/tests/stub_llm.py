@@ -3,9 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import re
 from types import UnionType
-from typing import Any, Sequence, Union, get_args, get_origin
+from typing import Any, Sequence, Union, cast, get_args, get_origin
 
-from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
 from pydantic import BaseModel
 
 from datapillar_oneagentic.core.graphs.mapreduce.schemas import (
@@ -17,6 +16,8 @@ from datapillar_oneagentic.core.graphs.react.schemas import (
     PlanTaskOutput,
     ReflectorOutput,
 )
+from datapillar_oneagentic.messages import Message, Messages, ToolCall
+from datapillar_oneagentic.messages.adapters.langchain import from_langchain, is_langchain_list
 from datapillar_oneagentic.todo.tool import TODO_PLAN_TOOL_NAME, TODO_TOOL_NAME
 
 
@@ -38,10 +39,24 @@ def make_stub_factory(config: StubLlmConfig | None = None):
     return _factory
 
 
-def _extract_agent_ids(messages: Sequence[BaseMessage]) -> list[str]:
+def _coerce_messages(messages: Sequence[Any]) -> Messages:
+    if isinstance(messages, Messages):
+        return messages
+    if isinstance(messages, list) and is_langchain_list(messages):
+        return cast(Messages, from_langchain(messages))
+    if isinstance(messages, tuple):
+        as_list = list(messages)
+        if is_langchain_list(as_list):
+            return cast(Messages, from_langchain(as_list))
+    if isinstance(messages, (list, tuple)) and all(isinstance(item, Message) for item in messages):
+        return Messages(messages)
+    raise TypeError("StubChatModel only accepts Messages or LangChain message lists")
+
+
+def _extract_system_agent_ids(messages: Messages) -> list[str]:
     ids: list[str] = []
     for msg in messages:
-        if isinstance(msg, SystemMessage):
+        if msg.role == "system":
             ids.extend(re.findall(r"\*\*([a-z0-9_]+)\*\*", msg.content))
     return ids
 
@@ -83,19 +98,10 @@ def _build_default_schema(schema: type[BaseModel]) -> BaseModel:
         return schema.model_validate(data)
 
 
-def _make_ai_message(content: str, tool_calls: list[dict[str, Any]] | None = None) -> AIMessage:
+def _make_ai_message(content: str, tool_calls: list[ToolCall] | None = None) -> Message:
     if tool_calls is None:
-        return AIMessage(content=content)
-
-    try:
-        return AIMessage(content=content, tool_calls=tool_calls)
-    except TypeError:
-        msg = AIMessage(content=content, additional_kwargs={"tool_calls": tool_calls})
-        try:
-            object.__setattr__(msg, "tool_calls", tool_calls)
-        except Exception:
-            setattr(msg, "tool_calls", tool_calls)
-        return msg
+        return Message.assistant(content)
+    return Message.assistant(content, tool_calls=tool_calls)
 
 
 class StubChatModel:
@@ -128,14 +134,15 @@ class StubChatModel:
             tools=tools,
         )
 
-    async def ainvoke(self, messages: Sequence[BaseMessage], _config: dict | None = None, **_kwargs) -> Any:
+    async def ainvoke(self, messages: Sequence[Any], _config: dict | None = None, **_kwargs) -> Any:
+        normalized = _coerce_messages(messages)
         if self._tools:
-            return self._invoke_with_tools(messages)
+            return self._invoke_with_tools(normalized)
         if self._structured_schema is not None:
-            return self._build_structured(messages)
-        return AIMessage(content="{}")
+            return self._build_structured(normalized)
+        return Message.assistant("{}")
 
-    def _invoke_with_tools(self, _messages: Sequence[BaseMessage]) -> AIMessage:
+    def _invoke_with_tools(self, _messages: Messages) -> Message:
         tool_call = self._select_tool_call()
         if tool_call:
             self._tool_call_count += 1
@@ -145,7 +152,7 @@ class StubChatModel:
     def _final_tool_response(self) -> str:
         return f"{{\"text\": \"{self._config.tool_text}\"}}"
 
-    def _select_tool_call(self) -> dict[str, Any] | None:
+    def _select_tool_call(self) -> ToolCall | None:
         if not self._tools:
             return None
 
@@ -197,21 +204,16 @@ class StubChatModel:
 
         return None
 
-    def _build_tool_call(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "id": f"call_{self._tool_call_count + 1}",
-            "name": name,
-            "args": args,
-            "type": "tool_call",
-        }
+    def _build_tool_call(self, name: str, args: dict[str, Any]) -> ToolCall:
+        return ToolCall(id=f"call_{self._tool_call_count + 1}", name=name, args=args)
 
-    def _build_structured(self, messages: Sequence[BaseMessage]) -> BaseModel:
+    def _build_structured(self, messages: Messages) -> BaseModel:
         schema = self._structured_schema
         if schema is None:
             return BaseModel()
 
         if schema is PlannerOutput:
-            agent_ids = _extract_agent_ids(messages)
+            agent_ids = _extract_system_agent_ids(messages)
             agent_id = agent_ids[0] if agent_ids else "agent"
             return PlannerOutput(
                 understanding="stub",
@@ -236,7 +238,7 @@ class StubChatModel:
             )
 
         if schema is MapReducePlannerOutput:
-            agent_ids = _extract_agent_ids(messages)
+            agent_ids = _extract_system_agent_ids(messages)
             if not agent_ids:
                 agent_ids = ["agent"]
             tasks = [
@@ -250,19 +252,19 @@ class StubChatModel:
             return MapReducePlannerOutput(understanding="stub", tasks=tasks)
 
         if _has_tool_messages(messages):
-            return _build_schema_with_text(schema, self._config.tool_text)
+            return _build_schema(schema, self._config.tool_text)
 
         return _build_default_schema(schema)
 
 
-def _has_tool_messages(messages: Sequence[BaseMessage]) -> bool:
+def _has_tool_messages(messages: Messages) -> bool:
     for msg in messages:
-        if isinstance(msg, ToolMessage):
+        if msg.role == "tool":
             return True
     return False
 
 
-def _build_schema_with_text(schema: type[BaseModel], text: str) -> BaseModel:
+def _build_schema(schema: type[BaseModel], text: str) -> BaseModel:
     try:
         return schema(text=text)
     except Exception:

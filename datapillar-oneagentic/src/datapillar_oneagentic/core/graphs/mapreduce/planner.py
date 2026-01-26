@@ -1,10 +1,10 @@
 """
-MapReduce Planner
+MapReduce planner.
 
-职责：
-- 接收用户目标
-- 生成可并行执行的任务列表
-- 为每个任务分配 Agent
+Responsibilities:
+- Receive the user goal
+- Generate parallelizable tasks
+- Assign an agent to each task
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 def _parse_planner_output(result: Any) -> MapReducePlannerOutput:
     """
-    解析 Planner 输出（严格模式）
+    Parse planner output (strict mode).
     """
     return parse_structured_output(result, MapReducePlannerOutput, strict=False)
 
@@ -45,7 +45,7 @@ MAPREDUCE_PLANNER_OUTPUT_SCHEMA = """{
 }"""
 
 
-def _build_mapreduce_planner_system_prompt(agent_list: str) -> str:
+def _build_planner_prompt(agent_list: str) -> str:
     return format_markdown(
         title=None,
         sections=[
@@ -78,7 +78,7 @@ def _build_mapreduce_planner_system_prompt(agent_list: str) -> str:
 
 
 def _format_agent_list(agents: list[AgentSpec]) -> str:
-    """格式化 Agent 列表"""
+    """Format agent list."""
     lines = []
     for agent in agents:
         lines.append(f"- **{agent.id}** ({agent.name}): {agent.description or 'No description'}")
@@ -93,30 +93,30 @@ async def create_mapreduce_plan(
     contexts: dict[str, str] | None = None,
 ) -> MapReducePlan:
     """
-    创建 MapReduce 计划
+    Create a MapReduce plan.
 
     Args:
-        goal: 用户目标
-        llm: LLM 实例
-        available_agents: 可用的 Agent 列表（不含 reducer）
-        contexts: __context 分层块（可选）
+        goal: user goal
+        llm: LLM instance
+        available_agents: available agents (excluding reducer)
+        contexts: _context blocks (optional)
 
     Returns:
         MapReducePlan
     """
     if not available_agents:
-        raise ValueError("MapReduce Planner 没有可用 Agent")
+        raise ValueError("MapReduce planner has no available agents")
 
     agent_list = _format_agent_list(available_agents)
-    system_prompt = _build_mapreduce_planner_system_prompt(agent_list)
+    system_prompt = _build_planner_prompt(agent_list)
 
-    messages = ContextBuilder.build_mapreduce_planner_messages(
+    messages = ContextBuilder.build_mapreduce_planner(
         system_prompt=system_prompt,
         goal=goal,
         contexts=contexts or {},
     )
 
-    logger.info(f"MapReduce Planner 开始规划: {goal[:100]}...")
+    logger.info(f"MapReduce planner started: {goal[:100]}...")
 
     structured_llm = llm.with_structured_output(
         MapReducePlannerOutput,
@@ -127,17 +127,17 @@ async def create_mapreduce_plan(
 
     output = _parse_planner_output(result)
     if not output.tasks:
-        raise ValueError("MapReduce Planner 输出为空任务列表")
+        raise ValueError("MapReduce planner output contains no tasks")
 
     available_ids = {agent.id for agent in available_agents}
     tasks: list[MapReduceTask] = []
     for idx, task_output in enumerate(output.tasks, 1):
         agent_id = task_output.agent_id.strip()
         if agent_id not in available_ids:
-            raise ValueError(f"MapReduce Planner 分配了无效 Agent: {agent_id}")
+            raise ValueError(f"MapReduce planner assigned an invalid agent: {agent_id}")
         task_input = task_output.input.strip()
         if not task_input:
-            raise ValueError(f"MapReduce Planner 任务 {idx} 的 input 为空")
+            raise ValueError(f"MapReduce planner task {idx} has empty input")
 
         tasks.append(
             MapReduceTask(
@@ -148,5 +148,5 @@ async def create_mapreduce_plan(
             )
         )
 
-    logger.info(f"MapReduce Planner 完成规划: {len(tasks)} 个任务")
+    logger.info(f"MapReduce planner completed: {len(tasks)} tasks")
     return MapReducePlan(goal=goal, understanding=output.understanding, tasks=tasks)

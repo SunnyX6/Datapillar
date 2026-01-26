@@ -1,17 +1,17 @@
 """
-Planner - 规划器
+Planner.
 
-职责：
-- 接收用户目标
-- 分解为可执行的任务列表
-- 分配给合适的 Agent
+Responsibilities:
+- Receive user goals
+- Decompose into executable tasks
+- Assign tasks to appropriate agents
 
-使用示例：
+Example:
 ```python
 from datapillar_oneagentic.core.graphs.react.planner import create_plan
 
 plan = await create_plan(
-    goal="帮我分析销售数据并生成报告",
+    goal="Analyze sales data and produce a report",
     llm=llm,
     available_agents=available_agents,
 )
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 def _parse_planner_output(result: Any) -> PlannerOutput:
     """
-    解析 Planner 输出（严格模式）
+    Parse planner output (strict mode).
     """
     return parse_structured_output(result, PlannerOutput, strict=False)
 
@@ -53,7 +53,7 @@ PLANNER_OUTPUT_SCHEMA = """{
 }"""
 
 
-def _build_planner_system_prompt(agent_list: str) -> str:
+def _build_planner_prompt(agent_list: str) -> str:
     return format_markdown(
         title=None,
         sections=[
@@ -86,7 +86,7 @@ def _build_planner_system_prompt(agent_list: str) -> str:
 
 
 def _format_agent_list(agents: list[AgentSpec]) -> str:
-    """格式化 Agent 列表"""
+    """Format agent list."""
     lines = []
     for agent in agents:
         lines.append(f"- **{agent.id}** ({agent.name}): {agent.description or 'No description'}")
@@ -100,31 +100,31 @@ async def create_plan(
     available_agents: list[AgentSpec],
 ) -> Plan:
     """
-    创建计划
+    Create a plan.
 
     Args:
-        goal: 用户目标
-        llm: LLM 实例
-        available_agents: 可用的 Agent 列表
+        goal: user goal
+        llm: LLM instance
+        available_agents: available agents
 
     Returns:
-        Plan: 生成的计划
+        Plan: generated plan
     """
     if not available_agents:
-        logger.warning("没有可用的 Agent，无法创建计划")
+        logger.warning("No available agents; cannot create plan")
         return Plan(goal=goal, status=ExecutionStatus.FAILED, stage=ProcessStage.PLANNING)
 
-    # 构建 prompt
+    # Build prompt.
     agent_list = _format_agent_list(available_agents)
-    system_prompt = _build_planner_system_prompt(agent_list)
+    system_prompt = _build_planner_prompt(agent_list)
 
-    messages = ContextBuilder.build_react_planner_messages(
+    messages = ContextBuilder.build_react_planner(
         system_prompt=system_prompt,
         goal=goal,
     )
 
-    # 调用 LLM
-    logger.info(f"Planner 开始规划: {goal[:100]}...")
+    # Call LLM.
+    logger.info(f"Planner started: {goal[:100]}...")
 
     structured_llm = llm.with_structured_output(
         PlannerOutput,
@@ -133,14 +133,14 @@ async def create_plan(
     )
     result = await structured_llm.ainvoke(messages)
 
-    # 解析结果（带 fallback）
+    # Parse output (with fallback).
     output = _parse_planner_output(result)
 
-    # 构建 Plan
+    # Build Plan.
     plan = Plan(goal=goal, status=ExecutionStatus.RUNNING, stage=ProcessStage.EXECUTING)
 
     for task_output in output.tasks:
-        # 转换依赖关系（从序号到 task_id）
+        # Convert dependencies (index to task_id).
         depends_on = [f"t{int(d)}" for d in task_output.depends_on if d.isdigit()]
 
         plan.add_task(
@@ -149,7 +149,7 @@ async def create_plan(
             depends_on=depends_on,
         )
 
-    logger.info(f"Planner 完成规划: {len(plan.tasks)} 个任务")
+    logger.info(f"Planner completed: {len(plan.tasks)} tasks")
 
     return plan
 
@@ -162,22 +162,22 @@ async def replan(
     available_agents: list[AgentSpec],
 ) -> Plan:
     """
-    重新规划（根据反思结果调整计划）
+    Replan based on reflection summary.
 
     Args:
-        plan: 原计划
-        reflection_summary: 反思总结
-        llm: LLM 实例
-        available_agents: 可用的 Agent 列表
+        plan: original plan
+        reflection_summary: reflection summary
+        llm: LLM instance
+        available_agents: available agents
 
     Returns:
-        Plan: 新计划
+        Plan: updated plan
     """
-    # 构建 prompt
+    # Build prompt.
     agent_list = _format_agent_list(available_agents)
-    system_prompt = _build_planner_system_prompt(agent_list)
+    system_prompt = _build_planner_prompt(agent_list)
 
-    # 添加原计划和反思信息
+    # Add original plan and reflection.
     context = format_markdown(
         title=None,
         sections=[
@@ -195,12 +195,12 @@ async def replan(
         ],
     )
 
-    messages = ContextBuilder.build_react_replan_messages(
+    messages = ContextBuilder.build_react_replan(
         system_prompt=system_prompt,
         context=context,
     )
 
-    logger.info(f"Planner 重新规划: {plan.goal[:100]}...")
+    logger.info(f"Planner replan started: {plan.goal[:100]}...")
 
     structured_llm = llm.with_structured_output(
         PlannerOutput,
@@ -209,10 +209,10 @@ async def replan(
     )
     result = await structured_llm.ainvoke(messages)
 
-    # 解析结果（带 fallback）
+    # Parse output (with fallback).
     output = _parse_planner_output(result)
 
-    # 构建新 Plan
+    # Build new Plan.
     new_plan = Plan(
         goal=plan.goal,
         status=ExecutionStatus.RUNNING,
@@ -229,6 +229,6 @@ async def replan(
             depends_on=depends_on,
         )
 
-    logger.info(f"Planner 重新规划完成: {len(new_plan.tasks)} 个任务")
+    logger.info(f"Planner replan completed: {len(new_plan.tasks)} tasks")
 
     return new_plan

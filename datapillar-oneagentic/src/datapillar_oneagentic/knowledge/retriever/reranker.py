@@ -1,6 +1,4 @@
-"""
-重排器
-"""
+"""Reranker."""
 
 from __future__ import annotations
 
@@ -12,7 +10,7 @@ from datapillar_oneagentic.knowledge.config import RerankConfig
 
 class Reranker(Protocol):
     def score(self, query: str, passages: list[str], **kwargs: Any) -> list[float]:
-        """对候选进行打分"""
+        """Score candidate passages."""
 
 
 class SentenceTransformersReranker:
@@ -21,7 +19,7 @@ class SentenceTransformersReranker:
             from sentence_transformers import CrossEncoder
         except ImportError as err:
             raise ImportError(
-                "使用 sentence_transformers 重排需要安装依赖：\n"
+                "sentence_transformers reranking requires dependencies:\n"
                 "  pip install datapillar-oneagentic[knowledge]"
             ) from err
         self._encoder = CrossEncoder(model, device=device)
@@ -44,7 +42,7 @@ def build_reranker(config: RerankConfig) -> Reranker:
         batch_size = params.pop("batch_size", None)
         model = config.model or "cross-encoder/ms-marco-MiniLM-L-6-v2"
         return SentenceTransformersReranker(model=model, device=device, batch_size=batch_size)
-    raise ValueError(f"不支持的 rerank provider: {config.provider}")
+    raise ValueError(f"Unsupported rerank provider: {config.provider}")
 
 
 async def rerank_scores(

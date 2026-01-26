@@ -1,5 +1,6 @@
 import type { RefObject } from 'react'
 import { ChevronDown, History, MessageSquare, SquarePen, Trash2 } from 'lucide-react'
+import { menuWidthClassMap } from '@/design-tokens/dimensions'
 import { cn } from '@/lib/utils'
 
 type HistorySessionGroup = {
@@ -52,7 +53,7 @@ export function ChatHeader({
         {showHistory && (
           <div
             ref={historyCardRef}
-            className="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl shadow-slate-200/50 dark:shadow-slate-950/40 p-2 animate-in fade-in zoom-in-95 duration-100 origin-top-left flex flex-col max-h-[400px]"
+            className={`absolute top-full left-0 mt-2 ${menuWidthClassMap.wide} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl shadow-slate-200/50 dark:shadow-slate-950/40 p-2 animate-in fade-in zoom-in-95 duration-100 origin-top-left flex flex-col max-h-[400px]`}
           >
             <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
               {historySessions.map((group) => (

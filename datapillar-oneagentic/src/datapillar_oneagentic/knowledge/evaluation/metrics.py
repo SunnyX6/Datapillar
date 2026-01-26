@@ -1,6 +1,4 @@
-"""
-评估指标计算
-"""
+"""Evaluation metric calculations."""
 
 from __future__ import annotations
 
@@ -36,7 +34,7 @@ def compute_duplicate_ratio(texts: list[str]) -> float:
     return (len(texts) - unique) / len(texts)
 
 
-def compute_coverage_and_overlap(
+def compute_coverage_overlap(
     *,
     doc_length: int,
     spans: Iterable[SourceSpan],

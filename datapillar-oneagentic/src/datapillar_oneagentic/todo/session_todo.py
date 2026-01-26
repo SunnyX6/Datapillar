@@ -1,7 +1,7 @@
 """
-会话级 Todo 模型
+Session-level Todo models.
 
-用于团队级进度跟踪，不参与路由或委派。
+Used for team progress tracking; not used for routing or delegation.
 """
 
 from __future__ import annotations
@@ -18,15 +18,15 @@ TodoStatus = StepStatus
 
 
 class TodoItem(BaseModel):
-    """Todo 条目（会话级）"""
+    """Todo item (session-level)."""
 
-    id: str = Field(..., description="Todo ID（t1, t2...）")
-    description: str = Field(..., description="任务描述")
-    status: TodoStatus = Field(default=ExecutionStatus.PENDING, description="状态")
-    result: str | None = Field(default=None, description="结果说明")
+    id: str = Field(..., description="Todo ID (t1, t2...)")
+    description: str = Field(..., description="Task description")
+    status: TodoStatus = Field(default=ExecutionStatus.PENDING, description="Status")
+    result: str | None = Field(default=None, description="Result note")
 
     def update(self, *, status: TodoStatus | None = None, result: str | None = None) -> bool:
-        """更新条目，返回是否有变更"""
+        """Update item and return whether it changed."""
         changed = False
         if status and status != self.status:
             self.status = status
@@ -38,42 +38,42 @@ class TodoItem(BaseModel):
 
 
 class TodoUpdate(BaseModel):
-    """Todo 更新（用于上报或审计）"""
+    """Todo update (reporting/audit)."""
 
-    id: str = Field(..., description="Todo ID（t1, t2...）")
-    status: TodoStatus = Field(..., description="状态")
-    result: str | None = Field(default=None, description="结果说明")
+    id: str = Field(..., description="Todo ID (t1, t2...)")
+    status: TodoStatus = Field(..., description="Status")
+    result: str | None = Field(default=None, description="Result note")
 
 
 class TodoPlanOp(BaseModel):
-    """Todo 规划操作（用于结构变更）"""
+    """Todo plan operation (structural change)."""
 
-    op: Literal["add", "remove", "replace"] = Field(..., description="操作类型")
-    items: list[str] = Field(default_factory=list, description="add/replace 的条目列表")
-    todo_ids: list[str] = Field(default_factory=list, description="remove 的条目 ID 列表")
-    goal: str | None = Field(default=None, description="可选目标")
+    op: Literal["add", "remove", "replace"] = Field(..., description="Operation type")
+    items: list[str] = Field(default_factory=list, description="Items for add/replace")
+    todo_ids: list[str] = Field(default_factory=list, description="Todo IDs for remove")
+    goal: str | None = Field(default=None, description="Optional goal")
 
 
 class SessionTodoList(BaseModel):
     """
-    会话级 Todo 列表
+    Session-level Todo list.
 
-    仅用于进度跟踪，不影响执行路径。
+    Used for progress tracking only; does not affect execution flow.
     """
 
-    session_id: str = Field(..., description="会话 ID")
-    goal: str | None = Field(default=None, description="用户目标")
-    items: list[TodoItem] = Field(default_factory=list, description="Todo 列表")
-    next_item_id: int = Field(default=1, description="下一个 Todo ID")
-    updated_at_ms: int = Field(default_factory=now_ms, description="更新时间")
+    session_id: str = Field(..., description="Session ID")
+    goal: str | None = Field(default=None, description="User goal")
+    items: list[TodoItem] = Field(default_factory=list, description="Todo items")
+    next_item_id: int = Field(default=1, description="Next Todo ID")
+    updated_at_ms: int = Field(default_factory=now_ms, description="Updated timestamp (ms)")
 
     def set_goal(self, goal: str) -> None:
-        """设置目标"""
+        """Set goal."""
         self.goal = goal
         self.updated_at_ms = now_ms()
 
     def add_item(self, description: str) -> TodoItem:
-        """新增 Todo 条目"""
+        """Add a Todo item."""
         item = TodoItem(
             id=f"t{self.next_item_id}",
             description=description,
@@ -84,21 +84,21 @@ class SessionTodoList(BaseModel):
         return item
 
     def get_item(self, item_id: str) -> TodoItem | None:
-        """获取指定 Todo 条目"""
+        """Get a Todo item by ID."""
         for item in self.items:
             if item.id == item_id:
                 return item
         return None
 
-    def get_next_pending_item(self) -> TodoItem | None:
-        """获取下一个待处理条目"""
+    def get_next_pending(self) -> TodoItem | None:
+        """Get the next pending item."""
         for item in self.items:
             if item.status == ExecutionStatus.PENDING:
                 return item
         return None
 
     def apply_updates(self, updates: list[TodoUpdate]) -> bool:
-        """批量应用更新，返回是否有变更"""
+        """Apply updates in batch and return whether it changed."""
         changed = False
         for update in updates:
             item = self.get_item(update.id)
@@ -113,7 +113,7 @@ class SessionTodoList(BaseModel):
         return changed
 
     def apply_plan(self, ops: list[TodoPlanOp]) -> bool:
-        """应用规划操作，返回是否有变更"""
+        """Apply plan operations and return whether it changed."""
         changed = False
         for op in ops:
             if op.goal and op.goal != self.goal:
@@ -173,13 +173,13 @@ class SessionTodoList(BaseModel):
         return len(self.items) != before
 
     def is_completed(self) -> bool:
-        """是否所有条目都已结束"""
+        """Return whether all items are completed."""
         if not self.items:
             return False
         return all(item.status in TERMINAL_STATUSES for item in self.items)
 
     def to_prompt(self, *, include_title: bool = True) -> str:
-        """生成 Todo 提示词"""
+        """Build Todo prompt text."""
         if not self.items:
             return ""
 
@@ -194,7 +194,7 @@ class SessionTodoList(BaseModel):
                 line += f" -> {item.result}"
             team_lines.append(line)
 
-        focus_item = self.get_next_pending_item()
+        focus_item = self.get_next_pending()
         if not include_title:
             lines = [f"- {item}" for item in team_lines]
             if focus_item:

@@ -38,7 +38,7 @@ class _DummyLLM:
 
 
 @pytest.mark.asyncio
-async def test_create_mapreduce_plan_should_assign_task_ids() -> None:
+async def test_create_mapreduce() -> None:
     output = MapReducePlannerOutput(
         understanding="ok",
         tasks=[
@@ -61,7 +61,7 @@ async def test_create_mapreduce_plan_should_assign_task_ids() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reduce_map_results_should_return_schema_instance() -> None:
+async def test_map_results() -> None:
     plan = MapReducePlan(
         goal="goal",
         understanding="ok",
@@ -98,7 +98,7 @@ async def test_reduce_map_results_should_return_schema_instance() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reduce_map_results_should_fail_fast_on_failed_map() -> None:
+async def test_map_results2() -> None:
     plan = MapReducePlan(
         goal="goal",
         understanding="ok",

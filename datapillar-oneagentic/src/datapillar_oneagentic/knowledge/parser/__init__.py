@@ -1,6 +1,4 @@
-"""
-文档解析器
-"""
+"""Document parsers."""
 
 from datapillar_oneagentic.knowledge.parser.registry import ParserRegistry, default_registry
 

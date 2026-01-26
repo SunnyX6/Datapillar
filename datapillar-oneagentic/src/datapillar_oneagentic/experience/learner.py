@@ -1,12 +1,12 @@
 """
-经验学习器
+Experience learner.
 
-职责：
-1. 自动记录执行过程
-2. 使用者调用 save_experience 保存（包含 feedback）
-3. 框架自动处理，不需要策略
+Responsibilities:
+1. Automatically record execution traces
+2. Persist experiences via save_experience (with optional feedback)
+3. Framework-managed, no policy required
 
-使用示例：
+Example:
 ```python
 from datapillar_oneagentic import Datapillar, DatapillarConfig
 
@@ -21,14 +21,14 @@ team = Datapillar(
     enable_learning=True,
 )
 
-# 执行任务（框架自动记录）
-async for event in team.stream(query="分析销售数据", session_id="s001"):
+# Execute a task (framework records automatically)
+async for event in team.stream(query="Analyze sales data", session_id="s001"):
     ...
 
-# 保存经验（包含用户反馈）
+# Save experience (with user feedback)
 await team.save_experience(
     session_id="s001",
-    feedback={"stars": 5, "comment": "很好用"},
+    feedback={"stars": 5, "comment": "Very helpful"},
 )
 ```
 """
@@ -51,78 +51,78 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ExperienceRecord:
     """
-    经验记录
+    Experience record.
 
-    这是存入向量库的数据结构，所有字段都是独立列。
-    vector 字段存储 embedding 向量，用于相似度搜索。
+    This structure is stored in the vector database with columnar fields.
+    The vector field stores embeddings for similarity search.
     """
 
     id: str
-    """记录 ID（通常用 session_id）"""
+    """Record ID (usually session_id)."""
 
     namespace: str
-    """命名空间（用于隔离不同团队的经验）"""
+    """Namespace for isolating experiences between teams."""
 
     session_id: str
-    """会话 ID"""
+    """Session ID."""
 
     goal: str
-    """用户目标"""
+    """User goal."""
 
     outcome: str = "pending"
-    """执行结果: pending / success / failure / partial"""
+    """Execution outcome: pending / success / failure / partial."""
 
     result_summary: str = ""
-    """结果摘要"""
+    """Result summary."""
 
     tools_used: list[str] = field(default_factory=list)
-    """使用的工具"""
+    """Tools used."""
 
     agents_involved: list[str] = field(default_factory=list)
-    """参与的 Agent"""
+    """Agents involved."""
 
     duration_ms: int = 0
-    """执行时长（毫秒）"""
+    """Execution duration in milliseconds."""
 
     feedback: dict[str, Any] = field(default_factory=dict)
-    """用户反馈（结构由使用者定义）"""
+    """User feedback (structure defined by the caller)."""
 
     knowledge_refs: list[dict[str, Any]] = field(default_factory=list)
-    """关联知识引用"""
+    """Associated knowledge references."""
 
     created_at: int = field(default_factory=now_ms)
-    """创建时间"""
+    """Created timestamp."""
 
     vector: list[float] = field(default_factory=list)
-    """embedding 向量（用于相似度搜索）"""
+    """Embedding vector for similarity search."""
 
     def to_embed_text(self) -> str:
         """
-        生成用于向量化的完整文本
+        Generate a full text payload for embedding.
 
-        包含所有关键信息，让相似度搜索能匹配到完整的经验语义。
+        Includes key signals so similarity search captures complete semantics.
         """
-        parts = [f"目标: {self.goal}"]
+        parts = [f"Goal: {self.goal}"]
 
         if self.outcome and self.outcome != "pending":
-            parts.append(f"结果: {self.outcome}")
+            parts.append(f"Outcome: {self.outcome}")
 
         if self.result_summary:
-            parts.append(f"摘要: {self.result_summary}")
+            parts.append(f"Summary: {self.result_summary}")
 
         if self.tools_used:
-            parts.append(f"使用工具: {', '.join(self.tools_used)}")
+            parts.append(f"Tools: {', '.join(self.tools_used)}")
 
         if self.agents_involved:
-            parts.append(f"参与Agent: {', '.join(self.agents_involved)}")
+            parts.append(f"Agents: {', '.join(self.agents_involved)}")
 
         return "\n".join(parts)
 
     def to_context(self) -> str:
         """
-        生成可注入 prompt 的上下文
+        Build a prompt-injectable context block.
 
-        框架自动调用此方法，将经验拼接成上下文。
+        This is called internally to render experience context.
         """
         lines = [
             f"- Goal: {self.goal}",
@@ -148,7 +148,7 @@ class ExperienceRecord:
         return "\n".join(lines)
 
     def to_dict(self) -> dict[str, Any]:
-        """序列化为字典（用于存储）"""
+        """Serialize to a dict for storage."""
         return {
             "id": self.id,
             "namespace": self.namespace,
@@ -167,7 +167,7 @@ class ExperienceRecord:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ExperienceRecord:
-        """从字典反序列化"""
+        """Deserialize from a dict."""
         return cls(
             id=data.get("id", ""),
             namespace=data.get("namespace", ""),
@@ -187,11 +187,11 @@ class ExperienceRecord:
 
 class ExperienceLearner:
     """
-    经验学习器
+    Experience learner.
 
-    职责：
-    1. 自动记录执行过程（内存临时存储）
-    2. 使用者调用 save_experience 保存到向量库
+    Responsibilities:
+    1. Auto-record execution (in-memory temporary storage)
+    2. Persist to vector store via save_experience
     """
 
     def __init__(
@@ -201,22 +201,22 @@ class ExperienceLearner:
         embedding_provider: "EmbeddingProvider",
     ):
         """
-        初始化学习器
+        Initialize the learner.
 
         Args:
-            store: 经验存储（ExperienceStore 抽象接口）
-            namespace: 命名空间（用于隔离不同团队的经验）
-            embedding_provider: Embedding 提供者（用于向量化）
+            store: experience store (ExperienceStore interface)
+            namespace: namespace for isolating team experiences
+            embedding_provider: embedding provider for vectorization
         """
         self._store = store
         self._namespace = namespace
         self._embedding_provider = embedding_provider
-        self._pending: dict[str, ExperienceRecord] = {}  # 临时记录
+        self._pending: dict[str, ExperienceRecord] = {}  # Temporary records.
 
-    # ==================== 框架内部调用 ====================
+    # ==================== Framework internal ====================
 
     def start_recording(self, session_id: str, goal: str) -> None:
-        """开始记录（框架内部调用）"""
+        """Start recording (framework internal)."""
         self._pending[session_id] = ExperienceRecord(
             id=session_id,
             namespace=self._namespace,
@@ -225,19 +225,19 @@ class ExperienceLearner:
         )
 
     def record_tool(self, session_id: str, tool_name: str) -> None:
-        """记录工具使用（框架内部调用）"""
+        """Record tool usage (framework internal)."""
         record = self._pending.get(session_id)
         if record and tool_name not in record.tools_used:
             record.tools_used.append(tool_name)
 
     def record_agent(self, session_id: str, agent_id: str) -> None:
-        """记录 Agent 参与（框架内部调用）"""
+        """Record agent participation (framework internal)."""
         record = self._pending.get(session_id)
         if record and agent_id not in record.agents_involved:
             record.agents_involved.append(agent_id)
 
     def record_knowledge(self, session_id: str, refs: list[dict[str, Any]]) -> None:
-        """记录知识引用（框架内部调用）"""
+        """Record knowledge references (framework internal)."""
         record = self._pending.get(session_id)
         if not record or not refs:
             return
@@ -253,7 +253,7 @@ class ExperienceLearner:
         outcome: str,
         result_summary: str = "",
     ) -> None:
-        """完成记录（框架内部调用）"""
+        """Complete recording (framework internal)."""
         record = self._pending.get(session_id)
         if not record:
             return
@@ -262,7 +262,7 @@ class ExperienceLearner:
         record.result_summary = result_summary
         record.duration_ms = now_ms() - record.created_at
 
-    # ==================== 使用者调用 ====================
+    # ==================== Caller API ====================
 
     async def save_experience(
         self,
@@ -270,45 +270,45 @@ class ExperienceLearner:
         feedback: dict[str, Any] | None = None,
     ) -> bool:
         """
-        保存经验到向量库
+        Save an experience into the vector store.
 
-        使用者调用此方法保存经验，feedback 作为记录的一部分存储。
+        The caller triggers this to persist an experience, with optional feedback.
 
         Args:
-            session_id: 会话 ID
-            feedback: 用户反馈（可选）
+            session_id: session ID
+            feedback: user feedback (optional)
 
         Returns:
-            是否保存成功
+            True when saved successfully.
         """
         record = self._pending.pop(session_id, None)
         if not record:
-            logger.warning(f"未找到待保存的记录: {session_id}")
+            logger.warning(f"No pending record to save: {session_id}")
             return False
 
-        # 设置 feedback
+        # Attach feedback.
         if feedback:
             record.feedback = feedback
 
-        # 生成 embedding（向量化完整经验信息）
+        # Generate embeddings from the full experience text.
         embed_content = record.to_embed_text()
         try:
             record.vector = await self._embedding_provider.embed_text(embed_content)
         except Exception as e:
-            logger.error(f"生成 embedding 失败，无法保存经验: {e}")
+            logger.error(f"Embedding generation failed; experience not saved: {e}")
             self._pending[session_id] = record
             return False
 
-        # 直接保存 ExperienceRecord
+        # Persist the ExperienceRecord.
         await self._store.add(record)
-        logger.info(f"经验已保存: {session_id}")
+        logger.info(f"Experience saved: {session_id}")
         return True
 
     def has_pending(self, session_id: str) -> bool:
-        """是否有待保存的记录"""
+        """Return whether there is a pending record."""
         return session_id in self._pending
 
     def discard(self, session_id: str) -> None:
-        """丢弃临时记录"""
+        """Discard a pending record."""
         if session_id in self._pending:
             del self._pending[session_id]

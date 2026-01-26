@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Database, Box, Hash, ChevronRight, Loader2, ArrowRight, Search, Filter, Target, Pin } from 'lucide-react'
 import { fetchCatalogs, fetchSchemas, fetchTables, getTable, getObjectTags } from '@/services/oneMetaService'
 import { fetchValueDomains } from '@/services/oneMetaSemanticService'
+import { menuWidthClassMap } from '@/design-tokens/dimensions'
 import type { MetricFormData, MeasureColumn, FilterColumn } from './types'
 
 const VALUE_DOMAIN_TAG_PREFIX = 'vd:'
@@ -170,7 +171,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
               <div
                 ref={dropdownRef}
                 style={{ bottom: dropdownPos.bottom, left: dropdownPos.left }}
-                className="fixed w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[1000000]"
+                className={`fixed ${menuWidthClassMap.large} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[1000000]`}
               >
                 <div className="p-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">选择过滤值</span>

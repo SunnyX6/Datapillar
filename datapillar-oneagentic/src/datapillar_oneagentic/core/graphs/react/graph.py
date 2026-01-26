@@ -1,13 +1,13 @@
 """
-ReAct 执行图构建
+ReAct execution graph builder.
 
-ReAct (Reasoning + Acting) 模式：
-1. react_controller: 规划和反思
-2. agents: 根据 active_agent 执行具体 Agent
-3. finalize: 整理最终输出
+ReAct (Reasoning + Acting) mode:
+1. react_controller: planning and reflection
+2. agents: execute agent by active_agent
+3. finalize: format final output
 
-流程：
-START → react_controller → [agent_id] → react_controller → ... → finalize → END
+Flow:
+START -> react_controller -> [agent_id] -> react_controller -> ... -> finalize -> END
 """
 
 from typing import Any
@@ -26,22 +26,22 @@ def build_react_graph(
     llm: Any,
 ) -> StateGraph:
     """
-    构建 ReAct 执行图
+    Build a ReAct execution graph.
 
     Args:
-        agent_specs: Agent 规格列表
-        agent_ids: 所有 Agent ID 列表
-        create_agent_node: 节点创建函数
-        llm: LLM 实例（用于规划和反思）
+        agent_specs: agent spec list
+        agent_ids: all agent IDs
+        create_agent_node: node factory
+        llm: LLM instance (planning/reflection)
 
     Returns:
-        StateGraph 实例
+        StateGraph instance
     """
     from datapillar_oneagentic.core.graphs.react.controller import react_controller_node
 
     graph = StateGraph(Blackboard)
 
-    # 1. 添加 react_controller 节点
+    # 1. Add react_controller node.
     async def controller_node(state: Blackboard):
         return await react_controller_node(
             state,
@@ -52,26 +52,26 @@ def build_react_graph(
 
     graph.add_node("react_controller", controller_node)
 
-    # 2. 添加所有 Agent 节点
+    # 2. Add all agent nodes.
     for spec in agent_specs:
         node_fn = create_agent_node(spec.id)
         graph.add_node(spec.id, node_fn)
 
-    # 3. 添加 finalize 节点（整理最终输出）
+    # 3. Add finalize node.
     def finalize_node(state: Blackboard) -> dict:
-        """整理最终输出"""
+        """Prepare final output."""
         sb = StateBuilder(state)
         sb.routing.clear_active()
         return sb.patch()
 
     graph.add_node("finalize", finalize_node)
 
-    # 4. 设置边
+    # 4. Set edges.
 
-    # 入口 → react_controller
+    # Entry -> react_controller.
     graph.set_entry_point("react_controller")
 
-    # react_controller → 具体 Agent 或 finalize（通过 active_agent 路由）
+    # react_controller -> agent or finalize via active_agent routing.
     graph.add_conditional_edges(
         "react_controller",
         _react_controller_router(agent_ids),
@@ -81,11 +81,11 @@ def build_react_graph(
         },
     )
 
-    # 每个 Agent 执行后 → react_controller
+    # After each agent -> react_controller.
     for spec in agent_specs:
         graph.add_edge(spec.id, "react_controller")
 
-    # finalize → END
+    # finalize -> END.
     graph.add_edge("finalize", END)
 
     return graph
@@ -93,11 +93,11 @@ def build_react_graph(
 
 def _react_controller_router(agent_ids: list[str]):
     """
-    ReAct 控制器路由函数
+    ReAct controller router.
 
-    根据 active_agent 决定下一个节点：
-    - 有 active_agent 且在 agent_ids 中 → 路由到该 Agent
-    - 否则 → finalize
+    Route by active_agent:
+    - If active_agent is in agent_ids -> that agent
+    - Otherwise -> finalize
     """
     def router(state: Blackboard) -> str:
         sb = StateBuilder(state)

@@ -1,6 +1,4 @@
-"""
-纯文本解析器
-"""
+"""Plain text parser."""
 
 from __future__ import annotations
 

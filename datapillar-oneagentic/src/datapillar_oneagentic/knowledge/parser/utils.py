@@ -1,6 +1,4 @@
-"""
-解析器工具
-"""
+"""Parser utilities."""
 
 from __future__ import annotations
 

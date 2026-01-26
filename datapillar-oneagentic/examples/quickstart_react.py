@@ -1,7 +1,7 @@
 """
-Datapillar OneAgentic ReAct 模式示例
+Datapillar OneAgentic ReAct mode example.
 
-运行命令：
+Run:
     uv run python examples/quickstart_react.py
 """
 
@@ -29,35 +29,35 @@ class TextOutput(BaseModel):
 
 @tool
 def echo(text: str) -> str:
-    """回显文本。
+    """Echo text.
 
     Args:
-        text: 输入文本。
+        text: input text
 
     Returns:
-        回显结果。
+        echoed result
     """
     return f"echo:{text}"
 
 
 @agent(
     id="react_worker",
-    name="执行者",
+    name="Worker",
     deliverable_schema=TextOutput,
     tools=[echo],
-    description="执行 ReAct 计划中的具体任务",
+    description="Execute tasks in the ReAct plan",
 )
 class ReactWorkerAgent:
-    SYSTEM_PROMPT = """你是执行者。
-使用 echo 工具处理任务并给出结果。
+    SYSTEM_PROMPT = """You are the worker.
+Use the echo tool to process the task and respond.
 
-## 输出要求
-只能输出 JSON（单个对象），不得输出解释或 Markdown：
-{"text": "你的结果"}
+## Output requirements
+Return JSON only (single object), no explanations or Markdown:
+{"text": "Your result"}
 """
 
     async def run(self, ctx: AgentContext) -> TextOutput:
-        messages = ctx.build_messages(self.SYSTEM_PROMPT)
+        messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
         messages = await ctx.invoke_tools(messages)
         return await ctx.get_structured_output(messages)
 
@@ -67,41 +67,41 @@ def _render_event(event: dict) -> None:
     data = event.get("data", {})
     if event_type == "agent.start":
         agent_info = event.get("agent", {})
-        print(f"\n🤖 [{agent_info.get('name')}] 开始工作...")
+        print(f"\n[{agent_info.get('name')}] started...")
     elif event_type == "agent.thinking":
         message = data.get("message", {})
         thinking = message.get("content", "")
         if thinking:
             agent_info = event.get("agent", {})
-            print(f"\n🧠 [{agent_info.get('id')}] 思考中...")
-            print(f"   {thinking[:200]}..." if len(thinking) > 200 else f"   {thinking}")
+            print(f"\n[{agent_info.get('id')}] thinking...")
+            print(f"  {thinking[:200]}..." if len(thinking) > 200 else f"  {thinking}")
     elif event_type == "tool.call":
         tool_info = data.get("tool", {})
-        print(f"   🔧 调用: {tool_info.get('name')}")
+        print(f"  Tool call: {tool_info.get('name')}")
     elif event_type == "tool.result":
         tool_info = data.get("tool", {})
         result = str(tool_info.get("output", ""))
         if len(result) > 100:
             result = result[:100] + "..."
-        print(f"   📋 结果: {result}")
+        print(f"  Tool result: {result}")
     elif event_type == "agent.end":
         deliverable = data.get("deliverable")
         if deliverable is not None:
-            print("   ✅ 完成")
-            print(f"   📦 交付物: {json.dumps(deliverable, ensure_ascii=False)}")
+            print("  Completed")
+            print(f"  Deliverable: {json.dumps(deliverable, ensure_ascii=False)}")
     elif event_type == "agent.interrupt":
         interrupt_payload = data.get("interrupt", {}).get("payload")
-        print(f"\n❓ 需要用户输入: {interrupt_payload}")
+        print(f"\nUser input required: {interrupt_payload}")
     elif event_type == "agent.failed":
         error = data.get("error", {})
-        print(f"\n❌ 错误: {error.get('detail') or error.get('message')}")
+        print(f"\nError: {error.get('detail') or error.get('message')}")
 
 
 def create_react_team(config: DatapillarConfig) -> Datapillar:
     team = Datapillar(
         config=config,
         namespace="demo_react",
-        name="ReAct 团队示例",
+        name="ReAct Team Example",
         agents=[ReactWorkerAgent],
         process=Process.REACT,
         enable_share_context=True,
@@ -115,31 +115,31 @@ async def main() -> None:
     if not config.llm.is_configured():
         supported = ", ".join(Provider.list_supported())
         raise RuntimeError(
-            "请先配置 LLM：\n"
+            "Please configure LLM first:\n"
             "  export DATAPILLAR_LLM_PROVIDER=\"openai\"\n"
             "  export DATAPILLAR_LLM_API_KEY=\"sk-xxx\"\n"
             "  export DATAPILLAR_LLM_MODEL=\"gpt-4o\"\n"
-            "可选：export DATAPILLAR_LLM_BASE_URL=\"https://api.openai.com/v1\"\n"
-            "可选：export DATAPILLAR_LLM_ENABLE_THINKING=\"false\"\n"
-            f"支持 provider: {supported}"
+            "Optional: export DATAPILLAR_LLM_BASE_URL=\"https://api.openai.com/v1\"\n"
+            "Optional: export DATAPILLAR_LLM_ENABLE_THINKING=\"false\"\n"
+            f"Supported providers: {supported}"
         )
     team = create_react_team(config)
 
     print("=" * 60)
-    print("🧠 ReAct 模式示例已就绪")
-    print(f"   模型: {config.llm.model}")
-    print("   成员: 执行者（控制器负责规划/反思）")
+    print("ReAct mode example is ready")
+    print(f"  Model: {config.llm.model}")
+    print("  Member: Worker (controller handles planning/reflection)")
     print("=" * 60)
 
-    query = "请规划并输出一句话总结 Datapillar 的核心价值。"
-    print(f"\n📝 用户需求: {query}\n")
+    query = "Plan and output a one-sentence summary of Datapillar's core value."
+    print(f"\nUser request: {query}\n")
     print("-" * 60)
 
     async for event in team.stream(query=query, session_id="s_demo_react"):
         _render_event(event)
 
     print("\n" + "=" * 60)
-    print("✨ 演示完成")
+    print("Demo completed")
 
 
 if __name__ == "__main__":

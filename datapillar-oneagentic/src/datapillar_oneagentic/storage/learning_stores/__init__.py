@@ -1,8 +1,8 @@
 """
-Learning Stores - 经验向量存储
+Learning stores - experience vector storage.
 
-统一使用 ExperienceStore 抽象接口，底层复用 VectorStore。
-推荐通过 storage.create_learning_store 创建。
+Uses the ExperienceStore abstraction and reuses VectorStore underneath.
+Recommended to create via storage.create_learning_store.
 """
 
 from datapillar_oneagentic.storage.learning_stores.base import ExperienceStore

@@ -1,12 +1,12 @@
 """
-LLM 精确缓存
+LLM exact cache.
 
-设计原则：
-- 精确匹配：相同内容 = 命中，任何差异 = 不命中
-- 规范化处理：去除 LangChain 消息中的动态 ID，只保留实际内容
-- 可选 Redis 存储：支持 TTL，分布式友好
-- 简单可靠：无 embedding、无相似度计算、无误判
-- 同步接口：LangChain BaseCache 要求同步
+Design principles:
+- Exact match: identical content = hit, any difference = miss
+- Normalization: remove dynamic IDs from LangChain messages
+- Optional Redis storage: TTL support, friendly to distributed setups
+- Simple and reliable: no embeddings, no similarity heuristics
+- Sync interface: LangChain BaseCache is synchronous
 """
 
 from __future__ import annotations
@@ -18,24 +18,24 @@ import threading
 from typing import Any
 
 from langchain_core.caches import RETURN_VAL_TYPE, BaseCache
-from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, Generation
 from datapillar_oneagentic.providers.llm.config import LLMCacheConfig
+from datapillar_oneagentic.messages.adapters.langchain import build_ai_message
 
 logger = logging.getLogger(__name__)
 
 
 def _normalize_prompt(prompt: str) -> str:
     """
-    规范化 prompt 用于缓存 key 计算
+    Normalize prompt for cache key calculation.
 
-    解决 LangChain 的已知问题：消息序列化时包含动态生成的唯一 ID，
-    导致相同内容的消息 hash 不同，缓存无法命中。
+    Fixes a LangChain issue where serialized messages contain dynamic IDs,
+    causing identical content to hash differently.
 
-    处理逻辑：
-    - 解析 JSON 格式的消息列表
-    - 只保留 type/role 和 content，去除 id 等动态字段
-    - 返回规范化后的 JSON 字符串
+    Logic:
+    - Parse JSON list of messages
+    - Keep only type/role and content, drop dynamic fields like id
+    - Return normalized JSON string
     """
     try:
         raw = json.loads(prompt)
@@ -47,7 +47,7 @@ def _normalize_prompt(prompt: str) -> str:
             if not isinstance(item, dict):
                 continue
 
-            # 提取 type（兼容多种格式）
+            # Extract type (support multiple formats).
             msg_type = (
                 item.get("type")
                 or item.get("kwargs", {}).get("type")
@@ -55,10 +55,10 @@ def _normalize_prompt(prompt: str) -> str:
                 or "unknown"
             )
 
-            # 提取 content（兼容多种格式）
+            # Extract content (support multiple formats).
             content = item.get("content") or item.get("kwargs", {}).get("content")
 
-            # content 可能是字符串或 content blocks 列表
+            # Content may be a string or a list of content blocks.
             if isinstance(content, list):
                 text_parts = []
                 for block in content:
@@ -83,14 +83,14 @@ def _normalize_prompt(prompt: str) -> str:
 
 
 def _compute_cache_key(prompt: str, llm_string: str) -> str:
-    """计算缓存 key"""
+    """Compute cache key."""
     normalized = _normalize_prompt(prompt)
     raw_key = f"{normalized}:{llm_string}"
     return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
 
 
 def _serialize_return_val(return_val: RETURN_VAL_TYPE) -> str:
-    """序列化 LLM 返回值"""
+    """Serialize LLM return value."""
     items: list[dict[str, Any]] = []
     for gen in return_val or []:
         msg = getattr(gen, "message", None)
@@ -109,7 +109,7 @@ def _serialize_return_val(return_val: RETURN_VAL_TYPE) -> str:
 
 
 def _deserialize_return_val(data: str | bytes) -> RETURN_VAL_TYPE | None:
-    """反序列化 LLM 返回值"""
+    """Deserialize LLM return value."""
     try:
         if isinstance(data, bytes):
             data = data.decode("utf-8")
@@ -124,7 +124,7 @@ def _deserialize_return_val(data: str | bytes) -> RETURN_VAL_TYPE | None:
             item_type = item.get("type")
             if item_type == "chat":
                 content = item.get("content", "")
-                result.append(ChatGeneration(message=AIMessage(content=content)))
+                result.append(ChatGeneration(message=build_ai_message(content)))
             elif item_type == "text":
                 result.append(Generation(text=str(item.get("text", ""))))
         return result if result else None
@@ -135,14 +135,14 @@ def _deserialize_return_val(data: str | bytes) -> RETURN_VAL_TYPE | None:
 
 class InMemoryLLMCache(BaseCache):
     """
-    内存 LLM 缓存（默认实现）
+    In-memory LLM cache (default).
 
-    特点：
-    - 精确匹配：相同内容才命中
-    - 规范化处理：去除动态 ID
-    - 内存存储：简单可靠
-    - 支持 TTL（通过定期清理）
-    - 线程安全
+    Characteristics:
+    - Exact match
+    - Normalized prompts (drop dynamic IDs)
+    - In-memory storage
+    - TTL via periodic cleanup
+    - Thread-safe
     """
 
     def __init__(
@@ -154,10 +154,10 @@ class InMemoryLLMCache(BaseCache):
         self.ttl_seconds = ttl_seconds
         self.max_size = max_size
         self._cache: dict[str, tuple[str, float]] = {}  # key -> (value, timestamp)
-        self._lock = threading.RLock()  # 可重入锁，保证线程安全
+        self._lock = threading.RLock()  # Re-entrant lock for thread safety.
 
     def lookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
-        """查询缓存"""
+        """Lookup cache."""
         import time
 
         cache_key = _compute_cache_key(prompt, llm_string)
@@ -168,7 +168,7 @@ class InMemoryLLMCache(BaseCache):
 
             data, timestamp = self._cache[cache_key]
 
-            # 检查 TTL
+            # Check TTL.
             if time.time() - timestamp > self.ttl_seconds:
                 del self._cache[cache_key]
                 return None
@@ -177,13 +177,13 @@ class InMemoryLLMCache(BaseCache):
         return result
 
     def update(self, prompt: str, llm_string: str, return_val: RETURN_VAL_TYPE) -> None:
-        """更新缓存"""
+        """Update cache."""
         import time
 
         if not return_val:
             return
 
-        # 检查是否有实际内容
+        # Ensure there is content.
         has_content = False
         for gen in return_val:
             msg = getattr(gen, "message", None)
@@ -201,18 +201,18 @@ class InMemoryLLMCache(BaseCache):
         data = _serialize_return_val(return_val)
 
         with self._lock:
-            # 清理过期和超限
+            # Cleanup expired and oversized entries.
             self._cleanup()
             self._cache[cache_key] = (data, time.time())
 
 
     def _cleanup(self) -> None:
-        """清理过期和超限的缓存（调用方需持有锁）"""
+        """Cleanup expired and oversized cache entries (lock required)."""
         import time
 
         current_time = time.time()
 
-        # 清理过期：先复制 keys 避免迭代时修改
+        # Expired entries: copy keys to avoid mutation during iteration.
         expired_keys = [
             k for k, (_, ts) in list(self._cache.items())
             if current_time - ts > self.ttl_seconds
@@ -220,7 +220,7 @@ class InMemoryLLMCache(BaseCache):
         for k in expired_keys:
             del self._cache[k]
 
-        # 清理超限（LRU 简化版：按时间戳排序删除最旧的）
+        # Oversize cleanup (simplified LRU: remove oldest by timestamp).
         if len(self._cache) > self.max_size:
             sorted_keys = sorted(
                 self._cache.keys(),
@@ -231,17 +231,17 @@ class InMemoryLLMCache(BaseCache):
                 del self._cache[k]
 
     def clear(self, **kwargs: Any) -> None:
-        """清空缓存"""
+        """Clear cache."""
         with self._lock:
             self._cache.clear()
-        logger.info("LLM 缓存已清空")
+        logger.info("LLM cache cleared")
 
 
 class RedisLLMCache(BaseCache):
     """
-    Redis LLM 缓存
+    Redis LLM cache.
 
-    需要安装 redis 包：pip install datapillar-oneagentic[redis]
+    Requires redis package: pip install datapillar-oneagentic[redis]
     """
 
     def __init__(
@@ -255,17 +255,17 @@ class RedisLLMCache(BaseCache):
         self.key_prefix = key_prefix
         self._redis_url = redis_url
         self._redis = None
-        logger.info(f"LLM Redis 缓存初始化: ttl={ttl_seconds}s, prefix={key_prefix}")
+        logger.info(f"LLM Redis cache initialized: ttl={ttl_seconds}s, prefix={key_prefix}")
 
     def _get_redis(self):
-        """获取 Redis 客户端（延迟初始化）"""
+        """Get Redis client (lazy init)."""
         if self._redis is None:
             import redis
             self._redis = redis.from_url(self._redis_url, decode_responses=True)
         return self._redis
 
     def lookup(self, prompt: str, llm_string: str) -> RETURN_VAL_TYPE | None:
-        """查询缓存"""
+        """Lookup cache."""
         try:
             client = self._get_redis()
             cache_key = self.key_prefix + _compute_cache_key(prompt, llm_string)
@@ -278,15 +278,15 @@ class RedisLLMCache(BaseCache):
             return result
 
         except Exception as e:
-            logger.warning(f"Redis 缓存查询失败: {e}")
+            logger.warning(f"Redis cache lookup failed: {e}")
             return None
 
     def update(self, prompt: str, llm_string: str, return_val: RETURN_VAL_TYPE) -> None:
-        """更新缓存"""
+        """Update cache."""
         if not return_val:
             return
 
-        # 检查是否有实际内容
+        # Ensure there is content.
         has_content = False
         for gen in return_val:
             msg = getattr(gen, "message", None)
@@ -308,10 +308,10 @@ class RedisLLMCache(BaseCache):
             client.set(cache_key, data, ex=self.ttl_seconds)
 
         except Exception as e:
-            logger.warning(f"Redis 缓存写入失败: {e}")
+            logger.warning(f"Redis cache update failed: {e}")
 
     def clear(self, **kwargs: Any) -> None:
-        """清空缓存"""
+        """Clear cache."""
         try:
             client = self._get_redis()
             cursor = 0
@@ -323,22 +323,22 @@ class RedisLLMCache(BaseCache):
                     deleted += len(keys)
                 if cursor == 0:
                     break
-            logger.info(f"LLM Redis 缓存已清空: 删除 {deleted} 条记录")
+            logger.info(f"LLM Redis cache cleared: deleted {deleted} entries")
         except Exception as e:
-            logger.warning(f"Redis 缓存清空失败: {e}")
+            logger.warning(f"Redis cache clear failed: {e}")
 
 
 def create_llm_cache(cache_config: LLMCacheConfig) -> BaseCache | None:
     """
-    创建 LLM 缓存实例（基于传入配置）
+    Create LLM cache instance based on config.
 
-    配置项（在 llm.cache 下）：
-    - enabled: 是否启用缓存（默认 True）
-    - backend: 缓存后端 memory 或 redis（默认 memory）
-    - ttl_seconds: TTL 秒（默认 300）
-    - max_size: 内存缓存最大条目数（默认 1000）
-    - redis_url: Redis URL（backend=redis 时必填）
-    - key_prefix: Redis key 前缀（默认 llm_cache:）
+    Config (llm.cache):
+    - enabled: enable cache (default True)
+    - backend: memory or redis (default memory)
+    - ttl_seconds: TTL seconds (default 300)
+    - max_size: max in-memory entries (default 1000)
+    - redis_url: Redis URL (required when backend=redis)
+    - key_prefix: Redis key prefix (default llm_cache:)
     """
     if not cache_config.enabled:
         return None
@@ -347,7 +347,9 @@ def create_llm_cache(cache_config: LLMCacheConfig) -> BaseCache | None:
 
     if backend == "redis":
         if not cache_config.redis_url:
-            logger.warning("LLM 缓存配置 backend=redis，但未设置 redis_url，降级为内存缓存")
+            logger.warning(
+                "LLM cache backend=redis but redis_url is missing; falling back to memory cache"
+            )
             return InMemoryLLMCache(
                 ttl_seconds=cache_config.ttl_seconds,
                 max_size=cache_config.max_size,

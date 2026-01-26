@@ -1,12 +1,12 @@
 """
-A2A 委派工具
+A2A delegation tools.
 
-为 Agent 创建调用远程 A2A Agent 的工具。
-使用官方 a2a-sdk 实现。
+Creates tools that allow agents to call remote A2A agents.
+Uses the official a2a-sdk implementation.
 
-安全机制：
-- 外部 Agent 行为不可预测，默认需要用户确认
-- 可通过 A2AConfig.require_confirmation 控制
+Security:
+- External agent behavior is unpredictable; confirmation required by default
+- Controlled via A2AConfig.require_confirmation
 """
 
 from __future__ import annotations
@@ -28,14 +28,14 @@ logger = logging.getLogger(__name__)
 
 
 class A2ADelegateInput(BaseModel):
-    """A2A 委派工具输入"""
+    """A2A delegation tool input."""
 
     task: str = Field(description="Task description for the remote agent")
     context: str = Field(default="", description="Additional context")
 
 
 def _check_a2a_confirmation(config: A2AConfig, task: str, context: str) -> None:
-    """安全校验，不通过则抛出异常"""
+    """Security check; raise if not confirmed."""
     if not config.require_confirmation:
         return
 
@@ -46,13 +46,13 @@ def _check_a2a_confirmation(config: A2AConfig, task: str, context: str) -> None:
     confirmation_request = ConfirmationRequest(
         operation_type="a2a_delegate",
         name=f"A2A Agent ({config.endpoint})",
-        description="委派任务到远程 A2A Agent",
+        description="Delegate a task to a remote A2A agent",
         parameters={"task": task, "context": context},
         risk_level="high",
         warnings=[
-            "此操作将调用外部 Agent，行为不可预测",
-            "任务内容将发送到远程服务器",
-            "远程 Agent 可能执行任意操作",
+            "This operation calls an external agent with unpredictable behavior.",
+            "Task content will be sent to a remote server.",
+            "The remote agent may perform arbitrary actions.",
         ],
         source=config.endpoint,
         metadata={
@@ -64,16 +64,16 @@ def _check_a2a_confirmation(config: A2AConfig, task: str, context: str) -> None:
 
     if not security_config.confirmation_callback:
         raise NoConfirmationCallbackError(
-            f"调用远程 Agent {config.endpoint} 需要用户确认，但未配置 confirmation_callback。\n"
-            f"请配置 configure_security(confirmation_callback=...) 或设置 require_confirmation=False"
+            f"Remote agent {config.endpoint} requires confirmation, but confirmation_callback is not configured.\n"
+            "Configure configure_security(confirmation_callback=...) or set require_confirmation=False"
         )
 
     if not security_config.confirmation_callback(confirmation_request):
-        raise UserRejectedError(f"用户拒绝调用远程 Agent: {config.endpoint}")
+        raise UserRejectedError(f"User rejected remote agent call: {config.endpoint}")
 
 
-async def _call_a2a_remote_agent(endpoint: str, full_task: str) -> str:
-    """执行 A2A 调用"""
+async def _call_a2a_agent(endpoint: str, full_task: str) -> str:
+    """Execute A2A call."""
     from a2a.client import ClientConfig, ClientFactory, create_text_message_object
     from a2a.types import TaskState
 
@@ -104,56 +104,56 @@ async def _call_a2a_remote_agent(endpoint: str, full_task: str) -> str:
 
 def create_a2a_tool(config: A2AConfig, name: str | None = None) -> StructuredTool:
     """
-    创建 A2A 委派工具
+    Create an A2A delegation tool.
 
-    参数：
-    - config: A2A 配置
-    - name: 工具名称（默认根据 endpoint 生成）
+    Args:
+    - config: A2A configuration
+    - name: Tool name (defaults to endpoint-derived)
 
-    返回：
+    Returns:
     - LangChain StructuredTool
 
-    安全：
-    - 外部 Agent 行为不可预测，默认需要用户确认
-    - 通过 A2AConfig.require_confirmation 控制
+    Security:
+    - External agent behavior is unpredictable; confirmation required by default
+    - Controlled via A2AConfig.require_confirmation
 
-    使用示例：
+    Example:
     ```python
     config = A2AConfig(
         endpoint="https://api.example.com/.well-known/agent.json",
     )
     tool = create_a2a_tool(config, name="call_data_analyst")
 
-    # Agent 可以使用这个工具调用远程 Agent
-    result = await tool.ainvoke({"task": "分析销售数据"})
+    # Agents can use this tool to call remote agents
+    result = await tool.ainvoke({"task": "Analyze sales data"})
     ```
     """
 
     async def delegate_to_a2a(task: str, context: str = "") -> str:
         """Delegate a task to a remote A2A agent (with security checks)."""
         try:
-            from a2a.client import ClientFactory  # noqa: F401 - 检查依赖是否安装
+            from a2a.client import ClientFactory  # noqa: F401 - dependency check
         except ImportError as err:
-            raise ImportError("a2a-sdk 未安装。请运行: pip install a2a-sdk") from err
+            raise ImportError("a2a-sdk is not installed. Run: pip install a2a-sdk") from err
 
         _check_a2a_confirmation(config, task, context)
 
         full_task = f"{task}\n\nContext:\n{context}" if context else task
 
         try:
-            return await _call_a2a_remote_agent(config.endpoint, full_task)
+            return await _call_a2a_agent(config.endpoint, full_task)
         except Exception as e:
             if config.fail_fast:
                 raise
             return f"A2A call failed: {e}"
 
-    # 工具名称
+    # Tool name
     tool_name = name or f"delegate_to_{_endpoint_to_name(config.endpoint)}"
 
-    # 构建描述（包含安全警告）
+    # Build description (include security notice)
     description = f"Delegate a task to a remote A2A agent ({config.endpoint})"
     if config.require_confirmation:
-        description += "\n[⚠️ External agent, confirmation required]"
+        description += "\n[External agent, confirmation required]"
 
     return StructuredTool.from_function(
         func=delegate_to_a2a,
@@ -165,27 +165,27 @@ def create_a2a_tool(config: A2AConfig, name: str | None = None) -> StructuredToo
 
 
 def _endpoint_to_name(endpoint: str) -> str:
-    """将 endpoint URL 转换为工具名称"""
+    """Convert endpoint URL to tool name."""
     from urllib.parse import urlparse
 
     parsed = urlparse(endpoint)
     host = parsed.hostname or "unknown"
-    # 移除常见后缀和特殊字符
+    # Strip common suffixes and special characters
     name = host.replace(".", "_").replace("-", "_")
     return name
 
 
 async def create_a2a_tools(configs: list[A2AConfig]) -> list[StructuredTool]:
     """
-    从配置列表批量创建 A2A 工具
+    Create A2A tools from configs.
 
-    参数：
-    - configs: A2A 配置列表
+    Args:
+    - configs: A2A config list
 
-    返回：
-    - 工具列表
+    Returns:
+    - Tool list
 
-    使用示例：
+    Example:
     ```python
     configs = [
         A2AConfig(endpoint="https://agent1.example.com/.well-known/agent.json"),
@@ -199,7 +199,7 @@ async def create_a2a_tools(configs: list[A2AConfig]) -> list[StructuredTool]:
         from a2a.client import ClientConfig, ClientFactory
     except ImportError as err:
         raise ImportError(
-            "a2a-sdk 未安装。请运行: pip install a2a-sdk"
+            "a2a-sdk is not installed. Run: pip install a2a-sdk"
         ) from err
 
     tools = []
@@ -207,7 +207,7 @@ async def create_a2a_tools(configs: list[A2AConfig]) -> list[StructuredTool]:
     for config in configs:
         client = None
         try:
-            # 使用 ClientFactory 连接获取 AgentCard
+            # Use ClientFactory to fetch AgentCard
             client_config = ClientConfig(streaming=True)
             client = await ClientFactory.connect(config.endpoint, client_config=client_config)
 
@@ -220,16 +220,16 @@ async def create_a2a_tools(configs: list[A2AConfig]) -> list[StructuredTool]:
             tool = create_a2a_tool(config, name=tool_name)
             tools.append(tool)
 
-            # 记录安全信息
+            # Log security info
             if config.require_confirmation:
-                logger.info(f"🔗 A2A 工具创建: {tool_name} [⚠️ 需确认]")
+                logger.info(f"A2A tool created: {tool_name} [confirmation required]")
             else:
-                logger.info(f"🔗 A2A 工具创建: {tool_name}")
+                logger.info(f"A2A tool created: {tool_name}")
 
         except Exception as e:
             if config.fail_fast:
                 raise
-            logger.warning(f"跳过不可用的 A2A Agent: {config.endpoint}, 错误: {e}")
+            logger.warning(f"Skipping unavailable A2A agent: {config.endpoint}, error={e}")
         finally:
             if client:
                 await client.close()

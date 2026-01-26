@@ -1,15 +1,15 @@
 """
-Agent 定义
+Agent definitions.
 
-核心类：
-- AgentSpec: Agent 规格（声明式配置）
-- @agent: 装饰器，定义即绑定规格
+Core types:
+- AgentSpec: agent specification (declarative config)
+- @agent: decorator that binds the spec
 
-设计原则：
-- 声明式配置是契约
-- 框架根据配置自动处理
-- Agent 只需实现 run() 方法
-- 装饰器严格校验，防止错误配置
+Design principles:
+- Declarative config is the contract
+- Framework behavior follows the config
+- Agent only implements run()
+- Decorator validates strictly to prevent bad configs
 """
 
 from __future__ import annotations
@@ -34,188 +34,185 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AgentSpec:
     """
-    Agent 规格（声明式配置）
+    Agent specification (declarative config).
 
-    定义 Agent 的身份、能力、输出契约。
-    框架根据此规格自动处理工具注入、委派、结果构建等。
+    Defines identity, capabilities, and output contract.
+    The framework uses this spec for tool injection, delegation, and result handling.
 
-    注意：此类是框架内部使用，业务侧通过 @agent 装饰器声明。
+    Note: This class is internal; business code declares it via @agent.
     """
 
-    # === 身份 ===
+    # === Identity ===
     id: str
-    """Agent 唯一标识"""
+    """Agent unique identifier."""
 
     name: str
-    """Agent 显示名称"""
+    """Agent display name."""
 
-    # === 能力声明 ===
+    # === Capabilities ===
     description: str = ""
-    """一句话描述 Agent 能做什么"""
+    """One-line description of the agent's capability."""
 
     tools: list[Any] = field(default_factory=list)
-    """工具对象列表（BaseTool 或兼容工具）"""
+    """Tool list (BaseTool or compatible)."""
 
-    # === 委派配置（框架自动填充）===
+    # === Delegation config (framework-populated) ===
     can_delegate_to: list[str] = field(default_factory=list)
-    """可委派的目标 Agent ID 列表（由 Team 在 DYNAMIC 模式下自动设置）"""
+    """Delegation targets (auto-set in DYNAMIC mode)."""
 
-    # === 交付物契约 ===
+    # === Deliverable contract ===
     deliverable_schema: type[BaseModel] | None = None
-    """交付物数据结构（Pydantic 模型，框架自动处理 LLM 结构化输出）"""
+    """Deliverable schema (Pydantic model; structured output handled by framework)."""
 
-    # === 执行配置 ===
+    # === Execution config ===
     temperature: float = 0.0
-    """LLM 温度"""
+    """LLM temperature."""
 
     max_steps: int | None = None
-    """Agent 最大执行步数（None 时读团队 AgentConfig.max_steps）"""
+    """Max steps (None uses team AgentConfig.max_steps)."""
 
     retry_config: "AgentRetryConfig | None" = None
-    """Agent 重试配置（None 时读团队 AgentConfig.retry）"""
+    """Retry config (None uses team AgentConfig.retry)."""
 
     timeout_seconds: float | None = None
-    """Agent 单次执行超时（None 时读团队 AgentConfig.timeout_seconds）"""
+    """Single-run timeout (None uses team AgentConfig.timeout_seconds)."""
 
     tool_timeout_seconds: float | None = None
-    """工具单次调用超时（None 时读团队 AgentConfig.tool_timeout_seconds）"""
+    """Tool call timeout (None uses team AgentConfig.tool_timeout_seconds)."""
 
     def get_max_steps(self, config: AgentConfig) -> int:
-        """获取最大执行步数"""
+        """Return max steps."""
         return self.max_steps if self.max_steps is not None else config.max_steps
 
     def get_timeout_seconds(self, config: AgentConfig) -> float:
-        """获取 Agent 执行超时（秒）"""
+        """Return agent timeout in seconds."""
         return self.timeout_seconds if self.timeout_seconds is not None else config.timeout_seconds
 
     def get_retry_config(self, config: AgentConfig) -> "AgentRetryConfig":
-        """获取 Agent 重试配置"""
+        """Return retry config."""
         return self.retry_config if self.retry_config is not None else config.retry
 
-    def get_tool_timeout_seconds(self, config: AgentConfig) -> float:
-        """获取工具调用超时（秒）"""
+    def get_tool_timeout(self, config: AgentConfig) -> float:
+        """Return tool timeout in seconds."""
         return self.tool_timeout_seconds if self.tool_timeout_seconds is not None else config.tool_timeout_seconds
 
-    # === 知识配置 ===
+    # === Knowledge config ===
     knowledge: "Knowledge | None" = None
-    """知识配置（RAG 检索注入）"""
+    """Knowledge config (RAG injection)."""
 
-    # === A2A 远程 Agent ===
+    # === A2A remote agents ===
     a2a_agents: list[A2AConfig] = field(default_factory=list)
-    """远程 A2A Agent 配置列表（框架自动创建委派工具）"""
+    """A2A agent configs (delegation tools created by framework)."""
 
-    # === MCP 服务器 ===
+    # === MCP servers ===
     mcp_servers: list[MCPServerConfig] = field(default_factory=list)
-    """MCP 服务器配置列表（框架自动将 MCP 工具转换为 Agent 可调用的工具）"""
+    """MCP server configs (tools converted for agent use)."""
 
-    # === 运行时（框架填充）===
+    # === Runtime (framework-populated) ===
     agent_class: type | None = None
-    """Agent 类引用（执行时按需创建实例，避免单例共享）"""
+    """Agent class reference (instantiated per run)."""
 
 
 class AgentRegistry:
     """
-    Agent 注册中心（预留接口）
+    Agent registry (reserved).
 
-    当前框架通过 @agent 装饰器绑定 AgentSpec，未在 Datapillar 解析流程中使用。
-    该 Registry 仅用于扩展或测试场景。
+    The framework uses @agent binding and does not use this registry in Datapillar.
+    This registry is for extensions or tests.
     """
 
     def __init__(self) -> None:
         self._agents: dict[str, AgentSpec] = {}
 
     def register(self, spec: AgentSpec) -> None:
-        """注册 Agent"""
+        """Register an agent."""
         if spec.id in self._agents:
-            logger.warning(f"Agent {spec.id} 已存在，将被覆盖")
+            logger.warning(f"Agent {spec.id} already exists and will be overwritten")
 
         self._agents[spec.id] = spec
-        logger.info(f"📦 Agent 注册: {spec.name} ({spec.id})")
+        logger.info(f"Agent registered: {spec.name} ({spec.id})")
 
     def get(self, agent_id: str) -> AgentSpec | None:
-        """获取 Agent 规格"""
+        """Get agent spec."""
         return self._agents.get(agent_id)
 
     def list_ids(self) -> list[str]:
-        """列出所有 Agent ID"""
+        """List agent IDs."""
         return list(self._agents.keys())
 
     def list_specs(self) -> list[AgentSpec]:
-        """列出所有 Agent 规格"""
+        """List agent specs."""
         return list(self._agents.values())
 
     def count(self) -> int:
-        """返回 Agent 数量"""
+        """Return number of agents."""
         return len(self._agents)
 
 
-# === ID 格式校验 ===
+# === ID validation ===
 _ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 def _validate_id(agent_id: str, class_name: str) -> None:
-    """校验 Agent ID 格式"""
+    """Validate agent ID format."""
     if not agent_id:
-        raise ValueError(f"Agent {class_name} 的 id 不能为空")
+        raise ValueError(f"Agent {class_name} id must not be empty")
 
     if not _ID_PATTERN.match(agent_id):
         raise ValueError(
-            f"Agent {class_name} 的 id '{agent_id}' 格式错误，"
-            f"必须以小写字母开头，只能包含小写字母、数字和下划线"
+            f"Agent {class_name} id '{agent_id}' is invalid. "
+            "It must start with a lowercase letter and contain only lowercase letters, numbers, and underscores."
         )
 
 
 def _validate_run_method(cls: type) -> None:
-    """校验 run 方法"""
+    """Validate run method."""
     if not hasattr(cls, "run"):
-        raise ValueError(f"Agent {cls.__name__} 必须实现 run(self, ctx) 方法")
+        raise ValueError(f"Agent {cls.__name__} must implement run(self, ctx)")
 
     run_method = cls.run
 
-    # 检查是否是方法
+    # Ensure it is callable.
     if not callable(run_method):
-        raise ValueError(f"Agent {cls.__name__}.run 必须是方法")
+        raise ValueError(f"Agent {cls.__name__}.run must be callable")
 
-    # 检查签名
+    # Validate signature.
     sig = inspect.signature(run_method)
     params = list(sig.parameters.keys())
 
-    # 至少有 self 和 ctx 两个参数
+    # Must include self and ctx.
     if len(params) < 2:
         raise ValueError(
-            f"Agent {cls.__name__}.run() 签名错误，"
-            f"必须是 run(self, ctx: AgentContext)"
+            f"Agent {cls.__name__}.run() signature is invalid; expected run(self, ctx: AgentContext)"
         )
 
-    # 第二个参数应该是 ctx
+    # Second argument must be ctx.
     if params[1] != "ctx":
         raise ValueError(
-            f"Agent {cls.__name__}.run() 的第二个参数必须命名为 'ctx'，"
-            f"当前是 '{params[1]}'"
+            f"Agent {cls.__name__}.run() second parameter must be named 'ctx', got '{params[1]}'"
         )
 
-    # 检查是否是异步方法
+    # Must be async.
     if not inspect.iscoroutinefunction(run_method):
         raise ValueError(
-            f"Agent {cls.__name__}.run() 必须是异步方法（async def）"
+            f"Agent {cls.__name__}.run() must be async (async def)"
         )
 
 
 def _validate_deliverable_schema(schema: type | None, class_name: str) -> None:
-    """校验 deliverable_schema（必填）"""
+    """Validate deliverable_schema (required)."""
     if schema is None:
         raise ValueError(
-            f"Agent {class_name} 必须声明 deliverable_schema，"
-            f"框架统一使用结构化 JSON 输出"
+            f"Agent {class_name} must declare deliverable_schema; "
+            "the framework uses structured JSON output."
         )
 
-    # 检查是否是 Pydantic 模型
+    # Ensure it is a Pydantic model.
     from pydantic import BaseModel
 
     if not (isinstance(schema, type) and issubclass(schema, BaseModel)):
         raise ValueError(
-            f"Agent {class_name} 的 deliverable_schema 必须是 Pydantic BaseModel 子类，"
-            f"当前是 {type(schema)}"
+            f"Agent {class_name} deliverable_schema must be a Pydantic BaseModel subclass, got {type(schema)}"
         )
 
 
@@ -237,18 +234,17 @@ def agent(
     knowledge: "Knowledge | None" = None,
 ):
     """
-    Agent 定义装饰器
+    Agent definition decorator.
 
-    在类上使用 @agent(...) 定义一个 Agent。
-    类必须实现 async def run(self, ctx: AgentContext) 方法。
+    Use @agent(...) on a class. The class must implement async run(self, ctx: AgentContext).
 
-    使用示例：
+    Example:
     ```python
     from datapillar_oneagentic.mcp import MCPServerStdio
 
     @agent(
         id="analyst",
-        name="需求分析师",
+        name="Requirements Analyst",
         deliverable_schema=AnalysisOutput,
         tools=[search_tables],
         mcp_servers=[
@@ -262,51 +258,51 @@ def agent(
         SYSTEM_PROMPT = "You are a requirements analyst."
 
         async def run(self, ctx: AgentContext) -> AnalysisOutput:
-            messages = ctx.build_messages(self.SYSTEM_PROMPT)
+            messages = ctx.messages().system(self.SYSTEM_PROMPT)
             messages = await ctx.invoke_tools(messages)
 
             return await ctx.get_structured_output(messages)
     ```
 
-    参数：
-    - id: Agent 唯一标识（小写字母开头，只能包含小写字母、数字、下划线）
-    - name: 显示名称
-    - deliverable_schema: 交付物数据结构（Pydantic 模型，必填）
-    - description: 能力描述
-    - tools: 工具对象列表（BaseTool 或兼容工具）
-    - mcp_servers: MCP 服务器配置列表（框架自动将 MCP 工具转换为可调用工具）
-    - a2a_agents: 远程 A2A Agent 配置列表（跨服务调用）
-    - temperature: LLM 温度
-    - max_steps: Agent 最大执行步数（None 时读团队 AgentConfig.max_steps）
-    - retry_config: Agent 重试配置（None 时读团队 AgentConfig.retry）
-    - knowledge: 知识配置（RAG 检索注入）
-    注意：
-    - 入口 Agent 由 Team 的 agents 列表第一个决定
-    - 委派关系由 Team 在 DYNAMIC 模式下自动推断
-    - 经验学习由 Datapillar(enable_learning=True) 统一控制
-    - 交付物统一用 agent_id 存储和获取
+    Args:
+        id: agent ID (lowercase letter first; only lowercase letters, numbers, underscore)
+        name: display name
+        deliverable_schema: deliverable schema (Pydantic model, required)
+        description: capability description
+        tools: tool list (BaseTool or compatible)
+        mcp_servers: MCP server configs (tools converted by framework)
+        a2a_agents: remote A2A agent configs (cross-service)
+        temperature: LLM temperature
+        max_steps: max steps (None uses team AgentConfig.max_steps)
+        retry_config: retry config (None uses team AgentConfig.retry)
+        knowledge: knowledge config (RAG injection)
+
+    Notes:
+        - Entry agent is the first in the team's agents list
+        - Delegation is inferred in DYNAMIC mode
+        - Experience learning is controlled by Datapillar(enable_learning=True)
+        - Deliverables are stored/retrieved by agent_id
     """
 
     def decorator(cls: type) -> type:
-        # === 严格校验 ===
+        # === Strict validation ===
 
-        # 1. 校验 ID 格式
+        # 1. Validate ID format.
         _validate_id(id, cls.__name__)
 
-        # 2. 校验 run 方法
+        # 2. Validate run method.
         _validate_run_method(cls)
 
-        # 3. 校验 deliverable_schema
+        # 3. Validate deliverable_schema.
         _validate_deliverable_schema(deliverable_schema, cls.__name__)
 
-        # 4. 校验 temperature 范围
+        # 4. Validate temperature range.
         if not 0.0 <= temperature <= 2.0:
             raise ValueError(
-                f"Agent {cls.__name__} 的 temperature 必须在 0.0-2.0 之间，"
-                f"当前是 {temperature}"
+                f"Agent {cls.__name__} temperature must be within 0.0-2.0, got {temperature}"
             )
 
-        # === 保存类引用（执行时按需创建实例）===
+        # === Store class reference (instantiate per run) ===
 
         spec = AgentSpec(
             id=id,
@@ -323,7 +319,7 @@ def agent(
             agent_class=cls,
         )
 
-        # 绑定规格到类
+        # Bind spec to class.
         setattr(cls, _AGENT_SPEC_ATTR, spec)
 
         return cls
@@ -332,5 +328,5 @@ def agent(
 
 
 def get_agent_spec(agent_class: type) -> AgentSpec | None:
-    """获取 Agent 类绑定的规格"""
+    """Get bound AgentSpec from an agent class."""
     return getattr(agent_class, _AGENT_SPEC_ATTR, None)

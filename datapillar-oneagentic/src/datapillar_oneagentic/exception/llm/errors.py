@@ -1,5 +1,5 @@
 """
-LLM 异常定义
+LLM error definitions.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from datapillar_oneagentic.exception.llm.categories import LLMErrorCategory
 
 
 class RetryableError(Exception):
-    """可重试错误（包装原始异常）"""
+    """Retryable error (wraps original exception)."""
 
     def __init__(self, message: str, original: Exception | None = None):
         super().__init__(message)
@@ -19,7 +19,7 @@ class RetryableError(Exception):
 
 
 class NonRetryableError(Exception):
-    """不可重试错误（包装原始异常）"""
+    """Non-retryable error (wraps original exception)."""
 
     def __init__(self, message: str, original: Exception | None = None):
         super().__init__(message)
@@ -27,7 +27,7 @@ class NonRetryableError(Exception):
 
 
 class LLMError(Exception):
-    """LLM 异常（带分类与恢复动作）"""
+    """LLM error with category and recovery action."""
 
     def __init__(
         self,
@@ -53,11 +53,11 @@ class LLMError(Exception):
         self.parsing_error = parsing_error
 
     def attach_agent_id(self, agent_id: str) -> None:
-        """补充 Agent ID（LLM 层默认未知）"""
+        """Attach agent ID when unknown at LLM layer."""
         self.agent_id = agent_id
 
     def to_dict(self) -> dict[str, Any]:
-        """转换为结构化字典（用于日志/SSE）"""
+        """Convert to a structured dict (for logs/SSE)."""
         return {
             "category": self.category.value,
             "action": self.action.value,

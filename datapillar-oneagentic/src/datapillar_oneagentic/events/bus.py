@@ -1,12 +1,12 @@
 """
-事件总线
+Event bus.
 
-提供事件发布/订阅机制。
+Provides publish/subscribe for events.
 
-特点：
-- 支持同步/异步处理器
-- 线程安全
-- 作用域隔离（用于测试）
+Features:
+- Sync/async handlers
+- Thread-safe
+- Scoped isolation (for tests)
 """
 
 from __future__ import annotations
@@ -25,22 +25,22 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseEvent)
 
-# 处理器类型
+# Handler types
 SyncHandler = Callable[[Any, BaseEvent], None]
 AsyncHandler = Callable[[Any, BaseEvent], Any]
 Handler = SyncHandler | AsyncHandler
 
 
 def _is_async_handler(handler: Handler) -> bool:
-    """检查是否是异步处理器"""
+    """Return True if the handler is async."""
     return asyncio.iscoroutinefunction(handler)
 
 
 class EventBus:
     """
-    事件总线
+    Event bus.
 
-    使用示例：
+    Example:
     ```python
     from datapillar_oneagentic.events import EventBus, AgentStartedEvent
 
@@ -50,19 +50,19 @@ class EventBus:
     def on_agent_started(source, event):
         print(f"Agent {event.agent_name} started")
 
-    # 发送事件
-    await event_bus.emit(self, AgentStartedEvent(agent_id="analyst", agent_name="分析师"))
+    # Emit an event
+    await event_bus.emit(self, AgentStartedEvent(agent_id="analyst", agent_name="Analyst"))
     ```
     """
 
     def __init__(self) -> None:
-        """初始化"""
+        """Initialize the bus."""
         self._lock = threading.RLock()
         self._sync_handlers: dict[type[BaseEvent], set[SyncHandler]] = {}
         self._async_handlers: dict[type[BaseEvent], set[AsyncHandler]] = {}
         self._shutting_down = False
 
-        # 线程池用于同步处理器
+        # Thread pool for sync handlers.
         self._executor = ThreadPoolExecutor(
             max_workers=5,
             thread_name_prefix="EventBusSync",
@@ -72,7 +72,7 @@ class EventBus:
         self,
         event_type: type[T],
     ) -> Callable[[Handler], Handler]:
-        """装饰器：注册事件处理器"""
+        """Decorator: register an event handler."""
 
         def decorator(handler: Handler) -> Handler:
             self.register(event_type, handler)
@@ -85,7 +85,7 @@ class EventBus:
         event_type: type[BaseEvent],
         handler: Handler,
     ) -> None:
-        """注册事件处理器"""
+        """Register an event handler."""
         with self._lock:
             if _is_async_handler(handler):
                 if event_type not in self._async_handlers:
@@ -101,7 +101,7 @@ class EventBus:
         event_type: type[BaseEvent],
         handler: Handler,
     ) -> None:
-        """注销事件处理器"""
+        """Unregister an event handler."""
         with self._lock:
             if _is_async_handler(handler):
                 if event_type in self._async_handlers:
@@ -116,11 +116,11 @@ class EventBus:
         source: Any,
         event: BaseEvent,
     ) -> None:
-        """调用同步处理器"""
+        """Invoke a sync handler."""
         try:
             handler(source, event)
         except Exception as e:
-            logger.error(f"同步处理器错误: {handler.__name__}, 错误: {e}")
+            logger.error(f"Sync handler error: {handler.__name__}, error={e}")
 
     async def _call_async_handlers(
         self,
@@ -128,8 +128,8 @@ class EventBus:
         event: BaseEvent,
         handlers: set[AsyncHandler],
     ) -> None:
-        """调用异步处理器"""
-        # 转为 list 保证顺序一致（set 无序，两次迭代顺序可能不同）
+        """Invoke async handlers."""
+        # Convert to list for stable order (set iteration is not deterministic).
         handlers_list = list(handlers)
         coros = [handler(source, event) for handler in handlers_list]
         results = await asyncio.gather(*coros, return_exceptions=True)
@@ -137,11 +137,11 @@ class EventBus:
         for handler, result in zip(handlers_list, results, strict=False):
             if isinstance(result, Exception):
                 logger.error(
-                    f"异步处理器错误: {getattr(handler, '__name__', handler)}, 错误: {result}"
+                    f"Async handler error: {getattr(handler, '__name__', handler)}, error={result}"
                 )
 
     async def emit(self, source: Any, event: BaseEvent) -> None:
-        """发送事件"""
+        """Emit an event."""
         if self._shutting_down:
             return
 
@@ -153,7 +153,7 @@ class EventBus:
 
         loop = asyncio.get_running_loop()
 
-        # 执行同步处理器（在线程池中执行，避免阻塞主事件循环）
+        # Run sync handlers in a thread pool to avoid blocking the event loop.
         sync_tasks = [
             loop.run_in_executor(
                 self._executor,
@@ -165,7 +165,7 @@ class EventBus:
             for handler in sync_handlers
         ]
 
-        # 并发执行同步和异步处理器
+        # Run sync and async handlers concurrently.
         all_tasks: list[Any] = sync_tasks
         if async_handlers:
             all_tasks.append(self._call_async_handlers(source, event, async_handlers))
@@ -175,7 +175,7 @@ class EventBus:
 
     @contextmanager
     def scoped_handlers(self) -> Generator[None, Any, None]:
-        """作用域隔离（用于测试）"""
+        """Scoped isolation (for tests)."""
         with self._lock:
             prev_sync = dict(self._sync_handlers)
             prev_async = dict(self._async_handlers)
@@ -190,13 +190,13 @@ class EventBus:
                 self._async_handlers = prev_async
 
     def clear(self) -> None:
-        """清空所有处理器"""
+        """Clear all handlers."""
         with self._lock:
             self._sync_handlers.clear()
             self._async_handlers.clear()
 
     def handler_count(self, event_type: type[BaseEvent] | None = None) -> int:
-        """获取处理器数量"""
+        """Return the handler count."""
         with self._lock:
             if event_type is None:
                 sync_count = sum(len(h) for h in self._sync_handlers.values())
@@ -208,7 +208,7 @@ class EventBus:
             return sync_count + async_count
 
     def shutdown(self, wait: bool = True) -> None:
-        """关闭事件总线"""
+        """Shutdown the event bus."""
         with self._lock:
             self._shutting_down = True
 

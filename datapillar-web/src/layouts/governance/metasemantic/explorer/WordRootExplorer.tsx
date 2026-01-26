@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { ArrowLeft, Plus, BookA, Pencil, Trash2, Check, X, Loader2 } from 'lucide-react'
 import { Badge } from '../components'
 import type { WordRoot } from '../types'
-import { iconSizeToken } from '@/design-tokens/dimensions'
+import { iconSizeToken, tableColumnWidthClassMap } from '@/design-tokens/dimensions'
 import { useSearchStore, useSemanticStatsStore } from '@/stores'
 import { useInfiniteScroll } from '@/hooks'
 import { fetchWordRoots, createWordRoot, deleteWordRoot, updateWordRoot, type CreateWordRootRequest, type UpdateWordRootRequest } from '@/services/oneMetaSemanticService'
@@ -473,12 +473,12 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
         >
           <TableHeader>
             <TableRow>
-              <TableHead className="w-56">词根名称 / 编码</TableHead>
-              <TableHead className="w-52 text-center">数据类型</TableHead>
+              <TableHead className={tableColumnWidthClassMap['5xl']}>词根名称 / 编码</TableHead>
+              <TableHead className={`${tableColumnWidthClassMap['4xl']} text-center`}>数据类型</TableHead>
               <TableHead>描述</TableHead>
-              <TableHead className="w-24">创建人</TableHead>
-              <TableHead className="w-40">创建时间</TableHead>
-              <TableHead className="w-24 text-center">操作</TableHead>
+              <TableHead className={tableColumnWidthClassMap.lg}>创建人</TableHead>
+              <TableHead className={tableColumnWidthClassMap['2xl']}>创建时间</TableHead>
+              <TableHead className={`${tableColumnWidthClassMap.lg} text-center`}>操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

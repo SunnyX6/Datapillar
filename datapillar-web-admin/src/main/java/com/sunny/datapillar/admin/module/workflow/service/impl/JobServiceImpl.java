@@ -15,8 +15,8 @@ import com.sunny.datapillar.admin.module.workflow.mapper.JobDependencyMapper;
 import com.sunny.datapillar.admin.module.workflow.mapper.JobInfoMapper;
 import com.sunny.datapillar.admin.module.workflow.mapper.JobWorkflowMapper;
 import com.sunny.datapillar.admin.module.workflow.service.JobService;
-import com.sunny.datapillar.admin.response.WebAdminErrorCode;
-import com.sunny.datapillar.admin.response.WebAdminException;
+import com.sunny.datapillar.common.error.ErrorCode;
+import com.sunny.datapillar.common.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +45,7 @@ public class JobServiceImpl implements JobService {
     public JobDto.Response getJobDetail(Long id) {
         JobDto.Response job = jobInfoMapper.selectJobDetail(id);
         if (job == null) {
-            throw new WebAdminException(WebAdminErrorCode.JOB_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_JOB_NOT_FOUND, id);
         }
         return job;
     }
@@ -56,13 +56,13 @@ public class JobServiceImpl implements JobService {
         // 验证工作流
         JobWorkflow workflow = workflowMapper.selectById(workflowId);
         if (workflow == null) {
-            throw new WebAdminException(WebAdminErrorCode.WORKFLOW_NOT_FOUND, workflowId);
+            throw new BusinessException(ErrorCode.ADMIN_WORKFLOW_NOT_FOUND, workflowId);
         }
 
         // 验证组件类型
         JobComponent component = componentMapper.selectById(dto.getJobType());
         if (component == null) {
-            throw new WebAdminException(WebAdminErrorCode.JOB_TYPE_NOT_FOUND, dto.getJobType());
+            throw new BusinessException(ErrorCode.ADMIN_JOB_TYPE_NOT_FOUND, dto.getJobType());
         }
 
         JobInfo jobInfo = new JobInfo();
@@ -79,7 +79,7 @@ public class JobServiceImpl implements JobService {
     public void updateJob(Long id, JobDto.Update dto) {
         JobInfo jobInfo = jobInfoMapper.selectById(id);
         if (jobInfo == null) {
-            throw new WebAdminException(WebAdminErrorCode.JOB_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_JOB_NOT_FOUND, id);
         }
 
         if (dto.getJobName() != null) {
@@ -88,7 +88,7 @@ public class JobServiceImpl implements JobService {
         if (dto.getJobType() != null) {
             JobComponent component = componentMapper.selectById(dto.getJobType());
             if (component == null) {
-                throw new WebAdminException(WebAdminErrorCode.JOB_TYPE_NOT_FOUND, dto.getJobType());
+                throw new BusinessException(ErrorCode.ADMIN_JOB_TYPE_NOT_FOUND, dto.getJobType());
             }
             jobInfo.setJobType(dto.getJobType());
         }
@@ -126,7 +126,7 @@ public class JobServiceImpl implements JobService {
     public void deleteJob(Long id) {
         JobInfo jobInfo = jobInfoMapper.selectById(id);
         if (jobInfo == null) {
-            throw new WebAdminException(WebAdminErrorCode.JOB_NOT_FOUND, id);
+            throw new BusinessException(ErrorCode.ADMIN_JOB_NOT_FOUND, id);
         }
 
         // 删除相关依赖
@@ -143,7 +143,7 @@ public class JobServiceImpl implements JobService {
         // 验证工作流
         JobWorkflow workflow = workflowMapper.selectById(workflowId);
         if (workflow == null) {
-            throw new WebAdminException(WebAdminErrorCode.WORKFLOW_NOT_FOUND, workflowId);
+            throw new BusinessException(ErrorCode.ADMIN_WORKFLOW_NOT_FOUND, workflowId);
         }
 
         jobInfoMapper.batchUpdatePositions(dto.getPositions());

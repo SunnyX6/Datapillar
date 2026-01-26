@@ -1,12 +1,12 @@
 """
-SSE 模块
+SSE module.
 
-仅提供流管理器，事件结构统一由 events 模块定义。
+Provides the stream manager; event schema is defined in the events module.
 """
 
 from datapillar_oneagentic.sse.manager import StreamManager
 
 __all__ = [
-    # 管理器
+    # Manager
     "StreamManager",
 ]

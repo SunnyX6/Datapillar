@@ -12,7 +12,7 @@ import {
   Info,
   X
 } from 'lucide-react'
-import { cardWidthClassMap, progressWidthClassMap } from '@/design-tokens/dimensions'
+import { cardWidthClassMap, menuWidthClassMap, panelWidthClassMap, progressWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { Button, Card } from '@/components/ui'
 import type { Chunk, Document } from './types'
@@ -148,7 +148,7 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
               </span>
             </button>
 
-            <div className="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all z-50">
+            <div className={`absolute top-full left-0 mt-2 ${menuWidthClassMap.wide} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all z-50`}>
               <div className="p-2">
                 <div className={`${TYPOGRAPHY.micro} text-slate-400 px-2 py-1 uppercase font-bold tracking-wider`}>切换文档</div>
                 {availableDocs.length > 0 ? (
@@ -204,7 +204,7 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
           </button>
 
           {showConfig && (
-            <div className="absolute right-0 top-full mt-2 w-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className={`absolute right-0 top-full mt-2 ${menuWidthClassMap.extraWide} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-200`}>
               <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/40 rounded-t-xl">
                 <div className={`flex items-center space-x-2 ${TYPOGRAPHY.caption} text-slate-800 dark:text-slate-100 font-semibold`}>
                   <Sliders size={16} />
@@ -303,7 +303,7 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <div className="w-80 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900 rounded-bl-xl">
+        <div className={`${panelWidthClassMap.narrow} border-r border-slate-200 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900 rounded-bl-xl`}>
           <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
             <div className="relative group">
               <Search className="absolute left-2.5 top-2.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={14} />

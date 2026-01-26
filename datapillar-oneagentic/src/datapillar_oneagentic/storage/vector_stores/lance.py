@@ -1,6 +1,4 @@
-"""
-Lance VectorStore 实现
-"""
+"""Lance VectorStore implementation."""
 
 from __future__ import annotations
 
@@ -39,12 +37,12 @@ class LanceVectorStore(VectorStore):
         import lancedb
 
         self._db = await lancedb.connect_async(self._path)
-        logger.info(f"初始化 LanceVectorStore: {self._path}")
+        logger.info(f"LanceVectorStore initialized: {self._path}")
 
     async def close(self) -> None:
         self._db = None
         self._tables.clear()
-        logger.info("LanceVectorStore 已关闭")
+        logger.info("LanceVectorStore closed")
 
     async def ensure_collection(self, schema: VectorCollectionSchema) -> None:
         if self._db is None:
@@ -73,12 +71,12 @@ class LanceVectorStore(VectorStore):
                 fields.append(pa.field(field.name, pa.string()))
             elif field.field_type == VectorFieldType.VECTOR:
                 if field.dimension is None:
-                    raise ValueError(f"向量字段缺少 dimension: {field.name}")
+                    raise ValueError(f"Vector field missing dimension: {field.name}")
                 fields.append(pa.field(field.name, pa.list_(pa.float32(), list_size=field.dimension)))
             elif field.field_type == VectorFieldType.SPARSE_VECTOR:
                 fields.append(pa.field(field.name, pa.string()))
             else:
-                raise ValueError(f"不支持的字段类型: {field.field_type}")
+                raise ValueError(f"Unsupported field type: {field.field_type}")
 
         pa_schema = pa.schema(fields)
         try:
@@ -88,7 +86,7 @@ class LanceVectorStore(VectorStore):
                 schema=pa_schema,
                 exist_ok=True,
             )
-            logger.info(f"创建或复用 Lance 表: {name}")
+            logger.info(f"Create or reuse Lance table: {name}")
         except TypeError as exc:
             if "exist_ok" not in str(exc):
                 raise
@@ -98,17 +96,17 @@ class LanceVectorStore(VectorStore):
                     data=[],
                     schema=pa_schema,
                 )
-                logger.info(f"创建 Lance 表: {name}")
+                logger.info(f"Create Lance table: {name}")
             except Exception as inner_exc:
-                if _is_table_exists_error(inner_exc):
+                if _is_table_exists(inner_exc):
                     self._tables[schema.name] = await self._db.open_table(name)
-                    logger.info(f"复用 Lance 表: {name}")
+                    logger.info(f"Reuse Lance table: {name}")
                 else:
                     raise
         except Exception as exc:
-            if _is_table_exists_error(exc):
+            if _is_table_exists(exc):
                 self._tables[schema.name] = await self._db.open_table(name)
-                logger.info(f"复用 Lance 表: {name}")
+                logger.info(f"Reuse Lance table: {name}")
             else:
                 raise
 
@@ -168,7 +166,7 @@ class LanceVectorStore(VectorStore):
         for row in rows:
             distance = row.get("_distance")
             if distance is None:
-                raise ValueError("LanceDB 搜索结果缺少 _distance")
+                raise ValueError("LanceDB search result missing _distance")
             results.append(
                 VectorSearchResult(
                     record=row,
@@ -217,6 +215,6 @@ def _build_lance_filter(filters: dict[str, Any]) -> str:
     return " AND ".join(parts)
 
 
-def _is_table_exists_error(exc: Exception) -> bool:
+def _is_table_exists(exc: Exception) -> bool:
     message = str(exc).lower()
     return "already exists" in message

@@ -1,10 +1,10 @@
 """
-StateBuilder - Blackboard 状态写入器（V1）
+StateBuilder - Blackboard state writer (V1).
 
-目标：
-- 调用点禁止字段级读写；必须通过模块化门面一次性读写一组字段
-- patch 生成集中管理（单节点单 patch）
-- reducer 字段（messages/mapreduce_results）写入强约束，避免重复写入与重复累加
+Goals:
+- No field-level reads/writes at call sites; use module facades for grouped updates
+- Centralized patch generation (one node, one patch)
+- Strict handling for reducer fields (messages/mapreduce_results) to avoid duplicates
 """
 
 from __future__ import annotations
@@ -13,20 +13,14 @@ import json
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
-from langchain_core.messages import (
-    AIMessage,
-    BaseMessage,
-    HumanMessage,
-    RemoveMessage,
-    ToolMessage,
-    SystemMessage,
-)
-from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.types import Overwrite
 
 from datapillar_oneagentic.context.timeline.timeline import Timeline
 from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
 from datapillar_oneagentic.core.types import SessionKey
+from datapillar_oneagentic.messages import Message, Messages
+from datapillar_oneagentic.messages.adapters.langchain import from_langchain, to_langchain
+from datapillar_oneagentic.messages.adapters.langgraph import remove_all_messages
 from datapillar_oneagentic.state.blackboard import Blackboard
 
 
@@ -35,7 +29,7 @@ BLACKBOARD_KEYS = frozenset(Blackboard.__annotations__.keys())
 
 def _validate_key(key: str) -> None:
     if key not in BLACKBOARD_KEYS:
-        raise KeyError(f"非法 Blackboard key: {key}")
+        raise KeyError(f"Invalid Blackboard key: {key}")
 
 
 def _as_dict(value: Any) -> dict | None:
@@ -84,21 +78,21 @@ class MapReduceSnapshot:
 
 class StateBuilder:
     """
-    patch 生成器（集中管理写入语义）
+    Patch generator (centralized write semantics).
 
-    普通字段：
-    - 最后写入覆盖
+    Regular fields:
+    - Last write wins
 
-    reducer 字段：
-    - messages: add_messages reducer，支持 append/replace
-    - mapreduce_results: operator.add reducer，仅支持 append/reset
+    Reducer fields:
+    - messages: add_messages reducer, supports append/replace
+    - mapreduce_results: operator.add reducer, supports append/reset only
     """
 
     def __init__(self, state: dict[str, Any]) -> None:
         self._state = state
         self._patch: dict[str, Any] = {}
 
-        # modules（对调用点唯一暴露）
+        # Modules exposed to callers.
         self.memory = MemoryModule(state=state, patch=self)
         self.routing = RoutingModule(state=state, patch=self)
         self.deliverables = DeliverablesModule(state=state, patch=self)
@@ -111,39 +105,40 @@ class StateBuilder:
     def set(self, key: str, value: Any) -> None:
         _validate_key(key)
         if key in {"messages", "mapreduce_results"}:
-            raise KeyError(f"{key} 禁止使用 set，请使用专用接口")
+            raise KeyError(f"{key} cannot use set; use the dedicated APIs")
         self._state[key] = value
         self._patch[key] = value
 
-    def append_messages(self, messages: list[BaseMessage]) -> None:
+    def append_messages(self, messages: Messages) -> None:
         _validate_key("messages")
         if not messages:
             return
+        langchain_messages = to_langchain(messages)
         current = _as_list(self._state.get("messages"))
-        current.extend(messages)
+        current.extend(langchain_messages)
         self._state["messages"] = current
 
         existing = self._patch.get("messages")
         if existing is None:
-            self._patch["messages"] = list(messages)
+            self._patch["messages"] = list(langchain_messages)
             return
         if not isinstance(existing, list):
-            raise TypeError("messages patch 冲突：已存在非 list 的 messages patch")
-        existing.extend(messages)
+            raise TypeError("messages patch conflict: existing patch is not a list")
+        existing.extend(langchain_messages)
         self._patch["messages"] = existing
 
-    def replace_messages(self, messages: list[BaseMessage]) -> None:
+    def replace_messages(self, messages: Messages) -> None:
         _validate_key("messages")
-        cleaned = list(messages)
+        cleaned = to_langchain(messages)
         self._state["messages"] = cleaned
-        patch_messages: list[BaseMessage] = [RemoveMessage(id=REMOVE_ALL_MESSAGES, content="")]
+        patch_messages = [remove_all_messages()]
         patch_messages.extend(cleaned)
         self._patch["messages"] = patch_messages
 
     def reset_mapreduce_results(self) -> None:
         _validate_key("mapreduce_results")
         self._state["mapreduce_results"] = []
-        # operator.add reducer 字段：清空必须用 Overwrite
+        # operator.add reducer field: reset must use Overwrite.
         self._patch["mapreduce_results"] = Overwrite([])
 
     def append_mapreduce_results(self, items: Iterable[dict]) -> None:
@@ -160,7 +155,7 @@ class StateBuilder:
             self._patch["mapreduce_results"] = list(new_items)
             return
         if not isinstance(existing, list):
-            raise TypeError("mapreduce_results patch 冲突：已存在非 list 的 patch")
+            raise TypeError("mapreduce_results patch conflict: existing patch is not a list")
         existing.extend(new_items)
         self._patch["mapreduce_results"] = existing
 
@@ -189,7 +184,7 @@ class StateBuilder:
         return latest or ""
 
     def patch(self) -> dict[str, Any]:
-        # timeline 按 dirty flush
+        # Flush timeline if dirty.
         self.timeline.flush()
         return dict(self._patch)
 
@@ -202,7 +197,7 @@ class StateBuilder:
         query: str,
         entry_agent_id: str,
     ) -> dict[str, Any]:
-        """构造新会话初始 state（完整 state，而非 patch）。"""
+        """Build initial state for a new session (full state, not a patch)."""
         from datapillar_oneagentic.state.blackboard import create_blackboard
 
         state = create_blackboard(
@@ -222,14 +217,14 @@ class StateBuilder:
         query: str,
         entry_agent_id: str,
     ) -> dict[str, Any]:
-        """构造续聊的增量 patch（用于恢复后的继续执行）。"""
+        """Build incremental patch for a resumed session."""
         sb = cls(dict(state))
         sb.memory.append_user_message(query)
         sb.routing.activate(entry_agent_id)
         return sb.patch()
 
-    # === 仅用于将 user reply 写入运行态 state（interrupt 恢复）===
-    def append_user_reply_inplace(self, resume_value: Any) -> None:
+    # === Only for writing user replies into runtime state (interrupt resume) ===
+    def append_reply_state(self, resume_value: Any) -> None:
         if isinstance(resume_value, str):
             content = resume_value
         else:
@@ -237,71 +232,74 @@ class StateBuilder:
                 content = json.dumps(resume_value, ensure_ascii=False)
             except Exception:
                 content = str(resume_value)
-        # 运行态写入不走 patch（不在图内），直接更新 state.messages
-        filtered = MemoryModule._strip_system_messages([HumanMessage(content=content)])
+        # Runtime writes bypass patch (out of graph) and update state.messages directly.
+        filtered = MemoryModule._strip_system_messages([Message.user(content)])
         if not filtered:
             return
         current = _as_list(self._state.get("messages"))
-        current.extend(filtered)
+        current.extend(to_langchain(Messages(filtered)))
         self._state["messages"] = current
 
 
 class MemoryModule:
-    """messages（checkpoint 记忆）模块：清洗/追加/覆盖与常用文本提取。"""
+    """messages (checkpoint memory) module: clean/append/replace and text helpers."""
 
     def __init__(self, *, state: dict[str, Any], patch: StateBuilder) -> None:
         self._state = state
         self._patch = patch
 
-    def snapshot(self) -> list[BaseMessage]:
+    def snapshot(self) -> Messages:
         raw = self._state.get("messages") or []
-        return self._strip_system_messages(_as_list(raw))
+        messages = from_langchain(_as_list(raw))
+        filtered = self._strip_system_messages(messages)
+        return Messages(filtered)
 
-    def raw_snapshot(self) -> list[BaseMessage]:
-        """仅供 tool_call 解析使用，避免污染常规记忆读取路径。"""
-        return _as_list(self._state.get("messages"))
+    def raw_snapshot(self) -> Messages:
+        """For tool_call parsing only; avoid polluting normal memory access."""
+        raw = _as_list(self._state.get("messages"))
+        return Messages(from_langchain(raw))
 
     def has_messages(self) -> bool:
         return bool(self.snapshot())
 
     def append(
         self,
-        messages: list[BaseMessage],
+        messages: Messages,
         *,
         drop_tail_ai: bool = False,
     ) -> None:
         filtered = self._strip_system_messages(messages)
-        if drop_tail_ai and filtered and isinstance(filtered[-1], AIMessage):
+        if drop_tail_ai and filtered and filtered[-1].role == "assistant":
             filtered = filtered[:-1]
         if filtered:
-            self._patch.append_messages(filtered)
+            self._patch.append_messages(Messages(filtered))
 
-    def replace(self, messages: list[BaseMessage]) -> None:
+    def replace(self, messages: Messages) -> None:
         filtered = self._strip_system_messages(messages)
-        self._patch.replace_messages(filtered)
+        self._patch.replace_messages(Messages(filtered))
 
-    def replace_runtime_only(self, messages: list[BaseMessage]) -> None:
+    def replace_runtime_only(self, messages: Messages) -> None:
         """
-        仅用于 runtime：缩短下一次调用的 messages，不写入 checkpoint。
+        Runtime-only: shorten messages for the next call without writing to checkpoint.
 
-        注意：该方法不会写入 patch。
+        Note: this method does not write to patch.
         """
         filtered = self._strip_system_messages(messages)
-        self._state["messages"] = list(filtered)
+        self._state["messages"] = to_langchain(Messages(filtered))
 
-    def append_tool_messages(self, messages: list[BaseMessage]) -> None:
+    def append_tool_messages(self, messages: Messages) -> None:
         if not messages:
             return
-        tool_messages = [msg for msg in messages if isinstance(msg, ToolMessage)]
+        tool_messages = [msg for msg in messages if msg.role == "tool"]
         if not tool_messages:
             return
-        self._patch.append_messages(tool_messages)
+        self._patch.append_messages(Messages(tool_messages))
 
     def append_user_message(self, content: str) -> None:
         text = (content or "").strip()
         if not text:
             return
-        self._patch.append_messages([HumanMessage(content=text)])
+        self._patch.append_messages(Messages([Message.user(text)]))
 
     def append_user_reply(self, content: str) -> None:
         self.append_user_message(content)
@@ -310,12 +308,7 @@ class MemoryModule:
         if not task_id or not description:
             return
         self._patch.append_messages(
-            [
-                AIMessage(
-                    content=f"【TASK {task_id}】{description}",
-                    name="react_controller",
-                )
-            ]
+            Messages([Message.assistant(f"[TASK {task_id}] {description}", name="react_controller")])
         )
 
     def append_execution_summary(
@@ -327,8 +320,8 @@ class MemoryModule:
         error: str | None,
         deliverable_key: str | None,
     ) -> None:
-        task_id = self._extract_latest_task_id(self.snapshot())
-        msg = self._build_execution_summary_message(
+        task_id = self._extract_task_latest(self.snapshot())
+        msg = self._build_execution_summary(
             agent_id=agent_id,
             task_id=task_id,
             status=execution_status,
@@ -336,11 +329,11 @@ class MemoryModule:
             error=error,
             deliverable_key=deliverable_key,
         )
-        self._patch.append_messages([msg])
+        self._patch.append_messages(Messages([msg]))
 
     def latest_user_text(self) -> str | None:
         for msg in reversed(self.snapshot()):
-            if isinstance(msg, HumanMessage):
+            if msg.role == "user":
                 content = self.extract_text(msg.content).strip()
                 if content:
                     return content
@@ -348,35 +341,25 @@ class MemoryModule:
 
     def latest_task_instruction(self) -> str | None:
         for msg in reversed(self.snapshot()):
-            if isinstance(msg, AIMessage) and getattr(msg, "name", None) == "react_controller":
+            if msg.role == "assistant" and getattr(msg, "name", None) == "react_controller":
                 content = self.extract_text(msg.content)
                 if content.startswith("【TASK "):
                     return content
         return None
 
     @staticmethod
-    def extract_text(content: str | list | None) -> str:
+    def extract_text(content: str | None) -> str:
         if content is None:
             return ""
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):
-            texts: list[str] = []
-            for item in content:
-                if isinstance(item, str):
-                    texts.append(item)
-                elif isinstance(item, dict) and item.get("type") == "text":
-                    texts.append(str(item.get("text", "")))
-            return "\n".join(texts)
-        return str(content)
+        return content if isinstance(content, str) else str(content)
 
     @staticmethod
-    def _strip_system_messages(messages: list[BaseMessage]) -> list[BaseMessage]:
-        cleaned: list[BaseMessage] = []
+    def _strip_system_messages(messages: list[Message]) -> list[Message]:
+        cleaned: list[Message] = []
         for msg in messages:
-            if isinstance(msg, SystemMessage):
+            if msg.role == "system":
                 continue
-            if (getattr(msg, "additional_kwargs", {}) or {}).get("internal"):
+            if msg.metadata.get("internal") is True:
                 continue
             sanitized = MemoryModule._sanitize_message(msg)
             if sanitized is not None:
@@ -384,25 +367,17 @@ class MemoryModule:
         return cleaned
 
     @staticmethod
-    def _sanitize_message(msg: BaseMessage) -> BaseMessage | None:
-        if isinstance(msg, HumanMessage):
-            return HumanMessage(
-                content=msg.content,
-                name=getattr(msg, "name", None) or None,
-                id=getattr(msg, "id", None),
-            )
-        if isinstance(msg, AIMessage):
-            return AIMessage(
-                content=msg.content,
-                name=getattr(msg, "name", None) or None,
-                id=getattr(msg, "id", None),
-            )
+    def _sanitize_message(msg: Message) -> Message | None:
+        if msg.role == "user":
+            return Message.user(msg.content, name=msg.name, id=msg.id)
+        if msg.role == "assistant":
+            return Message.assistant(msg.content, name=msg.name, id=msg.id)
         return None
 
     @staticmethod
-    def _extract_latest_task_id(messages: list[BaseMessage]) -> str | None:
+    def _extract_task_latest(messages: list[Message]) -> str | None:
         for msg in reversed(messages):
-            if isinstance(msg, AIMessage) and getattr(msg, "name", None) == "react_controller":
+            if msg.role == "assistant" and getattr(msg, "name", None) == "react_controller":
                 text = MemoryModule.extract_text(msg.content)
                 if text.startswith("【TASK "):
                     try:
@@ -413,7 +388,7 @@ class MemoryModule:
         return None
 
     @staticmethod
-    def _build_execution_summary_message(
+    def _build_execution_summary(
         *,
         agent_id: str,
         task_id: str | None,
@@ -421,7 +396,7 @@ class MemoryModule:
         failure_kind: FailureKind | str | None,
         error: str | None,
         deliverable_key: str | None,
-    ) -> AIMessage:
+    ) -> Message:
         parts = [f"【RESULT】agent={agent_id}"]
         if task_id:
             parts.append(f"task={task_id}")
@@ -435,7 +410,7 @@ class MemoryModule:
             parts.append(f"deliverable={deliverable_key}")
         if error:
             parts.append(f"error={error}")
-        return AIMessage(content=" ".join(parts), name="datapillar")
+        return Message.assistant(" ".join(parts), name="datapillar")
 
 
 class RoutingModule:
@@ -570,16 +545,16 @@ class ReactModule:
     def save_reflection(self, reflection: dict | None) -> None:
         self._patch.set("reflection", reflection)
 
-    def set_error_retry_count(self, count: int) -> None:
+    def set_error_retry(self, count: int) -> None:
         self._patch.set("error_retry_count", int(count))
 
     def reset_error_retry(self) -> None:
-        self.set_error_retry_count(0)
+        self.set_error_retry(0)
 
     def inc_error_retry(self) -> int:
         snap = self.snapshot()
         next_value = snap.error_retry_count + 1
-        self.set_error_retry_count(next_value)
+        self.set_error_retry(next_value)
         return next_value
 
 
@@ -624,14 +599,14 @@ class CompressionModule:
         self._patch = patch
 
     def snapshot(self) -> str | None:
-        value = self._state.get("compression__context")
+        value = self._state.get("compression_context")
         return str(value) if value is not None else None
 
     def persist_compression(self, summary: str | None) -> None:
-        self._patch.set("compression__context", summary)
+        self._patch.set("compression_context", summary)
 
     def set_runtime_compression(self, summary: str | None) -> None:
-        self._state["compression__context"] = summary
+        self._state["compression_context"] = summary
 
 
 class TimelineModule:
@@ -654,9 +629,9 @@ class TimelineModule:
             self._timeline = Timeline()
         for event_data in events:
             try:
-                self._timeline.add_entry_from_dict(event_data)
+                self._timeline.add_entry_dict(event_data)
             except Exception:
-                # TimelineRecorder 输出应是稳定格式；这里仅做保护，避免单条坏数据污染整个节点。
+                # TimelineRecorder output should be stable; guard against corrupt entries.
                 continue
         self._dirty = True
 

@@ -1,6 +1,4 @@
-"""
-CSV 解析器
-"""
+"""CSV parser."""
 
 from __future__ import annotations
 

@@ -1,6 +1,4 @@
-"""
-知识评估执行器
-"""
+"""Knowledge evaluation executor."""
 
 from __future__ import annotations
 
@@ -9,7 +7,7 @@ from typing import Iterable
 from datapillar_oneagentic.knowledge.chunker import KnowledgeChunker
 from datapillar_oneagentic.knowledge.config import KnowledgeChunkConfig, KnowledgeConfig, KnowledgeRetrieveConfig
 from datapillar_oneagentic.knowledge.evaluation.metrics import (
-    compute_coverage_and_overlap,
+    compute_coverage_overlap,
     compute_duplicate_ratio,
     compute_length_stats,
     compute_ranking_metrics,
@@ -40,7 +38,7 @@ from datapillar_oneagentic.storage.knowledge_stores.base import KnowledgeStore
 
 
 class KnowledgeEvaluator:
-    """知识评估执行器"""
+    """Knowledge evaluation executor."""
 
     def __init__(
         self,
@@ -88,7 +86,7 @@ class KnowledgeEvaluator:
 
     async def evaluate(self, evalset: EvalSet) -> EvaluationReport:
         if evalset.k_values and max(evalset.k_values) > self._retrieve_config.top_k:
-            raise ValueError("retrieve_config.top_k 必须大于等于评估集最大 k")
+            raise ValueError("retrieve_config.top_k must be >= max k in evalset")
         chunking_report = self.evaluate_chunking(evalset)
         await self._ingest_eval_documents(evalset.documents)
         retrieval_reports = [
@@ -110,7 +108,7 @@ class KnowledgeEvaluator:
             preview = self._chunker.preview(parsed)
             contents = [chunk.content for chunk in preview.chunks]
             lengths = [len(content) for content in contents]
-            coverage_ratio, overlap_ratio = compute_coverage_and_overlap(
+            coverage_ratio, overlap_ratio = compute_coverage_overlap(
                 doc_length=len(doc.text),
                 spans=[span for chunk in preview.chunks for span in chunk.source_spans],
             )
@@ -160,7 +158,7 @@ class KnowledgeEvaluator:
                     k_values=evalset.k_values,
                 )
             else:
-                raise ValueError(f"不支持的评估目标: {target}")
+                raise ValueError(f"Unsupported evaluation target: {target}")
 
             query_reports.append(RetrievalQueryReport(query_id=query.query_id, metrics=metrics))
 

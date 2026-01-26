@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.sunny.datapillar.admin.module.sql.dto.SqlDto;
 import com.sunny.datapillar.admin.module.sql.service.SqlService;
-import com.sunny.datapillar.admin.response.WebAdminResponse;
+import com.sunny.datapillar.admin.web.response.ApiResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,13 +29,9 @@ public class SqlController {
 
     @Operation(summary = "执行 SQL")
     @PostMapping("/execute")
-    public WebAdminResponse<SqlDto.ExecuteResult> execute(
+    public ApiResponse<SqlDto.ExecuteResult> execute(
             @Valid @RequestBody SqlDto.ExecuteRequest request) {
         SqlDto.ExecuteResult result = sqlService.executeSql(request);
-        if (result.isSuccess()) {
-            return WebAdminResponse.ok(result);
-        } else {
-            return WebAdminResponse.error(result.getError());
-        }
+        return ApiResponse.ok(result);
     }
 }

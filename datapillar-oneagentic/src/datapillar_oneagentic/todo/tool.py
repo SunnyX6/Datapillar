@@ -1,7 +1,7 @@
 """
-Todo 上报工具
+Todo reporting tools.
 
-用于 Agent 上报 Todo 进度，框架自动解析。
+Used by agents to report Todo progress; the framework parses automatically.
 """
 
 from __future__ import annotations
@@ -10,10 +10,10 @@ import ast
 import json
 from typing import Annotated
 
-from langchain_core.messages import BaseMessage, ToolMessage
 from langchain_core.tools import BaseTool, tool
 
 from datapillar_oneagentic.todo.session_todo import TodoPlanOp, TodoUpdate
+from datapillar_oneagentic.messages import Message, Messages
 
 TODO_TOOL_NAME = "report_todo"
 TODO_PLAN_TOOL_NAME = "plan_todo"
@@ -25,7 +25,7 @@ def report_todo(
     status: Annotated[str, "Status: pending/running/completed/failed/skipped"],
     result: Annotated[str | None, "Short result note (optional)"] = None,
 ) -> dict:
-    """上报 Todo 进度"""
+    """Report Todo progress."""
     return {
         "id": todo_id,
         "status": status,
@@ -39,7 +39,7 @@ def plan_todo(
     todo_ids: Annotated[list[str] | None, "Todo IDs for remove"] = None,
     goal: Annotated[str | None, "Optional goal"] = None,
 ) -> dict:
-    """规划 Todo 列表"""
+    """Plan or adjust Todo list."""
     return {
         "op": op,
         "items": items or [],
@@ -49,39 +49,39 @@ def plan_todo(
 
 
 def create_todo_tools() -> list[BaseTool]:
-    """创建 Todo 工具列表"""
+    """Create Todo tools."""
     return [report_todo, plan_todo]
 
 
-def extract_todo_updates(messages: list[BaseMessage]) -> list[TodoUpdate]:
-    """从消息中解析 Todo 更新"""
+def extract_todo_updates(messages: Messages) -> list[TodoUpdate]:
+    """Parse Todo updates from messages."""
     updates: list[TodoUpdate] = []
     for msg in messages:
-        if not isinstance(msg, ToolMessage):
+        if msg.role != "tool":
             continue
-        if getattr(msg, "name", "") != TODO_TOOL_NAME:
+        if msg.name != TODO_TOOL_NAME:
             continue
         updates.extend(_parse_tool_payload(msg.content))
     return updates
 
 
-def extract_todo_plan_ops(messages: list[BaseMessage]) -> list[TodoPlanOp]:
-    """从消息中解析 Todo 规划操作"""
+def extract_todo_plan(messages: Messages) -> list[TodoPlanOp]:
+    """Parse Todo plan operations from messages."""
     ops: list[TodoPlanOp] = []
     for msg in messages:
-        if not isinstance(msg, ToolMessage):
+        if msg.role != "tool":
             continue
-        if getattr(msg, "name", "") != TODO_PLAN_TOOL_NAME:
+        if msg.name != TODO_PLAN_TOOL_NAME:
             continue
         ops.extend(_parse_plan_payload(msg.content))
     return ops
 
 
-def build_todo_tool_message(updates: list[TodoUpdate]) -> ToolMessage:
-    """构建 Todo 工具消息（用于审计兜底）"""
+def build_todo_message(updates: list[TodoUpdate]) -> Message:
+    """Build a Todo tool message (audit fallback)."""
     payload = {"updates": [u.model_dump(mode="json") for u in updates]}
     content = json.dumps(payload, ensure_ascii=False)
-    return ToolMessage(
+    return Message.tool(
         content=content,
         name=TODO_TOOL_NAME,
         tool_call_id="todo_audit",
@@ -89,7 +89,7 @@ def build_todo_tool_message(updates: list[TodoUpdate]) -> ToolMessage:
 
 
 def _parse_tool_payload(payload: object) -> list[TodoUpdate]:
-    """解析工具 payload 为更新列表"""
+    """Parse tool payload into update list."""
     data: object = payload
     if isinstance(payload, str):
         try:
@@ -124,7 +124,7 @@ def _parse_update_items(items: list[object]) -> list[TodoUpdate]:
 
 
 def _parse_plan_payload(payload: object) -> list[TodoPlanOp]:
-    """解析工具 payload 为规划操作列表"""
+    """Parse tool payload into plan operations."""
     data: object = payload
     if isinstance(payload, str):
         try:

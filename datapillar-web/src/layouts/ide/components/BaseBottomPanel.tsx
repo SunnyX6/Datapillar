@@ -171,6 +171,7 @@ export function BaseBottomPanel({
           {collapsible && (
             <button
               onClick={() => handleCollapsedChange(!isCollapsed)}
+              aria-label={isCollapsed ? '展开底部面板' : '收起底部面板'}
               className="p-0.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-all text-slate-500 dark:text-slate-400"
             >
               <motion.div animate={{ rotate: isCollapsed ? 0 : 180 }}>

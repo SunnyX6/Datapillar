@@ -1,6 +1,4 @@
-"""
-知识运行时构建
-"""
+"""Knowledge runtime builder."""
 
 from __future__ import annotations
 
@@ -14,7 +12,7 @@ from datapillar_oneagentic.storage.knowledge_stores.base import KnowledgeStore
 
 @dataclass
 class KnowledgeRuntime:
-    """知识运行时依赖集合"""
+    """Knowledge runtime dependencies."""
 
     store: KnowledgeStore
     embedding_provider: EmbeddingProvider
@@ -25,11 +23,11 @@ class KnowledgeRuntime:
 
 def build_runtime(*, namespace: str, base_config: KnowledgeBaseConfig) -> KnowledgeRuntime:
     if not namespace:
-        raise ValueError("namespace 不能为空")
+        raise ValueError("namespace cannot be empty")
     if not base_config.embedding.is_configured():
-        raise ValueError("KnowledgeConfig.base_config.embedding 未配置")
+        raise ValueError("KnowledgeConfig.base_config.embedding is not configured")
     if base_config.embedding.dimension is None:
-        raise ValueError("KnowledgeConfig.base_config.embedding.dimension 不能为空")
+        raise ValueError("KnowledgeConfig.base_config.embedding.dimension cannot be empty")
 
     store = create_knowledge_store(
         namespace,

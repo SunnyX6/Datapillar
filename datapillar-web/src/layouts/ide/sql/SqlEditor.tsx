@@ -3,8 +3,9 @@
  * 基于 BaseEditor 骨架构建
  */
 
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import '@/lib/monaco'
 import Editor from '@monaco-editor/react'
 import type * as Monaco from 'monaco-editor'
 import {
@@ -38,6 +39,8 @@ import {
   SiRedis
 } from 'react-icons/si'
 import { BaseEditor, type EditorTab, type ContextMenuGroup, Minimap } from '../components'
+import { useMonacoLayout } from '@/hooks/useMonacoLayout'
+import { panelWidthClassMap } from '@/design-tokens/dimensions'
 import { BottomPanel } from './BottomPanel'
 import { RightRail } from './RightRail'
 import { fetchCatalogs, fetchSchemas, mapProviderToIcon, type CatalogItem, type SchemaItem } from '@/services/oneMetaService'
@@ -157,10 +160,12 @@ export function SqlEditor() {
   const [executeResult, setExecuteResult] = useState<ExecuteResult | null>(null)
   const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(true)
   const [bottomPanelTab, setBottomPanelTab] = useState('results')
+  const didInitStickyScroll = useRef(false)
 
   // Monaco Editor 实例引用
   const [editorInstance, setEditorInstance] = useState<Monaco.editor.IStandaloneCodeEditor | null>(null)
   const [monacoInstance, setMonacoInstance] = useState<typeof Monaco | null>(null)
+  const editorContainerRef = useRef<HTMLDivElement>(null)
 
   // Catalog/Schema 选择相关状态
   const [catalogs, setCatalogs] = useState<CatalogItem[]>([])
@@ -187,6 +192,8 @@ export function SqlEditor() {
     id: w.id,
     name: w.name
   }))
+
+  const { layoutNow } = useMonacoLayout(editorInstance, editorContainerRef)
 
   const handleExecute = async () => {
     // 校验：必须选择 catalog 和 schema
@@ -345,6 +352,11 @@ export function SqlEditor() {
 
   // 切换 Tab 时重置 Sticky Scroll 状态（通过禁用再启用强制刷新）
   useEffect(() => {
+    if (!editorInstance) return
+    if (!didInitStickyScroll.current) {
+      didInitStickyScroll.current = true
+      return
+    }
     if (editorInstance) {
       editorInstance.updateOptions({ stickyScroll: { enabled: false } })
       requestAnimationFrame(() => {
@@ -424,7 +436,7 @@ export function SqlEditor() {
       {showCatalogPicker && catalogPickerStyle && createPortal(
         <div
           ref={catalogPickerRef}
-          className="fixed z-[100000] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl dark:shadow-2xl overflow-hidden w-panel-responsive max-h-[var(--catalog-picker-max-height)]"
+          className={`fixed z-[100000] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl dark:shadow-2xl overflow-hidden ${panelWidthClassMap.responsive} max-h-[var(--catalog-picker-max-height)]`}
           style={{
             ...(catalogPickerStyle.top !== undefined ? { top: catalogPickerStyle.top } : {}),
             ...(catalogPickerStyle.bottom !== undefined ? { bottom: catalogPickerStyle.bottom } : {}),
@@ -586,6 +598,32 @@ export function SqlEditor() {
     }
   ]
 
+  const editorOptions = useMemo<Monaco.editor.IStandaloneEditorConstructionOptions>(() => ({
+    fontSize: 14,
+    fontFamily: "Menlo, 'PingFang SC', 'Microsoft YaHei', Consolas, monospace",
+    lineHeight: 20,
+    minimap: {
+      enabled: false,
+    },
+    overviewRulerLanes: 0,
+    overviewRulerBorder: false,
+    stickyScroll: {
+      enabled: true
+    },
+    contextmenu: false,
+    scrollbar: {
+      vertical: 'auto',
+      verticalScrollbarSize: 10,
+      verticalSliderSize: 6,
+    },
+    padding: { top: 12 },
+    lineNumbersMinChars: 3,
+    renderLineHighlight: 'none',
+    scrollBeyondLastLine: false,
+    cursorHeight: 16,
+    automaticLayout: false,
+  }), [])
+
   return (
     <BaseEditor
       tabs={tabs}
@@ -620,7 +658,7 @@ export function SqlEditor() {
       contextMenuGroups={contextMenuGroups}
     >
       <div className="flex h-full w-full">
-        <div className="flex-1 min-w-0 h-full">
+        <div ref={editorContainerRef} className="flex-1 min-w-0 h-full">
           <Editor
             height="100%"
             defaultLanguage="sql"
@@ -644,6 +682,7 @@ export function SqlEditor() {
               setEditorInstance(editor)
               setMonacoInstance(monaco)
               editor.onDidChangeCursorPosition(e => setCursor({ ln: e.position.lineNumber, col: e.position.column }))
+              layoutNow(editor)
 
               // 获取编辑器 DOM 容器，添加拖放事件监听
               const editorDom = editor.getDomNode()
@@ -680,25 +719,7 @@ export function SqlEditor() {
                 })
               }
             }}
-            options={{
-              fontSize: 14,
-              fontFamily: "Menlo, 'PingFang SC', 'Microsoft YaHei', Consolas, monospace",
-              minimap: {
-                enabled: false, // 关闭内置 minimap，使用自定义组件
-              },
-              contextmenu: false, // 禁用内置右键菜单，使用自定义菜单
-              scrollbar: {
-                vertical: 'auto',
-                verticalScrollbarSize: 10,
-                verticalSliderSize: 6,
-              },
-              padding: { top: 12 },
-              lineNumbersMinChars: 3,
-              renderLineHighlight: 'none',
-              scrollBeyondLastLine: false,
-              cursorHeight: 16,
-              automaticLayout: true,
-            }}
+            options={editorOptions}
           />
         </div>
         {/* 自定义 Minimap */}

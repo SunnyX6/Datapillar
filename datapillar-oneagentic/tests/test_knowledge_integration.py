@@ -32,7 +32,7 @@ def _module_available(module_name: str) -> bool:
     return importlib.util.find_spec(module_name) is not None
 
 
-def _select_vector_store_config(path: str) -> VectorStoreConfig:
+def _select_vector(path: str) -> VectorStoreConfig:
     if _module_available("lancedb") and _module_available("pyarrow"):
         return VectorStoreConfig(type="lance", path=path)
     if _module_available("chromadb"):
@@ -41,9 +41,9 @@ def _select_vector_store_config(path: str) -> VectorStoreConfig:
 
 
 @pytest.mark.asyncio
-async def test_knowledge_ingest_and_retrieve_integration() -> None:
+async def test_knowledge_ingest() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
-        vector_store_config = _select_vector_store_config(tmpdir)
+        vector_store_config = _select_vector(tmpdir)
         embedding_config = EmbeddingConfig(
             provider="openai",
             api_key="stub",

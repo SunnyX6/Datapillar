@@ -5,7 +5,7 @@ from datapillar_oneagentic.exception import (
 )
 
 
-def test_llm_error_classifier_rate_limit() -> None:
+def test_llm_error() -> None:
     error = RuntimeError("rate limit exceeded")
     category, action = LLMErrorClassifier.classify(error)
     assert category == LLMErrorCategory.RATE_LIMIT

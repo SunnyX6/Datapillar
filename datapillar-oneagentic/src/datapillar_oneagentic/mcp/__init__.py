@@ -1,18 +1,18 @@
 """
-MCP (Model Context Protocol) 客户端模块
+MCP (Model Context Protocol) client module.
 
-基于官方 MCP SDK 实现，提供 MCP 服务器连接能力。
+Built on the official MCP SDK and provides MCP server connectivity.
 
-支持传输方式：
-- Stdio 传输（本地进程）
-- HTTP 传输（Streamable HTTP）
-- SSE 传输（流式服务）
+Supported transports:
+- Stdio transport (local process)
+- HTTP transport (streamable HTTP)
+- SSE transport (streaming service)
 
-使用示例：
+Example:
 ```python
 from datapillar_oneagentic.mcp import MCPServerStdio, MCPToolkit
 
-# 推荐：使用 MCPToolkit 管理连接生命周期
+# Recommended: use MCPToolkit to manage connection lifecycle
 servers = [
     MCPServerStdio(
         command="npx",
@@ -22,7 +22,7 @@ servers = [
 
 async with MCPToolkit(servers) as toolkit:
     tools = toolkit.get_tools()
-    # 使用工具...
+    # Use tools...
 ```
 """
 
@@ -45,19 +45,19 @@ from datapillar_oneagentic.mcp.tool import (
 )
 
 __all__ = [
-    # 配置
+    # Config
     "MCPServerConfig",
     "MCPServerStdio",
     "MCPServerHTTP",
     "MCPServerSSE",
-    # 客户端
+    # Client
     "MCPClient",
     "MCPTool",
     "ToolAnnotations",
-    # 异常
+    # Errors
     "MCPError",
     "MCPConnectionError",
     "MCPTimeoutError",
-    # 工具包
+    # Toolkit
     "MCPToolkit",
 ]

@@ -1,11 +1,11 @@
 """
-核心类型定义
+Core type definitions.
 
-对外暴露：
-- SessionKey: 会话标识（namespace + session_id）
+Public:
+- SessionKey: session identifier (namespace + session_id)
 
-框架内部：
-- AgentResult: Agent 执行结果
+Framework internal:
+- AgentResult: agent execution result
 """
 
 from __future__ import annotations
@@ -13,27 +13,27 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Self
 
-from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, Field
 
 from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
+from datapillar_oneagentic.messages import Messages
 
 @dataclass(frozen=True, slots=True)
 class SessionKey:
     """
-    会话标识（不可变值对象）
+    Session identifier (immutable value object).
 
-    统一 namespace + session_id 的组合，确保全系统一致性。
-    所有子系统（Checkpoint、Timeline、SSE、Store）必须使用此类型作为 key。
+    Uses namespace + session_id for system-wide consistency.
+    All subsystems (Checkpoint, Timeline, SSE, Store) must use this type as key.
 
-    使用示例：
+    Example:
     ```python
     key = SessionKey(namespace="etl_team", session_id="abc123")
 
-    # 作为存储 key
+    # As a storage key
     buffer[str(key)]  # "etl_team:abc123"
 
-    # 解析
+    # Parse
     key = SessionKey.parse("etl_team:abc123")
     key.namespace  # "etl_team"
     key.session_id  # "abc123"
@@ -45,79 +45,79 @@ class SessionKey:
 
     def __post_init__(self) -> None:
         if not self.namespace or not self.session_id:
-            raise ValueError("namespace 和 session_id 不能为空")
+            raise ValueError("namespace and session_id cannot be empty")
 
     def __str__(self) -> str:
-        """用于存储 key（Redis/Dict/Checkpoint）"""
+        """Return storage key (Redis/Dict/Checkpoint)."""
         return f"{self.namespace}:{self.session_id}"
 
     @classmethod
     def parse(cls, key: str) -> Self:
-        """从字符串解析"""
+        """Parse from a string."""
         if ":" not in key:
-            raise ValueError(f"无效的 SessionKey 格式: {key}")
+            raise ValueError(f"Invalid SessionKey format: {key}")
         namespace, session_id = key.split(":", 1)
         return cls(namespace=namespace, session_id=session_id)
 
 
-# ==================== 框架内部类型 ====================
+# ==================== Framework internal types ====================
 
 
 class AgentResult(BaseModel):
     """
-    Agent 执行结果（框架内部使用）
+    Agent execution result (framework internal).
 
-    业务侧不需要直接构建此类型，框架会自动处理。
+    Application code should not build this directly; the framework handles it.
 
-    状态语义：
-    - completed: Agent 正确完成任务
-    - failed: 执行失败（通过 failure_kind 区分业务/系统）
+    Status semantics:
+    - completed: agent completed successfully
+    - failed: execution failed (use failure_kind for business/system)
     """
 
     model_config = {"arbitrary_types_allowed": True}
 
-    status: ExecutionStatus = Field(..., description="执行状态")
-    failure_kind: FailureKind | None = Field(None, description="失败类型（status=failed 时有效）")
-    deliverable: Any | None = Field(None, description="交付物")
-    deliverable_type: str | None = Field(None, description="交付物类型")
-    error: str | None = Field(None, description="错误信息")
-    messages: list[BaseMessage] = Field(default_factory=list, description="Agent 执行过程中的消息")
+    status: ExecutionStatus = Field(..., description="Execution status")
+    failure_kind: FailureKind | None = Field(None, description="Failure kind (status=failed)")
+    deliverable: Any | None = Field(None, description="Deliverable")
+    deliverable_type: str | None = Field(None, description="Deliverable type")
+    error: str | None = Field(None, description="Error message")
+    messages: Messages = Field(default_factory=Messages, description="Messages during execution")
 
     @classmethod
     def completed(
         cls,
         deliverable: Any,
         deliverable_type: str,
-        messages: list[BaseMessage] | None = None,
+        messages: Messages | None = None,
     ) -> AgentResult:
-        """创建成功结果"""
+        """Create a success result."""
         return cls(
             status=ExecutionStatus.COMPLETED,
             deliverable=deliverable,
             deliverable_type=deliverable_type,
-            messages=messages or [],
+            messages=messages or Messages(),
         )
 
     @classmethod
     def failed(
         cls,
         error: str,
-        messages: list[BaseMessage] | None = None,
+        messages: Messages | None = None,
         failure_kind: FailureKind = FailureKind.BUSINESS,
     ) -> AgentResult:
-        """创建业务失败结果"""
+        """Create a business failure result."""
         return cls(
             status=ExecutionStatus.FAILED,
             failure_kind=failure_kind,
             error=error,
-            messages=messages or [],
+            messages=messages or Messages(),
         )
 
     @classmethod
     def system_error(
         cls,
         error: str,
-        messages: list[BaseMessage] | None = None,
+        messages: Messages | None = None,
     ) -> AgentResult:
-        """兼容入口：系统异常结果（等价于 failed + system）"""
+        """Compatibility entrypoint: system error result (failed + system)."""
         return cls.failed(error=error, messages=messages, failure_kind=FailureKind.SYSTEM)

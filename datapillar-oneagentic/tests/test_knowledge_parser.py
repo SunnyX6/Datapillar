@@ -6,7 +6,7 @@ from datapillar_oneagentic.knowledge.parser.csv import CsvParser
 from datapillar_oneagentic.knowledge.parser.pdf import PdfParser
 
 
-def test_registry_sets_parser_name() -> None:
+def test_registry_sets() -> None:
     registry = default_registry()
     doc = DocumentInput(source="hello", mime_type="text/plain")
 
@@ -16,7 +16,7 @@ def test_registry_sets_parser_name() -> None:
     assert parsed.text == "hello"
 
 
-def test_registry_fallbacks_to_text() -> None:
+def test_registry_fallbacks() -> None:
     registry = default_registry()
     doc = DocumentInput(source="fallback", mime_type="application/unknown")
 
@@ -26,7 +26,7 @@ def test_registry_fallbacks_to_text() -> None:
     assert parsed.text == "fallback"
 
 
-def test_registry_resolves_by_extension() -> None:
+def test_registry_resolves() -> None:
     registry = default_registry()
     doc = DocumentInput(source="plain", filename="doc.txt")
 
@@ -36,7 +36,7 @@ def test_registry_resolves_by_extension() -> None:
     assert parsed.text == "plain"
 
 
-def test_csv_parser_outputs_tab_separated_lines() -> None:
+def test_csv_parser() -> None:
     parser = CsvParser()
     doc = DocumentInput(source="a,b\nc,d", filename="demo.csv")
 
@@ -45,7 +45,7 @@ def test_csv_parser_outputs_tab_separated_lines() -> None:
     assert parsed.text == "a\tb\nc\td"
 
 
-def test_docx_parser_uses_custom_extractor(monkeypatch) -> None:
+def test_docx_parser(monkeypatch) -> None:
     from datapillar_oneagentic.knowledge.parser import docx as docx_module
 
     monkeypatch.setattr(docx_module, "_docx_to_text", lambda _: "docx-content")
@@ -61,7 +61,7 @@ def test_docx_parser_uses_custom_extractor(monkeypatch) -> None:
     assert parsed.text == "docx-content"
 
 
-def test_markdown_parser_uses_custom_extractor(monkeypatch) -> None:
+def test_markdown_parser(monkeypatch) -> None:
     from datapillar_oneagentic.knowledge.parser import markdown as markdown_module
 
     monkeypatch.setattr(markdown_module, "_markdown_to_text", lambda _: "md-content")
@@ -74,7 +74,7 @@ def test_markdown_parser_uses_custom_extractor(monkeypatch) -> None:
     assert parsed.text == "md-content"
 
 
-def test_html_parser_uses_custom_extractor(monkeypatch) -> None:
+def test_html_parser(monkeypatch) -> None:
     from datapillar_oneagentic.knowledge.parser import html as html_module
 
     monkeypatch.setattr(html_module, "_html_to_text", lambda _: "html-content")
@@ -87,7 +87,7 @@ def test_html_parser_uses_custom_extractor(monkeypatch) -> None:
     assert parsed.text == "html-content"
 
 
-def test_xlsx_parser_uses_custom_extractor(monkeypatch) -> None:
+def test_xlsx_parser(monkeypatch) -> None:
     from datapillar_oneagentic.knowledge.parser import xlsx as xlsx_module
 
     monkeypatch.setattr(xlsx_module, "_xlsx_to_text", lambda _: "xlsx-content")
@@ -103,7 +103,7 @@ def test_xlsx_parser_uses_custom_extractor(monkeypatch) -> None:
     assert parsed.text == "xlsx-content"
 
 
-def test_pdf_parser_keeps_attachments(monkeypatch) -> None:
+def test_pdf_parser(monkeypatch) -> None:
     attachment = Attachment(
         attachment_id="att1",
         name="att1.png",
@@ -125,7 +125,7 @@ def test_pdf_parser_keeps_attachments(monkeypatch) -> None:
     assert parsed.attachments[0].attachment_id == "att1"
 
 
-def test_pdf_parser_respects_extractor(monkeypatch) -> None:
+def test_pdf_parser2(monkeypatch) -> None:
     parser = PdfParser()
     monkeypatch.setattr(
         "datapillar_oneagentic.knowledge.parser.pdf._extract_pdf",

@@ -20,8 +20,8 @@ from typing import Any
 
 import structlog
 import xxhash
+from datapillar_oneagentic.messages import Message, Messages
 from datapillar_oneagentic.providers.llm import LLMProvider
-from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
 from src.infrastructure.llm.embeddings import UnifiedEmbedder
@@ -301,10 +301,12 @@ class SQLSummaryProcessor:
         prompt = self._build_batch_prompt(tasks)
 
         llm = _get_llm_provider()(output_schema=BatchSummaryResult)
-        messages = [
-            SystemMessage(content=self._get_system_prompt()),
-            HumanMessage(content=prompt),
-        ]
+        messages = Messages(
+            [
+                Message.system(self._get_system_prompt()),
+                Message.user(prompt),
+            ]
+        )
 
         result = await llm.ainvoke(messages)
 

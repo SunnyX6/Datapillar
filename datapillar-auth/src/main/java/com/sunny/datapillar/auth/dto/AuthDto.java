@@ -83,13 +83,6 @@ public class AuthDto {
             dto.setEmail(email);
             return dto;
         }
-
-        public static TokenResponse failure(String errorMessage) {
-            TokenResponse dto = new TokenResponse();
-            dto.setValid(false);
-            dto.setErrorMessage(errorMessage);
-            return dto;
-        }
     }
 
     @Data
@@ -132,13 +125,6 @@ public class AuthDto {
                     .userId(userId)
                     .username(username)
                     .email(email)
-                    .build();
-        }
-
-        public static SsoValidateResponse failure(String message) {
-            return SsoValidateResponse.builder()
-                    .valid(false)
-                    .message(message)
                     .build();
         }
     }

@@ -1,32 +1,32 @@
 """
-知识 RAG 快速使用示例：团队级知识入口 + Agent 级覆盖
+Knowledge RAG quickstart: team-level entry + agent-level override.
 
-运行命令：
+Run:
     uv run python examples/quickstart_knowledge_team_agent.py
 
-依赖安装：
+Dependencies:
     pip install datapillar-oneagentic[lance,knowledge]
 
-配置要求：
-    1) LLM（Datapillar 团队执行需要）
+Requirements:
+    1) LLM (Datapillar team execution)
        export DATAPILLAR_LLM_PROVIDER="openai"              # openai | anthropic | glm | deepseek | openrouter | ollama
        export DATAPILLAR_LLM_API_KEY="sk-xxx"
        export DATAPILLAR_LLM_MODEL="gpt-4o"
-       # 可选：export DATAPILLAR_LLM_BASE_URL="https://api.openai.com/v1"
-       # 可选：export DATAPILLAR_LLM_ENABLE_THINKING="true"
-    2) Embedding（知识入库与检索需要）
+       # Optional: export DATAPILLAR_LLM_BASE_URL="https://api.openai.com/v1"
+       # Optional: export DATAPILLAR_LLM_ENABLE_THINKING="true"
+    2) Embedding (knowledge ingest and retrieval)
        export DATAPILLAR_EMBEDDING_PROVIDER="openai"        # openai | glm
        export DATAPILLAR_EMBEDDING_API_KEY="sk-xxx"
        export DATAPILLAR_EMBEDDING_MODEL="text-embedding-3-small"
        export DATAPILLAR_EMBEDDING_DIMENSION="1536"
-       # 可选：export DATAPILLAR_EMBEDDING_BASE_URL="https://api.openai.com/v1"
+       # Optional: export DATAPILLAR_EMBEDDING_BASE_URL="https://api.openai.com/v1"
 
-说明：
-    - source_id 由系统生成，不需要传入。
-    - content 可选；传了 content 就不会读取 source_uri 的内容。
-    - source_uri 写本地完整路径且文件存在时，会自动读取文件内容；filename/mime_type 可选。
-    - namespace 必须显式传入（由 Datapillar 与 ingest/retrieve 内部创建 store 绑定）。
-    - 检索默认只在当前 namespace 内进行，跨 namespace 检索暂不支持。
+Notes:
+    - source_id is generated automatically.
+    - content is optional; if provided, source_uri is not read.
+    - If source_uri is a valid local path, content is read automatically; filename/mime_type are optional.
+    - namespace must be provided explicitly (store is bound inside Datapillar and ingest/retrieve).
+    - Retrieval is scoped to the current namespace; cross-namespace retrieval is not supported.
 """
 
 import asyncio
@@ -55,23 +55,23 @@ class AnswerOutput(BaseModel):
 async def _prepare_demo_knowledge(namespace: str, knowledge_config: KnowledgeConfig) -> None:
 
     team_source = KnowledgeSource(
-        name="团队知识库",
+        name="Team knowledge base",
         source_type="doc",
         source_uri="team.txt",
         content=(
-            "Datapillar 是一个数据开发 SaaS 平台，提供知识切分与检索增强能力。\n"
-            "知识框架是基座能力，可挂载到团队或 Agent。"
+            "Datapillar is a data development SaaS platform with knowledge chunking and retrieval augmentation.\n"
+            "The knowledge framework is a foundational capability that can be attached to teams or agents."
         ),
         filename="team.txt",
-        metadata={"title": "团队知识示例"},
+        metadata={"title": "Team knowledge example"},
     )
     agent_source = KnowledgeSource(
-        name="个人知识库",
+        name="Personal knowledge base",
         source_type="doc",
         source_uri="agent.txt",
-        content="Agent 可以在团队知识之上叠加个人知识，并覆盖检索参数。",
+        content="Agents can layer personal knowledge on top of team knowledge and override retrieval settings.",
         filename="agent.txt",
-        metadata={"title": "个人知识示例"},
+        metadata={"title": "Personal knowledge example"},
     )
 
     await team_source.ingest(
@@ -86,31 +86,31 @@ async def _prepare_demo_knowledge(namespace: str, knowledge_config: KnowledgeCon
 
 @agent(
     id="team_agent",
-    name="团队知识使用者",
+    name="Team Knowledge User",
     deliverable_schema=AnswerOutput,
 )
 class TeamAgent:
     SYSTEM_PROMPT = (
-        "你是团队知识使用者。"
-        "如果知识上下文中包含答案，请优先引用并给出简洁回应。\n\n"
-        "## 输出要求\n"
-        "只能输出 JSON（单个对象），不得输出解释或 Markdown：\n"
-        '{"answer": "你的结果"}'
+        "You use team knowledge."
+        "If the knowledge context contains the answer, quote it and respond succinctly.\n\n"
+        "## Output requirements\n"
+        "Return JSON only (single object), no explanations or Markdown:\n"
+        '{"answer": "Your answer"}'
     )
 
     async def run(self, ctx: AgentContext) -> AnswerOutput:
-        messages = ctx.build_messages(self.SYSTEM_PROMPT)
+        messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
         output = await ctx.get_structured_output(messages)
         return output
 
 
 @agent(
     id="specialist_agent",
-    name="知识特化 Agent",
+    name="Knowledge Specialist",
     deliverable_schema=AnswerOutput,
     knowledge=Knowledge(
         sources=[
-            KnowledgeSource(name="个人知识库", source_type="doc", source_uri="agent.txt"),
+            KnowledgeSource(name="Personal knowledge base", source_type="doc", source_uri="agent.txt"),
         ],
         retrieve=KnowledgeRetrieve(
             method="semantic",
@@ -120,15 +120,15 @@ class TeamAgent:
 )
 class SpecialistAgent:
     SYSTEM_PROMPT = (
-        "你是知识特化 Agent。"
-        "优先使用知识上下文回答问题。\n\n"
-        "## 输出要求\n"
-        "只能输出 JSON（单个对象），不得输出解释或 Markdown：\n"
-        '{"answer": "你的结果"}'
+        "You are a knowledge specialist."
+        "Use the knowledge context to answer the question first.\n\n"
+        "## Output requirements\n"
+        "Return JSON only (single object), no explanations or Markdown:\n"
+        '{"answer": "Your answer"}'
     )
 
     async def run(self, ctx: AgentContext) -> AnswerOutput:
-        messages = ctx.build_messages(self.SYSTEM_PROMPT)
+        messages = ctx.messages().system(self.SYSTEM_PROMPT).user(ctx.query)
         output = await ctx.get_structured_output(messages)
         return output
 
@@ -138,24 +138,24 @@ async def main() -> None:
     if not config.llm.is_configured():
         supported = ", ".join(Provider.list_supported())
         raise RuntimeError(
-            "请先配置 LLM：\n"
+            "Please configure LLM first:\n"
             "  export DATAPILLAR_LLM_PROVIDER=\"openai\"\n"
             "  export DATAPILLAR_LLM_API_KEY=\"sk-xxx\"\n"
             "  export DATAPILLAR_LLM_MODEL=\"gpt-4o\"\n"
-            "可选：export DATAPILLAR_LLM_BASE_URL=\"https://api.openai.com/v1\"\n"
-            "可选：export DATAPILLAR_LLM_ENABLE_THINKING=\"true\"\n"
-            f"支持 provider: {supported}"
+            "Optional: export DATAPILLAR_LLM_BASE_URL=\"https://api.openai.com/v1\"\n"
+            "Optional: export DATAPILLAR_LLM_ENABLE_THINKING=\"true\"\n"
+            f"Supported providers: {supported}"
         )
     if not config.embedding.is_configured():
         supported = ", ".join(EmbeddingBackend.list_supported())
         raise RuntimeError(
-            "请先配置 Embedding：\n"
+            "Please configure embedding first:\n"
             "  export DATAPILLAR_EMBEDDING_PROVIDER=\"openai\"\n"
             "  export DATAPILLAR_EMBEDDING_API_KEY=\"sk-xxx\"\n"
             "  export DATAPILLAR_EMBEDDING_MODEL=\"text-embedding-3-small\"\n"
             "  export DATAPILLAR_EMBEDDING_DIMENSION=\"1536\"\n"
-            "可选：export DATAPILLAR_EMBEDDING_BASE_URL=\"https://api.openai.com/v1\"\n"
-            f"支持 provider: {supported}"
+            "Optional: export DATAPILLAR_EMBEDDING_BASE_URL=\"https://api.openai.com/v1\"\n"
+            f"Supported providers: {supported}"
         )
 
     embedding_config = config.embedding.model_dump()
@@ -176,18 +176,18 @@ async def main() -> None:
     )
     config.knowledge = knowledge_config
 
-    # namespace 必填，用于知识隔离，需与 Datapillar 保持一致
+    # namespace is required and must match Datapillar for knowledge isolation.
     namespace = "demo_knowledge_team"
     await _prepare_demo_knowledge(namespace, knowledge_config)
 
     team = Datapillar(
         config=config,
         namespace=namespace,
-        name="知识团队",
+        name="Knowledge Team",
         agents=[TeamAgent, SpecialistAgent],
         process=Process.SEQUENTIAL,
         knowledge=Knowledge(
-            sources=[KnowledgeSource(name="团队知识库", source_type="doc", source_uri="team.txt")],
+            sources=[KnowledgeSource(name="Team knowledge base", source_type="doc", source_uri="team.txt")],
             retrieve=KnowledgeRetrieve(
                 method="semantic",
                 top_k=4,
@@ -196,7 +196,7 @@ async def main() -> None:
         ),
     )
 
-    async for event in team.stream(query="Datapillar 的知识框架能做什么？", session_id="s1"):
+    async for event in team.stream(query="What can Datapillar's knowledge framework do?", session_id="s1"):
         if event.get("event") == "agent.end":
             deliverable = event.get("data", {}).get("deliverable")
             if deliverable is not None:

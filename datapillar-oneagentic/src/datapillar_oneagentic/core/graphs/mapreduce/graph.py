@@ -1,8 +1,8 @@
 """
-MapReduce 执行图构建
+MapReduce execution graph builder.
 
-流程：
-planner → (fan-out) workers → reducer → END
+Flow:
+planner -> (fan-out) workers -> reducer -> END
 """
 
 from __future__ import annotations
@@ -23,26 +23,26 @@ def build_mapreduce_graph(
     *,
     agent_specs: list,
     agent_ids: list[str],
-    create_mapreduce_worker_node,
-    create_mapreduce_reducer_node,
+    create_mapreduce_worker,
+    create_mapreduce_reducer,
     llm: Any,
     context_collector: ContextCollector | None = None,
 ) -> StateGraph:
     """
-    构建 MapReduce 执行图
+    Build a MapReduce execution graph.
 
     Args:
-        agent_specs: Agent 规格列表
-        agent_ids: 所有 Agent ID 列表
-        create_mapreduce_worker_node: Map Worker 节点创建函数
-        create_mapreduce_reducer_node: Reducer 节点创建函数
-        llm: LLM 实例（用于 planner/reducer）
+        agent_specs: agent spec list
+        agent_ids: all agent IDs
+        create_mapreduce_worker: map worker node factory
+        create_mapreduce_reducer: reducer node factory
+        llm: LLM instance (planner/reducer)
 
     Returns:
-        StateGraph 实例
+        StateGraph instance
     """
     if len(agent_specs) < 2:
-        raise ValueError("MAPREDUCE 模式需要至少 2 个 Agent（最后一个作为 Reducer）")
+        raise ValueError("MAPREDUCE requires at least 2 agents (last agent is reducer)")
 
     worker_specs = agent_specs[:-1]
     reducer_spec = agent_specs[-1]
@@ -55,7 +55,7 @@ def build_mapreduce_graph(
         query = sb.memory.latest_user_text() or ""
 
         if not query:
-            raise ValueError("MapReduce Planner 未找到用户输入")
+            raise ValueError("MapReduce planner did not find user input")
 
         contexts: dict[str, str] = {}
         if context_collector is not None:
@@ -81,11 +81,11 @@ def build_mapreduce_graph(
 
     graph.add_node("mapreduce_planner", planner_node)
 
-    worker_node = create_mapreduce_worker_node(worker_ids)
+    worker_node = create_mapreduce_worker(worker_ids)
     graph.add_node("mapreduce_worker", worker_node)
 
     reducer_node_name = reducer_spec.id
-    reducer_node = create_mapreduce_reducer_node(
+    reducer_node = create_mapreduce_reducer(
         reducer_agent_id=reducer_spec.id,
         reducer_llm=llm,
         reducer_schema=reducer_spec.deliverable_schema,

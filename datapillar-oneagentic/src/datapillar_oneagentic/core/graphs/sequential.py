@@ -1,11 +1,11 @@
 """
-顺序执行图构建
+Sequential execution graph builder.
 
-Agent 按定义顺序依次执行：A → B → C → END
+Agents execute in order: A -> B -> C -> END
 
-支持 interrupt 暂停：
-- 正常完成 → 下一个 Agent
-- interrupt 暂停 → 用户回复后继续执行当前 Agent
+Supports interrupt pause:
+- Normal completion -> next agent
+- Interrupt pause -> resume current agent after user reply
 """
 
 from langgraph.graph import END, StateGraph
@@ -22,27 +22,27 @@ def build_sequential_graph(
     create_agent_node,
 ) -> StateGraph:
     """
-    构建顺序执行图
+    Build a sequential execution graph.
 
     Args:
-        agent_specs: Agent 规格列表
-        entry_agent_id: 入口 Agent ID
-        create_agent_node: 节点创建函数
+        agent_specs: agent spec list
+        entry_agent_id: entry agent ID
+        create_agent_node: node factory
 
     Returns:
-        StateGraph 实例
+        StateGraph instance
     """
     graph = StateGraph(Blackboard)
 
-    # 为每个 Agent 创建节点
+    # Create nodes for each agent.
     for spec in agent_specs:
         node_fn = create_agent_node(spec.id)
         graph.add_node(spec.id, node_fn)
 
-    # 设置入口
+    # Set entry point.
     graph.set_entry_point(entry_agent_id)
 
-    # 条件边：根据 active_agent 决定下一步
+    # Conditional edges: route by active_agent.
     for i, spec in enumerate(agent_specs[:-1]):
         next_spec = agent_specs[i + 1]
 
@@ -51,12 +51,12 @@ def build_sequential_graph(
                 sb = StateBuilder(state)
                 routing = sb.routing.snapshot()
                 active = routing.active_agent
-                # 如果 active_agent 仍是当前 Agent（clarification 后重试），返回当前
+                # If active_agent stays on the current agent (clarification retry), return current.
                 if active == current_id:
                     return current_id
                 if routing.last_status == ExecutionStatus.FAILED:
                     return "end"
-                # 否则继续下一个
+                # Otherwise continue to next.
                 return next_id
             return router
 
@@ -66,7 +66,7 @@ def build_sequential_graph(
             {spec.id: spec.id, next_spec.id: next_spec.id, "end": END},
         )
 
-    # 最后一个 Agent 的条件边
+    # Conditional edges for the last agent.
     if agent_specs:
         last_spec = agent_specs[-1]
 

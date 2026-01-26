@@ -1,6 +1,4 @@
-"""
-Context Timeline 子模块 - 时间旅行
-"""
+"""Context timeline submodule - time travel."""
 
 from __future__ import annotations
 
@@ -8,30 +6,30 @@ from pydantic import BaseModel, Field
 
 
 class TimeTravelRequest(BaseModel):
-    """时间旅行请求"""
+    """Time travel request."""
 
-    session_id: str = Field(..., description="会话 ID")
-    target_checkpoint_id: str = Field(..., description="目标检查点 ID")
+    session_id: str = Field(..., description="Session ID")
+    target_checkpoint_id: str = Field(..., description="Target checkpoint ID")
     create_branch: bool = Field(
         default=False,
-        description="是否创建分支（而不是覆盖）",
+        description="Whether to create a branch instead of overwriting",
     )
     branch_name: str | None = Field(
         default=None,
-        description="分支名称",
+        description="Branch name",
     )
 
 
 class TimeTravelResult(BaseModel):
-    """时间旅行结果"""
+    """Time travel result."""
 
-    success: bool = Field(..., description="是否成功")
-    session_id: str = Field(..., description="会话 ID（分支时为新 ID）")
-    checkpoint_id: str = Field(..., description="当前检查点 ID")
-    removed_entries: int = Field(default=0, description="移除的事件数")
-    message: str = Field(default="", description="结果消息")
-    is_branch: bool = Field(default=False, description="是否为分支")
-    branch_name: str | None = Field(default=None, description="分支名称")
+    success: bool = Field(..., description="Whether the operation succeeded")
+    session_id: str = Field(..., description="Session ID (new ID when branched)")
+    checkpoint_id: str = Field(..., description="Current checkpoint ID")
+    removed_entries: int = Field(default=0, description="Number of removed entries")
+    message: str = Field(default="", description="Result message")
+    is_branch: bool = Field(default=False, description="Whether this is a branch")
+    branch_name: str | None = Field(default=None, description="Branch name")
 
     @classmethod
     def success_result(
@@ -39,11 +37,11 @@ class TimeTravelResult(BaseModel):
         session_id: str,
         checkpoint_id: str,
         removed_entries: int = 0,
-        message: str = "时间旅行成功",
+        message: str = "Time travel succeeded",
         is_branch: bool = False,
         branch_name: str | None = None,
     ) -> TimeTravelResult:
-        """创建成功结果"""
+        """Create a success result."""
         return cls(
             success=True,
             session_id=session_id,
@@ -59,9 +57,9 @@ class TimeTravelResult(BaseModel):
         cls,
         session_id: str,
         checkpoint_id: str,
-        message: str = "时间旅行失败",
+        message: str = "Time travel failed",
     ) -> TimeTravelResult:
-        """创建失败结果"""
+        """Create a failure result."""
         return cls(
             success=False,
             session_id=session_id,

@@ -1,7 +1,7 @@
 """
-事件总线模块
+Event bus module.
 
-提供框架级别的事件发布/订阅机制。
+Provides framework-level publish/subscribe for events.
 """
 
 from datapillar_oneagentic.events.base import BaseEvent
@@ -11,56 +11,56 @@ from datapillar_oneagentic.events.payload import build_event_payload
 from datapillar_oneagentic.events.types import (
     AgentCompletedEvent,
     AgentFailedEvent,
-    # Agent 事件
+    # Agent events
     AgentStartedEvent,
     AgentThinkingEvent,
     AgentInterruptedEvent,
     DelegationCompletedEvent,
-    # 委派事件
+    # Delegation events
     DelegationStartedEvent,
     LLMCallCompletedEvent,
     LLMCallFailedEvent,
     LLMCallStartedEvent,
     LLMStreamChunkEvent,
-    # LLM 事件
+    # LLM events
     LLMThinkingEvent,
     SessionCompletedEvent,
-    # 系统事件
+    # System events
     SessionStartedEvent,
-    # 工具事件
+    # Tool events
     ToolCalledEvent,
     ToolCompletedEvent,
     ToolFailedEvent,
 )
 
 __all__ = [
-    # 核心
+    # Core
     "EventBus",
     "BaseEvent",
-    # 事件常量
+    # Event constants
     "EventType",
     "EventLevel",
     "build_event_payload",
-    # Agent 事件
+    # Agent events
     "AgentStartedEvent",
     "AgentCompletedEvent",
     "AgentFailedEvent",
     "AgentThinkingEvent",
     "AgentInterruptedEvent",
-    # 工具事件
+    # Tool events
     "ToolCalledEvent",
     "ToolCompletedEvent",
     "ToolFailedEvent",
-    # LLM 事件
+    # LLM events
     "LLMThinkingEvent",
     "LLMCallStartedEvent",
     "LLMCallCompletedEvent",
     "LLMCallFailedEvent",
     "LLMStreamChunkEvent",
-    # 委派事件
+    # Delegation events
     "DelegationStartedEvent",
     "DelegationCompletedEvent",
-    # 系统事件
+    # System events
     "SessionStartedEvent",
     "SessionCompletedEvent",
 ]

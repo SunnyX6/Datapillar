@@ -1,6 +1,4 @@
-"""
-知识评估模块
-"""
+"""Knowledge evaluation module."""
 
 from datapillar_oneagentic.knowledge.evaluation.schema import (
     ChunkingDocReport,

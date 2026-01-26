@@ -1,8 +1,9 @@
 package com.sunny.datapillar.auth.security;
 
-import com.sunny.datapillar.auth.response.AuthErrorCode;
-import com.sunny.datapillar.auth.response.AuthException;
+import com.sunny.datapillar.common.error.ErrorCode;
+import com.sunny.datapillar.common.exception.BusinessException;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,7 +30,7 @@ public class JwtTokenUtil {
             @Value("${jwt.issuer}") String issuer) {
 
         if (secret == null || secret.length() < 32) {
-            throw new IllegalArgumentException("JWT secret must be at least 32 characters");
+            throw new IllegalArgumentException("JWT 密钥长度至少 32 位");
         }
 
         this.key = new SecretKeySpec(secret.getBytes(), "HmacSHA256");
@@ -94,8 +95,10 @@ public class JwtTokenUtil {
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
+        } catch (ExpiredJwtException e) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_EXPIRED);
         } catch (JwtException | IllegalArgumentException e) {
-            throw new AuthException(AuthErrorCode.TOKEN_INVALID, e.getMessage());
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, e.getMessage());
         }
     }
 
@@ -170,7 +173,7 @@ public class JwtTokenUtil {
 
         String[] parts = token.split("\\.");
         if (parts.length != 3) {
-            throw new AuthException(AuthErrorCode.TOKEN_INVALID, "Invalid JWT format");
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, "JWT 格式非法");
         }
 
         // 返回签名部分（第三部分）
