@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 OpenLineage LineageWriter 子模块（仅写关系）
 

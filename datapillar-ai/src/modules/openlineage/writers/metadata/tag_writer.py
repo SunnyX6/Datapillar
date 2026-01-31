@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 OpenLineage Tag 节点写入器
 
@@ -10,14 +14,14 @@ OpenLineage Tag 节点写入器
 
 from __future__ import annotations
 
-import structlog
+import logging
 from neo4j import AsyncSession
 
 from src.infrastructure.repository.openlineage import Metadata
 from src.modules.openlineage.parsers.plans.metadata import TagWritePlan
 from src.modules.openlineage.writers.metadata.types import QueueTagEmbeddingTask
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class TagWriter:
@@ -47,7 +51,10 @@ class TagWriter:
                 properties=tag.properties,
                 created_by=created_by,
             )
-            logger.info("tag_upserted", tag_id=tag.id, tag_name=tag.name)
+            logger.info(
+                "tag_upserted",
+                extra={"data": {"tag_id": tag.id, "tag_name": tag.name}},
+            )
 
             # Tag 向量化：name 本身有业务含义，可选加 description
             embedding_text = tag.name
@@ -61,4 +68,7 @@ class TagWriter:
         """删除 Tag 节点（drop_tag）"""
         for tag_id in tag_ids:
             await Metadata.delete_tag(session, tag_id=tag_id)
-            logger.info("tag_deleted", tag_id=tag_id)
+            logger.info(
+                "tag_deleted",
+                extra={"data": {"tag_id": tag_id}},
+            )

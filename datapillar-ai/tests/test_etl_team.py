@@ -71,7 +71,7 @@ class TestAgentSpecs:
         assert spec.name == "需求分析师"
         assert spec.deliverable_schema is AnalysisOutput
         tool_names = {tool.name for tool in spec.tools}
-        assert tool_names == {"search_tables", "get_table_detail"}
+        assert tool_names == {"get_knowledge_navigation", "search_tables", "get_table_detail"}
 
     def test_catalog_spec(self):
         spec = get_agent_spec(CatalogAgent)
@@ -80,9 +80,7 @@ class TestAgentSpecs:
         assert spec.deliverable_schema is CatalogOutput
         tool_names = {tool.name for tool in spec.tools}
         assert tool_names == {
-            "count_catalogs",
-            "count_schemas",
-            "count_tables",
+            "get_knowledge_navigation",
             "list_catalogs",
             "list_schemas",
             "list_tables",
@@ -90,6 +88,7 @@ class TestAgentSpecs:
             "search_columns",
             "get_table_detail",
             "get_table_lineage",
+            "get_lineage_sql",
         }
 
     def test_architect_spec(self):
@@ -98,7 +97,7 @@ class TestAgentSpecs:
         assert spec.name == "数据架构师"
         assert spec.deliverable_schema is WorkflowOutput
         tool_names = {tool.name for tool in spec.tools}
-        assert tool_names == {"get_table_lineage", "search_tables", "list_component"}
+        assert tool_names == {"get_knowledge_navigation", "get_table_lineage", "list_component"}
 
     def test_developer_spec(self):
         spec = get_agent_spec(DeveloperAgent)
@@ -107,10 +106,10 @@ class TestAgentSpecs:
         assert spec.deliverable_schema is WorkflowOutput
         tool_names = {tool.name for tool in spec.tools}
         assert tool_names == {
+            "get_knowledge_navigation",
             "get_table_detail",
             "get_table_lineage",
             "get_lineage_sql",
-            "search_tables",
         }
 
     def test_reviewer_spec(self):
@@ -118,4 +117,5 @@ class TestAgentSpecs:
         assert spec is not None
         assert spec.name == "代码评审员"
         assert spec.deliverable_schema is ReviewResult
-        assert spec.tools == []
+        tool_names = {tool.name for tool in spec.tools}
+        assert tool_names == {"get_knowledge_navigation"}

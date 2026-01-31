@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 ETL 模块 API 路由
 
@@ -15,6 +19,7 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from src.modules.etl.sse_protocol import RunRegistry, adapt_sse_stream
+from src.shared.web import build_success
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +36,7 @@ class WorkflowRequest(BaseModel):
     user_input: str | None = Field(None, alias="userInput", description="用户输入")
     session_id: str | None = Field(None, alias="sessionId", description="会话ID")
     resume_value: Any | None = Field(None, alias="resumeValue", description="interrupt 恢复数据")
+    interrupt_id: str | None = Field(None, alias="interruptId", description="interrupt 标识")
 
     class Config:
         populate_by_name = True
@@ -112,10 +118,13 @@ async def chat(payload: WorkflowRequest, request: Request):
             resume_value=None,
         )
 
-    return {
-        "success": True,
-        "stream_url": f"/api/ai/etl/workflow/sse?sessionId={payload.session_id}",
-    }
+    return build_success(
+        request=request,
+        data={
+            "success": True,
+            "stream_url": f"/api/ai/etl/workflow/sse?sessionId={payload.session_id}",
+        },
+    )
 
 
 @router.get("/workflow/sse")
@@ -150,8 +159,8 @@ async def workflow_sse(request: Request, session_id: str = Query(..., alias="ses
             on_run_complete=_finish_run,
         ),
         ping=15,
+        media_type="text/event-stream; charset=utf-8",
         headers={
-            "Content-Type": "text/event-stream; charset=utf-8",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
@@ -184,10 +193,13 @@ async def clear_session(payload: WorkflowRequest, request: Request):
     etl_stream_manager.clear_session(key=key)
     etl_run_registry.finish_run(str(key))
 
-    return {
-        "success": True,
-        "message": "历史对话已清除",
-    }
+    return build_success(
+        request=request,
+        data={
+            "success": True,
+            "message": "历史对话已清除",
+        },
+    )
 
 
 @router.post("/workflow/abort")
@@ -212,17 +224,28 @@ async def abort_workflow(payload: WorkflowRequest, request: Request):
         f"sessionId={payload.session_id}"
     )
 
-    aborted = await etl_stream_manager.abort(
-        key=key,
-    )
+    if payload.interrupt_id:
+        aborted = await etl_stream_manager.abort_interrupt(
+            key=key,
+            interrupt_id=payload.interrupt_id,
+        )
+        message = "interrupt 已终止" if aborted else "没有等待中的 interrupt"
+    else:
+        aborted = await etl_stream_manager.abort(
+            key=key,
+        )
+        message = "已停止" if aborted else "没有正在运行的任务"
     if aborted:
         etl_run_registry.finish_run(str(key))
 
-    return {
-        "success": True,
-        "aborted": aborted,
-        "message": "已停止" if aborted else "没有正在运行的任务",
-    }
+    return build_success(
+        request=request,
+        data={
+            "success": True,
+            "aborted": aborted,
+            "message": message,
+        },
+    )
 
 
 @router.post("/session/compact")
@@ -253,7 +276,7 @@ async def compact_session(payload: WorkflowRequest, request: Request):
         logger.error("压缩失败: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="压缩失败") from exc
 
-    return result
+    return build_success(request=request, data=result)
 
 
 @router.get("/session/stats")
@@ -282,4 +305,4 @@ async def get_session_stats(
         logger.error("获取统计信息失败: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="获取统计信息失败") from exc
 
-    return stats
+    return build_success(request=request, data=stats)

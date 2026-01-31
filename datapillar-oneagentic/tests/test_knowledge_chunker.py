@@ -8,7 +8,7 @@ from datapillar_oneagentic.knowledge.chunker import KnowledgeChunker
 from datapillar_oneagentic.knowledge.chunker.models import ChunkPreview
 from datapillar_oneagentic.knowledge.config import KnowledgeChunkConfig
 from datapillar_oneagentic.knowledge.ingest.pipeline import KnowledgeIngestor
-from datapillar_oneagentic.knowledge.models import Attachment, DocumentInput, ParsedDocument
+from datapillar_oneagentic.knowledge.models import Attachment, DocumentInput, KnowledgeSource, ParsedDocument
 
 
 def _parsed(text: str) -> ParsedDocument:
@@ -141,14 +141,16 @@ def test_ingestor_preview() -> None:
         async def delete_doc_chunks(self, doc_id: str) -> int:
             return 0
 
+    chunk_config = KnowledgeChunkConfig(mode="general")
     ingestor = KnowledgeIngestor(
         store=_StubStore(),
         embedding_provider=_StubEmbedder(),
-        config=KnowledgeChunkConfig(mode="general"),
         parser_registry=_StubParserRegistry(),
     )
 
-    previews = ingestor.preview(documents=[DocumentInput(source="hello")])
+    previews = ingestor.preview(
+        sources=[KnowledgeSource(source="hello", chunk=chunk_config)],
+    )
 
     assert isinstance(previews[0], ChunkPreview)
     assert previews[0].attachments[0].attachment_id == "att1"

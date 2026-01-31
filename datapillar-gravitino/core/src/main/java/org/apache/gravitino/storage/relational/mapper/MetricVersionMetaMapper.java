@@ -51,6 +51,11 @@ public interface MetricVersionMetaMapper {
   MetricVersionPO selectMetricVersionMetaByMetricIdAndVersion(
       @Param("metricId") Long metricId, @Param("version") Integer version);
 
+  @SelectProvider(
+      type = MetricVersionMetaSQLProviderFactory.class,
+      method = "listMetricVersionMetasByRefTableId")
+  List<MetricVersionPO> listMetricVersionMetasByRefTableId(@Param("refTableId") Long refTableId);
+
   @UpdateProvider(
       type = MetricVersionMetaSQLProviderFactory.class,
       method = "softDeleteMetricVersionsBySchemaIdAndMetricCode")

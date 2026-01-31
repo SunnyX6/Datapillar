@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 Embedding 批量处理器
 
@@ -11,14 +15,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-import structlog
+import logging
 
 from src.infrastructure.llm.embeddings import UnifiedEmbedder
 from src.infrastructure.repository.neo4j_uow import neo4j_async_session
 from src.infrastructure.repository.openlineage import Metadata
 from src.modules.openlineage.core.queue import AsyncEventQueue, QueueConfig
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -81,7 +85,10 @@ class EmbeddingProcessor:
             embedder = self._get_embedder()
             batch_size = embedder.batch_size
         except Exception as exc:
-            logger.debug("embedding_processor_get_batch_size_failed", error=str(exc))
+            logger.debug(
+                "embedding_processor_get_batch_size_failed",
+                extra={"data": {"error": str(exc)}},
+            )
 
         # 初始化队列
         queue_config = QueueConfig(
@@ -95,8 +102,12 @@ class EmbeddingProcessor:
         self._initialized = True
         logger.info(
             "embedding_processor_initialized",
-            batch_size=batch_size,
-            flush_interval=queue_config.flush_interval_seconds,
+            extra={
+                "data": {
+                    "batch_size": batch_size,
+                    "flush_interval": queue_config.flush_interval_seconds,
+                }
+            },
         )
 
     def _get_embedder(self) -> UnifiedEmbedder:
@@ -114,7 +125,10 @@ class EmbeddingProcessor:
         """停止处理器"""
         await self._queue.stop(timeout=timeout)
         self._executor.shutdown(wait=False)
-        logger.info("embedding_processor_stopped", stats=self._stats.to_dict())
+        logger.info(
+            "embedding_processor_stopped",
+            extra={"data": {"stats": self._stats.to_dict()}},
+        )
 
     async def put(self, node_id: str, node_label: str, text: str) -> bool:
         """
@@ -163,7 +177,10 @@ class EmbeddingProcessor:
         if not tasks:
             return
 
-        logger.debug("embedding_batch_start", count=len(tasks))
+        logger.debug(
+            "embedding_batch_start",
+            extra={"data": {"count": len(tasks)}},
+        )
 
         try:
             # 1. 提取文本列表
@@ -180,11 +197,17 @@ class EmbeddingProcessor:
             self._stats.total_embedded += len(tasks)
             self._stats.last_batch_time = datetime.now(UTC)
 
-            logger.info("embedding_batch_complete", count=len(tasks))
+            logger.info(
+                "embedding_batch_complete",
+                extra={"data": {"count": len(tasks)}},
+            )
 
         except Exception as e:
             self._stats.total_failed += len(tasks)
-            logger.error("embedding_batch_failed", count=len(tasks), error=str(e))
+            logger.error(
+                "embedding_batch_failed",
+                extra={"data": {"count": len(tasks), "error": str(e)}},
+            )
             raise
 
     async def _write_embeddings(

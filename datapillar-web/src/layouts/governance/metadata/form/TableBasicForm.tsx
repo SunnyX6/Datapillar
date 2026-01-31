@@ -106,7 +106,7 @@ export const TableBasicForm = forwardRef<TableBasicFormHandle, TableBasicFormPro
             value={tableName}
             onChange={(e) => setTableName(e.target.value)}
             placeholder="例如: fact_order_sales"
-            className="w-full px-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
           {tableName !== initialData.name && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
@@ -125,7 +125,7 @@ export const TableBasicForm = forwardRef<TableBasicFormHandle, TableBasicFormPro
             onChange={(e) => setTableComment(e.target.value)}
             placeholder="精准的业务描述更有助于AI的生成..."
             rows={3}
-            className="w-full px-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
 
@@ -154,7 +154,7 @@ export const TableBasicForm = forwardRef<TableBasicFormHandle, TableBasicFormPro
                     placeholder="参数名"
                     value={prop.key}
                     onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)}
-                    className="w-[45%] min-w-0 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 truncate"
+                    className="w-[45%] min-w-0 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 truncate"
                   />
                   <span className="text-slate-300 flex-shrink-0">=</span>
                   <input
@@ -162,7 +162,7 @@ export const TableBasicForm = forwardRef<TableBasicFormHandle, TableBasicFormPro
                     placeholder="参数值"
                     value={prop.value}
                     onChange={(e) => handlePropertyChange(prop.id, 'value', e.target.value)}
-                    className="w-[45%] min-w-0 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 truncate"
+                    className="w-[45%] min-w-0 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 truncate"
                   />
                   <button
                     type="button"

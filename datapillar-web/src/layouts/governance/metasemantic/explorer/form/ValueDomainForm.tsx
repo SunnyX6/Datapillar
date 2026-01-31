@@ -127,7 +127,7 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
               value={form.domainName}
               onChange={(e) => setForm({ ...form, domainName: e.target.value })}
               placeholder="订单状态"
-              className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+              className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
             />
           </div>
           <div>
@@ -139,7 +139,7 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
               value={form.domainCode}
               onChange={(e) => setForm({ ...form, domainCode: e.target.value.toUpperCase() })}
               placeholder="ORDER_STATUS"
-              className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 font-mono uppercase border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+              className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 font-mono uppercase border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
             />
           </div>
         </div>
@@ -184,7 +184,7 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
             value={form.dataType}
             onChange={(dataType) => setForm({ ...form, dataType })}
             size="small"
-            triggerClassName="w-full h-[38px]"
+            triggerClassName="w-full h-[38px] bg-white dark:bg-slate-900"
           />
         </div>
 
@@ -211,14 +211,14 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
                     value={item.key}
                     onChange={(e) => updateEnumItem(index, 'key', e.target.value)}
                     placeholder="PAID"
-                    className="w-full px-3 py-1.5 text-body-sm text-slate-800 dark:text-slate-200 font-mono border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                    className="w-full px-3 py-1.5 text-body-sm text-slate-800 dark:text-slate-200 font-mono border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
                   />
                   <input
                     type="text"
                     value={item.value}
                     onChange={(e) => updateEnumItem(index, 'value', e.target.value)}
                     placeholder="已支付"
-                    className="w-full px-3 py-1.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                    className="w-full px-3 py-1.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
                   />
                   <button
                     type="button"
@@ -247,7 +247,7 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
                 value={form.itemValue}
                 onChange={(e) => setForm({ ...form, itemValue: e.target.value })}
                 placeholder={form.domainType === 'RANGE' ? '[0, 100]' : '^[1-9]\\d{5}(18|19|20)\\d{2}...'}
-                className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 font-mono border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 font-mono border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
               />
               <p className="text-micro text-slate-400 mt-1">
                 {form.domainType === 'RANGE' ? '输入数值区间，如: [0, 100] 或 (0, 1]' : '输入正则表达式'}
@@ -266,7 +266,7 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
             value={form.comment}
             onChange={(e) => setForm({ ...form, comment: e.target.value })}
             placeholder="值域说明（可选）"
-            className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
       </div>

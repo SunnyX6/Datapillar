@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 知识图谱 API 路由（使用 Repository 模式）
 """
@@ -11,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 from src.modules.knowledge.schemas import GraphSearchRequest
 from src.modules.knowledge.service import KnowledgeGraphService
+from src.shared.web import build_success
 
 router = APIRouter()
 
@@ -26,13 +31,11 @@ async def get_initial_graph(
     limit: int = 500,
 ):
     """获取初始图数据（非 SSE，一次性 JSON 返回）"""
-    # 中间件已验证，直接从 request.state 获取当前用户
-    current_user = request.state.current_user
     service = _get_service()
     safe_limit = min(max(limit, 1), 2000)
 
     graph = service.get_initial_graph(limit=safe_limit)
-    return graph.model_dump()
+    return build_success(request=request, data=graph.model_dump())
 
 
 @router.post("/search")
@@ -50,4 +53,4 @@ async def search_graph(
         top_k=payload.top_k,
         search_type="hybrid",
     )
-    return result
+    return build_success(request=request, data=result)

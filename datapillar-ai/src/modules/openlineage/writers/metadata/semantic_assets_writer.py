@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 OpenLineage 语义资产写入器
 
@@ -12,7 +16,7 @@ OpenLineage 语义资产写入器
 
 from __future__ import annotations
 
-import structlog
+import logging
 from neo4j import AsyncSession
 
 from src.infrastructure.repository.kg.dto import (
@@ -28,7 +32,7 @@ from src.modules.openlineage.parsers.plans.metadata import MetricWritePlan
 from src.modules.openlineage.writers.metadata.physical_assets_writer import PhysicalAssetsWriter
 from src.modules.openlineage.writers.metadata.types import QueueEmbeddingTask
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class SemanticAssetsWriter:
@@ -70,7 +74,10 @@ class SemanticAssetsWriter:
         """
         for metric_id in metric_ids:
             await Metadata.delete_metric(session, metric_id=metric_id)
-            logger.info("metric_deleted", metric_id=metric_id)
+            logger.info(
+                "metric_deleted",
+                extra={"data": {"metric_id": metric_id}},
+            )
 
     async def delete_wordroot_metadata(
         self, session: AsyncSession, wordroot_ids: list[str]
@@ -82,7 +89,10 @@ class SemanticAssetsWriter:
                 node_id=wordroot_id,
                 node_label="WordRoot",
             )
-            logger.info("wordroot_deleted", wordroot_id=wordroot_id)
+            logger.info(
+                "wordroot_deleted",
+                extra={"data": {"wordroot_id": wordroot_id}},
+            )
 
     async def delete_modifier_metadata(
         self, session: AsyncSession, modifier_ids: list[str]
@@ -94,7 +104,10 @@ class SemanticAssetsWriter:
                 node_id=modifier_id,
                 node_label="Modifier",
             )
-            logger.info("modifier_deleted", modifier_id=modifier_id)
+            logger.info(
+                "modifier_deleted",
+                extra={"data": {"modifier_id": modifier_id}},
+            )
 
     async def delete_unit_metadata(self, session: AsyncSession, unit_ids: list[str]) -> None:
         """删除 Unit 元数据"""
@@ -104,7 +117,10 @@ class SemanticAssetsWriter:
                 node_id=unit_id,
                 node_label="Unit",
             )
-            logger.info("unit_deleted", unit_id=unit_id)
+            logger.info(
+                "unit_deleted",
+                extra={"data": {"unit_id": unit_id}},
+            )
 
     async def delete_valuedomain_metadata(
         self, session: AsyncSession, valuedomain_ids: list[str]
@@ -118,7 +134,7 @@ class SemanticAssetsWriter:
             )
             logger.info(
                 "valuedomain_deleted",
-                valuedomain_id=valuedomain_id,
+                extra={"data": {"valuedomain_id": valuedomain_id}},
             )
 
     async def write_metrics(self, session: AsyncSession, plans: list[MetricWritePlan]) -> None:
@@ -156,7 +172,10 @@ class SemanticAssetsWriter:
         await self._queue_embedding_task(metric.id, metric_label, metric.name, metric.description)
 
         self._metrics_written += 1
-        logger.debug("metric_written", id=metric.id, name=metric.name)
+        logger.debug(
+            "metric_written",
+            extra={"data": {"id": metric.id, "name": metric.name}},
+        )
 
     async def write_wordroot_nodes(self, session: AsyncSession, nodes: list[WordRootDTO]) -> None:
         """写入词根节点"""
@@ -180,7 +199,10 @@ class SemanticAssetsWriter:
             wordroot.id, "WordRoot", wordroot.name or wordroot.code, wordroot.description
         )
 
-        logger.debug("wordroot_written", id=wordroot.id, code=wordroot.code)
+        logger.debug(
+            "wordroot_written",
+            extra={"data": {"id": wordroot.id, "code": wordroot.code}},
+        )
 
     async def write_modifier_nodes(self, session: AsyncSession, nodes: list[ModifierDTO]) -> None:
         """写入修饰符节点"""
@@ -204,7 +226,10 @@ class SemanticAssetsWriter:
             modifier.id, "Modifier", modifier.name or modifier.code, modifier.description
         )
 
-        logger.debug("modifier_written", id=modifier.id, code=modifier.code)
+        logger.debug(
+            "modifier_written",
+            extra={"data": {"id": modifier.id, "code": modifier.code}},
+        )
 
     async def write_unit_nodes(self, session: AsyncSession, nodes: list[UnitDTO]) -> None:
         """写入单位节点"""
@@ -226,7 +251,10 @@ class SemanticAssetsWriter:
         # 将 Unit embedding 任务入队
         await self._queue_embedding_task(unit.id, "Unit", unit.name or unit.code, unit.description)
 
-        logger.debug("unit_written", id=unit.id, code=unit.code)
+        logger.debug(
+            "unit_written",
+            extra={"data": {"id": unit.id, "code": unit.code}},
+        )
 
     async def write_valuedomain_nodes(
         self, session: AsyncSession, nodes: list[ValueDomainDTO]
@@ -258,7 +286,10 @@ class SemanticAssetsWriter:
             valuedomain.id, "ValueDomain", embedding_text, valuedomain.description
         )
 
-        logger.debug("valuedomain_written", id=valuedomain.id, code=valuedomain.code)
+        logger.debug(
+            "valuedomain_written",
+            extra={"data": {"id": valuedomain.id, "code": valuedomain.code}},
+        )
 
     async def write_metric(self, session: AsyncSession, metric: MetricDTO) -> None:
         """写入 Metric 节点（不写任何关系）"""
@@ -280,4 +311,7 @@ class SemanticAssetsWriter:
         await self._queue_embedding_task(metric.id, label, metric.name, metric.description)
 
         self._metrics_written += 1
-        logger.debug("metric_written", id=metric.id, name=metric.name)
+        logger.debug(
+            "metric_written",
+            extra={"data": {"id": metric.id, "name": metric.name}},
+        )

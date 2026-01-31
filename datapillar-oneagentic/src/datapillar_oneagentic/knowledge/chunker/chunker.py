@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """Chunking executor."""
 
 from __future__ import annotations
@@ -11,7 +14,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from datapillar_oneagentic.knowledge.chunker.cleaner import apply_preprocess
 from datapillar_oneagentic.knowledge.chunker.models import ChunkDraft, ChunkPreview
 from datapillar_oneagentic.knowledge.config import KnowledgeChunkConfig
-from datapillar_oneagentic.knowledge.identity import build_doc_id
 from datapillar_oneagentic.knowledge.models import ParsedDocument, SourceSpan
 
 
@@ -23,7 +25,11 @@ class KnowledgeChunker:
 
     def preview(self, parsed: ParsedDocument) -> ChunkPreview:
         text = apply_preprocess(parsed.text, self._config.preprocess)
-        doc_id = build_doc_id(text)
+        doc_id = parsed.document_id
+        if not doc_id:
+            from datapillar_oneagentic.knowledge.parser.utils import build_document_id
+
+            doc_id = build_document_id()
         parsed.document_id = doc_id
         mode = (self._config.mode or "general").lower()
         if mode == "general":

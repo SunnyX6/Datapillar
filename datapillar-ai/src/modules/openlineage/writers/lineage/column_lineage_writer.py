@@ -1,11 +1,15 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 from __future__ import annotations
 
-import structlog
+import logging
 from neo4j import AsyncSession
 
 from src.infrastructure.repository.openlineage import Lineage
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class ColumnLineageWriter:
@@ -24,4 +28,7 @@ class ColumnLineageWriter:
             lineage_data=lineage_data,
         )
         self._column_lineage_written += len(lineage_data)
-        logger.debug("column_lineage_batch_written", count=len(lineage_data))
+        logger.debug(
+            "column_lineage_batch_written",
+            extra={"data": {"count": len(lineage_data)}},
+        )

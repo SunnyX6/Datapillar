@@ -353,6 +353,7 @@ async def test_stub_interrupt(monkeypatch) -> None:
     events = await _collect_events(team, query="start", session_id="s6")
     interrupt_event = next(e for e in events if e["event"] == "agent.interrupt")
     assert interrupt_event["data"]["interrupt"]["payload"] == "need input"
+    assert interrupt_event["data"]["interrupt"]["interrupt_id"]
 
     resume_events = await _collect_events(team, session_id="s6", resume_value="yes")
     deliverables = _extract_deliverables(resume_events)

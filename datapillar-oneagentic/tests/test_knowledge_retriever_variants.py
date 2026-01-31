@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import pytest
 
-from datapillar_oneagentic.knowledge.config import KnowledgeConfig, KnowledgeRetrieveConfig, RerankConfig
+from datapillar_oneagentic.knowledge.config import KnowledgeRetrieveConfig, RerankConfig
 from datapillar_oneagentic.knowledge.models import (
     Knowledge,
     KnowledgeChunk,
-    KnowledgeScope,
     KnowledgeSearchHit,
     KnowledgeSource,
 )
 from datapillar_oneagentic.knowledge.retriever import KnowledgeRetriever
+
+DEFAULT_CHUNK = {"mode": "general"}
 
 
 class _StubEmbeddingProvider:
@@ -30,10 +31,19 @@ class _StubKnowledgeStore:
     def __init__(self, *, search_results: list[KnowledgeSearchHit]) -> None:
         self._namespace = "ns_stub"
         self.search_results = list(search_results)
+        self.last_filters: dict | None = None
 
     @property
     def namespace(self) -> str:
         return self._namespace
+
+    @property
+    def supports_hybrid(self) -> bool:
+        return True
+
+    @property
+    def supports_full_text(self) -> bool:
+        return False
 
     async def initialize(self) -> None:
         return None
@@ -48,7 +58,23 @@ class _StubKnowledgeStore:
         k: int,
         filters: dict | None = None,
     ) -> list[KnowledgeSearchHit]:
+        self.last_filters = filters
         return list(self.search_results[:k])
+
+    async def hybrid_search_chunks(
+        self,
+        *,
+        query_vector: list[float],
+        query_text: str,
+        k: int,
+        filters: dict | None = None,
+        rrf_k: int = 60,
+    ) -> list[KnowledgeSearchHit]:
+        self.last_filters = filters
+        return list(self.search_results[:k])
+
+    async def full_text_search_chunks(self, *, query_text: str, k: int, filters: dict | None = None):
+        return []
 
     async def get_chunks(self, chunk_ids: list[str]) -> list[KnowledgeChunk]:
         return []
@@ -90,24 +116,126 @@ async def test_score_threshold() -> None:
         ),
     ]
     store = _StubKnowledgeStore(search_results=hits)
-    config = KnowledgeConfig(
-        retrieve_config=KnowledgeRetrieveConfig(
-            method="semantic",
-            top_k=5,
-            score_threshold=0.5,
-        )
+    retrieve_defaults = KnowledgeRetrieveConfig(
+        method="semantic",
+        top_k=5,
+        score_threshold=0.5,
     )
     retriever = KnowledgeRetriever(
-        store=store, embedding_provider=_StubEmbeddingProvider(), config=config
+        store=store,
+        embedding_provider=_StubEmbeddingProvider(),
+        retrieve_defaults=retrieve_defaults,
     )
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="s1", name="demo", source_type="doc")],
+        sources=[
+            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, source_id="s1", name="demo", source_type="doc")
+        ],
         sparse_embedder=_StubSparseEmbedder(),
     )
 
     result = await retriever.retrieve(query="query", knowledge=knowledge)
 
     assert [chunk.chunk_id for chunk, _ in result.hits] == ["c1"]
+
+
+class _NoEmbedProvider:
+    async def embed_text(self, _text: str) -> list[float]:
+        raise AssertionError("full_text should not call embed_text")
+
+
+class _FullTextStore:
+    def __init__(self, hits: list[KnowledgeSearchHit]) -> None:
+        self._namespace = "ns_full_text"
+        self._hits = list(hits)
+        self.query_texts: list[str] = []
+
+    @property
+    def namespace(self) -> str:
+        return self._namespace
+
+    @property
+    def supports_hybrid(self) -> bool:
+        return False
+
+    @property
+    def supports_full_text(self) -> bool:
+        return True
+
+    async def initialize(self) -> None:
+        return None
+
+    async def close(self) -> None:
+        return None
+
+    async def search_chunks(self, *, query_vector, k, filters=None):
+        raise AssertionError("full_text should not call search_chunks")
+
+    async def hybrid_search_chunks(self, *, query_vector, query_text, k, filters=None, rrf_k=60):
+        raise AssertionError("full_text should not call hybrid_search_chunks")
+
+    async def full_text_search_chunks(self, *, query_text: str, k: int, filters=None):
+        self.query_texts.append(query_text)
+        return list(self._hits[:k])
+
+    async def get_chunks(self, chunk_ids: list[str]) -> list[KnowledgeChunk]:
+        return []
+
+    async def get_doc(self, doc_id: str):
+        return None
+
+    async def delete_doc(self, doc_id: str) -> int:
+        return 0
+
+    async def delete_doc_chunks(self, doc_id: str) -> int:
+        return 0
+
+
+class _NoFullTextStore(_FullTextStore):
+    @property
+    def supports_full_text(self) -> bool:
+        return False
+
+
+@pytest.mark.asyncio
+async def test_full_text_retrieval_uses_store() -> None:
+    hits = [
+        KnowledgeSearchHit(
+            chunk=KnowledgeChunk(
+                chunk_id="ft1",
+                doc_id="d1",
+                source_id="s1",
+                content="full text",
+                vector=[1.0, 0.0],
+            ),
+            score=0.9,
+            score_kind="similarity",
+        )
+    ]
+    store = _FullTextStore(hits)
+    retriever = KnowledgeRetriever(
+        store=store,
+        embedding_provider=_NoEmbedProvider(),
+        retrieve_defaults=KnowledgeRetrieveConfig(method="full_text", top_k=5),
+    )
+
+    result = await retriever.retrieve(query="test query")
+
+    assert [chunk.chunk_id for chunk, _ in result.hits] == ["ft1"]
+    assert store.query_texts == ["test query"]
+
+
+@pytest.mark.asyncio
+async def test_full_text_requires_support() -> None:
+    hits = []
+    store = _NoFullTextStore(hits)
+    retriever = KnowledgeRetriever(
+        store=store,
+        embedding_provider=_StubEmbeddingProvider(),
+        retrieve_defaults=KnowledgeRetrieveConfig(method="full_text"),
+    )
+
+    with pytest.raises(ValueError, match="Full-text retrieval is not supported"):
+        await retriever.retrieve(query="test query")
 
 
 @pytest.mark.asyncio
@@ -151,18 +279,20 @@ async def test_rank_sparse() -> None:
         ),
     ]
     store = _StubKnowledgeStore(search_results=hits)
-    config = KnowledgeConfig(
-        retrieve_config=KnowledgeRetrieveConfig(
-            method="hybrid",
-            top_k=3,
-            tuning={"rrf_k": 1},
-        )
+    retrieve_defaults = KnowledgeRetrieveConfig(
+        method="hybrid",
+        top_k=3,
+        tuning={"rrf_k": 1},
     )
     retriever = KnowledgeRetriever(
-        store=store, embedding_provider=_StubEmbeddingProvider(), config=config
+        store=store,
+        embedding_provider=_StubEmbeddingProvider(),
+        retrieve_defaults=retrieve_defaults,
     )
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="s1", name="demo", source_type="doc")],
+        sources=[
+            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, source_id="s1", name="demo", source_type="doc")
+        ],
         sparse_embedder=_StubSparseEmbedder(),
     )
 
@@ -198,38 +328,41 @@ async def test_retriever_filters() -> None:
         ),
     ]
     store = _StubKnowledgeStore(search_results=hits)
-    config = KnowledgeConfig(
-        retrieve_config=KnowledgeRetrieveConfig(
-            method="semantic",
-            top_k=2,
-        )
-    )
+    retrieve_defaults = KnowledgeRetrieveConfig(method="semantic", top_k=2)
     retriever = KnowledgeRetriever(
-        store=store, embedding_provider=_StubEmbeddingProvider(), config=config
+        store=store,
+        embedding_provider=_StubEmbeddingProvider(),
+        retrieve_defaults=retrieve_defaults,
     )
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="s1", name="demo", source_type="doc")],
+        sources=[
+            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, source_id="s1", name="demo", source_type="doc")
+        ],
         sparse_embedder=_StubSparseEmbedder(),
     )
 
     result = await retriever.retrieve(
         query="query",
         knowledge=knowledge,
-        scope=KnowledgeScope(document_ids=["d1"]),
+        filters={"doc_id": "d1"},
     )
 
-    assert [chunk.chunk_id for chunk, _ in result.hits] == ["c1"]
+    assert store.last_filters == {"doc_id": "d1"}
 
 
 @pytest.mark.asyncio
 async def test_retriever_scope() -> None:
     store = _StubKnowledgeStore(search_results=[])
-    config = KnowledgeConfig(retrieve_config=KnowledgeRetrieveConfig(method="semantic"))
+    retrieve_defaults = KnowledgeRetrieveConfig(method="semantic")
     retriever = KnowledgeRetriever(
-        store=store, embedding_provider=_StubEmbeddingProvider(), config=config
+        store=store,
+        embedding_provider=_StubEmbeddingProvider(),
+        retrieve_defaults=retrieve_defaults,
     )
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="s1", name="demo", source_type="doc")],
+        sources=[
+            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, source_id="s1", name="demo", source_type="doc")
+        ],
         sparse_embedder=_StubSparseEmbedder(),
     )
 
@@ -237,19 +370,23 @@ async def test_retriever_scope() -> None:
         await retriever.retrieve(
             query="query",
             knowledge=knowledge,
-            scope=KnowledgeScope(tags=["tag"]),
+            search_params={"ef": 10},
         )
 
 
 @pytest.mark.asyncio
 async def test_retriever_scope2() -> None:
     store = _StubKnowledgeStore(search_results=[])
-    config = KnowledgeConfig(retrieve_config=KnowledgeRetrieveConfig(method="semantic"))
+    retrieve_defaults = KnowledgeRetrieveConfig(method="semantic")
     retriever = KnowledgeRetriever(
-        store=store, embedding_provider=_StubEmbeddingProvider(), config=config
+        store=store,
+        embedding_provider=_StubEmbeddingProvider(),
+        retrieve_defaults=retrieve_defaults,
     )
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="s1", name="demo", source_type="doc")],
+        sources=[
+            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, source_id="s1", name="demo", source_type="doc")
+        ],
         sparse_embedder=_StubSparseEmbedder(),
     )
 
@@ -257,7 +394,7 @@ async def test_retriever_scope2() -> None:
         await retriever.retrieve(
             query="query",
             knowledge=knowledge,
-            scope=KnowledgeScope(namespaces=["n1", "n2"]),
+            search_params={"nprobe": 32},
         )
 
 
@@ -300,22 +437,24 @@ async def test_rerank_weighted(monkeypatch) -> None:
     monkeypatch.setattr(retriever_module, "build_reranker", _stub_build_reranker)
 
     store = _StubKnowledgeStore(search_results=hits)
-    config = KnowledgeConfig(
-        retrieve_config=KnowledgeRetrieveConfig(
-            method="semantic",
-            top_k=2,
-            rerank=RerankConfig(
-                mode="weighted",
-                provider="sentence_transformers",
-                params={"alpha": 0.0},
-            ),
-        )
+    retrieve_defaults = KnowledgeRetrieveConfig(
+        method="semantic",
+        top_k=2,
+        rerank=RerankConfig(
+            mode="weighted",
+            provider="sentence_transformers",
+            params={"alpha": 0.0},
+        ),
     )
     retriever = KnowledgeRetriever(
-        store=store, embedding_provider=_StubEmbeddingProvider(), config=config
+        store=store,
+        embedding_provider=_StubEmbeddingProvider(),
+        retrieve_defaults=retrieve_defaults,
     )
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="s1", name="demo", source_type="doc")],
+        sources=[
+            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, source_id="s1", name="demo", source_type="doc")
+        ],
         sparse_embedder=_StubSparseEmbedder(),
     )
 
@@ -363,23 +502,25 @@ async def test_normalize_minmax(monkeypatch) -> None:
     monkeypatch.setattr(retriever_module, "build_reranker", _stub_build_reranker)
 
     store = _StubKnowledgeStore(search_results=hits)
-    config = KnowledgeConfig(
-        retrieve_config=KnowledgeRetrieveConfig(
-            method="semantic",
-            top_k=2,
-            rerank=RerankConfig(
-                mode="model",
-                provider="sentence_transformers",
-                score_mode="normalize",
-                normalize="min_max",
-            ),
-        )
+    retrieve_defaults = KnowledgeRetrieveConfig(
+        method="semantic",
+        top_k=2,
+        rerank=RerankConfig(
+            mode="model",
+            provider="sentence_transformers",
+            score_mode="normalize",
+            normalize="min_max",
+        ),
     )
     retriever = KnowledgeRetriever(
-        store=store, embedding_provider=_StubEmbeddingProvider(), config=config
+        store=store,
+        embedding_provider=_StubEmbeddingProvider(),
+        retrieve_defaults=retrieve_defaults,
     )
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="s1", name="demo", source_type="doc")],
+        sources=[
+            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, source_id="s1", name="demo", source_type="doc")
+        ],
         sparse_embedder=_StubSparseEmbedder(),
     )
 

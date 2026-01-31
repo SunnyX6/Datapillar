@@ -8,8 +8,6 @@ from pydantic import BaseModel
 from datapillar_oneagentic import AgentContext, Datapillar, DatapillarConfig, Process, agent, tool
 from datapillar_oneagentic.events import EventType
 from datapillar_oneagentic.knowledge import (
-    DocumentInput,
-    Knowledge,
     KnowledgeChunkConfig,
     KnowledgeConfig,
     KnowledgeIngestor,
@@ -149,41 +147,36 @@ async def test_glm_sequential() -> None:
     llm_config = _require_glm()
     embedding_config = _require_glm2()
     vector_store = _select_vector()
+    namespace = "ns_glm_seq"
     knowledge_config = KnowledgeConfig(
-        base_config={
-            "embedding": embedding_config,
-            "vector_store": vector_store,
-        }
+        namespaces=[namespace],
+        embedding=embedding_config,
+        vector_store=vector_store,
     )
     config = DatapillarConfig(
         llm=llm_config,
-        knowledge=knowledge_config,
     )
-
-    namespace = "ns_glm_seq"
+    chunk_config = KnowledgeChunkConfig(mode="general", general={"max_tokens": 2000, "overlap": 0})
     source = KnowledgeSource(
-        source_id="kb_demo",
+        source="Always include token KNO123 in the final answer.",
+        chunk=chunk_config,
         name="Demo Knowledge",
         source_type="doc",
-    )
-    doc = DocumentInput(
-        source="Always include token KNO123 in the final answer.",
         filename="kb_doc_1.txt",
         metadata={"title": "Demo Doc"},
     )
     sparse_embedder = _StubSparseEmbedder()
-    embedding_provider = EmbeddingProvider(knowledge_config.base_config.embedding)
+    embedding_provider = EmbeddingProvider(knowledge_config.embedding)
     knowledge_store = create_knowledge_store(
         namespace,
-        vector_store_config=knowledge_config.base_config.vector_store,
-        embedding_config=knowledge_config.base_config.embedding,
+        vector_store_config=knowledge_config.vector_store,
+        embedding_config=knowledge_config.embedding,
     )
     ingestor = KnowledgeIngestor(
         store=knowledge_store,
         embedding_provider=embedding_provider,
-        config=KnowledgeChunkConfig(mode="general", general={"max_tokens": 2000, "overlap": 0}),
     )
-    await ingestor.ingest(source=source, documents=[doc], sparse_embedder=sparse_embedder)
+    await ingestor.ingest(sources=[source], sparse_embedder=sparse_embedder)
 
     @agent(
         id="alpha",
@@ -191,10 +184,6 @@ async def test_glm_sequential() -> None:
         deliverable_schema=TextOutput,
         tools=[echo],
         description="Use tools and follow knowledge.",
-        knowledge=Knowledge(
-            sources=[source],
-            sparse_embedder=sparse_embedder,
-        ),
     )
     class AlphaAgent:
         SYSTEM_PROMPT = (
@@ -237,6 +226,7 @@ async def test_glm_sequential() -> None:
         name="glm_seq",
         agents=[AlphaAgent, BetaAgent],
         process=Process.SEQUENTIAL,
+        knowledge=knowledge_config,
     )
 
     events = await _collect_events(team, query="run tool and follow knowledge", session_id="s_glm_seq")
@@ -508,6 +498,7 @@ async def test_glm_interrupt() -> None:
     events = await _collect_events(team, query="start", session_id="s_glm_interrupt")
     interrupt_event = next(e for e in events if e["event"] == "agent.interrupt")
     assert interrupt_event["data"]["interrupt"]["payload"] == "need input"
+    assert interrupt_event["data"]["interrupt"]["interrupt_id"]
 
     resume_events = await _collect_events(
         team,

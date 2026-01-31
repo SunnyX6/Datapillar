@@ -1,7 +1,12 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 from __future__ import annotations
 
+import json
 import logging
 from contextvars import ContextVar
+from enum import Enum
 from typing import Any, Iterable
 
 _CONTEXT_FIELDS: tuple[str, ...] = (
@@ -17,6 +22,41 @@ _context_var: ContextVar[dict[str, Any] | None] = ContextVar(
     "datapillar_log_context",
     default=None,
 )
+
+
+def _is_present(value: Any) -> bool:
+    return value is not None and value != ""
+
+
+def _normalize_value(value: Any) -> Any:
+    if isinstance(value, Enum):
+        return value.value
+    return value
+
+
+def _format_context(record: logging.LogRecord) -> str:
+    parts: list[str] = []
+
+    event = _normalize_value(getattr(record, "event", None))
+    if _is_present(event) and event != "log":
+        parts.append(f"event={event}")
+
+    for field in _CONTEXT_FIELDS:
+        value = _normalize_value(getattr(record, field, None))
+        if _is_present(value):
+            parts.append(f"{field}={value}")
+
+    data = getattr(record, "data", None)
+    if data:
+        try:
+            data_payload = json.dumps(data, ensure_ascii=False, default=str)
+        except (TypeError, ValueError):
+            data_payload = str(data)
+        parts.append(f"data={data_payload}")
+
+    if not parts:
+        return ""
+    return " | " + " ".join(parts)
 
 
 def _select_context(fields: dict[str, Any]) -> dict[str, Any]:
@@ -92,4 +132,5 @@ class ContextFilter(logging.Filter):
             if record.error_type is None:
                 record.error_type = record.exc_info[0].__name__
 
+        record.context = _format_context(record)
         return True

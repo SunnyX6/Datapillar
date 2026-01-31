@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 Vendor prompt cache utilities.
 
@@ -13,7 +16,7 @@ from datapillar_oneagentic.messages import Messages
 OPENAI_CACHE_PROVIDERS = {"openai", "deepseek", "openrouter"}
 CLAUDE_CACHE_PROVIDERS = {"anthropic", "claude"}
 SYSTEM_PROMPT_KEY = "system_prompt"
-DEFAULT_CACHE_CONTEXT_KEYS = ("framework_context", "knowledge_context")
+DEFAULT_CACHE_CONTEXT_KEYS = ("framework_context",)
 DEFAULT_INCLUDE_SYSTEM_PROMPT = True
 
 

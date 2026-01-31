@@ -1,12 +1,16 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 from __future__ import annotations
 
-import structlog
+import logging
 from neo4j import AsyncSession
 
 from src.infrastructure.repository.kg.dto import SQLDTO
 from src.infrastructure.repository.openlineage import Lineage
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class TableLineageWriter:
@@ -34,7 +38,10 @@ class TableLineageWriter:
                 table_ids=input_table_ids,
             )
             self._table_lineage_written += len(input_table_ids)
-            logger.debug("table_input_lineage_batch_written", count=len(input_table_ids))
+            logger.debug(
+                "table_input_lineage_batch_written",
+                extra={"data": {"count": len(input_table_ids)}},
+            )
 
         if output_table_ids:
             await Lineage.link_sql_outputs(
@@ -43,4 +50,7 @@ class TableLineageWriter:
                 table_ids=output_table_ids,
             )
             self._table_lineage_written += len(output_table_ids)
-            logger.debug("table_output_lineage_batch_written", count=len(output_table_ids))
+            logger.debug(
+                "table_output_lineage_batch_written",
+                extra={"data": {"count": len(output_table_ids)}},
+            )

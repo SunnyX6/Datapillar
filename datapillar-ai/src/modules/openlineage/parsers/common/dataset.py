@@ -1,8 +1,12 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-import structlog
+import logging
 
 from src.infrastructure.repository.kg.dto import generate_id
 from src.modules.openlineage.parsers.common.namespace import (
@@ -12,7 +16,7 @@ from src.modules.openlineage.parsers.common.namespace import (
 from src.modules.openlineage.parsers.common.qualified_name import parse_schema_table
 from src.modules.openlineage.schemas.events import InputDataset, OutputDataset
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -66,14 +70,16 @@ class DatasetResolver:
         if not table_name:
             logger.debug(
                 "cannot_extract_table_info",
-                namespace=dataset.namespace,
-                name=dataset.name,
+                extra={"data": {"namespace": dataset.namespace, "name": dataset.name}},
             )
             return None
 
         parsed_table = parse_schema_table(table_name)
         if not parsed_table:
-            logger.debug("invalid_table_name_format", table_name=table_name)
+            logger.debug(
+                "invalid_table_name_format",
+                extra={"data": {"table_name": table_name}},
+            )
             return None
 
         schema_name, table_only = parsed_table

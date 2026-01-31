@@ -1,28 +1,14 @@
 import { loader } from '@monaco-editor/react'
-import * as monaco from 'monaco-editor'
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
+import { conf as sqlConf, language as sqlLanguage } from 'monaco-editor/esm/vs/basic-languages/sql/sql'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
-import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
-import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
-import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
-import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 
 type WorkerCtor = new () => Worker
 
-const workerMap: Record<string, WorkerCtor> = {
-  json: jsonWorker,
-  css: cssWorker,
-  scss: cssWorker,
-  less: cssWorker,
-  html: htmlWorker,
-  handlebars: htmlWorker,
-  razor: htmlWorker,
-  typescript: tsWorker,
-  javascript: tsWorker
-}
+const EditorWorker: WorkerCtor = editorWorker
 
-const getWorker = (_: unknown, label: string) => {
-  const WorkerCtor = workerMap[label] ?? editorWorker
-  return new WorkerCtor()
+const getWorker = (_: unknown, _label: string) => {
+  return new EditorWorker()
 }
 
 const globalScope = globalThis as typeof globalThis & {
@@ -33,3 +19,11 @@ const globalScope = globalThis as typeof globalThis & {
 
 globalScope.MonacoEnvironment = { getWorker }
 loader.config({ monaco })
+
+const sqlLanguageId = 'sql'
+const hasSql = monaco.languages.getLanguages().some((lang) => lang.id === sqlLanguageId)
+if (!hasSql) {
+  monaco.languages.register({ id: sqlLanguageId })
+}
+monaco.languages.setMonarchTokensProvider(sqlLanguageId, sqlLanguage)
+monaco.languages.setLanguageConfiguration(sqlLanguageId, sqlConf)

@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react
 import { createPortal } from 'react-dom'
 import { Sparkles, Scale, Plus, ChevronLeft, ChevronRight, Loader2, Trash2, ChevronDown, X, Check, Tag, Pencil } from 'lucide-react'
 import { iconSizeToken, menuWidthClassMap, panelWidthClassMap } from '@/design-tokens/dimensions'
-import { Modal, ModalCancelButton, ModalPrimaryButton } from '@/components/ui'
+import { Modal, ModalCancelButton, ModalPrimaryButton, Tooltip } from '@/components/ui'
 import {
   fetchUnits,
   fetchModifiers,
@@ -279,7 +279,7 @@ function CreateUnitModal({
             value={form.code}
             onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
             placeholder="如: CNY"
-            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
         <div>
@@ -306,7 +306,7 @@ function CreateUnitModal({
                 setNameFilterActive(false)
               }}
               placeholder="如: 人民币"
-              className={`w-full ${hasSymbol ? 'pl-12 pr-10' : 'px-4 pr-10'} py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600`}
+              className={`w-full ${hasSymbol ? 'pl-12 pr-10' : 'px-4 pr-10'} py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600`}
             />
             <button
               type="button"
@@ -328,7 +328,7 @@ function CreateUnitModal({
             value={form.symbol}
             onChange={(e) => setForm({ ...form, symbol: e.target.value })}
             placeholder="可选，支持自定义符号"
-            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
         <div>
@@ -338,7 +338,7 @@ function CreateUnitModal({
             value={form.comment}
             onChange={(e) => setForm({ ...form, comment: e.target.value })}
             placeholder="可选"
-            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
       </div>
@@ -628,7 +628,7 @@ function CreateModifierModal({
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             placeholder="如: 同比"
-            className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
 
@@ -641,7 +641,7 @@ function CreateModifierModal({
               value={form.code}
               onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
               placeholder="如: YOY"
-              className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
+              className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
             />
           </div>
           <div>
@@ -651,7 +651,7 @@ function CreateModifierModal({
               type="button"
               disabled={loadingDomains}
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className={`w-full flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`w-full flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-900 border rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                 dropdownOpen
                   ? 'border-blue-400 dark:border-blue-500 ring-2 ring-blue-100 dark:ring-blue-900/50'
                   : 'border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600'
@@ -682,7 +682,7 @@ function CreateModifierModal({
             value={form.comment}
             onChange={(e) => setForm({ ...form, comment: e.target.value })}
             placeholder="可选"
-            className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
       </div>
@@ -860,7 +860,7 @@ function EditModifierModal({
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             placeholder="如: 同比"
-            className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
 
@@ -868,13 +868,13 @@ function EditModifierModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">编码</label>
-            <div className="px-3 py-2 text-body-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono">
+            <div className="px-3 py-2 text-body-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono">
               {modifier.code}
             </div>
           </div>
           <div>
             <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">修饰符类型</label>
-            <div className="px-3 py-2 text-body-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400">
+            <div className="px-3 py-2 text-body-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400">
               {modifier.modifierType || '-'}
             </div>
           </div>
@@ -888,7 +888,7 @@ function EditModifierModal({
             value={form.comment}
             onChange={(e) => setForm({ ...form, comment: e.target.value })}
             placeholder="可选"
-            className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
       </div>
@@ -1040,7 +1040,7 @@ function EditUnitModal({
       <div className="space-y-4">
         <div>
           <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">编码</label>
-          <div className="px-4 py-2.5 text-body-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono">
+          <div className="px-4 py-2.5 text-body-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono">
             {unit.code}
           </div>
         </div>
@@ -1068,7 +1068,7 @@ function EditUnitModal({
                 setNameFilterActive(false)
               }}
               placeholder="如: 人民币"
-              className={`w-full ${hasSymbol ? 'pl-12 pr-10' : 'px-4 pr-10'} py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600`}
+              className={`w-full ${hasSymbol ? 'pl-12 pr-10' : 'px-4 pr-10'} py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600`}
             />
             <button
               type="button"
@@ -1090,7 +1090,7 @@ function EditUnitModal({
             value={form.symbol}
             onChange={(e) => setForm({ ...form, symbol: e.target.value })}
             placeholder="可选，支持自定义符号"
-            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
         <div>
@@ -1100,7 +1100,7 @@ function EditUnitModal({
             value={form.comment}
             onChange={(e) => setForm({ ...form, comment: e.target.value })}
             placeholder="可选"
-            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
       </div>
@@ -1239,42 +1239,48 @@ export function ComponentLibrarySidebar() {
   // 折叠状态
   if (collapsed) {
     return (
-      <div className="w-12 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center py-4">
+      <div className="w-12 border-l border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col items-center py-4">
         <div className="flex-1 flex flex-col items-center gap-3">
-          <button
-            onClick={() => {
-              setActiveTab('MODIFIER')
-              setCollapsed(false)
-            }}
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-blue-500 hover:text-blue-600 transition-colors"
-            title="修饰符"
-          >
-            <Sparkles size={iconSizeToken.medium} />
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('UNIT')
-              setCollapsed(false)
-            }}
-            className="p-2 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg text-amber-500 hover:text-amber-600 transition-colors"
-            title="单位库"
-          >
-            <Scale size={iconSizeToken.medium} />
-          </button>
+          <Tooltip content="修饰符" side="left" className="w-full flex justify-center">
+            <button
+              onClick={() => {
+                setActiveTab('MODIFIER')
+                setCollapsed(false)
+              }}
+              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-blue-500 hover:text-blue-600 transition-colors"
+              aria-label="修饰符"
+            >
+              <Sparkles size={iconSizeToken.medium} />
+            </button>
+          </Tooltip>
+          <Tooltip content="单位库" side="left" className="w-full flex justify-center">
+            <button
+              onClick={() => {
+                setActiveTab('UNIT')
+                setCollapsed(false)
+              }}
+              className="p-2 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg text-amber-500 hover:text-amber-600 transition-colors"
+              aria-label="单位库"
+            >
+              <Scale size={iconSizeToken.medium} />
+            </button>
+          </Tooltip>
         </div>
-        <button
-          onClick={() => setCollapsed(false)}
-          className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
-          title="展开组件库"
-        >
-          <ChevronLeft size={iconSizeToken.medium} />
-        </button>
+        <Tooltip content="展开组件库" side="left" className="w-full flex justify-center">
+          <button
+            onClick={() => setCollapsed(false)}
+            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+            aria-label="展开组件库"
+          >
+            <ChevronLeft size={iconSizeToken.medium} />
+          </button>
+        </Tooltip>
       </div>
     )
   }
 
   return (
-    <div className={`${panelWidthClassMap.medium} border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col overflow-hidden`}>
+    <div className={`${panelWidthClassMap.medium} border-l border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col overflow-hidden`}>
       {/* 标题 */}
       <div className="px-3 pt-3 pb-1.5">
         <h3 className="text-caption font-semibold text-slate-800 dark:text-slate-200">
@@ -1284,12 +1290,12 @@ export function ComponentLibrarySidebar() {
 
       {/* Tab 切换 */}
       <div className="px-3 py-1.5">
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-full">
+        <div className="flex bg-slate-100 dark:bg-slate-900/60 p-0.5 rounded-full">
           <button
             onClick={() => setActiveTab('MODIFIER')}
             className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-full text-micro font-medium transition-all ${
               activeTab === 'MODIFIER'
-                ? 'bg-white dark:bg-slate-700 text-blue-500 shadow-sm'
+                ? 'bg-white dark:bg-slate-900 text-blue-500 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -1333,7 +1339,7 @@ export function ComponentLibrarySidebar() {
           units.map((item) => (
             <div
               key={item.code}
-              className="group flex items-center gap-2.5 p-2.5 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-lg hover:border-amber-200 dark:hover:border-amber-700 hover:shadow-sm transition-all"
+              className="group flex items-center gap-2.5 p-2.5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-lg hover:border-amber-200 dark:hover:border-amber-700 hover:shadow-sm transition-all"
             >
               <div className="w-8 h-8 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 font-bold text-caption flex-shrink-0">
                 {item.symbol || item.code[0]}
@@ -1369,7 +1375,7 @@ export function ComponentLibrarySidebar() {
           modifiers.map((item) => (
             <div
               key={item.code}
-              className="group flex items-center gap-2.5 p-2.5 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-lg hover:border-blue-200 dark:hover:border-blue-700 hover:shadow-sm transition-all"
+              className="group flex items-center gap-2.5 p-2.5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-lg hover:border-blue-200 dark:hover:border-blue-700 hover:shadow-sm transition-all"
             >
               <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-caption flex-shrink-0">
                 {item.name[0]}
@@ -1405,7 +1411,7 @@ export function ComponentLibrarySidebar() {
       </div>
 
       {/* 底部区域 */}
-      <div className="px-3 py-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex items-center justify-between gap-2">
+      <div className="px-3 py-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/60 flex items-center justify-between gap-2">
         <p className="text-micro text-slate-400 leading-relaxed flex-1">组装派生指标前，请确保组件库中已有所需口径片段。</p>
         <button
           onClick={() => setCollapsed(true)}

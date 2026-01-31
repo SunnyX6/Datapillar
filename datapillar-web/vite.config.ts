@@ -90,11 +90,36 @@ export default defineConfig(({ mode }) => {
         '@neo4j-nvl/base',
         '@neo4j-nvl/interaction-handlers',
         '@neo4j-nvl/react',
+        // Monaco 深度导入，减少 dev 请求爆炸
+        '@monaco-editor/react',
+        'monaco-editor/esm/vs/editor/editor.api',
+        'monaco-editor/esm/vs/basic-languages/sql/sql',
+        // 视觉与交互重库，换取首屏响应
+        'framer-motion',
+        'lucide-react',
+        'react-icons',
+        'react-icons/si',
+        'sonner',
+        // 大型 UI 与图形依赖
+        '@xyflow/react',
+        'react-virtuoso',
+        // 文本/表单/格式化
+        'react-markdown',
+        'remark-gfm',
+        'react-hook-form',
+        '@hookform/resolvers',
+        'zod',
+        'yup',
+        'sql-formatter',
+        // 其他重依赖
+        '@iconify/react',
+        '@radix-ui/react-select',
+        '@dnd-kit/utilities',
+        'zustand',
         // neo4j 依赖的 CommonJS 模块，需要预构建
         '@neo4j-bloom/dagre',
         'graphlib'
-      ],
-      exclude: ['monaco-editor'] // Monaco 按需加载，不预构建
+      ]
     }
   }
 })

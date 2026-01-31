@@ -1,8 +1,11 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 知识库表相关的工具
 
 工具分层设计：
-- count: 查询总数（count_catalogs, count_schemas, count_tables）
 - list: 列表查询（list_catalogs, list_schemas, list_tables），默认 limit=5
 - search: 语义搜索（search_tables, search_columns）
 - detail: 获取详情（get_table_detail, get_table_lineage, get_lineage_sql）
@@ -18,26 +21,13 @@ import logging
 
 from pydantic import BaseModel, Field
 
-from src.infrastructure.repository.kg import Neo4jTableSearch
-from datapillar_oneagentic import tool
+from src.infrastructure.repository.kg import Neo4jColumnSearch, Neo4jTableSearch
+from src.modules.etl.tools.registry import etl_tool
 
 logger = logging.getLogger(__name__)
 
 
 # ==================== 工具参数 Schema ====================
-
-
-class CountSchemasInput(BaseModel):
-    """统计 Schema 数量的参数"""
-
-    catalog: str = Field(..., description="Catalog 名称")
-
-
-class CountTablesInput(BaseModel):
-    """统计 Table 数量的参数"""
-
-    catalog: str = Field(..., description="Catalog 名称")
-    schema_name: str = Field(..., description="Schema 名称")
 
 
 class ListCatalogsInput(BaseModel):
@@ -108,16 +98,14 @@ class GetLineageSqlInput(BaseModel):
 # ==================== 内部辅助函数 ====================
 
 
-def _tool_error(message: str, **extra: object) -> str:
+def _tool_error(message: str) -> str:
     """构造工具错误响应"""
-    payload: dict[str, object] = {"status": "error", "message": message}
-    payload.update(extra)
-    return json.dumps(payload, ensure_ascii=False)
+    return json.dumps({"error": message}, ensure_ascii=False)
 
 
 def _tool_success(data: dict) -> str:
     """构造工具成功响应"""
-    return json.dumps({"status": "success", **data}, ensure_ascii=False)
+    return json.dumps(data, ensure_ascii=False)
 
 
 def _parse_table_path(path: str) -> tuple[str, str, str] | None:
@@ -141,126 +129,19 @@ def _parse_table_path(path: str) -> tuple[str, str, str] | None:
     return catalog.strip(), schema.strip(), table.strip()
 
 
-# ==================== Count 工具（第一层） ====================
-
-
-@tool("count_catalogs")
-def count_catalogs() -> str:
-    """
-    统计 Catalog 总数
-
-    使用场景：
-    - 用户问"有哪些 catalog"时，先调用此工具知道总数
-    - 然后调用 list_catalogs() 获取列表
-    - 如果总数超过 5 个，告知用户"共 N 个，已显示前 5 个"
-
-    输出示例：
-    {"status": "success", "count": 3}
-    """
-    logger.info("count_catalogs()")
-
-    try:
-        catalogs = Neo4jTableSearch.list_catalogs(limit=1000)
-        return _tool_success({"count": len(catalogs)})
-    except Exception as e:
-        logger.error(f"count_catalogs 执行失败: {e}", exc_info=True)
-        return _tool_error(str(e))
-
-
-@tool("count_schemas", args_schema=CountSchemasInput)
-def count_schemas(catalog: str) -> str:
-    """
-    统计指定 Catalog 下的 Schema 总数
-
-    使用场景：
-    - 用户问"hive_prod 下有哪些 schema"时，先调用此工具知道总数
-    - 然后调用 list_schemas(catalog) 获取列表
-    - 如果总数超过 5 个，告知用户"共 N 个，已显示前 5 个"
-
-    输入示例：
-    {"catalog": "hive_prod"}
-
-    输出示例：
-    {"status": "success", "catalog": "hive_prod", "count": 5}
-    """
-    logger.info(f"count_schemas(catalog='{catalog}')")
-
-    if not (isinstance(catalog, str) and catalog.strip()):
-        return _tool_error("catalog 不能为空")
-
-    catalog = catalog.strip()
-
-    try:
-        schemas = Neo4jTableSearch.list_schemas(catalog=catalog, limit=1000)
-        return _tool_success({"catalog": catalog, "count": len(schemas)})
-    except Exception as e:
-        logger.error(f"count_schemas 执行失败: {e}", exc_info=True)
-        return _tool_error(str(e))
-
-
-@tool("count_tables", args_schema=CountTablesInput)
-def count_tables(catalog: str, schema_name: str) -> str:
-    """
-    统计指定 Catalog.Schema 下的 Table 总数
-
-    使用场景：
-    - 用户问"ods 下有哪些表"时，先调用此工具知道总数
-    - 然后调用 list_tables(catalog, schema_name) 获取列表
-    - 如果总数超过 5 个，告知用户"共 N 个，已显示前 5 个"
-
-    输入示例：
-    {"catalog": "hive_prod", "schema_name": "ods"}
-
-    输出示例：
-    {"status": "success", "catalog": "hive_prod", "schema": "ods", "count": 120}
-    """
-    logger.info(f"count_tables(catalog='{catalog}', schema='{schema_name}')")
-
-    if not (isinstance(catalog, str) and catalog.strip()):
-        return _tool_error("catalog 不能为空")
-    if not (isinstance(schema_name, str) and schema_name.strip()):
-        return _tool_error("schema_name 不能为空")
-
-    catalog = catalog.strip()
-    schema_name = schema_name.strip()
-
-    try:
-        tables = Neo4jTableSearch.list_tables(
-            catalog=catalog,
-            schema=schema_name,
-            limit=10000,
-        )
-        return _tool_success(
-            {
-                "catalog": catalog,
-                "schema": schema_name,
-                "count": len(tables),
-            }
-        )
-    except Exception as e:
-        logger.error(f"count_tables 执行失败: {e}", exc_info=True)
-        return _tool_error(str(e))
-
-
 # ==================== List 工具（第二层） ====================
 
 
-@tool("list_catalogs", args_schema=ListCatalogsInput)
+@etl_tool("list_catalogs", tool_type="Catalog", desc="列出目录", args_schema=ListCatalogsInput)
 def list_catalogs(limit: int = 5) -> str:
     """
     列出 Catalog 列表
 
     ⚠️ 重要：默认只返回前 5 个（折叠显示），不是全部！
-    - 如需知道总数，请先调用 count_catalogs()
     - 如需查看更多，请传入更大的 limit 参数（最大 100）
-
-    使用场景：
-    - 用户问"有哪些 catalog" → 先 count_catalogs() 获取总数，再 list_catalogs() 获取列表
-    - 如果总数超过 5 个，告知用户"共 N 个，已显示前 5 个"
 
     输出示例：
     {
-        "status": "success",
         "catalogs": [
             {"name": "hive_prod", "description": "生产环境 Hive"},
             {"name": "mysql_prod", "description": "生产环境 MySQL"}
@@ -275,28 +156,22 @@ def list_catalogs(limit: int = 5) -> str:
         return _tool_success({"catalogs": catalogs, "count": len(catalogs)})
     except Exception as e:
         logger.error(f"list_catalogs 执行失败: {e}", exc_info=True)
-        return _tool_error(str(e))
+        return _tool_error("查询失败")
 
 
-@tool("list_schemas", args_schema=ListSchemasInput)
+@etl_tool("list_schemas", tool_type="Schema", desc="列出目录下 schema", args_schema=ListSchemasInput)
 def list_schemas(catalog: str, limit: int = 5) -> str:
     """
     列出指定 Catalog 下的 Schema 列表
 
     ⚠️ 重要：默认只返回前 5 个（折叠显示），不是全部！
-    - 如需知道总数，请先调用 count_schemas(catalog)
     - 如需查看更多，请传入更大的 limit 参数（最大 100）
-
-    使用场景：
-    - 用户问"hive_prod 下有哪些 schema" → 先 count_schemas() 获取总数，再 list_schemas() 获取列表
-    - 如果总数超过 5 个，告知用户"共 N 个，已显示前 5 个"
 
     输入示例：
     {"catalog": "hive_prod"}
 
     输出示例：
     {
-        "status": "success",
         "catalog": "hive_prod",
         "schemas": [
             {"name": "ods", "path": "hive_prod.ods", "description": "原始数据层"},
@@ -315,7 +190,7 @@ def list_schemas(catalog: str, limit: int = 5) -> str:
     try:
         schemas = Neo4jTableSearch.list_schemas(catalog=catalog, limit=limit)
         if not schemas:
-            return _tool_error(f"未找到任何 Schema: {catalog}")
+            return _tool_error("未找到任何 Schema")
 
         # 添加完整路径
         for s in schemas:
@@ -331,10 +206,10 @@ def list_schemas(catalog: str, limit: int = 5) -> str:
         )
     except Exception as e:
         logger.error(f"list_schemas 执行失败: {e}", exc_info=True)
-        return _tool_error(str(e))
+        return _tool_error("查询失败")
 
 
-@tool("list_tables", args_schema=ListTablesInput)
+@etl_tool("list_tables", tool_type="Table", desc="列出表", args_schema=ListTablesInput)
 def list_tables(
     catalog: str,
     schema_name: str,
@@ -345,20 +220,14 @@ def list_tables(
     列出指定 Catalog.Schema 下的 Table 列表
 
     ⚠️ 重要：默认只返回前 5 个（折叠显示），不是全部！
-    - 如需知道总数，请先调用 count_tables(catalog, schema_name)
     - 如需查看更多，请传入更大的 limit 参数（最大 100）
     - 可选：使用 keyword 参数按表名关键字过滤
-
-    使用场景：
-    - 用户问"ods 下有哪些表" → 先 count_tables() 获取总数，再 list_tables() 获取列表
-    - 如果总数超过 5 个，告知用户"共 N 个，已显示前 5 个"
 
     输入示例：
     {"catalog": "hive_prod", "schema_name": "ods"}
 
     输出示例：
     {
-        "status": "success",
         "catalog": "hive_prod",
         "schema": "ods",
         "tables": [
@@ -391,7 +260,7 @@ def list_tables(
             hint = f"{catalog}.{schema_name}"
             if keyword and str(keyword).strip():
                 hint = f"{hint} (keyword={keyword})"
-            return _tool_error(f"未找到任何表: {hint}")
+            return _tool_error("未找到任何表")
 
         # 添加完整路径
         for t in tables:
@@ -409,13 +278,13 @@ def list_tables(
         )
     except Exception as e:
         logger.error(f"list_tables 执行失败: {e}", exc_info=True)
-        return _tool_error(str(e))
+        return _tool_error("查询失败")
 
 
 # ==================== Search 工具（语义搜索） ====================
 
 
-@tool("search_tables", args_schema=SearchTablesInput)
+@etl_tool("search_tables", tool_type="Table", desc="语义搜索表", args_schema=SearchTablesInput)
 def search_tables(query: str, top_k: int = 10) -> str:
     """
     搜索表（语义搜索）
@@ -432,7 +301,6 @@ def search_tables(query: str, top_k: int = 10) -> str:
 
     输出示例：
     {
-        "status": "success",
         "query": "订单",
         "tables": [
             {
@@ -454,10 +322,9 @@ def search_tables(query: str, top_k: int = 10) -> str:
 
     try:
         # 使用向量搜索
-        results = Neo4jTableSearch.search_tables_columns(
+        results = Neo4jTableSearch.search_tables(
             query=query.strip(),
             top_k=top_k,
-            min_score=0.6,
         )
 
         # 过滤只保留 Table 类型
@@ -487,10 +354,10 @@ def search_tables(query: str, top_k: int = 10) -> str:
         )
     except Exception as e:
         logger.error(f"search_tables 执行失败: {e}", exc_info=True)
-        return _tool_error(str(e))
+        return _tool_error("查询失败")
 
 
-@tool("search_columns", args_schema=SearchColumnsInput)
+@etl_tool("search_columns", tool_type="Column", desc="语义搜索字段", args_schema=SearchColumnsInput)
 def search_columns(query: str, top_k: int = 10) -> str:
     """
     搜索列（语义搜索）
@@ -505,7 +372,6 @@ def search_columns(query: str, top_k: int = 10) -> str:
 
     输出示例：
     {
-        "status": "success",
         "query": "订单状态",
         "columns": [
             {
@@ -529,10 +395,9 @@ def search_columns(query: str, top_k: int = 10) -> str:
 
     try:
         # 使用向量搜索
-        results = Neo4jTableSearch.search_tables_columns(
+        results = Neo4jColumnSearch.search_columns(
             query=query.strip(),
             top_k=top_k,
-            min_score=0.6,
         )
 
         # 过滤只保留 Column 类型
@@ -564,13 +429,18 @@ def search_columns(query: str, top_k: int = 10) -> str:
         )
     except Exception as e:
         logger.error(f"search_columns 执行失败: {e}", exc_info=True)
-        return _tool_error(str(e))
+        return _tool_error("查询失败")
 
 
 # ==================== Detail 工具（第三层） ====================
 
 
-@tool("get_table_detail", args_schema=GetTableDetailInput)
+@etl_tool(
+    "get_table_detail",
+    tool_type="Table",
+    desc="获取表详情（字段/描述）",
+    args_schema=GetTableDetailInput,
+)
 def get_table_detail(path: str) -> str:
     """
     获取表详情（含列和值域）
@@ -587,7 +457,6 @@ def get_table_detail(path: str) -> str:
 
     输出示例：
     {
-        "status": "success",
         "path": "hive_prod.ods.t_order",
         "catalog": "hive_prod",
         "schema": "ods",
@@ -603,10 +472,7 @@ def get_table_detail(path: str) -> str:
 
     parsed = _parse_table_path(path)
     if not parsed:
-        return _tool_error(
-            f"路径格式错误: {path}，应为 catalog.schema.table 格式",
-            expected_format="catalog.schema.table",
-        )
+        return _tool_error("路径格式错误，应为 catalog.schema.table")
 
     catalog, schema, table = parsed
 
@@ -614,7 +480,7 @@ def get_table_detail(path: str) -> str:
         detail = Neo4jTableSearch.get_table_detail(catalog, schema, table)
 
         if not detail:
-            return _tool_error(f"未找到表: {path}")
+            return _tool_error("未找到表")
 
         return _tool_success(
             {
@@ -629,10 +495,10 @@ def get_table_detail(path: str) -> str:
 
     except Exception as e:
         logger.error(f"get_table_detail 执行失败: {e}", exc_info=True)
-        return _tool_error(str(e))
+        return _tool_error("查询失败")
 
 
-@tool("get_table_lineage", args_schema=GetTableLineageInput)
+@etl_tool("get_table_lineage", tool_type="Table", desc="获取表血缘", args_schema=GetTableLineageInput)
 def get_table_lineage(path: str, direction: str = "both") -> str:
     """
     获取表血缘关系
@@ -650,7 +516,6 @@ def get_table_lineage(path: str, direction: str = "both") -> str:
 
     输出示例：
     {
-        "status": "success",
         "path": "hive_prod.dwd.order_detail",
         "catalog": "hive_prod",
         "schema": "dwd",
@@ -664,10 +529,7 @@ def get_table_lineage(path: str, direction: str = "both") -> str:
 
     parsed = _parse_table_path(path)
     if not parsed:
-        return _tool_error(
-            f"路径格式错误: {path}，应为 catalog.schema.table 格式",
-            expected_format="catalog.schema.table",
-        )
+        return _tool_error("路径格式错误，应为 catalog.schema.table")
 
     catalog, schema, table = parsed
 
@@ -675,7 +537,7 @@ def get_table_lineage(path: str, direction: str = "both") -> str:
         lineage = Neo4jTableSearch.get_table_lineage(schema, table, direction)
 
         if not lineage.get("upstream") and not lineage.get("downstream"):
-            return _tool_error(f"未找到表 {path} 的血缘关系")
+            return _tool_error("未找到表的血缘关系")
 
         return _tool_success(
             {
@@ -692,10 +554,15 @@ def get_table_lineage(path: str, direction: str = "both") -> str:
 
     except Exception as e:
         logger.error(f"get_table_lineage 执行失败: {e}", exc_info=True)
-        return _tool_error(str(e))
+        return _tool_error("查询失败")
 
 
-@tool("get_lineage_sql", args_schema=GetLineageSqlInput)
+@etl_tool(
+    "get_lineage_sql",
+    tool_type="Table",
+    desc="根据血缘查找历史 SQL",
+    args_schema=GetLineageSqlInput,
+)
 def get_lineage_sql(source_tables: list[str], target_table: str) -> str:
     """
     根据血缘关系精准查找历史 SQL
@@ -715,7 +582,6 @@ def get_lineage_sql(source_tables: list[str], target_table: str) -> str:
 
     输出示例：
     {
-        "status": "success",
         "source_tables": ["hive_prod.ods.t_order", "hive_prod.ods.t_user"],
         "target_table": "hive_prod.dwd.order_detail",
         "sql_id": "abc123",
@@ -729,9 +595,7 @@ def get_lineage_sql(source_tables: list[str], target_table: str) -> str:
     # 验证目标表路径
     target_parsed = _parse_table_path(target_table)
     if not target_parsed:
-        return _tool_error(
-            f"目标表路径格式错误: {target_table}，应为 catalog.schema.table 格式",
-        )
+        return _tool_error("目标表路径格式错误，应为 catalog.schema.table")
 
     # 提取 schema.table 格式（Neo4j 查询使用）
     source_schema_tables = []
@@ -751,7 +615,7 @@ def get_lineage_sql(source_tables: list[str], target_table: str) -> str:
         result = Neo4jTableSearch.find_lineage_sql(source_schema_tables, target_schema_table)
 
         if not result:
-            return _tool_error(f"未找到从 {source_tables} 到 {target_table} 的历史 SQL")
+            return _tool_error("未找到血缘 SQL")
 
         return _tool_success(
             {
@@ -766,13 +630,10 @@ def get_lineage_sql(source_tables: list[str], target_table: str) -> str:
 
     except Exception as e:
         logger.error(f"get_lineage_sql 执行失败: {e}", exc_info=True)
-        return _tool_error(str(e))
+        return _tool_error("查询失败")
 
 
 # ==================== 工具列表 ====================
-
-# Count 工具（第一层）
-COUNT_TOOLS = [count_catalogs, count_schemas, count_tables]
 
 # List 工具（第二层）
 LIST_TOOLS = [list_catalogs, list_schemas, list_tables]
@@ -784,4 +645,4 @@ SEARCH_TOOLS = [search_tables, search_columns]
 DETAIL_TOOLS = [get_table_detail, get_table_lineage, get_lineage_sql]
 
 # 所有表相关工具
-TABLE_TOOLS = COUNT_TOOLS + LIST_TOOLS + SEARCH_TOOLS + DETAIL_TOOLS
+TABLE_TOOLS = LIST_TOOLS + SEARCH_TOOLS + DETAIL_TOOLS

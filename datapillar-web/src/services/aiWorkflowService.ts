@@ -12,40 +12,34 @@ import { fetchWithAuthRetry } from '@/lib/api/client'
  */
 export type SseEventType = 'stream'
 
-export type ProcessPhase = 'analysis' | 'catalog' | 'design' | 'develop' | 'review'
+export type ActivityEvent = 'llm' | 'tool' | 'interrupt'
 
 export type ProcessStatus = 'running' | 'waiting' | 'done' | 'error' | 'aborted'
 
-export interface ProcessActivity {
-  id: string
-  phase: ProcessPhase
-  status: ProcessStatus
-  actor?: string
-  title: string
-  detail?: string
-  progress?: number
-}
-
-export type StreamStatus = 'running' | 'interrupt' | 'done' | 'error' | 'aborted'
-
 export interface StreamInterrupt {
-  text: string
   options: string[]
+  interrupt_id?: string
 }
+
+export interface ProcessActivity {
+  agent_cn: string
+  agent_en: string
+  summary: string
+  event: ActivityEvent
+  event_name: string
+  status: ProcessStatus
+  interrupt?: StreamInterrupt
+  recommendations?: string[]
+}
+
+export type StreamStatus = 'running' | 'done' | 'error' | 'aborted'
 
 export interface StreamEvent {
-  v: number
   ts: number
-  event: 'stream'
   run_id: string
-  message_id: string
   status: StreamStatus
-  phase: ProcessPhase
   activity?: ProcessActivity | null
-  message: string
-  interrupt: StreamInterrupt
   workflow?: WorkflowResponse | null
-  recommendations?: string[]
 }
 
 export type SseEvent = StreamEvent
@@ -122,16 +116,19 @@ export function createWorkflowStream(
     try {
       const emitLocalError = (message: string, detail?: string) => {
         callbacks.onEvent({
-          v: 3,
           ts: Date.now(),
-          event: 'stream',
           run_id: `local-${Date.now()}`,
-          message_id: `msg-local-${Date.now()}`,
           status: 'error',
-          phase: 'analysis',
-          activity: null,
-          message: detail ? `${message}：${detail}` : message,
-          interrupt: { text: '', options: [] },
+          activity: {
+            agent_cn: '系统',
+            agent_en: 'system',
+            summary: detail ? `${message}：${detail}` : message,
+            event: 'llm',
+            event_name: 'llm',
+            status: 'error',
+            interrupt: { options: [] },
+            recommendations: []
+          },
           workflow: null
         })
       }
@@ -166,7 +163,7 @@ export function createWorkflowStream(
         try {
           const sseEvent = JSON.parse(event.data) as SseEvent
           callbacks.onEvent(sseEvent)
-          if (sseEvent.status !== 'running') {
+          if (sseEvent.status === 'done' || sseEvent.status === 'error' || sseEvent.status === 'aborted') {
             eventSource?.close()
             eventSource = null
           }
@@ -187,16 +184,19 @@ export function createWorkflowStream(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       callbacks.onEvent({
-        v: 3,
         ts: Date.now(),
-        event: 'stream',
         run_id: `local-${Date.now()}`,
-        message_id: `msg-local-${Date.now()}`,
         status: 'error',
-        phase: 'analysis',
-        activity: null,
-        message: `连接失败：${message}`,
-        interrupt: { text: '', options: [] },
+        activity: {
+          agent_cn: '系统',
+          agent_en: 'system',
+          summary: `连接失败：${message}`,
+          event: 'llm',
+          event_name: 'llm',
+          status: 'error',
+          interrupt: { options: [] },
+          recommendations: []
+        },
         workflow: null
       })
     }
@@ -217,13 +217,20 @@ export function createWorkflowStream(
  * 打断的是 run（当前执行），不是 session（对话历史）。
  * 用户可以在打断后继续在同一个 session 发送新消息。
  */
-export async function abortWorkflow(sessionId: string): Promise<{ success: boolean; aborted: boolean; message: string }> {
+export async function abortWorkflow(
+  sessionId: string,
+  interruptId?: string
+): Promise<{ success: boolean; aborted: boolean; message: string }> {
+  const payload: { sessionId: string; interruptId?: string } = { sessionId }
+  if (interruptId) {
+    payload.interruptId = interruptId
+  }
   const response = await fetchWithAuthRetry('/api/ai/etl/workflow/abort', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ sessionId }),
+    body: JSON.stringify(payload),
     credentials: 'include'
   })
 

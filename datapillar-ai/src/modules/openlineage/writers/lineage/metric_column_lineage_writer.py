@@ -1,11 +1,15 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 from __future__ import annotations
 
-import structlog
+import logging
 from neo4j import AsyncSession
 
 from src.infrastructure.repository.openlineage import Lineage
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class MetricColumnLineageWriter:
@@ -27,7 +31,10 @@ class MetricColumnLineageWriter:
             column_ids=column_ids,
         )
         self._metric_lineage_written += len(column_ids)
-        logger.debug("metric_measures_written", metric_id=metric_id, count=len(column_ids))
+        logger.debug(
+            "metric_measures_written",
+            extra={"data": {"metric_id": metric_id, "count": len(column_ids)}},
+        )
 
     async def write_filters(
         self, session: AsyncSession, *, metric_id: str, column_ids: list[str]
@@ -38,4 +45,7 @@ class MetricColumnLineageWriter:
             column_ids=column_ids,
         )
         self._metric_lineage_written += len(column_ids)
-        logger.debug("metric_filters_written", metric_id=metric_id, count=len(column_ids))
+        logger.debug(
+            "metric_filters_written",
+            extra={"data": {"metric_id": metric_id, "count": len(column_ids)}},
+        )

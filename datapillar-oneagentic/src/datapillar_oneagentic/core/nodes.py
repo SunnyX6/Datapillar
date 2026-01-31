@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 LangGraph node factory.
 
@@ -14,15 +17,15 @@ Out of scope:
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import TYPE_CHECKING, Any
 
 from langgraph.config import get_store
 from langgraph.store.base import BaseStore
 from langgraph.types import Command
-from pydantic import BaseModel, Field
 
-from datapillar_oneagentic.context import ContextBuilder, ContextCollector, ContextScenario
+from datapillar_oneagentic.context import ContextCollector, ContextScenario
 from datapillar_oneagentic.exception import AgentError, AgentErrorCategory, AgentErrorClassifier
 from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
 from datapillar_oneagentic.core.types import AgentResult, SessionKey
@@ -39,7 +42,6 @@ from datapillar_oneagentic.todo.store import (
 )
 from datapillar_oneagentic.todo.tool import extract_todo_plan, extract_todo_updates
 from datapillar_oneagentic.exception import RecoveryAction
-from datapillar_oneagentic.tools.registry import tool as register_tool
 from datapillar_oneagentic.state import StateBuilder
 from datapillar_oneagentic.messages.adapters.langchain import to_langchain
 from datapillar_oneagentic.messages import Messages
@@ -47,8 +49,7 @@ from datapillar_oneagentic.messages import Messages
 if TYPE_CHECKING:
     from datapillar_oneagentic.core.agent import AgentSpec
     from datapillar_oneagentic.context.timeline.recorder import TimelineRecorder
-    from datapillar_oneagentic.experience import ExperienceLearner
-    from datapillar_oneagentic.knowledge import KnowledgeRetriever
+    from datapillar_oneagentic.knowledge import KnowledgeConfig, KnowledgeService
 
 
 logger = logging.getLogger(__name__)
@@ -68,9 +69,10 @@ class NodeFactory:
         agent_ids: list[str],
         get_executor,
         timeline_recorder: "TimelineRecorder",
-        knowledge_retriever: "KnowledgeRetriever | None" = None,
-        experience_learner: "ExperienceLearner | None" = None,
+        namespace: str | None = None,
+        knowledge_config_map: dict[str, "KnowledgeConfig"] | None = None,
         context_collector: ContextCollector | None = None,
+        llm_provider=None,
     ):
         """
         Initialize the node factory.
@@ -79,17 +81,43 @@ class NodeFactory:
             agent_specs: list of agent specs
             agent_ids: list of agent IDs
             get_executor: executor factory
-            knowledge_retriever: knowledge retriever (optional)
-            experience_learner: experience learner (optional)
+            namespace: team namespace
+            knowledge_config_map: knowledge tool bindings by agent_id
         """
         self._agent_specs = agent_specs
         self._agent_ids = agent_ids
         self._spec_by_id = {spec.id: spec for spec in agent_specs}
         self._get_executor = get_executor
         self._timeline_recorder = timeline_recorder
-        self._knowledge_retriever = knowledge_retriever
-        self._experience_learner = experience_learner
+        self._namespace = namespace
+        self._knowledge_config_map = knowledge_config_map or {}
+        self._knowledge_service_cache: dict[str, KnowledgeService] = {}
         self._context_collector = context_collector
+        self._llm_provider = llm_provider
+
+    def _resolve_knowledge_config(self, spec: AgentSpec | None) -> "KnowledgeConfig | None":
+        if spec is None:
+            return None
+        return self._knowledge_config_map.get(spec.id)
+
+    def _get_knowledge_service(self, *, config: "KnowledgeConfig") -> "KnowledgeService":
+        if config is None:
+            raise ValueError("Knowledge config is required for knowledge retrieval.")
+
+        key = json.dumps(
+            config.model_dump(mode="json", exclude_none=True),
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+        cached = self._knowledge_service_cache.get(key)
+        if cached is not None:
+            return cached
+
+        from datapillar_oneagentic.knowledge import KnowledgeService
+
+        service = KnowledgeService(config=config)
+        self._knowledge_service_cache[key] = service
+        return service
 
     def _build_knowledge_tools(
         self,
@@ -97,11 +125,8 @@ class NodeFactory:
         spec: AgentSpec | None,
         session_id: str,
     ) -> list[Any]:
-        if not spec or not spec.knowledge or self._knowledge_retriever is None:
-            return []
-        inject = self._knowledge_retriever.resolve_inject_config(spec.knowledge)
-        inject_mode = (inject.mode or "tool").lower()
-        if inject_mode != "tool":
+        knowledge_binding = self._resolve_knowledge_config(spec)
+        if knowledge_binding is None:
             return []
         existing_names = {getattr(t, "name", "") for t in (spec.tools or [])}
         if "knowledge_retrieve" in existing_names:
@@ -111,27 +136,18 @@ class NodeFactory:
             )
             return []
 
-        class _KnowledgeRetrieveInput(BaseModel):
-            query: str = Field(description="User query text")
+        from datapillar_oneagentic.tools.knowledge import create_knowledge_retrieve_tool
 
-        # Internal injected tool: explicit args_schema avoids LangChain docstring parsing errors.
-        @register_tool("knowledge_retrieve", args_schema=_KnowledgeRetrieveInput)
-        async def knowledge_retrieve(query: str) -> str:
-            """Retrieve knowledge and return content (call when needed)."""
-            result = await self._knowledge_retriever.retrieve(
-                query=query,
-                knowledge=spec.knowledge,
-            )
-            if result.refs and self._experience_learner is not None:
-                refs = [ref.to_dict() for ref in result.refs]
-                self._experience_learner.record_knowledge(session_id, refs)
-            knowledge_text = ContextBuilder.build_knowledge_context(
-                chunks=[chunk for chunk, _ in result.hits],
-                inject=inject,
-            )
-            return knowledge_text or "No relevant knowledge found."
-
-        return [knowledge_retrieve]
+        default_config = knowledge_binding.model_copy(deep=True)
+        if not default_config.namespaces:
+            raise ValueError("KnowledgeConfig.namespaces is required for knowledge tool binding.")
+        tool = create_knowledge_retrieve_tool(
+            knowledge_config=default_config,
+            get_service=self._get_knowledge_service,
+            llm_provider=self._llm_provider,
+        )
+        tool.bound_namespaces = list(default_config.namespaces or [])
+        return [tool]
 
     async def _should_clear_todo(
         self,
@@ -486,6 +502,13 @@ class NodeFactory:
                     failure_kind=failure_kind,
                 )
                 raise agent_error
+            if result is not None and hasattr(result, "status") and result.status == ExecutionStatus.ABORTED:
+                sb.routing.finish_agent(
+                    status=ExecutionStatus.ABORTED,
+                    failure_kind=None,
+                    error=getattr(result, "error", None),
+                )
+                return Command(update=sb.patch())
 
             deliverable = getattr(result, "deliverable", None)
             output = (
@@ -618,7 +641,6 @@ def _apply_runtime_contexts(state: dict, contexts: dict[str, str]) -> None:
     for key in list(state.keys()):
         if key.endswith("_context"):
             state.pop(key, None)
-    state.pop("knowledge_context", None)
     state.pop("experience_context", None)
     state.pop("todo_context", None)
     for key, value in contexts.items():

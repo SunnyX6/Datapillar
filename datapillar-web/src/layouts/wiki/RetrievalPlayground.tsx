@@ -1,37 +1,29 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Search, Database, ChevronRight, FileText, Sliders, Zap, Layers, Command, Globe } from 'lucide-react'
+import { toast } from 'sonner'
 import { Card } from '@/components/ui'
 import { Select, type SelectOption } from '@/components/ui/Select'
 import { cardWidthClassMap, contentMaxWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
-import type { SearchResult } from './types'
+import { retrieve } from '@/services/knowledgeWikiService'
+import type { Document, SearchResult } from './types'
+import { mapSearchHitToResult } from './utils'
 
 interface Props {
+  spaceId: string
   spaceName: string
+  documents: Document[]
   isNamespaceCollapsed: boolean
 }
 
-type RetrievalMode = 'vector' | 'keyword' | 'hybrid'
-
-const availableDocs = [
-  { id: '1', title: 'DataButterfly_API_v2.0.pdf' },
-  { id: '2', title: 'HR_Onboarding_Policy_2024.docx' },
-  { id: '3', title: 'Backend_Microservices_Arch.md' },
-  { id: '4', title: 'Legacy_System_Logs.txt' }
-]
-
-const SEARCH_SCOPE_OPTIONS: SelectOption[] = [
-  { value: 'all', label: '全库检索 (All Documents)' },
-  ...availableDocs.map((doc) => ({ value: doc.id, label: doc.title }))
-]
+type RetrievalMode = 'semantic' | 'hybrid'
 
 const RETRIEVAL_MODE_OPTIONS: SelectOption[] = [
-  { value: 'vector', label: '向量' },
-  { value: 'keyword', label: '关键词' },
+  { value: 'semantic', label: '语义' },
   { value: 'hybrid', label: '混合' }
 ]
 
-export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }: Props) {
+export default function RetrievalPlayground({ spaceId, spaceName, documents, isNamespaceCollapsed }: Props) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[] | null>(null)
   const [isSearching, setIsSearching] = useState(false)
@@ -41,29 +33,60 @@ export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }:
   const [enableRerank, setEnableRerank] = useState(true)
   const [topK, setTopK] = useState(5)
   const [threshold, setThreshold] = useState(0.7)
+  const [latencyMs, setLatencyMs] = useState<number | null>(null)
   const searchWidthClass = `mx-auto w-full ${cardWidthClassMap.half} md:${cardWidthClassMap.medium} xl:${cardWidthClassMap.wide}`
   const resultsWidthClass = `mx-auto w-full ${
     isNamespaceCollapsed ? contentMaxWidthClassMap.normal : cardWidthClassMap.superWide
   }`
 
-  const handleSearch = () => {
-    if (!query) return
+  const searchScopeOptions = useMemo<SelectOption[]>(() => {
+    return [
+      { value: 'all', label: '全库检索 (All Documents)' },
+      ...documents.map((doc) => ({ value: doc.id, label: doc.title }))
+    ]
+  }, [documents])
+
+  useEffect(() => {
+    if (searchScope !== 'all' && !documents.some((doc) => doc.id === searchScope)) {
+      setSearchScope('all')
+    }
+  }, [documents, searchScope])
+
+  const handleSearch = async () => {
+    if (!query.trim()) return
+    if (!spaceId) {
+      toast.warning('请先选择知识空间')
+      return
+    }
+    const namespaceId = Number(spaceId)
+    if (!Number.isFinite(namespaceId)) {
+      toast.error('知识空间 ID 无效')
+      return
+    }
     setIsSearching(true)
     setShowConfig(false)
-
-    setTimeout(() => {
-      const allResults: SearchResult[] = [
-        { chunkId: 'c1', docTitle: 'DataButterfly_API_v2.0.pdf', similarity: 0.92, content: 'Rate Limits: The API is limited to 1000 requests per minute per IP address. Exceeding this limit will result in a 429 Too Many Requests response.' },
-        { chunkId: 'c8', docTitle: 'SLA_Enterprise.pdf', similarity: 0.85, content: 'For enterprise customers, standard rate limits can be negotiated. Contact support to increase throughput caps.' },
-        { chunkId: 'c12', docTitle: 'Error_Codes_Reference.md', similarity: 0.64, content: '429: Too Many Requests. Returned when the user has sent too many requests in a given amount of time ("rate limiting").' }
-      ]
-
-      const filtered = searchScope === 'all' ? allResults : [allResults[0]]
-
-      setResults(filtered)
+    try {
+      const response = await retrieve({
+        namespace_id: namespaceId,
+        query: query.trim(),
+        search_scope: searchScope,
+        retrieval_mode: retrievalMode,
+        rerank_enabled: enableRerank,
+        top_k: topK,
+        score_threshold: threshold
+      })
+      setResults(response.hits.map(mapSearchHitToResult))
+      setLatencyMs(response.latency_ms)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(`检索失败：${message}`)
+      setResults([])
+      setLatencyMs(null)
+    } finally {
       setIsSearching(false)
-    }, 800)
+    }
   }
+
 
   return (
     <div className="flex flex-col h-full bg-slate-50/50 dark:bg-slate-950/40 relative overflow-visible">
@@ -128,7 +151,7 @@ export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }:
                       <Select
                         value={searchScope}
                         onChange={(value) => setSearchScope(value)}
-                        options={SEARCH_SCOPE_OPTIONS}
+                        options={searchScopeOptions}
                         dropdownHeader="检索范围"
                         size="xs"
                       />
@@ -231,14 +254,14 @@ export default function RetrievalPlayground({ spaceName, isNamespaceCollapsed }:
                   {searchScope !== 'all' && (
                     <span className={`px-1.5 py-0.5 bg-blue-50 text-blue-600 ${TYPOGRAPHY.micro} rounded border border-blue-100 flex items-center max-w-40 truncate dark:bg-blue-500/10 dark:text-blue-200 dark:border-blue-500/20`}>
                       <FileText size={10} className="mr-1 flex-shrink-0" />
-                      {availableDocs.find((doc) => doc.id === searchScope)?.title}
+                      {documents.find((doc) => doc.id === searchScope)?.title}
                     </span>
                   )}
                   <span className={`px-1.5 py-0.5 bg-indigo-50 text-indigo-600 ${TYPOGRAPHY.micro} rounded border border-indigo-100 capitalize dark:bg-indigo-500/10 dark:text-indigo-200 dark:border-indigo-500/20`}>
                     {retrievalMode} {enableRerank ? '+ Rerank' : ''}
                   </span>
                 </div>
-                <span className={`${TYPOGRAPHY.caption} text-slate-400`}>耗时 342ms</span>
+                <span className={`${TYPOGRAPHY.caption} text-slate-400`}>耗时 {latencyMs ?? '-'}ms</span>
               </div>
 
               {results?.map((result) => (

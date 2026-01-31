@@ -3,11 +3,12 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Activity,
   ArrowRight,
+  BarChart3,
   Check,
   Database,
   Filter,
   Globe,
-  HardDrive,
+  Layers,
   LayoutGrid,
   Plus,
   Server,
@@ -481,10 +482,10 @@ export function ProjectView() {
 
           <div className="grid grid-cols-4 gap-2 @md:gap-3">
             {[
-              { label: '活跃执行器', value: '142', icon: Activity, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/30' },
-              { label: '吞吐量', value: '1.2B', unit: '/day', icon: Zap, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/30' },
-              { label: '存储量', value: '48.2', unit: 'TB', icon: HardDrive, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/30' },
-              { label: '团队规模', value: '24', icon: Users, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/30' }
+              { label: 'Total Projects', value: '4', meta: 'Active', icon: BarChart3, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/30' },
+              { label: 'Stack Services', value: '8', meta: 'Running', icon: Layers, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/30' },
+              { label: 'Avg Health Score', value: '92%', meta: 'Stable', icon: Activity, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/30' },
+              { label: 'Active Members', value: '27', meta: 'Contributors', icon: Users, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/30' }
             ].map((stat) => (
               <Card
                 key={stat.label}
@@ -494,7 +495,7 @@ export function ProjectView() {
                   <div className="text-legal font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1">{stat.label}</div>
                   <div className="text-subtitle @md:text-title font-bold text-slate-900 dark:text-slate-100">
                     {stat.value}
-                    {stat.unit ? <span className="ml-1 text-micro @md:text-caption font-medium text-slate-400 dark:text-slate-500">{stat.unit}</span> : null}
+                    {stat.meta ? <span className="ml-2 text-micro @md:text-caption font-semibold text-slate-400 dark:text-slate-500">{stat.meta}</span> : null}
                   </div>
                 </div>
                 <div className={`w-10 h-10 rounded-lg ${stat.bg} flex items-center justify-center ${stat.color} opacity-80 group-hover:opacity-100 transition-opacity`}>

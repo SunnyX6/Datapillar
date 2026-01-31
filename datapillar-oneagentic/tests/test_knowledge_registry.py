@@ -1,31 +1,27 @@
 from __future__ import annotations
 
-import json
-
 import pytest
 
-from datapillar_oneagentic.context import ContextBuilder
 from datapillar_oneagentic.knowledge.config import (
-    KnowledgeConfig,
     KnowledgeChunkConfig,
-    KnowledgeInjectConfig,
     KnowledgeRetrieveConfig,
     RerankConfig,
 )
 from datapillar_oneagentic.knowledge.ingest.pipeline import KnowledgeIngestor
 from datapillar_oneagentic.knowledge.models import (
-    DocumentInput,
     Knowledge,
     KnowledgeChunk,
     KnowledgeDocument,
-    KnowledgeInject,
     KnowledgeRetrieve,
     KnowledgeSearchHit,
     KnowledgeSource,
     merge_knowledge,
 )
+from datapillar_oneagentic.tools.knowledge import format_knowledge_output
 from datapillar_oneagentic.knowledge.retriever.evidence import dedupe_hits, group_hits
 from datapillar_oneagentic.knowledge.retriever import KnowledgeRetriever
+
+DEFAULT_CHUNK = {"mode": "general"}
 
 
 class _StubEmbeddingProvider:
@@ -62,6 +58,18 @@ class _StubKnowledgeStore:
     def namespace(self) -> str:
         return self._namespace
 
+    @property
+    def supports_hybrid(self) -> bool:
+        return False
+
+    @property
+    def supports_full_text(self) -> bool:
+        return False
+
+    @property
+    def supports_external_embeddings(self) -> bool:
+        return True
+
     async def initialize(self) -> None:
         return None
 
@@ -86,6 +94,20 @@ class _StubKnowledgeStore:
     ) -> list[KnowledgeSearchHit]:
         self.last_search = (list(query_vector), k, filters)
         return list(self.search_results[:k])
+
+    async def hybrid_search_chunks(
+        self,
+        *,
+        query_vector: list[float],
+        query_text: str,
+        k: int,
+        filters: dict | None = None,
+        rrf_k: int = 60,
+    ) -> list[KnowledgeSearchHit]:
+        return await self.search_chunks(query_vector=query_vector, k=k, filters=filters)
+
+    async def full_text_search_chunks(self, *, query_text: str, k: int, filters: dict | None = None):
+        return []
 
     async def get_doc(self, doc_id: str) -> KnowledgeDocument | None:
         return next((doc for doc in self.docs if doc.doc_id == doc_id), None)
@@ -114,11 +136,16 @@ async def test_knowledge_ingestor() -> None:
         general={"max_tokens": 4, "overlap": 1},
     )
 
-    ingestor = KnowledgeIngestor(store=store, embedding_provider=embedder, config=config)
-    source = KnowledgeSource(source_id="src1", name="example", source_type="doc")
-    doc = DocumentInput(source="abcdef", filename="doc1.txt")
+    ingestor = KnowledgeIngestor(store=store, embedding_provider=embedder)
+    source = KnowledgeSource(
+        source="abcdef",
+        chunk=config,
+        name="example",
+        source_type="doc",
+        filename="doc1.txt",
+    )
 
-    await ingestor.ingest(source=source, documents=[doc], sparse_embedder=sparse)
+    await ingestor.ingest(sources=[source], sparse_embedder=sparse)
 
     assert len(store.sources) == 1
     assert len(store.docs) == 1
@@ -130,10 +157,18 @@ async def test_knowledge_ingestor() -> None:
 async def test_knowledge_retriever() -> None:
     store = _StubKnowledgeStore()
     embedder = _StubEmbeddingProvider()
-    retriever = KnowledgeRetriever(store=store, embedding_provider=embedder, config=KnowledgeConfig())
+    retriever = KnowledgeRetriever(store=store, embedding_provider=embedder)
 
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="src1", name="example", source_type="doc")],
+        sources=[
+            KnowledgeSource(
+                source="stub",
+                chunk=DEFAULT_CHUNK,
+                source_id="src1",
+                name="example",
+                source_type="doc",
+            )
+        ],
         sparse_embedder=None,
     )
 
@@ -178,29 +213,35 @@ async def test_knowledge_retriever2() -> None:
 
     store = _StubKnowledgeStore(search_results=hits)
     embedder = _StubEmbeddingProvider()
-    config = KnowledgeConfig(
-        retrieve_config=KnowledgeRetrieveConfig(
-            method="semantic",
-            top_k=2,
-            inject=KnowledgeInjectConfig(mode="system", max_tokens=200, max_chunks=1, format="json"),
-        ),
+    retrieve_defaults = KnowledgeRetrieveConfig(
+        method="semantic",
+        top_k=2,
     )
-    retriever = KnowledgeRetriever(store=store, embedding_provider=embedder, config=config)
+    retriever = KnowledgeRetriever(
+        store=store,
+        embedding_provider=embedder,
+        retrieve_defaults=retrieve_defaults,
+    )
 
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="src1", name="example", source_type="doc")],
+        sources=[
+            KnowledgeSource(
+                source="stub",
+                chunk=DEFAULT_CHUNK,
+                source_id="src1",
+                name="example",
+                source_type="doc",
+            )
+        ],
         sparse_embedder=_StubSparseEmbedder(),
     )
 
     result = await retriever.retrieve(query="query", knowledge=knowledge)
-    context = ContextBuilder.build_knowledge_context(
-        chunks=[chunk for chunk, _ in result.hits],
-        inject=config.retrieve_config.inject,
-    )
-    payload = json.loads(context)
+    output = format_knowledge_output(result.hits)
 
     assert len(result.refs) == 1
-    assert payload["chunks"][0]["chunk_id"] == "c1"
+    assert output
+    assert "Chunk ID: c1" in output
 
 
 @pytest.mark.asyncio
@@ -225,50 +266,69 @@ async def test_knowledge_retriever3() -> None:
 
     store = _StubKnowledgeStore(search_results=hits)
     embedder = _StubEmbeddingProvider()
-    config = KnowledgeConfig(
-        retrieve_config=KnowledgeRetrieveConfig(
-            method="semantic",
-            top_k=1,
-            inject=KnowledgeInjectConfig(mode="tool", max_tokens=200, max_chunks=1, format="markdown"),
-        ),
+    retrieve_defaults = KnowledgeRetrieveConfig(method="semantic", top_k=1)
+    retriever = KnowledgeRetriever(
+        store=store,
+        embedding_provider=embedder,
+        retrieve_defaults=retrieve_defaults,
     )
-    retriever = KnowledgeRetriever(store=store, embedding_provider=embedder, config=config)
 
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="src1", name="example", source_type="doc")],
+        sources=[
+            KnowledgeSource(
+                source="stub",
+                chunk=DEFAULT_CHUNK,
+                source_id="src1",
+                name="example",
+                source_type="doc",
+            )
+        ],
         sparse_embedder=_StubSparseEmbedder(),
     )
 
     result = await retriever.retrieve(query="query", knowledge=knowledge)
-    context = ContextBuilder.build_knowledge_context(
-        chunks=[chunk for chunk, _ in result.hits],
-        inject=config.retrieve_config.inject,
-    )
-    assert "Knowledge Context" in context
+    output = format_knowledge_output(result.hits)
+    assert "Knowledge Results" in output
 
 
 def test_merge_knowledge() -> None:
     team = Knowledge(
-        sources=[KnowledgeSource(source_id="s1", name="team knowledge", source_type="doc")],
+        sources=[
+            KnowledgeSource(
+                source="stub-team",
+                chunk=DEFAULT_CHUNK,
+                source_id="s1",
+                name="team knowledge",
+                source_type="doc",
+            )
+        ],
         retrieve=KnowledgeRetrieve(
             top_k=5,
             rerank={"mode": "model", "model": "m1"},
-            inject=KnowledgeInject(mode="system"),
         ),
-        inject=KnowledgeInject(max_tokens=100),
         sparse_embedder=_StubSparseEmbedder(),
     )
     agent = Knowledge(
         sources=[
-            KnowledgeSource(source_id="s1", name="agent knowledge", source_type="doc"),
-            KnowledgeSource(source_id="s2", name="new knowledge", source_type="doc"),
+            KnowledgeSource(
+                source="stub-agent",
+                chunk=DEFAULT_CHUNK,
+                source_id="s1",
+                name="agent knowledge",
+                source_type="doc",
+            ),
+            KnowledgeSource(
+                source="stub-new",
+                chunk=DEFAULT_CHUNK,
+                source_id="s2",
+                name="new knowledge",
+                source_type="doc",
+            ),
         ],
         retrieve=KnowledgeRetrieve(
             top_k=3,
             rerank={"model": "m2"},
-            inject=KnowledgeInject(max_chunks=2),
         ),
-        inject=KnowledgeInject(format="json"),
     )
 
     merged = merge_knowledge(team, agent)
@@ -281,18 +341,20 @@ def test_merge_knowledge() -> None:
     assert merged.retrieve.rerank is not None
     assert merged.retrieve.rerank["mode"] == "model"
     assert merged.retrieve.rerank["model"] == "m2"
-    assert merged.retrieve.inject is not None
-    assert merged.retrieve.inject.mode == "system"
-    assert merged.retrieve.inject.max_chunks == 2
-    assert merged.inject is not None
-    assert merged.inject.max_tokens == 100
-    assert merged.inject.format == "json"
     assert merged.sparse_embedder is team.sparse_embedder
 
 
 def test_merge_knowledge2() -> None:
     team = Knowledge(
-        sources=[KnowledgeSource(source_id="s1", name="team knowledge", source_type="doc")],
+        sources=[
+            KnowledgeSource(
+                source="stub-team",
+                chunk=DEFAULT_CHUNK,
+                source_id="s1",
+                name="team knowledge",
+                source_type="doc",
+            )
+        ],
         sparse_embedder=_StubSparseEmbedder(),
     )
     override_embedder = _StubSparseEmbedder()
@@ -459,17 +521,27 @@ async def test_knowledge_retriever4(monkeypatch) -> None:
 
     store = _StubKnowledgeStore(search_results=hits)
     embedder = _StubEmbeddingProvider()
-    config = KnowledgeConfig(
-        retrieve_config=KnowledgeRetrieveConfig(
-            method="semantic",
-            top_k=2,
-            rerank=RerankConfig(mode="model", provider="sentence_transformers"),
-        )
+    retrieve_defaults = KnowledgeRetrieveConfig(
+        method="semantic",
+        top_k=2,
+        rerank=RerankConfig(mode="model", provider="sentence_transformers"),
     )
-    retriever = KnowledgeRetriever(store=store, embedding_provider=embedder, config=config)
+    retriever = KnowledgeRetriever(
+        store=store,
+        embedding_provider=embedder,
+        retrieve_defaults=retrieve_defaults,
+    )
 
     knowledge = Knowledge(
-        sources=[KnowledgeSource(source_id="src1", name="example", source_type="doc")],
+        sources=[
+            KnowledgeSource(
+                source="stub",
+                chunk=DEFAULT_CHUNK,
+                source_id="src1",
+                name="example",
+                source_type="doc",
+            )
+        ],
         sparse_embedder=_StubSparseEmbedder(),
     )
 

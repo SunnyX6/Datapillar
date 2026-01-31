@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 日志配置模块
 
@@ -14,6 +18,7 @@ import tempfile
 from pathlib import Path
 
 import yaml
+from datapillar_oneagentic.log.context import ContextFilter
 
 
 class ExcludeNoisyFilter(logging.Filter):
@@ -43,9 +48,10 @@ def setup_logging(config_path: str | Path | None = None) -> None:
         # 配置文件不存在，使用基础配置
         logging.basicConfig(
             level=logging.INFO,
-            format="%(asctime)s | %(levelname)-8s | %(name)s - %(message)s",
+            format="%(asctime)s.%(msecs)03d %(levelname)-5s %(name)s - %(message)s%(context)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
+        logging.getLogger().addFilter(ContextFilter())
         logging.warning(f"日志配置文件不存在: {config_path_str}，使用默认配置")
         return
 

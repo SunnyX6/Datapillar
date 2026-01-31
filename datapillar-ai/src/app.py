@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 FastAPI 应用入口（使用 Repository 模式）
 """
@@ -8,7 +12,8 @@ import gzip
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -26,6 +31,7 @@ from src.modules.openlineage.once_sync import sync_gravitino_metadata
 from src.shared.auth.middleware import AuthMiddleware
 from src.shared.config import settings
 from src.shared.config.exceptions import AuthenticationError, AuthorizationError, BaseError
+from src.shared.web import build_error
 
 
 class GzipRequestMiddleware:
@@ -186,21 +192,95 @@ def create_app() -> FastAPI:
     # 全局异常处理器
     @app.exception_handler(AuthenticationError)
     async def auth_error_handler(request: Request, exc: AuthenticationError):
-        return JSONResponse(status_code=401, content={"error": exc.message})
+        return JSONResponse(
+            status_code=401,
+            content=build_error(
+                request=request,
+                status=401,
+                code="UNAUTHORIZED",
+                message=exc.message,
+            ),
+        )
 
     @app.exception_handler(AuthorizationError)
     async def authz_error_handler(request: Request, exc: AuthorizationError):
-        return JSONResponse(status_code=403, content={"error": exc.message})
+        return JSONResponse(
+            status_code=403,
+            content=build_error(
+                request=request,
+                status=403,
+                code="FORBIDDEN",
+                message=exc.message,
+            ),
+        )
 
     @app.exception_handler(BaseError)
     async def base_error_handler(request: Request, exc: BaseError):
         logger.error(f"业务异常: {exc.message}", exc_info=True)
-        return JSONResponse(status_code=500, content={"error": exc.message})
+        return JSONResponse(
+            status_code=500,
+            content=build_error(
+                request=request,
+                status=500,
+                code="SERVER_ERROR",
+                message=exc.message,
+            ),
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error_handler(request: Request, exc: RequestValidationError):
+        return JSONResponse(
+            status_code=422,
+            content=build_error(
+                request=request,
+                status=422,
+                code="INVALID_PARAM",
+                message="请求参数校验失败",
+            ),
+        )
+
+    @app.exception_handler(HTTPException)
+    async def http_error_handler(request: Request, exc: HTTPException):
+        status_code = exc.status_code
+        if status_code == 400:
+            code = "INVALID_PARAM"
+        elif status_code == 401:
+            code = "UNAUTHORIZED"
+        elif status_code == 403:
+            code = "FORBIDDEN"
+        elif status_code == 404:
+            code = "NOT_FOUND"
+        elif status_code == 409:
+            code = "CONFLICT"
+        elif status_code == 422:
+            code = "INVALID_PARAM"
+        elif status_code == 503:
+            code = "SERVICE_UNAVAILABLE"
+        else:
+            code = "HTTP_ERROR"
+        message = str(exc.detail) if exc.detail else "请求失败"
+        return JSONResponse(
+            status_code=status_code,
+            content=build_error(
+                request=request,
+                status=status_code,
+                code=code,
+                message=message,
+            ),
+        )
 
     @app.exception_handler(Exception)
     async def global_error_handler(request: Request, exc: Exception):
         logger.exception(f"未捕获异常: {exc}")
-        return JSONResponse(status_code=500, content={"error": "服务器内部错误"})
+        return JSONResponse(
+            status_code=500,
+            content=build_error(
+                request=request,
+                status=500,
+                code="SERVER_ERROR",
+                message="服务器内部错误",
+            ),
+        )
 
     # 注册 API 路由
     app.include_router(api_router, prefix="/api")

@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 Datapillar OneAgentic - declarative multi-agent collaboration framework.
 
@@ -52,7 +55,7 @@ async for event in team.stream(query="Analyze sales data", session_id="session_0
 ```
 
 Advanced features are available from submodules:
-- Knowledge: `from datapillar_oneagentic.knowledge import Knowledge, KnowledgeSource, KnowledgeRetriever`
+- Knowledge: `from datapillar_oneagentic.knowledge import Knowledge, KnowledgeSource, KnowledgeService`
 - A2A: `from datapillar_oneagentic.a2a import A2AConfig, create_a2a_tool`
 - MCP: `from datapillar_oneagentic.mcp import MCPClient, MCPServerConfig`
 - Event subscription: `team.event_bus`

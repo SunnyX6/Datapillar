@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 OpenLineage 物理资产写入器
 
@@ -14,7 +18,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import structlog
+import logging
 from neo4j import AsyncSession
 
 from src.infrastructure.repository.kg.dto import CatalogDTO, ColumnDTO, SchemaDTO, TableDTO
@@ -35,7 +39,7 @@ from src.modules.openlineage.parsers.plans.metadata import (
 )
 from src.modules.openlineage.writers.metadata.types import QueueEmbeddingTask
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class PhysicalAssetsWriter:
@@ -142,7 +146,10 @@ class PhysicalAssetsWriter:
         """
         for table_id in table_ids:
             await Metadata.delete_table(session, table_id=table_id)
-            logger.info("table_deleted", table_id=table_id)
+            logger.info(
+                "table_deleted",
+                extra={"data": {"table_id": table_id}},
+            )
 
     async def delete_schema_metadata(self, session: AsyncSession, schema_ids: list[str]) -> None:
         """
@@ -155,7 +162,10 @@ class PhysicalAssetsWriter:
         """
         for schema_id in schema_ids:
             await Metadata.delete_schema_cascade(session, schema_id=schema_id)
-            logger.info("schema_deleted", schema_id=schema_id)
+            logger.info(
+                "schema_deleted",
+                extra={"data": {"schema_id": schema_id}},
+            )
 
     async def delete_catalog_metadata(self, session: AsyncSession, catalog_ids: list[str]) -> None:
         """
@@ -168,7 +178,10 @@ class PhysicalAssetsWriter:
         """
         for catalog_id in catalog_ids:
             await Metadata.delete_catalog_cascade(session, catalog_id=catalog_id)
-            logger.info("catalog_deleted", catalog_id=catalog_id)
+            logger.info(
+                "catalog_deleted",
+                extra={"data": {"catalog_id": catalog_id}},
+            )
 
     async def write_catalog(self, session: AsyncSession, catalog: CatalogDTO) -> None:
         """写入 Catalog 节点"""
@@ -185,7 +198,10 @@ class PhysicalAssetsWriter:
         await self._queue_embedding_task(catalog.id, "Catalog", catalog.name, None, tags)
 
         self._catalogs_written += 1
-        logger.debug("catalog_written", id=catalog.id, name=catalog.name)
+        logger.debug(
+            "catalog_written",
+            extra={"data": {"id": catalog.id, "name": catalog.name}},
+        )
 
     async def write_schema(self, session: AsyncSession, schema: SchemaDTO) -> None:
         """写入 Schema 节点（不写 Catalog->Schema 关系）"""
@@ -203,7 +219,10 @@ class PhysicalAssetsWriter:
         await self._queue_embedding_task(schema.id, "Schema", schema.name, schema.description, tags)
 
         self._schemas_written += 1
-        logger.debug("schema_written", id=schema.id, name=schema.name)
+        logger.debug(
+            "schema_written",
+            extra={"data": {"id": schema.id, "name": schema.name}},
+        )
 
     async def write_table(self, session: AsyncSession, table: TableDTO) -> None:
         """写入 Table 节点（不写 Schema->Table 关系）"""
@@ -234,7 +253,10 @@ class PhysicalAssetsWriter:
         await self._queue_embedding_task(table.id, "Table", table.name, table.description, tags)
 
         self._tables_written += 1
-        logger.debug("table_written", id=table.id, name=table.name)
+        logger.debug(
+            "table_written",
+            extra={"data": {"id": table.id, "name": table.name}},
+        )
 
     async def _apply_alter_plan(self, session: AsyncSession, plan: AlterTablePlan) -> None:
         for action in plan.actions:
@@ -243,8 +265,12 @@ class PhysicalAssetsWriter:
                 await self.write_table(session, action.new_table)
                 logger.info(
                     "table_renamed",
-                    old_table_id=action.old_table_id,
-                    new_table_id=action.new_table.id,
+                    extra={
+                        "data": {
+                            "old_table_id": action.old_table_id,
+                            "new_table_id": action.new_table.id,
+                        }
+                    },
                 )
                 continue
 
@@ -356,8 +382,12 @@ class PhysicalAssetsWriter:
         if deleted_count > 0:
             logger.info(
                 "orphan_columns_deleted",
-                table_id=table_id,
-                deleted_count=deleted_count,
+                extra={
+                    "data": {
+                        "table_id": table_id,
+                        "deleted_count": deleted_count,
+                    }
+                },
             )
 
     async def _write_columns_batch(
@@ -390,7 +420,10 @@ class PhysicalAssetsWriter:
             await self._queue_embedding_task(col.id, "Column", col.name, col.description, tags)
 
         self._columns_written += len(columns)
-        logger.debug("columns_batch_written", count=len(columns), table_id=table_id)
+        logger.debug(
+            "columns_batch_written",
+            extra={"data": {"count": len(columns), "table_id": table_id}},
+        )
 
     async def write_column(self, session: AsyncSession, column: ColumnDTO, table_id: str) -> None:
         """写入 Column 节点（不写 Table->Column 关系）"""
@@ -410,4 +443,7 @@ class PhysicalAssetsWriter:
         await self._queue_embedding_task(column.id, "Column", column.name, column.description)
 
         self._columns_written += 1
-        logger.debug("column_written", id=column.id, name=column.name)
+        logger.debug(
+            "column_written",
+            extra={"data": {"id": column.id, "name": column.name}},
+        )

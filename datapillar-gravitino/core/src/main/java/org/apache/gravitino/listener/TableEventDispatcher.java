@@ -53,7 +53,11 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.storage.relational.service.CommonMetaService;
+import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code TableEventDispatcher} is a decorator for {@link TableDispatcher} that not only delegates
@@ -62,6 +66,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * for event-driven workflows or monitoring of table operations.
  */
 public class TableEventDispatcher implements TableDispatcher {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TableEventDispatcher.class);
 
   private final EventBus eventBus;
   private final TableDispatcher dispatcher;
@@ -156,6 +162,7 @@ public class TableEventDispatcher implements TableDispatcher {
       eventBus.dispatchEvent(
           new AlterTableEvent(
               PrincipalUtils.getCurrentUserName(), ident, changes, new TableInfo(table)));
+      emitMetricLineageForTable(ident, table);
       return table;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -197,5 +204,19 @@ public class TableEventDispatcher implements TableDispatcher {
   @Override
   public boolean tableExists(NameIdentifier ident) {
     return dispatcher.tableExists(ident);
+  }
+
+  private void emitMetricLineageForTable(NameIdentifier ident, Table table) {
+    try {
+      Long schemaId =
+          CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
+      String tableName = table == null ? ident.name() : table.name();
+      Long tableId =
+          TableMetaService.getInstance().getTableIdBySchemaIdAndName(schemaId, tableName);
+      MetricLineageEventEmitter.emitForRefTable(
+          eventBus, PrincipalUtils.getCurrentUserName(), tableId);
+    } catch (Exception e) {
+      LOG.warn("表变更触发指标级联失败: table={}", ident, e);
+    }
   }
 }

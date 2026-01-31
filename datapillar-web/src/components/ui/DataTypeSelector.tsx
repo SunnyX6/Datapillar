@@ -74,6 +74,8 @@ export interface DataTypeSelectorProps {
   filter?: 'all' | 'numeric' | string[]
   /** 尺寸：'default' | 'small' */
   size?: 'default' | 'small'
+  /** 空值占位文案 */
+  placeholder?: string
   /** 触发按钮额外样式（用于容器内不溢出/对齐高度） */
   triggerClassName?: string
   /** 触发按钮文案额外样式（用于统一字号/截断） */
@@ -186,6 +188,7 @@ export function DataTypeSelector({
   disabled = false,
   filter = 'all',
   size = 'default',
+  placeholder,
   triggerClassName,
   labelClassName,
   dropdownWidth = 'trigger',
@@ -374,13 +377,15 @@ export function DataTypeSelector({
     setHoveredType(null)
   }
 
-  const displayLabel = currentConfig
+  const rawLabel = currentConfig
     ? currentConfig.hasParams === 'decimal'
       ? `${currentConfig.label}(${value.precision ?? 10},${value.scale ?? 2})`
       : currentConfig.hasParams === 'length'
         ? `${currentConfig.label}(${value.length ?? DEFAULT_LENGTH})`
         : currentConfig.label
     : value.type
+  const isPlaceholder = !rawLabel && !!placeholder
+  const displayLabel = isPlaceholder ? placeholder : rawLabel
 
   const IconComponent = currentConfig?.icon ?? Type
 
@@ -412,9 +417,9 @@ export function DataTypeSelector({
       >
         <IconComponent size={triggerIconSize} className="text-slate-500" />
         <span
-          className={`flex-1 min-w-0 truncate font-medium text-slate-700 dark:text-slate-200 ${
+          className={`flex-1 min-w-0 truncate font-medium ${
             isSmall ? 'text-xs' : 'text-body-sm'
-          } ${labelClassName ?? ''}`}
+          } ${labelClassName ?? ''} ${isPlaceholder ? 'text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}`}
         >
           {displayLabel}
         </span>
@@ -433,7 +438,7 @@ export function DataTypeSelector({
             className={`fixed z-[1000000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 ${dropdownRadiusClass} ${dropdownClassName ?? ''}`}
           >
             <div
-              className={`overflow-y-auto overscroll-contain ${dropdownListClass} ${dropdownListClassName ?? ''}`}
+              className={`overflow-y-auto overscroll-contain custom-scrollbar ${dropdownListClass} ${dropdownListClassName ?? ''}`}
               style={{ scrollbarWidth: 'thin' }}
               onWheel={(e) => e.stopPropagation()}
             >

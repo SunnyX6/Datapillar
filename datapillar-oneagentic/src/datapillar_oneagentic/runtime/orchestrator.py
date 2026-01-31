@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 Orchestrator.
 
@@ -44,6 +47,8 @@ from datapillar_oneagentic.utils.time import now_ms
 from datapillar_oneagentic.exception import LLMError
 
 logger = logging.getLogger(__name__)
+
+_INTERNAL_NODE_NAMES = {"__end__", "__interrupt__"}
 
 
 @dataclass
@@ -459,7 +464,11 @@ class Orchestrator:
         agent_id = first_interrupt.get("agent_id", "unknown")
         agent_name = self._get_agent_name(agent_id)
         payload = first_interrupt.get("payload")
+        interrupt_id = first_interrupt.get("interrupt_id")
         logger.info(f"Execution interrupted: key={key}")
+        interrupt_data = {"payload": payload}
+        if isinstance(interrupt_id, str) and interrupt_id:
+            interrupt_data["interrupt_id"] = interrupt_id
         return build_event_payload(
             event=EventType.AGENT_INTERRUPT,
             key=key,
@@ -467,9 +476,7 @@ class Orchestrator:
             agent_name=agent_name,
             duration_ms=now_ms() - start_time,
             data={
-                "interrupt": {
-                    "payload": payload,
-                }
+                "interrupt": interrupt_data
             },
         )
 
@@ -499,6 +506,10 @@ class Orchestrator:
         start_time = now_ms()
         agent_count = 0
         tool_count = 0
+        aborted = False
+        aborted_agent_id: str | None = None
+        aborted_agent_name: str | None = None
+        aborted_error: str | None = None
 
         await self._event_bus.emit(self, SessionStartedEvent(key=key, query=query or ""))
 
@@ -714,89 +725,164 @@ class Orchestrator:
         for event_type, handler in handlers:
             self._event_bus.register(event_type, handler)
 
-        try:
-            # Phase 3: execute stream.
-            async for event in compiled.astream(input_for_stream, config):
-                while not event_queue.empty():
-                    try:
-                        queued = event_queue.get_nowait()
-                    except asyncio.QueueEmpty:
-                        break
-                    yield queued
+        stream_task: asyncio.Task | None = None
+        queue_task: asyncio.Task | None = None
 
-                for node_name, node_output in event.items():
-                    if node_name == "__end__":
-                        continue
-
-                    agent_count += 1
-                    if self._experience_learner:
-                        self._experience_learner.record_agent(key.session_id, node_name)
-
-                    agent_name = self._get_agent_name(node_name)
-                    if node_name not in started_agents:
-                        started_agents.add(node_name)
-                        yield build_event_payload(
-                            event=EventType.AGENT_START,
-                            key=key,
-                            agent_id=node_name,
-                            agent_name=agent_name,
-                        )
-
-                    # Process node output.
-                    node_events, node_tool_count = self._process_node_output(node_name, node_output, key)
-                    for evt in node_events:
-                        yield evt
-                    tool_count += node_tool_count
-
-                    # Build agent end event.
-                    agent_status = ExecutionStatus.COMPLETED
-                    agent_error = None
-                    agent_failure_kind = None
-                    if isinstance(node_output, dict):
-                        agent_status = node_output.get("last_agent_status", ExecutionStatus.COMPLETED)
-                        agent_error = node_output.get("last_agent_error")
-                        agent_failure_kind = node_output.get("last_agent_failure_kind")
-
-                    if is_failed(agent_status):
-                        error_type = (
-                            agent_failure_kind.value
-                            if isinstance(agent_failure_kind, FailureKind)
-                            else "agent"
-                        )
-                        yield build_event_payload(
-                            event=EventType.AGENT_FAILED,
-                            key=key,
-                            agent_id=node_name,
-                            agent_name=agent_name,
-                            data={
-                                "error": {
-                                    "message": "Agent execution failed",
-                                    "detail": agent_error or "Execution failed",
-                                    "error_type": error_type,
-                                }
-                            },
-                        )
-                    else:
-                        deliverable = await self._load_deliverable(key.session_id, node_name)
-                        data: dict[str, Any] | None = None
-                        if deliverable is not None:
-                            data = {
-                                "deliverable": deliverable,
-                            }
-                        yield build_event_payload(
-                            event=EventType.AGENT_END,
-                            key=key,
-                            agent_id=node_name,
-                            agent_name=agent_name,
-                            data=data,
-                        )
-
-            while not event_queue.empty():
+        def _drain_event_queue() -> list[dict[str, Any]]:
+            drained: list[dict[str, Any]] = []
+            while True:
                 try:
-                    queued = event_queue.get_nowait()
+                    drained.append(event_queue.get_nowait())
                 except asyncio.QueueEmpty:
                     break
-                yield queued
+            return drained
+
+        try:
+            # Phase 3: execute stream.
+            stream_iter = compiled.astream(input_for_stream, config)
+            stream_task = asyncio.create_task(stream_iter.__anext__())
+            queue_task = asyncio.create_task(event_queue.get())
+            stream_done = False
+
+            while True:
+                if stream_done:
+                    for queued in _drain_event_queue():
+                        yield queued
+                    break
+
+                wait_tasks = {task for task in (stream_task, queue_task) if task is not None}
+                if not wait_tasks:
+                    break
+
+                done, _ = await asyncio.wait(wait_tasks, return_when=asyncio.FIRST_COMPLETED)
+
+                if queue_task in done:
+                    queued = queue_task.result()
+                    yield queued
+                    for queued in _drain_event_queue():
+                        yield queued
+                    if not stream_done:
+                        queue_task = asyncio.create_task(event_queue.get())
+
+                if stream_task in done:
+                    try:
+                        event = stream_task.result()
+                    except StopAsyncIteration:
+                        stream_done = True
+                        stream_task = None
+                        continue
+
+                    for queued in _drain_event_queue():
+                        yield queued
+
+                    for node_name, node_output in event.items():
+                        if node_name in _INTERNAL_NODE_NAMES:
+                            continue
+
+                        agent_count += 1
+                        if self._experience_learner:
+                            self._experience_learner.record_agent(key.session_id, node_name)
+
+                        agent_name = self._get_agent_name(node_name)
+                        if node_name not in started_agents:
+                            started_agents.add(node_name)
+                            yield build_event_payload(
+                                event=EventType.AGENT_START,
+                                key=key,
+                                agent_id=node_name,
+                                agent_name=agent_name,
+                            )
+
+                        # Process node output.
+                        node_events, node_tool_count = self._process_node_output(
+                            node_name, node_output, key
+                        )
+                        for evt in node_events:
+                            yield evt
+                        tool_count += node_tool_count
+
+                        # Build agent end event.
+                        agent_status = ExecutionStatus.COMPLETED
+                        agent_error = None
+                        agent_failure_kind = None
+                        if isinstance(node_output, dict):
+                            agent_status = node_output.get(
+                                "last_agent_status", ExecutionStatus.COMPLETED
+                            )
+                            agent_error = node_output.get("last_agent_error")
+                            agent_failure_kind = node_output.get("last_agent_failure_kind")
+
+                        if agent_status == ExecutionStatus.ABORTED:
+                            aborted = True
+                            aborted_agent_id = node_name
+                            aborted_agent_name = agent_name
+                            aborted_error = agent_error
+                            break
+
+                        if is_failed(agent_status):
+                            error_type = (
+                                agent_failure_kind.value
+                                if isinstance(agent_failure_kind, FailureKind)
+                                else "agent"
+                            )
+                            yield build_event_payload(
+                                event=EventType.AGENT_FAILED,
+                                key=key,
+                                agent_id=node_name,
+                                agent_name=agent_name,
+                                data={
+                                    "error": {
+                                        "message": "Agent execution failed",
+                                        "detail": agent_error or "Execution failed",
+                                        "error_type": error_type,
+                                    }
+                                },
+                            )
+                        else:
+                            deliverable = await self._load_deliverable(key.session_id, node_name)
+                            data: dict[str, Any] | None = None
+                            if deliverable is not None:
+                                data = {
+                                    "deliverable": deliverable,
+                                }
+                            yield build_event_payload(
+                                event=EventType.AGENT_END,
+                                key=key,
+                                agent_id=node_name,
+                                agent_name=agent_name,
+                                data=data,
+                            )
+
+                    if aborted:
+                        break
+
+                    stream_task = asyncio.create_task(stream_iter.__anext__())
+
+            if aborted:
+                abort_payload = {
+                    "message": "Aborted by user",
+                    "detail": aborted_error,
+                }
+                yield build_event_payload(
+                    event=EventType.SESSION_ABORT,
+                    key=key,
+                    agent_id=aborted_agent_id,
+                    agent_name=aborted_agent_name,
+                    duration_ms=now_ms() - start_time,
+                    data={"abort": abort_payload},
+                )
+                if self._experience_learner:
+                    self._experience_learner.complete_recording(
+                        session_id=key.session_id,
+                        outcome="abort",
+                        result_summary="Aborted by user",
+                    )
+                await self._cleanup_session_artifacts(
+                    session_id=key.session_id,
+                    compiled=compiled,
+                    checkpoint_manager=checkpoint_manager,
+                )
+                return
 
             # Phase 5: detect interruption.
             interrupt_event = await self._build_interrupt_event(
@@ -840,6 +926,9 @@ class Orchestrator:
             logger.debug("Execution failed: %s", e, exc_info=True)
             # If the error happens during compiled.astream(), the queue may contain start/tool events.
             # Flush queued events first to avoid only emitting a final failure event.
+            if queue_task is not None and queue_task.done() and not queue_task.cancelled():
+                queued = queue_task.result()
+                yield queued
             while not event_queue.empty():
                 try:
                     queued = event_queue.get_nowait()
@@ -859,6 +948,17 @@ class Orchestrator:
             yield error_event
             return
         finally:
+            for task in (stream_task, queue_task):
+                if task is None:
+                    continue
+                if not task.done():
+                    task.cancel()
+                    try:
+                        await task
+                    except (asyncio.CancelledError, StopAsyncIteration):
+                        pass
+                elif not task.cancelled():
+                    task.exception()
             for event_type, handler in handlers:
                 self._event_bus.unregister(event_type, handler)
 

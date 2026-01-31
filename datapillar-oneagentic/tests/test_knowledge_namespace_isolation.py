@@ -1,20 +1,19 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import tempfile
 
 import pytest
 
 from datapillar_oneagentic.knowledge import (
-    DocumentInput,
     Knowledge,
     KnowledgeChunkConfig,
-    KnowledgeConfig,
     KnowledgeIngestor,
     KnowledgeRetrieveConfig,
-    KnowledgeRetriever,
     KnowledgeSource,
 )
+from datapillar_oneagentic.knowledge.retriever import KnowledgeRetriever
 from datapillar_oneagentic.knowledge.identity import build_source_id
 from datapillar_oneagentic.providers.llm.config import EmbeddingConfig
 from datapillar_oneagentic.storage import create_knowledge_store
@@ -66,54 +65,50 @@ async def test_namespace_isolation() -> None:
         await store_b.initialize()
 
         embedder = _StubEmbedder()
+        chunk_config = KnowledgeChunkConfig(
+            mode="general",
+            general={"max_tokens": 50, "overlap": 0},
+        )
         ingestor_a = KnowledgeIngestor(
             store=store_a,
             embedding_provider=embedder,
-            config=KnowledgeChunkConfig(
-                mode="general",
-                general={"max_tokens": 50, "overlap": 0},
-            ),
         )
         ingestor_b = KnowledgeIngestor(
             store=store_b,
             embedding_provider=embedder,
-            config=KnowledgeChunkConfig(
-                mode="general",
-                general={"max_tokens": 50, "overlap": 0},
-            ),
         )
+
+        file_path = os.path.join(tmpdir, "doc.txt")
+        with open(file_path, "w", encoding="utf-8") as handle:
+            handle.write("shared content for namespace isolation")
 
         source_a = KnowledgeSource(
-            source_id="ignored",
+            source=file_path,
+            chunk=chunk_config,
             name="KB",
             source_type="doc",
-            source_uri="doc.txt",
         )
         source_b = KnowledgeSource(
-            source_id="ignored",
+            source=file_path,
+            chunk=chunk_config,
             name="KB",
             source_type="doc",
-            source_uri="doc.txt",
-        )
-        doc = DocumentInput(
-            source="shared content for namespace isolation",
-            filename="doc.txt",
         )
 
-        await ingestor_a.ingest(source=source_a, documents=[doc])
-        await ingestor_b.ingest(source=source_b, documents=[doc])
+        await ingestor_a.ingest(sources=[source_a])
+        await ingestor_b.ingest(sources=[source_b])
 
         expected_a = build_source_id(
             namespace="ns_a",
             source_type="doc",
-            source_uri="doc.txt",
-            metadata={},
+            source_uri=source_a.source_uri,
+            metadata=source_a.metadata,
         )
         expected_b = build_source_id(
             namespace="ns_b",
             source_type="doc",
-            source_uri="doc.txt",
-            metadata={},
+            source_uri=source_b.source_uri,
+            metadata=source_b.metadata,
         )
 
         assert source_a.source_id == expected_a
@@ -122,11 +117,9 @@ async def test_namespace_isolation() -> None:
         retriever_a = KnowledgeRetriever(
             store=store_a,
             embedding_provider=embedder,
-            config=KnowledgeConfig(
-                retrieve_config=KnowledgeRetrieveConfig(
-                    method="semantic",
-                    top_k=3,
-                )
+            retrieve_defaults=KnowledgeRetrieveConfig(
+                method="semantic",
+                top_k=3,
             ),
         )
         result_a = await retriever_a.retrieve(query="shared", knowledge=Knowledge(sources=[source_a]))
@@ -136,11 +129,9 @@ async def test_namespace_isolation() -> None:
         retriever_b = KnowledgeRetriever(
             store=store_b,
             embedding_provider=embedder,
-            config=KnowledgeConfig(
-                retrieve_config=KnowledgeRetrieveConfig(
-                    method="semantic",
-                    top_k=3,
-                )
+            retrieve_defaults=KnowledgeRetrieveConfig(
+                method="semantic",
+                top_k=3,
             ),
         )
         result_b = await retriever_b.retrieve(query="shared", knowledge=Knowledge(sources=[source_b]))

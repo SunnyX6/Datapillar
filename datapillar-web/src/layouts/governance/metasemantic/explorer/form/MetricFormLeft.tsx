@@ -151,7 +151,7 @@ function UnitSelector({
         ref={triggerRef}
         type="button"
         onClick={handleOpen}
-        className={`w-full flex items-center justify-between bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2.5 text-body-sm focus:outline-none focus:border-blue-500 transition-all ${!value ? 'text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}
+        className={`w-full flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-body-sm focus:outline-none focus:border-blue-500 transition-all ${!value ? 'text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-200'}`}
       >
         <span className="truncate">{displayLabel}</span>
         <ChevronDown size={14} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -167,7 +167,7 @@ function UnitSelector({
           } as React.CSSProperties}
           className="fixed z-[1000000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl top-[var(--unit-dropdown-top)] left-[var(--unit-dropdown-left)] w-[var(--unit-dropdown-width)]"
         >
-          <div ref={listRef} className="max-h-60 overflow-y-auto p-1">
+          <div ref={listRef} className="max-h-60 overflow-y-auto p-1 custom-scrollbar">
             {loading ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 size={16} className="animate-spin text-slate-400" />
@@ -407,7 +407,7 @@ export function MetricFormLeft({
           <input
             type="text"
             placeholder="例如：累计订单金额"
-            className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-all"
+            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-all"
             value={form.name}
             onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
           />
@@ -426,7 +426,7 @@ export function MetricFormLeft({
               <span className="text-body-sm font-mono font-semibold text-purple-600 dark:text-purple-400 tracking-wide">{form.code}</span>
             </div>
           ) : (
-          <div className="flex items-center h-12 px-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl overflow-x-auto">
+          <div className="flex items-center h-12 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl overflow-x-auto">
             {form.type === 'DERIVED' ? (
               <>
                 <div className="flex items-center gap-1">
@@ -548,7 +548,7 @@ export function MetricFormLeft({
                             style={{ top: aggDropdownPos.top, left: aggDropdownPos.left }}
                             className="fixed z-[1000000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl min-w-24"
                           >
-                            <div className="max-h-48 overflow-y-auto p-1">
+                            <div className="max-h-48 overflow-y-auto p-1 custom-scrollbar">
                               {filteredAggregations.map((agg) => (
                                 <button
                                   key={agg}
@@ -600,7 +600,8 @@ export function MetricFormLeft({
               value={toDataTypeValue(form)}
               onChange={(value) => setForm((prev) => ({ ...prev, ...fromDataTypeValue(value) }))}
               filter="numeric"
-              triggerClassName="w-full !border-2 !border-slate-100 dark:!border-slate-700 !py-2.5 !px-4"
+              triggerClassName="w-full !border !border-slate-200 dark:!border-slate-700 !py-2.5 !px-4 !bg-white dark:!bg-slate-900"
+              placeholder="请选择数据类型"
               labelClassName="text-body-sm text-slate-800 dark:text-slate-200"
             />
           </div>
@@ -619,7 +620,7 @@ export function MetricFormLeft({
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">业务描述</label>
           <textarea
             placeholder="描述该指标的业务含义..."
-            className="w-full flex-1 min-h-[60px] bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-all resize-none"
+            className="w-full flex-1 min-h-[60px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-all resize-none"
             value={form.comment}
             onChange={(e) => setForm((prev) => ({ ...prev, comment: e.target.value }))}
           />
@@ -641,7 +642,7 @@ export function MetricFormLeft({
                       ? "{SALES_AMOUNT} WHERE region = '北京'"
                       : '({SALES_AMOUNT} - {COST}) / {SALES_AMOUNT} * 100'
                 }
-                className="w-full h-full bg-slate-900 text-emerald-400 font-mono border-2 border-slate-100 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 text-body-sm focus:outline-none focus:border-emerald-500 shadow-lg resize-none"
+                className="w-full h-full bg-slate-900 text-emerald-400 font-mono border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 text-body-sm focus:outline-none focus:border-emerald-500 shadow-lg resize-none"
                 value={form.formula}
                 onChange={(e) => setForm((prev) => ({ ...prev, formula: e.target.value }))}
               />

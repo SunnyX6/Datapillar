@@ -1,5 +1,8 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
-Knowledge RAG quickstart: team-level entry + agent-level override.
+Knowledge RAG quickstart: team-level binding.
 
 Run:
     uv run python examples/quickstart_knowledge_team_agent.py
@@ -23,28 +26,26 @@ Requirements:
 
 Notes:
     - source_id is generated automatically.
-    - content is optional; if provided, source_uri is not read.
-    - If source_uri is a valid local path, content is read automatically; filename/mime_type are optional.
+    - source accepts a file path, URL, raw text, or bytes.
+    - Each document must provide its own chunk config.
     - namespace must be provided explicitly (store is bound inside Datapillar and ingest/retrieve).
     - Retrieval is scoped to the current namespace; cross-namespace retrieval is not supported.
 """
 
 import asyncio
 import json
+import os
 
 from pydantic import BaseModel
 
 from datapillar_oneagentic import AgentContext, Datapillar, DatapillarConfig, Process, agent
 from datapillar_oneagentic.providers.llm import EmbeddingBackend, Provider
+from datapillar_oneagentic.providers.llm.config import EmbeddingConfig, LLMConfig
 from datapillar_oneagentic.knowledge import (
-    Knowledge,
-    KnowledgeChunkConfig,
+    KnowledgeChunkRequest,
     KnowledgeConfig,
-    KnowledgeInject,
-    KnowledgeInjectConfig,
-    KnowledgeRetrieve,
-    KnowledgeRetrieveConfig,
     KnowledgeSource,
+    KnowledgeService,
 )
 
 
@@ -52,36 +53,34 @@ class AnswerOutput(BaseModel):
     answer: str
 
 
-async def _prepare_demo_knowledge(namespace: str, knowledge_config: KnowledgeConfig) -> None:
+async def _prepare_demo_knowledge(service: KnowledgeService) -> None:
 
+    chunk = {
+        "mode": "general",
+        "general": {"max_tokens": 200, "overlap": 40},
+    }
     team_source = KnowledgeSource(
-        name="Team knowledge base",
-        source_type="doc",
-        source_uri="team.txt",
-        content=(
+        source=(
             "Datapillar is a data development SaaS platform with knowledge chunking and retrieval augmentation.\n"
             "The knowledge framework is a foundational capability that can be attached to teams or agents."
         ),
+        chunk=chunk,
+        name="Team knowledge base",
+        source_type="doc",
         filename="team.txt",
         metadata={"title": "Team knowledge example"},
     )
     agent_source = KnowledgeSource(
+        source="Agents can layer personal knowledge on top of team knowledge and override retrieval settings.",
+        chunk=chunk,
         name="Personal knowledge base",
         source_type="doc",
-        source_uri="agent.txt",
-        content="Agents can layer personal knowledge on top of team knowledge and override retrieval settings.",
         filename="agent.txt",
         metadata={"title": "Personal knowledge example"},
     )
 
-    await team_source.ingest(
-        namespace=namespace,
-        config=knowledge_config,
-    )
-    await agent_source.ingest(
-        namespace=namespace,
-        config=knowledge_config,
-    )
+    await service.chunk(KnowledgeChunkRequest(sources=[team_source]), namespace=namespace)
+    await service.chunk(KnowledgeChunkRequest(sources=[agent_source]), namespace=namespace)
 
 
 @agent(
@@ -108,15 +107,6 @@ class TeamAgent:
     id="specialist_agent",
     name="Knowledge Specialist",
     deliverable_schema=AnswerOutput,
-    knowledge=Knowledge(
-        sources=[
-            KnowledgeSource(name="Personal knowledge base", source_type="doc", source_uri="agent.txt"),
-        ],
-        retrieve=KnowledgeRetrieve(
-            method="semantic",
-            top_k=2,
-        ),
-    ),
 )
 class SpecialistAgent:
     SYSTEM_PROMPT = (
@@ -134,8 +124,17 @@ class SpecialistAgent:
 
 
 async def main() -> None:
-    config = DatapillarConfig()
-    if not config.llm.is_configured():
+    def _env_bool(name: str) -> bool:
+        return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "y", "on"}
+
+    llm_config = LLMConfig(
+        provider=os.getenv("DATAPILLAR_LLM_PROVIDER", "openai"),
+        api_key=os.getenv("DATAPILLAR_LLM_API_KEY"),
+        model=os.getenv("DATAPILLAR_LLM_MODEL"),
+        base_url=os.getenv("DATAPILLAR_LLM_BASE_URL"),
+        enable_thinking=_env_bool("DATAPILLAR_LLM_ENABLE_THINKING"),
+    )
+    if not llm_config.is_configured():
         supported = ", ".join(Provider.list_supported())
         raise RuntimeError(
             "Please configure LLM first:\n"
@@ -146,7 +145,21 @@ async def main() -> None:
             "Optional: export DATAPILLAR_LLM_ENABLE_THINKING=\"true\"\n"
             f"Supported providers: {supported}"
         )
-    if not config.embedding.is_configured():
+
+    dimension_raw = os.getenv("DATAPILLAR_EMBEDDING_DIMENSION", "1536")
+    try:
+        dimension = int(dimension_raw)
+    except ValueError as exc:
+        raise RuntimeError("DATAPILLAR_EMBEDDING_DIMENSION must be an integer") from exc
+
+    embedding_config = EmbeddingConfig(
+        provider=os.getenv("DATAPILLAR_EMBEDDING_PROVIDER", "openai"),
+        api_key=os.getenv("DATAPILLAR_EMBEDDING_API_KEY"),
+        model=os.getenv("DATAPILLAR_EMBEDDING_MODEL"),
+        base_url=os.getenv("DATAPILLAR_EMBEDDING_BASE_URL"),
+        dimension=dimension,
+    )
+    if not embedding_config.is_configured():
         supported = ", ".join(EmbeddingBackend.list_supported())
         raise RuntimeError(
             "Please configure embedding first:\n"
@@ -158,27 +171,19 @@ async def main() -> None:
             f"Supported providers: {supported}"
         )
 
-    embedding_config = config.embedding.model_dump()
-    knowledge_config = KnowledgeConfig(
-        base_config={
-            "embedding": embedding_config,
-            "vector_store": {"type": "lance", "path": "./data/vectors"},
-        },
-        chunk_config=KnowledgeChunkConfig(
-            mode="general",
-            general={"max_tokens": 200, "overlap": 40},
-        ),
-        retrieve_config=KnowledgeRetrieveConfig(
-            method="semantic",
-            top_k=4,
-            inject=KnowledgeInjectConfig(mode="system", max_tokens=800),
-        ),
-    )
-    config.knowledge = knowledge_config
-
-    # namespace is required and must match Datapillar for knowledge isolation.
     namespace = "demo_knowledge_team"
-    await _prepare_demo_knowledge(namespace, knowledge_config)
+    config = DatapillarConfig(
+        llm=llm_config,
+        embedding=embedding_config,
+    )
+    knowledge_config = KnowledgeConfig(
+        namespaces=[namespace],
+        embedding=embedding_config,
+        vector_store={"type": "lance", "path": "./data/vectors"},
+    )
+    service = KnowledgeService(config=knowledge_config)
+    await _prepare_demo_knowledge(service)
+    await service.close()
 
     team = Datapillar(
         config=config,
@@ -186,14 +191,7 @@ async def main() -> None:
         name="Knowledge Team",
         agents=[TeamAgent, SpecialistAgent],
         process=Process.SEQUENTIAL,
-        knowledge=Knowledge(
-            sources=[KnowledgeSource(name="Team knowledge base", source_type="doc", source_uri="team.txt")],
-            retrieve=KnowledgeRetrieve(
-                method="semantic",
-                top_k=4,
-                inject=KnowledgeInject(mode="system", max_tokens=800),
-            ),
-        ),
+        knowledge=knowledge_config,
     )
 
     async for event in team.stream(query="What can Datapillar's knowledge framework do?", session_id="s1"):

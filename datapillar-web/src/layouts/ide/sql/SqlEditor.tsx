@@ -3,7 +3,7 @@
  * 基于 BaseEditor 骨架构建
  */
 
-import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect, useMemo, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import '@/lib/monaco'
 import Editor from '@monaco-editor/react'
@@ -38,15 +38,17 @@ import {
   SiMysql,
   SiRedis
 } from 'react-icons/si'
-import { BaseEditor, type EditorTab, type ContextMenuGroup, Minimap } from '../components'
+import { BaseEditor, type EditorTab, type ContextMenuGroup } from '../components'
 import { useMonacoLayout } from '@/hooks/useMonacoLayout'
 import { panelWidthClassMap } from '@/design-tokens/dimensions'
-import { BottomPanel } from './BottomPanel'
-import { RightRail } from './RightRail'
 import { fetchCatalogs, fetchSchemas, mapProviderToIcon, type CatalogItem, type SchemaItem } from '@/services/oneMetaService'
 import { executeSql, type ExecuteResult } from '@/services/sqlService'
 import { useIsDark } from '@/stores/themeStore'
 import { toast } from 'sonner'
+
+const LazyBottomPanel = lazy(() => import('./BottomPanel').then((mod) => ({ default: mod.BottomPanel })))
+const LazyRightRail = lazy(() => import('./RightRail').then((mod) => ({ default: mod.RightRail })))
+const LazyMinimap = lazy(() => import('../components/Minimap').then((mod) => ({ default: mod.Minimap })))
 
 /** 获取 Catalog 图标 */
 function getCatalogIcon(iconName?: string, size = 11) {
@@ -161,6 +163,7 @@ export function SqlEditor() {
   const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(true)
   const [bottomPanelTab, setBottomPanelTab] = useState('results')
   const didInitStickyScroll = useRef(false)
+  const [deferHeavyUi, setDeferHeavyUi] = useState(false)
 
   // Monaco Editor 实例引用
   const [editorInstance, setEditorInstance] = useState<Monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -194,6 +197,31 @@ export function SqlEditor() {
   }))
 
   const { layoutNow } = useMonacoLayout(editorInstance, editorContainerRef)
+
+  useEffect(() => {
+    let cancelled = false
+    const globalWindow = window as typeof window & {
+      requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number
+      cancelIdleCallback?: (id: number) => void
+    }
+    const enable = () => {
+      if (!cancelled) {
+        setDeferHeavyUi(true)
+      }
+    }
+    if (globalWindow.requestIdleCallback) {
+      const idleId = globalWindow.requestIdleCallback(enable, { timeout: 1500 })
+      return () => {
+        cancelled = true
+        globalWindow.cancelIdleCallback?.(idleId)
+      }
+    }
+    const timeoutId = window.setTimeout(enable, 1)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeoutId)
+    }
+  }, [])
 
   const handleExecute = async () => {
     // 校验：必须选择 catalog 和 schema
@@ -525,30 +553,48 @@ export function SqlEditor() {
   )
 
   // 底部面板
+  const bottomPanelFallback = (
+    <div className="h-7 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700" />
+  )
+
   const bottomPanel = (
-    <BottomPanel
-      cursor={cursor}
-      activeDialect={activeDialect}
-      dialects={DIALECTS}
-      onDialectChange={setActiveDialect}
-      executeResult={executeResult}
-      executionLogs={executionLogs}
-      isExecuting={isExecuting}
-      collapsed={bottomPanelCollapsed}
-      onCollapsedChange={setBottomPanelCollapsed}
-      activeTab={bottomPanelTab}
-      onActiveTabChange={setBottomPanelTab}
-    />
+    <Suspense fallback={bottomPanelFallback}>
+      {deferHeavyUi && (
+        <LazyBottomPanel
+          cursor={cursor}
+          activeDialect={activeDialect}
+          dialects={DIALECTS}
+          onDialectChange={setActiveDialect}
+          executeResult={executeResult}
+          executionLogs={executionLogs}
+          isExecuting={isExecuting}
+          collapsed={bottomPanelCollapsed}
+          onCollapsedChange={setBottomPanelCollapsed}
+          activeTab={bottomPanelTab}
+          onActiveTabChange={setBottomPanelTab}
+        />
+      )}
+    </Suspense>
   )
 
   // 右侧面板
+  const rightRailFallback = (
+    <div className="relative flex shrink-0 z-[60]">
+      <div className="w-10 bg-white dark:bg-slate-900 border-l border-slate-100 dark:border-slate-800" />
+    </div>
+  )
+
   const rightPanel = (
-    <RightRail
-      selectedCatalog={activeWorksheet.catalog}
-      selectedSchema={activeWorksheet.schema}
-      requestOpenDatabase={requestOpenDatabase}
-      onResetOpenRequest={() => setRequestOpenDatabase(false)}
-    />
+    <Suspense fallback={rightRailFallback}>
+      {deferHeavyUi ? (
+        <LazyRightRail
+          selectedCatalog={activeWorksheet.catalog}
+          selectedSchema={activeWorksheet.schema}
+          requestOpenDatabase={requestOpenDatabase}
+          onResetOpenRequest={() => setRequestOpenDatabase(false)}
+        />
+      ) : rightRailFallback}
+    </Suspense>
   )
 
   // 右键菜单分组
@@ -723,13 +769,29 @@ export function SqlEditor() {
           />
         </div>
         {/* 自定义 Minimap */}
-        <Minimap
-          editor={editorInstance}
-          monaco={monacoInstance}
-          width={220}
-          scale={0.35}
-          fontSize={14}
-        />
+        {deferHeavyUi ? (
+          <Suspense
+            fallback={
+              <div
+                className="relative bg-slate-50/80 dark:bg-slate-800/80 border-l border-slate-200/60 dark:border-slate-700/60 shrink-0 w-[var(--minimap-width)]"
+                style={{ '--minimap-width': '220px' } as React.CSSProperties}
+              />
+            }
+          >
+            <LazyMinimap
+              editor={editorInstance}
+              monaco={monacoInstance}
+              width={220}
+              scale={0.35}
+              fontSize={14}
+            />
+          </Suspense>
+        ) : (
+          <div
+            className="relative bg-slate-50/80 dark:bg-slate-800/80 border-l border-slate-200/60 dark:border-slate-700/60 shrink-0 w-[var(--minimap-width)]"
+            style={{ '--minimap-width': '220px' } as React.CSSProperties}
+          />
+        )}
       </div>
     </BaseEditor>
   )

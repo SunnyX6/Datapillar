@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 项目环境配置（使用 dynaconf）
 支持多环境配置，类似 Spring Profiles

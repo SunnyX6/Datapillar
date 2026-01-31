@@ -153,7 +153,7 @@ function ValueDomainCard({
       <p className="text-micro font-mono text-slate-400 dark:text-slate-500 uppercase tracking-tight mb-3">{domain.domainCode}</p>
 
       {/* 枚举值预览区 */}
-      <div className="bg-slate-900 dark:bg-slate-800 rounded-lg mb-2 h-14 flex overflow-hidden">
+      <div className="bg-black rounded-lg mb-2 h-14 flex overflow-hidden">
         <div className="flex-1 px-3 py-2 overflow-hidden">
           <div className="relative w-full h-full overflow-hidden">
             <div
@@ -167,7 +167,7 @@ function ValueDomainCard({
                       {pageItems.map((item) => (
                         <span
                           key={item.value}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-800 dark:bg-slate-700 rounded text-micro whitespace-nowrap"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-micro whitespace-nowrap"
                           title={item.label || item.value}
                         >
                           <code className="text-emerald-400 font-mono">{item.value}</code>
@@ -600,14 +600,14 @@ function EditValueDomainModal({
               value={domainName}
               onChange={(e) => setDomainName(e.target.value)}
               placeholder="订单状态"
-              className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+              className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
             />
           </div>
           <div>
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
               值域编码
             </label>
-            <div className="px-3 py-2 text-body-sm font-mono uppercase bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400">
+            <div className="px-3 py-2 text-body-sm font-mono uppercase bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400">
               {domain.domainCode}
             </div>
           </div>
@@ -619,7 +619,7 @@ function EditValueDomainModal({
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
               值域类型
             </label>
-            <div className="px-3 py-2 text-body-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400">
+            <div className="px-3 py-2 text-body-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400">
               {typeLabel}
             </div>
           </div>
@@ -649,7 +649,7 @@ function EditValueDomainModal({
             value={dataType}
             onChange={setDataType}
             size="small"
-            triggerClassName="w-full h-[38px]"
+            triggerClassName="w-full h-[38px] bg-white dark:bg-slate-900"
           />
         </div>
 
@@ -676,14 +676,14 @@ function EditValueDomainModal({
                     value={item.key}
                     onChange={(e) => updateEnumItem(index, 'key', e.target.value)}
                     placeholder="PAID"
-                    className="w-full px-3 py-1.5 text-body-sm text-slate-800 dark:text-slate-200 font-mono border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                    className="w-full px-3 py-1.5 text-body-sm text-slate-800 dark:text-slate-200 font-mono border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
                   />
                   <input
                     type="text"
                     value={item.value}
                     onChange={(e) => updateEnumItem(index, 'value', e.target.value)}
                     placeholder="已支付"
-                    className="w-full px-3 py-1.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                    className="w-full px-3 py-1.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
                   />
                   <button
                     type="button"
@@ -707,7 +707,7 @@ function EditValueDomainModal({
           ) : (
             // RANGE/REGEX: 单输入框（只读）
             <div>
-              <div className="px-3 py-2 text-body-sm font-mono bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400">
+              <div className="px-3 py-2 text-body-sm font-mono bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400">
                 {itemValue || '-'}
               </div>
               <p className="text-micro text-slate-400 mt-1">
@@ -727,7 +727,7 @@ function EditValueDomainModal({
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="值域说明（可选）"
-            className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
       </div>

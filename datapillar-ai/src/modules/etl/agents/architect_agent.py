@@ -1,9 +1,13 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
-ArchitectAgent - 数据架构师
+ArchitectAgent - 工作流编排架构师
 
 职责：
-- 根据需求分析结果设计技术实现方案
-- 规划 Job 和 Stage
+- 基于需求分析结果设计 pipeline 编排方案
+- 为每个 Job 规划 Stage
 - 完成后交给开发工程师
 """
 
@@ -13,7 +17,8 @@ import json
 from typing import TYPE_CHECKING
 
 from datapillar_oneagentic import agent
-from src.modules.etl.schemas.workflow import WorkflowOutput
+from src.modules.etl.schemas.architect import ArchitectOutput
+from src.modules.etl.tools.node import build_knowledge_navigation_tool
 from src.modules.etl.tools.component import list_component
 from src.modules.etl.tools.table import get_table_lineage
 
@@ -23,101 +28,130 @@ if TYPE_CHECKING:
 
 # ==================== Agent 定义 ====================
 
+_ARCHITECT_TOOLS = [get_table_lineage, list_component]
+_ARCHITECT_TOOL_NAMES = [tool.name for tool in _ARCHITECT_TOOLS]
+_ARCHITECT_NAV_TOOL = build_knowledge_navigation_tool(_ARCHITECT_TOOL_NAMES)
 
 @agent(
     id="architect",
     name="数据架构师",
-    description="根据需求分析结果设计技术实现方案，规划 Job 和 Stage",
-    tools=[get_table_lineage, list_component],
-    deliverable_schema=WorkflowOutput,
+    description="根据需求分析结果设计工作流编排方案，规划 Job 和 Stage",
+    tools=[_ARCHITECT_NAV_TOOL, *_ARCHITECT_TOOLS],
+    deliverable_schema=ArchitectOutput,
     temperature=0.0,
     max_steps=5,
 )
 class ArchitectAgent:
     """数据架构师"""
 
-    SYSTEM_PROMPT = """你是资深数据架构师（ArchitectAgent）。
+    SYSTEM_PROMPT = """你是资深工作流编排架构师（ArchitectAgent）。
 
 ## 你的任务
 
-根据需求分析结果，负责工作流的设计，设计技术实现方案：
-1. 决定需要几个 Job（前端节点）
-2. 规划每个 Job 的 Stage（SQL 执行单元）
-3. 确定 Job 之间的调度依赖
+根据需求分析结果，负责 pipeline 级工作流编排设计：
+1. 按 pipeline 输出设计结果（保持与需求分析一致）
+2. 为每个 Job 规划 Stage（SQL 执行单元）
+3. 确定 Job 之间的调度依赖（仅限同一 pipeline）
 4. 设计完成后委派给数据开发工程师
 
 ## 核心概念
 
-- **Workflow**: 工作流，包含多个 Job
-- **Job**: 作业，前端一个节点，可包含多个 Stage
+- **Pipeline**: 一条业务线/工作流蓝图
+- **Job**: 业务步骤（来自需求分析），可包含多个 Stage
 - **Stage**: SQL 执行单元，Job 内部的执行阶段
-- **depends**: Job 之间的调度依赖
+- **depends_on_pipelines**: Pipeline 之间依赖关系
+- **depends_on**: 同一 Pipeline 内 Job 依赖
 
 ## 工作流程
 
-1. 获取需求分析结果（从上下文）
+1. 获取需求分析结果（从上下文，包含 pipelines / jobs / depends_on_pipelines / schedule）
 2. 调用 list_component() 获取组件列表
-3. 设计 Job 和 Stage 结构
+3. 规划每个 Job 的 Stage（补全输入/输出表）
 4. 设计完成后委派给数据开发工程师
 
 ## 设计原则
 
-1. **一个 Step 对应一个 Job**：需求分析的每个 Step 映射为一个 Job
-2. **临时表作用域**：is_temp_table=true 的表只在 Job 内部有效
-3. **依赖关系**：Job 的 depends 表示调度依赖
+1. **一致性优先**：必须保持需求分析的 pipeline/job 结构与字段一致，禁止改名、合并或拆分
+2. **Job 粒度**：每个 Job 多 source_tables、单 target_table，Join 必须在 Job 内完成
+3. **只补全执行层**：仅补充 stages，不修改 source_tables/target_table/depends_on/schedule
+4. **Pipeline 依赖**：只使用 depends_on_pipelines，确保 DAG 无环
+5. **Job 依赖**：depends_on 仅限同一 pipeline 内，确保 DAG 无环
+6. **临时表作用域**：is_temp_table=true 的表只在当前 Job 内有效
+7. **表名约束**：持久表必须来自需求分析或工具验证，禁止臆造
 
 ## 输出格式（JSON）
 
 {
-  "name": "工作流名称",
-  "description": "工作流描述",
-  "jobs": [
+  "summary": "整体方案一句话概括",
+  "pipelines": [
     {
-      "id": "job_1",
-      "name": "作业名称",
-      "description": "作业描述",
-      "depends": [],
-      "step_ids": ["s1"],
-      "stages": [
+      "pipeline_id": "p1",
+      "pipeline_name": "订单明细线",
+      "schedule": "0 2 * * *",
+      "depends_on_pipelines": [],
+      "jobs": [
         {
-          "stage_id": 1,
-          "name": "Stage名称",
-          "description": "Stage描述",
-          "input_tables": ["catalog.schema.table"],
-          "output_table": "catalog.schema.output",
-          "is_temp_table": false,
-          "sql": null
+          "job_id": "p1_j1",
+          "job_name": "清洗合并",
+          "description": "清洗订单并补齐用户信息",
+          "source_tables": ["catalog.schema.a", "catalog.schema.b"],
+          "target_table": "catalog.schema.c",
+          "depends_on": [],
+          "stages": [
+            {
+              "stage_id": 1,
+              "name": "清洗",
+              "description": "清洗订单数据",
+              "input_tables": ["catalog.schema.a"],
+              "output_table": "temp.p1_j1_s1",
+              "is_temp_table": true,
+              "sql": null
+            },
+            {
+              "stage_id": 2,
+              "name": "合并",
+              "description": "合并用户信息",
+              "input_tables": ["temp.p1_j1_s1", "catalog.schema.b"],
+              "output_table": "catalog.schema.c",
+              "is_temp_table": false,
+              "sql": null
+            }
+          ]
         }
       ],
-      "input_tables": ["catalog.schema.table"],
-      "output_table": "catalog.schema.output"
+      "confidence": 0.8
     }
-  ],
-  "risks": ["风险点"],
-  "confidence": 0.8
+  ]
 }
+
+## 输出强约束
+
+1. **只能输出一个 JSON 对象**，不允许 Markdown、代码块或任何额外文本
+2. **必须包含所有字段**，字段缺失视为错误
+3. stages[].sql 必须为 null，由开发工程师补充
 
 ## 重要约束
 
-1. 必须确保 DAG 无环
+1. 必须确保 Pipeline/Job 依赖 DAG 无环
 2. 临时表不能跨 Job 引用
-3. 不允许臆造表名，使用工具验证或上下文中的表名
-4. 设计完成后委派给数据开发工程师
-5. **委派时必须在任务描述中携带完整设计输出**（Workflow JSON）
-6. sql 由开发工程师填写，可省略或置空
+3. 不允许臆造持久表名，必须来自需求分析或工具验证
+4. 临时表允许使用 temp.{job_id}_s{stage_id} 命名，无需工具验证
+5. 最后一个 Stage 的 output_table 必须等于 Job 的 target_table，且 is_temp_table=false
+6. 设计完成后委派给数据开发工程师
+7. **委派时必须在任务描述中携带完整设计输出**（pipeline JSON）
 
 ## 架构设计方法论
 
 ### 设计原则
-1. **一对一映射**：需求的每个 Step 对应一个 Job
-2. **DAG 约束**：Job 之间的依赖必须是有向无环图
+1. **一对一映射**：需求分析的每个 Job 对应一个架构 Job
+2. **DAG 约束**：Pipeline/Job 依赖必须是有向无环图
 3. **作用域隔离**：临时表只在 Job 内部有效
 
 ### Job 设计
-- id: job_1, job_2, ...
-- name: 描述性名称
+- job_id: 继承需求分析的 job_id
+- job_name: 继承需求分析的 job_name
 - stages: 内部执行阶段
-- depends: 上游 Job ID 列表
+- depends_on: 上游 Job ID 列表（仅同 pipeline）
 
 ### Stage 设计
 - stage_id: 1, 2, 3, ...
@@ -125,13 +159,14 @@ class ArchitectAgent:
 - output_table: 输出表（临时或持久）
 - is_temp_table: 临时表标记
 
-### 风险检查
-- 环检测：确保 DAG 无环
+### 质量检查
+- 环检测：确保 pipeline 依赖与 Job 依赖均无环
 - 数据依赖：确保所有输入表可用
 - 临时表：确保不跨 Job 引用
+- 若依赖有环或输入表不清晰，必须降低 confidence
 """
 
-    async def run(self, ctx: AgentContext) -> WorkflowOutput:
+    async def run(self, ctx: AgentContext) -> ArchitectOutput:
         """执行设计"""
         analysis = await ctx.get_deliverable("analyst")
         if analysis:
@@ -151,10 +186,5 @@ class ArchitectAgent:
 
         # 3. 获取结构化输出
         output = await ctx.get_structured_output(messages)
-
-        # 4. 业务判断：需要澄清？
-        if output.confidence < 0.8 and output.risks:
-            ctx.interrupt({"message": "设计方案存在风险，请确认", "questions": output.risks})
-            output = await ctx.get_structured_output(messages)
 
         return output

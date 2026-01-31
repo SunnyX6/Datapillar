@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """Lance VectorStore implementation."""
 
 from __future__ import annotations
@@ -31,7 +34,12 @@ class LanceVectorStore(VectorStore):
 
     @property
     def capabilities(self) -> VectorStoreCapabilities:
-        return VectorStoreCapabilities(supports_dense=True, supports_sparse=True, supports_filter=True)
+        return VectorStoreCapabilities(
+            supports_dense=True,
+            supports_sparse=True,
+            supports_filter=True,
+            supports_hybrid=False,
+        )
 
     async def initialize(self) -> None:
         import lancedb
@@ -175,6 +183,17 @@ class LanceVectorStore(VectorStore):
                 )
             )
         return results
+
+    async def hybrid_search(
+        self,
+        collection: str,
+        query_vector: list[float],
+        query_text: str,
+        k: int = 5,
+        filters: dict[str, Any] | None = None,
+        rrf_k: int = 60,
+    ) -> list[VectorSearchResult]:
+        raise NotImplementedError("LanceDB does not support Milvus-style hybrid search")
 
     async def query(
         self,

@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """Knowledge evaluation executor."""
 
 from __future__ import annotations
@@ -58,26 +61,30 @@ class KnowledgeEvaluator:
         self._retriever = KnowledgeRetriever(
             store=store,
             embedding_provider=embedding_provider,
-            config=KnowledgeConfig(chunk_config=chunk_config, retrieve_config=retrieve_config),
+            retrieve_defaults=retrieve_config,
         )
 
     @classmethod
     async def from_config(
         cls,
         *,
-        namespace: str,
+        namespace: str | None = None,
         config: KnowledgeConfig,
+        chunk_config: KnowledgeChunkConfig | None = None,
+        retrieve_config: KnowledgeRetrieveConfig | None = None,
         sparse_embedder: SparseEmbeddingProvider | None = None,
     ) -> "KnowledgeEvaluator":
+        if not namespace:
+            raise ValueError("namespace is required for KnowledgeEvaluator.from_config")
         from datapillar_oneagentic.knowledge.runtime import build_runtime
 
-        runtime = build_runtime(namespace=namespace, base_config=config.base_config)
+        runtime = build_runtime(namespace=namespace, config=config)
         await runtime.initialize()
         return cls(
             store=runtime.store,
             embedding_provider=runtime.embedding_provider,
-            chunk_config=config.chunk_config,
-            retrieve_config=config.retrieve_config,
+            chunk_config=chunk_config or KnowledgeChunkConfig(),
+            retrieve_config=retrieve_config or KnowledgeRetrieveConfig(),
             sparse_embedder=sparse_embedder,
         )
 
@@ -129,8 +136,8 @@ class KnowledgeEvaluator:
 
     async def _evaluate_retrieval(self, evalset: EvalSet, *, target: str) -> RetrievalReport:
         knowledge = Knowledge(
-            sources=_build_sources(evalset.documents),
-            sparse_embedder=self._sparse_embedder,
+            sources=_build_sources(evalset.documents, chunk_config=self._chunk_config),
+            sparse_embedder=None if self._store.supports_hybrid else self._sparse_embedder,
         )
         query_reports: list[RetrievalQueryReport] = []
 
@@ -166,7 +173,7 @@ class KnowledgeEvaluator:
         return RetrievalReport(target=target, summary=summary, queries=query_reports)
 
     async def _ingest_eval_documents(self, documents: Iterable[EvalDocument]) -> None:
-        sources = _build_sources(documents)
+        sources = _build_sources(documents, chunk_config=self._chunk_config)
         sources_map = {source.source_id: source for source in sources}
         if sources:
             await self._store.upsert_sources(sources)
@@ -190,7 +197,8 @@ class KnowledgeEvaluator:
 
             vectors = await self._embedding_provider.embed_texts([chunk.content for chunk in knowledge_chunks])
             sparse_vectors = None
-            if self._sparse_embedder:
+            use_sparse = self._sparse_embedder is not None and not self._store.supports_hybrid
+            if use_sparse:
                 sparse_vectors = await self._sparse_embedder.embed_texts(
                     [chunk.content for chunk in knowledge_chunks]
                 )
@@ -225,12 +233,18 @@ def _eval_source_id(doc: EvalDocument) -> str:
     return doc.doc_id
 
 
-def _build_sources(documents: Iterable[EvalDocument]) -> list[KnowledgeSource]:
+def _build_sources(
+    documents: Iterable[EvalDocument],
+    *,
+    chunk_config: KnowledgeChunkConfig,
+) -> list[KnowledgeSource]:
     sources: dict[str, KnowledgeSource] = {}
     for doc in documents:
         source_id = _eval_source_id(doc)
         if source_id not in sources:
             sources[source_id] = KnowledgeSource(
+                source=doc.text,
+                chunk=chunk_config,
                 source_id=source_id,
                 name=source_id,
                 source_type="doc",

@@ -8,39 +8,44 @@ Core orchestrator edge cases:
 
 from __future__ import annotations
 
-import pytest
+import asyncio
 from dataclasses import dataclass
+
+import pytest
 
 from datapillar_oneagentic.core.types import SessionKey
 from datapillar_oneagentic.core.status import ExecutionStatus
-from datapillar_oneagentic.events import EventBus
+from datapillar_oneagentic.events import EventBus, EventType, LLMCallStartedEvent
 from datapillar_oneagentic.runtime.orchestrator import Orchestrator
-from datapillar_oneagentic.events import EventType
 
 
 class _MockStateGraph:
     """Mock StateGraph"""
 
-    def __init__(self, events: list[dict] | None = None, state=None):
+    def __init__(self, events: list[dict] | None = None, state=None, delay: float = 0.0):
         self._events = events or []
         self._state = state
+        self._delay = delay
 
     def compile(self, checkpointer=None, store=None):
-        return _MockCompiledGraph(self._events, state=self._state)
+        return _MockCompiledGraph(self._events, state=self._state, delay=self._delay)
 
 
 class _MockCompiledGraph:
     """Mock CompiledGraph"""
 
-    def __init__(self, events: list[dict], state=None):
+    def __init__(self, events: list[dict], state=None, delay: float = 0.0):
         self._events = events
         self._state = state
         self.updated: list[dict] = []
+        self._delay = delay
 
     async def aget_state(self, config):
         return self._state
 
     async def astream(self, input_data, config):
+        if self._delay:
+            await asyncio.sleep(self._delay)
         for event in self._events:
             yield event
 
@@ -130,6 +135,87 @@ async def test_emit_agent() -> None:
     # Should only have agent.start/agent.end events.
     event_types = [e["event"] for e in events]
     assert event_types == [EventType.AGENT_START.value, EventType.AGENT_END.value]
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_ignores_internal_interrupt_node() -> None:
+    """Should ignore internal interrupt nodes in streamed output."""
+    graph = _MockStateGraph(
+        events=[
+            {
+                "__interrupt__": {"last_agent_status": ExecutionStatus.COMPLETED},
+                "agent1": {"last_agent_status": ExecutionStatus.COMPLETED},
+            }
+        ]
+    )
+
+    orchestrator = Orchestrator(
+        namespace="test",
+        name="test_team",
+        graph=graph,
+        entry_agent_id="agent1",
+        agent_ids=["agent1"],
+        checkpointer=None,
+        store=None,
+        event_bus=EventBus(),
+    )
+
+    key = SessionKey(namespace="test", session_id="s1")
+
+    events = []
+    async for event in orchestrator.stream(query="hello", key=key):
+        events.append(event)
+
+    event_types = [e["event"] for e in events]
+    assert event_types == [EventType.AGENT_START.value, EventType.AGENT_END.value]
+
+
+@pytest.mark.asyncio
+async def test_stream_emits_queued_events_before_node_output() -> None:
+    """Should stream queued events before node output is available."""
+    graph = _MockStateGraph(
+        events=[{"agent1": {"last_agent_status": ExecutionStatus.COMPLETED}}],
+        delay=0.05,
+    )
+
+    event_bus = EventBus()
+    orchestrator = Orchestrator(
+        namespace="test",
+        name="test_team",
+        graph=graph,
+        entry_agent_id="agent1",
+        agent_ids=["agent1"],
+        checkpointer=None,
+        store=None,
+        event_bus=event_bus,
+    )
+
+    key = SessionKey(namespace="test", session_id="s1")
+
+    async def emit_llm_start() -> None:
+        await asyncio.sleep(0.01)
+        await event_bus.emit(
+            orchestrator,
+            LLMCallStartedEvent(
+                agent_id="agent1",
+                key=key,
+                model="test-model",
+                message_count=1,
+            ),
+        )
+
+    emit_task = asyncio.create_task(emit_llm_start())
+
+    events = []
+    async for event in orchestrator.stream(query="hello", key=key):
+        events.append(event)
+
+    await emit_task
+
+    event_types = [e["event"] for e in events]
+    llm_index = event_types.index(EventType.LLM_START.value)
+    agent_index = event_types.index(EventType.AGENT_START.value)
+    assert llm_index < agent_index
 
 
 @pytest.mark.asyncio

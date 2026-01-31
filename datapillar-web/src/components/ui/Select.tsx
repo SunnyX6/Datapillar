@@ -103,7 +103,7 @@ export function Select({
         onClick={() => setOpen(!open)}
         variant="outline"
         size={isExtraSmall ? 'tiny' : 'small'}
-        className={`w-full flex items-center justify-between bg-white dark:bg-slate-800 border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all ${triggerSizeClass} ${className}`}
+        className={`w-full flex items-center justify-between bg-white dark:bg-slate-900 border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all ${triggerSizeClass} ${className}`}
       >
         <span className={`truncate ${selectedOption ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'}`}>
           {selectedOption?.label || placeholder}
@@ -115,14 +115,14 @@ export function Select({
         <div
           ref={dropdownRef}
           style={dropdownStyle}
-          className="fixed z-[1000000] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden top-[var(--dropdown-top)] left-[var(--dropdown-left)] w-[var(--dropdown-width)]"
+          className="fixed z-[1000000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden top-[var(--dropdown-top)] left-[var(--dropdown-left)] w-[var(--dropdown-width)]"
         >
           {dropdownHeader && (
             <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
               <span className={`${headerTextClass} font-medium text-slate-500 dark:text-slate-400`}>{dropdownHeader}</span>
             </div>
           )}
-          <div className="max-h-48 overflow-y-auto py-1">
+          <div className="max-h-48 overflow-y-auto py-1 custom-scrollbar">
             {options.map((option) => {
               const isSelected = value === option.value
               return (
@@ -138,7 +138,7 @@ export function Select({
                   className={`w-full flex items-center justify-between text-left transition-colors ${optionSizeClass} ${
                     isSelected
                       ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
-                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
                 >
                   <span>{option.label}</span>

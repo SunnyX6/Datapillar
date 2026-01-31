@@ -25,6 +25,7 @@
     },
     "profile": {
       "profile": "Profile",
+      "models": "Model & Token",
       "billing": "Billing",
       "logout": "Log out"
     }
@@ -40,6 +41,7 @@
       "workflow": "Workflow Studio",
       "ide": "One IDE",
       "catalog": "Data Catalog",
+      "tracking": "Data Tracking",
       "warehouses": "Warehouses",
       "jobs": "Jobs & Clusters",
       "config": "Configurations",

@@ -25,6 +25,7 @@
     },
     "profile": {
       "profile": "个人中心",
+      "models": "模型&令牌",
       "billing": "账单",
       "logout": "退出登录"
     }
@@ -40,9 +41,8 @@
       "workflow": "工作流构建",
       "ide": "统一开发 IDE",
       "catalog": "数据目录",
+      "tracking": "数据埋点",
       "warehouses": "计算仓",
-      "jobs": "任务与集群",
-      "config": "配置中心",
       "deployments": "发布",
       "logs": "日志",
       "history": "版本历史",

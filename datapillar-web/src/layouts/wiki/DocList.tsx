@@ -3,13 +3,6 @@ import { Card } from '@/components/ui'
 import { RESPONSIVE_TYPOGRAPHY, TYPOGRAPHY } from '@/design-tokens/typography'
 import type { Document } from './types'
 
-const documents: Document[] = [
-  { id: '1', spaceId: 'ks1', title: 'DataButterfly_API_v2.0.pdf', type: 'pdf', size: '2.4 MB', uploadDate: '2023-10-24 14:20', status: 'indexed', chunkCount: 142, tokenCount: 45000 },
-  { id: '2', spaceId: 'ks1', title: 'HR_Onboarding_Policy_2024.docx', type: 'docx', size: '840 KB', uploadDate: '2023-10-24 10:15', status: 'indexed', chunkCount: 56, tokenCount: 12000 },
-  { id: '3', spaceId: 'ks2', title: 'Backend_Microservices_Arch.md', type: 'md', size: '12 KB', uploadDate: '2023-10-23 18:30', status: 'processing', chunkCount: 0, tokenCount: 0 },
-  { id: '4', spaceId: 'ks3', title: 'Legacy_System_Logs.txt', type: 'txt', size: '5.6 MB', uploadDate: '2023-10-22 09:00', status: 'error', chunkCount: 0, tokenCount: 0 }
-]
-
 const StatusBadge = ({ status }: { status: Document['status'] }) => {
   switch (status) {
     case 'indexed':
@@ -67,9 +60,10 @@ const FileIcon = ({ type }: { type: Document['type'] }) => {
 
 interface DocListProps {
   spaceId: string
+  documents: Document[]
 }
 
-export default function DocList({ spaceId }: DocListProps) {
+export default function DocList({ spaceId, documents }: DocListProps) {
   const filteredDocs = documents.filter((doc) => doc.spaceId === spaceId)
 
   return (
@@ -80,7 +74,7 @@ export default function DocList({ spaceId }: DocListProps) {
             <tr>
               <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>文档名称</th>
               <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>状态</th>
-              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>切片数 / Tokens</th>
+              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>切片数 / 长度</th>
               <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>上传时间</th>
               <th scope="col" className="relative px-4 py-2.5"><span className="sr-only">Actions</span></th>
             </tr>
@@ -102,11 +96,9 @@ export default function DocList({ spaceId }: DocListProps) {
                     <StatusBadge status={doc.status} />
                   </td>
                   <td className={`px-4 py-3 whitespace-nowrap ${TYPOGRAPHY.bodySm} text-slate-500 font-mono`}>
-                    {doc.chunkCount > 0 ? (
-                      <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-700 dark:text-slate-200">
-                        {doc.chunkCount} / {doc.tokenCount.toLocaleString()}
-                      </span>
-                    ) : '-'}
+                    <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-700 dark:text-slate-200">
+                      {doc.chunkCount} / {doc.tokenCount.toLocaleString()}
+                    </span>
                   </td>
                   <td className={`px-4 py-3 whitespace-nowrap ${TYPOGRAPHY.bodySm} text-slate-500 dark:text-slate-400`}>
                     {doc.uploadDate}

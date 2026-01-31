@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 SQL 摘要批量处理器
 
@@ -18,7 +22,7 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Any
 
-import structlog
+import logging
 import xxhash
 from datapillar_oneagentic.messages import Message, Messages
 from datapillar_oneagentic.providers.llm import LLMProvider
@@ -30,7 +34,7 @@ from src.infrastructure.repository.neo4j_uow import neo4j_async_session
 from src.modules.openlineage.core.queue import AsyncEventQueue, QueueConfig
 from src.shared.config.settings import settings
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1)
@@ -166,8 +170,12 @@ class SQLSummaryProcessor:
         self._initialized = True
         logger.info(
             "sql_summary_processor_initialized",
-            batch_size=self._config.batch_size,
-            flush_interval=self._config.flush_interval_seconds,
+            extra={
+                "data": {
+                    "batch_size": self._config.batch_size,
+                    "flush_interval": self._config.flush_interval_seconds,
+                }
+            },
         )
 
     def _get_embedder(self) -> UnifiedEmbedder:
@@ -200,7 +208,10 @@ class SQLSummaryProcessor:
         if self._queue:
             await self._queue.stop(timeout=timeout)
         self._executor.shutdown(wait=False)
-        logger.info("sql_summary_processor_stopped", stats=self._stats.to_dict())
+        logger.info(
+            "sql_summary_processor_stopped",
+            extra={"data": {"stats": self._stats.to_dict()}},
+        )
 
     async def enqueue(
         self,
@@ -230,7 +241,10 @@ class SQLSummaryProcessor:
         sql_len = len(sql_content)
         if sql_len < self._config.min_sql_length:
             self._stats.total_skipped += 1
-            logger.debug("sql_summary_skipped_too_short", length=sql_len)
+            logger.debug(
+                "sql_summary_skipped_too_short",
+                extra={"data": {"length": sql_len}},
+            )
             return False
 
         # 去重检查
@@ -271,7 +285,10 @@ class SQLSummaryProcessor:
         if not tasks:
             return
 
-        logger.info("sql_summary_batch_start", count=len(tasks))
+        logger.info(
+            "sql_summary_batch_start",
+            extra={"data": {"count": len(tasks)}},
+        )
 
         try:
             # 1. 批量调用 LLM 生成摘要
@@ -290,11 +307,17 @@ class SQLSummaryProcessor:
             self._stats.total_processed += len(tasks)
             self._stats.last_batch_time = datetime.now(UTC)
 
-            logger.info("sql_summary_batch_complete", count=len(tasks))
+            logger.info(
+                "sql_summary_batch_complete",
+                extra={"data": {"count": len(tasks)}},
+            )
 
         except Exception as e:
             self._stats.total_failed += len(tasks)
-            logger.error("sql_summary_batch_failed", count=len(tasks), error=str(e))
+            logger.error(
+                "sql_summary_batch_failed",
+                extra={"data": {"count": len(tasks), "error": str(e)}},
+            )
 
     async def _generate_summaries(self, tasks: list[SQLSummaryTask]) -> list[SQLSummaryResult]:
         """批量调用 LLM 生成摘要（使用结构化输出）"""
@@ -385,7 +408,10 @@ class SQLSummaryProcessor:
             """
             await session.run(query, data=data)
 
-        logger.debug("sql_summaries_written", count=len(data))
+        logger.debug(
+            "sql_summaries_written",
+            extra={"data": {"count": len(data)}},
+        )
 
 
 # 全局单例

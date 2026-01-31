@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """Knowledge ingestion pipeline."""
 
 from __future__ import annotations
@@ -9,8 +12,18 @@ from datapillar_oneagentic.knowledge.chunker import KnowledgeChunker
 from datapillar_oneagentic.knowledge.chunker.models import ChunkPreview
 from datapillar_oneagentic.knowledge.config import KnowledgeChunkConfig
 from datapillar_oneagentic.knowledge.identity import build_source_id
-from datapillar_oneagentic.knowledge.ingest.builder import average_vectors, build_chunks, build_document
-from datapillar_oneagentic.knowledge.models import DocumentInput, KnowledgeSource, SparseEmbeddingProvider
+from datapillar_oneagentic.knowledge.ingest.builder import (
+    apply_window_metadata,
+    average_vectors,
+    build_chunks,
+    build_document,
+)
+from datapillar_oneagentic.knowledge.models import (
+    DocumentInput,
+    KnowledgeSource,
+    SparseEmbeddingProvider,
+    _build_document_input,
+)
 from datapillar_oneagentic.knowledge.parser import ParserRegistry, default_registry
 from datapillar_oneagentic.providers.llm.embedding import EmbeddingProvider
 from datapillar_oneagentic.storage.knowledge_stores.base import KnowledgeStore
@@ -28,62 +41,74 @@ class KnowledgeIngestor:
         *,
         store: KnowledgeStore,
         embedding_provider: EmbeddingProvider,
-        config: KnowledgeChunkConfig,
         parser_registry: ParserRegistry | None = None,
     ) -> None:
         self._store = store
         self._embedding_provider = embedding_provider
-        self._config = config
         self._parser_registry = parser_registry or default_registry()
-        self._chunker = KnowledgeChunker(config=config)
 
-    def preview(self, *, documents: Iterable[DocumentInput]) -> list[ChunkPreview]:
+    def preview(self, *, sources: Iterable[KnowledgeSource]) -> list[ChunkPreview]:
         previews: list[ChunkPreview] = []
-        for doc_input in documents:
+        for source in sources:
+            chunk_config = _resolve_chunk_config(source)
+            _attach_chunk_config(source, chunk_config)
+            doc_input = _build_document_input(source)
             parsed = self._parser_registry.parse(doc_input)
-            previews.append(self._chunker.preview(parsed))
+            chunker = KnowledgeChunker(config=chunk_config)
+            previews.append(chunker.preview(parsed))
         return previews
 
     async def ingest(
         self,
         *,
-        source: KnowledgeSource,
-        documents: Iterable[DocumentInput],
+        sources: Iterable[KnowledgeSource],
         sparse_embedder: SparseEmbeddingProvider | None = None,
     ) -> None:
-        inputs = list(documents)
-        if not inputs:
+        source_list = list(sources)
+        if not source_list:
             return
 
-        resolved_source = self._resolve_source(source)
-        await self._store.upsert_sources([resolved_source])
+        resolved_sources = []
+        source_items: list[tuple[KnowledgeSource, DocumentInput, KnowledgeChunkConfig]] = []
+        for source in source_list:
+            chunk_config = _resolve_chunk_config(source)
+            _attach_chunk_config(source, chunk_config)
+            doc_input = _build_document_input(source)
+            resolved_sources.append(self._resolve_source(source))
+            source_items.append((source, doc_input, chunk_config))
+        await self._store.upsert_sources(resolved_sources)
 
         all_docs: dict[str, KnowledgeDocument] = {}
         all_chunks: dict[str, list[KnowledgeChunk]] = {}
         seen_doc_ids: set[str] = set()
 
-        for doc_input in inputs:
+        for source, doc_input, chunk_config in source_items:
             parsed = self._parser_registry.parse(doc_input)
-            preview = self._chunker.preview(parsed)
+            chunker = KnowledgeChunker(config=chunk_config)
+            preview = chunker.preview(parsed)
             if not preview.chunks:
                 continue
             if parsed.document_id not in seen_doc_ids:
                 await self._rebuild_doc(parsed.document_id)
                 seen_doc_ids.add(parsed.document_id)
-            doc = build_document(source=resolved_source, parsed=parsed, doc_input=doc_input)
-            chunks = build_chunks(source=resolved_source, doc=doc, drafts=preview.chunks)
+            doc = build_document(source=source, parsed=parsed, doc_input=doc_input)
+            chunks = build_chunks(source=source, doc=doc, drafts=preview.chunks)
+            apply_window_metadata(chunks=chunks, config=chunk_config.window)
 
-            vectors = await self._embedding_provider.embed_texts([c.content for c in chunks])
+            vectors: list[list[float]] = []
             sparse_vectors = None
-            if sparse_embedder:
-                sparse_vectors = await sparse_embedder.embed_texts([c.content for c in chunks])
+            if self._store.supports_external_embeddings:
+                vectors = await self._embedding_provider.embed_texts([c.content for c in chunks])
+                use_sparse = sparse_embedder is not None and not self._store.supports_hybrid
+                if use_sparse:
+                    sparse_vectors = await sparse_embedder.embed_texts([c.content for c in chunks])
 
-            for idx, chunk in enumerate(chunks):
-                chunk.vector = vectors[idx]
-                if sparse_vectors:
-                    chunk.sparse_vector = sparse_vectors[idx]
+                for idx, chunk in enumerate(chunks):
+                    chunk.vector = vectors[idx]
+                    if sparse_vectors:
+                        chunk.sparse_vector = sparse_vectors[idx]
 
-            doc.vector = average_vectors(vectors)
+                doc.vector = average_vectors(vectors)
             all_docs[doc.doc_id] = doc
             all_chunks[doc.doc_id] = chunks
 
@@ -93,8 +118,8 @@ class KnowledgeIngestor:
             flat_chunks.extend(chunks)
         await self._store.upsert_chunks(flat_chunks)
         logger.info(
-            "Knowledge ingestion completed: source_id=%s, docs=%s, chunks=%s",
-            resolved_source.source_id,
+            "Knowledge ingestion completed: sources=%s, docs=%s, chunks=%s",
+            len(resolved_sources),
             len(all_docs),
             len(flat_chunks),
         )
@@ -115,3 +140,20 @@ class KnowledgeIngestor:
             return
         await self._store.delete_doc_chunks(doc_id)
         await self._store.delete_doc(doc_id)
+
+
+def _resolve_chunk_config(source: KnowledgeSource) -> KnowledgeChunkConfig:
+    payload = source.chunk
+    if payload is None:
+        raise ValueError("Chunk config is required for each knowledge source.")
+    if isinstance(payload, KnowledgeChunkConfig):
+        return payload
+    if isinstance(payload, dict):
+        return KnowledgeChunkConfig.model_validate(payload)
+    raise TypeError(f"Unsupported chunk config type: {type(payload).__name__}")
+
+
+def _attach_chunk_config(source: KnowledgeSource, chunk_config: KnowledgeChunkConfig) -> None:
+    metadata = dict(source.metadata or {})
+    metadata["chunk_config"] = chunk_config.model_dump(mode="json")
+    source.metadata = metadata

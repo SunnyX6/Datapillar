@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 统计和监控
 
@@ -8,9 +12,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-import structlog
+import logging
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -119,7 +123,10 @@ class StatsCollector:
     def record_event_rejected(self, reason: str) -> None:
         """记录拒绝事件"""
         self._metrics.events_rejected += 1
-        logger.debug("event_rejected", reason=reason)
+        logger.debug(
+            "event_rejected",
+            extra={"data": {"reason": reason}},
+        )
 
     def record_event_processed(self) -> None:
         """记录处理完成"""
@@ -128,7 +135,10 @@ class StatsCollector:
     def record_event_failed(self, error: str) -> None:
         """记录处理失败"""
         self._metrics.events_failed += 1
-        logger.warning("event_failed", error=error)
+        logger.warning(
+            "event_failed",
+            extra={"data": {"error": error}},
+        )
 
     def update_component_stats(
         self,

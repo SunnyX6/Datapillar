@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 JWT Token 工具类
 本地验证 JWT Token，无需调用认证中心

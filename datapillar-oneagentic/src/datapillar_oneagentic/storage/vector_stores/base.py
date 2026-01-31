@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """VectorStore abstract interface."""
 
 from __future__ import annotations
@@ -36,6 +39,7 @@ class VectorStoreCapabilities:
     supports_dense: bool = True
     supports_sparse: bool = True
     supports_filter: bool = True
+    supports_hybrid: bool = False
 
 
 @dataclass(frozen=True)
@@ -107,6 +111,18 @@ class VectorStore(ABC):
         filters: dict[str, Any] | None = None,
     ) -> list[VectorSearchResult]:
         """Vector search."""
+
+    @abstractmethod
+    async def hybrid_search(
+        self,
+        collection: str,
+        query_vector: list[float],
+        query_text: str,
+        k: int = 5,
+        filters: dict[str, Any] | None = None,
+        rrf_k: int = 60,
+    ) -> list[VectorSearchResult]:
+        """Hybrid search (dense + sparse)."""
 
     @abstractmethod
     async def query(

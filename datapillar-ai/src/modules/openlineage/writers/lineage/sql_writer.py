@@ -1,12 +1,16 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 from __future__ import annotations
 
-import structlog
+import logging
 from neo4j import AsyncSession
 
 from src.infrastructure.repository.kg.dto import SQLDTO
 from src.infrastructure.repository.openlineage import Lineage
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class SQLWriter:
@@ -29,4 +33,7 @@ class SQLWriter:
             created_by="OPENLINEAGE",
         )
         self._sql_written += 1
-        logger.debug("sql_written", id=sql.id)
+        logger.debug(
+            "sql_written",
+            extra={"data": {"id": sql.id}},
+        )

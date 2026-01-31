@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Bell,
   Check,
@@ -26,7 +27,7 @@ import { useTranslation } from 'react-i18next'
 import { iconSizeToken, inputContainerWidthClassMap, menuWidthClassMap } from '@/design-tokens/dimensions'
 import { Button } from '@/components/ui'
 
-type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide' | 'projects' | 'collaboration'
+type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide' | 'projects' | 'collaboration' | 'tracking'
 
 const LANGUAGE_OPTIONS: { id: Language; label: string }[] = [
   { id: 'zh-CN', label: '简体中文' },
@@ -71,8 +72,11 @@ export function TopNav({
   const [isGovernanceOpen, setIsGovernanceOpen] = useState(false)
   const [isLanguageOpen, setIsLanguageOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement | null>(null)
+  const dropdownPanelRef = useRef<HTMLDivElement | null>(null)
   const governanceRef = useRef<HTMLDivElement | null>(null)
   const languageRef = useRef<HTMLDivElement | null>(null)
+  const governancePanelRef = useRef<HTMLDivElement | null>(null)
+  const languagePanelRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
 
   // 全局搜索状态
@@ -127,9 +131,27 @@ export function TopNav({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node
-      if (dropdownRef.current && !dropdownRef.current.contains(target)) setIsDropdownOpen(false)
-      if (governanceRef.current && !governanceRef.current.contains(target)) setIsGovernanceOpen(false)
-      if (languageRef.current && !languageRef.current.contains(target)) setIsLanguageOpen(false)
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target) &&
+        (!dropdownPanelRef.current || !dropdownPanelRef.current.contains(target))
+      ) {
+        setIsDropdownOpen(false)
+      }
+      if (
+        governanceRef.current &&
+        !governanceRef.current.contains(target) &&
+        (!governancePanelRef.current || !governancePanelRef.current.contains(target))
+      ) {
+        setIsGovernanceOpen(false)
+      }
+      if (
+        languageRef.current &&
+        !languageRef.current.contains(target) &&
+        (!languagePanelRef.current || !languagePanelRef.current.contains(target))
+      ) {
+        setIsLanguageOpen(false)
+      }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
@@ -138,6 +160,11 @@ export function TopNav({
 
   const handleProfileClick = () => {
     onProfile()
+    setIsDropdownOpen(false)
+  }
+
+  const handleModelManagementClick = () => {
+    navigate('/profile/llm/models')
     setIsDropdownOpen(false)
   }
 
@@ -155,6 +182,94 @@ export function TopNav({
   const _languageLabel = language === 'zh-CN' ? t('language.zh', { defaultValue: '简体中文' }) : t('language.en', { defaultValue: 'English' })
   const orgLabel = t('top.org', { defaultValue: 'Acme Corp' })
 
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null)
+  const [governancePos, setGovernancePos] = useState<{ top: number; left: number } | null>(null)
+  const [languagePos, setLanguagePos] = useState<{ top: number; right: number } | null>(null)
+
+  useLayoutEffect(() => {
+    if (!isDropdownOpen) return
+    const updatePosition = () => {
+      const target = dropdownRef.current
+      if (!target) return
+      const rect = target.getBoundingClientRect()
+      setDropdownPos({
+        top: rect.bottom + 12,
+        left: rect.right
+      })
+    }
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [isDropdownOpen])
+
+  useLayoutEffect(() => {
+    if (!isGovernanceOpen) return
+    const updatePosition = () => {
+      const target = governanceRef.current
+      if (!target) return
+      const rect = target.getBoundingClientRect()
+      setGovernancePos({
+        top: rect.bottom + 12,
+        left: rect.left
+      })
+    }
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [isGovernanceOpen])
+
+  useLayoutEffect(() => {
+    if (!isLanguageOpen) return
+    const updatePosition = () => {
+      const target = languageRef.current
+      if (!target) return
+      const rect = target.getBoundingClientRect()
+      setLanguagePos({
+        top: rect.bottom + 12,
+        right: rect.right
+      })
+    }
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [isLanguageOpen])
+
+  const dropdownStyle = useMemo(() => {
+    if (!dropdownPos) return undefined
+    return {
+      '--dropdown-top': `${dropdownPos.top}px`,
+      '--dropdown-right': `${dropdownPos.left}px`
+    } as CSSProperties
+  }, [dropdownPos])
+
+  const governanceDropdownStyle = useMemo(() => {
+    if (!governancePos) return undefined
+    return {
+      '--dropdown-top': `${governancePos.top}px`,
+      '--dropdown-left': `${governancePos.left}px`
+    } as CSSProperties
+  }, [governancePos])
+
+  const languageDropdownStyle = useMemo(() => {
+    if (!languagePos) return undefined
+    return {
+      '--dropdown-top': `${languagePos.top}px`,
+      '--dropdown-right': `${languagePos.right}px`
+    } as CSSProperties
+  }, [languagePos])
+
   const handleNavigateGovernance = (path: string) => {
     navigate(path)
     setIsGovernanceOpen(false)
@@ -162,14 +277,18 @@ export function TopNav({
   const handleGovernanceEnter = () => setIsGovernanceOpen(true)
   const handleGovernanceLeave = (event: React.MouseEvent) => {
     const nextTarget = event.relatedTarget as Node | null
-    if (governanceRef.current && nextTarget && governanceRef.current.contains(nextTarget)) {
+    if (
+      nextTarget &&
+      ((governanceRef.current && governanceRef.current.contains(nextTarget)) ||
+        (governancePanelRef.current && governancePanelRef.current.contains(nextTarget)))
+    ) {
       return
     }
     setIsGovernanceOpen(false)
   }
 
   return (
-    <div className="@container relative h-14 w-full bg-white/80 dark:bg-[#0B1120]/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 sticky top-0 z-40 transition-colors duration-300">
+    <div className="@container relative h-14 w-full bg-white/80 dark:bg-slate-900 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 sticky top-0 z-40 transition-colors duration-300">
       {isSidebarCollapsed && (
         <ExpandToggle variant="topnav" onToggle={onToggleSidebar} className="absolute left-0 bottom-0" />
       )}
@@ -234,66 +353,71 @@ export function TopNav({
             onMouseLeave={handleGovernanceLeave}
             aria-hidden
           />
-          <div
-            className={`absolute left-0 top-[calc(100%+12px)] ${menuWidthClassMap.wide} bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden z-[60] transition-all duration-150 origin-top-left ${
-              isGovernanceOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'
-            }`}
-            onMouseEnter={handleGovernanceEnter}
-            onMouseLeave={handleGovernanceLeave}
-          >
-            <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
-              <span className="text-micro font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                {t('top.dropdown.governanceHeader', { defaultValue: 'Governance & One Meta' })}
-              </span>
-            </div>
-            <div className="p-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="normal"
-                className="w-full whitespace-normal px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
-                onClick={() => handleNavigateGovernance('/governance/metadata')}
+          {isGovernanceOpen &&
+            governanceDropdownStyle &&
+            createPortal(
+              <div
+                ref={governancePanelRef}
+                style={governanceDropdownStyle}
+                className={`fixed z-[1000000] ${menuWidthClassMap.wide} bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 origin-top-left top-[var(--dropdown-top)] left-[var(--dropdown-left)]`}
+                onMouseEnter={handleGovernanceEnter}
+                onMouseLeave={handleGovernanceLeave}
               >
-                <div className="p-1.5 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-purple-500 shrink-0 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/50 transition-colors">
-                  <Layers size={iconSizeToken.small} />
+                <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
+                  <span className="text-micro font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                    {t('top.dropdown.governanceHeader', { defaultValue: 'Governance & One Meta' })}
+                  </span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.metadata')}</div>
-                  <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.metadataDesc', { defaultValue: '统一物理资产元数据' })}</div>
+                <div className="p-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="normal"
+                    className="w-full whitespace-normal px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
+                    onClick={() => handleNavigateGovernance('/governance/metadata')}
+                  >
+                    <div className="p-1.5 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-purple-500 shrink-0 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/50 transition-colors">
+                      <Layers size={iconSizeToken.small} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.metadata')}</div>
+                      <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.metadataDesc', { defaultValue: '统一物理资产元数据' })}</div>
+                    </div>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="normal"
+                    className="w-full whitespace-normal px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
+                    onClick={() => handleNavigateGovernance('/governance/semantic')}
+                  >
+                    <div className="p-1.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-500 shrink-0 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
+                      <Book size={iconSizeToken.small} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.semantic', { defaultValue: '元语义' })}</div>
+                      <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.semanticDesc', { defaultValue: '指标、词根、API等语义资产空间' })}</div>
+                    </div>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="normal"
+                    className="w-full whitespace-normal px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
+                    onClick={() => handleNavigateGovernance('/governance/knowledge')}
+                  >
+                    <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-500 shrink-0 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 transition-colors">
+                      <Share2 size={iconSizeToken.small} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.knowledge')}</div>
+                      <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.knowledgeDesc', { defaultValue: '知识图谱可视化与关系探索' })}</div>
+                    </div>
+                  </Button>
                 </div>
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="normal"
-                className="w-full whitespace-normal px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
-                onClick={() => handleNavigateGovernance('/governance/semantic')}
-              >
-                <div className="p-1.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-500 shrink-0 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
-                  <Book size={iconSizeToken.small} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.semantic', { defaultValue: '元语义' })}</div>
-                  <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.semanticDesc', { defaultValue: '指标、词根、API等语义资产空间' })}</div>
-                </div>
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="normal"
-                className="w-full whitespace-normal px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
-                onClick={() => handleNavigateGovernance('/governance/knowledge')}
-              >
-                <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-500 shrink-0 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 transition-colors">
-                  <Share2 size={iconSizeToken.small} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.knowledge')}</div>
-                  <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.knowledgeDesc', { defaultValue: '知识图谱可视化与关系探索' })}</div>
-                </div>
-              </Button>
-            </div>
-          </div>
+              </div>,
+              document.body
+            )}
         </div>
         <TabItem icon={<FolderKanban size={iconSizeToken.small} />} label={t('top.tabs.projects')} active={isProjectsActive} onClick={() => onNavigate('projects')} />
         <TabItem icon={<Users size={iconSizeToken.small} />} label={t('top.tabs.team')} active={isTeamActive} onClick={() => onNavigate('collaboration')} />
@@ -360,7 +484,7 @@ export function TopNav({
           className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors relative"
         >
           <Bell size={iconSizeToken.large} />
-          <span className="absolute top-2 right-2.5 w-1.5 h-1.5 bg-rose-500 rounded-full ring-2 ring-white dark:ring-[#0B1120] animate-pulse" />
+          <span className="absolute top-2 right-2.5 w-1.5 h-1.5 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse" />
         </Button>
 
         <div className="relative" ref={languageRef}>
@@ -375,26 +499,31 @@ export function TopNav({
             <ChevronDown size={iconSizeToken.tiny} className={`transition-transform duration-200 ${isLanguageOpen ? 'rotate-180' : ''} text-slate-400 shrink-0`} />
           </Button>
 
-          <div
-            className={`absolute right-0 top-full mt-3 ${menuWidthClassMap.compact} bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg overflow-hidden z-[60] transition-all duration-150 origin-top-right ${
-              isLanguageOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'
-            }`}
-          >
-            {LANGUAGE_OPTIONS.map((option) => (
-              <Button
-                key={option.id}
-                type="button"
-                variant="ghost"
-                size="small"
-                onClick={() => handleLanguageSelect(option.id)}
-                className="w-full px-3 py-1.5 text-left text-body-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between gap-2"
-                aria-pressed={language === option.id}
+          {isLanguageOpen &&
+            languageDropdownStyle &&
+            createPortal(
+              <div
+                ref={languagePanelRef}
+                style={languageDropdownStyle}
+                className={`fixed z-[1000000] ${menuWidthClassMap.compact} bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150 origin-top-right top-[var(--dropdown-top)] right-[calc(100vw-var(--dropdown-right))]`}
               >
-                <span>{option.label}</span>
-                {language === option.id && <Check size={iconSizeToken.small} className="text-indigo-500" />}
-              </Button>
-            ))}
-          </div>
+                {LANGUAGE_OPTIONS.map((option) => (
+                  <Button
+                    key={option.id}
+                    type="button"
+                    variant="ghost"
+                    size="small"
+                    onClick={() => handleLanguageSelect(option.id)}
+                    className="w-full px-3 py-1.5 text-left text-body-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between gap-2"
+                    aria-pressed={language === option.id}
+                  >
+                    <span>{option.label}</span>
+                    {language === option.id && <Check size={iconSizeToken.small} className="text-indigo-500" />}
+                  </Button>
+                ))}
+              </div>,
+              document.body
+            )}
         </div>
 
         <div className="ml-1 pl-2.5 border-l border-slate-200 dark:border-slate-800 relative" ref={dropdownRef}>
@@ -406,30 +535,38 @@ export function TopNav({
             </div>
           </Button>
 
-          {isDropdownOpen && (
-            <div className={`absolute right-0 top-full mt-3 ${menuWidthClassMap.large} bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden z-[60] animate-in fade-in zoom-in-95 duration-200 origin-top-right`}>
-              <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#0B1120]/50">
-                <p className="text-body-sm font-semibold text-slate-800 dark:text-slate-200">{user.name}</p>
-                <p className="text-caption text-slate-500 truncate">{user.email || 'engineer@datapillar.ai'}</p>
-              </div>
+          {isDropdownOpen &&
+            dropdownStyle &&
+            createPortal(
+              <div
+                ref={dropdownPanelRef}
+                style={dropdownStyle}
+                className={`fixed z-[1000000] ${menuWidthClassMap.large} bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right top-[var(--dropdown-top)] right-[calc(100vw-var(--dropdown-right))]`}
+              >
+                <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-900/50">
+                  <p className="text-body-sm font-semibold text-slate-800 dark:text-slate-200">{user.name}</p>
+                  <p className="text-caption text-slate-500 truncate">{user.email || 'engineer@datapillar.ai'}</p>
+                </div>
 
-              <div className="p-1">
-                <DropdownButton icon={<UserIcon size={iconSizeToken.small} className="text-indigo-500" />} label={t('top.profile.profile')} onClick={handleProfileClick} />
-                <DropdownButton icon={<CreditCard size={iconSizeToken.small} className="text-emerald-500" />} label={t('top.profile.billing')} />
-              </div>
+                <div className="p-1">
+                  <DropdownButton icon={<UserIcon size={iconSizeToken.small} className="text-indigo-500" />} label={t('top.profile.profile')} onClick={handleProfileClick} />
+                  <DropdownButton icon={<LayoutGrid size={iconSizeToken.small} className="text-blue-500" />} label={t('top.profile.models')} onClick={handleModelManagementClick} />
+                  <DropdownButton icon={<CreditCard size={iconSizeToken.small} className="text-emerald-500" />} label={t('top.profile.billing')} />
+                </div>
 
-              <div className="p-1 border-t border-slate-100 dark:border-slate-700/50">
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  className="w-full text-left px-2.5 py-1.5 text-body-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg flex items-center gap-2 transition-colors"
-                >
-                  <LogOut size={iconSizeToken.small} />
-                  {t('top.profile.logout')}
-                </button>
-              </div>
-            </div>
-          )}
+                <div className="p-1 border-t border-slate-100 dark:border-slate-700/50">
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="w-full text-left px-2.5 py-1.5 text-body-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    <LogOut size={iconSizeToken.small} />
+                    {t('top.profile.logout')}
+                  </button>
+                </div>
+              </div>,
+              document.body
+            )}
         </div>
       </div>
     </div>

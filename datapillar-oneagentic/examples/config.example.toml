@@ -72,7 +72,7 @@ max_size = 1000
 # key_prefix = "llm_cache:"
 
 # ============================================================================
-# Embedding configuration (required for learning/knowledge retrieval)
+# Embedding configuration (required for learning)
 # ============================================================================
 [embedding]
 # Base settings
@@ -110,18 +110,6 @@ type = "memory"  # memory | postgres | redis
 # url = "redis://localhost:6379"  # postgres/redis only
 
 # ============================================================================
-# VectorStore configuration (shared by learning and knowledge)
-# ============================================================================
-[vector_store]
-type = "lance"  # lance | chroma | milvus
-path = "./data/vectors"  # lance/chroma local
-# uri = "./data/milvus.db"  # milvus local
-# uri = "http://localhost:19530"  # milvus remote
-# token = "root:Milvus"  # milvus remote auth
-# host = "localhost"  # chroma remote
-# port = 8000  # chroma remote port
-
-# ============================================================================
 # Learning configuration
 # ============================================================================
 [learning]
@@ -129,19 +117,7 @@ verify_threshold = 0.7
 reject_threshold = 0.3
 retrieval_k = 5
 
-# ============================================================================
-# Knowledge configuration (knowledge module overrides)
-# ============================================================================
-[knowledge.base_config.embedding]
-# Base settings
-# api_key = "sk-xxx"  # Sensitive data should use env var: DATAPILLAR_EMBEDDING_API_KEY (defaults to global embedding)
-# provider: supports openai, glm
-provider = "openai"
-model = "text-embedding-3-small"
-# base_url = "https://api.openai.com/v1"  # Optional, set for custom endpoint
-dimension = 1536
-
-[knowledge.base_config.vector_store]
+[learning.vector_store]
 type = "lance"  # lance | chroma | milvus
 path = "./data/vectors"  # lance/chroma local
 # uri = "./data/milvus.db"  # milvus local
@@ -149,45 +125,3 @@ path = "./data/vectors"  # lance/chroma local
 # token = "root:Milvus"  # milvus remote auth
 # host = "localhost"  # chroma remote
 # port = 8000  # chroma remote port
-
-[knowledge.chunk_config]
-mode = "general"  # general | parent_child | qa
-preprocess = ["normalize_newlines", "remove_control", "collapse_whitespace"]
-
-[knowledge.chunk_config.general]
-max_tokens = 800
-overlap = 120
-# delimiter = "\n\n"  # Optional fixed delimiter
-
-[knowledge.retrieve_config]
-method = "hybrid"  # semantic | hybrid
-top_k = 8
-# score_threshold = 0.2
-
-[knowledge.retrieve_config.tuning]
-pool_k = 32
-rrf_k = 60
-
-[knowledge.retrieve_config.quality]
-dedupe = true
-dedupe_threshold = 0.92
-max_per_document = 2
-
-[knowledge.retrieve_config.rerank]
-mode = "off"  # off | model | weighted
-provider = "sentence_transformers"
-model = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-score_mode = "rank"  # rank | normalize | raw
-
-[knowledge.retrieve_config.rerank.params]
-# batch_size = 16
-# device = "cuda"
-
-[knowledge.retrieve_config.inject]
-# mode=system: auto-retrieve and inject a system message before each agent run
-# mode=tool: expose a knowledge_retrieve tool so the agent can fetch on demand (smaller context)
-# Note: MapReduce reducers do not inject knowledge; they only summarize map results.
-mode = "tool"  # system | tool
-max_tokens = 1200
-max_chunks = 6
-format = "markdown"  # markdown | json

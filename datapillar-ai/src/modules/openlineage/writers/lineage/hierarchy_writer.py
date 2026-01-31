@@ -1,12 +1,16 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 from __future__ import annotations
 
-import structlog
+import logging
 from neo4j import AsyncSession
 
 from src.infrastructure.repository.openlineage import Lineage
 from src.modules.openlineage.parsers.plans.types import LineageWritePlans
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class HierarchyWriter:
@@ -53,6 +57,10 @@ class HierarchyWriter:
         if self._hierarchy_edges_written:
             logger.debug(
                 "hierarchy_edges_written",
-                operation=plans.operation,
-                count=self._hierarchy_edges_written,
+                extra={
+                    "data": {
+                        "operation": plans.operation,
+                        "count": self._hierarchy_edges_written,
+                    }
+                },
             )

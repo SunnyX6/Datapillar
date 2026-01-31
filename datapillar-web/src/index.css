@@ -314,6 +314,20 @@
     }
   }
 
+  /* 加宽抽屉（聊天/配置混合面板） */
+  .w-drawer-wide {
+    width: 680px;
+    @media (width >= 1440px) {
+      width: 760px;
+    }
+    @media (width >= 1920px) {
+      width: 900px;
+    }
+    @media (width >= 2560px) {
+      width: 980px;
+    }
+  }
+
   /* 表格最小宽度（横向滚动表格） */
   .min-w-table-wide {
     min-width: 900px;

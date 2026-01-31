@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 OpenLineage 事件处理器
 
@@ -8,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-import structlog
+import logging
 
 from src.infrastructure.repository.neo4j_uow import neo4j_async_session
 from src.modules.openlineage.config import OpenLineageSinkConfig
@@ -19,7 +23,7 @@ from src.modules.openlineage.writers.lineage_writer import LineageWriter
 from src.modules.openlineage.writers.metadata_writer import MetadataWriter
 from src.shared.config import settings
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -85,7 +89,7 @@ class EventProcessor:
         self._initialized = True
         logger.info(
             "event_processor_initialized",
-            config=self._config.model_dump(),
+            extra={"data": {"config": self._config.model_dump()}},
         )
 
     async def start(self, paused: bool = True) -> None:
@@ -98,12 +102,18 @@ class EventProcessor:
         if paused:
             self._queue.pause()
         await self._queue.start()
-        logger.info("event_processor_started", paused=paused)
+        logger.info(
+            "event_processor_started",
+            extra={"data": {"paused": paused}},
+        )
 
     async def stop(self, timeout: float = 30.0) -> None:
         """停止处理器"""
         await self._queue.stop(timeout=timeout)
-        logger.info("event_processor_stopped", stats=self._stats.to_dict())
+        logger.info(
+            "event_processor_stopped",
+            extra={"data": {"stats": self._stats.to_dict()}},
+        )
 
     async def put(self, event: RunEvent) -> dict[str, Any]:
         """
@@ -167,11 +177,17 @@ class EventProcessor:
                     await self._lineage_writer.write(session, plans.lineage)
 
                 self._stats.events_processed += 1
-                logger.debug("event_processed", job=event.job.name)
+                logger.debug(
+                    "event_processed",
+                    extra={"data": {"job": event.job.name}},
+                )
 
             except Exception as e:
                 self._stats.events_failed += 1
-                logger.error("event_process_failed", job=event.job.name, error=str(e))
+                logger.error(
+                    "event_process_failed",
+                    extra={"data": {"job": event.job.name, "error": str(e)}},
+                )
 
 
 # 全局单例

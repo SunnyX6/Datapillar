@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 OpenLineage Sink API
 
@@ -14,31 +18,21 @@ transport:
 
 from typing import Any
 
-import structlog
-from fastapi import APIRouter, HTTPException, Response, status
-from pydantic import BaseModel
+import logging
+from fastapi import APIRouter, Request, status
+from fastapi.responses import JSONResponse
 
 from src.modules.openlineage.core.event_processor import event_processor
 from src.modules.openlineage.schemas.events import RunEvent
+from src.shared.web import build_error, build_success
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-class SinkResponse(BaseModel):
-    """Sink 响应"""
-
-    success: bool
-    message: str | None = None
-    error: str | None = None
-    queued: bool | None = None
-    queue_size: int | None = None
-
-
 @router.post(
     "",
-    response_model=SinkResponse,
     summary="接收 OpenLineage 事件",
     description="""
 接收来自 Flink/Spark/Gravitino 等系统的 OpenLineage RunEvent。
@@ -51,7 +45,7 @@ class SinkResponse(BaseModel):
 注意：retry、rate_limit、filter 由 Producer 端配置
 """,
 )
-async def receive_event(event: RunEvent, response: Response) -> SinkResponse:
+async def receive_event(request: Request, event: RunEvent):
     """接收 OpenLineage 事件"""
     try:
         # 调试日志：打印完整 facets
@@ -79,10 +73,14 @@ async def receive_event(event: RunEvent, response: Response) -> SinkResponse:
 
         logger.info(
             "openlineage_event_received",
-            event_type=str(event.eventType) if event.eventType else None,
-            job_namespace=event.job.namespace,
-            inputs=input_details,
-            outputs=output_details,
+            extra={
+                "data": {
+                    "event_type": str(event.eventType) if event.eventType else None,
+                    "job_namespace": event.job.namespace,
+                    "inputs": input_details,
+                    "outputs": output_details,
+                }
+            },
         )
 
         result = await event_processor.put(event)
@@ -90,25 +88,48 @@ async def receive_event(event: RunEvent, response: Response) -> SinkResponse:
         if not result.get("success"):
             error = result.get("error", "Unknown error")
             if "Queue full" in error:
-                response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-            return SinkResponse(success=False, error=error)
+                status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+                code = "SERVICE_UNAVAILABLE"
+            else:
+                status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+                code = "SERVER_ERROR"
+            return JSONResponse(
+                status_code=status_code,
+                content=build_error(
+                    request=request,
+                    status=status_code,
+                    code=code,
+                    message=error,
+                ),
+            )
 
-        return SinkResponse(
-            success=True,
-            queued=True,
-            queue_size=result.get("queue_size"),
-            message="Event queued",
+        return build_success(
+            request=request,
+            data={
+                "success": True,
+                "queued": True,
+                "queue_size": result.get("queue_size"),
+                "message": "Event queued",
+            },
         )
 
     except Exception as e:
-        logger.error("receive_event_failed", error=str(e))
-        raise HTTPException(
+        logger.error(
+            "receive_event_failed",
+            extra={"data": {"error": str(e)}},
+        )
+        return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e),
-        ) from e
+            content=build_error(
+                request=request,
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                code="SERVER_ERROR",
+                message=str(e),
+            ),
+        )
 
 
 @router.get("/stats", summary="获取统计信息")
-async def get_stats() -> dict[str, Any]:
+async def get_stats(request: Request) -> dict[str, Any]:
     """获取统计信息"""
-    return event_processor.stats
+    return build_success(request=request, data=event_processor.stats)

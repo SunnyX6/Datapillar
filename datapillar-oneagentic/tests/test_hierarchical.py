@@ -9,7 +9,6 @@ from datapillar_oneagentic.context.timeline.recorder import TimelineRecorder
 from datapillar_oneagentic.core.agent import AgentSpec
 from datapillar_oneagentic.core.context import AgentContext
 from datapillar_oneagentic.core.nodes import NodeFactory
-from datapillar_oneagentic.knowledge.models import Knowledge, KnowledgeSource
 from datapillar_oneagentic.core.types import AgentResult
 from datapillar_oneagentic.events import EventBus
 from datapillar_oneagentic.messages import Message, Messages
@@ -79,7 +78,7 @@ async def test_agent_context2() -> None:
         id="demo",
         name="Demo",
         deliverable_schema=_OutputSchema,
-        knowledge=Knowledge(sources=[KnowledgeSource(source_id="s1", name="example", source_type="doc")]),
+        knowledge=None,
     )
     state = {"messages": []}
     collector = ContextCollector()
