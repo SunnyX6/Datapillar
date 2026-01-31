@@ -134,6 +134,8 @@ htmlcov/
 *.sqlite3
 *.parquet
 *.index
+*.lance
+**/*.lance
 
 # ============================================
 # Flink 运行时
