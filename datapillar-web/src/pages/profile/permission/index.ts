@@ -1,0 +1,1 @@
+export { PermissionPage } from './PermissionPage'

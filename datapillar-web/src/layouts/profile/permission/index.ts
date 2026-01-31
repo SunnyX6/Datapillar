@@ -1,0 +1,1 @@
+export { PermissionLayout } from './Permission'

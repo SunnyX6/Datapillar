@@ -62,14 +62,7 @@ from typing import TYPE_CHECKING
 from datapillar_oneagentic.core.config import AgentConfig
 from datapillar_oneagentic.providers.llm.config import EmbeddingConfig
 from datapillar_oneagentic.storage.config import VectorStoreConfig
-from datapillar_oneagentic.storage.knowledge_stores.vector import VectorKnowledgeStore
-from datapillar_oneagentic.storage.learning_stores.vector import VectorExperienceStore
-from datapillar_oneagentic.storage.vector_stores import (
-    ChromaVectorStore,
-    LanceVectorStore,
-    MilvusVectorStore,
-    VectorStore,
-)
+from datapillar_oneagentic.storage.vector_stores.base import VectorStore
 
 if TYPE_CHECKING:
     from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -256,6 +249,12 @@ def _build_vector_store(
     """
     Create a VectorStore from configuration.
     """
+    from datapillar_oneagentic.storage.vector_stores import (
+        ChromaVectorStore,
+        LanceVectorStore,
+        MilvusVectorStore,
+    )
+
     store_type = vector_store_config.type
 
     if store_type == "lance":
@@ -315,6 +314,8 @@ def create_learning_store(
     embedding_config: EmbeddingConfig,
 ):
     """Create an ExperienceStore from configuration."""
+    from datapillar_oneagentic.storage.learning_stores.vector import VectorExperienceStore
+
     if embedding_config.dimension is None:
         raise ValueError("Embedding dimension is not configured for ExperienceStore")
     vector_store = _build_vector_store(
@@ -336,6 +337,8 @@ def create_knowledge_store(
     embedding_config: EmbeddingConfig,
 ):
     """Create a KnowledgeStore from configuration."""
+    from datapillar_oneagentic.storage.knowledge_stores.vector import VectorKnowledgeStore
+
     if embedding_config.dimension is None:
         raise ValueError("Embedding dimension is not configured for KnowledgeStore")
     driver = _resolve_vector_store_driver(vector_store_config)

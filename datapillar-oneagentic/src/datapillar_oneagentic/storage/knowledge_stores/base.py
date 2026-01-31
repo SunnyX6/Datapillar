@@ -6,14 +6,15 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-from datapillar_oneagentic.knowledge.models import (
-    KnowledgeChunk,
-    KnowledgeDocument,
-    KnowledgeSearchHit,
-    KnowledgeSource,
-)
+if TYPE_CHECKING:
+    from datapillar_oneagentic.knowledge.models import (
+        KnowledgeChunk,
+        KnowledgeDocument,
+        KnowledgeSearchHit,
+        KnowledgeSource,
+    )
 
 
 class KnowledgeStore(ABC):

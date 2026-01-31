@@ -25,7 +25,8 @@
     },
     "profile": {
       "profile": "Profile",
-      "models": "Model & Token",
+      "permission": "Permission Assignment",
+      "models": "AI Configuration",
       "billing": "Billing",
       "logout": "Log out"
     }

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { cn } from '@/lib/utils'
 
-type TooltipSide = 'top' | 'right' | 'bottom' | 'left'
+type TooltipSide = 'top' | 'right' | 'bottom' | 'left' | 'center-bottom'
 
 export interface TooltipProps {
   children: ReactNode
@@ -53,28 +53,32 @@ export function Tooltip({
     let top = 0
     let left = 0
     const gap = sideOffset
+    const tooltip = tooltipRef.current
+    if (!tooltip) return
 
     switch (side) {
       case 'right':
         top = rect.top + rect.height / 2
         left = rect.right + gap
+        tooltip.style.removeProperty('--tooltip-arrow-left')
         break
       case 'left':
         top = rect.top + rect.height / 2
         left = rect.left - gap
+        tooltip.style.removeProperty('--tooltip-arrow-left')
         break
       case 'top':
         top = rect.top - gap
         left = rect.left + rect.width / 2
+        tooltip.style.removeProperty('--tooltip-arrow-left')
         break
+      case 'center-bottom':
       case 'bottom':
         top = rect.bottom + gap
         left = rect.left + rect.width / 2
+        tooltip.style.removeProperty('--tooltip-arrow-left')
         break
     }
-
-    const tooltip = tooltipRef.current
-    if (!tooltip) return
     tooltip.style.top = `${top}px`
     tooltip.style.left = `${left}px`
   }, [side, sideOffset])
@@ -160,10 +164,10 @@ export function Tooltip({
                 side === 'right'
                   ? 'translateY(-50%)'
                   : side === 'left'
-                    ? 'translate(-100%, -50%)'
-                    : side === 'top'
-                      ? 'translate(-50%, -100%)'
-                      : 'translate(-50%, 0)'
+                  ? 'translate(-100%, -50%)'
+                  : side === 'top'
+                    ? 'translate(-50%, -100%)'
+                    : 'translate(-50%, 0)'
             }}
           >
             <div className="relative">
@@ -173,7 +177,7 @@ export function Tooltip({
                   side === 'right' && 'left-[-5px] top-1/2 -translate-y-1/2 border-l border-b',
                   side === 'left' && 'right-[-5px] top-1/2 -translate-y-1/2 border-r border-t',
                   side === 'top' && 'bottom-[-5px] left-1/2 -translate-x-1/2 border-r border-b',
-                  side === 'bottom' && 'top-[-5px] left-1/2 -translate-x-1/2 border-l border-t'
+                  (side === 'bottom' || side === 'center-bottom') && 'top-[-5px] left-1/2 -translate-x-1/2 border-l border-t'
                 )}
               />
 

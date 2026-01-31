@@ -396,7 +396,7 @@ function CompareModal({
       onClose={onClose}
       title="模型对比 (Compare Models)"
       subtitle={<span className="text-body-sm text-slate-500">正在对比 {models.length} 个模型</span>}
-      size="lg"
+      size="xl"
     >
       <Card padding="none" variant="default" className="overflow-hidden shadow-sm">
         <table className="w-full text-left border-collapse">

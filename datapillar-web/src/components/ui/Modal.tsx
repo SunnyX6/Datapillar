@@ -1,7 +1,7 @@
 /**
  * 通用模态框组件
  *
- * 支持三种尺寸：小(sm) | 中(md) | 大(lg)
+ * 支持尺寸：迷你(mini) | 小(sm) | 中(md) | 大(lg) | 特大(xl)
  * 参考 examples/MetricRegistrationModal.tsx 设计风格
  */
 
@@ -25,8 +25,8 @@ interface ModalProps {
   footerLeft?: ReactNode
   /** 右侧 footer 按钮区域 */
   footerRight?: ReactNode
-  /** 迷你(mini): 简单表单 | 小(sm): 窄表单 | 中(md): 标准表单 | 大(lg): 复杂表单 */
-  size?: 'mini' | 'sm' | 'md' | 'lg'
+  /** 迷你(mini): 简单表单 | 小(sm): 窄表单 | 中(md): 标准表单 | 大(lg): 宽表单 | 特大(xl): 超宽复杂表单 */
+  size?: 'mini' | 'sm' | 'md' | 'lg' | 'xl'
 }
 
 export function Modal({
@@ -79,7 +79,9 @@ export function Modal({
         ? modalWidthClassMap.small
         : size === 'md'
           ? modalWidthClassMap.normal
-          : modalWidthClassMap.huge
+          : size === 'lg'
+            ? modalWidthClassMap.large
+            : modalWidthClassMap.huge
 
   const modalContent = (
     <div className="fixed inset-0 z-[999999] flex items-center justify-center p-6">

@@ -542,36 +542,41 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
   // Step 1: 选择指标类型
   if (step === 1) {
     return (
-      <Modal isOpen={isOpen} onClose={handleClose} size="sm">
-        <div className="text-center mb-6">
-          <h2 className="text-subtitle font-bold text-slate-900 dark:text-white">指标注册向导</h2>
-          <p className="text-caption text-slate-500 mt-1">请选择您要创建的指标类型</p>
-        </div>
-
-        <div className="space-y-3">
-          {(['ATOMIC', 'DERIVED', 'COMPOSITE'] as MetricType[]).map((type) => {
-            const config = METRIC_TYPE_CONFIG[type]
-            return (
-              <button
-                key={type}
-                onClick={() => handleSelectType(type)}
-                className="w-full flex items-start gap-4 p-5 rounded-2xl border-2 border-slate-100 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-700 hover:bg-white dark:hover:bg-slate-800 hover:shadow-lg transition-all text-left group"
-              >
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${config.bg} ${config.color} shadow-sm group-hover:scale-110 transition-transform`}>
-                  <config.icon size={24} />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center mb-1">
-                    <span className="text-body-sm font-bold text-slate-900 dark:text-white">{config.label}</span>
-                  </div>
-                  <p className="text-caption text-slate-500">{config.desc}</p>
-                </div>
-                <div className="self-center w-7 h-7 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300 group-hover:bg-slate-900 dark:group-hover:bg-white group-hover:text-white dark:group-hover:text-slate-900 transition-all">
-                  <ArrowRight size={14} />
-                </div>
-              </button>
-            )
-          })}
+      <Modal
+        isOpen={isOpen}
+        onClose={handleClose}
+        size="sm"
+        title="指标注册向导"
+        subtitle={<span className="text-xs text-slate-400">请选择您要创建的指标类型</span>}
+      >
+        <div className="flex flex-col min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
+            <div className="space-y-3">
+              {(['ATOMIC', 'DERIVED', 'COMPOSITE'] as MetricType[]).map((type) => {
+                const config = METRIC_TYPE_CONFIG[type]
+                return (
+                  <button
+                    key={type}
+                    onClick={() => handleSelectType(type)}
+                    className="w-full flex items-start gap-4 p-5 rounded-2xl border-2 border-slate-100 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-700 hover:bg-white dark:hover:bg-slate-800 hover:shadow-lg transition-all text-left group"
+                  >
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${config.bg} ${config.color} shadow-sm group-hover:scale-110 transition-transform`}>
+                      <config.icon size={24} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center mb-1">
+                        <span className="text-body-sm font-bold text-slate-900 dark:text-white">{config.label}</span>
+                      </div>
+                      <p className="text-caption text-slate-500">{config.desc}</p>
+                    </div>
+                    <div className="self-center w-7 h-7 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300 group-hover:bg-slate-900 dark:group-hover:bg-white group-hover:text-white dark:group-hover:text-slate-900 transition-all">
+                      <ArrowRight size={14} />
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </Modal>
     )
@@ -582,7 +587,7 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      size="lg"
+      size="xl"
       title={
         <div className="flex items-center gap-3">
           {!isEditMode && (

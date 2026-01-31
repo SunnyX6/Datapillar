@@ -12,6 +12,7 @@ import {
   Share2,
   Search,
   ShieldCheck,
+  Shield,
   Sun,
   Users,
   ChevronDown,
@@ -165,6 +166,11 @@ export function TopNav({
 
   const handleModelManagementClick = () => {
     navigate('/profile/llm/models')
+    setIsDropdownOpen(false)
+  }
+
+  const handlePermissionClick = () => {
+    navigate('/profile/permission')
     setIsDropdownOpen(false)
   }
 
@@ -427,11 +433,7 @@ export function TopNav({
       <div className="flex items-center gap-2.5 min-w-0 @md:min-w-40 justify-end">
         <div className="hidden @md:flex items-center relative">
           <div
-            className={`flex items-center gap-2 ${inputContainerWidthClassMap.compact} bg-slate-50 dark:bg-slate-900 border rounded-lg transition-all duration-200 shadow-sm ${
-              isSearchOpen || searchTerm
-                ? 'border-indigo-500/50 bg-white dark:bg-slate-800 ring-2 ring-indigo-500/20'
-                : 'border-slate-200 dark:border-slate-800 hover:border-indigo-500/30 hover:bg-white dark:hover:bg-slate-800'
-            }`}
+            className={`flex items-center gap-2 ${inputContainerWidthClassMap.compact} bg-white dark:bg-slate-900 border border-brand-300/70 dark:border-brand-400/40 rounded-lg transition-all duration-200 hover:border-brand-400/80 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20`}
           >
             <Search size={iconSizeToken.small} className="ml-3 shrink-0 text-slate-400" />
             <input
@@ -550,6 +552,7 @@ export function TopNav({
 
                 <div className="p-1">
                   <DropdownButton icon={<UserIcon size={iconSizeToken.small} className="text-indigo-500" />} label={t('top.profile.profile')} onClick={handleProfileClick} />
+                  <DropdownButton icon={<Shield size={iconSizeToken.small} className="text-amber-500" />} label={t('top.profile.permission', { defaultValue: '权限分配' })} onClick={handlePermissionClick} />
                   <DropdownButton icon={<LayoutGrid size={iconSizeToken.small} className="text-blue-500" />} label={t('top.profile.models')} onClick={handleModelManagementClick} />
                   <DropdownButton icon={<CreditCard size={iconSizeToken.small} className="text-emerald-500" />} label={t('top.profile.billing')} />
                 </div>

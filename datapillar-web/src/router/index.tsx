@@ -39,6 +39,7 @@ const LazySqlEditorPage = lazy(() => import('@/pages/ide/SqlEditorPage').then(m 
 const LazyDataTrackingPage = lazy(() => import('@/pages/data_tracking').then(m => ({ default: m.DataTrackingPage })))
 
 const LazyProfilePage = lazy(() => import('@/pages/profile').then(m => ({ default: m.ProfilePage })))
+const LazyPermissionPage = lazy(() => import('@/pages/profile/permission').then(m => ({ default: m.PermissionPage })))
 const LazyModelManagementPage = lazy(() => import('@/pages/llm').then(m => ({ default: m.ModelManagementPage })))
 
 // Governance 页面 - 分开导入避免 HMR 问题
@@ -106,6 +107,10 @@ export const router = createBrowserRouter([
           {
             path: '/profile',
             element: withSuspense(LazyProfilePage)
+          },
+          {
+            path: '/profile/permission',
+            element: withSuspense(LazyPermissionPage)
           },
           {
             path: '/profile/llm/models',
