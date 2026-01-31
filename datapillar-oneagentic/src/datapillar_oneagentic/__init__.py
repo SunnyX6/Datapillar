@@ -63,22 +63,12 @@ Advanced features are available from submodules:
 - SSE streaming: `from datapillar_oneagentic.sse import StreamManager`
 """
 
+from __future__ import annotations
+
+from importlib import import_module
+from typing import Any
+
 __version__ = "0.1.0"
-
-# === Core API ===
-
-# Config
-from datapillar_oneagentic.config import DatapillarConfig
-
-# Decorators
-from datapillar_oneagentic.core.agent import agent
-from datapillar_oneagentic.core.context import AgentContext
-
-# Core classes
-from datapillar_oneagentic.core.datapillar import Datapillar
-from datapillar_oneagentic.core.process import Process
-from datapillar_oneagentic.core.types import SessionKey
-from datapillar_oneagentic.tools.registry import tool
 
 __all__ = [
     # Version
@@ -94,3 +84,28 @@ __all__ = [
     "Process",
     "SessionKey",
 ]
+
+_EXPORTS: dict[str, tuple[str, str]] = {
+    "DatapillarConfig": ("datapillar_oneagentic.config", "DatapillarConfig"),
+    "agent": ("datapillar_oneagentic.core.agent", "agent"),
+    "AgentContext": ("datapillar_oneagentic.core.context", "AgentContext"),
+    "Datapillar": ("datapillar_oneagentic.core.datapillar", "Datapillar"),
+    "Process": ("datapillar_oneagentic.core.process", "Process"),
+    "SessionKey": ("datapillar_oneagentic.core.types", "SessionKey"),
+    "tool": ("datapillar_oneagentic.tools.registry", "tool"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    target = _EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+    module_name, attr_name = target
+    module = import_module(module_name)
+    value = getattr(module, attr_name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()).union(__all__))
