@@ -18,15 +18,21 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.MetricEntity;
 import org.apache.gravitino.meta.MetricVersionEntity;
 import org.apache.gravitino.storage.relational.mapper.MetricVersionMetaMapper;
+import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.MetricVersionPO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -124,5 +130,70 @@ public class MetricVersionMetaService {
     }
 
     return getVersionByIdentifier(metricIdent, version);
+  }
+
+  /**
+   * 根据引用表 ID 获取当前版本指标（仅返回 current_version 对应记录）。
+   *
+   * @param refTableId 引用表 ID
+   * @return 指标版本实体列表
+   */
+  public List<MetricVersionEntity> listCurrentVersionsByRefTableId(Long refTableId) {
+    if (refTableId == null) {
+      return Collections.emptyList();
+    }
+
+    List<MetricVersionPO> versionPOs =
+        SessionUtils.getWithoutCommit(
+            MetricVersionMetaMapper.class,
+            mapper -> mapper.listMetricVersionMetasByRefTableId(refTableId));
+    if (versionPOs.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    Map<Long, SchemaPO> schemaCache = new HashMap<>();
+    Map<Long, CatalogPO> catalogCache = new HashMap<>();
+    Map<Long, MetalakePO> metalakeCache = new HashMap<>();
+    List<MetricVersionEntity> versions = new ArrayList<>(versionPOs.size());
+
+    for (MetricVersionPO versionPO : versionPOs) {
+      if (versionPO == null || versionPO.getMetricCode() == null) {
+        continue;
+      }
+
+      SchemaPO schemaPO =
+          schemaCache.computeIfAbsent(
+              versionPO.getSchemaId(), id -> SchemaMetaService.getInstance().getSchemaPOById(id));
+      if (schemaPO == null) {
+        continue;
+      }
+
+      CatalogPO catalogPO =
+          catalogCache.computeIfAbsent(
+              schemaPO.getCatalogId(),
+              id -> CatalogMetaService.getInstance().getCatalogPOById(id));
+      if (catalogPO == null) {
+        continue;
+      }
+
+      MetalakePO metalakePO =
+          metalakeCache.computeIfAbsent(
+              catalogPO.getMetalakeId(),
+              id -> MetalakeMetaService.getInstance().getMetalakePOById(id));
+      if (metalakePO == null) {
+        continue;
+      }
+
+      NameIdentifier metricIdent =
+          NameIdentifier.of(
+              Namespace.of(
+                  metalakePO.getMetalakeName(),
+                  catalogPO.getCatalogName(),
+                  schemaPO.getSchemaName()),
+              versionPO.getMetricCode());
+      versions.add(POConverters.fromMetricVersionPO(versionPO, metricIdent));
+    }
+
+    return versions;
   }
 }

@@ -52,6 +52,7 @@ class _FakeAsyncMilvusClient:
         self._create_error = create_error
         self.has_collection_calls = 0
         self.create_calls = 0
+        self.create_kwargs = None
 
     async def has_collection(self, _name: str) -> bool:
         self.has_collection_calls += 1
@@ -59,6 +60,7 @@ class _FakeAsyncMilvusClient:
 
     async def create_collection(self, **_kwargs) -> None:
         self.create_calls += 1
+        self.create_kwargs = dict(_kwargs)
         if self._create_error:
             raise self._create_error
 
@@ -131,3 +133,25 @@ async def test_ensure_collection3(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="boom"):
         await store.ensure_collection(_build_schema())
+
+
+@pytest.mark.asyncio
+async def test_custom_index_params(monkeypatch) -> None:
+    _install_fake_pymilvus(monkeypatch)
+    client = _FakeAsyncMilvusClient()
+    store = MilvusVectorStore(
+        uri="http://example.com",
+        token=None,
+        namespace="datapillar",
+        dim=2,
+        index_params={"index_type": "HNSW", "metric_type": "COSINE", "params": {"M": 8}},
+    )
+    store._client = client
+
+    await store.ensure_collection(_build_schema())
+
+    index_params = client.create_kwargs["index_params"]
+    assert index_params.indexes
+    assert index_params.indexes[0]["index_type"] == "HNSW"
+    assert index_params.indexes[0]["metric_type"] == "COSINE"
+    assert index_params.indexes[0]["params"] == {"M": 8}

@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 Agent execution context.
 
@@ -44,6 +47,17 @@ if TYPE_CHECKING:
     from datapillar_oneagentic.core.config import AgentConfig
 
 logger = logging.getLogger(__name__)
+
+
+class AbortInterrupt(Exception):
+    """User aborted an interrupt (control-flow exception)."""
+
+
+def _is_abort_payload(value: Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    return value.get("__abort__") is True
+
 
 class DelegationSignal(Exception):
     """
@@ -216,6 +230,56 @@ class AgentContext:
                 return True
         return False
 
+    @staticmethod
+    def _tool_name(tool: Any) -> str:
+        name = getattr(tool, "name", None)
+        if not name and callable(tool):
+            name = getattr(tool, "__name__", "")
+        return name or ""
+
+    def _collect_bound_namespaces(self) -> dict[str, list[str]]:
+        bound_map: dict[str, list[str]] = {}
+        for tool in self._tools or []:
+            name = self._tool_name(tool)
+            if not name:
+                continue
+            bound = getattr(tool, "bound_namespaces", None)
+            if bound:
+                bound_map[name] = list(bound)
+        return bound_map
+
+    @staticmethod
+    def _inject_tool_call_namespaces(
+        tool_calls: list[Any],
+        *,
+        bound_namespaces: list[str] | None,
+    ) -> None:
+        if not tool_calls:
+            return
+        missing_bound = not bound_namespaces
+        for tc in tool_calls:
+            name = getattr(tc, "name", None)
+            if not name and isinstance(tc, dict):
+                name = tc.get("name")
+            if name != "knowledge_retrieve":
+                continue
+            if missing_bound:
+                raise ValueError("knowledge_retrieve namespaces missing and no bound namespaces provided")
+            args = getattr(tc, "args", None)
+            if args is None and isinstance(tc, dict):
+                args = tc.get("args")
+            if not isinstance(args, dict):
+                args = {}
+            if not args.get("namespaces"):
+                args["namespaces"] = list(bound_namespaces)
+                if isinstance(tc, dict):
+                    tc["args"] = args
+                else:
+                    try:
+                        setattr(tc, "args", args)
+                    except Exception:
+                        pass
+
     async def invoke_tools(self, messages: Messages) -> Messages:
         """
         Tool invocation loop.
@@ -265,6 +329,8 @@ class AgentContext:
         llm_messages = self._compose_messages(messages)
         max_steps = self._spec.get_max_steps(self._agent_config)
         key = SessionKey(namespace=self.namespace, session_id=self.session_id)
+        bound_map = self._collect_bound_namespaces()
+        bound_knowledge = bound_map.get("knowledge_retrieve")
         for _iteration in range(1, max_steps + 1):
             # LLM call.
             response = await llm_with_tools.ainvoke(llm_messages)
@@ -285,6 +351,11 @@ class AgentContext:
                 llm_messages.append(response)
                 messages.append(response)
                 break
+
+            self._inject_tool_call_namespaces(
+                response.tool_calls,
+                bound_namespaces=bound_knowledge,
+            )
 
             llm_messages.append(response)
             messages.append(response)
@@ -460,6 +531,8 @@ class AgentContext:
         Returns the user response and appends it to context messages.
         """
         resume_value = interrupt(payload)
+        if _is_abort_payload(resume_value):
+            raise AbortInterrupt("Aborted by user")
         self._append_user_reply(resume_value)
         return resume_value
 

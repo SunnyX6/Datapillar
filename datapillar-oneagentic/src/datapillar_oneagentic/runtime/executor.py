@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 Agent executor.
 
@@ -21,7 +24,7 @@ from langgraph.types import Command
 from datapillar_oneagentic.a2a.tool import create_a2a_tools
 from datapillar_oneagentic.core.agent import AgentSpec
 from datapillar_oneagentic.core.config import AgentConfig
-from datapillar_oneagentic.core.context import AgentContext, DelegationSignal
+from datapillar_oneagentic.core.context import AgentContext, AbortInterrupt, DelegationSignal
 from datapillar_oneagentic.exception import AgentError, AgentErrorCategory, AgentErrorClassifier
 from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
 from datapillar_oneagentic.core.types import AgentResult, SessionKey
@@ -217,6 +220,7 @@ class AgentExecutor:
         llm_with_context = self.llm.with_event_context(agent_id=spec.id, key=key)
         todo_audit_llm = self._todo_audit_llm.with_event_context(agent_id=spec.id, key=key)
         start_time = time.time()
+        ctx: AgentContext | None = None
 
         if not query:
             raise AgentError(
@@ -234,7 +238,7 @@ class AgentExecutor:
         all_tools = self.base_tools + extra_tools + mcp_tools + a2a_tools
 
         try:
-            logger.info(f"[{spec.name}] Execution started: {query[:100]}...")
+            logger.info(f"[{spec.name}] Execution started")
 
             await self._event_bus.emit(
                 self,
@@ -242,7 +246,6 @@ class AgentExecutor:
                     agent_id=spec.id,
                     agent_name=spec.name,
                     key=key,
-                    query=query[:200],
                 ),
             )
 
@@ -287,6 +290,12 @@ class AgentExecutor:
                 except DelegationSignal as signal:
                     logger.info(f"[{spec.name}] Delegated to {signal.command.goto}")
                     return signal.command
+                except AbortInterrupt:
+                    logger.info(f"[{spec.name}] interrupt aborted by user")
+                    return AgentResult.aborted(
+                        error="Aborted by user",
+                        messages=ctx._messages if ctx is not None else Messages(),
+                    )
 
                 except LLMError as error:
                     if error.agent_id is None:
@@ -395,6 +404,9 @@ class AgentExecutor:
                             f"AgentError:{agent_error.category.value}",
                         )
                         raise agent_error
+
+                    if result.status == ExecutionStatus.ABORTED:
+                        return result
 
                     if result.status != ExecutionStatus.COMPLETED:
                         agent_error = AgentError(

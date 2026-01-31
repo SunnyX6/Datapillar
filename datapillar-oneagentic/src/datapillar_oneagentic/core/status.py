@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 Unified status definitions.
 
@@ -18,6 +21,7 @@ class ExecutionStatus(StrEnum):
     COMPLETED = "completed"
     FAILED = "failed"
     SKIPPED = "skipped"
+    ABORTED = "aborted"
 
 
 class AgentStatus(StrEnum):
@@ -51,6 +55,7 @@ TERMINAL_STATUSES: Final[set[ExecutionStatus]] = {
     ExecutionStatus.COMPLETED,
     ExecutionStatus.FAILED,
     ExecutionStatus.SKIPPED,
+    ExecutionStatus.ABORTED,
 }
 
 def _normalize_status(status: ExecutionStatus | str | None) -> ExecutionStatus | None:

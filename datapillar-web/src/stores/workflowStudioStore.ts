@@ -1,10 +1,11 @@
 import { create } from 'zustand'
-import type { ProcessActivity as SseProcessActivity } from '@/services/aiWorkflowService'
+import type { ProcessActivity as SseProcessActivity, StreamStatus } from '@/services/aiWorkflowService'
 import { emptyWorkflowGraph, type WorkflowGraph } from '@/services/workflowStudioService'
+import { DEFAULT_WORKFLOW_MODEL_ID } from '@/config/workflowModels'
 
 export type ChatRole = 'user' | 'assistant'
 
-export type ProcessActivity = SseProcessActivity & { timestamp: number }
+export type ProcessActivity = SseProcessActivity & { id: string; timestamp: number }
 export type AgentActivity = ProcessActivity
 
 export interface ChatMessage {
@@ -14,10 +15,10 @@ export interface ChatMessage {
   timestamp: number
   processRows?: ProcessActivity[]
   agentRows?: ProcessActivity[]
-  isStreaming?: boolean
+  streamStatus?: StreamStatus
   interrupt?: {
-    text: string
     options: string[]
+    interrupt_id?: string
   }
   recommendations?: string[]
 }
@@ -27,6 +28,7 @@ interface WorkflowStudioState {
   isGenerating: boolean
   isWaitingForResume: boolean
   isInitialized: boolean
+  selectedModelId: string
   workflow: WorkflowGraph
   lastPrompt: string
   addMessage: (message: ChatMessage) => void
@@ -37,10 +39,12 @@ interface WorkflowStudioState {
     lastPrompt: string
     isInitialized: boolean
     isWaitingForResume?: boolean
+    selectedModelId?: string
   }) => void
   setGenerating: (value: boolean) => void
   setWaitingForResume: (value: boolean) => void
   setInitialized: (value: boolean) => void
+  setSelectedModelId: (value: string) => void
   setWorkflow: (workflow: WorkflowGraph) => void
   setLastPrompt: (prompt: string) => void
   reset: () => void
@@ -51,6 +55,7 @@ export const useWorkflowStudioStore = create<WorkflowStudioState>((set) => ({
   isGenerating: false,
   isWaitingForResume: false,
   isInitialized: false,
+  selectedModelId: DEFAULT_WORKFLOW_MODEL_ID,
   workflow: emptyWorkflowGraph,
   lastPrompt: '',
   addMessage: (message) =>
@@ -65,19 +70,18 @@ export const useWorkflowStudioStore = create<WorkflowStudioState>((set) => ({
     })),
   hydrateFromCache: (payload) =>
     set(() => ({
-      messages: payload.messages.map((message) => ({
-        ...message,
-        isStreaming: false
-      })),
+      messages: payload.messages,
       workflow: payload.workflow,
       lastPrompt: payload.lastPrompt,
       isInitialized: payload.isInitialized,
       isWaitingForResume: payload.isWaitingForResume ?? false,
-      isGenerating: false
+      isGenerating: false,
+      selectedModelId: payload.selectedModelId ?? DEFAULT_WORKFLOW_MODEL_ID
     })),
   setGenerating: (value) => set({ isGenerating: value }),
   setWaitingForResume: (value) => set({ isWaitingForResume: value }),
   setInitialized: (value) => set({ isInitialized: value }),
+  setSelectedModelId: (value) => set({ selectedModelId: value }),
   setWorkflow: (workflow) => set({ workflow }),
   setLastPrompt: (prompt) => set({ lastPrompt: prompt }),
   reset: () =>
@@ -87,6 +91,7 @@ export const useWorkflowStudioStore = create<WorkflowStudioState>((set) => ({
       isWaitingForResume: false,
       isInitialized: false,
       workflow: emptyWorkflowGraph,
-      lastPrompt: ''
+      lastPrompt: '',
+      selectedModelId: DEFAULT_WORKFLOW_MODEL_ID
     })
 }))

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { StateSnapshot, VirtuosoHandle } from 'react-virtuoso'
 import { useWorkflowStudioCacheStore, useWorkflowStudioStore, type AgentActivity } from '@/stores'
 import { upsertAgentActivityByAgent } from '@/layouts/workflow/utils'
@@ -13,6 +14,7 @@ import {
 import { ChatHeader } from './ChatHeader'
 import { ChatMessageList } from './ChatMessage'
 import { ChatInput } from './ChatInput'
+import { CHAT_COMMAND_OPTIONS, type ChatCommandId } from './commandLibrary'
 
 const DEFAULT_WORKFLOW_INTRO_MESSAGE =
   '你好！我是 Datapillar 智能助手，可以帮你查询元数据或分析 ETL 需求。请问有什么我可以帮你的？'
@@ -57,9 +59,16 @@ export function ChatPanel() {
   const setLastPrompt = useWorkflowStudioStore((state) => state.setLastPrompt)
   const resetStudio = useWorkflowStudioStore((state) => state.reset)
   const setInitialized = useWorkflowStudioStore((state) => state.setInitialized)
+  const selectedModelId = useWorkflowStudioStore((state) => state.selectedModelId)
+  const setSelectedModelId = useWorkflowStudioStore((state) => state.setSelectedModelId)
   const [input, setInput] = useState('')
   const [showHistory, setShowHistory] = useState(false)
   const [forceScrollVersion, setForceScrollVersion] = useState(0)
+  const [commandNotice, setCommandNotice] = useState<string | null>(null)
+  const [commandNoticeVisible, setCommandNoticeVisible] = useState(false)
+  const navigate = useNavigate()
+  const commandNoticeHideTimerRef = useRef<number | null>(null)
+  const commandNoticeClearTimerRef = useRef<number | null>(null)
   const initialCacheSnapshot = useWorkflowStudioCacheStore.persist?.hasHydrated?.()
     ? useWorkflowStudioCacheStore.getState()
     : null
@@ -116,7 +125,8 @@ export function ChatPanel() {
           workflow: cache.workflow,
           lastPrompt: cache.lastPrompt,
           isInitialized: cache.isInitialized,
-          isWaitingForResume: false
+          isWaitingForResume: false,
+          selectedModelId: cache.selectedModelId
         })
       }
     }
@@ -131,17 +141,14 @@ export function ChatPanel() {
   const persistSnapshot = useCallback(() => {
     if (!cacheReady) return
     const runtime = useWorkflowStudioStore.getState()
-    const normalizedMessages = runtime.messages.map((message) => ({
-      ...message,
-      isStreaming: false
-    }))
     const commitSnapshot = (virtuosoState: StateSnapshot | null) => {
       useWorkflowStudioCacheStore.getState().setSnapshot({
-        messages: normalizedMessages,
+        messages: runtime.messages,
         workflow: runtime.workflow,
         lastPrompt: runtime.lastPrompt,
         isInitialized: runtime.isInitialized,
-        virtuosoState
+        virtuosoState,
+        selectedModelId: runtime.selectedModelId
       })
     }
     const handle = virtuosoRef.current
@@ -175,6 +182,19 @@ export function ChatPanel() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showHistory])
 
+  useEffect(() => {
+    return () => {
+      if (commandNoticeHideTimerRef.current) {
+        window.clearTimeout(commandNoticeHideTimerRef.current)
+        commandNoticeHideTimerRef.current = null
+      }
+      if (commandNoticeClearTimerRef.current) {
+        window.clearTimeout(commandNoticeClearTimerRef.current)
+        commandNoticeClearTimerRef.current = null
+      }
+    }
+  }, [])
+
   // 清理 SSE 连接
   useEffect(() => {
     return () => {
@@ -202,7 +222,6 @@ export function ChatPanel() {
       content: DEFAULT_WORKFLOW_INTRO_MESSAGE,
       timestamp: Date.now(),
       processRows: [],
-      isStreaming: false,
       recommendations: DEFAULT_WORKFLOW_INTRO_RECOMMENDATIONS
     })
     store.setInitialized(true)
@@ -227,11 +246,12 @@ export function ChatPanel() {
       if (evt.activity) {
         const activity = evt.activity
         const timestamp = evt.ts ?? Date.now()
-        const activityId = activity.id || `phase:${activity.phase}`
+        const eventName = activity.event_name || activity.event
+        const agentKey = activity.agent_en || activity.agent_cn || 'agent'
+        const activityId = `${agentKey}:${activity.event}:${eventName}`
         const nextActivity: AgentActivity = {
           ...activity,
           id: activityId,
-          title: activity.title || activity.phase,
           timestamp
         }
         updateMessage(msgId, (currentMsg) => ({
@@ -248,21 +268,29 @@ export function ChatPanel() {
         }
       }
 
-      const nextMessage = evt.message?.trim()
-      const nextRecommendations = evt.recommendations && evt.recommendations.length > 0 ? evt.recommendations : undefined
-      const nextInterrupt = evt.status === 'interrupt' ? evt.interrupt : undefined
+      const nextMessage = evt.activity?.summary?.trim()
+      const nextRecommendations =
+        evt.activity?.recommendations && evt.activity.recommendations.length > 0 ? evt.activity.recommendations : undefined
+      const isInterruptEvent = evt.activity?.event === 'interrupt'
+      const nextInterrupt = isInterruptEvent ? evt.activity?.interrupt : undefined
 
       updateMessage(msgId, (currentMsg) => ({
         ...currentMsg,
         content: nextMessage || currentMsg.content,
-        isStreaming: evt.status === 'running',
-        interrupt: nextInterrupt ?? currentMsg.interrupt,
+        streamStatus: evt.status,
+        interrupt: isInterruptEvent ? (nextInterrupt ?? { options: [] }) : undefined,
         recommendations: nextRecommendations ?? currentMsg.recommendations
       }))
 
-      if (evt.status !== 'running') {
+      if (isInterruptEvent) {
         setGenerating(false)
-        setWaitingForResume(evt.status === 'interrupt')
+        setWaitingForResume(true)
+        return
+      }
+
+      if (evt.status === 'done' || evt.status === 'error' || evt.status === 'aborted') {
+        setGenerating(false)
+        setWaitingForResume(false)
         streamingMessageIdRef.current = null
       }
     },
@@ -293,8 +321,7 @@ export function ChatPanel() {
         role: 'assistant',
         content: '',
         timestamp: Date.now(),
-        processRows: [],
-        isStreaming: true
+        processRows: []
       })
       requestForceScroll()
 
@@ -328,6 +355,7 @@ export function ChatPanel() {
   const canSend = input.trim().length > 0
 
   const handleNewSession = useCallback(() => {
+    const preservedModelId = useWorkflowStudioStore.getState().selectedModelId
     if (cancelStreamRef.current) {
       cancelStreamRef.current()
       cancelStreamRef.current = null
@@ -337,6 +365,7 @@ export function ChatPanel() {
     sessionIdRef.current = generateSessionId()
     setGenerating(false)
     resetStudio()
+    setSelectedModelId(preservedModelId)
     setInitialVirtuosoState(null)
     setVirtuosoKey((key) => key + 1)
     addMessage({
@@ -345,12 +374,49 @@ export function ChatPanel() {
       content: DEFAULT_WORKFLOW_INTRO_MESSAGE,
       timestamp: Date.now(),
       processRows: [],
-      isStreaming: false,
       recommendations: DEFAULT_WORKFLOW_INTRO_RECOMMENDATIONS
     })
     setInitialized(true)
     setInput('')
-  }, [addMessage, resetStudio, setGenerating, setInitialized, setWaitingForResume])
+  }, [addMessage, resetStudio, setGenerating, setInitialized, setSelectedModelId, setWaitingForResume])
+
+  const handleManageModels = useCallback(() => {
+    navigate('/profile/llm/models')
+  }, [navigate])
+
+  const showCommandNotice = useCallback((message: string) => {
+    const totalDuration = 3000
+    const fadeDuration = 200
+    const hideDelay = Math.max(0, totalDuration - fadeDuration)
+    setCommandNotice(message)
+    setCommandNoticeVisible(true)
+    if (commandNoticeHideTimerRef.current) {
+      window.clearTimeout(commandNoticeHideTimerRef.current)
+    }
+    if (commandNoticeClearTimerRef.current) {
+      window.clearTimeout(commandNoticeClearTimerRef.current)
+    }
+    commandNoticeHideTimerRef.current = window.setTimeout(() => {
+      setCommandNoticeVisible(false)
+      commandNoticeHideTimerRef.current = null
+    }, hideDelay)
+    commandNoticeClearTimerRef.current = window.setTimeout(() => {
+      setCommandNotice(null)
+      commandNoticeClearTimerRef.current = null
+    }, totalDuration)
+  }, [])
+
+  const handleCommand = useCallback((commandId: ChatCommandId) => {
+    const command = CHAT_COMMAND_OPTIONS.find((item) => item.id === commandId)
+    const label = command?.label ?? `/${commandId}`
+    if (commandId === 'clear') {
+      showCommandNotice(`已触发 ${label}，待后端接入后生效`)
+      return
+    }
+    if (commandId === 'compact') {
+      showCommandNotice(`已触发 ${label}，待后端接入后生效`)
+    }
+  }, [showCommandNotice])
 
   const isComposingRef = useRef(false)
 
@@ -373,10 +439,46 @@ export function ChatPanel() {
   }
 
   // 打断当前 run
-  const handleAbort = useCallback(async () => {
-    if (!isGenerating) return
+  const latestInterrupt = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index]
+      if (message.role !== 'assistant') continue
+      const interruptId = message.interrupt?.interrupt_id
+      if (interruptId) {
+        return { messageId: message.id, interruptId }
+      }
+    }
+    return null
+  }, [messages])
 
+  const handleAbort = useCallback(async () => {
+    if (!isGenerating && !isWaitingForResume) return
+
+    const isInterruptAbort = Boolean(isWaitingForResume && latestInterrupt?.interruptId)
     try {
+      if (isWaitingForResume && !latestInterrupt?.interruptId) {
+        return
+      }
+      if (isInterruptAbort) {
+        if (cancelStreamRef.current) {
+          cancelStreamRef.current()
+          cancelStreamRef.current = null
+        }
+        const response = await abortWorkflow(sessionIdRef.current, latestInterrupt?.interruptId)
+        setGenerating(false)
+        setWaitingForResume(false)
+        const msgId = latestInterrupt?.messageId
+        if (msgId) {
+          updateMessage(msgId, {
+            content: response.message,
+            streamStatus: 'aborted',
+            interrupt: undefined
+          })
+          streamingMessageIdRef.current = null
+        }
+        return
+      }
+
       // 先关闭 SSE 连接
       if (cancelStreamRef.current) {
         cancelStreamRef.current()
@@ -384,7 +486,7 @@ export function ChatPanel() {
       }
 
       // 调用后端 abort API
-      await abortWorkflow(sessionIdRef.current)
+      const response = await abortWorkflow(sessionIdRef.current)
 
       // 更新 UI 状态
       setGenerating(false)
@@ -394,20 +496,28 @@ export function ChatPanel() {
       const msgId = streamingMessageIdRef.current
       if (msgId) {
         updateMessage(msgId, {
-          content: '已停止',
-          isStreaming: false
+          content: response.message,
+          streamStatus: 'aborted',
+          interrupt: undefined
         })
         streamingMessageIdRef.current = null
       }
     } catch (error) {
       console.error('[Chat] Abort 失败:', error)
     }
-  }, [isGenerating, updateMessage, setGenerating, setWaitingForResume])
+  }, [
+    isGenerating,
+    isWaitingForResume,
+    latestInterrupt,
+    updateMessage,
+    setGenerating,
+    setWaitingForResume
+  ])
 
   // ESC 键打断
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isGenerating) {
+      if (event.key === 'Escape' && (isGenerating || isWaitingForResume)) {
         event.preventDefault()
         handleAbort()
       }
@@ -415,7 +525,7 @@ export function ChatPanel() {
 
     document.addEventListener('keydown', handleEsc)
     return () => document.removeEventListener('keydown', handleEsc)
-  }, [isGenerating, handleAbort])
+  }, [isGenerating, isWaitingForResume, handleAbort])
 
   const latestAssistantMessageId = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -440,15 +550,28 @@ export function ChatPanel() {
 
   return (
     <aside className="w-full h-full flex-shrink-0 bg-white/90 dark:bg-slate-900/95 border-r border-slate-200/60 dark:border-slate-800/80 flex flex-col overflow-hidden">
-      <ChatHeader
-        showHistory={showHistory}
-        onToggleHistory={() => setShowHistory((prev) => !prev)}
-        historySessions={historySessions}
-        historyButtonRef={historyButtonRef}
-        historyCardRef={historyCardRef}
-        latestUserMessage={latestUserMessage}
-        onNewSession={handleNewSession}
-      />
+      <div className="relative">
+        <ChatHeader
+          showHistory={showHistory}
+          onToggleHistory={() => setShowHistory((prev) => !prev)}
+          historySessions={historySessions}
+          historyButtonRef={historyButtonRef}
+          historyCardRef={historyCardRef}
+          latestUserMessage={latestUserMessage}
+          onNewSession={handleNewSession}
+        />
+        {commandNotice && (
+          <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center px-16">
+            <div
+              className={`rounded-lg border border-blue-100/80 dark:border-blue-900/60 bg-blue-50/90 dark:bg-blue-900/30 px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 shadow-sm transition-all duration-200 ease-out ${
+                commandNoticeVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1'
+              }`}
+            >
+              {commandNotice}
+            </div>
+          </div>
+        )}
+      </div>
       <ChatMessageList
         key={virtuosoKey}
         messages={messages}
@@ -473,6 +596,10 @@ export function ChatPanel() {
         isGenerating={isGenerating}
         isWaitingForResume={isWaitingForResume}
         canSend={canSend}
+        selectedModelId={selectedModelId}
+        onModelChange={setSelectedModelId}
+        onManageModels={handleManageModels}
+        onCommand={handleCommand}
       />
     </aside>
   )

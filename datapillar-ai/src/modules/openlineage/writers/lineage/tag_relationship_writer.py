@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 Tag 关系写入器
 
@@ -6,14 +10,14 @@ Tag 关系写入器
 
 from __future__ import annotations
 
-import structlog
+import logging
 from neo4j import AsyncSession
 
 from src.infrastructure.repository.kg.dto import generate_id
 from src.infrastructure.repository.openlineage import Lineage
 from src.modules.openlineage.parsers.plans.metadata import TagUpdatePlan
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class TagRelationshipWriter:
@@ -53,9 +57,13 @@ class TagRelationshipWriter:
                 self.tag_edges_added += len(tag_ids_to_add)
                 logger.info(
                     "has_tag_added",
-                    node_id=plan.node_id,
-                    object_type=plan.object_type,
-                    tags_added=plan.tags_to_add,
+                    extra={
+                        "data": {
+                            "node_id": plan.node_id,
+                            "object_type": plan.object_type,
+                            "tags_added": plan.tags_to_add,
+                        }
+                    },
                 )
 
             # 移除 HAS_TAG 关系
@@ -69,7 +77,11 @@ class TagRelationshipWriter:
                 self.tag_edges_removed += len(tag_ids_to_remove)
                 logger.info(
                     "has_tag_removed",
-                    node_id=plan.node_id,
-                    object_type=plan.object_type,
-                    tags_removed=plan.tags_to_remove,
+                    extra={
+                        "data": {
+                            "node_id": plan.node_id,
+                            "object_type": plan.object_type,
+                            "tags_removed": plan.tags_to_remove,
+                        }
+                    },
                 )

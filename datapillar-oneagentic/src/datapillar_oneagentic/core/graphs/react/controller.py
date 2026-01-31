@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 ReAct controller (plan-execute-reflect).
 
@@ -202,6 +205,16 @@ def _decide_next_step(
                 logger.info(f"ReAct: task {current_task.id} completed successfully")
                 error_retry_count = 0
                 sb.react.set_error_retry(error_retry_count)
+
+            elif last_status == ExecutionStatus.ABORTED:
+                logger.info(f"ReAct: task {current_task.id} aborted by user")
+                current_task.status = ExecutionStatus.ABORTED
+                current_task.error = "Aborted by user"
+                plan.status = ExecutionStatus.ABORTED
+                plan.stage = ProcessStage.REFLECTING
+                sb.routing.clear_active()
+                sb.react.set_error_retry(0)
+                return "finalize"
 
             elif last_status == ExecutionStatus.FAILED and last_failure_kind == FailureKind.SYSTEM:
                 # System error: fast retry.

@@ -47,6 +47,8 @@ import org.apache.gravitino.listener.api.event.LoadSchemaFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadSchemaPreEvent;
 import org.apache.gravitino.listener.api.info.SchemaInfo;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code SchemaEventDispatcher} is a decorator for {@link SchemaDispatcher} that not only delegates
@@ -55,6 +57,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * for event-driven workflows or monitoring of schema operations.
  */
 public class SchemaEventDispatcher implements SchemaDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(SchemaEventDispatcher.class);
+
   private final EventBus eventBus;
   private final SchemaDispatcher dispatcher;
 
@@ -134,6 +138,7 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
       eventBus.dispatchEvent(
           new AlterSchemaEvent(
               PrincipalUtils.getCurrentUserName(), ident, changes, new SchemaInfo(schema)));
+      emitMetricLineageForSchema(ident, schema);
       return schema;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -154,6 +159,17 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
       eventBus.dispatchEvent(
           new DropSchemaFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e, cascade));
       throw e;
+    }
+  }
+
+  private void emitMetricLineageForSchema(NameIdentifier ident, Schema schema) {
+    try {
+      String schemaName = schema == null ? ident.name() : schema.name();
+      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace(), schemaName);
+      MetricLineageEventEmitter.emitForSchema(
+          eventBus, PrincipalUtils.getCurrentUserName(), schemaIdent);
+    } catch (Exception e) {
+      LOG.warn("Schema变更触发指标级联失败: schema={}", ident, e);
     }
   }
 }

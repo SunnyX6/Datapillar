@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """VectorKnowledgeStore implementation."""
 
 from __future__ import annotations
@@ -43,6 +46,14 @@ class VectorKnowledgeStore(KnowledgeStore):
     @property
     def namespace(self) -> str:
         return self._namespace
+
+    @property
+    def supports_hybrid(self) -> bool:
+        return self._vector_store.capabilities.supports_hybrid
+
+    @property
+    def supports_full_text(self) -> bool:
+        return False
 
     def _register_schemas(self) -> None:
         self._vector_store.register_schema(
@@ -251,6 +262,46 @@ class VectorKnowledgeStore(KnowledgeStore):
             )
         return hits
 
+    async def hybrid_search_chunks(
+        self,
+        *,
+        query_vector: list[float],
+        query_text: str,
+        k: int,
+        filters: dict[str, Any] | None = None,
+        rrf_k: int = 60,
+    ) -> list[KnowledgeSearchHit]:
+        merged_filters = dict(filters or {})
+        merged_filters["namespace"] = self._namespace
+        results = await self._vector_store.hybrid_search(
+            _CHUNKS,
+            query_vector=query_vector,
+            query_text=query_text,
+            k=k,
+            filters=merged_filters,
+            rrf_k=rrf_k,
+        )
+        hits: list[KnowledgeSearchHit] = []
+        for item in results:
+            chunk = _row_to_chunk(item.record)
+            hits.append(
+                KnowledgeSearchHit(
+                    chunk=chunk,
+                    score=item.score,
+                    score_kind=item.score_kind,
+                )
+            )
+        return hits
+
+    async def full_text_search_chunks(
+        self,
+        *,
+        query_text: str,
+        k: int,
+        filters: dict[str, Any] | None = None,
+    ) -> list[KnowledgeSearchHit]:
+        raise ValueError("Full-text retrieval is not supported by the current backend.")
+
     async def get_doc(self, doc_id: str) -> KnowledgeDocument | None:
         rows = await self._vector_store.get(_DOCS, [self._build_key(doc_id)])
         if not rows:
@@ -262,6 +313,23 @@ class VectorKnowledgeStore(KnowledgeStore):
             return []
         keys = [self._build_key(chunk_id) for chunk_id in chunk_ids]
         rows = await self._vector_store.get(_CHUNKS, keys)
+        return [_row_to_chunk(row) for row in rows]
+
+    async def delete_chunks(self, chunk_ids: list[str]) -> int:
+        if not chunk_ids:
+            return 0
+        keys = [self._build_key(chunk_id) for chunk_id in chunk_ids]
+        return await self._vector_store.delete(_CHUNKS, keys)
+
+    async def query_chunks(
+        self,
+        *,
+        filters: dict[str, Any] | None = None,
+        limit: int | None = None,
+    ) -> list[KnowledgeChunk]:
+        merged_filters = dict(filters or {})
+        merged_filters["namespace"] = self._namespace
+        rows = await self._vector_store.query(_CHUNKS, filters=merged_filters, limit=limit)
         return [_row_to_chunk(row) for row in rows]
 
     async def delete_doc(self, doc_id: str) -> int:

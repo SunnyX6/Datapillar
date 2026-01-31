@@ -1,10 +1,14 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 from __future__ import annotations
 
 import json
 from collections.abc import Callable
 from typing import Any
 
-import structlog
+import logging
 
 from src.infrastructure.repository.kg.dto import SQLDTO, generate_id
 from src.modules.openlineage.parsers.common.dataset import DatasetResolver
@@ -28,7 +32,7 @@ from src.modules.openlineage.schemas.events import RunEvent
 from src.modules.openlineage.schemas.facets import ColumnLineageDatasetFacet, SchemaDatasetFacet
 from src.shared.utils.sql_lineage import SQLLineageAnalyzer
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class OpenLineagePlanBuilder:
@@ -407,7 +411,10 @@ class OpenLineagePlanBuilder:
         try:
             result = SQLLineageAnalyzer(dialect=dialect).analyze_sql(sql)
         except Exception as e:
-            logger.warning("sql_column_lineage_analysis_failed", error=str(e))
+            logger.warning(
+                "sql_column_lineage_analysis_failed",
+                extra={"data": {"error": str(e)}},
+            )
             return []
 
         lineage_data: list[dict] = []
@@ -514,7 +521,10 @@ class OpenLineagePlanBuilder:
                     if column_ids:
                         measures.append((metric_id, column_ids))
                 except json.JSONDecodeError:
-                    logger.warning("metric_lineage_measure_parse_error", metric_id=metric_id)
+                    logger.warning(
+                        "metric_lineage_measure_parse_error",
+                        extra={"data": {"metric_id": metric_id}},
+                    )
 
             filter_columns_field = fields.get("filterColumns")
             if filter_columns_field and filter_columns_field.description:
@@ -530,7 +540,10 @@ class OpenLineagePlanBuilder:
                     if column_ids:
                         filters.append((metric_id, column_ids))
                 except json.JSONDecodeError:
-                    logger.warning("metric_lineage_filter_parse_error", metric_id=metric_id)
+                    logger.warning(
+                        "metric_lineage_filter_parse_error",
+                        extra={"data": {"metric_id": metric_id}},
+                    )
 
         return measures, filters
 

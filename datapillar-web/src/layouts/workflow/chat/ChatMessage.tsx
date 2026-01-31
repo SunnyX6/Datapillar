@@ -3,14 +3,23 @@ import { Virtuoso, type StateSnapshot, type VirtuosoHandle } from 'react-virtuos
 import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronDown, Loader2, Sparkles, User, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AgentActivity, ChatMessage } from '@/stores/workflowStudioStore'
-import type { ProcessStatus } from '@/services/aiWorkflowService'
+import type { StreamStatus } from '@/services/aiWorkflowService'
 
-const PROCESS_STATUS_LABEL: Record<ProcessStatus, string> = {
+const STREAM_STATUS_LABEL: Record<StreamStatus, string> = {
   running: '进行中',
-  waiting: '等待补充',
   done: '已完成',
   error: '失败',
   aborted: '已停止'
+}
+
+const getProcessRowTitle = (row: AgentActivity): string => {
+  return row.agent_cn || row.agent_en || ''
+}
+
+const getProcessRowMessage = (row: AgentActivity): string => row.event_name
+
+const getProcessStatusLabel = (streamStatus: StreamStatus | undefined): string => {
+  return streamStatus ? STREAM_STATUS_LABEL[streamStatus] : ''
 }
 
 type ChatMessageListProps = {
@@ -133,7 +142,7 @@ const ChatBubble = memo(
       [message.processRows, message.agentRows]
     )
     const hasProcessRows = !isUser && processRows.length > 0
-    const isStreaming = message.isStreaming === true
+    const isStreaming = message.streamStatus === 'running'
     const [isExpanded, setIsExpanded] = useState(false)
 
     const latestProcessRow = useMemo(() => {
@@ -155,19 +164,22 @@ const ChatBubble = memo(
       return <Activity size={10} strokeWidth={2.75} />
     }, [])
 
-    const buildRowMessage = useCallback((row: AgentActivity) => {
-      const detail = row.detail || PROCESS_STATUS_LABEL[row.status]
-      const actor = row.actor ? `${row.actor} · ` : ''
-      const progress = typeof row.progress === 'number' ? ` ${row.progress}%` : ''
-      return `${actor}${detail}${progress}`.trim()
-    }, [])
+    const buildRowTitle = useCallback((row: AgentActivity) => getProcessRowTitle(row), [])
 
-    const latestStatusLabel = latestProcessRow ? PROCESS_STATUS_LABEL[latestProcessRow.status] : '处理中'
-    const latestProcessLabel = latestProcessRow ? `${latestProcessRow.title} · ${latestStatusLabel}` : '处理中'
+    const buildRowMessage = useCallback((row: AgentActivity) => getProcessRowMessage(row), [])
+
+    const latestStatusLabel = getProcessStatusLabel(message.streamStatus)
+    const latestProcessLabel = latestProcessRow
+      ? latestStatusLabel
+        ? `${buildRowTitle(latestProcessRow)} · ${latestStatusLabel}`
+        : buildRowTitle(latestProcessRow)
+      : latestStatusLabel
 
     const recommendations = useMemo(() => message.recommendations ?? [], [message.recommendations])
     const interrupt = !isUser ? message.interrupt : undefined
-    const hasInterrupt = Boolean(interrupt?.text?.trim()) || (interrupt?.options?.length ?? 0) > 0
+    const interruptSummary = interrupt ? message.content.trim() : ''
+    const hasInterrupt = Boolean(interrupt && (interruptSummary || (interrupt.options?.length ?? 0) > 0))
+    const canAbortInterrupt = Boolean(interrupt?.interrupt_id)
     const shouldShowAiGuide = !isUser && Boolean(isLatestAssistant) && recommendations.length > 0
 
     return (
@@ -204,7 +216,7 @@ const ChatBubble = memo(
             {isStreaming && hasProcessRows && (
               <div className="space-y-2 mb-2 pb-2 border-b border-slate-100 dark:border-slate-700/50">
                 <div className="px-1 flex items-center gap-2">
-                  <Loader2 size={10} className="text-indigo-500" />
+                  <Loader2 size={10} className="animate-spin text-indigo-500" />
                   <span className="text-tiny font-black text-indigo-500 uppercase tracking-widest">过程动态</span>
                 </div>
                 {processRows.map((row) => (
@@ -212,10 +224,10 @@ const ChatBubble = memo(
                     <div className={cn('w-5 h-5 rounded border flex items-center justify-center shrink-0', getRowBadgeClass(row))}>
                       <RowIcon row={row} />
                     </div>
-                    <span className="text-nano font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter shrink-0 w-24">
-                      {row.title}
+                    <span className="text-nano font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter min-w-0 max-w-[40%] truncate">
+                      {buildRowTitle(row)}
                     </span>
-                    <span className="text-micro font-medium text-slate-400 truncate flex-1">
+                    <span className="text-micro font-medium text-slate-400 truncate flex-1 min-w-0">
                       {buildRowMessage(row)}
                     </span>
                   </div>
@@ -274,10 +286,10 @@ const ChatBubble = memo(
                         >
                           <RowIcon row={row} />
                         </div>
-                        <span className="text-nano font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter shrink-0 w-24">
-                          {row.title}
+                        <span className="text-nano font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter min-w-0 max-w-[40%] truncate">
+                          {buildRowTitle(row)}
                         </span>
-                        <span className="text-micro font-medium text-slate-400 truncate flex-1">
+                        <span className="text-micro font-medium text-slate-400 truncate flex-1 min-w-0">
                           {buildRowMessage(row)}
                         </span>
                       </div>
@@ -288,12 +300,23 @@ const ChatBubble = memo(
             )}
 
             {/* 消息内容 */}
-            {message.content}
+            {!hasInterrupt && message.content}
 
             {hasInterrupt && (
               <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700/50">
-                <div className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-micro xl:text-legal font-normal text-amber-700 shadow-sm shadow-amber-100 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200 whitespace-pre-wrap">
-                  {interrupt?.text}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-micro xl:text-legal font-normal text-amber-700 shadow-sm shadow-amber-100 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200 whitespace-pre-wrap">
+                    {interruptSummary || '需要补充信息才能继续。'}
+                  </div>
+                  {isLatestAssistant && _onAbort && canAbortInterrupt && (
+                    <button
+                      type="button"
+                      onClick={() => _onAbort()}
+                      className="shrink-0 rounded-md border border-amber-200 bg-white px-2 py-1 text-micro font-medium text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-800/60 dark:bg-slate-900 dark:text-amber-200 dark:hover:bg-amber-900/30"
+                    >
+                      停止
+                    </button>
+                  )}
                 </div>
                 {interrupt?.options && interrupt.options.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -344,21 +367,21 @@ const ChatBubble = memo(
     const prevInterrupt = previous.message.interrupt
     const nextInterrupt = next.message.interrupt
     const interruptEqual =
-      (prevInterrupt?.text ?? '') === (nextInterrupt?.text ?? '') &&
       (prevInterrupt?.options ?? []).length === (nextInterrupt?.options ?? []).length &&
-      (prevInterrupt?.options ?? []).every((value, index) => value === nextInterrupt?.options?.[index])
+      (prevInterrupt?.options ?? []).every((value, index) => value === nextInterrupt?.options?.[index]) &&
+      prevInterrupt?.interrupt_id === nextInterrupt?.interrupt_id
     const rowsEqual =
       prevRows.length === nextRows.length &&
       prevRows.every((row, index) => {
         const nextRow = nextRows[index]
         return (
           row.id === nextRow?.id &&
-          row.phase === nextRow?.phase &&
+          row.agent_cn === nextRow?.agent_cn &&
+          row.agent_en === nextRow?.agent_en &&
+          row.event === nextRow?.event &&
+          row.event_name === nextRow?.event_name &&
           row.status === nextRow?.status &&
-          row.title === nextRow?.title &&
-          row.detail === nextRow?.detail &&
-          row.actor === nextRow?.actor &&
-          row.progress === nextRow?.progress &&
+          row.summary === nextRow?.summary &&
           row.timestamp === nextRow?.timestamp
         )
       })
@@ -368,7 +391,7 @@ const ChatBubble = memo(
       previous.message.content === next.message.content &&
       previous.message.timestamp === next.message.timestamp &&
       rowsEqual &&
-      previous.message.isStreaming === next.message.isStreaming &&
+      previous.message.streamStatus === next.message.streamStatus &&
       recommendationsEqual &&
       interruptEqual &&
       previous.isLatestAssistant === next.isLatestAssistant

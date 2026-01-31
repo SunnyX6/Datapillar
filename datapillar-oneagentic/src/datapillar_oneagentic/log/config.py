@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 from __future__ import annotations
 
 import logging
@@ -7,12 +10,7 @@ from datapillar_oneagentic.log.context import ContextFilter
 _LOGGER_NAME = "datapillar_oneagentic"
 _HANDLER_FLAG = "_datapillar_log_handler"
 
-_LOG_FORMAT = (
-    "%(asctime)s.%(msecs)03d %(levelname)-5s %(name)s - "
-    "[event=%(event)s namespace=%(namespace)s session_id=%(session_id)s "
-    "agent_id=%(agent_id)s request_id=%(request_id)s trace_id=%(trace_id)s "
-    "span_id=%(span_id)s] %(message)s"
-)
+_LOG_FORMAT = "%(asctime)s.%(msecs)03d %(levelname)-5s %(name)s - %(message)s%(context)s"
 _DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 

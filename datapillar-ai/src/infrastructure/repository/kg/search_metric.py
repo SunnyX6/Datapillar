@@ -1,9 +1,13 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 Neo4j 指标查询服务
 
 职责：提供指标相关的查询功能
 - get_metric_context: 根据指标 code 列表查询指标详情
-- search_metrics: 向量搜索指标
+- search_metrics: 混合检索指标（向量 + 全文）
 """
 
 from __future__ import annotations
@@ -107,12 +111,10 @@ class Neo4jMetricSearch:
 
     @classmethod
     def search_metrics(
-        cls, query: str, top_k: int = 3, min_score: float = 0.8
+        cls, query: str, top_k: int = 3, min_score: float = 0.55
     ) -> list[dict[str, Any]]:
         """
-        向量搜索指标
-
-        搜索原子指标和派生指标索引，返回匹配的指标。
+        混合搜索指标
 
         参数：
         - query: 搜索文本
@@ -122,81 +124,104 @@ class Neo4jMetricSearch:
         返回：
         - 推荐的指标列表，包含 type, code, name, description, score
         """
+        from neo4j_graphrag.retrievers import HybridCypherRetriever
+        from neo4j_graphrag.types import HybridSearchRanker, RetrieverResultItem
+
         from src.infrastructure.llm.embeddings import UnifiedEmbedder
 
         start = time.time()
-        index_names = ["atomic_metric_embedding", "derived_metric_embedding"]
 
-        # 生成 embedding
-        embedder = UnifiedEmbedder()
-        query_vector = embedder.embed_query(query)
+        search_configs = [
+            {
+                "metric_type": "AtomicMetric",
+                "vector_index": "atomic_metric_embedding",
+                "fulltext_index": "atomic_metric_fulltext",
+            },
+            {
+                "metric_type": "DerivedMetric",
+                "vector_index": "derived_metric_embedding",
+                "fulltext_index": "derived_metric_fulltext",
+            },
+            {
+                "metric_type": "CompositeMetric",
+                "vector_index": "composite_metric_embedding",
+                "fulltext_index": "composite_metric_fulltext",
+            },
+        ]
 
-        driver = Neo4jClient.get_driver()
-        all_results: list[dict] = []
+        def metric_result_formatter(record: Any) -> Any:
+            return RetrieverResultItem(
+                content=f"{record.get('name')} {record.get('description') or ''}",
+                metadata={
+                    "type": record.get("type"),
+                    "code": record.get("code"),
+                    "name": record.get("name"),
+                    "description": record.get("description"),
+                    "score": record.get("score"),
+                },
+            )
 
-        def search_single_index(index_name: str) -> list[dict]:
-            """单索引查询"""
-            results = []
+        def hybrid_search_single(config: dict[str, str]) -> list[dict[str, Any]]:
+            results: list[dict[str, Any]] = []
+            retrieval_query = f"""
+            RETURN
+                node.id AS node_id,
+                '{config["metric_type"]}' AS type,
+                node.code AS code,
+                node.name AS name,
+                node.description AS description,
+                score
+            """
+
             try:
-                with driver.session(database=settings.neo4j_database) as session:
-                    cypher = """
-                    CALL db.index.vector.queryNodes($index_name, $top_k, $vector)
-                    YIELD node, score
-                    WHERE score >= $min_score
-                    RETURN elementId(node) AS element_id, score
-                    """
-                    result = run_cypher(
-                        session,
-                        cypher,
+                retriever = HybridCypherRetriever(
+                    driver=Neo4jClient.get_driver(),
+                    vector_index_name=config["vector_index"],
+                    fulltext_index_name=config["fulltext_index"],
+                    retrieval_query=retrieval_query,
+                    result_formatter=metric_result_formatter,
+                    embedder=UnifiedEmbedder(),
+                    neo4j_database=settings.neo4j_database,
+                )
+
+                search_result = retriever.search(
+                    query_text=query,
+                    top_k=top_k,
+                    ranker=HybridSearchRanker.LINEAR,
+                    alpha=0.6,
+                )
+                items = list(getattr(search_result, "items", []) or [])
+
+                for item in items:
+                    metadata = getattr(item, "metadata", {}) or {}
+                    score = float(metadata.get("score", 0) or 0)
+                    if score < min_score:
+                        continue
+                    results.append(
                         {
-                            "index_name": index_name,
-                            "top_k": top_k,
-                            "vector": query_vector,
-                            "min_score": min_score,
-                        },
+                            "type": metadata.get("type"),
+                            "code": metadata.get("code"),
+                            "name": metadata.get("name"),
+                            "description": metadata.get("description"),
+                            "score": round(score, 3),
+                        }
                     )
-                    for record in result:
-                        results.append(
-                            {"element_id": record["element_id"], "score": record["score"]}
-                        )
             except Exception as e:
-                logger.warning(f"向量搜索[{index_name}]失败: {e}")
+                logger.warning(f"混合搜索[{config['metric_type']}]失败: {e}")
+
             return results
 
-        # 并行查询多个索引
-        with ThreadPoolExecutor(max_workers=len(index_names)) as executor:
-            futures = {executor.submit(search_single_index, idx): idx for idx in index_names}
+        all_results: list[dict[str, Any]] = []
+        with ThreadPoolExecutor(max_workers=len(search_configs)) as executor:
+            futures = [executor.submit(hybrid_search_single, cfg) for cfg in search_configs]
             for future in as_completed(futures):
                 all_results.extend(future.result())
 
         if not all_results:
             return []
 
-        # 按 score 排序，取 top 5
         all_results.sort(key=lambda x: x.get("score", 0), reverse=True)
-        all_results = all_results[:5]
+        all_results = all_results[:top_k]
 
-        element_ids = [r.get("element_id") for r in all_results if r.get("element_id")]
-        score_map = {r.get("element_id"): r.get("score", 0) for r in all_results}
-
-        if not element_ids:
-            return []
-
-        # 批量查询上下文
-        try:
-            with driver.session(database=settings.neo4j_database) as session:
-                result = run_cypher(session, cls._METRIC_CYPHER, {"element_ids": element_ids})
-                records = result.data()
-
-                recommendations = []
-                for r in records:
-                    eid = r.get("element_id")
-                    r["score"] = round(score_map.get(eid, 0), 3)
-                    del r["element_id"]
-                    recommendations.append(r)
-
-                logger.debug(f"[指标搜索] 总耗时: {time.time() - start:.3f}s")
-                return recommendations
-        except Exception as e:
-            logger.error(f"搜索指标上下文失败: {e}")
-            return []
+        logger.debug(f"[指标搜索] 总耗时: {time.time() - start:.3f}s")
+        return all_results

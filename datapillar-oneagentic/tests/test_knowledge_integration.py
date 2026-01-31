@@ -6,15 +6,13 @@ import tempfile
 import pytest
 
 from datapillar_oneagentic.knowledge import (
-    DocumentInput,
     Knowledge,
     KnowledgeChunkConfig,
-    KnowledgeConfig,
     KnowledgeIngestor,
     KnowledgeRetrieveConfig,
-    KnowledgeRetriever,
     KnowledgeSource,
 )
+from datapillar_oneagentic.knowledge.retriever import KnowledgeRetriever
 from datapillar_oneagentic.providers.llm.config import EmbeddingConfig
 from datapillar_oneagentic.storage import create_knowledge_store
 from datapillar_oneagentic.storage.config import VectorStoreConfig
@@ -59,29 +57,29 @@ async def test_knowledge_ingest() -> None:
         await store.initialize()
 
         embedder = _StubEmbedder()
+        chunk_config = KnowledgeChunkConfig(
+            mode="general",
+            general={"max_tokens": 50, "overlap": 0},
+        )
         ingestor = KnowledgeIngestor(
             store=store,
             embedding_provider=embedder,
-            config=KnowledgeChunkConfig(
-                mode="general",
-                general={"max_tokens": 50, "overlap": 0},
-            ),
         )
-        source = KnowledgeSource(source_id="kb", name="KB", source_type="doc")
-        doc = DocumentInput(
+        source = KnowledgeSource(
             source="Datapillar knowledge integration test text.",
+            chunk=chunk_config,
+            name="KB",
+            source_type="doc",
             filename="doc.txt",
         )
-        await ingestor.ingest(source=source, documents=[doc])
+        await ingestor.ingest(sources=[source])
 
         retriever = KnowledgeRetriever(
             store=store,
             embedding_provider=embedder,
-            config=KnowledgeConfig(
-                retrieve_config=KnowledgeRetrieveConfig(
-                    method="semantic",
-                    top_k=1,
-                )
+            retrieve_defaults=KnowledgeRetrieveConfig(
+                method="semantic",
+                top_k=1,
             ),
         )
         knowledge = Knowledge(sources=[source])

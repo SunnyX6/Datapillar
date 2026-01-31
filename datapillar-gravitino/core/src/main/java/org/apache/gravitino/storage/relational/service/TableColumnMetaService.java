@@ -45,7 +45,7 @@ public class TableColumnMetaService {
     return INSTANCE;
   }
 
-  List<ColumnPO> getColumnsByTableIdAndVersion(Long tableId, Long version) {
+  public List<ColumnPO> getColumnsByTableIdAndVersion(Long tableId, Long version) {
     List<ColumnPO> columnPOs =
         SessionUtils.getWithoutCommit(
             TableColumnMapper.class,

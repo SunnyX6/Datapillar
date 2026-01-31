@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 Delegation tools.
 
@@ -21,7 +24,6 @@ from langgraph.types import Command
 
 from datapillar_oneagentic.state import StateBuilder
 from datapillar_oneagentic.messages import Message, Messages
-from datapillar_oneagentic.utils.prompt_format import format_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -59,13 +61,6 @@ def create_delegation_tool(
         sb = StateBuilder(state)
         messages = sb.memory.raw_snapshot()
         tool_call_id = _extract_call_id(messages, tool_name)
-        user_message = _extract_last_user(messages)
-        if user_message and user_message not in task_description:
-            user_block = format_markdown(
-                title=None,
-                sections=[("Original User Input", user_message)],
-            )
-            task_description = f"{task_description}\n\n{user_block}"
 
         # Create confirmation message.
         tool_message = Message.tool(
@@ -74,7 +69,7 @@ def create_delegation_tool(
             tool_call_id=tool_call_id or "unknown",
         )
 
-        logger.info(f"Delegation: {target_agent_id}, task: {task_description[:100]}...")
+        logger.info(f"Delegation: {target_agent_id}")
 
         update_messages = Messages([tool_message])
         # Tool messages must be written back to match tool_call_id.
@@ -98,14 +93,6 @@ def _extract_call_id(messages: Messages, tool_name: str) -> str | None:
         for tc in _iter_tool_calls(msg):
             if tc.name == tool_name:
                 return tc.id
-    return None
-
-
-def _extract_last_user(messages: Messages) -> str | None:
-    """Return the last user input to enrich delegation context."""
-    for msg in reversed(messages):
-        if msg.role == "user" and msg.content:
-            return msg.content
     return None
 
 

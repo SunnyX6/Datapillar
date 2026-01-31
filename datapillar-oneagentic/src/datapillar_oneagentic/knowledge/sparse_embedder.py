@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """Built-in sparse embedders for knowledge retrieval."""
 
 from __future__ import annotations

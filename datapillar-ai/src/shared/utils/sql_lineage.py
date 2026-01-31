@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 SQL 血缘分析器
 
@@ -15,11 +19,11 @@ SQL 血缘分析器
 from dataclasses import dataclass, field
 from enum import Enum
 
+import logging
 import sqlglot
-import structlog
 from sqlglot import exp
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class TableRole(str, Enum):
@@ -155,7 +159,10 @@ class SQLLineageAnalyzer:
                 created_tables.update(writes)
                 sql_dependencies.append((reads, writes, sql))
             except Exception as e:
-                logger.warning("sql_parse_failed", sql=sql[:100], error=str(e))
+                logger.warning(
+                    "sql_parse_failed",
+                    extra={"data": {"sql": sql[:100], "error": str(e)}},
+                )
                 continue
 
         # 临时表 = 在 session 中创建 且 被读取
@@ -197,7 +204,10 @@ class SQLLineageAnalyzer:
         try:
             statements = sqlglot.parse(sql, dialect=self.dialect)
         except Exception as e:
-            logger.warning("sql_parse_error", sql=sql[:100], error=str(e))
+            logger.warning(
+                "sql_parse_error",
+                extra={"data": {"sql": sql[:100], "error": str(e)}},
+            )
             return reads, writes
 
         for statement in statements:
@@ -358,7 +368,10 @@ class SQLLineageAnalyzer:
                 lineages = self._analyze_column_lineage(sql, schema)
                 column_lineages.extend(lineages)
             except Exception as e:
-                logger.debug("column_lineage_extract_failed", sql=sql[:50], error=str(e))
+                logger.debug(
+                    "column_lineage_extract_failed",
+                    extra={"data": {"sql": sql[:50], "error": str(e)}},
+                )
                 continue
 
         return column_lineages

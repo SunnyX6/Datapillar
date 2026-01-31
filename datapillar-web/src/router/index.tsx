@@ -32,11 +32,14 @@ const LazyWorkflowStudioPage = lazy(() => import('@/pages/workflow').then(m => (
 
 const LazyWikiPage = lazy(() => import('@/pages/wiki').then(m => ({ default: m.WikiPage })))
 
-const LazyOneIdePage = lazy(() => import('@/pages/ide').then(m => ({ default: m.OneIdePage })))
+const LazyOneIdePage = lazy(() => import('@/pages/ide/OneIdePage').then(m => ({ default: m.OneIdePage })))
 
-const LazySqlEditorPage = lazy(() => import('@/pages/ide').then(m => ({ default: m.SqlEditorPage })))
+const LazySqlEditorPage = lazy(() => import('@/pages/ide/SqlEditorPage').then(m => ({ default: m.SqlEditorPage })))
+
+const LazyDataTrackingPage = lazy(() => import('@/pages/data_tracking').then(m => ({ default: m.DataTrackingPage })))
 
 const LazyProfilePage = lazy(() => import('@/pages/profile').then(m => ({ default: m.ProfilePage })))
+const LazyModelManagementPage = lazy(() => import('@/pages/llm').then(m => ({ default: m.ModelManagementPage })))
 
 // Governance 页面 - 分开导入避免 HMR 问题
 const LazyGovernanceKnowledgePage = lazy(() => import('@/pages/governance/KnowledgeGraphPage').then(m => ({ default: m.GovernanceKnowledgePage })))
@@ -89,6 +92,10 @@ export const router = createBrowserRouter([
             element: withSuspense(LazyWikiPage)
           },
           {
+            path: '/data-tracking',
+            element: withSuspense(LazyDataTrackingPage)
+          },
+          {
             path: '/ide',
             element: withSuspense(LazyOneIdePage)
           },
@@ -99,6 +106,10 @@ export const router = createBrowserRouter([
           {
             path: '/profile',
             element: withSuspense(LazyProfilePage)
+          },
+          {
+            path: '/profile/llm/models',
+            element: withSuspense(LazyModelManagementPage)
           },
           {
             path: '/governance/metadata',

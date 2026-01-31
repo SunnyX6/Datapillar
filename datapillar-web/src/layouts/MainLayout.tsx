@@ -3,7 +3,7 @@ import { Sidebar } from './navigation/Sidebar'
 import { TopNav } from './navigation/TopNav'
 import { useThemeStore, useAuthStore, useLayoutStore } from '@/stores'
 
-type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide' | 'projects' | 'collaboration'
+type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide' | 'projects' | 'collaboration' | 'tracking'
 
 const MOCK_USER = {
   name: 'S. Engineer',
@@ -21,6 +21,8 @@ export function MainLayout() {
     ? 'workflow'
     : location.pathname.startsWith('/wiki')
       ? 'wiki'
+      : location.pathname.startsWith('/data-tracking')
+        ? 'tracking'
       : location.pathname.startsWith('/ide')
         ? 'ide'
         : location.pathname.startsWith('/projects')
@@ -52,6 +54,8 @@ export function MainLayout() {
         ? '/workflow'
         : nextView === 'wiki'
           ? '/wiki'
+          : nextView === 'tracking'
+            ? '/data-tracking'
           : nextView === 'ide'
             ? '/ide'
             : nextView === 'projects'

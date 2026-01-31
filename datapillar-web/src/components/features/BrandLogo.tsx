@@ -24,7 +24,7 @@ export function BrandLogo({
   brandName = '',
   brandTagline = '',
   className = '',
-  nameClassName = 'text-title leading-tight tracking-tight text-indigo-600 dark:text-indigo-300',
+  nameClassName = 'text-title leading-tight tracking-tight text-brand-600 dark:text-brand-400',
   taglineClassName = 'text-caption text-slate-400 dark:text-slate-500 mt-0.5 leading-snug'
 }: BrandLogoProps) {
   const dimension = `${size}px`

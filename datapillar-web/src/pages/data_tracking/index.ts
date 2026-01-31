@@ -1,0 +1,1 @@
+export { DataTrackingPage } from './DataTrackingPage'

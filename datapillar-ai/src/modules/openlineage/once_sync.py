@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 Gravitino 元数据一次性同步服务
 
@@ -7,7 +11,7 @@ Gravitino 元数据一次性同步服务
 
 import json
 
-import structlog
+import logging
 from neo4j import AsyncSession
 
 from src.infrastructure.database.gravitino import GravitinoDBClient
@@ -27,7 +31,7 @@ from src.infrastructure.repository.openlineage.metadata import TableUpsertPayloa
 from src.modules.openlineage.core.embedding_processor import embedding_processor
 from src.shared.config import settings
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class GravitinoSyncService:
@@ -72,7 +76,10 @@ class GravitinoSyncService:
             embedder = UnifiedEmbedder()
             self._current_embedding_provider = f"{embedder.provider}/{embedder.model_name}"
         except Exception as e:
-            logger.warning("gravitino_sync_embedder_init_failed", error=str(e))
+            logger.warning(
+                "gravitino_sync_embedder_init_failed",
+                extra={"data": {"error": str(e)}},
+            )
             self._current_embedding_provider = ""
             return
 
@@ -87,9 +94,13 @@ class GravitinoSyncService:
 
         logger.info(
             "gravitino_sync_embedding_check",
-            current_provider=self._current_embedding_provider,
-            valid_count=len(self._valid_embeddings),
-            stale_count=stale_count,
+            extra={
+                "data": {
+                    "current_provider": self._current_embedding_provider,
+                    "valid_count": len(self._valid_embeddings),
+                    "stale_count": stale_count,
+                }
+            },
         )
 
     async def _queue_embedding_task(
@@ -124,15 +135,24 @@ class GravitinoSyncService:
 
         返回同步统计信息
         """
-        logger.info("gravitino_sync_start", metalake=self._metalake_name)
+        logger.info(
+            "gravitino_sync_start",
+            extra={"data": {"metalake": self._metalake_name}},
+        )
 
         # 1. 获取 metalake_id
         self._metalake_id = self._get_metalake_id()
         if not self._metalake_id:
-            logger.error("gravitino_sync_metalake_not_found", metalake=self._metalake_name)
+            logger.error(
+                "gravitino_sync_metalake_not_found",
+                extra={"data": {"metalake": self._metalake_name}},
+            )
             raise ValueError(f"Metalake '{self._metalake_name}' not found in Gravitino")
 
-        logger.info("gravitino_sync_metalake_found", metalake_id=self._metalake_id)
+        logger.info(
+            "gravitino_sync_metalake_found",
+            extra={"data": {"metalake_id": self._metalake_id}},
+        )
 
         async with neo4j_async_session() as session:
             # 3. 加载已有正确 embedding 的节点（避免重复向量化）
@@ -154,7 +174,10 @@ class GravitinoSyncService:
             await self._sync_domain_lineage(session)
             await self._sync_tag_relationships(session)
 
-        logger.info("gravitino_sync_complete", stats=self._stats)
+        logger.info(
+            "gravitino_sync_complete",
+            extra={"data": {"stats": self._stats}},
+        )
         return self._stats
 
     def _get_metalake_id(self) -> int | None:
@@ -207,7 +230,10 @@ class GravitinoSyncService:
                 catalog_id, "Catalog", row["catalog_name"], row["catalog_comment"], tags
             )
 
-        logger.debug("gravitino_sync_catalogs", count=self._stats["catalogs"])
+        logger.debug(
+            "gravitino_sync_catalogs",
+            extra={"data": {"count": self._stats["catalogs"]}},
+        )
 
     async def _sync_schemas(self, session: AsyncSession) -> None:
         """同步 Schema"""
@@ -255,7 +281,10 @@ class GravitinoSyncService:
                 schema_id, "Schema", row["schema_name"], row["schema_comment"], tags
             )
 
-        logger.debug("gravitino_sync_schemas", count=self._stats["schemas"])
+        logger.debug(
+            "gravitino_sync_schemas",
+            extra={"data": {"count": self._stats["schemas"]}},
+        )
 
     async def _sync_table_cols(self, session: AsyncSession) -> None:
         """同步 Table 和 Column"""
@@ -374,8 +403,12 @@ class GravitinoSyncService:
 
         logger.debug(
             "gravitino_sync_tables_columns",
-            tables=self._stats["tables"],
-            columns=self._stats["columns"],
+            extra={
+                "data": {
+                    "tables": self._stats["tables"],
+                    "columns": self._stats["columns"],
+                }
+            },
         )
 
     async def _sync_metrics(self, session: AsyncSession) -> None:
@@ -385,8 +418,6 @@ class GravitinoSyncService:
         SELECT m.metric_id, m.metric_name, m.metric_code, m.metric_type,
                m.data_type, m.metric_comment, m.current_version,
                v.metric_unit, v.calculation_formula, v.parent_metric_codes,
-               v.ref_catalog_name, v.ref_schema_name, v.ref_table_name,
-               v.measure_columns, v.filter_columns,
                s.schema_name, c.catalog_name
         FROM metric_meta m
         JOIN schema_meta s ON m.schema_id = s.schema_id AND s.deleted_at = 0
@@ -453,7 +484,10 @@ class GravitinoSyncService:
 
             self._stats["metrics"] += 1
 
-        logger.debug("gravitino_sync_metrics", count=self._stats["metrics"])
+        logger.debug(
+            "gravitino_sync_metrics",
+            extra={"data": {"count": self._stats["metrics"]}},
+        )
 
     async def _sync_wordroots(self, session: AsyncSession) -> None:
         """同步 WordRoot"""
@@ -483,7 +517,10 @@ class GravitinoSyncService:
 
             self._stats["wordroots"] += 1
 
-        logger.debug("gravitino_sync_wordroots", count=self._stats["wordroots"])
+        logger.debug(
+            "gravitino_sync_wordroots",
+            extra={"data": {"count": self._stats["wordroots"]}},
+        )
 
     async def _sync_modifiers(self, session: AsyncSession) -> None:
         """同步 Modifier"""
@@ -516,7 +553,10 @@ class GravitinoSyncService:
 
             self._stats["modifiers"] += 1
 
-        logger.debug("gravitino_sync_modifiers", count=self._stats["modifiers"])
+        logger.debug(
+            "gravitino_sync_modifiers",
+            extra={"data": {"count": self._stats["modifiers"]}},
+        )
 
     async def _sync_units(self, session: AsyncSession) -> None:
         """同步 Unit"""
@@ -546,7 +586,10 @@ class GravitinoSyncService:
 
             self._stats["units"] += 1
 
-        logger.debug("gravitino_sync_units", count=self._stats["units"])
+        logger.debug(
+            "gravitino_sync_units",
+            extra={"data": {"count": self._stats["units"]}},
+        )
 
     async def _sync_valuedomains(self, session: AsyncSession) -> None:
         """同步 ValueDomain"""
@@ -583,85 +626,157 @@ class GravitinoSyncService:
 
             self._stats["valuedomains"] += 1
 
-        logger.debug("gravitino_sync_valuedomains", count=self._stats["valuedomains"])
+        logger.debug(
+            "gravitino_sync_valuedomains",
+            extra={"data": {"count": self._stats["valuedomains"]}},
+        )
 
     async def _sync_metric_lineage(self, session: AsyncSession) -> None:
         """同步原子指标与列的血缘关系 (MEASURES, FILTERS_BY)"""
         # 查询原子指标的版本信息，包含 ref 表和列信息
         query = """
         SELECT m.metric_code, m.metric_type,
-               v.ref_catalog_name, v.ref_schema_name, v.ref_table_name,
-               v.measure_columns, v.filter_columns
+               v.ref_table_id, v.measure_column_ids, v.filter_column_ids,
+               t.table_name, t.current_version,
+               s.schema_name, c.catalog_name
         FROM metric_meta m
         JOIN metric_version_info v ON m.metric_id = v.metric_id
             AND m.current_version = v.version AND v.deleted_at = 0
+        JOIN table_meta t ON v.ref_table_id = t.table_id AND t.deleted_at = 0
+        JOIN schema_meta s ON t.schema_id = s.schema_id AND s.deleted_at = 0
+        JOIN catalog_meta c ON t.catalog_id = c.catalog_id AND c.deleted_at = 0
         WHERE m.metalake_id = :metalake_id AND m.deleted_at = 0
             AND m.metric_type = 'ATOMIC'
-            AND v.ref_catalog_name IS NOT NULL
-            AND v.ref_schema_name IS NOT NULL
-            AND v.ref_table_name IS NOT NULL
+            AND v.ref_table_id IS NOT NULL
         """
         rows = GravitinoDBClient.execute_query(query, {"metalake_id": self._metalake_id})
 
         for row in rows:
             metric_id = generate_id("metric", row["metric_code"])
-            ref_catalog = row["ref_catalog_name"]
-            ref_schema = row["ref_schema_name"]
-            ref_table = row["ref_table_name"]
+            ref_table_id = row["ref_table_id"]
+            ref_catalog = row["catalog_name"]
+            ref_schema = row["schema_name"]
+            ref_table = row["table_name"]
+            table_version = row["current_version"]
 
-            # 处理 measure_columns
-            if row["measure_columns"]:
-                try:
-                    measure_cols = json.loads(row["measure_columns"])
-                    for col in measure_cols:
-                        col_name = col.get("name")
-                        if not col_name:
-                            continue
-                        column_id = generate_id(
-                            "column",
-                            self._metalake_name,
-                            ref_catalog,
-                            ref_schema,
-                            ref_table,
-                            col_name,
-                        )
-                        await Lineage.add_metric_measure(
-                            session,
-                            metric_id=metric_id,
-                            column_id=column_id,
-                        )
-                        self._stats["metric_column_lineage"] += 1
-                except json.JSONDecodeError:
-                    pass
+            measure_ids = self._parse_metric_column_ids(row["measure_column_ids"])
+            filter_ids = self._parse_metric_column_ids(row["filter_column_ids"])
+            if not measure_ids and not filter_ids:
+                continue
 
-            # 处理 filter_columns
-            if row["filter_columns"]:
-                try:
-                    filter_cols = json.loads(row["filter_columns"])
-                    for col in filter_cols:
-                        col_name = col.get("name")
-                        if not col_name:
-                            continue
-                        column_id = generate_id(
-                            "column",
-                            self._metalake_name,
-                            ref_catalog,
-                            ref_schema,
-                            ref_table,
-                            col_name,
-                        )
-                        await Lineage.add_metric_filter(
-                            session,
-                            metric_id=metric_id,
-                            column_id=column_id,
-                        )
-                        self._stats["metric_column_lineage"] += 1
-                except json.JSONDecodeError:
-                    pass
+            combined_ids = self._dedupe_ids(measure_ids + filter_ids)
+            column_name_map = self._load_column_name_map(
+                ref_table_id, table_version, combined_ids
+            )
+
+            for col_id in self._dedupe_ids(measure_ids):
+                col_name = column_name_map.get(col_id)
+                if not col_name:
+                    continue
+                column_id = generate_id(
+                    "column",
+                    self._metalake_name,
+                    ref_catalog,
+                    ref_schema,
+                    ref_table,
+                    col_name,
+                )
+                await Lineage.add_metric_measure(
+                    session,
+                    metric_id=metric_id,
+                    column_id=column_id,
+                )
+                self._stats["metric_column_lineage"] += 1
+
+            for col_id in self._dedupe_ids(filter_ids):
+                col_name = column_name_map.get(col_id)
+                if not col_name:
+                    continue
+                column_id = generate_id(
+                    "column",
+                    self._metalake_name,
+                    ref_catalog,
+                    ref_schema,
+                    ref_table,
+                    col_name,
+                )
+                await Lineage.add_metric_filter(
+                    session,
+                    metric_id=metric_id,
+                    column_id=column_id,
+                )
+                self._stats["metric_column_lineage"] += 1
 
         logger.debug(
-            "gravitino_sync_metric_column_lineage", count=self._stats["metric_column_lineage"]
+            "gravitino_sync_metric_column_lineage",
+            extra={"data": {"count": self._stats["metric_column_lineage"]}},
         )
+
+    @staticmethod
+    def _parse_metric_column_ids(raw: str | None) -> list[int]:
+        if not raw:
+            return []
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+        if not isinstance(data, list):
+            return []
+
+        ids: list[int] = []
+        for item in data:
+            if isinstance(item, dict):
+                candidate = item.get("id") or item.get("column_id") or item.get("columnId")
+            else:
+                candidate = item
+
+            if isinstance(candidate, bool):
+                continue
+            if isinstance(candidate, (int,)):
+                ids.append(candidate)
+                continue
+            if isinstance(candidate, str) and candidate.isdigit():
+                ids.append(int(candidate))
+
+        return ids
+
+    @staticmethod
+    def _dedupe_ids(ids: list[int]) -> list[int]:
+        seen: set[int] = set()
+        result: list[int] = []
+        for item in ids:
+            if item in seen:
+                continue
+            seen.add(item)
+            result.append(item)
+        return result
+
+    @staticmethod
+    def _load_column_name_map(
+        table_id: int, table_version: int, column_ids: list[int]
+    ) -> dict[int, str]:
+        if not column_ids:
+            return {}
+
+        params: dict[str, int] = {
+            "table_id": table_id,
+            "table_version": table_version,
+        }
+        placeholders: list[str] = []
+        for idx, col_id in enumerate(column_ids):
+            key = f"col_id_{idx}"
+            params[key] = col_id
+            placeholders.append(f":{key}")
+
+        query = f"""
+        SELECT column_id, column_name
+        FROM table_column_version_info
+        WHERE table_id = :table_id AND table_version = :table_version
+            AND deleted_at = 0 AND column_op_type != 3
+            AND column_id IN ({", ".join(placeholders)})
+        """
+        rows = GravitinoDBClient.execute_query(query, params)
+        return {row["column_id"]: row["column_name"] for row in rows}
 
     async def _sync_domain_lineage(self, session: AsyncSession) -> None:
         """同步列与值域的血缘关系 (HAS_VALUE_DOMAIN)"""
@@ -724,7 +839,7 @@ class GravitinoSyncService:
 
         logger.debug(
             "gravitino_sync_column_valuedomain_lineage",
-            count=self._stats["column_valuedomain_lineage"],
+            extra={"data": {"count": self._stats["column_valuedomain_lineage"]}},
         )
 
     async def _sync_tag_nodes(self, session: AsyncSession) -> None:
@@ -762,7 +877,10 @@ class GravitinoSyncService:
 
             self._stats["tags"] += 1
 
-        logger.debug("gravitino_sync_tag_nodes", count=self._stats["tags"])
+        logger.debug(
+            "gravitino_sync_tag_nodes",
+            extra={"data": {"count": self._stats["tags"]}},
+        )
 
     async def _queue_tag_embedding(self, node_id: str, text: str) -> None:
         """Tag 向量化入队（name 本身有业务含义，不需要 description 必选）"""
@@ -808,7 +926,10 @@ class GravitinoSyncService:
 
             self._stats["tag_relationships"] += 1
 
-        logger.debug("gravitino_sync_tag_relationships", count=self._stats["tag_relationships"])
+        logger.debug(
+            "gravitino_sync_tag_relationships",
+            extra={"data": {"count": self._stats["tag_relationships"]}},
+        )
 
     async def _link_table_tag(self, session: AsyncSession, table_id: int, tag_node_id: str) -> None:
         """创建 Table -> Tag 的 HAS_TAG 关系"""

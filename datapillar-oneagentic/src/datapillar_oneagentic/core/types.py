@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 Core type definitions.
 
@@ -72,6 +75,7 @@ class AgentResult(BaseModel):
     Status semantics:
     - completed: agent completed successfully
     - failed: execution failed (use failure_kind for business/system)
+    - aborted: user aborted interrupt
     """
 
     model_config = {"arbitrary_types_allowed": True}
@@ -121,3 +125,16 @@ class AgentResult(BaseModel):
     ) -> AgentResult:
         """Compatibility entrypoint: system error result (failed + system)."""
         return cls.failed(error=error, messages=messages, failure_kind=FailureKind.SYSTEM)
+
+    @classmethod
+    def aborted(
+        cls,
+        error: str | None = None,
+        messages: Messages | None = None,
+    ) -> AgentResult:
+        """Create an aborted result."""
+        return cls(
+            status=ExecutionStatus.ABORTED,
+            error=error,
+            messages=messages or Messages(),
+        )

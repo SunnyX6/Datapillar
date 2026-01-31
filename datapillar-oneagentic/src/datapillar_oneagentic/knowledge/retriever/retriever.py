@@ -1,25 +1,37 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """Knowledge retriever."""
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import asdict, is_dataclass
-from typing import Any
+from typing import Any, Callable, TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from datapillar_oneagentic.knowledge.config import KnowledgeConfig, KnowledgeInjectConfig, KnowledgeRetrieveConfig
+from datapillar_oneagentic.knowledge.config import KnowledgeConfig, KnowledgeRetrieveConfig
 from datapillar_oneagentic.knowledge.models import (
     Knowledge,
     KnowledgeChunk,
     KnowledgeRef,
     KnowledgeRetrieveResult,
-    KnowledgeScope,
     KnowledgeSearchHit,
+    KnowledgeRetrieve,
 )
 from datapillar_oneagentic.knowledge.retriever.evidence import dedupe_hits, group_hits
+from datapillar_oneagentic.knowledge.retriever.query import (
+    QueryRouteOutput,
+    build_query_route,
+    expand_queries,
+)
 from datapillar_oneagentic.knowledge.retriever.reranker import build_reranker, rerank_scores
 from datapillar_oneagentic.providers.llm.embedding import EmbeddingProvider
 from datapillar_oneagentic.storage.knowledge_stores.base import KnowledgeStore
+
+if TYPE_CHECKING:
+    from datapillar_oneagentic.providers.llm.llm import ResilientChatModel
 
 
 class KnowledgeRetriever:
@@ -30,101 +42,85 @@ class KnowledgeRetriever:
         *,
         store: KnowledgeStore,
         embedding_provider: EmbeddingProvider,
-        config: KnowledgeConfig,
+        retrieve_defaults: KnowledgeRetrieveConfig | None = None,
     ) -> None:
         self._store = store
         self._embedding_provider = embedding_provider
-        self._config = config
+        self._defaults = retrieve_defaults or KnowledgeRetrieveConfig()
         self._initialized = False
 
     @classmethod
     def from_config(
         cls,
         *,
-        namespace: str,
+        namespace: str | None = None,
         config: KnowledgeConfig,
     ) -> "KnowledgeRetriever":
+        if not namespace:
+            raise ValueError("namespace is required for KnowledgeRetriever.from_config")
         from datapillar_oneagentic.knowledge.runtime import build_runtime
 
-        runtime = build_runtime(namespace=namespace, base_config=config.base_config)
+        runtime = build_runtime(namespace=namespace, config=config)
         return cls(
             store=runtime.store,
             embedding_provider=runtime.embedding_provider,
-            config=config,
         )
 
     async def retrieve(
         self,
         *,
         query: str,
-        knowledge: Knowledge,
-        scope: KnowledgeScope | None = None,
+        knowledge: Knowledge | None = None,
+        retrieve: KnowledgeRetrieve | None = None,
+        filters: dict[str, Any] | None = None,
+        search_params: dict[str, Any] | None = None,
+        llm_provider: Callable[[], "ResilientChatModel"] | None = None,
     ) -> KnowledgeRetrieveResult:
         if not query:
             return KnowledgeRetrieveResult()
 
         await self._ensure_initialized()
-        retrieve = _merge_retrieve(self._config.retrieve_config, knowledge.retrieve, knowledge.inject)
-        inject = retrieve.inject
+        override = retrieve or (knowledge.retrieve if knowledge else None)
+        explicit_method = _override_has_value(override, "method")
+        explicit_rerank = _override_has_value(override, "rerank")
+        retrieve = _merge_retrieve(self._defaults, override)
+
+        route = await build_query_route(
+            query=query,
+            config=retrieve.routing,
+            supports_hybrid=self._store.supports_hybrid,
+            supports_full_text=self._store.supports_full_text,
+            llm_provider=llm_provider if retrieve.routing.use_llm else None,
+        )
+        if route and route.use_rag is False and retrieve.routing.allow_no_rag:
+            return KnowledgeRetrieveResult()
+        if route:
+            retrieve = _apply_route_decision(
+                retrieve,
+                route=route,
+                explicit_method=explicit_method,
+                explicit_rerank=explicit_rerank,
+            )
 
         method = (retrieve.method or "hybrid").lower()
-        if method not in {"semantic", "hybrid"}:
+        if method not in {"semantic", "hybrid", "full_text"}:
             raise ValueError(f"Unsupported retrieval method: {method}")
-        if method == "hybrid" and knowledge.sparse_embedder is None:
-            raise ValueError("hybrid retrieval requires sparse_embedder")
-        inject_mode = (inject.mode or "tool").lower()
-        if inject_mode not in {"system", "tool"}:
-            raise ValueError(f"Unsupported knowledge injection mode: {inject_mode}")
+        if method == "hybrid" and not self._store.supports_hybrid:
+            raise ValueError("Hybrid retrieval is not supported by the current backend.")
+        if method == "full_text" and not self._store.supports_full_text:
+            raise ValueError("Full-text retrieval is not supported by the current backend.")
+        if search_params:
+            raise ValueError("search_params is not supported by the current vector store backend")
 
-        query_vector = await self._embedding_provider.embed_text(query)
-        sparse_query = None
-        if method == "hybrid" and knowledge.sparse_embedder is not None:
-            sparse_query = await knowledge.sparse_embedder.embed_text(query)
-
-        hits = await self._search_in_namespace(
-            query_vector=query_vector,
-            pool_k=_resolve_pool_k(retrieve),
-            scope=scope,
-        )
-        if not hits:
-            return KnowledgeRetrieveResult()
-
-        ranked = _rank_chunks(
-            hits=hits,
+        result = await self._execute_retrieval(
+            query=query,
+            retrieve=retrieve,
+            filters=filters,
+            llm_provider=llm_provider,
             method=method,
-            sparse_query=sparse_query,
-            rrf_k=retrieve.tuning.rrf_k,
         )
 
-        reranked = await _apply_rerank(query=query, ranked=ranked, retrieve=retrieve)
-        filtered = _apply_score_threshold(reranked, retrieve.score_threshold)
-
-        grouped = group_hits(filtered, max_per_document=retrieve.quality.max_per_document)
-        if retrieve.quality.dedupe:
-            grouped = dedupe_hits(grouped, threshold=retrieve.quality.dedupe_threshold)
-
-        final = grouped[: retrieve.top_k]
-        if not final:
-            return KnowledgeRetrieveResult()
-
-        context_hits = await self._resolve_context_hits(final)
-        refs = [
-            KnowledgeRef(
-                source_id=chunk.source_id,
-                doc_id=chunk.doc_id,
-                chunk_id=chunk.chunk_id,
-                score=score,
-                version=chunk.version,
-                query=query,
-            )
-            for chunk, score in context_hits
-        ]
-
-        return KnowledgeRetrieveResult(hits=context_hits, refs=refs)
-
-    def resolve_inject_config(self, knowledge: Knowledge) -> KnowledgeInjectConfig:
-        retrieve = _merge_retrieve(self._config.retrieve_config, knowledge.retrieve, knowledge.inject)
-        return retrieve.inject
+        return result
 
     async def close(self) -> None:
         await self._store.close()
@@ -140,30 +136,169 @@ class KnowledgeRetriever:
         *,
         query_vector: list[float],
         pool_k: int,
-        scope: KnowledgeScope | None,
+        filters: dict[str, Any] | None,
     ) -> list[KnowledgeSearchHit]:
         results: list[KnowledgeSearchHit] = []
-        if scope and scope.namespaces and len(scope.namespaces) > 1:
-            raise ValueError("Cross-namespace retrieval is not supported")
-        if scope and scope.tags:
-            raise ValueError("Tag-based filtering is not supported")
         hits = await self._store.search_chunks(
             query_vector=query_vector,
             k=max(1, pool_k),
+            filters=filters,
         )
-        if scope and scope.document_ids:
-            hits = [hit for hit in hits if hit.chunk.doc_id in set(scope.document_ids)]
         results.extend(hits)
 
+        return _dedupe_chunk_id(results)
+
+    async def _search_queries(
+        self,
+        *,
+        queries: list[str],
+        method: str,
+        pool_k: int,
+        filters: dict[str, Any] | None,
+        rrf_k: int,
+        expansion,
+    ) -> list[KnowledgeSearchHit]:
+        per_query_k = _resolve_per_query_k(pool_k, queries, expansion.per_query_k)
+        tasks = []
+        if method == "full_text":
+            for item in queries:
+                tasks.append(
+                    self._store.full_text_search_chunks(
+                        query_text=item,
+                        k=max(1, per_query_k),
+                        filters=filters,
+                    )
+                )
+        else:
+            query_vectors = await asyncio.gather(
+                *[self._embedding_provider.embed_text(item) for item in queries]
+            )
+            if method == "hybrid":
+                for item, vector in zip(queries, query_vectors):
+                    tasks.append(
+                        self._store.hybrid_search_chunks(
+                            query_vector=vector,
+                            query_text=item,
+                            k=max(1, per_query_k),
+                            filters=filters,
+                            rrf_k=rrf_k,
+                        )
+                    )
+            else:
+                for vector in query_vectors:
+                    tasks.append(
+                        self._store.search_chunks(
+                            query_vector=vector,
+                            k=max(1, per_query_k),
+                            filters=filters,
+                        )
+                    )
+
+        results: list[KnowledgeSearchHit] = []
+        for batch in await asyncio.gather(*tasks):
+            results.extend(batch)
+        return _dedupe_chunk_id(results)
+
+    async def _execute_retrieval(
+        self,
+        *,
+        query: str,
+        retrieve: KnowledgeRetrieveConfig,
+        filters: dict[str, Any] | None,
+        llm_provider: Callable[[], "ResilientChatModel"] | None,
+        method: str,
+    ) -> KnowledgeRetrieveResult:
+        queries = await expand_queries(
+            query=query,
+            config=retrieve.expansion,
+            llm_provider=llm_provider if retrieve.expansion.use_llm else None,
+        )
+        if not queries:
+            return KnowledgeRetrieveResult()
+
+        hits = await self._search_queries(
+            queries=queries,
+            method=method,
+            pool_k=_resolve_pool_k(retrieve),
+            filters=filters,
+            rrf_k=retrieve.tuning.rrf_k,
+            expansion=retrieve.expansion,
+        )
+        if not hits:
+            return KnowledgeRetrieveResult()
+
+        ranked = _rank_by_score(hits)
+        reranked = await _apply_rerank(query=query, ranked=ranked, retrieve=retrieve)
+        filtered = _apply_score_threshold(reranked, retrieve.score_threshold)
+
+        grouped = group_hits(filtered, max_per_document=retrieve.quality.max_per_document)
+        if retrieve.quality.dedupe:
+            grouped = dedupe_hits(grouped, threshold=retrieve.quality.dedupe_threshold)
+
+        final = grouped[: retrieve.top_k]
+        if not final:
+            return KnowledgeRetrieveResult()
+
+        context_hits = await self._resolve_context_hits(final, context=retrieve.context)
+        refs = [
+            KnowledgeRef(
+                source_id=chunk.source_id,
+                doc_id=chunk.doc_id,
+                chunk_id=chunk.chunk_id,
+                score=score,
+                version=chunk.version,
+                query=query,
+            )
+            for chunk, score in context_hits
+        ]
+        return KnowledgeRetrieveResult(hits=context_hits, refs=refs)
+    async def _search_hybrid_in_namespace(
+        self,
+        *,
+        query_vector: list[float],
+        query_text: str,
+        pool_k: int,
+        filters: dict[str, Any] | None,
+        rrf_k: int,
+    ) -> list[KnowledgeSearchHit]:
+        results: list[KnowledgeSearchHit] = []
+        hits = await self._store.hybrid_search_chunks(
+            query_vector=query_vector,
+            query_text=query_text,
+            k=max(1, pool_k),
+            filters=filters,
+            rrf_k=rrf_k,
+        )
+        results.extend(hits)
         return _dedupe_chunk_id(results)
 
     async def _resolve_context_hits(
         self,
         scored: list[tuple[KnowledgeChunk, float]],
+        *,
+        context,
     ) -> list[tuple[KnowledgeChunk, float]]:
         if not scored:
             return []
 
+        mode = (context.mode or "parent").lower()
+        if mode == "off":
+            return scored
+
+        apply_parent = mode in {"parent", "parent_window"}
+        apply_window = mode in {"window", "parent_window"}
+
+        resolved = scored
+        if apply_parent:
+            resolved = await self._resolve_parent_hits(scored)
+        if apply_window:
+            resolved = await self._resolve_window_hits(resolved, radius=context.window_radius)
+        return resolved
+
+    async def _resolve_parent_hits(
+        self,
+        scored: list[tuple[KnowledgeChunk, float]],
+    ) -> list[tuple[KnowledgeChunk, float]]:
         chunks = [chunk for chunk, _ in scored]
         has_child = any(chunk.chunk_type == "child" and chunk.parent_id for chunk in chunks)
         if not has_child:
@@ -182,38 +317,112 @@ class KnowledgeRetriever:
         parents = await self._store.get_chunks(parent_ids)
         parent_map = {item.chunk_id: item for item in parents}
         context_hits: list[tuple[KnowledgeChunk, float]] = []
-        seen: set[str] = set()
+        seen_ids: set[str] = set()
         for chunk, score in scored:
             if chunk.chunk_type == "child" and chunk.parent_id:
                 parent = parent_map.get(chunk.parent_id)
-                if parent and parent.chunk_id not in seen:
+                if parent and parent.chunk_id not in seen_ids:
                     context_hits.append((parent, score))
-                    seen.add(parent.chunk_id)
+                    seen_ids.add(parent.chunk_id)
                     continue
+            if chunk.chunk_id not in seen_ids:
+                context_hits.append((chunk, score))
+                seen_ids.add(chunk.chunk_id)
+        return context_hits
+
+    async def _resolve_window_hits(
+        self,
+        scored: list[tuple[KnowledgeChunk, float]],
+        *,
+        radius: int,
+    ) -> list[tuple[KnowledgeChunk, float]]:
+        if radius <= 0:
+            return scored
+
+        anchor_ids = {chunk.chunk_id for chunk, _ in scored}
+        window_map: dict[str, tuple[list[str], list[str]]] = {}
+        extra_ids: set[str] = set()
+
+        for chunk, _score in scored:
+            metadata = chunk.metadata or {}
+            prev_ids = list(metadata.get("window_prev_ids") or [])
+            next_ids = list(metadata.get("window_next_ids") or [])
+            if radius:
+                prev_ids = prev_ids[-radius:]
+                next_ids = next_ids[:radius]
+            window_map[chunk.chunk_id] = (prev_ids, next_ids)
+            for cid in prev_ids:
+                if cid and cid not in anchor_ids:
+                    extra_ids.add(cid)
+            for cid in next_ids:
+                if cid and cid not in anchor_ids:
+                    extra_ids.add(cid)
+
+        extra_chunks = await self._store.get_chunks(list(extra_ids))
+        extra_map = {chunk.chunk_id: chunk for chunk in extra_chunks}
+
+        context_hits: list[tuple[KnowledgeChunk, float]] = []
+        seen: set[str] = set()
+
+        for chunk, score in scored:
+            prev_ids, next_ids = window_map.get(chunk.chunk_id, ([], []))
+            for cid in prev_ids:
+                if cid in seen or cid in anchor_ids:
+                    continue
+                neighbor = extra_map.get(cid)
+                if neighbor:
+                    context_hits.append((neighbor, score))
+                    seen.add(cid)
             if chunk.chunk_id not in seen:
                 context_hits.append((chunk, score))
                 seen.add(chunk.chunk_id)
+            for cid in next_ids:
+                if cid in seen or cid in anchor_ids:
+                    continue
+                neighbor = extra_map.get(cid)
+                if neighbor:
+                    context_hits.append((neighbor, score))
+                    seen.add(cid)
+
         return context_hits
 
 
 def _merge_retrieve(
     base: KnowledgeRetrieveConfig,
     override,
-    inject_override,
 ) -> KnowledgeRetrieveConfig:
     data = base.model_dump()
     if override is not None:
         override_dict = _normalize_override(override)
+        if "fallback" in override_dict:
+            raise ValueError("Fallback has been removed from retrieval configuration.")
+        if "hierarchical" in override_dict:
+            raise ValueError("Hierarchical summary retrieval has been removed from retrieval configuration.")
         if "rerank" in override_dict:
             rerank_override = {
                 k: v for k, v in (override_dict.pop("rerank") or {}).items() if v is not None
             }
             data["rerank"].update(rerank_override)
-        if "inject" in override_dict:
-            inject_override_data = {
-                k: v for k, v in (override_dict.pop("inject") or {}).items() if v is not None
+        if "params" in override_dict:
+            params_override = {
+                k: v for k, v in (override_dict.pop("params") or {}).items() if v is not None
             }
-            data["inject"].update(inject_override_data)
+            data["params"].update(params_override)
+        if "filtering" in override_dict:
+            filtering_override = {k: v for k, v in (override_dict.pop("filtering") or {}).items() if v is not None}
+            fields_override = filtering_override.pop("fields", None)
+            data["filtering"].update(filtering_override)
+            if fields_override:
+                data["filtering"]["fields"].update(fields_override)
+        if "routing" in override_dict:
+            routing_override = {k: v for k, v in (override_dict.pop("routing") or {}).items() if v is not None}
+            data["routing"].update(routing_override)
+        if "expansion" in override_dict:
+            expansion_override = {k: v for k, v in (override_dict.pop("expansion") or {}).items() if v is not None}
+            data["expansion"].update(expansion_override)
+        if "context" in override_dict:
+            context_override = {k: v for k, v in (override_dict.pop("context") or {}).items() if v is not None}
+            data["context"].update(context_override)
         for key in ("pool_k", "rerank_k", "rrf_k"):
             if key in override_dict:
                 data["tuning"][key] = override_dict.pop(key)
@@ -221,9 +430,6 @@ def _merge_retrieve(
             if key in override_dict:
                 data["quality"][key] = override_dict.pop(key)
         data.update(override_dict)
-
-    if inject_override is not None:
-        data["inject"].update(_normalize_override(inject_override))
 
     return KnowledgeRetrieveConfig(**data)
 
@@ -242,10 +448,49 @@ def _normalize_override(payload: Any) -> dict[str, Any]:
     return {k: v for k, v in data.items() if v is not None}
 
 
+def _override_has_value(override: Any, field_name: str) -> bool:
+    if override is None:
+        return False
+    if is_dataclass(override) or isinstance(override, BaseModel):
+        value = getattr(override, field_name, None)
+    elif isinstance(override, dict):
+        value = override.get(field_name)
+    else:
+        return False
+    return value is not None
+
+
+def _apply_route_decision(
+    retrieve: KnowledgeRetrieveConfig,
+    *,
+    route: QueryRouteOutput,
+    explicit_method: bool,
+    explicit_rerank: bool,
+) -> KnowledgeRetrieveConfig:
+    if route.method and not explicit_method:
+        retrieve.method = route.method
+    if route.rerank is not None and not explicit_rerank:
+        if route.rerank:
+            if retrieve.rerank.mode == "off":
+                retrieve.rerank.mode = "model"
+        else:
+            retrieve.rerank.mode = "off"
+    return retrieve
+
+
 def _resolve_pool_k(retrieve: KnowledgeRetrieveConfig) -> int:
     if retrieve.tuning.pool_k:
         return retrieve.tuning.pool_k
     return max(retrieve.top_k * 4, retrieve.top_k)
+
+
+def _resolve_per_query_k(pool_k: int, queries: list[str], per_query_k: int | None) -> int:
+    if per_query_k:
+        return per_query_k
+    total = len(queries)
+    if total <= 1:
+        return pool_k
+    return max(1, (pool_k + total - 1) // total)
 
 
 def _resolve_rerank_k(retrieve: KnowledgeRetrieveConfig, total: int) -> int:
@@ -286,6 +531,10 @@ async def _apply_rerank(
     )
 
     rerank_scores_list = list(scores)
+    if len(rerank_scores_list) < len(candidates):
+        rerank_scores_list.extend([0.0] * (len(candidates) - len(rerank_scores_list)))
+    elif len(rerank_scores_list) > len(candidates):
+        rerank_scores_list = rerank_scores_list[: len(candidates)]
     reranked = list(zip([c[0] for c in candidates], rerank_scores_list))
     reranked = _apply_rerank_scoring(reranked, retrieve.rerank)
 
@@ -295,6 +544,9 @@ async def _apply_rerank(
             for chunk, score in reranked
             if score >= retrieve.rerank.score_threshold
         ]
+
+    if not reranked:
+        return ranked
 
     if retrieve.rerank.top_n:
         reranked = sorted(reranked, key=lambda item: item[1], reverse=True)[
@@ -365,7 +617,10 @@ def _blend_scores(
     blended: list[tuple[KnowledgeChunk, float]] = []
     for chunk, score in original:
         if chunk.chunk_id in rerank_map:
-            blended.append((chunk, weight * score + (1 - weight) * rerank_map[chunk.chunk_id]))
+            blended_score = weight * score + (1 - weight) * rerank_map[chunk.chunk_id]
+        else:
+            blended_score = score
+        blended.append((chunk, blended_score))
     blended.sort(key=lambda item: item[1], reverse=True)
     return blended
 
@@ -400,53 +655,13 @@ def _is_better_score(a: float, b: float, score_kind: str) -> bool:
     raise ValueError(f"Unsupported score_kind: {score_kind}")
 
 
-def _rank_chunks(
-    *,
-    hits: list[KnowledgeSearchHit],
-    method: str,
-    sparse_query: dict[int, float] | None,
-    rrf_k: int,
-) -> list[tuple[KnowledgeChunk, float]]:
+def _rank_by_score(hits: list[KnowledgeSearchHit]) -> list[tuple[KnowledgeChunk, float]]:
     if not hits:
         return []
     score_kind = _resolve_score_kind(hits)
     reverse = score_kind == "similarity"
-    dense_sorted = sorted(hits, key=lambda item: item.score, reverse=reverse)
-
-    if method == "semantic":
-        return [(hit.chunk, _score_to_similarity(hit.score, score_kind)) for hit in dense_sorted]
-
-    dense_rank = {hit.chunk.chunk_id: idx + 1 for idx, hit in enumerate(dense_sorted)}
-    sparse_scores = {}
-    if sparse_query:
-        for hit in hits:
-            chunk = hit.chunk
-            sparse_scores[chunk.chunk_id] = _sparse_dot(sparse_query, chunk.sparse_vector or {})
-
-    sparse_rank = {
-        chunk_id: idx + 1
-        for idx, (chunk_id, _) in enumerate(
-            sorted(sparse_scores.items(), key=lambda item: item[1], reverse=True)
-        )
-    }
-
-    ranked: list[tuple[KnowledgeChunk, float]] = []
-    for hit in hits:
-        chunk = hit.chunk
-        dr = dense_rank.get(chunk.chunk_id, len(hits) + 1)
-        sr = sparse_rank.get(chunk.chunk_id, len(hits) + 1)
-        score = (1.0 / (rrf_k + dr)) + (1.0 / (rrf_k + sr))
-        ranked.append((chunk, score))
-
-    ranked.sort(key=lambda item: item[1], reverse=True)
-    return ranked
-
-
-def _sparse_dot(query: dict[int, float], doc: dict[int, float]) -> float:
-    score = 0.0
-    for key, weight in query.items():
-        score += weight * doc.get(key, 0.0)
-    return score
+    ordered = sorted(hits, key=lambda item: item.score, reverse=reverse)
+    return [(hit.chunk, _score_to_similarity(hit.score, score_kind)) for hit in ordered]
 
 
 def _score_to_similarity(score: float, score_kind: str) -> float:

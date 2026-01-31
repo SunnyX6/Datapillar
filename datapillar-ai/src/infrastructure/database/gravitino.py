@@ -1,17 +1,21 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 Gravitino 元数据库连接管理
 
 支持 MySQL、PostgreSQL、H2 等多种后端数据库
 """
 
-import structlog
+import logging
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import QueuePool
 
 from src.shared.config.settings import settings
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class GravitinoDBClient:
@@ -60,12 +64,19 @@ class GravitinoDBClient:
                 )
                 logger.info(
                     "gravitino_db_connected",
-                    db_type=settings.gravitino_db_type,
-                    host=settings.gravitino_db_host,
-                    database=settings.gravitino_db_database,
+                    extra={
+                        "data": {
+                            "db_type": settings.gravitino_db_type,
+                            "host": settings.gravitino_db_host,
+                            "database": settings.gravitino_db_database,
+                        }
+                    },
                 )
             except Exception as e:
-                logger.error("gravitino_db_connection_failed", error=str(e))
+                logger.error(
+                    "gravitino_db_connection_failed",
+                    extra={"data": {"error": str(e)}},
+                )
                 raise
         return cls._engine
 

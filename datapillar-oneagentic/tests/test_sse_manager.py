@@ -27,6 +27,28 @@ class _BlockingOrchestrator:
                 yield {}
 
 
+class _InterruptOrchestrator:
+    def __init__(self, *, interrupt_id: str) -> None:
+        self._interrupt_id = interrupt_id
+
+    async def stream(self, *, query=None, key=None, resume_value=None):
+        if resume_value is None:
+            yield build_event_payload(
+                event=EventType.AGENT_INTERRUPT,
+                key=key,
+                agent_id="a1",
+                agent_name="A1",
+                data={"interrupt": {"payload": "need input", "interrupt_id": self._interrupt_id}},
+            )
+            return
+        assert resume_value == {self._interrupt_id: {"__abort__": True}}
+        yield build_event_payload(
+            event=EventType.SESSION_ABORT,
+            key=key,
+            data={"abort": {"message": "Aborted by user"}},
+        )
+
+
 class _StubRequest:
     async def is_disconnected(self) -> bool:
         return False
@@ -86,3 +108,29 @@ async def test_run_cancels() -> None:
 
     run = manager._runs[str(key)]
     assert run.buffer == []
+
+
+@pytest.mark.asyncio
+async def test_abort_interrupt() -> None:
+    manager = StreamManager()
+    key = SessionKey(namespace="ns", session_id="s3")
+    interrupt_id = "iid-1"
+    orchestrator = _InterruptOrchestrator(interrupt_id=interrupt_id)
+
+    await manager.chat(orchestrator=orchestrator, query="hi", key=key)
+    run = manager._runs[str(key)]
+    await run.running_task
+
+    ok = await manager.abort_interrupt(key=key, interrupt_id=interrupt_id)
+    assert ok is True
+    await run.running_task
+
+    request = _StubRequest()
+    events = []
+    async for item in manager.subscribe(request=request, key=key, last_event_id=None):
+        events.append(json.loads(item["data"]))
+
+    assert [event["event"] for event in events] == [
+        EventType.AGENT_INTERRUPT.value,
+        EventType.SESSION_ABORT.value,
+    ]

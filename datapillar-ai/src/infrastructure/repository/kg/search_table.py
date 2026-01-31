@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 Neo4j 表查询服务
 
@@ -7,14 +11,13 @@ Neo4j 表查询服务
 - get_table_lineage: 获取表血缘关系
 - get_column_lineage: 获取列级血缘
 - find_lineage_sql: 根据血缘查找 SQL
-- search_tables_columns: 向量搜索表和列
+- search_tables: 混合搜索表（向量 + 全文）
 """
 
 from __future__ import annotations
 
 import logging
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from src.infrastructure.database import Neo4jClient
@@ -28,38 +31,22 @@ logger = logging.getLogger(__name__)
 class Neo4jTableSearch:
     """Neo4j 表查询服务"""
 
-    # Table/Column 向量搜索上下文 Cypher
-    _TABLE_COLUMN_CONTEXT_CYPHER = """
-    UNWIND $node_ids AS nid
-    MATCH (n:Knowledge)
-    WHERE n.id = nid
-    WITH n, labels(n) AS node_labels
-
-    OPTIONAL MATCH (t:Table)-[:HAS_COLUMN]->(n)
-    WHERE 'Column' IN node_labels
-    OPTIONAL MATCH (s:Schema)-[:HAS_TABLE]->(t)
+    # Table 混合检索返回格式（HybridCypherRetriever）
+    _TABLE_RETRIEVAL_QUERY = """
+    OPTIONAL MATCH (s:Schema)-[:HAS_TABLE]->(node)
     OPTIONAL MATCH (c:Catalog)-[:HAS_SCHEMA]->(s)
-
-    OPTIONAL MATCH (s2:Schema)-[:HAS_TABLE]->(n)
-    WHERE 'Table' IN node_labels
-    OPTIONAL MATCH (c2:Catalog)-[:HAS_SCHEMA]->(s2)
-
     RETURN
-        n.id AS node_id,
+        node.id AS node_id,
+        'Table' AS type,
         CASE
-            WHEN 'Column' IN node_labels THEN 'Column'
-            WHEN 'Table' IN node_labels THEN 'Table'
-            ELSE head(node_labels)
-        END AS type,
-        CASE
-            WHEN 'Column' IN node_labels THEN c.name + '.' + s.name + '.' + t.name + '.' + n.name
-            WHEN 'Table' IN node_labels THEN c2.name + '.' + s2.name + '.' + n.name
-            ELSE n.name
+            WHEN c IS NULL OR s IS NULL THEN node.name
+            ELSE c.name + '.' + s.name + '.' + node.name
         END AS path,
-        n.name AS name,
-        coalesce(n.description, '') AS description,
-        CASE WHEN 'Column' IN node_labels THEN n.dataType ELSE null END AS dataType,
-        CASE WHEN 'Column' IN node_labels THEN c.name + '.' + s.name + '.' + t.name ELSE null END AS table
+        node.name AS name,
+        coalesce(node.description, '') AS description,
+        null AS dataType,
+        null AS table,
+        score
     """
 
     # =========================================================================
@@ -490,97 +477,87 @@ class Neo4jTableSearch:
             return None
 
     # =========================================================================
-    # 向量搜索
+    # 混合搜索（表）
     # =========================================================================
 
     @classmethod
-    def search_tables_columns(
+    def search_tables(
         cls,
         query: str,
         top_k: int = 3,
-        min_score: float = 0.8,
+        min_score: float = 0.55,
     ) -> list[dict[str, Any]]:
         """
-        向量搜索表和列
+        混合搜索表（向量 + 全文）
 
         参数：
         - query: 搜索文本
-        - top_k: 每个索引返回的数量
+        - top_k: 返回数量上限
         - min_score: 最小相似度阈值
 
         返回：
         - [{type, path, name, description, dataType, table, score}]
         """
+        from neo4j_graphrag.retrievers import HybridCypherRetriever
+        from neo4j_graphrag.types import HybridSearchRanker, RetrieverResultItem
+
         from src.infrastructure.llm.embeddings import UnifiedEmbedder
 
         start = time.time()
-        index_names = ["table_embedding", "column_embedding"]
 
-        embedder = UnifiedEmbedder()
-        query_vector = embedder.embed_query(query)
-
-        driver = Neo4jClient.get_driver()
-        all_results: list[dict] = []
-
-        def search_single_index(index_name: str) -> list[dict]:
-            results = []
-            try:
-                with driver.session(database=settings.neo4j_database) as session:
-                    cypher = """
-                    CALL db.index.vector.queryNodes($index_name, $top_k, $vector)
-                    YIELD node, score
-                    WHERE score >= $min_score
-                    RETURN node.id AS node_id, score
-                    """
-                    result = run_cypher(
-                        session,
-                        cypher,
-                        {
-                            "index_name": index_name,
-                            "top_k": top_k,
-                            "vector": query_vector,
-                            "min_score": min_score,
-                        },
-                    )
-                    for record in result:
-                        results.append({"node_id": record["node_id"], "score": record["score"]})
-            except Exception as e:
-                logger.warning(f"向量搜索[{index_name}]失败: {e}")
-            return results
-
-        with ThreadPoolExecutor(max_workers=len(index_names)) as executor:
-            futures = {executor.submit(search_single_index, idx): idx for idx in index_names}
-            for future in as_completed(futures):
-                all_results.extend(future.result())
-
-        if not all_results:
-            return []
-
-        all_results.sort(key=lambda x: x.get("score", 0), reverse=True)
-        all_results = all_results[:5]
-
-        node_ids = [r.get("node_id") for r in all_results if r.get("node_id")]
-        score_map = {r.get("node_id"): r.get("score", 0) for r in all_results}
-
-        if not node_ids:
-            return []
+        def table_result_formatter(record: Any) -> Any:
+            return RetrieverResultItem(
+                content=f"{record.get('name')} {record.get('description') or ''}",
+                metadata={
+                    "type": record.get("type"),
+                    "path": record.get("path"),
+                    "name": record.get("name"),
+                    "description": record.get("description"),
+                    "dataType": record.get("dataType"),
+                    "table": record.get("table"),
+                    "score": record.get("score"),
+                },
+            )
 
         try:
-            with driver.session(database=settings.neo4j_database) as session:
-                result = run_cypher(
-                    session, cls._TABLE_COLUMN_CONTEXT_CYPHER, {"node_ids": node_ids}
+            retriever = HybridCypherRetriever(
+                driver=Neo4jClient.get_driver(),
+                vector_index_name="table_embedding",
+                fulltext_index_name="table_fulltext",
+                retrieval_query=cls._TABLE_RETRIEVAL_QUERY,
+                result_formatter=table_result_formatter,
+                embedder=UnifiedEmbedder(),
+                neo4j_database=settings.neo4j_database,
+            )
+
+            results = retriever.search(
+                query_text=query,
+                top_k=top_k,
+                ranker=HybridSearchRanker.LINEAR,
+                alpha=0.6,
+            )
+            items = list(getattr(results, "items", []) or [])
+
+            recommendations: list[dict[str, Any]] = []
+            for item in items:
+                metadata = getattr(item, "metadata", {}) or {}
+                score = float(metadata.get("score", 0) or 0)
+                if score < min_score:
+                    continue
+                recommendations.append(
+                    {
+                        "type": metadata.get("type"),
+                        "path": metadata.get("path"),
+                        "name": metadata.get("name"),
+                        "description": metadata.get("description"),
+                        "dataType": metadata.get("dataType"),
+                        "table": metadata.get("table"),
+                        "score": round(score, 3),
+                    }
                 )
-                records = result.data()
 
-                recommendations = []
-                for r in records:
-                    nid = r.get("node_id")
-                    r["score"] = round(score_map.get(nid, 0), 3)
-                    del r["node_id"]
-                    recommendations.append(r)
-
-                logger.debug(f"[表列搜索] 总耗时: {time.time() - start:.3f}s")
-                return recommendations
+            logger.debug(f"[表搜索] 总耗时: {time.time() - start:.3f}s")
+            return recommendations
         except Exception as e:
-            logger.error(f"搜索表列上下文失败: {e}")
+            logger.error(f"混合搜索表失败: {e}")
             return []

@@ -43,6 +43,24 @@ auth_enabled = true  # 是否启用认证，开发调试时可设为 false
 # ==================== LLM 配置 ====================
 [default.llm]
 retry.max_retries = 3
+enable_thinking = false
+
+# ==================== 知识 Wiki（RAG）配置 ====================
+[default.knowledge_wiki]
+vector_store.type = "milvus"
+vector_store.uri = "http://localhost:19530"
+vector_store.token = ""
+
+storage.type = "local" # local | s3
+storage.local_dir = "./data/knowledge_wiki"
+storage.s3.endpoint_url = ""
+storage.s3.access_key = ""
+storage.s3.secret_key = ""
+storage.s3.bucket = ""
+storage.s3.region = ""
+
+embedding_batch_size = 20
+progress_step = 20
 
 # ==================== LLM 缓存配置 ====================
 # 说明：

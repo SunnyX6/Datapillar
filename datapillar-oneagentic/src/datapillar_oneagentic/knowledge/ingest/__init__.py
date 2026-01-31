@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """Knowledge ingestion."""
 
 from datapillar_oneagentic.knowledge.ingest.chunker import TextChunk, split_text

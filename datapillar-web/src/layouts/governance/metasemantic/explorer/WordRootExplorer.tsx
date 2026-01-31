@@ -127,7 +127,7 @@ function WordRootRow({
               onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               onClick={(e) => e.stopPropagation()}
               placeholder="词根名称"
-              className="w-full px-2 py-1 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-2 py-1 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="text-micro font-mono text-slate-400 uppercase px-1">{root.code}</div>
           </div>
@@ -137,6 +137,7 @@ function WordRootRow({
             <DataTypeSelector
               value={editForm.dataTypeValue}
               onChange={(value) => setEditForm({ ...editForm, dataTypeValue: value })}
+              triggerClassName="bg-white dark:bg-slate-900"
             />
           </div>
         </td>
@@ -147,7 +148,7 @@ function WordRootRow({
             onChange={(e) => setEditForm({ ...editForm, comment: e.target.value })}
             onClick={(e) => e.stopPropagation()}
             placeholder="描述"
-            className="w-full px-2 py-1.5 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-2 py-1.5 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </td>
         <td className="px-4 py-2">
@@ -260,14 +261,14 @@ function NewWordRootRow({
             value={form.name}
             onChange={(e) => onChange({ ...form, name: e.target.value })}
             placeholder="词根名称"
-            className="w-full px-2 py-1 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-2 py-1 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <input
             type="text"
             value={form.code}
             onChange={(e) => onChange({ ...form, code: e.target.value.toUpperCase() })}
             placeholder="编码 (CODE)"
-            className="w-full px-2 py-1 text-micro font-mono uppercase border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-2 py-1 text-micro font-mono uppercase border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </td>
@@ -276,6 +277,7 @@ function NewWordRootRow({
           <DataTypeSelector
             value={form.dataTypeValue}
             onChange={(value) => onChange({ ...form, dataTypeValue: value })}
+            triggerClassName="bg-white dark:bg-slate-900"
           />
         </div>
       </td>
@@ -285,7 +287,7 @@ function NewWordRootRow({
           value={form.comment}
           onChange={(e) => onChange({ ...form, comment: e.target.value })}
           placeholder="描述（可选）"
-          className="w-full px-2 py-1.5 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-2 py-1.5 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </td>
       <td className="px-4 py-2">

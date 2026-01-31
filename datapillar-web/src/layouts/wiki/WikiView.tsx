@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Plus,
   FileText,
@@ -12,19 +12,19 @@ import {
   ChevronRight,
   type LucideIcon
 } from 'lucide-react'
-import { Button, Card } from '@/components/ui'
+import { Button, Card, Modal, ModalCancelButton, ModalPrimaryButton } from '@/components/ui'
 import { contentMaxWidthClassMap, iconSizeToken, paddingClassMap, panelWidthClassMap } from '@/design-tokens/dimensions'
 import { RESPONSIVE_TYPOGRAPHY, TYPOGRAPHY } from '@/design-tokens/typography'
-import type { KnowledgeSpace, WikiTab } from './types'
+import { toast } from 'sonner'
+import { createNamespace, listDocuments, listNamespaces } from '@/services/knowledgeWikiService'
+import type { Document, KnowledgeSpace, WikiTab } from './types'
 import DocList from './DocList'
 import ChunkManager from './ChunkManager'
 import RetrievalPlayground from './RetrievalPlayground'
-
-const spaces: KnowledgeSpace[] = [
-  { id: 'ks1', name: '研发技术栈', description: '后端架构、API 文档与运维手册', docCount: 42, color: 'bg-indigo-500' },
-  { id: 'ks2', name: '产品与设计', description: 'PRD、UI 规范与用户调研', docCount: 28, color: 'bg-rose-500' },
-  { id: 'ks3', name: '企业行政', description: '员工手册、报销流程', docCount: 15, color: 'bg-emerald-500' }
-]
+import { SPACE_COLOR_PALETTE, getNamespaceFormStatus, mapDocumentToUi, mapNamespaceToSpace } from './utils'
+import UploadDocumentModal from './UploadDocumentModal'
+import { WikiHero } from './WikiHero'
+import { NamespaceCreateForm, type NamespaceCreateFormValue } from './NamespaceCreateForm'
 
 type StatConfig = {
   label: string
@@ -39,11 +39,78 @@ type StatConfig = {
 
 export function WikiView() {
   const [activeTab, setActiveTab] = useState<WikiTab>('DOCUMENTS')
-  const [currentSpace, setCurrentSpace] = useState<KnowledgeSpace>(spaces[0])
+  const [spaceList, setSpaceList] = useState<KnowledgeSpace[]>([])
+  const [currentSpace, setCurrentSpace] = useState<KnowledgeSpace | null>(null)
+  const [documents, setDocuments] = useState<Document[]>([])
   const [isNamespaceCollapsed, setIsNamespaceCollapsed] = useState(false)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
+  const [newSpaceForm, setNewSpaceForm] = useState<NamespaceCreateFormValue>({ name: '', description: '' })
+  const spaceListRef = useRef<KnowledgeSpace[]>([])
+  const currentSpaceRef = useRef<KnowledgeSpace | null>(null)
 
-  const getStats = (space: KnowledgeSpace): StatConfig[] => {
-    const multiplier = space.id === 'ks1' ? 1 : space.id === 'ks2' ? 0.6 : 0.3
+  const { trimmedName: trimmedSpaceName, showNameError, canCreateSpace } = getNamespaceFormStatus(
+    spaceList,
+    newSpaceForm.name
+  )
+  const hasSpaces = spaceList.length > 0
+
+  useEffect(() => {
+    spaceListRef.current = spaceList
+  }, [spaceList])
+
+  useEffect(() => {
+    currentSpaceRef.current = currentSpace
+  }, [currentSpace])
+
+  const syncDocuments = useCallback(async (spaceId?: string) => {
+    if (!spaceId) {
+      setDocuments([])
+      return
+    }
+    const namespaceId = Number(spaceId)
+    if (!Number.isFinite(namespaceId)) {
+      setDocuments([])
+      return
+    }
+    try {
+      const { items } = await listDocuments(namespaceId)
+      setDocuments(items.map(mapDocumentToUi))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(`加载文档失败：${message}`)
+      setDocuments([])
+    }
+  }, [])
+
+  const syncSpaces = useCallback(async (preferredId?: string) => {
+    try {
+      const { items } = await listNamespaces()
+      const colorMap = new Map(spaceListRef.current.map((space) => [space.id, space.color]))
+      const nextSpaces = items.map((item, index) =>
+        mapNamespaceToSpace(
+          item,
+          colorMap.get(String(item.namespace_id)) ?? SPACE_COLOR_PALETTE[index % SPACE_COLOR_PALETTE.length]
+        )
+      )
+      setSpaceList(nextSpaces)
+      const target = preferredId ? nextSpaces.find((space) => space.id === preferredId) : undefined
+      const fallback = currentSpaceRef.current ? nextSpaces.find((space) => space.id === currentSpaceRef.current?.id) : undefined
+      const nextActiveSpace = target ?? fallback ?? nextSpaces[0] ?? null
+      setCurrentSpace(nextActiveSpace)
+      void syncDocuments(nextActiveSpace?.id)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(`加载知识空间失败：${message}`)
+    }
+  }, [syncDocuments])
+
+  useEffect(() => {
+    void syncSpaces()
+  }, [syncSpaces])
+
+  const getStats = (space: KnowledgeSpace, index: number): StatConfig[] => {
+    const multiplier = index <= 0 ? 1 : index === 1 ? 0.6 : 0.3
 
     return [
       {
@@ -51,7 +118,7 @@ export function WikiView() {
         value: space.docCount,
         unit: '个',
         icon: FileText,
-        change: space.id === 'ks1' ? '+12' : '+3',
+        change: index <= 0 ? '+12' : '+3',
         trend: 'up',
         color: 'text-indigo-600',
         bg: 'bg-indigo-50 dark:bg-indigo-500/10'
@@ -68,19 +135,100 @@ export function WikiView() {
       },
       {
         label: '平均召回准确率',
-        value: space.id === 'ks1' ? '94.2' : space.id === 'ks2' ? '89.5' : '91.0',
+        value: index <= 0 ? '94.2' : index === 1 ? '89.5' : '91.0',
         unit: '%',
         icon: Zap,
-        change: space.id === 'ks1' ? '+2.1%' : '-0.4%',
-        trend: space.id === 'ks1' ? 'up' : 'down',
+        change: index <= 0 ? '+2.1%' : '-0.4%',
+        trend: index <= 0 ? 'up' : 'down',
         color: 'text-emerald-600',
         bg: 'bg-emerald-50 dark:bg-emerald-500/10'
       }
     ]
   }
 
-  const currentStats = getStats(currentSpace)
+  const handleCloseCreateModal = () => {
+    setIsCreateModalOpen(false)
+    setNewSpaceForm({ name: '', description: '' })
+  }
 
+  const handleCreateSpace = async () => {
+    if (!canCreateSpace) return
+    try {
+      const namespaceId = await createNamespace({
+        namespace: trimmedSpaceName,
+        description: newSpaceForm.description.trim() || null
+      })
+      await syncSpaces(String(namespaceId))
+      setNewSpaceForm({ name: '', description: '' })
+      setIsCreateModalOpen(false)
+      toast.success('知识空间创建成功')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(`创建失败：${message}`)
+    }
+  }
+
+  const handleDocumentUploaded = (doc: Document) => {
+    setDocuments((prev) => [doc, ...prev])
+    setSpaceList((prev) =>
+      prev.map((space) => (space.id === doc.spaceId ? { ...space, docCount: space.docCount + 1 } : space))
+    )
+    if (currentSpace?.id === doc.spaceId) {
+      setCurrentSpace((prev) => (prev ? { ...prev, docCount: prev.docCount + 1 } : prev))
+    }
+  }
+
+  const handleSelectSpace = useCallback(
+    (space: KnowledgeSpace) => {
+      setCurrentSpace(space)
+      void syncDocuments(space.id)
+    },
+    [syncDocuments]
+  )
+
+  if (!hasSpaces) {
+    return (
+      <section className="h-full bg-slate-50 dark:bg-[#0f172a] selection:bg-indigo-500/30">
+        <WikiHero onCreate={() => setIsCreateModalOpen(true)} />
+
+        <Modal
+          isOpen={isCreateModalOpen}
+          onClose={handleCloseCreateModal}
+          title="创建知识空间"
+          subtitle={<span className="text-xs text-slate-400 dark:text-slate-500">Namespace 用于隔离不同业务域的知识文档。</span>}
+          size="sm"
+          footerRight={
+            <>
+              <ModalCancelButton onClick={handleCloseCreateModal}>取消</ModalCancelButton>
+              <ModalPrimaryButton onClick={handleCreateSpace} disabled={!canCreateSpace}>
+                创建空间
+              </ModalPrimaryButton>
+            </>
+          }
+        >
+          <NamespaceCreateForm
+            value={newSpaceForm}
+            onChange={setNewSpaceForm}
+            showNameError={showNameError}
+          />
+        </Modal>
+      </section>
+    )
+  }
+
+  const fallbackSpace: KnowledgeSpace = {
+    id: '',
+    name: '未选择知识空间',
+    description: '请先创建知识空间以开始上传文档',
+    docCount: 0,
+    color: 'bg-slate-400'
+  }
+  const activeSpace = currentSpace ?? fallbackSpace
+  const currentIndex = Math.max(
+    0,
+    spaceList.findIndex((space) => space.id === activeSpace.id)
+  )
+  const currentStats = getStats(activeSpace, currentIndex)
   return (
     <section className="h-full bg-slate-50 dark:bg-[#0f172a] selection:bg-indigo-500/30">
       <div className="relative flex h-full">
@@ -94,23 +242,30 @@ export function WikiView() {
               <div className={`${paddingClassMap.sm} flex flex-col min-h-0 h-full`}>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className={`${TYPOGRAPHY.caption} font-semibold text-slate-500 uppercase tracking-wider`}>知识空间 (Namespaces)</h3>
-                  <button className="text-slate-400 hover:text-indigo-600"><Plus size={14} /></button>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateModalOpen(true)}
+                    className="text-slate-400 hover:text-indigo-600"
+                    aria-label="创建知识空间"
+                  >
+                    <Plus size={14} />
+                  </button>
                 </div>
 
                 <div className="space-y-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar pb-8">
-                  {spaces.map((space) => (
+                  {spaceList.map((space) => (
                     <div
                       key={space.id}
-                      onClick={() => setCurrentSpace(space)}
+                      onClick={() => handleSelectSpace(space)}
                       className={`group flex items-start p-3 rounded-lg cursor-pointer transition-all border ${
-                        currentSpace.id === space.id
+                        currentSpace?.id === space.id
                           ? 'bg-white dark:bg-slate-900 border-indigo-200 dark:border-indigo-500/30 shadow-sm ring-1 ring-indigo-100 dark:ring-indigo-500/20'
                           : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800'
                       }`}
                     >
                       <div className={`w-2 h-2 mt-1.5 rounded-full mr-3 ${space.color}`} />
                       <div>
-                        <div className={`${TYPOGRAPHY.bodySm} font-medium ${currentSpace.id === space.id ? 'text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-300'}`}>
+                        <div className={`${TYPOGRAPHY.bodySm} font-medium ${currentSpace?.id === space.id ? 'text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-300'}`}>
                           {space.name}
                         </div>
                         <div className={`${TYPOGRAPHY.micro} text-slate-400 mt-0.5 line-clamp-1`}>{space.description}</div>
@@ -164,16 +319,22 @@ export function WikiView() {
                     <div className={`flex items-center space-x-2 ${TYPOGRAPHY.legal} text-slate-400 uppercase tracking-widest mb-1`}>
                       <span>Knowledge Wiki</span>
                       <span>/</span>
-                      <span className="text-slate-600 dark:text-slate-300">{currentSpace.name}</span>
+                      <span className="text-slate-600 dark:text-slate-300">{activeSpace.name}</span>
                     </div>
                     <h2 className={`${TYPOGRAPHY.subtitle} font-bold text-slate-900 dark:text-slate-100 tracking-tight flex items-center`}>
-                      {currentSpace.name}
+                      {activeSpace.name}
                       <button className="ml-3 text-slate-300 hover:text-slate-500"><Settings size={16} /></button>
                     </h2>
-                    <p className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400 mt-1`}>{currentSpace.description}</p>
+                    <p className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400 mt-1`}>{activeSpace.description}</p>
                   </div>
                   <div className="flex space-x-3">
-                    <Button variant="primary" size="small" className="shadow-sm hover:shadow-lg">
+                    <Button
+                      variant="primary"
+                      size="small"
+                      className="shadow-sm hover:shadow-lg"
+                      disabled={!currentSpace?.id}
+                      onClick={() => setIsUploadModalOpen(true)}
+                    >
                       <Plus size={14} />
                       上传文档至空间
                     </Button>
@@ -235,15 +396,17 @@ export function WikiView() {
                   <div className={`p-0 bg-slate-50/50 dark:bg-slate-950/40 flex flex-col relative ${activeTab === 'DOCUMENTS' ? 'overflow-hidden' : 'overflow-visible'}`}>
                     {activeTab === 'DOCUMENTS' && (
                       <div className="p-4">
-                        <DocList spaceId={currentSpace.id} />
+                        <DocList spaceId={activeSpace.id} documents={documents} />
                       </div>
                     )}
                     {activeTab === 'CHUNKS' && (
-                      <ChunkManager spaceId={currentSpace.id} spaceName={currentSpace.name} />
+                      <ChunkManager spaceId={activeSpace.id} spaceName={activeSpace.name} documents={documents} />
                     )}
                     {activeTab === 'RETRIEVAL_TEST' && (
                       <RetrievalPlayground
-                        spaceName={currentSpace.name}
+                        spaceId={activeSpace.id}
+                        spaceName={activeSpace.name}
+                        documents={documents}
                         isNamespaceCollapsed={isNamespaceCollapsed}
                       />
                     )}
@@ -253,6 +416,36 @@ export function WikiView() {
             </div>
           </div>
         </div>
+
+        <Modal
+          isOpen={isCreateModalOpen}
+          onClose={handleCloseCreateModal}
+          title="创建知识空间"
+          subtitle={<span className="text-xs text-slate-400 dark:text-slate-500">Namespace 用于隔离不同业务域的知识文档。</span>}
+          size="sm"
+          footerRight={
+            <>
+              <ModalCancelButton onClick={handleCloseCreateModal}>取消</ModalCancelButton>
+              <ModalPrimaryButton onClick={handleCreateSpace} disabled={!canCreateSpace}>
+                创建空间
+              </ModalPrimaryButton>
+            </>
+          }
+        >
+          <NamespaceCreateForm
+            value={newSpaceForm}
+            onChange={setNewSpaceForm}
+            showNameError={showNameError}
+          />
+        </Modal>
+
+        <UploadDocumentModal
+          isOpen={isUploadModalOpen}
+          onClose={() => setIsUploadModalOpen(false)}
+          spaceId={activeSpace.id}
+          spaceName={activeSpace.name}
+          onUploaded={handleDocumentUploaded}
+        />
       </div>
     </section>
   )

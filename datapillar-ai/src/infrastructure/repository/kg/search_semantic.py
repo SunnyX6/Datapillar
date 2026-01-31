@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 Neo4j 语义资产查询服务
 
@@ -13,7 +17,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from src.infrastructure.database import Neo4jClient
-from src.infrastructure.database.cypher import run_cypher
 from src.shared.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -22,44 +25,9 @@ logger = logging.getLogger(__name__)
 class Neo4jSemanticSearch:
     """Neo4j 语义资产查询服务（词根、修饰符、单位）"""
 
-    _WORDROOT_CYPHER = """
-    UNWIND $element_ids AS eid
-    MATCH (w:WordRoot)
-    WHERE elementId(w) = eid
-    RETURN
-        elementId(w) AS element_id,
-        w.code AS code,
-        w.name AS name,
-        w.dataType AS dataType,
-        w.description AS description
-    """
-
-    _MODIFIER_CYPHER = """
-    UNWIND $element_ids AS eid
-    MATCH (m:Modifier)
-    WHERE elementId(m) = eid
-    RETURN
-        elementId(m) AS element_id,
-        m.code AS code,
-        m.modifierType AS modifierType,
-        m.description AS description
-    """
-
-    _UNIT_CYPHER = """
-    UNWIND $element_ids AS eid
-    MATCH (u:Unit)
-    WHERE elementId(u) = eid
-    RETURN
-        elementId(u) AS element_id,
-        u.code AS code,
-        u.name AS name,
-        u.symbol AS symbol,
-        u.description AS description
-    """
-
     @classmethod
     def search_semantic_assets(
-        cls, query: str, top_k: int = 10, min_score: float = 0.75
+        cls, query: str, top_k: int = 10, min_score: float = 0.55
     ) -> dict[str, list[Any]]:
         """
         根据用户输入语义检索相关的词根、修饰符、单位（混合检索：向量+全文）
@@ -76,113 +44,90 @@ class Neo4jSemanticSearch:
             "units": [{"code": ..., "name": ..., "symbol": ..., "score": ...}]
         }
         """
+        from neo4j_graphrag.retrievers import HybridCypherRetriever
+        from neo4j_graphrag.types import HybridSearchRanker, RetrieverResultItem
+
         from src.infrastructure.llm.embeddings import UnifiedEmbedder
 
         start = time.time()
-
-        embedder = UnifiedEmbedder()
-        query_vector = embedder.embed_query(query)
-
-        driver = Neo4jClient.get_driver()
 
         search_configs = [
             {
                 "name": "word_roots",
                 "vector_index": "wordroot_embedding",
                 "fulltext_index": "wordroot_fulltext",
-                "cypher": cls._WORDROOT_CYPHER,
+                "retrieval_query": """
+                RETURN
+                    node.code AS code,
+                    node.name AS name,
+                    node.dataType AS dataType,
+                    node.description AS description,
+                    score
+                """,
             },
             {
                 "name": "modifiers",
                 "vector_index": "modifier_embedding",
                 "fulltext_index": "modifier_fulltext",
-                "cypher": cls._MODIFIER_CYPHER,
+                "retrieval_query": """
+                RETURN
+                    node.code AS code,
+                    node.modifierType AS modifierType,
+                    node.description AS description,
+                    score
+                """,
             },
             {
                 "name": "units",
                 "vector_index": "unit_embedding",
                 "fulltext_index": "unit_fulltext",
-                "cypher": cls._UNIT_CYPHER,
+                "retrieval_query": """
+                RETURN
+                    node.code AS code,
+                    node.name AS name,
+                    node.symbol AS symbol,
+                    node.description AS description,
+                    score
+                """,
             },
         ]
 
-        def hybrid_search_single(config: dict) -> tuple[str, list]:
-            """单资产类型混合搜索（支持降级）"""
-            results: list[dict] = []
-            score_map: dict[str, float] = {}
+        def semantic_result_formatter(record: Any) -> Any:
+            return RetrieverResultItem(
+                content=f"{record.get('name') or record.get('code')} {record.get('description') or ''}",
+                metadata=dict(record),
+            )
+
+        def hybrid_search_single(config: dict[str, str]) -> tuple[str, list]:
+            """单资产类型混合搜索"""
+            results: list[dict[str, Any]] = []
 
             try:
-                with driver.session(database=settings.neo4j_database) as session:
-                    vector_cypher = """
-                    CALL db.index.vector.queryNodes($index_name, $top_k, $vector)
-                    YIELD node, score
-                    WHERE score >= $min_score
-                    RETURN elementId(node) AS element_id, score
-                    """
-                    vector_result = run_cypher(
-                        session,
-                        vector_cypher,
-                        {
-                            "index_name": config["vector_index"],
-                            "top_k": top_k,
-                            "vector": query_vector,
-                            "min_score": min_score,
-                        },
-                    )
-                    for record in vector_result:
-                        eid = record["element_id"]
-                        score_map[eid] = max(score_map.get(eid, 0), record["score"])
+                retriever = HybridCypherRetriever(
+                    driver=Neo4jClient.get_driver(),
+                    vector_index_name=config["vector_index"],
+                    fulltext_index_name=config["fulltext_index"],
+                    retrieval_query=config["retrieval_query"],
+                    result_formatter=semantic_result_formatter,
+                    embedder=UnifiedEmbedder(),
+                    neo4j_database=settings.neo4j_database,
+                )
 
-                    fulltext_cypher = """
-                    CALL db.index.fulltext.queryNodes($index_name, $query)
-                    YIELD node, score
-                    WHERE score >= 0.5
-                    RETURN elementId(node) AS element_id, score / 10.0 AS score
-                    LIMIT $top_k
-                    """
-                    fulltext_result = run_cypher(
-                        session,
-                        fulltext_cypher,
-                        {"index_name": config["fulltext_index"], "query": query, "top_k": top_k},
-                    )
-                    for record in fulltext_result:
-                        eid = record["element_id"]
-                        score_map[eid] = max(score_map.get(eid, 0), record["score"])
+                search_result = retriever.search(
+                    query_text=query,
+                    top_k=top_k,
+                    ranker=HybridSearchRanker.LINEAR,
+                    alpha=0.6,
+                )
+                items = list(getattr(search_result, "items", []) or [])
 
-                    if not score_map:
-                        fallback_min_score = 0.55
-                        vector_result = run_cypher(
-                            session,
-                            vector_cypher,
-                            {
-                                "index_name": config["vector_index"],
-                                "top_k": top_k,
-                                "vector": query_vector,
-                                "min_score": fallback_min_score,
-                            },
-                        )
-                        for record in vector_result:
-                            eid = record["element_id"]
-                            score_map[eid] = max(score_map.get(eid, 0), record["score"])
-
-                    if not score_map:
-                        return (config["name"], [])
-
-                    sorted_items = sorted(score_map.items(), key=lambda x: x[1], reverse=True)[
-                        :top_k
-                    ]
-                    element_ids = [eid for eid, _ in sorted_items]
-
-                    detail_result = run_cypher(
-                        session, config["cypher"], {"element_ids": element_ids}
-                    )
-                    for record in detail_result:
-                        data = dict(record)
-                        eid = data.pop("element_id")
-                        data["score"] = round(score_map.get(eid, 0), 3)
-                        results.append(data)
-
-                    results.sort(key=lambda x: x.get("score", 0), reverse=True)
+                for item in items:
+                    metadata = getattr(item, "metadata", {}) or {}
+                    score = float(metadata.get("score", 0) or 0)
+                    if score < min_score:
+                        continue
+                    metadata["score"] = round(score, 3)
+                    results.append(metadata)
 
             except Exception as e:
                 logger.warning(f"语义资产搜索[{config['name']}]失败: {e}")

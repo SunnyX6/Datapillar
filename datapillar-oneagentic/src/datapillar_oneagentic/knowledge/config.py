@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """Knowledge configuration."""
 
 from __future__ import annotations
@@ -7,7 +10,7 @@ from typing import Any
 from datapillar_oneagentic.providers.llm.config import EmbeddingConfig
 from datapillar_oneagentic.storage.config import VectorStoreConfig
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class KnowledgeChunkGeneralConfig(BaseModel):
@@ -36,6 +39,14 @@ class KnowledgeChunkQAConfig(BaseModel):
     )
 
 
+class KnowledgeWindowConfig(BaseModel):
+    """Chunk window metadata configuration."""
+
+    enabled: bool = Field(default=False, description="Enable window metadata on chunks")
+    radius: int = Field(default=1, ge=0, description="Neighbor radius to store")
+    scope: str = Field(default="auto", description="Window scope: auto | doc | parent")
+
+
 class KnowledgeChunkConfig(BaseModel):
     """Knowledge chunking configuration."""
 
@@ -44,22 +55,17 @@ class KnowledgeChunkConfig(BaseModel):
     general: KnowledgeChunkGeneralConfig = Field(default_factory=KnowledgeChunkGeneralConfig)
     parent_child: KnowledgeChunkParentChildConfig = Field(default_factory=KnowledgeChunkParentChildConfig)
     qa: KnowledgeChunkQAConfig = Field(default_factory=KnowledgeChunkQAConfig)
-
-
-class KnowledgeInjectConfig(BaseModel):
-    """Knowledge injection configuration (defaults)."""
-
-    mode: str = Field(default="tool", description="Injection mode: system | tool")
-    max_tokens: int = Field(default=1200, ge=1, description="Max injected tokens (rough estimate)")
-    max_chunks: int = Field(default=6, ge=1, description="Max injected chunks")
-    format: str = Field(default="markdown", description="Injection format: markdown | json")
+    window: KnowledgeWindowConfig = Field(default_factory=KnowledgeWindowConfig)
 
 
 class RerankConfig(BaseModel):
     """Rerank configuration."""
 
     mode: str = Field(default="off", description="Rerank mode: off | model | weighted")
-    provider: str | None = Field(default="sentence_transformers", description="Rerank provider")
+    provider: str | None = Field(
+        default="sentence_transformers",
+        description="Rerank provider: sentence_transformers | milvus",
+    )
     model: str | None = Field(
         default="cross-encoder/ms-marco-MiniLM-L-6-v2", description="Rerank model"
     )
@@ -88,28 +94,111 @@ class RetrieveQualityConfig(BaseModel):
     max_per_document: int = Field(default=2, ge=1, description="Max chunks per document")
 
 
+class MetadataFilterConfig(BaseModel):
+    """Automatic metadata filtering."""
+
+    mode: str = Field(default="auto", description="Filtering mode: off | auto")
+    min_confidence: float = Field(default=0.6, ge=0, le=1, description="Minimum confidence to apply")
+    fields: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="Field -> candidate values/aliases for rule-based matching",
+    )
+    use_llm: bool = Field(default=False, description="Use LLM fallback when rules are insufficient")
+
+
+class QueryRouterConfig(BaseModel):
+    """Query routing configuration."""
+
+    mode: str = Field(default="off", description="Routing mode: off | auto")
+    allow_no_rag: bool = Field(default=False, description="Allow skipping retrieval when routing decides")
+    use_llm: bool = Field(default=False, description="Use LLM for routing decisions")
+    min_confidence: float = Field(default=0.6, ge=0, le=1, description="Minimum confidence to apply")
+
+
+class QueryExpansionConfig(BaseModel):
+    """Query expansion configuration."""
+
+    mode: str = Field(default="off", description="Expansion mode: off | multi | hyde")
+    max_queries: int = Field(default=3, ge=1, description="Maximum expanded queries (excluding original)")
+    include_original: bool = Field(default=True, description="Include original query in expansion")
+    per_query_k: int | None = Field(default=None, ge=1, description="Override per-query pool size")
+    use_llm: bool = Field(default=False, description="Use LLM for expansion")
+
+
+class ContextResolveConfig(BaseModel):
+    """Context resolution configuration."""
+
+    mode: str = Field(
+        default="parent",
+        description="Context mode: off | parent | window | parent_window",
+    )
+    window_radius: int = Field(default=1, ge=0, description="Neighbor radius for window mode")
+
+
 class KnowledgeRetrieveConfig(BaseModel):
     """Knowledge retrieval configuration (defaults)."""
 
-    method: str = Field(default="hybrid", description="Retrieval method: semantic | hybrid")
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_removed_fields(cls, data):
+        if isinstance(data, dict) and "hierarchical" in data:
+            raise ValueError("Hierarchical summary retrieval has been removed from retrieval configuration.")
+        return data
+
+    method: str = Field(
+        default="hybrid",
+        description=(
+            "Retrieval method: semantic | hybrid | full_text."
+        ),
+    )
     top_k: int = Field(default=8, ge=1, description="Final result count")
     score_threshold: float | None = Field(default=None, description="Minimum score threshold")
+    params: dict[str, Any] = Field(default_factory=dict, description="Backend passthrough parameters")
     rerank: RerankConfig = Field(default_factory=RerankConfig)
     tuning: RetrieveTuningConfig = Field(default_factory=RetrieveTuningConfig)
     quality: RetrieveQualityConfig = Field(default_factory=RetrieveQualityConfig)
-    inject: KnowledgeInjectConfig = Field(default_factory=KnowledgeInjectConfig)
-
-
-class KnowledgeBaseConfig(BaseModel):
-    """Knowledge base configuration (Embedding + VectorStore)."""
-
-    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
-    vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
+    filtering: MetadataFilterConfig = Field(default_factory=MetadataFilterConfig)
+    routing: QueryRouterConfig = Field(default_factory=QueryRouterConfig)
+    expansion: QueryExpansionConfig = Field(default_factory=QueryExpansionConfig)
+    context: ContextResolveConfig = Field(default_factory=ContextResolveConfig)
 
 
 class KnowledgeConfig(BaseModel):
-    """Knowledge configuration."""
+    """Knowledge configuration (store + retrieve defaults)."""
 
-    base_config: KnowledgeBaseConfig = Field(default_factory=KnowledgeBaseConfig)
-    chunk_config: KnowledgeChunkConfig = Field(default_factory=KnowledgeChunkConfig)
-    retrieve_config: KnowledgeRetrieveConfig = Field(default_factory=KnowledgeRetrieveConfig)
+    namespaces: list[str] | None = Field(
+        default=None,
+        description="Optional namespace whitelist for tool binding",
+    )
+    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
+    vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
+    retrieve: KnowledgeRetrieveConfig = Field(default_factory=KnowledgeRetrieveConfig)
+
+    @model_validator(mode="after")
+    def _validate_namespaces(self) -> "KnowledgeConfig":
+        if self.namespaces is None:
+            return self
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for item in self.namespaces:
+            value = (item or "").strip()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            cleaned.append(value)
+        if not cleaned:
+            raise ValueError("KnowledgeConfig.namespaces cannot be empty")
+        self.namespaces = cleaned
+        return self
+
+
+class KnowledgeVectorDB(BaseModel):
+    """Deprecated: use KnowledgeConfig and tool retrieve/filters instead."""
+
+    store: VectorStoreConfig = Field(
+        description="Vector store configuration (type/uri/path/params)",
+    )
+    retrieve: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Dynamic retrieve options (method/top_k/params/expr/param/filters)",
+    )

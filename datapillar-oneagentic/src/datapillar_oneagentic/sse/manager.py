@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 SSE stream manager.
 
@@ -148,6 +151,7 @@ class _SessionRun:
     completed: bool = False
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     running_task: asyncio.Task | None = None
+    orchestrator: OrchestratorProtocol | None = None
 
 
 class StreamManager:
@@ -249,12 +253,15 @@ class StreamManager:
         """
         run = self._runs[str(key)]
 
+        interrupted = False
         try:
             async for msg in orchestrator.stream(
                 query=query,
                 key=key,
                 resume_value=resume_value,
             ):
+                if isinstance(msg, dict) and msg.get("event") == "agent.interrupt":
+                    interrupted = True
                 await self._emit(run, msg)
         except asyncio.CancelledError:
             logger.info(f"Run cancelled by user: key={key}")
@@ -262,7 +269,8 @@ class StreamManager:
         except Exception as exc:
             logger.error("SSE emit failed: %s", exc, exc_info=True)
         finally:
-            await self._complete(run)
+            if not interrupted:
+                await self._complete(run)
 
     async def chat(
         self,
@@ -298,10 +306,12 @@ class StreamManager:
                     with contextlib.suppress(asyncio.CancelledError):
                         await run.running_task
 
-                run.completed = False
                 run.last_activity_ms = now_ms()
                 run.buffer.clear()
-                run.next_seq = 1
+                if run.completed:
+                    run.next_seq = 1
+                run.completed = False
+        run.orchestrator = orchestrator
 
         run.running_task = asyncio.create_task(
             self._run_orchestrator_stream(
@@ -311,6 +321,49 @@ class StreamManager:
                 resume_value=resume_value,
             )
         )
+
+    async def abort_interrupt(self, *, key: SessionKey, interrupt_id: str) -> bool:
+        """
+        Abort a pending interrupt by interrupt_id.
+
+        Returns:
+            True if abort started, False otherwise
+        """
+        if not interrupt_id:
+            logger.warning(f"Abort interrupt failed: interrupt_id is empty: {key}")
+            return False
+
+        storage_key = str(key)
+        run = self._runs.get(storage_key)
+
+        if run is None:
+            logger.warning(f"Abort interrupt failed: session not found: {key}")
+            return False
+
+        if run.orchestrator is None:
+            logger.warning(f"Abort interrupt failed: orchestrator missing: {key}")
+            return False
+
+        async with run.lock:
+            if run.completed:
+                logger.info(f"Abort interrupt skipped: run already completed: {key}")
+                return False
+            if run.running_task is not None and not run.running_task.done():
+                logger.info(f"Abort interrupt skipped: run still active: {key}")
+                return False
+
+            run.completed = False
+            run.last_activity_ms = now_ms()
+            run.running_task = asyncio.create_task(
+                self._run_orchestrator_stream(
+                    orchestrator=run.orchestrator,
+                    query=None,
+                    key=key,
+                    resume_value={interrupt_id: {"__abort__": True}},
+                )
+            )
+
+        return True
 
     async def subscribe(
         self,

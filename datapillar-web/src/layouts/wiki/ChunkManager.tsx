@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Edit2,
   Save,
@@ -15,55 +15,78 @@ import {
 import { cardWidthClassMap, menuWidthClassMap, panelWidthClassMap, progressWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { Button, Card } from '@/components/ui'
+import { toast } from 'sonner'
+import { deleteChunk, listChunks, startChunkJob, updateChunk } from '@/services/knowledgeWikiService'
 import type { Chunk, Document } from './types'
+import { mapChunkToUi } from './utils'
 
-const mockDocuments: Document[] = [
-  { id: '1', spaceId: 'ks1', title: 'DataButterfly_API_v2.0.pdf', type: 'pdf', size: '2.4 MB', uploadDate: '2023-10-24', status: 'indexed', chunkCount: 142, tokenCount: 45000 },
-  { id: '2', spaceId: 'ks1', title: 'System_Architecture.docx', type: 'docx', size: '1.2 MB', uploadDate: '2023-10-25', status: 'indexed', chunkCount: 85, tokenCount: 22000 },
-  { id: '3', spaceId: 'ks2', title: 'Product_Design_Notes.md', type: 'md', size: '48 KB', uploadDate: '2023-10-27', status: 'indexed', chunkCount: 96, tokenCount: 18000 }
-]
+type ChunkMode = 'general' | 'parent_child' | 'qa'
 
-const mockChunks: Record<string, Chunk[]> = {
-  '1': [
-    { id: 'c1', docId: '1', docTitle: 'DataButterfly_API_v2.0.pdf', content: 'Rate Limits: The API is limited to 1000 requests per minute per IP address. Exceeding this limit will result in a 429 Too Many Requests response.', tokenCount: 42, lastModified: '10 mins ago', embeddingStatus: 'synced' },
-    { id: 'c2', docId: '1', docTitle: 'DataButterfly_API_v2.0.pdf', content: 'Authentication: All requests must be authenticated using a Bearer Token in the Authorization header.', tokenCount: 38, lastModified: '12 mins ago', embeddingStatus: 'synced' },
-    { id: 'c3', docId: '1', docTitle: 'DataButterfly_API_v2.0.pdf', content: 'Pagination: Endpoints returning lists of resources support pagination via cursor-based parameters.', tokenCount: 45, lastModified: '15 mins ago', embeddingStatus: 'synced' }
-  ],
-  '2': [
-    { id: 'c4', docId: '2', docTitle: 'System_Architecture.docx', content: 'The system uses a microservices architecture based on Kubernetes.', tokenCount: 20, lastModified: '1 day ago', embeddingStatus: 'synced' }
-  ],
-  '3': [
-    { id: 'c5', docId: '3', docTitle: 'Product_Design_Notes.md', content: 'Primary navigation emphasizes knowledge space context before artifact operations.', tokenCount: 26, lastModified: '2 days ago', embeddingStatus: 'pending' }
-  ]
-}
-
-type ChunkMethod = 'recursive' | 'token' | 'markdown' | 'semantic'
-
-const CHUNK_METHODS: ChunkMethod[] = ['recursive', 'token', 'markdown', 'semantic']
+const CHUNK_MODES: ChunkMode[] = ['general', 'parent_child', 'qa']
 
 interface Props {
   spaceId: string
   spaceName: string
+  documents: Document[]
 }
 
 interface ChunkConfig {
-  method: ChunkMethod
-  chunkSize: number
-  overlap: number
-  separators: string
+  mode: ChunkMode
+  general: {
+    maxTokens: number
+    overlap: number
+    delimiter: string
+  }
+  parent_child: {
+    parent: {
+      maxTokens: number
+      overlap: number
+      delimiter: string
+    }
+    child: {
+      maxTokens: number
+      overlap: number
+      delimiter: string
+    }
+  }
+  qa: {
+    pattern: string
+  }
 }
 
-export default function ChunkManager({ spaceId, spaceName }: Props) {
-  const availableDocs = useMemo(() => mockDocuments.filter((doc) => doc.spaceId === spaceId), [spaceId])
+export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
+  const availableDocs = useMemo(() => documents.filter((doc) => doc.spaceId === spaceId), [documents, spaceId])
   const [selectedDocId, setSelectedDocId] = useState<string>(() => availableDocs[0]?.id ?? '')
   const [selectedChunkId, setSelectedChunkId] = useState<string | null>(null)
   const [editContentByChunkId, setEditContentByChunkId] = useState<Record<string, string>>({})
   const [showConfig, setShowConfig] = useState(false)
+  const [chunks, setChunks] = useState<Chunk[]>([])
+  const [isChunkLoading, setIsChunkLoading] = useState(false)
+  const [isChunking, setIsChunking] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [config, setConfig] = useState<ChunkConfig>({
-    method: 'recursive',
-    chunkSize: 512,
-    overlap: 50,
-    separators: '\\n\\n, \\n, " ", ""'
+    mode: 'general',
+    general: {
+      maxTokens: 800,
+      overlap: 120,
+      delimiter: '\\n\\n'
+    },
+    parent_child: {
+      parent: {
+        maxTokens: 800,
+        overlap: 120,
+        delimiter: '\\n\\n'
+      },
+      child: {
+        maxTokens: 200,
+        overlap: 40,
+        delimiter: '\\n\\n'
+      }
+    },
+    qa: {
+      pattern: 'Q\\d+:\\s*(.*?)\\s*A\\d+:\\s*([\\s\\S]*?)(?=Q\\d+:|$)'
+    }
   })
 
   const activeDocId = useMemo(() => {
@@ -74,11 +97,6 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
   const currentDoc = useMemo(
     () => availableDocs.find((doc) => doc.id === activeDocId),
     [availableDocs, activeDocId]
-  )
-
-  const chunks = useMemo(
-    () => (activeDocId ? mockChunks[activeDocId] || [] : []),
-    [activeDocId]
   )
 
   const activeChunk = useMemo(() => {
@@ -95,13 +113,64 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
     ? editContentByChunkId[editContentKey] ?? activeChunk.content
     : ''
 
+  const referenceChunkSize = useMemo(() => {
+    if (config.mode === 'general') return config.general.maxTokens
+    if (config.mode === 'parent_child') return config.parent_child.child.maxTokens
+    return 0
+  }, [config])
+
+  const modeSummary = useMemo(() => {
+    if (config.mode === 'general') {
+      return `${config.general.maxTokens} / ${config.general.overlap}`
+    }
+    if (config.mode === 'parent_child') {
+      return `P:${config.parent_child.parent.maxTokens}/${config.parent_child.parent.overlap} C:${config.parent_child.child.maxTokens}/${config.parent_child.child.overlap}`
+    }
+    return 'QA'
+  }, [config])
+
+  const estimatedChunks = useMemo(() => {
+    if (!referenceChunkSize) return 0
+    const totalTokens = currentDoc?.tokenCount ?? 0
+    if (!totalTokens) return 0
+    return Math.ceil(totalTokens / referenceChunkSize)
+  }, [currentDoc?.tokenCount, referenceChunkSize])
+
   const progressWidthClass = useMemo(() => {
     if (!activeChunk) return progressWidthClassMap.low
-    const ratio = activeChunk.tokenCount / config.chunkSize
+    const ratio = referenceChunkSize ? activeChunk.tokenCount / referenceChunkSize : 0
     if (ratio >= 0.85) return progressWidthClassMap.high
     if (ratio >= 0.7) return progressWidthClassMap.medium
     return progressWidthClassMap.low
-  }, [activeChunk, config.chunkSize])
+  }, [activeChunk, referenceChunkSize])
+
+  const embeddingSynced = activeChunk?.embeddingStatus === 'synced'
+
+  useEffect(() => {
+    if (!activeDocId) {
+      setChunks([])
+      return
+    }
+    const documentId = Number(activeDocId)
+    if (!Number.isFinite(documentId)) {
+      setChunks([])
+      return
+    }
+    setSelectedChunkId(null)
+    setIsChunkLoading(true)
+    listChunks(documentId)
+      .then(({ items }) => {
+        setChunks(items.map(mapChunkToUi))
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        toast.error(`加载切片失败：${message}`)
+        setChunks([])
+      })
+      .finally(() => {
+        setIsChunkLoading(false)
+      })
+  }, [activeDocId])
 
   const handleChunkSelect = (chunk: Chunk) => {
     setSelectedChunkId(chunk.id)
@@ -118,18 +187,123 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
     setEditContentByChunkId((current) => ({ ...current, [key]: value }))
   }
 
-  const getMethodLabel = (method: ChunkMethod) => {
-    switch (method) {
-      case 'recursive':
-        return 'Recursive'
-      case 'token':
-        return 'Fixed Token'
-      case 'markdown':
-        return 'Markdown'
-      case 'semantic':
-        return 'Semantic'
+  const buildChunkConfigPayload = () => ({
+    chunk_mode: config.mode,
+    chunk_config_json: {
+      mode: config.mode,
+      general: {
+        max_tokens: config.general.maxTokens,
+        overlap: config.general.overlap,
+        delimiter: config.general.delimiter
+      },
+      parent_child: {
+        parent: {
+          max_tokens: config.parent_child.parent.maxTokens,
+          overlap: config.parent_child.parent.overlap,
+          delimiter: config.parent_child.parent.delimiter
+        },
+        child: {
+          max_tokens: config.parent_child.child.maxTokens,
+          overlap: config.parent_child.child.overlap,
+          delimiter: config.parent_child.child.delimiter
+        }
+      },
+      qa: {
+        pattern: config.qa.pattern
+      }
+    }
+  })
+
+  const handleApplyConfig = async () => {
+    if (!activeDocId) {
+      toast.warning('请先选择文档')
+      return
+    }
+    const documentId = Number(activeDocId)
+    if (!Number.isFinite(documentId)) {
+      toast.error('文档 ID 无效')
+      return
+    }
+    try {
+      setIsChunking(true)
+      await startChunkJob(documentId, buildChunkConfigPayload())
+      toast.success('切分任务已提交')
+      setShowConfig(false)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(`切分失败：${message}`)
+    } finally {
+      setIsChunking(false)
+    }
+  }
+
+  const handleSaveChunk = async () => {
+    if (!activeChunk) return
+    const nextContent = editContent.trim()
+    if (!nextContent) {
+      toast.warning('切片内容不能为空')
+      return
+    }
+    if (nextContent === activeChunk.content) return
+    try {
+      setIsSaving(true)
+      await updateChunk(activeChunk.id, nextContent)
+      setChunks((prev) =>
+        prev.map((chunk) =>
+          chunk.id === activeChunk.id
+            ? { ...chunk, content: nextContent, embeddingStatus: 'pending' }
+            : chunk
+        )
+      )
+      const key = `${activeChunk.docId}:${activeChunk.id}`
+      setEditContentByChunkId((prev) => ({ ...prev, [key]: nextContent }))
+      toast.success('切片已更新')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(`更新失败：${message}`)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleResetChunk = () => {
+    if (!activeChunk) return
+    const key = `${activeChunk.docId}:${activeChunk.id}`
+    setEditContentByChunkId((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+
+  const handleDeleteChunk = async () => {
+    if (!activeChunk) return
+    try {
+      setIsDeleting(true)
+      const deleted = await deleteChunk(activeChunk.id)
+      if (deleted) {
+        setChunks((prev) => prev.filter((chunk) => chunk.id !== activeChunk.id))
+        setSelectedChunkId(null)
+      }
+      toast.success('切片已移除')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(`移除失败：${message}`)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const getModeLabel = (mode: ChunkMode) => {
+    switch (mode) {
+      case 'general':
+        return 'General'
+      case 'parent_child':
+        return 'Parent/Child'
+      case 'qa':
+        return 'Q&A'
       default:
-        return method
+        return mode
     }
   }
 
@@ -192,11 +366,9 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
             <div className="flex items-center mr-3">
               <span className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase tracking-wider mr-2`}>切分策略:</span>
               <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded px-2 py-1">
-                <span className={`${TYPOGRAPHY.caption} font-bold text-indigo-700 dark:text-indigo-200 mr-2`}>{getMethodLabel(config.method)}</span>
+                <span className={`${TYPOGRAPHY.caption} font-bold text-indigo-700 dark:text-indigo-200 mr-2`}>{getModeLabel(config.mode)}</span>
                 <span className="text-slate-300 border-l border-slate-300 dark:border-slate-600 h-3 mx-2"></span>
-                <span className={`${TYPOGRAPHY.caption} font-mono text-slate-600 dark:text-slate-300`}>{config.chunkSize}</span>
-                <span className={`text-slate-300 ${TYPOGRAPHY.caption} mx-1`}>/</span>
-                <span className={`${TYPOGRAPHY.caption} font-mono text-slate-600 dark:text-slate-300`}>{config.overlap}</span>
+                <span className={`${TYPOGRAPHY.caption} font-mono text-slate-600 dark:text-slate-300`}>{modeSummary}</span>
               </div>
             </div>
 
@@ -217,86 +389,201 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
 
               <div className="p-4 space-y-4">
                 <div>
-                  <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2`}>Splitter Method</label>
+                  <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2`}>Chunk Mode</label>
                   <div className="grid grid-cols-2 gap-2">
-                    {CHUNK_METHODS.map((method) => (
+                    {CHUNK_MODES.map((mode) => (
                       <button
-                        key={method}
-                        onClick={() => setConfig({ ...config, method })}
-                        className={`px-3 py-2 rounded-lg ${TYPOGRAPHY.caption} font-medium border text-left transition-all ${config.method === method ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        key={mode}
+                        onClick={() => setConfig({ ...config, mode })}
+                        className={`px-3 py-2 rounded-lg ${TYPOGRAPHY.caption} font-medium border text-left transition-all ${config.mode === mode ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                       >
-                        {getMethodLabel(method)}
+                        {getModeLabel(mode)}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Chunk Size (Tokens)</label>
-                      <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-200 px-2 py-0.5 rounded`}>{config.chunkSize}</span>
+                {config.mode === 'general' && (
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between mb-2">
+                        <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Chunk Length (Chars)</label>
+                        <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-200 px-2 py-0.5 rounded`}>{config.general.maxTokens}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="128"
+                        max="2048"
+                        step="64"
+                        value={config.general.maxTokens}
+                        onChange={(e) => setConfig({ ...config, general: { ...config.general, maxTokens: parseInt(e.target.value, 10) } })}
+                        className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                      />
+                      <div className={`flex justify-between ${TYPOGRAPHY.micro} text-slate-400 mt-1`}>
+                        <span>128</span>
+                        <span>2048</span>
+                      </div>
                     </div>
-                    <input
-                      type="range"
-                      min="128"
-                      max="2048"
-                      step="64"
-                      value={config.chunkSize}
-                      onChange={(e) => setConfig({ ...config, chunkSize: parseInt(e.target.value, 10) })}
-                      className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                    />
-                    <div className={`flex justify-between ${TYPOGRAPHY.micro} text-slate-400 mt-1`}>
-                      <span>128</span>
-                      <span>2048</span>
+
+                    <div>
+                      <div className="flex justify-between mb-2">
+                        <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Overlap</label>
+                        <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-200 px-2 py-0.5 rounded`}>{config.general.overlap}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="200"
+                        step="10"
+                        value={config.general.overlap}
+                        onChange={(e) => setConfig({ ...config, general: { ...config.general, overlap: parseInt(e.target.value, 10) } })}
+                        className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2 flex items-center`}>
+                        Delimiter <Info size={12} className="ml-1 text-slate-400" />
+                      </label>
+                      <input
+                        type="text"
+                        value={config.general.delimiter}
+                        onChange={(e) => setConfig({ ...config, general: { ...config.general, delimiter: e.target.value } })}
+                        className={`w-full ${TYPOGRAPHY.caption} font-mono bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none`}
+                      />
                     </div>
                   </div>
+                )}
 
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Overlap</label>
-                      <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-200 px-2 py-0.5 rounded`}>{config.overlap}</span>
+                {config.mode === 'parent_child' && (
+                  <div className="space-y-5">
+                    <div className="space-y-3">
+                      <div className={`${TYPOGRAPHY.caption} font-semibold text-slate-600 dark:text-slate-300`}>Parent Chunk</div>
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Parent Length (Chars)</label>
+                          <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-200 px-2 py-0.5 rounded`}>{config.parent_child.parent.maxTokens}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="128"
+                          max="2048"
+                          step="64"
+                          value={config.parent_child.parent.maxTokens}
+                          onChange={(e) => setConfig({ ...config, parent_child: { ...config.parent_child, parent: { ...config.parent_child.parent, maxTokens: parseInt(e.target.value, 10) } } })}
+                          className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                        />
+                        <div className={`flex justify-between ${TYPOGRAPHY.micro} text-slate-400 mt-1`}>
+                          <span>128</span>
+                          <span>2048</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Parent Overlap</label>
+                          <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-200 px-2 py-0.5 rounded`}>{config.parent_child.parent.overlap}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="200"
+                          step="10"
+                          value={config.parent_child.parent.overlap}
+                          onChange={(e) => setConfig({ ...config, parent_child: { ...config.parent_child, parent: { ...config.parent_child.parent, overlap: parseInt(e.target.value, 10) } } })}
+                          className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2`}>Parent Delimiter</label>
+                        <input
+                          type="text"
+                          value={config.parent_child.parent.delimiter}
+                          onChange={(e) => setConfig({ ...config, parent_child: { ...config.parent_child, parent: { ...config.parent_child.parent, delimiter: e.target.value } } })}
+                          className={`w-full ${TYPOGRAPHY.caption} font-mono bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none`}
+                        />
+                      </div>
                     </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="200"
-                      step="10"
-                      value={config.overlap}
-                      onChange={(e) => setConfig({ ...config, overlap: parseInt(e.target.value, 10) })}
-                      className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                    />
-                  </div>
-                </div>
 
-                {config.method === 'recursive' && (
+                    <div className="space-y-3">
+                      <div className={`${TYPOGRAPHY.caption} font-semibold text-slate-600 dark:text-slate-300`}>Child Chunk</div>
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Child Length (Chars)</label>
+                          <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-200 px-2 py-0.5 rounded`}>{config.parent_child.child.maxTokens}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="64"
+                          max="1024"
+                          step="32"
+                          value={config.parent_child.child.maxTokens}
+                          onChange={(e) => setConfig({ ...config, parent_child: { ...config.parent_child, child: { ...config.parent_child.child, maxTokens: parseInt(e.target.value, 10) } } })}
+                          className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                        />
+                        <div className={`flex justify-between ${TYPOGRAPHY.micro} text-slate-400 mt-1`}>
+                          <span>64</span>
+                          <span>1024</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Child Overlap</label>
+                          <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-200 px-2 py-0.5 rounded`}>{config.parent_child.child.overlap}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="120"
+                          step="10"
+                          value={config.parent_child.child.overlap}
+                          onChange={(e) => setConfig({ ...config, parent_child: { ...config.parent_child, child: { ...config.parent_child.child, overlap: parseInt(e.target.value, 10) } } })}
+                          className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2`}>Child Delimiter</label>
+                        <input
+                          type="text"
+                          value={config.parent_child.child.delimiter}
+                          onChange={(e) => setConfig({ ...config, parent_child: { ...config.parent_child, child: { ...config.parent_child.child, delimiter: e.target.value } } })}
+                          className={`w-full ${TYPOGRAPHY.caption} font-mono bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {config.mode === 'qa' && (
                   <div>
-                    <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2 flex items-center`}>
-                      Separators <Info size={12} className="ml-1 text-slate-400" />
-                    </label>
+                    <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2`}>Q&A Pattern</label>
                     <input
                       type="text"
-                      value={config.separators}
-                      onChange={(e) => setConfig({ ...config, separators: e.target.value })}
+                      value={config.qa.pattern}
+                      onChange={(e) => setConfig({ ...config, qa: { ...config.qa, pattern: e.target.value } })}
                       className={`w-full ${TYPOGRAPHY.caption} font-mono bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none`}
                     />
                   </div>
                 )}
               </div>
 
-            <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-800 rounded-b-xl flex justify-between items-center">
-              <div className={`${TYPOGRAPHY.micro} text-slate-500`}>
-                预计生成: <span className="font-bold text-slate-900 dark:text-slate-100">~{Math.ceil((currentDoc?.tokenCount || 0) / config.chunkSize)} chunks</span>
+              <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-800 rounded-b-xl flex justify-between items-center">
+                <div className={`${TYPOGRAPHY.micro} text-slate-500`}>
+                  预计生成: <span className="font-bold text-slate-900 dark:text-slate-100">~{estimatedChunks} chunks</span>
+                </div>
+                <Button
+                  onClick={handleApplyConfig}
+                  variant="primary"
+                  size="normal"
+                  className={`${TYPOGRAPHY.caption} font-bold`}
+                  disabled={isChunking || !activeDocId}
+                >
+                  应用配置并重新切分
+                </Button>
               </div>
-              <Button
-                onClick={() => setShowConfig(false)}
-                variant="primary"
-                size="normal"
-                className={`${TYPOGRAPHY.caption} font-bold`}
-              >
-                应用配置并重新切分
-              </Button>
-            </div>
             </div>
           )}
         </div>
@@ -315,24 +602,30 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar rounded-bl-xl">
-            {chunks.map((chunk, idx) => (
-              <div
-                key={chunk.id}
-                onClick={() => handleChunkSelect(chunk)}
-                className={`p-3 border-b border-slate-50 dark:border-slate-800 cursor-pointer transition-all hover:bg-slate-50 dark:hover:bg-slate-800 ${activeChunk?.id === chunk.id ? 'bg-indigo-50/60 dark:bg-indigo-500/10 border-l-4 border-l-indigo-600' : 'border-l-4 border-l-transparent'}`}
-              >
-                <div className="flex justify-between items-center mb-1.5">
-                  <span className={`${TYPOGRAPHY.micro} font-mono font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded`}>#{idx + 1}</span>
-                  <div className="flex items-center space-x-1">
-                    <span className={`${TYPOGRAPHY.micro} text-slate-400`}>{chunk.tokenCount}t</span>
-                    <span className={`w-1.5 h-1.5 rounded-full ${chunk.embeddingStatus === 'synced' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            {isChunkLoading ? (
+              <div className={`px-3 py-6 text-center ${TYPOGRAPHY.caption} text-slate-400`}>加载切片中...</div>
+            ) : chunks.length === 0 ? (
+              <div className={`px-3 py-6 text-center ${TYPOGRAPHY.caption} text-slate-400`}>暂无切片</div>
+            ) : (
+              chunks.map((chunk, idx) => (
+                <div
+                  key={chunk.id}
+                  onClick={() => handleChunkSelect(chunk)}
+                  className={`p-3 border-b border-slate-50 dark:border-slate-800 cursor-pointer transition-all hover:bg-slate-50 dark:hover:bg-slate-800 ${activeChunk?.id === chunk.id ? 'bg-indigo-50/60 dark:bg-indigo-500/10 border-l-4 border-l-indigo-600' : 'border-l-4 border-l-transparent'}`}
+                >
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className={`${TYPOGRAPHY.micro} font-mono font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded`}>#{idx + 1}</span>
+                    <div className="flex items-center space-x-1">
+                      <span className={`${TYPOGRAPHY.micro} text-slate-400`}>{chunk.tokenCount}len</span>
+                      <span className={`w-1.5 h-1.5 rounded-full ${chunk.embeddingStatus === 'synced' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                    </div>
                   </div>
+                  <p className={`${TYPOGRAPHY.caption} line-clamp-3 leading-relaxed ${activeChunk?.id === chunk.id ? 'text-slate-900 dark:text-slate-100 font-medium' : 'text-slate-500 dark:text-slate-400'}`}>
+                    {chunk.content}
+                  </p>
                 </div>
-                <p className={`${TYPOGRAPHY.caption} line-clamp-3 leading-relaxed ${activeChunk?.id === chunk.id ? 'text-slate-900 dark:text-slate-100 font-medium' : 'text-slate-500 dark:text-slate-400'}`}>
-                  {chunk.content}
-                </p>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -347,10 +640,18 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
                   </h2>
                 </div>
                 <div className="flex space-x-2">
-                  <button className={`flex items-center px-3 py-1.5 ${TYPOGRAPHY.caption} font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors`}>
+                  <button
+                    onClick={handleDeleteChunk}
+                    disabled={isDeleting || !activeChunk}
+                    className={`flex items-center px-3 py-1.5 ${TYPOGRAPHY.caption} font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors ${isDeleting ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  >
                     <Trash2 size={14} className="mr-1.5" /> 移除
                   </button>
-                  <button className={`flex items-center px-3 py-1.5 ${TYPOGRAPHY.caption} font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-200 hover:bg-indigo-100 border border-indigo-100 dark:border-indigo-500/30 rounded-lg transition-colors`}>
+                  <button
+                    onClick={handleResetChunk}
+                    disabled={!activeChunk}
+                    className={`flex items-center px-3 py-1.5 ${TYPOGRAPHY.caption} font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-200 hover:bg-indigo-100 border border-indigo-100 dark:border-indigo-500/30 rounded-lg transition-colors ${!activeChunk ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  >
                     <RefreshCcw size={14} className="mr-1.5" /> 重置
                   </button>
                 </div>
@@ -385,8 +686,8 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
                         <span className={`${TYPOGRAPHY.caption} text-slate-900 dark:text-slate-100 font-mono font-medium`}>Page 4</span>
                       </div>
                       <div className="flex justify-between items-center pb-2 border-b border-dashed border-slate-100 dark:border-slate-800">
-                        <span className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400`}>Token Usage</span>
-                        <span className={`${TYPOGRAPHY.caption} text-slate-900 dark:text-slate-100 font-mono font-medium`}>{activeChunk.tokenCount} / {config.chunkSize}</span>
+                        <span className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400`}>Length Usage</span>
+                        <span className={`${TYPOGRAPHY.caption} text-slate-900 dark:text-slate-100 font-mono font-medium`}>{activeChunk.tokenCount} / {referenceChunkSize}</span>
                       </div>
                       <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mt-1 overflow-hidden">
                         <div className={`bg-indigo-500 h-1.5 rounded-full ${progressWidthClass}`}></div>
@@ -397,14 +698,19 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
                     <h4 className={`${TYPOGRAPHY.legal} font-bold text-slate-400 uppercase tracking-wider mb-3`}>Embedding Status</h4>
                     <div className="flex flex-col space-y-2">
                       <div className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400`}>
-                        Model: <span className="text-indigo-600 dark:text-indigo-200 font-mono font-medium">text-embedding-3-large</span>
+                        Model: <span className="text-slate-500 dark:text-slate-300 font-mono font-medium">未配置</span>
                       </div>
                       <div className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400`}>
-                        Vector ID: <span className="font-mono text-slate-400">vec_8923...1a2</span>
+                        Vector ID: <span className="font-mono text-slate-400">-</span>
                       </div>
-                      <div className={`mt-2 inline-flex items-center ${TYPOGRAPHY.caption} font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-200 px-2 py-1 rounded-md self-start border border-emerald-100 dark:border-emerald-500/20`}>
-                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1.5"></div>
-                        Vector Synced
+                      <div className={`mt-2 inline-flex items-center ${TYPOGRAPHY.caption} font-medium px-2 py-1 rounded-md self-start border ${
+                        embeddingSynced
+                          ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-200 border-emerald-100 dark:border-emerald-500/20'
+                          : 'text-amber-600 bg-amber-50 dark:bg-amber-500/10 dark:text-amber-200 border-amber-100 dark:border-amber-500/20'
+                      }`}
+                      >
+                        <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${embeddingSynced ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+                        {embeddingSynced ? 'Vector Synced' : 'Vector Pending'}
                       </div>
                     </div>
                   </Card>
@@ -420,6 +726,8 @@ export default function ChunkManager({ spaceId, spaceName }: Props) {
                   variant="primary"
                   size="normal"
                   className={`px-5 py-2 ${TYPOGRAPHY.caption} font-bold hover:-translate-y-0.5`}
+                  onClick={handleSaveChunk}
+                  disabled={isSaving || !activeChunk}
                 >
                   <Save size={14} />
                   保存并更新索引

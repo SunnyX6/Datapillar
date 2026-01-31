@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 关系写入器（LineageWriter）
 
@@ -11,8 +15,6 @@
 """
 
 from __future__ import annotations
-
-import structlog
 from neo4j import AsyncSession
 
 from src.modules.openlineage.core.sql_summary_processor import sql_summary_processor
@@ -28,9 +30,6 @@ from src.modules.openlineage.writers.lineage import (
     TagRelationshipWriter,
     ValueDomainLineageWriter,
 )
-
-logger = structlog.get_logger()
-
 
 class LineageWriter(BaseWriter):
     """

@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 Sequential execution graph builder.
 
@@ -54,7 +57,7 @@ def build_sequential_graph(
                 # If active_agent stays on the current agent (clarification retry), return current.
                 if active == current_id:
                     return current_id
-                if routing.last_status == ExecutionStatus.FAILED:
+                if routing.last_status in {ExecutionStatus.FAILED, ExecutionStatus.ABORTED}:
                     return "end"
                 # Otherwise continue to next.
                 return next_id
@@ -76,7 +79,7 @@ def build_sequential_graph(
             active = routing.active_agent
             if active == last_spec.id:
                 return last_spec.id
-            if routing.last_status == ExecutionStatus.FAILED:
+            if routing.last_status in {ExecutionStatus.FAILED, ExecutionStatus.ABORTED}:
                 return "end"
             return "end"
 

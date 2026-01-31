@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 Agent definitions.
 
@@ -25,7 +28,7 @@ if TYPE_CHECKING:
 
     from datapillar_oneagentic.a2a.config import A2AConfig
     from datapillar_oneagentic.core.config import AgentConfig, AgentRetryConfig
-    from datapillar_oneagentic.knowledge import Knowledge
+    from datapillar_oneagentic.knowledge import KnowledgeConfig
     from datapillar_oneagentic.mcp.config import MCPServerConfig
 
 logger = logging.getLogger(__name__)
@@ -96,9 +99,9 @@ class AgentSpec:
         """Return tool timeout in seconds."""
         return self.tool_timeout_seconds if self.tool_timeout_seconds is not None else config.tool_timeout_seconds
 
-    # === Knowledge config ===
-    knowledge: "Knowledge | None" = None
-    """Knowledge config (RAG injection)."""
+    # === Knowledge tool binding ===
+    knowledge: "KnowledgeConfig | None" = None
+    """Knowledge tool binding (store + retrieve defaults)."""
 
     # === A2A remote agents ===
     a2a_agents: list[A2AConfig] = field(default_factory=list)
@@ -231,7 +234,7 @@ def agent(
     temperature: float = 0.0,
     max_steps: int | None = None,
     retry_config: "AgentRetryConfig | None" = None,
-    knowledge: "Knowledge | None" = None,
+    knowledge: "KnowledgeConfig | None" = None,
 ):
     """
     Agent definition decorator.
@@ -275,7 +278,7 @@ def agent(
         temperature: LLM temperature
         max_steps: max steps (None uses team AgentConfig.max_steps)
         retry_config: retry config (None uses team AgentConfig.retry)
-        knowledge: knowledge config (RAG injection)
+        knowledge: knowledge tool binding (store + retrieve defaults)
 
     Notes:
         - Entry agent is the first in the team's agents list

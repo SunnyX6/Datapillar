@@ -449,7 +449,10 @@ export const panelHeightClassMap = {
  */
 export const drawerWidthClassMap = {
   /** 响应式抽屉：480px → 540px → 600px → 680px */
-  responsive: 'w-drawer-responsive'
+  responsive: 'w-drawer-responsive',
+
+  /** 加宽抽屉：680px → 760px → 900px → 980px */
+  wide: 'w-drawer-wide'
 } as const
 
 /**
@@ -473,6 +476,9 @@ export const menuWidthClassMap = {
 
   /** 超大：224px */
   xxlarge: 'w-56',
+
+  /** 超超大：256px */
+  xxxlarge: 'w-64',
 
   /** 宽：288px */
   wide: 'w-72',
@@ -510,7 +516,10 @@ export const tableColumnWidthClassMap = {
   '4xl': 'w-52',
 
   /** 极宽：224px */
-  '5xl': 'w-56'
+  '5xl': 'w-56',
+
+  /** 超极宽：256px */
+  '6xl': 'w-64'
 } as const
 
 /**

@@ -190,7 +190,7 @@ function ColumnRow({
     <div
       onDragOver={onDragOver}
       onDrop={(e) => onDrop(e, index)}
-      className={`group relative w-full min-w-0 px-1.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg transition-all ${
+      className={`group relative w-full min-w-0 px-1.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-all ${
         isDragging ? 'opacity-50 border-blue-400 shadow-sm' : 'hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm'
       }`}
     >
@@ -235,7 +235,7 @@ function ColumnRow({
             value={parseDataTypeString(column.dataType)}
             onChange={(value) => onUpdate('dataType', buildDataTypeString(value))}
             size="default"
-            triggerClassName="h-7 w-full justify-between px-2 py-0 rounded-md"
+            triggerClassName="h-7 w-full justify-between px-2 py-0 rounded-md bg-slate-50 dark:bg-slate-900"
             labelClassName="text-xs"
           />
         </div>
@@ -300,7 +300,7 @@ function ColumnRow({
               <Pin size={12} />
             </button>
             <div
-              className={`hidden absolute right-0 top-full mt-1 z-50 ${menuWidthClassMap.medium} bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden`}
+              className={`hidden absolute right-0 top-full mt-1 z-50 ${menuWidthClassMap.medium} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden`}
               onMouseLeave={(e) => {
                 e.currentTarget.classList.add('hidden')
                 setHoveredDomain(null)
@@ -371,7 +371,7 @@ function ColumnRow({
           onMouseLeave={handleCardMouseLeave}
         >
           {/* 卡片头部 */}
-          <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 rounded-t-xl">
+          <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 rounded-t-xl">
             <div className="flex items-center gap-2">
               {getDomainIcon(activeHoveredDomain.domainType)}
               <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">{activeHoveredDomain.domainName}</span>
@@ -554,7 +554,7 @@ export const CreateTableForm = forwardRef<TableFormHandle, CreateTableFormProps>
               defaultValue={ddlInputRef.current}
               onChange={handleDdlChange}
               placeholder="粘贴 CREATE TABLE 语句，自动解析表名、表描述、列定义"
-              className="w-full h-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono resize-none"
+              className="w-full h-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono resize-none"
               autoFocus={ddlExpanded}
             />
           </div>
@@ -676,7 +676,7 @@ export const CreateTableForm = forwardRef<TableFormHandle, CreateTableFormProps>
                   value={tableName}
                   onChange={(e) => setTableName(e.target.value)}
                   placeholder="例如: fact_order_sales"
-                  className="w-full px-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                  className="w-full px-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
                 />
               </div>
 
@@ -688,7 +688,7 @@ export const CreateTableForm = forwardRef<TableFormHandle, CreateTableFormProps>
                   onChange={(e) => setTableComment(e.target.value)}
                   placeholder="描述表的数据来源与核心业务用途..."
                   rows={3}
-                  className="w-full px-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                  className="w-full px-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none placeholder:text-slate-400 dark:placeholder:text-slate-600"
                 />
               </div>
 
@@ -717,7 +717,7 @@ export const CreateTableForm = forwardRef<TableFormHandle, CreateTableFormProps>
                           placeholder="参数名"
                           value={prop.key}
                           onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)}
-                          className="w-[45%] min-w-0 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 truncate"
+                          className="w-[45%] min-w-0 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 truncate"
                         />
                         <span className="text-slate-300 flex-shrink-0">=</span>
                         <input
@@ -725,7 +725,7 @@ export const CreateTableForm = forwardRef<TableFormHandle, CreateTableFormProps>
                           placeholder="参数值"
                           value={prop.value}
                           onChange={(e) => handlePropertyChange(prop.id, 'value', e.target.value)}
-                          className="w-[45%] min-w-0 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 truncate"
+                          className="w-[45%] min-w-0 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 truncate"
                         />
                         <button
                           type="button"

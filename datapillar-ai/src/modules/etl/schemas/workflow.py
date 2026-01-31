@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 工作流数据结构（统一三端：AI/前端/调度）
 
@@ -40,9 +44,13 @@ class StageOutput(BaseModel):
     name: str = Field(..., description="Stage 名称，简洁描述这个阶段做什么")
     description: str = Field(..., description="Stage 详细描述，说明数据处理逻辑")
     input_tables: list[str] = Field(
-        default_factory=list, description="读取的表列表，格式为 catalog.schema.table"
+        default_factory=list,
+        description="读取的表列表，持久表为 catalog.schema.table，临时表允许 temp.xxx",
     )
-    output_table: str = Field(..., description="输出表名，格式为 catalog.schema.table")
+    output_table: str = Field(
+        ...,
+        description="输出表名，持久表为 catalog.schema.table，临时表允许 temp.xxx",
+    )
     is_temp_table: bool = Field(default=True, description="是否是临时表，临时表只在当前 Job 内有效")
     sql: str | None = Field(default=None, description="SQL 语句（开发阶段补充）")
 
@@ -62,8 +70,9 @@ class JobOutput(BaseModel):
         default_factory=list,
         description="依赖的上游 Job ID 列表，用于调度依赖，如果 Job B 读的表是 Job A 写的，则填 Job A 的 ID",
     )
-    step_ids: list[str] = Field(
-        default_factory=list, description="关联的业务步骤 ID 列表，来自 AnalysisResult.steps"
+    job_ids: list[str] = Field(
+        default_factory=list,
+        description="关联的业务 Job ID 列表，来自 AnalysisResult.pipelines[].jobs",
     )
     stages: list[StageOutput] = Field(
         default_factory=list, description="执行阶段列表，按执行顺序排列"
@@ -71,7 +80,7 @@ class JobOutput(BaseModel):
     input_tables: list[str] = Field(default_factory=list, description="Job 读取的持久化表列表")
     output_table: str | None = Field(None, description="Job 写入的最终目标表")
 
-    @field_validator("depends", "step_ids", "input_tables", mode="before")
+    @field_validator("depends", "job_ids", "input_tables", mode="before")
     @classmethod
     def _parse_list_fields(cls, v: object) -> object:
         """容错：null -> 空列表，字符串化 JSON -> 解析"""
@@ -93,11 +102,12 @@ class WorkflowOutput(BaseModel):
     """
     工作流输出（LLM 生成，用于 structured output）
 
-    不含 id/schedule/env 等运行时字段，由代码填充。
+    不含 id/env 等运行时字段，由代码填充。
     """
 
     name: str = Field(..., description="工作流名称，简洁描述整个 ETL 流程")
     description: str | None = Field(None, description="工作流详细描述")
+    schedule: str | None = Field(..., description="调度周期 cron 表达式，未明确则为 null")
     jobs: list[JobOutput] = Field(default_factory=list, description="作业列表，按 DAG 拓扑顺序排列")
     risks: list[str] = Field(
         default_factory=list, description="架构风险点列表，如性能瓶颈、数据倾斜等"
@@ -139,8 +149,8 @@ class Stage(BaseModel):
     name: str = Field(..., description="Stage 名称")
     description: str = Field(..., description="这个 Stage 做什么")
 
-    input_tables: list[str] = Field(default_factory=list, description="读取的表")
-    output_table: str = Field(..., description="输出表")
+    input_tables: list[str] = Field(default_factory=list, description="读取的表（持久表或临时表）")
+    output_table: str = Field(..., description="输出表（持久表或临时表）")
     is_temp_table: bool = Field(default=True, description="是否是临时表")
 
     sql: str | None = Field(None, description="SQL 语句（由 DeveloperAgent 生成）")
@@ -151,7 +161,7 @@ class Job(BaseModel):
     作业定义（统一三端命名：Job）
 
     每个 Job 是一个独立的执行单元（前端一个节点）。
-    一个 Job 可包含多个业务步骤（step_ids）和多个执行阶段（stages）。
+    一个 Job 可包含多个业务 Job（job_ids）和多个执行阶段（stages）。
     """
 
     # 基础信息
@@ -166,8 +176,11 @@ class Job(BaseModel):
     # 依赖关系（统一字段：depends）
     depends: list[str] = Field(default_factory=list, description="依赖的上游 Job ID 列表")
 
-    # 关联的业务步骤（来自 AnalystAgent）
-    step_ids: list[str] = Field(default_factory=list, description="包含的业务步骤 ID 列表")
+    # 关联的业务 Job（来自 AnalystAgent）
+    job_ids: list[str] = Field(
+        default_factory=list,
+        description="包含的业务 Job ID 列表（来自 AnalysisResult.pipelines[].jobs）",
+    )
 
     # 执行阶段（由 ArchitectAgent 规划）
     stages: list[Stage] = Field(default_factory=list, description="执行阶段列表")
@@ -208,7 +221,7 @@ class Workflow(BaseModel):
     description: str | None = Field(None, description="工作流描述")
 
     # 调度配置
-    schedule: str | None = Field(None, description="调度 cron 表达式")
+    schedule: str | None = Field(None, description="调度周期 cron 表达式")
     env: Literal["dev", "stg", "prod"] = Field(default="dev", description="运行环境")
 
     # 作业列表
@@ -259,7 +272,7 @@ class Workflow(BaseModel):
                 type=selected_component,
                 type_id=selected_component_id,
                 depends=job_output.depends,
-                step_ids=job_output.step_ids,
+                job_ids=job_output.job_ids,
                 stages=stages,
                 input_tables=job_output.input_tables,
                 output_table=job_output.output_table,
@@ -269,6 +282,7 @@ class Workflow(BaseModel):
         return cls(
             name=output.name,
             description=output.description,
+            schedule=output.schedule,
             jobs=jobs,
             risks=output.risks,
             confidence=output.confidence,

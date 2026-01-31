@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 ContextBuilder - LLM context builder (V2).
 
@@ -13,7 +16,6 @@ Hard constraints:
 
 from __future__ import annotations
 
-import json
 import logging
 from enum import Enum
 from typing import Any, Mapping, TYPE_CHECKING
@@ -23,8 +25,6 @@ from datapillar_oneagentic.messages.adapters.langchain import from_langchain
 
 from datapillar_oneagentic.context.checkpoint import CheckpointManager
 from datapillar_oneagentic.core.types import SessionKey
-from datapillar_oneagentic.knowledge.config import KnowledgeInjectConfig
-from datapillar_oneagentic.knowledge.models import KnowledgeChunk
 from datapillar_oneagentic.todo.session_todo import SessionTodoList
 from datapillar_oneagentic.todo.tool import TODO_PLAN_TOOL_NAME, TODO_TOOL_NAME
 from datapillar_oneagentic.utils.prompt_format import format_markdown
@@ -32,19 +32,18 @@ from datapillar_oneagentic.utils.prompt_format import format_markdown
 if TYPE_CHECKING:
     from datapillar_oneagentic.core.agent import AgentSpec
     from datapillar_oneagentic.experience import ExperienceLearner, ExperienceRetriever
-    from datapillar_oneagentic.knowledge import KnowledgeRetriever
+    from datapillar_oneagentic.knowledge import KnowledgeService
 
 logger = logging.getLogger(__name__)
 
+
 FRAMEWORK_CONTEXT_KEY = "framework_context"
 EXPERIENCE_CONTEXT_KEY = "experience_context"
-KNOWLEDGE_CONTEXT_KEY = "knowledge_context"
 TODO_CONTEXT_KEY = "todo_context"
 COMPRESSION_CONTEXT_KEY = "compression_context"
 
 CONTEXT_ORDER = (
     FRAMEWORK_CONTEXT_KEY,
-    KNOWLEDGE_CONTEXT_KEY,
     EXPERIENCE_CONTEXT_KEY,
     TODO_CONTEXT_KEY,
     COMPRESSION_CONTEXT_KEY,
@@ -109,12 +108,12 @@ class ContextCollector:
     def __init__(
         self,
         *,
-        knowledge_retriever: "KnowledgeRetriever | None" = None,
+        knowledge_service: "KnowledgeService | None" = None,
         experience_retriever: "ExperienceRetriever | None" = None,
         experience_learner: "ExperienceLearner | None" = None,
         share_agent_context: bool = True,
     ) -> None:
-        self._knowledge_retriever = knowledge_retriever
+        self._knowledge_service = knowledge_service
         self._experience_retriever = experience_retriever
         self._experience_learner = experience_learner
         self._share_agent_context = share_agent_context
@@ -128,7 +127,6 @@ class ContextCollector:
         session_id: str,
         spec: "AgentSpec | None" = None,
         has_knowledge_tool: bool = False,
-        force_knowledge_system: bool = False,
     ) -> dict[str, str]:
         allowed = self._resolve_allowed_contexts(scenario=scenario)
         if not allowed:
@@ -164,32 +162,21 @@ class ContextCollector:
             if experience_context:
                 contexts[EXPERIENCE_CONTEXT_KEY] = experience_context
 
-        if KNOWLEDGE_CONTEXT_KEY in allowed:
-            knowledge_context = await self._build_knowledge_context(
-                spec=spec,
-                query=query,
-                session_id=session_id,
-                force_system=force_knowledge_system,
-            )
-            if knowledge_context:
-                contexts[KNOWLEDGE_CONTEXT_KEY] = knowledge_context
-
         return contexts
 
     def _resolve_allowed_contexts(self, *, scenario: ContextScenario) -> set[str]:
         if scenario == ContextScenario.MAPREDUCE_WORKER:
-            return {FRAMEWORK_CONTEXT_KEY, KNOWLEDGE_CONTEXT_KEY}
+            return {FRAMEWORK_CONTEXT_KEY}
         if scenario in {ContextScenario.MAPREDUCE_PLANNER, ContextScenario.MAPREDUCE_REDUCER}:
             allowed = {FRAMEWORK_CONTEXT_KEY}
             if self._share_agent_context:
-                allowed |= {EXPERIENCE_CONTEXT_KEY, KNOWLEDGE_CONTEXT_KEY}
+                allowed |= {EXPERIENCE_CONTEXT_KEY}
             return allowed
         if not self._share_agent_context:
             return set()
         return {
             FRAMEWORK_CONTEXT_KEY,
             EXPERIENCE_CONTEXT_KEY,
-            KNOWLEDGE_CONTEXT_KEY,
             TODO_CONTEXT_KEY,
             COMPRESSION_CONTEXT_KEY,
         }
@@ -207,7 +194,7 @@ class ContextCollector:
                 (
                     "Knowledge Retrieval",
                     [
-                        "When external knowledge is required, call `knowledge_retrieve(query)`.",
+                        "When external knowledge is required, call `knowledge_retrieve(query, retrieve, filters)`.",
                         "Do not fabricate sources.",
                     ],
                 )
@@ -261,44 +248,6 @@ class ContextCollector:
         if context:
             logger.info("Similar experience found; context injected")
         return context or None
-
-    async def _build_knowledge_context(
-        self,
-        *,
-        spec: "AgentSpec | None",
-        query: str,
-        session_id: str,
-        force_system: bool,
-    ) -> str | None:
-        if not spec or not spec.knowledge or self._knowledge_retriever is None:
-            return None
-        inject = self._knowledge_retriever.resolve_inject_config(spec.knowledge)
-        inject_mode = (inject.mode or "tool").lower()
-        if inject_mode == "tool" and not force_system:
-            return None
-        try:
-            if inject_mode == "tool" and force_system:
-                logger.info(
-                    "MapReduce reducer does not support tool injection; forced system mode: %s",
-                    spec.id,
-                )
-            result = await self._knowledge_retriever.retrieve(
-                query=query,
-                knowledge=spec.knowledge,
-            )
-            if result.refs and self._experience_learner is not None:
-                refs = [ref.to_dict() for ref in result.refs]
-                self._experience_learner.record_knowledge(session_id, refs)
-            knowledge_text = ContextBuilder.build_knowledge_context(
-                chunks=[chunk for chunk, _ in result.hits],
-                inject=inject,
-            )
-            return knowledge_text or None
-        except ValueError:
-            raise
-        except Exception as exc:
-            logger.warning("Knowledge retrieval failed: %s", exc)
-            return None
 
 
 class ContextBuilder:
@@ -386,81 +335,22 @@ class ContextBuilder:
             payloads = [getattr(item, "value", None) for item in task_interrupts]
             payload = payloads[0] if len(payloads) == 1 else payloads
             interrupt_obj = task_interrupts[0]
-            agent_id = (
-                getattr(task, "name", None)
-                or getattr(task, "node", None)
-                or cls.extract_interrupt_agent(interrupt_obj)
-                or "unknown"
+            agent_id = getattr(task, "name", None) or getattr(task, "node", None)
+            if not isinstance(agent_id, str) or not agent_id or agent_id == "__interrupt__":
+                agent_id = cls.extract_interrupt_agent(interrupt_obj)
+            if not agent_id:
+                agent_id = "unknown"
+            interrupt_id = getattr(interrupt_obj, "id", None) or getattr(
+                interrupt_obj, "interrupt_id", None
             )
             interrupts_info.append(
                 {
                     "agent_id": agent_id,
                     "payload": payload,
+                    **({"interrupt_id": interrupt_id} if isinstance(interrupt_id, str) else {}),
                 }
             )
         return interrupts_info
-
-    # ========== Knowledge context builder ==========
-
-    @staticmethod
-    def build_knowledge_context(
-        *,
-        chunks: list[KnowledgeChunk],
-        inject: KnowledgeInjectConfig,
-    ) -> str:
-        if not chunks:
-            return ""
-
-        max_chunks = inject.max_chunks
-        max_chars = inject.max_tokens * 2
-        format_value = (inject.format or "markdown").lower()
-        if format_value not in {"markdown", "json"}:
-            raise ValueError(f"Unsupported knowledge inject format: {format_value}")
-
-        total_chars = 0
-        selected: list[KnowledgeChunk] = []
-        for chunk in chunks:
-            content = chunk.content.strip()
-            if not content:
-                continue
-            if total_chars + len(content) > max_chars:
-                break
-            selected.append(chunk)
-            total_chars += len(content)
-            if len(selected) >= max_chunks:
-                break
-
-        if not selected:
-            return ""
-
-        if format_value == "json":
-            payload = {
-                "title": "Knowledge Context",
-                "chunks": [
-                    {
-                        "source_id": chunk.source_id,
-                        "doc_id": chunk.doc_id,
-                        "doc_title": chunk.doc_title or chunk.doc_id,
-                        "chunk_id": chunk.chunk_id,
-                        "content": chunk.content.strip(),
-                    }
-                    for chunk in selected
-                ],
-            }
-            return json.dumps(payload, ensure_ascii=False)
-
-        lines: list[str] = []
-        for idx, chunk in enumerate(selected, 1):
-            title = chunk.doc_title or chunk.doc_id
-            lines.append(f"### Chunk {idx}")
-            lines.append(f"- Source: {chunk.source_id} / {title}")
-            lines.append(chunk.content.strip())
-            lines.append("")
-        body = "\n".join(lines).strip()
-        return format_markdown(
-            title="Knowledge Context",
-            sections=[("Chunks", body)],
-        )
 
     # ========== System message builders ==========
 

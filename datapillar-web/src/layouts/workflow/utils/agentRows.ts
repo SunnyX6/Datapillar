@@ -10,9 +10,9 @@ const findLastIndex = <T,>(list: T[], predicate: (value: T) => boolean) => {
 }
 
 /**
- * 以活动 id 为粒度做“滚动替换”：
- * - 同一阶段只保留一行，后续事件覆盖该行
- * - 不依赖 agent/tool 事件结构，避免前端解析细节
+ * 以 agent 为粒度做“滚动替换”：
+ * - 同一 agent 只保留一行，后续事件覆盖该行
+ * - agent 为空时回退 id
  */
 export const upsertAgentActivityByAgent = (
   rows: ProcessActivity[] | undefined,
@@ -20,7 +20,11 @@ export const upsertAgentActivityByAgent = (
   maxRows: number
 ): ProcessActivity[] => {
   const currentRows = rows ?? []
-  const index = findLastIndex(currentRows, (row) => row.id === nextActivity.id)
+  const nextAgentKey = nextActivity.agent_en || nextActivity.agent_cn || nextActivity.id
+  const index = findLastIndex(
+    currentRows,
+    (row) => (row.agent_en || row.agent_cn || row.id) === nextAgentKey
+  )
 
   if (index < 0) {
     const nextRows = [...currentRows, nextActivity]

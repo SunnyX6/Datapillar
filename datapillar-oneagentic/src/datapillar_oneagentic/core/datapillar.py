@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 Datapillar team class.
 
@@ -8,7 +11,7 @@ Core concepts:
 - session_id: session identifier
 - SessionKey: namespace + session_id for full isolation
 - Sessions/deliverables are isolated by namespace; experience/knowledge vector stores
-  use a fixed database and are isolated by a namespace column
+  use a fixed database and are isolated by a namespace column (knowledge namespace is from KnowledgeConfig)
 
 Example:
 ```python
@@ -64,7 +67,7 @@ from datapillar_oneagentic.log import bind_log_context, setup_logging
 from datapillar_oneagentic.providers.llm import EmbeddingProvider, LLMProvider
 
 if TYPE_CHECKING:
-    from datapillar_oneagentic.knowledge import Knowledge
+    from datapillar_oneagentic.knowledge import KnowledgeConfig
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +85,7 @@ class Datapillar:
     - Memory management: optional session memory
     - Experience learning: optional experience recording
     - Resource safety: connections created per run and closed afterward
-    - Team-level knowledge entry: Datapillar(knowledge=...) for shared knowledge
+    - Knowledge tool binding: Datapillar(knowledge=...) binds tools for the team
     """
 
     @classmethod
@@ -102,7 +105,7 @@ class Datapillar:
         enable_share_context: bool = True,
         a2a_agents: list | None = None,
         verbose: bool = False,
-        knowledge: "Knowledge | None" = None,
+        knowledge: "KnowledgeConfig | None" = None,
     ):
         """
         Create a team.
@@ -118,7 +121,7 @@ class Datapillar:
             enable_share_context: enable shared agent context (default True)
             a2a_agents: team-level A2A remote agent configs
             verbose: enable verbose logging (default False)
-            knowledge: team-level knowledge config (optional, default knowledge entry)
+            knowledge: knowledge tool binding (store + retrieve defaults)
         """
         self._config = config
         self.namespace = namespace
@@ -141,17 +144,28 @@ class Datapillar:
 
         # Resolve agent classes into AgentSpec.
         self._agent_specs = self._resolve_agents(agents)
-        if knowledge is not None:
-            from datapillar_oneagentic.knowledge import merge_knowledge
-
-            for spec in self._agent_specs:
-                spec.knowledge = merge_knowledge(knowledge, spec.knowledge)
         self._agent_ids = [spec.id for spec in self._agent_specs]
         self._agent_name_map = {spec.id: spec.name for spec in self._agent_specs}
-        self._has_knowledge = any(spec.knowledge is not None for spec in self._agent_specs)
+
+        # Resolve knowledge tool bindings (team + agent).
+        self._knowledge_config = knowledge
+        self._knowledge_config_map: dict[str, KnowledgeConfig] = {}
+        for spec in self._agent_specs:
+            if spec.knowledge is not None and self._knowledge_config is not None:
+                if spec.knowledge.model_dump(mode="json", exclude_none=True) != (
+                    self._knowledge_config.model_dump(mode="json", exclude_none=True)
+                ):
+                    raise ValueError(
+                        f"Agent {spec.id} has a different knowledge config than the team binding."
+                    )
+            bound = spec.knowledge or self._knowledge_config
+            if bound is not None:
+                self._knowledge_config_map[spec.id] = bound
 
         if enable_learning:
             self._config.validate_embedding()
+        if self._knowledge_config_map:
+            self._validate_knowledge_configs()
 
         # Merge team-level A2A config into each agent.
         if self.a2a_agents:
@@ -182,14 +196,11 @@ class Datapillar:
         # Executor cache (per team).
         self._executors: dict[str, Any] = {}
 
-        # Experience learning and knowledge components.
+        # Experience learning components.
         self._learning_embedding_provider = None
-        self._knowledge_embedding_provider = None
         self._learning_store = None
         self._experience_learner = None
         self._experience_retriever = None
-        self._knowledge_store = None
-        self._knowledge_retriever = None
 
         if enable_learning:
             self._learning_embedding_provider = EmbeddingProvider(self._config.embedding)
@@ -198,7 +209,7 @@ class Datapillar:
 
             self._learning_store = create_learning_store(
                 namespace,
-                vector_store_config=self._config.vector_store,
+                vector_store_config=self._config.learning.vector_store,
                 embedding_config=self._config.embedding,
             )
             self._experience_learner = ExperienceLearner(
@@ -215,33 +226,13 @@ class Datapillar:
                 extra={"event": "experience.enabled", "namespace": namespace},
             )
 
-        if self._has_knowledge:
-            from datapillar_oneagentic.knowledge import KnowledgeRetriever
-            from datapillar_oneagentic.storage import create_knowledge_store
-
-            if not self._config.knowledge.base_config.embedding.is_configured():
-                raise ValueError("Knowledge requires knowledge.base_config.embedding to be configured.")
-
-            self._knowledge_embedding_provider = EmbeddingProvider(
-                self._config.knowledge.base_config.embedding
-            )
-            self._knowledge_store = create_knowledge_store(
-                namespace,
-                vector_store_config=self._config.knowledge.base_config.vector_store,
-                embedding_config=self._config.knowledge.base_config.embedding,
-            )
-            self._knowledge_retriever = KnowledgeRetriever(
-                store=self._knowledge_store,
-                embedding_provider=self._knowledge_embedding_provider,
-                config=self._config.knowledge,
-            )
+        if self._knowledge_config_map:
             logger.info(
                 "Knowledge retrieval enabled",
                 extra={"event": "knowledge.enabled", "namespace": namespace},
             )
 
         self._context_collector = ContextCollector(
-            knowledge_retriever=self._knowledge_retriever,
             experience_retriever=self._experience_retriever,
             experience_learner=self._experience_learner,
             share_agent_context=self.enable_share_context,
@@ -253,9 +244,10 @@ class Datapillar:
             agent_ids=self._agent_ids,
             get_executor=self._get_executor,
             timeline_recorder=self._timeline_recorder,
-            knowledge_retriever=self._knowledge_retriever,
-            experience_learner=self._experience_learner,
+            namespace=self.namespace,
+            knowledge_config_map=self._knowledge_config_map,
             context_collector=self._context_collector,
+            llm_provider=self._llm_provider,
         )
 
         # Create LLM for ReAct mode.
@@ -312,6 +304,18 @@ class Datapillar:
             specs.append(copy.deepcopy(spec))
 
         return specs
+
+    def _validate_knowledge_configs(self) -> None:
+        """Validate knowledge configs for tool bindings."""
+        for agent_id, config in self._knowledge_config_map.items():
+            if not config.embedding.is_configured():
+                raise ValueError(
+                    f"Knowledge embedding is not configured for agent {agent_id}."
+                )
+            if not config.embedding.dimension:
+                raise ValueError(
+                    f"Knowledge embedding dimension is required for agent {agent_id}."
+                )
 
     def _validate(self) -> None:
         """Validate configuration."""

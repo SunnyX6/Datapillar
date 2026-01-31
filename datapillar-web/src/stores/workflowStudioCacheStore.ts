@@ -10,6 +10,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { StateSnapshot } from 'react-virtuoso'
 import { emptyWorkflowGraph, type WorkflowGraph } from '@/services/workflowStudioService'
+import { DEFAULT_WORKFLOW_MODEL_ID } from '@/config/workflowModels'
 import type { ChatMessage } from './workflowStudioStore'
 
 type WorkflowStudioCacheSnapshot = {
@@ -18,6 +19,7 @@ type WorkflowStudioCacheSnapshot = {
   lastPrompt: string
   isInitialized: boolean
   virtuosoState: StateSnapshot | null
+  selectedModelId: string
 }
 
 interface WorkflowStudioCacheState extends WorkflowStudioCacheSnapshot {
@@ -30,10 +32,11 @@ const DEFAULT_SNAPSHOT: WorkflowStudioCacheSnapshot = {
   workflow: emptyWorkflowGraph,
   lastPrompt: '',
   isInitialized: false,
-  virtuosoState: null
+  virtuosoState: null,
+  selectedModelId: DEFAULT_WORKFLOW_MODEL_ID
 }
 
-const CACHE_VERSION = 2
+const CACHE_VERSION = 3
 
 export const useWorkflowStudioCacheStore = create<WorkflowStudioCacheState>()(
   persist(
@@ -61,7 +64,8 @@ export const useWorkflowStudioCacheStore = create<WorkflowStudioCacheState>()(
         workflow: state.workflow,
         lastPrompt: state.lastPrompt,
         isInitialized: state.isInitialized,
-        virtuosoState: state.virtuosoState
+        virtuosoState: state.virtuosoState,
+        selectedModelId: state.selectedModelId
       })
     }
   )

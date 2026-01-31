@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 Datapillar OneAgentic quickstart example.
 
@@ -52,9 +55,7 @@ from datapillar_oneagentic import (
 )
 from datapillar_oneagentic.knowledge import (
     BM25SparseEmbedder,
-    Knowledge,
     KnowledgeConfig,
-    KnowledgeRetrieve,
     KnowledgeSource,
 )
 from datapillar_oneagentic.providers.llm import EmbeddingBackend, Provider
@@ -75,10 +76,13 @@ DEMO_KNOWLEDGE_TEXT = (
 DEMO_SPARSE_EMBEDDER = BM25SparseEmbedder()
 
 DEMO_KNOWLEDGE_SOURCE = KnowledgeSource(
+    source=DEMO_KNOWLEDGE_TEXT,
+    chunk={
+        "mode": "general",
+        "general": {"max_tokens": 200, "overlap": 40},
+    },
     name="Example knowledge base",
     source_type="doc",
-    source_uri="kb_demo",
-    content=DEMO_KNOWLEDGE_TEXT,
     filename="kb_demo.txt",
 )
 
@@ -206,14 +210,6 @@ class OrderResult(BaseModel):
     # Structured output is sensitive to randomness; keep temperature at 0.
     temperature=0.0,
     max_steps=10,                              # Max tool calls
-
-    # === Knowledge config (optional) ===
-    # Knowledge retrieval requires knowledge.base_config.embedding.
-    knowledge=Knowledge(
-        sources=[DEMO_KNOWLEDGE_SOURCE],
-        retrieve=KnowledgeRetrieve(method="hybrid", top_k=4),
-        sparse_embedder=DEMO_SPARSE_EMBEDDER,
-    ),
 
     # === A2A remote agents (optional) ===
     # a2a_agents=[                             # Remote agents you can delegate to
@@ -374,7 +370,7 @@ On failure, return the same JSON schema (order_id is null):
 # ============================================================================
 
 
-def create_shopping_team(config: DatapillarConfig) -> Datapillar:
+def create_shopping_team(config: DatapillarConfig, knowledge_config: KnowledgeConfig) -> Datapillar:
     """
     Create the shopping assistant team.
 
@@ -398,6 +394,7 @@ def create_shopping_team(config: DatapillarConfig) -> Datapillar:
 
         # === Debug ===
         verbose=True,                          # Verbose logging
+        knowledge=knowledge_config,
     )
     return team
 
@@ -435,21 +432,20 @@ async def main():
         )
 
     # quickstart.py uses a local Lance vector store to avoid extra configuration.
-    config.knowledge = KnowledgeConfig(
-        base_config={
-            "embedding": config.embedding.model_dump(),
-            "vector_store": {"type": "lance", "path": "./data/vectors"},
-        }
+    knowledge_config = KnowledgeConfig(
+        namespaces=[TEAM_NAMESPACE],
+        embedding=config.embedding.model_dump(),
+        vector_store={"type": "lance", "path": "./data/vectors"},
     )
 
     await DEMO_KNOWLEDGE_SOURCE.ingest(
-        namespace=TEAM_NAMESPACE,
-        config=config.knowledge,
+        config=knowledge_config,
         sparse_embedder=DEMO_SPARSE_EMBEDDER,
+        namespace=TEAM_NAMESPACE,
     )
 
     # Create team.
-    team = create_shopping_team(config)
+    team = create_shopping_team(config, knowledge_config)
 
     print("=" * 60)
     print("Shopping assistant team is ready")

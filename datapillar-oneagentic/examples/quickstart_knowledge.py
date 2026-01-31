@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 Knowledge RAG quickstart: document chunking + retrieval.
 
@@ -7,43 +10,53 @@ Run:
 Dependencies:
     pip install datapillar-oneagentic[lance,knowledge]
 
-Embedding configuration (choose one):
-    1) Environment variables (recommended):
-       export DATAPILLAR_EMBEDDING_PROVIDER="openai"          # openai | glm
-       export DATAPILLAR_EMBEDDING_API_KEY="sk-xxx"
-       export DATAPILLAR_EMBEDDING_MODEL="text-embedding-3-small"
-       export DATAPILLAR_EMBEDDING_DIMENSION="1536"
-       # Optional: export DATAPILLAR_EMBEDDING_BASE_URL="https://api.openai.com/v1"
-    2) Config file (see examples/config.example.toml)
+Embedding configuration (environment variables):
+    export DATAPILLAR_EMBEDDING_PROVIDER="openai"          # openai | glm
+    export DATAPILLAR_EMBEDDING_API_KEY="sk-xxx"
+    export DATAPILLAR_EMBEDDING_MODEL="text-embedding-3-small"
+    export DATAPILLAR_EMBEDDING_DIMENSION="1536"
+    # Optional: export DATAPILLAR_EMBEDDING_BASE_URL="https://api.openai.com/v1"
 
 Notes:
     - source_id is generated automatically.
-    - content is optional; if provided, source_uri is not read.
-    - If source_uri is a valid local path, content is read automatically; filename/mime_type are optional.
+    - source accepts a file path, URL, raw text, or bytes.
+    - Each document must provide its own chunk config.
     - namespace must be provided explicitly (store is bound inside ingest/retrieve).
     - Retrieval is scoped to the current namespace; cross-namespace retrieval is not supported.
 """
 
 import asyncio
+import os
 
-from datapillar_oneagentic import DatapillarConfig
 from datapillar_oneagentic.providers.llm import EmbeddingBackend
+from datapillar_oneagentic.providers.llm.config import EmbeddingConfig
 
-from datapillar_oneagentic.context import ContextBuilder
 from datapillar_oneagentic.knowledge import (
     BM25SparseEmbedder,
     Knowledge,
-    KnowledgeChunkConfig,
     KnowledgeConfig,
-    KnowledgeRetrieveConfig,
+    KnowledgeChunkRequest,
+    KnowledgeRetrieve,
     KnowledgeSource,
-    KnowledgeRetriever,
+    KnowledgeService,
 )
 
 
 async def main() -> None:
-    config = DatapillarConfig()
-    if not config.embedding.is_configured():
+    dimension_raw = os.getenv("DATAPILLAR_EMBEDDING_DIMENSION", "1536")
+    try:
+        dimension = int(dimension_raw)
+    except ValueError as exc:
+        raise RuntimeError("DATAPILLAR_EMBEDDING_DIMENSION must be an integer") from exc
+
+    embedding_config = EmbeddingConfig(
+        provider=os.getenv("DATAPILLAR_EMBEDDING_PROVIDER", "openai"),
+        api_key=os.getenv("DATAPILLAR_EMBEDDING_API_KEY"),
+        model=os.getenv("DATAPILLAR_EMBEDDING_MODEL"),
+        base_url=os.getenv("DATAPILLAR_EMBEDDING_BASE_URL"),
+        dimension=dimension,
+    )
+    if not embedding_config.is_configured():
         supported = ", ".join(EmbeddingBackend.list_supported())
         raise RuntimeError(
             "Please configure embedding first:\n"
@@ -54,23 +67,12 @@ async def main() -> None:
             "Optional: export DATAPILLAR_EMBEDDING_BASE_URL=\"https://api.openai.com/v1\"\n"
             f"Supported providers: {supported}"
         )
-    embedding_config = config.embedding.model_dump()
 
     namespace = "demo_knowledge"
     knowledge_config = KnowledgeConfig(
-        base_config={
-            "embedding": embedding_config,
-            "vector_store": {"type": "lance", "path": "./data/vectors"},
-        },
-        chunk_config=KnowledgeChunkConfig(
-            mode="general",
-            preprocess=["normalize_newlines", "remove_control", "collapse_whitespace"],
-            general={"max_tokens": 80, "overlap": 10},
-        ),
-        retrieve_config=KnowledgeRetrieveConfig(
-            method="hybrid",
-            top_k=3,
-        ),
+        namespaces=[namespace],
+        embedding=embedding_config,
+        vector_store={"type": "lance", "path": "./data/vectors"},
     )
 
     sparse_embedder = BM25SparseEmbedder()
@@ -80,41 +82,57 @@ async def main() -> None:
         "The knowledge framework provides parsing, preprocessing, chunking, vectorization, and retrieval augmentation.\n"
         "Retrieval supports semantic and hybrid recall, with rerank and dedupe before context injection.\n"
         "Namespace is a hard isolation boundary to prevent knowledge leakage across business lines.\n"
-        "doc_id is generated deterministically; duplicate ingest triggers rebuild rather than duplication.\n"
+        "doc_id is generated per ingest; duplicate files are stored as separate documents by default.\n"
         "Typical scenarios include data assistants, team knowledge bases, enterprise QA, and agent augmentation."
     )
+    chunk_config = {
+        "mode": "general",
+        "preprocess": ["normalize_newlines", "remove_control", "collapse_whitespace"],
+        "general": {"max_tokens": 80, "overlap": 10},
+    }
     source = KnowledgeSource(
+        source=sample_text,
+        chunk=chunk_config,
         name="Example knowledge base",
         source_type="doc",
-        source_uri="demo.txt",
-        content=sample_text,
         filename="demo.txt",
         metadata={"title": "Datapillar Overview"},
     )
 
-    preview = source.chunk(chunk_config=knowledge_config.chunk_config)
-    print(f"Chunk preview: chunks={len(preview.chunks)}, attachments={len(preview.attachments)}")
-    if preview.chunks:
-        print("First chunk preview:")
-        print(preview.chunks[0].content)
-
-    await source.ingest(
+    service = KnowledgeService(config=knowledge_config)
+    previews = await service.chunk(
+        KnowledgeChunkRequest(
+            sources=[source],
+            preview=True,
+        ),
         namespace=namespace,
-        config=knowledge_config,
-        sparse_embedder=sparse_embedder,
+    )
+    preview = previews[0] if previews else None
+    if preview:
+        print(f"Chunk preview: chunks={len(preview.chunks)}, attachments={len(preview.attachments)}")
+        if preview.chunks:
+            print("First chunk preview:")
+            print(preview.chunks[0].content)
+
+    await service.chunk(
+        KnowledgeChunkRequest(
+            sources=[source],
+            sparse_embedder=sparse_embedder,
+        ),
+        namespace=namespace,
     )
 
-    retriever = KnowledgeRetriever.from_config(namespace=namespace, config=knowledge_config)
     knowledge = Knowledge(sources=[source], sparse_embedder=sparse_embedder)
-    result = await retriever.retrieve(query="What are Datapillar's core capabilities?", knowledge=knowledge)
-    inject_config = retriever.resolve_inject_config(knowledge)
-    context = ContextBuilder.build_knowledge_context(
-        chunks=[chunk for chunk, _ in result.hits],
-        inject=inject_config,
+    result = await service.retrieve(
+        query="What are Datapillar's core capabilities?",
+        namespaces=[namespace],
+        knowledge=knowledge,
+        retrieve=KnowledgeRetrieve(method="semantic", top_k=3),
     )
+    context = "\n\n".join([chunk.content for chunk, _ in result.hits])
     print("\nRetrieval result:")
     print(context or "No relevant knowledge found.")
-    await retriever.close()
+    await service.close()
 
 
 if __name__ == "__main__":

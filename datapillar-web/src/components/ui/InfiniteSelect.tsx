@@ -226,7 +226,7 @@ export function InfiniteSelect({
         >
           <div
             ref={listRef}
-            className="overflow-y-auto p-1 max-h-60 min-w-40"
+            className="overflow-y-auto p-1 max-h-60 min-w-40 custom-scrollbar"
           >
             {showLoading ? (
               <div className="flex items-center justify-center py-4">

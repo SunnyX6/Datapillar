@@ -102,6 +102,28 @@ public class MetricVersionMetaBaseSQLProvider {
         + " WHERE mv.metric_id = #{metricId} AND mv.version = #{version} AND mv.deleted_at = 0";
   }
 
+  public String listMetricVersionMetasByRefTableId(@Param("refTableId") Long refTableId) {
+    return "SELECT mv.id, mv.metric_id AS metricId, mv.metalake_id AS metalakeId, mv.catalog_id AS catalogId,"
+        + " mv.schema_id AS schemaId, mv.version, mv.metric_name AS metricName, mv.metric_code AS metricCode,"
+        + " mv.metric_type AS metricType, mv.data_type AS dataType, mv.metric_comment AS metricComment,"
+        + " mv.metric_unit AS metricUnit, u.unit_name AS unitName, u.unit_symbol AS unitSymbol,"
+        + " mv.parent_metric_codes AS parentMetricCodes,"
+        + " mv.calculation_formula AS calculationFormula, mv.ref_table_id AS refTableId,"
+        + " t.table_name AS refTableName, s.schema_name AS refSchemaName, c.catalog_name AS refCatalogName,"
+        + " mv.measure_column_ids AS measureColumnIds, mv.filter_column_ids AS filterColumnIds,"
+        + " mv.version_properties AS versionProperties, mv.audit_info AS auditInfo, mv.deleted_at AS deletedAt"
+        + " FROM "
+        + MetricVersionMetaMapper.TABLE_NAME
+        + " mv JOIN "
+        + MetricMetaMapper.TABLE_NAME
+        + " mm ON mv.metric_id = mm.metric_id AND mv.version = mm.current_version AND mm.deleted_at = 0"
+        + " LEFT JOIN unit_meta u ON mv.schema_id = u.schema_id AND mv.metric_unit = u.unit_code AND u.deleted_at = 0"
+        + " LEFT JOIN table_meta t ON mv.ref_table_id = t.table_id AND t.deleted_at = 0"
+        + " LEFT JOIN schema_meta s ON t.schema_id = s.schema_id AND s.deleted_at = 0"
+        + " LEFT JOIN catalog_meta c ON t.catalog_id = c.catalog_id AND c.deleted_at = 0"
+        + " WHERE mv.ref_table_id = #{refTableId} AND mv.deleted_at = 0";
+  }
+
   public String softDeleteMetricVersionsBySchemaIdAndMetricCode(
       @Param("schemaId") Long schemaId, @Param("metricCode") String metricCode) {
     return "UPDATE "

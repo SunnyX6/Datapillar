@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 指标 AI 治理服务
 
@@ -278,7 +282,7 @@ class MetricAIService:
     def _recommend_tables(self, user_input: str) -> tuple[str, list]:
         """推荐表和列，返回 (格式化字符串, 原始列表)"""
         start = time.time()
-        raw_results = Neo4jTableSearch.search_tables_columns(query=user_input)
+        raw_results = Neo4jTableSearch.search_tables(query=user_input)
 
         if not raw_results:
             logger.info(f"[recommend] 推荐表/列无结果, 耗时 {time.time() - start:.3f}s")

@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 Neo4j 节点搜索服务
 
@@ -56,6 +60,59 @@ class Neo4jNodeSearch:
            COALESCE(node.description, node.summary) AS description,
            score
     """
+
+    @classmethod
+    def get_knowledge_navigation(cls) -> dict[str, int] | None:
+        """获取数仓知识导航统计（Catalog/Schema/Table/Column/Metric/SQL/Tag/ValueDomain）"""
+        cypher = """
+        OPTIONAL MATCH (cat:Catalog)
+        WITH count(cat) AS catalogs
+        OPTIONAL MATCH (sch:Schema)
+        WITH catalogs, count(sch) AS schemas
+        OPTIONAL MATCH (tbl:Table)
+        WITH catalogs, schemas, count(tbl) AS tables
+        OPTIONAL MATCH (col:Column)
+        WITH catalogs, schemas, tables, count(col) AS columns
+        OPTIONAL MATCH (metric)
+        WHERE metric:AtomicMetric OR metric:DerivedMetric OR metric:CompositeMetric
+        WITH catalogs, schemas, tables, columns, count(metric) AS metrics
+        OPTIONAL MATCH (sql:SQL)
+        WITH catalogs, schemas, tables, columns, metrics, count(sql) AS sql
+        OPTIONAL MATCH (tag:Tag)
+        WITH catalogs, schemas, tables, columns, metrics, sql, count(tag) AS tags
+        OPTIONAL MATCH (vd:ValueDomain)
+        RETURN catalogs, schemas, tables, columns, metrics, sql, tags, count(vd) AS value_domains
+        """
+
+        try:
+            driver = Neo4jClient.get_driver()
+            with driver.session(database=settings.neo4j_database) as session:
+                result = run_cypher(session, cypher)
+                record = result.single()
+                if not record:
+                    return {
+                        "catalogs": 0,
+                        "schemas": 0,
+                        "tables": 0,
+                        "columns": 0,
+                        "metrics": 0,
+                        "sql": 0,
+                        "tags": 0,
+                        "value_domains": 0,
+                    }
+                return {
+                    "catalogs": int(record.get("catalogs") or 0),
+                    "schemas": int(record.get("schemas") or 0),
+                    "tables": int(record.get("tables") or 0),
+                    "columns": int(record.get("columns") or 0),
+                    "metrics": int(record.get("metrics") or 0),
+                    "sql": int(record.get("sql") or 0),
+                    "tags": int(record.get("tags") or 0),
+                    "value_domains": int(record.get("value_domains") or 0),
+                }
+        except Exception as e:
+            logger.error(f"获取数仓知识导航失败: {e}", exc_info=True)
+            return None
 
     @classmethod
     def _result_formatter(cls, record: Any) -> Any:
@@ -259,7 +316,7 @@ class Neo4jNodeSearch:
         cls,
         query: str,
         top_k: int = 10,
-        min_score: float = 0.8,
+        min_score: float = 0.3,
         node_types: list[str] | None = None,
         exclude_sql: bool = True,
         vector_index: str | None = None,
@@ -291,6 +348,7 @@ class Neo4jNodeSearch:
 
         try:
             from neo4j_graphrag.retrievers import HybridCypherRetriever
+            from neo4j_graphrag.types import HybridSearchRanker
 
             from src.infrastructure.llm.embeddings import UnifiedEmbedder
 
@@ -303,7 +361,12 @@ class Neo4jNodeSearch:
                 embedder=UnifiedEmbedder(),
             )
 
-            results = retriever.search(query_text=query, top_k=top_k)
+            results = retriever.search(
+                query_text=query,
+                top_k=top_k,
+                ranker=HybridSearchRanker.LINEAR,
+                alpha=0.6,
+            )
             items = list(getattr(results, "items", []) or [])
 
             return cls._build_hits(items, min_score, node_types, exclude_types)

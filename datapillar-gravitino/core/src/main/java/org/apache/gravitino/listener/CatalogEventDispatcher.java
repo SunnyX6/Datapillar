@@ -48,6 +48,8 @@ import org.apache.gravitino.listener.api.event.LoadCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadCatalogPreEvent;
 import org.apache.gravitino.listener.api.info.CatalogInfo;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code CatalogEventDispatcher} is a decorator for {@link CatalogDispatcher} that not only
@@ -56,6 +58,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * completed. This allows for event-driven workflows or monitoring of catalog operations.
  */
 public class CatalogEventDispatcher implements CatalogDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogEventDispatcher.class);
+
   private final EventBus eventBus;
   private final CatalogDispatcher dispatcher;
 
@@ -153,6 +157,7 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
       eventBus.dispatchEvent(
           new AlterCatalogEvent(
               PrincipalUtils.getCurrentUserName(), ident, changes, new CatalogInfo(catalog)));
+      emitMetricLineageForCatalog(ident, catalog);
       return catalog;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -200,5 +205,16 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
   public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     // todo: support disable catalog event
     dispatcher.disableCatalog(ident);
+  }
+
+  private void emitMetricLineageForCatalog(NameIdentifier ident, Catalog catalog) {
+    try {
+      String catalogName = catalog == null ? ident.name() : catalog.name();
+      NameIdentifier catalogIdent = NameIdentifier.of(ident.namespace(), catalogName);
+      MetricLineageEventEmitter.emitForCatalog(
+          eventBus, PrincipalUtils.getCurrentUserName(), catalogIdent);
+    } catch (Exception e) {
+      LOG.warn("Catalog变更触发指标级联失败: catalog={}", ident, e);
+    }
   }
 }

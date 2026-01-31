@@ -626,7 +626,7 @@ export function MetricFormModal({ isOpen, onClose, onSave, saving, editMetric }:
                     ? '先在左侧编码区选择原子指标，右侧选择维度过滤列，例如：统计北京地区的月度累计值'
                   : '先在右侧选择至少两个指标，然后描述运算规则，例如：销售额减成本再除以销售额'
               }
-              className="flex-1 bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-purple-500 transition-all"
+              className="flex-1 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-purple-500 transition-all"
               value={aiInput}
               onChange={(e) => {
                 setAiInput(e.target.value)

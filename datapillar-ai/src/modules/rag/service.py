@@ -1,0 +1,744 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-28
+
+"""RAG 知识 Wiki 服务层."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+import time
+from typing import Any
+
+from datapillar_oneagentic.knowledge import (
+    Knowledge,
+    KnowledgeBaseConfig,
+    KnowledgeChunkConfig,
+    KnowledgeChunker,
+    KnowledgeConfig,
+    KnowledgeRetrieveConfig,
+    KnowledgeRetriever,
+    KnowledgeScope,
+)
+from datapillar_oneagentic.knowledge.ingest.builder import build_chunks, build_document
+from datapillar_oneagentic.knowledge.models import DocumentInput, KnowledgeSource
+from datapillar_oneagentic.knowledge.parser import default_registry
+from datapillar_oneagentic.knowledge.runtime import build_runtime
+from datapillar_oneagentic.providers.llm.config import EmbeddingConfig
+from datapillar_oneagentic.storage.config import VectorStoreConfig
+
+from src.infrastructure.repository.rag import DocumentRepository, JobRepository, NamespaceRepository
+from src.infrastructure.repository.system.ai_model import Model as AiModelRepository
+from src.modules.rag.sse import job_event_hub
+from src.modules.rag.storage import StorageManager
+from src.shared.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+class KnowledgeWikiService:
+    def __init__(self) -> None:
+        cfg = settings.get("knowledge_wiki", {})
+        self._storage = StorageManager(cfg.get("storage", {}))
+        self._vector_store_cfg = VectorStoreConfig(**(cfg.get("vector_store", {}) or {}))
+        self._embedding_batch_size = int(cfg.get("embedding_batch_size") or 20)
+        self._progress_step = int(cfg.get("progress_step") or 20)
+
+    def list_namespaces(self, user_id: int, *, limit: int, offset: int) -> tuple[list[dict], int]:
+        return NamespaceRepository.list_by_user(user_id, limit=limit, offset=offset)
+
+    def create_namespace(self, user_id: int, payload: dict[str, Any]) -> int:
+        payload = {
+            "namespace": payload["namespace"],
+            "description": payload.get("description"),
+            "created_by": user_id,
+            "status": 1,
+        }
+        return NamespaceRepository.create(payload)
+
+    def update_namespace(self, user_id: int, namespace_id: int, fields: dict[str, Any]) -> int:
+        return NamespaceRepository.update(namespace_id, user_id, fields)
+
+    def delete_namespace(self, user_id: int, namespace_id: int) -> int:
+        return NamespaceRepository.soft_delete(namespace_id, user_id)
+
+    def list_documents(
+        self,
+        user_id: int,
+        namespace_id: int,
+        *,
+        status: str | None,
+        keyword: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[dict[str, Any]], int]:
+        rows, total = DocumentRepository.list_by_namespace(
+            namespace_id,
+            user_id,
+            status=status,
+            keyword=keyword,
+            limit=limit,
+            offset=offset,
+        )
+        return [self._normalize_document(row) for row in rows], total
+
+    def get_document(self, user_id: int, document_id: int) -> dict[str, Any] | None:
+        doc = DocumentRepository.get(document_id, user_id)
+        return self._normalize_document(doc) if doc else None
+
+    def update_document(self, user_id: int, document_id: int, fields: dict[str, Any]) -> int:
+        return DocumentRepository.update(document_id, user_id, fields)
+
+    async def upload_document(
+        self,
+        *,
+        user_id: int,
+        namespace_id: int,
+        filename: str,
+        content: bytes,
+        title: str | None,
+    ) -> dict[str, Any]:
+        namespace = NamespaceRepository.get(namespace_id, user_id)
+        if not namespace:
+            raise ValueError("namespace not found")
+
+        storage_result = await self._storage.save(
+            namespace_id=namespace_id,
+            filename=filename,
+            content=content,
+        )
+        resolved_title = title or filename
+        file_type = _infer_file_type(filename)
+
+        document_id = DocumentRepository.create(
+            {
+                "namespace_id": namespace_id,
+                "doc_uid": None,
+                "title": resolved_title,
+                "file_type": file_type,
+                "size_bytes": storage_result.size_bytes,
+                "storage_uri": storage_result.storage_uri,
+                "storage_type": storage_result.storage_type,
+                "storage_key": storage_result.storage_key,
+                "status": "processing",
+                "chunk_count": 0,
+                "token_count": 0,
+                "error_message": None,
+                "embedding_model_id": None,
+                "embedding_dimension": None,
+                "chunk_mode": None,
+                "chunk_config_json": None,
+                "last_chunked_at": None,
+                "created_by": user_id,
+            }
+        )
+
+        return {
+            "document_id": document_id,
+            "status": "processing",
+        }
+
+    async def start_chunk_job(
+        self,
+        *,
+        user_id: int,
+        document_id: int,
+        chunk_mode: str | None,
+        chunk_config_json: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        document = DocumentRepository.get(document_id, user_id)
+        if not document:
+            raise ValueError("document not found")
+
+        embedding_model_id = document.get("embedding_model_id")
+        if not embedding_model_id:
+            raise ValueError("embedding_model_id is required")
+        self._ensure_namespace_embedding(int(document["namespace_id"]), int(embedding_model_id))
+
+        resolved_chunk = self._resolve_chunk_config(chunk_mode, chunk_config_json)
+        DocumentRepository.update(
+            document_id,
+            user_id,
+            {
+                "chunk_mode": resolved_chunk.mode,
+                "chunk_config_json": json.dumps(resolved_chunk.model_dump(), ensure_ascii=False),
+                "status": "processing",
+                "error_message": None,
+            },
+        )
+
+        job_id = self._create_job(int(document["namespace_id"]), document_id, user_id, job_type="chunk")
+        asyncio.create_task(
+            self._run_chunk_job(
+                job_id=job_id,
+                namespace_id=int(document["namespace_id"]),
+                document_id=document_id,
+                user_id=user_id,
+                chunk_mode=resolved_chunk.mode,
+                chunk_config=resolved_chunk,
+            )
+        )
+        return {
+            "job_id": job_id,
+            "status": "queued",
+            "sse_url": f"/api/ai/knowledge/wiki/jobs/{job_id}/sse",
+        }
+
+    def get_job(self, user_id: int, job_id: int) -> dict[str, Any] | None:
+        return JobRepository.get(job_id, user_id)
+
+    def list_jobs(
+        self,
+        user_id: int,
+        document_id: int,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[dict[str, Any]], int]:
+        return JobRepository.list_by_document(document_id, user_id, limit=limit, offset=offset)
+
+    async def list_chunks(
+        self,
+        *,
+        user_id: int,
+        document_id: int,
+        limit: int,
+        offset: int,
+        keyword: str | None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        document = DocumentRepository.get(document_id, user_id)
+        if not document or not document.get("doc_uid"):
+            return [], 0
+
+        namespace_value = self._get_namespace_value(int(document["namespace_id"]), user_id)
+        runtime = await self._build_runtime(namespace_value, document)
+        rows = await runtime.store.query_chunks(filters={"doc_id": document["doc_uid"]}, limit=None)
+        await runtime.store.close()
+
+        items = rows
+        if keyword:
+            items = [item for item in items if keyword in (item.content or "")]
+
+        total = len(items)
+        sliced = items[offset : offset + limit]
+        return [self._chunk_to_dict(item) for item in sliced], total
+
+    async def edit_chunk(
+        self,
+        *,
+        user_id: int,
+        chunk_id: str,
+        content: str,
+    ) -> dict[str, Any]:
+        doc_uid = _parse_doc_uid(chunk_id)
+        if not doc_uid:
+            raise ValueError("invalid chunk_id")
+        document = DocumentRepository.get_by_doc_uid(doc_uid, user_id)
+        if not document:
+            raise ValueError("document not found")
+        namespace_id = int(document["namespace_id"])
+        job_id = self._create_job(namespace_id, int(document["document_id"]), user_id, job_type="reembed")
+        asyncio.create_task(
+            self._run_chunk_edit_job(
+                job_id=job_id,
+                document=document,
+                chunk_id=chunk_id,
+                content=content,
+            )
+        )
+        return {
+            "job_id": job_id,
+            "status": "queued",
+            "sse_url": f"/api/ai/knowledge/wiki/jobs/{job_id}/sse",
+        }
+
+    async def delete_chunk(self, *, user_id: int, chunk_id: str) -> int:
+        doc_uid = _parse_doc_uid(chunk_id)
+        if not doc_uid:
+            raise ValueError("invalid chunk_id")
+        document = DocumentRepository.get_by_doc_uid(doc_uid, user_id)
+        if not document:
+            raise ValueError("document not found")
+        namespace_value = self._get_namespace_value(int(document["namespace_id"]), user_id)
+        runtime = await self._build_runtime(namespace_value, document)
+        deleted = await runtime.store.delete_chunks([chunk_id])
+        await runtime.store.close()
+        if deleted:
+            DocumentRepository.update(
+                int(document["document_id"]),
+                user_id,
+                {"chunk_count": max(int(document.get("chunk_count") or 0) - deleted, 0)},
+            )
+        return deleted
+
+    async def retrieve(self, *, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        namespace_id = int(payload["namespace_id"])
+        self._ensure_namespace_owner(user_id, namespace_id)
+        model_id = self._resolve_namespace_embedding_model(namespace_id)
+        embedding_model = self._get_embedding_model(model_id)
+        namespace_value = self._get_namespace_value(namespace_id, user_id)
+        runtime = await self._build_runtime_from_model(namespace_value, embedding_model)
+
+        retrieve_config = KnowledgeRetrieveConfig(
+            method=(payload.get("retrieval_mode") or "hybrid"),
+            top_k=int(payload.get("top_k") or 5),
+            score_threshold=payload.get("score_threshold"),
+        )
+        if payload.get("rerank_enabled"):
+            retrieve_config.rerank.mode = "model"
+            retrieve_config.rerank.provider = "sentence_transformers"
+            retrieve_config.rerank.model = payload.get("rerank_model") or retrieve_config.rerank.model
+        else:
+            retrieve_config.rerank.mode = "off"
+
+        config = KnowledgeConfig(
+            base_config=self._build_base_config(embedding_model),
+            retrieve_config=retrieve_config,
+        )
+        retriever = KnowledgeRetriever(
+            store=runtime.store,
+            embedding_provider=runtime.embedding_provider,
+            config=config,
+        )
+
+        scope = KnowledgeScope(
+            document_ids=self._resolve_scope_doc_uids(
+                user_id=user_id,
+                namespace_id=namespace_id,
+                payload=payload,
+            )
+        )
+        start_ms = time.time()
+        result = await retriever.retrieve(
+            query=payload["query"],
+            knowledge=Knowledge(),
+            scope=scope,
+        )
+        latency_ms = int((time.time() - start_ms) * 1000)
+        await retriever.close()
+
+        hits = []
+        for chunk, score in result.hits:
+            hits.append(
+                {
+                    "chunk_id": chunk.chunk_id,
+                    "doc_id": chunk.doc_id,
+                    "doc_title": chunk.doc_title,
+                    "score": score,
+                    "content": chunk.content,
+                    "source_spans": [
+                        {
+                            "page": span.page,
+                            "start_offset": span.start_offset,
+                            "end_offset": span.end_offset,
+                            "block_id": span.block_id,
+                        }
+                        for span in (chunk.source_spans or [])
+                    ],
+                }
+            )
+        return {"hits": hits, "latency_ms": latency_ms}
+
+    async def delete_document(self, *, user_id: int, document_id: int) -> int:
+        document = DocumentRepository.get(document_id, user_id)
+        if not document:
+            return 0
+        if document.get("doc_uid"):
+            namespace_value = self._get_namespace_value(int(document["namespace_id"]), user_id)
+            runtime = await self._build_runtime(namespace_value, document)
+            await runtime.store.delete_doc_chunks(document["doc_uid"])
+            await runtime.store.delete_doc(document["doc_uid"])
+            await runtime.store.close()
+        return DocumentRepository.soft_delete(document_id, user_id)
+
+    async def _run_chunk_job(
+        self,
+        *,
+        job_id: int,
+        namespace_id: int,
+        document_id: int,
+        user_id: int,
+        chunk_mode: str,
+        chunk_config: KnowledgeChunkConfig,
+    ) -> None:
+        JobRepository.mark_running(job_id)
+        job_snapshot = JobRepository.get(job_id, user_id)
+        if job_snapshot:
+            await job_event_hub.publish(job_id, _build_progress_event(job_snapshot))
+
+        document = DocumentRepository.get(document_id, user_id)
+        if not document:
+            JobRepository.mark_error(job_id, "document not found")
+            await job_event_hub.publish(
+                job_id, _build_done_event(job_id, "error", "document not found", 0, 0, 0)
+            )
+            await job_event_hub.close(job_id)
+            return
+
+        try:
+            embedding_model = self._get_embedding_model(int(document["embedding_model_id"]))
+            namespace_value = self._get_namespace_value(int(document["namespace_id"]), int(document["created_by"]))
+            runtime = await self._build_runtime_from_model(namespace_value, embedding_model)
+            source_bytes = await self._storage.read(document["storage_uri"])
+            filename = _resolve_filename(document)
+            doc_input = DocumentInput(
+                source=source_bytes,
+                filename=filename,
+                metadata={"title": document["title"]},
+            )
+            parser = default_registry()
+            parsed = parser.parse(doc_input)
+            chunker = KnowledgeChunker(config=chunk_config)
+            preview = chunker.preview(parsed)
+            if not preview.chunks:
+                raise ValueError("no chunks generated")
+
+            doc_uid = preview.document_id
+            source = KnowledgeSource(
+                name=document["title"],
+                source_type="doc",
+                source_uri=document["storage_uri"],
+                metadata={"namespace_id": namespace_id, "document_id": document_id},
+            )
+            knowledge_doc = build_document(source=source, parsed=parsed, doc_input=doc_input)
+            knowledge_doc.source_uri = document["storage_uri"]
+            knowledge_doc.title = document["title"]
+            knowledge_doc.doc_id = doc_uid
+
+            chunks = build_chunks(source=source, doc=knowledge_doc, drafts=preview.chunks)
+            total_chunks = len(chunks)
+            await runtime.store.upsert_sources([source])
+            await runtime.store.delete_doc_chunks(doc_uid)
+            await runtime.store.delete_doc(doc_uid)
+
+            batch_size = max(self._embedding_batch_size, 1)
+            processed = 0
+            vectors_sum: list[float] | None = None
+            for idx in range(0, total_chunks, batch_size):
+                batch = chunks[idx : idx + batch_size]
+                vectors = await runtime.embedding_provider.embed_texts([c.content for c in batch])
+                for i, chunk in enumerate(batch):
+                    chunk.vector = vectors[i]
+                    if vectors_sum is None:
+                        vectors_sum = [0.0 for _ in vectors[i]]
+                    for dim_idx, value in enumerate(vectors[i]):
+                        vectors_sum[dim_idx] += value
+                await runtime.store.upsert_chunks(batch)
+                processed += len(batch)
+                if processed % self._progress_step == 0 or processed == total_chunks:
+                    progress = int(processed * 100 / total_chunks)
+                    JobRepository.update_progress(
+                        job_id,
+                        processed_chunks=processed,
+                        total_chunks=total_chunks,
+                        progress=progress,
+                    )
+                    job_snapshot = JobRepository.get(job_id, user_id)
+                    if job_snapshot:
+                        await job_event_hub.publish(job_id, _build_progress_event(job_snapshot))
+
+            if vectors_sum is None:
+                vectors_sum = []
+            knowledge_doc.vector = (
+                [v / total_chunks for v in vectors_sum] if total_chunks else []
+            )
+            await runtime.store.upsert_docs([knowledge_doc])
+            await runtime.store.close()
+
+            DocumentRepository.update(
+                document_id,
+                user_id,
+                {
+                    "doc_uid": doc_uid,
+                    "chunk_count": total_chunks,
+                    "status": "indexed",
+                    "error_message": None,
+                    "chunk_mode": chunk_mode,
+                    "chunk_config_json": json.dumps(chunk_config.model_dump(), ensure_ascii=False),
+                    "last_chunked_at": _now_time_str(),
+                },
+            )
+            JobRepository.mark_success(job_id, processed_chunks=total_chunks, total_chunks=total_chunks)
+            job_snapshot = JobRepository.get(job_id, user_id)
+            if job_snapshot:
+                await job_event_hub.publish(job_id, _build_done_event_from_job(job_snapshot))
+            await job_event_hub.close(job_id)
+
+        except Exception as exc:
+            logger.error("Chunk job failed: %s", exc, exc_info=True)
+            JobRepository.mark_error(job_id, str(exc))
+            DocumentRepository.update(
+                document_id,
+                user_id,
+                {"status": "error", "error_message": str(exc)},
+            )
+            job_snapshot = JobRepository.get(job_id, user_id)
+            if job_snapshot:
+                await job_event_hub.publish(job_id, _build_done_event_from_job(job_snapshot))
+            else:
+                await job_event_hub.publish(
+                    job_id,
+                    _build_done_event(job_id, "error", str(exc), 0, 0, 0),
+                )
+            await job_event_hub.close(job_id)
+
+    async def _run_chunk_edit_job(
+        self,
+        *,
+        job_id: int,
+        document: dict[str, Any],
+        chunk_id: str,
+        content: str,
+    ) -> None:
+        JobRepository.mark_running(job_id)
+        job_snapshot = JobRepository.get(job_id, int(document["created_by"]))
+        if job_snapshot:
+            await job_event_hub.publish(job_id, _build_progress_event(job_snapshot))
+
+        try:
+            embedding_model = self._get_embedding_model(int(document["embedding_model_id"]))
+            namespace_value = self._get_namespace_value(int(document["namespace_id"]), int(document["created_by"]))
+            runtime = await self._build_runtime_from_model(namespace_value, embedding_model)
+            chunks = await runtime.store.get_chunks([chunk_id])
+            if not chunks:
+                raise ValueError("chunk not found")
+            chunk = chunks[0]
+            chunk.content = content
+            chunk.token_count = 0
+            vector = await runtime.embedding_provider.embed_text(content)
+            chunk.vector = vector
+            await runtime.store.delete_chunks([chunk_id])
+            await runtime.store.upsert_chunks([chunk])
+            await runtime.store.close()
+
+            JobRepository.mark_success(job_id, processed_chunks=1, total_chunks=1)
+            job_snapshot = JobRepository.get(job_id, int(document["created_by"]))
+            if job_snapshot:
+                await job_event_hub.publish(job_id, _build_done_event_from_job(job_snapshot))
+            await job_event_hub.close(job_id)
+        except Exception as exc:
+            logger.error("Chunk edit failed: %s", exc, exc_info=True)
+            JobRepository.mark_error(job_id, str(exc))
+            job_snapshot = JobRepository.get(job_id, int(document["created_by"]))
+            if job_snapshot:
+                await job_event_hub.publish(job_id, _build_done_event_from_job(job_snapshot))
+            else:
+                await job_event_hub.publish(
+                    job_id,
+                    _build_done_event(job_id, "error", str(exc), 0, 0, 0),
+                )
+            await job_event_hub.close(job_id)
+
+    def _resolve_chunk_config(
+        self,
+        chunk_mode: str | None,
+        chunk_config_json: dict[str, Any] | None,
+    ) -> KnowledgeChunkConfig:
+        if chunk_config_json:
+            config = KnowledgeChunkConfig.model_validate(chunk_config_json)
+        else:
+            config = KnowledgeChunkConfig()
+        if chunk_mode:
+            config.mode = chunk_mode
+        return config
+
+    def _get_embedding_model(self, model_id: int) -> dict[str, Any]:
+        model = AiModelRepository.get_model(model_id)
+        if not model:
+            raise ValueError("embedding model not found")
+        if model.get("model_type") != "embedding":
+            raise ValueError("model_type is not embedding")
+        if not model.get("embedding_dimension"):
+            raise ValueError("embedding_dimension is required")
+        return model
+
+    def _build_base_config(self, model: dict[str, Any]):
+        embedding = EmbeddingConfig(
+            provider=model.get("provider"),
+            api_key=model.get("api_key"),
+            model=model.get("model_name"),
+            base_url=model.get("base_url"),
+            dimension=int(model.get("embedding_dimension")),
+        )
+        return KnowledgeBaseConfig(
+            embedding=embedding,
+            vector_store=self._vector_store_cfg,
+        )
+
+    async def _build_runtime_from_model(self, namespace: str, model: dict[str, Any]):
+        base = self._build_base_config(model)
+        config = KnowledgeConfig(
+            base_config=base,
+            retrieve_config=KnowledgeRetrieveConfig(),
+        )
+        runtime = build_runtime(namespace=namespace, base_config=config.base_config)
+        await runtime.initialize()
+        return runtime
+
+    async def _build_runtime(self, namespace: str, document: dict[str, Any]):
+        model = self._get_embedding_model(int(document["embedding_model_id"]))
+        return await self._build_runtime_from_model(namespace, model)
+
+    def _normalize_document(self, doc: dict[str, Any] | None) -> dict[str, Any] | None:
+        if not doc:
+            return None
+        normalized = dict(doc)
+        raw_config = normalized.get("chunk_config_json")
+        if isinstance(raw_config, str):
+            try:
+                normalized["chunk_config_json"] = json.loads(raw_config)
+            except json.JSONDecodeError:
+                normalized["chunk_config_json"] = None
+        normalized.pop("embedding_model_id", None)
+        normalized.pop("embedding_dimension", None)
+        return normalized
+
+    def _ensure_namespace_owner(self, user_id: int, namespace_id: int) -> None:
+        namespace = NamespaceRepository.get(namespace_id, user_id)
+        if not namespace:
+            raise ValueError("namespace not found")
+
+    def _get_namespace_value(self, namespace_id: int, user_id: int) -> str:
+        namespace = NamespaceRepository.get(namespace_id, user_id)
+        if not namespace:
+            raise ValueError("namespace not found")
+        return namespace["namespace"]
+
+    def _ensure_namespace_embedding(self, namespace_id: int, embedding_model_id: int) -> None:
+        model_ids = DocumentRepository.list_namespace_embedding_models(namespace_id)
+        if model_ids and embedding_model_id not in model_ids:
+            raise ValueError("namespace embedding_model_id mismatch")
+
+    def _resolve_namespace_embedding_model(self, namespace_id: int) -> int:
+        model_ids = DocumentRepository.list_namespace_embedding_models(namespace_id)
+        if not model_ids:
+            raise ValueError("namespace has no embedding_model")
+        return model_ids[0]
+
+    def _resolve_scope_doc_uids(
+        self,
+        *,
+        user_id: int,
+        namespace_id: int,
+        payload: dict[str, Any],
+    ) -> list[str] | None:
+        doc_ids: list[Any] = []
+        search_scope = payload.get("search_scope")
+        if search_scope and search_scope != "all":
+            doc_ids.append(search_scope)
+        if payload.get("document_ids"):
+            doc_ids.extend(payload["document_ids"])
+        if not doc_ids:
+            return None
+
+        doc_uids: list[str] = []
+        for item in doc_ids:
+            if isinstance(item, int) or (isinstance(item, str) and item.isdigit()):
+                document = DocumentRepository.get(int(item), user_id)
+                if document and document.get("doc_uid"):
+                    doc_uids.append(document["doc_uid"])
+            elif isinstance(item, str):
+                doc_uids.append(item)
+        return list({uid for uid in doc_uids if uid})
+
+    def _chunk_to_dict(self, chunk) -> dict[str, Any]:
+        return {
+            "chunk_id": chunk.chunk_id,
+            "doc_id": chunk.doc_id,
+            "doc_title": chunk.doc_title,
+            "content": chunk.content,
+            "token_count": 0,
+            "updated_at": chunk.updated_at,
+            "embedding_status": "synced",
+        }
+
+    def _create_job(self, namespace_id: int, document_id: int, user_id: int, job_type: str) -> int:
+        return JobRepository.create(
+            {
+                "namespace_id": namespace_id,
+                "document_id": document_id,
+                "job_type": job_type,
+                "status": "queued",
+                "progress": 0,
+                "progress_seq": 0,
+                "total_chunks": 0,
+                "processed_chunks": 0,
+                "error_message": None,
+                "started_at": None,
+                "finished_at": None,
+                "created_by": user_id,
+            }
+        )
+
+
+def _infer_file_type(filename: str) -> str:
+    ext = os.path.splitext(filename)[1].lstrip(".")
+    return ext or "txt"
+
+
+def _parse_doc_uid(chunk_id: str) -> str | None:
+    if ":" not in chunk_id:
+        return None
+    return chunk_id.split(":", 1)[0]
+
+
+def _resolve_filename(document: dict[str, Any]) -> str:
+    title = document.get("title") or "document"
+    file_type = document.get("file_type") or "txt"
+    if "." in title:
+        return title
+    return f"{title}.{file_type}"
+
+
+def _build_progress_event(job: dict[str, Any]) -> dict[str, Any]:
+    payload = {
+        "job_id": job["job_id"],
+        "status": job["status"],
+        "progress": job["progress"],
+        "total_chunks": job["total_chunks"],
+        "processed_chunks": job["processed_chunks"],
+        "progress_seq": job["progress_seq"],
+    }
+    return {
+        "event": "progress",
+        "id": str(job["progress_seq"]),
+        "data": json.dumps(payload, ensure_ascii=False),
+    }
+
+
+def _build_done_event(job_id: int, status: str, message: str, progress: int, processed: int, total: int):
+    payload = {
+        "job_id": job_id,
+        "status": status,
+        "progress": progress,
+        "processed_chunks": processed,
+        "total_chunks": total,
+        "message": message,
+    }
+    return {
+        "event": "done",
+        "id": str(int(time.time() * 1000)),
+        "data": json.dumps(payload, ensure_ascii=False),
+    }
+
+
+def _build_done_event_from_job(job: dict[str, Any]) -> dict[str, Any]:
+    payload = {
+        "job_id": job["job_id"],
+        "status": job["status"],
+        "progress": job["progress"],
+        "processed_chunks": job["processed_chunks"],
+        "total_chunks": job["total_chunks"],
+    }
+    return {
+        "event": "done",
+        "id": str(job["progress_seq"]),
+        "data": json.dumps(payload, ensure_ascii=False),
+    }
+
+
+def _now_time_str() -> str:
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())

@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """KnowledgeStore abstract interface."""
 
 from __future__ import annotations
@@ -20,6 +23,21 @@ class KnowledgeStore(ABC):
     @abstractmethod
     def namespace(self) -> str:
         """Namespace (isolation boundary)."""
+
+    @property
+    @abstractmethod
+    def supports_hybrid(self) -> bool:
+        """Whether hybrid retrieval is supported."""
+
+    @property
+    def supports_full_text(self) -> bool:
+        """Whether full-text retrieval is supported."""
+        return False
+
+    @property
+    def supports_external_embeddings(self) -> bool:
+        """Whether the store expects caller-provided embeddings."""
+        return True
 
     @abstractmethod
     async def initialize(self) -> None:
@@ -52,12 +70,47 @@ class KnowledgeStore(ABC):
         """Search chunks."""
 
     @abstractmethod
+    async def hybrid_search_chunks(
+        self,
+        *,
+        query_vector: list[float],
+        query_text: str,
+        k: int,
+        filters: dict[str, Any] | None = None,
+        rrf_k: int = 60,
+    ) -> list[KnowledgeSearchHit]:
+        """Hybrid search chunks (dense + sparse)."""
+
+    @abstractmethod
+    async def full_text_search_chunks(
+        self,
+        *,
+        query_text: str,
+        k: int,
+        filters: dict[str, Any] | None = None,
+    ) -> list[KnowledgeSearchHit]:
+        """Full-text search chunks (BM25)."""
+
+    @abstractmethod
     async def get_doc(self, doc_id: str) -> KnowledgeDocument | None:
         """Get document metadata."""
 
     @abstractmethod
     async def get_chunks(self, chunk_ids: list[str]) -> list[KnowledgeChunk]:
         """Get chunks by ID."""
+
+    @abstractmethod
+    async def delete_chunks(self, chunk_ids: list[str]) -> int:
+        """Delete chunks by ID."""
+
+    @abstractmethod
+    async def query_chunks(
+        self,
+        *,
+        filters: dict[str, Any] | None = None,
+        limit: int | None = None,
+    ) -> list[KnowledgeChunk]:
+        """Query chunks by filters."""
 
     @abstractmethod
     async def delete_doc(self, doc_id: str) -> int:

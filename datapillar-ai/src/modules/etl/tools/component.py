@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 组件工具
 
@@ -11,7 +15,7 @@ import logging
 from pydantic import BaseModel
 
 from src.infrastructure.repository import Component
-from datapillar_oneagentic import tool
+from src.modules.etl.tools.registry import etl_tool
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +24,7 @@ class ListComponentInput(BaseModel):
     """获取组件列表的参数（无参数）"""
 
 
-@tool("list_component", args_schema=ListComponentInput)
+@etl_tool("list_component", tool_type="Component", desc="列出可用组件", args_schema=ListComponentInput)
 def list_component() -> str:
     """
     获取企业支持的所有大数据组件列表
@@ -47,8 +51,7 @@ def list_component() -> str:
         if not results:
             return json.dumps(
                 {
-                    "status": "error",
-                    "message": "未找到任何可用组件",
+                    "error": "未找到任何可用组件",
                     "components": [],
                 },
                 ensure_ascii=False,
@@ -77,7 +80,6 @@ def list_component() -> str:
 
         return json.dumps(
             {
-                "status": "success",
                 "total": len(components),
                 "components": components,
                 "hint": "设计 Job 时，type 填组件 code，type_id 填组件 id",
@@ -89,8 +91,7 @@ def list_component() -> str:
         logger.error(f"list_component 执行失败: {e}", exc_info=True)
         return json.dumps(
             {
-                "status": "error",
-                "message": f"查询失败：{str(e)}",
+                "error": "查询失败",
                 "components": [],
             },
             ensure_ascii=False,

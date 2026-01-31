@@ -1,14 +1,19 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """Knowledge models."""
 
 from __future__ import annotations
 
 import copy
+import hashlib
 import os
 from dataclasses import dataclass, field, fields
 from typing import Any, Protocol
 from urllib.parse import urlparse
 
 from datapillar_oneagentic.knowledge.identity import canonicalize_metadata
+from datapillar_oneagentic.knowledge.config import KnowledgeChunkConfig
 
 class SparseEmbeddingProvider(Protocol):
     """Sparse embedding interface (provided by callers)."""
@@ -69,41 +74,26 @@ class SourceSpan:
 
 @dataclass
 class KnowledgeSource:
-    """Knowledge source definition (for registration)."""
+    """Knowledge source definition (per-document ingestion)."""
 
+    source: str | bytes
+    chunk: KnowledgeChunkConfig | dict[str, Any]
     name: str | None = None
     source_type: str = "doc"
     source_id: str | None = None
-    source_uri: str | None = None
     tags: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
-    content: str | bytes | None = None
     filename: str | None = None
     mime_type: str | None = None
     parser_hint: str | None = None
+    source_uri: str | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         if not self.name:
-            self.name = self.source_uri or "Untitled"
-
-    def chunk(
-        self,
-        *,
-        chunk_config: "KnowledgeChunkConfig",
-        parser_registry: "ParserRegistry | None" = None,
-    ) -> "ChunkPreview":
-        if not self.source_uri:
-            raise ValueError("source_uri cannot be empty")
-        if chunk_config is None:
-            raise ValueError("chunk_config cannot be empty")
-        from datapillar_oneagentic.knowledge.chunker import KnowledgeChunker
-        from datapillar_oneagentic.knowledge.parser import default_registry
-
-        doc_input = _build_document_input(self)
-        registry = parser_registry or default_registry()
-        parsed = registry.parse(doc_input)
-        chunker = KnowledgeChunker(config=chunk_config)
-        return chunker.preview(parsed)
+            if isinstance(self.source, str) and self.source:
+                self.name = self.source
+            else:
+                self.name = "Untitled"
 
     async def ingest(
         self,
@@ -113,38 +103,24 @@ class KnowledgeSource:
         sparse_embedder: "SparseEmbeddingProvider | None" = None,
         parser_registry: "ParserRegistry | None" = None,
     ) -> None:
-        if not self.source_uri:
-            raise ValueError("source_uri cannot be empty")
-        if not namespace:
-            raise ValueError("namespace cannot be empty")
         if config is None:
             raise ValueError("config cannot be empty")
+        if not namespace:
+            raise ValueError("namespace cannot be empty")
         from datapillar_oneagentic.knowledge.ingest.pipeline import KnowledgeIngestor
         from datapillar_oneagentic.knowledge.parser import default_registry
         from datapillar_oneagentic.knowledge.runtime import build_runtime
 
-        runtime = build_runtime(namespace=namespace, base_config=config.base_config)
+        runtime = build_runtime(namespace=namespace, config=config)
         await runtime.initialize()
-        doc_input = _build_document_input(self)
         registry = parser_registry or default_registry()
         ingestor = KnowledgeIngestor(
             store=runtime.store,
             embedding_provider=runtime.embedding_provider,
-            config=config.chunk_config,
             parser_registry=registry,
         )
-        await ingestor.ingest(source=self, documents=[doc_input], sparse_embedder=sparse_embedder)
+        await ingestor.ingest(sources=[self], sparse_embedder=sparse_embedder)
         await runtime.store.close()
-
-
-@dataclass
-class KnowledgeInject:
-    """Injection overrides (agent-level)."""
-
-    mode: str | None = None
-    max_tokens: int | None = None
-    max_chunks: int | None = None
-    format: str | None = None
 
 
 @dataclass
@@ -161,16 +137,11 @@ class KnowledgeRetrieve:
     dedupe: bool | None = None
     dedupe_threshold: float | None = None
     rerank: dict[str, Any] | None = None
-    inject: KnowledgeInject | None = None
-
-
-@dataclass
-class KnowledgeScope:
-    """Retrieval scope (runtime)."""
-
-    namespaces: list[str] | None = None
-    document_ids: list[str] | None = None
-    tags: list[str] | None = None
+    params: dict[str, Any] | None = None
+    filtering: dict[str, Any] | None = None
+    routing: dict[str, Any] | None = None
+    expansion: dict[str, Any] | None = None
+    context: dict[str, Any] | None = None
 
 
 @dataclass
@@ -179,14 +150,12 @@ class Knowledge:
 
     sources: list[KnowledgeSource] = field(default_factory=list)
     retrieve: KnowledgeRetrieve | None = None
-    inject: KnowledgeInject | None = None
     sparse_embedder: SparseEmbeddingProvider | None = field(default=None, repr=False, compare=False)
 
     def __deepcopy__(self, memo):
         return Knowledge(
             sources=copy.deepcopy(self.sources, memo),
             retrieve=copy.deepcopy(self.retrieve, memo),
-            inject=copy.deepcopy(self.inject, memo),
             sparse_embedder=self.sparse_embedder,
         )
 
@@ -248,7 +217,7 @@ class KnowledgeSearchHit:
 
 @dataclass
 class KnowledgeRef:
-    """Knowledge reference (for experience records)."""
+    """Knowledge reference."""
 
     source_id: str
     doc_id: str
@@ -274,6 +243,7 @@ class KnowledgeRetrieveResult:
 
     hits: list[tuple[KnowledgeChunk, float]] = field(default_factory=list)
     refs: list[KnowledgeRef] = field(default_factory=list)
+    raw: Any | None = None
 
 
 def merge_knowledge(base: Knowledge | None, override: Knowledge | None) -> Knowledge | None:
@@ -288,7 +258,6 @@ def merge_knowledge(base: Knowledge | None, override: Knowledge | None) -> Knowl
     merged = copy.deepcopy(base)
     merged.sources = _merge_sources(base.sources, override.sources)
     merged.retrieve = _merge_retrieve(base.retrieve, override.retrieve)
-    merged.inject = _merge_inject(base.inject, override.inject)
     if override.sparse_embedder is not None:
         merged.sparse_embedder = override.sparse_embedder
     return merged
@@ -320,19 +289,25 @@ def _merge_sources(
 def _source_merge_key(source: KnowledgeSource) -> str:
     if source.source_id:
         return source.source_id
+    if source.source_uri:
+        return f"{source.source_type}|{source.source_uri}"
+    if isinstance(source.source, str):
+        return f"{source.source_type}|{source.source}"
+    if isinstance(source.source, bytes):
+        digest = hashlib.sha256(source.source).hexdigest()
+        return f"{source.source_type}|bytes:{digest}"
     canonical = canonicalize_metadata(source.metadata)
-    return f"{source.source_type}|{source.source_uri or ''}|{canonical}"
+    return f"{source.source_type}|{canonical}"
 
 
 def _build_document_input(source: KnowledgeSource) -> DocumentInput:
-    source_uri = source.source_uri
-    if not source_uri:
-        raise ValueError("source_uri cannot be empty")
-    payload, filename, mime_type, source_info = _resolve_source_payload(source)
+    payload, filename, mime_type, source_info, source_uri = _resolve_source_payload(source)
     source_info.setdefault("source_type", source.source_type)
-    source_info.setdefault("source_uri", source_uri)
+    source_info.setdefault("source_uri", source_uri or "")
     metadata = dict(source.metadata)
     _merge_source_info(metadata, source_info)
+    source.metadata = metadata
+    source.source_uri = source_uri
     return DocumentInput(
         source=payload,
         filename=filename,
@@ -344,15 +319,25 @@ def _build_document_input(source: KnowledgeSource) -> DocumentInput:
 
 def _resolve_source_payload(
     source: KnowledgeSource,
-) -> tuple[str | bytes, str | None, str | None, dict[str, Any]]:
-    source_uri = source.source_uri or ""
-    if source.content is not None:
-        return _load_from_inline(source.content, source)
-    if _is_url(source_uri):
-        return _load_from_url(source_uri, source)
-    if os.path.exists(source_uri):
-        return _load_from_file(source_uri, source)
-    return _load_from_text(source_uri, source)
+) -> tuple[str | bytes, str | None, str | None, dict[str, Any], str | None]:
+    payload = source.source
+    if isinstance(payload, bytes):
+        source_uri = _build_inline_source_uri("bytes", payload)
+        content, filename, mime_type, info = _load_from_inline(payload, source)
+        info.setdefault("source_ref", source_uri)
+        return content, filename, mime_type, info, source_uri
+    if not isinstance(payload, str) or not payload:
+        raise ValueError("source cannot be empty")
+    if _is_url(payload):
+        content, filename, mime_type, info = _load_from_url(payload, source)
+        return content, filename, mime_type, info, payload
+    if os.path.exists(payload):
+        content, filename, mime_type, info = _load_from_file(payload, source)
+        return content, filename, mime_type, info, payload
+    source_uri = _build_inline_source_uri("text", payload)
+    content, filename, mime_type, info = _load_from_text(payload, source)
+    info.setdefault("source_ref", source_uri)
+    return content, filename, mime_type, info, source_uri
 
 
 def _load_from_url(
@@ -420,6 +405,15 @@ def _load_from_inline(
     return content, source.filename, source.mime_type, info
 
 
+def _build_inline_source_uri(kind: str, payload: str | bytes) -> str:
+    if isinstance(payload, str):
+        data = payload.encode("utf-8", errors="ignore")
+    else:
+        data = payload
+    digest = hashlib.sha256(data).hexdigest()
+    return f"{kind}:{digest}"
+
+
 def _merge_source_info(metadata: dict[str, Any], info: dict[str, Any]) -> None:
     if "source_info" in metadata:
         metadata["source_info_auto"] = info
@@ -463,25 +457,6 @@ def _is_url(value: str) -> bool:
     return value.startswith("http://") or value.startswith("https://")
 
 
-def _merge_inject(
-    base: KnowledgeInject | None,
-    override: KnowledgeInject | None,
-) -> KnowledgeInject | None:
-    if base is None and override is None:
-        return None
-    if base is None:
-        return copy.deepcopy(override)
-    if override is None:
-        return copy.deepcopy(base)
-
-    merged = copy.deepcopy(base)
-    for field_item in fields(KnowledgeInject):
-        value = getattr(override, field_item.name)
-        if value is not None:
-            setattr(merged, field_item.name, value)
-    return merged
-
-
 def _merge_retrieve(
     base: KnowledgeRetrieve | None,
     override: KnowledgeRetrieve | None,
@@ -502,9 +477,6 @@ def _merge_retrieve(
                 for key, value in override.rerank.items():
                     if value is not None:
                         merged.rerank[key] = value
-            continue
-        if field_item.name == "inject":
-            merged.inject = _merge_inject(base.inject, override.inject)
             continue
 
         value = getattr(override, field_item.name)

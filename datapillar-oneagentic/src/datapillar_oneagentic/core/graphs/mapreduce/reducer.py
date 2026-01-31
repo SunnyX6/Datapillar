@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 MapReduce reducer.
 
@@ -105,7 +108,11 @@ async def reduce_map_results(
     if not results:
         raise ValueError("MapReduce reducer has no available results")
 
-    failed_results = [result for result in results if result.status == ExecutionStatus.FAILED]
+    failed_results = [
+        result
+        for result in results
+        if result.status in (ExecutionStatus.FAILED, ExecutionStatus.ABORTED)
+    ]
     if failed_results:
         failure_kind = failed_results[0].failure_kind or FailureKind.BUSINESS
         detail = "; ".join(

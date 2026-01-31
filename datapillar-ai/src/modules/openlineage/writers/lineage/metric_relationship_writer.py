@@ -1,12 +1,16 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 from __future__ import annotations
 
-import structlog
+import logging
 from neo4j import AsyncSession
 
 from src.infrastructure.repository.openlineage import Lineage
 from src.modules.openlineage.parsers.plans.types import LineageWritePlans
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class MetricRelationshipWriter:
@@ -46,6 +50,10 @@ class MetricRelationshipWriter:
         if self._metric_schema_edges_written or self._metric_parent_edges_written:
             logger.debug(
                 "metric_relationships_written",
-                schema_edges=self._metric_schema_edges_written,
-                parent_edges=self._metric_parent_edges_written,
+                extra={
+                    "data": {
+                        "schema_edges": self._metric_schema_edges_written,
+                        "parent_edges": self._metric_parent_edges_written,
+                    }
+                },
             )

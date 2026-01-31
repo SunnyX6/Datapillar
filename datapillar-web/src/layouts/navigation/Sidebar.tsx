@@ -1,12 +1,11 @@
 import {
   Cloud,
   Code2,
-  Cpu,
   GitBranch,
   History,
   BookOpen,
+  MousePointerClick,
   Play,
-  Settings,
   Sparkles,
   Terminal,
   Workflow
@@ -22,7 +21,7 @@ import {
 import { Tooltip } from '@/components/ui'
 import { ExpandToggle } from './ExpandToggle'
 
-type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide' | 'projects' | 'collaboration'
+type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide' | 'projects' | 'collaboration' | 'tracking'
 
 interface SidebarProps {
   onNavigate: (view: View) => void
@@ -40,21 +39,22 @@ export function Sidebar({ onNavigate, currentView, collapsed, onToggleCollapse }
   const logoSpacing = collapsed ? 'mb-0' : 'mb-3'
   const contentPaddingY = collapsed ? 'py-0' : 'py-2'
   const topOffset = collapsed ? '' : 'xl:pt-[7px]'
+  const logoOffset = collapsed ? '' : 'translate-y-[2px]'
 
   const brandNameClass = collapsed
     ? undefined
-    : 'text-lg font-bold leading-tight tracking-tight text-indigo-600 dark:text-indigo-200'
+    : 'text-lg font-bold leading-tight tracking-tight text-brand-600 dark:text-brand-400'
 
   const brandTaglineClass = collapsed
     ? undefined
     : 'text-legal font-medium text-slate-400 dark:text-slate-500 mt-0.5 leading-snug'
 
   return (
-    <aside className={`${sidebarWidth} ${topOffset} flex-shrink-0 bg-[#F9FAFB] dark:bg-[#0B1120] border-r border-slate-200 dark:border-slate-800 flex flex-col h-full z-30 overflow-visible relative transition-[width] duration-200 ease-out`}>
+    <aside className={`${sidebarWidth} ${topOffset} flex-shrink-0 bg-[#F9FAFB] dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700/80 flex flex-col h-full z-30 overflow-visible relative transition-[width] duration-200 ease-out`}>
       {/* 品牌 Logo 区域 */}
       <div className={`${sectionPadding} relative ${logoHeight} flex items-center ${logoSpacing}`}>
         <div
-          className={`flex items-center ${collapsed ? 'w-14 h-14 justify-center mx-auto' : 'w-full h-full gap-2.5 -ml-1'}`}
+          className={`flex items-center ${collapsed ? 'w-14 h-14 justify-center mx-auto' : 'w-full h-full gap-2.5 -ml-1'} ${logoOffset}`}
         >
           <BrandLogo
             size={collapsed ? 32 : 42}
@@ -83,9 +83,14 @@ export function Sidebar({ onNavigate, currentView, collapsed, onToggleCollapse }
         </NavSection>
 
         <NavSection title={t('side.sections.compute', { ns: 'navigation' })} collapsed={collapsed}>
+          <NavItem
+            collapsed={collapsed}
+            icon={<MousePointerClick size={iconSizeToken.normal} />}
+            label={t('side.items.tracking', { ns: 'navigation' })}
+            active={currentView === 'tracking'}
+            onClick={() => onNavigate('tracking')}
+          />
           <NavItem collapsed={collapsed} icon={<Cloud size={iconSizeToken.normal} />} label={t('side.items.warehouses', { ns: 'navigation' })} />
-          <NavItem collapsed={collapsed} icon={<Cpu size={iconSizeToken.normal} />} label={t('side.items.jobs', { ns: 'navigation' })} />
-          <NavItem collapsed={collapsed} icon={<Settings size={iconSizeToken.normal} />} label={t('side.items.config', { ns: 'navigation' })} />
         </NavSection>
 
         <NavSection title={t('side.sections.observe', { ns: 'navigation' })} collapsed={collapsed}>
@@ -157,7 +162,7 @@ interface NavItemProps {
 
 function NavItem({ icon, label, active, shortcut, onClick, collapsed }: NavItemProps) {
   const buttonStateClass = active
-    ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-[0_1px_2px_rgba(0,0,0,0.05)] ring-1 ring-slate-200 dark:ring-slate-700'
+    ? 'bg-indigo-50/70 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/50'
 
   const button = (
@@ -166,10 +171,11 @@ function NavItem({ icon, label, active, shortcut, onClick, collapsed }: NavItemP
       onClick={onClick}
       className={`
         flex items-center transition-all duration-200 group relative overflow-hidden
-        ${collapsed ? 'mx-auto size-9 justify-center rounded-2xl' : 'w-full justify-between px-3 py-2 rounded-lg'}
+        ${collapsed ? 'mx-auto size-9 justify-center rounded-2xl' : 'w-[calc(100%+theme(spacing.8))] justify-between -mx-4 px-7 py-2 rounded-none'}
         ${buttonStateClass}
       `}
     >
+      {active && !collapsed && <span className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />}
       <span
         className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} relative z-10 ${active ? 'text-indigo-500' : 'opacity-80 group-hover:opacity-100'}`}
       >

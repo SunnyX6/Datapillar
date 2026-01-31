@@ -1,31 +1,44 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """Knowledge module."""
 
 from datapillar_oneagentic.knowledge.config import (
-    KnowledgeConfig,
-    KnowledgeInjectConfig,
-    KnowledgeBaseConfig,
     KnowledgeChunkConfig,
+    KnowledgeChunkGeneralConfig,
+    KnowledgeChunkParentChildConfig,
+    KnowledgeChunkQAConfig,
+    KnowledgeConfig,
+    KnowledgeWindowConfig,
+    MetadataFilterConfig,
+    QueryExpansionConfig,
+    QueryRouterConfig,
+    ContextResolveConfig,
     KnowledgeRetrieveConfig,
+    RerankConfig,
+    RetrieveQualityConfig,
+    RetrieveTuningConfig,
 )
 from datapillar_oneagentic.knowledge.models import (
     Attachment,
-    DocumentInput,
     Knowledge,
     KnowledgeChunk,
     KnowledgeDocument,
-    KnowledgeInject,
     KnowledgeSearchHit,
     KnowledgeRef,
     KnowledgeRetrieve,
     KnowledgeRetrieveResult,
     KnowledgeSource,
-    KnowledgeScope,
     ParsedDocument,
     SparseEmbeddingProvider,
     SourceSpan,
     merge_knowledge,
 )
-from datapillar_oneagentic.knowledge.retriever.retriever import KnowledgeRetriever
+from datapillar_oneagentic.knowledge.service import (
+    KnowledgeChunkEdit,
+    KnowledgeChunkRequest,
+    KnowledgeService,
+)
 from datapillar_oneagentic.knowledge.ingest.pipeline import KnowledgeIngestor
 from datapillar_oneagentic.knowledge.chunker import KnowledgeChunker
 from datapillar_oneagentic.knowledge.sparse_embedder import BM25SparseEmbedder
@@ -48,10 +61,7 @@ from datapillar_oneagentic.knowledge.evaluation import (
 __all__ = [
     "Knowledge",
     "KnowledgeSource",
-    "KnowledgeScope",
     "KnowledgeRetrieve",
-    "KnowledgeInject",
-    "DocumentInput",
     "ParsedDocument",
     "Attachment",
     "SourceSpan",
@@ -62,12 +72,23 @@ __all__ = [
     "KnowledgeRetrieveResult",
     "merge_knowledge",
     "SparseEmbeddingProvider",
-    "KnowledgeConfig",
-    "KnowledgeBaseConfig",
     "KnowledgeChunkConfig",
+    "KnowledgeChunkGeneralConfig",
+    "KnowledgeChunkParentChildConfig",
+    "KnowledgeChunkQAConfig",
+    "KnowledgeWindowConfig",
     "KnowledgeRetrieveConfig",
-    "KnowledgeInjectConfig",
-    "KnowledgeRetriever",
+    "MetadataFilterConfig",
+    "QueryExpansionConfig",
+    "QueryRouterConfig",
+    "ContextResolveConfig",
+    "RerankConfig",
+    "RetrieveTuningConfig",
+    "RetrieveQualityConfig",
+    "KnowledgeConfig",
+    "KnowledgeService",
+    "KnowledgeChunkRequest",
+    "KnowledgeChunkEdit",
     "KnowledgeIngestor",
     "KnowledgeChunker",
     "BM25SparseEmbedder",

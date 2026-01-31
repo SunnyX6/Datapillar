@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
+
 """
 元数据写入器
 
@@ -8,7 +12,7 @@
 
 from __future__ import annotations
 
-import structlog
+import logging
 from neo4j import AsyncSession
 
 from src.infrastructure.repository.kg.dto import MetricDTO
@@ -21,7 +25,7 @@ from src.modules.openlineage.writers.metadata import (
     TagWriter,
 )
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class MetadataWriter(BaseWriter):
@@ -181,7 +185,10 @@ class MetadataWriter(BaseWriter):
         await self._apply_upserts(session, plans)
 
         if self._is_empty(plans):
-            logger.debug("skip_empty_metadata_plans", operation=plans.operation)
+            logger.debug(
+                "skip_empty_metadata_plans",
+                extra={"data": {"operation": plans.operation}},
+            )
 
     async def write_metric(self, session: AsyncSession, metric: MetricDTO) -> None:
         """写入 Metric 节点"""

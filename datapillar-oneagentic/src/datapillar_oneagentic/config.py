@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# @author Sunny
+# @date 2026-01-27
 """
 Datapillar OneAgentic configuration system.
 
@@ -47,15 +50,13 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from pydantic import Field, model_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from datapillar_oneagentic.core.config import AgentConfig, ContextConfig
 from datapillar_oneagentic.experience.config import LearningConfig
-from datapillar_oneagentic.knowledge.config import KnowledgeConfig
 from datapillar_oneagentic.log import setup_logging
 from datapillar_oneagentic.providers.llm.config import EmbeddingConfig, LLMConfig
-from datapillar_oneagentic.storage.config import VectorStoreConfig
 
 logger = logging.getLogger(__name__)
 
@@ -169,17 +170,11 @@ class DatapillarConfig(BaseSettings):
     context: ContextConfig = Field(default_factory=ContextConfig)
     """Context configuration."""
 
-    vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
-    """Vector store configuration (shared by knowledge/experience)."""
-
     agent: AgentConfig = Field(default_factory=AgentConfig)
     """Agent execution configuration."""
 
     learning: LearningConfig = Field(default_factory=LearningConfig)
     """Experience learning configuration."""
-
-    knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
-    """Knowledge configuration (including base_config)."""
 
     verbose: bool = Field(default=False, description="Enable verbose logging")
     """Verbose logging flag."""
@@ -223,24 +218,6 @@ class DatapillarConfig(BaseSettings):
         """Return True if embedding is configured."""
         return self.embedding.is_configured()
 
-    @model_validator(mode="after")
-    def _inherit_knowledge_embedding(self) -> "DatapillarConfig":
-        """
-        Knowledge module reuses global embedding config by default.
-
-        Rules:
-        - If knowledge.base_config.embedding is not explicitly set
-          (api_key/model are empty)
-        - And the global embedding is configured
-        Then copy global embedding to knowledge.base_config.embedding.
-        """
-        if (
-            self.knowledge.base_config.embedding.api_key is None
-            and self.knowledge.base_config.embedding.model is None
-            and self.embedding.is_configured()
-        ):
-            self.knowledge.base_config.embedding = self.embedding.model_copy(deep=True)
-        return self
 
     def validate_llm(self) -> None:
         """Validate LLM configuration."""

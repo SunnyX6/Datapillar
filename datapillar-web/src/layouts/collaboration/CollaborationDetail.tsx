@@ -54,7 +54,7 @@ export function CollaborationDetail({
     return (
       <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 min-w-0">
         <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-500">
-          <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/60 rounded-full flex items-center justify-center mb-4">
+          <div className="w-16 h-16 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center mb-4">
             <ShieldAlert size={24} className="text-slate-300 dark:text-slate-600" />
           </div>
           <p className={cn(TYPOGRAPHY.bodySm, 'font-medium text-slate-500 dark:text-slate-400')}>未选择工单</p>
@@ -125,7 +125,7 @@ export function CollaborationDetail({
             {selectedTicket.title}
           </h1>
 
-          <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 p-5 relative overflow-hidden">
+          <div className="bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-1 h-full bg-brand-500"></div>
 
             {selectedTicket.type === 'DATA_ACCESS' && (
@@ -310,7 +310,7 @@ export function CollaborationDetail({
 	                    <span className="text-micro text-slate-400 dark:text-slate-500">{event.time}</span>
 	                  </div>
 	                  {event.comment && (
-	                    <p className={cn(TYPOGRAPHY.caption, 'text-slate-600 dark:text-slate-300 mt-2 bg-slate-50 dark:bg-slate-800/60 p-2 rounded border border-slate-100 dark:border-slate-800')}>
+	                    <p className={cn(TYPOGRAPHY.caption, 'text-slate-600 dark:text-slate-300 mt-2 bg-slate-50 dark:bg-slate-900 p-2 rounded border border-slate-100 dark:border-slate-800')}>
 	                      {event.comment}
 	                    </p>
 	                  )}
@@ -325,7 +325,7 @@ export function CollaborationDetail({
 	                    value={commentText}
 	                    onChange={(event) => onCommentTextChange(event.target.value)}
 	                    className={cn(
-	                      'w-full p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all resize-none',
+	                      'w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all resize-none',
 	                      TYPOGRAPHY.bodySm
 	                    )}
 	                    rows={3}

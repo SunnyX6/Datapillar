@@ -153,7 +153,7 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
           placeholder="例如: prod_mysql_catalog"
           value={formData.name}
           onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-          className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+          className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
         />
       </div>
 
@@ -170,6 +170,7 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
             { value: 'MESSAGING', label: '消息队列' }
           ]}
           dropdownHeader="选择 Catalog 类型"
+          className="dark:bg-slate-900 dark:border-slate-700"
         />
       </div>
 
@@ -182,6 +183,7 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
           onChange={handleProviderChange}
           options={PROVIDER_BY_TYPE[catalogType]}
           dropdownHeader="选择数据源类型"
+          className="dark:bg-slate-900 dark:border-slate-700"
         />
       </div>
 
@@ -200,7 +202,7 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
           value={formData.comment}
           onChange={(e) => setFormData((prev) => ({ ...prev, comment: e.target.value }))}
           rows={2}
-          className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none placeholder:text-slate-400 dark:placeholder:text-slate-600"
+          className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none placeholder:text-slate-400 dark:placeholder:text-slate-600"
         />
       </div>
     </div>
@@ -257,7 +259,7 @@ function ProviderConfigFields({
             type="text"
             value={label}
             disabled
-            className="w-full px-3 py-1.5 text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-md cursor-not-allowed"
+            className="w-full px-3 py-1.5 text-xs font-medium bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-md cursor-not-allowed"
           />
         </div>
         <div className="flex-1">
@@ -274,7 +276,7 @@ function ProviderConfigFields({
               placeholder={defaultValue}
               value={values[key] ?? ''}
               onChange={(e) => onChange(key, e.target.value)}
-              className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+              className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
             />
           )}
         </div>
@@ -301,7 +303,7 @@ function ProviderConfigFields({
             placeholder="配置项名称"
             value={displayKey}
             onChange={(e) => handleKeyChange(tempKey, e.target.value)}
-            className="w-full px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
         <div className="flex-1">
@@ -310,7 +312,7 @@ function ProviderConfigFields({
             placeholder="配置项值"
             value={values[actualKey] || ''}
             onChange={(e) => onChange(actualKey, e.target.value)}
-            className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
         <button
