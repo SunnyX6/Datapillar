@@ -19,6 +19,7 @@ const withSuspense = (Component: LazyExoticComponent<ComponentType>) => (
 )
 
 const LazyLoginPage = lazy(() => import('@/pages/login').then(m => ({ default: m.LoginPage })))
+const LazyInvitePage = lazy(() => import('@/pages/invite').then(m => ({ default: m.InvitePage })))
 
 const LazyMainLayout = lazy(() => import('@/layouts/MainLayout').then(m => ({ default: m.MainLayout })))
 
@@ -65,6 +66,10 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: withSuspense(LazyLoginPage)
+  },
+  {
+    path: '/invite',
+    element: withSuspense(LazyInvitePage)
   },
   {
     element: <PrivateRoute />,

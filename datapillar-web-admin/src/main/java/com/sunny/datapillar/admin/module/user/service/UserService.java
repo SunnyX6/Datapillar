@@ -2,6 +2,7 @@ package com.sunny.datapillar.admin.module.user.service;
 
 import java.util.List;
 
+import com.sunny.datapillar.admin.module.user.dto.PermissionObjectDto;
 import com.sunny.datapillar.admin.module.user.dto.UserDto;
 import com.sunny.datapillar.admin.module.user.entity.User;
 
@@ -56,6 +57,16 @@ public interface UserService {
      * 获取用户权限代码列表
      */
     List<String> getUserPermissionCodes(Long userId);
+
+    /**
+     * 获取用户权限
+     */
+    List<PermissionObjectDto.ObjectPermission> getUserPermissions(Long userId);
+
+    /**
+     * 更新用户权限（全量覆盖）
+     */
+    void updateUserPermissions(Long userId, List<PermissionObjectDto.Assignment> permissions);
 
     /**
      * 更新当前用户个人信息

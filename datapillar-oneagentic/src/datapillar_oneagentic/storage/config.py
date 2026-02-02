@@ -26,6 +26,18 @@ class VectorStoreConfig(BaseModel):
         default=None,
         description="Milvus connection URI",
     )
+    user: str | None = Field(
+        default=None,
+        description="Milvus username",
+    )
+    password: str | None = Field(
+        default=None,
+        description="Milvus password",
+    )
+    db_name: str | None = Field(
+        default=None,
+        description="Milvus database name",
+    )
     host: str | None = Field(
         default=None,
         description="Chroma remote host",

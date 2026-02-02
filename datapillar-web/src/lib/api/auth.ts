@@ -6,7 +6,7 @@
 
 import { createApiClient } from '@/lib/api/client'
 import type { ApiResponse } from '@/types/api'
-import type { LoginRequest, LoginResponse } from '@/types/auth'
+import type { LoginRequest, LoginResponse, SsoLoginRequest, SsoQrResponse } from '@/types/auth'
 
 /**
  * Auth API 客户端
@@ -38,6 +38,32 @@ function extractErrorMessage(error: unknown): string {
 export async function login(request: LoginRequest): Promise<LoginResponse> {
   try {
     const response = await authClient.post<ApiResponse<LoginResponse>>('/login', request)
+    return response.data.data
+  } catch (error) {
+    throw new Error(extractErrorMessage(error))
+  }
+}
+
+/**
+ * 获取 SSO 扫码配置
+ */
+export async function getSsoQr(tenantCode: string, provider: string): Promise<SsoQrResponse> {
+  try {
+    const response = await authClient.get<ApiResponse<SsoQrResponse>>('/sso/qr', {
+      params: { tenantCode, provider }
+    })
+    return response.data.data
+  } catch (error) {
+    throw new Error(extractErrorMessage(error))
+  }
+}
+
+/**
+ * SSO 登录
+ */
+export async function ssoLogin(request: SsoLoginRequest): Promise<LoginResponse> {
+  try {
+    const response = await authClient.post<ApiResponse<LoginResponse>>('/sso/login', request)
     return response.data.data
   } catch (error) {
     throw new Error(extractErrorMessage(error))

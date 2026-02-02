@@ -13,7 +13,7 @@ from datapillar_oneagentic.knowledge.models import Attachment, DocumentInput, Kn
 
 def _parsed(text: str) -> ParsedDocument:
     return ParsedDocument(
-        document_id="doc1",
+        document_id=None,
         source_type="text",
         mime_type="text/plain",
         text=text,
@@ -29,7 +29,7 @@ def test_chunker_general() -> None:
         general={"max_tokens": 8, "overlap": 0, "delimiter": "|"},
     )
     chunker = KnowledgeChunker(config=config)
-    preview = chunker.preview(_parsed("hello|world|again"))
+    preview = chunker.preview(_parsed("hello|world|again"), doc_id="doc1")
 
     assert [chunk.content for chunk in preview.chunks] == ["hello", "world", "again"]
 
@@ -43,7 +43,7 @@ def test_chunker_parent() -> None:
         },
     )
     chunker = KnowledgeChunker(config=config)
-    preview = chunker.preview(_parsed("abcdefghijklm"))
+    preview = chunker.preview(_parsed("abcdefghijklm"), doc_id="doc1")
 
     parents = [chunk for chunk in preview.chunks if chunk.chunk_type == "parent"]
     children = [chunk for chunk in preview.chunks if chunk.chunk_type == "child"]
@@ -57,7 +57,7 @@ def test_chunker_parent() -> None:
 def test_chunker_qa() -> None:
     config = KnowledgeChunkConfig(mode="qa")
     chunker = KnowledgeChunker(config=config)
-    preview = chunker.preview(_parsed("Q1: What?\nA1: Answer.\nQ2: Why?\nA2: Because."))
+    preview = chunker.preview(_parsed("Q1: What?\nA1: Answer.\nQ2: Why?\nA2: Because."), doc_id="doc1")
 
     assert len(preview.chunks) == 2
     assert preview.chunks[0].content.startswith("Q: ")
@@ -66,7 +66,7 @@ def test_chunker_qa() -> None:
 def test_chunker_qa2() -> None:
     config = KnowledgeChunkConfig(mode="qa")
     chunker = KnowledgeChunker(config=config)
-    preview = chunker.preview(_parsed("No QA here"))
+    preview = chunker.preview(_parsed("No QA here"), doc_id="doc1")
 
     assert preview.chunks
 
@@ -78,7 +78,7 @@ def test_chunker_applies() -> None:
         general={"max_tokens": 100, "overlap": 0},
     )
     chunker = KnowledgeChunker(config=config)
-    preview = chunker.preview(_parsed("a\x01\r\nb\t\tc "))
+    preview = chunker.preview(_parsed("a\x01\r\nb\t\tc "), doc_id="doc1")
 
     assert preview.chunks[0].content == "a\nb c"
 
@@ -92,7 +92,7 @@ def test_chunker_rule() -> None:
     chunker = KnowledgeChunker(config=config)
 
     with pytest.raises(ValueError):
-        chunker.preview(_parsed("text"))
+        chunker.preview(_parsed("text"), doc_id="")
 
 
 def test_ingestor_preview() -> None:
@@ -107,7 +107,7 @@ def test_ingestor_preview() -> None:
     class _StubParserRegistry:
         def parse(self, doc_input: DocumentInput) -> ParsedDocument:
             return ParsedDocument(
-                document_id="doc1",
+                document_id=None,
                 source_type="text",
                 mime_type="text/plain",
                 text="hello",
@@ -149,7 +149,7 @@ def test_ingestor_preview() -> None:
     )
 
     previews = ingestor.preview(
-        sources=[KnowledgeSource(source="hello", chunk=chunk_config)],
+        sources=[KnowledgeSource(source="hello", chunk=chunk_config, doc_uid="doc1")],
     )
 
     assert isinstance(previews[0], ChunkPreview)

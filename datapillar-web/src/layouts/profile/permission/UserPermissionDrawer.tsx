@@ -27,14 +27,14 @@ export function UserPermissionDrawer({ isOpen, onClose, user, role, onUpdatePerm
   return createPortal(
     <aside
       className={cn(
-        'fixed right-0 top-14 bottom-0 z-30 bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col animate-in slide-in-from-right duration-500',
+        'fixed right-0 top-14 bottom-0 z-30 bg-white dark:bg-slate-900/90 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col animate-in slide-in-from-right duration-500',
         drawerWidthClassMap.wide
       )}
     >
-      <div className="px-6 py-6 bg-white dark:bg-slate-900 flex-shrink-0">
+      <div className="px-6 py-6 bg-white dark:bg-slate-900/90 flex-shrink-0">
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-4">
-            <PermissionAvatar name={user.name} src={user.avatarUrl} size="lg" className="ring-4 ring-white shadow-sm" />
+            <PermissionAvatar name={user.name} src={user.avatarUrl} size="lg" className="ring-4 ring-white dark:ring-slate-800 shadow-sm" />
             <div>
               <h2 className={cn(TYPOGRAPHY.heading, 'font-bold text-slate-900 dark:text-white')}>{user.name} 的权限配置</h2>
               <div className={cn(TYPOGRAPHY.caption, 'flex items-center gap-2 mt-1 text-slate-500 dark:text-slate-400')}>
@@ -49,7 +49,7 @@ export function UserPermissionDrawer({ isOpen, onClose, user, role, onUpdatePerm
                 </span>
                 {user.department && (
                   <>
-                    <span className="w-1 h-1 bg-slate-300 rounded-full mx-1" />
+                    <span className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full mx-1" />
                     <span>部门: {user.department}</span>
                   </>
                 )}
@@ -59,7 +59,7 @@ export function UserPermissionDrawer({ isOpen, onClose, user, role, onUpdatePerm
           <button
             type="button"
             onClick={onClose}
-            className="p-2 hover:bg-slate-200 rounded-full text-slate-400 transition-colors"
+            className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-400 dark:text-slate-500 transition-colors"
             aria-label="关闭"
           >
             <X size={20} />
@@ -67,7 +67,7 @@ export function UserPermissionDrawer({ isOpen, onClose, user, role, onUpdatePerm
         </div>
       </div>
 
-      <div className="px-6 pt-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0">
+      <div className="px-6 pt-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 flex-shrink-0">
         <div className="flex gap-8">
           <button
             type="button"
@@ -77,7 +77,7 @@ export function UserPermissionDrawer({ isOpen, onClose, user, role, onUpdatePerm
               'pb-3 font-medium border-b-2 transition-all flex items-center gap-2',
               activeTab === 'functional'
                 ? 'border-brand-600 text-brand-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
             )}
           >
             <SlidersHorizontal size={16} />
@@ -92,7 +92,7 @@ export function UserPermissionDrawer({ isOpen, onClose, user, role, onUpdatePerm
               'pb-3 font-medium border-b-2 transition-all flex items-center gap-2',
               activeTab === 'data'
                 ? 'border-brand-600 text-brand-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
             )}
           >
             <Database size={16} />
@@ -102,7 +102,7 @@ export function UserPermissionDrawer({ isOpen, onClose, user, role, onUpdatePerm
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 bg-slate-50/30 dark:bg-slate-900/40 overflow-hidden">
+      <div className="flex-1 min-h-0 bg-slate-50/30 dark:bg-slate-950/35 overflow-hidden">
         {activeTab === 'functional' && (
           <div className="h-full overflow-y-auto p-6 custom-scrollbar animate-in fade-in duration-200">
             <FunctionalPermission
@@ -122,7 +122,7 @@ export function UserPermissionDrawer({ isOpen, onClose, user, role, onUpdatePerm
         )}
       </div>
 
-      <div className="px-6 py-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center z-10 shrink-0">
+      <div className="px-6 py-4 bg-white dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center z-10 shrink-0">
         <div className={cn(TYPOGRAPHY.caption, 'text-slate-400 dark:text-slate-500')}>修改即时生效</div>
         <div className="flex gap-3">
           <Button size="small" onClick={onClose} className="bg-brand-600 text-white hover:bg-brand-700">

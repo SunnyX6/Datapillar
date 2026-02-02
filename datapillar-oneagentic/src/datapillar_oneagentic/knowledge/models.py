@@ -52,7 +52,7 @@ class Attachment:
 class ParsedDocument:
     """Parsed document structure."""
 
-    document_id: str
+    document_id: str | None
     source_type: str
     mime_type: str
     text: str
@@ -78,6 +78,7 @@ class KnowledgeSource:
 
     source: str | bytes
     chunk: KnowledgeChunkConfig | dict[str, Any]
+    doc_uid: str
     name: str | None = None
     source_type: str = "doc"
     source_id: str | None = None
@@ -86,9 +87,15 @@ class KnowledgeSource:
     filename: str | None = None
     mime_type: str | None = None
     parser_hint: str | None = None
-    source_uri: str | None = field(default=None, init=False, repr=False)
+    source_uri: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
+        if not self.doc_uid or not str(self.doc_uid).strip():
+            raise ValueError("doc_uid is required for KnowledgeSource")
+        self.doc_uid = str(self.doc_uid).strip()
+        metadata = dict(self.metadata or {})
+        metadata.setdefault("doc_uid", self.doc_uid)
+        self.metadata = metadata
         if not self.name:
             if isinstance(self.source, str) and self.source:
                 self.name = self.source
@@ -289,6 +296,8 @@ def _merge_sources(
 def _source_merge_key(source: KnowledgeSource) -> str:
     if source.source_id:
         return source.source_id
+    if source.doc_uid:
+        return f"{source.source_type}|doc_uid:{source.doc_uid}"
     if source.source_uri:
         return f"{source.source_type}|{source.source_uri}"
     if isinstance(source.source, str):
@@ -301,7 +310,8 @@ def _source_merge_key(source: KnowledgeSource) -> str:
 
 
 def _build_document_input(source: KnowledgeSource) -> DocumentInput:
-    payload, filename, mime_type, source_info, source_uri = _resolve_source_payload(source)
+    payload, filename, mime_type, source_info, resolved_uri = _resolve_source_payload(source)
+    source_uri = source.source_uri or resolved_uri
     source_info.setdefault("source_type", source.source_type)
     source_info.setdefault("source_uri", source_uri or "")
     metadata = dict(source.metadata)

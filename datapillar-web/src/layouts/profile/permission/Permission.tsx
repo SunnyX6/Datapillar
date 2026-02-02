@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Pencil, Shield, Trash2, Users } from 'lucide-react'
-import { Button, Tooltip } from '@/components/ui'
+import { Shield, Users } from 'lucide-react'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { cn } from '@/lib/utils'
+import { AccessControlHeader } from '../AccessControlHeader'
+import { FeatureList, FEATURE_SCHEMA } from '../features/FeatureList'
+import { FeatureStep } from '../features/FeatureStep'
 import { RoleList } from './RoleList'
 import { MembersList } from './MembersList'
 import { FunctionalPermission, buildPermissions } from './FunctionalPermission'
@@ -190,6 +192,8 @@ export function PermissionLayout() {
   const [roleDefinitions, setRoleDefinitions] = useState<RoleDefinition[]>(ROLE_DEFINITIONS)
   const [selectedRoleId, setSelectedRoleId] = useState<string>(ROLE_DEFINITIONS[2]?.id ?? ROLE_DEFINITIONS[0]?.id ?? '')
   const [activeTab, setActiveTab] = useState<'members' | 'functional'>('members')
+  const [activeSection, setActiveSection] = useState<'architecture' | 'definition'>('definition')
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string>(FEATURE_SCHEMA[0]?.id ?? '')
 
   const roleUserCounts = useMemo(() => {
     return users.reduce<Record<string, number>>((acc, user) => {
@@ -253,111 +257,87 @@ export function PermissionLayout() {
   }
 
   return (
-    <section className="flex h-full w-full overflow-hidden bg-slate-50 dark:bg-[#0f172a]">
-      <div className="flex h-full w-full overflow-hidden">
-        <RoleList roles={roles} selectedRoleId={selectedRoleId} onSelectRole={setSelectedRoleId} />
-        <div className="flex-1 overflow-hidden">
-          <div className="h-full overflow-hidden flex flex-col bg-white dark:bg-slate-900">
-            <RoleHeader role={selectedRole} />
-            <div className="px-6 pt-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-              <div className="flex items-center gap-8">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('members')}
+    <section className="flex h-full w-full flex-col overflow-hidden bg-slate-50 dark:bg-[#0f172a]">
+      <AccessControlHeader activeTab={activeSection} onTabChange={setActiveSection} />
+      <div className="flex-1 overflow-hidden">
+        {activeSection === 'architecture' ? (
+          <div className="flex h-full w-full overflow-hidden">
+            <RoleList roles={roles} selectedRoleId={selectedRoleId} onSelectRole={setSelectedRoleId} />
+            <div className="flex-1 overflow-hidden">
+              <div className="h-full overflow-hidden flex flex-col bg-white dark:bg-slate-900 shadow-sm dark:shadow-[0_16px_40px_-16px_rgba(0,0,0,0.45)]">
+                <div className="h-14 px-6 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 flex items-end">
+                  <div className="flex items-center justify-between gap-4 w-full">
+                    <div className="flex items-center gap-8">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('members')}
+                        className={cn(
+                        TYPOGRAPHY.bodySm,
+                        'pb-2 font-medium border-b-2 transition-all flex items-center gap-2',
+                          activeTab === 'members'
+                            ? 'border-brand-600 text-brand-600'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                        )}
+                      >
+                        <Users size={16} />
+                        成员列表
+                        <span className="ml-0.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">
+                          {roleUserCounts[selectedRole.id] ?? 0}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('functional')}
+                        className={cn(
+                        TYPOGRAPHY.bodySm,
+                        'pb-2 font-medium border-b-2 transition-all flex items-center gap-2',
+                          activeTab === 'functional'
+                            ? 'border-brand-600 text-brand-600'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                        )}
+                      >
+                        <Shield size={16} />
+                        功能权限
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div
                   className={cn(
-                    TYPOGRAPHY.bodySm,
-                    'pb-3 font-medium border-b-2 transition-all flex items-center gap-2',
-                    activeTab === 'members'
-                      ? 'border-brand-600 text-brand-600'
-                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                    'flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950/35 custom-scrollbar',
+                    activeTab === 'members' ? 'px-6 py-6' : 'px-0 py-0'
                   )}
                 >
-                  <Users size={16} />
-                  成员列表
-                  <span className="ml-0.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-600">
-                    {roleUserCounts[selectedRole.id] ?? 0}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('functional')}
-                  className={cn(
-                    TYPOGRAPHY.bodySm,
-                    'pb-3 font-medium border-b-2 transition-all flex items-center gap-2',
-                    activeTab === 'functional'
-                      ? 'border-brand-600 text-brand-600'
-                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  {activeTab === 'members' ? (
+                    <MembersList
+                      role={selectedRole}
+                      users={users}
+                      onAddUser={handleAddUser}
+                      onUpdateUserPermissions={handlePermissionUpdate}
+                    />
+                  ) : (
+                    <FunctionalPermission
+                      mode="role"
+                      role={selectedRole}
+                      onUpdatePermission={handleRolePermissionUpdate}
+                      className="px-6 py-6 animate-in fade-in zoom-in-95 duration-200"
+                    />
                   )}
-                >
-                  <Shield size={16} />
-                  功能权限
-                </button>
+                </div>
               </div>
             </div>
-            <div
-              className={cn(
-                'flex-1 overflow-y-auto bg-slate-50 dark:bg-[#0f172a] custom-scrollbar',
-                activeTab === 'members' ? 'px-6 py-6' : 'px-0 py-0'
-              )}
-            >
-              {activeTab === 'members' ? (
-                <MembersList
-                  role={selectedRole}
-                  users={users}
-                  onAddUser={handleAddUser}
-                  onUpdateUserPermissions={handlePermissionUpdate}
-                />
-              ) : (
-                <FunctionalPermission
-                  mode="role"
-                  role={selectedRole}
-                  onUpdatePermission={handleRolePermissionUpdate}
-                  className="px-6 py-6 animate-in fade-in zoom-in-95 duration-200"
-                />
-              )}
+          </div>
+        ) : (
+          <div className="flex h-full w-full overflow-hidden">
+            <FeatureList selectedId={selectedFeatureId} onSelect={setSelectedFeatureId} />
+            <div className="flex-1 overflow-hidden">
+              <div className="h-full overflow-hidden flex flex-col bg-white dark:bg-slate-900 shadow-sm dark:shadow-[0_16px_40px_-16px_rgba(0,0,0,0.45)]">
+                <FeatureStep selectedId={selectedFeatureId} roles={roles} />
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </section>
-  )
-}
-
-interface RoleHeaderProps {
-  role: RoleDefinition
-}
-
-function RoleHeader({ role }: RoleHeaderProps) {
-  return (
-    <div className="px-6 py-6 flex items-start justify-between bg-white dark:bg-slate-900">
-      <div className="min-w-0">
-        <div className="flex items-center gap-3">
-          <h2 className={cn(TYPOGRAPHY.heading, 'font-semibold text-slate-900 dark:text-white')}>{role.name}</h2>
-          {role.isSystem && (
-            <span className={cn(TYPOGRAPHY.micro, 'text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full shrink-0')}>
-              系统默认
-            </span>
-          )}
-        </div>
-        <p className={cn(TYPOGRAPHY.caption, 'text-slate-400 dark:text-slate-500 mt-2')}>{role.description}</p>
-      </div>
-      <div className="flex items-center gap-2 mt-3">
-        <Tooltip content="删除角色" side="center-bottom">
-          <Button variant="dangerOutline" size="iconSm" aria-label="删除角色">
-            <Trash2 size={14} />
-          </Button>
-        </Tooltip>
-        <Tooltip content="编辑角色" side="center-bottom">
-          <Button
-            variant="outline"
-            size="iconSm"
-            className="text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
-            aria-label="编辑角色"
-          >
-            <Pencil size={14} />
-          </Button>
-        </Tooltip>
-      </div>
-    </div>
   )
 }

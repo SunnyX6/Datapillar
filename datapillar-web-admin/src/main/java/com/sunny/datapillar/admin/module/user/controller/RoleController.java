@@ -10,8 +10,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.sunny.datapillar.admin.module.user.dto.PermissionObjectDto;
 import com.sunny.datapillar.admin.module.user.dto.RoleDto;
 import com.sunny.datapillar.admin.module.user.service.RoleService;
 import com.sunny.datapillar.admin.web.response.ApiResponse;
@@ -74,11 +76,24 @@ public class RoleController {
         return ApiResponse.ok(null);
     }
 
-    @Operation(summary = "为角色分配权限")
+    @Operation(summary = "获取角色权限")
+    @GetMapping("/{id}/permissions")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ApiResponse<List<PermissionObjectDto.ObjectPermission>> getPermissions(
+            @PathVariable Long id,
+            @RequestParam(value = "scope", required = false) String scope) {
+        List<PermissionObjectDto.ObjectPermission> permissions = roleService.getRolePermissions(id, scope);
+        return ApiResponse.ok(permissions);
+    }
+
+    @Operation(summary = "更新角色权限")
     @PutMapping("/{id}/permissions")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> assignPermissions(@PathVariable Long id, @RequestBody List<Long> permissionIds) {
-        roleService.assignPermissions(id, permissionIds);
+    public ApiResponse<Void> updatePermissions(
+            @PathVariable Long id,
+            @RequestBody PermissionObjectDto.AssignmentRequest request) {
+        List<PermissionObjectDto.Assignment> permissions = request == null ? null : request.getPermissions();
+        roleService.updateRolePermissions(id, permissions);
         return ApiResponse.ok(null);
     }
 }

@@ -1,14 +1,22 @@
 package com.sunny.datapillar.admin.module.user.service.impl;
 
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.sunny.datapillar.admin.module.user.dto.PermissionObjectDto;
 import com.sunny.datapillar.admin.module.user.dto.RoleDto;
+import com.sunny.datapillar.admin.module.user.entity.Permission;
 import com.sunny.datapillar.admin.module.user.entity.Role;
 import com.sunny.datapillar.admin.module.user.entity.RolePermission;
+import com.sunny.datapillar.admin.module.user.mapper.PermissionMapper;
+import com.sunny.datapillar.admin.module.user.mapper.PermissionObjectMapper;
 import com.sunny.datapillar.admin.module.user.mapper.RoleMapper;
 import com.sunny.datapillar.admin.module.user.service.RoleService;
 import com.sunny.datapillar.common.error.ErrorCode;
@@ -28,11 +36,8 @@ import lombok.extern.slf4j.Slf4j;
 public class RoleServiceImpl implements RoleService {
 
     private final RoleMapper roleMapper;
-
-    @Override
-    public Role findByCode(String code) {
-        return roleMapper.findByCode(code);
-    }
+    private final PermissionMapper permissionMapper;
+    private final PermissionObjectMapper permissionObjectMapper;
 
     @Override
     public RoleDto.Response getRoleById(Long id) {
@@ -49,20 +54,23 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional
     public Long createRole(RoleDto.Create dto) {
-        if (roleMapper.findByCode(dto.getCode()) != null) {
-            throw new BusinessException(ErrorCode.ADMIN_ROLE_ALREADY_EXISTS, dto.getCode());
+        if (roleMapper.findByName(dto.getName()) != null) {
+            throw new BusinessException(ErrorCode.ADMIN_ROLE_ALREADY_EXISTS, dto.getName());
         }
 
         Role role = new Role();
-        BeanUtils.copyProperties(dto, role);
+        role.setName(dto.getName());
+        role.setDescription(dto.getDescription());
+        String normalizedType = normalizeRoleType(dto.getType());
+        role.setType(normalizedType == null ? "USER" : normalizedType);
 
         roleMapper.insert(role);
 
-        if (dto.getPermissionIds() != null && !dto.getPermissionIds().isEmpty()) {
-            assignPermissions(role.getId(), dto.getPermissionIds());
+        if (dto.getPermissions() != null) {
+            updateRolePermissions(role.getId(), dto.getPermissions());
         }
 
-        log.info("Created role: id={}, code={}", role.getId(), role.getCode());
+        log.info("Created role: id={}, name={}", role.getId(), role.getName());
         return role.getId();
     }
 
@@ -74,24 +82,24 @@ public class RoleServiceImpl implements RoleService {
             throw new BusinessException(ErrorCode.ADMIN_ROLE_NOT_FOUND, id);
         }
 
-        if (dto.getCode() != null) {
-            Role roleWithSameCode = roleMapper.findByCode(dto.getCode());
-            if (roleWithSameCode != null && !roleWithSameCode.getId().equals(id)) {
-                throw new BusinessException(ErrorCode.ADMIN_ROLE_ALREADY_EXISTS, dto.getCode());
+        if (dto.getName() != null && !dto.getName().isBlank()) {
+            Role roleWithSameName = roleMapper.findByName(dto.getName());
+            if (roleWithSameName != null && !roleWithSameName.getId().equals(id)) {
+                throw new BusinessException(ErrorCode.ADMIN_ROLE_ALREADY_EXISTS, dto.getName());
             }
-            existingRole.setCode(dto.getCode());
-        }
-        if (dto.getName() != null) {
             existingRole.setName(dto.getName());
         }
         if (dto.getDescription() != null) {
             existingRole.setDescription(dto.getDescription());
         }
+        if (dto.getType() != null && !dto.getType().isBlank()) {
+            existingRole.setType(normalizeRoleType(dto.getType()));
+        }
 
         roleMapper.updateById(existingRole);
 
-        if (dto.getPermissionIds() != null) {
-            assignPermissions(id, dto.getPermissionIds());
+        if (dto.getPermissions() != null) {
+            updateRolePermissions(id, dto.getPermissions());
         }
 
         log.info("Updated role: id={}", id);
@@ -136,17 +144,85 @@ public class RoleServiceImpl implements RoleService {
     }
 
     @Override
+    public List<PermissionObjectDto.ObjectPermission> getRolePermissions(Long roleId, String scope) {
+        if (roleMapper.selectById(roleId) == null) {
+            throw new BusinessException(ErrorCode.ADMIN_ROLE_NOT_FOUND, roleId);
+        }
+        String normalizedScope = scope == null ? "ALL" : scope.trim().toUpperCase(Locale.ROOT);
+        if ("ASSIGNED".equals(normalizedScope)) {
+            return permissionObjectMapper.selectRoleObjectPermissionsAssigned(roleId);
+        }
+        return permissionObjectMapper.selectRoleObjectPermissionsAll(roleId);
+    }
+
+    @Override
     @Transactional
-    public void assignPermissions(Long roleId, List<Long> permissionIds) {
+    public void updateRolePermissions(Long roleId, List<PermissionObjectDto.Assignment> permissions) {
+        if (roleMapper.selectById(roleId) == null) {
+            throw new BusinessException(ErrorCode.ADMIN_ROLE_NOT_FOUND, roleId);
+        }
         roleMapper.deleteRolePermissions(roleId);
 
-        if (permissionIds != null && !permissionIds.isEmpty()) {
-            for (Long permissionId : permissionIds) {
-                RolePermission rolePermission = new RolePermission();
-                rolePermission.setRoleId(roleId);
-                rolePermission.setPermissionId(permissionId);
-                roleMapper.insertRolePermission(rolePermission);
+        if (permissions == null || permissions.isEmpty()) {
+            return;
+        }
+
+        Map<String, Long> permissionIdMap = getPermissionIdMap();
+        Map<Long, String> uniqueAssignments = new LinkedHashMap<>();
+        for (PermissionObjectDto.Assignment assignment : permissions) {
+            if (assignment == null || assignment.getObjectId() == null) {
+                continue;
+            }
+            uniqueAssignments.put(assignment.getObjectId(), assignment.getPermissionCode());
+        }
+
+        for (Map.Entry<Long, String> entry : uniqueAssignments.entrySet()) {
+            String code = normalizePermissionCode(entry.getValue());
+            if (code == null) {
+                continue;
+            }
+            Long permissionId = permissionIdMap.get(code);
+            if (permissionId == null) {
+                throw new BusinessException(ErrorCode.ADMIN_INVALID_ARGUMENT, entry.getValue());
+            }
+
+            RolePermission rolePermission = new RolePermission();
+            rolePermission.setRoleId(roleId);
+            rolePermission.setObjectId(entry.getKey());
+            rolePermission.setPermissionId(permissionId);
+            roleMapper.insertRolePermission(rolePermission);
+        }
+    }
+
+    private Map<String, Long> getPermissionIdMap() {
+        List<Permission> permissions = permissionMapper.selectList(null);
+        Map<String, Long> map = new HashMap<>();
+        if (permissions == null) {
+            return map;
+        }
+        for (Permission permission : permissions) {
+            if (permission.getCode() != null) {
+                map.put(permission.getCode().toUpperCase(Locale.ROOT), permission.getId());
             }
         }
+        return map;
+    }
+
+    private String normalizePermissionCode(String code) {
+        if (code == null) {
+            return null;
+        }
+        String normalized = code.trim().toUpperCase(Locale.ROOT);
+        if (normalized.isEmpty() || "NONE".equals(normalized)) {
+            return null;
+        }
+        return normalized;
+    }
+
+    private String normalizeRoleType(String type) {
+        if (type == null || type.isBlank()) {
+            return null;
+        }
+        return type.trim().toUpperCase(Locale.ROOT);
     }
 }

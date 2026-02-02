@@ -25,7 +25,7 @@
     },
     "profile": {
       "profile": "Profile",
-      "permission": "Permission Assignment",
+      "permission": "Feature Permission",
       "models": "AI Configuration",
       "billing": "Billing",
       "logout": "Log out"

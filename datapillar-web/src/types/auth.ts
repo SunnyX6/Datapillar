@@ -10,9 +10,17 @@ export interface Menu {
   id: number
   name: string
   path: string
-  icon?: string
   permissionCode?: string
+  location?: 'TOP' | 'SIDEBAR' | 'PROFILE' | 'PAGE'
+  categoryId?: number
+  categoryName?: string
   children?: Menu[]
+}
+
+export interface RoleInfo {
+  id: number
+  name: string
+  type: 'ADMIN' | 'USER'
 }
 
 /**
@@ -20,11 +28,11 @@ export interface Menu {
  */
 export interface User {
   userId: number
+  tenantId?: number
   username: string
   email?: string
   avatar?: string
-  roles: string[]
-  permissions: string[]
+  roles: RoleInfo[]
   menus: Menu[]
 }
 
@@ -32,6 +40,10 @@ export interface User {
  * 登录请求接口
  */
 export interface LoginRequest {
+  tenantCode?: string
+  inviteCode?: string
+  email?: string
+  phone?: string
   username: string
   password: string
   rememberMe?: boolean
@@ -42,11 +54,25 @@ export interface LoginRequest {
  */
 export interface LoginResponse {
   userId: number
+  tenantId?: number
   username: string
   email?: string
-  roles: string[]
-  permissions: string[]
+  roles: RoleInfo[]
   menus: Menu[]
+}
+
+export interface SsoQrResponse {
+  type: 'SDK' | 'URL' | string
+  state: string
+  payload: Record<string, unknown>
+}
+
+export interface SsoLoginRequest {
+  tenantCode: string
+  provider: string
+  authCode: string
+  state: string
+  inviteCode?: string
 }
 
 /**

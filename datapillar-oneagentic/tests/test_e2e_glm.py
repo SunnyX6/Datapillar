@@ -160,6 +160,7 @@ async def test_glm_sequential() -> None:
     source = KnowledgeSource(
         source="Always include token KNO123 in the final answer.",
         chunk=chunk_config,
+        doc_uid="doc1",
         name="Demo Knowledge",
         source_type="doc",
         filename="kb_doc_1.txt",

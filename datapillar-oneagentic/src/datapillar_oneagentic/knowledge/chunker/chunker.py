@@ -23,14 +23,11 @@ class KnowledgeChunker:
     def __init__(self, *, config: KnowledgeChunkConfig) -> None:
         self._config = config
 
-    def preview(self, parsed: ParsedDocument) -> ChunkPreview:
+    def preview(self, parsed: ParsedDocument, *, doc_id: str) -> ChunkPreview:
+        if not doc_id or not str(doc_id).strip():
+            raise ValueError("doc_id is required for chunking preview")
         text = apply_preprocess(parsed.text, self._config.preprocess)
-        doc_id = parsed.document_id
-        if not doc_id:
-            from datapillar_oneagentic.knowledge.parser.utils import build_document_id
-
-            doc_id = build_document_id()
-        parsed.document_id = doc_id
+        doc_id = str(doc_id).strip()
         mode = (self._config.mode or "general").lower()
         if mode == "general":
             chunks = _split_general(doc_id, text, self._config.general)

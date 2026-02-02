@@ -3,8 +3,6 @@ import { Sidebar } from './navigation/Sidebar'
 import { TopNav } from './navigation/TopNav'
 import { useThemeStore, useAuthStore, useLayoutStore } from '@/stores'
 
-type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide' | 'projects' | 'collaboration' | 'tracking'
-
 const MOCK_USER = {
   name: 'S. Engineer',
   role: 'Data Engineer',
@@ -16,22 +14,8 @@ export function MainLayout() {
   const location = useLocation()
   const mode = useThemeStore((state) => state.mode)
   const setMode = useThemeStore((state) => state.setMode)
+  const menus = useAuthStore((state) => state.user?.menus ?? [])
   const isDark = mode === 'dark'
-  const currentView: View = location.pathname.startsWith('/workflow')
-    ? 'workflow'
-    : location.pathname.startsWith('/wiki')
-      ? 'wiki'
-      : location.pathname.startsWith('/data-tracking')
-        ? 'tracking'
-      : location.pathname.startsWith('/ide')
-        ? 'ide'
-        : location.pathname.startsWith('/projects')
-          ? 'projects'
-          : location.pathname.startsWith('/collaboration')
-            ? 'collaboration'
-            : location.pathname.startsWith('/profile')
-              ? 'profile'
-              : 'dashboard'
   const isSidebarCollapsed = useLayoutStore((state) => state.isSidebarCollapsed)
   const toggleSidebar = useLayoutStore((state) => state.toggleSidebar)
 
@@ -48,24 +32,8 @@ export function MainLayout() {
     navigate('/')
   }
 
-  const handleViewChange = (nextView: View) => {
-    const targetPath =
-      nextView === 'workflow'
-        ? '/workflow'
-        : nextView === 'wiki'
-          ? '/wiki'
-          : nextView === 'tracking'
-            ? '/data-tracking'
-          : nextView === 'ide'
-            ? '/ide'
-            : nextView === 'projects'
-              ? '/projects'
-              : nextView === 'collaboration'
-                ? '/collaboration'
-                : nextView === 'profile'
-                  ? '/profile'
-                  : '/home'
-    if (location.pathname === targetPath) {
+  const handleNavigate = (targetPath: string) => {
+    if (!targetPath || location.pathname === targetPath) {
       return
     }
     navigate(targetPath)
@@ -81,8 +49,9 @@ export function MainLayout() {
   return (
     <div className="flex h-screen w-full bg-slate-50 dark:bg-[#020617] text-slate-900 dark:text-white">
       <Sidebar
-        currentView={currentView}
-        onNavigate={handleViewChange}
+        menus={menus}
+        currentPath={location.pathname}
+        onNavigate={handleNavigate}
         collapsed={isSidebarCollapsed}
         onToggleCollapse={handleToggleSidebar}
       />
@@ -91,8 +60,9 @@ export function MainLayout() {
           isDark={isDark}
           toggleTheme={handleToggleTheme}
           user={MOCK_USER}
-          currentView={currentView}
-          onNavigate={handleViewChange}
+          menus={menus}
+          currentPath={location.pathname}
+          onNavigate={handleNavigate}
           onLogout={handleLogout}
           isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebar={handleToggleSidebar}

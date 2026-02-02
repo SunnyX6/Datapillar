@@ -115,6 +115,13 @@
     cursor: default;
   }
 
+  /* 主题切换期间禁用过渡，避免闪灰 */
+  html.theme-switching *,
+  html.theme-switching *::before,
+  html.theme-switching *::after {
+    transition: none !important;
+  }
+
   button,
   a,
   summary,

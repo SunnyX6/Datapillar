@@ -17,6 +17,7 @@ import {
   Users,
   X
 } from 'lucide-react'
+import { ThirdPartyIcons } from '@/components'
 import { Button, Modal } from '@/components/ui'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { cn } from '@/lib/utils'
@@ -32,43 +33,6 @@ interface AddMemberModalProps {
 }
 
 type ConfigProvider = 'DingTalk' | 'Lark'
-
-const ThirdPartyIcons = {
-  WeCom: () => (
-    <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path
-        d="M10.45 13.98c-3.6 0-6.52-2.38-6.52-5.3 0-2.92 2.92-5.3 6.52-5.3 3.6 0 6.53 2.38 6.53 5.3 0 2.92-2.93 5.3-6.53 5.3zM2.87 14.88a7.83 7.83 0 0 1 0-.15c.34-.63 1.05-1.07 2.03-1.32-.4-.7-.64-1.5-.64-2.34 0-3.52 3.5-6.38 7.82-6.38s7.82 2.86 7.82 6.38c0 3.52-3.5 6.38-7.82 6.38-.85 0-1.67-.1-2.43-.3l-2.76 1.7a.5.5 0 0 1-.76-.41v-1.92c-.36-.34-.96-.85-1.54-1.28-.58-.43-1.12-.9-1.72-.36z"
-        fill="#4776E6"
-      />
-      <path
-        d="M17.82 13.06c2.56 0 4.63 1.63 4.63 3.64 0 2-2.07 3.63-4.63 3.63-.52 0-1.02-.06-1.5-.18v1.3c0 .28-.32.45-.55.3l-1.66-1.06c-.4.12-.9.2-1.42.34-.23-.28-.33-.63-.33-.98 0-1.37.8-2.6 2.1-3.32a6.3 6.3 0 0 1 3.36-3.67z"
-        fill="#4776E6"
-        opacity="0.7"
-      />
-    </svg>
-  ),
-  DingTalk: () => (
-    <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path
-        d="M11.64 2.06L1.87 5.62c-.8.3-.92 1.4-.2 1.84l7.63 4.7 9.87-4.48c.35-.16.65.25.37.5l-8.08 7.28v5.82c0 .4.48.6.76.32l2.67-2.67 4.54 2.8c.67.4 1.54-.05 1.6-.84l.97-17.84c.04-.84-.96-1.35-1.64-1.1L11.64 2.07z"
-        fill="#0089FF"
-      />
-    </svg>
-  ),
-  Lark: () => (
-    <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path
-        d="M11.6 2.6c1.67-1.17 3.96-.92 5.33.58 1.13 1.23.97 3.12-.32 4.14l-8.4 6.64c-1.3 1.02-3.2 1-4.32-.23-1.12-1.23-.97-3.12.32-4.14L11.6 2.6z"
-        fill="#00D6B9"
-      />
-      <path
-        d="M19.38 8.16c1.13 1.23.97 3.12-.32 4.14l-6.24 4.93c-1.3 1.02-3.2 1-4.33-.23-.5-.55-.73-1.26-.68-1.95l8.77-6.94c.9-.7 2.07-.64 2.8.05z"
-        fill="#00D6B9"
-        opacity="0.8"
-      />
-    </svg>
-  )
-}
 
 export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddMemberModalProps) {
   const [activeTab, setActiveTab] = useState<'platform' | 'import'>('platform')
@@ -170,7 +134,7 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
     <div className="p-5">
       <button
         type="button"
-        className="flex items-center gap-2 mb-4 text-slate-500 cursor-pointer hover:text-slate-900 transition-colors"
+        className="flex items-center gap-2 mb-4 text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
         onClick={() => setConfigProvider(null)}
       >
         <ChevronLeft size={16} />
@@ -178,14 +142,14 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
       </button>
 
       <div className="flex items-center gap-4 mb-6">
-        <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 shadow-sm">
+        <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-100 dark:border-slate-700 shadow-sm">
           {configProvider === 'DingTalk' ? <ThirdPartyIcons.DingTalk /> : <ThirdPartyIcons.Lark />}
         </div>
         <div>
-          <h3 className={cn(TYPOGRAPHY.subtitle, 'font-bold text-slate-900')}>
+          <h3 className={cn(TYPOGRAPHY.subtitle, 'font-bold text-slate-900 dark:text-white')}>
             配置 {configProvider === 'DingTalk' ? '钉钉' : '飞书'} 连接
           </h3>
-          <p className={cn(TYPOGRAPHY.caption, 'text-slate-500 mt-1')}>
+          <p className={cn(TYPOGRAPHY.caption, 'text-slate-500 dark:text-slate-400 mt-1')}>
             请输入您的企业 {configProvider === 'DingTalk' ? '钉钉' : '飞书'} 应用凭证以完成授权。
           </p>
         </div>
@@ -193,16 +157,16 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
 
       <div className="space-y-4">
         <div>
-          <label className={cn(TYPOGRAPHY.caption, 'block font-semibold text-slate-700 uppercase tracking-wider mb-1.5')}>
+          <label className={cn(TYPOGRAPHY.caption, 'block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5')}>
             {configProvider === 'DingTalk' ? 'Agent ID' : 'App ID'} <span className="text-red-500">*</span>
           </label>
           <div className="relative">
-            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={16} />
             <input
               type="text"
               className={cn(
                 TYPOGRAPHY.bodySm,
-                'w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all'
+                'w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:focus:border-brand-400 outline-none transition-all text-slate-900 dark:text-slate-100'
               )}
               placeholder={configProvider === 'DingTalk' ? '例如: 23456789' : '例如: cli_a1b2c3d4e5'}
             />
@@ -210,16 +174,16 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
         </div>
 
         <div>
-          <label className={cn(TYPOGRAPHY.caption, 'block font-semibold text-slate-700 uppercase tracking-wider mb-1.5')}>
+          <label className={cn(TYPOGRAPHY.caption, 'block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5')}>
             App Key <span className="text-red-500">*</span>
           </label>
           <div className="relative">
-            <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={16} />
             <input
               type="text"
               className={cn(
                 TYPOGRAPHY.bodySm,
-                'w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all'
+                'w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:focus:border-brand-400 outline-none transition-all text-slate-900 dark:text-slate-100'
               )}
               placeholder="输入应用的 App Key"
             />
@@ -227,16 +191,16 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
         </div>
 
         <div>
-          <label className={cn(TYPOGRAPHY.caption, 'block font-semibold text-slate-700 uppercase tracking-wider mb-1.5')}>
+          <label className={cn(TYPOGRAPHY.caption, 'block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5')}>
             App Secret <span className="text-red-500">*</span>
           </label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={16} />
             <input
               type="password"
               className={cn(
                 TYPOGRAPHY.bodySm,
-                'w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all'
+                'w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:focus:border-brand-400 outline-none transition-all text-slate-900 dark:text-slate-100'
               )}
               placeholder="输入应用的 App Secret"
             />
@@ -250,7 +214,7 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
         </div>
 
         <div className="flex justify-center mt-4">
-          <a href="#" className={cn(TYPOGRAPHY.caption, 'text-brand-600 hover:underline')}>
+          <a href="#" className={cn(TYPOGRAPHY.caption, 'text-brand-600 dark:text-brand-300 hover:underline')}>
             如何获取这些信息？
           </a>
         </div>
@@ -265,9 +229,9 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
       size={configProvider ? 'sm' : 'lg'}
       title="添加成员"
       subtitle={(
-        <span className={cn(TYPOGRAPHY.caption, 'text-slate-500 flex items-center gap-2')}>
+        <span className={cn(TYPOGRAPHY.caption, 'text-slate-500 dark:text-slate-400 flex items-center gap-2')}>
           添加至
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
             <UserPlus size={12} />
             {role.name}
           </span>
@@ -281,7 +245,7 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
         )}
       >
         {!configProvider && (
-          <div className="bg-white border-b border-slate-100 px-6 pt-4 pb-0 shrink-0">
+          <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-6 pt-4 pb-0 shrink-0">
             <div className="flex gap-6">
               <button
                 type="button"
@@ -291,7 +255,7 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                   `pb-3 font-medium border-b-2 transition-all ${
                     activeTab === 'platform'
                       ? 'border-brand-600 text-brand-600'
-                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
                   }`
                 )}
               >
@@ -305,12 +269,12 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                   `pb-3 font-medium border-b-2 transition-all flex items-center gap-1.5 ${
                     activeTab === 'import'
                       ? 'border-brand-600 text-brand-600'
-                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
                   }`
                 )}
               >
                 第三方同步
-                <span className={cn(TYPOGRAPHY.micro, 'bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold')}>
+                <span className={cn(TYPOGRAPHY.micro, 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-300 px-1.5 py-0.5 rounded-full font-bold')}>
                   Auto
                 </span>
               </button>
@@ -318,16 +282,16 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
           </div>
         )}
 
-        <div className="flex-1 min-h-0 bg-slate-50 dark:bg-slate-900/40 overflow-hidden">
+        <div className="flex-1 min-h-0 bg-slate-50 dark:bg-slate-950/35 overflow-hidden">
           {configProvider ? (
             <div className="flex-1 min-h-0 overflow-y-auto">{renderConfigForm()}</div>
           ) : (
             <>
               {activeTab === 'platform' && (
-                <div className="flex w-full h-full min-h-0 bg-white">
-                  <div className="w-60 bg-slate-50/50 border-r border-slate-100 flex flex-col shrink-0 min-h-0">
-                    <div className="px-4 pt-6 pb-3 border-b border-slate-200/60">
-                      <h4 className={cn(TYPOGRAPHY.bodyXs, 'font-semibold text-slate-400 uppercase tracking-wider px-2 mb-2')}>部门筛选</h4>
+                <div className="flex w-full h-full min-h-0 bg-white dark:bg-slate-900/90">
+                  <div className="w-60 bg-slate-50/50 dark:bg-slate-900/70 border-r border-slate-100 dark:border-slate-800 flex flex-col shrink-0 min-h-0">
+                    <div className="px-4 pt-6 pb-3 border-b border-slate-200/60 dark:border-slate-800/80">
+                      <h4 className={cn(TYPOGRAPHY.bodyXs, 'font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-2 mb-2')}>部门筛选</h4>
                     </div>
                     <div className="flex-1 overflow-y-auto px-3 pt-2 pb-3 space-y-0.5 custom-scrollbar min-h-0">
                       <button
@@ -337,15 +301,17 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                           TYPOGRAPHY.bodyXs,
                           `w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-all ${
                             activeOrgId === allUnit.id
-                              ? 'bg-white text-brand-600 shadow-sm ring-1 ring-slate-200'
-                              : 'text-slate-600 hover:bg-slate-100/50 hover:text-slate-900'
+                              ? 'bg-white dark:bg-slate-900 text-brand-600 dark:text-brand-300 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700'
+                              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100'
                           }`
                         )}
                       >
                         <div className="flex items-center gap-2.5">
                           <div
                             className={`p-1 rounded ${
-                              activeOrgId === allUnit.id ? 'bg-brand-50 text-brand-600' : 'bg-slate-100 text-slate-500'
+                              activeOrgId === allUnit.id
+                                ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                             }`}
                           >
                             <allUnit.icon size={14} />
@@ -356,7 +322,9 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                           className={cn(
                             TYPOGRAPHY.micro,
                             `px-1.5 py-0.5 rounded-md font-bold ${
-                              activeOrgId === allUnit.id ? 'bg-brand-50 text-brand-600' : 'bg-slate-100 text-slate-400'
+                              activeOrgId === allUnit.id
+                                ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
                             }`
                           )}
                         >
@@ -364,7 +332,7 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                         </span>
                       </button>
 
-                      <div className="my-2 border-t border-slate-200/50 mx-2"></div>
+                      <div className="my-2 border-t border-slate-200/50 dark:border-slate-800 mx-2"></div>
 
                       {departmentUnits.map((unit) => {
                         const isActive = activeOrgId === unit.id
@@ -378,13 +346,19 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                               TYPOGRAPHY.bodyXs,
                               `w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-all ${
                                 isActive
-                                  ? 'bg-white text-brand-600 shadow-sm ring-1 ring-slate-200'
-                                  : 'text-slate-600 hover:bg-slate-100/50 hover:text-slate-900'
+                                  ? 'bg-white dark:bg-slate-900 text-brand-600 dark:text-brand-300 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700'
+                                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100'
                               }`
                             )}
                           >
                             <div className="flex items-center gap-2.5 truncate">
-                              <div className={`p-1 rounded ${isActive ? 'bg-brand-50 text-brand-600' : 'bg-slate-100 text-slate-500'}`}>
+                              <div
+                                className={`p-1 rounded ${
+                                  isActive
+                                    ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                                }`}
+                              >
                                 <Icon size={14} />
                               </div>
                               <span className="truncate max-w-[120px]" title={unit.name}>
@@ -395,7 +369,9 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                               className={cn(
                                 TYPOGRAPHY.micro,
                                 `px-1.5 py-0.5 rounded-md font-bold ${
-                                  isActive ? 'bg-brand-50 text-brand-600' : 'bg-slate-100 text-slate-400'
+                                  isActive
+                                    ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
                                 }`
                               )}
                             >
@@ -407,12 +383,12 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                     </div>
                   </div>
 
-                  <div className="flex-1 flex flex-col min-w-0 bg-white relative min-h-0">
-                    <div className="border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur z-[5]">
+                  <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-slate-900/90 relative min-h-0">
+                    <div className="border-b border-slate-100 dark:border-slate-800/80 sticky top-0 bg-white/95 dark:bg-slate-900/90 backdrop-blur z-[5]">
                       <div className="px-1.5 pt-5 pb-4">
                         <div className="relative group">
                           <Search
-                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors"
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 group-focus-within:text-brand-500 dark:group-focus-within:text-brand-400 transition-colors"
                             size={16}
                           />
                           <input
@@ -422,19 +398,24 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                             placeholder="搜索姓名或邮箱..."
                             className={cn(
                               TYPOGRAPHY.bodyXs,
-                              'w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all'
+                              'w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:focus:border-brand-400 outline-none transition-all text-slate-900 dark:text-slate-100'
                             )}
                           />
                         </div>
                       </div>
-                      <div className={cn(TYPOGRAPHY.bodyXs, 'flex items-center px-1.5 py-2 bg-slate-50/50 font-semibold text-slate-500 uppercase tracking-wider')}>
+                      <div
+                        className={cn(
+                          TYPOGRAPHY.bodyXs,
+                          'flex items-center px-1.5 py-2 bg-slate-50/50 dark:bg-slate-800/60 font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider'
+                        )}
+                      >
                         <div className="w-[32px] flex justify-center">
                           {filteredUsers.length > 0 && (
                             <div
                               className={`w-3.5 h-3.5 rounded border flex items-center justify-center cursor-pointer transition-colors ${
                                 isAllSelected
                                   ? 'bg-brand-600 border-brand-600'
-                                  : 'border-slate-300 bg-white hover:border-slate-400'
+                                  : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 hover:border-slate-400 dark:hover:border-slate-500'
                               }`}
                               onClick={toggleSelectAll}
                             >
@@ -449,14 +430,14 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
 
                     <div className="flex-1 overflow-y-auto pb-20 min-h-0">
                       {filteredUsers.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 pb-20">
-                          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 pb-20">
+                          <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
                             <Search size={24} className="opacity-40" />
                           </div>
-                          <p className={cn(TYPOGRAPHY.bodyXs, 'font-medium text-slate-500')}>未找到匹配的成员</p>
+                          <p className={cn(TYPOGRAPHY.bodyXs, 'font-medium text-slate-500 dark:text-slate-400')}>未找到匹配的成员</p>
                         </div>
                       ) : (
-                        <div className="divide-y divide-slate-50">
+                        <div className="divide-y divide-slate-50 dark:divide-slate-800">
                           {filteredUsers.map((user) => {
                             const department = roleDepartmentMap[user.roleId] ?? '平台研发部'
                             const isSelected = selectedUserIds.includes(user.id)
@@ -465,7 +446,7 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                                 key={user.id}
                                 onClick={() => toggleUserSelection(user.id)}
                                 className={`group flex items-center px-1.5 py-3 cursor-pointer transition-colors duration-150 ${
-                                  isSelected ? 'bg-brand-50/60' : 'hover:bg-slate-50'
+                                  isSelected ? 'bg-brand-50/60 dark:bg-brand-500/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/70'
                                 }`}
                               >
                                 <div className="w-[32px] flex justify-center shrink-0">
@@ -477,7 +458,7 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                                     className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all duration-200 ${
                                       isSelected
                                         ? 'bg-brand-600 border-brand-600 scale-100'
-                                        : 'border-slate-300 bg-white group-hover:border-slate-400'
+                                        : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 group-hover:border-slate-400 dark:group-hover:border-slate-500'
                                     }`}
                                   >
                                     <Check
@@ -492,16 +473,21 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                                     name={user.name}
                                     src={user.avatarUrl}
                                     size="sm"
-                                    className={`${isSelected ? 'ring-2 ring-brand-200' : ''} transition-all w-9 h-9`}
+                                    className={`${isSelected ? 'ring-2 ring-brand-200 dark:ring-brand-500/40' : ''} transition-all w-9 h-9`}
                                   />
                                   <div className="min-w-0">
                                     <div className="flex items-center gap-2">
-                                      <span className={cn(TYPOGRAPHY.bodyXs, `font-medium truncate ${isSelected ? 'text-brand-900' : 'text-slate-900'}`)}>
+                                      <span
+                                        className={cn(
+                                          TYPOGRAPHY.bodyXs,
+                                          `font-medium truncate ${isSelected ? 'text-brand-900 dark:text-brand-200' : 'text-slate-900 dark:text-slate-100'}`
+                                        )}
+                                      >
                                         {user.name}
                                       </span>
                                     </div>
                                     {activeOrgId === 'all' && (
-                                      <div className={cn(TYPOGRAPHY.caption, 'text-slate-500 mt-0.5 flex items-center gap-1.5')}>
+                                      <div className={cn(TYPOGRAPHY.caption, 'text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1.5')}>
                                         <Building2 size={10} />
                                         <span className="truncate">{department}</span>
                                       </div>
@@ -509,7 +495,12 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                                   </div>
                                 </div>
 
-                                <div className={cn(TYPOGRAPHY.caption, 'w-1/3 text-center text-slate-400 truncate font-mono px-1.5 group-hover:text-slate-500 transition-colors')}>
+                                <div
+                                  className={cn(
+                                    TYPOGRAPHY.caption,
+                                    'w-1/3 text-center text-slate-400 dark:text-slate-500 truncate font-mono px-1.5 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-colors'
+                                  )}
+                                >
                                   {user.email}
                                 </div>
                               </div>
@@ -521,7 +512,7 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
 
                     {selectedCount > 0 && (
                       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] z-30">
-                        <div className="bg-slate-900 text-white px-3 py-1.5 rounded-2xl shadow-2xl shadow-slate-900/20 flex items-center justify-between border border-slate-800 animate-in slide-in-from-bottom-4 duration-300">
+                        <div className="bg-slate-900 dark:bg-slate-800 text-white px-3 py-1.5 rounded-2xl shadow-2xl shadow-slate-900/20 dark:shadow-slate-900/40 flex items-center justify-between border border-slate-800 dark:border-slate-700 animate-in slide-in-from-bottom-4 duration-300">
                           <div className="flex items-center gap-3 px-2 min-w-0 flex-1">
                             <div className="flex -space-x-2 overflow-hidden py-0.5 pl-1">
                               {selectedUserIds.slice(0, 5).map((userId) => {
@@ -564,7 +555,7 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                             <button
                               type="button"
                               onClick={() => setSelectedUserIds([])}
-                              className="text-xs text-slate-400 hover:text-white transition-colors"
+                              className="text-xs text-slate-400 dark:text-slate-300 hover:text-white transition-colors"
                             >
                               清空
                             </button>
@@ -589,31 +580,36 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                   <div className="flex-1 min-h-0 overflow-y-auto">
                     <div className="px-8 py-8">
                       <div className="text-center mb-8">
-                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 mb-4 ring-1 ring-brand-100 shadow-sm">
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-300 mb-4 ring-1 ring-brand-100 dark:ring-brand-500/30 shadow-sm">
                           <RefreshCw size={22} />
                         </div>
-                        <h3 className={cn(TYPOGRAPHY.subtitle, 'font-bold text-slate-900 tracking-tight')}>同步组织架构</h3>
-                        <p className={cn(TYPOGRAPHY.caption, 'text-slate-500 mt-2 max-w-sm mx-auto leading-relaxed')}>
+                        <h3 className={cn(TYPOGRAPHY.subtitle, 'font-bold text-slate-900 dark:text-white tracking-tight')}>同步组织架构</h3>
+                        <p className={cn(TYPOGRAPHY.caption, 'text-slate-500 dark:text-slate-400 mt-2 max-w-sm mx-auto leading-relaxed')}>
                           连接您的企业 OA 平台，自动拉取最新的部门结构与人员名单，保持权限分配实时更新。
                         </p>
                       </div>
 
                       <div className="space-y-2">
-                        <div className="group relative bg-white rounded-xl border border-slate-200 p-2 flex items-center gap-4 transition-all hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-500/5">
-                          <div className="w-14 h-14 rounded-lg bg-indigo-50/30 border border-indigo-100/50 flex items-center justify-center shrink-0">
+                        <div className="group relative bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-2 flex items-center gap-4 transition-all hover:border-indigo-300 dark:hover:border-indigo-400/50 hover:shadow-lg hover:shadow-indigo-500/5 dark:hover:shadow-indigo-500/20">
+                          <div className="w-14 h-14 rounded-lg bg-indigo-50/30 dark:bg-indigo-500/10 border border-indigo-100/50 dark:border-indigo-500/30 flex items-center justify-center shrink-0">
                             <ThirdPartyIcons.WeCom />
                           </div>
                           <div className="flex-1 min-w-0 py-0.5">
                             <div className="flex items-center gap-2 mb-1">
-                              <h4 className={cn(TYPOGRAPHY.bodyXs, 'font-bold text-slate-900')}>企业微信</h4>
-                              <div className={cn(TYPOGRAPHY.micro, 'flex items-center gap-1 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold border border-emerald-100/50')}>
-                                <CheckCircle2 size={10} className="fill-emerald-100 stroke-emerald-600" />
+                              <h4 className={cn(TYPOGRAPHY.bodyXs, 'font-bold text-slate-900 dark:text-slate-100')}>企业微信</h4>
+                              <div
+                                className={cn(
+                                  TYPOGRAPHY.micro,
+                                  'flex items-center gap-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-bold border border-emerald-100/50 dark:border-emerald-500/30'
+                                )}
+                              >
+                                <CheckCircle2 size={10} className="fill-emerald-100 stroke-emerald-600 dark:fill-emerald-500/20 dark:stroke-emerald-300" />
                                 <span>已连接</span>
                               </div>
                             </div>
-                            <div className={cn(TYPOGRAPHY.micro, 'flex items-center gap-2 text-slate-500')}>
+                            <div className={cn(TYPOGRAPHY.micro, 'flex items-center gap-2 text-slate-500 dark:text-slate-400')}>
                               <span className="truncate">今天 09:30</span>
-                              <span className="w-0.5 h-2.5 bg-slate-200 rounded-full" />
+                              <span className="w-0.5 h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full" />
                               <span>128 人</span>
                             </div>
                           </div>
@@ -623,7 +619,7 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                               variant="outline"
                               className={cn(
                                 TYPOGRAPHY.bodyXs,
-                                'h-8 px-3 border-slate-200 text-slate-600 group-hover:border-indigo-200 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-all'
+                                'h-8 px-3 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 group-hover:border-indigo-200 dark:group-hover:border-indigo-400/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-500/10 transition-all'
                               )}
                               onClick={handleSync}
                             >
@@ -633,20 +629,20 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                           </div>
                         </div>
 
-                        <div className="group relative bg-white rounded-xl border border-slate-200 p-2 flex items-center gap-4 transition-all hover:border-blue-300 hover:shadow-lg hover:shadow-blue-500/5">
-                          <div className="w-14 h-14 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 grayscale group-hover:grayscale-0 transition-all duration-300">
+                        <div className="group relative bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-2 flex items-center gap-4 transition-all hover:border-blue-300 dark:hover:border-blue-400/50 hover:shadow-lg hover:shadow-blue-500/5 dark:hover:shadow-blue-500/20">
+                          <div className="w-14 h-14 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0 grayscale group-hover:grayscale-0 transition-all duration-300">
                             <ThirdPartyIcons.DingTalk />
                           </div>
                           <div className="flex-1 min-w-0 py-0.5">
                             <div className="flex items-center gap-2 mb-1">
-                              <h4 className={cn(TYPOGRAPHY.bodyXs, 'font-bold text-slate-900 group-hover:text-blue-600 transition-colors')}>
+                              <h4 className={cn(TYPOGRAPHY.bodyXs, 'font-bold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors')}>
                                 钉钉
                               </h4>
-                              <span className={cn(TYPOGRAPHY.micro, 'bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded-full border border-slate-200')}>
+                              <span className={cn(TYPOGRAPHY.micro, 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold px-1.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700')}>
                                 未配置
                               </span>
                             </div>
-                            <p className={cn(TYPOGRAPHY.micro, 'text-slate-400 group-hover:text-slate-500 transition-colors truncate')}>
+                            <p className={cn(TYPOGRAPHY.micro, 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-colors truncate')}>
                               支持同步部门、员工及角色组
                             </p>
                           </div>
@@ -654,7 +650,10 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                             <Button
                               size="small"
                               variant="outline"
-                              className={cn(TYPOGRAPHY.bodyXs, 'h-8 px-3')}
+                              className={cn(
+                                TYPOGRAPHY.bodyXs,
+                                'h-8 px-3 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                              )}
                               onClick={() => setConfigProvider('DingTalk')}
                             >
                               去配置
@@ -663,20 +662,20 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                           </div>
                         </div>
 
-                        <div className="group relative bg-white rounded-xl border border-slate-200 p-2 flex items-center gap-4 transition-all hover:border-teal-300 hover:shadow-lg hover:shadow-teal-500/5">
-                          <div className="w-14 h-14 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 grayscale group-hover:grayscale-0 transition-all duration-300">
+                        <div className="group relative bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-2 flex items-center gap-4 transition-all hover:border-teal-300 dark:hover:border-teal-400/50 hover:shadow-lg hover:shadow-teal-500/5 dark:hover:shadow-teal-500/20">
+                          <div className="w-14 h-14 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0 grayscale group-hover:grayscale-0 transition-all duration-300">
                             <ThirdPartyIcons.Lark />
                           </div>
                           <div className="flex-1 min-w-0 py-0.5">
                             <div className="flex items-center gap-2 mb-1">
-                              <h4 className={cn(TYPOGRAPHY.bodyXs, 'font-bold text-slate-900 group-hover:text-teal-600 transition-colors')}>
+                              <h4 className={cn(TYPOGRAPHY.bodyXs, 'font-bold text-slate-900 dark:text-slate-100 group-hover:text-teal-600 dark:group-hover:text-teal-300 transition-colors')}>
                                 飞书
                               </h4>
-                              <span className={cn(TYPOGRAPHY.micro, 'bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded-full border border-slate-200')}>
+                              <span className={cn(TYPOGRAPHY.micro, 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold px-1.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700')}>
                                 未配置
                               </span>
                             </div>
-                            <p className={cn(TYPOGRAPHY.micro, 'text-slate-400 group-hover:text-slate-500 transition-colors truncate')}>
+                            <p className={cn(TYPOGRAPHY.micro, 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-colors truncate')}>
                               支持同步组织架构与文档权限
                             </p>
                           </div>
@@ -684,7 +683,10 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                             <Button
                               size="small"
                               variant="outline"
-                              className={cn(TYPOGRAPHY.bodyXs, 'h-8 px-3')}
+                              className={cn(
+                                TYPOGRAPHY.bodyXs,
+                                'h-8 px-3 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                              )}
                               onClick={() => setConfigProvider('Lark')}
                             >
                               去配置
@@ -696,10 +698,10 @@ export function AddMemberModal({ isOpen, onClose, role, users, onAddUser }: AddM
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 p-4 border-t border-slate-100 text-center">
-                    <p className={cn(TYPOGRAPHY.micro, 'text-slate-400')}>
-                      需要协助？查看 <a href="#" className="text-brand-600 hover:underline">配置指南</a> 或{' '}
-                      <a href="#" className="text-brand-600 hover:underline">联系技术支持</a>
+                  <div className="bg-slate-50 dark:bg-slate-900/70 p-4 border-t border-slate-100 dark:border-slate-800/80 text-center">
+                    <p className={cn(TYPOGRAPHY.micro, 'text-slate-400 dark:text-slate-500')}>
+                      需要协助？查看 <a href="#" className="text-brand-600 dark:text-brand-300 hover:underline">配置指南</a> 或{' '}
+                      <a href="#" className="text-brand-600 dark:text-brand-300 hover:underline">联系技术支持</a>
                     </p>
                   </div>
                 </div>

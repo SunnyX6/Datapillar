@@ -18,6 +18,9 @@ public class User {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    @TableField("tenant_id")
+    private Long tenantId;
+
     private String username;
 
     @TableField("password")
@@ -25,13 +28,9 @@ public class User {
 
     private String email;
 
+    private String phone;
+
     private Integer status;  // 1:启用 0:禁用
-
-    @TableField("token_sign")
-    private String tokenSign;  // 登录Token签名（用于SSO验证和Token撤销）
-
-    @TableField("token_expire_time")
-    private LocalDateTime tokenExpireTime;  // Token过期时间
 
     @TableField("created_at")
     private LocalDateTime createdAt;

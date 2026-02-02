@@ -42,9 +42,10 @@ public class JwtTokenUtil {
     /**
      * 生成 Access Token
      */
-    public String generateAccessToken(Long userId, String username, String email) {
+    public String generateAccessToken(Long userId, Long tenantId, String username, String email) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
+        claims.put("tenantId", tenantId);
         claims.put("username", username);
         claims.put("email", email);
         claims.put("tokenType", "access");
@@ -67,9 +68,10 @@ public class JwtTokenUtil {
      * @param userId 用户ID
      * @param rememberMe 是否记住我（true=30天，false=7天）
      */
-    public String generateRefreshToken(Long userId, Boolean rememberMe) {
+    public String generateRefreshToken(Long userId, Long tenantId, Boolean rememberMe) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("tokenType", "refresh");
+        claims.put("tenantId", tenantId);
         claims.put("rememberMe", rememberMe != null && rememberMe);
 
         Date now = new Date();
@@ -127,6 +129,21 @@ public class JwtTokenUtil {
     public Long getUserId(String token) {
         Claims claims = parseToken(token);
         return Long.parseLong(claims.getSubject());
+    }
+
+    /**
+     * 从 Token 提取 tenantId
+     */
+    public Long getTenantId(String token) {
+        Claims claims = parseToken(token);
+        Object tenantId = claims.get("tenantId");
+        if (tenantId instanceof Number) {
+            return ((Number) tenantId).longValue();
+        }
+        if (tenantId instanceof String) {
+            return Long.parseLong((String) tenantId);
+        }
+        return null;
     }
 
     /**

@@ -9,10 +9,10 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { login as apiLogin, logout as apiLogout } from '@/lib/api/auth'
+import { login as apiLogin, logout as apiLogout, ssoLogin as apiSsoLogin } from '@/lib/api/auth'
 import { getTokenInfo } from '@/lib/api/token'
 import { setUnauthorizedHandler } from '@/lib/api/client'
-import type { User } from '@/types/auth'
+import type { SsoLoginRequest, User } from '@/types/auth'
 
 /**
  * 认证状态接口
@@ -23,7 +23,18 @@ interface AuthStore {
   error: string | null
   isAuthenticated: boolean
 
-  login: (username: string, password: string, rememberMe?: boolean) => Promise<void>
+  login: (
+    username: string,
+    password: string,
+    rememberMe?: boolean,
+    options?: {
+      tenantCode?: string
+      inviteCode?: string
+      email?: string
+      phone?: string
+    }
+  ) => Promise<void>
+  loginWithSso: (request: SsoLoginRequest) => Promise<void>
   logout: () => Promise<void>
   initializeAuth: () => Promise<void>
   clearError: () => void
@@ -43,18 +54,26 @@ export const useAuthStore = create<AuthStore>()(
       /**
        * 登录
        */
-      login: async (username: string, password: string, rememberMe = false) => {
+      login: async (username: string, password: string, rememberMe = false, options) => {
         set({ loading: true, error: null })
 
         try {
-          const response = await apiLogin({ username, password, rememberMe })
+          const response = await apiLogin({
+            username,
+            password,
+            rememberMe,
+            tenantCode: options?.tenantCode,
+            inviteCode: options?.inviteCode,
+            email: options?.email,
+            phone: options?.phone
+          })
 
           const user: User = {
             userId: response.userId,
+            tenantId: response.tenantId,
             username: response.username,
             email: response.email,
             roles: response.roles,
-            permissions: response.permissions,
             menus: response.menus
           }
 
@@ -65,6 +84,41 @@ export const useAuthStore = create<AuthStore>()(
             error: null
           })
 
+        } catch (error) {
+          set({
+            user: null,
+            isAuthenticated: false,
+            loading: false,
+            error: error instanceof Error ? error.message : '登录失败'
+          })
+          throw error
+        }
+      },
+
+      /**
+       * SSO 登录
+       */
+      loginWithSso: async (request: SsoLoginRequest) => {
+        set({ loading: true, error: null })
+
+        try {
+          const response = await apiSsoLogin(request)
+
+          const user: User = {
+            userId: response.userId,
+            tenantId: response.tenantId,
+            username: response.username,
+            email: response.email,
+            roles: response.roles,
+            menus: response.menus
+          }
+
+          set({
+            user,
+            isAuthenticated: true,
+            loading: false,
+            error: null
+          })
         } catch (error) {
           set({
             user: null,

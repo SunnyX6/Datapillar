@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,6 +22,9 @@ public class AuthDto {
 
     @Data
     public static class LoginRequest {
+        @NotBlank(message = "租户编码不能为空")
+        private String tenantCode;
+
         @NotBlank(message = "用户名不能为空")
         private String username;
 
@@ -29,6 +33,16 @@ public class AuthDto {
 
         /** 记住我（7天 vs 30天） */
         private Boolean rememberMe = false;
+
+        /** 邀请码（首次入库必填） */
+        private String inviteCode;
+
+        /** 邮箱（邀请匹配用，可选） */
+        @Email(message = "邮箱格式不正确")
+        private String email;
+
+        /** 手机号（邀请匹配用，可选） */
+        private String phone;
     }
 
     @Data
@@ -36,11 +50,20 @@ public class AuthDto {
     @AllArgsConstructor
     public static class LoginResponse {
         private Long userId;
+        private Long tenantId;
         private String username;
         private String email;
-        private List<String> roles;
-        private List<String> permissions;
+        private List<RoleInfo> roles;
         private List<MenuInfo> menus;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RoleInfo {
+        private Long id;
+        private String name;
+        private String type;
     }
 
     @Data
@@ -50,8 +73,10 @@ public class AuthDto {
         private Long id;
         private String name;
         private String path;
-        private String icon;
         private String permissionCode;
+        private String location;
+        private Long categoryId;
+        private String categoryName;
         private List<MenuInfo> children;
     }
 
@@ -71,14 +96,16 @@ public class AuthDto {
     public static class TokenResponse {
         private boolean valid;
         private Long userId;
+        private Long tenantId;
         private String username;
         private String email;
         private String errorMessage;
 
-        public static TokenResponse success(Long userId, String username, String email) {
+        public static TokenResponse success(Long userId, Long tenantId, String username, String email) {
             TokenResponse dto = new TokenResponse();
             dto.setValid(true);
             dto.setUserId(userId);
+            dto.setTenantId(tenantId);
             dto.setUsername(username);
             dto.setEmail(email);
             return dto;
@@ -95,6 +122,7 @@ public class AuthDto {
         private Long expirationTime;
         private Long issuedAt;
         private Long userId;
+        private Long tenantId;
         private String username;
     }
 
@@ -103,30 +131,35 @@ public class AuthDto {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class SsoValidateRequest {
-        private String token;
+    public static class SsoLoginRequest {
+        @NotBlank(message = "租户编码不能为空")
+        private String tenantCode;
+
+        @NotBlank(message = "SSO 提供方不能为空")
+        private String provider;
+
+        @NotBlank(message = "授权码不能为空")
+        private String authCode;
+
+        @NotBlank(message = "state 不能为空")
+        private String state;
+
+        /** 邀请码（首次入库必填） */
+        private String inviteCode;
     }
 
     @Data
-    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class SsoValidateResponse {
-        private Boolean valid;
-        private Long userId;
-        private String username;
-        private String email;
-        private List<String> roles;
-        private String message;
+    public static class SsoQrResponse {
+        /** SDK / URL */
+        private String type;
 
-        public static SsoValidateResponse success(Long userId, String username, String email) {
-            return SsoValidateResponse.builder()
-                    .valid(true)
-                    .userId(userId)
-                    .username(username)
-                    .email(email)
-                    .build();
-        }
+        /** 登录 state */
+        private String state;
+
+        /** 扫码/授权配置 */
+        private java.util.Map<String, Object> payload;
     }
 
     // ==================== OAuth2 ====================

@@ -25,7 +25,8 @@
   - knowledge_document（文档元数据）
   - knowledge_document_job（切分/重嵌入任务进度）
 - 说明：`token_count` 暂不统计，默认返回 0（后续核心功能完善再启用）
-- 说明：`doc_uid` 为向量库文档ID（hash），用于和 Milvus 对齐
+- 说明：`doc_uid` 为后端生成的稳定文档ID（必填、由 datapillar-ai 生成），用于与向量库对齐
+- 约束：`doc_uid` **不得包含冒号**（`:`），长度建议 ≤ 64
 - 说明：`embedding_model_id/embedding_dimension` 从 `ai_model` 选择并快照
 
 ## 切分任务进度与断线恢复（不使用 Redis）
@@ -134,7 +135,7 @@
     {
       "document_id": 10,
       "namespace_id": 1,
-      "doc_uid": "2b1d0e6d8b6b4c7f8a5c...",
+      "doc_uid": "doc_20260128_0001",
       "title": "Backend_Arch.md",
       "file_type": "md",
       "size_bytes": 12034,

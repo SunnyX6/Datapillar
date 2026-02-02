@@ -1,8 +1,6 @@
 package com.sunny.datapillar.admin.module.user.dto;
 
-import java.time.LocalDateTime;
 import java.util.List;
-
 import lombok.Data;
 
 /**
@@ -16,15 +14,14 @@ public class MenuDto {
     public static class Response {
         private Long id;
         private Long parentId;
+        private String type;
         private String name;
         private String path;
-        private String component;
-        private String icon;
-        private String permissionCode;
-        private Integer visible;
+        private String location;
         private Integer sort;
-        private LocalDateTime createdAt;
-        private LocalDateTime updatedAt;
+        private Integer status;
+        private Long categoryId;
+        private String categoryName;
         private List<Response> children;
     }
 }

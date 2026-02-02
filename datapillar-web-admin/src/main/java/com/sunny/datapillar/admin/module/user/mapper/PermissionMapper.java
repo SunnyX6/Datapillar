@@ -25,4 +25,9 @@ public interface PermissionMapper extends BaseMapper<Permission> {
      * 根据用户ID查询权限列表
      */
     List<Permission> selectByUserId(@Param("userId") Long userId);
+
+    /**
+     * 根据权限代码查询权限
+     */
+    Permission findByCode(@Param("code") String code);
 }

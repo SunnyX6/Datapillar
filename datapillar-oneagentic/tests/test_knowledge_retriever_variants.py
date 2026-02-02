@@ -128,7 +128,7 @@ async def test_score_threshold() -> None:
     )
     knowledge = Knowledge(
         sources=[
-            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, source_id="s1", name="demo", source_type="doc")
+            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, doc_uid="doc1", source_id="s1", name="demo", source_type="doc")
         ],
         sparse_embedder=_StubSparseEmbedder(),
     )
@@ -291,7 +291,7 @@ async def test_rank_sparse() -> None:
     )
     knowledge = Knowledge(
         sources=[
-            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, source_id="s1", name="demo", source_type="doc")
+            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, doc_uid="doc1", source_id="s1", name="demo", source_type="doc")
         ],
         sparse_embedder=_StubSparseEmbedder(),
     )
@@ -336,7 +336,7 @@ async def test_retriever_filters() -> None:
     )
     knowledge = Knowledge(
         sources=[
-            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, source_id="s1", name="demo", source_type="doc")
+            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, doc_uid="doc1", source_id="s1", name="demo", source_type="doc")
         ],
         sparse_embedder=_StubSparseEmbedder(),
     )
@@ -361,7 +361,7 @@ async def test_retriever_scope() -> None:
     )
     knowledge = Knowledge(
         sources=[
-            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, source_id="s1", name="demo", source_type="doc")
+            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, doc_uid="doc1", source_id="s1", name="demo", source_type="doc")
         ],
         sparse_embedder=_StubSparseEmbedder(),
     )
@@ -385,7 +385,7 @@ async def test_retriever_scope2() -> None:
     )
     knowledge = Knowledge(
         sources=[
-            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, source_id="s1", name="demo", source_type="doc")
+            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, doc_uid="doc1", source_id="s1", name="demo", source_type="doc")
         ],
         sparse_embedder=_StubSparseEmbedder(),
     )
@@ -453,7 +453,7 @@ async def test_rerank_weighted(monkeypatch) -> None:
     )
     knowledge = Knowledge(
         sources=[
-            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, source_id="s1", name="demo", source_type="doc")
+            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, doc_uid="doc1", source_id="s1", name="demo", source_type="doc")
         ],
         sparse_embedder=_StubSparseEmbedder(),
     )
@@ -519,7 +519,7 @@ async def test_normalize_minmax(monkeypatch) -> None:
     )
     knowledge = Knowledge(
         sources=[
-            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, source_id="s1", name="demo", source_type="doc")
+            KnowledgeSource(source="stub", chunk=DEFAULT_CHUNK, doc_uid="doc1", source_id="s1", name="demo", source_type="doc")
         ],
         sparse_embedder=_StubSparseEmbedder(),
     )

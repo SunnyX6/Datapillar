@@ -3,16 +3,32 @@
 <mapper namespace="com.sunny.datapillar.admin.module.user.mapper.MenuMapper">
 
     <select id="findByUserId" resultType="com.sunny.datapillar.admin.module.user.entity.Menu">
-        SELECT DISTINCT m.* FROM menus m
-        INNER JOIN menu_roles mr ON m.id = mr.menu_id
-        INNER JOIN user_roles ur ON mr.role_id = ur.role_id
-        WHERE ur.user_id = #{userId}
-          AND m.visible = 1
-        ORDER BY m.sort ASC, m.id ASC
+        SELECT DISTINCT o.*, c.name AS category_name
+        FROM permission_objects o
+        LEFT JOIN permission_object_categories c ON o.category_id = c.id
+        WHERE o.type = MENU
+          AND o.status = 1
+          AND (#{location} IS NULL OR #{location} =  OR o.location = #{location})
+          AND o.id IN (
+                SELECT rp.object_id
+                FROM role_permissions rp
+                INNER JOIN user_roles ur ON ur.role_id = rp.role_id
+                WHERE ur.user_id = #{userId}
+                UNION
+                SELECT up.object_id
+                FROM user_permission_overrides up
+                WHERE up.user_id = #{userId}
+          )
+        ORDER BY o.sort ASC, o.id ASC
     </select>
 
     <select id="findAllVisible" resultType="com.sunny.datapillar.admin.module.user.entity.Menu">
-        SELECT * FROM menus WHERE visible = 1 ORDER BY sort ASC, id ASC
+        SELECT o.*, c.name AS category_name
+        FROM permission_objects o
+        LEFT JOIN permission_object_categories c ON o.category_id = c.id
+        WHERE o.type = MENU
+          AND o.status = 1
+        ORDER BY o.sort ASC, o.id ASC
     </select>
 
 </mapper>

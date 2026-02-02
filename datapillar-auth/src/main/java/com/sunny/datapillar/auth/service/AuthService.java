@@ -4,16 +4,37 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.sunny.datapillar.auth.dto.AuthDto;
+import com.sunny.datapillar.auth.entity.OrgUser;
+import com.sunny.datapillar.auth.entity.Tenant;
+import com.sunny.datapillar.auth.entity.TenantUser;
 import com.sunny.datapillar.auth.entity.User;
+import com.sunny.datapillar.auth.entity.UserIdentity;
+import com.sunny.datapillar.auth.entity.UserInvitation;
+import com.sunny.datapillar.auth.entity.UserRole;
+import com.sunny.datapillar.auth.mapper.OrgUserMapper;
+import com.sunny.datapillar.auth.mapper.TenantMapper;
+import com.sunny.datapillar.auth.mapper.TenantUserMapper;
 import com.sunny.datapillar.auth.mapper.UserMapper;
+import com.sunny.datapillar.auth.mapper.UserIdentityMapper;
+import com.sunny.datapillar.auth.mapper.UserInvitationMapper;
+import com.sunny.datapillar.auth.mapper.UserInvitationOrgMapper;
+import com.sunny.datapillar.auth.mapper.UserInvitationRoleMapper;
+import com.sunny.datapillar.auth.mapper.UserRoleMapper;
 import com.sunny.datapillar.auth.security.JwtTokenUtil;
+import com.sunny.datapillar.auth.sso.SsoAuthService;
+import com.sunny.datapillar.auth.sso.SsoQrService;
+import com.sunny.datapillar.auth.sso.model.SsoQrResponse;
+import com.sunny.datapillar.auth.sso.model.SsoUserInfo;
 import com.sunny.datapillar.common.error.ErrorCode;
 import com.sunny.datapillar.common.exception.BusinessException;
 
@@ -34,8 +55,18 @@ import lombok.extern.slf4j.Slf4j;
 public class AuthService {
 
     private final UserMapper userMapper;
+    private final TenantMapper tenantMapper;
+    private final TenantUserMapper tenantUserMapper;
+    private final UserInvitationMapper userInvitationMapper;
+    private final UserInvitationOrgMapper userInvitationOrgMapper;
+    private final UserInvitationRoleMapper userInvitationRoleMapper;
+    private final OrgUserMapper orgUserMapper;
+    private final UserRoleMapper userRoleMapper;
+    private final UserIdentityMapper userIdentityMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenUtil jwtTokenUtil;
+    private final SsoAuthService ssoAuthService;
+    private final SsoQrService ssoQrService;
 
     @Value("${cookie.secure:false}")
     private boolean cookieSecure;
@@ -46,49 +77,68 @@ public class AuthService {
     /**
      * 用户登录
      */
+    @Transactional
     public AuthDto.LoginResponse login(AuthDto.LoginRequest request, HttpServletResponse response) {
+        Tenant tenant = loadTenant(request.getTenantCode());
         User user = userMapper.selectByUsername(request.getUsername());
+
+        if (user != null) {
+            if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+                log.warn("登录失败: 密码错误, username={}", request.getUsername());
+                throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
+            }
+            validateUserStatus(user);
+        }
+
+        TenantUser tenantUser = null;
         if (user == null) {
-            log.warn("登录失败: 用户不存在, username={}", request.getUsername());
-            throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
+            UserInvitation invitation = loadValidInvitation(request.getInviteCode(), tenant.getId());
+            validateInviteMatch(invitation, request.getEmail(), request.getPhone());
+            user = createLocalUser(tenant.getId(), request);
+            applyInvitation(tenant, user, invitation);
+        } else {
+            tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenant.getId(), user.getId());
+            if (tenantUser == null) {
+                UserInvitation invitation = loadValidInvitation(request.getInviteCode(), tenant.getId());
+                String matchEmail = pickFirstNotBlank(user.getEmail(), request.getEmail());
+                String matchPhone = pickFirstNotBlank(user.getPhone(), request.getPhone());
+                validateInviteMatch(invitation, matchEmail, matchPhone);
+                updateUserContactIfBlank(user, request.getEmail(), request.getPhone());
+                applyInvitation(tenant, user, invitation);
+            } else {
+                validateTenantUserStatus(tenantUser, tenant.getId(), user.getId());
+            }
         }
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            log.warn("登录失败: 密码错误, username={}", request.getUsername());
-            throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
+        if (tenantUser == null) {
+            tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenant.getId(), user.getId());
         }
 
-        if (user.getStatus() == null || user.getStatus() != 1) {
-            log.warn("登录失败: 用户被禁用, username={}", request.getUsername());
-            throw new BusinessException(ErrorCode.AUTH_USER_DISABLED);
-        }
+        String accessToken = jwtTokenUtil.generateAccessToken(user.getId(), tenant.getId(), user.getUsername(), user.getEmail());
+        String refreshToken = jwtTokenUtil.generateRefreshToken(user.getId(), tenant.getId(), request.getRememberMe());
+        updateTenantUserToken(tenant.getId(), user.getId(), accessToken);
 
-        String accessToken = jwtTokenUtil.generateAccessToken(user.getId(), user.getUsername(), user.getEmail());
-        String refreshToken = jwtTokenUtil.generateRefreshToken(user.getId(), request.getRememberMe());
-
-        String tokenSign = jwtTokenUtil.extractTokenSignature(accessToken);
-        LocalDateTime expireTime = LocalDateTime.now().plusSeconds(jwtTokenUtil.getAccessTokenExpiration());
-        userMapper.updateTokenSign(user.getId(), tokenSign, expireTime);
-
-        List<String> roles = userMapper.selectRoleCodesByUserId(user.getId());
-        List<String> permissions = userMapper.selectPermissionCodesByUserId(user.getId());
-        List<Map<String, Object>> menuMaps = userMapper.selectMenusByUserId(user.getId());
-        List<AuthDto.MenuInfo> menus = buildMenuTree(menuMaps);
-
-        // 设置 HttpOnly Cookie
+        AuthDto.LoginResponse loginResponse = buildLoginResponse(tenant.getId(), user);
         setAuthCookies(response, accessToken, refreshToken);
 
-        log.info("登录成功: userId={}, username={}", user.getId(), user.getUsername());
-
-        AuthDto.LoginResponse loginResponse = new AuthDto.LoginResponse();
-        loginResponse.setUserId(user.getId());
-        loginResponse.setUsername(user.getUsername());
-        loginResponse.setEmail(user.getEmail());
-        loginResponse.setRoles(roles);
-        loginResponse.setPermissions(permissions);
-        loginResponse.setMenus(menus);
-
+        log.info("登录成功: tenantId={}, userId={}, username={}", tenant.getId(), user.getId(), user.getUsername());
         return loginResponse;
+    }
+
+    /**
+     * SSO 扫码配置
+     */
+    public AuthDto.SsoQrResponse getSsoQr(String tenantCode, String provider) {
+        if (tenantCode == null || tenantCode.isBlank()) {
+            throw new BusinessException(ErrorCode.AUTH_INVALID_ARGUMENT);
+        }
+        String normalizedProvider = normalizeProvider(provider);
+        if (normalizedProvider == null || normalizedProvider.isBlank()) {
+            throw new BusinessException(ErrorCode.AUTH_INVALID_ARGUMENT);
+        }
+        Tenant tenant = loadTenant(tenantCode);
+        SsoQrResponse qrResponse = ssoQrService.buildQr(tenant.getId(), normalizedProvider);
+        return new AuthDto.SsoQrResponse(qrResponse.getType(), qrResponse.getState(), qrResponse.getPayload());
     }
 
     /**
@@ -116,6 +166,19 @@ public class AuthService {
             }
 
             Long userId = jwtTokenUtil.getUserId(refreshToken);
+            Long tenantId = jwtTokenUtil.getTenantId(refreshToken);
+            if (tenantId == null) {
+                throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID);
+            }
+
+            Tenant tenant = tenantMapper.selectById(tenantId);
+            if (tenant == null) {
+                throw new BusinessException(ErrorCode.AUTH_TENANT_NOT_FOUND, String.valueOf(tenantId));
+            }
+            if (tenant.getStatus() == null || tenant.getStatus() != 1) {
+                throw new BusinessException(ErrorCode.AUTH_TENANT_DISABLED, tenantId);
+            }
+
             User user = userMapper.selectById(userId);
             if (user == null) {
                 throw new BusinessException(ErrorCode.AUTH_USER_NOT_FOUND, userId);
@@ -125,11 +188,14 @@ public class AuthService {
                 throw new BusinessException(ErrorCode.AUTH_USER_DISABLED);
             }
 
-            String newAccessToken = jwtTokenUtil.generateAccessToken(user.getId(), user.getUsername(), user.getEmail());
+            TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, userId);
+            if (tenantUser == null) {
+                throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+            }
+            validateTenantUserStatus(tenantUser, tenantId, userId);
 
-            String tokenSign = jwtTokenUtil.extractTokenSignature(newAccessToken);
-            LocalDateTime expireTime = LocalDateTime.now().plusSeconds(jwtTokenUtil.getAccessTokenExpiration());
-            userMapper.updateTokenSign(user.getId(), tokenSign, expireTime);
+            String newAccessToken = jwtTokenUtil.generateAccessToken(user.getId(), tenantId, user.getUsername(), user.getEmail());
+            updateTenantUserToken(tenantId, userId, newAccessToken);
 
             // 设置新的 access token cookie
             Cookie accessTokenCookie = new Cookie("auth-token", newAccessToken);
@@ -139,10 +205,11 @@ public class AuthService {
             accessTokenCookie.setMaxAge(cookieMaxAge);
             response.addCookie(accessTokenCookie);
 
-            log.info("刷新令牌成功: userId={}, username={}", user.getId(), user.getUsername());
+            log.info("刷新令牌成功: tenantId={}, userId={}, username={}", tenantId, user.getId(), user.getUsername());
 
             AuthDto.LoginResponse loginResponse = new AuthDto.LoginResponse();
             loginResponse.setUserId(user.getId());
+            loginResponse.setTenantId(tenantId);
             loginResponse.setUsername(user.getUsername());
             loginResponse.setEmail(user.getEmail());
 
@@ -207,8 +274,21 @@ public class AuthService {
         }
 
         Long userId = Long.parseLong(claims.getSubject());
+        Long tenantId = jwtTokenUtil.getTenantId(token);
         String username = claims.get("username", String.class);
         String email = claims.get("email", String.class);
+
+        if (tenantId == null) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID);
+        }
+
+        Tenant tenant = tenantMapper.selectById(tenantId);
+        if (tenant == null) {
+            throw new BusinessException(ErrorCode.AUTH_TENANT_NOT_FOUND, String.valueOf(tenantId));
+        }
+        if (tenant.getStatus() == null || tenant.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.AUTH_TENANT_DISABLED, tenantId);
+        }
 
         User user = userMapper.selectById(userId);
         if (user == null) {
@@ -219,39 +299,83 @@ public class AuthService {
             throw new BusinessException(ErrorCode.AUTH_USER_DISABLED);
         }
 
-        return AuthDto.TokenResponse.success(userId, username, email);
-    }
-
-    /**
-     * SSO Token 验证
-     */
-    public AuthDto.SsoValidateResponse validateSsoToken(AuthDto.SsoValidateRequest request) {
-        String token = request.getToken();
-        Claims claims = jwtTokenUtil.parseToken(token);
-
-        String tokenType = claims.get("tokenType", String.class);
-        if (!"access".equals(tokenType)) {
-            throw new BusinessException(ErrorCode.AUTH_TOKEN_TYPE_ERROR);
+        TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, userId);
+        if (tenantUser == null) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
         }
+        validateTenantUserStatus(tenantUser, tenantId, userId);
 
-        Long userId = Long.parseLong(claims.getSubject());
         String tokenSign = jwtTokenUtil.extractTokenSignature(token);
-
-        User user = userMapper.selectByIdAndTokenSign(userId, tokenSign);
-        if (user == null) {
+        if (tenantUser.getTokenSign() == null || !tenantUser.getTokenSign().equals(tokenSign)) {
             throw new BusinessException(ErrorCode.AUTH_TOKEN_REVOKED);
         }
-
-        if (user.getTokenExpireTime() != null && user.getTokenExpireTime().isBefore(LocalDateTime.now())) {
+        if (tenantUser.getTokenExpireTime() != null && tenantUser.getTokenExpireTime().isBefore(LocalDateTime.now())) {
             throw new BusinessException(ErrorCode.AUTH_TOKEN_EXPIRED);
         }
 
-        if (user.getStatus() == null || user.getStatus() != 1) {
-            throw new BusinessException(ErrorCode.AUTH_USER_DISABLED);
+        return AuthDto.TokenResponse.success(userId, tenantId, username, email);
+    }
+
+    /**
+     * SSO 登录
+     */
+    @Transactional
+    public AuthDto.LoginResponse loginWithSso(AuthDto.SsoLoginRequest request, HttpServletResponse response) {
+        Tenant tenant = loadTenant(request.getTenantCode());
+        String provider = normalizeProvider(request.getProvider());
+        if (provider == null || provider.isBlank()) {
+            throw new BusinessException(ErrorCode.AUTH_INVALID_ARGUMENT);
         }
 
-        log.info("SSO 校验成功: userId={}, username={}", user.getId(), user.getUsername());
-        return AuthDto.SsoValidateResponse.success(user.getId(), user.getUsername(), user.getEmail());
+        SsoUserInfo userInfo = ssoAuthService.authenticate(tenant.getId(), provider, request.getAuthCode(), request.getState());
+        String externalUserId = userInfo.getExternalUserId();
+        String username = userInfo.getNick();
+        String email = userInfo.getEmail();
+        String mobile = userInfo.getMobile();
+
+        UserIdentity identity = userIdentityMapper.selectByProviderAndExternalUserId(tenant.getId(), provider, externalUserId);
+        User user = null;
+        if (identity != null) {
+            user = userMapper.selectById(identity.getUserId());
+            if (user == null) {
+                throw new BusinessException(ErrorCode.AUTH_USER_NOT_FOUND, identity.getUserId());
+            }
+        } else if (email != null && !email.isBlank()) {
+            user = userMapper.selectByEmail(email);
+        }
+
+        if (user != null) {
+            validateUserStatus(user);
+            TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenant.getId(), user.getId());
+            if (tenantUser == null) {
+                UserInvitation invitation = loadValidInvitation(request.getInviteCode(), tenant.getId());
+                validateInviteMatch(invitation, email, mobile);
+                updateUserContactIfBlank(user, email, mobile);
+                applyInvitation(tenant, user, invitation);
+            } else {
+                validateTenantUserStatus(tenantUser, tenant.getId(), user.getId());
+            }
+            if (identity == null) {
+                createUserIdentity(tenant.getId(), user.getId(), provider, userInfo);
+            }
+        } else {
+            UserInvitation invitation = loadValidInvitation(request.getInviteCode(), tenant.getId());
+            validateInviteMatch(invitation, email, mobile);
+            String finalUsername = buildSsoUsername(username, email, externalUserId);
+            user = createSsoUser(tenant.getId(), finalUsername, email, mobile);
+            applyInvitation(tenant, user, invitation);
+            createUserIdentity(tenant.getId(), user.getId(), provider, userInfo);
+        }
+
+        String accessToken = jwtTokenUtil.generateAccessToken(user.getId(), tenant.getId(), user.getUsername(), user.getEmail());
+        String refreshToken = jwtTokenUtil.generateRefreshToken(user.getId(), tenant.getId(), false);
+        updateTenantUserToken(tenant.getId(), user.getId(), accessToken);
+
+        AuthDto.LoginResponse loginResponse = buildLoginResponse(tenant.getId(), user);
+        setAuthCookies(response, accessToken, refreshToken);
+
+        log.info("SSO 登录成功: tenantId={}, userId={}, username={}", tenant.getId(), user.getId(), user.getUsername());
+        return loginResponse;
     }
 
     /**
@@ -261,8 +385,11 @@ public class AuthService {
         try {
             if (accessToken != null && !accessToken.isBlank()) {
                 Long userId = jwtTokenUtil.getUserId(accessToken);
-                userMapper.clearTokenSign(userId);
-                log.info("用户退出登录: userId={}", userId);
+                Long tenantId = jwtTokenUtil.getTenantId(accessToken);
+                if (tenantId != null) {
+                    tenantUserMapper.clearTokenSign(tenantId, userId);
+                }
+                log.info("用户退出登录: tenantId={}, userId={}", tenantId, userId);
             }
         } finally {
             clearAuthCookies(response);
@@ -289,8 +416,238 @@ public class AuthService {
                 .expirationTime(expirationTime)
                 .issuedAt(claims.getIssuedAt().getTime())
                 .userId(Long.parseLong(claims.getSubject()))
+                .tenantId(jwtTokenUtil.getTenantId(accessToken))
                 .username(claims.get("username", String.class))
                 .build();
+    }
+
+    private Tenant loadTenant(String tenantCode) {
+        Tenant tenant = tenantMapper.selectByCode(tenantCode);
+        if (tenant == null) {
+            throw new BusinessException(ErrorCode.AUTH_TENANT_NOT_FOUND, tenantCode);
+        }
+        if (tenant.getStatus() == null || tenant.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.AUTH_TENANT_DISABLED, tenant.getId());
+        }
+        return tenant;
+    }
+
+    private void validateUserStatus(User user) {
+        if (user.getStatus() == null || user.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.AUTH_USER_DISABLED);
+        }
+    }
+
+    private void validateTenantUserStatus(TenantUser tenantUser, Long tenantId, Long userId) {
+        if (tenantUser.getStatus() == null || tenantUser.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.AUTH_TENANT_USER_DISABLED, tenantId, userId);
+        }
+    }
+
+    private UserInvitation loadValidInvitation(String inviteCode, Long tenantId) {
+        if (inviteCode == null || inviteCode.isBlank()) {
+            throw new BusinessException(ErrorCode.AUTH_INVITE_REQUIRED);
+        }
+        UserInvitation invitation = userInvitationMapper.selectByInviteCode(inviteCode);
+        if (invitation == null || invitation.getTenantId() == null || !invitation.getTenantId().equals(tenantId)) {
+            throw new BusinessException(ErrorCode.AUTH_INVITE_INVALID);
+        }
+        if (invitation.getStatus() != null && invitation.getStatus() != 0) {
+            if (invitation.getStatus() == 1) {
+                throw new BusinessException(ErrorCode.AUTH_INVITE_ALREADY_USED);
+            }
+            if (invitation.getStatus() == 2) {
+                throw new BusinessException(ErrorCode.AUTH_INVITE_EXPIRED);
+            }
+            throw new BusinessException(ErrorCode.AUTH_INVITE_INVALID);
+        }
+        if (invitation.getExpiresAt() != null && invitation.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new BusinessException(ErrorCode.AUTH_INVITE_EXPIRED);
+        }
+        return invitation;
+    }
+
+    private void validateInviteMatch(UserInvitation invitation, String email, String mobile) {
+        String inviteEmail = normalizeEmail(invitation.getInviteeEmail());
+        if (inviteEmail != null && !inviteEmail.isBlank()) {
+            String inputEmail = normalizeEmail(email);
+            if (inputEmail == null || !inviteEmail.equals(inputEmail)) {
+                throw new BusinessException(ErrorCode.AUTH_INVITE_MISMATCH);
+            }
+        }
+        String inviteMobile = normalizePhone(invitation.getInviteeMobile());
+        if (inviteMobile != null && !inviteMobile.isBlank()) {
+            String inputMobile = normalizePhone(mobile);
+            if (inputMobile == null || !inviteMobile.equals(inputMobile)) {
+                throw new BusinessException(ErrorCode.AUTH_INVITE_MISMATCH);
+            }
+        }
+    }
+
+    private void applyInvitation(Tenant tenant, User user, UserInvitation invitation) {
+        insertTenantUser(tenant.getId(), user.getId());
+
+        List<Long> orgIds = userInvitationOrgMapper.selectOrgIdsByInvitationId(invitation.getId());
+        if (orgIds != null) {
+            for (Long orgId : orgIds) {
+                OrgUser orgUser = new OrgUser();
+                orgUser.setTenantId(tenant.getId());
+                orgUser.setOrgId(orgId);
+                orgUser.setUserId(user.getId());
+                orgUser.setStatus(1);
+                orgUser.setJoinedAt(LocalDateTime.now());
+                orgUserMapper.insert(orgUser);
+            }
+        }
+
+        List<Long> roleIds = userInvitationRoleMapper.selectRoleIdsByInvitationId(invitation.getId());
+        if (roleIds != null) {
+            for (Long roleId : roleIds) {
+                UserRole userRole = new UserRole();
+                userRole.setTenantId(tenant.getId());
+                userRole.setUserId(user.getId());
+                userRole.setRoleId(roleId);
+                userRole.setCreatedAt(LocalDateTime.now());
+                userRoleMapper.insert(userRole);
+            }
+        }
+
+        int updated = userInvitationMapper.acceptInvitation(invitation.getId(), user.getId(), LocalDateTime.now(), LocalDateTime.now());
+        if (updated == 0) {
+            throw new BusinessException(ErrorCode.AUTH_INVITE_ALREADY_USED);
+        }
+    }
+
+    private void insertTenantUser(Long tenantId, Long userId) {
+        TenantUser tenantUser = new TenantUser();
+        tenantUser.setTenantId(tenantId);
+        tenantUser.setUserId(userId);
+        tenantUser.setStatus(1);
+        tenantUser.setIsDefault(tenantUserMapper.countByUserId(userId) == 0 ? 1 : 0);
+        tenantUser.setJoinedAt(LocalDateTime.now());
+        tenantUserMapper.insert(tenantUser);
+    }
+
+    private void updateTenantUserToken(Long tenantId, Long userId, String accessToken) {
+        String tokenSign = jwtTokenUtil.extractTokenSignature(accessToken);
+        LocalDateTime expireTime = LocalDateTime.now().plusSeconds(jwtTokenUtil.getAccessTokenExpiration());
+        int updated = tenantUserMapper.updateTokenSign(tenantId, userId, tokenSign, expireTime);
+        if (updated == 0) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_REVOKED);
+        }
+    }
+
+    private AuthDto.LoginResponse buildLoginResponse(Long tenantId, User user) {
+        List<AuthDto.RoleInfo> roles = userMapper.selectRolesByUserId(tenantId, user.getId());
+        List<Map<String, Object>> menuMaps = userMapper.selectMenusByUserId(tenantId, user.getId());
+        List<AuthDto.MenuInfo> menus = buildMenuTree(menuMaps);
+
+        AuthDto.LoginResponse loginResponse = new AuthDto.LoginResponse();
+        loginResponse.setUserId(user.getId());
+        loginResponse.setTenantId(tenantId);
+        loginResponse.setUsername(user.getUsername());
+        loginResponse.setEmail(user.getEmail());
+        loginResponse.setRoles(roles);
+        loginResponse.setMenus(menus);
+        return loginResponse;
+    }
+
+    private User createLocalUser(Long tenantId, AuthDto.LoginRequest request) {
+        User user = new User();
+        user.setTenantId(tenantId);
+        user.setUsername(request.getUsername());
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setEmail(request.getEmail());
+        user.setPhone(request.getPhone());
+        user.setStatus(1);
+        userMapper.insert(user);
+        return user;
+    }
+
+    private User createSsoUser(Long tenantId, String username, String email, String mobile) {
+        User user = new User();
+        user.setTenantId(tenantId);
+        user.setUsername(username);
+        user.setPasswordHash(passwordEncoder.encode("sso_" + UUID.randomUUID()));
+        user.setEmail(email);
+        user.setPhone(mobile);
+        user.setStatus(1);
+        userMapper.insert(user);
+        return user;
+    }
+
+    private String buildSsoUsername(String username, String email, String externalUserId) {
+        String candidate = pickFirstNotBlank(username, email);
+        if (candidate == null || candidate.isBlank()) {
+            candidate = "sso_" + externalUserId;
+        }
+        User existing = userMapper.selectByUsername(candidate);
+        if (existing != null) {
+            String fallback = "sso_" + externalUserId;
+            if (userMapper.selectByUsername(fallback) != null) {
+                throw new BusinessException(ErrorCode.AUTH_DUPLICATE_KEY);
+            }
+            return fallback;
+        }
+        return candidate;
+    }
+
+    private void updateUserContactIfBlank(User user, String email, String phone) {
+        boolean changed = false;
+        if ((user.getEmail() == null || user.getEmail().isBlank()) && email != null && !email.isBlank()) {
+            user.setEmail(email);
+            changed = true;
+        }
+        if ((user.getPhone() == null || user.getPhone().isBlank()) && phone != null && !phone.isBlank()) {
+            user.setPhone(phone);
+            changed = true;
+        }
+        if (changed) {
+            userMapper.updateById(user);
+        }
+    }
+
+    private void createUserIdentity(Long tenantId, Long userId, String provider, SsoUserInfo userInfo) {
+        UserIdentity identity = new UserIdentity();
+        identity.setTenantId(tenantId);
+        identity.setUserId(userId);
+        identity.setProvider(provider);
+        identity.setExternalUserId(userInfo.getExternalUserId());
+        identity.setUnionId(userInfo.getUnionId());
+        identity.setOpenId(userInfo.getOpenId());
+        identity.setEmail(userInfo.getEmail());
+        identity.setMobile(userInfo.getMobile());
+        identity.setProfileJson(userInfo.getRawJson());
+        identity.setStatus(1);
+        userIdentityMapper.insert(identity);
+    }
+
+    private String normalizeProvider(String provider) {
+        if (provider == null || provider.isBlank()) {
+            return null;
+        }
+        return provider.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String pickFirstNotBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        return second;
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null) {
+            return null;
+        }
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizePhone(String phone) {
+        if (phone == null) {
+            return null;
+        }
+        return phone.trim();
     }
 
     /**
@@ -307,8 +664,13 @@ public class AuthService {
             menu.setId(((Number) map.get("id")).longValue());
             menu.setName((String) map.get("name"));
             menu.setPath((String) map.get("path"));
-            menu.setIcon((String) map.get("icon"));
             menu.setPermissionCode((String) map.get("permission_code"));
+            menu.setLocation((String) map.get("location"));
+            Object categoryId = map.get("category_id");
+            if (categoryId instanceof Number) {
+                menu.setCategoryId(((Number) categoryId).longValue());
+            }
+            menu.setCategoryName((String) map.get("category_name"));
             menu.setChildren(new ArrayList<>());
             allMenus.add(menu);
         }

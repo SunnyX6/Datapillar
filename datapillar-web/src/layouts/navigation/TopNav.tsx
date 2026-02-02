@@ -27,8 +27,7 @@ import { useI18nStore, useSearchStore, type Language, type SearchContext } from 
 import { useTranslation } from 'react-i18next'
 import { iconSizeToken, inputContainerWidthClassMap, menuWidthClassMap } from '@/design-tokens/dimensions'
 import { Button } from '@/components/ui'
-
-type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide' | 'projects' | 'collaboration' | 'tracking'
+import type { Menu } from '@/types/auth'
 
 const LANGUAGE_OPTIONS: { id: Language; label: string }[] = [
   { id: 'zh-CN', label: '简体中文' },
@@ -45,8 +44,9 @@ interface TopNavProps {
   isDark: boolean
   toggleTheme: () => void
   user: UserInfo
-  onNavigate: (view: View) => void
-  currentView: View
+  menus: Menu[]
+  currentPath: string
+  onNavigate: (path: string) => void
   onLogout: () => void
   isSidebarCollapsed: boolean
   onToggleSidebar: () => void
@@ -57,8 +57,9 @@ export function TopNav({
   isDark,
   toggleTheme,
   user,
+  menus,
+  currentPath,
   onNavigate,
-  currentView,
   onLogout,
   isSidebarCollapsed,
   onToggleSidebar,
@@ -68,7 +69,7 @@ export function TopNav({
   const location = useLocation()
   const language = useI18nStore((state) => state.language)
   const setLanguage = useI18nStore((state) => state.setLanguage)
-  const { t } = useTranslation('navigation')
+  const { t, i18n } = useTranslation('navigation')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isGovernanceOpen, setIsGovernanceOpen] = useState(false)
   const [isLanguageOpen, setIsLanguageOpen] = useState(false)
@@ -79,6 +80,7 @@ export function TopNav({
   const governancePanelRef = useRef<HTMLDivElement | null>(null)
   const languagePanelRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const governanceLeaveTimerRef = useRef<number | null>(null)
 
   // 全局搜索状态
   const searchTerm = useSearchStore((state) => state.searchTerm)
@@ -159,18 +161,17 @@ export function TopNav({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  useEffect(() => {
+    return () => {
+      if (governanceLeaveTimerRef.current) {
+        window.clearTimeout(governanceLeaveTimerRef.current)
+        governanceLeaveTimerRef.current = null
+      }
+    }
+  }, [])
+
   const handleProfileClick = () => {
     onProfile()
-    setIsDropdownOpen(false)
-  }
-
-  const handleModelManagementClick = () => {
-    navigate('/profile/llm/models')
-    setIsDropdownOpen(false)
-  }
-
-  const handlePermissionClick = () => {
-    navigate('/profile/permission')
     setIsDropdownOpen(false)
   }
 
@@ -179,12 +180,117 @@ export function TopNav({
       setLanguage(next)
     }
     setIsLanguageOpen(false)
+    setIsGovernanceOpen(false)
+    setIsDropdownOpen(false)
   }
 
-  const isGovernanceActive = location.pathname.startsWith('/governance')
-  const isDashboardActive = currentView === 'dashboard' && !isGovernanceActive
-  const isProjectsActive = currentView === 'projects'
-  const isTeamActive = currentView === 'collaboration'
+  const topMenus = useMemo(() => menus.filter((menu) => menu.location === 'TOP'), [menus])
+  const governanceMenu = useMemo(() => topMenus.find((menu) => menu.path === '/governance'), [topMenus])
+  const profileMenu = useMemo(
+    () => menus.find((menu) => menu.location === 'PROFILE' && menu.path === '/profile') ?? menus.find((menu) => menu.location === 'PROFILE'),
+    [menus]
+  )
+  const profileItems = useMemo(() => {
+    if (!profileMenu) return []
+    return [profileMenu, ...(profileMenu.children ?? [])]
+  }, [profileMenu])
+
+  const isMenuActive = (path: string) => {
+    if (path === '/home') {
+      return currentPath === '/' || currentPath === '/home' || currentPath.startsWith('/home/')
+    }
+    return currentPath === path || currentPath.startsWith(`${path}/`)
+  }
+
+  const isGovernanceActive = governanceMenu ? isMenuActive(governanceMenu.path) : false
+
+  const topMenuIconMap: Record<string, React.ReactNode> = {
+    '/home': <LayoutGrid size={iconSizeToken.small} />,
+    '/governance': <ShieldCheck size={iconSizeToken.small} />,
+    '/projects': <FolderKanban size={iconSizeToken.small} />,
+    '/collaboration': <Users size={iconSizeToken.small} />
+  }
+
+  const getTopMenuIcon = (path: string) => {
+    return topMenuIconMap[path] ?? <Layers size={iconSizeToken.small} />
+  }
+
+  const governanceItemIconMap: Record<string, React.ReactNode> = {
+    '/governance/metadata': <Layers size={iconSizeToken.small} />,
+    '/governance/semantic': <Book size={iconSizeToken.small} />,
+    '/governance/knowledge': <Share2 size={iconSizeToken.small} />
+  }
+
+  const getGovernanceItemIcon = (path: string) => {
+    return governanceItemIconMap[path] ?? <Layers size={iconSizeToken.small} />
+  }
+
+  const getTopMenuLabel = (menu: Menu) => {
+    switch (menu.path) {
+      case '/home':
+        return t('top.tabs.dashboard', { defaultValue: menu.name })
+      case '/governance':
+        return t('top.tabs.governance', { defaultValue: menu.name })
+      case '/projects':
+        return t('top.tabs.projects', { defaultValue: menu.name })
+      case '/collaboration':
+        return t('top.tabs.team', { defaultValue: menu.name })
+      default:
+        return menu.name ?? menu.path
+    }
+  }
+
+  const getGovernanceItemLabel = (menu: Menu) => {
+    switch (menu.path) {
+      case '/governance/metadata':
+        return t('top.dropdown.metadata', { defaultValue: menu.name })
+      case '/governance/semantic':
+        return t('top.dropdown.semantic', { defaultValue: menu.name })
+      case '/governance/knowledge':
+        return t('top.dropdown.knowledge', { defaultValue: menu.name })
+      default:
+        return menu.name ?? menu.path
+    }
+  }
+
+  const getGovernanceItemDescription = (menu: Menu) => {
+    switch (menu.path) {
+      case '/governance/metadata':
+        return t('top.dropdown.metadataDesc', { defaultValue: menu.path })
+      case '/governance/semantic':
+        return t('top.dropdown.semanticDesc', { defaultValue: menu.path })
+      case '/governance/knowledge':
+        return t('top.dropdown.knowledgeDesc', { defaultValue: menu.path })
+      default:
+        return menu.path
+    }
+  }
+
+  const getProfileLabel = (menu: Menu) => {
+    switch (menu.path) {
+      case '/profile':
+        return t('top.profile.profile', { defaultValue: menu.name })
+      case '/profile/permission':
+        return t('top.profile.permission', { defaultValue: menu.name })
+      case '/profile/llm/models':
+        return t('top.profile.models', { defaultValue: menu.name })
+      case '/profile/billing':
+        return t('top.profile.billing', { defaultValue: menu.name })
+      default:
+        return menu.name ?? menu.path
+    }
+  }
+
+  const profileIconMap: Record<string, React.ReactNode> = {
+    '/profile': <UserIcon size={iconSizeToken.small} className="text-indigo-500" />,
+    '/profile/permission': <Shield size={iconSizeToken.small} className="text-amber-500" />,
+    '/profile/llm/models': <LayoutGrid size={iconSizeToken.small} className="text-blue-500" />,
+    '/profile/billing': <CreditCard size={iconSizeToken.small} className="text-emerald-500" />
+  }
+
+  const getProfileIcon = (path: string) => {
+    return profileIconMap[path] ?? <UserIcon size={iconSizeToken.small} className="text-slate-400" />
+  }
   const _languageLabel = language === 'zh-CN' ? t('language.zh', { defaultValue: '简体中文' }) : t('language.en', { defaultValue: 'English' })
   const orgLabel = t('top.org', { defaultValue: 'Acme Corp' })
 
@@ -232,6 +338,21 @@ export function TopNav({
     }
   }, [isGovernanceOpen])
 
+  useEffect(() => {
+    const handleLanguageChanged = () => {
+      setIsGovernanceOpen(false)
+      setIsDropdownOpen(false)
+      setIsLanguageOpen(false)
+      setGovernancePos(null)
+      setDropdownPos(null)
+      setLanguagePos(null)
+    }
+    i18n.on('languageChanged', handleLanguageChanged)
+    return () => {
+      i18n.off('languageChanged', handleLanguageChanged)
+    }
+  }, [i18n])
+
   useLayoutEffect(() => {
     if (!isLanguageOpen) return
     const updatePosition = () => {
@@ -277,10 +398,33 @@ export function TopNav({
   }, [languagePos])
 
   const handleNavigateGovernance = (path: string) => {
+    if (governanceLeaveTimerRef.current) {
+      window.clearTimeout(governanceLeaveTimerRef.current)
+      governanceLeaveTimerRef.current = null
+    }
     navigate(path)
     setIsGovernanceOpen(false)
+    setGovernancePos(null)
   }
-  const handleGovernanceEnter = () => setIsGovernanceOpen(true)
+
+  const handleProfileNavigate = (path: string) => {
+    if (path === '/profile') {
+      handleProfileClick()
+      return
+    }
+    onNavigate(path)
+    setIsDropdownOpen(false)
+  }
+  const handleGovernanceEnter = () => {
+    if (governanceLeaveTimerRef.current) {
+      window.clearTimeout(governanceLeaveTimerRef.current)
+      governanceLeaveTimerRef.current = null
+    }
+    if (!isGovernanceOpen) {
+      setGovernancePos(null)
+      setIsGovernanceOpen(true)
+    }
+  }
   const handleGovernanceLeave = (event: React.MouseEvent) => {
     const nextTarget = event.relatedTarget as Node | null
     if (
@@ -290,7 +434,14 @@ export function TopNav({
     ) {
       return
     }
-    setIsGovernanceOpen(false)
+    if (governanceLeaveTimerRef.current) {
+      window.clearTimeout(governanceLeaveTimerRef.current)
+    }
+    governanceLeaveTimerRef.current = window.setTimeout(() => {
+      setIsGovernanceOpen(false)
+      setGovernancePos(null)
+      governanceLeaveTimerRef.current = null
+    }, 150)
   }
 
   return (
@@ -304,7 +455,7 @@ export function TopNav({
           variant="ghost"
           size="tiny"
           className="flex items-center gap-2 group p-0"
-          onClick={() => onNavigate('dashboard')}
+          onClick={() => onNavigate('/home')}
         >
         </Button>
 
@@ -324,109 +475,105 @@ export function TopNav({
 
       <div className="flex items-center flex-1 min-w-0 mx-2">
       <div className="flex items-center p-1 bg-slate-100/50 dark:bg-slate-900/50 rounded-lg border border-slate-200/50 dark:border-slate-800/50 gap-0.5 mx-auto">
-        <TabItem icon={<LayoutGrid size={iconSizeToken.small} />} label={t('top.tabs.dashboard')} active={isDashboardActive} onClick={() => onNavigate('dashboard')} />
-        <div
-          className="relative"
-          ref={governanceRef}
-          onMouseEnter={handleGovernanceEnter}
-          onMouseLeave={handleGovernanceLeave}
-        >
-          <Button
-            type="button"
-            variant="ghost"
-            size="small"
-            onClick={() => setIsGovernanceOpen((prev) => !prev)}
-            className={`
-              flex items-center gap-2 px-2 @md:px-3 py-1.5 rounded-md text-body transition-none! duration-0! relative
-              ${
-                isGovernanceActive
-                  ? 'text-indigo-600 dark:text-indigo-300 bg-white dark:bg-slate-800 shadow-sm hover:bg-white! hover:text-indigo-600! active:bg-white! active:text-indigo-600! dark:hover:bg-slate-800! dark:hover:text-indigo-300! dark:active:bg-slate-800! dark:active:text-indigo-300!'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800! dark:hover:text-slate-200! hover:bg-white/50! dark:hover:bg-slate-800/50! active:bg-white/50! dark:active:bg-slate-800/50!'
-              }
-            `}
-          >
-            <ShieldCheck size={iconSizeToken.small} />
-            <span className="hidden @md:inline">{t('top.tabs.governance')}</span>
-            <ChevronDown
-              size={iconSizeToken.tiny}
-              className={`transition-transform duration-200 ${isGovernanceOpen ? 'rotate-180' : ''} ${isGovernanceActive ? 'text-indigo-500' : 'text-slate-400 dark:text-slate-500'}`}
-            />
-            {isGovernanceActive && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo-500" />}
-          </Button>
-          <div
-            className="absolute left-0 top-full h-3 w-full"
-            onMouseEnter={handleGovernanceEnter}
-            onMouseLeave={handleGovernanceLeave}
-            aria-hidden
-          />
-          {isGovernanceOpen &&
-            governanceDropdownStyle &&
-            createPortal(
+        {topMenus.map((menu) => {
+          if (menu.path === '/governance') {
+            return (
               <div
-                ref={governancePanelRef}
-                style={governanceDropdownStyle}
-                className={`fixed z-[1000000] ${menuWidthClassMap.wide} bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 origin-top-left top-[var(--dropdown-top)] left-[var(--dropdown-left)]`}
+                key={menu.id}
+                className="relative"
+                ref={governanceRef}
                 onMouseEnter={handleGovernanceEnter}
                 onMouseLeave={handleGovernanceLeave}
               >
-                <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
-                  <span className="text-micro font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                    {t('top.dropdown.governanceHeader', { defaultValue: 'Governance & One Meta' })}
-                  </span>
-                </div>
-                <div className="p-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="normal"
-                    className="w-full whitespace-normal px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
-                    onClick={() => handleNavigateGovernance('/governance/metadata')}
-                  >
-                    <div className="p-1.5 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-purple-500 shrink-0 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/50 transition-colors">
-                      <Layers size={iconSizeToken.small} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.metadata')}</div>
-                      <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.metadataDesc', { defaultValue: '统一物理资产元数据' })}</div>
-                    </div>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="normal"
-                    className="w-full whitespace-normal px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
-                    onClick={() => handleNavigateGovernance('/governance/semantic')}
-                  >
-                    <div className="p-1.5 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-500 shrink-0 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
-                      <Book size={iconSizeToken.small} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.semantic', { defaultValue: '元语义' })}</div>
-                      <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.semanticDesc', { defaultValue: '指标、词根、API等语义资产空间' })}</div>
-                    </div>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="normal"
-                    className="w-full whitespace-normal px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
-                    onClick={() => handleNavigateGovernance('/governance/knowledge')}
-                  >
-                    <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-500 shrink-0 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 transition-colors">
-                      <Share2 size={iconSizeToken.small} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{t('top.dropdown.knowledge')}</div>
-                      <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{t('top.dropdown.knowledgeDesc', { defaultValue: '知识图谱可视化与关系探索' })}</div>
-                    </div>
-                  </Button>
-                </div>
-              </div>,
-              document.body
-            )}
-        </div>
-        <TabItem icon={<FolderKanban size={iconSizeToken.small} />} label={t('top.tabs.projects')} active={isProjectsActive} onClick={() => onNavigate('projects')} />
-        <TabItem icon={<Users size={iconSizeToken.small} />} label={t('top.tabs.team')} active={isTeamActive} onClick={() => onNavigate('collaboration')} />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="small"
+                  onClick={() => {
+                    setIsGovernanceOpen((prev) => {
+                      const next = !prev
+                      if (next) {
+                        setGovernancePos(null)
+                      }
+                      return next
+                    })
+                  }}
+                  className={`
+                    flex items-center gap-2 px-2 @md:px-3 py-1.5 rounded-md text-body transition-none! duration-0! relative
+                    ${
+                      isGovernanceActive
+                        ? 'text-indigo-600 dark:text-indigo-300 bg-white dark:bg-slate-800 shadow-sm hover:bg-white! hover:text-indigo-600! active:bg-white! active:text-indigo-600! dark:hover:bg-slate-800! dark:hover:text-indigo-300! dark:active:bg-slate-800! dark:active:text-indigo-300!'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800! dark:hover:text-slate-200! hover:bg-white/50! dark:hover:bg-slate-800/50! active:bg-white/50! dark:active:bg-slate-800/50!'
+                    }
+                  `}
+                >
+                  {getTopMenuIcon(menu.path)}
+                  <span className="hidden @md:inline">{getTopMenuLabel(menu)}</span>
+                  <ChevronDown
+                    size={iconSizeToken.tiny}
+                    className={`transition-transform duration-200 ${isGovernanceOpen ? 'rotate-180' : ''} ${isGovernanceActive ? 'text-indigo-500' : 'text-slate-400 dark:text-slate-500'}`}
+                  />
+                  {isGovernanceActive && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo-500" />}
+                </Button>
+                <div
+                  className="absolute left-0 top-full h-3 w-full"
+                  onMouseEnter={handleGovernanceEnter}
+                  onMouseLeave={handleGovernanceLeave}
+                  aria-hidden
+                />
+                {isGovernanceOpen &&
+                  governanceDropdownStyle &&
+                  createPortal(
+                    <div
+                      ref={governancePanelRef}
+                      style={governanceDropdownStyle}
+                      className={`fixed z-[1000000] ${menuWidthClassMap.wide} bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 origin-top-left top-[var(--dropdown-top)] left-[var(--dropdown-left)]`}
+                      onMouseEnter={handleGovernanceEnter}
+                      onMouseLeave={handleGovernanceLeave}
+                    >
+                      <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
+                        <span className="text-micro font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                          {t('top.dropdown.governanceHeader', { defaultValue: menu.name })}
+                        </span>
+                      </div>
+                      <div className="p-2">
+                        {(menu.children ?? []).map((child) => (
+                          <Button
+                            key={child.id}
+                            type="button"
+                            variant="ghost"
+                            size="normal"
+                            className="w-full whitespace-normal px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg flex items-start gap-3 transition-colors group"
+                            onClick={() => handleNavigateGovernance(child.path)}
+                          >
+                            <div className="p-1.5 bg-slate-50 dark:bg-slate-900/30 rounded-lg text-slate-500 shrink-0 group-hover:bg-slate-100 dark:group-hover:bg-slate-900/50 transition-colors">
+                              {getGovernanceItemIcon(child.path)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-body-sm font-medium text-slate-800 dark:text-slate-200">{getGovernanceItemLabel(child)}</div>
+                              <div className="text-legal text-slate-400 dark:text-slate-500 mt-0.5">{getGovernanceItemDescription(child)}</div>
+                            </div>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>,
+                    document.body
+                  )}
+              </div>
+            )
+          }
+
+          const isActive = isMenuActive(menu.path)
+          return (
+            <TabItem
+              key={menu.id}
+              icon={getTopMenuIcon(menu.path)}
+              label={getTopMenuLabel(menu)}
+              active={isActive}
+              onClick={() => onNavigate(menu.path)}
+            />
+          )
+        })}
       </div>
       </div>
 
@@ -551,10 +698,14 @@ export function TopNav({
                 </div>
 
                 <div className="p-1">
-                  <DropdownButton icon={<UserIcon size={iconSizeToken.small} className="text-indigo-500" />} label={t('top.profile.profile')} onClick={handleProfileClick} />
-                  <DropdownButton icon={<Shield size={iconSizeToken.small} className="text-amber-500" />} label={t('top.profile.permission', { defaultValue: '权限分配' })} onClick={handlePermissionClick} />
-                  <DropdownButton icon={<LayoutGrid size={iconSizeToken.small} className="text-blue-500" />} label={t('top.profile.models')} onClick={handleModelManagementClick} />
-                  <DropdownButton icon={<CreditCard size={iconSizeToken.small} className="text-emerald-500" />} label={t('top.profile.billing')} />
+                  {profileItems.map((item) => (
+                    <DropdownButton
+                      key={item.id}
+                      icon={getProfileIcon(item.path)}
+                      label={getProfileLabel(item)}
+                      onClick={() => handleProfileNavigate(item.path)}
+                    />
+                  ))}
                 </div>
 
                 <div className="p-1 border-t border-slate-100 dark:border-slate-700/50">

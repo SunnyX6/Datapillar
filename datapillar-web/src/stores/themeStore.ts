@@ -28,14 +28,25 @@ interface ThemeState {
 /**
  * 应用主题到 DOM
  */
+let themeSwitchTimeout: number | undefined
+
 const applyTheme = (theme: ThemeMode) => {
   const root = document.documentElement
+
+  root.classList.add('theme-switching')
+  if (themeSwitchTimeout) {
+    window.clearTimeout(themeSwitchTimeout)
+  }
 
   if (theme === 'dark') {
     root.classList.add('dark')
   } else {
     root.classList.remove('dark')
   }
+
+  themeSwitchTimeout = window.setTimeout(() => {
+    root.classList.remove('theme-switching')
+  }, 120)
 }
 
 // ==================== Zustand Store ====================

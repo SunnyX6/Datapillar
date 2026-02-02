@@ -14,7 +14,7 @@ public interface MenuService {
     /**
      * 根据用户ID查询可访问的菜单列表
      */
-    List<MenuDto.Response> getMenusByUserId(Long userId);
+    List<MenuDto.Response> getMenusByUserId(Long userId, String location);
 
     /**
      * 查询所有可见菜单

@@ -2,8 +2,8 @@ package com.sunny.datapillar.admin.module.user.service;
 
 import java.util.List;
 
+import com.sunny.datapillar.admin.module.user.dto.PermissionObjectDto;
 import com.sunny.datapillar.admin.module.user.dto.RoleDto;
-import com.sunny.datapillar.admin.module.user.entity.Role;
 
 /**
  * 角色服务接口
@@ -11,11 +11,6 @@ import com.sunny.datapillar.admin.module.user.entity.Role;
  * @author sunny
  */
 public interface RoleService {
-
-    /**
-     * 根据角色代码查询角色
-     */
-    Role findByCode(String code);
 
     /**
      * 根据角色ID查询角色详情
@@ -48,7 +43,12 @@ public interface RoleService {
     List<RoleDto.Response> getRolesByUserId(Long userId);
 
     /**
-     * 为角色分配权限
+     * 获取角色权限
      */
-    void assignPermissions(Long roleId, List<Long> permissionIds);
+    List<PermissionObjectDto.ObjectPermission> getRolePermissions(Long roleId, String scope);
+
+    /**
+     * 更新角色权限（全量覆盖）
+     */
+    void updateRolePermissions(Long roleId, List<PermissionObjectDto.Assignment> permissions);
 }
