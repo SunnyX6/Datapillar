@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.datapillar.auth.mapper.UserInvitationOrgMapper">
+
+    <select id="selectOrgIdsByInvitationId" resultType="long">
+        SELECT org_id
+        FROM user_invitation_orgs
+        WHERE invitation_id = #{invitationId}
+    </select>
+
+</mapper>

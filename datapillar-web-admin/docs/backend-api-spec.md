@@ -148,11 +148,20 @@ Base Path: `/auth`
 请求示例：
 ```json
 {
+  "tenantCode": "demo",
   "username": "sunny",
   "password": "123456asd",
-  "rememberMe": true
+  "rememberMe": true,
+  "inviteCode": "X9P7-ABCD",
+  "email": "sunny@datapillar.com",
+  "phone": "13800000000"
 }
 ```
+
+说明：
+- `inviteCode` 仅在首次入库时必填；已存在 `tenant_users` 的用户可不传。
+- 未携带有效 `inviteCode` 的首次登录请求直接拒绝。
+- 若邀请填写了邮箱/手机号，登录请求中的邮箱/手机号必须匹配邀请。
 
 响应示例：
 ```json
@@ -162,6 +171,7 @@ Base Path: `/auth`
   "message": "操作成功",
   "data": {
     "userId": 1,
+    "tenantId": 10,
     "username": "sunny",
     "email": "sunny@datapillar.com",
     "roles": ["ADMIN"],
@@ -194,6 +204,7 @@ Base Path: `/auth`
   "message": "操作成功",
   "data": {
     "userId": 1,
+    "tenantId": 10,
     "username": "sunny",
     "email": "sunny@datapillar.com",
     "roles": [],
@@ -239,6 +250,7 @@ Base Path: `/auth`
   "data": {
     "valid": true,
     "userId": 1,
+    "tenantId": 10,
     "username": "sunny",
     "email": "sunny@datapillar.com",
     "errorMessage": null
@@ -249,14 +261,12 @@ Base Path: `/auth`
 }
 ```
 
-### 4.4 POST /auth/sso/validate
-说明：SSO Token 验证
+### 4.4 GET /auth/sso/qr
+说明：获取 SSO 扫码配置
 
 请求示例：
-```json
-{
-  "token": "<sso-token>"
-}
+```
+GET /auth/sso/qr?tenantCode=demo&provider=dingtalk
 ```
 
 响应示例：
@@ -266,20 +276,67 @@ Base Path: `/auth`
   "code": "OK",
   "message": "操作成功",
   "data": {
-    "valid": true,
-    "userId": 1,
-    "username": "sunny",
-    "email": "sunny@datapillar.com",
-    "roles": ["ADMIN"],
-    "message": null
+    "type": "SDK",
+    "state": "b1c2d3e4f5a6",
+    "payload": {
+      "clientId": "dingxxx",
+      "redirectUri": "https://demo.example.com/auth/callback",
+      "scope": "openid corpid",
+      "responseType": "code",
+      "prompt": "consent",
+      "corpId": "dingcorp"
+    }
   },
   "timestamp": "2025-01-01T12:00:00Z",
-  "path": "/auth/sso/validate",
+  "path": "/auth/sso/qr",
   "traceId": "8f6b0c2b0d3f4f2c"
 }
 ```
 
-### 4.5 POST /auth/logout
+说明：
+- `state` 为一次性校验码，必须在 `/auth/sso/login` 中原样回传。
+- `payload` 用于前端 SDK/跳转授权；字段由不同 provider 决定。
+
+### 4.5 POST /auth/sso/login
+说明：SSO 登录（授权码模式）
+
+请求示例：
+```json
+{
+  "tenantCode": "demo",
+  "provider": "dingtalk",
+  "authCode": "<auth-code>",
+  "state": "<state>",
+  "inviteCode": "X9P7-ABCD"
+}
+```
+
+说明：
+- `inviteCode` 仅在首次入库时必填；已存在 `tenant_users` 的用户可不传。
+- 若邀请填写了邮箱/手机号，SSO 回调的已验证邮箱/手机号必须匹配邀请，否则拒绝。
+- `provider` 必填，用于区分不同 OA/IdP。
+
+响应示例：
+```json
+{
+  "status": 200,
+  "code": "OK",
+  "message": "操作成功",
+  "data": {
+    "userId": 1,
+    "tenantId": 10,
+    "username": "sunny",
+    "email": "sunny@datapillar.com",
+    "roles": ["ADMIN"],
+    "menus": []
+  },
+  "timestamp": "2025-01-01T12:00:00Z",
+  "path": "/auth/sso/login",
+  "traceId": "8f6b0c2b0d3f4f2c"
+}
+```
+
+### 4.6 POST /auth/logout
 说明：登出
 
 响应示例：
@@ -295,7 +352,7 @@ Base Path: `/auth`
 }
 ```
 
-### 4.6 GET /auth/token-info
+### 4.7 GET /auth/token-info
 说明：获取 Token 信息（状态查询接口）
 
 响应示例：
@@ -310,6 +367,7 @@ Base Path: `/auth`
     "expirationTime": 1735689600000,
     "issuedAt": 1735686000000,
     "userId": 1,
+    "tenantId": 10,
     "username": "sunny"
   },
   "timestamp": "2025-01-01T12:00:00Z",
@@ -318,7 +376,7 @@ Base Path: `/auth`
 }
 ```
 
-### 4.7 GET /auth/health
+### 4.8 GET /auth/health
 说明：健康检查
 
 响应示例：
@@ -725,6 +783,135 @@ GET /users/{id}/menus
   ],
   "timestamp": "2025-01-01T12:00:00Z",
   "path": "/users/1/menus",
+  "traceId": "8f6b0c2b0d3f4f2c"
+}
+```
+
+### 5.4.1 邀请管理
+
+POST /users/{userId}/invitations
+
+请求示例：
+```json
+{
+  "inviteeEmail": "alice@company.com",
+  "inviteeMobile": null,
+  "orgIds": [10, 12],
+  "roleIds": [3, 4],
+  "expiresAt": "2025-02-10T12:00:00"
+}
+```
+
+说明：
+- `inviteeEmail` 与 `inviteeMobile` 至少一个必填。
+- 同一租户同一邀请对象同一时间只允许一条待接受邀请。
+
+响应示例：
+```json
+{
+  "status": 200,
+  "code": "OK",
+  "message": "操作成功",
+  "data": {
+    "id": 1001,
+    "inviteCode": "X9P7-ABCD",
+    "inviteUrl": "https://<domain>/invite?code=X9P7-ABCD",
+    "expiresAt": "2025-02-10T12:00:00"
+  },
+  "timestamp": "2025-01-01T12:00:00Z",
+  "path": "/users/1/invitations",
+  "traceId": "8f6b0c2b0d3f4f2c"
+}
+```
+
+GET /users/{userId}/invitations?status=0&keyword=alice&offset=0&limit=20
+
+响应示例：
+```json
+{
+  "status": 200,
+  "code": "OK",
+  "message": "操作成功",
+  "data": [
+    {
+      "id": 1001,
+      "inviteeEmail": "alice@company.com",
+      "inviteeMobile": null,
+      "status": 0,
+      "expiresAt": "2025-02-10T12:00:00",
+      "orgIds": [10, 12],
+      "roleIds": [3, 4],
+      "createdAt": "2025-02-01T12:00:00",
+      "updatedAt": "2025-02-01T12:00:00"
+    }
+  ],
+  "limit": 20,
+  "offset": 0,
+  "total": 1,
+  "timestamp": "2025-01-01T12:00:00Z",
+  "path": "/users/1/invitations",
+  "traceId": "8f6b0c2b0d3f4f2c"
+}
+```
+
+GET /users/{userId}/invitations/{id}
+
+响应示例：
+```json
+{
+  "status": 200,
+  "code": "OK",
+  "message": "操作成功",
+  "data": {
+    "id": 1001,
+    "inviteeEmail": "alice@company.com",
+    "inviteeMobile": null,
+    "status": 0,
+    "expiresAt": "2025-02-10T12:00:00",
+    "orgIds": [10, 12],
+    "roleIds": [3, 4],
+    "createdAt": "2025-02-01T12:00:00",
+    "updatedAt": "2025-02-01T12:00:00"
+  },
+  "timestamp": "2025-01-01T12:00:00Z",
+  "path": "/users/1/invitations/1001",
+  "traceId": "8f6b0c2b0d3f4f2c"
+}
+```
+
+PATCH /users/{userId}/invitations/{id}
+
+请求示例：
+```json
+{
+  "status": 3
+}
+```
+
+响应示例：
+```json
+{
+  "status": 200,
+  "code": "OK",
+  "message": "操作成功",
+  "data": null,
+  "timestamp": "2025-01-01T12:00:00Z",
+  "path": "/users/1/invitations/1001",
+  "traceId": "8f6b0c2b0d3f4f2c"
+}
+```
+
+POST /users/{userId}/invitations/{id}/resend
+
+响应示例：
+```json
+{
+  "status": 200,
+  "code": "OK",
+  "message": "操作成功",
+  "data": "OK",
+  "timestamp": "2025-01-01T12:00:00Z",
+  "path": "/users/1/invitations/1001/resend",
   "traceId": "8f6b0c2b0d3f4f2c"
 }
 ```

@@ -8,8 +8,8 @@
         WHERE ur.user_id = #{userId}
     </select>
 
-    <select id="findByCode" resultType="com.sunny.datapillar.admin.module.user.entity.Role">
-        SELECT * FROM roles WHERE code = #{code}
+    <select id="findByName" resultType="com.sunny.datapillar.admin.module.user.entity.Role">
+        SELECT * FROM roles WHERE name = #{name}
     </select>
 
     <delete id="deleteRolePermissions">
@@ -21,7 +21,8 @@
     </delete>
 
     <insert id="insertRolePermission">
-        INSERT INTO role_permissions (role_id, permission_id) VALUES (#{roleId}, #{permissionId})
+        INSERT INTO role_permissions (role_id, object_id, permission_id)
+        VALUES (#{roleId}, #{objectId}, #{permissionId})
     </insert>
 
 </mapper>

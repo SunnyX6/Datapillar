@@ -140,6 +140,7 @@ async def test_knowledge_ingestor() -> None:
     source = KnowledgeSource(
         source="abcdef",
         chunk=config,
+        doc_uid="doc1",
         name="example",
         source_type="doc",
         filename="doc1.txt",
@@ -164,6 +165,7 @@ async def test_knowledge_retriever() -> None:
             KnowledgeSource(
                 source="stub",
                 chunk=DEFAULT_CHUNK,
+                doc_uid="doc1",
                 source_id="src1",
                 name="example",
                 source_type="doc",
@@ -228,6 +230,7 @@ async def test_knowledge_retriever2() -> None:
             KnowledgeSource(
                 source="stub",
                 chunk=DEFAULT_CHUNK,
+                doc_uid="doc1",
                 source_id="src1",
                 name="example",
                 source_type="doc",
@@ -278,6 +281,7 @@ async def test_knowledge_retriever3() -> None:
             KnowledgeSource(
                 source="stub",
                 chunk=DEFAULT_CHUNK,
+                doc_uid="doc1",
                 source_id="src1",
                 name="example",
                 source_type="doc",
@@ -297,6 +301,7 @@ def test_merge_knowledge() -> None:
             KnowledgeSource(
                 source="stub-team",
                 chunk=DEFAULT_CHUNK,
+                doc_uid="doc-team",
                 source_id="s1",
                 name="team knowledge",
                 source_type="doc",
@@ -313,6 +318,7 @@ def test_merge_knowledge() -> None:
             KnowledgeSource(
                 source="stub-agent",
                 chunk=DEFAULT_CHUNK,
+                doc_uid="doc-agent",
                 source_id="s1",
                 name="agent knowledge",
                 source_type="doc",
@@ -320,6 +326,7 @@ def test_merge_knowledge() -> None:
             KnowledgeSource(
                 source="stub-new",
                 chunk=DEFAULT_CHUNK,
+                doc_uid="doc-new",
                 source_id="s2",
                 name="new knowledge",
                 source_type="doc",
@@ -350,6 +357,7 @@ def test_merge_knowledge2() -> None:
             KnowledgeSource(
                 source="stub-team",
                 chunk=DEFAULT_CHUNK,
+                doc_uid="doc-team",
                 source_id="s1",
                 name="team knowledge",
                 source_type="doc",
@@ -537,6 +545,7 @@ async def test_knowledge_retriever4(monkeypatch) -> None:
             KnowledgeSource(
                 source="stub",
                 chunk=DEFAULT_CHUNK,
+                doc_uid="doc1",
                 source_id="src1",
                 name="example",
                 source_type="doc",

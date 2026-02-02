@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sunny.datapillar.auth.dto.AuthDto;
@@ -57,13 +58,24 @@ public class AuthController {
     }
 
     /**
-     * SSO Token 验证
+     * SSO 登录
      */
-    @PostMapping("/sso/validate")
-    public ApiResponse<AuthDto.SsoValidateResponse> validateSsoToken(
-            @Valid @RequestBody AuthDto.SsoValidateRequest request) {
-        AuthDto.SsoValidateResponse ssoResponse = authService.validateSsoToken(request);
-        return ApiResponse.ok(ssoResponse);
+    @PostMapping("/sso/login")
+    public ApiResponse<AuthDto.LoginResponse> ssoLogin(
+            @Valid @RequestBody AuthDto.SsoLoginRequest request,
+            HttpServletResponse response) {
+        AuthDto.LoginResponse loginResponse = authService.loginWithSso(request, response);
+        return ApiResponse.ok(loginResponse);
+    }
+
+    /**
+     * SSO 扫码配置
+     */
+    @GetMapping("/sso/qr")
+    public ApiResponse<AuthDto.SsoQrResponse> ssoQr(@RequestParam String tenantCode,
+                                                    @RequestParam String provider) {
+        AuthDto.SsoQrResponse qrResponse = authService.getSsoQr(tenantCode, provider);
+        return ApiResponse.ok(qrResponse);
     }
 
     /**

@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Param;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.sunny.datapillar.admin.module.user.entity.User;
+import com.sunny.datapillar.admin.module.user.entity.UserPermission;
 import com.sunny.datapillar.admin.module.user.entity.UserRole;
 
 /**
@@ -46,6 +47,16 @@ public interface UserMapper extends BaseMapper<User> {
      * 插入用户角色关联
      */
     void insertUserRole(UserRole userRole);
+
+    /**
+     * 删除用户权限关联
+     */
+    void deleteUserPermissions(@Param("userId") Long userId);
+
+    /**
+     * 插入用户权限关联
+     */
+    void insertUserPermission(UserPermission userPermission);
 
     /**
      * 根据用户ID和Token签名查询用户

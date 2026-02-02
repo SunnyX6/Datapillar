@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.datapillar.auth.mapper.UserIdentityMapper">
+
+    <select id="selectByProviderAndExternalUserId" resultType="com.sunny.datapillar.auth.entity.UserIdentity">
+        SELECT id, tenant_id, user_id, provider, external_user_id, union_id, open_id, email, mobile, profile_json,
+               status, created_at, updated_at
+        FROM user_identities
+        WHERE tenant_id = #{tenantId}
+          AND provider = #{provider}
+          AND external_user_id = #{externalUserId}
+    </select>
+
+</mapper>

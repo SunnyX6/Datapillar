@@ -2,7 +2,7 @@
 
 ## 目标
 - 将知识 RAG 设计为**统一能力内核**（与具体后端解耦）。
-- 保证**同一检索管道**覆盖所有后端（含 Milvus、langchain_milvus）。
+- 保证**同一检索管道**覆盖所有后端（含 Milvus 等）。
 - 输出**纯文本/Markdown**检索结果。
 - **工具注入与 agent/团队绑定**放在最后实现。
 
@@ -20,7 +20,7 @@
 ## 方案概述
 1) **统一 Knowledge 内核**
    - KnowledgeService 只依赖统一 Retriever + Store 适配层。
-   - 保留 langchain_milvus，但作为 Store/Adapter 的一种实现，进入统一检索管道。
+   - 统一走 VectorStore + pymilvus，保持同一检索管道。
    - 对外暴露两类对象（职责清晰）：
      - `KnowledgeConfig`：namespaces + embedding + vector_store + retrieve（库级检索配置）
      - `KnowledgeSource`：source + chunk + metadata（文档级切分配置）
@@ -52,6 +52,7 @@
 ### 1) 文档级切分（必填 chunk）
 - `KnowledgeSource` 作为唯一外部入口：
   - `source`: 文件路径/URL/文本/bytes
+  - `doc_uid`: 稳定文档 ID（必填，由业务方传入）
   - `chunk`: 文档级切分配置（必填）
   - `metadata/tags/filename/mime_type/parser_hint`: 可选
 - 示例（伪码）：

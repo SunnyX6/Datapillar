@@ -39,6 +39,7 @@ class LanceVectorStore(VectorStore):
             supports_sparse=True,
             supports_filter=True,
             supports_hybrid=False,
+            supports_full_text=False,
         )
 
     async def initialize(self) -> None:
@@ -194,6 +195,15 @@ class LanceVectorStore(VectorStore):
         rrf_k: int = 60,
     ) -> list[VectorSearchResult]:
         raise NotImplementedError("LanceDB does not support Milvus-style hybrid search")
+
+    async def full_text_search(
+        self,
+        collection: str,
+        query_text: str,
+        k: int = 5,
+        filters: dict[str, Any] | None = None,
+    ) -> list[VectorSearchResult]:
+        raise NotImplementedError("LanceDB does not support full-text search")
 
     async def query(
         self,

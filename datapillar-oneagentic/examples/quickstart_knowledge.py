@@ -93,6 +93,7 @@ async def main() -> None:
     source = KnowledgeSource(
         source=sample_text,
         chunk=chunk_config,
+        doc_uid="demo-doc",
         name="Example knowledge base",
         source_type="doc",
         filename="demo.txt",

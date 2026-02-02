@@ -24,8 +24,12 @@ def build_document(
     source: KnowledgeSource,
     parsed: ParsedDocument,
     doc_input: DocumentInput,
+    doc_id: str,
 ) -> KnowledgeDocument:
     """Build document metadata."""
+    if not doc_id or not str(doc_id).strip():
+        raise ValueError("doc_id is required for knowledge document")
+    doc_id = str(doc_id).strip()
     now = now_ms()
     content_hash = hash_content(parsed.text)
     source_uri = doc_input.filename
@@ -47,9 +51,9 @@ def build_document(
         **parsed.metadata,
     }
     return KnowledgeDocument(
-        doc_id=parsed.document_id,
+        doc_id=doc_id,
         source_id=source.source_id,
-        title=parsed.metadata.get("title", doc_input.filename or parsed.document_id),
+        title=parsed.metadata.get("title", doc_input.filename or doc_id),
         content=parsed.text,
         source_uri=source_uri or source.source_uri,
         content_hash=content_hash,

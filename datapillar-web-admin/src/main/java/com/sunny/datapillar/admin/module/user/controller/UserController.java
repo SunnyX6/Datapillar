@@ -10,9 +10,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sunny.datapillar.admin.module.user.dto.MenuDto;
+import com.sunny.datapillar.admin.module.user.dto.PermissionObjectDto;
 import com.sunny.datapillar.admin.module.user.dto.RoleDto;
 import com.sunny.datapillar.admin.module.user.dto.UserDto;
 import com.sunny.datapillar.admin.module.user.service.MenuService;
@@ -95,8 +97,30 @@ public class UserController {
 
     @Operation(summary = "获取用户的菜单")
     @GetMapping("/{id}/menus")
-    public ApiResponse<List<MenuDto.Response>> getUserMenus(@PathVariable Long id) {
-        List<MenuDto.Response> menus = menuService.getMenusByUserId(id);
+    public ApiResponse<List<MenuDto.Response>> getUserMenus(
+            @PathVariable Long id,
+            @RequestParam(value = "location", required = false) String location) {
+        List<MenuDto.Response> menus = menuService.getMenusByUserId(id, location);
         return ApiResponse.ok(menus);
+    }
+
+    @Operation(summary = "获取用户权限")
+    @GetMapping("/{id}/permissions")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ApiResponse<List<PermissionObjectDto.ObjectPermission>> getUserPermissions(
+            @PathVariable Long id) {
+        List<PermissionObjectDto.ObjectPermission> permissions = userService.getUserPermissions(id);
+        return ApiResponse.ok(permissions);
+    }
+
+    @Operation(summary = "更新用户权限")
+    @PutMapping("/{id}/permissions")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ApiResponse<Void> updateUserPermissions(
+            @PathVariable Long id,
+            @RequestBody PermissionObjectDto.AssignmentRequest request) {
+        List<PermissionObjectDto.Assignment> permissions = request == null ? null : request.getPermissions();
+        userService.updateUserPermissions(id, permissions);
+        return ApiResponse.ok(null);
     }
 }

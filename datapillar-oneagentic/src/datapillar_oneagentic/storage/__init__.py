@@ -57,7 +57,7 @@ import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from datapillar_oneagentic.core.config import AgentConfig
 from datapillar_oneagentic.providers.llm.config import EmbeddingConfig
@@ -287,16 +287,20 @@ def _build_vector_store(
         if embedding_config.dimension is None:
             raise ValueError("Embedding dimension is not configured for Milvus VectorStore")
         try:
+            backend_params = _resolve_backend_params(vector_store_config)
             return MilvusVectorStore(
                 uri=vector_store_config.uri or "./data/milvus.db",
                 token=vector_store_config.token,
+                user=vector_store_config.user,
+                password=vector_store_config.password,
+                db_name=vector_store_config.db_name,
                 namespace=namespace,
                 dim=embedding_config.dimension,
                 index_params=vector_store_config.index_params,
                 sparse_index_params=vector_store_config.sparse_index_params,
                 search_params=vector_store_config.search_params,
                 sparse_search_params=vector_store_config.sparse_search_params,
-                params=vector_store_config.params,
+                params=backend_params,
             )
         except ImportError as err:
             raise ImportError(
@@ -344,21 +348,6 @@ def create_knowledge_store(
     driver = _resolve_vector_store_driver(vector_store_config)
     if driver:
         raise ValueError("VectorStoreConfig.params.driver is internal and must not be set.")
-    if vector_store_config.type == "milvus" and _resolve_bm25_enabled(vector_store_config):
-        try:
-            from datapillar_oneagentic.storage.knowledge_stores.langchain_milvus import (
-                LangChainMilvusKnowledgeStore,
-            )
-        except ImportError as err:
-            raise ImportError(
-                "LangChain Milvus knowledge store requires extra dependencies:\n"
-                "  pip install datapillar-oneagentic[milvus]"
-            ) from err
-        return LangChainMilvusKnowledgeStore(
-            namespace=namespace,
-            vector_store_config=vector_store_config,
-            embedding_config=embedding_config,
-        )
     vector_store = _build_vector_store(
         VECTOR_DB_NAMESPACE,
         vector_store_config=vector_store_config,
@@ -378,19 +367,12 @@ def _resolve_vector_store_driver(config: VectorStoreConfig) -> str | None:
     return str(driver).lower() if isinstance(driver, str) and driver else None
 
 
-def _resolve_bm25_enabled(config: VectorStoreConfig) -> bool:
+def _resolve_backend_params(config: VectorStoreConfig) -> dict[str, Any]:
     params = dict(config.params or {})
     extra = getattr(config, "model_extra", None) or {}
-    bm25 = params.get("bm25")
-    if bm25 is None and "bm25" in extra:
-        bm25 = extra.get("bm25")
-    if bm25 is None:
-        return False
-    if isinstance(bm25, bool):
-        return bm25
-    if isinstance(bm25, dict):
-        return bool(bm25.get("enabled", True))
-    raise TypeError("VectorStoreConfig.params.bm25 must be a bool or dict")
+    if "bm25" in extra and "bm25" not in params:
+        params["bm25"] = extra.get("bm25")
+    return params
 
 
 __all__ = [

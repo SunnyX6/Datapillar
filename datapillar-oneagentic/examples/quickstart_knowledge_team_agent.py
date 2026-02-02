@@ -65,6 +65,7 @@ async def _prepare_demo_knowledge(service: KnowledgeService) -> None:
             "The knowledge framework is a foundational capability that can be attached to teams or agents."
         ),
         chunk=chunk,
+        doc_uid="team-doc",
         name="Team knowledge base",
         source_type="doc",
         filename="team.txt",
@@ -73,6 +74,7 @@ async def _prepare_demo_knowledge(service: KnowledgeService) -> None:
     agent_source = KnowledgeSource(
         source="Agents can layer personal knowledge on top of team knowledge and override retrieval settings.",
         chunk=chunk,
+        doc_uid="agent-doc",
         name="Personal knowledge base",
         source_type="doc",
         filename="agent.txt",

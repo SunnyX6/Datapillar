@@ -81,6 +81,7 @@ DEMO_KNOWLEDGE_SOURCE = KnowledgeSource(
         "mode": "general",
         "general": {"max_tokens": 200, "overlap": 40},
     },
+    doc_uid="demo-doc",
     name="Example knowledge base",
     source_type="doc",
     filename="kb_demo.txt",

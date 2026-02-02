@@ -23,9 +23,9 @@ public interface RoleMapper extends BaseMapper<Role> {
     List<Role> findByUserId(@Param("userId") Long userId);
 
     /**
-     * 根据角色代码查询角色
+     * 根据角色名称查询角色
      */
-    Role findByCode(@Param("code") String code);
+    Role findByName(@Param("name") String name);
 
     /**
      * 删除角色权限关联

@@ -40,6 +40,7 @@ class VectorStoreCapabilities:
     supports_sparse: bool = True
     supports_filter: bool = True
     supports_hybrid: bool = False
+    supports_full_text: bool = False
 
 
 @dataclass(frozen=True)
@@ -123,6 +124,16 @@ class VectorStore(ABC):
         rrf_k: int = 60,
     ) -> list[VectorSearchResult]:
         """Hybrid search (dense + sparse)."""
+
+    @abstractmethod
+    async def full_text_search(
+        self,
+        collection: str,
+        query_text: str,
+        k: int = 5,
+        filters: dict[str, Any] | None = None,
+    ) -> list[VectorSearchResult]:
+        """Full-text search (BM25)."""
 
     @abstractmethod
     async def query(

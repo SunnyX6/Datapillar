@@ -63,6 +63,7 @@ async def test_list_and_upsert_chunks() -> None:
         source = KnowledgeSource(
             source="alpha beta gamma",
             chunk=chunk_config,
+            doc_uid="doc1",
             name="demo",
             source_type="doc",
         )
@@ -97,6 +98,7 @@ async def test_delete_parent_cascades() -> None:
         source = KnowledgeSource(
             source="abcdefghijklmno",
             chunk=chunk_config,
+            doc_uid="doc1",
             name="demo",
             source_type="doc",
         )

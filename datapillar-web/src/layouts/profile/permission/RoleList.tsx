@@ -11,10 +11,14 @@ interface RoleListProps {
 
 export function RoleList({ roles, selectedRoleId, onSelectRole }: RoleListProps) {
   return (
-    <div className="w-80 flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-full">
-      <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-10">
-        <h2 className={cn(TYPOGRAPHY.caption, 'font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider')}>角色列表</h2>
-        <button type="button" className="text-slate-400 hover:text-brand-600 hover:bg-brand-50 p-1.5 rounded-md transition-all" aria-label="新增角色">
+    <div className="w-80 flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 h-full">
+      <div className="h-14 px-4 border-b border-slate-100 dark:border-slate-800/80 flex justify-between items-center sticky top-0 bg-white/95 dark:bg-slate-900/90 backdrop-blur z-10">
+        <h2 className={cn(TYPOGRAPHY.caption, 'font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider')}>角色列表</h2>
+        <button
+          type="button"
+          className="text-slate-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-500/10 p-1.5 rounded-md transition-all"
+          aria-label="新增角色"
+        >
           <Plus size={16} />
         </button>
       </div>
@@ -27,7 +31,7 @@ export function RoleList({ roles, selectedRoleId, onSelectRole }: RoleListProps)
               key={role.id}
               onClick={() => onSelectRole(role.id)}
               className={
-                `group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:shadow-sm ${
+                `group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/70 ${
                   isSelected
                     ? 'text-blue-600 dark:text-blue-400'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100'
@@ -59,7 +63,7 @@ export function RoleList({ roles, selectedRoleId, onSelectRole }: RoleListProps)
                     {role.name}
                   </span>
                   {role.isSystem && (
-                    <span className={cn(TYPOGRAPHY.micro, 'text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 rounded ml-2 shrink-0')}>
+                    <span className={cn(TYPOGRAPHY.micro, 'text-slate-400 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 rounded ml-2 shrink-0')}>
                       系统
                     </span>
                   )}
@@ -67,7 +71,7 @@ export function RoleList({ roles, selectedRoleId, onSelectRole }: RoleListProps)
                 <div
                   className={cn(
                     TYPOGRAPHY.caption,
-                    `truncate flex justify-between ${isSelected ? 'text-blue-400 dark:text-blue-300' : 'text-slate-400'}`
+                    `truncate flex justify-between ${isSelected ? 'text-blue-400 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`
                   )}
                 >
                   <span>{role.userCount} 位成员</span>
@@ -75,7 +79,11 @@ export function RoleList({ roles, selectedRoleId, onSelectRole }: RoleListProps)
               </div>
 
               {isSelected && (
-                <button type="button" className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-200 rounded text-slate-400" aria-label="角色操作">
+                <button
+                  type="button"
+                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-slate-400 dark:text-slate-500"
+                  aria-label="角色操作"
+                >
                   <MoreHorizontal size={14} />
                 </button>
               )}
@@ -84,8 +92,8 @@ export function RoleList({ roles, selectedRoleId, onSelectRole }: RoleListProps)
         })}
       </div>
 
-      <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/60">
-        <div className={cn(TYPOGRAPHY.caption, 'text-slate-400 text-center')}>
+      <div className="p-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/70">
+        <div className={cn(TYPOGRAPHY.caption, 'text-slate-400 dark:text-slate-500 text-center')}>
           共 {roles.length} 个角色 · <span className="hover:text-brand-600 cursor-pointer hover:underline">管理元数据</span>
         </div>
       </div>

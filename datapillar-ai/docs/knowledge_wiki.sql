@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS knowledge_namespace (
 CREATE TABLE IF NOT EXISTS knowledge_document (
   document_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '文档ID',
   namespace_id BIGINT UNSIGNED NOT NULL COMMENT '所属命名空间ID',
-  doc_uid VARCHAR(64) NULL COMMENT '向量库文档ID（hash）',
+  doc_uid VARCHAR(64) NOT NULL COMMENT '稳定文档ID（后端生成，不含冒号）',
 
   title VARCHAR(255) NOT NULL COMMENT '文档标题',
   file_type VARCHAR(32) NOT NULL COMMENT '文件类型：pdf/docx/md/txt/...',

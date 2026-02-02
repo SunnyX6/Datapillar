@@ -4,13 +4,12 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.Data;
-
 import java.time.LocalDateTime;
+import lombok.Data;
 
 /**
  * 角色实体类
- * 
+ *
  * @author sunny
  * @since 2024-01-01
  */
@@ -19,25 +18,20 @@ import java.time.LocalDateTime;
 public class Role {
     @TableId(type = IdType.AUTO)
     private Long id;
-    
-    /**
-     * 角色代码，唯一标识
-     */
-    private String code;
-    
-    /**
-     * 角色名称
-     */
+
+    private String type;
+
     private String name;
-    
-    /**
-     * 角色描述
-     */
+
     private String description;
-    
+
+    private Integer status;
+
+    private Integer sort;
+
     @TableField("created_at")
     private LocalDateTime createdAt;
-    
+
     @TableField("updated_at")
     private LocalDateTime updatedAt;
 }

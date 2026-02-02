@@ -68,6 +68,7 @@ async def test_knowledge_ingest() -> None:
         source = KnowledgeSource(
             source="Datapillar knowledge integration test text.",
             chunk=chunk_config,
+            doc_uid="doc1",
             name="KB",
             source_type="doc",
             filename="doc.txt",

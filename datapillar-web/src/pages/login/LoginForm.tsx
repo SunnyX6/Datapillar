@@ -8,16 +8,18 @@
  * 4. 错误处理
  */
 
-import { useState, FormEvent, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, FormEvent, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, UserRound, Lock, Loader2, Eye, EyeOff, Check } from 'lucide-react'
+import { ArrowRight, UserRound, Lock, Loader2, Eye, EyeOff, Check, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { useThemeMode, useAuthStore } from '@/stores'
-import { BrandLogo } from '@/components'
+import { BrandLogo, ThirdPartyIcons } from '@/components'
 import { Button } from '@/components/ui'
 import { paddingClassMap } from '@/design-tokens/dimensions'
 import { cn } from '@/lib/utils'
+import { getSsoQr } from '@/lib/api/auth'
+import type { SsoQrResponse } from '@/types/auth'
 
 /**
  * 尺寸配置系统
@@ -62,15 +64,98 @@ const SIZES = {
   }
 }
 
+const DINGTALK_PROVIDER = 'dingtalk'
+const DINGTALK_SCRIPT_SRC = 'https://g.alicdn.com/dingding/h5-dingtalk-login/0.21.0/ddlogin.js'
+const DINGTALK_CONTAINER_ID = 'dingtalk-login-container'
+const DINGTALK_QR_SIZE = 180
+
+let dingtalkScriptPromise: Promise<void> | null = null
+
+function loadDingTalkScript(): Promise<void> {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('无法加载钉钉脚本'))
+  }
+  if (window.DTFrameLogin) {
+    return Promise.resolve()
+  }
+  if (dingtalkScriptPromise) {
+    return dingtalkScriptPromise
+  }
+  dingtalkScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[data-dingtalk-login="true"]`)
+    if (existing) {
+      existing.addEventListener('load', () => resolve())
+      existing.addEventListener('error', () => reject(new Error('钉钉脚本加载失败')))
+      return
+    }
+    const script = document.createElement('script')
+    script.src = DINGTALK_SCRIPT_SRC
+    script.async = true
+    script.setAttribute('data-dingtalk-login', 'true')
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('钉钉脚本加载失败'))
+    document.body.appendChild(script)
+  })
+  return dingtalkScriptPromise
+}
+
+function readPayloadString(payload: Record<string, unknown>, key: string, fallback: string | null = null): string | null {
+  const value = payload[key]
+  if (typeof value !== 'string') {
+    return fallback
+  }
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : fallback
+}
+
+function resolveAuthCode(result: { authCode?: string; redirectUrl?: string }): string | null {
+  if (result.authCode && result.authCode.trim().length > 0) {
+    return result.authCode.trim()
+  }
+  if (result.redirectUrl) {
+    try {
+      const url = new URL(result.redirectUrl)
+      return url.searchParams.get('authCode') || url.searchParams.get('code')
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
 /**
  * 登录表单组件
  */
 interface LoginFormProps {
   scale: number
   ready: boolean
+  tenantCode?: string | null
+  inviteCode?: string | null
 }
 
-export function LoginForm({ scale, ready }: LoginFormProps) {
+interface LoginFormContentProps {
+  tenantCode?: string | null
+  inviteCode?: string | null
+  onSsoClick?: () => void
+}
+
+type LoginTab = 'account' | 'sso'
+
+type SsoProviderKey = 'dingtalk' | 'wecom' | 'lark'
+
+const PROVIDER_CONFIG: Array<{
+  key: SsoProviderKey
+  name: string
+  desc: string
+  icon: keyof typeof ThirdPartyIcons
+  enabled: boolean
+}> = [
+  { key: 'dingtalk', name: '钉钉 登录', desc: '使用该平台组织账号授权', icon: 'DingTalk', enabled: true },
+  { key: 'wecom', name: '企业微信 登录', desc: '使用该平台组织账号授权', icon: 'WeCom', enabled: false },
+  { key: 'lark', name: '飞书 登录', desc: '使用该平台组织账号授权', icon: 'Lark', enabled: false }
+]
+
+export function LoginFormContent({ tenantCode, inviteCode, onSsoClick }: LoginFormContentProps) {
   const { t } = useTranslation('login')
   const mode = useThemeMode()
   const navigate = useNavigate()
@@ -118,14 +203,318 @@ export function LoginForm({ scale, ready }: LoginFormProps) {
       return
     }
 
+    if (!tenantCode || !tenantCode.trim()) {
+      toast.error('缺少租户编码')
+      return
+    }
+
     try {
-      await login(username, password, rememberMe)
+      await login(username, password, rememberMe, { tenantCode, inviteCode: inviteCode ?? undefined })
       toast.success(t('form.success'), { style: successToastStyle })
       navigate('/home')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '登录失败，请重试')
     }
   }
+
+  return (
+    <div className="select-none">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3 md:gap-4 select-none">
+        {/* 用户名输入框 */}
+        <div className="flex flex-col gap-1.5 md:gap-2">
+          <div className="flex items-center justify-between">
+            <span className={`text-xs font-semibold text-slate-500 dark:text-slate-400 ${labelTypography}`}>
+              {t('form.username.label')}
+            </span>
+          </div>
+          <div className="relative group">
+            <div className={`absolute inset-y-0 left-0 ${SIZES.input.iconPadding} flex items-center pointer-events-none text-slate-400 dark:text-slate-500 group-focus-within:text-indigo-500 transition-colors`}>
+              <UserRound size={SIZES.input.iconSize} />
+            </div>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className={inputBaseClass}
+              placeholder="sunny"
+              disabled={loading}
+            />
+          </div>
+        </div>
+
+        {/* 密码输入框 */}
+        <div className="flex flex-col gap-1.5 md:gap-2">
+          <div className="flex justify-between items-center">
+            <label className={`text-xs font-semibold text-slate-500 dark:text-slate-400 ${labelTypography}`}>
+              {t('form.password.label')}
+            </label>
+            <a href="#" className="text-xs font-semibold text-indigo-500 dark:text-indigo-400 hover:text-indigo-300">
+              {t('form.forgot')}
+            </a>
+          </div>
+          <div className="relative group">
+            <div className={`absolute inset-y-0 left-0 ${SIZES.input.iconPadding} flex items-center pointer-events-none text-slate-400 dark:text-slate-500 group-focus-within:text-indigo-500 transition-colors`}>
+              <Lock size={SIZES.input.iconSize} />
+            </div>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={inputBaseClass}
+              placeholder="••••••••"
+              disabled={loading}
+            />
+            <Button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              variant="ghost"
+              size="tiny"
+              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 dark:text-slate-500 hover:text-indigo-500 transition-colors"
+              aria-label={showPassword ? '隐藏密码' : '显示密码'}
+            >
+              {showPassword ? <EyeOff size={SIZES.input.iconSize} /> : <Eye size={SIZES.input.iconSize} />}
+            </Button>
+          </div>
+        </div>
+
+        {/* 记住我复选框 */}
+        <label
+          className={`flex items-center gap-2.5 select-none group ${loading ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+        >
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={() => setRememberMe(!rememberMe)}
+            disabled={loading}
+            className="sr-only"
+          />
+          <span
+            className={`flex ${SIZES.checkbox.size} items-center justify-center rounded-[5px] border transition-all duration-200 ${
+              rememberMe
+                ? 'border-transparent bg-gradient-to-br from-indigo-500 to-purple-500 text-white shadow-[0_8px_14px_rgba(79,70,229,0.35)]'
+                : 'border-slate-400/70 dark:border-slate-600 bg-transparent text-transparent group-hover:border-indigo-400/70 dark:group-hover:border-indigo-500/60'
+            }`}
+          >
+            {rememberMe ? <Check size={SIZES.checkbox.iconSize} strokeWidth={2} /> : null}
+          </span>
+          <span className={`text-xs font-semibold text-slate-500 dark:text-slate-400 ${labelTypography} group-hover:text-slate-900 dark:group-hover:text-slate-300 transition-colors`}>
+            {t('form.remember')}
+          </span>
+        </label>
+
+        {/* 登录按钮 */}
+        <Button
+          type="submit"
+          disabled={loading}
+          // 登录页按钮不应该继承 Button 的默认 header 尺寸（含 @md:py-* 容器断点），否则会覆盖这里自定义的 py-*。
+          size="normal"
+          className={cn(
+            'w-full text-white rounded-lg shadow-md shadow-indigo-500/20 disabled:cursor-not-allowed',
+            'flex items-center justify-center gap-2',
+            'bg-indigo-500 hover:bg-indigo-600 active:bg-indigo-700 disabled:bg-indigo-400',
+            'dark:bg-indigo-500 dark:hover:bg-indigo-600 dark:active:bg-indigo-700 dark:disabled:bg-indigo-400',
+            'transition-colors duration-150',
+            SIZES.button.text,
+            SIZES.button.py,
+            'font-semibold',
+            '-mt-1',
+            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400'
+          )}
+        >
+          {loading ? (
+            <>
+              <Loader2 size={SIZES.button.iconSize} className="animate-spin" />
+              <span>{t('form.submit')}...</span>
+            </>
+          ) : (
+            <>
+              <span>{t('form.submit')}</span>
+              <ArrowRight size={SIZES.button.iconSize} />
+            </>
+          )}
+        </Button>
+        <div className="mt-6">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 border-t border-slate-100 dark:border-white/10" />
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">其他登录方式</span>
+            <div className="flex-1 border-t border-slate-100 dark:border-white/10" />
+          </div>
+          {onSsoClick ? (
+            <div className="flex justify-center mt-3">
+              <button
+                type="button"
+                onClick={onSsoClick}
+                className="text-xs font-semibold text-indigo-500 hover:text-indigo-600 dark:text-indigo-300 dark:hover:text-indigo-200 transition-colors"
+              >
+                企业SSO
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </form>
+    </div>
+  )
+}
+
+export function LoginForm({ scale, ready, tenantCode, inviteCode }: LoginFormProps) {
+  const { t } = useTranslation('login')
+  const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState<LoginTab>('account')
+  const [activeProvider, setActiveProvider] = useState<SsoProviderKey | null>(null)
+  const [qrConfig, setQrConfig] = useState<SsoQrResponse | null>(null)
+  const [qrLoading, setQrLoading] = useState(false)
+  const [qrError, setQrError] = useState<string | null>(null)
+  const [scriptReady, setScriptReady] = useState(false)
+  const qrContainerRef = useRef<HTMLDivElement | null>(null)
+  const loginWithSso = useAuthStore((state) => state.loginWithSso)
+  const authLoading = useAuthStore((state) => state.loading)
+
+  const panelStyle = useMemo(() => ({
+    transform: `scale(${scale})`,
+    transformOrigin: 'center center',
+    opacity: ready ? 1 : 0,
+    transition: 'opacity 0.3s ease'
+  }), [scale, ready])
+
+  useEffect(() => {
+    if (activeTab === 'account') {
+      setActiveProvider(null)
+      setQrConfig(null)
+      setQrError(null)
+    }
+  }, [activeTab])
+
+  useEffect(() => {
+    if (activeProvider !== 'dingtalk') {
+      return
+    }
+    if (!tenantCode || !tenantCode.trim()) {
+      setQrError('缺少租户编码')
+      toast.error('缺少租户编码')
+      return
+    }
+    let cancelled = false
+    setQrLoading(true)
+    setQrError(null)
+    getSsoQr(tenantCode, DINGTALK_PROVIDER)
+      .then((data) => {
+        if (!cancelled) {
+          setQrConfig(data)
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : '获取扫码配置失败'
+          setQrError(message)
+          toast.error(message)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setQrLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeProvider, tenantCode])
+
+  useEffect(() => {
+    if (activeProvider !== 'dingtalk' || !qrConfig) {
+      return
+    }
+    let cancelled = false
+    loadDingTalkScript()
+      .then(() => {
+        if (!cancelled) {
+          setScriptReady(true)
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : '钉钉脚本加载失败'
+          setQrError(message)
+          toast.error(message)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeProvider, qrConfig])
+
+  useEffect(() => {
+    if (!scriptReady || !qrConfig || activeProvider !== 'dingtalk') {
+      return
+    }
+    if (!window.DTFrameLogin) {
+      return
+    }
+    const payload = (qrConfig.payload ?? {}) as Record<string, unknown>
+    const clientId = readPayloadString(payload, 'clientId')
+    const redirectUri = readPayloadString(payload, 'redirectUri')
+    if (!clientId || !redirectUri) {
+      setQrError('SSO 配置缺少 clientId 或 redirectUri')
+      return
+    }
+    const scope = readPayloadString(payload, 'scope', 'openid corpid') || 'openid corpid'
+    const responseType = readPayloadString(payload, 'responseType', 'code') || 'code'
+    const prompt = readPayloadString(payload, 'prompt', 'consent')
+    const corpId = readPayloadString(payload, 'corpId')
+    const container = qrContainerRef.current
+    if (container) {
+      container.innerHTML = ''
+    }
+    window.DTFrameLogin(
+      {
+        id: DINGTALK_CONTAINER_ID,
+        width: DINGTALK_QR_SIZE,
+        height: DINGTALK_QR_SIZE
+      },
+      {
+        redirect_uri: encodeURIComponent(redirectUri),
+        client_id: clientId,
+        scope,
+        response_type: responseType,
+        state: qrConfig.state,
+        prompt: prompt ?? 'consent',
+        ...(corpId ? { corpId } : {})
+      },
+      async (result) => {
+        const authCode = resolveAuthCode(result || {})
+        const state = result?.state || qrConfig.state
+        if (!authCode) {
+          toast.error('获取授权码失败')
+          return
+        }
+        if (!tenantCode || !tenantCode.trim()) {
+          toast.error('缺少租户编码')
+          return
+        }
+        try {
+          await loginWithSso({
+            tenantCode,
+            provider: DINGTALK_PROVIDER,
+            authCode,
+            state,
+            inviteCode: inviteCode ?? undefined
+          })
+          toast.success('登录成功')
+          navigate('/home')
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : '登录失败，请重试')
+        }
+      },
+      (errorMsg) => {
+        const message = errorMsg || '钉钉登录失败'
+        toast.error(message)
+      }
+    )
+  }, [scriptReady, qrConfig, activeProvider, tenantCode, inviteCode, loginWithSso, navigate])
+
+  const showQrPanel = activeTab === 'sso' && activeProvider === 'dingtalk'
+  const showListPanel = activeTab === 'sso' && activeProvider === null
 
   return (
     <div
@@ -138,20 +527,10 @@ export function LoginForm({ scale, ready }: LoginFormProps) {
           paddingClassMap.md,
           LOGIN_FORM_WIDTH_CLASS
         )}
-        style={{
-          transform: `scale(${scale})`,
-          transformOrigin: 'center center',
-          opacity: ready ? 1 : 0,
-          transition: 'opacity 0.3s ease'
-        }}
+        style={panelStyle}
       >
-      {/* 欢迎标题 */}
-      {/* <div className="select-none mb-3 md:mb-4 mt-4 md:mt-6">
-          <h2 className={`${SIZES.title.text} font-semibold text-slate-900 dark:text-white text-center`}>{t('title')}</h2>
-        </div> */}
-
-      {/* 品牌区域 - 固定高度防止中英文切换时布局抖动 */}
-        <div className="flex flex-col gap-1 md:gap-1.5 select-none mb-2 md:mb-3 -ml-2 min-h-[60px]">
+        {/* 品牌区域 - 固定高度防止中英文切换时布局抖动 */}
+        <div className="flex flex-col gap-1 md:gap-1.5 select-none mb-1 md:mb-2 -ml-2 min-h-[60px]">
           <BrandLogo
             size={Math.round(38 * SCALE)}
             showText
@@ -161,127 +540,122 @@ export function LoginForm({ scale, ready }: LoginFormProps) {
           />
         </div>
 
-        {/* 登录表单 */}
-        <div className="select-none">
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3 md:gap-4 select-none">
-
-          {/* 用户名输入框 */}
-            <div className="flex flex-col gap-1.5 md:gap-2">
-              <div className="flex items-center justify-between">
-                <span className={`text-xs font-semibold text-slate-500 dark:text-slate-400 ${labelTypography}`}>
-                  {t('form.username.label')}
-                </span>
+        {activeTab === 'account' ? (
+          <LoginFormContent
+            tenantCode={tenantCode}
+            inviteCode={inviteCode}
+            onSsoClick={() => setActiveTab('sso')}
+          />
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">企业登录</h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">通过第三方平台授权</p>
               </div>
-              <div className="relative group">
-              <div className={`absolute inset-y-0 left-0 ${SIZES.input.iconPadding} flex items-center pointer-events-none text-slate-400 dark:text-slate-500 group-focus-within:text-indigo-500 transition-colors`}>
-                <UserRound size={SIZES.input.iconSize} />
-                </div>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className={inputBaseClass}
-                  placeholder="sunny"
-                  disabled={loading}
-                />
-               
-              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('account')}
+                className="text-xs font-semibold text-indigo-500 hover:text-indigo-600 dark:text-indigo-300 dark:hover:text-indigo-200 transition-colors"
+              >
+                账号登录
+              </button>
             </div>
 
-          {/* 密码输入框 */}
-            <div className="flex flex-col gap-1.5 md:gap-2">
-              <div className="flex justify-between items-center">
-                <label className={`text-xs font-semibold text-slate-500 dark:text-slate-400 ${labelTypography}`}>
-                  {t('form.password.label')}
-                </label>
-                <a href="#" className="text-xs font-semibold text-indigo-500 dark:text-indigo-400 hover:text-indigo-300">
-                  {t('form.forgot')}
-                </a>
+            <div className="relative">
+              <div
+                aria-hidden={!showListPanel}
+                className={cn(
+                  'flex flex-col gap-2.5 transition-opacity',
+                  showListPanel ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                )}
+              >
+                {PROVIDER_CONFIG.map((provider) => {
+                  const Icon = ThirdPartyIcons[provider.icon]
+                  const disabled = !provider.enabled || authLoading
+                  return (
+                    <button
+                      key={provider.key}
+                      type="button"
+                      onClick={() => {
+                        if (disabled) {
+                          return
+                        }
+                        setActiveProvider(provider.key)
+                      }}
+                      className={cn(
+                        'group relative bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center gap-4 transition-all',
+                        disabled
+                          ? 'opacity-60 cursor-not-allowed'
+                          : 'hover:border-indigo-300 dark:hover:border-indigo-400/50 hover:shadow-lg hover:shadow-indigo-500/10'
+                      )}
+                    >
+                      <div className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0">
+                        <Icon />
+                      </div>
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            {provider.name}
+                          </h4>
+                          {!provider.enabled && (
+                            <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                              敬请期待
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                          {provider.desc}
+                        </p>
+                      </div>
+                      {!disabled && (
+                        <div className="text-slate-300 group-hover:text-indigo-500 transition-colors">
+                          <ChevronRight size={18} />
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
-              <div className="relative group">
-                <div className={`absolute inset-y-0 left-0 ${SIZES.input.iconPadding} flex items-center pointer-events-none text-slate-400 dark:text-slate-500 group-focus-within:text-indigo-500 transition-colors`}>
-                  <Lock size={SIZES.input.iconSize} />
+
+              {showQrPanel ? (
+                <div className="absolute inset-0 flex flex-col items-center gap-2">
+                  <div className="w-full flex items-center justify-between">
+                    <h3 className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">钉钉扫码登录</h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveProvider(null)
+                        setQrConfig(null)
+                        setQrError(null)
+                      }}
+                      className="text-[11px] text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                    >
+                      返回
+                    </button>
+                  </div>
+                  <div
+                    className="bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700 flex items-center justify-center"
+                    style={{ width: DINGTALK_QR_SIZE, height: DINGTALK_QR_SIZE }}
+                  >
+                    {qrLoading ? (
+                      <Loader2 size={22} className="animate-spin text-slate-400" />
+                    ) : (
+                      <div id={DINGTALK_CONTAINER_ID} ref={qrContainerRef} className="w-full h-full" />
+                    )}
+                  </div>
+                  {qrError ? (
+                    <div className="text-[11px] text-rose-500">{qrError}</div>
+                  ) : (
+                    <div className="text-[11px] text-slate-400 bg-slate-50 dark:bg-slate-800/80 px-3 py-1.5 rounded-full">
+                      请使用钉钉App扫码登录
+                    </div>
+                  )}
                 </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={inputBaseClass}
-                  placeholder="••••••••"
-                  disabled={loading}
-                />
-                <Button
-                  type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  variant="ghost"
-                  size="tiny"
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 dark:text-slate-500 hover:text-indigo-500 transition-colors"
-                  aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                >
-                  {showPassword ? <EyeOff size={SIZES.input.iconSize} /> : <Eye size={SIZES.input.iconSize} />}
-                </Button>
-              </div>
+              ) : null}
             </div>
-
-          {/* 记住我复选框 */}
-          <label
-            className={`flex items-center gap-2.5 select-none group ${loading ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-          >
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={() => setRememberMe(!rememberMe)}
-              disabled={loading}
-              className="sr-only"
-            />
-            <span
-              className={`flex ${SIZES.checkbox.size} items-center justify-center rounded-[5px] border transition-all duration-200 ${
-                rememberMe
-                  ? 'border-transparent bg-gradient-to-br from-indigo-500 to-purple-500 text-white shadow-[0_8px_14px_rgba(79,70,229,0.35)]'
-                  : 'border-slate-400/70 dark:border-slate-600 bg-transparent text-transparent group-hover:border-indigo-400/70 dark:group-hover:border-indigo-500/60'
-              }`}
-            >
-              {rememberMe ? <Check size={SIZES.checkbox.iconSize} strokeWidth={2} /> : null}
-            </span>
-            <span className={`text-xs font-semibold text-slate-500 dark:text-slate-400 ${labelTypography} group-hover:text-slate-900 dark:group-hover:text-slate-300 transition-colors`}>
-              {t('form.remember')}
-            </span>
-          </label>
-
-          {/* 登录按钮 */}
-          <Button
-            type="submit"
-            disabled={loading}
-            // 登录页按钮不应该继承 Button 的默认 header 尺寸（含 @md:py-* 容器断点），否则会覆盖这里自定义的 py-*。
-            size="normal"
-            className={cn(
-              'w-full text-white rounded-lg shadow-md shadow-indigo-500/20 disabled:cursor-not-allowed',
-              'flex items-center justify-center gap-2',
-              'bg-indigo-500 hover:bg-indigo-600 active:bg-indigo-700 disabled:bg-indigo-400',
-              'dark:bg-indigo-500 dark:hover:bg-indigo-600 dark:active:bg-indigo-700 dark:disabled:bg-indigo-400',
-              'transition-colors duration-150',
-              SIZES.button.text,
-              SIZES.button.py,
-              'font-semibold',
-              '-mt-1',
-              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400'
-            )}
-          >
-            {loading ? (
-              <>
-                <Loader2 size={SIZES.button.iconSize} className="animate-spin" />
-                <span>{t('form.submit')}...</span>
-              </>
-            ) : (
-              <>
-                <span>{t('form.submit')}</span>
-                <ArrowRight size={SIZES.button.iconSize} />
-              </>
-            )}
-          </Button>
-          <div className="border-t border-slate-100 dark:border-white/10 mt-6" />
-          </form>
-        </div>
+          </div>
+        )}
 
         {/* 底部版权区域 - 固定高度防止中英文切换时布局抖动 */}
         <div className="text-legal text-slate-400 dark:text-slate-500 text-center mt-3 select-none min-h-[48px]">

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -56,6 +57,8 @@ class KnowledgeChunkRequest:
     preview: bool = False
     parser_registry: ParserRegistry | None = None
     sparse_embedder: SparseEmbeddingProvider | None = None
+    batch_size: int | None = None
+    progress_step: int | None = None
     write: dict[str, Any] | None = None
 
 
@@ -135,6 +138,7 @@ class KnowledgeService:
         request: KnowledgeChunkRequest,
         *,
         namespace: str,
+        progress_cb: Callable[[int, int], Awaitable[None] | None] | None = None,
     ) -> list[ChunkPreview] | None:
         if request is None:
             raise ValueError("chunk request cannot be empty")
@@ -143,7 +147,7 @@ class KnowledgeService:
 
         await self.initialize()
         runtime = await self._get_runtime(namespace)
-        return await self._chunk_vector_store(request, runtime=runtime)
+        return await self._chunk_vector_store(request, runtime=runtime, progress_cb=progress_cb)
 
     async def retrieve(
         self,
@@ -324,11 +328,26 @@ class KnowledgeService:
         await self._repair_docs(doc_ids=_unique_doc_ids(existing_chunks), doc_cache=None, runtime=runtime)
         return deleted
 
+    async def delete_document(
+        self,
+        *,
+        doc_id: str,
+        namespace: str,
+    ) -> int:
+        if not doc_id:
+            raise ValueError("doc_id cannot be empty")
+
+        await self.initialize()
+        runtime = await self._get_runtime(namespace)
+        await runtime.store.delete_doc_chunks(doc_id)
+        return await runtime.store.delete_doc(doc_id)
+
     async def _chunk_vector_store(
         self,
         request: KnowledgeChunkRequest,
         *,
         runtime,
+        progress_cb: Callable[[int, int], Awaitable[None] | None] | None = None,
     ) -> list[ChunkPreview] | None:
         registry = request.parser_registry or default_registry()
         ingestor = KnowledgeIngestor(
@@ -342,6 +361,9 @@ class KnowledgeService:
         await ingestor.ingest(
             sources=request.sources,
             sparse_embedder=request.sparse_embedder,
+            batch_size=request.batch_size,
+            progress_step=request.progress_step,
+            progress_cb=progress_cb,
         )
         return previews
 

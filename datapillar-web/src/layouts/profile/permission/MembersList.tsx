@@ -51,13 +51,13 @@ export function MembersList({ role, users, onAddUser, onUpdateUserPermissions }:
         </div>
         <div className="flex items-center gap-3">
           <div className="relative group w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={14} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 group-focus-within:text-brand-500 dark:group-focus-within:text-brand-400 transition-colors" size={14} />
             <input
               type="text"
               placeholder="搜索成员..."
               className={cn(
                 TYPOGRAPHY.bodySm,
-                'w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-brand-300/70 dark:border-brand-400/40 rounded-lg hover:border-brand-400/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all text-slate-900 dark:text-slate-100 placeholder:text-slate-400'
+                'w-full pl-9 pr-4 py-1.5 bg-white dark:bg-slate-900 border border-brand-300/70 dark:border-brand-400/40 rounded-lg hover:border-brand-400/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all text-slate-900 dark:text-slate-100 placeholder:text-slate-400'
               )}
             />
           </div>
@@ -68,59 +68,59 @@ export function MembersList({ role, users, onAddUser, onUpdateUserPermissions }:
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-        <Table
-          layout="auto"
-          minWidth="none"
-          tableClassName={cn(TYPOGRAPHY.bodySm, 'text-slate-900 dark:text-slate-100')}
-        >
-          <TableHeader className={cn(TYPOGRAPHY.caption, 'bg-slate-50/50 dark:bg-slate-900/70 text-slate-500 dark:text-slate-400 font-medium')}>
+      <Table
+        layout="auto"
+        minWidth="none"
+        className="shadow-none dark:shadow-none"
+        tableClassName={cn(TYPOGRAPHY.bodySm, 'text-slate-900 dark:text-slate-100')}
+      >
+        <TableHeader className={cn(TYPOGRAPHY.caption, 'bg-slate-50/50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 font-medium')}>
+          <TableRow>
+            <TableHead className="px-6 py-3.5 w-1/3">用户</TableHead>
+            <TableHead className="px-6 py-3.5">部门</TableHead>
+            <TableHead className="px-6 py-3.5">权限状态</TableHead>
+            <TableHead className="px-6 py-3.5">活跃时间</TableHead>
+            <TableHead className="px-6 py-3.5 text-center">权限配置</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
+          {assignedUsers.length === 0 ? (
             <TableRow>
-              <TableHead className="px-6 py-3.5 w-1/3">用户</TableHead>
-              <TableHead className="px-6 py-3.5">部门</TableHead>
-              <TableHead className="px-6 py-3.5">权限状态</TableHead>
-              <TableHead className="px-6 py-3.5">活跃时间</TableHead>
-              <TableHead className="px-6 py-3.5 text-center">权限配置</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {assignedUsers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="px-6 py-16 text-center">
-                  <div className="flex flex-col items-center justify-center text-slate-400">
-                    <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
-                      <UserPlus size={20} />
-                    </div>
-                    <p className={cn(TYPOGRAPHY.bodySm, 'text-slate-600 font-medium')}>暂无成员</p>
-                    <Button
-                      variant="outline"
-                      size="small"
-                      className="mt-4"
-                      onClick={() => setIsAddModalOpen(true)}
-                    >
-                      立即添加
-                    </Button>
+              <TableCell colSpan={5} className="px-6 py-16 text-center">
+                <div className="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
+                  <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center mb-3">
+                    <UserPlus size={20} />
                   </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              assignedUsers.map((user) => {
-                const hasCustomPermissions = user.customPermissions && user.customPermissions.length > 0
+                  <p className={cn(TYPOGRAPHY.bodySm, 'text-slate-600 dark:text-slate-300 font-medium')}>暂无成员</p>
+                  <Button
+                    variant="outline"
+                    size="small"
+                    className="mt-4"
+                    onClick={() => setIsAddModalOpen(true)}
+                  >
+                    立即添加
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ) : (
+            assignedUsers.map((user) => {
+              const hasCustomPermissions = user.customPermissions && user.customPermissions.length > 0
 
-                return (
-                  <TableRow key={user.id} className="hover:bg-slate-50/80 transition-colors">
-                    <TableCell className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <PermissionAvatar name={user.name} src={user.avatarUrl} size="sm" />
-                        <div>
-                          <div className={cn(TYPOGRAPHY.bodySm, 'font-medium text-slate-900 dark:text-white')}>{user.name}</div>
-                          <div className={cn(TYPOGRAPHY.caption, 'text-slate-500 dark:text-slate-400')}>{user.email}</div>
-                        </div>
+              return (
+                <TableRow key={user.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/70 transition-colors">
+                  <TableCell className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <PermissionAvatar name={user.name} src={user.avatarUrl} size="sm" />
+                      <div>
+                        <div className={cn(TYPOGRAPHY.bodySm, 'font-medium text-slate-900 dark:text-white')}>{user.name}</div>
+                        <div className={cn(TYPOGRAPHY.caption, 'text-slate-500 dark:text-slate-400')}>{user.email}</div>
                       </div>
-                    </TableCell>
+                    </div>
+                  </TableCell>
                     <TableCell className="px-6 py-4">
                       <div className={cn(TYPOGRAPHY.caption, 'flex items-center gap-2 text-slate-500 dark:text-slate-400')}>
-                        <Building2 size={12} className="text-slate-400" />
+                        <Building2 size={12} className="text-slate-400 dark:text-slate-500" />
                         <span>{user.department ?? '-'}</span>
                       </div>
                     </TableCell>
@@ -128,7 +128,12 @@ export function MembersList({ role, users, onAddUser, onUpdateUserPermissions }:
                       <div className="flex flex-col items-start gap-1">
                         <StatusBadge status={user.status} />
                         {hasCustomPermissions && (
-                          <span className={cn(TYPOGRAPHY.micro, 'text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 flex items-center gap-1')}>
+                          <span
+                            className={cn(
+                              TYPOGRAPHY.micro,
+                              'text-amber-600 bg-amber-50 dark:bg-amber-500/10 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-100 dark:border-amber-500/30 flex items-center gap-1'
+                            )}
+                          >
                             <Shield size={10} /> 包含独立权限
                           </span>
                         )}
@@ -148,13 +153,12 @@ export function MembersList({ role, users, onAddUser, onUpdateUserPermissions }:
                         配置权限
                       </Button>
                     </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                </TableRow>
+              )
+            })
+          )}
+        </TableBody>
+      </Table>
 
       <AddMemberModal
         isOpen={isAddModalOpen}

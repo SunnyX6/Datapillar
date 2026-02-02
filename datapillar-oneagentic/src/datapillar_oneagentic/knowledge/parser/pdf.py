@@ -11,7 +11,7 @@ import uuid
 
 from datapillar_oneagentic.knowledge.models import Attachment, DocumentInput, ParsedDocument
 from datapillar_oneagentic.knowledge.parser.base import DocumentParser
-from datapillar_oneagentic.knowledge.parser.utils import build_document_id, guess_mime_type, load_bytes, normalize_metadata
+from datapillar_oneagentic.knowledge.parser.utils import guess_mime_type, load_bytes, normalize_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class PdfParser(DocumentParser):
         mime_type = guess_mime_type(doc_input)
         text, pages, attachments = _extract_pdf(data)
         return ParsedDocument(
-            document_id=build_document_id(),
+            document_id=None,
             source_type="file",
             mime_type=mime_type,
             text=text,

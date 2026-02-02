@@ -4,67 +4,47 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import java.time.LocalDateTime;
 import lombok.Data;
 
-import java.time.LocalDateTime;
-
 /**
- * 菜单实体类
- * 
+ * 权限对象（菜单/页面）实体类
+ *
  * @author sunny
  * @since 2024-01-01
  */
 @Data
-@TableName("menus")
+@TableName("permission_objects")
 public class Menu {
     @TableId(type = IdType.AUTO)
     private Long id;
-    
-    /**
-     * 父菜单ID
-     */
+
     @TableField("parent_id")
     private Long parentId;
-    
-    /**
-     * 菜单名称
-     */
+
+    private String type;
+
     private String name;
-    
-    /**
-     * 菜单路径
-     */
+
+    @TableField("category_id")
+    private Long categoryId;
+
     private String path;
-    
-    /**
-     * 组件路径
-     */
-    private String component;
-    
-    /**
-     * 菜单图标
-     */
-    private String icon;
-    
-    /**
-     * 权限代码
-     */
-    @TableField("permission_code")
-    private String permissionCode;
-    
-    /**
-     * 是否可见
-     */
-    private Integer visible;
-    
-    /**
-     * 排序
-     */
+
+    private String location;
+
+    private String description;
+
     private Integer sort;
-    
+
+    private Integer status;
+
     @TableField("created_at")
     private LocalDateTime createdAt;
-    
+
     @TableField("updated_at")
     private LocalDateTime updatedAt;
+
+    @TableField(exist = false)
+    private String categoryName;
 }

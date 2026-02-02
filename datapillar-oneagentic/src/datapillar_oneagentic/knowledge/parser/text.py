@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datapillar_oneagentic.knowledge.models import DocumentInput, ParsedDocument
 from datapillar_oneagentic.knowledge.parser.base import DocumentParser
-from datapillar_oneagentic.knowledge.parser.utils import build_document_id, guess_mime_type, load_text, normalize_metadata
+from datapillar_oneagentic.knowledge.parser.utils import guess_mime_type, load_text, normalize_metadata
 
 
 class TextParser(DocumentParser):
@@ -19,7 +19,7 @@ class TextParser(DocumentParser):
         text = load_text(doc_input)
         mime_type = guess_mime_type(doc_input)
         return ParsedDocument(
-            document_id=build_document_id(),
+            document_id=None,
             source_type="text",
             mime_type=mime_type,
             text=text,

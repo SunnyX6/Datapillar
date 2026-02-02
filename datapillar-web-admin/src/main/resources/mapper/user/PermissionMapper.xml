@@ -3,16 +3,29 @@
 <mapper namespace="com.sunny.datapillar.admin.module.user.mapper.PermissionMapper">
 
     <select id="selectByRoleId" resultType="com.sunny.datapillar.admin.module.user.entity.Permission">
-        SELECT p.* FROM permissions p
+        SELECT DISTINCT p.*
+        FROM permissions p
         INNER JOIN role_permissions rp ON p.id = rp.permission_id
         WHERE rp.role_id = #{roleId}
     </select>
 
     <select id="selectByUserId" resultType="com.sunny.datapillar.admin.module.user.entity.Permission">
-        SELECT DISTINCT p.* FROM permissions p
-        INNER JOIN role_permissions rp ON p.id = rp.permission_id
-        INNER JOIN user_roles ur ON rp.role_id = ur.role_id
-        WHERE ur.user_id = #{userId}
+        SELECT DISTINCT p.*
+        FROM permissions p
+        WHERE p.id IN (
+            SELECT rp.permission_id
+            FROM role_permissions rp
+            INNER JOIN user_roles ur ON rp.role_id = ur.role_id
+            WHERE ur.user_id = #{userId}
+            UNION
+            SELECT up.permission_id
+            FROM user_permission_overrides up
+            WHERE up.user_id = #{userId}
+        )
+    </select>
+
+    <select id="findByCode" resultType="com.sunny.datapillar.admin.module.user.entity.Permission">
+        SELECT * FROM permissions WHERE code = #{code}
     </select>
 
 </mapper>

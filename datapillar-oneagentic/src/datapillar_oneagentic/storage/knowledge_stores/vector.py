@@ -53,7 +53,7 @@ class VectorKnowledgeStore(KnowledgeStore):
 
     @property
     def supports_full_text(self) -> bool:
-        return False
+        return self._vector_store.capabilities.supports_full_text
 
     def _register_schemas(self) -> None:
         self._vector_store.register_schema(
@@ -300,7 +300,25 @@ class VectorKnowledgeStore(KnowledgeStore):
         k: int,
         filters: dict[str, Any] | None = None,
     ) -> list[KnowledgeSearchHit]:
-        raise ValueError("Full-text retrieval is not supported by the current backend.")
+        merged_filters = dict(filters or {})
+        merged_filters["namespace"] = self._namespace
+        results = await self._vector_store.full_text_search(
+            _CHUNKS,
+            query_text=query_text,
+            k=k,
+            filters=merged_filters,
+        )
+        hits: list[KnowledgeSearchHit] = []
+        for item in results:
+            chunk = _row_to_chunk(item.record)
+            hits.append(
+                KnowledgeSearchHit(
+                    chunk=chunk,
+                    score=item.score,
+                    score_kind=item.score_kind,
+                )
+            )
+        return hits
 
     async def get_doc(self, doc_id: str) -> KnowledgeDocument | None:
         rows = await self._vector_store.get(_DOCS, [self._build_key(doc_id)])

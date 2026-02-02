@@ -11,22 +11,19 @@ import json
 import logging
 import os
 import time
+import uuid
 from typing import Any
 
 from datapillar_oneagentic.knowledge import (
     Knowledge,
-    KnowledgeBaseConfig,
     KnowledgeChunkConfig,
-    KnowledgeChunker,
+    KnowledgeChunkEdit,
+    KnowledgeChunkRequest,
     KnowledgeConfig,
     KnowledgeRetrieveConfig,
-    KnowledgeRetriever,
-    KnowledgeScope,
+    KnowledgeService,
+    KnowledgeSource,
 )
-from datapillar_oneagentic.knowledge.ingest.builder import build_chunks, build_document
-from datapillar_oneagentic.knowledge.models import DocumentInput, KnowledgeSource
-from datapillar_oneagentic.knowledge.parser import default_registry
-from datapillar_oneagentic.knowledge.runtime import build_runtime
 from datapillar_oneagentic.providers.llm.config import EmbeddingConfig
 from datapillar_oneagentic.storage.config import VectorStoreConfig
 
@@ -104,6 +101,7 @@ class KnowledgeWikiService:
         namespace = NamespaceRepository.get(namespace_id, user_id)
         if not namespace:
             raise ValueError("namespace not found")
+        doc_uid = _normalize_doc_uid(_generate_doc_uid())
 
         storage_result = await self._storage.save(
             namespace_id=namespace_id,
@@ -116,7 +114,7 @@ class KnowledgeWikiService:
         document_id = DocumentRepository.create(
             {
                 "namespace_id": namespace_id,
-                "doc_uid": None,
+                "doc_uid": doc_uid,
                 "title": resolved_title,
                 "file_type": file_type,
                 "size_bytes": storage_result.size_bytes,
@@ -157,6 +155,7 @@ class KnowledgeWikiService:
         if not embedding_model_id:
             raise ValueError("embedding_model_id is required")
         self._ensure_namespace_embedding(int(document["namespace_id"]), int(embedding_model_id))
+        _normalize_doc_uid(document.get("doc_uid"))
 
         resolved_chunk = self._resolve_chunk_config(chunk_mode, chunk_config_json)
         DocumentRepository.update(
@@ -210,13 +209,19 @@ class KnowledgeWikiService:
         keyword: str | None,
     ) -> tuple[list[dict[str, Any]], int]:
         document = DocumentRepository.get(document_id, user_id)
-        if not document or not document.get("doc_uid"):
+        if not document:
             return [], 0
+        doc_uid = _normalize_doc_uid(document.get("doc_uid"))
 
         namespace_value = self._get_namespace_value(int(document["namespace_id"]), user_id)
-        runtime = await self._build_runtime(namespace_value, document)
-        rows = await runtime.store.query_chunks(filters={"doc_id": document["doc_uid"]}, limit=None)
-        await runtime.store.close()
+        embedding_model = self._get_embedding_model(int(document["embedding_model_id"]))
+        service = self._build_service(namespace=namespace_value, model=embedding_model)
+        rows = await service.list_chunks(
+            filters={"doc_id": doc_uid},
+            limit=None,
+            namespace=namespace_value,
+        )
+        await service.close()
 
         items = rows
         if keyword:
@@ -263,9 +268,10 @@ class KnowledgeWikiService:
         if not document:
             raise ValueError("document not found")
         namespace_value = self._get_namespace_value(int(document["namespace_id"]), user_id)
-        runtime = await self._build_runtime(namespace_value, document)
-        deleted = await runtime.store.delete_chunks([chunk_id])
-        await runtime.store.close()
+        embedding_model = self._get_embedding_model(int(document["embedding_model_id"]))
+        service = self._build_service(namespace=namespace_value, model=embedding_model)
+        deleted = await service.delete_chunks(chunk_ids=[chunk_id], namespace=namespace_value)
+        await service.close()
         if deleted:
             DocumentRepository.update(
                 int(document["document_id"]),
@@ -280,45 +286,40 @@ class KnowledgeWikiService:
         model_id = self._resolve_namespace_embedding_model(namespace_id)
         embedding_model = self._get_embedding_model(model_id)
         namespace_value = self._get_namespace_value(namespace_id, user_id)
-        runtime = await self._build_runtime_from_model(namespace_value, embedding_model)
+        service = self._build_service(namespace=namespace_value, model=embedding_model)
 
-        retrieve_config = KnowledgeRetrieveConfig(
-            method=(payload.get("retrieval_mode") or "hybrid"),
-            top_k=int(payload.get("top_k") or 5),
-            score_threshold=payload.get("score_threshold"),
-        )
+        default_retrieve = KnowledgeRetrieveConfig()
+        retrieve_override: dict[str, Any] = {
+            "method": payload.get("retrieval_mode") or "hybrid",
+            "top_k": int(payload.get("top_k") or 5),
+            "score_threshold": payload.get("score_threshold"),
+        }
         if payload.get("rerank_enabled"):
-            retrieve_config.rerank.mode = "model"
-            retrieve_config.rerank.provider = "sentence_transformers"
-            retrieve_config.rerank.model = payload.get("rerank_model") or retrieve_config.rerank.model
+            retrieve_override["rerank"] = {
+                "mode": "model",
+                "provider": "sentence_transformers",
+                "model": payload.get("rerank_model") or default_retrieve.rerank.model,
+            }
         else:
-            retrieve_config.rerank.mode = "off"
+            retrieve_override["rerank"] = {"mode": "off"}
 
-        config = KnowledgeConfig(
-            base_config=self._build_base_config(embedding_model),
-            retrieve_config=retrieve_config,
+        doc_uids = self._resolve_scope_doc_uids(
+            user_id=user_id,
+            namespace_id=namespace_id,
+            payload=payload,
         )
-        retriever = KnowledgeRetriever(
-            store=runtime.store,
-            embedding_provider=runtime.embedding_provider,
-            config=config,
-        )
+        filters = {"doc_id": doc_uids} if doc_uids else None
 
-        scope = KnowledgeScope(
-            document_ids=self._resolve_scope_doc_uids(
-                user_id=user_id,
-                namespace_id=namespace_id,
-                payload=payload,
-            )
-        )
         start_ms = time.time()
-        result = await retriever.retrieve(
+        result = await service.retrieve(
             query=payload["query"],
+            namespaces=[namespace_value],
             knowledge=Knowledge(),
-            scope=scope,
+            retrieve=retrieve_override,
+            filters=filters,
         )
         latency_ms = int((time.time() - start_ms) * 1000)
-        await retriever.close()
+        await service.close()
 
         hits = []
         for chunk, score in result.hits:
@@ -348,10 +349,10 @@ class KnowledgeWikiService:
             return 0
         if document.get("doc_uid"):
             namespace_value = self._get_namespace_value(int(document["namespace_id"]), user_id)
-            runtime = await self._build_runtime(namespace_value, document)
-            await runtime.store.delete_doc_chunks(document["doc_uid"])
-            await runtime.store.delete_doc(document["doc_uid"])
-            await runtime.store.close()
+            embedding_model = self._get_embedding_model(int(document["embedding_model_id"]))
+            service = self._build_service(namespace=namespace_value, model=embedding_model)
+            await service.delete_document(doc_id=document["doc_uid"], namespace=namespace_value)
+            await service.close()
         return DocumentRepository.soft_delete(document_id, user_id)
 
     async def _run_chunk_job(
@@ -381,72 +382,51 @@ class KnowledgeWikiService:
         try:
             embedding_model = self._get_embedding_model(int(document["embedding_model_id"]))
             namespace_value = self._get_namespace_value(int(document["namespace_id"]), int(document["created_by"]))
-            runtime = await self._build_runtime_from_model(namespace_value, embedding_model)
-            source_bytes = await self._storage.read(document["storage_uri"])
-            filename = _resolve_filename(document)
-            doc_input = DocumentInput(
-                source=source_bytes,
-                filename=filename,
-                metadata={"title": document["title"]},
-            )
-            parser = default_registry()
-            parsed = parser.parse(doc_input)
-            chunker = KnowledgeChunker(config=chunk_config)
-            preview = chunker.preview(parsed)
-            if not preview.chunks:
-                raise ValueError("no chunks generated")
+            doc_uid = _normalize_doc_uid(document.get("doc_uid"))
+            service = self._build_service(namespace=namespace_value, model=embedding_model)
+            try:
+                source_bytes = await self._storage.read(document["storage_uri"])
+                filename = _resolve_filename(document)
+                source = KnowledgeSource(
+                    source=source_bytes,
+                    chunk=chunk_config,
+                    doc_uid=doc_uid,
+                    name=document["title"],
+                    source_type="doc",
+                    filename=filename,
+                    metadata={"namespace_id": namespace_id, "document_id": document_id},
+                    source_uri=document["storage_uri"],
+                )
 
-            doc_uid = preview.document_id
-            source = KnowledgeSource(
-                name=document["title"],
-                source_type="doc",
-                source_uri=document["storage_uri"],
-                metadata={"namespace_id": namespace_id, "document_id": document_id},
-            )
-            knowledge_doc = build_document(source=source, parsed=parsed, doc_input=doc_input)
-            knowledge_doc.source_uri = document["storage_uri"]
-            knowledge_doc.title = document["title"]
-            knowledge_doc.doc_id = doc_uid
-
-            chunks = build_chunks(source=source, doc=knowledge_doc, drafts=preview.chunks)
-            total_chunks = len(chunks)
-            await runtime.store.upsert_sources([source])
-            await runtime.store.delete_doc_chunks(doc_uid)
-            await runtime.store.delete_doc(doc_uid)
-
-            batch_size = max(self._embedding_batch_size, 1)
-            processed = 0
-            vectors_sum: list[float] | None = None
-            for idx in range(0, total_chunks, batch_size):
-                batch = chunks[idx : idx + batch_size]
-                vectors = await runtime.embedding_provider.embed_texts([c.content for c in batch])
-                for i, chunk in enumerate(batch):
-                    chunk.vector = vectors[i]
-                    if vectors_sum is None:
-                        vectors_sum = [0.0 for _ in vectors[i]]
-                    for dim_idx, value in enumerate(vectors[i]):
-                        vectors_sum[dim_idx] += value
-                await runtime.store.upsert_chunks(batch)
-                processed += len(batch)
-                if processed % self._progress_step == 0 or processed == total_chunks:
-                    progress = int(processed * 100 / total_chunks)
+                async def _on_progress(processed: int, total: int) -> None:
+                    progress = int(processed * 100 / total) if total else 0
                     JobRepository.update_progress(
                         job_id,
                         processed_chunks=processed,
-                        total_chunks=total_chunks,
+                        total_chunks=total,
                         progress=progress,
                     )
                     job_snapshot = JobRepository.get(job_id, user_id)
                     if job_snapshot:
                         await job_event_hub.publish(job_id, _build_progress_event(job_snapshot))
 
-            if vectors_sum is None:
-                vectors_sum = []
-            knowledge_doc.vector = (
-                [v / total_chunks for v in vectors_sum] if total_chunks else []
-            )
-            await runtime.store.upsert_docs([knowledge_doc])
-            await runtime.store.close()
+                previews = await service.chunk(
+                    KnowledgeChunkRequest(
+                        sources=[source],
+                        batch_size=self._embedding_batch_size,
+                        progress_step=self._progress_step,
+                    ),
+                    namespace=namespace_value,
+                    progress_cb=_on_progress,
+                )
+            finally:
+                await service.close()
+
+            preview = previews[0] if previews else None
+            if not preview or not preview.chunks:
+                raise ValueError("no chunks generated")
+
+            total_chunks = len(preview.chunks)
 
             DocumentRepository.update(
                 document_id,
@@ -501,18 +481,14 @@ class KnowledgeWikiService:
         try:
             embedding_model = self._get_embedding_model(int(document["embedding_model_id"]))
             namespace_value = self._get_namespace_value(int(document["namespace_id"]), int(document["created_by"]))
-            runtime = await self._build_runtime_from_model(namespace_value, embedding_model)
-            chunks = await runtime.store.get_chunks([chunk_id])
-            if not chunks:
-                raise ValueError("chunk not found")
-            chunk = chunks[0]
-            chunk.content = content
-            chunk.token_count = 0
-            vector = await runtime.embedding_provider.embed_text(content)
-            chunk.vector = vector
-            await runtime.store.delete_chunks([chunk_id])
-            await runtime.store.upsert_chunks([chunk])
-            await runtime.store.close()
+            service = self._build_service(namespace=namespace_value, model=embedding_model)
+            try:
+                await service.upsert_chunks(
+                    chunks=[KnowledgeChunkEdit(chunk_id=chunk_id, content=content)],
+                    namespace=namespace_value,
+                )
+            finally:
+                await service.close()
 
             JobRepository.mark_success(job_id, processed_chunks=1, total_chunks=1)
             job_snapshot = JobRepository.get(job_id, int(document["created_by"]))
@@ -555,7 +531,12 @@ class KnowledgeWikiService:
             raise ValueError("embedding_dimension is required")
         return model
 
-    def _build_base_config(self, model: dict[str, Any]):
+    def _build_knowledge_config(
+        self,
+        model: dict[str, Any],
+        *,
+        retrieve_config: KnowledgeRetrieveConfig | None = None,
+    ) -> KnowledgeConfig:
         embedding = EmbeddingConfig(
             provider=model.get("provider"),
             api_key=model.get("api_key"),
@@ -563,24 +544,21 @@ class KnowledgeWikiService:
             base_url=model.get("base_url"),
             dimension=int(model.get("embedding_dimension")),
         )
-        return KnowledgeBaseConfig(
+        return KnowledgeConfig(
             embedding=embedding,
             vector_store=self._vector_store_cfg,
+            retrieve=retrieve_config or KnowledgeRetrieveConfig(),
         )
 
-    async def _build_runtime_from_model(self, namespace: str, model: dict[str, Any]):
-        base = self._build_base_config(model)
-        config = KnowledgeConfig(
-            base_config=base,
-            retrieve_config=KnowledgeRetrieveConfig(),
-        )
-        runtime = build_runtime(namespace=namespace, base_config=config.base_config)
-        await runtime.initialize()
-        return runtime
-
-    async def _build_runtime(self, namespace: str, document: dict[str, Any]):
-        model = self._get_embedding_model(int(document["embedding_model_id"]))
-        return await self._build_runtime_from_model(namespace, model)
+    def _build_service(
+        self,
+        *,
+        namespace: str,
+        model: dict[str, Any],
+        retrieve_config: KnowledgeRetrieveConfig | None = None,
+    ) -> KnowledgeService:
+        config = self._build_knowledge_config(model, retrieve_config=retrieve_config)
+        return KnowledgeService(namespace=namespace, config=config)
 
     def _normalize_document(self, doc: dict[str, Any] | None) -> dict[str, Any] | None:
         if not doc:
@@ -677,6 +655,23 @@ class KnowledgeWikiService:
 def _infer_file_type(filename: str) -> str:
     ext = os.path.splitext(filename)[1].lstrip(".")
     return ext or "txt"
+
+
+def _generate_doc_uid() -> str:
+    return f"doc_{uuid.uuid4().hex}"
+
+
+def _normalize_doc_uid(doc_uid: str | None) -> str:
+    if doc_uid is None:
+        raise ValueError("doc_uid is required")
+    value = str(doc_uid).strip()
+    if not value:
+        raise ValueError("doc_uid is required")
+    if ":" in value:
+        raise ValueError("doc_uid cannot contain ':'")
+    if len(value) > 64:
+        raise ValueError("doc_uid length must be <= 64")
+    return value
 
 
 def _parse_doc_uid(chunk_id: str) -> str | None:

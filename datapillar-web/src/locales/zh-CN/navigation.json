@@ -25,7 +25,7 @@
     },
     "profile": {
       "profile": "个人中心",
-      "permission": "权限分配",
+      "permission": "功能权限",
       "models": "AI 配置",
       "billing": "账单",
       "logout": "退出登录"

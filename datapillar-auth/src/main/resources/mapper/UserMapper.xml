@@ -4,65 +4,75 @@
 
     <resultMap id="UserResult" type="com.sunny.datapillar.auth.entity.User">
         <result property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
         <result property="username" column="username"/>
         <result property="passwordHash" column="password"/>
         <result property="email" column="email"/>
+        <result property="phone" column="phone"/>
         <result property="status" column="status"/>
-        <result property="tokenSign" column="token_sign"/>
-        <result property="tokenExpireTime" column="token_expire_time"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
     <select id="selectByUsername" resultMap="UserResult">
-        SELECT id, username, password, email, status, token_sign, token_expire_time, created_at, updated_at
+        SELECT id, tenant_id, username, password, email, phone, status, created_at, updated_at
         FROM users
         WHERE username = #{username}
     </select>
 
     <select id="selectByEmail" resultMap="UserResult">
-        SELECT id, username, password, email, status, token_sign, token_expire_time, created_at, updated_at
+        SELECT id, tenant_id, username, password, email, phone, status, created_at, updated_at
         FROM users
         WHERE email = #{email}
     </select>
 
-    <update id="updateTokenSign">
-        UPDATE users SET token_sign = #{tokenSign}, token_expire_time = #{expireTime}
-        WHERE id = #{userId}
-    </update>
-
-    <select id="selectByIdAndTokenSign" resultMap="UserResult">
-        SELECT id, username, password, email, status, token_sign, token_expire_time, created_at, updated_at
-        FROM users
-        WHERE id = #{userId} AND token_sign = #{tokenSign}
-    </select>
-
-    <update id="clearTokenSign">
-        UPDATE users SET token_sign = NULL, token_expire_time = NULL
-        WHERE id = #{userId}
-    </update>
-
-    <select id="selectRoleCodesByUserId" resultType="string">
-        SELECT r.code FROM roles r
+    <select id="selectRolesByUserId" resultType="com.sunny.datapillar.auth.dto.AuthDto$RoleInfo">
+        SELECT r.id, r.name, r.type
+        FROM roles r
         INNER JOIN user_roles ur ON r.id = ur.role_id
-        WHERE ur.user_id = #{userId}
-    </select>
-
-    <select id="selectPermissionCodesByUserId" resultType="string">
-        SELECT DISTINCT p.code FROM permissions p
-        INNER JOIN role_permissions rp ON p.id = rp.permission_id
-        INNER JOIN user_roles ur ON rp.role_id = ur.role_id
-        WHERE ur.user_id = #{userId}
+        WHERE ur.tenant_id = #{tenantId}
+          AND r.tenant_id = #{tenantId}
+          AND ur.user_id = #{userId}
+        ORDER BY r.sort ASC, r.id ASC
     </select>
 
     <select id="selectMenusByUserId" resultType="map">
-        SELECT DISTINCT m.id, m.name, m.path, m.icon, m.permission_code, m.parent_id, m.sort
-        FROM menus m
-        LEFT JOIN menu_roles mr ON m.id = mr.menu_id
-        LEFT JOIN user_roles ur ON mr.role_id = ur.role_id
-        WHERE (ur.user_id = #{userId} OR m.permission_code IS NULL)
-          AND m.visible = 1
-        ORDER BY m.sort ASC
+        SELECT
+            o.id,
+            o.name,
+            o.path,
+            o.parent_id,
+            o.location,
+            CASE WHEN o.location = 'SIDEBAR' THEN o.category_id ELSE NULL END AS category_id,
+            CASE WHEN o.location = 'SIDEBAR' THEN c.name ELSE NULL END AS category_name,
+            o.sort,
+            CASE
+                WHEN MAX(CASE p.code WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END) >= 2 THEN 'WRITE'
+                WHEN MAX(CASE p.code WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END) >= 1 THEN 'READ'
+                ELSE 'NONE'
+            END AS permission_code
+        FROM permission_objects o
+        LEFT JOIN permission_object_categories c ON o.category_id = c.id
+        INNER JOIN (
+            SELECT rp.object_id, rp.permission_id
+            FROM role_permissions rp
+            INNER JOIN user_roles ur ON ur.role_id = rp.role_id
+            WHERE ur.tenant_id = #{tenantId}
+              AND rp.tenant_id = #{tenantId}
+              AND ur.user_id = #{userId}
+            UNION ALL
+            SELECT up.object_id, up.permission_id
+            FROM user_permission_overrides up
+            WHERE up.tenant_id = #{tenantId}
+              AND up.user_id = #{userId}
+        ) rel ON rel.object_id = o.id
+        INNER JOIN permissions p ON p.id = rel.permission_id
+        WHERE o.type = 'MENU'
+          AND o.status = 1
+          AND (o.tenant_id = 0 OR o.tenant_id = #{tenantId})
+          AND (p.tenant_id = 0 OR p.tenant_id = #{tenantId})
+        GROUP BY o.id, o.name, o.path, o.parent_id, o.location, o.category_id, c.name, o.sort
+        ORDER BY o.sort ASC, o.id ASC
     </select>
 
 </mapper>

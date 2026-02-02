@@ -12,6 +12,7 @@ import {
   Table,
   Unlock
 } from 'lucide-react'
+import { panelWidthClassMap } from '@/design-tokens/dimensions'
 import { cn } from '@/lib/utils'
 import type { UserItem } from './Permission'
 
@@ -146,8 +147,8 @@ const Switch = ({
     onClick={onChange}
     disabled={disabled}
     className={cn(
-      'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2',
-      checked ? color : 'bg-slate-200',
+      'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',
+      checked ? color : 'bg-slate-200 dark:bg-slate-700',
       disabled ? 'opacity-50 cursor-not-allowed' : ''
     )}
   >
@@ -271,12 +272,12 @@ export function DataPermission({ user }: DataPermissionProps) {
 
       const colorClass =
         node.type === 'metalake'
-          ? 'text-indigo-600'
+          ? 'text-indigo-600 dark:text-indigo-400'
           : node.type === 'catalog'
-            ? 'text-blue-600'
+            ? 'text-blue-600 dark:text-blue-400'
             : node.type === 'schema'
-              ? 'text-amber-500'
-              : 'text-slate-500'
+              ? 'text-amber-500 dark:text-amber-400'
+              : 'text-slate-500 dark:text-slate-400'
 
       const hasPermissions = localPrivileges[node.id]?.length > 0
 
@@ -287,14 +288,14 @@ export function DataPermission({ user }: DataPermissionProps) {
             className={cn(
               'flex items-center gap-1.5 py-1.5 px-2 cursor-pointer select-none transition-colors border-l-2',
               isSelected
-                ? 'bg-brand-50 border-brand-500 text-brand-900 font-medium'
-                : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                ? 'bg-brand-50 border-brand-500 text-brand-900 font-medium dark:bg-brand-500/10 dark:border-brand-400/60 dark:text-brand-200'
+                : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/60 dark:hover:text-slate-100'
             )}
             style={{ paddingLeft: `${level * 16 + 8}px` }}
           >
             <div
               onClick={(event) => hasChildren && toggleExpand(node.id, event)}
-              className={cn('p-0.5 rounded hover:bg-black/5 transition-colors', !hasChildren && 'invisible')}
+              className={cn('p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors', !hasChildren && 'invisible')}
             >
               {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             </div>
@@ -310,31 +311,31 @@ export function DataPermission({ user }: DataPermissionProps) {
   }
 
   return (
-    <div className="flex h-full border rounded-xl border-slate-200 overflow-hidden bg-white shadow-sm ring-1 ring-slate-100">
-      <div className="w-[280px] bg-slate-50/50 border-r border-slate-200 flex flex-col">
-        <div className="p-3 border-b border-slate-200 bg-slate-50 font-bold text-xs text-slate-500 uppercase tracking-wider flex items-center gap-2">
+    <div className="flex h-full border rounded-xl border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900/90 shadow-none dark:shadow-none ring-1 ring-slate-100 dark:ring-slate-800/60">
+      <div className={cn(panelWidthClassMap.medium, 'bg-slate-50/50 dark:bg-slate-900/70 border-r border-slate-200 dark:border-slate-800 flex flex-col')}>
+        <div className="p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
           <Layers size={14} />
           资源拓扑
         </div>
         <div className="flex-1 overflow-y-auto py-2 custom-scrollbar">{renderTree(MOCK_GRAVITINO_ASSETS)}</div>
       </div>
 
-      <div className="flex-1 flex flex-col bg-white min-w-0">
+      <div className="flex-1 flex flex-col bg-white dark:bg-slate-900/90 min-w-0">
         {selectedAsset ? (
           <div className="flex flex-col h-full animate-in fade-in duration-200">
-            <div className="px-6 py-5 border-b border-slate-100">
+            <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div
                     className={cn(
                       'p-2 rounded-lg',
                       selectedAsset.type === 'metalake'
-                        ? 'bg-indigo-50 text-indigo-600'
+                        ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300'
                         : selectedAsset.type === 'catalog'
-                          ? 'bg-blue-50 text-blue-600'
+                          ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300'
                           : selectedAsset.type === 'schema'
-                            ? 'bg-amber-50 text-amber-600'
-                            : 'bg-slate-100 text-slate-600'
+                            ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
                     )}
                   >
                     {selectedAsset.type === 'metalake' ? (
@@ -348,36 +349,36 @@ export function DataPermission({ user }: DataPermissionProps) {
                     )}
                   </div>
                   <div>
-                    <h4 className="font-bold text-slate-900 text-base tracking-tight">{selectedAsset.name}</h4>
-                    <p className="text-legal text-slate-500 font-mono mt-0.5">{selectedAsset.description || '无描述'}</p>
+                    <h4 className="font-bold text-slate-900 dark:text-slate-100 text-base tracking-tight">{selectedAsset.name}</h4>
+                    <p className="text-legal text-slate-500 dark:text-slate-400 font-mono mt-0.5">{selectedAsset.description || '无描述'}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">ACL Context</span>
+                  <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">ACL Context</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 bg-slate-50/30 custom-scrollbar">
-              <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-4 bg-slate-50/30 dark:bg-slate-950/35 custom-scrollbar">
+              <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl shadow-none dark:shadow-none overflow-hidden">
                 {privilegeGroups.map((group, idx) => (
-                  <div key={group.name} className={cn(idx !== privilegeGroups.length - 1 && 'border-b border-slate-100')}>
-                    <div className="px-5 py-2.5 bg-slate-50/80 border-b border-slate-100 backdrop-blur-sm flex items-center justify-between">
+                  <div key={group.name} className={cn(idx !== privilegeGroups.length - 1 && 'border-b border-slate-100 dark:border-slate-800')}>
+                    <div className="px-5 py-2.5 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800/80 backdrop-blur-sm flex items-center justify-between">
                       <h5
                         className={cn(
                           'text-xs font-bold uppercase tracking-wider flex items-center gap-2',
-                          group.danger ? 'text-rose-600' : 'text-slate-500'
+                          group.danger ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'
                         )}
                       >
                         {group.danger ? <AlertCircle size={14} /> : <Shield size={14} />}
                         {group.name}
                       </h5>
-                      <span className="text-[10px] font-medium text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
                         {group.items.filter((item) => hasPrivilege(item.key)).length} / {group.items.length} 授权
                       </span>
                     </div>
 
-                    <div className="divide-y divide-slate-50">
+                    <div className="divide-y divide-slate-50 dark:divide-slate-800">
                       {group.items.map((item) => {
                         const isActive = hasPrivilege(item.key)
                         return (
@@ -385,35 +386,47 @@ export function DataPermission({ user }: DataPermissionProps) {
                             key={item.key}
                             className={cn(
                               'flex items-center justify-between px-5 py-4 transition-all duration-200',
-                              isActive ? 'bg-slate-50/50' : 'hover:bg-slate-50/30'
+                              isActive ? 'bg-slate-50/50 dark:bg-slate-800/60' : 'hover:bg-slate-50/30 dark:hover:bg-slate-800/70'
                             )}
                           >
                             <div className="flex items-start gap-4">
                               <div
                                 className={cn(
                                   'mt-1 p-1.5 rounded-md transition-colors',
-                                  isActive ? 'bg-white shadow-sm ring-1 ring-slate-200' : 'bg-slate-100 text-slate-400'
+                                  isActive
+                                    ? 'bg-white dark:bg-slate-900 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
                                 )}
                               >
-                                {isActive ? <Unlock size={14} className="text-brand-600" /> : <Lock size={14} />}
+                                {isActive ? <Unlock size={14} className="text-brand-600 dark:text-brand-300" /> : <Lock size={14} />}
                               </div>
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <span className={cn('text-legal font-bold font-mono', isActive ? 'text-slate-900' : 'text-slate-600')}>
+                                  <span
+                                    className={cn(
+                                      'text-legal font-bold font-mono',
+                                      isActive ? 'text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-300'
+                                    )}
+                                  >
                                     {item.label}
                                   </span>
                                   {group.danger && (
-                                    <span className="text-[10px] text-rose-600 bg-rose-50 border border-rose-100 px-1.5 rounded font-medium">
+                                    <span className="text-[10px] text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/30 px-1.5 rounded font-medium">
                                       High Risk
                                     </span>
                                   )}
                                 </div>
-                                <p className={cn('text-micro text-slate-500 mt-1')}>{item.desc}</p>
+                                <p className={cn('text-micro text-slate-500 dark:text-slate-400 mt-1')}>{item.desc}</p>
                               </div>
                             </div>
 
                             <div className="flex items-center gap-4">
-                              <span className={cn('text-xs font-medium transition-colors', isActive ? 'text-brand-600' : 'text-slate-300')}>
+                              <span
+                                className={cn(
+                                  'text-xs font-medium transition-colors',
+                                  isActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-300 dark:text-slate-600'
+                                )}
+                              >
                                 {isActive ? 'Allow' : 'Deny'}
                               </span>
                               <Switch checked={isActive} onChange={() => togglePrivilege(item.key)} color={group.color} />
@@ -428,7 +441,7 @@ export function DataPermission({ user }: DataPermissionProps) {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full text-slate-400 flex-col gap-3">
+          <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500 flex-col gap-3">
             <Database size={48} className="opacity-20" />
             <p className="font-medium">请从左侧选择数据资产进行配置</p>
           </div>

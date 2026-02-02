@@ -112,7 +112,7 @@ class KnowledgeEvaluator:
         for doc in evalset.documents:
             source_id = _eval_source_id(doc)
             parsed = _build_parsed_document(doc)
-            preview = self._chunker.preview(parsed)
+            preview = self._chunker.preview(parsed, doc_id=doc.doc_id)
             contents = [chunk.content for chunk in preview.chunks]
             lengths = [len(content) for content in contents]
             coverage_ratio, overlap_ratio = compute_coverage_overlap(
@@ -184,7 +184,7 @@ class KnowledgeEvaluator:
             source_id = _eval_source_id(doc)
             source = sources_map[source_id]
             parsed = _build_parsed_document(doc)
-            preview = self._chunker.preview(parsed)
+            preview = self._chunker.preview(parsed, doc_id=doc.doc_id)
             if not preview.chunks:
                 continue
             doc_input = DocumentInput(
@@ -192,7 +192,7 @@ class KnowledgeEvaluator:
                 filename=doc.title or doc.doc_id,
                 metadata=doc.metadata,
             )
-            knowledge_doc = build_document(source=source, parsed=parsed, doc_input=doc_input)
+            knowledge_doc = build_document(source=source, parsed=parsed, doc_input=doc_input, doc_id=doc.doc_id)
             knowledge_chunks = build_chunks(source=source, doc=knowledge_doc, drafts=preview.chunks)
 
             vectors = await self._embedding_provider.embed_texts([chunk.content for chunk in knowledge_chunks])
@@ -221,7 +221,7 @@ class KnowledgeEvaluator:
 def _build_parsed_document(doc: EvalDocument) -> ParsedDocument:
     metadata = {"title": doc.title or doc.doc_id, **doc.metadata}
     return ParsedDocument(
-        document_id=doc.doc_id,
+        document_id=None,
         source_type="doc",
         mime_type="text/plain",
         text=doc.text,
@@ -245,6 +245,7 @@ def _build_sources(
             sources[source_id] = KnowledgeSource(
                 source=doc.text,
                 chunk=chunk_config,
+                doc_uid=doc.doc_id,
                 source_id=source_id,
                 name=source_id,
                 source_type="doc",

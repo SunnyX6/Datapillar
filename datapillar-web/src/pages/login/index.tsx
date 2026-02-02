@@ -7,6 +7,7 @@
  */
 
 import { useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { AppLayout, SplitGrid, useLayout } from '@/layouts/responsive'
 import { ThemeToggle, LanguageToggle } from '@/components'
 import { DemoCanvas } from './DemoCanvas'
@@ -16,6 +17,10 @@ import { LoginForm, LOGIN_FORM_BASE_HEIGHT, LOGIN_FORM_BASE_WIDTH } from './Logi
  * 登录页面
  */
 export function LoginPage() {
+  const [searchParams] = useSearchParams()
+  const tenantCode = searchParams.get('tenantCode')
+  const inviteCode = searchParams.get('inviteCode')
+
   // 禁用 body 滚动
   useEffect(() => {
     const originalOverflow = document.body.style.overflow
@@ -66,7 +71,7 @@ export function LoginPage() {
               <ThemeToggle />
               <LanguageToggle />
             </div>
-            <LoginForm scale={formScale} ready={formReady} />
+            <LoginForm scale={formScale} ready={formReady} tenantCode={tenantCode} inviteCode={inviteCode} />
           </div>
         }
       />

@@ -62,7 +62,7 @@ sqlite = ["langgraph-checkpoint-sqlite>=0.2.0"]
 # Vector database (experience learning)
 lance = ["lancedb>=0.20.0", "pyarrow>=18.0.0"]
 chroma = ["chromadb>=1.0.0"]
-milvus = ["pymilvus>=2.5.0", "langchain-milvus>=0.1.0"]
+milvus = ["pymilvus>=2.5.0"]
 vectordb = ["datapillar-oneagentic[lance,chroma,milvus]"]
 
 # MCP protocol support

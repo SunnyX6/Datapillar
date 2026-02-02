@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import {
   Cloud,
   Code2,
@@ -8,7 +9,8 @@ import {
   Play,
   Sparkles,
   Terminal,
-  Workflow
+  Workflow,
+  Layers
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { BrandLogo } from '@/components'
@@ -20,17 +22,33 @@ import {
 } from '@/design-tokens/dimensions'
 import { Tooltip } from '@/components/ui'
 import { ExpandToggle } from './ExpandToggle'
-
-type View = 'dashboard' | 'workflow' | 'wiki' | 'profile' | 'ide' | 'projects' | 'collaboration' | 'tracking'
+import type { Menu } from '@/types/auth'
 
 interface SidebarProps {
-  onNavigate: (view: View) => void
-  currentView: View
+  menus: Menu[]
+  onNavigate: (path: string) => void
+  currentPath: string
   collapsed: boolean
   onToggleCollapse: () => void
 }
 
-export function Sidebar({ onNavigate, currentView, collapsed, onToggleCollapse }: SidebarProps) {
+const iconMapByPath: Record<string, React.ReactNode> = {
+  '/wiki': <BookOpen size={iconSizeToken.normal} />,
+  '/workflow': <Workflow size={iconSizeToken.normal} />,
+  '/ide': <Code2 size={iconSizeToken.normal} />,
+  '/data-tracking': <MousePointerClick size={iconSizeToken.normal} />,
+  '/compute-warehouse': <Cloud size={iconSizeToken.normal} />,
+  '/deployments': <Play size={iconSizeToken.normal} />,
+  '/logs': <Terminal size={iconSizeToken.normal} />,
+  '/version': <History size={iconSizeToken.normal} />,
+  '/git': <GitBranch size={iconSizeToken.normal} />
+}
+
+const getMenuIcon = (path: string) => {
+  return iconMapByPath[path] ?? <Layers size={iconSizeToken.normal} />
+}
+
+export function Sidebar({ menus, onNavigate, currentPath, collapsed, onToggleCollapse }: SidebarProps) {
   const { t } = useTranslation(['login', 'navigation'])
   const sidebarWidth = collapsed ? sidebarWidthClassMap.collapsed : sidebarWidthClassMap.normal
   const sectionPadding = collapsed ? sidebarPaddingClassMap.collapsed : sidebarPaddingClassMap.normal
@@ -48,6 +66,66 @@ export function Sidebar({ onNavigate, currentView, collapsed, onToggleCollapse }
   const brandTaglineClass = collapsed
     ? undefined
     : 'text-legal font-medium text-slate-400 dark:text-slate-500 mt-0.5 leading-snug'
+
+  const getSidebarSectionLabel = (categoryName?: string) => {
+    if (!categoryName) {
+      return t('side.sections.other', { ns: 'navigation', defaultValue: '其他' })
+    }
+    switch (categoryName) {
+      case '构建与设计':
+        return t('side.sections.build', { ns: 'navigation', defaultValue: categoryName })
+      case '计算与连接':
+        return t('side.sections.compute', { ns: 'navigation', defaultValue: categoryName })
+      case '观测':
+        return t('side.sections.observe', { ns: 'navigation', defaultValue: categoryName })
+      default:
+        return categoryName
+    }
+  }
+
+  const getSidebarItemLabel = (menu: Menu) => {
+    switch (menu.path) {
+      case '/wiki':
+        return t('side.items.wiki', { ns: 'navigation', defaultValue: menu.name })
+      case '/workflow':
+        return t('side.items.workflow', { ns: 'navigation', defaultValue: menu.name })
+      case '/ide':
+        return t('side.items.ide', { ns: 'navigation', defaultValue: menu.name })
+      case '/data-tracking':
+        return t('side.items.tracking', { ns: 'navigation', defaultValue: menu.name })
+      case '/compute-warehouse':
+        return t('side.items.warehouses', { ns: 'navigation', defaultValue: menu.name })
+      case '/deployments':
+        return t('side.items.deployments', { ns: 'navigation', defaultValue: menu.name })
+      case '/logs':
+        return t('side.items.logs', { ns: 'navigation', defaultValue: menu.name })
+      case '/version':
+        return t('side.items.history', { ns: 'navigation', defaultValue: menu.name })
+      case '/git':
+        return t('side.items.git', { ns: 'navigation', defaultValue: menu.name })
+      default:
+        return menu.name
+    }
+  }
+
+  const sidebarMenus = useMemo(() => menus.filter((menu) => menu.location === 'SIDEBAR'), [menus])
+
+  const groupedMenus = useMemo(() => {
+    const groups: Array<{ key: string; name: string; items: Menu[] }> = []
+    const groupIndex = new Map<string, number>()
+    sidebarMenus.forEach((menu) => {
+      const groupKey = menu.categoryName || 'OTHER'
+      const groupName = getSidebarSectionLabel(menu.categoryName)
+      const index = groupIndex.get(groupKey)
+      if (index === undefined) {
+        groupIndex.set(groupKey, groups.length)
+        groups.push({ key: groupKey, name: groupName, items: [menu] })
+        return
+      }
+      groups[index].items.push(menu)
+    })
+    return groups
+  }, [sidebarMenus, t])
 
   return (
     <aside className={`${sidebarWidth} ${topOffset} flex-shrink-0 bg-[#F9FAFB] dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700/80 flex flex-col h-full z-30 overflow-visible relative transition-[width] duration-200 ease-out`}>
@@ -76,29 +154,23 @@ export function Sidebar({ onNavigate, currentView, collapsed, onToggleCollapse }
       </div>
 
       <div className={`flex-1 overflow-y-auto ${sectionPadding} ${contentPaddingY} ${stackSpacing} scrollbar-invisible`}>
-        <NavSection title={t('side.sections.build', { ns: 'navigation' })} collapsed={collapsed}>
-          <NavItem collapsed={collapsed} icon={<BookOpen size={iconSizeToken.normal} />} label={t('side.items.wiki', { ns: 'navigation' })} active={currentView === 'wiki'} onClick={() => onNavigate('wiki')} />
-          <NavItem collapsed={collapsed} icon={<Workflow size={iconSizeToken.normal} />} label={t('side.items.workflow', { ns: 'navigation' })} active={currentView === 'workflow'} onClick={() => onNavigate('workflow')} shortcut="W" />
-          <NavItem collapsed={collapsed} icon={<Code2 size={iconSizeToken.normal} />} label={t('side.items.ide', { ns: 'navigation' })} active={currentView === 'ide'} onClick={() => onNavigate('ide')} shortcut="I" />
-        </NavSection>
-
-        <NavSection title={t('side.sections.compute', { ns: 'navigation' })} collapsed={collapsed}>
-          <NavItem
-            collapsed={collapsed}
-            icon={<MousePointerClick size={iconSizeToken.normal} />}
-            label={t('side.items.tracking', { ns: 'navigation' })}
-            active={currentView === 'tracking'}
-            onClick={() => onNavigate('tracking')}
-          />
-          <NavItem collapsed={collapsed} icon={<Cloud size={iconSizeToken.normal} />} label={t('side.items.warehouses', { ns: 'navigation' })} />
-        </NavSection>
-
-        <NavSection title={t('side.sections.observe', { ns: 'navigation' })} collapsed={collapsed}>
-          <NavItem collapsed={collapsed} icon={<Play size={iconSizeToken.normal} />} label={t('side.items.deployments', { ns: 'navigation' })} />
-          <NavItem collapsed={collapsed} icon={<Terminal size={iconSizeToken.normal} />} label={t('side.items.logs', { ns: 'navigation' })} />
-          <NavItem collapsed={collapsed} icon={<History size={iconSizeToken.normal} />} label={t('side.items.history', { ns: 'navigation' })} />
-          <NavItem collapsed={collapsed} icon={<GitBranch size={iconSizeToken.normal} />} label={t('side.items.git', { ns: 'navigation' })} />
-        </NavSection>
+        {groupedMenus.map((group) => (
+          <NavSection key={group.key} title={group.name} collapsed={collapsed}>
+            {group.items.map((menu) => {
+              const isActive = currentPath === menu.path || currentPath.startsWith(`${menu.path}/`)
+              return (
+                <NavItem
+                  key={menu.id}
+                  collapsed={collapsed}
+                  icon={getMenuIcon(menu.path)}
+                  label={getSidebarItemLabel(menu)}
+                  active={isActive}
+                  onClick={() => onNavigate(menu.path)}
+                />
+              )
+            })}
+          </NavSection>
+        ))}
       </div>
 
       {!collapsed && (

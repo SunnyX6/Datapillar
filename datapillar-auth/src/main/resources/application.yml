@@ -20,6 +20,19 @@ spring:
       pool-name: AuthHikariCP
       max-lifetime: 900000
       connection-timeout: 10000
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
 
 mybatis-plus:
   configuration:
@@ -45,6 +58,10 @@ jwt:
 cookie:
   secure: ${COOKIE_SECURE:false}  # 生产环境设为true，开发环境false
   max-age: ${COOKIE_MAX_AGE:2592000}  # 30天，单位秒（与 Refresh Token 一致）
+
+# SSO 配置
+sso:
+  state-ttl-seconds: ${SSO_STATE_TTL_SECONDS:300}  # 5分钟
 
 logging:
   level:

@@ -85,12 +85,14 @@ async def test_namespace_isolation() -> None:
         source_a = KnowledgeSource(
             source=file_path,
             chunk=chunk_config,
+            doc_uid="doc1",
             name="KB",
             source_type="doc",
         )
         source_b = KnowledgeSource(
             source=file_path,
             chunk=chunk_config,
+            doc_uid="doc1",
             name="KB",
             source_type="doc",
         )

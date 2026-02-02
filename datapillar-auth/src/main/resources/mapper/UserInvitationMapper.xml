@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.datapillar.auth.mapper.UserInvitationMapper">
+
+    <resultMap id="UserInvitationResult" type="com.sunny.datapillar.auth.entity.UserInvitation">
+        <result property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="inviterUserId" column="inviter_user_id"/>
+        <result property="inviteeEmail" column="invitee_email"/>
+        <result property="inviteeMobile" column="invitee_mobile"/>
+        <result property="inviteeKey" column="invitee_key"/>
+        <result property="activeInviteeKey" column="active_invitee_key"/>
+        <result property="inviteCode" column="invite_code"/>
+        <result property="status" column="status"/>
+        <result property="expiresAt" column="expires_at"/>
+        <result property="acceptedUserId" column="accepted_user_id"/>
+        <result property="acceptedAt" column="accepted_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="selectByInviteCode" resultMap="UserInvitationResult">
+        SELECT id, tenant_id, inviter_user_id, invitee_email, invitee_mobile, invitee_key, active_invitee_key,
+               invite_code, status, expires_at, accepted_user_id, accepted_at, created_at, updated_at
+        FROM user_invitations
+        WHERE invite_code = #{inviteCode}
+    </select>
+
+    <update id="acceptInvitation">
+        UPDATE user_invitations
+        SET status = 1,
+            accepted_user_id = #{userId},
+            accepted_at = #{acceptedAt},
+            active_invitee_key = NULL
+        WHERE id = #{id}
+          AND status = 0
+          AND (expires_at IS NULL OR expires_at &gt; #{now})
+    </update>
+
+</mapper>

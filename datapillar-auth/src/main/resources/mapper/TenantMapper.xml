@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.datapillar.auth.mapper.TenantMapper">
+
+    <select id="selectByCode" resultType="com.sunny.datapillar.auth.entity.Tenant">
+        SELECT id, code, status
+        FROM tenants
+        WHERE code = #{code}
+    </select>
+
+</mapper>

@@ -27,8 +27,8 @@ public class MenuServiceImpl implements MenuService {
     private final MenuMapper menuMapper;
 
     @Override
-    public List<MenuDto.Response> getMenusByUserId(Long userId) {
-        List<Menu> menus = menuMapper.findByUserId(userId);
+    public List<MenuDto.Response> getMenusByUserId(Long userId, String location) {
+        List<Menu> menus = menuMapper.findByUserId(userId, location);
         List<MenuDto.Response> menuResponses = convertToMenuResponses(menus);
         return buildMenuTree(menuResponses);
     }
