@@ -119,8 +119,8 @@ start_java_service "datapillar-auth" \
     "$PROJECT_ROOT/datapillar-auth/target/datapillar-auth-1.0.0.jar" 6001
 
 # 2. 启动核心业务服务
-start_java_service "datapillar-workbench-service" \
-    "$PROJECT_ROOT/datapillar-workbench-service/target/datapillar-workbench-service-1.0.0.jar" 6002
+start_java_service "datapillar-studio-service" \
+    "$PROJECT_ROOT/datapillar-studio-service/target/datapillar-studio-service-1.0.0.jar" 6002
 
 # 2.1 启动平台服务
 start_java_service "datapillar-platform" \

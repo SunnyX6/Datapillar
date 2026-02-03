@@ -23,28 +23,28 @@ Datapillar 是一个企业级的 SaaS 数据产品，整合了数据目录、数
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                                用户层 (Browser)                               │
-│  datapillar-web-site (:3100)                 datapillar-workbench (:3000)     │
-│  官网与营销站点                               Workbench 产品前端               │
+│  datapillar-web-site (:3100)                 datapillar-studio (:3000)     │
+│  官网与营销站点                               Datapillar Studio 产品前端       │
 └───────────────────────────────────┬──────────────────────────────────────────┘
                                     │
                                     ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                       API 网关 (datapillar-api-gateway :6000)                 │
-│        统一鉴权 / 路由 / 限流  (/api/auth | /api/platform | /api/workbench | …) │
+│        统一鉴权 / 路由 / 限流  (/api/auth | /api/platform | /api/studio | …) │
 └──────────────┬───────────────┬───────────────────┬─────────────────┬─────────────────┘
                │               │                   │                 │                 │
                ▼               ▼                   ▼                 ▼                 ▼
 ┌────────────────────┐ ┌──────────────────────┐ ┌────────────────────────┐ ┌─────────────────┐ ┌────────────────────┐
-│ datapillar-auth    │ │ datapillar-platform  │ │ datapillar-workbench-  │ │ datapillar-ai   │ │ datapillar-gravitino │
+│ datapillar-auth    │ │ datapillar-platform  │ │ datapillar-studio-  │ │ datapillar-ai   │ │ datapillar-gravitino │
 │ (:6001)            │ │ (:6006)              │ │ service (:6002)        │ │ (:6003)         │ │ (:8090)            │
-│ 登录/签发 Token     │ │ 租户/IAM/套餐/配额     │ │ Workbench 业务能力     │ │ AI 智能体服务    │ │ 元数据服务         │
+│ 登录/签发 Token     │ │ 租户/IAM/套餐/配额     │ │ Datapillar Studio 业务能力 │ │ AI 智能体服务    │ │ 元数据服务         │
 └───────────┬────────┘ └───────────┬──────────┘ └───────────┬──────────┘ └────────┬────────┘ └──────────┬──────────┘
             │                      │                        │                    │                   │
             └──────────────┬───────┴──────────────┬─────────┴──────────────┬──────┴───────────┬───────┘
                            ▼                      ▼                        ▼                  ▼
                  ┌─────────────────┐     ┌──────────────────┐     ┌──────────────────┐  ┌─────────────────┐
                  │ MySQL            │     │ MySQL             │     │ Redis / Neo4j    │  │ Gravitino Store │
-                 │ datapillar_platform │  │ datapillar_workbench │  │ 缓存 / 知识图谱  │  │ 元数据存储      │
+                 │ datapillar_platform │  │ datapillar_studio │  │ 缓存 / 知识图谱  │  │ 元数据存储      │
                  └─────────────────┘     └──────────────────┘     └──────────────────┘  └─────────────────┘
 ```
 
@@ -57,11 +57,11 @@ Datapillar 是一个企业级的 SaaS 数据产品，整合了数据目录、数
 | 服务 | 端口 | 技术栈 | 说明 |
 |------|------|--------|------|
 | datapillar-web-site | 3100 | React + Vite + Tailwind | 官网与营销站点 |
-| datapillar-workbench | 3000 | React + Vite + Tailwind | Workbench 产品前端 |
+| datapillar-studio | 3000 | React + Vite + Tailwind | Datapillar Studio 产品前端 |
 | datapillar-api-gateway | 6000 | Spring Cloud Gateway | API 网关 |
 | datapillar-auth | 6001 | Spring Boot | 认证服务 |
 | datapillar-platform | 6006 | Spring Boot | 平台服务（租户/IAM/套餐/配额） |
-| datapillar-workbench-service | 6002 | Spring Boot | Workbench 业务服务 |
+| datapillar-studio-service | 6002 | Spring Boot | Datapillar Studio 业务服务 |
 | datapillar-ai | 6003 | FastAPI + LangGraph | AI 智能体服务 |
 | datapillar-gravitino | 8090 | Gravitino | 元数据服务 |
 
@@ -72,11 +72,11 @@ Datapillar 是一个企业级的 SaaS 数据产品，整合了数据目录、数
 ```
 Datapillar/
 ├── datapillar-web-site/       # 官网前端 (React + Vite)
-├── datapillar-workbench/      # 产品前端 (React + Vite)
+├── datapillar-studio/      # Datapillar Studio 产品前端 (React + Vite)
 ├── datapillar-api-gateway/    # API 网关
 ├── datapillar-auth/           # 认证服务
 ├── datapillar-platform/       # 平台服务（租户/IAM/套餐/配额）
-├── datapillar-workbench-service/ # Workbench 业务服务
+├── datapillar-studio-service/ # Datapillar Studio 业务服务
 ├── datapillar-ai/             # AI 服务 (FastAPI)
 ├── datapillar-gravitino/      # 元数据服务
 ├── datapillar-airflow-plugin/ # Airflow 插件

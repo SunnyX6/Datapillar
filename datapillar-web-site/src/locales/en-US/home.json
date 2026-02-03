@@ -3,7 +3,7 @@
     "release": "Datapillar 1.0 Now Live",
     "titleLine": "Build the data foundation",
     "titleHighlight": "for the AI era",
-    "subtitle": "AI-native Data Fabric architecture. In a single immersive workbench, deliver <0>Data Integration</0>, <1>Data Governance</1>, and <2>End-to-end Lineage</2>.",
+    "subtitle": "AI-native Data Fabric architecture. In a single immersive studio, deliver <0>Data Integration</0>, <1>Data Governance</1>, and <2>End-to-end Lineage</2>.",
     "cta": {
       "startTrial": "Start Free Trial",
       "watchDemo": "Watch Product Demo"
@@ -191,7 +191,7 @@
       },
       {
         "keywords": ["feature", "capability", "product", "function"],
-        "reply": "Datapillar Workbench covers integration, governance, permissions, and cost control, with AI assistance and automation."
+        "reply": "Datapillar Studio covers integration, governance, permissions, and cost control, with AI assistance and automation."
       },
       {
         "keywords": ["security", "compliance", "permission", "audit"],

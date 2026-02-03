@@ -25,7 +25,7 @@
         <!-- 引入所有需要打包的模块 -->
         <dependency>
             <groupId>com.sunny</groupId>
-            <artifactId>datapillar-workbench-service</artifactId>
+            <artifactId>datapillar-studio-service</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

@@ -54,13 +54,13 @@ spring:
               filters:
                 - RewritePath=/api/platform(?<segment>/?.*), ${segment}
 
-            # 3. 核心业务服务 (datapillar-workbench-service)
-            - id: workbench-service
+            # 3. 核心业务服务 (datapillar-studio-service)
+            - id: studio-service
               uri: http://localhost:6002
               predicates:
-                - Path=/api/workbench/**
+                - Path=/api/studio/**
               filters:
-                - RewritePath=/api/workbench(?<segment>/?.*), ${segment}
+                - RewritePath=/api/studio(?<segment>/?.*), ${segment}
 
             # 4. AI 服务 (datapillar-ai)
             - id: ai-service

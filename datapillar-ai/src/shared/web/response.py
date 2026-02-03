@@ -3,7 +3,7 @@
 # @date 2026-01-28
 
 """
-API 统一响应封装（对齐 datapillar-workbench ApiResponse）
+API 统一响应封装（对齐 datapillar-studio ApiResponse）
 """
 
 from __future__ import annotations

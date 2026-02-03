@@ -1,7 +1,7 @@
 /**
  * i18n 国际化配置
  *
- * 参考 workbench 的初始化方式，覆盖导航与营销站点文案。
+ * 参考 studio 的初始化方式，覆盖导航与营销站点文案。
  */
 
 import i18n from 'i18next'
