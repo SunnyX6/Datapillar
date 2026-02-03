@@ -18,7 +18,7 @@
 - **身份映射**：第三方账号映射落在 `user_identities`，支持 JIT（首次登录建用户）或同步导入。
 - **输出标准身份**：对业务服务只输出 `user_id + tenant_id`。
 
-### 2) 授权层（datapillar-workbench-service）
+### 2) 授权层（datapillar-studio-service）
 - **产品内 RBAC**：角色/权限/菜单都在产品内按租户与项目（Workspace）授权。
 - **不依赖 OA 直连**：当前不接入第三方组织同步，仅使用本地模型和权限体系。
 
@@ -166,7 +166,7 @@ com.sunny.datapillar.auth.sso
   - `X-User-Id`、`X-Username`（已有）
 - 禁止客户端自带 `X-Tenant-Id` 覆盖。
 
-## 业务服务（datapillar-workbench-service 等）
+## 业务服务（datapillar-studio-service 等）
 ### 1. 租户上下文
 - 统一 `TenantContext`（ThreadLocal/MDC），从请求头解析租户信息。
 - 所有日志、审计打点包含 tenant_id。
@@ -183,7 +183,7 @@ com.sunny.datapillar.auth.sso
 - `projects/job_workflow/job_info/job_dependency/job_component/knowledge_*` 等表必须按 tenant_id 隔离。
 
 ### 5. 用户/租户接口
-- 在 **workbench-service** 提供 `GET /users/{id}/tenants`：返回用户可访问租户列表。
+- 在 **studio-service** 提供 `GET /users/{id}/tenants`：返回用户可访问租户列表。
 - `{id}` 必须与 token 中 `user_id` 一致，不一致直接拒绝。
 - 访问其他租户 = 重新签发 token。
 
@@ -227,7 +227,7 @@ com.sunny.datapillar.auth.sso
 ### 单一路由规范（接口清单/权限）
 **统一规则**
 - 所有业务接口只依赖 token 的 `tenant_id`，不支持外部传参切租户。
-- “业务接口”指 workbench-service 的业务域接口（如用户、角色、权限、组织、项目等）；assume token 仅用于访问目标租户业务接口。
+- “业务接口”指 studio-service 的业务域接口（如用户、角色、权限、组织、项目等）；assume token 仅用于访问目标租户业务接口。
 - 平台超管若需管理目标租户，必须先调用 `assume` 获取目标租户 access token；**业务接口只认 token.tenant_id**。
 
 **示例**

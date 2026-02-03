@@ -22,7 +22,7 @@ Datapillar 统一 API 网关 - 基于 Spring Cloud Gateway 4.2.x
 | 路径前缀 | 目标服务 | 端口 | 说明 |
 |---------|---------|------|------|
 | `/api/auth/**` | datapillar-auth | 7000 | 认证服务 |
-| `/api/workbench/**` | datapillar-workbench-service | 6002 | 核心业务 |
+| `/api/studio/**` | datapillar-studio-service | 6002 | 核心业务 |
 | `/api/ai/**` | datapillar-ai | 5000 | AI 服务 |
 | `/api/metadata/**` | datapillar-gravitino | 8090 | 元数据服务 |
 | `/api/job/**` | datapillar-job | 9080 | 调度服务 |

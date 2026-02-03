@@ -1,6 +1,6 @@
 # Datapillar 后端 API 统一规范与接口清单
 
-适用范围：`datapillar-auth`、`datapillar-workbench-service`
+适用范围：`datapillar-auth`、`datapillar-studio-service`
 
 目标：
 - 所有接口统一响应结构、统一状态码语义
@@ -124,7 +124,7 @@
 | AUTH_DUPLICATE_KEY | 409 | 资源冲突 |
 | AUTH_INTERNAL_ERROR | 500 | 服务异常 |
 
-### 3.2 Workbench Service（datapillar-workbench-service）
+### 3.2 Studio Service（datapillar-studio-service）
 
 | 业务码 | HTTP 状态码 | 说明 |
 |---|---|---|
@@ -464,7 +464,7 @@ GET /auth/sso/qr?tenantCode=demo&provider=dingtalk
 
 ---
 
-## 5. datapillar-workbench-service 接口清单与案例
+## 5. datapillar-studio-service 接口清单与案例
 
 ### 5.1 健康检查
 
@@ -1734,7 +1734,7 @@ DELETE /users/{userId}/projects/{projectId}/workflows/{workflowId}/dependencies?
 
 Maven 约束：
 - 根 `pom.xml` 增加模块：`datapillar-common`
-- `datapillar-auth` 与 `datapillar-workbench-service` 必须依赖该模块
+- `datapillar-auth` 与 `datapillar-studio-service` 必须依赖该模块
 
 依赖示例（模块 `pom.xml`）：
 ```xml
@@ -1745,7 +1745,7 @@ Maven 约束：
 </dependency>
 ```
 
-### 6.2 各模块落点（auth / workbench-service）
+### 6.2 各模块落点（auth / studio-service）
 
 每个模块必须保证以下落点，且所有接口共用：
 
