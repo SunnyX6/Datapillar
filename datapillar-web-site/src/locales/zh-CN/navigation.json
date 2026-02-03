@@ -1,0 +1,32 @@
+{
+  "brand": {
+    "tagline": "吞噬原数，羽化真知"
+  },
+  "menu": {
+    "products": "产品功能",
+    "solutions": "解决方案",
+    "pricing": "价格方案",
+    "trial": "申请试用"
+  },
+  "language": {
+    "zh": "中文",
+    "en": "English"
+  },
+  "products": {
+    "studio": {
+      "name": "Datapillar Studio",
+      "status": "已上线",
+      "desc": "一体化数据集成与治理工作台"
+    },
+    "analytics": {
+      "name": "智能分析",
+      "status": "即将上线",
+      "desc": "智能可视化与指标探索"
+    },
+    "insights": {
+      "name": "智能问数",
+      "status": "即将上线",
+      "desc": "自然语言数据洞察"
+    }
+  }
+}

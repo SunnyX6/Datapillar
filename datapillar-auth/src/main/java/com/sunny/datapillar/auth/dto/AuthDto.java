@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,7 +23,6 @@ public class AuthDto {
 
     @Data
     public static class LoginRequest {
-        @NotBlank(message = "租户编码不能为空")
         private String tenantCode;
 
         @NotBlank(message = "用户名不能为空")
@@ -55,6 +55,45 @@ public class AuthDto {
         private String email;
         private List<RoleInfo> roles;
         private List<MenuInfo> menus;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class LoginResult {
+        /** SUCCESS / TENANT_SELECT */
+        private String loginStage;
+        /** 多租户选择时返回 */
+        private String loginToken;
+        /** 多租户选择时返回 */
+        private List<TenantOption> tenants;
+
+        private Long userId;
+        private Long tenantId;
+        private String username;
+        private String email;
+        private List<RoleInfo> roles;
+        private List<MenuInfo> menus;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TenantOption {
+        private Long tenantId;
+        private String tenantCode;
+        private String tenantName;
+        private Integer status;
+        private Integer isDefault;
+    }
+
+    @Data
+    public static class LoginTenantRequest {
+        @NotBlank(message = "loginToken 不能为空")
+        private String loginToken;
+
+        @NotNull(message = "tenantId 不能为空")
+        private Long tenantId;
     }
 
     @Data

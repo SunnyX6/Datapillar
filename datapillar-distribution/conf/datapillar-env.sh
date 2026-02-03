@@ -23,7 +23,6 @@ export DATAPILLAR_VERSION="1.0.0"
 # 数据库配置
 export DB_HOST="${DB_HOST:-localhost}"
 export DB_PORT="${DB_PORT:-3306}"
-export DB_NAME="${DB_NAME:-datapillar}"
 export DB_USERNAME="${DB_USERNAME:-root}"
 export DB_PASSWORD="${DB_PASSWORD:-Sunny.123456}"
 

@@ -14,22 +14,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.sunny.datapillar.auth.dto.AuthDto;
-import com.sunny.datapillar.auth.entity.OrgUser;
 import com.sunny.datapillar.auth.entity.Tenant;
 import com.sunny.datapillar.auth.entity.TenantUser;
 import com.sunny.datapillar.auth.entity.User;
 import com.sunny.datapillar.auth.entity.UserIdentity;
 import com.sunny.datapillar.auth.entity.UserInvitation;
-import com.sunny.datapillar.auth.entity.UserRole;
-import com.sunny.datapillar.auth.mapper.OrgUserMapper;
 import com.sunny.datapillar.auth.mapper.TenantMapper;
 import com.sunny.datapillar.auth.mapper.TenantUserMapper;
 import com.sunny.datapillar.auth.mapper.UserMapper;
 import com.sunny.datapillar.auth.mapper.UserIdentityMapper;
 import com.sunny.datapillar.auth.mapper.UserInvitationMapper;
-import com.sunny.datapillar.auth.mapper.UserInvitationOrgMapper;
-import com.sunny.datapillar.auth.mapper.UserInvitationRoleMapper;
-import com.sunny.datapillar.auth.mapper.UserRoleMapper;
 import com.sunny.datapillar.auth.security.JwtTokenUtil;
 import com.sunny.datapillar.auth.sso.SsoAuthService;
 import com.sunny.datapillar.auth.sso.SsoQrService;
@@ -58,10 +52,6 @@ public class AuthService {
     private final TenantMapper tenantMapper;
     private final TenantUserMapper tenantUserMapper;
     private final UserInvitationMapper userInvitationMapper;
-    private final UserInvitationOrgMapper userInvitationOrgMapper;
-    private final UserInvitationRoleMapper userInvitationRoleMapper;
-    private final OrgUserMapper orgUserMapper;
-    private final UserRoleMapper userRoleMapper;
     private final UserIdentityMapper userIdentityMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenUtil jwtTokenUtil;
@@ -71,15 +61,12 @@ public class AuthService {
     @Value("${cookie.secure:false}")
     private boolean cookieSecure;
 
-    @Value("${cookie.max-age:2592000}")
-    private int cookieMaxAge;
-
     /**
      * 用户登录
      */
     @Transactional
-    public AuthDto.LoginResponse login(AuthDto.LoginRequest request, HttpServletResponse response) {
-        Tenant tenant = loadTenant(request.getTenantCode());
+    public AuthDto.LoginResult login(AuthDto.LoginRequest request, HttpServletResponse response) {
+        String tenantCode = normalizeTenantCode(request.getTenantCode());
         User user = userMapper.selectByUsername(request.getUsername());
 
         if (user != null) {
@@ -90,6 +77,21 @@ public class AuthService {
             validateUserStatus(user);
         }
 
+        if (tenantCode == null) {
+            if (user == null) {
+                throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
+            }
+            AuthDto.LoginResult result = loginWithoutTenant(user, request.getRememberMe(), response);
+            if ("TENANT_SELECT".equals(result.getLoginStage())) {
+                log.info("登录成功(待选租户): userId={}, username={}", user.getId(), user.getUsername());
+            } else {
+                log.info("登录成功: tenantId={}, userId={}, username={}",
+                        result.getTenantId(), user.getId(), user.getUsername());
+            }
+            return result;
+        }
+
+        Tenant tenant = loadTenant(tenantCode);
         TenantUser tenantUser = null;
         if (user == null) {
             UserInvitation invitation = loadValidInvitation(request.getInviteCode(), tenant.getId());
@@ -110,19 +112,45 @@ public class AuthService {
             }
         }
 
-        if (tenantUser == null) {
-            tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenant.getId(), user.getId());
+        AuthDto.LoginResult loginResult = loginForTenant(user, tenant.getId(), request.getRememberMe(), response);
+        log.info("登录成功: tenantId={}, userId={}, username={}", tenant.getId(), user.getId(), user.getUsername());
+        return loginResult;
+    }
+
+    /**
+     * 选择租户后完成登录
+     */
+    @Transactional
+    public AuthDto.LoginResult loginWithTenant(AuthDto.LoginTenantRequest request, HttpServletResponse response) {
+        if (request == null || request.getLoginToken() == null || request.getLoginToken().isBlank()) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID);
+        }
+        Claims claims = jwtTokenUtil.parseToken(request.getLoginToken());
+        String tokenType = claims.get("tokenType", String.class);
+        if (!"login".equals(tokenType)) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_TYPE_ERROR);
         }
 
-        String accessToken = jwtTokenUtil.generateAccessToken(user.getId(), tenant.getId(), user.getUsername(), user.getEmail());
-        String refreshToken = jwtTokenUtil.generateRefreshToken(user.getId(), tenant.getId(), request.getRememberMe());
-        updateTenantUserToken(tenant.getId(), user.getId(), accessToken);
+        Long userId = Long.parseLong(claims.getSubject());
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.AUTH_USER_NOT_FOUND, userId);
+        }
+        validateUserStatus(user);
 
-        AuthDto.LoginResponse loginResponse = buildLoginResponse(tenant.getId(), user);
-        setAuthCookies(response, accessToken, refreshToken);
+        Long tenantId = request.getTenantId();
+        Tenant tenant = tenantMapper.selectById(tenantId);
+        if (tenant == null) {
+            throw new BusinessException(ErrorCode.AUTH_TENANT_NOT_FOUND, String.valueOf(tenantId));
+        }
+        if (tenant.getStatus() == null || tenant.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.AUTH_TENANT_DISABLED, tenantId);
+        }
 
-        log.info("登录成功: tenantId={}, userId={}, username={}", tenant.getId(), user.getId(), user.getUsername());
-        return loginResponse;
+        Boolean rememberMe = claims.get("rememberMe", Boolean.class);
+        AuthDto.LoginResult loginResult = loginForTenant(user, tenantId, rememberMe, response);
+        log.info("租户选择登录成功: tenantId={}, userId={}, username={}", tenantId, userId, user.getUsername());
+        return loginResult;
     }
 
     /**
@@ -198,12 +226,7 @@ public class AuthService {
             updateTenantUserToken(tenantId, userId, newAccessToken);
 
             // 设置新的 access token cookie
-            Cookie accessTokenCookie = new Cookie("auth-token", newAccessToken);
-            accessTokenCookie.setHttpOnly(true);
-            accessTokenCookie.setSecure(cookieSecure);
-            accessTokenCookie.setPath("/");
-            accessTokenCookie.setMaxAge(cookieMaxAge);
-            response.addCookie(accessTokenCookie);
+            setAccessTokenCookie(response, newAccessToken);
 
             log.info("刷新令牌成功: tenantId={}, userId={}, username={}", tenantId, user.getId(), user.getUsername());
 
@@ -226,20 +249,33 @@ public class AuthService {
     /**
      * 设置认证 Cookie
      */
-    private void setAuthCookies(HttpServletResponse response, String accessToken, String refreshToken) {
+    private void setAuthCookies(HttpServletResponse response, String accessToken, String refreshToken, Boolean rememberMe) {
+        int accessMaxAge = Math.toIntExact(jwtTokenUtil.getAccessTokenExpiration());
+        int refreshMaxAge = Math.toIntExact(jwtTokenUtil.getRefreshTokenExpiration(Boolean.TRUE.equals(rememberMe)));
+
         Cookie accessTokenCookie = new Cookie("auth-token", accessToken);
         accessTokenCookie.setHttpOnly(true);
         accessTokenCookie.setSecure(cookieSecure);
         accessTokenCookie.setPath("/");
-        accessTokenCookie.setMaxAge(cookieMaxAge);
+        accessTokenCookie.setMaxAge(accessMaxAge);
         response.addCookie(accessTokenCookie);
 
         Cookie refreshTokenCookie = new Cookie("refresh-token", refreshToken);
         refreshTokenCookie.setHttpOnly(true);
         refreshTokenCookie.setSecure(cookieSecure);
         refreshTokenCookie.setPath("/");
-        refreshTokenCookie.setMaxAge(cookieMaxAge);
+        refreshTokenCookie.setMaxAge(refreshMaxAge);
         response.addCookie(refreshTokenCookie);
+    }
+
+    private void setAccessTokenCookie(HttpServletResponse response, String accessToken) {
+        int accessMaxAge = Math.toIntExact(jwtTokenUtil.getAccessTokenExpiration());
+        Cookie accessTokenCookie = new Cookie("auth-token", accessToken);
+        accessTokenCookie.setHttpOnly(true);
+        accessTokenCookie.setSecure(cookieSecure);
+        accessTokenCookie.setPath("/");
+        accessTokenCookie.setMaxAge(accessMaxAge);
+        response.addCookie(accessTokenCookie);
     }
 
     /**
@@ -299,28 +335,83 @@ public class AuthService {
             throw new BusinessException(ErrorCode.AUTH_USER_DISABLED);
         }
 
-        TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, userId);
-        if (tenantUser == null) {
-            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
-        }
-        validateTenantUserStatus(tenantUser, tenantId, userId);
+        boolean impersonation = Boolean.TRUE.equals(claims.get("impersonation", Boolean.class));
+        if (!impersonation) {
+            TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, userId);
+            if (tenantUser == null) {
+                throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+            }
+            validateTenantUserStatus(tenantUser, tenantId, userId);
 
-        String tokenSign = jwtTokenUtil.extractTokenSignature(token);
-        if (tenantUser.getTokenSign() == null || !tenantUser.getTokenSign().equals(tokenSign)) {
-            throw new BusinessException(ErrorCode.AUTH_TOKEN_REVOKED);
-        }
-        if (tenantUser.getTokenExpireTime() != null && tenantUser.getTokenExpireTime().isBefore(LocalDateTime.now())) {
-            throw new BusinessException(ErrorCode.AUTH_TOKEN_EXPIRED);
+            String tokenSign = jwtTokenUtil.extractTokenSignature(token);
+            if (tenantUser.getTokenSign() == null || !tenantUser.getTokenSign().equals(tokenSign)) {
+                throw new BusinessException(ErrorCode.AUTH_TOKEN_REVOKED);
+            }
+            if (tenantUser.getTokenExpireTime() != null && tenantUser.getTokenExpireTime().isBefore(LocalDateTime.now())) {
+                throw new BusinessException(ErrorCode.AUTH_TOKEN_EXPIRED);
+            }
         }
 
         return AuthDto.TokenResponse.success(userId, tenantId, username, email);
     }
 
     /**
+     * 平台超管授权访问目标租户（assume），签发用于目标租户业务接口访问的 access token。
+     */
+    public AuthDto.LoginResponse assumeTenant(Long tenantId, String accessToken, HttpServletResponse response) {
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID);
+        }
+        Claims claims = jwtTokenUtil.parseToken(accessToken);
+        String tokenType = claims.get("tokenType", String.class);
+        if (!"access".equals(tokenType)) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_TYPE_ERROR);
+        }
+
+        Long actorUserId = Long.parseLong(claims.getSubject());
+        Long actorTenantId = jwtTokenUtil.getTenantId(accessToken);
+        if (actorTenantId == null || actorTenantId != 0L) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        User actor = userMapper.selectById(actorUserId);
+        if (actor == null) {
+            throw new BusinessException(ErrorCode.AUTH_USER_NOT_FOUND, actorUserId);
+        }
+        validateUserStatus(actor);
+
+        List<AuthDto.RoleInfo> systemRoles = userMapper.selectRolesByUserId(0L, actorUserId);
+        boolean isAdmin = systemRoles != null && systemRoles.stream()
+                .anyMatch(role -> "ADMIN".equalsIgnoreCase(role.getType()));
+        if (!isAdmin) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        Tenant targetTenant = tenantMapper.selectById(tenantId);
+        if (targetTenant == null) {
+            throw new BusinessException(ErrorCode.AUTH_TENANT_NOT_FOUND, String.valueOf(tenantId));
+        }
+        if (targetTenant.getStatus() == null || targetTenant.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.AUTH_TENANT_DISABLED, tenantId);
+        }
+
+        Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put("actorUserId", actorUserId);
+        extraClaims.put("actorTenantId", 0L);
+        extraClaims.put("impersonation", true);
+
+        String newAccessToken = jwtTokenUtil.generateAccessToken(
+                actorUserId, tenantId, actor.getUsername(), actor.getEmail(), extraClaims);
+        setAccessTokenCookie(response, newAccessToken);
+
+        return buildAssumeLoginResponse(tenantId, actor);
+    }
+
+    /**
      * SSO 登录
      */
     @Transactional
-    public AuthDto.LoginResponse loginWithSso(AuthDto.SsoLoginRequest request, HttpServletResponse response) {
+    public AuthDto.LoginResult loginWithSso(AuthDto.SsoLoginRequest request, HttpServletResponse response) {
         Tenant tenant = loadTenant(request.getTenantCode());
         String provider = normalizeProvider(request.getProvider());
         if (provider == null || provider.isBlank()) {
@@ -367,15 +458,17 @@ public class AuthService {
             createUserIdentity(tenant.getId(), user.getId(), provider, userInfo);
         }
 
-        String accessToken = jwtTokenUtil.generateAccessToken(user.getId(), tenant.getId(), user.getUsername(), user.getEmail());
-        String refreshToken = jwtTokenUtil.generateRefreshToken(user.getId(), tenant.getId(), false);
-        updateTenantUserToken(tenant.getId(), user.getId(), accessToken);
+        List<AuthDto.TenantOption> tenantOptions = loadTenantOptions(user.getId());
+        if (tenantOptions.size() > 1) {
+            String loginToken = jwtTokenUtil.generateLoginToken(user.getId(), false);
+            AuthDto.LoginResult selectResult = buildTenantSelectResult(loginToken, tenantOptions);
+            log.info("SSO 登录成功(待选租户): userId={}, username={}", user.getId(), user.getUsername());
+            return selectResult;
+        }
 
-        AuthDto.LoginResponse loginResponse = buildLoginResponse(tenant.getId(), user);
-        setAuthCookies(response, accessToken, refreshToken);
-
+        AuthDto.LoginResult loginResult = loginForTenant(user, tenant.getId(), false, response);
         log.info("SSO 登录成功: tenantId={}, userId={}, username={}", tenant.getId(), user.getId(), user.getUsername());
-        return loginResponse;
+        return loginResult;
     }
 
     /**
@@ -384,12 +477,14 @@ public class AuthService {
     public void logout(String accessToken, HttpServletResponse response) {
         try {
             if (accessToken != null && !accessToken.isBlank()) {
-                Long userId = jwtTokenUtil.getUserId(accessToken);
+                Claims claims = jwtTokenUtil.parseToken(accessToken);
+                Long userId = Long.parseLong(claims.getSubject());
                 Long tenantId = jwtTokenUtil.getTenantId(accessToken);
-                if (tenantId != null) {
+                boolean impersonation = Boolean.TRUE.equals(claims.get("impersonation", Boolean.class));
+                if (!impersonation && tenantId != null) {
                     tenantUserMapper.clearTokenSign(tenantId, userId);
                 }
-                log.info("用户退出登录: tenantId={}, userId={}", tenantId, userId);
+                log.info("用户退出登录: tenantId={}, userId={}, impersonation={}", tenantId, userId, impersonation);
             }
         } finally {
             clearAuthCookies(response);
@@ -487,31 +582,6 @@ public class AuthService {
     private void applyInvitation(Tenant tenant, User user, UserInvitation invitation) {
         insertTenantUser(tenant.getId(), user.getId());
 
-        List<Long> orgIds = userInvitationOrgMapper.selectOrgIdsByInvitationId(invitation.getId());
-        if (orgIds != null) {
-            for (Long orgId : orgIds) {
-                OrgUser orgUser = new OrgUser();
-                orgUser.setTenantId(tenant.getId());
-                orgUser.setOrgId(orgId);
-                orgUser.setUserId(user.getId());
-                orgUser.setStatus(1);
-                orgUser.setJoinedAt(LocalDateTime.now());
-                orgUserMapper.insert(orgUser);
-            }
-        }
-
-        List<Long> roleIds = userInvitationRoleMapper.selectRoleIdsByInvitationId(invitation.getId());
-        if (roleIds != null) {
-            for (Long roleId : roleIds) {
-                UserRole userRole = new UserRole();
-                userRole.setTenantId(tenant.getId());
-                userRole.setUserId(user.getId());
-                userRole.setRoleId(roleId);
-                userRole.setCreatedAt(LocalDateTime.now());
-                userRoleMapper.insert(userRole);
-            }
-        }
-
         int updated = userInvitationMapper.acceptInvitation(invitation.getId(), user.getId(), LocalDateTime.now(), LocalDateTime.now());
         if (updated == 0) {
             throw new BusinessException(ErrorCode.AUTH_INVITE_ALREADY_USED);
@@ -550,6 +620,76 @@ public class AuthService {
         loginResponse.setRoles(roles);
         loginResponse.setMenus(menus);
         return loginResponse;
+    }
+
+    private AuthDto.LoginResponse buildAssumeLoginResponse(Long tenantId, User user) {
+        List<AuthDto.RoleInfo> roles = new ArrayList<>();
+        roles.add(new AuthDto.RoleInfo(0L, "平台管理员", "ADMIN"));
+
+        List<Map<String, Object>> menuMaps = userMapper.selectMenusByTenantId(tenantId);
+        List<AuthDto.MenuInfo> menus = buildMenuTree(menuMaps);
+
+        AuthDto.LoginResponse loginResponse = new AuthDto.LoginResponse();
+        loginResponse.setUserId(user.getId());
+        loginResponse.setTenantId(tenantId);
+        loginResponse.setUsername(user.getUsername());
+        loginResponse.setEmail(user.getEmail());
+        loginResponse.setRoles(roles);
+        loginResponse.setMenus(menus);
+        return loginResponse;
+    }
+
+    private AuthDto.LoginResult loginWithoutTenant(User user, Boolean rememberMe, HttpServletResponse response) {
+        List<AuthDto.TenantOption> tenantOptions = loadTenantOptions(user.getId());
+        if (tenantOptions.isEmpty()) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+        }
+        if (tenantOptions.size() == 1) {
+            return loginForTenant(user, tenantOptions.get(0).getTenantId(), rememberMe, response);
+        }
+        String loginToken = jwtTokenUtil.generateLoginToken(user.getId(), rememberMe);
+        return buildTenantSelectResult(loginToken, tenantOptions);
+    }
+
+    private AuthDto.LoginResult loginForTenant(User user, Long tenantId, Boolean rememberMe, HttpServletResponse response) {
+        TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, user.getId());
+        if (tenantUser == null) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+        }
+        validateTenantUserStatus(tenantUser, tenantId, user.getId());
+
+        String accessToken = jwtTokenUtil.generateAccessToken(user.getId(), tenantId, user.getUsername(), user.getEmail());
+        String refreshToken = jwtTokenUtil.generateRefreshToken(user.getId(), tenantId, rememberMe);
+        updateTenantUserToken(tenantId, user.getId(), accessToken);
+
+        AuthDto.LoginResponse loginResponse = buildLoginResponse(tenantId, user);
+        setAuthCookies(response, accessToken, refreshToken, rememberMe);
+        return buildLoginResult(loginResponse);
+    }
+
+    private List<AuthDto.TenantOption> loadTenantOptions(Long userId) {
+        List<AuthDto.TenantOption> options = tenantUserMapper.selectTenantOptionsByUserId(userId);
+        return options == null ? new ArrayList<>() : options;
+    }
+
+    private AuthDto.LoginResult buildLoginResult(AuthDto.LoginResponse loginResponse) {
+        AuthDto.LoginResult result = new AuthDto.LoginResult();
+        result.setLoginStage("SUCCESS");
+        result.setUserId(loginResponse.getUserId());
+        result.setTenantId(loginResponse.getTenantId());
+        result.setUsername(loginResponse.getUsername());
+        result.setEmail(loginResponse.getEmail());
+        result.setRoles(loginResponse.getRoles());
+        result.setMenus(loginResponse.getMenus());
+        return result;
+    }
+
+    private AuthDto.LoginResult buildTenantSelectResult(String loginToken, List<AuthDto.TenantOption> tenants) {
+        AuthDto.LoginResult result = new AuthDto.LoginResult();
+        result.setLoginStage("TENANT_SELECT");
+        result.setLoginToken(loginToken);
+        result.setTenants(tenants);
+        return result;
     }
 
     private User createLocalUser(Long tenantId, AuthDto.LoginRequest request) {
@@ -620,6 +760,13 @@ public class AuthService {
         identity.setProfileJson(userInfo.getRawJson());
         identity.setStatus(1);
         userIdentityMapper.insert(identity);
+    }
+
+    private String normalizeTenantCode(String tenantCode) {
+        if (tenantCode == null || tenantCode.isBlank()) {
+            return null;
+        }
+        return tenantCode.trim();
     }
 
     private String normalizeProvider(String provider) {

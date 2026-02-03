@@ -1,0 +1,111 @@
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE 文件
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 日志文件
+logs/
+*.log
+be/logs/
+
+# Java 编译产物
+be/target/
+**/target/
+be/out/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+*.iml
+
+# Flink 运行时（不推送）
+flink/
+
+# XXL-Job 和 Gravitino 的 distribution 目录
+*/distribution/
+xxl-job/distribution/
+gravitino/distribution/
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# BlueJ files
+*.ctxt
+
+# virtual machine crash logs
+hs_err_pid*
+replay_pid*
+
+# Maven
+.be/target/
+mvnw
+mvnw.cmd
+
+# 前端依赖和构建产物
+node_modules/**
+
+
+# 环境变量和配置文件
+fe/.env.local
+fe/.env.production
+be/.env
+be/application-prod.yml
+be/application-dev.yml
+be/data-storage/
+# 临时文件
+*.tmp
+*.temp
+.cache/
+
+# 测试覆盖率报告
+coverage/
+*.lcov
+
+# Playwright 测试产物
+playwright-report/
+test-results/
+
+# 依赖分析报告
+.nyc_output/
+
+# 安全相关文件
+*.pem
+*.key
+*.crt
+cookies.txt
+login_response.json
+
+# 缓存目录
+.be/
+.trae/
+
+# 文档草稿和临时文件
+.checkpoints/
+demo-ui/
+
+# 脚本执行日志
+code_review_report.md
+
+# 其他临时文件
+quick_check.sh.log
+code_review.sh.log

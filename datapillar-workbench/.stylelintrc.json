@@ -1,0 +1,26 @@
+{
+  "extends": "stylelint-config-standard",
+  "rules": {
+    "at-rule-disallowed-list": [
+      ["tailwind"],
+      {
+        "message": "❌ 禁止使用 @tailwind 指令（Tailwind v3 写法）。请使用 @import \"tailwindcss\"（v4 写法）"
+      }
+    ],
+    "at-rule-no-unknown": [
+      true,
+      {
+        "ignoreAtRules": [
+          "variant",
+          "layer",
+          "source",
+          "utility",
+          "config",
+          "theme",
+          "import"
+        ]
+      }
+    ],
+    "import-notation": "string"
+  }
+}

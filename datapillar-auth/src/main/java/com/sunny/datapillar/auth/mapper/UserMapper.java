@@ -38,4 +38,9 @@ public interface UserMapper extends BaseMapper<User> {
      */
     List<Map<String, Object>> selectMenusByUserId(@Param("tenantId") Long tenantId,
                                                   @Param("userId") Long userId);
+
+    /**
+     * 查询租户下所有菜单（用于平台超管 assume）
+     */
+    List<Map<String, Object>> selectMenusByTenantId(@Param("tenantId") Long tenantId);
 }

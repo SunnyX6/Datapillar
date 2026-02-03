@@ -47,12 +47,27 @@
             CASE WHEN o.location = 'SIDEBAR' THEN c.name ELSE NULL END AS category_name,
             o.sort,
             CASE
-                WHEN MAX(CASE p.code WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END) >= 2 THEN 'WRITE'
-                WHEN MAX(CASE p.code WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END) >= 1 THEN 'READ'
+                WHEN LEAST(
+                    MAX(CASE p.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END),
+                    MAX(CASE tp.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END)
+                ) >= 3 THEN 'ADMIN'
+                WHEN LEAST(
+                    MAX(CASE p.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END),
+                    MAX(CASE tp.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END)
+                ) >= 2 THEN 'WRITE'
+                WHEN LEAST(
+                    MAX(CASE p.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END),
+                    MAX(CASE tp.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END)
+                ) >= 1 THEN 'READ'
                 ELSE 'NONE'
             END AS permission_code
-        FROM permission_objects o
-        LEFT JOIN permission_object_categories c ON o.category_id = c.id
+        FROM feature_objects o
+        LEFT JOIN feature_object_categories c ON o.category_id = c.id AND c.tenant_id IN (0, #{tenantId})
+        INNER JOIN tenant_feature_permissions tfe
+                ON tfe.object_id = o.id
+               AND tfe.tenant_id = #{tenantId}
+               AND tfe.status = 1
+        INNER JOIN permissions tp ON tp.id = tfe.permission_id AND tp.tenant_id = 0
         INNER JOIN (
             SELECT rp.object_id, rp.permission_id
             FROM role_permissions rp
@@ -66,12 +81,35 @@
             WHERE up.tenant_id = #{tenantId}
               AND up.user_id = #{userId}
         ) rel ON rel.object_id = o.id
-        INNER JOIN permissions p ON p.id = rel.permission_id
+        INNER JOIN permissions p ON p.id = rel.permission_id AND p.tenant_id = 0
         WHERE o.type = 'MENU'
           AND o.status = 1
-          AND (o.tenant_id = 0 OR o.tenant_id = #{tenantId})
-          AND (p.tenant_id = 0 OR p.tenant_id = #{tenantId})
+          AND o.tenant_id IN (0, #{tenantId})
         GROUP BY o.id, o.name, o.path, o.parent_id, o.location, o.category_id, c.name, o.sort
+        ORDER BY o.sort ASC, o.id ASC
+    </select>
+
+    <select id="selectMenusByTenantId" resultType="map">
+        SELECT
+            o.id,
+            o.name,
+            o.path,
+            o.parent_id,
+            o.location,
+            CASE WHEN o.location = 'SIDEBAR' THEN o.category_id ELSE NULL END AS category_id,
+            CASE WHEN o.location = 'SIDEBAR' THEN c.name ELSE NULL END AS category_name,
+            o.sort,
+            tp.code AS permission_code
+        FROM feature_objects o
+        LEFT JOIN feature_object_categories c ON o.category_id = c.id AND c.tenant_id IN (0, #{tenantId})
+        INNER JOIN tenant_feature_permissions tfe
+                ON tfe.object_id = o.id
+               AND tfe.tenant_id = #{tenantId}
+               AND tfe.status = 1
+        INNER JOIN permissions tp ON tp.id = tfe.permission_id AND tp.tenant_id = 0
+        WHERE o.type = 'MENU'
+          AND o.status = 1
+          AND o.tenant_id IN (0, #{tenantId})
         ORDER BY o.sort ASC, o.id ASC
     </select>
 

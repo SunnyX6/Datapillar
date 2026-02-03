@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.datapillar.platform.module.features.mapper.PermissionMapper">
+
+    <select id="selectByRoleId" resultType="com.sunny.datapillar.platform.module.features.entity.Permission">
+        SELECT DISTINCT p.*
+        FROM permissions p
+        INNER JOIN role_permissions rp ON p.id = rp.permission_id
+        WHERE rp.role_id = #{roleId}
+          AND rp.tenant_id = #{tenantId}
+          AND p.tenant_id = 0
+    </select>
+
+    <select id="selectByUserId" resultType="com.sunny.datapillar.platform.module.features.entity.Permission">
+        SELECT DISTINCT p.*
+        FROM permissions p
+        WHERE p.id IN (
+            SELECT rp.permission_id
+            FROM role_permissions rp
+            INNER JOIN user_roles ur ON rp.role_id = ur.role_id
+            WHERE ur.user_id = #{userId}
+              AND ur.tenant_id = #{tenantId}
+              AND rp.tenant_id = #{tenantId}
+            UNION
+            SELECT up.permission_id
+            FROM user_permission_overrides up
+            WHERE up.user_id = #{userId}
+              AND up.tenant_id = #{tenantId}
+        )
+          AND p.tenant_id = 0
+    </select>
+
+    <select id="findByCode" resultType="com.sunny.datapillar.platform.module.features.entity.Permission">
+        SELECT *
+        FROM permissions
+        WHERE tenant_id = #{tenantId}
+          AND code = #{code}
+    </select>
+
+    <select id="selectSystemPermissions" resultType="com.sunny.datapillar.platform.module.features.entity.Permission">
+        SELECT *
+        FROM permissions
+        WHERE tenant_id = 0
+          AND status = 1
+        ORDER BY level DESC, sort ASC, id ASC
+    </select>
+
+    <select id="selectSystemByCode" resultType="com.sunny.datapillar.platform.module.features.entity.Permission">
+        SELECT *
+        FROM permissions
+        WHERE tenant_id = 0
+          AND code = #{code}
+        LIMIT 1
+    </select>
+
+</mapper>

@@ -2,7 +2,7 @@
 """
 Datapillar Airflow Plugin - Unified REST API for Airflow 3.x
 
-封装 Airflow 官方 API，提供统一的接口给 web-admin 调用。
+封装 Airflow 官方 API，提供统一的接口给 workbench-service 调用。
 
 API 设计：
 ├── DAG 管理

@@ -8,7 +8,7 @@ spring:
     name: datapillar-auth
   datasource:
     # 使用与业务系统相同的数据库
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:datapillar}?useSSL=false&serverTimezone=UTC&characterEncoding=utf8&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:datapillar_platform}?useSSL=false&serverTimezone=UTC&characterEncoding=utf8&allowPublicKeyRetrieval=true
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:Sunny.123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -47,17 +47,21 @@ jwt:
   secret: ${JWT_SECRET:DatapillarJwtSecretKey123456789012345678901234567890}
   # Access Token 过期时间 (秒)
   # 开发环境：可通过环境变量 JWT_ACCESS_EXPIRATION=60 设置为60秒来测试自动刷新
-  # 生产环境：604800秒（7天），真正实现7天免登录
-  access-token-expiration: ${JWT_ACCESS_EXPIRATION:604800}     # 7 天
+  # 生产环境：3600秒（60分钟）
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:3600}     # 60 分钟
   # Refresh Token 过期时间 (秒)
-  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:2592000}  # 30 天
+  # 未勾选记住我：7 天
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800}  # 7 天
+  # 勾选记住我：30 天
+  refresh-token-expiration-remember: ${JWT_REFRESH_REMEMBER_EXPIRATION:2592000}  # 30 天
+  # 登录选择租户临时 Token 过期时间 (秒)
+  login-token-expiration: ${JWT_LOGIN_EXPIRATION:300}  # 5 分钟
   # 颁发者
   issuer: datapillar-auth
 
 # Cookie 配置
 cookie:
   secure: ${COOKIE_SECURE:false}  # 生产环境设为true，开发环境false
-  max-age: ${COOKIE_MAX_AGE:2592000}  # 30天，单位秒（与 Refresh Token 一致）
 
 # SSO 配置
 sso:

@@ -21,12 +21,16 @@ public class JwtTokenUtil {
     private final SecretKey key;
     private final long accessTokenExpiration;
     private final long refreshTokenExpiration;
+    private final long refreshTokenRememberExpiration;
+    private final long loginTokenExpiration;
     private final String issuer;
 
     public JwtTokenUtil(
             @Value("${jwt.secret}") String secret,
             @Value("${jwt.access-token-expiration}") long accessTokenExpiration,
             @Value("${jwt.refresh-token-expiration}") long refreshTokenExpiration,
+            @Value("${jwt.refresh-token-expiration-remember:2592000}") long refreshTokenRememberExpiration,
+            @Value("${jwt.login-token-expiration}") long loginTokenExpiration,
             @Value("${jwt.issuer}") String issuer) {
 
         if (secret == null || secret.length() < 32) {
@@ -36,6 +40,8 @@ public class JwtTokenUtil {
         this.key = new SecretKeySpec(secret.getBytes(), "HmacSHA256");
         this.accessTokenExpiration = accessTokenExpiration * 1000;  // 转换为毫秒
         this.refreshTokenExpiration = refreshTokenExpiration * 1000;
+        this.refreshTokenRememberExpiration = refreshTokenRememberExpiration * 1000;
+        this.loginTokenExpiration = loginTokenExpiration * 1000;
         this.issuer = issuer;
     }
 
@@ -43,12 +49,23 @@ public class JwtTokenUtil {
      * 生成 Access Token
      */
     public String generateAccessToken(Long userId, Long tenantId, String username, String email) {
+        return generateAccessToken(userId, tenantId, username, email, null);
+    }
+
+    /**
+     * 生成 Access Token（可附加扩展 claims）
+     */
+    public String generateAccessToken(Long userId, Long tenantId, String username, String email,
+                                      Map<String, Object> extraClaims) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("tenantId", tenantId);
         claims.put("username", username);
         claims.put("email", email);
         claims.put("tokenType", "access");
+        if (extraClaims != null && !extraClaims.isEmpty()) {
+            claims.putAll(extraClaims);
+        }
 
         Date now = new Date();
         Date expiration = new Date(now.getTime() + accessTokenExpiration);
@@ -75,7 +92,29 @@ public class JwtTokenUtil {
         claims.put("rememberMe", rememberMe != null && rememberMe);
 
         Date now = new Date();
-        Date expiration = new Date(now.getTime() + refreshTokenExpiration);
+        long refreshExpiration = rememberMe != null && rememberMe ? refreshTokenRememberExpiration : refreshTokenExpiration;
+        Date expiration = new Date(now.getTime() + refreshExpiration);
+
+        return Jwts.builder()
+                .claims(claims)
+                .subject(String.valueOf(userId))
+                .issuer(issuer)
+                .issuedAt(now)
+                .expiration(expiration)
+                .signWith(key)
+                .compact();
+    }
+
+    /**
+     * 生成登录态临时 Token（用于选择租户）
+     */
+    public String generateLoginToken(Long userId, Boolean rememberMe) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("tokenType", "login");
+        claims.put("rememberMe", rememberMe != null && rememberMe);
+
+        Date now = new Date();
+        Date expiration = new Date(now.getTime() + loginTokenExpiration);
 
         return Jwts.builder()
                 .claims(claims)
@@ -202,5 +241,13 @@ public class JwtTokenUtil {
      */
     public long getAccessTokenExpiration() {
         return accessTokenExpiration / 1000;
+    }
+
+    /**
+     * 获取 Refresh Token 过期时间（秒）
+     */
+    public long getRefreshTokenExpiration(boolean rememberMe) {
+        long expiration = rememberMe ? refreshTokenRememberExpiration : refreshTokenExpiration;
+        return expiration / 1000;
     }
 }

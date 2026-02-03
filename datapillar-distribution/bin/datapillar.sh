@@ -3,26 +3,26 @@
 # Datapillar 统一启动脚本
 #
 # 用法:
-#   ./bin/datapillar.sh start web-admin    # 后台启动 web-admin
-#   ./bin/datapillar.sh run web-admin      # 前台启动（Docker/K8s）
-#   ./bin/datapillar.sh stop web-admin     # 停止
-#   ./bin/datapillar.sh restart web-admin  # 重启
-#   ./bin/datapillar.sh status web-admin   # 查看状态
+#   ./bin/datapillar.sh start workbench-service    # 后台启动 workbench-service
+#   ./bin/datapillar.sh run workbench-service      # 前台启动（Docker/K8s）
+#   ./bin/datapillar.sh stop workbench-service     # 停止
+#   ./bin/datapillar.sh restart workbench-service  # 重启
+#   ./bin/datapillar.sh status workbench-service   # 查看状态
 #
-# 支持的服务: web-admin, gateway, auth
+# 支持的服务: workbench-service, gateway, auth
 #
 
 set -e
 
 # 服务配置映射
 declare -A SERVICE_MAP=(
-    ["web-admin"]="com.sunny.datapillar.admin.DatapillarAdminApplication"
+    ["workbench-service"]="com.sunny.datapillar.workbench.DatapillarWorkbenchApplication"
     ["gateway"]="com.sunny.datapillar.gateway.DatapillarGatewayApplication"
     ["auth"]="com.sunny.datapillar.auth.DatapillarAuthApplication"
 )
 
 declare -A SERVICE_PORT=(
-    ["web-admin"]="8081"
+    ["workbench-service"]="8081"
     ["gateway"]="8080"
     ["auth"]="8082"
 )
@@ -71,7 +71,7 @@ print_usage() {
     echo "用法: $0 {start|run|stop|restart|status} <service>"
     echo ""
     echo "服务列表:"
-    echo "  web-admin  - Web Admin 服务 (端口 8081)"
+    echo "  workbench-service  - Workbench 服务 (端口 8081)"
     echo "  gateway    - API Gateway 服务 (端口 8080)"
     echo "  auth       - Auth 认证服务 (端口 8082)"
     echo ""
@@ -83,7 +83,7 @@ print_usage() {
     echo "  status     - 查看服务状态"
     echo ""
     echo "示例:"
-    echo "  $0 start web-admin"
+    echo "  $0 start workbench-service"
     echo "  $0 stop gateway"
     echo "  $0 status auth"
 }
