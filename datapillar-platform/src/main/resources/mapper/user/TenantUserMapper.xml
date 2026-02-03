@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.datapillar.platform.module.user.mapper.TenantUserMapper">
+
+    <select id="selectByTenantIdAndUserId" resultType="com.sunny.datapillar.platform.module.user.entity.TenantUser">
+        SELECT *
+        FROM tenant_users
+        WHERE tenant_id = #{tenantId}
+          AND user_id = #{userId}
+    </select>
+
+    <delete id="deleteByTenantIdAndUserId">
+        DELETE FROM tenant_users
+        WHERE tenant_id = #{tenantId}
+          AND user_id = #{userId}
+    </delete>
+
+    <select id="countByUserId" resultType="int">
+        SELECT COUNT(1) FROM tenant_users WHERE user_id = #{userId}
+    </select>
+
+</mapper>

@@ -42,7 +42,7 @@
 - 进度去重：`knowledge_document_job.progress_seq` 每次更新 +1；SSE 使用该值作为 Last-Event-ID
 
 ## 统一响应协议（ApiResponse）
-- 统一响应与 `datapillar-web/src/types/api.ts` 一致
+- 统一响应与 `datapillar-workbench/src/types/api.ts` 一致
 - 仅 SSE 事件不使用该包装
 - **列表接口的 data 直接是数组**，分页字段使用 ApiResponse 顶层的 `limit/offset/total`
 

@@ -6,7 +6,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.bind.annotation.RequestHeader;
 
 import com.sunny.datapillar.auth.dto.AuthDto;
 import com.sunny.datapillar.auth.service.AuthService;
@@ -31,9 +34,19 @@ public class AuthController {
      * 登录
      */
     @PostMapping("/login")
-    public ApiResponse<AuthDto.LoginResponse> login(@Valid @RequestBody AuthDto.LoginRequest request,
-                                                    HttpServletResponse response) {
-        AuthDto.LoginResponse loginResponse = authService.login(request, response);
+    public ApiResponse<AuthDto.LoginResult> login(@Valid @RequestBody AuthDto.LoginRequest request,
+                                                  HttpServletResponse response) {
+        AuthDto.LoginResult loginResponse = authService.login(request, response);
+        return ApiResponse.ok(loginResponse);
+    }
+
+    /**
+     * 选择租户后完成登录
+     */
+    @PostMapping("/login/tenant")
+    public ApiResponse<AuthDto.LoginResult> loginTenant(@Valid @RequestBody AuthDto.LoginTenantRequest request,
+                                                        HttpServletResponse response) {
+        AuthDto.LoginResult loginResponse = authService.loginWithTenant(request, response);
         return ApiResponse.ok(loginResponse);
     }
 
@@ -45,6 +58,20 @@ public class AuthController {
             @CookieValue(name = "refresh-token", required = false) String refreshToken,
             HttpServletResponse response) {
         AuthDto.LoginResponse loginResponse = authService.refreshToken(refreshToken, response);
+        return ApiResponse.ok(loginResponse);
+    }
+
+    /**
+     * 平台超管授权访问目标租户（assume），签发用于目标租户业务接口访问的 access token。
+     */
+    @PostMapping("/tenants/{tenantId}/assume")
+    public ApiResponse<AuthDto.LoginResponse> assumeTenant(
+            @PathVariable Long tenantId,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @CookieValue(name = "auth-token", required = false) String accessToken,
+            HttpServletResponse response) {
+        String token = extractAccessToken(authorization, accessToken);
+        AuthDto.LoginResponse loginResponse = authService.assumeTenant(tenantId, token, response);
         return ApiResponse.ok(loginResponse);
     }
 
@@ -61,10 +88,10 @@ public class AuthController {
      * SSO 登录
      */
     @PostMapping("/sso/login")
-    public ApiResponse<AuthDto.LoginResponse> ssoLogin(
+    public ApiResponse<AuthDto.LoginResult> ssoLogin(
             @Valid @RequestBody AuthDto.SsoLoginRequest request,
             HttpServletResponse response) {
-        AuthDto.LoginResponse loginResponse = authService.loginWithSso(request, response);
+        AuthDto.LoginResult loginResponse = authService.loginWithSso(request, response);
         return ApiResponse.ok(loginResponse);
     }
 
@@ -104,5 +131,12 @@ public class AuthController {
     @GetMapping("/health")
     public ApiResponse<String> health() {
         return ApiResponse.ok("OK");
+    }
+
+    private String extractAccessToken(String authorization, String cookieToken) {
+        if (authorization != null && authorization.startsWith("Bearer ")) {
+            return authorization.substring(7);
+        }
+        return cookieToken;
     }
 }

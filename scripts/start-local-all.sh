@@ -119,8 +119,12 @@ start_java_service "datapillar-auth" \
     "$PROJECT_ROOT/datapillar-auth/target/datapillar-auth-1.0.0.jar" 6001
 
 # 2. 启动核心业务服务
-start_java_service "datapillar-web-admin" \
-    "$PROJECT_ROOT/datapillar-web-admin/target/datapillar-web-admin-1.0.0.jar" 6002
+start_java_service "datapillar-workbench-service" \
+    "$PROJECT_ROOT/datapillar-workbench-service/target/datapillar-workbench-service-1.0.0.jar" 6002
+
+# 2.1 启动平台服务
+start_java_service "datapillar-platform" \
+    "$PROJECT_ROOT/datapillar-platform/target/datapillar-platform-1.0.0.jar" 6006
 
 # 3. 启动 API 网关
 start_java_service "datapillar-api-gateway" \
@@ -139,6 +143,7 @@ echo "📋 服务列表："
 echo "   • API 网关:           http://localhost:6000"
 echo "   • 认证服务:           http://localhost:6001"
 echo "   • 核心业务:           http://localhost:6002"
+echo "   • 平台服务:           http://localhost:6006"
 echo "   • AI 服务:            http://localhost:6003"
 echo ""
 echo "📝 日志目录: $LOG_HOME"

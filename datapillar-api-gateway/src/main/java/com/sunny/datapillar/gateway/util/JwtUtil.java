@@ -72,6 +72,21 @@ public class JwtUtil {
     }
 
     /**
+     * 从 Token 获取租户ID
+     */
+    public Long getTenantId(String token) {
+        Claims claims = validateAndParse(token);
+        Object tenantId = claims.get("tenantId");
+        if (tenantId instanceof Number) {
+            return ((Number) tenantId).longValue();
+        }
+        if (tenantId instanceof String) {
+            return Long.parseLong((String) tenantId);
+        }
+        return null;
+    }
+
+    /**
      * 从 Token 获取邮箱
      */
     public String getEmail(String token) {
@@ -85,5 +100,38 @@ public class JwtUtil {
     public String getTokenType(String token) {
         Claims claims = validateAndParse(token);
         return claims.get("tokenType", String.class);
+    }
+
+    /**
+     * 从 Token 获取平台超管审计字段
+     */
+    public Long getActorUserId(String token) {
+        Claims claims = validateAndParse(token);
+        Object actorUserId = claims.get("actorUserId");
+        if (actorUserId instanceof Number) {
+            return ((Number) actorUserId).longValue();
+        }
+        if (actorUserId instanceof String) {
+            return Long.parseLong((String) actorUserId);
+        }
+        return null;
+    }
+
+    public Long getActorTenantId(String token) {
+        Claims claims = validateAndParse(token);
+        Object actorTenantId = claims.get("actorTenantId");
+        if (actorTenantId instanceof Number) {
+            return ((Number) actorTenantId).longValue();
+        }
+        if (actorTenantId instanceof String) {
+            return Long.parseLong((String) actorTenantId);
+        }
+        return null;
+    }
+
+    public boolean isImpersonation(String token) {
+        Claims claims = validateAndParse(token);
+        Boolean impersonation = claims.get("impersonation", Boolean.class);
+        return Boolean.TRUE.equals(impersonation);
     }
 }

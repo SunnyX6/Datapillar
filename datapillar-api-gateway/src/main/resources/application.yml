@@ -45,21 +45,30 @@ spring:
               filters:
                 - RewritePath=/api(?<segment>/?.*), ${segment}
 
-            # 2. 核心业务服务 (datapillar-web-admin)
-            - id: webadmin-service
+            # 2. 平台服务 (datapillar-platform)
+            # 重写: /api/platform/** → /**
+            - id: platform-service
+              uri: http://localhost:6006
+              predicates:
+                - Path=/api/platform/**
+              filters:
+                - RewritePath=/api/platform(?<segment>/?.*), ${segment}
+
+            # 3. 核心业务服务 (datapillar-workbench-service)
+            - id: workbench-service
               uri: http://localhost:6002
               predicates:
-                - Path=/api/users/**,/api/roles/**
+                - Path=/api/workbench/**
               filters:
-                - RewritePath=/api(?<segment>/?.*), ${segment}
+                - RewritePath=/api/workbench(?<segment>/?.*), ${segment}
 
-            # 3. AI 服务 (datapillar-ai)
+            # 4. AI 服务 (datapillar-ai)
             - id: ai-service
               uri: http://localhost:6003
               predicates:
                 - Path=/api/ai/**
 
-            # 4. 元数据服务 (datapillar-gravitino)
+            # 5. 元数据服务 (datapillar-gravitino)
             # Gravitino 原生 REST API
             # 重写: /api/metadata/** → /api/**
             - id: onemeta-service
@@ -86,6 +95,7 @@ gateway:
       /api/auth/register,
       /api/auth/refresh,
       /api/auth/captcha,
+      /api/platform/health,
       /actuator/**,
       /health/**
 

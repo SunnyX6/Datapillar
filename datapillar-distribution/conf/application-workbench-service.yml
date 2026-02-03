@@ -1,0 +1,90 @@
+# Datapillar Workbench Service 生产环境配置
+# 此配置会覆盖默认配置
+
+server:
+  port: ${SERVER_PORT:8081}
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: datapillar-workbench-service
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:datapillar_workbench}?useSSL=false&serverTimezone=UTC&characterEncoding=utf8&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:Sunny.123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+  jackson:
+    time-zone: Asia/Shanghai
+    serialization:
+      WRITE_DATES_AS_TIMESTAMPS: false
+  flyway:
+    enabled: true
+    validate-on-migrate: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: -1ms
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      update-strategy: IGNORED
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    com.sunny.datapillar: INFO
+    org.springframework: WARN
+    root: INFO
+  file:
+    name: ${DATAPILLAR_LOG_DIR:./logs}/datapillar-workbench-service.log
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
+      total-size-cap: 5GB
+
+# Airflow 配置
+airflow:
+  base-url: ${AIRFLOW_BASE_URL:http://localhost:8080}
+  plugin-path: /plugins/datapillar
+  username: ${AIRFLOW_USERNAME:datapillar}
+  password: ${AIRFLOW_PASSWORD:123456asd}
+  connect-timeout: 5000
+  read-timeout: 30000
+
+# Gravitino 配置
+gravitino:
+  uri: ${GRAVITINO_URI:http://localhost:8090}
+  metalake: ${GRAVITINO_METALAKE:datapillar}
+
+# Flink SQL 配置
+flink:
+  sql:
+    enabled: true
+    max-rows: 10000
+    execution-timeout: 300000

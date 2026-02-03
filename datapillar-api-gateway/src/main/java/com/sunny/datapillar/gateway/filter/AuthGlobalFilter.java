@@ -86,13 +86,46 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
             Long userId = jwtUtil.getUserId(token);
             String username = jwtUtil.getUsername(token);
             String email = jwtUtil.getEmail(token);
+            Long tenantId = jwtUtil.getTenantId(token);
+            if (tenantId == null) {
+                log.warn("认证失败 - Token 缺少租户信息: {}", path);
+                return unauthorized(exchange, "Token 缺少租户信息");
+            }
+
+            Long actorUserId = jwtUtil.getActorUserId(token);
+            Long actorTenantId = jwtUtil.getActorTenantId(token);
+            boolean impersonation = jwtUtil.isImpersonation(token);
 
             // 将用户信息注入请求头，传递给下游服务
             ServerHttpRequest mutatedRequest = request.mutate()
+                    .headers(headers -> {
+                        headers.remove(HeaderConstants.HEADER_TENANT_ID);
+                        headers.remove(HeaderConstants.HEADER_USER_ID);
+                        headers.remove(HeaderConstants.HEADER_USERNAME);
+                        headers.remove(HeaderConstants.HEADER_EMAIL);
+                        headers.remove(HeaderConstants.HEADER_ACTOR_USER_ID);
+                        headers.remove(HeaderConstants.HEADER_ACTOR_TENANT_ID);
+                        headers.remove(HeaderConstants.HEADER_IMPERSONATION);
+                    })
+                    .header(HeaderConstants.HEADER_TENANT_ID, String.valueOf(tenantId))
                     .header(HeaderConstants.HEADER_USER_ID, String.valueOf(userId))
                     .header(HeaderConstants.HEADER_USERNAME, username)
                     .header(HeaderConstants.HEADER_EMAIL, email != null ? email : "")
+                    .header(HeaderConstants.HEADER_IMPERSONATION, String.valueOf(impersonation))
                     .build();
+
+            if (impersonation) {
+                if (actorUserId != null) {
+                    mutatedRequest = mutatedRequest.mutate()
+                            .header(HeaderConstants.HEADER_ACTOR_USER_ID, String.valueOf(actorUserId))
+                            .build();
+                }
+                if (actorTenantId != null) {
+                    mutatedRequest = mutatedRequest.mutate()
+                            .header(HeaderConstants.HEADER_ACTOR_TENANT_ID, String.valueOf(actorTenantId))
+                            .build();
+                }
+            }
 
             return chain.filter(exchange.mutate().request(mutatedRequest).build());
 

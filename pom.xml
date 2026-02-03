@@ -16,7 +16,8 @@
     <modules>
         <module>datapillar-common</module>
         <module>datapillar-auth</module>
-        <module>datapillar-web-admin</module>
+        <module>datapillar-workbench-service</module>
+        <module>datapillar-platform</module>
         <module>datapillar-api-gateway</module>
         <module>datapillar-distribution</module>
     </modules>

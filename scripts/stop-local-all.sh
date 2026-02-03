@@ -65,7 +65,8 @@ stop_service_by_port() {
 echo "📋 停止服务（通过 PID 文件）..."
 
 stop_service_by_pid "datapillar-auth"
-stop_service_by_pid "datapillar-web-admin"
+stop_service_by_pid "datapillar-workbench-service"
+stop_service_by_pid "datapillar-platform"
 stop_service_by_pid "datapillar-api-gateway"
 stop_service_by_pid "datapillar-ai"
 

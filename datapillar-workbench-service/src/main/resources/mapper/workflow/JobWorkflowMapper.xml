@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.datapillar.workbench.module.workflow.mapper.JobWorkflowMapper">
+
+    <resultMap id="ListItemResult" type="com.sunny.datapillar.workbench.module.workflow.dto.WorkflowDto$ListItem">
+        <result property="id" column="id"/>
+        <result property="projectId" column="project_id"/>
+        <result property="projectName" column="project_name"/>
+        <result property="workflowName" column="workflow_name"/>
+        <result property="triggerType" column="trigger_type"/>
+        <result property="status" column="status"/>
+        <result property="description" column="description"/>
+        <result property="jobCount" column="job_count"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="ResponseResult" type="com.sunny.datapillar.workbench.module.workflow.dto.WorkflowDto$Response">
+        <result property="id" column="id"/>
+        <result property="projectId" column="project_id"/>
+        <result property="projectName" column="project_name"/>
+        <result property="workflowName" column="workflow_name"/>
+        <result property="triggerType" column="trigger_type"/>
+        <result property="triggerValue" column="trigger_value"/>
+        <result property="timeoutSeconds" column="timeout_seconds"/>
+        <result property="maxRetryTimes" column="max_retry_times"/>
+        <result property="priority" column="priority"/>
+        <result property="status" column="status"/>
+        <result property="description" column="description"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="selectWorkflowPage" resultMap="ListItemResult">
+        SELECT w.id, w.project_id, p.name as project_name, w.workflow_name,
+               w.trigger_type, w.status, w.description,
+               (SELECT COUNT(*) FROM job_info j WHERE j.workflow_id = w.id AND j.is_deleted = 0) as job_count,
+               w.created_at, w.updated_at
+        FROM job_workflow w
+        LEFT JOIN projects p ON w.project_id = p.id
+        WHERE w.is_deleted = 0
+        <if test="projectId != null">
+            AND w.project_id = #{projectId}
+        </if>
+        <if test="workflowName != null and workflowName != ''">
+            AND w.workflow_name LIKE CONCAT('%', #{workflowName}, '%')
+        </if>
+        <if test="status != null">
+            AND w.status = #{status}
+        </if>
+        ORDER BY w.updated_at DESC
+    </select>
+
+    <select id="selectWorkflowDetail" resultMap="ResponseResult">
+        SELECT w.id, w.project_id, p.name as project_name,
+               w.workflow_name, w.trigger_type, w.trigger_value,
+               w.timeout_seconds, w.max_retry_times, w.priority,
+               w.status, w.description, w.created_at, w.updated_at
+        FROM job_workflow w
+        LEFT JOIN projects p ON w.project_id = p.id
+        WHERE w.id = #{id} AND w.is_deleted = 0
+    </select>
+
+    <select id="selectByProjectId" resultType="com.sunny.datapillar.workbench.module.workflow.entity.JobWorkflow">
+        SELECT id, workflow_name
+        FROM job_workflow
+        WHERE project_id = #{projectId} AND is_deleted = 0
+        ORDER BY workflow_name
+    </select>
+
+</mapper>
