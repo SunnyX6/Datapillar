@@ -1,0 +1,78 @@
+{
+  "brand": {
+    "name": "数蝶",
+    "tagline": "吞噬原数，羽化真知",
+    "slogan": "让AI来吐丝结茧"
+  },
+  "title": "欢迎回来",
+  "demo": {
+    "agentWorking": "AGENT 工作中",
+    "workflowStudio": "数据流工作台",
+    "buildingETL": "任务运行...",
+    "aiAgent": "AI 驱动的数据工程 Agent",
+    "realtime": "录制"
+  },
+  "form": {
+    "username": {
+      "label": "用户名",
+      "placeholder": "请输入用户名或邮箱",
+      "required": "请输入用户名"
+    },
+    "password": {
+      "label": "密码",
+      "placeholder": "请输入密码",
+      "required": "请输入密码"
+    },
+    "remember": "记住我",
+    "rememberHintDefault": "不勾选：7天内免登录",
+    "rememberHintRemember": "勾选：30天内免登录",
+    "forgot": "忘记密码？",
+    "submit": "登录",
+    "success": "登录成功"
+  },
+  "sso": {
+    "otherMethods": "其他登录方式",
+    "quickLogin": "企业SSO 快捷登录",
+    "panel": {
+      "title": "企业登录",
+      "subtitle": "通过第三方平台授权",
+      "accountLogin": "账号登录",
+      "back": "返回",
+      "comingSoon": "敬请期待"
+    },
+    "providers": {
+      "dingtalk": {
+        "name": "钉钉",
+        "desc": "使用该平台组织账号授权"
+      },
+      "wecom": {
+        "name": "企业微信",
+        "desc": "使用该平台组织账号授权"
+      },
+      "lark": {
+        "name": "飞书",
+        "desc": "使用该平台组织账号授权"
+      }
+    },
+    "qr": {
+      "title": "钉钉扫码登录",
+      "subtitle": "使用企业钉钉账号授权登录",
+      "scanTip": "请使用钉钉 App 扫码登录",
+      "expires": "二维码 5 分钟内有效",
+      "help": "遇到问题？查看帮助"
+    },
+    "errors": {
+      "qrConfigFailed": "获取扫码配置失败",
+      "qrConfigInvalid": "SSO 配置缺少 clientId 或 redirectUri",
+      "authCodeFailed": "获取授权码失败",
+      "dingtalkScriptFailed": "钉钉脚本加载失败",
+      "dingtalkScriptUnavailable": "无法加载钉钉脚本",
+      "dingtalkLoginFailed": "钉钉登录失败",
+      "loginFailed": "登录失败，请重试"
+    }
+  },
+  "footer": {
+    "noAccount": "还没有账号？",
+    "register": "申请试用"
+  }
+}

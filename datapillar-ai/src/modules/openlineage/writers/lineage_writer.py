@@ -17,7 +17,7 @@
 from __future__ import annotations
 from neo4j import AsyncSession
 
-from src.modules.openlineage.core.sql_summary_processor import sql_summary_processor
+from src.modules.openlineage.core.sql_summary_processor import get_sql_summary_processor
 from src.modules.openlineage.parsers.plans.types import LineageWritePlans
 from src.modules.openlineage.writers.base import BaseWriter
 from src.modules.openlineage.writers.lineage import (
@@ -102,7 +102,8 @@ class LineageWriter(BaseWriter):
                 output_table_ids=plans.table_output_ids,
             )
             # 将 SQL 摘要任务入队（异步批量处理）
-            await sql_summary_processor.enqueue(
+            summary_processor = get_sql_summary_processor()
+            await summary_processor.enqueue(
                 sql_node_id=plans.sql_node.id,
                 sql_content=plans.sql_node.content,
                 input_tables=plans.table_input_names,

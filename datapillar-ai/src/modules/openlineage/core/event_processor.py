@@ -15,13 +15,12 @@ from typing import Any
 import logging
 
 from src.infrastructure.repository.neo4j_uow import neo4j_async_session
-from src.modules.openlineage.config import OpenLineageSinkConfig
 from src.modules.openlineage.core.queue import AsyncEventQueue, QueueConfig
 from src.modules.openlineage.parsers.plans import OpenLineagePlanBuilder
 from src.modules.openlineage.schemas.events import RunEvent
 from src.modules.openlineage.writers.lineage_writer import LineageWriter
 from src.modules.openlineage.writers.metadata_writer import MetadataWriter
-from src.shared.config import settings
+from src.shared.config.runtime import get_runtime_config
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +53,7 @@ class EventProcessor:
     处理流程：
     1. 接收事件入队
     2. 批量处理：MetadataWriter 写入元数据，LineageWriter 写入血缘
-    3. 支持暂停/恢复（启动时暂停，等待 Gravitino 同步完成后恢复）
+    3. 支持暂停/恢复（同步期间可暂停，完成后恢复）
     """
 
     _instance: "EventProcessor | None" = None
@@ -69,7 +68,7 @@ class EventProcessor:
         if self._initialized:
             return
 
-        self._config = OpenLineageSinkConfig.from_settings(settings)
+        self._config = get_runtime_config().openlineage_sink
         self._stats = ProcessorStats()
 
         # 初始化队列
@@ -190,5 +189,12 @@ class EventProcessor:
                 )
 
 
-# 全局单例
-event_processor = EventProcessor()
+_event_processor: EventProcessor | None = None
+
+
+def get_event_processor() -> EventProcessor:
+    """获取 EventProcessor 单例（延迟初始化）"""
+    global _event_processor
+    if _event_processor is None:
+        _event_processor = EventProcessor()
+    return _event_processor

@@ -67,7 +67,7 @@
 ```json
 {
   "status": 401,
-  "code": "AUTH_REFRESH_TOKEN_EXPIRED",
+  "code": "REFRESH_TOKEN_EXPIRED",
   "message": "refresh token 已过期",
   "data": null,
   "timestamp": "2025-01-01T12:00:00Z",
@@ -90,7 +90,7 @@
 - `ApiResponse`：统一响应结构 + 工厂方法（归属 web 层）
 - `ErrorCode`：业务码 + HTTP 状态码
 - `BusinessException`：业务异常，携带 ErrorCode
-- `SystemException`：系统异常（统一映射为 `COMMON_INTERNAL_ERROR`）
+- `SystemException`：系统异常（统一映射为 `INTERNAL_ERROR`）
 - `BaseGlobalExceptionHandler`：集中处理所有异常
 - `SecurityEntryPoint/AccessDeniedHandler`：统一输出 401/403 JSON
 
@@ -104,37 +104,37 @@
 
 规则：
 - 业务异常统一用 `BusinessException`（携带 ErrorCode）
-- 系统异常统一用 `SystemException`（对外固定 `COMMON_INTERNAL_ERROR`，细节只进日志）
+- 系统异常统一用 `SystemException`（对外固定 `INTERNAL_ERROR`，细节只进日志）
 - 非 HTTP 场景不直接拼 JSON，由上层统一处理或包装为错误对象
 
 ## 3. 错误码与 HTTP 状态码映射
 
 业务码规范（强制）：
 - 成功码固定 `OK`
-- 错误码必须加模块前缀：`AUTH_*` / `ADMIN_*` / `COMMON_*`
+- 错误码不再区分模块前缀，统一维护在 `ErrorCode`
 
 ### 3.1 Auth（datapillar-auth）
 
 | 业务码 | HTTP 状态码 | 说明 |
 |---|---|---|
 | OK | 200 | 成功 |
-| AUTH_VALIDATION_ERROR / AUTH_INVALID_ARGUMENT | 400 | 参数错误 |
-| AUTH_UNAUTHORIZED / AUTH_TOKEN_* / AUTH_REFRESH_TOKEN_EXPIRED / AUTH_INVALID_CREDENTIALS / AUTH_USER_NOT_FOUND | 401 | 未授权或 token 异常 |
-| AUTH_FORBIDDEN / AUTH_USER_DISABLED | 403 | 无权限或禁用 |
-| AUTH_DUPLICATE_KEY | 409 | 资源冲突 |
-| AUTH_INTERNAL_ERROR | 500 | 服务异常 |
+| VALIDATION_ERROR / INVALID_ARGUMENT | 400 | 参数错误 |
+| UNAUTHORIZED / TOKEN_* / REFRESH_TOKEN_EXPIRED / INVALID_CREDENTIALS / USER_NOT_FOUND | 401 | 未授权或 token 异常 |
+| FORBIDDEN / USER_DISABLED | 403 | 无权限或禁用 |
+| DUPLICATE_KEY | 409 | 资源冲突 |
+| INTERNAL_ERROR | 500 | 服务异常 |
 
 ### 3.2 Studio Service（datapillar-studio-service）
 
 | 业务码 | HTTP 状态码 | 说明 |
 |---|---|---|
 | OK | 200 | 成功 |
-| ADMIN_VALIDATION_ERROR / ADMIN_INVALID_ARGUMENT | 400 | 参数错误 |
-| ADMIN_UNAUTHORIZED / ADMIN_USER_NOT_LOGGED_IN | 401 | 未授权 |
-| ADMIN_FORBIDDEN / ADMIN_PROJECT_ACCESS_DENIED | 403 | 无权限 |
-| ADMIN_*_NOT_FOUND / ADMIN_RESOURCE_NOT_FOUND | 404 | 资源不存在 |
-| ADMIN_DUPLICATE_RESOURCE / ADMIN_DUPLICATE_KEY | 409 | 资源冲突 |
-| ADMIN_INTERNAL_ERROR | 500 | 服务异常 |
+| VALIDATION_ERROR / INVALID_ARGUMENT | 400 | 参数错误 |
+| UNAUTHORIZED / USER_NOT_LOGGED_IN | 401 | 未授权 |
+| FORBIDDEN / PROJECT_ACCESS_DENIED | 403 | 无权限 |
+| RESOURCE_NOT_FOUND / ROLE_NOT_FOUND / PROJECT_NOT_FOUND / WORKFLOW_NOT_FOUND / JOB_NOT_FOUND / COMPONENT_NOT_FOUND | 404 | 资源不存在 |
+| DUPLICATE_RESOURCE / DUPLICATE_KEY | 409 | 资源冲突 |
+| INTERNAL_ERROR | 500 | 服务异常 |
 
 ---
 
@@ -285,7 +285,7 @@ Base Path: `/auth`
 ```json
 {
   "status": 401,
-  "code": "AUTH_REFRESH_TOKEN_EXPIRED",
+  "code": "REFRESH_TOKEN_EXPIRED",
   "message": "refresh token 已过期",
   "data": null,
   "timestamp": "2025-01-01T12:00:00Z",
@@ -1729,7 +1729,7 @@ DELETE /users/{userId}/projects/{projectId}/workflows/{workflowId}/dependencies?
 
 错误码规则（强制）：
 - 不再按模块拆分多个枚举文件
-- 所有错误码统一维护在 `ErrorCode` 中，按前缀分区（`AUTH_`/`ADMIN_`/`COMMON_`）
+- 所有错误码统一维护在 `ErrorCode` 中，不区分模块前缀
 - 新业务仅新增常量，不新增 `XXXErrorCode` 类
 
 Maven 约束：

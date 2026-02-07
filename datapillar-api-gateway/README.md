@@ -21,9 +21,9 @@ Datapillar 统一 API 网关 - 基于 Spring Cloud Gateway 4.2.x
 
 | 路径前缀 | 目标服务 | 端口 | 说明 |
 |---------|---------|------|------|
-| `/api/auth/**` | datapillar-auth | 7000 | 认证服务 |
-| `/api/studio/**` | datapillar-studio-service | 6002 | 核心业务 |
-| `/api/ai/**` | datapillar-ai | 5000 | AI 服务 |
+| `/api/auth/**` | datapillar-auth | 7001 | 认证服务 |
+| `/api/studio/**` | datapillar-studio-service | 7002 | 核心业务 |
+| `/api/ai/**` | datapillar-ai | 7003 | AI 服务 |
 | `/api/metadata/**` | datapillar-gravitino | 8090 | 元数据服务 |
 | `/api/job/**` | datapillar-job | 9080 | 调度服务 |
 
@@ -44,10 +44,10 @@ mvn spring-boot:run
 
 ```bash
 # 网关健康状态
-curl http://localhost:8080/actuator/health
+curl http://localhost:7000/actuator/health
 
 # 查看所有路由
-curl http://localhost:8080/actuator/gateway/routes
+curl http://localhost:7000/actuator/gateway/routes
 ```
 
 ## 配置说明
@@ -99,7 +99,7 @@ filters:
 A: 已配置全局 CORS，允许所有来源。生产环境请修改 `allowedOrigins`。
 
 ### Q: 如何查看路由列表？
-A: 访问 `http://localhost:8080/actuator/gateway/routes`
+A: 访问 `http://localhost:7000/actuator/gateway/routes`
 
 ### Q: 如何禁用某个路由？
 A: 在路由配置中添加 `enabled: false`

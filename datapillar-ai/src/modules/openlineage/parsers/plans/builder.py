@@ -10,7 +10,7 @@ from typing import Any
 
 import logging
 
-from src.infrastructure.repository.kg.dto import SQLDTO, generate_id
+from src.infrastructure.repository.knowledge.dto import SQLDTO, generate_id
 from src.modules.openlineage.parsers.common.dataset import DatasetResolver
 from src.modules.openlineage.parsers.common.operation import get_operation
 from src.modules.openlineage.parsers.common.qualified_name import (

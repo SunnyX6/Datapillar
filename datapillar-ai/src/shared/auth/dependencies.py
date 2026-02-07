@@ -58,6 +58,27 @@ def extract_token(request: Request) -> str:
     )
 
 
+def extract_tenant_id(request: Request) -> int:
+    """
+    从请求头提取租户ID
+    """
+    tenant_id = request.headers.get("X-Tenant-Id") or request.headers.get("x-tenant-id")
+    if not tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="缺少租户信息",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        return int(tenant_id)
+    except (TypeError, ValueError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="租户信息无效",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from e
+
+
 def current_user_state(request: Request) -> CurrentUser:
     """
     从 request.state 获取当前用户
@@ -86,6 +107,7 @@ def current_user_state(request: Request) -> CurrentUser:
 # 推荐使用 current_user_state
 def get_current_user(
     token: Annotated[str, Depends(extract_token)],
+    request: Request,
     jwt_util: Annotated[JwtTokenUtil, Depends(get_jwt_util)],
 ) -> CurrentUser:
     """
@@ -125,11 +147,13 @@ def get_current_user(
         user_id = jwt_util.get_user_id(token)
         username = jwt_util.get_username(token)
         email = jwt_util.get_email(token)
+        tenant_id = extract_tenant_id(request)
 
         logger.debug(f"Token validation successful for user: {username} (userId: {user_id})")
 
         return CurrentUser(
             user_id=user_id,
+            tenant_id=tenant_id,
             username=username,
             email=email,
         )

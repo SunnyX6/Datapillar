@@ -59,14 +59,21 @@ public class LoggingFilter implements GlobalFilter, Ordered {
             ip = request.getHeaders().getFirst("X-Real-IP");
         }
         if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddress() != null ?
-                    request.getRemoteAddress().getAddress().getHostAddress() : "unknown";
+            if (request.getRemoteAddress() != null) {
+                if (request.getRemoteAddress().getAddress() != null) {
+                    ip = request.getRemoteAddress().getAddress().getHostAddress();
+                } else {
+                    ip = request.getRemoteAddress().getHostString();
+                }
+            } else {
+                ip = "unknown";
+            }
         }
         // 多个代理时取第一个
         if (ip != null && ip.contains(",")) {
             ip = ip.split(",")[0].trim();
         }
-        return ip;
+        return ip == null || ip.isBlank() ? "unknown" : ip;
     }
 
     @Override

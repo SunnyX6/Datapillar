@@ -1,0 +1,259 @@
+{
+  "hero": {
+    "release": "Datapillar 1.0 正式发布",
+    "titleLine": "构建智能时代的",
+    "titleHighlight": "企业数据基石",
+    "subtitle": "面向 AI 原生时代的 Data Fabric 架构。在一个沉浸式工作台中，实现 <0>数据集成</0>、<1>数据治理</1> 以及 <2>全链路血缘分析</2>。",
+    "cta": {
+      "startTrial": "免费开始试用",
+      "watchDemo": "观看产品演示"
+    },
+    "studio": {
+      "workspace": "工作区",
+      "autosave": "自动保存：开启",
+      "paths": {
+        "integration": "pipeline_v2",
+        "analytics": "analytics_dashboard"
+      }
+    },
+    "scenarios": {
+      "integration": {
+        "title": "数据集成 (Zero-ETL)",
+        "description": "自动构建订单宽表与销售汇总链路"
+      },
+      "analytics": {
+        "title": "智能分析 (Text-to-BI)",
+        "description": "自然语言生成 SQL 查询与可视化图表"
+      }
+    },
+    "pipeline": {
+      "title": "AI 协同助手",
+      "prompt": "关联订单表和商品表输出到订单宽表，汇总统计销售额",
+      "nodes": {
+        "orders": "订单表",
+        "products": "商品表",
+        "join": "JOIN 关联",
+        "wide": "订单宽表",
+        "aggregation": "汇总统计"
+      },
+      "aiLabel": "Datapillar AI",
+      "aiReply": "已生成 Spark SQL：订单表 LEFT JOIN 商品表，产出 DWD 宽表与 DWS 汇总。",
+      "ready": "Pipeline 就绪",
+      "deploy": "立即部署",
+      "inputPlaceholder": "询问 AI 协同助手..."
+    },
+    "analytics": {
+      "title": "AI 分析师",
+      "prompt": "分析近14天华东地区销售趋势。",
+      "aiLabel": "Datapillar AI",
+      "aiReply": "SQL 查询已生成。正在渲染可视化...",
+      "inputPlaceholder": "解读这个图表...",
+      "sqlTitle": "生成的 SQL",
+      "sqlExecution": "执行耗时：{{ms}}"
+    }
+  },
+  "features": {
+    "eyebrow": "核心架构",
+    "title": "一体化",
+    "titleHighlight": "SaaS 数据基座",
+    "description": {
+      "line1": "专为 SaaS 应用设计的数据基础设施。",
+      "line2": "从多租户隔离到高并发 API，Datapillar 为您的产品提供企业级的数据处理能力，无需自行构建复杂的 ETL 管道。"
+    },
+    "tags": [
+      "多租户",
+      "行级安全",
+      "亚毫秒延迟"
+    ]
+  },
+  "pricing": {
+    "eyebrow": "订阅方案",
+    "title": "按用量付费，透明可控",
+    "subtitle": "仅为实际使用的计算和存储付费。不限制坐席数量。",
+    "popular": "最受欢迎",
+    "perMonth": "/月",
+    "plans": [
+      {
+        "id": "standard",
+        "name": "标准版",
+        "price": "0元",
+        "description": "适合起步团队的统一数据开发与治理能力。",
+        "cta": "申请试用",
+        "highlight": false,
+        "isCustom": false,
+        "features": [
+          { "text": "原生多租户隔离与权限基础", "included": true },
+          { "text": "工作流编排 + SQL 开发", "included": true },
+          { "text": "统一数据目录与基础血缘", "included": true },
+          { "text": "AI 分析助手（按量）", "included": true },
+          { "text": "企业级合规与 SSO", "included": false },
+          { "text": "私有化部署与专属支持", "included": false }
+        ]
+      },
+      {
+        "id": "pro",
+        "name": "专业版",
+        "price": "0元",
+        "description": "覆盖核心数据链路，适合快速增长的业务团队。",
+        "cta": "预约演示",
+        "highlight": true,
+        "isCustom": false,
+        "features": [
+          { "text": "原生多租户隔离与权限策略", "included": true },
+          { "text": "联邦查询与统一资产目录", "included": true },
+          { "text": "高级血缘 + 质量规则", "included": true },
+          { "text": "AI 助手与自动化优化", "included": true },
+          { "text": "企业级合规与 SSO", "included": true },
+          { "text": "私有化部署与专属支持", "included": false }
+        ]
+      },
+      {
+        "id": "enterprise",
+        "name": "企业版",
+        "price": "定制",
+        "description": "满足大型组织的安全、合规与规模化需求。",
+        "cta": "联系销售",
+        "highlight": false,
+        "isCustom": true,
+        "features": [
+          { "text": "跨区域/跨产品统一租户治理", "included": true },
+          { "text": "全链路审计与数据合规", "included": true },
+          { "text": "自定义功能包与配额控制", "included": true },
+          { "text": "AI 与自动化企业级保障", "included": true },
+          { "text": "企业级合规与 SSO", "included": true },
+          { "text": "私有化部署与专属支持", "included": true }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "tagline": "赋予数据团队构建未来智能的能力。安全、可扩展，前所未有的简单。",
+    "sections": {
+      "product": "产品",
+      "company": "公司",
+      "follow": "关注我们"
+    },
+    "links": {
+      "core": "核心功能",
+      "integration": "集成能力",
+      "enterprise": "企业版",
+      "changelog": "更新日志",
+      "about": "关于我们",
+      "careers": "加入我们",
+      "blog": "技术博客",
+      "legal": "法律条款"
+    }
+  },
+  "requestAccess": {
+    "title": "申请早期试用",
+    "subtitle": "Datapillar 让数据更智能。",
+    "successTitle": "申请已提交！",
+    "successBody": "感谢您对 Datapillar 的关注。我们的团队将审核您的申请，并在 24 小时内将邀请码发送至",
+    "successSuffix": "。",
+    "close": "关闭",
+    "form": {
+      "name": {
+        "label": "姓名",
+        "placeholder": "请输入姓名"
+      },
+      "email": {
+        "label": "工作邮箱",
+        "placeholder": "请输入工作邮箱"
+      },
+      "company": {
+        "label": "公司名称",
+        "placeholder": "请输入公司名称"
+      },
+      "role": {
+        "label": "职位",
+        "placeholder": "请选择职位",
+        "options": {
+          "CTO": "CTO / 技术副总裁",
+          "DataEngineer": "数据工程师",
+          "Product": "产品经理",
+          "Other": "其他"
+        }
+      }
+    },
+    "submitting": "提交中...",
+    "submit": "提交申请",
+    "agreement": "提交即代表您同意我们的服务条款和隐私政策。"
+  },
+  "chat": {
+    "presetResponses": [
+      {
+        "keywords": ["价格", "报价", "定价", "套餐", "费用", "付费"],
+        "reply": "我们采用按量计费，计算与存储透明可控。可先申请试用，团队会为你评估最合适的方案。"
+      },
+      {
+        "keywords": ["试用", "演示", "申请", "开通", "体验"],
+        "reply": "可以点击页面里的“申请试用”，提交信息后我们会安排演示并提供专属方案。"
+      },
+      {
+        "keywords": ["功能", "能力", "特性", "产品"],
+        "reply": "Datapillar Studio 覆盖数据集成、治理、权限与成本控制，并提供 AI 协助与自动化编排。"
+      },
+      {
+        "keywords": ["安全", "合规", "权限", "审计"],
+        "reply": "支持多租户隔离、RBAC、审计日志与敏感数据脱敏，满足企业级合规要求。"
+      },
+      {
+        "keywords": ["部署", "私有化", "本地", "云原生"],
+        "reply": "支持公有云与私有化部署，核心能力可按需组合，适配不同规模团队。"
+      }
+    ],
+    "fallbackResponses": [
+      "我们可以先了解你的场景，再给出更贴合的产品建议。",
+      "如果你愿意，我可以帮你梳理最优的接入路径与试用流程。",
+      "你可以继续提问题，我会基于产品能力给出清晰说明。"
+    ],
+    "initialMessage": "你好！我是 Datapillar 智能客服。有什么可以帮您的吗？",
+    "title": "智能客服",
+    "status": "在线服务",
+    "roleUser": "你",
+    "roleAssistant": "智能客服",
+    "placeholder": "请输入问题...",
+    "disclaimer": "智能客服仅供参考，请以正式文档为准。"
+  },
+  "analyticsDemo": {
+    "badge": "Datapillar 智能引擎",
+    "title": "对话即分析。",
+    "subtitle": "从提问到洞察，只需几秒钟。",
+    "promptTitle": "你想了解什么数据？",
+    "promptValue": "统计过去30天华东地区的销售额趋势，按天分组",
+    "analysisMode": "AI 分析模式",
+    "sqlTitle": "生成的 SQL",
+    "sqlExecution": "24ms 执行",
+    "steps": [
+      {
+        "id": "ask",
+        "title": "自然语言提问",
+        "description": "无需学习 SQL。直接用中文询问业务问题，AI 引擎瞬间理解意图。"
+      },
+      {
+        "id": "sql",
+        "title": "SQL 自动生成",
+        "description": "透明可控。AI 生成标准 ANSI SQL，你可以随时审查、优化或复制。"
+      },
+      {
+        "id": "visualize",
+        "title": "智能可视化",
+        "description": "自动选择最合适的图表类型。发现趋势，一键分享给团队。"
+      }
+    ]
+  },
+  "smartChart": {
+    "title": "华东地区销售趋势",
+    "live": "实时数据",
+    "sourceLabel": "数据源：",
+    "sourceValue": "prod.orders",
+    "metricValue": "¥3,240,000",
+    "metricDelta": "较前 30 天 +24.5%"
+  },
+  "notFound": {
+    "label": "未找到",
+    "title": "页面不存在",
+    "description": "当前地址没有可访问的内容，请返回首页。",
+    "back": "返回首页"
+  }
+}

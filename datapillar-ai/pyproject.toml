@@ -6,6 +6,7 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
     # FastAPI框架
     "fastapi>=0.109.0",
+    "python-multipart>=0.0.9",
     "uvicorn[standard]>=0.27.0",
     "pydantic>=2.6.0",
     # Neo4j图数据库
@@ -24,7 +25,7 @@ dependencies = [
     "msgpack>=1.0.8",
     # 工具库
     "dynaconf>=3.2.0",
-    "httpx>=0.26.0,<0.28.0",
+    "httpx>=0.28.1,<0.29.0",
     "pyyaml>=6.0.1",
     # SQL 解析（血缘分析）
     "sqlglot>=26.0.0",
@@ -35,6 +36,9 @@ dependencies = [
     "json-repair>=0.30.0",
     # 高性能哈希（内容去重）
     "xxhash>=3.4.0",
+    # 加解密（API Key 保护）
+    "cryptography>=42.0.0",
+    "nacos-sdk-python>=3.0.3,<3.0.4",
 ]
 
 [project.optional-dependencies]

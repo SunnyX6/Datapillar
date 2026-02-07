@@ -54,8 +54,9 @@ public class SecurityConfig {
                         .authenticationEntryPoint(securityExceptionHandler)
                         .accessDeniedHandler(securityExceptionHandler))
                 .authorizeHttpRequests(auth -> auth
-                        // 健康检查等公开端点
-                        .requestMatchers("/health", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
+                        // 健康检查与文档端点
+                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         // 所有请求都需要认证（Gateway 已验证，这里信任 Gateway）
                         .anyRequest().authenticated()
                 )

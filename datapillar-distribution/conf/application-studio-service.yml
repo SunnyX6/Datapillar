@@ -10,7 +10,7 @@ spring:
   application:
     name: datapillar-studio-service
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:datapillar_studio}?useSSL=false&serverTimezone=UTC&characterEncoding=utf8&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:datapillar}?useSSL=false&serverTimezone=UTC&characterEncoding=utf8&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:Sunny.123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -23,9 +23,6 @@ spring:
     time-zone: Asia/Shanghai
     serialization:
       WRITE_DATES_AS_TIMESTAMPS: false
-  flyway:
-    enabled: true
-    validate-on-migrate: false
   data:
     redis:
       host: ${REDIS_HOST:localhost}

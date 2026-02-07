@@ -11,10 +11,14 @@ System 级别数据访问（系统配置/元数据）
 """
 
 from src.infrastructure.repository.system.ai_model import LlmUsage, Model
+from src.infrastructure.repository.system.ai_provider import Provider
 from src.infrastructure.repository.system.component import Component
+from src.infrastructure.repository.system.tenant import Tenant
 
 __all__ = [
     "Model",
     "LlmUsage",
+    "Provider",
     "Component",
+    "Tenant",
 ]

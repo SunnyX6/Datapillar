@@ -62,12 +62,12 @@
                 ELSE 'NONE'
             END AS permission_code
         FROM feature_objects o
-        LEFT JOIN feature_object_categories c ON o.category_id = c.id AND c.tenant_id IN (0, #{tenantId})
+        LEFT JOIN feature_object_categories c ON o.category_id = c.id
         INNER JOIN tenant_feature_permissions tfe
                 ON tfe.object_id = o.id
                AND tfe.tenant_id = #{tenantId}
                AND tfe.status = 1
-        INNER JOIN permissions tp ON tp.id = tfe.permission_id AND tp.tenant_id = 0
+        INNER JOIN permissions tp ON tp.id = tfe.permission_id
         INNER JOIN (
             SELECT rp.object_id, rp.permission_id
             FROM role_permissions rp
@@ -81,10 +81,9 @@
             WHERE up.tenant_id = #{tenantId}
               AND up.user_id = #{userId}
         ) rel ON rel.object_id = o.id
-        INNER JOIN permissions p ON p.id = rel.permission_id AND p.tenant_id = 0
+        INNER JOIN permissions p ON p.id = rel.permission_id
         WHERE o.type = 'MENU'
           AND o.status = 1
-          AND o.tenant_id IN (0, #{tenantId})
         GROUP BY o.id, o.name, o.path, o.parent_id, o.location, o.category_id, c.name, o.sort
         ORDER BY o.sort ASC, o.id ASC
     </select>
@@ -101,15 +100,14 @@
             o.sort,
             tp.code AS permission_code
         FROM feature_objects o
-        LEFT JOIN feature_object_categories c ON o.category_id = c.id AND c.tenant_id IN (0, #{tenantId})
+        LEFT JOIN feature_object_categories c ON o.category_id = c.id
         INNER JOIN tenant_feature_permissions tfe
                 ON tfe.object_id = o.id
                AND tfe.tenant_id = #{tenantId}
                AND tfe.status = 1
-        INNER JOIN permissions tp ON tp.id = tfe.permission_id AND tp.tenant_id = 0
+        INNER JOIN permissions tp ON tp.id = tfe.permission_id
         WHERE o.type = 'MENU'
           AND o.status = 1
-          AND o.tenant_id IN (0, #{tenantId})
         ORDER BY o.sort ASC, o.id ASC
     </select>
 

@@ -32,7 +32,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
                          org.springframework.security.core.AuthenticationException authException)
             throws IOException, ServletException {
         log.warn("未授权访问: {}", authException.getMessage());
-        writeError(request, response, ErrorCode.AUTH_UNAUTHORIZED);
+        writeError(request, response, ErrorCode.UNAUTHORIZED);
     }
 
     @Override
@@ -40,7 +40,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
                        AccessDeniedException accessDeniedException)
             throws IOException, ServletException {
         log.warn("无权限访问: {}", accessDeniedException.getMessage());
-        writeError(request, response, ErrorCode.AUTH_FORBIDDEN);
+        writeError(request, response, ErrorCode.FORBIDDEN);
     }
 
     private void writeError(HttpServletRequest request, HttpServletResponse response, ErrorCode errorCode)

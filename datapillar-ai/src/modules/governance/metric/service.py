@@ -19,11 +19,12 @@ from functools import lru_cache
 from datapillar_oneagentic.messages import Message, Messages
 from datapillar_oneagentic.providers.llm import LLMProvider
 from src.infrastructure.llm.config import get_datapillar_config
-from src.infrastructure.repository.kg import (
+from src.infrastructure.repository.knowledge import (
     Neo4jMetricSearch,
     Neo4jSemanticSearch,
     Neo4jTableSearch,
 )
+from src.shared.config.runtime import get_default_tenant_id
 from src.modules.governance.metric.schemas import (
     AIFillOutput,
     AIFillRequest,
@@ -34,9 +35,9 @@ from src.modules.governance.metric.schemas import (
 logger = logging.getLogger(__name__)
 
 
-@lru_cache(maxsize=1)
-def _get_llm_provider() -> LLMProvider:
-    config = get_datapillar_config()
+@lru_cache(maxsize=128)
+def _get_llm_provider(tenant_id: int) -> LLMProvider:
+    config = get_datapillar_config(tenant_id)
     return LLMProvider(config.llm)
 
 
@@ -134,7 +135,7 @@ COMPOSITE_FILL_PROMPT = """你专门为用户生成复合指标。
 class MetricAIService:
     """指标 AI 治理服务"""
 
-    async def fill(self, request: AIFillRequest) -> AIFillResponse:
+    async def fill(self, request: AIFillRequest, *, tenant_id: int | None = None) -> AIFillResponse:
         """
         AI 填写表单
 
@@ -145,8 +146,12 @@ class MetricAIService:
         """
         total_start = time.time()
 
+        resolved_tenant_id = tenant_id or get_default_tenant_id()
+
         # 1. 按需检索语义资产（基于用户输入的语义）
-        semantic_assets = self._search_semantic_assets(request.user_input)
+        semantic_assets = self._search_semantic_assets(
+            request.user_input, tenant_id=resolved_tenant_id
+        )
 
         # 2. 获取表上下文
         table_context = self._get_table_context(request)
@@ -155,7 +160,9 @@ class MetricAIService:
         metric_context = self._get_metric_context(request)
 
         # 4. 获取推荐结果（用于 success=false 时返回）
-        _, recommendations_list = self._get_recommendations(request)
+        _, recommendations_list = self._get_recommendations(
+            request, tenant_id=resolved_tenant_id
+        )
 
         # 5. 构建 prompt
         system_prompt = self._build_system_prompt(
@@ -164,7 +171,7 @@ class MetricAIService:
         user_message = self._build_user_message(request)
 
         # 6. 调用 LLM（使用 structured output）
-        llm = _get_llm_provider()(
+        llm = _get_llm_provider(resolved_tenant_id)(
             output_schema=AIFillOutput,
             temperature=0.3,
             max_tokens=4096,
@@ -261,14 +268,16 @@ class MetricAIService:
 
         return json.dumps(result, ensure_ascii=False, indent=2)
 
-    def _get_recommendations(self, request: AIFillRequest) -> tuple[str, list]:
+    def _get_recommendations(
+        self, request: AIFillRequest, *, tenant_id: int | None = None
+    ) -> tuple[str, list]:
         """获取推荐结果，返回 (格式化字符串, 原始列表)"""
         if request.context.metric_type == MetricType.ATOMIC:
-            return self._recommend_tables(request.user_input)
+            return self._recommend_tables(request.user_input, tenant_id=tenant_id)
         elif request.context.metric_type == MetricType.DERIVED:
             # 派生指标：推荐指标 + 表/列，统一按 score 排序
-            _, metrics_list = self._recommend_metrics(request.user_input)
-            _, tables_list = self._recommend_tables(request.user_input)
+            _, metrics_list = self._recommend_metrics(request.user_input, tenant_id=tenant_id)
+            _, tables_list = self._recommend_tables(request.user_input, tenant_id=tenant_id)
             combined = metrics_list + tables_list
             # 统一按 score 降序排列
             combined.sort(key=lambda x: x.get("score", 0), reverse=True)
@@ -277,12 +286,14 @@ class MetricAIService:
                 combined,
             )
         else:
-            return self._recommend_metrics(request.user_input)
+            return self._recommend_metrics(request.user_input, tenant_id=tenant_id)
 
-    def _recommend_tables(self, user_input: str) -> tuple[str, list]:
+    def _recommend_tables(
+        self, user_input: str, *, tenant_id: int | None = None
+    ) -> tuple[str, list]:
         """推荐表和列，返回 (格式化字符串, 原始列表)"""
         start = time.time()
-        raw_results = Neo4jTableSearch.search_tables(query=user_input)
+        raw_results = Neo4jTableSearch.search_tables(query=user_input, tenant_id=tenant_id)
 
         if not raw_results:
             logger.info(f"[recommend] 推荐表/列无结果, 耗时 {time.time() - start:.3f}s")
@@ -381,10 +392,12 @@ class MetricAIService:
             recommendations,
         )
 
-    def _recommend_metrics(self, user_input: str) -> tuple[str, list]:
+    def _recommend_metrics(
+        self, user_input: str, *, tenant_id: int | None = None
+    ) -> tuple[str, list]:
         """推荐指标，返回 (格式化字符串, 原始列表)"""
         start = time.time()
-        raw_results = Neo4jMetricSearch.search_metrics(query=user_input)
+        raw_results = Neo4jMetricSearch.search_metrics(query=user_input, tenant_id=tenant_id)
 
         if not raw_results:
             logger.info(f"[recommend] 推荐指标无结果, 耗时 {time.time() - start:.3f}s")
@@ -442,9 +455,15 @@ class MetricAIService:
                 semantic_assets=semantic_assets, metric_context=metric_context
             )
 
-    def _search_semantic_assets(self, user_input: str) -> str:
+    def _search_semantic_assets(
+        self, user_input: str, *, tenant_id: int | None = None
+    ) -> str:
         """按需检索语义资产（混合检索：向量+全文）"""
-        assets = Neo4jSemanticSearch.search_semantic_assets(query=user_input, top_k=15)
+        assets = Neo4jSemanticSearch.search_semantic_assets(
+            query=user_input,
+            top_k=15,
+            tenant_id=tenant_id,
+        )
         return self._format_semantic_assets(assets)
 
     def _format_semantic_assets(self, assets: dict) -> str:

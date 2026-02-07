@@ -31,5 +31,5 @@ gateway:
   routes:
     auth:
       url: http://${AUTH_HOST:localhost}:${AUTH_PORT:8082}
-    admin:
-      url: http://${ADMIN_HOST:localhost}:${ADMIN_PORT:8081}
+    studio:
+      url: http://${STUDIO_HOST:localhost}:${STUDIO_PORT:8081}

@@ -13,8 +13,10 @@ import org.springframework.web.bind.annotation.RequestHeader;
 
 import com.sunny.datapillar.auth.dto.AuthDto;
 import com.sunny.datapillar.auth.service.AuthService;
+import com.sunny.datapillar.auth.util.ClientIpUtil;
 import com.sunny.datapillar.auth.web.response.ApiResponse;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -35,8 +37,10 @@ public class AuthController {
      */
     @PostMapping("/login")
     public ApiResponse<AuthDto.LoginResult> login(@Valid @RequestBody AuthDto.LoginRequest request,
+                                                  HttpServletRequest httpRequest,
                                                   HttpServletResponse response) {
-        AuthDto.LoginResult loginResponse = authService.login(request, response);
+        String clientIp = ClientIpUtil.getClientIp(httpRequest);
+        AuthDto.LoginResult loginResponse = authService.login(request, clientIp, response);
         return ApiResponse.ok(loginResponse);
     }
 

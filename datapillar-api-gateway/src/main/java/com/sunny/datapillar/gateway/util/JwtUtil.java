@@ -1,12 +1,8 @@
 package com.sunny.datapillar.gateway.util;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 
 /**
  * JWT 工具类（仅用于验证，不颁发 Token）
@@ -18,8 +14,7 @@ import javax.crypto.spec.SecretKeySpec;
 @Component
 public class JwtUtil {
 
-    private final SecretKey key;
-    private final String issuer;
+    private final com.sunny.datapillar.common.utils.JwtUtil jwtUtil;
 
     public JwtUtil(
             @Value("${jwt.secret}") String secret,
@@ -27,32 +22,21 @@ public class JwtUtil {
         if (secret == null || secret.length() < 32) {
             throw new IllegalArgumentException("JWT secret must be at least 32 characters");
         }
-        this.key = new SecretKeySpec(secret.getBytes(), "HmacSHA256");
-        this.issuer = issuer;
+        this.jwtUtil = new com.sunny.datapillar.common.utils.JwtUtil(secret, issuer);
     }
 
     /**
      * 验证并解析 Token
      */
     public Claims validateAndParse(String token) {
-        return Jwts.parser()
-                .verifyWith(key)
-                .requireIssuer(issuer)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+        return jwtUtil.parseTokenWithIssuer(token);
     }
 
     /**
      * 验证 Token 是否有效
      */
     public boolean isValid(String token) {
-        try {
-            Claims claims = validateAndParse(token);
-            return claims.getExpiration().getTime() > System.currentTimeMillis();
-        } catch (Exception e) {
-            return false;
-        }
+        return jwtUtil.isValidWithIssuer(token);
     }
 
     /**
@@ -60,7 +44,7 @@ public class JwtUtil {
      */
     public Long getUserId(String token) {
         Claims claims = validateAndParse(token);
-        return Long.parseLong(claims.getSubject());
+        return jwtUtil.getUserId(claims);
     }
 
     /**
@@ -68,7 +52,7 @@ public class JwtUtil {
      */
     public String getUsername(String token) {
         Claims claims = validateAndParse(token);
-        return claims.get("username", String.class);
+        return jwtUtil.getUsername(claims);
     }
 
     /**
@@ -76,14 +60,7 @@ public class JwtUtil {
      */
     public Long getTenantId(String token) {
         Claims claims = validateAndParse(token);
-        Object tenantId = claims.get("tenantId");
-        if (tenantId instanceof Number) {
-            return ((Number) tenantId).longValue();
-        }
-        if (tenantId instanceof String) {
-            return Long.parseLong((String) tenantId);
-        }
-        return null;
+        return jwtUtil.getTenantId(claims);
     }
 
     /**
@@ -91,7 +68,7 @@ public class JwtUtil {
      */
     public String getEmail(String token) {
         Claims claims = validateAndParse(token);
-        return claims.get("email", String.class);
+        return jwtUtil.getEmail(claims);
     }
 
     /**
@@ -99,7 +76,7 @@ public class JwtUtil {
      */
     public String getTokenType(String token) {
         Claims claims = validateAndParse(token);
-        return claims.get("tokenType", String.class);
+        return jwtUtil.getTokenType(claims);
     }
 
     /**
@@ -107,31 +84,16 @@ public class JwtUtil {
      */
     public Long getActorUserId(String token) {
         Claims claims = validateAndParse(token);
-        Object actorUserId = claims.get("actorUserId");
-        if (actorUserId instanceof Number) {
-            return ((Number) actorUserId).longValue();
-        }
-        if (actorUserId instanceof String) {
-            return Long.parseLong((String) actorUserId);
-        }
-        return null;
+        return jwtUtil.getActorUserId(claims);
     }
 
     public Long getActorTenantId(String token) {
         Claims claims = validateAndParse(token);
-        Object actorTenantId = claims.get("actorTenantId");
-        if (actorTenantId instanceof Number) {
-            return ((Number) actorTenantId).longValue();
-        }
-        if (actorTenantId instanceof String) {
-            return Long.parseLong((String) actorTenantId);
-        }
-        return null;
+        return jwtUtil.getActorTenantId(claims);
     }
 
     public boolean isImpersonation(String token) {
         Claims claims = validateAndParse(token);
-        Boolean impersonation = claims.get("impersonation", Boolean.class);
-        return Boolean.TRUE.equals(impersonation);
+        return jwtUtil.isImpersonation(claims);
     }
 }

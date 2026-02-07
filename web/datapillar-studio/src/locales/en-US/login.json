@@ -1,0 +1,78 @@
+{
+  "brand": {
+    "name": "Datapillar",
+    "tagline": "Raw In, Golden Wings Out",
+    "slogan": "Let AI spin the cocoon"
+  },
+  "title": "Welcome Back",
+  "demo": {
+    "agentWorking": "AGENT WORKING",
+    "workflowStudio": "Workflow Studio",
+    "buildingETL": "ETL Running...",
+    "aiAgent": "AI-Powered Data Engineering Agent",
+    "realtime": "Live"
+  },
+  "form": {
+    "username": {
+      "label": "Username",
+      "placeholder": "Enter your username or email",
+      "required": "Please enter your username"
+    },
+    "password": {
+      "label": "Password",
+      "placeholder": "Enter your password",
+      "required": "Please enter your password"
+    },
+    "remember": "Remember me",
+    "rememberHintDefault": "Unchecked: 7-day auto sign-in",
+    "rememberHintRemember": "Checked: 30-day auto sign-in",
+    "forgot": "Forgot password?",
+    "submit": "Sign In",
+    "success": "Signed in successfully"
+  },
+  "sso": {
+    "otherMethods": "Other sign-in methods",
+    "quickLogin": "Enterprise SSO Quick Sign-in",
+    "panel": {
+      "title": "Enterprise sign-in",
+      "subtitle": "Authorize via third-party platforms",
+      "accountLogin": "Account sign-in",
+      "back": "Back",
+      "comingSoon": "Coming soon"
+    },
+    "providers": {
+      "dingtalk": {
+        "name": "DingTalk",
+        "desc": "Authorize with your organization account"
+      },
+      "wecom": {
+        "name": "WeCom",
+        "desc": "Authorize with your organization account"
+      },
+      "lark": {
+        "name": "Lark",
+        "desc": "Authorize with your organization account"
+      }
+    },
+    "qr": {
+      "title": "DingTalk QR sign-in",
+      "subtitle": "Authorize with your enterprise DingTalk account",
+      "scanTip": "Use the DingTalk app to scan",
+      "expires": "QR code valid for 5 minutes",
+      "help": "Having issues? View help"
+    },
+    "errors": {
+      "qrConfigFailed": "Failed to load QR configuration",
+      "qrConfigInvalid": "SSO config missing clientId or redirectUri",
+      "authCodeFailed": "Failed to obtain authorization code",
+      "dingtalkScriptFailed": "Failed to load DingTalk script",
+      "dingtalkScriptUnavailable": "DingTalk script is unavailable",
+      "dingtalkLoginFailed": "DingTalk sign-in failed",
+      "loginFailed": "Sign-in failed. Please try again"
+    }
+  },
+  "footer": {
+    "noAccount": "Don't have an account?",
+    "register": "Request Trial"
+  }
+}

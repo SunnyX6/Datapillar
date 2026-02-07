@@ -21,7 +21,7 @@ from typing import Any
 import logging
 from neo4j import AsyncSession
 
-from src.infrastructure.repository.kg.dto import CatalogDTO, ColumnDTO, SchemaDTO, TableDTO
+from src.infrastructure.repository.knowledge.dto import CatalogDTO, ColumnDTO, SchemaDTO, TableDTO
 from src.infrastructure.repository.openlineage import Metadata
 from src.infrastructure.repository.openlineage.metadata import TableUpsertPayload
 from src.modules.openlineage.parsers.plans.metadata import (

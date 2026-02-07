@@ -1,0 +1,102 @@
+app_name: "Datapillar AI"
+app_version: "1.0.0"
+app_host: "0.0.0.0"
+app_port: 7003
+debug: false
+
+neo4j_uri: "bolt://REPLACE_ME:7687"
+neo4j_username: "REPLACE_ME"
+neo4j_password: "REPLACE_ME"
+neo4j_database: "REPLACE_ME"
+
+mysql_host: "REPLACE_ME"
+mysql_port: 3306
+mysql_database: "REPLACE_ME"
+mysql_username: "REPLACE_ME"
+mysql_password: "REPLACE_ME"
+
+gravitino_db_type: "mysql"
+gravitino_db_host: "REPLACE_ME"
+gravitino_db_port: 3306
+gravitino_db_database: "REPLACE_ME"
+gravitino_db_username: "REPLACE_ME"
+gravitino_db_password: "REPLACE_ME"
+gravitino_sync_metalake: "OneMeta"
+
+redis_host: "REPLACE_ME"
+redis_port: 6379
+redis_db: 0
+redis_password: "REPLACE_ME"
+
+jwt_issuer: "datapillar-auth"
+jwt_secret: "REPLACE_ME"
+auth_enabled: true
+
+llm:
+  retry:
+    max_retries: 3
+  enable_thinking: false
+  cache:
+    enabled: true
+    backend: "redis"
+    redis_url: "redis://REPLACE_ME:6379/0"
+    ttl_seconds: 300
+    key_prefix: "llm_cache:"
+
+knowledge_wiki:
+  vector_store:
+    type: "milvus"
+    uri: "http://REPLACE_ME:19530"
+    token: ""
+  storage:
+    type: "local"
+    local_dir: "/data/datapillar/knowledge_wiki"
+    s3:
+      endpoint_url: "REPLACE_ME"
+      access_key: "REPLACE_ME"
+      secret_key: "REPLACE_ME"
+      bucket: "REPLACE_ME"
+      region: "REPLACE_ME"
+  embedding_batch_size: 20
+  progress_step: 20
+
+agent:
+  max_steps: 5
+  checkpointer:
+    type: "redis_shallow"
+    url: "redis://REPLACE_ME:6379/0"
+    ttl_minutes: 10080
+  deliverable_store:
+    type: "redis"
+    url: "redis://REPLACE_ME:6379/0"
+
+openlineage_sink:
+  graceful_shutdown_timeout: 30.0
+  queue:
+    max_size: 10000
+    batch_size: 100
+    flush_interval_seconds: 3.0
+  neo4j:
+    batch_size: 50
+    max_concurrent: 10
+
+sql_summary:
+  enabled: true
+  batch_size: 5
+  flush_interval_seconds: 300
+  max_queue_size: 1000
+  max_sql_length: 10000
+  min_sql_length: 50
+
+security:
+  default_tenant_id: 1
+  key_storage:
+    type: "local"
+    local_path: "/data/datapillar/privkeys"
+    s3:
+      endpoint_url: "REPLACE_ME"
+      access_key: "REPLACE_ME"
+      secret_key: "REPLACE_ME"
+      bucket: "REPLACE_ME"
+      region: "REPLACE_ME"
+      prefix: "privkeys"

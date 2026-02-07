@@ -52,7 +52,7 @@ public class ProjectServiceImpl implements ProjectService {
     public ProjectDto.Response getProjectById(Long id, Long userId) {
         ProjectDto.Response project = projectMapper.selectProjectById(id, userId);
         if (project == null) {
-            throw new BusinessException(ErrorCode.ADMIN_PROJECT_ACCESS_DENIED, id);
+            throw new BusinessException(ErrorCode.PROJECT_ACCESS_DENIED, id);
         }
         return project;
     }
@@ -95,7 +95,7 @@ public class ProjectServiceImpl implements ProjectService {
         );
 
         if (existingProject == null) {
-            throw new BusinessException(ErrorCode.ADMIN_PROJECT_ACCESS_DENIED, id);
+            throw new BusinessException(ErrorCode.PROJECT_ACCESS_DENIED, id);
         }
 
         Project project = new Project();
@@ -139,7 +139,7 @@ public class ProjectServiceImpl implements ProjectService {
         );
 
         if (existingProject == null) {
-            throw new BusinessException(ErrorCode.ADMIN_PROJECT_ACCESS_DENIED, id);
+            throw new BusinessException(ErrorCode.PROJECT_ACCESS_DENIED, id);
         }
 
         projectMapper.deleteById(id);

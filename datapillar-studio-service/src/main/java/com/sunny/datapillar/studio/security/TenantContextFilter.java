@@ -30,7 +30,8 @@ public class TenantContextFilter extends OncePerRequestFilter {
     private static final String IMPERSONATION_KEY = "impersonation";
 
     private static final Set<String> WHITELIST_PREFIX = Set.of(
-            "/health",
+            "/actuator/health",
+            "/actuator/info",
             "/v3/api-docs",
             "/swagger-ui"
     );
@@ -47,6 +48,13 @@ public class TenantContextFilter extends OncePerRequestFilter {
         if (path == null) {
             return false;
         }
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isBlank() && path.startsWith(contextPath)) {
+            path = path.substring(contextPath.length());
+            if (path.isEmpty()) {
+                path = "/";
+            }
+        }
         for (String prefix : WHITELIST_PREFIX) {
             if (path.startsWith(prefix)) {
                 return true;
@@ -60,7 +68,7 @@ public class TenantContextFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String tenantIdHeader = request.getHeader(HeaderConstants.HEADER_TENANT_ID);
         if (tenantIdHeader == null || tenantIdHeader.isBlank()) {
-            SecurityErrorWriter.writeError(request, response, ErrorCode.ADMIN_UNAUTHORIZED, objectMapper);
+            SecurityErrorWriter.writeError(request, response, ErrorCode.UNAUTHORIZED, objectMapper);
             return;
         }
 
@@ -68,7 +76,7 @@ public class TenantContextFilter extends OncePerRequestFilter {
         try {
             tenantId = Long.parseLong(tenantIdHeader);
         } catch (NumberFormatException e) {
-            SecurityErrorWriter.writeError(request, response, ErrorCode.ADMIN_UNAUTHORIZED, objectMapper);
+            SecurityErrorWriter.writeError(request, response, ErrorCode.UNAUTHORIZED, objectMapper);
             return;
         }
 

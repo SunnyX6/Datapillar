@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from src.infrastructure.repository.kg.dto import (
+from src.infrastructure.repository.knowledge.dto import (
     CatalogDTO,
     ColumnDTO,
     MetricDTO,

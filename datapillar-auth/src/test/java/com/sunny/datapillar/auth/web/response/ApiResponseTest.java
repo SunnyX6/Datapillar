@@ -60,10 +60,10 @@ class ApiResponseTest {
 
     @Test
     void shouldBuildErrorResponse() {
-        ApiResponse<Object> response = ApiResponse.error(ErrorCode.AUTH_INVALID_ARGUMENT, "参数错误");
+        ApiResponse<Object> response = ApiResponse.error(ErrorCode.INVALID_ARGUMENT, "参数错误");
 
         assertEquals(400, response.getStatus());
-        assertEquals("AUTH_INVALID_ARGUMENT", response.getCode());
+        assertEquals("INVALID_ARGUMENT", response.getCode());
         assertEquals("参数错误", response.getMessage());
         assertNull(response.getData());
         assertNotNull(response.getTimestamp());

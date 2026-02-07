@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 import logging
 
-from src.infrastructure.repository.kg.dto import generate_id
+from src.infrastructure.repository.knowledge.dto import generate_id
 from src.modules.openlineage.parsers.common.namespace import (
     dataset_table_name,
     parse_gravitino_namespace,

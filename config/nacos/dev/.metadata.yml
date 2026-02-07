@@ -1,0 +1,21 @@
+metadata:
+  - dataId: datapillar-api-gateway.yaml
+    group: DATAPILLAR
+    type: yaml
+    appName: ''
+    desc: ''
+  - dataId: datapillar-auth.yaml
+    group: DATAPILLAR
+    type: yaml
+    appName: ''
+    desc: ''
+  - dataId: datapillar-studio-service.yaml
+    group: DATAPILLAR
+    type: yaml
+    appName: ''
+    desc: ''
+  - dataId: datapillar-ai.yaml
+    group: DATAPILLAR
+    type: yaml
+    appName: ''
+    desc: ''

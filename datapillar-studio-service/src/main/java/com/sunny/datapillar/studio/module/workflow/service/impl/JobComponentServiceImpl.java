@@ -40,7 +40,7 @@ public class JobComponentServiceImpl implements JobComponentService {
     public JobComponentDto.Response getComponentByCode(String code) {
         JobComponent component = componentMapper.selectByCode(code);
         if (component == null) {
-            throw new BusinessException(ErrorCode.ADMIN_COMPONENT_NOT_FOUND, code);
+            throw new BusinessException(ErrorCode.COMPONENT_NOT_FOUND, code);
         }
         return toResponse(component);
     }

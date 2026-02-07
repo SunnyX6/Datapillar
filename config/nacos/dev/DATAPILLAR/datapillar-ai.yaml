@@ -1,0 +1,102 @@
+app_name: "Datapillar AI"
+app_version: "1.0.0"
+app_host: "0.0.0.0"
+app_port: 7003
+debug: true
+
+neo4j_uri: "bolt://localhost:7687"
+neo4j_username: "neo4j"
+neo4j_password: "123456asd"
+neo4j_database: "neo4j"
+
+mysql_host: "localhost"
+mysql_port: 3306
+mysql_database: "datapillar"
+mysql_username: "root"
+mysql_password: "Sunny.123456"
+
+gravitino_db_type: "mysql"
+gravitino_db_host: "localhost"
+gravitino_db_port: 3306
+gravitino_db_database: "gravitino"
+gravitino_db_username: "root"
+gravitino_db_password: "Sunny.123456"
+gravitino_sync_metalake: "OneMeta"
+
+redis_host: "127.0.0.1"
+redis_port: 6379
+redis_db: 0
+redis_password: ""
+
+jwt_issuer: "datapillar-auth"
+jwt_secret: "Datapillar-Local-Secret-2026-02-04"
+auth_enabled: true
+
+llm:
+  retry:
+    max_retries: 3
+  enable_thinking: false
+  cache:
+    enabled: true
+    backend: "redis"
+    redis_url: "redis://127.0.0.1:6379/0"
+    ttl_seconds: 300
+    key_prefix: "llm_cache:"
+
+knowledge_wiki:
+  vector_store:
+    type: "milvus"
+    uri: "http://localhost:19530"
+    token: ""
+  storage:
+    type: "local"
+    local_dir: "./data/knowledge_wiki"
+    s3:
+      endpoint_url: ""
+      access_key: ""
+      secret_key: ""
+      bucket: ""
+      region: ""
+  embedding_batch_size: 20
+  progress_step: 20
+
+agent:
+  max_steps: 5
+  checkpointer:
+    type: "redis_shallow"
+    url: "redis://127.0.0.1:6379/0"
+    ttl_minutes: 10080
+  deliverable_store:
+    type: "redis"
+    url: "redis://127.0.0.1:6379/0"
+
+openlineage_sink:
+  graceful_shutdown_timeout: 30.0
+  queue:
+    max_size: 10000
+    batch_size: 100
+    flush_interval_seconds: 3.0
+  neo4j:
+    batch_size: 50
+    max_concurrent: 10
+
+sql_summary:
+  enabled: true
+  batch_size: 5
+  flush_interval_seconds: 300
+  max_queue_size: 1000
+  max_sql_length: 10000
+  min_sql_length: 50
+
+security:
+  default_tenant_id: 1
+  key_storage:
+    type: "local"
+    local_path: "/data/datapillar/privkeys"
+    s3:
+      endpoint_url: ""
+      access_key: ""
+      secret_key: ""
+      bucket: ""
+      region: ""
+      prefix: "privkeys"

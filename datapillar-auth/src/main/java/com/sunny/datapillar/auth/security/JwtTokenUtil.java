@@ -1,16 +1,10 @@
 package com.sunny.datapillar.auth.security;
 
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.common.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -18,12 +12,11 @@ import java.util.Map;
 @Component
 public class JwtTokenUtil {
 
-    private final SecretKey key;
+    private final JwtUtil jwtUtil;
     private final long accessTokenExpiration;
     private final long refreshTokenExpiration;
     private final long refreshTokenRememberExpiration;
     private final long loginTokenExpiration;
-    private final String issuer;
 
     public JwtTokenUtil(
             @Value("${jwt.secret}") String secret,
@@ -37,12 +30,11 @@ public class JwtTokenUtil {
             throw new IllegalArgumentException("JWT 密钥长度至少 32 位");
         }
 
-        this.key = new SecretKeySpec(secret.getBytes(), "HmacSHA256");
+        this.jwtUtil = new JwtUtil(secret, issuer);
         this.accessTokenExpiration = accessTokenExpiration * 1000;  // 转换为毫秒
         this.refreshTokenExpiration = refreshTokenExpiration * 1000;
         this.refreshTokenRememberExpiration = refreshTokenRememberExpiration * 1000;
         this.loginTokenExpiration = loginTokenExpiration * 1000;
-        this.issuer = issuer;
     }
 
     /**
@@ -70,14 +62,7 @@ public class JwtTokenUtil {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + accessTokenExpiration);
 
-        return Jwts.builder()
-                .claims(claims)
-                .subject(String.valueOf(userId))
-                .issuer(issuer)
-                .issuedAt(now)
-                .expiration(expiration)
-                .signWith(key)
-                .compact();
+        return jwtUtil.sign(claims, String.valueOf(userId), now, expiration);
     }
 
     /**
@@ -95,14 +80,7 @@ public class JwtTokenUtil {
         long refreshExpiration = rememberMe != null && rememberMe ? refreshTokenRememberExpiration : refreshTokenExpiration;
         Date expiration = new Date(now.getTime() + refreshExpiration);
 
-        return Jwts.builder()
-                .claims(claims)
-                .subject(String.valueOf(userId))
-                .issuer(issuer)
-                .issuedAt(now)
-                .expiration(expiration)
-                .signWith(key)
-                .compact();
+        return jwtUtil.sign(claims, String.valueOf(userId), now, expiration);
     }
 
     /**
@@ -116,58 +94,28 @@ public class JwtTokenUtil {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + loginTokenExpiration);
 
-        return Jwts.builder()
-                .claims(claims)
-                .subject(String.valueOf(userId))
-                .issuer(issuer)
-                .issuedAt(now)
-                .expiration(expiration)
-                .signWith(key)
-                .compact();
+        return jwtUtil.sign(claims, String.valueOf(userId), now, expiration);
     }
 
     /**
      * 解析 Token
      */
     public Claims parseToken(String token) {
-        try {
-            return Jwts.parser()
-                    .verifyWith(key)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
-        } catch (ExpiredJwtException e) {
-            throw new BusinessException(ErrorCode.AUTH_TOKEN_EXPIRED);
-        } catch (JwtException | IllegalArgumentException e) {
-            throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, e.getMessage());
-        }
+        return jwtUtil.parseToken(token);
     }
 
     /**
      * 验证 Token
      */
     public boolean validateToken(String token) {
-        try {
-            Claims claims = parseToken(token);
-            return !isExpired(claims);
-        } catch (Exception e) {
-            return false;
-        }
+        return jwtUtil.isValid(token);
     }
-
-    /**
-     * 检查 Token 是否过期
-     */
-    private boolean isExpired(Claims claims) {
-        return claims.getExpiration().before(new Date());
-    }
-
     /**
      * 从 Token 提取 userId
      */
     public Long getUserId(String token) {
         Claims claims = parseToken(token);
-        return Long.parseLong(claims.getSubject());
+        return jwtUtil.getUserId(claims);
     }
 
     /**
@@ -175,14 +123,7 @@ public class JwtTokenUtil {
      */
     public Long getTenantId(String token) {
         Claims claims = parseToken(token);
-        Object tenantId = claims.get("tenantId");
-        if (tenantId instanceof Number) {
-            return ((Number) tenantId).longValue();
-        }
-        if (tenantId instanceof String) {
-            return Long.parseLong((String) tenantId);
-        }
-        return null;
+        return jwtUtil.getTenantId(claims);
     }
 
     /**
@@ -190,7 +131,7 @@ public class JwtTokenUtil {
      */
     public String getUsername(String token) {
         Claims claims = parseToken(token);
-        return claims.get("username", String.class);
+        return jwtUtil.getUsername(claims);
     }
 
     /**
@@ -198,7 +139,7 @@ public class JwtTokenUtil {
      */
     public String getEmail(String token) {
         Claims claims = parseToken(token);
-        return claims.get("email", String.class);
+        return jwtUtil.getEmail(claims);
     }
 
     /**
@@ -206,7 +147,7 @@ public class JwtTokenUtil {
      */
     public String getTokenType(String token) {
         Claims claims = parseToken(token);
-        return claims.get("tokenType", String.class);
+        return jwtUtil.getTokenType(claims);
     }
 
     /**
@@ -214,7 +155,7 @@ public class JwtTokenUtil {
      */
     public Boolean getRememberMe(String token) {
         Claims claims = parseToken(token);
-        return claims.get("rememberMe", Boolean.class);
+        return jwtUtil.getRememberMe(claims);
     }
 
     /**
@@ -226,14 +167,7 @@ public class JwtTokenUtil {
         if (token == null || token.isEmpty()) {
             return null;
         }
-
-        String[] parts = token.split("\\.");
-        if (parts.length != 3) {
-            throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, "JWT 格式非法");
-        }
-
-        // 返回签名部分（第三部分）
-        return parts[2];
+        return jwtUtil.extractTokenSignature(token);
     }
 
     /**

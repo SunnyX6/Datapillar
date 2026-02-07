@@ -30,7 +30,7 @@ public class SsoProviderRegistry {
         String key = normalize(provider);
         SsoProvider ssoProvider = providerMap.get(key);
         if (ssoProvider == null) {
-            throw new BusinessException(ErrorCode.AUTH_SSO_PROVIDER_NOT_FOUND, provider);
+            throw new BusinessException(ErrorCode.SSO_PROVIDER_NOT_FOUND, provider);
         }
         return ssoProvider;
     }
