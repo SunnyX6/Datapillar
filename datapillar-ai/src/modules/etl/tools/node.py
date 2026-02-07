@@ -13,7 +13,7 @@ import logging
 
 from pydantic import BaseModel
 
-from src.infrastructure.repository.kg import Neo4jNodeSearch
+from src.infrastructure.repository.knowledge import Neo4jNodeSearch
 from src.modules.etl.tools.registry import REGISTRY, etl_tool
 
 logger = logging.getLogger(__name__)

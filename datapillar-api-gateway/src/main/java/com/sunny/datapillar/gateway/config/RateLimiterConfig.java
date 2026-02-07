@@ -30,15 +30,21 @@ public class RateLimiterConfig {
                 ip = exchange.getRequest().getHeaders().getFirst("X-Real-IP");
             }
             if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-                ip = exchange.getRequest().getRemoteAddress() != null
-                        ? exchange.getRequest().getRemoteAddress().getAddress().getHostAddress()
-                        : "unknown";
+                if (exchange.getRequest().getRemoteAddress() != null) {
+                    if (exchange.getRequest().getRemoteAddress().getAddress() != null) {
+                        ip = exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
+                    } else {
+                        ip = exchange.getRequest().getRemoteAddress().getHostString();
+                    }
+                } else {
+                    ip = "unknown";
+                }
             }
             // 多个代理时取第一个
             if (ip != null && ip.contains(",")) {
                 ip = ip.split(",")[0].trim();
             }
-            return Mono.just(ip);
+            return Mono.just(ip == null || ip.isBlank() ? "unknown" : ip);
         };
     }
 

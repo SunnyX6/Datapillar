@@ -32,7 +32,7 @@ from src.infrastructure.llm.embeddings import UnifiedEmbedder
 from src.infrastructure.llm.config import get_datapillar_config
 from src.infrastructure.repository.neo4j_uow import neo4j_async_session
 from src.modules.openlineage.core.queue import AsyncEventQueue, QueueConfig
-from src.shared.config.settings import settings
+from src.shared.config.runtime import get_sql_summary_config
 
 logger = logging.getLogger(__name__)
 
@@ -50,24 +50,24 @@ def _get_llm_provider() -> LLMProvider:
 class SQLSummaryConfig:
     """SQL 摘要生成配置"""
 
-    enabled: bool = True
-    batch_size: int = 5
-    flush_interval_seconds: float = 300.0
-    max_queue_size: int = 1000
-    max_sql_length: int = 10000
-    min_sql_length: int = 50
+    enabled: bool
+    batch_size: int
+    flush_interval_seconds: float
+    max_queue_size: int
+    max_sql_length: int
+    min_sql_length: int
 
     @classmethod
     def from_settings(cls) -> "SQLSummaryConfig":
-        """从配置文件加载"""
-        cfg = settings.get("sql_summary", {})
+        """从统一运行时配置契约加载"""
+        cfg = get_sql_summary_config()
         return cls(
-            enabled=cfg.get("enabled", True),
-            batch_size=cfg.get("batch_size", 5),
-            flush_interval_seconds=cfg.get("flush_interval_seconds", 300.0),
-            max_queue_size=cfg.get("max_queue_size", 1000),
-            max_sql_length=cfg.get("max_sql_length", 10000),
-            min_sql_length=cfg.get("min_sql_length", 50),
+            enabled=bool(cfg["enabled"]),
+            batch_size=int(cfg["batch_size"]),
+            flush_interval_seconds=float(cfg["flush_interval_seconds"]),
+            max_queue_size=int(cfg["max_queue_size"]),
+            max_sql_length=int(cfg["max_sql_length"]),
+            min_sql_length=int(cfg["min_sql_length"]),
         )
 
 
@@ -414,5 +414,12 @@ class SQLSummaryProcessor:
         )
 
 
-# 全局单例
-sql_summary_processor = SQLSummaryProcessor()
+_sql_summary_processor: SQLSummaryProcessor | None = None
+
+
+def get_sql_summary_processor() -> SQLSummaryProcessor:
+    """获取 SQLSummaryProcessor 单例（延迟初始化）"""
+    global _sql_summary_processor
+    if _sql_summary_processor is None:
+        _sql_summary_processor = SQLSummaryProcessor()
+    return _sql_summary_processor

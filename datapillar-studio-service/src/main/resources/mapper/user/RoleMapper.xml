@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.datapillar.studio.module.user.mapper.RoleMapper">
+
+    <select id="findByUserId" resultType="com.sunny.datapillar.studio.module.user.entity.Role">
+        SELECT r.* FROM roles r
+        INNER JOIN user_roles ur ON r.id = ur.role_id
+        WHERE ur.user_id = #{userId}
+          AND ur.tenant_id = #{tenantId}
+          AND r.tenant_id = #{tenantId}
+    </select>
+
+    <select id="findByName" resultType="com.sunny.datapillar.studio.module.user.entity.Role">
+        SELECT * FROM roles
+        WHERE tenant_id = #{tenantId}
+          AND name = #{name}
+    </select>
+
+    <delete id="deleteRolePermissions">
+        DELETE FROM role_permissions WHERE role_id = #{roleId} AND tenant_id = #{tenantId}
+    </delete>
+
+    <delete id="deleteUserRolesByRoleId">
+        DELETE FROM user_roles WHERE role_id = #{roleId} AND tenant_id = #{tenantId}
+    </delete>
+
+    <insert id="insertRolePermission">
+        INSERT INTO role_permissions (tenant_id, role_id, object_id, permission_id)
+        VALUES (#{tenantId}, #{roleId}, #{objectId}, #{permissionId})
+    </insert>
+
+</mapper>

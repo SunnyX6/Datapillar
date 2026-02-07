@@ -17,7 +17,6 @@
         <module>datapillar-common</module>
         <module>datapillar-auth</module>
         <module>datapillar-studio-service</module>
-        <module>datapillar-platform</module>
         <module>datapillar-api-gateway</module>
         <module>datapillar-distribution</module>
     </modules>
@@ -35,17 +34,36 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- Dependencies Versions -->
+        <spring-cloud.version>2025.0.0</spring-cloud.version>
+        <spring-cloud-alibaba.version>2025.0.0.0</spring-cloud-alibaba.version>
         <mybatis-plus.version>3.5.9</mybatis-plus.version>
         <jjwt.version>0.12.6</jjwt.version>
         <springdoc.version>2.7.0</springdoc.version>
         <mysql-connector.version>9.1.0</mysql-connector.version>
-        <flyway.version>10.10.0</flyway.version>
         <flink.version>1.18.1</flink.version>
         <scala.binary.version>2.12</scala.binary.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!-- Spring Cloud -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Spring Cloud Alibaba -->
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>${spring-cloud-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
             <!-- MyBatis-Plus -->
             <dependency>
                 <groupId>com.baomidou</groupId>
@@ -94,18 +112,6 @@
                 <groupId>com.mysql</groupId>
                 <artifactId>mysql-connector-j</artifactId>
                 <version>${mysql-connector.version}</version>
-            </dependency>
-
-            <!-- Flyway -->
-            <dependency>
-                <groupId>org.flywaydb</groupId>
-                <artifactId>flyway-core</artifactId>
-                <version>${flyway.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.flywaydb</groupId>
-                <artifactId>flyway-mysql</artifactId>
-                <version>${flyway.version}</version>
             </dependency>
 
             <!-- Flink -->

@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 from neo4j import AsyncSession
 
-from src.infrastructure.repository.kg.dto import (
+from src.infrastructure.repository.knowledge.dto import (
     MetricDTO,
     ModifierDTO,
     UnitDTO,

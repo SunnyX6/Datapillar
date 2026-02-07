@@ -18,7 +18,7 @@ public class SsoProviderConfig {
     public String getRequiredString(String key) {
         Object value = config != null ? config.get(key) : null;
         if (value == null || String.valueOf(value).isBlank()) {
-            throw new BusinessException(ErrorCode.AUTH_SSO_CONFIG_INVALID, key);
+            throw new BusinessException(ErrorCode.SSO_CONFIG_INVALID, key);
         }
         return String.valueOf(value).trim();
     }

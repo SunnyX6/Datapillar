@@ -30,7 +30,7 @@ import java.net.URI;
  *
  * <pre>
  * gravitino.openlineage.transport.type = http
- * gravitino.openlineage.transport.url = http://datapillar-ai:6003
+ * gravitino.openlineage.transport.url = http://datapillar-ai:7003
  * gravitino.openlineage.transport.endpoint = /api/v1/lineage
  * gravitino.openlineage.transport.timeoutInMillis = 5000
  * gravitino.openlineage.transport.compression = gzip

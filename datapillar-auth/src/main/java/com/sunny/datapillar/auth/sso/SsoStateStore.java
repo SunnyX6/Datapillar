@@ -54,22 +54,22 @@ public class SsoStateStore {
                     return state;
                 }
             } catch (Exception e) {
-                throw new BusinessException(ErrorCode.AUTH_SSO_STATE_GENERATE_FAILED);
+                throw new BusinessException(ErrorCode.SSO_STATE_GENERATE_FAILED);
             }
         }
-        throw new BusinessException(ErrorCode.AUTH_SSO_STATE_GENERATE_FAILED);
+        throw new BusinessException(ErrorCode.SSO_STATE_GENERATE_FAILED);
     }
 
     public StatePayload consumeState(String state) {
         String key = buildKey(state);
         String value = stringRedisTemplate.execute(consumeScript, List.of(key));
         if (value == null || value.isBlank()) {
-            throw new BusinessException(ErrorCode.AUTH_SSO_STATE_INVALID);
+            throw new BusinessException(ErrorCode.SSO_STATE_INVALID);
         }
         try {
             return objectMapper.readValue(value, StatePayload.class);
         } catch (Exception e) {
-            throw new BusinessException(ErrorCode.AUTH_SSO_STATE_INVALID);
+            throw new BusinessException(ErrorCode.SSO_STATE_INVALID);
         }
     }
 

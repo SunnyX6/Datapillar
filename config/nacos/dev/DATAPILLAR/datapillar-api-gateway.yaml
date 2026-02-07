@@ -1,0 +1,192 @@
+server:
+  port: 7000
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: datapillar-api-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          # 全局 CORS 配置
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOriginPatterns:
+                  - http://localhost:3001
+                  - http://127.0.0.1:3001
+                  - https://localhost:3001
+                  - https://127.0.0.1:3001
+                  - https://localhost
+                  - https://127.0.0.1
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders: "*"
+                allowCredentials: true
+                maxAge: 3600
+
+          # 默认过滤器
+          default-filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+                deny-empty-key: false
+
+          # 路由配置（全部走服务发现）
+          routes:
+            # 1. 认证服务 (datapillar-auth)
+            # 重写: /api/auth/** → /auth/**
+            - id: auth-service
+              uri: lb://datapillar-auth
+              predicates:
+                - Path=/api/auth/**
+              filters:
+                - RewritePath=/api(?<segment>/?.*), ${segment}
+
+            # 2. 核心业务服务 (datapillar-studio-service)
+            - id: studio-service
+              uri: lb://datapillar-studio-service
+              predicates:
+                - Path=/api/studio/**
+
+            # 3. AI 服务 (datapillar-ai)
+            - id: ai-service
+              uri: lb://datapillar-ai
+              predicates:
+                - Path=/api/ai/**
+
+            # 4. 元数据服务 (datapillar-gravitino)
+            # Gravitino 原生 REST API
+            # 重写: /api/onemeta/** → /api/**
+            - id: onemeta-service
+              uri: lb://datapillar-gravitino
+              predicates:
+                - Path=/api/onemeta/**
+              filters:
+                - RewritePath=/api/onemeta(?<segment>/?.*), /api${segment}
+
+  # Redis 配置（用于限流）
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:1}
+
+# 网关认证配置
+gateway:
+  auth:
+    # 认证白名单（不需要 Token 的路径）
+    whitelist: >
+      /api/auth/login,
+      /api/auth/register,
+      /api/auth/refresh,
+      /api/auth/captcha,
+      /actuator/health/**,
+      /actuator/info
+
+# 安全配置（严格模式）
+security:
+  require-https: false
+  allowed-origins:
+    - http://localhost:3001
+    - http://127.0.0.1:3001
+    - https://localhost:3001
+    - https://127.0.0.1:3001
+    - https://localhost
+    - https://127.0.0.1
+  headers:
+    enabled: true
+    hsts-max-age-seconds: 31536000
+    include-sub-domains: true
+  csrf:
+    enabled: true
+    header-name: X-CSRF-Token
+    cookie-name: csrf-token
+    refresh-header-name: X-Refresh-CSRF-Token
+    refresh-cookie-name: refresh-csrf-token
+    whitelist:
+      - /api/auth/login
+      - /api/auth/login/tenant
+      - /api/auth/sso/login
+      - /api/auth/sso/qr
+      - /api/auth/health
+      - /api/auth/validate
+      - /actuator/health/**
+      - /actuator/info
+
+# JWT 配置（必须与 datapillar-auth 保持一致）
+jwt:
+  secret: ${JWT_SECRET:Datapillar-Local-Secret-2026-02-04}
+  issuer: datapillar-auth
+
+# Resilience4j 熔断配置
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 5
+    instances:
+      auth-service:
+        baseConfig: default
+      studio-service:
+        baseConfig: default
+      ai-service:
+        baseConfig: default
+        # AI 服务超时时间更长
+        slowCallDurationThreshold: 30s
+      job-service:
+        baseConfig: default
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 10s
+    instances:
+      ai-service:
+        timeoutDuration: 60s
+
+# Actuator 健康检查（与服务同端口）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    reactor.netty: INFO
+    com.sunny.datapillar.gateway: DEBUG
+    io.netty.resolver.dns: WARN
+    root: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: ${LOG_HOME:/tmp/datapillar-logs}/datapillar-api-gateway.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30

@@ -29,27 +29,27 @@ Datapillar 是一个企业级的 SaaS 数据产品，整合了数据目录、数
                                     │
                                     ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│                       API 网关 (datapillar-api-gateway :6000)                 │
-│        统一鉴权 / 路由 / 限流  (/api/auth | /api/platform | /api/studio | …) │
-└──────────────┬───────────────┬───────────────────┬─────────────────┬─────────────────┘
-               │               │                   │                 │                 │
-               ▼               ▼                   ▼                 ▼                 ▼
-┌────────────────────┐ ┌──────────────────────┐ ┌────────────────────────┐ ┌─────────────────┐ ┌────────────────────┐
-│ datapillar-auth    │ │ datapillar-platform  │ │ datapillar-studio-  │ │ datapillar-ai   │ │ datapillar-gravitino │
-│ (:6001)            │ │ (:6006)              │ │ service (:6002)        │ │ (:6003)         │ │ (:8090)            │
-│ 登录/签发 Token     │ │ 租户/IAM/套餐/配额     │ │ Datapillar Studio 业务能力 │ │ AI 智能体服务    │ │ 元数据服务         │
-└───────────┬────────┘ └───────────┬──────────┘ └───────────┬──────────┘ └────────┬────────┘ └──────────┬──────────┘
-            │                      │                        │                    │                   │
-            └──────────────┬───────┴──────────────┬─────────┴──────────────┬──────┴───────────┬───────┘
-                           ▼                      ▼                        ▼                  ▼
-                 ┌─────────────────┐     ┌──────────────────┐     ┌──────────────────┐  ┌─────────────────┐
-                 │ MySQL            │     │ MySQL             │     │ Redis / Neo4j    │  │ Gravitino Store │
-                 │ datapillar_platform │  │ datapillar_studio │  │ 缓存 / 知识图谱  │  │ 元数据存储      │
-                 └─────────────────┘     └──────────────────┘     └──────────────────┘  └─────────────────┘
+│                       API 网关 (datapillar-api-gateway :7000)                 │
+│        统一鉴权 / 路由 / 限流  (/api/auth | /api/studio | /api/ai | /api/onemeta | …) │
+└──────────────┬───────────────────┬─────────────────┬─────────────────┐
+               │                   │                 │                 │
+               ▼                   ▼                 ▼                 ▼
+┌────────────────────┐ ┌────────────────────────┐ ┌─────────────────┐ ┌────────────────────┐
+│ datapillar-auth    │ │ datapillar-studio-      │ │ datapillar-ai   │ │ datapillar-gravitino │
+│ (:7001)            │ │ service (:7002)         │ │ (:7003)         │ │ (:8090)            │
+│ 登录/签发 Token     │ │ Studio 业务与租户/IAM   │ │ AI 智能体服务    │ │ 元数据服务         │
+└───────────┬────────┘ └───────────┬──────────────┘ └────────┬────────┘ └──────────┬──────────┘
+            │                      │                        │                   │
+            └──────────────┬───────┴──────────────┬─────────┴──────────────┬──────┘
+                           ▼                      ▼                        ▼
+                 ┌─────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+                 │ MySQL            │     │ Redis / Neo4j    │     │ Gravitino Store │
+                 │ datapillar       │     │ 缓存 / 知识图谱  │     │ 元数据存储      │
+                 └─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
 **边界说明（当前共识）**
-- 平台级多租户与 IAM 在 `datapillar-platform`，产品服务只通过平台 API 获取授权/配额/租户信息。
+- 租户/IAM 下沉到 `datapillar-studio-service`，不再依赖独立平台服务。
 - `datapillar-auth` 只负责登录与签发/刷新 Token，不承载业务权限判断。
 
 ### 服务端口一览
@@ -58,11 +58,10 @@ Datapillar 是一个企业级的 SaaS 数据产品，整合了数据目录、数
 |------|------|--------|------|
 | datapillar-web-site | 3100 | React + Vite + Tailwind | 官网与营销站点 |
 | datapillar-studio | 3000 | React + Vite + Tailwind | Datapillar Studio 产品前端 |
-| datapillar-api-gateway | 6000 | Spring Cloud Gateway | API 网关 |
-| datapillar-auth | 6001 | Spring Boot | 认证服务 |
-| datapillar-platform | 6006 | Spring Boot | 平台服务（租户/IAM/套餐/配额） |
-| datapillar-studio-service | 6002 | Spring Boot | Datapillar Studio 业务服务 |
-| datapillar-ai | 6003 | FastAPI + LangGraph | AI 智能体服务 |
+| datapillar-api-gateway | 7000 | Spring Cloud Gateway | API 网关 |
+| datapillar-auth | 7001 | Spring Boot | 认证服务 |
+| datapillar-studio-service | 7002 | Spring Boot | Datapillar Studio 业务服务 |
+| datapillar-ai | 7003 | FastAPI + LangGraph | AI 智能体服务 |
 | datapillar-gravitino | 8090 | Gravitino | 元数据服务 |
 
 ---
@@ -75,7 +74,6 @@ Datapillar/
 ├── datapillar-studio/      # Datapillar Studio 产品前端 (React + Vite)
 ├── datapillar-api-gateway/    # API 网关
 ├── datapillar-auth/           # 认证服务
-├── datapillar-platform/       # 平台服务（租户/IAM/套餐/配额）
 ├── datapillar-studio-service/ # Datapillar Studio 业务服务
 ├── datapillar-ai/             # AI 服务 (FastAPI)
 ├── datapillar-gravitino/      # 元数据服务

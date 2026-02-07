@@ -12,6 +12,7 @@ import gzip
 import logging
 from contextlib import asynccontextmanager
 
+from datapillar_oneagentic import Datapillar
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,14 +25,17 @@ logger = logging.getLogger(__name__)
 from src.api.router import api_router
 from src.infrastructure.database import AsyncNeo4jClient, MySQLClient, Neo4jClient, RedisClient
 from src.infrastructure.database.gravitino import GravitinoDBClient
-from src.modules.etl.agents import create_etl_team
-from src.modules.openlineage.core.embedding_processor import embedding_processor
-from src.modules.openlineage.core.event_processor import event_processor
-from src.modules.openlineage.once_sync import sync_gravitino_metadata
+from src.modules.knowledge.embedding_processor import (
+    get_embedding_processor as get_knowledge_embedding_processor,
+)
+from src.modules.openlineage.core.embedding_processor import get_embedding_processor
+from src.modules.openlineage.core.event_processor import get_event_processor
+from src.modules.openlineage.core.sql_summary_processor import get_sql_summary_processor
 from src.shared.auth.middleware import AuthMiddleware
 from src.shared.config import settings
 from src.shared.config.exceptions import AuthenticationError, AuthorizationError, BaseError
-from src.shared.web import build_error
+from src.shared.config.nacos_client import NacosRuntime, bootstrap_nacos
+from src.shared.web import ApiResponse
 
 
 class GzipRequestMiddleware:
@@ -98,15 +102,36 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        nacos_runtime: NacosRuntime | None = None
+        event_processor = None
+        embedding_processor = None
+        knowledge_embedding_processor = None
+        sql_summary_processor = None
+
+        nacos_runtime = await bootstrap_nacos(settings)
+        app.state.nacos_runtime = nacos_runtime
+
         logger.info("=" * 60)
         logger.info("Datapillar AI - 启动中...")
-        logger.info(f"环境: {settings.get('ENV_FOR_DYNACONF', 'development')}")
+        logger.info(f"环境: {nacos_runtime.config.namespace}")
         logger.info(f"Neo4j URI: {settings.neo4j_uri}")
         logger.info(f"MySQL: {settings.mysql_host}:{settings.mysql_port}/{settings.mysql_database}")
         logger.info("=" * 60)
 
-        etl_team = None
+        etl_teams: dict[int, Datapillar] = {}
         try:
+            # 运行期依赖（必须在 Nacos 配置注入后初始化）
+            event_processor = get_event_processor()
+            embedding_processor = get_embedding_processor()
+            knowledge_embedding_processor = get_knowledge_embedding_processor()
+            sql_summary_processor = get_sql_summary_processor()
+
+            app.state.event_processor = event_processor
+            app.state.embedding_processor = embedding_processor
+            app.state.knowledge_embedding_processor = knowledge_embedding_processor
+            app.state.sql_summary_processor = sql_summary_processor
+
+            await nacos_runtime.register_service(port=settings.app_port)
             # 初始化连接池（全局单例，自动管理）
             logger.info("初始化 MySQL 连接池...")
             MySQLClient.get_engine()  # 触发连接池初始化
@@ -123,29 +148,24 @@ def create_app() -> FastAPI:
             logger.info("初始化 Gravitino 数据库连接...")
             GravitinoDBClient.get_engine()  # 触发连接池初始化
 
-            # 启动 EventProcessor（暂停状态，接收事件但不处理）
-            logger.info("启动 EventProcessor（暂停消费模式）...")
-            await event_processor.start(paused=True)
+            # 启动 EventProcessor
+            logger.info("启动 EventProcessor...")
+            await event_processor.start(paused=False)
 
             # 启动 EmbeddingProcessor
             logger.info("启动 EmbeddingProcessor...")
             await embedding_processor.start()
 
-            # 执行 Gravitino 全量同步
-            logger.info("开始 Gravitino 元数据全量同步...")
-            try:
-                sync_stats = await sync_gravitino_metadata()
-                logger.info(f"Gravitino 元数据同步完成: {sync_stats}")
-            except Exception as e:
-                logger.error(f"Gravitino 元数据同步失败: {e}", exc_info=True)
+            # 启动 Knowledge EmbeddingProcessor
+            logger.info("启动 Knowledge EmbeddingProcessor...")
+            await knowledge_embedding_processor.start()
 
-            # 同步完成后恢复事件处理
-            logger.info("恢复 EventProcessor 事件消费...")
-            event_processor.resume()
+            # 启动 SQLSummaryProcessor
+            logger.info("启动 SQLSummaryProcessor...")
+            await sql_summary_processor.start()
 
-            # 创建 ETL 智能团队
-            etl_team = create_etl_team()
-            app.state.etl_team = etl_team
+            # ETL 智能团队按租户懒加载
+            app.state.etl_teams = etl_teams
 
             logger.info("FastAPI 应用启动完成")
             yield
@@ -155,10 +175,20 @@ def create_app() -> FastAPI:
 
             # 停止处理器
             logger.info("停止 EventProcessor...")
-            await event_processor.stop()
+            if event_processor is not None:
+                await event_processor.stop()
 
             logger.info("停止 EmbeddingProcessor...")
-            await embedding_processor.stop()
+            if embedding_processor is not None:
+                await embedding_processor.stop()
+
+            logger.info("停止 Knowledge EmbeddingProcessor...")
+            if knowledge_embedding_processor is not None:
+                await knowledge_embedding_processor.stop()
+
+            logger.info("停止 SQLSummaryProcessor...")
+            if sql_summary_processor is not None:
+                await sql_summary_processor.stop()
 
             # 关闭连接池
             await RedisClient.close()
@@ -167,6 +197,9 @@ def create_app() -> FastAPI:
             MySQLClient.close()
             GravitinoDBClient.close()
             logger.info("所有连接池已关闭")
+            if nacos_runtime is not None:
+                await nacos_runtime.deregister_service()
+                await nacos_runtime.shutdown()
 
     app = FastAPI(
         title="Datapillar AI",
@@ -174,7 +207,6 @@ def create_app() -> FastAPI:
         version="3.0.0",
         lifespan=lifespan,
     )
-
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -194,7 +226,7 @@ def create_app() -> FastAPI:
     async def auth_error_handler(request: Request, exc: AuthenticationError):
         return JSONResponse(
             status_code=401,
-            content=build_error(
+            content=ApiResponse.error(
                 request=request,
                 status=401,
                 code="UNAUTHORIZED",
@@ -206,7 +238,7 @@ def create_app() -> FastAPI:
     async def authz_error_handler(request: Request, exc: AuthorizationError):
         return JSONResponse(
             status_code=403,
-            content=build_error(
+            content=ApiResponse.error(
                 request=request,
                 status=403,
                 code="FORBIDDEN",
@@ -219,10 +251,10 @@ def create_app() -> FastAPI:
         logger.error(f"业务异常: {exc.message}", exc_info=True)
         return JSONResponse(
             status_code=500,
-            content=build_error(
+            content=ApiResponse.error(
                 request=request,
                 status=500,
-                code="SERVER_ERROR",
+                code="INTERNAL_ERROR",
                 message=exc.message,
             ),
         )
@@ -231,10 +263,10 @@ def create_app() -> FastAPI:
     async def validation_error_handler(request: Request, exc: RequestValidationError):
         return JSONResponse(
             status_code=422,
-            content=build_error(
+            content=ApiResponse.error(
                 request=request,
                 status=422,
-                code="INVALID_PARAM",
+                code="VALIDATION_ERROR",
                 message="请求参数校验失败",
             ),
         )
@@ -243,25 +275,25 @@ def create_app() -> FastAPI:
     async def http_error_handler(request: Request, exc: HTTPException):
         status_code = exc.status_code
         if status_code == 400:
-            code = "INVALID_PARAM"
+            code = "INVALID_ARGUMENT"
         elif status_code == 401:
             code = "UNAUTHORIZED"
         elif status_code == 403:
             code = "FORBIDDEN"
         elif status_code == 404:
-            code = "NOT_FOUND"
+            code = "RESOURCE_NOT_FOUND"
         elif status_code == 409:
-            code = "CONFLICT"
+            code = "DUPLICATE_RESOURCE"
         elif status_code == 422:
-            code = "INVALID_PARAM"
+            code = "VALIDATION_ERROR"
         elif status_code == 503:
             code = "SERVICE_UNAVAILABLE"
         else:
-            code = "HTTP_ERROR"
+            code = "INTERNAL_ERROR"
         message = str(exc.detail) if exc.detail else "请求失败"
         return JSONResponse(
             status_code=status_code,
-            content=build_error(
+            content=ApiResponse.error(
                 request=request,
                 status=status_code,
                 code=code,
@@ -274,10 +306,10 @@ def create_app() -> FastAPI:
         logger.exception(f"未捕获异常: {exc}")
         return JSONResponse(
             status_code=500,
-            content=build_error(
+            content=ApiResponse.error(
                 request=request,
                 status=500,
-                code="SERVER_ERROR",
+                code="INTERNAL_ERROR",
                 message="服务器内部错误",
             ),
         )
@@ -287,7 +319,7 @@ def create_app() -> FastAPI:
 
     # 健康检查
     @app.get("/health")
-    async def health_check():
+    async def health_check(request: Request):
         """健康检查（使用连接池）"""
         neo4j_connected = False
         mysql_connected = False
@@ -318,11 +350,13 @@ def create_app() -> FastAPI:
             logger.warning(f"Redis 健康检查失败: {e}")
 
         all_ok = neo4j_connected and mysql_connected and redis_connected
+        nacos_runtime: NacosRuntime | None = getattr(request.app.state, "nacos_runtime", None)
+        environment = nacos_runtime.config.namespace if nacos_runtime else "unknown"
 
         return {
             "status": "ok" if all_ok else "degraded",
             "service": "datapillar-ai",
-            "environment": settings.get("ENV_FOR_DYNACONF", "development"),
+            "environment": environment,
             "connections": {
                 "neo4j": neo4j_connected,
                 "mysql": mysql_connected,
@@ -339,9 +373,13 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
+    host = "0.0.0.0"
+    port = 7003
+    reload_enabled = False
+
     uvicorn.run(
         "src.app:app",
-        host=settings.app_host,
-        port=settings.app_port,
-        reload=settings.debug,
+        host=host,
+        port=port,
+        reload=reload_enabled,
     )

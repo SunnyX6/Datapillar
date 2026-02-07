@@ -27,16 +27,16 @@ public class SsoConfigService {
     public SsoProviderConfig loadConfig(Long tenantId, String provider) {
         TenantSsoConfig config = tenantSsoConfigMapper.selectByTenantIdAndProvider(tenantId, provider);
         if (config == null) {
-            throw new BusinessException(ErrorCode.AUTH_SSO_CONFIG_NOT_FOUND, provider);
+            throw new BusinessException(ErrorCode.SSO_CONFIG_NOT_FOUND, provider);
         }
         if (config.getStatus() == null || config.getStatus() != 1) {
-            throw new BusinessException(ErrorCode.AUTH_SSO_CONFIG_DISABLED, provider);
+            throw new BusinessException(ErrorCode.SSO_CONFIG_DISABLED, provider);
         }
         Map<String, Object> map;
         try {
             map = objectMapper.readValue(config.getConfigJson(), new TypeReference<>() {});
         } catch (Exception e) {
-            throw new BusinessException(ErrorCode.AUTH_SSO_CONFIG_INVALID, provider);
+            throw new BusinessException(ErrorCode.SSO_CONFIG_INVALID, provider);
         }
         return new SsoProviderConfig(config.getProvider(), config.getBaseUrl(), map);
     }

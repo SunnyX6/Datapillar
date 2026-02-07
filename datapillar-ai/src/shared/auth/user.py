@@ -13,6 +13,7 @@ class CurrentUser(BaseModel):
     """当前用户信息"""
 
     user_id: int
+    tenant_id: int
     username: str
     email: str | None = None
 

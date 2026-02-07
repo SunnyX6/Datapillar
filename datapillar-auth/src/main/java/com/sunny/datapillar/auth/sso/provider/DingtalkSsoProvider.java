@@ -71,7 +71,7 @@ public class DingtalkSsoProvider implements SsoProvider {
     @Override
     public SsoToken exchangeCode(SsoProviderConfig config, String authCode) {
         if (authCode == null || authCode.isBlank()) {
-            throw new BusinessException(ErrorCode.AUTH_INVALID_ARGUMENT);
+            throw new BusinessException(ErrorCode.INVALID_ARGUMENT);
         }
         String clientId = config.getRequiredString("clientId");
         String clientSecret = config.getRequiredString("clientSecret");
@@ -85,21 +85,21 @@ public class DingtalkSsoProvider implements SsoProvider {
             GetUserTokenResponse response = client.getUserToken(request);
             if (response == null || response.getBody() == null || response.getBody().getAccessToken() == null
                     || response.getBody().getAccessToken().isBlank()) {
-                throw new BusinessException(ErrorCode.AUTH_SSO_REQUEST_FAILED, "accessToken为空");
+                throw new BusinessException(ErrorCode.SSO_REQUEST_FAILED, "accessToken为空");
             }
             Map<String, Object> raw = toMap(response.getBody());
             return new SsoToken(response.getBody().getAccessToken(), null, raw);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            throw new BusinessException(ErrorCode.AUTH_SSO_REQUEST_FAILED, e.getMessage());
+            throw new BusinessException(ErrorCode.SSO_REQUEST_FAILED, e.getMessage());
         }
     }
 
     @Override
     public SsoUserInfo fetchUserInfo(SsoProviderConfig config, SsoToken token) {
         if (token == null || token.getAccessToken() == null || token.getAccessToken().isBlank()) {
-            throw new BusinessException(ErrorCode.AUTH_SSO_REQUEST_FAILED, "accessToken为空");
+            throw new BusinessException(ErrorCode.SSO_REQUEST_FAILED, "accessToken为空");
         }
         try {
             Client client = new Client(buildOpenApiConfig());
@@ -107,7 +107,7 @@ public class DingtalkSsoProvider implements SsoProvider {
             headers.xAcsDingtalkAccessToken = token.getAccessToken();
             GetUserResponse response = client.getUserWithOptions("me", headers, new RuntimeOptions());
             if (response == null || response.getBody() == null) {
-                throw new BusinessException(ErrorCode.AUTH_SSO_REQUEST_FAILED, "用户信息为空");
+                throw new BusinessException(ErrorCode.SSO_REQUEST_FAILED, "用户信息为空");
             }
             String unionId = response.getBody().getUnionId();
             String openId = response.getBody().getOpenId();
@@ -125,7 +125,7 @@ public class DingtalkSsoProvider implements SsoProvider {
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            throw new BusinessException(ErrorCode.AUTH_SSO_REQUEST_FAILED, e.getMessage());
+            throw new BusinessException(ErrorCode.SSO_REQUEST_FAILED, e.getMessage());
         }
     }
 

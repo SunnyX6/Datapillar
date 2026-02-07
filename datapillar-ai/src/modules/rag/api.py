@@ -23,12 +23,19 @@ from src.modules.rag.schemas import (
 )
 from src.modules.rag.service import KnowledgeWikiService
 from src.modules.rag.sse import job_event_hub
-from src.shared.web import build_error, build_success
+from src.shared.web import ApiResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-service = KnowledgeWikiService()
+_service: KnowledgeWikiService | None = None
+
+
+def _get_service() -> KnowledgeWikiService:
+    global _service
+    if _service is None:
+        _service = KnowledgeWikiService()
+    return _service
 
 
 def _pagination(limit: int | None, offset: int | None) -> tuple[int, int]:
@@ -40,7 +47,7 @@ def _pagination(limit: int | None, offset: int | None) -> tuple[int, int]:
 def _error_response(request: Request, status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(
         status_code=status,
-        content=build_error(request=request, status=status, code=code, message=message),
+        content=ApiResponse.error(request=request, status=status, code=code, message=message),
     )
 
 
@@ -48,8 +55,8 @@ def _error_response(request: Request, status: int, code: str, message: str) -> J
 async def list_namespaces(request: Request, limit: int = 20, offset: int = 0):
     current_user = request.state.current_user
     limit, offset = _pagination(limit, offset)
-    rows, total = service.list_namespaces(current_user.user_id, limit=limit, offset=offset)
-    return build_success(
+    rows, total = _get_service().list_namespaces(current_user.user_id, limit=limit, offset=offset)
+    return ApiResponse.success(
         request=request,
         data=rows,
         limit=limit,
@@ -61,8 +68,8 @@ async def list_namespaces(request: Request, limit: int = 20, offset: int = 0):
 @router.post("/namespaces")
 async def create_namespace(request: Request, payload: NamespaceCreateRequest):
     current_user = request.state.current_user
-    namespace_id = service.create_namespace(current_user.user_id, payload.model_dump())
-    return build_success(request=request, data={"namespace_id": namespace_id})
+    namespace_id = _get_service().create_namespace(current_user.user_id, payload.model_dump())
+    return ApiResponse.success(request=request, data={"namespace_id": namespace_id})
 
 
 @router.patch("/namespaces/{namespace_id}")
@@ -70,20 +77,20 @@ async def update_namespace(request: Request, namespace_id: int, payload: Namespa
     current_user = request.state.current_user
     fields = {k: v for k, v in payload.model_dump().items() if v is not None}
     if not fields:
-        return _error_response(request, 400, "INVALID_PARAM", "没有可更新字段")
-    updated = service.update_namespace(current_user.user_id, namespace_id, fields)
+        return _error_response(request, 400, "INVALID_ARGUMENT", "没有可更新字段")
+    updated = _get_service().update_namespace(current_user.user_id, namespace_id, fields)
     if updated == 0:
-        return _error_response(request, 404, "NOT_FOUND", "namespace 不存在")
-    return build_success(request=request, data={"updated": updated})
+        return _error_response(request, 404, "RESOURCE_NOT_FOUND", "namespace 不存在")
+    return ApiResponse.success(request=request, data={"updated": updated})
 
 
 @router.delete("/namespaces/{namespace_id}")
 async def delete_namespace(request: Request, namespace_id: int):
     current_user = request.state.current_user
-    deleted = service.delete_namespace(current_user.user_id, namespace_id)
+    deleted = _get_service().delete_namespace(current_user.user_id, namespace_id)
     if deleted == 0:
-        return _error_response(request, 404, "NOT_FOUND", "namespace 不存在")
-    return build_success(request=request, data={"deleted": deleted})
+        return _error_response(request, 404, "RESOURCE_NOT_FOUND", "namespace 不存在")
+    return ApiResponse.success(request=request, data={"deleted": deleted})
 
 
 @router.get("/namespaces/{namespace_id}/documents")
@@ -97,7 +104,7 @@ async def list_documents(
 ):
     current_user = request.state.current_user
     limit, offset = _pagination(limit, offset)
-    rows, total = service.list_documents(
+    rows, total = _get_service().list_documents(
         current_user.user_id,
         namespace_id,
         status=status,
@@ -105,7 +112,7 @@ async def list_documents(
         limit=limit,
         offset=offset,
     )
-    return build_success(
+    return ApiResponse.success(
         request=request,
         data=rows,
         limit=limit,
@@ -123,12 +130,12 @@ async def upload_document(
 ):
     current_user = request.state.current_user
     if not file:
-        return _error_response(request, 400, "INVALID_PARAM", "file 不能为空")
+        return _error_response(request, 400, "INVALID_ARGUMENT", "file 不能为空")
     content = await file.read()
     if not content:
-        return _error_response(request, 400, "INVALID_PARAM", "上传文件为空")
+        return _error_response(request, 400, "INVALID_ARGUMENT", "上传文件为空")
     try:
-        result = await service.upload_document(
+        result = await _get_service().upload_document(
             user_id=current_user.user_id,
             namespace_id=namespace_id,
             filename=file.filename or "document",
@@ -136,17 +143,17 @@ async def upload_document(
             title=title,
         )
     except ValueError as exc:
-        return _error_response(request, 400, "INVALID_PARAM", str(exc))
-    return build_success(request=request, data=result)
+        return _error_response(request, 400, "INVALID_ARGUMENT", str(exc))
+    return ApiResponse.success(request=request, data=result)
 
 
 @router.get("/documents/{document_id}")
 async def get_document(request: Request, document_id: int):
     current_user = request.state.current_user
-    doc = service.get_document(current_user.user_id, document_id)
+    doc = _get_service().get_document(current_user.user_id, document_id)
     if not doc:
-        return _error_response(request, 404, "NOT_FOUND", "document 不存在")
-    return build_success(request=request, data=doc)
+        return _error_response(request, 404, "RESOURCE_NOT_FOUND", "document 不存在")
+    return ApiResponse.success(request=request, data=doc)
 
 
 @router.patch("/documents/{document_id}")
@@ -154,65 +161,70 @@ async def update_document(request: Request, document_id: int, payload: DocumentU
     current_user = request.state.current_user
     fields = {k: v for k, v in payload.model_dump().items() if v is not None}
     if not fields:
-        return _error_response(request, 400, "INVALID_PARAM", "没有可更新字段")
-    updated = service.update_document(current_user.user_id, document_id, fields)
+        return _error_response(request, 400, "INVALID_ARGUMENT", "没有可更新字段")
+    updated = _get_service().update_document(current_user.user_id, document_id, fields)
     if updated == 0:
-        return _error_response(request, 404, "NOT_FOUND", "document 不存在")
-    return build_success(request=request, data={"updated": updated})
+        return _error_response(request, 404, "RESOURCE_NOT_FOUND", "document 不存在")
+    return ApiResponse.success(request=request, data={"updated": updated})
 
 
 @router.delete("/documents/{document_id}")
 async def delete_document(request: Request, document_id: int):
     current_user = request.state.current_user
-    deleted = await service.delete_document(user_id=current_user.user_id, document_id=document_id)
+    deleted = await _get_service().delete_document(
+        user_id=current_user.user_id,
+        tenant_id=current_user.tenant_id,
+        document_id=document_id,
+    )
     if deleted == 0:
-        return _error_response(request, 404, "NOT_FOUND", "document 不存在")
-    return build_success(request=request, data={"deleted": deleted})
+        return _error_response(request, 404, "RESOURCE_NOT_FOUND", "document 不存在")
+    return ApiResponse.success(request=request, data={"deleted": deleted})
 
 
 @router.post("/documents/{document_id}/chunk")
 async def start_chunk_job(request: Request, document_id: int, payload: ChunkJobRequest):
     current_user = request.state.current_user
     try:
-        result = await service.start_chunk_job(
+        result = await _get_service().start_chunk_job(
             user_id=current_user.user_id,
+            tenant_id=current_user.tenant_id,
             document_id=document_id,
             chunk_mode=payload.chunk_mode,
             chunk_config_json=payload.chunk_config_json,
         )
     except ValueError as exc:
-        return _error_response(request, 400, "INVALID_PARAM", str(exc))
-    return build_success(request=request, data=result)
+        return _error_response(request, 400, "INVALID_ARGUMENT", str(exc))
+    return ApiResponse.success(request=request, data=result)
 
 
 @router.get("/documents/{document_id}/jobs")
 async def list_document_jobs(request: Request, document_id: int, limit: int = 20, offset: int = 0):
     current_user = request.state.current_user
     limit, offset = _pagination(limit, offset)
-    rows, total = service.list_jobs(
+    rows, total = _get_service().list_jobs(
         current_user.user_id,
         document_id,
         limit=limit,
         offset=offset,
     )
-    return build_success(request=request, data=rows, limit=limit, offset=offset, total=total)
+    return ApiResponse.success(request=request, data=rows, limit=limit, offset=offset, total=total)
 
 
 @router.get("/jobs/{job_id}")
 async def get_job(request: Request, job_id: int):
     current_user = request.state.current_user
-    job = service.get_job(current_user.user_id, job_id)
+    job = _get_service().get_job(current_user.user_id, job_id)
     if not job:
-        return _error_response(request, 404, "NOT_FOUND", "job 不存在")
-    return build_success(request=request, data=job)
+        return _error_response(request, 404, "RESOURCE_NOT_FOUND", "job 不存在")
+    return ApiResponse.success(request=request, data=job)
 
 
 @router.get("/jobs/{job_id}/sse")
 async def job_sse(request: Request, job_id: int):
     current_user = request.state.current_user
-    job = service.get_job(current_user.user_id, job_id)
+    job = _get_service().get_job(current_user.user_id, job_id)
     if not job:
-        return _error_response(request, 404, "NOT_FOUND", "job 不存在")
+        return _error_response(request, 404, "RESOURCE_NOT_FOUND", "job 不存在")
 
     last_event_id = request.headers.get("Last-Event-ID")
     last_event_id_int: int | None = None
@@ -278,47 +290,57 @@ async def list_chunks(
     current_user = request.state.current_user
     limit, offset = _pagination(limit, offset)
     try:
-        rows, total = await service.list_chunks(
+        rows, total = await _get_service().list_chunks(
             user_id=current_user.user_id,
+            tenant_id=current_user.tenant_id,
             document_id=document_id,
             limit=limit,
             offset=offset,
             keyword=keyword,
         )
     except ValueError as exc:
-        return _error_response(request, 400, "INVALID_PARAM", str(exc))
-    return build_success(request=request, data=rows, limit=limit, offset=offset, total=total)
+        return _error_response(request, 400, "INVALID_ARGUMENT", str(exc))
+    return ApiResponse.success(request=request, data=rows, limit=limit, offset=offset, total=total)
 
 
 @router.patch("/chunks/{chunk_id}")
 async def edit_chunk(request: Request, chunk_id: str, payload: ChunkEditRequest):
     current_user = request.state.current_user
     try:
-        result = await service.edit_chunk(
+        result = await _get_service().edit_chunk(
             user_id=current_user.user_id,
+            tenant_id=current_user.tenant_id,
             chunk_id=chunk_id,
             content=payload.content,
         )
     except ValueError as exc:
-        return _error_response(request, 400, "INVALID_PARAM", str(exc))
-    return build_success(request=request, data=result)
+        return _error_response(request, 400, "INVALID_ARGUMENT", str(exc))
+    return ApiResponse.success(request=request, data=result)
 
 
 @router.delete("/chunks/{chunk_id}")
 async def delete_chunk(request: Request, chunk_id: str):
     current_user = request.state.current_user
     try:
-        deleted = await service.delete_chunk(user_id=current_user.user_id, chunk_id=chunk_id)
+        deleted = await _get_service().delete_chunk(
+            user_id=current_user.user_id,
+            tenant_id=current_user.tenant_id,
+            chunk_id=chunk_id,
+        )
     except ValueError as exc:
-        return _error_response(request, 400, "INVALID_PARAM", str(exc))
-    return build_success(request=request, data={"deleted": deleted})
+        return _error_response(request, 400, "INVALID_ARGUMENT", str(exc))
+    return ApiResponse.success(request=request, data={"deleted": deleted})
 
 
 @router.post("/retrieve")
 async def retrieve(request: Request, payload: RetrieveRequest):
     current_user = request.state.current_user
     try:
-        data = await service.retrieve(user_id=current_user.user_id, payload=payload.model_dump())
+        data = await _get_service().retrieve(
+            user_id=current_user.user_id,
+            tenant_id=current_user.tenant_id,
+            payload=payload.model_dump(),
+        )
     except ValueError as exc:
-        return _error_response(request, 400, "INVALID_PARAM", str(exc))
-    return build_success(request=request, data=data)
+        return _error_response(request, 400, "INVALID_ARGUMENT", str(exc))
+    return ApiResponse.success(request=request, data=data)

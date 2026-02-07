@@ -23,6 +23,7 @@ ETL 智能团队
 from src.modules.etl import tools as _tools  # noqa: F401
 from datapillar_oneagentic import Datapillar, DatapillarConfig, Process
 from src.infrastructure.llm.config import get_datapillar_config
+from src.shared.config.runtime import get_default_tenant_id
 
 # 显式导入所有 agent 模块，触发 @agent 装饰器注册
 from . import (
@@ -37,6 +38,7 @@ def create_etl_team(
     *,
     config: DatapillarConfig | None = None,
     namespace: str | None = None,
+    tenant_id: int | None = None,
 ) -> Datapillar:
     """创建 ETL 智能团队
 
@@ -57,10 +59,11 @@ def create_etl_team(
     from .developer_agent import DeveloperAgent
     from .reviewer_agent import ReviewerAgent
 
+    resolved_tenant_id = tenant_id or get_default_tenant_id()
     if config is None:
-        config = get_datapillar_config()
+        config = get_datapillar_config(resolved_tenant_id)
     if not namespace:
-        namespace = "etl_team"
+        namespace = f"etl_team_{resolved_tenant_id}"
 
     return Datapillar(
         config=config,

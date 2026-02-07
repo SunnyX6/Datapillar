@@ -4,6 +4,6 @@
 
 """Web response helpers."""
 
-from src.shared.web.response import build_error, build_success
+from src.shared.web.response import ApiResponse, build_error, build_success
 
-__all__ = ["build_success", "build_error"]
+__all__ = ["ApiResponse", "build_success", "build_error"]

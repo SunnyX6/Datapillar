@@ -23,18 +23,18 @@ public class SsoAuthService {
 
     public SsoUserInfo authenticate(Long tenantId, String provider, String authCode, String state) {
         if (tenantId == null) {
-            throw new BusinessException(ErrorCode.AUTH_INVALID_ARGUMENT);
+            throw new BusinessException(ErrorCode.INVALID_ARGUMENT);
         }
         String normalizedProvider = normalize(provider);
         if (normalizedProvider == null) {
-            throw new BusinessException(ErrorCode.AUTH_INVALID_ARGUMENT);
+            throw new BusinessException(ErrorCode.INVALID_ARGUMENT);
         }
         StatePayload payload = ssoStateStore.consumeState(state);
         if (payload.getTenantId() == null || !payload.getTenantId().equals(tenantId)) {
-            throw new BusinessException(ErrorCode.AUTH_SSO_STATE_MISMATCH);
+            throw new BusinessException(ErrorCode.SSO_STATE_MISMATCH);
         }
         if (payload.getProvider() == null || !payload.getProvider().equals(normalizedProvider)) {
-            throw new BusinessException(ErrorCode.AUTH_SSO_STATE_MISMATCH);
+            throw new BusinessException(ErrorCode.SSO_STATE_MISMATCH);
         }
 
         SsoProviderConfig config = ssoConfigService.loadConfig(tenantId, normalizedProvider);
@@ -42,7 +42,7 @@ public class SsoAuthService {
         SsoToken token = ssoProvider.exchangeCode(config, authCode);
         SsoUserInfo userInfo = ssoProvider.fetchUserInfo(config, token);
         if (userInfo == null || userInfo.getExternalUserId() == null || userInfo.getExternalUserId().isBlank()) {
-            throw new BusinessException(ErrorCode.AUTH_SSO_USER_ID_MISSING);
+            throw new BusinessException(ErrorCode.SSO_USER_ID_MISSING);
         }
         return userInfo;
     }

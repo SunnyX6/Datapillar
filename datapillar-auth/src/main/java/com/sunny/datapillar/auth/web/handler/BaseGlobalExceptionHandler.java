@@ -100,7 +100,7 @@ public abstract class BaseGlobalExceptionHandler {
     }
 
     protected ErrorCode getInternalErrorCode() {
-        return ErrorCode.COMMON_INTERNAL_ERROR;
+        return ErrorCode.INTERNAL_ERROR;
     }
 
     private ApiResponse<Object> buildInternalError(HttpServletResponse response) {

@@ -13,17 +13,17 @@ public class GlobalExceptionHandler extends BaseGlobalExceptionHandler {
 
     @Override
     protected ErrorCode getValidationErrorCode() {
-        return ErrorCode.AUTH_VALIDATION_ERROR;
+        return ErrorCode.VALIDATION_ERROR;
     }
 
     @Override
     protected ErrorCode getInvalidArgumentErrorCode() {
-        return ErrorCode.AUTH_INVALID_ARGUMENT;
+        return ErrorCode.INVALID_ARGUMENT;
     }
 
     @Override
     protected ErrorCode getDuplicateKeyErrorCode() {
-        return ErrorCode.AUTH_DUPLICATE_KEY;
+        return ErrorCode.DUPLICATE_KEY;
     }
 
     @Override

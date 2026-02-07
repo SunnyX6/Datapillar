@@ -19,7 +19,7 @@
 - 本地存储 `storage_uri` 必须带 `file:///` 前缀
 
 ## 数据表设计
-- DDL 文件：`docs/knowledge_wiki.sql`
+- DDL 文件：`../docs/db/datapillar_studio_schema.sql`（唯一来源）
 - 当前表：
   - knowledge_namespace（命名空间）
   - knowledge_document（文档元数据）
@@ -69,7 +69,7 @@
 ```json
 {
   "status": 400,
-  "code": "INVALID_PARAM",
+  "code": "INVALID_ARGUMENT",
   "message": "namespace 不能为空",
   "data": null,
   "timestamp": "2026-01-28T12:00:00Z",

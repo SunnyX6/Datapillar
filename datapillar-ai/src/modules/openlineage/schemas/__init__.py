@@ -8,7 +8,7 @@ OpenLineage Sink - 数据模型
 包含 OpenLineage 标准事件模型、Facet 模型和 Neo4j 节点 DTO
 """
 
-from src.infrastructure.repository.kg.dto import (
+from src.infrastructure.repository.knowledge.dto import (
     SQLDTO,
     ColumnDTO,
     MetricDTO,

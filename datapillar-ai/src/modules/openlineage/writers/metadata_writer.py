@@ -15,8 +15,8 @@ from __future__ import annotations
 import logging
 from neo4j import AsyncSession
 
-from src.infrastructure.repository.kg.dto import MetricDTO
-from src.modules.openlineage.core.embedding_processor import embedding_processor
+from src.infrastructure.repository.knowledge.dto import MetricDTO
+from src.modules.openlineage.core.embedding_processor import get_embedding_processor
 from src.modules.openlineage.parsers.plans.types import MetadataWritePlans
 from src.modules.openlineage.writers.base import BaseWriter
 from src.modules.openlineage.writers.metadata import (
@@ -73,6 +73,7 @@ class MetadataWriter(BaseWriter):
         if tags:
             parts.extend(tags)
         text = " ".join(parts)
+        embedding_processor = get_embedding_processor()
         if await embedding_processor.put(node_id, node_label, text):
             self._embedding_tasks_queued += 1
 
@@ -82,6 +83,7 @@ class MetadataWriter(BaseWriter):
 
         与普通节点不同，Tag 的 name 通常就包含业务语义，如"金融"、"核心指标"等
         """
+        embedding_processor = get_embedding_processor()
         if await embedding_processor.put(node_id, "Tag", text):
             self._tag_embedding_tasks_queued += 1
 

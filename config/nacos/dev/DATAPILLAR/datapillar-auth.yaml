@@ -1,0 +1,130 @@
+server:
+  port: 7001
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: datapillar-auth
+  datasource:
+    # 使用与业务系统相同的数据库
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:datapillar}?useSSL=false&serverTimezone=UTC&characterEncoding=utf8&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:Sunny.123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      auto-commit: true
+      idle-timeout: 30000
+      pool-name: AuthHikariCP
+      max-lifetime: 900000
+      connection-timeout: 10000
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    map-underscore-to-camel-case: true
+  # 认证服务只扫描 users 表的 Mapper
+  mapper-locations: classpath*:/mapper/*Mapper.xml
+
+# JWT 配置
+jwt:
+  # 对称密钥
+  secret: Datapillar-Local-Secret-2026-02-04
+  # Access Token 过期时间 (秒)
+  # 开发环境：可通过环境变量 JWT_ACCESS_EXPIRATION=60 设置为60秒来测试自动刷新
+  # 生产环境：3600秒（60分钟）
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:3600}     # 60 分钟
+  # Refresh Token 过期时间 (秒)
+  # 未勾选记住我：7 天
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800}  # 7 天
+  # 勾选记住我：30 天
+  refresh-token-expiration-remember: ${JWT_REFRESH_REMEMBER_EXPIRATION:2592000}  # 30 天
+  # 登录选择租户临时 Token 过期时间 (秒)
+  login-token-expiration: ${JWT_LOGIN_EXPIRATION:300}  # 5 分钟
+  # 颁发者
+  issuer: datapillar-auth
+
+# Cookie 配置
+cookie:
+  secure: false
+
+# 安全配置（严格模式）
+security:
+  allowed-origins:
+    - http://localhost:3001
+    - http://127.0.0.1:3001
+    - https://localhost:3001
+    - https://127.0.0.1:3001
+    - https://localhost
+    - https://127.0.0.1
+  csrf:
+    enabled: true
+    header-name: X-CSRF-Token
+    cookie-name: csrf-token
+    refresh-header-name: X-Refresh-CSRF-Token
+    refresh-cookie-name: refresh-csrf-token
+    ttl-seconds: ${JWT_ACCESS_EXPIRATION:3600}
+  login:
+    enabled: true
+    max-attempts: 5
+    window-seconds: 600
+    lock-seconds: 900
+  password:
+    argon2:
+      salt-length: 16
+      hash-length: 32
+      parallelism: 1
+      memory-mb: 64
+      iterations: 3
+
+# SSO 配置
+sso:
+  state-ttl-seconds: ${SSO_STATE_TTL_SECONDS:300}  # 5分钟
+
+# Actuator 健康检查（与服务同端口）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+logging:
+  level:
+    com.sunny.datapillar.auth: INFO
+    org.springframework.security: WARN
+    org.mybatis: WARN
+    com.zaxxer.hikari: WARN
+    root: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: ${LOG_HOME:/tmp/datapillar-logs}/datapillar-auth.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30

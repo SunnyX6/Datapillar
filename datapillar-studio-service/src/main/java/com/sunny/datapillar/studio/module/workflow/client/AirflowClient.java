@@ -76,14 +76,14 @@ public class AirflowClient {
                         return cachedToken;
                     }
                 }
-                throw new BusinessException(ErrorCode.ADMIN_AIRFLOW_AUTH_FAILED,
+                throw new BusinessException(ErrorCode.AIRFLOW_AUTH_FAILED,
                         "Failed to get Airflow token, response code: " + response.code());
             }
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
             log.error("Failed to authenticate with Airflow: {}", e.getMessage());
-            throw new BusinessException(ErrorCode.ADMIN_AIRFLOW_AUTH_FAILED,
+            throw new BusinessException(ErrorCode.AIRFLOW_AUTH_FAILED,
                     "Airflow authentication failed: " + e.getMessage());
         }
     }
@@ -106,7 +106,7 @@ public class AirflowClient {
             throw e;
         } catch (Exception e) {
             log.error("Airflow GET {} failed: {}", path, e.getMessage());
-            throw new BusinessException(ErrorCode.ADMIN_AIRFLOW_REQUEST_FAILED,
+            throw new BusinessException(ErrorCode.AIRFLOW_REQUEST_FAILED,
                     "Airflow request failed: " + e.getMessage());
         }
     }
@@ -134,7 +134,7 @@ public class AirflowClient {
             throw e;
         } catch (Exception e) {
             log.error("Airflow POST {} failed: {}", path, e.getMessage());
-            throw new BusinessException(ErrorCode.ADMIN_AIRFLOW_REQUEST_FAILED,
+            throw new BusinessException(ErrorCode.AIRFLOW_REQUEST_FAILED,
                     "Airflow request failed: " + e.getMessage());
         }
     }
@@ -161,7 +161,7 @@ public class AirflowClient {
             throw e;
         } catch (Exception e) {
             log.error("Airflow PATCH {} failed: {}", path, e.getMessage());
-            throw new BusinessException(ErrorCode.ADMIN_AIRFLOW_REQUEST_FAILED,
+            throw new BusinessException(ErrorCode.AIRFLOW_REQUEST_FAILED,
                     "Airflow request failed: " + e.getMessage());
         }
     }
@@ -184,7 +184,7 @@ public class AirflowClient {
             throw e;
         } catch (Exception e) {
             log.error("Airflow DELETE {} failed: {}", path, e.getMessage());
-            throw new BusinessException(ErrorCode.ADMIN_AIRFLOW_REQUEST_FAILED,
+            throw new BusinessException(ErrorCode.AIRFLOW_REQUEST_FAILED,
                     "Airflow request failed: " + e.getMessage());
         }
     }
@@ -200,7 +200,7 @@ public class AirflowClient {
 
         String errorBody = response.body() != null ? response.body().string() : "";
         log.error("Airflow {} {} failed: {} {}", method, path, response.code(), errorBody);
-        throw new BusinessException(ErrorCode.ADMIN_AIRFLOW_REQUEST_FAILED,
+        throw new BusinessException(ErrorCode.AIRFLOW_REQUEST_FAILED,
                 "Airflow request failed: " + response.code() + " " + errorBody);
     }
 }

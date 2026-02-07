@@ -27,22 +27,24 @@ from datapillar_oneagentic.knowledge import (
 from datapillar_oneagentic.providers.llm.config import EmbeddingConfig
 from datapillar_oneagentic.storage.config import VectorStoreConfig
 
+from src.infrastructure.crypto.key_crypto import decrypt_api_key, is_encrypted
+from src.infrastructure.keystore import get_key_storage
 from src.infrastructure.repository.rag import DocumentRepository, JobRepository, NamespaceRepository
 from src.infrastructure.repository.system.ai_model import Model as AiModelRepository
 from src.modules.rag.sse import job_event_hub
 from src.modules.rag.storage import StorageManager
-from src.shared.config import settings
+from src.shared.config.runtime import get_knowledge_wiki_config
 
 logger = logging.getLogger(__name__)
 
 
 class KnowledgeWikiService:
     def __init__(self) -> None:
-        cfg = settings.get("knowledge_wiki", {})
-        self._storage = StorageManager(cfg.get("storage", {}))
-        self._vector_store_cfg = VectorStoreConfig(**(cfg.get("vector_store", {}) or {}))
-        self._embedding_batch_size = int(cfg.get("embedding_batch_size") or 20)
-        self._progress_step = int(cfg.get("progress_step") or 20)
+        cfg = get_knowledge_wiki_config()
+        self._storage = StorageManager(cfg["storage"])
+        self._vector_store_cfg = VectorStoreConfig(**cfg["vector_store"])
+        self._embedding_batch_size = int(cfg["embedding_batch_size"])
+        self._progress_step = int(cfg["progress_step"])
 
     def list_namespaces(self, user_id: int, *, limit: int, offset: int) -> tuple[list[dict], int]:
         return NamespaceRepository.list_by_user(user_id, limit=limit, offset=offset)
@@ -143,6 +145,7 @@ class KnowledgeWikiService:
         self,
         *,
         user_id: int,
+        tenant_id: int,
         document_id: int,
         chunk_mode: str | None,
         chunk_config_json: dict[str, Any] | None,
@@ -176,6 +179,7 @@ class KnowledgeWikiService:
                 namespace_id=int(document["namespace_id"]),
                 document_id=document_id,
                 user_id=user_id,
+                tenant_id=tenant_id,
                 chunk_mode=resolved_chunk.mode,
                 chunk_config=resolved_chunk,
             )
@@ -203,6 +207,7 @@ class KnowledgeWikiService:
         self,
         *,
         user_id: int,
+        tenant_id: int,
         document_id: int,
         limit: int,
         offset: int,
@@ -214,7 +219,7 @@ class KnowledgeWikiService:
         doc_uid = _normalize_doc_uid(document.get("doc_uid"))
 
         namespace_value = self._get_namespace_value(int(document["namespace_id"]), user_id)
-        embedding_model = self._get_embedding_model(int(document["embedding_model_id"]))
+        embedding_model = self._get_embedding_model(int(document["embedding_model_id"]), tenant_id)
         service = self._build_service(namespace=namespace_value, model=embedding_model)
         rows = await service.list_chunks(
             filters={"doc_id": doc_uid},
@@ -235,6 +240,7 @@ class KnowledgeWikiService:
         self,
         *,
         user_id: int,
+        tenant_id: int,
         chunk_id: str,
         content: str,
     ) -> dict[str, Any]:
@@ -252,6 +258,7 @@ class KnowledgeWikiService:
                 document=document,
                 chunk_id=chunk_id,
                 content=content,
+                tenant_id=tenant_id,
             )
         )
         return {
@@ -260,7 +267,7 @@ class KnowledgeWikiService:
             "sse_url": f"/api/ai/knowledge/wiki/jobs/{job_id}/sse",
         }
 
-    async def delete_chunk(self, *, user_id: int, chunk_id: str) -> int:
+    async def delete_chunk(self, *, user_id: int, tenant_id: int, chunk_id: str) -> int:
         doc_uid = _parse_doc_uid(chunk_id)
         if not doc_uid:
             raise ValueError("invalid chunk_id")
@@ -268,7 +275,7 @@ class KnowledgeWikiService:
         if not document:
             raise ValueError("document not found")
         namespace_value = self._get_namespace_value(int(document["namespace_id"]), user_id)
-        embedding_model = self._get_embedding_model(int(document["embedding_model_id"]))
+        embedding_model = self._get_embedding_model(int(document["embedding_model_id"]), tenant_id)
         service = self._build_service(namespace=namespace_value, model=embedding_model)
         deleted = await service.delete_chunks(chunk_ids=[chunk_id], namespace=namespace_value)
         await service.close()
@@ -280,11 +287,11 @@ class KnowledgeWikiService:
             )
         return deleted
 
-    async def retrieve(self, *, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+    async def retrieve(self, *, user_id: int, tenant_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         namespace_id = int(payload["namespace_id"])
         self._ensure_namespace_owner(user_id, namespace_id)
         model_id = self._resolve_namespace_embedding_model(namespace_id)
-        embedding_model = self._get_embedding_model(model_id)
+        embedding_model = self._get_embedding_model(model_id, tenant_id)
         namespace_value = self._get_namespace_value(namespace_id, user_id)
         service = self._build_service(namespace=namespace_value, model=embedding_model)
 
@@ -343,13 +350,13 @@ class KnowledgeWikiService:
             )
         return {"hits": hits, "latency_ms": latency_ms}
 
-    async def delete_document(self, *, user_id: int, document_id: int) -> int:
+    async def delete_document(self, *, user_id: int, tenant_id: int, document_id: int) -> int:
         document = DocumentRepository.get(document_id, user_id)
         if not document:
             return 0
         if document.get("doc_uid"):
             namespace_value = self._get_namespace_value(int(document["namespace_id"]), user_id)
-            embedding_model = self._get_embedding_model(int(document["embedding_model_id"]))
+            embedding_model = self._get_embedding_model(int(document["embedding_model_id"]), tenant_id)
             service = self._build_service(namespace=namespace_value, model=embedding_model)
             await service.delete_document(doc_id=document["doc_uid"], namespace=namespace_value)
             await service.close()
@@ -362,6 +369,7 @@ class KnowledgeWikiService:
         namespace_id: int,
         document_id: int,
         user_id: int,
+        tenant_id: int,
         chunk_mode: str,
         chunk_config: KnowledgeChunkConfig,
     ) -> None:
@@ -380,7 +388,7 @@ class KnowledgeWikiService:
             return
 
         try:
-            embedding_model = self._get_embedding_model(int(document["embedding_model_id"]))
+            embedding_model = self._get_embedding_model(int(document["embedding_model_id"]), tenant_id)
             namespace_value = self._get_namespace_value(int(document["namespace_id"]), int(document["created_by"]))
             doc_uid = _normalize_doc_uid(document.get("doc_uid"))
             service = self._build_service(namespace=namespace_value, model=embedding_model)
@@ -472,6 +480,7 @@ class KnowledgeWikiService:
         document: dict[str, Any],
         chunk_id: str,
         content: str,
+        tenant_id: int,
     ) -> None:
         JobRepository.mark_running(job_id)
         job_snapshot = JobRepository.get(job_id, int(document["created_by"]))
@@ -479,7 +488,7 @@ class KnowledgeWikiService:
             await job_event_hub.publish(job_id, _build_progress_event(job_snapshot))
 
         try:
-            embedding_model = self._get_embedding_model(int(document["embedding_model_id"]))
+            embedding_model = self._get_embedding_model(int(document["embedding_model_id"]), tenant_id)
             namespace_value = self._get_namespace_value(int(document["namespace_id"]), int(document["created_by"]))
             service = self._build_service(namespace=namespace_value, model=embedding_model)
             try:
@@ -521,15 +530,26 @@ class KnowledgeWikiService:
             config.mode = chunk_mode
         return config
 
-    def _get_embedding_model(self, model_id: int) -> dict[str, Any]:
-        model = AiModelRepository.get_model(model_id)
+    def _get_embedding_model(self, model_id: int, tenant_id: int) -> dict[str, Any]:
+        model = AiModelRepository.get_model(model_id, tenant_id)
         if not model:
             raise ValueError("embedding model not found")
-        if model.get("model_type") != "embedding":
-            raise ValueError("model_type is not embedding")
+        if model.get("model_type") != "embeddings":
+            raise ValueError("model_type is not embeddings")
+        if model.get("status") != "ACTIVE":
+            raise ValueError("embedding model is not active")
+        encrypted_key = model.get("api_key")
+        if not encrypted_key:
+            raise ValueError("embedding model api_key is required")
+        if not is_encrypted(encrypted_key):
+            raise ValueError("embedding model api_key 未加密")
         if not model.get("embedding_dimension"):
             raise ValueError("embedding_dimension is required")
-        return model
+        private_key = get_key_storage().load_private_key(tenant_id)
+        decrypted_key = decrypt_api_key(private_key, encrypted_key)
+        normalized = dict(model)
+        normalized["api_key"] = decrypted_key
+        return normalized
 
     def _build_knowledge_config(
         self,
@@ -538,9 +558,9 @@ class KnowledgeWikiService:
         retrieve_config: KnowledgeRetrieveConfig | None = None,
     ) -> KnowledgeConfig:
         embedding = EmbeddingConfig(
-            provider=model.get("provider"),
+            provider=model.get("provider_code"),
             api_key=model.get("api_key"),
-            model=model.get("model_name"),
+            model=model.get("model_id"),
             base_url=model.get("base_url"),
             dimension=int(model.get("embedding_dimension")),
         )

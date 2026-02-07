@@ -112,7 +112,7 @@ gravitino.openlineage.transport.type = http
 gravitino.openlineage.namespace = gravitino
 
 # HTTP Transport Settings
-gravitino.openlineage.transport.url = http://127.0.0.1:6003
+gravitino.openlineage.transport.url = http://127.0.0.1:7003
 gravitino.openlineage.transport.endpoint = /api/ai/openlineage
 gravitino.openlineage.transport.timeoutInMillis = 5000
 gravitino.openlineage.transport.compression = gzip

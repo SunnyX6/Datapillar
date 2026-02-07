@@ -18,8 +18,9 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
+from src.modules.etl.agents import create_etl_team
 from src.modules.etl.sse_protocol import RunRegistry, adapt_sse_stream
-from src.shared.web import build_success
+from src.shared.web import ApiResponse
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +45,18 @@ class WorkflowRequest(BaseModel):
 
 def _get_team(request: Request) -> Datapillar:
     """获取 ETL 团队实例"""
-    team: Datapillar | None = getattr(request.app.state, "etl_team", None)
+    current_user = request.state.current_user
+    tenant_id = current_user.tenant_id
+    teams: dict[int, Datapillar] | None = getattr(request.app.state, "etl_teams", None)
+    if teams is None:
+        teams = {}
+        request.app.state.etl_teams = teams
+
+    team = teams.get(tenant_id)
     if team is None:
-        raise HTTPException(status_code=503, detail="ETL 团队尚未就绪")
+        team = create_etl_team(tenant_id=tenant_id)
+        teams[tenant_id] = team
+
     return team
 
 
@@ -118,7 +128,7 @@ async def chat(payload: WorkflowRequest, request: Request):
             resume_value=None,
         )
 
-    return build_success(
+    return ApiResponse.success(
         request=request,
         data={
             "success": True,
@@ -193,7 +203,7 @@ async def clear_session(payload: WorkflowRequest, request: Request):
     etl_stream_manager.clear_session(key=key)
     etl_run_registry.finish_run(str(key))
 
-    return build_success(
+    return ApiResponse.success(
         request=request,
         data={
             "success": True,
@@ -238,7 +248,7 @@ async def abort_workflow(payload: WorkflowRequest, request: Request):
     if aborted:
         etl_run_registry.finish_run(str(key))
 
-    return build_success(
+    return ApiResponse.success(
         request=request,
         data={
             "success": True,
@@ -276,7 +286,7 @@ async def compact_session(payload: WorkflowRequest, request: Request):
         logger.error("压缩失败: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="压缩失败") from exc
 
-    return build_success(request=request, data=result)
+    return ApiResponse.success(request=request, data=result)
 
 
 @router.get("/session/stats")
@@ -305,4 +315,4 @@ async def get_session_stats(
         logger.error("获取统计信息失败: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="获取统计信息失败") from exc
 
-    return build_success(request=request, data=stats)
+    return ApiResponse.success(request=request, data=stats)

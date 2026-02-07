@@ -11,7 +11,7 @@ OpenLineage Sink API
 ```yaml
 transport:
   type: http
-  url: http://datapillar-ai:6003
+  url: http://datapillar-ai:7003
   endpoint: /api/ai/openlineage
 ```
 """
@@ -22,13 +22,21 @@ import logging
 from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 
-from src.modules.openlineage.core.event_processor import event_processor
+from src.modules.openlineage.service import OpenLineageSinkService
 from src.modules.openlineage.schemas.events import RunEvent
-from src.shared.web import build_error, build_success
+from src.shared.web import ApiResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+_service: OpenLineageSinkService | None = None
+
+
+def _get_service() -> OpenLineageSinkService:
+    global _service
+    if _service is None:
+        _service = OpenLineageSinkService()
+    return _service
 
 
 @router.post(
@@ -48,42 +56,8 @@ router = APIRouter()
 async def receive_event(request: Request, event: RunEvent):
     """接收 OpenLineage 事件"""
     try:
-        # 调试日志：打印完整 facets
-        input_details = []
-        for i in event.inputs:
-            detail = {"namespace": i.namespace, "name": i.name}
-            if i.facets:
-                if "symlinks" in i.facets:
-                    detail["symlinks"] = i.facets["symlinks"]
-                if "catalog" in i.facets:
-                    detail["catalog"] = i.facets["catalog"]
-            input_details.append(detail)
-
-        output_details = []
-        for o in event.outputs:
-            detail = {"namespace": o.namespace, "name": o.name}
-            if o.facets:
-                if "symlinks" in o.facets:
-                    detail["symlinks"] = o.facets["symlinks"]
-                if "catalog" in o.facets:
-                    detail["catalog"] = o.facets["catalog"]
-                if "columnLineage" in o.facets:
-                    detail["columnLineage"] = o.facets["columnLineage"]
-            output_details.append(detail)
-
-        logger.info(
-            "openlineage_event_received",
-            extra={
-                "data": {
-                    "event_type": str(event.eventType) if event.eventType else None,
-                    "job_namespace": event.job.namespace,
-                    "inputs": input_details,
-                    "outputs": output_details,
-                }
-            },
-        )
-
-        result = await event_processor.put(event)
+        service = _get_service()
+        result = await service.handle_event(event)
 
         if not result.get("success"):
             error = result.get("error", "Unknown error")
@@ -92,10 +66,10 @@ async def receive_event(request: Request, event: RunEvent):
                 code = "SERVICE_UNAVAILABLE"
             else:
                 status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-                code = "SERVER_ERROR"
+                code = "INTERNAL_ERROR"
             return JSONResponse(
                 status_code=status_code,
-                content=build_error(
+                content=ApiResponse.error(
                     request=request,
                     status=status_code,
                     code=code,
@@ -103,7 +77,7 @@ async def receive_event(request: Request, event: RunEvent):
                 ),
             )
 
-        return build_success(
+        return ApiResponse.success(
             request=request,
             data={
                 "success": True,
@@ -120,10 +94,10 @@ async def receive_event(request: Request, event: RunEvent):
         )
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=build_error(
+            content=ApiResponse.error(
                 request=request,
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                code="SERVER_ERROR",
+                code="INTERNAL_ERROR",
                 message=str(e),
             ),
         )
@@ -132,4 +106,5 @@ async def receive_event(request: Request, event: RunEvent):
 @router.get("/stats", summary="获取统计信息")
 async def get_stats(request: Request) -> dict[str, Any]:
     """获取统计信息"""
-    return build_success(request=request, data=event_processor.stats)
+    service = _get_service()
+    return ApiResponse.success(request=request, data=service.get_stats())

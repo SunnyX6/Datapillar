@@ -8,7 +8,7 @@
 提供数据库访问的统一接口
 """
 
-from src.infrastructure.repository.kg import (
+from src.infrastructure.repository.knowledge import (
     MetricDTO,
     ModifierDTO,
     Neo4jGraphSearch,

@@ -1,0 +1,155 @@
+from __future__ import annotations
+
+import importlib
+
+import pytest
+from dynaconf import Dynaconf
+
+from src.shared.config.exceptions import ConfigurationError
+from src.shared.config.nacos_client import (
+    apply_nacos_config,
+    load_nacos_config,
+    parse_nacos_config_content,
+)
+from src.shared.config.runtime import clear_runtime_config_cache
+
+
+class StubNacosClient:
+    def __init__(self, content: str | bytes | None):
+        self._content = content
+
+    async def get_config(self, _param):
+        return self._content
+
+
+@pytest.fixture(autouse=True)
+def _clear_runtime_config_cache():
+    clear_runtime_config_cache()
+    yield
+    clear_runtime_config_cache()
+
+
+def _valid_runtime_config() -> dict[str, object]:
+    return {
+        "app_port": 7003,
+        "mysql_host": "127.0.0.1",
+        "mysql_port": 3306,
+        "mysql_database": "datapillar",
+        "mysql_username": "root",
+        "mysql_password": "Sunny.123456",
+        "neo4j_uri": "bolt://127.0.0.1:7687",
+        "neo4j_database": "neo4j",
+        "neo4j_username": "neo4j",
+        "neo4j_password": "123456asd",
+        "redis_host": "127.0.0.1",
+        "redis_port": 6379,
+        "redis_db": 0,
+        "redis_password": "",
+        "gravitino_db_type": "mysql",
+        "gravitino_db_host": "127.0.0.1",
+        "gravitino_db_port": 3306,
+        "gravitino_db_database": "gravitino",
+        "gravitino_db_username": "root",
+        "gravitino_db_password": "Sunny.123456",
+        "gravitino_sync_metalake": "datapillar",
+        "jwt_secret": "jwt-secret",
+        "jwt_issuer": "datapillar",
+        "auth_enabled": True,
+        "llm": {"retry": {"max_retries": 2}},
+        "agent": {"max_steps": 10},
+        "openlineage_sink": {
+            "graceful_shutdown_timeout": 30.0,
+            "queue": {
+                "max_size": 10000,
+                "batch_size": 100,
+                "flush_interval_seconds": 5.0,
+            },
+            "neo4j": {"batch_size": 50, "max_concurrent": 10},
+        },
+        "sql_summary": {
+            "enabled": True,
+            "batch_size": 5,
+            "flush_interval_seconds": 300.0,
+            "max_queue_size": 1000,
+            "max_sql_length": 10000,
+            "min_sql_length": 50,
+        },
+        "knowledge_wiki": {
+            "storage": {"type": "local", "local_dir": "./data/knowledge_wiki"},
+            "vector_store": {
+                "provider": "milvus",
+                "uri": "http://127.0.0.1:19530",
+            },
+            "embedding_batch_size": 20,
+            "progress_step": 20,
+        },
+        "security": {
+            "default_tenant_id": 1,
+            "key_storage": {
+                "type": "local",
+                "local_path": "/data/datapillar/privkeys",
+                "s3": {
+                    "endpoint_url": "",
+                    "access_key": "",
+                    "secret_key": "",
+                    "bucket": "",
+                    "region": "",
+                    "prefix": "privkeys",
+                },
+            },
+        },
+    }
+
+
+def test_parse_nacos_config_content_ok():
+    content = """
+app_name: "Datapillar AI"
+llm:
+  retry:
+    max_retries: 2
+"""
+    data = parse_nacos_config_content(content, "datapillar-ai.yaml", "DATAPILLAR")
+    assert data["app_name"] == "Datapillar AI"
+    assert data["llm"]["retry"]["max_retries"] == 2
+
+
+def test_parse_nacos_config_content_rejects_list():
+    content = """
+- a
+- b
+"""
+    with pytest.raises(ConfigurationError):
+        parse_nacos_config_content(content, "datapillar-ai.yaml", "DATAPILLAR")
+
+
+@pytest.mark.asyncio
+async def test_load_nacos_config_empty_raises():
+    client = StubNacosClient("")
+    with pytest.raises(ConfigurationError):
+        await load_nacos_config(client, "datapillar-ai.yaml", "DATAPILLAR")
+
+
+def test_apply_nacos_config_updates_settings():
+    settings = Dynaconf(loaders=[])
+    config = _valid_runtime_config()
+    apply_nacos_config(settings, config)
+
+    assert settings.mysql_host == "127.0.0.1"
+    assert settings.sql_summary["batch_size"] == 5
+
+
+def test_apply_nacos_config_missing_required_key_raises():
+    settings = Dynaconf(loaders=[])
+    config = _valid_runtime_config()
+    del config["mysql_host"]
+
+    with pytest.raises(ConfigurationError):
+        apply_nacos_config(settings, config)
+
+
+def test_settings_module_disables_env_override(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("DATAPILLAR_MYSQL_HOST", "env-host")
+
+    settings_module = importlib.import_module("src.shared.config.settings")
+    reloaded = importlib.reload(settings_module)
+    assert reloaded.settings.get("mysql_host") is None

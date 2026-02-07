@@ -18,6 +18,13 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 export LOG_HOME="/tmp/datapillar-logs"
 mkdir -p "$LOG_HOME"
 
+# Nacos 统一环境变量（本地）
+export NACOS_SERVER_ADDR="127.0.0.1:8848"
+export NACOS_NAMESPACE="dev"
+export NACOS_USERNAME="datapillar-svc"
+export NACOS_PASSWORD="123456asd"
+export NACOS_GROUP="DATAPILLAR"
+
 echo "=========================================="
 echo "   ____        _              _ _ _            "
 echo "  |  _ \  __ _| |_ __ _ _ __ (_) | | __ _ _ __ "
@@ -85,13 +92,13 @@ start_java_service() {
 
 # 启动 Python AI 服务
 start_ai_service() {
-    # 从 .env 读取端口配置，默认 6003
+    # 从 .env 读取端口配置，默认 7003
     cd "$PROJECT_ROOT/datapillar-ai"
     if [ -f ".env" ]; then
         AI_PORT=$(grep "^APP_PORT=" .env | cut -d'=' -f2)
-        AI_PORT=${AI_PORT:-6003}
+        AI_PORT=${AI_PORT:-7003}
     else
-        AI_PORT=6003
+        AI_PORT=7003
     fi
 
     echo "▶️  启动 datapillar-ai (端口: $AI_PORT)"
@@ -116,19 +123,15 @@ echo ""
 
 # 1. 启动认证服务
 start_java_service "datapillar-auth" \
-    "$PROJECT_ROOT/datapillar-auth/target/datapillar-auth-1.0.0.jar" 6001
+    "$PROJECT_ROOT/datapillar-auth/target/datapillar-auth-1.0.0.jar" 7001
 
 # 2. 启动核心业务服务
 start_java_service "datapillar-studio-service" \
-    "$PROJECT_ROOT/datapillar-studio-service/target/datapillar-studio-service-1.0.0.jar" 6002
-
-# 2.1 启动平台服务
-start_java_service "datapillar-platform" \
-    "$PROJECT_ROOT/datapillar-platform/target/datapillar-platform-1.0.0.jar" 6006
+    "$PROJECT_ROOT/datapillar-studio-service/target/datapillar-studio-service-1.0.0.jar" 7002
 
 # 3. 启动 API 网关
 start_java_service "datapillar-api-gateway" \
-    "$PROJECT_ROOT/datapillar-api-gateway/target/datapillar-api-gateway-1.0.0.jar" 6000
+    "$PROJECT_ROOT/datapillar-api-gateway/target/datapillar-api-gateway-1.0.0.jar" 7000
 
 # 4. 启动 AI 服务
 start_ai_service
@@ -140,11 +143,10 @@ echo -e "${GREEN}✅ 所有服务启动命令已执行！${NC}"
 echo "=========================================="
 echo ""
 echo "📋 服务列表："
-echo "   • API 网关:           http://localhost:6000"
-echo "   • 认证服务:           http://localhost:6001"
-echo "   • 核心业务:           http://localhost:6002"
-echo "   • 平台服务:           http://localhost:6006"
-echo "   • AI 服务:            http://localhost:6003"
+echo "   • API 网关:           http://localhost:7000"
+echo "   • 认证服务:           http://localhost:7001"
+echo "   • 核心业务:           http://localhost:7002"
+echo "   • AI 服务:            http://localhost:7003"
 echo ""
 echo "📝 日志目录: $LOG_HOME"
 echo "   tail -f $LOG_HOME/datapillar-*.log"

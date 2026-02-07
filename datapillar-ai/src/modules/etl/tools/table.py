@@ -21,7 +21,7 @@ import logging
 
 from pydantic import BaseModel, Field
 
-from src.infrastructure.repository.kg import Neo4jColumnSearch, Neo4jTableSearch
+from src.infrastructure.repository.knowledge import Neo4jColumnSearch, Neo4jTableSearch
 from src.modules.etl.tools.registry import etl_tool
 
 logger = logging.getLogger(__name__)

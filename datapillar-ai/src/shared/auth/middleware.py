@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 from src.shared.auth.jwt_util import JwtTokenUtil
 from src.shared.auth.user import CurrentUser
 from src.shared.config.settings import settings
+from src.shared.web import ApiResponse
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -37,24 +38,24 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app):
         super().__init__(app)
-        self.jwt_util = JwtTokenUtil(
-            secret=settings.jwt_secret,
-            issuer=settings.jwt_issuer,
-        )
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """拦截请求，验证认证"""
         path = request.url.path
 
-        # 检查是否禁用认证
-        if not getattr(settings, 'auth_enabled', True):
-            # 认证关闭时，注入默认用户
-            request.state.current_user = CurrentUser(
-                user_id=1,
-                username="dev_user",
-                email="dev@datapillar.io",
+        tenant_id = self._extract_tenant_id(request)
+        if tenant_id is None:
+            logger.warning(f"[Auth] 缺少租户信息: {path}")
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content=ApiResponse.error(
+                    request=request,
+                    status=status.HTTP_401_UNAUTHORIZED,
+                    code="UNAUTHORIZED",
+                    message="缺少租户信息",
+                ),
+                headers={"WWW-Authenticate": "Bearer"},
             )
-            return await call_next(request)
 
         # 白名单放行
         if (
@@ -71,37 +72,58 @@ class AuthMiddleware(BaseHTTPMiddleware):
             logger.warning(f"[Auth] 未提供认证凭证: {path}")
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                content={"error": "未提供认证凭证"},
+                content=ApiResponse.error(
+                    request=request,
+                    status=status.HTTP_401_UNAUTHORIZED,
+                    code="UNAUTHORIZED",
+                    message="未提供认证凭证",
+                ),
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
         # 验证 Token
         try:
-            if not self.jwt_util.validate_token(token):
+            jwt_util = JwtTokenUtil(
+                secret=settings.jwt_secret,
+                issuer=settings.jwt_issuer,
+            )
+
+            if not jwt_util.validate_token(token):
                 logger.warning(f"[Auth] Token验证失败: {path}")
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"error": "Token验证失败"},
+                    content=ApiResponse.error(
+                        request=request,
+                        status=status.HTTP_401_UNAUTHORIZED,
+                        code="TOKEN_INVALID",
+                        message="Token验证失败",
+                    ),
                     headers={"WWW-Authenticate": "Bearer"},
                 )
 
             # 检查 Token 类型
-            jwt_type = self.jwt_util.get_token_type(token)
+            jwt_type = jwt_util.get_token_type(token)
             if jwt_type != "access":
                 logger.warning(f"[Auth] Token类型错误: {jwt_type}, path={path}")
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"error": "Token类型错误，请使用Access Token"},
+                    content=ApiResponse.error(
+                        request=request,
+                        status=status.HTTP_401_UNAUTHORIZED,
+                        code="TOKEN_TYPE_ERROR",
+                        message="Token类型错误，请使用Access Token",
+                    ),
                     headers={"WWW-Authenticate": "Bearer"},
                 )
 
             # 提取用户信息并注入到 request.state
-            user_id = self.jwt_util.get_user_id(token)
-            username = self.jwt_util.get_username(token)
-            email = self.jwt_util.get_email(token)
+            user_id = jwt_util.get_user_id(token)
+            username = jwt_util.get_username(token)
+            email = jwt_util.get_email(token)
 
             current_user = CurrentUser(
                 user_id=user_id,
+                tenant_id=tenant_id,
                 username=username,
                 email=email,
             )
@@ -115,13 +137,30 @@ class AuthMiddleware(BaseHTTPMiddleware):
             logger.error(f"[Auth] 认证异常: {e}, path={path}")
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                content={"error": "认证失败"},
+                content=ApiResponse.error(
+                    request=request,
+                    status=status.HTTP_401_UNAUTHORIZED,
+                    code="UNAUTHORIZED",
+                    message="认证失败",
+                ),
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
         # 放行请求
         response = await call_next(request)
         return response
+
+    def _extract_tenant_id(self, request: Request) -> int | None:
+        """
+        从请求头提取租户ID
+        """
+        tenant_id = request.headers.get("X-Tenant-Id") or request.headers.get("x-tenant-id")
+        if not tenant_id:
+            return None
+        try:
+            return int(tenant_id)
+        except (TypeError, ValueError):
+            return None
 
     def _extract_token(self, request: Request) -> str | None:
         """

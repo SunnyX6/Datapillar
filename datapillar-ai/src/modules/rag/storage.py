@@ -25,13 +25,30 @@ class StorageResult:
 class StorageManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self._config = config
-        self._storage_type = (config.get("type") or "local").lower()
-        self._local_dir = config.get("local_dir") or "./data/knowledge_wiki"
-        self._s3_cfg = config.get("s3", {})
+        storage_type = config.get("type")
+        if not isinstance(storage_type, str) or not storage_type.strip():
+            raise ValueError("knowledge_wiki.storage.type 缺失")
+
+        self._storage_type = storage_type.strip().lower()
+        self._local_dir = config.get("local_dir")
+        self._s3_cfg = config.get("s3")
         self._s3_client = None
 
+        if self._storage_type == "local":
+            if not isinstance(self._local_dir, str) or not self._local_dir.strip():
+                raise ValueError("knowledge_wiki.storage.local_dir 缺失")
+            return
+
         if self._storage_type == "s3":
+            if not isinstance(self._s3_cfg, dict):
+                raise ValueError("knowledge_wiki.storage.s3 缺失")
+            bucket = self._s3_cfg.get("bucket")
+            if not isinstance(bucket, str) or not bucket.strip():
+                raise ValueError("knowledge_wiki.storage.s3.bucket 缺失")
             self._init_s3_client()
+            return
+
+        raise ValueError(f"不支持的知识库存储类型: {self._storage_type}")
 
     async def save(self, *, namespace_id: int, filename: str, content: bytes) -> StorageResult:
         if self._storage_type == "s3":
