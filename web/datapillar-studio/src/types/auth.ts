@@ -29,6 +29,9 @@ export interface RoleInfo {
 export interface User {
   userId: number
   tenantId?: number
+  tenantCode?: string
+  tenantName?: string
+  tenants?: TenantOption[]
   username: string
   email?: string
   avatar?: string
@@ -37,14 +40,11 @@ export interface User {
 }
 
 /**
- * 登录请求接口
+ * 密码登录请求接口
  */
-export interface LoginRequest {
+export interface PasswordLoginRequest {
   tenantCode?: string
-  inviteCode?: string
-  email?: string
-  phone?: string
-  username: string
+  loginAlias: string
   password: string
   rememberMe?: boolean
 }
@@ -53,10 +53,12 @@ export interface LoginRequest {
  * 登录成功响应接口
  */
 export interface LoginSuccess {
+  /** 成功登录场景通常不回传 loginStage */
+  loginStage?: string
   userId: number
-  tenantId: number
   username: string
   email?: string
+  tenants: TenantOption[]
   roles: RoleInfo[]
   menus: Menu[]
 }
@@ -69,44 +71,40 @@ export interface TenantOption {
   isDefault?: number
 }
 
-export type LoginStage = 'SUCCESS' | 'TENANT_SELECT'
+export interface TenantSelectResult {
+  loginStage: 'TENANT_SELECT'
+  tenants: TenantOption[]
+}
 
-export type LoginResult =
-  | ({ loginStage: 'SUCCESS' } & LoginSuccess)
-  | ({
-      loginStage: 'TENANT_SELECT'
-      loginToken: string
-      tenants: TenantOption[]
-    })
+export type LoginResult = LoginSuccess | TenantSelectResult
+
+export function isTenantSelectResult(result: LoginResult): result is TenantSelectResult {
+  return result.loginStage === 'TENANT_SELECT'
+}
 
 export interface LoginTenantRequest {
-  loginToken: string
   tenantId: number
 }
 
-export interface SsoQrResponse {
-  type: 'SDK' | 'URL' | string
+export interface SsoLoginRequest {
+  provider: string
+  code: string
   state: string
-  payload: Record<string, unknown>
+  rememberMe?: boolean
+  tenantCode?: string
 }
 
-export interface SsoLoginRequest {
-  tenantCode: string
-  provider: string
-  authCode: string
-  state: string
-  inviteCode?: string
-}
+export type LoginRequest = PasswordLoginRequest | SsoLoginRequest
 
 /**
  * Token 信息接口
  */
 export interface TokenInfo {
-  valid: boolean
   remainingSeconds: number
   expirationTime?: number
   issuedAt?: number
   userId?: number
+  tenantId?: number
   username?: string
 }
 

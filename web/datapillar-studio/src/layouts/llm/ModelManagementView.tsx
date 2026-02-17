@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -23,20 +23,14 @@ import {
   Maximize2,
   X
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button, Card, Modal, ModalCancelButton, ModalPrimaryButton, Select } from '@/components/ui'
 import { cardWidthClassMap, contentMaxWidthClassMap, drawerWidthClassMap, iconSizeToken, menuWidthClassMap, panelWidthClassMap, tableColumnWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
+import { listAdminModels } from '@/services/studioLlmService'
+import { mapAdminModelToRecord, resolveProviderLabel } from './modelAdapters'
 import { MAX_COMPARE_MODELS, connectModel, filterModels, toggleModelSelection } from './utils'
 import type { LlmProvider, ModelCategory, ModelFilters, ModelRecord } from './types'
-
-const PROVIDER_OPTIONS: Array<{ label: string; value: LlmProvider }> = [
-  { label: 'OpenAI', value: 'openai' },
-  { label: 'Anthropic', value: 'anthropic' },
-  { label: 'Google', value: 'google' },
-  { label: 'Meta', value: 'meta' },
-  { label: 'Mistral', value: 'mistral' },
-  { label: 'DeepSeek', value: 'deepseek' }
-]
 
 const TYPE_OPTIONS: Array<{ label: string; value: ModelCategory }> = [
   { label: 'Chat', value: 'chat' },
@@ -51,98 +45,7 @@ const MODEL_TYPE_OPTIONS: Array<{ label: string; value: ModelCategory }> = [
   { label: 'Code', value: 'code' }
 ]
 
-const CONTEXT_OPTIONS = ['4K', '8K', '32K', '64K', '128K', '1M+']
-
-const MODEL_RECORDS: ModelRecord[] = [
-  {
-    id: 'deepseek/deepseek-chat-v3',
-    name: 'DeepSeek: DeepSeek V3',
-    provider: 'deepseek',
-    description:
-      'DeepSeek-V3 is a strong Mixture-of-Experts (MoE) language model with 671B total parameters with 37B active for each token. It achieves comparable performance to GPT-4 and Claude 3.5 Sonnet.',
-    tags: ['chat'],
-    type: 'chat',
-    contextGroup: '64K',
-    stats: { context: '64K context', inputPrice: '$0.14/M', outputPrice: '$0.28/M', params: '671B params' },
-    isNew: true
-  },
-  {
-    id: 'openai/gpt-4o',
-    name: 'OpenAI: GPT-4o',
-    provider: 'openai',
-    description:
-      "GPT-4o is OpenAI's flagship model that integrates text, audio, and image processing in real time. It offers state-of-the-art performance in reasoning and multimodal tasks.",
-    tags: ['chat', 'vision'],
-    type: 'chat',
-    contextGroup: '128K',
-    stats: { context: '128K context', inputPrice: '$5.00/M', outputPrice: '$15.00/M' }
-  },
-  {
-    id: 'openai/text-embedding-3-large',
-    name: 'OpenAI: Text Embedding 3 Large',
-    provider: 'openai',
-    description: 'Most capable embedding model for both English and non-English tasks.',
-    tags: ['embeddings'],
-    type: 'embeddings',
-    contextGroup: '8K',
-    stats: { context: '8K context', inputPrice: '$0.13/M', outputPrice: '-', params: '3072 dims' }
-  },
-  {
-    id: 'anthropic/claude-3.5-sonnet',
-    name: 'Anthropic: Claude 3.5 Sonnet',
-    provider: 'anthropic',
-    description:
-      'Claude 3.5 Sonnet raises the industry bar for intelligence, outperforming competitor models and Claude 3 Opus on a wide range of evaluations.',
-    tags: ['chat', 'vision', 'coding'],
-    type: 'chat',
-    contextGroup: '128K',
-    stats: { context: '200K context', inputPrice: '$3.00/M', outputPrice: '$15.00/M' }
-  },
-  {
-    id: 'meta-llama/llama-3-70b-instruct',
-    name: 'Meta: Llama 3 70B Instruct (free)',
-    provider: 'meta',
-    description:
-      'The Llama 3 instruction tuned models are optimized for dialogue use cases and outperform many of the available open source chat models on common industry benchmarks.',
-    tags: ['chat', 'free', 'open-source'],
-    type: 'chat',
-    contextGroup: '8K',
-    stats: { context: '8K context', inputPrice: '$0/M', outputPrice: '$0/M', params: '70B params' }
-  },
-  {
-    id: 'google/gemini-pro-1.5',
-    name: 'Google: Gemini Pro 1.5',
-    provider: 'google',
-    description:
-      'Gemini 1.5 Pro is a mid-size multimodal model that is optimized for scaling across a wide range of tasks.',
-    tags: ['chat', 'vision', 'long-context'],
-    type: 'chat',
-    contextGroup: '1M+',
-    stats: { context: '1M context', inputPrice: '$3.50/M', outputPrice: '$10.50/M' }
-  },
-  {
-    id: 'mistralai/mistral-large',
-    name: 'Mistral: Mistral Large',
-    provider: 'mistral',
-    description: 'Mistral Large is the most advanced Large Language Model (LLM) developed by Mistral AI.',
-    tags: ['chat'],
-    type: 'chat',
-    contextGroup: '32K',
-    stats: { context: '32K context', inputPrice: '$8.00/M', outputPrice: '$24.00/M' }
-  }
-]
-
-const PROVIDER_LABEL: Record<LlmProvider, string> = {
-  openai: 'OpenAI',
-  anthropic: 'Anthropic',
-  deepseek: 'DeepSeek',
-  google: 'Google',
-  meta: 'Meta',
-  mistral: 'Mistral',
-  custom: 'Custom'
-}
-
-const DEFAULT_PROVIDER: LlmProvider = PROVIDER_OPTIONS[0]?.value ?? 'openai'
+const DEFAULT_PROVIDER: LlmProvider = 'openai'
 
 const emptyCreateForm = {
   modelId: '',
@@ -153,9 +56,13 @@ const emptyCreateForm = {
   modelType: 'chat' as ModelCategory
 }
 
+const getProviderLabel = (model: ModelRecord) => resolveProviderLabel(model.provider, model.providerLabel)
+
 export function ModelManagementView() {
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+  const [models, setModels] = useState<ModelRecord[]>([])
+  const [isLoadingModels, setIsLoadingModels] = useState(true)
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([])
   const [connectedModelIds, setConnectedModelIds] = useState<string[]>([])
   const [activeModelId, setActiveModelId] = useState<string | null>(null)
@@ -165,14 +72,99 @@ export function ModelManagementView() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState(emptyCreateForm)
 
+  const providerOptions = useMemo<Array<{ label: string; value: LlmProvider }>>(() => {
+    const providerMap = new Map<string, string>()
+    models.forEach((model) => {
+      if (!providerMap.has(model.provider)) {
+        providerMap.set(model.provider, resolveProviderLabel(model.provider, model.providerLabel))
+      }
+    })
+    return Array.from(providerMap.entries()).map(([value, label]) => ({
+      value: value as LlmProvider,
+      label
+    }))
+  }, [models])
+
+  const contextOptions = useMemo(() => {
+    return Array.from(new Set(models.map((model) => model.contextGroup)))
+      .filter((context) => context.trim().length > 0)
+      .map((value) => ({ label: value, value }))
+  }, [models])
+
   const modelIdOptions = useMemo(() => {
     const filtered = createForm.provider
-      ? MODEL_RECORDS.filter((model) => model.provider === createForm.provider)
-      : MODEL_RECORDS
+      ? models.filter((model) => model.provider === createForm.provider)
+      : models
     return filtered.map((model) => ({ value: model.id, label: model.id }))
-  }, [createForm.provider])
+  }, [createForm.provider, models])
 
-  const filteredModels = useMemo(() => filterModels(MODEL_RECORDS, searchQuery, filters), [searchQuery, filters])
+  const filteredModels = useMemo(() => filterModels(models, searchQuery, filters), [models, searchQuery, filters])
+
+  const buildCreateForm = (provider: LlmProvider = providerOptions[0]?.value ?? DEFAULT_PROVIDER) => ({
+    ...emptyCreateForm,
+    provider,
+    modelId: models.find((model) => model.provider === provider)?.id ?? ''
+  })
+
+  useEffect(() => {
+    let ignore = false
+
+    const syncModels = async () => {
+      setIsLoadingModels(true)
+      try {
+        const response = await listAdminModels()
+        if (ignore) {
+          return
+        }
+        const nextModels = response.map(mapAdminModelToRecord)
+        setModels(nextModels)
+        setConnectedModelIds(
+          nextModels
+            .filter((model) => model.hasApiKey)
+            .map((model) => model.id)
+        )
+        setCreateForm((prev) => {
+          const nextProvider = nextModels.some((model) => model.provider === prev.provider)
+            ? prev.provider
+            : (nextModels[0]?.provider ?? DEFAULT_PROVIDER)
+          const nextModelId = nextModels.find((model) => model.provider === nextProvider)?.id ?? ''
+          return {
+            ...prev,
+            provider: nextProvider,
+            modelId: nextModelId
+          }
+        })
+      } catch (error) {
+        if (ignore) {
+          return
+        }
+        const message = error instanceof Error ? error.message : String(error)
+        toast.error(`加载模型失败：${message}`)
+        setModels([])
+        setConnectedModelIds([])
+      } finally {
+        if (!ignore) {
+          setIsLoadingModels(false)
+        }
+      }
+    }
+
+    void syncModels()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!activeModelId) {
+      return
+    }
+    if (models.some((model) => model.id === activeModelId)) {
+      return
+    }
+    setActiveModelId(null)
+  }, [activeModelId, models])
 
   const toggleFilter = <T extends keyof ModelFilters>(group: T, value: ModelFilters[T][number]) => {
     setFilters((prev) => {
@@ -212,7 +204,7 @@ export function ModelManagementView() {
   }
 
   const handleProviderChange = (value: LlmProvider) => {
-    const nextOptions = MODEL_RECORDS.filter((model) => model.provider === value)
+    const nextOptions = models.filter((model) => model.provider === value)
     const nextModelId = nextOptions[0]?.id ?? ''
     setCreateForm((prev) => ({
       ...prev,
@@ -225,22 +217,22 @@ export function ModelManagementView() {
 
   const handleCloseCreateModal = () => {
     setIsCreateOpen(false)
-    setCreateForm(emptyCreateForm)
+    setCreateForm(buildCreateForm())
   }
 
   const handleCreateModel = () => {
     if (!isCreateValid) return
     setIsCreateOpen(false)
-    setCreateForm(emptyCreateForm)
+    setCreateForm(buildCreateForm())
   }
 
   const selectedModels = useMemo(
-    () => MODEL_RECORDS.filter((model) => selectedModelIds.includes(model.id)),
-    [selectedModelIds]
+    () => models.filter((model) => selectedModelIds.includes(model.id)),
+    [models, selectedModelIds]
   )
   const activeModel = useMemo(
-    () => MODEL_RECORDS.find((model) => model.id === activeModelId) ?? null,
-    [activeModelId]
+    () => models.find((model) => model.id === activeModelId) ?? null,
+    [activeModelId, models]
   )
   const isActiveModelConnected = activeModel ? connectedModelIds.includes(activeModel.id) : false
 
@@ -249,7 +241,7 @@ export function ModelManagementView() {
       <aside className={`hidden @md:block ${panelWidthClassMap.mediumResponsive} flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 @xl:pl-8 @xl:pr-6 pb-6 pt-8 overflow-y-auto custom-scrollbar`}>
         <FilterSection
           title="供应商 (Providers)"
-          options={PROVIDER_OPTIONS}
+          options={providerOptions}
           selected={filters.providers}
           onToggle={(value) => toggleFilter('providers', value as LlmProvider)}
           defaultOpen
@@ -263,7 +255,7 @@ export function ModelManagementView() {
         />
         <FilterSection
           title="上下文长度 (Context)"
-          options={CONTEXT_OPTIONS.map((value) => ({ label: value, value }))}
+          options={contextOptions}
           selected={filters.contexts}
           onToggle={(value) => toggleFilter('contexts', value)}
           defaultOpen
@@ -332,14 +324,22 @@ export function ModelManagementView() {
           </div>
 
           <div className="flex justify-between items-center text-body-sm text-slate-500 dark:text-slate-400 mb-4">
-            <span>{filteredModels.length} 个模型</span>
+            <span>{isLoadingModels ? '模型加载中...' : `${filteredModels.length} 个模型`}</span>
             <button type="button" className="flex items-center hover:text-slate-900 dark:hover:text-slate-200 transition-colors">
               最新发布 (Newest)
               <ArrowUpDown size={14} className="ml-1.5" />
             </button>
           </div>
 
-          {viewMode === 'list' ? (
+          {isLoadingModels ? (
+            <Card className="h-28 flex items-center justify-center text-slate-500 dark:text-slate-400">
+              正在加载模型...
+            </Card>
+          ) : filteredModels.length === 0 ? (
+            <Card className="h-28 flex items-center justify-center text-slate-500 dark:text-slate-400">
+              暂无可用模型
+            </Card>
+          ) : viewMode === 'list' ? (
             <div className="space-y-2">
               {filteredModels.map((model) => {
                 const isConnected = connectedModelIds.includes(model.id)
@@ -472,7 +472,7 @@ export function ModelManagementView() {
             <Select
               value={createForm.provider}
               onChange={(value) => handleProviderChange(value as LlmProvider)}
-              options={PROVIDER_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+              options={providerOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
               dropdownHeader="选择供应商"
               size="sm"
             />
@@ -572,7 +572,7 @@ function CompareModal({
                     )}
                   </div>
                   <div className="text-caption text-slate-500 font-medium bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded w-fit mb-3">
-                    {PROVIDER_LABEL[model.provider]}
+                    {getProviderLabel(model)}
                   </div>
                   <div className="text-micro text-slate-400 font-mono break-all">{model.id}</div>
                 </th>
@@ -797,12 +797,12 @@ function ModelDrawer({
                 <Key size={22} className="text-slate-400" />
               </div>
               <h2 className="text-subtitle @md:text-title font-black text-slate-900 dark:text-white">
-                {isConnected ? `${PROVIDER_LABEL[model.provider]} 已连接` : `Connect to ${PROVIDER_LABEL[model.provider]}`}
+                {isConnected ? `${getProviderLabel(model)} 已连接` : `Connect to ${getProviderLabel(model)}`}
               </h2>
               <p className="text-caption @md:text-body-sm text-slate-500 dark:text-slate-400 mt-2.5 max-w-sm mx-auto">
                 {isConnected
                   ? 'API Key 已连接，可直接进入 Playground 测试模型。'
-                  : `输入 API Key 以连接 ${PROVIDER_LABEL[model.provider]} 并启用 ${model.name}。`}
+                  : `输入 API Key 以连接 ${getProviderLabel(model)} 并启用 ${model.name}。`}
               </p>
             </div>
 
@@ -849,7 +849,7 @@ function ModelDrawer({
                         type="password"
                         value={apiKey}
                         onChange={(event) => setApiKey(event.target.value)}
-                        placeholder={`sk-... (${PROVIDER_LABEL[model.provider]} Key)`}
+                        placeholder={`sk-... (${getProviderLabel(model)} Key)`}
                         className="w-full h-9 pl-8 pr-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-caption text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all font-mono"
                         autoFocus
                       />
@@ -1178,7 +1178,7 @@ function ModelRow({
 
           <div className="flex flex-wrap items-center text-caption text-slate-500 dark:text-slate-400 space-x-4 font-mono">
             <span className="text-slate-400">
-              by <span className="text-slate-600 dark:text-slate-300 underline decoration-slate-300">{model.provider}</span>
+              by <span className="text-slate-600 dark:text-slate-300 underline decoration-slate-300">{getProviderLabel(model)}</span>
             </span>
             <span>{model.stats.context}</span>
             <span className="text-slate-400">{model.stats.inputPrice} input</span>
@@ -1260,7 +1260,7 @@ function ModelCard({
             </div>
             <div className="text-caption text-slate-500 mt-1.5 flex items-center">
               <span className="text-slate-400 mr-1">by</span>
-              <span className="underline decoration-slate-300">{PROVIDER_LABEL[model.provider]}</span>
+              <span className="underline decoration-slate-300">{getProviderLabel(model)}</span>
             </div>
           </div>
         </div>

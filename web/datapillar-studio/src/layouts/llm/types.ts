@@ -1,4 +1,12 @@
-export type LlmProvider = 'openai' | 'anthropic' | 'deepseek' | 'google' | 'meta' | 'mistral' | 'custom'
+export type LlmProvider =
+  | 'openai'
+  | 'anthropic'
+  | 'deepseek'
+  | 'google'
+  | 'meta'
+  | 'mistral'
+  | 'custom'
+  | (string & {})
 
 export type ModelCategory = 'chat' | 'embeddings' | 'reranking' | 'code'
 
@@ -11,13 +19,17 @@ export interface ModelStats {
 
 export interface ModelRecord {
   id: string
+  modelPk?: number
   name: string
   provider: LlmProvider
+  providerLabel?: string
   description: string
   tags: string[]
   type: ModelCategory
   contextGroup: string
   stats: ModelStats
+  hasApiKey?: boolean
+  status?: string
   isNew?: boolean
 }
 
