@@ -113,12 +113,12 @@ security:
   gateway-assertion:
     enabled: true
     header-name: X-Gateway-Assertion
-    issuer: datapillar-gateway
+    issuer: datapillar-auth
     audience: datapillar-studio-service
-    key-id: gw-prod-2026-02
-    public-key-path: ${GATEWAY_ASSERTION_PUBLIC_KEY_PATH}
-    previous-key-id: ${GATEWAY_ASSERTION_PREVIOUS_KEY_ID:}
-    previous-public-key-path: ${GATEWAY_ASSERTION_PREVIOUS_PUBLIC_KEY_PATH:}
+    key-id: ${AUTH_ASSERTION_KEY_ID}
+    public-key-path: ${AUTH_ASSERTION_PUBLIC_KEY_PATH}
+    previous-key-id: ${AUTH_ASSERTION_PREVIOUS_KEY_ID:}
+    previous-public-key-path: ${AUTH_ASSERTION_PREVIOUS_PUBLIC_KEY_PATH:}
     max-clock-skew-seconds: 5
 
 datapillar:

@@ -36,4 +36,9 @@ public interface AuthService {
      * 返回 token 基础信息（剩余时长、过期时间、主体信息）。
      */
     AuthDto.TokenInfo getTokenInfo(String accessToken);
+
+    /**
+     * 解析 access token 并返回网关断言所需的认证上下文。
+     */
+    AuthDto.AccessContext resolveAccessContext(String accessToken);
 }

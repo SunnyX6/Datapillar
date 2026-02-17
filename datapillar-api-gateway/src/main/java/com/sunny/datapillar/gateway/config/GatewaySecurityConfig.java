@@ -11,6 +11,6 @@ import org.springframework.context.annotation.Configuration;
  */
 
 @Configuration
-@EnableConfigurationProperties({GatewaySecurityProperties.class, GatewayAssertionProperties.class, GatewayAuthProperties.class})
+@EnableConfigurationProperties(GatewaySecurityProperties.class)
 public class GatewaySecurityConfig {
 }

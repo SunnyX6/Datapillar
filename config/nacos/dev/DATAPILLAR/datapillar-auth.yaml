@@ -103,6 +103,31 @@ security:
       secret-key: ${KEY_STORAGE_OBJECT_SECRET_KEY:}
       region: ${KEY_STORAGE_OBJECT_REGION:}
       prefix: ${KEY_STORAGE_OBJECT_PREFIX:privkeys}
+  gateway-assertion:
+    enabled: true
+    header-name: X-Gateway-Assertion
+    issuer: datapillar-auth
+    audience: datapillar-studio-service
+    ttl-seconds: 20
+    key-id: auth-dev-2026-02
+    private-key-path: ${AUTH_ASSERTION_PRIVATE_KEY_PATH:classpath:security/gateway-assertion-dev-private.pem}
+
+# 认证代理路由配置
+auth:
+  proxy:
+    connect-timeout-ms: ${AUTH_PROXY_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${AUTH_PROXY_READ_TIMEOUT_MS:30000}
+    routes:
+      - path-prefix: /api/studio
+        service-id: datapillar-studio-service
+        target-prefix: /api/studio
+        assertion-enabled: true
+      - path-prefix: /api/ai
+        service-id: datapillar-ai
+        target-prefix: /api/ai
+      - path-prefix: /api/onemeta
+        service-id: datapillar-gravitino
+        target-prefix: /api
 
 # SSO 配置
 sso:

@@ -10,7 +10,7 @@ import com.sunny.datapillar.common.exception.InternalException;
 import com.sunny.datapillar.common.exception.NotFoundException;
 import com.sunny.datapillar.common.exception.ServiceUnavailableException;
 import com.sunny.datapillar.common.exception.UnauthorizedException;
-import com.sunny.datapillar.gateway.response.GatewayResponse;
+import com.sunny.datapillar.common.response.ErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
 import org.springframework.core.annotation.Order;
@@ -61,12 +61,12 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
             log.warn("网关请求异常: type={}, message={}", detail.type(), detail.message(), ex);
         }
 
-        GatewayResponse<Object> gatewayResponse = GatewayResponse.error(
-                String.valueOf(detail.errorCode()),
+        ErrorResponse body = ErrorResponse.of(
+                detail.errorCode(),
                 detail.type(),
                 detail.message(),
                 detail.stack());
-        return writeResponse(response, HttpStatus.valueOf(detail.httpStatus()), gatewayResponse);
+        return writeResponse(response, HttpStatus.valueOf(detail.httpStatus()), body);
     }
 
     private DatapillarRuntimeException mapException(Throwable ex) {
@@ -102,18 +102,18 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
 
     private Mono<Void> writeResponse(ServerHttpResponse response,
                                      HttpStatus status,
-                                     GatewayResponse<Object> gatewayResponse) {
+                                     ErrorResponse body) {
         response.setStatusCode(status);
         response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
         try {
-            byte[] bytes = objectMapper.writeValueAsBytes(gatewayResponse);
+            byte[] bytes = objectMapper.writeValueAsBytes(body);
             return response.writeWith(Mono.just(response.bufferFactory().wrap(bytes)));
         } catch (JsonProcessingException e) {
             log.error("网关响应序列化失败", e);
             List<String> stack = ExceptionMapper.resolve(e).stack();
             String fallback = String.format(
-                    "{\"code\":\"1002\",\"message\":\"响应序列化失败\",\"type\":\"%s\",\"stack\":%s}",
+                    "{\"code\":1002,\"message\":\"响应序列化失败\",\"type\":\"%s\",\"stack\":%s}",
                     e.getClass().getSimpleName(),
                     toJsonArray(stack));
             return response.writeWith(Mono.just(response.bufferFactory().wrap(fallback.getBytes(StandardCharsets.UTF_8))));
