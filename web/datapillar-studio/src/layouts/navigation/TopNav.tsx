@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { ExpandToggle } from './ExpandToggle'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useI18nStore, useSearchStore, type Language, type SearchContext } from '@/stores'
+import { useAuthStore, useI18nStore, useSearchStore, type Language, type SearchContext } from '@/stores'
 import { useTranslation } from 'react-i18next'
 import { iconSizeToken, inputContainerWidthClassMap, menuWidthClassMap } from '@/design-tokens/dimensions'
 import { Button } from '@/components/ui'
@@ -67,6 +67,7 @@ export function TopNav({
 }: TopNavProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const authUser = useAuthStore((state) => state.user)
   const language = useI18nStore((state) => state.language)
   const setLanguage = useI18nStore((state) => state.setLanguage)
   const { t, i18n } = useTranslation('navigation')
@@ -313,7 +314,8 @@ export function TopNav({
     return profileIconMap[path] ?? <UserIcon size={iconSizeToken.small} className="text-slate-400" />
   }
   const _languageLabel = language === 'zh-CN' ? t('language.zh', { defaultValue: '简体中文' }) : t('language.en', { defaultValue: 'English' })
-  const orgLabel = t('top.org', { defaultValue: 'Acme Corp' })
+  const orgLabel = authUser?.tenantName?.trim() ?? ''
+  const orgInitial = orgLabel.slice(0, 1).toUpperCase()
 
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null)
   const [governancePos, setGovernancePos] = useState<{ top: number; left: number } | null>(null)
@@ -447,7 +449,7 @@ export function TopNav({
     }
   }
   const handleGovernanceLeave = (event: React.MouseEvent) => {
-    const nextTarget = event.relatedTarget as Node | null
+    const nextTarget = event.relatedTarget instanceof Node ? event.relatedTarget : null
     if (
       nextTarget &&
       ((governanceRef.current && governanceRef.current.contains(nextTarget)) ||
@@ -487,7 +489,7 @@ export function TopNav({
           className="hidden @md:flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors text-body-sm text-slate-600 dark:text-slate-400"
         >
           <div className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-micro">
-            A
+            {orgInitial}
           </div>
           <span>{orgLabel}</span>
           <ChevronDown size={iconSizeToken.tiny} className="opacity-50" />

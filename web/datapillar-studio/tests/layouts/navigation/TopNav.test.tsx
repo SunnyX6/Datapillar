@@ -21,6 +21,14 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('@/stores', () => ({
+  useAuthStore: (
+    selector: (state: { user: { tenantName: string } | null }) => unknown
+  ) =>
+    selector({
+      user: {
+        tenantName: '平台租户'
+      }
+    }),
   useI18nStore: (selector: (state: { language: string; setLanguage: () => void }) => unknown) =>
     selector({ language: 'en-US', setLanguage: vi.fn() }),
   useSearchStore: (

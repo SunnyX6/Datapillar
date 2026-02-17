@@ -9,10 +9,24 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { login as apiLogin, loginTenant as apiLoginTenant, logout as apiLogout, ssoLogin as apiSsoLogin } from '@/lib/api/auth'
+import {
+  login as apiLogin,
+  loginSso as apiLoginSso,
+  loginTenant as apiLoginTenant,
+  logout as apiLogout
+} from '@/lib/api/auth'
 import { getTokenInfo } from '@/lib/api/token'
 import { setUnauthorizedHandler } from '@/lib/api/client'
-import type { LoginResult, SsoLoginRequest, User } from '@/types/auth'
+import {
+  isTenantSelectResult,
+  type LoginResult,
+  type LoginSuccess,
+  type SsoLoginRequest,
+  type TenantOption,
+  type User
+} from '@/types/auth'
+
+type SsoLoginPayload = SsoLoginRequest
 
 /**
  * 认证状态接口
@@ -33,13 +47,10 @@ interface AuthStore {
     rememberMe?: boolean,
     options?: {
       tenantCode?: string
-      inviteCode?: string
-      email?: string
-      phone?: string
     }
   ) => Promise<LoginResult>
-  loginWithSso: (request: SsoLoginRequest) => Promise<LoginResult>
-  loginTenant: (loginToken: string, tenantId: number) => Promise<LoginResult>
+  loginWithSso: (request: SsoLoginPayload) => Promise<LoginResult>
+  loginTenant: (tenantId: number) => Promise<LoginResult>
   logout: () => Promise<void>
   initializeAuth: () => Promise<void>
   clearError: () => void
@@ -54,6 +65,57 @@ const SESSION_EXPIRES_MS = {
 const buildSessionExpiresAt = (rememberMe?: boolean) => {
   const ttl = rememberMe ? SESSION_EXPIRES_MS.remember : SESSION_EXPIRES_MS.default
   return Date.now() + ttl
+}
+
+function extractHttpStatus(error: unknown): number | null {
+  if (!error || typeof error !== 'object') {
+    return null
+  }
+
+  const candidate = error as { status?: unknown; response?: { status?: unknown } }
+  if (typeof candidate.status === 'number') {
+    return candidate.status
+  }
+
+  if (candidate.response && typeof candidate.response.status === 'number') {
+    return candidate.response.status
+  }
+
+  return null
+}
+
+function isBackendUnavailableError(error: unknown): boolean {
+  const status = extractHttpStatus(error)
+  if (status !== null) {
+    return status >= 500
+  }
+
+  return error instanceof Error
+}
+
+function resolveCurrentTenant(tenants: TenantOption[]): TenantOption | undefined {
+  if (!Array.isArray(tenants) || tenants.length === 0) {
+    return undefined
+  }
+
+  const defaultTenant = tenants.find((tenant) => tenant.isDefault === 1)
+  return defaultTenant ?? tenants[0]
+}
+
+function buildUser(response: LoginSuccess): User {
+  const currentTenant = resolveCurrentTenant(response.tenants)
+
+  return {
+    userId: response.userId,
+    tenantId: currentTenant?.tenantId,
+    tenantCode: currentTenant?.tenantCode,
+    tenantName: currentTenant?.tenantName,
+    tenants: response.tenants,
+    username: response.username,
+    email: response.email,
+    roles: response.roles,
+    menus: response.menus
+  }
 }
 
 /**
@@ -85,25 +147,15 @@ export const useAuthStore = create<AuthStore>()(
 
         try {
           const response = await apiLogin({
-            username,
+            loginAlias: normalizedUsername,
             password,
             rememberMe,
-            tenantCode: options?.tenantCode,
-            inviteCode: options?.inviteCode,
-            email: options?.email,
-            phone: options?.phone
+            tenantCode: options?.tenantCode?.trim() || undefined
           })
 
-          if (response.loginStage === 'SUCCESS') {
+          if (!isTenantSelectResult(response)) {
             const sessionExpiresAt = buildSessionExpiresAt(rememberMe)
-            const user: User = {
-              userId: response.userId,
-              tenantId: response.tenantId,
-              username: response.username,
-              email: response.email,
-              roles: response.roles,
-              menus: response.menus
-            }
+            const user = buildUser(response)
 
             set({
               user,
@@ -147,22 +199,15 @@ export const useAuthStore = create<AuthStore>()(
       /**
        * SSO 登录
        */
-      loginWithSso: async (request: SsoLoginRequest) => {
+      loginWithSso: async (request: SsoLoginPayload) => {
         set({ loading: true, error: null })
 
         try {
-          const response = await apiSsoLogin(request)
+          const response = await apiLoginSso(request)
 
-          if (response.loginStage === 'SUCCESS') {
+          if (!isTenantSelectResult(response)) {
             const sessionExpiresAt = buildSessionExpiresAt(false)
-            const user: User = {
-              userId: response.userId,
-              tenantId: response.tenantId,
-              username: response.username,
-              email: response.email,
-              roles: response.roles,
-              menus: response.menus
-            }
+            const user = buildUser(response)
 
             set({
               user,
@@ -200,25 +245,18 @@ export const useAuthStore = create<AuthStore>()(
       /**
        * 选择租户完成登录
        */
-      loginTenant: async (loginToken: string, tenantId: number) => {
+      loginTenant: async (tenantId: number) => {
         set({ loading: true, error: null })
 
         try {
           const rememberMe = get().pendingRememberMe ?? false
-          const response = await apiLoginTenant({ loginToken, tenantId })
-          if (response.loginStage !== 'SUCCESS') {
+          const response = await apiLoginTenant({ tenantId })
+          if (isTenantSelectResult(response)) {
             throw new Error('租户选择未完成')
           }
 
           const sessionExpiresAt = buildSessionExpiresAt(rememberMe)
-          const user: User = {
-            userId: response.userId,
-            tenantId: response.tenantId,
-            username: response.username,
-            email: response.email,
-            roles: response.roles,
-            menus: response.menus
-          }
+          const user = buildUser(response)
 
           set({
             user,
@@ -287,12 +325,8 @@ export const useAuthStore = create<AuthStore>()(
 
         try {
           const tokenInfo = await getTokenInfo()
-
-          if (tokenInfo.valid) {
-            set({ isAuthenticated: true, loading: false })
-
-          } else {
-            // Token 无效，清除用户信息
+          const remainingSeconds = tokenInfo.remainingSeconds
+          if (typeof remainingSeconds === 'number' && remainingSeconds <= 0) {
             set({
               user: null,
               isAuthenticated: false,
@@ -300,9 +334,16 @@ export const useAuthStore = create<AuthStore>()(
               sessionExpiresAt: null,
               pendingRememberMe: null
             })
+            return
           }
-        } catch {
-          // 验证失败，清除用户信息
+          set({ isAuthenticated: true, loading: false })
+        } catch (error) {
+          if (isBackendUnavailableError(error)) {
+            set({ loading: false })
+            throw error
+          }
+
+          // Token 无效或权限错误，清除用户信息
           set({
             user: null,
             isAuthenticated: false,
@@ -330,11 +371,8 @@ export const useAuthStore = create<AuthStore>()(
         lastRememberMe: state.lastRememberMe
       }),
       onRehydrateStorage: () => {
-        return (state) => {
-          // 数据恢复完成后，验证认证状态
-          if (state) {
-            state.initializeAuth()
-          }
+        return () => {
+          // 认证校验由入口路由统一触发，避免启动阶段并发请求打乱初始化分流。
         }
       }
     }
