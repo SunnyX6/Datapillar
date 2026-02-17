@@ -173,6 +173,24 @@ public class AuthDto {
         private String username;
     }
 
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(name = "AuthAccessContext")
+    public static class AccessContext {
+        private Long userId;
+        private Long tenantId;
+        private String username;
+        private String email;
+        private List<String> roles;
+        private Boolean impersonation;
+        private Long actorUserId;
+        private Long actorTenantId;
+        private String sessionId;
+        private String tokenId;
+    }
+
     // ==================== SSO ====================
 
     @Data

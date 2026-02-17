@@ -1,8 +1,8 @@
-package com.sunny.datapillar.gateway.security;
+package com.sunny.datapillar.auth.security;
 
+import com.sunny.datapillar.auth.config.AuthSecurityProperties;
 import com.sunny.datapillar.common.security.EdDsaJwtSupport;
 import com.sunny.datapillar.common.security.GatewayAssertionClaims;
-import com.sunny.datapillar.gateway.config.GatewayAssertionProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.Test;
@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class GatewayAssertionSignerTest {
+class AuthAssertionSignerTest {
 
     @TempDir
     Path tempDir;
@@ -28,19 +28,20 @@ class GatewayAssertionSignerTest {
     @Test
     void sign_shouldIncludeCoreClaims() throws Exception {
         KeyPair keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
-        Path privateKeyPath = tempDir.resolve("gw-private.pem");
+        Path privateKeyPath = tempDir.resolve("auth-private.pem");
         Files.writeString(privateKeyPath, toPem("PRIVATE KEY", keyPair.getPrivate().getEncoded()), StandardCharsets.US_ASCII);
 
-        GatewayAssertionProperties properties = new GatewayAssertionProperties();
-        properties.setEnabled(true);
-        properties.setIssuer("datapillar-gateway");
-        properties.setAudience("datapillar-studio-service");
-        properties.setTtlSeconds(20);
-        properties.setKeyId("gw-test-kid");
-        properties.setPrivateKeyPath(privateKeyPath.toString());
+        AuthSecurityProperties properties = new AuthSecurityProperties();
+        properties.getGatewayAssertion().setEnabled(true);
+        properties.getGatewayAssertion().setHeaderName("X-Gateway-Assertion");
+        properties.getGatewayAssertion().setIssuer("datapillar-auth");
+        properties.getGatewayAssertion().setAudience("datapillar-studio-service");
+        properties.getGatewayAssertion().setTtlSeconds(20);
+        properties.getGatewayAssertion().setKeyId("auth-test-kid");
+        properties.getGatewayAssertion().setPrivateKeyPath(privateKeyPath.toString());
 
-        GatewayAssertionSigner signer = new GatewayAssertionSigner(properties);
-        String token = signer.sign(new GatewayAssertionSigner.AssertionPayload(
+        AuthAssertionSigner signer = new AuthAssertionSigner(properties);
+        String token = signer.sign(new AuthAssertionSigner.AssertionPayload(
                 1L,
                 10L,
                 "sunny",
@@ -60,7 +61,7 @@ class GatewayAssertionSignerTest {
                 .getPayload();
 
         assertEquals("1", claims.getSubject());
-        assertEquals("datapillar-gateway", claims.getIssuer());
+        assertEquals("datapillar-auth", claims.getIssuer());
         assertTrue(EdDsaJwtSupport.hasAudience(claims, "datapillar-studio-service"));
         assertEquals(10L, ((Number) claims.get(GatewayAssertionClaims.TENANT_ID)).longValue());
         assertEquals("POST", claims.get(GatewayAssertionClaims.METHOD, String.class));

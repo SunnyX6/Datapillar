@@ -21,11 +21,11 @@ Datapillar 统一 API 网关 - 基于 Spring Cloud Gateway 4.2.x
 
 | 路径前缀 | 目标服务 | 端口 | 说明 |
 |---------|---------|------|------|
+| `/api/login/**` | datapillar-auth | 7001 | 登录服务 |
 | `/api/auth/**` | datapillar-auth | 7001 | 认证服务 |
-| `/api/studio/**` | datapillar-studio-service | 7002 | 核心业务 |
-| `/api/ai/**` | datapillar-ai | 7003 | AI 服务 |
-| `/api/metadata/**` | datapillar-gravitino | 8090 | 元数据服务 |
-| `/api/job/**` | datapillar-job | 9080 | 调度服务 |
+| `/api/studio/**` | datapillar-auth | 7001 | 统一鉴权后代理至 Studio |
+| `/api/ai/**` | datapillar-auth | 7001 | 统一鉴权后代理至 AI |
+| `/api/onemeta/**` | datapillar-auth | 7001 | 统一鉴权后代理至 Gravitino |
 
 ## 启动方式
 
@@ -55,7 +55,7 @@ curl http://localhost:7000/actuator/gateway/routes
 ### 环境变量
 
 ```bash
-# Redis 配置（用于限流）
+# Redis 配置（仅用于限流）
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=

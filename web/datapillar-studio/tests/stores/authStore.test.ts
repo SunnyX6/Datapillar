@@ -24,10 +24,6 @@ vi.mock('@/lib/api/auth', () => ({
   logout: vi.fn()
 }))
 
-vi.mock('@/lib/api/token', () => ({
-  getTokenInfo: vi.fn()
-}))
-
 const DAY_MS = 24 * 60 * 60 * 1000
 
 const resetAuthStore = () => {
@@ -94,7 +90,6 @@ describe('authStore', () => {
       sessionExpiresAt: Date.now() - 1000
     })
 
-    const { getTokenInfo } = await import('@/lib/api/token')
     await useAuthStore.getState().initializeAuth()
 
     const state = useAuthStore.getState()
@@ -102,39 +97,18 @@ describe('authStore', () => {
     expect(state.isAuthenticated).toBe(false)
     expect(state.lastUsername).toBeNull()
     expect(state.lastRememberMe).toBe(false)
-    expect(getTokenInfo).not.toHaveBeenCalled()
   })
 
-  it('initializeAuth 遇到 500 错误时保持会话并抛出异常', async () => {
+  it('initializeAuth 遇到有效会话时直接恢复认证状态', async () => {
     const activeSessionState = createActiveSessionState()
-    const { getTokenInfo } = await import('@/lib/api/token')
-    const backendError = Object.assign(new Error('service unavailable'), { status: 500 })
-    vi.mocked(getTokenInfo).mockRejectedValueOnce(backendError)
-
-    useAuthStore.setState(activeSessionState)
-
-    await expect(useAuthStore.getState().initializeAuth()).rejects.toThrow('service unavailable')
-
-    const state = useAuthStore.getState()
-    expect(state.user).toEqual(activeSessionState.user)
-    expect(state.isAuthenticated).toBe(true)
-    expect(state.loading).toBe(false)
-  })
-
-  it('initializeAuth 遇到 401 错误时清理会话', async () => {
-    const activeSessionState = createActiveSessionState()
-    const { getTokenInfo } = await import('@/lib/api/token')
-    const unauthorizedError = Object.assign(new Error('unauthorized'), { status: 401 })
-    vi.mocked(getTokenInfo).mockRejectedValueOnce(unauthorizedError)
-
     useAuthStore.setState(activeSessionState)
 
     await useAuthStore.getState().initializeAuth()
 
     const state = useAuthStore.getState()
-    expect(state.user).toBeNull()
-    expect(state.isAuthenticated).toBe(false)
-    expect(state.sessionExpiresAt).toBeNull()
-    expect(state.pendingRememberMe).toBeNull()
+    expect(state.user).toEqual(activeSessionState.user)
+    expect(state.isAuthenticated).toBe(true)
+    expect(state.loading).toBe(false)
+    expect(state.error).toBeNull()
   })
 })

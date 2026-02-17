@@ -20,6 +20,7 @@ import com.sunny.datapillar.auth.security.SessionStateStore;
 import com.sunny.datapillar.auth.service.AuthService;
 import com.sunny.datapillar.auth.service.support.UserAccessReader;
 import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
+import com.sunny.datapillar.common.security.EdDsaJwtSupport;
 import com.sunny.datapillar.common.security.SessionTokenClaims;
 import com.sunny.datapillar.common.utils.JwtUtil;
 
@@ -181,22 +182,7 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     public AuthDto.TokenResponse validateToken(AuthDto.TokenRequest request) {
-        String token = request.getToken();
-        Claims claims = jwtUtil.parseToken(token);
-
-        String tokenType = jwtUtil.getTokenType(claims);
-        if (!"access".equals(tokenType)) {
-            throw new UnauthorizedException("Token类型错误");
-        }
-
-        String sid = jwtUtil.getSessionId(claims);
-        String currentAccessJti = jwtUtil.getTokenId(claims);
-        if (sid == null || sid.isBlank() || currentAccessJti == null || currentAccessJti.isBlank()) {
-            throw new UnauthorizedException("Token无效");
-        }
-        if (!sessionStateStore.isAccessTokenActive(sid, currentAccessJti)) {
-            throw new UnauthorizedException("Token已被撤销，请重新登录");
-        }
+        Claims claims = parseAccessClaims(request.getToken());
 
         Long userId = jwtUtil.getUserId(claims);
         Long tenantId = jwtUtil.getTenantId(claims);
@@ -323,24 +309,7 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     public AuthDto.TokenInfo getTokenInfo(String accessToken) {
-        if (accessToken == null || accessToken.isBlank()) {
-            throw new UnauthorizedException("Token无效");
-        }
-
-        Claims claims = jwtUtil.parseToken(accessToken);
-        String tokenType = jwtUtil.getTokenType(claims);
-        if (!"access".equals(tokenType)) {
-            throw new UnauthorizedException("Token类型错误");
-        }
-
-        String sid = jwtUtil.getSessionId(claims);
-        String currentAccessJti = jwtUtil.getTokenId(claims);
-        if (sid == null || sid.isBlank() || currentAccessJti == null || currentAccessJti.isBlank()) {
-            throw new UnauthorizedException("Token无效");
-        }
-        if (!sessionStateStore.isAccessTokenActive(sid, currentAccessJti)) {
-            throw new UnauthorizedException("Token已被撤销，请重新登录");
-        }
+        Claims claims = parseAccessClaims(accessToken);
 
         long expirationTime = claims.getExpiration().getTime();
         long now = System.currentTimeMillis();
@@ -386,6 +355,78 @@ public class AuthServiceImpl implements AuthService {
                 .tenantId(tenantId)
                 .username(jwtUtil.getUsername(claims))
                 .build();
+    }
+
+    @Override
+    public AuthDto.AccessContext resolveAccessContext(String accessToken) {
+        Claims claims = parseAccessClaims(accessToken);
+
+        Long userId = jwtUtil.getUserId(claims);
+        Long tenantId = jwtUtil.getTenantId(claims);
+        if (userId == null || tenantId == null) {
+            throw new UnauthorizedException("Token无效");
+        }
+
+        Tenant tenant = tenantMapper.selectById(tenantId);
+        if (tenant == null) {
+            throw new UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
+        }
+        if (tenant.getStatus() == null || tenant.getStatus() != 1) {
+            throw new ForbiddenException("租户已被禁用: tenantId=%s", tenantId);
+        }
+
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new UnauthorizedException("用户不存在，请重新登录");
+        }
+        validateUserStatus(user);
+
+        boolean impersonation = Boolean.TRUE.equals(claims.get("impersonation", Boolean.class));
+        if (!impersonation) {
+            TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, userId);
+            if (tenantUser == null) {
+                throw new ForbiddenException("无权限访问");
+            }
+            validateTenantUserStatus(tenantUser, tenantId, userId);
+        }
+
+        String sid = jwtUtil.getSessionId(claims);
+        String accessJti = jwtUtil.getTokenId(claims);
+        return AuthDto.AccessContext.builder()
+                .userId(userId)
+                .tenantId(tenantId)
+                .username(jwtUtil.getUsername(claims))
+                .email(jwtUtil.getEmail(claims))
+                .roles(EdDsaJwtSupport.toStringList(claims.get("roles")))
+                .impersonation(impersonation)
+                .actorUserId(jwtUtil.getActorUserId(claims))
+                .actorTenantId(jwtUtil.getActorTenantId(claims))
+                .sessionId(sid)
+                .tokenId(accessJti)
+                .build();
+    }
+
+    private Claims parseAccessClaims(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new UnauthorizedException("缺少认证信息");
+        }
+
+        Claims claims = jwtUtil.parseToken(accessToken);
+        String tokenType = jwtUtil.getTokenType(claims);
+        if (!"access".equals(tokenType)) {
+            throw new UnauthorizedException("Token类型错误");
+        }
+
+        String sid = jwtUtil.getSessionId(claims);
+        String accessJti = jwtUtil.getTokenId(claims);
+        if (sid == null || sid.isBlank() || accessJti == null || accessJti.isBlank()) {
+            throw new UnauthorizedException("Token无效");
+        }
+        if (!sessionStateStore.isAccessTokenActive(sid, accessJti)) {
+            throw new UnauthorizedException("Token已失效");
+        }
+
+        return claims;
     }
 
     private void validateUserStatus(User user) {

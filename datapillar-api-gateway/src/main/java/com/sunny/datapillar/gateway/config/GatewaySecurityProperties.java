@@ -21,7 +21,6 @@ public class GatewaySecurityProperties {
     private boolean requireHttps = false;
     private List<String> trustedProxies = new ArrayList<>();
     private Headers headers = new Headers();
-    private Csrf csrf = new Csrf();
 
     @Data
     public static class Headers {
@@ -30,13 +29,4 @@ public class GatewaySecurityProperties {
         private boolean includeSubDomains = true;
     }
 
-    @Data
-    public static class Csrf {
-        private boolean enabled = true;
-        private String headerName = "X-CSRF-Token";
-        private String cookieName = "csrf-token";
-        private String refreshHeaderName = "X-Refresh-CSRF-Token";
-        private String refreshCookieName = "refresh-csrf-token";
-        private List<String> whitelist = new ArrayList<>();
-    }
 }

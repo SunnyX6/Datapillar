@@ -66,27 +66,26 @@ spring:
               filters:
                 - RewritePath=/api(?<segment>/?.*), ${segment}
 
-            # 4. 核心业务服务 (datapillar-studio-service)
-            - id: studio-service
+            # 4. Studio OpenAPI 文档
+            - id: studio-docs
+              uri: lb://datapillar-studio-service
+              order: -10
+              predicates:
+                - Path=/api/studio/v3/api-docs,/api/studio/v3/api-docs/**
+
+            # 5. Studio 初始化接口（初始化前无需登录）
+            - id: studio-setup
               uri: lb://datapillar-studio-service
               predicates:
-                - Path=/api/studio/**
+                - Path=/api/studio/setup,/api/studio/setup/**
 
-            # 5. AI 服务 (datapillar-ai)
-            - id: ai-service
-              uri: lb://datapillar-ai
+            # 6. 受保护业务接口统一交由 Auth 服务认证并转发
+            - id: protected-service
+              uri: lb://datapillar-auth
               predicates:
-                - Path=/api/ai/**
-
-            # 6. 元数据服务 (datapillar-gravitino)
-            # Gravitino 原生 REST API
-            # 重写: /api/onemeta/** → /api/**
-            - id: onemeta-service
-              uri: lb://datapillar-gravitino
-              predicates:
-                - Path=/api/onemeta/**
+                - Path=/api/studio/**,/api/ai/**,/api/onemeta/**
               filters:
-                - RewritePath=/api/onemeta(?<segment>/?.*), /api${segment}
+                - RewritePath=/api(?<segment>/?.*), /proxy/api${segment}
 
   # Redis 配置（用于限流）
   data:
@@ -95,28 +94,6 @@ spring:
       port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD}
       database: ${REDIS_DATABASE}
-
-# 网关认证配置
-gateway:
-  auth:
-    # 认证白名单（不需要 Token 的路径）
-    whitelist:
-      - /api/login
-      - /api/login/logout
-      - /api/auth/refresh
-      - /api/auth/health
-      - /api/auth/validate
-      - /api/auth/v3/api-docs
-      - /api/auth/v3/api-docs/**
-      - /api/studio/v3/api-docs
-      - /api/studio/v3/api-docs/**
-      - /api/docs
-      - /api/docs/**
-      - /actuator/health/**
-      - /actuator/info
-      - /api/studio/setup/status
-      - /api/studio/setup
-      - /api/studio/setup/**
 
 scalar:
   enabled: true
@@ -138,34 +115,6 @@ security:
     enabled: true
     hsts-max-age-seconds: 31536000
     include-sub-domains: true
-  gateway-assertion:
-    enabled: true
-    header-name: X-Gateway-Assertion
-    issuer: datapillar-gateway
-    audience: datapillar-studio-service
-    ttl-seconds: 20
-    key-id: gw-prod-2026-02
-    private-key-path: ${GATEWAY_ASSERTION_PRIVATE_KEY_PATH}
-  csrf:
-    enabled: true
-    header-name: X-CSRF-Token
-    cookie-name: csrf-token
-    refresh-header-name: X-Refresh-CSRF-Token
-    refresh-cookie-name: refresh-csrf-token
-    whitelist:
-      - /api/login
-      - /api/login/logout
-      - /api/auth/health
-      - /api/auth/validate
-      - /actuator/health/**
-      - /actuator/info
-      - /api/studio/setup
-      - /api/studio/setup/**
-
-# JWT 配置（必须与 datapillar-auth 保持一致）
-jwt:
-  secret: ${JWT_SECRET}
-  issuer: datapillar-auth
 
 # Resilience4j 熔断配置
 resilience4j:

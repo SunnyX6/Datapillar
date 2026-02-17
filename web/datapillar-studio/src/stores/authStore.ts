@@ -15,7 +15,6 @@ import {
   loginTenant as apiLoginTenant,
   logout as apiLogout
 } from '@/lib/api/auth'
-import { getTokenInfo } from '@/lib/api/token'
 import { setUnauthorizedHandler } from '@/lib/api/client'
 import {
   isTenantSelectResult,
@@ -65,32 +64,6 @@ const SESSION_EXPIRES_MS = {
 const buildSessionExpiresAt = (rememberMe?: boolean) => {
   const ttl = rememberMe ? SESSION_EXPIRES_MS.remember : SESSION_EXPIRES_MS.default
   return Date.now() + ttl
-}
-
-function extractHttpStatus(error: unknown): number | null {
-  if (!error || typeof error !== 'object') {
-    return null
-  }
-
-  const candidate = error as { status?: unknown; response?: { status?: unknown } }
-  if (typeof candidate.status === 'number') {
-    return candidate.status
-  }
-
-  if (candidate.response && typeof candidate.response.status === 'number') {
-    return candidate.response.status
-  }
-
-  return null
-}
-
-function isBackendUnavailableError(error: unknown): boolean {
-  const status = extractHttpStatus(error)
-  if (status !== null) {
-    return status >= 500
-  }
-
-  return error instanceof Error
 }
 
 function resolveCurrentTenant(tenants: TenantOption[]): TenantOption | undefined {
@@ -302,7 +275,7 @@ export const useAuthStore = create<AuthStore>()(
 
       /**
        * 初始化认证状态
-       * 页面加载时调用，验证当前登录状态
+       * 页面加载时调用，仅根据本地会话状态恢复
        */
       initializeAuth: async () => {
         const { user: currentUser, sessionExpiresAt } = get()
@@ -319,39 +292,11 @@ export const useAuthStore = create<AuthStore>()(
           })
           return
         }
-
-        // 有用户信息，验证 token 是否有效
-        set({ loading: true })
-
-        try {
-          const tokenInfo = await getTokenInfo()
-          const remainingSeconds = tokenInfo.remainingSeconds
-          if (typeof remainingSeconds === 'number' && remainingSeconds <= 0) {
-            set({
-              user: null,
-              isAuthenticated: false,
-              loading: false,
-              sessionExpiresAt: null,
-              pendingRememberMe: null
-            })
-            return
-          }
-          set({ isAuthenticated: true, loading: false })
-        } catch (error) {
-          if (isBackendUnavailableError(error)) {
-            set({ loading: false })
-            throw error
-          }
-
-          // Token 无效或权限错误，清除用户信息
-          set({
-            user: null,
-            isAuthenticated: false,
-            loading: false,
-            sessionExpiresAt: null,
-            pendingRememberMe: null
-          })
-        }
+        set({
+          isAuthenticated: true,
+          loading: false,
+          error: null
+        })
       },
 
       /**

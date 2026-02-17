@@ -21,6 +21,7 @@ public class AuthSecurityProperties {
     private Csrf csrf = new Csrf();
     private Login login = new Login();
     private Password password = new Password();
+    private GatewayAssertion gatewayAssertion = new GatewayAssertion();
     private List<String> trustedProxies = new ArrayList<>();
 
     @Data
@@ -68,5 +69,16 @@ public class AuthSecurityProperties {
              */
             private int iterations = 3;
         }
+    }
+
+    @Data
+    public static class GatewayAssertion {
+        private boolean enabled = true;
+        private String headerName = "X-Gateway-Assertion";
+        private String issuer = "datapillar-auth";
+        private String audience = "datapillar-studio-service";
+        private long ttlSeconds = 20;
+        private String keyId = "auth-default";
+        private String privateKeyPath;
     }
 }
