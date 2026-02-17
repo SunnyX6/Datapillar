@@ -1,6 +1,7 @@
 package com.sunny.datapillar.gateway.config;
 
 import com.sunny.datapillar.common.constant.HeaderConstants;
+import com.sunny.datapillar.gateway.security.ClientIpResolver;
 import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,15 +9,20 @@ import org.springframework.context.annotation.Primary;
 import reactor.core.publisher.Mono;
 
 /**
- * 限流配置
- * 基于 Redis 的请求限流
+ * 限流限流器配置
+ * 负责限流限流器配置装配与Bean初始化
  *
  * @author Sunny
- * @version 1.0.0
- * @since 2025-12-08
+ * @date 2026-01-01
  */
 @Configuration
 public class RateLimiterConfig {
+
+    private final ClientIpResolver clientIpResolver;
+
+    public RateLimiterConfig(ClientIpResolver clientIpResolver) {
+        this.clientIpResolver = clientIpResolver;
+    }
 
     /**
      * 基于 IP 的限流 Key 解析器
@@ -24,28 +30,7 @@ public class RateLimiterConfig {
     @Bean
     @Primary
     public KeyResolver ipKeyResolver() {
-        return exchange -> {
-            String ip = exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
-            if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-                ip = exchange.getRequest().getHeaders().getFirst("X-Real-IP");
-            }
-            if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-                if (exchange.getRequest().getRemoteAddress() != null) {
-                    if (exchange.getRequest().getRemoteAddress().getAddress() != null) {
-                        ip = exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
-                    } else {
-                        ip = exchange.getRequest().getRemoteAddress().getHostString();
-                    }
-                } else {
-                    ip = "unknown";
-                }
-            }
-            // 多个代理时取第一个
-            if (ip != null && ip.contains(",")) {
-                ip = ip.split(",")[0].trim();
-            }
-            return Mono.just(ip == null || ip.isBlank() ? "unknown" : ip);
-        };
+        return exchange -> Mono.just(clientIpResolver.resolve(exchange.getRequest()));
     }
 
     /**

@@ -1,9 +1,13 @@
 package com.sunny.datapillar.gateway.filter;
 
 import com.sunny.datapillar.common.constant.HeaderConstants;
+import com.sunny.datapillar.common.utils.ExceptionMessageUtil;
 import com.sunny.datapillar.gateway.config.GatewaySecurityProperties;
 import com.sunny.datapillar.gateway.security.TokenHashUtil;
 import com.sunny.datapillar.gateway.util.JwtUtil;
+import org.springframework.cloud.gateway.config.GlobalCorsProperties;
+import io.jsonwebtoken.Claims;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -15,15 +19,28 @@ import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+/**
+ * CSRF全局过滤器
+ * 负责CSRF全局请求过滤与上下文控制
+ *
+ * @author Sunny
+ * @date 2026-01-01
+ */
 
 @Component
+@Slf4j
 public class CsrfGlobalFilter implements GlobalFilter, Ordered {
 
     private static final String AUTH_COOKIE_NAME = "auth-token";
@@ -34,14 +51,30 @@ public class CsrfGlobalFilter implements GlobalFilter, Ordered {
     private final GatewaySecurityProperties securityProperties;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final JwtUtil jwtUtil;
+    private final CorsConfigurationSource corsConfigurationSource;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     public CsrfGlobalFilter(GatewaySecurityProperties securityProperties,
                             ReactiveStringRedisTemplate redisTemplate,
-                            JwtUtil jwtUtil) {
+                            JwtUtil jwtUtil,
+                            GlobalCorsProperties globalCorsProperties) {
         this.securityProperties = securityProperties;
         this.redisTemplate = redisTemplate;
         this.jwtUtil = jwtUtil;
+        this.corsConfigurationSource = buildCorsConfigurationSource(globalCorsProperties);
+    }
+
+    private CorsConfigurationSource buildCorsConfigurationSource(GlobalCorsProperties globalCorsProperties) {
+        if (globalCorsProperties == null) {
+            throw new IllegalStateException("spring.cloud.gateway.server.webflux.globalcors.cors-configurations 未配置");
+        }
+        Map<String, CorsConfiguration> corsConfigurations = globalCorsProperties.getCorsConfigurations();
+        if (corsConfigurations == null || corsConfigurations.isEmpty()) {
+            throw new IllegalStateException("spring.cloud.gateway.server.webflux.globalcors.cors-configurations 未配置");
+        }
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.setCorsConfigurations(corsConfigurations);
+        return source;
     }
 
     @Override
@@ -71,7 +104,8 @@ public class CsrfGlobalFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
 
-        if (!isOriginAllowed(request)) {
+        if (!isOriginAllowed(exchange)) {
+            log.warn("security_event event=csrf_rejected reason=origin_mismatch path={}", path);
             return forbidden(exchange, "CSRF 校验失败");
         }
 
@@ -85,35 +119,48 @@ public class CsrfGlobalFilter implements GlobalFilter, Ordered {
         String headerToken = request.getHeaders().getFirst(headerName);
         HttpCookie csrfCookie = request.getCookies().getFirst(cookieName);
         if (headerToken == null || csrfCookie == null || !headerToken.equals(csrfCookie.getValue())) {
+            log.warn("security_event event=csrf_rejected reason=token_mismatch path={}", path);
             return forbidden(exchange, "CSRF 校验失败");
         }
 
         String tenantId = request.getHeaders().getFirst(HeaderConstants.HEADER_TENANT_ID);
         String userId = request.getHeaders().getFirst(HeaderConstants.HEADER_USER_ID);
+        List<String> parseErrors = new ArrayList<>();
         if (tenantId == null || userId == null) {
-            TokenIdentity tokenIdentity = resolveTokenIdentity(path, authCookieValue, refreshCookieValue);
+            TokenIdentity tokenIdentity = resolveTokenIdentity(path, authCookieValue, refreshCookieValue, parseErrors);
             if (tokenIdentity != null) {
                 tenantId = tokenIdentity.tenantId();
                 userId = tokenIdentity.userId();
             }
         }
         if (tenantId == null || userId == null) {
-            return forbidden(exchange, "CSRF 校验失败");
+            String detail = parseErrors.isEmpty() ? "token_identity_missing"
+                    : String.join(" | ", parseErrors);
+            log.warn("security_event event=csrf_rejected reason=identity_missing path={} detail={}", path, detail);
+            return forbidden(exchange, "CSRF 校验失败 | " + detail);
         }
+        String finalTenantId = tenantId;
+        String finalUserId = userId;
 
         String keyPrefix = refreshRequest ? REFRESH_CSRF_KEY_PREFIX : CSRF_KEY_PREFIX;
-        String key = keyPrefix + tenantId + ":" + userId;
+        String key = keyPrefix + finalTenantId + ":" + finalUserId;
         String tokenHash = TokenHashUtil.sha256(headerToken);
 
         return redisTemplate.opsForValue()
                 .get(key)
                 .flatMap(value -> {
                     if (value == null || !value.equals(tokenHash)) {
+                        log.warn("security_event event=csrf_rejected reason=redis_hash_mismatch path={} tenantId={} userId={}",
+                                path, finalTenantId, finalUserId);
                         return forbidden(exchange, "CSRF 校验失败");
                     }
                     return chain.filter(exchange);
                 })
-                .switchIfEmpty(forbidden(exchange, "CSRF 校验失败"));
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.warn("security_event event=csrf_rejected reason=redis_key_missing path={} tenantId={} userId={}",
+                            path, finalTenantId, finalUserId);
+                    return forbidden(exchange, "CSRF 校验失败");
+                }));
     }
 
     private boolean isSafeMethod(HttpMethod method) {
@@ -131,34 +178,40 @@ public class CsrfGlobalFilter implements GlobalFilter, Ordered {
     /**
      * refresh 请求优先使用 refresh-token，避免 access-token 到期后 CSRF 身份解析失败。
      */
-    private TokenIdentity resolveTokenIdentity(String path, String authCookie, String refreshCookie) {
+    private TokenIdentity resolveTokenIdentity(String path,
+                                               String authCookie,
+                                               String refreshCookie,
+                                               List<String> parseErrors) {
         if (pathMatcher.match("/api/auth/refresh", path)) {
-            TokenIdentity refreshIdentity = parseIdentity(refreshCookie);
+            TokenIdentity refreshIdentity = parseIdentity("refresh-token", refreshCookie, parseErrors);
             if (refreshIdentity != null) {
                 return refreshIdentity;
             }
-            return parseIdentity(authCookie);
+            return parseIdentity("auth-token", authCookie, parseErrors);
         }
 
-        TokenIdentity authIdentity = parseIdentity(authCookie);
+        TokenIdentity authIdentity = parseIdentity("auth-token", authCookie, parseErrors);
         if (authIdentity != null) {
             return authIdentity;
         }
-        return parseIdentity(refreshCookie);
+        return parseIdentity("refresh-token", refreshCookie, parseErrors);
     }
 
-    private TokenIdentity parseIdentity(String token) {
+    private TokenIdentity parseIdentity(String tokenName, String token, List<String> parseErrors) {
         if (token == null || token.isBlank()) {
             return null;
         }
         try {
-            Long tenantId = jwtUtil.getTenantId(token);
-            Long userId = jwtUtil.getUserId(token);
+            Claims claims = jwtUtil.parseToken(token);
+            Long tenantId = jwtUtil.getTenantId(claims);
+            Long userId = jwtUtil.getUserId(claims);
             if (tenantId == null || userId == null) {
+                parseErrors.add(tokenName + "_claims_missing_identity");
                 return null;
             }
             return new TokenIdentity(String.valueOf(tenantId), String.valueOf(userId));
         } catch (Exception e) {
+            parseErrors.add(ExceptionMessageUtil.compose(tokenName + "_parse_failed", e));
             return null;
         }
     }
@@ -168,7 +221,8 @@ public class CsrfGlobalFilter implements GlobalFilter, Ordered {
         return authHeader != null && authHeader.startsWith("Bearer ");
     }
 
-    private boolean isOriginAllowed(ServerHttpRequest request) {
+    private boolean isOriginAllowed(ServerWebExchange exchange) {
+        ServerHttpRequest request = exchange.getRequest();
         String origin = request.getHeaders().getFirst(HttpHeaders.ORIGIN);
         if (origin == null || origin.isBlank()) {
             String referer = request.getHeaders().getFirst(HttpHeaders.REFERER);
@@ -177,8 +231,11 @@ public class CsrfGlobalFilter implements GlobalFilter, Ordered {
         if (origin == null || origin.isBlank()) {
             return false;
         }
-        List<String> allowedOrigins = securityProperties.getAllowedOrigins();
-        return allowedOrigins != null && allowedOrigins.contains(origin);
+        CorsConfiguration corsConfiguration = corsConfigurationSource.getCorsConfiguration(exchange);
+        if (corsConfiguration == null) {
+            return false;
+        }
+        return corsConfiguration.checkOrigin(origin) != null;
     }
 
     private String extractOrigin(String referer) {
@@ -196,15 +253,29 @@ public class CsrfGlobalFilter implements GlobalFilter, Ordered {
             }
             return uri.getScheme() + "://" + uri.getHost();
         } catch (IllegalArgumentException e) {
+            log.warn("security_event event=csrf_rejected reason=referer_malformed detail={}",
+                    ExceptionMessageUtil.compose("referer_parse_failed", e));
             return null;
         }
     }
 
     private Mono<Void> forbidden(ServerWebExchange exchange, String message) {
-        byte[] bytes = String.format("{\"code\":403,\"message\":\"%s\"}", message).getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = String.format("{\"code\":403,\"message\":\"%s\"}", escapeJson(message))
+                .getBytes(StandardCharsets.UTF_8);
         exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
         return exchange.getResponse().writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(bytes)));
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r");
     }
 
     @Override

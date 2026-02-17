@@ -10,16 +10,18 @@ import com.sunny.datapillar.studio.module.workflow.dto.JobComponentDto;
 import com.sunny.datapillar.studio.module.workflow.entity.JobComponent;
 import com.sunny.datapillar.studio.module.workflow.mapper.JobComponentMapper;
 import com.sunny.datapillar.studio.module.workflow.service.JobComponentService;
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.sunny.datapillar.common.exception.NotFoundException;
 
 /**
- * 组件服务实现
+ * 任务Component服务实现
+ * 实现任务Component业务流程与规则校验
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Slf4j
 @Service
@@ -40,7 +42,7 @@ public class JobComponentServiceImpl implements JobComponentService {
     public JobComponentDto.Response getComponentByCode(String code) {
         JobComponent component = componentMapper.selectByCode(code);
         if (component == null) {
-            throw new BusinessException(ErrorCode.COMPONENT_NOT_FOUND, code);
+            throw new NotFoundException("组件不存在: code=%s", code);
         }
         return toResponse(component);
     }

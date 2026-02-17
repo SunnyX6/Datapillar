@@ -41,6 +41,11 @@ mybatis-plus:
   # 认证服务只扫描 users 表的 Mapper
   mapper-locations: classpath*:/mapper/*Mapper.xml
 
+springdoc:
+  use-fqn: true
+  api-docs:
+    enabled: true
+
 # JWT 配置
 jwt:
   # 对称密钥
@@ -65,8 +70,8 @@ cookie:
 
 # 安全配置（严格模式）
 security:
-  allowed-origins:
-    - https://REPLACE_ME
+  trusted-proxies:
+    - ${TRUSTED_PROXY_CIDR_1:}
   csrf:
     enabled: true
     header-name: X-CSRF-Token
@@ -86,9 +91,21 @@ security:
       parallelism: 1
       memory-mb: 64
       iterations: 3
+  key-storage:
+    type: ${KEY_STORAGE_TYPE:local}
+    local:
+      path: ${KEY_STORAGE_LOCAL_PATH:/data/datapillar/privkeys}
+    object:
+      endpoint: ${KEY_STORAGE_OBJECT_ENDPOINT:}
+      bucket: ${KEY_STORAGE_OBJECT_BUCKET:}
+      access-key: ${KEY_STORAGE_OBJECT_ACCESS_KEY:}
+      secret-key: ${KEY_STORAGE_OBJECT_SECRET_KEY:}
+      region: ${KEY_STORAGE_OBJECT_REGION:}
+      prefix: ${KEY_STORAGE_OBJECT_PREFIX:privkeys}
 
 # SSO 配置
 sso:
+  state-bytes: ${SSO_STATE_BYTES:24}  # state 随机字节数（至少16）
   state-ttl-seconds: ${SSO_STATE_TTL_SECONDS:300}  # 5分钟
 
 # Actuator 健康检查（与服务同端口）
@@ -123,3 +140,30 @@ logging:
     rollingpolicy:
       max-file-size: 10MB
       max-history: 30
+
+datapillar:
+  rpc:
+    group: ${DUBBO_GROUP:datapillar}
+    version: ${DUBBO_VERSION:1.0.0}
+
+# Dubbo 配置
+
+dubbo:
+  application:
+    name: datapillar-auth
+    register-mode: interface
+    migration:
+      step: FORCE_INTERFACE
+    service-discovery:
+      migration: FORCE_INTERFACE
+  protocol:
+    name: tri
+    port: -1
+  registry:
+    address: nacos://${NACOS_SERVER_ADDR}
+    group: ${NACOS_GROUP:DATAPILLAR}
+    register-mode: interface
+    parameters:
+      namespace: ${NACOS_NAMESPACE}
+      username: ${NACOS_USERNAME}
+      password: ${NACOS_PASSWORD}

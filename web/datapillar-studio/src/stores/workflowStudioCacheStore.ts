@@ -20,6 +20,7 @@ type WorkflowStudioCacheSnapshot = {
   isInitialized: boolean
   virtuosoState: StateSnapshot | null
   selectedModelId: string
+  defaultModelId: string
 }
 
 interface WorkflowStudioCacheState extends WorkflowStudioCacheSnapshot {
@@ -33,10 +34,11 @@ const DEFAULT_SNAPSHOT: WorkflowStudioCacheSnapshot = {
   lastPrompt: '',
   isInitialized: false,
   virtuosoState: null,
-  selectedModelId: DEFAULT_WORKFLOW_MODEL_ID
+  selectedModelId: DEFAULT_WORKFLOW_MODEL_ID,
+  defaultModelId: DEFAULT_WORKFLOW_MODEL_ID
 }
 
-const CACHE_VERSION = 3
+const CACHE_VERSION = 4
 
 export const useWorkflowStudioCacheStore = create<WorkflowStudioCacheState>()(
   persist(
@@ -50,11 +52,16 @@ export const useWorkflowStudioCacheStore = create<WorkflowStudioCacheState>()(
       storage: createJSONStorage(() => localStorage),
       version: CACHE_VERSION,
       migrate: (persistedState, version) => {
+        const legacyState = persistedState as Partial<WorkflowStudioCacheSnapshot>
         if (version < CACHE_VERSION) {
           return {
             ...DEFAULT_SNAPSHOT,
-            ...(persistedState as Partial<WorkflowStudioCacheSnapshot>),
-            virtuosoState: null
+            ...legacyState,
+            virtuosoState: null,
+            defaultModelId:
+              version < 4
+                ? legacyState.selectedModelId ?? DEFAULT_WORKFLOW_MODEL_ID
+                : legacyState.defaultModelId ?? DEFAULT_WORKFLOW_MODEL_ID
           }
         }
         return persistedState as WorkflowStudioCacheSnapshot
@@ -65,7 +72,8 @@ export const useWorkflowStudioCacheStore = create<WorkflowStudioCacheState>()(
         lastPrompt: state.lastPrompt,
         isInitialized: state.isInitialized,
         virtuosoState: state.virtuosoState,
-        selectedModelId: state.selectedModelId
+        selectedModelId: state.selectedModelId,
+        defaultModelId: state.defaultModelId
       })
     }
   )

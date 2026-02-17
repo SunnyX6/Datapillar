@@ -1,9 +1,16 @@
 package com.sunny.datapillar.gateway.filter;
 
 import com.sunny.datapillar.common.constant.HeaderConstants;
+import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
+import com.sunny.datapillar.common.utils.ExceptionMessageUtil;
+import com.sunny.datapillar.gateway.config.GatewayAssertionProperties;
+import com.sunny.datapillar.gateway.config.GatewayAuthProperties;
+import com.sunny.datapillar.gateway.security.ClientIpResolver;
+import com.sunny.datapillar.gateway.security.GatewayAssertionSigner;
+import com.sunny.datapillar.gateway.security.SessionStateVerifier;
 import com.sunny.datapillar.gateway.util.JwtUtil;
+import io.jsonwebtoken.Claims;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -22,25 +29,51 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
- * 全局认证过滤器
- * 验证 JWT Token，并将用户信息注入请求头传递给下游服务
+ * 认证全局过滤器
+ * 负责认证全局请求过滤与上下文控制
  *
  * @author Sunny
- * @version 1.0.0
- * @since 2025-12-08
+ * @date 2026-01-01
  */
 @Slf4j
 @Component
 public class AuthGlobalFilter implements GlobalFilter, Ordered {
 
     private final JwtUtil jwtUtil;
+    private final GatewayAssertionSigner assertionSigner;
+    private final GatewayAssertionProperties assertionProperties;
+    private final SessionStateVerifier sessionStateVerifier;
+    private final ClientIpResolver clientIpResolver;
+    private final List<String> whitelist;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
-    @Value("#{'${gateway.auth.whitelist}'.split(',')}")
-    private List<String> whitelist;
-
-    public AuthGlobalFilter(JwtUtil jwtUtil) {
+    public AuthGlobalFilter(JwtUtil jwtUtil,
+                            GatewayAssertionSigner assertionSigner,
+                            GatewayAssertionProperties assertionProperties,
+                            SessionStateVerifier sessionStateVerifier,
+                            ClientIpResolver clientIpResolver,
+                            GatewayAuthProperties authProperties) {
         this.jwtUtil = jwtUtil;
+        this.assertionSigner = assertionSigner;
+        this.assertionProperties = assertionProperties;
+        this.sessionStateVerifier = sessionStateVerifier;
+        this.clientIpResolver = clientIpResolver;
+        this.whitelist = resolveWhitelist(authProperties);
+    }
+
+    private List<String> resolveWhitelist(GatewayAuthProperties authProperties) {
+        if (authProperties == null || authProperties.getWhitelist() == null) {
+            throw new IllegalStateException("gateway.auth.whitelist 未配置");
+        }
+        List<String> configured = authProperties.getWhitelist().stream()
+                .filter(path -> path != null && !path.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (configured.isEmpty()) {
+            throw new IllegalStateException("gateway.auth.whitelist 未配置");
+        }
+        return configured;
     }
 
     /**
@@ -52,86 +85,119 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getPath().value();
+        ServerHttpRequest normalizedClientRequest = normalizeClientIpHeaders(request);
 
         log.info("AuthFilter processing path: {}, whitelist: {}", path, whitelist);
 
         // 白名单路径直接放行
         if (isWhitelisted(path)) {
             log.info("Path {} is whitelisted, passing through", path);
-            return chain.filter(exchange);
+            return chain.filter(exchange.mutate().request(normalizedClientRequest).build());
         }
 
         // 提取 Token：优先从 Authorization Header 获取，其次从 Cookie 获取
-        String token = extractToken(request);
+        String token = extractToken(normalizedClientRequest);
         if (token == null) {
             log.warn("认证失败 - 缺少认证信息: {}", path);
             return unauthorized(exchange, "缺少认证信息");
         }
 
         try {
-            // 验证 Token
-            if (!jwtUtil.isValid(token)) {
-                log.warn("认证失败 - Token 无效或已过期: {}", path);
-                return unauthorized(exchange, "Token 无效或已过期");
-            }
+            Claims claims = jwtUtil.parseToken(token);
 
             // 检查是否是 access token
-            String tokenType = jwtUtil.getTokenType(token);
+            String tokenType = jwtUtil.getTokenType(claims);
             if (!"access".equals(tokenType)) {
                 log.warn("认证失败 - Token 类型错误: {}", tokenType);
                 return unauthorized(exchange, "Token 类型错误");
             }
 
             // 提取用户信息
-            Long userId = jwtUtil.getUserId(token);
-            String username = jwtUtil.getUsername(token);
-            String email = jwtUtil.getEmail(token);
-            Long tenantId = jwtUtil.getTenantId(token);
+            Long userId = jwtUtil.getUserId(claims);
+            String username = jwtUtil.getUsername(claims);
+            String email = jwtUtil.getEmail(claims);
+            Long tenantId = jwtUtil.getTenantId(claims);
+            if (userId == null) {
+                log.warn("认证失败 - Token 缺少用户信息: {}", path);
+                return unauthorized(exchange, "Token 缺少用户信息");
+            }
             if (tenantId == null) {
                 log.warn("认证失败 - Token 缺少租户信息: {}", path);
                 return unauthorized(exchange, "Token 缺少租户信息");
             }
 
-            Long actorUserId = jwtUtil.getActorUserId(token);
-            Long actorTenantId = jwtUtil.getActorTenantId(token);
-            boolean impersonation = jwtUtil.isImpersonation(token);
-
-            // 将用户信息注入请求头，传递给下游服务
-            ServerHttpRequest mutatedRequest = request.mutate()
-                    .headers(headers -> {
-                        headers.remove(HeaderConstants.HEADER_TENANT_ID);
-                        headers.remove(HeaderConstants.HEADER_USER_ID);
-                        headers.remove(HeaderConstants.HEADER_USERNAME);
-                        headers.remove(HeaderConstants.HEADER_EMAIL);
-                        headers.remove(HeaderConstants.HEADER_ACTOR_USER_ID);
-                        headers.remove(HeaderConstants.HEADER_ACTOR_TENANT_ID);
-                        headers.remove(HeaderConstants.HEADER_IMPERSONATION);
-                    })
-                    .header(HeaderConstants.HEADER_TENANT_ID, String.valueOf(tenantId))
-                    .header(HeaderConstants.HEADER_USER_ID, String.valueOf(userId))
-                    .header(HeaderConstants.HEADER_USERNAME, username)
-                    .header(HeaderConstants.HEADER_EMAIL, email != null ? email : "")
-                    .header(HeaderConstants.HEADER_IMPERSONATION, String.valueOf(impersonation))
-                    .build();
-
-            if (impersonation) {
-                if (actorUserId != null) {
-                    mutatedRequest = mutatedRequest.mutate()
-                            .header(HeaderConstants.HEADER_ACTOR_USER_ID, String.valueOf(actorUserId))
-                            .build();
-                }
-                if (actorTenantId != null) {
-                    mutatedRequest = mutatedRequest.mutate()
-                            .header(HeaderConstants.HEADER_ACTOR_TENANT_ID, String.valueOf(actorTenantId))
-                            .build();
-                }
+            Long actorUserId = jwtUtil.getActorUserId(claims);
+            Long actorTenantId = jwtUtil.getActorTenantId(claims);
+            boolean impersonation = jwtUtil.isImpersonation(claims);
+            List<String> roles = jwtUtil.getRoles(claims);
+            String sid = jwtUtil.getSessionId(claims);
+            String accessJti = jwtUtil.getTokenId(claims);
+            if (sid == null || sid.isBlank() || accessJti == null || accessJti.isBlank()) {
+                log.warn("认证失败 - Token 缺少会话标识: {}", path);
+                return unauthorized(exchange, "Token 无效");
             }
 
-            return chain.filter(exchange.mutate().request(mutatedRequest).build());
+            if (!assertionProperties.isEnabled()) {
+                log.error("网关断言未启用，拒绝受保护请求: {}", path);
+                return unauthorized(exchange, "内部断言未启用");
+            }
 
+            String requestMethod = request.getMethod() != null ? request.getMethod().name() : "";
+
+            return sessionStateVerifier.isAccessTokenActive(sid, accessJti)
+                    .flatMap(active -> {
+                        if (!active) {
+                            log.warn("认证失败 - Token 已吊销: sid={}, jti={}, path={}", sid, accessJti, path);
+                            return unauthorized(exchange, "Token 已失效");
+                        }
+
+                        String assertion = assertionSigner.sign(new GatewayAssertionSigner.AssertionPayload(
+                                userId,
+                                tenantId,
+                                username,
+                                email,
+                                roles,
+                                impersonation,
+                                actorUserId,
+                                actorTenantId,
+                                requestMethod,
+                                path
+                        ));
+
+                        if (assertion == null || assertion.isBlank()) {
+                            log.error("网关断言签发失败: path={}", path);
+                            return unauthorized(exchange, "内部断言签发失败");
+                        }
+
+                        ServerHttpRequest.Builder requestBuilder = normalizedClientRequest.mutate()
+                                .headers(headers -> {
+                                    headers.remove(HeaderConstants.HEADER_TENANT_ID);
+                                    headers.remove(HeaderConstants.HEADER_USER_ID);
+                                    headers.remove(HeaderConstants.HEADER_USERNAME);
+                                    headers.remove(HeaderConstants.HEADER_EMAIL);
+                                    headers.remove(HeaderConstants.HEADER_ACTOR_USER_ID);
+                                    headers.remove(HeaderConstants.HEADER_ACTOR_TENANT_ID);
+                                    headers.remove(HeaderConstants.HEADER_IMPERSONATION);
+                                    headers.remove(assertionProperties.getHeaderName());
+                                });
+                        requestBuilder.header(assertionProperties.getHeaderName(), assertion);
+                        ServerHttpRequest mutatedRequest = requestBuilder.build();
+                        return chain.filter(exchange.mutate().request(mutatedRequest).build());
+                    })
+                    .onErrorResume(ex -> {
+                        log.error("会话状态校验异常: {}", ex.getMessage(), ex);
+                        String message = ExceptionMessageUtil.compose("Token 状态校验失败", ex);
+                        return unauthorized(exchange, message);
+                    });
+
+        } catch (DatapillarRuntimeException e) {
+            log.warn("认证失败 - Token 无效或已过期: {}", path, e);
+            String message = ExceptionMessageUtil.compose("Token 无效或已过期", e);
+            return unauthorized(exchange, message);
         } catch (Exception e) {
-            log.error("认证异常: {}", e.getMessage());
-            return unauthorized(exchange, "Token 验证失败");
+            log.error("认证异常: {}", e.getMessage(), e);
+            String message = ExceptionMessageUtil.compose("Token 验证失败", e);
+            return unauthorized(exchange, message);
         }
     }
 
@@ -139,7 +205,20 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
      * 检查路径是否在白名单中
      */
     private boolean isWhitelisted(String path) {
-        return whitelist.stream().anyMatch(pattern -> pathMatcher.match(pattern.trim(), path));
+        return whitelist.stream().anyMatch(pattern -> pathMatcher.match(pattern, path));
+    }
+
+    private ServerHttpRequest normalizeClientIpHeaders(ServerHttpRequest request) {
+        String clientIp = clientIpResolver.resolve(request);
+        ServerHttpRequest.Builder builder = request.mutate().headers(headers -> {
+            headers.remove("X-Forwarded-For");
+            headers.remove("X-Real-IP");
+        });
+        if (clientIp != null && !clientIp.isBlank() && !"unknown".equalsIgnoreCase(clientIp)) {
+            builder.header("X-Forwarded-For", clientIp);
+            builder.header("X-Real-IP", clientIp);
+        }
+        return builder.build();
     }
 
     /**
@@ -170,10 +249,21 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
         response.setStatusCode(HttpStatus.UNAUTHORIZED);
         response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
-        String body = String.format("{\"code\":401,\"message\":\"%s\"}", message);
+        String body = String.format("{\"code\":401,\"message\":\"%s\"}", escapeJson(message));
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
 
         return response.writeWith(Mono.just(response.bufferFactory().wrap(bytes)));
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r");
     }
 
     @Override

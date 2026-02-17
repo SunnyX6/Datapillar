@@ -10,9 +10,11 @@ import com.sunny.datapillar.studio.module.workflow.dto.JobDependencyDto;
 import com.sunny.datapillar.studio.module.workflow.entity.JobDependency;
 
 /**
- * 任务依赖 Mapper 接口
+ * 任务DependencyMapper
+ * 负责任务Dependency数据访问与持久化映射
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Mapper
 public interface JobDependencyMapper extends BaseMapper<JobDependency> {

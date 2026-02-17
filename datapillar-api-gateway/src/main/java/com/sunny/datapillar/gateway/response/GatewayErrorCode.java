@@ -4,7 +4,11 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * 网关错误码枚举
+ * 网关错误编码枚举
+ * 定义网关错误编码枚举取值与业务语义
+ *
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Getter
 @AllArgsConstructor

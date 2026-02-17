@@ -1279,7 +1279,7 @@ export function KnowledgeGraphView() {
         )}
 
         <div className="absolute bottom-6 left-0 right-0 z-40 pointer-events-auto">
-          <div className="relative mx-auto w-full max-w-[640px] px-4">
+          <div className="relative mx-auto w-full max-w-screen-sm px-4">
             {commandNotice && (
               <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center px-16">
                 <div

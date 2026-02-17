@@ -9,7 +9,11 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 /**
- * 用户身份映射
+ * 用户Identity组件
+ * 负责用户Identity核心逻辑实现
+ *
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Data
 @TableName("user_identities")
@@ -28,20 +32,10 @@ public class UserIdentity {
     @TableField("external_user_id")
     private String externalUserId;
 
-    @TableField("union_id")
-    private String unionId;
-
-    @TableField("open_id")
-    private String openId;
-
-    private String email;
-
-    private String mobile;
 
     @TableField("profile_json")
     private String profileJson;
 
-    private Integer status;
 
     @TableField("created_at")
     private LocalDateTime createdAt;

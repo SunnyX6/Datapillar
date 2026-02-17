@@ -6,9 +6,11 @@ import org.springframework.stereotype.Component;
 import lombok.Data;
 
 /**
- * Airflow 配置类
+ * Airflow配置
+ * 负责Airflow配置装配与Bean初始化
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Data
 @Component
@@ -18,17 +20,17 @@ public class AirflowConfig {
     /**
      * Airflow 服务地址
      */
-    private String baseUrl = "http://localhost:8080";
+    private String baseUrl;
 
     /**
      * 插件路径
      */
-    private String pluginPath = "/plugins/datapillar";
+    private String pluginPath;
 
     /**
      * 认证用户名
      */
-    private String username = "datapillar";
+    private String username;
 
     /**
      * 认证密码
@@ -38,12 +40,12 @@ public class AirflowConfig {
     /**
      * 连接超时时间（毫秒）
      */
-    private int connectTimeout = 5000;
+    private int connectTimeout;
 
     /**
      * 读取超时时间（毫秒）
      */
-    private int readTimeout = 30000;
+    private int readTimeout;
 
     /**
      * 获取完整的插件 API URL

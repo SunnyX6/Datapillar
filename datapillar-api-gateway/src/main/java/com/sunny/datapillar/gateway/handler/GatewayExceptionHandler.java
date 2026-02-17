@@ -2,8 +2,14 @@ package com.sunny.datapillar.gateway.handler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sunny.datapillar.common.constant.HeaderConstants;
-import com.sunny.datapillar.gateway.response.GatewayErrorCode;
+import com.sunny.datapillar.common.exception.BadRequestException;
+import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
+import com.sunny.datapillar.common.exception.ExceptionMapper;
+import com.sunny.datapillar.common.exception.ForbiddenException;
+import com.sunny.datapillar.common.exception.InternalException;
+import com.sunny.datapillar.common.exception.NotFoundException;
+import com.sunny.datapillar.common.exception.ServiceUnavailableException;
+import com.sunny.datapillar.common.exception.UnauthorizedException;
 import com.sunny.datapillar.gateway.response.GatewayResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
@@ -18,11 +24,15 @@ import reactor.core.publisher.Mono;
 
 import java.net.ConnectException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 /**
- * 网关全局异常处理器
- * 响应式异常处理
+ * 网关异常处理器
+ * 负责网关异常处理流程与结果输出
+ *
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Slf4j
 @Order(-1)
@@ -38,65 +48,61 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
         ServerHttpResponse response = exchange.getResponse();
-
-        // 已经提交响应则跳过
         if (response.isCommitted()) {
             return Mono.error(ex);
         }
 
-        // 获取 TraceId
-        String traceId = exchange.getRequest().getHeaders().getFirst(HeaderConstants.HEADER_TRACE_ID);
+        DatapillarRuntimeException mappedException = mapException(ex);
+        ExceptionMapper.ExceptionDetail detail = ExceptionMapper.resolve(mappedException);
 
-        // 根据异常类型构建响应
-        GatewayResponse<Object> gatewayResponse;
-        HttpStatus httpStatus;
-
-        if (ex instanceof ResponseStatusException responseStatusException) {
-            // Spring 框架异常
-            log.warn("[{}] 响应状态异常: {}", traceId, ex.getMessage());
-            httpStatus = HttpStatus.valueOf(responseStatusException.getStatusCode().value());
-            gatewayResponse = buildResponseFromStatus(httpStatus, responseStatusException.getReason());
-
-        } else if (ex instanceof ConnectException) {
-            // 连接异常 - 下游服务不可用
-            log.error("[{}] 服务连接失败: {}", traceId, ex.getMessage());
-            gatewayResponse = GatewayResponse.error(GatewayErrorCode.SERVICE_UNAVAILABLE);
-            httpStatus = HttpStatus.SERVICE_UNAVAILABLE;
-
-        } else if (ex instanceof TimeoutException) {
-            // 超时异常
-            log.error("[{}] 服务响应超时: {}", traceId, ex.getMessage());
-            gatewayResponse = GatewayResponse.error(GatewayErrorCode.GATEWAY_TIMEOUT);
-            httpStatus = HttpStatus.GATEWAY_TIMEOUT;
-
+        if (detail.serverError()) {
+            log.error("网关异常: type={}, message={}", detail.type(), detail.message(), ex);
         } else {
-            // 未知异常
-            log.error("[{}] 网关内部错误: {}", traceId, ex.getMessage(), ex);
-            gatewayResponse = GatewayResponse.error(GatewayErrorCode.GATEWAY_INTERNAL_ERROR);
-            httpStatus = HttpStatus.INTERNAL_SERVER_ERROR;
+            log.warn("网关请求异常: type={}, message={}", detail.type(), detail.message(), ex);
         }
 
-        return writeResponse(response, httpStatus, gatewayResponse);
+        GatewayResponse<Object> gatewayResponse = GatewayResponse.error(
+                String.valueOf(detail.errorCode()),
+                detail.type(),
+                detail.message(),
+                detail.stack());
+        return writeResponse(response, HttpStatus.valueOf(detail.httpStatus()), gatewayResponse);
     }
 
-    /**
-     * 根据 HTTP 状态码构建响应
-     */
-    private GatewayResponse<Object> buildResponseFromStatus(HttpStatus status, String reason) {
-        return switch (status) {
-            case NOT_FOUND -> GatewayResponse.error(GatewayErrorCode.RESOURCE_NOT_FOUND);
-            case UNAUTHORIZED -> GatewayResponse.error(GatewayErrorCode.UNAUTHORIZED);
-            case FORBIDDEN -> GatewayResponse.error(GatewayErrorCode.FORBIDDEN);
-            case SERVICE_UNAVAILABLE -> GatewayResponse.error(GatewayErrorCode.SERVICE_UNAVAILABLE);
-            case GATEWAY_TIMEOUT -> GatewayResponse.error(GatewayErrorCode.GATEWAY_TIMEOUT);
-            default -> GatewayResponse.error(status.name(), reason != null ? reason : status.getReasonPhrase());
-        };
+    private DatapillarRuntimeException mapException(Throwable ex) {
+        if (ex instanceof DatapillarRuntimeException runtimeException) {
+            return runtimeException;
+        }
+
+        if (ex instanceof ResponseStatusException responseStatusException) {
+            HttpStatus status = HttpStatus.valueOf(responseStatusException.getStatusCode().value());
+            String reason = responseStatusException.getReason() == null
+                    ? status.getReasonPhrase()
+                    : responseStatusException.getReason();
+            return switch (status) {
+                case BAD_REQUEST -> new BadRequestException(ex, reason);
+                case UNAUTHORIZED -> new UnauthorizedException(ex, reason);
+                case FORBIDDEN -> new ForbiddenException(ex, reason);
+                case NOT_FOUND -> new NotFoundException(ex, reason);
+                case SERVICE_UNAVAILABLE -> new ServiceUnavailableException(ex, reason);
+                default -> new InternalException(ex, reason);
+            };
+        }
+
+        if (ex instanceof ConnectException) {
+            return new ServiceUnavailableException(ex, "服务连接失败");
+        }
+
+        if (ex instanceof TimeoutException) {
+            return new ServiceUnavailableException(ex, "服务响应超时");
+        }
+
+        return new InternalException(ex, "网关内部错误");
     }
 
-    /**
-     * 写入响应
-     */
-    private Mono<Void> writeResponse(ServerHttpResponse response, HttpStatus status, GatewayResponse<Object> gatewayResponse) {
+    private Mono<Void> writeResponse(ServerHttpResponse response,
+                                     HttpStatus status,
+                                     GatewayResponse<Object> gatewayResponse) {
         response.setStatusCode(status);
         response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
@@ -104,9 +110,39 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
             byte[] bytes = objectMapper.writeValueAsBytes(gatewayResponse);
             return response.writeWith(Mono.just(response.bufferFactory().wrap(bytes)));
         } catch (JsonProcessingException e) {
-            log.error("JSON 序列化失败", e);
-            byte[] fallback = "{\"code\":\"INTERNAL_ERROR\",\"message\":\"响应序列化失败\"}".getBytes(StandardCharsets.UTF_8);
-            return response.writeWith(Mono.just(response.bufferFactory().wrap(fallback)));
+            log.error("网关响应序列化失败", e);
+            List<String> stack = ExceptionMapper.resolve(e).stack();
+            String fallback = String.format(
+                    "{\"code\":\"1002\",\"message\":\"响应序列化失败\",\"type\":\"%s\",\"stack\":%s}",
+                    e.getClass().getSimpleName(),
+                    toJsonArray(stack));
+            return response.writeWith(Mono.just(response.bufferFactory().wrap(fallback.getBytes(StandardCharsets.UTF_8))));
         }
+    }
+
+    private String toJsonArray(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return "[]";
+        }
+        StringBuilder builder = new StringBuilder("[");
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                builder.append(',');
+            }
+            builder.append('"').append(escapeJson(values.get(i))).append('"');
+        }
+        builder.append(']');
+        return builder.toString();
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r");
     }
 }

@@ -7,7 +7,11 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.sunny.datapillar.auth.entity.Tenant;
 
 /**
- * 租户 Mapper
+ * 租户Mapper
+ * 负责租户数据访问与持久化映射
+ *
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Mapper
 public interface TenantMapper extends BaseMapper<Tenant> {

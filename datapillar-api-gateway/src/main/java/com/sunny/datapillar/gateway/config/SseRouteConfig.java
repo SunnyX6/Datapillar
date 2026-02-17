@@ -9,10 +9,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * SSE 路由配置
+ * SseRoute配置
+ * 负责SseRoute配置装配与Bean初始化
  *
- * 使用 Java DSL 定义 SSE 路由，避免 default-filters（如限流器）干扰流式响应。
- * Java DSL 定义的路由不会自动应用 default-filters。
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Slf4j
 @Configuration

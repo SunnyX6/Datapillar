@@ -1,44 +1,51 @@
 package com.sunny.datapillar.auth.security;
 
-import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 
-import org.springframework.http.HttpHeaders;
+import io.jsonwebtoken.Claims;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.auth.config.AuthSecurityProperties;
+import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
+import com.sunny.datapillar.common.utils.JwtUtil;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.sunny.datapillar.common.exception.ForbiddenException;
+/**
+ * 认证CSRF拦截器
+ * 负责认证CSRF请求拦截与访问校验
+ *
+ * @author Sunny
+ * @date 2026-01-01
+ */
 
 @Component
 public class AuthCsrfInterceptor implements HandlerInterceptor {
 
     private static final List<String> CSRF_WHITELIST = Arrays.asList(
-            "/auth/login",
-            "/auth/login/tenant",
-            "/auth/sso/login",
-            "/auth/sso/qr",
+            "/login",
+            "/login/sso",
+            "/login/logout",
             "/auth/health",
             "/auth/validate"
     );
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
     private final AuthSecurityProperties securityProperties;
-    private final CsrfTokenService csrfTokenService;
-    private final JwtTokenUtil jwtTokenUtil;
+    private final CsrfTokenStore csrfTokenStore;
+    private final JwtUtil jwtUtil;
 
     public AuthCsrfInterceptor(AuthSecurityProperties securityProperties,
-                               CsrfTokenService csrfTokenService,
-                               JwtTokenUtil jwtTokenUtil) {
+                               CsrfTokenStore csrfTokenStore,
+                               JwtUtil jwtUtil) {
         this.securityProperties = securityProperties;
-        this.csrfTokenService = csrfTokenService;
-        this.jwtTokenUtil = jwtTokenUtil;
+        this.csrfTokenStore = csrfTokenStore;
+        this.jwtUtil = jwtUtil;
     }
 
     @Override
@@ -64,10 +71,6 @@ public class AuthCsrfInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        if (!isOriginAllowed(request)) {
-            throw new BusinessException(ErrorCode.CSRF_INVALID);
-        }
-
         boolean refreshRequest = pathMatcher.match("/auth/refresh", path);
         String headerName = refreshRequest
                 ? securityProperties.getCsrf().getRefreshHeaderName()
@@ -78,18 +81,18 @@ public class AuthCsrfInterceptor implements HandlerInterceptor {
         String headerToken = request.getHeader(headerName);
         String cookieToken = getCookieValue(request, cookieName);
         if (headerToken == null || cookieToken == null || !headerToken.equals(cookieToken)) {
-            throw new BusinessException(ErrorCode.CSRF_INVALID);
+            throw new ForbiddenException("CSRF 校验失败");
         }
 
         TokenIdentity tokenIdentity = resolveTokenIdentity(path, authCookie, refreshCookie);
         if (tokenIdentity == null) {
-            throw new BusinessException(ErrorCode.CSRF_INVALID);
+            throw new ForbiddenException(new IllegalArgumentException("token_identity_missing"), "CSRF 校验失败");
         }
         boolean valid = refreshRequest
-                ? csrfTokenService.validateRefreshToken(tokenIdentity.tenantId(), tokenIdentity.userId(), headerToken)
-                : csrfTokenService.validateToken(tokenIdentity.tenantId(), tokenIdentity.userId(), headerToken);
+                ? csrfTokenStore.validateRefreshToken(tokenIdentity.tenantId(), tokenIdentity.userId(), headerToken)
+                : csrfTokenStore.validateToken(tokenIdentity.tenantId(), tokenIdentity.userId(), headerToken);
         if (!valid) {
-            throw new BusinessException(ErrorCode.CSRF_INVALID);
+            throw new ForbiddenException("CSRF 校验失败");
         }
 
         return true;
@@ -109,34 +112,74 @@ public class AuthCsrfInterceptor implements HandlerInterceptor {
      * refresh 请求优先使用 refresh-token，避免 access-token 到期后 CSRF 身份解析失败。
      */
     private TokenIdentity resolveTokenIdentity(String path, String authCookie, String refreshCookie) {
+        DatapillarRuntimeException parseFailure = null;
         if (pathMatcher.match("/auth/refresh", path)) {
-            TokenIdentity refreshIdentity = parseIdentity(refreshCookie);
+            TokenIdentity refreshIdentity;
+            try {
+                refreshIdentity = parseIdentity(refreshCookie, "refresh-token");
+            } catch (DatapillarRuntimeException ex) {
+                parseFailure = ex;
+                refreshIdentity = null;
+            }
             if (refreshIdentity != null) {
                 return refreshIdentity;
             }
-            return parseIdentity(authCookie);
+            try {
+                TokenIdentity authIdentity = parseIdentity(authCookie, "auth-token");
+                if (authIdentity != null) {
+                    return authIdentity;
+                }
+            } catch (DatapillarRuntimeException ex) {
+                if (parseFailure == null) {
+                    parseFailure = ex;
+                }
+            }
+            if (parseFailure != null) {
+                throw parseFailure;
+            }
+            return null;
         }
 
-        TokenIdentity authIdentity = parseIdentity(authCookie);
+        TokenIdentity authIdentity;
+        try {
+            authIdentity = parseIdentity(authCookie, "auth-token");
+        } catch (DatapillarRuntimeException ex) {
+            parseFailure = ex;
+            authIdentity = null;
+        }
         if (authIdentity != null) {
             return authIdentity;
         }
-        return parseIdentity(refreshCookie);
+        try {
+            TokenIdentity refreshIdentity = parseIdentity(refreshCookie, "refresh-token");
+            if (refreshIdentity != null) {
+                return refreshIdentity;
+            }
+        } catch (DatapillarRuntimeException ex) {
+            if (parseFailure == null) {
+                parseFailure = ex;
+            }
+        }
+        if (parseFailure != null) {
+            throw parseFailure;
+        }
+        return null;
     }
 
-    private TokenIdentity parseIdentity(String token) {
+    private TokenIdentity parseIdentity(String token, String tokenName) {
         if (token == null || token.isBlank()) {
             return null;
         }
         try {
-            Long tenantId = jwtTokenUtil.getTenantId(token);
-            Long userId = jwtTokenUtil.getUserId(token);
+            Claims claims = jwtUtil.parseToken(token);
+            Long tenantId = jwtUtil.getTenantId(claims);
+            Long userId = jwtUtil.getUserId(claims);
             if (tenantId == null || userId == null) {
                 return null;
             }
             return new TokenIdentity(tenantId, userId);
-        } catch (BusinessException e) {
-            return null;
+        } catch (DatapillarRuntimeException e) {
+            throw new ForbiddenException(e, "CSRF 校验失败", tokenName + "_parse_failed:" + e.getMessage());
         }
     }
 
@@ -144,40 +187,8 @@ public class AuthCsrfInterceptor implements HandlerInterceptor {
     }
 
     private boolean hasAuthorizationHeader(HttpServletRequest request) {
-        String auth = request.getHeader(HttpHeaders.AUTHORIZATION);
+        String auth = request.getHeader("Authorization");
         return auth != null && auth.startsWith("Bearer ");
-    }
-
-    private boolean isOriginAllowed(HttpServletRequest request) {
-        String origin = request.getHeader(HttpHeaders.ORIGIN);
-        if (origin == null || origin.isBlank()) {
-            String referer = request.getHeader(HttpHeaders.REFERER);
-            origin = extractOrigin(referer);
-        }
-        if (origin == null || origin.isBlank()) {
-            return false;
-        }
-        List<String> allowedOrigins = securityProperties.getAllowedOrigins();
-        return allowedOrigins != null && allowedOrigins.contains(origin);
-    }
-
-    private String extractOrigin(String referer) {
-        if (referer == null || referer.isBlank()) {
-            return null;
-        }
-        try {
-            URI uri = URI.create(referer);
-            if (uri.getScheme() == null || uri.getHost() == null) {
-                return null;
-            }
-            int port = uri.getPort();
-            if (port > 0) {
-                return uri.getScheme() + "://" + uri.getHost() + ":" + port;
-            }
-            return uri.getScheme() + "://" + uri.getHost();
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
     }
 
     private String getCookieValue(HttpServletRequest request, String name) {

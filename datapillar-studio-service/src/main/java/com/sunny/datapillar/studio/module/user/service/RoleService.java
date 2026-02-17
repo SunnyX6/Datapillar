@@ -2,13 +2,15 @@ package com.sunny.datapillar.studio.module.user.service;
 
 import java.util.List;
 
-import com.sunny.datapillar.studio.module.features.dto.FeatureObjectDto;
+import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
 import com.sunny.datapillar.studio.module.user.dto.RoleDto;
 
 /**
- * 角色服务接口
+ * 角色服务
+ * 提供角色业务能力与领域服务
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 public interface RoleService {
 

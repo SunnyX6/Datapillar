@@ -3,6 +3,13 @@ package com.sunny.datapillar.gateway.security;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+/**
+ * 令牌哈希工具类
+ * 提供令牌哈希通用工具能力
+ *
+ * @author Sunny
+ * @date 2026-01-01
+ */
 
 public final class TokenHashUtil {
 

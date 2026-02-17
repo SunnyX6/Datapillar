@@ -5,7 +5,7 @@
  */
 
 import { createApiClient, fetchWithAuthRetry } from '@/lib/api/client'
-import type { ApiResponse } from '@/types/api'
+import { isApiResponse, isApiSuccess, isErrorResponse, type ApiResponse, type ErrorResponse } from '@/types/api'
 
 export interface PageResult<T> {
   items: T[]
@@ -111,6 +111,13 @@ function buildPageResult<T>(payload: ApiResponse<T[]>): PageResult<T> {
   }
 }
 
+function requireApiData<T>(payload: ApiResponse<T>): T {
+  if (typeof payload.data === 'undefined') {
+    throw new Error('接口响应缺少 data 字段')
+  }
+  return payload.data
+}
+
 export async function listNamespaces(
   limit: number = 50,
   offset: number = 0
@@ -131,7 +138,7 @@ export async function createNamespace(payload: {
 }): Promise<number> {
   try {
     const response = await wikiClient.post<ApiResponse<{ namespace_id: number }>>('/namespaces', payload)
-    return response.data.data.namespace_id
+    return requireApiData(response.data).namespace_id
   } catch (error) {
     throw new Error(extractErrorMessage(error))
   }
@@ -162,7 +169,7 @@ export async function listDocuments(
 export async function getDocument(documentId: number): Promise<DocumentApi> {
   try {
     const response = await wikiClient.get<ApiResponse<DocumentApi>>(`/documents/${documentId}`)
-    return response.data.data
+    return requireApiData(response.data)
   } catch (error) {
     throw new Error(extractErrorMessage(error))
   }
@@ -189,11 +196,14 @@ export async function uploadDocument(
     throw new Error(`HTTP ${response.status}`)
   }
 
-  const payload = (await response.json()) as ApiResponse<UploadResponse>
-  if (payload.status !== 200 || payload.code !== 'OK') {
+  const payload = (await response.json()) as ApiResponse<UploadResponse> | ErrorResponse
+  if (isApiResponse<UploadResponse>(payload) && isApiSuccess(payload)) {
+    return requireApiData(payload)
+  }
+  if (isErrorResponse(payload)) {
     throw new Error(payload.message || '上传失败')
   }
-  return payload.data
+  throw new Error('上传失败')
 }
 
 export async function startChunkJob(
@@ -205,7 +215,7 @@ export async function startChunkJob(
       `/documents/${documentId}/chunk`,
       payload
     )
-    return response.data.data
+    return requireApiData(response.data)
   } catch (error) {
     throw new Error(extractErrorMessage(error))
   }
@@ -232,7 +242,7 @@ export async function listChunks(
 export async function updateChunk(chunkId: string, content: string): Promise<ChunkJobResponse> {
   try {
     const response = await wikiClient.patch<ApiResponse<ChunkJobResponse>>(`/chunks/${chunkId}`, { content })
-    return response.data.data
+    return requireApiData(response.data)
   } catch (error) {
     throw new Error(extractErrorMessage(error))
   }
@@ -241,7 +251,7 @@ export async function updateChunk(chunkId: string, content: string): Promise<Chu
 export async function deleteChunk(chunkId: string): Promise<number> {
   try {
     const response = await wikiClient.delete<ApiResponse<{ deleted: number }>>(`/chunks/${chunkId}`)
-    return response.data.data.deleted
+    return requireApiData(response.data).deleted
   } catch (error) {
     throw new Error(extractErrorMessage(error))
   }
@@ -260,7 +270,7 @@ export async function retrieve(payload: {
 }): Promise<RetrieveResponseApi> {
   try {
     const response = await wikiClient.post<ApiResponse<RetrieveResponseApi>>('/retrieve', payload)
-    return response.data.data
+    return requireApiData(response.data)
   } catch (error) {
     throw new Error(extractErrorMessage(error))
   }

@@ -1,6 +1,7 @@
 package com.sunny.datapillar.studio.util;
 
 import com.sunny.datapillar.common.constant.HeaderConstants;
+import com.sunny.datapillar.studio.security.GatewayAssertionContext;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -8,7 +9,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * 用户上下文工具类
- * 从 Gateway 注入的请求头中提取用户信息
+ * 提供用户上下文通用工具能力
+ *
+ * @author Sunny
+ * @date 2026-01-01
  */
 public final class UserContextUtil {
 
@@ -30,19 +34,8 @@ public final class UserContextUtil {
      * 获取当前用户 ID
      */
     public static Long getUserId() {
-        HttpServletRequest request = getRequest();
-        if (request == null) {
-            return null;
-        }
-        String userId = request.getHeader(HeaderConstants.HEADER_USER_ID);
-        if (userId == null || userId.isEmpty()) {
-            return null;
-        }
-        try {
-            return Long.parseLong(userId);
-        } catch (NumberFormatException e) {
-            return null;
-        }
+        GatewayAssertionContext context = getAssertionContext();
+        return context == null ? null : context.userId();
     }
 
     /**
@@ -60,53 +53,35 @@ public final class UserContextUtil {
      * 获取当前用户名
      */
     public static String getUsername() {
-        HttpServletRequest request = getRequest();
-        if (request == null) {
-            return null;
-        }
-        return request.getHeader(HeaderConstants.HEADER_USERNAME);
+        GatewayAssertionContext context = getAssertionContext();
+        return context == null ? null : context.username();
     }
 
     /**
      * 获取当前租户ID
      */
     public static Long getTenantId() {
-        HttpServletRequest request = getRequest();
-        if (request == null) {
-            return null;
-        }
-        String tenantId = request.getHeader(HeaderConstants.HEADER_TENANT_ID);
-        if (tenantId == null || tenantId.isEmpty()) {
-            return null;
-        }
-        try {
-            return Long.parseLong(tenantId);
-        } catch (NumberFormatException e) {
-            return null;
-        }
+        GatewayAssertionContext context = getAssertionContext();
+        return context == null ? null : context.tenantId();
     }
 
     /**
      * 是否为平台超管授权访问
      */
     public static boolean isImpersonation() {
-        HttpServletRequest request = getRequest();
-        if (request == null) {
-            return false;
-        }
-        String value = request.getHeader(HeaderConstants.HEADER_IMPERSONATION);
-        return "true".equalsIgnoreCase(value);
+        GatewayAssertionContext context = getAssertionContext();
+        return context != null && context.impersonation();
     }
 
     /**
      * 获取当前用户邮箱
      */
     public static String getEmail() {
-        HttpServletRequest request = getRequest();
-        if (request == null) {
+        GatewayAssertionContext context = getAssertionContext();
+        if (context == null) {
             return null;
         }
-        String email = request.getHeader(HeaderConstants.HEADER_EMAIL);
+        String email = context.email();
         return (email == null || email.isEmpty()) ? null : email;
     }
 
@@ -126,5 +101,13 @@ public final class UserContextUtil {
      */
     public static boolean isLoggedIn() {
         return getUserId() != null;
+    }
+
+    private static GatewayAssertionContext getAssertionContext() {
+        HttpServletRequest request = getRequest();
+        if (request == null) {
+            return null;
+        }
+        return GatewayAssertionContext.current(request);
     }
 }

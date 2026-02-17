@@ -15,16 +15,18 @@ import com.sunny.datapillar.studio.module.workflow.mapper.JobDependencyMapper;
 import com.sunny.datapillar.studio.module.workflow.mapper.JobInfoMapper;
 import com.sunny.datapillar.studio.module.workflow.mapper.JobWorkflowMapper;
 import com.sunny.datapillar.studio.module.workflow.service.JobService;
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.sunny.datapillar.common.exception.NotFoundException;
 
 /**
  * 任务服务实现
+ * 实现任务业务流程与规则校验
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Slf4j
 @Service
@@ -45,7 +47,7 @@ public class JobServiceImpl implements JobService {
     public JobDto.Response getJobDetail(Long id) {
         JobDto.Response job = jobInfoMapper.selectJobDetail(id);
         if (job == null) {
-            throw new BusinessException(ErrorCode.JOB_NOT_FOUND, id);
+            throw new NotFoundException("任务不存在: jobId=%s", id);
         }
         return job;
     }
@@ -56,13 +58,13 @@ public class JobServiceImpl implements JobService {
         // 验证工作流
         JobWorkflow workflow = workflowMapper.selectById(workflowId);
         if (workflow == null) {
-            throw new BusinessException(ErrorCode.WORKFLOW_NOT_FOUND, workflowId);
+            throw new NotFoundException("工作流不存在: workflowId=%s", workflowId);
         }
 
         // 验证组件类型
         JobComponent component = componentMapper.selectById(dto.getJobType());
         if (component == null) {
-            throw new BusinessException(ErrorCode.JOB_TYPE_NOT_FOUND, dto.getJobType());
+            throw new NotFoundException("任务类型不存在: jobType=%s", dto.getJobType());
         }
 
         JobInfo jobInfo = new JobInfo();
@@ -79,7 +81,7 @@ public class JobServiceImpl implements JobService {
     public void updateJob(Long id, JobDto.Update dto) {
         JobInfo jobInfo = jobInfoMapper.selectById(id);
         if (jobInfo == null) {
-            throw new BusinessException(ErrorCode.JOB_NOT_FOUND, id);
+            throw new NotFoundException("任务不存在: jobId=%s", id);
         }
 
         if (dto.getJobName() != null) {
@@ -88,7 +90,7 @@ public class JobServiceImpl implements JobService {
         if (dto.getJobType() != null) {
             JobComponent component = componentMapper.selectById(dto.getJobType());
             if (component == null) {
-                throw new BusinessException(ErrorCode.JOB_TYPE_NOT_FOUND, dto.getJobType());
+                throw new NotFoundException("任务类型不存在: jobType=%s", dto.getJobType());
             }
             jobInfo.setJobType(dto.getJobType());
         }
@@ -126,7 +128,7 @@ public class JobServiceImpl implements JobService {
     public void deleteJob(Long id) {
         JobInfo jobInfo = jobInfoMapper.selectById(id);
         if (jobInfo == null) {
-            throw new BusinessException(ErrorCode.JOB_NOT_FOUND, id);
+            throw new NotFoundException("任务不存在: jobId=%s", id);
         }
 
         // 删除相关依赖
@@ -143,7 +145,7 @@ public class JobServiceImpl implements JobService {
         // 验证工作流
         JobWorkflow workflow = workflowMapper.selectById(workflowId);
         if (workflow == null) {
-            throw new BusinessException(ErrorCode.WORKFLOW_NOT_FOUND, workflowId);
+            throw new NotFoundException("工作流不存在: workflowId=%s", workflowId);
         }
 
         jobInfoMapper.batchUpdatePositions(dto.getPositions());

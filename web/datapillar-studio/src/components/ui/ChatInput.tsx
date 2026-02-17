@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowUp, Check, ChevronDown, Command, Zap } from 'lucide-react'
+import { ArrowUp, Check, ChevronDown, Command, Star, Zap } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import { cn } from '@/lib/utils'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
@@ -36,6 +36,7 @@ export type ChatInputProps = {
   defaultModelId?: string
   modelOptions: ChatModelOption[]
   onModelChange: (value: string) => void
+  onDefaultModelChange?: (value: string) => void
   onManageModels?: () => void
   /** 模型下拉卡片头部文案 */
   modelDropdownHeader?: string
@@ -59,6 +60,7 @@ export function ChatInput({
   defaultModelId,
   modelOptions,
   onModelChange,
+  onDefaultModelChange,
   onManageModels,
   modelDropdownHeader = '选择模型',
   commandOptions,
@@ -75,6 +77,7 @@ export function ChatInput({
   const commandDropdownRef = useRef<HTMLDivElement | null>(null)
   const [commandDropdownPos, setCommandDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
   const resolvedModelId = selectedModelId || defaultModelId || modelOptions[0]?.id || ''
+  const resolvedDefaultModelId = defaultModelId || modelOptions[0]?.id || ''
   const selectedModel = useMemo(
     () => modelOptions.find((model) => model.id === resolvedModelId) ?? modelOptions[0],
     [modelOptions, resolvedModelId]
@@ -335,6 +338,7 @@ export function ChatInput({
             <div className="p-1.5" role="listbox">
               {modelOptions.map((model) => {
                 const isSelected = model.id === resolvedModelId
+                const isDefault = model.id === resolvedDefaultModelId
                 return (
                   <button
                     key={model.id}
@@ -366,6 +370,26 @@ export function ChatInput({
                       </span>
                       <span className={`${TYPOGRAPHY.micro} block text-slate-400 truncate`}>{model.providerLabel}</span>
                     </span>
+                    {onDefaultModelChange && (
+                      <span
+                        onClick={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          if (isDefault) return
+                          onDefaultModelChange(model.id)
+                        }}
+                        title={isDefault ? '默认模型' : '设为默认模型'}
+                        aria-label={isDefault ? '默认模型' : '设为默认模型'}
+                        className={cn(
+                          'flex size-5 items-center justify-center rounded-md transition-colors',
+                          isDefault
+                            ? 'text-amber-400 dark:text-amber-300'
+                            : 'text-slate-400 hover:text-amber-400 dark:text-slate-500 dark:hover:text-amber-300'
+                        )}
+                      >
+                        <Star size={13} className={cn('transition-colors', isDefault && 'fill-current')} />
+                      </span>
+                    )}
                     {isSelected && <Check size={14} className="text-indigo-500 flex-shrink-0" />}
                   </button>
                 )

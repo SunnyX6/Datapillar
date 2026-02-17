@@ -8,10 +8,11 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
- * 用户角色关联实体类
+ * 用户角色组件
+ * 负责用户角色核心逻辑实现
  *
- * @author sunny
- * @since 2024-01-01
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Data
 @TableName("user_roles")

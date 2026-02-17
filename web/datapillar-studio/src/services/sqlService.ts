@@ -11,7 +11,7 @@ import type { ApiResponse } from '@/types/api'
  * SQL API 客户端
  */
 const sqlClient = createApiClient({
-  baseURL: '/api/studio/sql',
+  baseURL: '/api/studio/biz/sql',
   timeout: 300000
 })
 
@@ -64,13 +64,20 @@ function extractErrorMessage(error: unknown): string {
   return '未知错误'
 }
 
+function requireApiData<T>(payload: ApiResponse<T>): T {
+  if (typeof payload.data === 'undefined') {
+    throw new Error('接口响应缺少 data 字段')
+  }
+  return payload.data
+}
+
 /**
  * 执行 SQL
  */
 export async function executeSql(request: ExecuteRequest): Promise<ExecuteResult> {
   try {
     const response = await sqlClient.post<ApiResponse<ExecuteResult>>('/execute', request)
-    return response.data.data
+    return requireApiData(response.data)
   } catch (error) {
     return {
       success: false,

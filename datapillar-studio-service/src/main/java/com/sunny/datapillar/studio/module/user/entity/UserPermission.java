@@ -8,10 +8,11 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
- * 用户权限关联实体类
+ * 用户权限组件
+ * 负责用户权限核心逻辑实现
  *
- * @author sunny
- * @since 2024-01-01
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Data
 @TableName("user_permission_overrides")

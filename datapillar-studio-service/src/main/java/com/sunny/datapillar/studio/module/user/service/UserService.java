@@ -2,15 +2,16 @@ package com.sunny.datapillar.studio.module.user.service;
 
 import java.util.List;
 
-import com.sunny.datapillar.studio.module.features.dto.FeatureObjectDto;
+import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
 import com.sunny.datapillar.studio.module.user.dto.UserDto;
 import com.sunny.datapillar.studio.module.user.entity.User;
-import com.baomidou.mybatisplus.core.metadata.IPage;
 
 /**
- * 用户服务接口
+ * 用户服务
+ * 提供用户业务能力与领域服务
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 public interface UserService {
 
@@ -47,7 +48,7 @@ public interface UserService {
     /**
      * 分页查询用户列表
      */
-    IPage<User> listUsers(Integer status, int limit, int offset);
+    List<User> listUsers(Integer status);
 
     /**
      * 为用户分配角色

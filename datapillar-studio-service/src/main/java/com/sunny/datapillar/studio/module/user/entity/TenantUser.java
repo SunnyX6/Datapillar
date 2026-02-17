@@ -8,7 +8,11 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
- * 租户成员关系实体
+ * 租户用户组件
+ * 负责租户用户核心逻辑实现
+ *
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Data
 @TableName("tenant_users")
@@ -27,11 +31,6 @@ public class TenantUser {
     @TableField("is_default")
     private Integer isDefault;
 
-    @TableField("token_sign")
-    private String tokenSign;
-
-    @TableField("token_expire_time")
-    private LocalDateTime tokenExpireTime;
 
     @TableField("joined_at")
     private LocalDateTime joinedAt;

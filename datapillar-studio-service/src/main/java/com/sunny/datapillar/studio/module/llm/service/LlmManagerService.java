@@ -1,0 +1,42 @@
+package com.sunny.datapillar.studio.module.llm.service;
+
+import com.sunny.datapillar.studio.module.llm.dto.LlmManagerDto;
+import com.sunny.datapillar.studio.module.llm.enums.AiModelType;
+import java.util.List;
+
+/**
+ * 大模型Manager服务
+ * 提供大模型Manager业务能力与领域服务
+ *
+ * @author Sunny
+ * @date 2026-01-01
+ */
+public interface LlmManagerService {
+
+    List<LlmManagerDto.ProviderResponse> listProviders();
+
+    List<LlmManagerDto.ModelResponse> listModels(String keyword,
+                                                  String providerCode,
+                                                  AiModelType modelType,
+                                                  Long userId);
+
+    LlmManagerDto.ModelResponse getModel(Long userId, Long modelId);
+
+    LlmManagerDto.ModelResponse createModel(Long userId, LlmManagerDto.CreateRequest request);
+
+    LlmManagerDto.ModelResponse updateModel(Long userId, Long modelId, LlmManagerDto.UpdateRequest request);
+
+    void deleteModel(Long userId, Long modelId);
+
+    LlmManagerDto.ConnectResponse connectModel(Long userId, Long modelId, LlmManagerDto.ConnectRequest request);
+
+    List<LlmManagerDto.ModelUsageResponse> listUserModelUsages(Long operatorUserId,
+                                                                Long targetUserId,
+                                                                boolean onlyEnabled);
+
+    LlmManagerDto.ModelUsageResponse grantUserModelUsage(Long operatorUserId, Long targetUserId, Long modelId);
+
+    void revokeUserModelUsage(Long operatorUserId, Long targetUserId, Long modelId);
+
+    LlmManagerDto.ModelUsageResponse setUserDefaultModel(Long operatorUserId, Long targetUserId, Long modelId);
+}

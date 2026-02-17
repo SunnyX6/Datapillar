@@ -6,12 +6,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
- * 密码加密器配置
- * 单独抽出避免循环依赖
+ * 密码Encoder配置
+ * 负责密码Encoder配置装配与Bean初始化
  *
  * @author Sunny
- * @version 1.0.0
- * @since 2025-12-08
+ * @date 2026-01-01
  */
 @Configuration
 public class PasswordEncoderConfig {

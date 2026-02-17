@@ -13,10 +13,11 @@ import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 /**
- * Redis配置类
- * 
+ * Redis配置
+ * 负责Redis配置装配与Bean初始化
+ *
  * @author Sunny
- * @since 2024-01-01
+ * @date 2026-01-01
  */
 @Configuration
 @ConditionalOnProperty(prefix = "spring.data.redis", name = "host", matchIfMissing = false)

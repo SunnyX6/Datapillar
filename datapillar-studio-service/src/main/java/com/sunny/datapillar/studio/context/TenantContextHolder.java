@@ -1,7 +1,11 @@
 package com.sunny.datapillar.studio.context;
 
 /**
- * 租户上下文持有器
+ * 租户上下文Holder组件
+ * 负责租户上下文Holder核心逻辑实现
+ *
+ * @author Sunny
+ * @date 2026-01-01
  */
 public final class TenantContextHolder {
     private static final ThreadLocal<TenantContext> CONTEXT = new ThreadLocal<>();

@@ -3,9 +3,11 @@ package com.sunny.datapillar.studio.module.sql.service;
 import com.sunny.datapillar.studio.module.sql.dto.SqlDto;
 
 /**
- * SQL 执行服务接口
+ * SQL服务
+ * 提供SQL业务能力与领域服务
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 public interface SqlService {
 

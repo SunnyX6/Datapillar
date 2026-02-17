@@ -7,15 +7,19 @@ import java.util.Map;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
- * 工作流 DTO
+ * 工作流数据传输对象
+ * 定义工作流数据传输结构
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 public class WorkflowDto {
 
     @Data
+    @Schema(name = "WorkflowCreate")
     public static class Create {
         private Long projectId;
 
@@ -38,6 +42,7 @@ public class WorkflowDto {
     }
 
     @Data
+    @Schema(name = "WorkflowUpdate")
     public static class Update {
         private String workflowName;
         private Integer triggerType;
@@ -49,6 +54,7 @@ public class WorkflowDto {
     }
 
     @Data
+    @Schema(name = "WorkflowResponse")
     public static class Response {
         private Long id;
         private Long projectId;
@@ -71,6 +77,7 @@ public class WorkflowDto {
     }
 
     @Data
+    @Schema(name = "WorkflowListItem")
     public static class ListItem {
         private Long id;
         private Long projectId;
@@ -90,6 +97,7 @@ public class WorkflowDto {
      * 触发DAG运行请求
      */
     @Data
+    @Schema(name = "WorkflowTriggerRequest")
     public static class TriggerRequest {
         /** ISO格式时间，不填则使用当前时间 */
         private String logicalDate;
@@ -101,6 +109,7 @@ public class WorkflowDto {
      * 重跑任务请求
      */
     @Data
+    @Schema(name = "WorkflowRerunJobRequest")
     public static class RerunJobRequest {
         /** 是否重跑下游任务 */
         private boolean downstream = false;
@@ -112,6 +121,7 @@ public class WorkflowDto {
      * 设置任务状态请求
      */
     @Data
+    @Schema(name = "WorkflowSetJobStateRequest")
     public static class SetJobStateRequest {
         /** 新状态: success, failed, skipped */
         @NotBlank(message = "状态不能为空")
@@ -126,6 +136,7 @@ public class WorkflowDto {
      * 批量清除任务请求
      */
     @Data
+    @Schema(name = "WorkflowClearJobsRequest")
     public static class ClearJobsRequest {
         /** 任务ID列表 */
         @NotNull(message = "任务ID列表不能为空")

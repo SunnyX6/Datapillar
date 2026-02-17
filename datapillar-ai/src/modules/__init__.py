@@ -7,8 +7,9 @@
 
 包含所有业务功能模块:
 - openlineage: OpenLineage 血缘治理
-- knowledge: 知识图谱服务
+- rag: 知识 Wiki 服务
 - etl: ETL 工作流生成
+- governance: 指标治理
 """
 
 __all__ = []

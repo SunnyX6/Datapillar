@@ -29,6 +29,7 @@ interface WorkflowStudioState {
   isWaitingForResume: boolean
   isInitialized: boolean
   selectedModelId: string
+  defaultModelId: string
   workflow: WorkflowGraph
   lastPrompt: string
   addMessage: (message: ChatMessage) => void
@@ -40,11 +41,13 @@ interface WorkflowStudioState {
     isInitialized: boolean
     isWaitingForResume?: boolean
     selectedModelId?: string
+    defaultModelId?: string
   }) => void
   setGenerating: (value: boolean) => void
   setWaitingForResume: (value: boolean) => void
   setInitialized: (value: boolean) => void
   setSelectedModelId: (value: string) => void
+  setDefaultModelId: (value: string) => void
   setWorkflow: (workflow: WorkflowGraph) => void
   setLastPrompt: (prompt: string) => void
   reset: () => void
@@ -56,6 +59,7 @@ export const useWorkflowStudioStore = create<WorkflowStudioState>((set) => ({
   isWaitingForResume: false,
   isInitialized: false,
   selectedModelId: DEFAULT_WORKFLOW_MODEL_ID,
+  defaultModelId: DEFAULT_WORKFLOW_MODEL_ID,
   workflow: emptyWorkflowGraph,
   lastPrompt: '',
   addMessage: (message) =>
@@ -69,29 +73,35 @@ export const useWorkflowStudioStore = create<WorkflowStudioState>((set) => ({
       )
     })),
   hydrateFromCache: (payload) =>
-    set(() => ({
-      messages: payload.messages,
-      workflow: payload.workflow,
-      lastPrompt: payload.lastPrompt,
-      isInitialized: payload.isInitialized,
-      isWaitingForResume: payload.isWaitingForResume ?? false,
-      isGenerating: false,
-      selectedModelId: payload.selectedModelId ?? DEFAULT_WORKFLOW_MODEL_ID
-    })),
+    set(() => {
+      const resolvedDefaultModelId = payload.defaultModelId ?? DEFAULT_WORKFLOW_MODEL_ID
+      return {
+        messages: payload.messages,
+        workflow: payload.workflow,
+        lastPrompt: payload.lastPrompt,
+        isInitialized: payload.isInitialized,
+        isWaitingForResume: payload.isWaitingForResume ?? false,
+        isGenerating: false,
+        selectedModelId: payload.selectedModelId ?? resolvedDefaultModelId,
+        defaultModelId: resolvedDefaultModelId
+      }
+    }),
   setGenerating: (value) => set({ isGenerating: value }),
   setWaitingForResume: (value) => set({ isWaitingForResume: value }),
   setInitialized: (value) => set({ isInitialized: value }),
   setSelectedModelId: (value) => set({ selectedModelId: value }),
+  setDefaultModelId: (value) => set({ defaultModelId: value }),
   setWorkflow: (workflow) => set({ workflow }),
   setLastPrompt: (prompt) => set({ lastPrompt: prompt }),
   reset: () =>
-    set({
+    set((state) => ({
       messages: [],
       isGenerating: false,
       isWaitingForResume: false,
       isInitialized: false,
       workflow: emptyWorkflowGraph,
       lastPrompt: '',
-      selectedModelId: DEFAULT_WORKFLOW_MODEL_ID
-    })
+      selectedModelId: state.defaultModelId,
+      defaultModelId: state.defaultModelId
+    }))
 }))

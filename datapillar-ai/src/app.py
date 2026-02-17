@@ -25,9 +25,6 @@ logger = logging.getLogger(__name__)
 from src.api.router import api_router
 from src.infrastructure.database import AsyncNeo4jClient, MySQLClient, Neo4jClient, RedisClient
 from src.infrastructure.database.gravitino import GravitinoDBClient
-from src.modules.knowledge.embedding_processor import (
-    get_embedding_processor as get_knowledge_embedding_processor,
-)
 from src.modules.openlineage.core.embedding_processor import get_embedding_processor
 from src.modules.openlineage.core.event_processor import get_event_processor
 from src.modules.openlineage.core.sql_summary_processor import get_sql_summary_processor
@@ -105,7 +102,6 @@ def create_app() -> FastAPI:
         nacos_runtime: NacosRuntime | None = None
         event_processor = None
         embedding_processor = None
-        knowledge_embedding_processor = None
         sql_summary_processor = None
 
         nacos_runtime = await bootstrap_nacos(settings)
@@ -123,12 +119,10 @@ def create_app() -> FastAPI:
             # 运行期依赖（必须在 Nacos 配置注入后初始化）
             event_processor = get_event_processor()
             embedding_processor = get_embedding_processor()
-            knowledge_embedding_processor = get_knowledge_embedding_processor()
             sql_summary_processor = get_sql_summary_processor()
 
             app.state.event_processor = event_processor
             app.state.embedding_processor = embedding_processor
-            app.state.knowledge_embedding_processor = knowledge_embedding_processor
             app.state.sql_summary_processor = sql_summary_processor
 
             await nacos_runtime.register_service(port=settings.app_port)
@@ -156,10 +150,6 @@ def create_app() -> FastAPI:
             logger.info("启动 EmbeddingProcessor...")
             await embedding_processor.start()
 
-            # 启动 Knowledge EmbeddingProcessor
-            logger.info("启动 Knowledge EmbeddingProcessor...")
-            await knowledge_embedding_processor.start()
-
             # 启动 SQLSummaryProcessor
             logger.info("启动 SQLSummaryProcessor...")
             await sql_summary_processor.start()
@@ -181,10 +171,6 @@ def create_app() -> FastAPI:
             logger.info("停止 EmbeddingProcessor...")
             if embedding_processor is not None:
                 await embedding_processor.stop()
-
-            logger.info("停止 Knowledge EmbeddingProcessor...")
-            if knowledge_embedding_processor is not None:
-                await knowledge_embedding_processor.stop()
 
             logger.info("停止 SQLSummaryProcessor...")
             if sql_summary_processor is not None:

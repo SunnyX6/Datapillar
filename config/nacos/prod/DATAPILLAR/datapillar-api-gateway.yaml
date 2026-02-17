@@ -38,7 +38,26 @@ spring:
 
           # 路由配置（全部走服务发现）
           routes:
-            # 1. 认证服务 (datapillar-auth)
+            # 1. 登录服务 (datapillar-auth)
+            # 重写: /api/login/** → /login/**
+            - id: login-service
+              uri: lb://datapillar-auth
+              predicates:
+                - Path=/api/login/**
+              filters:
+                - RewritePath=/api/login(?<segment>/?.*), /login${segment}
+
+            # 2. 认证服务 OpenAPI 文档 (datapillar-auth)
+            # 重写: /api/auth/v3/api-docs/** → /v3/api-docs/**
+            - id: auth-docs
+              uri: lb://datapillar-auth
+              order: -10
+              predicates:
+                - Path=/api/auth/v3/api-docs,/api/auth/v3/api-docs/**
+              filters:
+                - RewritePath=/api/auth/v3/api-docs(?<segment>/?.*), /v3/api-docs${segment}
+
+            # 3. 认证服务 (datapillar-auth)
             # 重写: /api/auth/** → /auth/**
             - id: auth-service
               uri: lb://datapillar-auth
@@ -47,19 +66,19 @@ spring:
               filters:
                 - RewritePath=/api(?<segment>/?.*), ${segment}
 
-            # 2. 核心业务服务 (datapillar-studio-service)
+            # 4. 核心业务服务 (datapillar-studio-service)
             - id: studio-service
               uri: lb://datapillar-studio-service
               predicates:
                 - Path=/api/studio/**
 
-            # 3. AI 服务 (datapillar-ai)
+            # 5. AI 服务 (datapillar-ai)
             - id: ai-service
               uri: lb://datapillar-ai
               predicates:
                 - Path=/api/ai/**
 
-            # 4. 元数据服务 (datapillar-gravitino)
+            # 6. 元数据服务 (datapillar-gravitino)
             # Gravitino 原生 REST API
             # 重写: /api/onemeta/** → /api/**
             - id: onemeta-service
@@ -81,23 +100,52 @@ spring:
 gateway:
   auth:
     # 认证白名单（不需要 Token 的路径）
-    whitelist: >
-      /api/auth/login,
-      /api/auth/register,
-      /api/auth/refresh,
-      /api/auth/captcha,
-      /actuator/health/**,
-      /actuator/info
+    whitelist:
+      - /api/login
+      - /api/login/logout
+      - /api/auth/refresh
+      - /api/auth/health
+      - /api/auth/validate
+      - /api/auth/v3/api-docs
+      - /api/auth/v3/api-docs/**
+      - /api/studio/v3/api-docs
+      - /api/studio/v3/api-docs/**
+      - /api/docs
+      - /api/docs/**
+      - /actuator/health/**
+      - /actuator/info
+      - /api/studio/setup/status
+      - /api/studio/setup
+      - /api/studio/setup/**
+
+scalar:
+  enabled: true
+  path: /api/docs
+  operation-title-source: path
+  sources:
+    - title: Auth API
+      url: /api/auth/v3/api-docs
+      default: true
+    - title: Studio API
+      url: /api/studio/v3/api-docs
 
 # 安全配置（严格模式）
 security:
   require-https: true
-  allowed-origins:
-    - https://REPLACE_ME
+  trusted-proxies:
+    - ${TRUSTED_PROXY_CIDR_1:}
   headers:
     enabled: true
     hsts-max-age-seconds: 31536000
     include-sub-domains: true
+  gateway-assertion:
+    enabled: true
+    header-name: X-Gateway-Assertion
+    issuer: datapillar-gateway
+    audience: datapillar-studio-service
+    ttl-seconds: 20
+    key-id: gw-prod-2026-02
+    private-key-path: ${GATEWAY_ASSERTION_PRIVATE_KEY_PATH}
   csrf:
     enabled: true
     header-name: X-CSRF-Token
@@ -105,14 +153,14 @@ security:
     refresh-header-name: X-Refresh-CSRF-Token
     refresh-cookie-name: refresh-csrf-token
     whitelist:
-      - /api/auth/login
-      - /api/auth/login/tenant
-      - /api/auth/sso/login
-      - /api/auth/sso/qr
+      - /api/login
+      - /api/login/logout
       - /api/auth/health
       - /api/auth/validate
       - /actuator/health/**
       - /actuator/info
+      - /api/studio/setup
+      - /api/studio/setup/**
 
 # JWT 配置（必须与 datapillar-auth 保持一致）
 jwt:

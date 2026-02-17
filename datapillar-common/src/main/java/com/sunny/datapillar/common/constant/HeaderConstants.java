@@ -1,7 +1,11 @@
 package com.sunny.datapillar.common.constant;
 
 /**
- * 统一请求头常量
+ * 请求头常量
+ * 集中维护请求头常量定义
+ *
+ * @author Sunny
+ * @date 2026-01-01
  */
 public final class HeaderConstants {
 
@@ -13,6 +17,7 @@ public final class HeaderConstants {
     public static final String HEADER_ACTOR_USER_ID = "X-Actor-User-Id";
     public static final String HEADER_ACTOR_TENANT_ID = "X-Actor-Tenant-Id";
     public static final String HEADER_IMPERSONATION = "X-Impersonation";
+    public static final String HEADER_GATEWAY_ASSERTION = "X-Gateway-Assertion";
 
     private HeaderConstants() {
     }

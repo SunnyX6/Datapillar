@@ -19,10 +19,17 @@ vi.mock('@/stores', () => ({
   useAuthStore: (selector: (state: { login: () => Promise<unknown>; loading: boolean }) => unknown) =>
     selector({
       login: vi.fn().mockResolvedValue({
-        loginStage: 'SUCCESS',
         userId: 10001,
-        tenantId: 0,
         username: 'mock-user',
+        tenants: [
+          {
+            tenantId: 0,
+            tenantCode: 'tenant-default',
+            tenantName: '默认租户',
+            status: 1,
+            isDefault: 1
+          }
+        ],
         roles: [],
         menus: []
       }),

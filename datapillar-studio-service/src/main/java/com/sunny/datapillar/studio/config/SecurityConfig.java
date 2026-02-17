@@ -1,8 +1,12 @@
 package com.sunny.datapillar.studio.config;
 
-import com.sunny.datapillar.studio.security.GatewayUserAuthenticationFilter;
-import com.sunny.datapillar.studio.security.TenantContextFilter;
-import com.sunny.datapillar.studio.security.TraceIdFilter;
+import com.sunny.datapillar.studio.filter.GatewayAssertionFilter;
+import com.sunny.datapillar.studio.filter.SetupStateFilter;
+import com.sunny.datapillar.studio.filter.TenantContextFilter;
+import com.sunny.datapillar.studio.filter.TraceIdFilter;
+import com.sunny.datapillar.studio.handler.SecurityExceptionHandler;
+import com.sunny.datapillar.studio.security.GatewayAssertionProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -11,43 +15,41 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfigurationSource;
 
 /**
- * Spring Security 配置
- * Gateway 已完成 JWT 认证，此处仅处理权限校验
+ * 安全配置
+ * 负责安全配置装配与Bean初始化
  *
  * @author Sunny
- * @version 1.0.0
- * @since 2025-12-08
+ * @date 2026-01-01
  */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
+@EnableConfigurationProperties(GatewayAssertionProperties.class)
 public class SecurityConfig {
 
-    private final GatewayUserAuthenticationFilter gatewayUserAuthenticationFilter;
+    private final GatewayAssertionFilter gatewayAssertionFilter;
+    private final SetupStateFilter setupStateFilter;
     private final TraceIdFilter traceIdFilter;
     private final TenantContextFilter tenantContextFilter;
     private final SecurityExceptionHandler securityExceptionHandler;
-    private final CorsConfigurationSource corsConfigurationSource;
 
-    public SecurityConfig(GatewayUserAuthenticationFilter gatewayUserAuthenticationFilter,
+    public SecurityConfig(GatewayAssertionFilter gatewayAssertionFilter,
+                          SetupStateFilter setupStateFilter,
                           TraceIdFilter traceIdFilter,
                           TenantContextFilter tenantContextFilter,
-                          SecurityExceptionHandler securityExceptionHandler,
-                          CorsConfigurationSource corsConfigurationSource) {
-        this.gatewayUserAuthenticationFilter = gatewayUserAuthenticationFilter;
+                          SecurityExceptionHandler securityExceptionHandler) {
+        this.gatewayAssertionFilter = gatewayAssertionFilter;
+        this.setupStateFilter = setupStateFilter;
         this.traceIdFilter = traceIdFilter;
         this.tenantContextFilter = tenantContextFilter;
         this.securityExceptionHandler = securityExceptionHandler;
-        this.corsConfigurationSource = corsConfigurationSource;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exception -> exception
@@ -56,13 +58,15 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 健康检查与文档端点
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
+                        .requestMatchers("/v3/api-docs/**").permitAll()
+                        .requestMatchers("/setup/**").permitAll()
                         // 所有请求都需要认证（Gateway 已验证，这里信任 Gateway）
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(traceIdFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(tenantContextFilter, TraceIdFilter.class)
-                .addFilterAfter(gatewayUserAuthenticationFilter, TenantContextFilter.class);
+                .addFilterAfter(setupStateFilter, TraceIdFilter.class)
+                .addFilterAfter(gatewayAssertionFilter, SetupStateFilter.class)
+                .addFilterAfter(tenantContextFilter, GatewayAssertionFilter.class);
 
         return http.build();
     }

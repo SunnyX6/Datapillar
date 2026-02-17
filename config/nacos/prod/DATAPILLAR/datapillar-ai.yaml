@@ -92,7 +92,7 @@ security:
   default_tenant_id: 1
   key_storage:
     type: "local"
-    local_path: "/data/datapillar/privkeys"
+    local_path: "./data/datapillar/privkeys"
     s3:
       endpoint_url: "REPLACE_ME"
       access_key: "REPLACE_ME"

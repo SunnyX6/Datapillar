@@ -10,9 +10,11 @@ import com.sunny.datapillar.studio.module.user.entity.Role;
 import com.sunny.datapillar.studio.module.user.entity.RolePermission;
 
 /**
- * 角色 Mapper 接口
+ * 角色Mapper
+ * 负责角色数据访问与持久化映射
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Mapper
 public interface RoleMapper extends BaseMapper<Role> {

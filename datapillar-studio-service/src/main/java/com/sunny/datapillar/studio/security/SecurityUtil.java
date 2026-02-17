@@ -3,15 +3,16 @@ package com.sunny.datapillar.studio.security;
 import com.sunny.datapillar.studio.util.UserContextUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 /**
  * 安全工具类
- * 用于获取当前认证用户信息
- * 
- * @author sunny
- * @since 2024-01-01
+ * 提供安全通用工具能力
+ *
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Component
 @Slf4j
@@ -65,10 +66,13 @@ public class SecurityUtil {
      */
     public boolean isCurrentUserAdmin() {
         try {
-            if (com.sunny.datapillar.studio.context.TenantContextHolder.isImpersonation()) {
-                return true;
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || authentication.getAuthorities() == null) {
+                return false;
             }
-            return false;
+            return authentication.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .anyMatch("ADMIN"::equalsIgnoreCase);
         } catch (Exception e) {
             log.warn("检查用户权限时发生异常", e);
             return false;

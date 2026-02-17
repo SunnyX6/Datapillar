@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ServiceLoader;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.EnvironmentSettings;
@@ -12,14 +13,15 @@ import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.factories.CatalogStoreFactory;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.Row;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import com.sunny.datapillar.studio.module.sql.config.SqlConfig;
-import com.sunny.datapillar.studio.module.sql.config.GravitinoConfig;
+import com.sunny.datapillar.studio.config.SqlConfig;
+import com.sunny.datapillar.studio.config.GravitinoConfig;
 import com.sunny.datapillar.studio.module.sql.dto.SqlDto;
 import com.sunny.datapillar.studio.module.sql.dto.SqlDto.ColumnSchema;
 import com.sunny.datapillar.studio.module.sql.dto.SqlDto.ExecuteResult;
@@ -29,12 +31,11 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
 /**
- * SQL 执行服务实现
+ * SQL服务实现
+ * 实现SQL业务流程与规则校验
  *
- * <p>使用 Flink TableEnvironment 执行 SQL，通过 Gravitino Catalog Store 自动加载 Catalog。
- * Flink 会自动管理本地执行环境，无需显式启动 MiniCluster。
- *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Service
 public class SqlServiceImpl implements SqlService {
@@ -91,10 +92,14 @@ public class SqlServiceImpl implements SqlService {
     private TableEnvironment createTableEnvironment() {
         Configuration config = new Configuration();
 
-        // 配置 Gravitino Catalog Store
-        config.setString("table.catalog-store.kind", "gravitino");
-        config.setString("table.catalog-store.gravitino.gravitino.metalake", gravitinoConfig.getMetalake());
-        config.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoConfig.getUri());
+        // 优先使用 Gravitino Catalog Store；运行时未加载连接器时降级到内存 catalog store
+        if (hasGravitinoCatalogStoreFactory()) {
+            config.setString("table.catalog-store.kind", "gravitino");
+            config.setString("table.catalog-store.gravitino.gravitino.metalake", gravitinoConfig.getMetalake());
+            config.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoConfig.getUri());
+        } else {
+            LOG.warn("未发现 Gravitino CatalogStoreFactory，SQL 服务将使用默认内存 catalog store");
+        }
 
         // SQL 执行配置
         config.setString("sql-client.execution.result-mode", "tableau");
@@ -107,6 +112,16 @@ public class SqlServiceImpl implements SqlService {
                 .build();
 
         return TableEnvironment.create(settings);
+    }
+
+    private boolean hasGravitinoCatalogStoreFactory() {
+        ServiceLoader<CatalogStoreFactory> serviceLoader = ServiceLoader.load(CatalogStoreFactory.class);
+        for (CatalogStoreFactory factory : serviceLoader) {
+            if ("gravitino".equalsIgnoreCase(factory.factoryIdentifier())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

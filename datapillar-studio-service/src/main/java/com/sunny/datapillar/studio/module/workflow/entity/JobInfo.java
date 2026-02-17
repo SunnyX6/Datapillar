@@ -14,9 +14,11 @@ import lombok.Data;
 import java.util.Map;
 
 /**
- * 任务实体 - 对应 job_info 表
+ * 任务Info组件
+ * 负责任务Info核心逻辑实现
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Data
 @TableName(value = "job_info", autoResultMap = true)

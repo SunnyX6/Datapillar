@@ -1,6 +1,7 @@
 package com.sunny.datapillar.gateway.filter;
 
 import com.sunny.datapillar.common.constant.HeaderConstants;
+import com.sunny.datapillar.gateway.security.ClientIpResolver;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -12,16 +13,21 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 /**
- * 请求日志过滤器
- * 记录请求和响应信息，便于问题排查和性能分析
+ * Logging过滤器
+ * 负责Logging请求过滤与上下文控制
  *
  * @author Sunny
- * @version 1.0.0
- * @since 2025-12-08
+ * @date 2026-01-01
  */
 @Slf4j
 @Component
 public class LoggingFilter implements GlobalFilter, Ordered {
+
+    private final ClientIpResolver clientIpResolver;
+
+    public LoggingFilter(ClientIpResolver clientIpResolver) {
+        this.clientIpResolver = clientIpResolver;
+    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -54,25 +60,7 @@ public class LoggingFilter implements GlobalFilter, Ordered {
      * 获取客户端真实 IP
      */
     private String getClientIp(ServerHttpRequest request) {
-        String ip = request.getHeaders().getFirst("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeaders().getFirst("X-Real-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            if (request.getRemoteAddress() != null) {
-                if (request.getRemoteAddress().getAddress() != null) {
-                    ip = request.getRemoteAddress().getAddress().getHostAddress();
-                } else {
-                    ip = request.getRemoteAddress().getHostString();
-                }
-            } else {
-                ip = "unknown";
-            }
-        }
-        // 多个代理时取第一个
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
+        String ip = clientIpResolver.resolve(request);
         return ip == null || ip.isBlank() ? "unknown" : ip;
     }
 

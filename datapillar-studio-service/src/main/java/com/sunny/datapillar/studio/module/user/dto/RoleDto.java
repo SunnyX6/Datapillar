@@ -2,20 +2,24 @@ package com.sunny.datapillar.studio.module.user.dto;
 
 import java.util.List;
 
-import com.sunny.datapillar.studio.module.features.dto.FeatureObjectDto;
+import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
- * 角色 DTO
+ * 角色数据传输对象
+ * 定义角色数据传输结构
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 public class RoleDto {
 
     @Data
+    @Schema(name = "RoleCreate")
     public static class Create {
         @NotBlank(message = "角色名称不能为空")
         @Size(max = 64, message = "角色名称长度不能超过64个字符")
@@ -31,6 +35,7 @@ public class RoleDto {
     }
 
     @Data
+    @Schema(name = "RoleUpdate")
     public static class Update {
         @Size(max = 64, message = "角色名称长度不能超过64个字符")
         private String name;
@@ -45,6 +50,7 @@ public class RoleDto {
     }
 
     @Data
+    @Schema(name = "RoleResponse")
     public static class Response {
         private Long id;
         private Long tenantId;

@@ -16,9 +16,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 
 /**
- * RestTemplate 配置类
+ * RestTemplate配置
+ * 负责RestTemplate配置装配与Bean初始化
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Configuration
 @RequiredArgsConstructor
