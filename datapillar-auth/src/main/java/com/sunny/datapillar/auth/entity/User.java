@@ -9,8 +9,11 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 用户实体 - 认证中心只操作此表
- * 只包含身份验证相关信息,不包含角色和权限
+ * 用户组件
+ * 负责用户核心逻辑实现
+ *
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Data
 @TableName("users")

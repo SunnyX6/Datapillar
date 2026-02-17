@@ -2,6 +2,10 @@ package com.sunny.datapillar.studio.context;
 
 /**
  * 租户上下文
+ * 维护租户上下文状态与访问能力
+ *
+ * @author Sunny
+ * @date 2026-01-01
  */
 public class TenantContext {
     private final Long tenantId;

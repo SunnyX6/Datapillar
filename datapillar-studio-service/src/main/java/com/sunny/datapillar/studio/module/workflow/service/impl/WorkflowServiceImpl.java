@@ -12,9 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.sunny.datapillar.studio.module.workflow.client.AirflowClient;
-import com.sunny.datapillar.studio.module.workflow.dag.DagBuilder;
-import com.sunny.datapillar.studio.module.workflow.dag.DagValidationException;
+import com.sunny.datapillar.studio.module.workflow.service.client.AirflowClient;
+import com.sunny.datapillar.studio.module.workflow.service.dag.DagBuilder;
+import com.sunny.datapillar.studio.module.workflow.service.dag.DagValidationException;
 import com.sunny.datapillar.studio.module.workflow.dto.JobDependencyDto;
 import com.sunny.datapillar.studio.module.workflow.dto.JobDto;
 import com.sunny.datapillar.studio.module.workflow.dto.WorkflowDto;
@@ -23,16 +23,19 @@ import com.sunny.datapillar.studio.module.workflow.mapper.JobDependencyMapper;
 import com.sunny.datapillar.studio.module.workflow.mapper.JobInfoMapper;
 import com.sunny.datapillar.studio.module.workflow.mapper.JobWorkflowMapper;
 import com.sunny.datapillar.studio.module.workflow.service.WorkflowService;
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.sunny.datapillar.common.exception.BadRequestException;
+import com.sunny.datapillar.common.exception.NotFoundException;
+import com.sunny.datapillar.common.exception.InternalException;
 
 /**
  * 工作流服务实现
+ * 实现工作流业务流程与规则校验
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Slf4j
 @Service
@@ -55,7 +58,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     public WorkflowDto.Response getWorkflowDetail(Long id) {
         WorkflowDto.Response workflow = workflowMapper.selectWorkflowDetail(id);
         if (workflow == null) {
-            throw new BusinessException(ErrorCode.WORKFLOW_NOT_FOUND, id);
+            throw new NotFoundException("工作流不存在: workflowId=%s", id);
         }
 
         List<JobDto.Response> jobs = jobInfoMapper.selectJobsByWorkflowId(id);
@@ -84,7 +87,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     public void updateWorkflow(Long id, WorkflowDto.Update dto) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new BusinessException(ErrorCode.WORKFLOW_NOT_FOUND, id);
+            throw new NotFoundException("工作流不存在: workflowId=%s", id);
         }
 
         if (dto.getWorkflowName() != null) {
@@ -122,7 +125,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     public void deleteWorkflow(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new BusinessException(ErrorCode.WORKFLOW_NOT_FOUND, id);
+            throw new NotFoundException("工作流不存在: workflowId=%s", id);
         }
 
         // 如果已发布，先删除Airflow DAG
@@ -132,7 +135,8 @@ public class WorkflowServiceImpl implements WorkflowService {
                 airflowClient.delete("/dags/" + dagId, JsonNode.class);
                 log.info("Deleted Airflow DAG: {}", dagId);
             } catch (Exception e) {
-                log.warn("Failed to delete Airflow DAG: {}, error: {}", dagId, e.getMessage());
+                log.error("Failed to delete Airflow DAG: {}", dagId, e);
+                throw new InternalException(e, "Airflow 请求失败: %s", "删除 DAG 失败: dagId=" + dagId);
             }
         }
 
@@ -151,7 +155,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     public void publishWorkflow(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new BusinessException(ErrorCode.WORKFLOW_NOT_FOUND, id);
+            throw new NotFoundException("工作流不存在: workflowId=%s", id);
         }
 
         List<JobDto.Response> jobs = jobInfoMapper.selectJobsByWorkflowId(id);
@@ -177,11 +181,11 @@ public class WorkflowServiceImpl implements WorkflowService {
     public void pauseWorkflow(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new BusinessException(ErrorCode.WORKFLOW_NOT_FOUND, id);
+            throw new NotFoundException("工作流不存在: workflowId=%s", id);
         }
 
         if (workflow.getStatus() != 1) {
-            throw new BusinessException(ErrorCode.WORKFLOW_INVALID_STATUS, "只有已发布的工作流才能暂停");
+            throw new BadRequestException("工作流状态不正确: %s", "只有已发布的工作流才能暂停");
         }
 
         String dagId = buildDagId(workflow);
@@ -197,11 +201,11 @@ public class WorkflowServiceImpl implements WorkflowService {
     public void resumeWorkflow(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new BusinessException(ErrorCode.WORKFLOW_NOT_FOUND, id);
+            throw new NotFoundException("工作流不存在: workflowId=%s", id);
         }
 
         if (workflow.getStatus() != 2) {
-            throw new BusinessException(ErrorCode.WORKFLOW_INVALID_STATUS, "只有已暂停的工作流才能恢复");
+            throw new BadRequestException("工作流状态不正确: %s", "只有已暂停的工作流才能恢复");
         }
 
         String dagId = buildDagId(workflow);
@@ -343,7 +347,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     private JobWorkflow getWorkflowById(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new BusinessException(ErrorCode.WORKFLOW_NOT_FOUND, id);
+            throw new NotFoundException("工作流不存在: workflowId=%s", id);
         }
         return workflow;
     }
@@ -369,7 +373,7 @@ public class WorkflowServiceImpl implements WorkflowService {
         try {
             dagBuilder.validate();
         } catch (DagValidationException e) {
-            throw new BusinessException(ErrorCode.DAG_HAS_CYCLE);
+            throw new BadRequestException("工作流存在循环依赖");
         }
     }
 

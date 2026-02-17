@@ -1,14 +1,16 @@
 export interface ApiResponse<T = unknown> {
-  status: number
-  code: string
-  message: string
-  data: T
-  timestamp: string
-  path?: string
-  traceId?: string
+  code: number
+  data?: T
   limit?: number
   offset?: number
   total?: number
+}
+
+export interface ErrorResponse {
+  code: number
+  type: string
+  message: string
+  stack?: string[]
 }
 
 export interface PageRequest {
@@ -18,38 +20,60 @@ export interface PageRequest {
 }
 
 export interface ApiError extends Error {
-  code?: string
+  code?: number
   status?: number
-  response?: ApiResponse<unknown>
+  response?: ApiResponse<unknown> | ErrorResponse
 }
 
-export function isApiSuccess(response: ApiResponse<unknown>): boolean {
-  return response.status === 200 && response.code === 'OK'
+export function isApiResponse<T = unknown>(response: unknown): response is ApiResponse<T> {
+  if (!response || typeof response !== 'object') {
+    return false
+  }
+  const candidate = response as Record<string, unknown>
+  return typeof candidate.code === 'number'
+}
+
+export function isErrorResponse(response: unknown): response is ErrorResponse {
+  if (!response || typeof response !== 'object') {
+    return false
+  }
+  const candidate = response as Record<string, unknown>
+  return typeof candidate.code === 'number' &&
+    typeof candidate.type === 'string' &&
+    typeof candidate.message === 'string'
+}
+
+export function isApiSuccess(response: { code: number }): boolean {
+  return response.code === 0
 }
 
 export function extractApiData<T>(response: ApiResponse<T>): T {
   if (!isApiSuccess(response)) {
-    throw new Error(response.message || 'API request failed')
+    throw new Error(`API request failed (code: ${response.code})`)
+  }
+  if (typeof response.data === 'undefined') {
+    throw new Error('API response missing data')
   }
   return response.data
 }
 
-export function createSuccessResponse<T>(data: T, message = 'Success'): ApiResponse<T> {
+export function createSuccessResponse<T>(data: T): ApiResponse<T> {
   return {
-    status: 200,
-    code: 'OK',
-    message,
-    data,
-    timestamp: new Date().toISOString()
+    code: 0,
+    data
   }
 }
 
-export function createErrorResponse(code: string, message: string, status = 500): ApiResponse<null> {
+export function createErrorResponse(
+  code: number,
+  type: string,
+  message: string,
+  stack?: string[]
+): ErrorResponse {
   return {
-    status,
     code,
+    type,
     message,
-    data: null,
-    timestamp: new Date().toISOString()
+    stack
   }
 }

@@ -10,9 +10,11 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 /**
- * 任务依赖关系实体 - 对应 job_dependency 表
+ * 任务Dependency组件
+ * 负责任务Dependency核心逻辑实现
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Data
 @TableName("job_dependency")

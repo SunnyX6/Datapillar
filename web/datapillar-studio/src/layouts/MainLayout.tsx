@@ -29,7 +29,7 @@ export function MainLayout() {
 
   const handleLogout = async () => {
     await useAuthStore.getState().logout()
-    navigate('/')
+    navigate('/login')
   }
 
   const handleNavigate = (targetPath: string) => {

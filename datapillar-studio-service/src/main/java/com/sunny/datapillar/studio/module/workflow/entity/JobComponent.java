@@ -13,9 +13,11 @@ import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 
 /**
- * 组件类型实体 - 对应 job_component 表
+ * 任务Component组件
+ * 负责任务Component核心逻辑实现
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Data
 @TableName(value = "job_component", autoResultMap = true)

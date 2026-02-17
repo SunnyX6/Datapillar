@@ -2,7 +2,7 @@
 
 # Datapillar 本地调试一键停止脚本
 # 作者: Sunny
-# 版本: 1.0.0
+# 版本: 1.1.0
 
 echo "🛑 Datapillar 本地服务停止中..."
 echo ""
@@ -71,7 +71,10 @@ stop_service_by_pid "datapillar-ai"
 
 echo ""
 echo "📋 清理残留进程（通过端口）..."
-
+stop_service_by_port "datapillar-api-gateway" 7000
+stop_service_by_port "datapillar-auth" 7001
+stop_service_by_port "datapillar-studio-service" 7002
+stop_service_by_port "datapillar-ai" 7003
 
 echo ""
 echo -e "${GREEN}✅ 所有服务已停止${NC}"

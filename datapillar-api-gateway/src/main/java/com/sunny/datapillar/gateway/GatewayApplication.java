@@ -4,19 +4,11 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * Datapillar API 网关 - 统一入口
- *
- * <p>功能：
- * <ul>
- *   <li>统一路由转发</li>
- *   <li>跨域处理</li>
- *   <li>限流熔断</li>
- *   <li>统一日志</li>
- * </ul>
+ * 网关启动类
+ * 负责服务启动与基础组件装配
  *
  * @author Sunny
- * @version 1.0.0
- * @since 2025-12-08
+ * @date 2026-01-01
  */
 @SpringBootApplication
 public class GatewayApplication {

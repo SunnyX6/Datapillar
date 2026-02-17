@@ -18,8 +18,11 @@ const withSuspense = (Component: LazyExoticComponent<ComponentType>) => (
   </Suspense>
 )
 
+const LazyEntryRoute = lazy(() => import('./EntryRoute').then(m => ({ default: m.EntryRoute })))
 const LazyLoginPage = lazy(() => import('@/pages/login').then(m => ({ default: m.LoginPage })))
+const LazySetupPage = lazy(() => import('@/pages/setup').then(m => ({ default: m.SetupPage })))
 const LazyInvitePage = lazy(() => import('@/pages/invite').then(m => ({ default: m.InvitePage })))
+const LazyServerErrorPage = lazy(() => import('@/pages/exception').then(m => ({ default: m.ServerErrorPage })))
 
 const LazyMainLayout = lazy(() => import('@/layouts/MainLayout').then(m => ({ default: m.MainLayout })))
 
@@ -60,16 +63,28 @@ const LazyGovernanceValueDomainPage = lazy(() => import('@/pages/governance/meta
 
 const LazyGovernanceClassificationPage = lazy(() => import('@/pages/governance/metasemantic/ClassificationPage').then(m => ({ default: m.GovernanceClassificationPage })))
 
-const LazyNotFoundPage = lazy(() => import('@/pages/not-found').then(m => ({ default: m.NotFoundPage })))
+const LazyNotFoundPage = lazy(() => import('@/pages/exception').then(m => ({ default: m.NotFoundPage })))
 
 export const router = createBrowserRouter([
   {
     path: '/',
+    element: withSuspense(LazyEntryRoute)
+  },
+  {
+    path: '/login',
     element: withSuspense(LazyLoginPage)
+  },
+  {
+    path: '/setup',
+    element: withSuspense(LazySetupPage)
   },
   {
     path: '/invite',
     element: withSuspense(LazyInvitePage)
+  },
+  {
+    path: '/500',
+    element: withSuspense(LazyServerErrorPage)
   },
   {
     element: <PrivateRoute />,

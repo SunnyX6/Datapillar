@@ -7,7 +7,7 @@
 
 定位：
 - 这是 Neo4j 上"知识图谱/数仓资产"的统一数据访问层
-- 供前端知识图谱查询（src/modules/knowledge）与 ETL 多智能体工具（src/modules/etl/tools）共同复用
+- 供 ETL、多智能体与治理能力共同复用
 
 模块划分：
 - search_table: 表查询（含列、值域、血缘）
@@ -32,7 +32,6 @@ from src.infrastructure.repository.knowledge.dto import (
     WordRootDTO,
 )
 from src.infrastructure.repository.knowledge.search_column import Neo4jColumnSearch
-from src.infrastructure.repository.knowledge.search_graph import Neo4jGraphSearch
 from src.infrastructure.repository.knowledge.search_metric import Neo4jMetricSearch
 from src.infrastructure.repository.knowledge.search_node import Neo4jNodeSearch, SearchHit
 from src.infrastructure.repository.knowledge.search_semantic import Neo4jSemanticSearch
@@ -50,7 +49,6 @@ __all__ = [
     "Neo4jSemanticSearch",
     "Neo4jNodeSearch",
     "Neo4jSQLSearch",
-    "Neo4jGraphSearch",
     # 元数据/血缘
     "Metadata",
     "TableUpsertPayload",

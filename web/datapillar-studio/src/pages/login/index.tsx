@@ -19,7 +19,6 @@ import { LoginForm, LOGIN_FORM_BASE_HEIGHT, LOGIN_FORM_BASE_WIDTH } from './Logi
 export function LoginPage() {
   const [searchParams] = useSearchParams()
   const tenantCode = searchParams.get('tenantCode')
-  const inviteCode = searchParams.get('inviteCode')
 
   // 禁用 body 滚动
   useEffect(() => {
@@ -71,7 +70,7 @@ export function LoginPage() {
               <ThemeToggle />
               <LanguageToggle />
             </div>
-            <LoginForm scale={formScale} ready={formReady} tenantCode={tenantCode} inviteCode={inviteCode} />
+            <LoginForm scale={formScale} ready={formReady} tenantCode={tenantCode} />
           </div>
         }
       />

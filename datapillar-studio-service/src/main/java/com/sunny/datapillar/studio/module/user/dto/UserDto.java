@@ -8,15 +8,19 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
- * 用户 DTO
+ * 用户数据传输对象
+ * 定义用户数据传输结构
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 public class UserDto {
 
     @Data
+    @Schema(name = "UserCreate")
     public static class Create {
         @NotBlank(message = "用户名不能为空")
         @Size(min = 3, max = 64, message = "用户名长度必须在3-64个字符之间")
@@ -42,6 +46,7 @@ public class UserDto {
     }
 
     @Data
+    @Schema(name = "UserUpdate")
     public static class Update {
         @Size(min = 3, max = 64, message = "用户名长度必须在3-64个字符之间")
         private String username;
@@ -65,6 +70,7 @@ public class UserDto {
     }
 
     @Data
+    @Schema(name = "UserUpdateProfile")
     public static class UpdateProfile {
         @Size(max = 50, message = "昵称长度不能超过50个字符")
         private String nickname;
@@ -78,11 +84,13 @@ public class UserDto {
     }
 
     @Data
+    @Schema(name = "UserStatusUpdate")
     public static class StatusUpdate {
         private Integer status;
     }
 
     @Data
+    @Schema(name = "UserResponse")
     public static class Response {
         private Long id;
         private Long tenantId;

@@ -12,6 +12,13 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
+/**
+ * HttpsEnforcement过滤器
+ * 负责HttpsEnforcement请求过滤与上下文控制
+ *
+ * @author Sunny
+ * @date 2026-01-01
+ */
 
 @Component
 public class HttpsEnforcementFilter implements GlobalFilter, Ordered {

@@ -1,7 +1,7 @@
 package com.sunny.datapillar.common.utils;
 
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
+import com.sunny.datapillar.common.security.SessionTokenClaims;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -11,9 +11,15 @@ import java.util.Date;
 import java.util.Map;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import com.sunny.datapillar.common.exception.BadRequestException;
+import com.sunny.datapillar.common.exception.UnauthorizedException;
 
 /**
- * JWT 通用工具（签发/解析/校验）
+ * JWT工具类
+ * 提供JWT通用工具能力
+ *
+ * @author Sunny
+ * @date 2026-01-01
  */
 public class JwtUtil {
 
@@ -29,15 +35,23 @@ public class JwtUtil {
     }
 
     public String sign(Map<String, Object> claims, String subject, Date issuedAt, Date expiration) {
+        return sign(claims, subject, issuedAt, expiration, null);
+    }
+
+    public String sign(Map<String, Object> claims, String subject, Date issuedAt, Date expiration, String tokenId) {
         if (claims == null || subject == null || issuedAt == null || expiration == null) {
-            throw new BusinessException(ErrorCode.INVALID_ARGUMENT);
+            throw new BadRequestException("参数错误");
         }
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .claims(claims)
                 .subject(subject)
                 .issuer(issuer)
                 .issuedAt(issuedAt)
-                .expiration(expiration)
+                .expiration(expiration);
+        if (tokenId != null && !tokenId.isBlank()) {
+            builder.id(tokenId);
+        }
+        return builder
                 .signWith(key)
                 .compact();
     }
@@ -121,20 +135,37 @@ public class JwtUtil {
         return Boolean.TRUE.equals(claims.get("impersonation", Boolean.class));
     }
 
+    public String getSessionId(Claims claims) {
+        if (claims == null) {
+            return null;
+        }
+        return claims.get(SessionTokenClaims.SESSION_ID, String.class);
+    }
+
+    public String getTokenId(Claims claims) {
+        if (claims == null) {
+            return null;
+        }
+        if (claims.getId() != null && !claims.getId().isBlank()) {
+            return claims.getId();
+        }
+        return claims.get(SessionTokenClaims.TOKEN_ID, String.class);
+    }
+
     public String extractTokenSignature(String token) {
         if (token == null || token.isEmpty()) {
-            throw new BusinessException(ErrorCode.TOKEN_INVALID, "JWT 不能为空");
+            throw new UnauthorizedException("Token无效", "JWT 不能为空");
         }
         String[] parts = token.split("\\.");
         if (parts.length != 3) {
-            throw new BusinessException(ErrorCode.TOKEN_INVALID, "JWT 格式非法");
+            throw new UnauthorizedException("Token无效", "JWT 格式非法");
         }
         return parts[2];
     }
 
     private Claims parseToken(String token, boolean requireIssuer) {
         if (token == null || token.isBlank()) {
-            throw new BusinessException(ErrorCode.TOKEN_INVALID);
+            throw new UnauthorizedException("Token无效");
         }
         try {
             JwtParserBuilder parser = Jwts.parser().verifyWith(key);
@@ -143,9 +174,9 @@ public class JwtUtil {
             }
             return parser.build().parseSignedClaims(token).getPayload();
         } catch (ExpiredJwtException e) {
-            throw new BusinessException(ErrorCode.TOKEN_EXPIRED);
+            throw new UnauthorizedException("Token已过期");
         } catch (JwtException | IllegalArgumentException e) {
-            throw new BusinessException(ErrorCode.TOKEN_INVALID, e.getMessage());
+            throw new UnauthorizedException("Token无效", e.getMessage());
         }
     }
 

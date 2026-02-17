@@ -5,9 +5,11 @@ import java.util.List;
 import com.sunny.datapillar.studio.module.workflow.dto.JobComponentDto;
 
 /**
- * 组件服务接口
+ * 任务Component服务
+ * 提供任务Component业务能力与领域服务
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 public interface JobComponentService {
 

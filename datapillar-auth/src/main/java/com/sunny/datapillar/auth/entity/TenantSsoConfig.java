@@ -9,7 +9,11 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 /**
- * 租户 SSO 配置
+ * 租户单点登录配置
+ * 负责租户单点登录配置装配与Bean初始化
+ *
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Data
 @TableName("tenant_sso_configs")

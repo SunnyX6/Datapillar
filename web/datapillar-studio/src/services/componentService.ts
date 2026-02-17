@@ -1,17 +1,14 @@
 /**
  * 组件服务
  *
- * 调用后端获取工作流组件信息
+ * 后端已取消 /biz/components 接口，这里使用内置组件清单提供渲染元数据
  */
-
-import { createApiClient } from '@/lib/api/client'
-import type { ApiResponse } from '@/types/api'
 
 export interface JobComponent {
   id: number
   componentCode: string
   componentName: string
-  componentType: 'SQL' | 'SCRIPT' | 'SYNC'
+  componentType: 'SQL' | 'SCRIPT' | 'SYNC' | string
   jobParams: Record<string, unknown>
   description: string
   icon: string | null
@@ -19,46 +16,59 @@ export interface JobComponent {
   sortOrder: number
 }
 
-const componentClient = createApiClient({
-  baseURL: '/api/studio/components',
-  timeout: 30000
-})
-
-function extractErrorMessage(error: unknown): string {
-  if (error && typeof error === 'object' && 'response' in error) {
-    const axiosError = error as { response?: { data?: { message?: string } } }
-    if (axiosError.response?.data?.message) {
-      return axiosError.response.data.message
-    }
+const BUILTIN_COMPONENTS: JobComponent[] = [
+  {
+    id: 1,
+    componentCode: 'SQL',
+    componentName: 'SQL 任务',
+    componentType: 'SQL',
+    jobParams: {},
+    description: '执行 SQL 脚本',
+    icon: 'Database',
+    color: '#3b82f6',
+    sortOrder: 1
+  },
+  {
+    id: 2,
+    componentCode: 'PYTHON',
+    componentName: 'Python 任务',
+    componentType: 'SCRIPT',
+    jobParams: {},
+    description: '执行 Python 脚本',
+    icon: 'Code2',
+    color: '#10b981',
+    sortOrder: 2
+  },
+  {
+    id: 3,
+    componentCode: 'SHELL',
+    componentName: 'Shell 任务',
+    componentType: 'SCRIPT',
+    jobParams: {},
+    description: '执行 Shell 命令',
+    icon: 'Terminal',
+    color: '#06b6d4',
+    sortOrder: 3
   }
-  if (error instanceof Error) {
-    return error.message
-  }
-  return '未知错误'
-}
+]
 
 /**
  * 获取所有可用组件
  */
-export async function getAllComponents(): Promise<JobComponent[]> {
-  try {
-    const response = await componentClient.get<ApiResponse<JobComponent[]>>('')
-    return response.data.data
-  } catch (error) {
-    throw new Error(extractErrorMessage(error))
-  }
+export function getAllComponents(): Promise<JobComponent[]> {
+  return Promise.resolve([...BUILTIN_COMPONENTS])
 }
 
 /**
  * 根据 code 获取组件信息
  */
-export async function getComponentByCode(code: string): Promise<JobComponent> {
-  try {
-    const response = await componentClient.get<ApiResponse<JobComponent>>(`/code/${code}`)
-    return response.data.data
-  } catch (error) {
-    throw new Error(extractErrorMessage(error))
+export function getComponentByCode(code: string): Promise<JobComponent> {
+  const normalizedCode = code.trim().toUpperCase()
+  const component = BUILTIN_COMPONENTS.find((item) => item.componentCode === normalizedCode)
+  if (!component) {
+    return Promise.reject(new Error(`未找到组件: ${code}`))
   }
+  return Promise.resolve(component)
 }
 
 /**
@@ -67,7 +77,9 @@ export async function getComponentByCode(code: string): Promise<JobComponent> {
 export const COMPONENT_TYPE_DEFAULTS: Record<string, { icon: string; color: string }> = {
   SQL: { icon: 'Database', color: '#3b82f6' },
   SCRIPT: { icon: 'Terminal', color: '#10b981' },
-  SYNC: { icon: 'ArrowRightLeft', color: '#f59e0b' }
+  SYNC: { icon: 'ArrowRightLeft', color: '#f59e0b' },
+  PYTHON: { icon: 'Code2', color: '#10b981' },
+  SHELL: { icon: 'Terminal', color: '#06b6d4' }
 }
 
 /**

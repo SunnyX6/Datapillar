@@ -8,41 +8,46 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.sunny.datapillar.studio.module.features.dto.FeatureEntitlementDto;
-import com.sunny.datapillar.studio.module.features.dto.FeatureObjectDto;
+import com.sunny.datapillar.studio.module.tenant.dto.FeatureEntitlementDto;
+import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
 import com.sunny.datapillar.studio.module.user.dto.UserDto;
-import com.sunny.datapillar.studio.module.features.entity.Permission;
+import com.sunny.datapillar.studio.module.tenant.entity.Permission;
 import com.sunny.datapillar.studio.module.user.entity.TenantUser;
 import com.sunny.datapillar.studio.module.user.entity.User;
 import com.sunny.datapillar.studio.module.user.entity.Role;
 import com.sunny.datapillar.studio.module.user.entity.UserPermission;
 import com.sunny.datapillar.studio.module.user.entity.UserRole;
-import com.sunny.datapillar.studio.module.features.mapper.PermissionMapper;
-import com.sunny.datapillar.studio.module.features.mapper.FeatureObjectMapper;
-import com.sunny.datapillar.studio.module.features.mapper.TenantFeaturePermissionMapper;
-import com.sunny.datapillar.studio.module.features.util.PermissionLevelUtil;
+import com.sunny.datapillar.studio.module.tenant.mapper.PermissionMapper;
+import com.sunny.datapillar.studio.module.tenant.mapper.FeatureObjectMapper;
+import com.sunny.datapillar.studio.module.tenant.mapper.TenantFeaturePermissionMapper;
+import com.sunny.datapillar.studio.module.tenant.util.PermissionLevelUtil;
 import com.sunny.datapillar.studio.module.user.mapper.RoleMapper;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
 import com.sunny.datapillar.studio.module.user.service.UserService;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.sunny.datapillar.common.exception.BadRequestException;
+import com.sunny.datapillar.common.exception.UnauthorizedException;
+import com.sunny.datapillar.common.exception.ForbiddenException;
+import com.sunny.datapillar.common.exception.NotFoundException;
+import com.sunny.datapillar.common.exception.AlreadyExistsException;
+import com.sunny.datapillar.common.exception.ConflictException;
 
 /**
- * 用户服务实现类
+ * 用户服务实现
+ * 实现用户业务流程与规则校验
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Slf4j
 @Service
@@ -68,7 +73,7 @@ public class UserServiceImpl implements UserService {
         Long tenantId = getRequiredTenantId();
         User user = userMapper.selectByIdAndTenantId(tenantId, id);
         if (user == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND, id);
+            throw new NotFoundException("用户不存在: %s", id);
         }
 
         UserDto.Response response = new UserDto.Response();
@@ -86,7 +91,7 @@ public class UserServiceImpl implements UserService {
         if (existing != null) {
             TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, existing.getId());
             if (tenantUser != null && tenantUser.getStatus() != null && tenantUser.getStatus() == 1) {
-                throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, dto.getUsername());
+                throw new AlreadyExistsException("用户名已存在: %s", dto.getUsername());
             }
             if (tenantUser == null) {
                 tenantUser = new TenantUser();
@@ -141,13 +146,13 @@ public class UserServiceImpl implements UserService {
         Long tenantId = getRequiredTenantId();
         User existingUser = userMapper.selectByIdAndTenantId(tenantId, id);
         if (existingUser == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND, id);
+            throw new NotFoundException("用户不存在: %s", id);
         }
 
         if (dto.getUsername() != null) {
             User userWithSameName = userMapper.selectByUsernameGlobal(dto.getUsername());
             if (userWithSameName != null && !userWithSameName.getId().equals(id)) {
-                throw new BusinessException(ErrorCode.USERNAME_IN_USE, dto.getUsername());
+                throw new ConflictException("用户名已被其他用户使用: %s", dto.getUsername());
             }
             existingUser.setUsername(dto.getUsername());
         }
@@ -183,7 +188,7 @@ public class UserServiceImpl implements UserService {
         Long tenantId = getRequiredTenantId();
         User user = userMapper.selectByIdAndTenantId(tenantId, id);
         if (user == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND, id);
+            throw new NotFoundException("用户不存在: %s", id);
         }
 
         tenantUserMapper.deleteByTenantIdAndUserId(tenantId, id);
@@ -208,13 +213,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public IPage<User> listUsers(Integer status, int limit, int offset) {
+    public List<User> listUsers(Integer status) {
         Long tenantId = getRequiredTenantId();
-        long current = resolveCurrent(limit, offset);
-        Page<User> page = Page.of(current, limit);
-        List<User> records = userMapper.selectUsersByTenantIdPage(page, tenantId, status);
-        page.setRecords(records);
-        return page;
+        return userMapper.selectUsersByTenantIdAndStatus(tenantId, status);
     }
 
     @Override
@@ -222,7 +223,7 @@ public class UserServiceImpl implements UserService {
     public void assignRoles(Long userId, List<Long> roleIds) {
         Long tenantId = getRequiredTenantId();
         if (userMapper.selectByIdAndTenantId(tenantId, userId) == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND, userId);
+            throw new NotFoundException("用户不存在: %s", userId);
         }
         userMapper.deleteUserRoles(tenantId, userId);
 
@@ -231,7 +232,7 @@ public class UserServiceImpl implements UserService {
             for (Long roleId : uniqueRoles) {
                 Role role = roleMapper.selectById(roleId);
                 if (role == null || !tenantId.equals(role.getTenantId())) {
-                    throw new BusinessException(ErrorCode.INVALID_ARGUMENT);
+                    throw new BadRequestException("参数错误");
                 }
                 UserRole userRole = new UserRole();
                 userRole.setTenantId(tenantId);
@@ -258,7 +259,7 @@ public class UserServiceImpl implements UserService {
     public List<FeatureObjectDto.ObjectPermission> getUserPermissions(Long userId) {
         Long tenantId = getRequiredTenantId();
         if (userMapper.selectByIdAndTenantId(tenantId, userId) == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND, userId);
+            throw new NotFoundException("用户不存在: %s", userId);
         }
         List<FeatureObjectDto.ObjectPermission> objects = featureObjectMapper.selectFeatureObjectsAll(tenantId);
         List<FeatureObjectDto.RoleSource> roleSources =
@@ -303,7 +304,7 @@ public class UserServiceImpl implements UserService {
     public void updateUserPermissions(Long userId, List<FeatureObjectDto.Assignment> permissions) {
         Long tenantId = getRequiredTenantId();
         if (userMapper.selectByIdAndTenantId(tenantId, userId) == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND, userId);
+            throw new NotFoundException("用户不存在: %s", userId);
         }
         userMapper.deleteUserPermissions(tenantId, userId);
 
@@ -328,12 +329,12 @@ public class UserServiceImpl implements UserService {
             Long permissionId = resolvedPermission.getId();
             FeatureEntitlementDto.PermissionLimit limit = limitMap.get(entry.getKey());
             if (limit == null || limit.getStatus() == null || limit.getStatus() != 1) {
-                throw new BusinessException(ErrorCode.FORBIDDEN);
+                throw new ForbiddenException("无权限访问");
             }
             int limitLevel = limit.getPermissionLevel() == null ? 0 : limit.getPermissionLevel();
             int permissionLevel = resolvedPermission.getLevel() == null ? 0 : resolvedPermission.getLevel();
             if (permissionLevel > limitLevel) {
-                throw new BusinessException(ErrorCode.FORBIDDEN);
+                throw new ForbiddenException("无权限访问");
             }
 
             UserPermission userPermission = new UserPermission();
@@ -351,7 +352,7 @@ public class UserServiceImpl implements UserService {
         Long tenantId = getRequiredTenantId();
         User user = userMapper.selectByIdAndTenantId(tenantId, userId);
         if (user == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND, userId);
+            throw new NotFoundException("用户不存在: %s", userId);
         }
 
         if (dto.getNickname() != null) {
@@ -371,16 +372,9 @@ public class UserServiceImpl implements UserService {
     private Long getRequiredTenantId() {
         Long tenantId = TenantContextHolder.getTenantId();
         if (tenantId == null) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+            throw new UnauthorizedException("未授权访问");
         }
         return tenantId;
-    }
-
-    private long resolveCurrent(int limit, int offset) {
-        if (limit <= 0) {
-            return 1;
-        }
-        return offset / limit + 1;
     }
 
     private Map<String, Permission> getPermissionMap() {
@@ -450,22 +444,22 @@ public class UserServiceImpl implements UserService {
                                          Map<String, Permission> permissionMap,
                                          Map<Long, Permission> permissionByIdMap) {
         if (assignment == null) {
-            throw new BusinessException(ErrorCode.INVALID_ARGUMENT);
+            throw new BadRequestException("参数错误");
         }
         if (assignment.getPermissionId() != null) {
             Permission permission = permissionByIdMap.get(assignment.getPermissionId());
             if (permission == null) {
-                throw new BusinessException(ErrorCode.INVALID_ARGUMENT, String.valueOf(assignment.getPermissionId()));
+                throw new BadRequestException("参数错误", String.valueOf(assignment.getPermissionId()));
             }
             return permission;
         }
         String code = normalizePermissionCode(assignment.getPermissionCode());
         if (code == null) {
-            throw new BusinessException(ErrorCode.INVALID_ARGUMENT);
+            throw new BadRequestException("参数错误");
         }
         Permission permission = permissionMap.get(code);
         if (permission == null) {
-            throw new BusinessException(ErrorCode.INVALID_ARGUMENT, assignment.getPermissionCode());
+            throw new BadRequestException("参数错误", assignment.getPermissionCode());
         }
         return permission;
     }

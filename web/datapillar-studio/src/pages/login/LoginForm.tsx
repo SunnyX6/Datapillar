@@ -16,11 +16,10 @@ import { useTranslation } from 'react-i18next'
 import { useThemeMode, useAuthStore } from '@/stores'
 import { BrandLogo, ThirdPartyIcons } from '@/components'
 import { Button, Tooltip } from '@/components/ui'
-import { paddingClassMap, surfaceSizeClassMap } from '@/design-tokens/dimensions'
+import { paddingClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { cn } from '@/lib/utils'
-import { getSsoQr } from '@/lib/api/auth'
-import type { LoginResult, SsoQrResponse, TenantOption } from '@/types/auth'
+import { isTenantSelectResult, type LoginResult, type TenantOption } from '@/types/auth'
 import { WorkspaceSelectPanel } from './WorkspaceSelect'
 
 /**
@@ -66,67 +65,6 @@ const SIZES = {
   }
 }
 
-const DINGTALK_PROVIDER = 'dingtalk'
-const DINGTALK_SCRIPT_SRC = 'https://g.alicdn.com/dingding/h5-dingtalk-login/0.21.0/ddlogin.js'
-const DINGTALK_CONTAINER_ID = 'dingtalk-login-container'
-const DINGTALK_QR_SIZE = 192
-const DINGTALK_SCRIPT_ERROR_UNAVAILABLE = 'DINGTALK_SCRIPT_UNAVAILABLE'
-const DINGTALK_SCRIPT_ERROR_LOAD_FAILED = 'DINGTALK_SCRIPT_LOAD_FAILED'
-
-let dingtalkScriptPromise: Promise<void> | null = null
-
-function loadDingTalkScript(): Promise<void> {
-  if (typeof window === 'undefined') {
-    return Promise.reject(new Error(DINGTALK_SCRIPT_ERROR_UNAVAILABLE))
-  }
-  if (window.DTFrameLogin) {
-    return Promise.resolve()
-  }
-  if (dingtalkScriptPromise) {
-    return dingtalkScriptPromise
-  }
-  dingtalkScriptPromise = new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[data-dingtalk-login="true"]`)
-    if (existing) {
-      existing.addEventListener('load', () => resolve())
-      existing.addEventListener('error', () => reject(new Error(DINGTALK_SCRIPT_ERROR_LOAD_FAILED)))
-      return
-    }
-    const script = document.createElement('script')
-    script.src = DINGTALK_SCRIPT_SRC
-    script.async = true
-    script.setAttribute('data-dingtalk-login', 'true')
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error(DINGTALK_SCRIPT_ERROR_LOAD_FAILED))
-    document.body.appendChild(script)
-  })
-  return dingtalkScriptPromise
-}
-
-function readPayloadString(payload: Record<string, unknown>, key: string, fallback: string | null = null): string | null {
-  const value = payload[key]
-  if (typeof value !== 'string') {
-    return fallback
-  }
-  const trimmed = value.trim()
-  return trimmed.length > 0 ? trimmed : fallback
-}
-
-function resolveAuthCode(result: { authCode?: string; redirectUrl?: string }): string | null {
-  if (result.authCode && result.authCode.trim().length > 0) {
-    return result.authCode.trim()
-  }
-  if (result.redirectUrl) {
-    try {
-      const url = new URL(result.redirectUrl)
-      return url.searchParams.get('authCode') || url.searchParams.get('code')
-    } catch {
-      return null
-    }
-  }
-  return null
-}
-
 /**
  * 登录表单组件
  */
@@ -134,12 +72,10 @@ interface LoginFormProps {
   scale: number
   ready: boolean
   tenantCode?: string | null
-  inviteCode?: string | null
 }
 
 interface LoginFormContentProps {
   tenantCode?: string | null
-  inviteCode?: string | null
   onSsoClick?: () => void
   onLoginSuccess?: (result: LoginResult) => void
 }
@@ -155,12 +91,12 @@ const PROVIDER_CONFIG: Array<{
   icon: keyof typeof ThirdPartyIcons
   enabled: boolean
 }> = [
-  { key: 'dingtalk', nameKey: 'sso.providers.dingtalk.name', descKey: 'sso.providers.dingtalk.desc', icon: 'DingTalk', enabled: true },
+  { key: 'dingtalk', nameKey: 'sso.providers.dingtalk.name', descKey: 'sso.providers.dingtalk.desc', icon: 'DingTalk', enabled: false },
   { key: 'wecom', nameKey: 'sso.providers.wecom.name', descKey: 'sso.providers.wecom.desc', icon: 'WeCom', enabled: false },
   { key: 'lark', nameKey: 'sso.providers.lark.name', descKey: 'sso.providers.lark.desc', icon: 'Lark', enabled: false }
 ]
 
-export function LoginFormContent({ tenantCode, inviteCode, onSsoClick, onLoginSuccess }: LoginFormContentProps) {
+export function LoginFormContent({ tenantCode, onSsoClick, onLoginSuccess }: LoginFormContentProps) {
   const { t } = useTranslation('login')
   const mode = useThemeMode()
   const navigate = useNavigate()
@@ -220,15 +156,15 @@ export function LoginFormContent({ tenantCode, inviteCode, onSsoClick, onLoginSu
     }
 
     try {
-      const result = await login(username, password, rememberMe, { tenantCode, inviteCode: inviteCode ?? undefined })
-      if (result.loginStage === 'SUCCESS') {
+      const result = await login(username, password, rememberMe, { tenantCode: tenantCode ?? undefined })
+      if (!isTenantSelectResult(result)) {
         toast.success(t('form.success'), { style: successToastStyle })
       }
       if (onLoginSuccess) {
         onLoginSuccess(result)
         return
       }
-      if (result.loginStage === 'SUCCESS') {
+      if (!isTenantSelectResult(result)) {
         navigate('/home')
       }
     } catch (error) {
@@ -445,20 +381,13 @@ export function LoginFormContent({ tenantCode, inviteCode, onSsoClick, onLoginSu
   )
 }
 
-export function LoginForm({ scale, ready, tenantCode, inviteCode }: LoginFormProps) {
+export function LoginForm({ scale, ready, tenantCode }: LoginFormProps) {
   const { t } = useTranslation('login')
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<LoginTab>('account')
   const [activeProvider, setActiveProvider] = useState<SsoProviderKey | null>(null)
   const [tenantOptions, setTenantOptions] = useState<TenantOption[]>([])
-  const [loginToken, setLoginToken] = useState<string | null>(null)
   const [tenantSelectLoading, setTenantSelectLoading] = useState(false)
-  const [qrConfig, setQrConfig] = useState<SsoQrResponse | null>(null)
-  const [qrLoading, setQrLoading] = useState(false)
-  const [qrError, setQrError] = useState<string | null>(null)
-  const [scriptReady, setScriptReady] = useState(false)
-  const qrContainerRef = useRef<HTMLDivElement | null>(null)
-  const loginWithSso = useAuthStore((state) => state.loginWithSso)
   const loginTenant = useAuthStore((state) => state.loginTenant)
   const authLoading = useAuthStore((state) => state.loading)
 
@@ -472,182 +401,39 @@ export function LoginForm({ scale, ready, tenantCode, inviteCode }: LoginFormPro
   const showWorkspaceSelect = tenantOptions.length > 0
 
   const handleLoginResult = useCallback((result: LoginResult) => {
-    if (result.loginStage === 'TENANT_SELECT') {
+    if (isTenantSelectResult(result)) {
       setActiveTab('account')
       setActiveProvider(null)
-      setQrConfig(null)
-      setQrError(null)
       setTenantOptions(result.tenants)
-      setLoginToken(result.loginToken)
       return
     }
     setTenantOptions([])
-    setLoginToken(null)
     navigate('/home')
   }, [navigate])
 
   const handleWorkspaceSelect = useCallback(async (tenantId: number) => {
-    if (!loginToken) {
-      toast.error('缺少登录上下文，请重新登录')
-      setTenantOptions([])
-      return
-    }
     try {
       setTenantSelectLoading(true)
-      await loginTenant(loginToken, tenantId)
+      await loginTenant(tenantId)
       setTenantOptions([])
-      setLoginToken(null)
       navigate('/home')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '登录失败，请重试')
     } finally {
       setTenantSelectLoading(false)
     }
-  }, [loginToken, loginTenant, navigate])
+  }, [loginTenant, navigate])
 
   const handleWorkspaceBack = useCallback(() => {
     setTenantOptions([])
-    setLoginToken(null)
     setTenantSelectLoading(false)
   }, [])
 
   useEffect(() => {
     if (activeTab === 'account') {
       setActiveProvider(null)
-      setQrConfig(null)
-      setQrError(null)
     }
   }, [activeTab])
-
-  useEffect(() => {
-    if (activeProvider !== 'dingtalk') {
-      return
-    }
-    const normalizedTenantCode = tenantCode?.trim() ?? ''
-    let cancelled = false
-    setQrLoading(true)
-    setQrError(null)
-    getSsoQr(normalizedTenantCode, DINGTALK_PROVIDER)
-      .then((data) => {
-        if (!cancelled) {
-          setQrConfig(data)
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          const message = error instanceof Error ? error.message : t('sso.errors.qrConfigFailed')
-          setQrError(message)
-          toast.error(message)
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setQrLoading(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [activeProvider, tenantCode])
-
-  useEffect(() => {
-    if (activeProvider !== 'dingtalk' || !qrConfig) {
-      return
-    }
-    let cancelled = false
-    loadDingTalkScript()
-      .then(() => {
-        if (!cancelled) {
-          setScriptReady(true)
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          const message = error instanceof Error
-            ? error.message === DINGTALK_SCRIPT_ERROR_UNAVAILABLE
-              ? t('sso.errors.dingtalkScriptUnavailable')
-              : t('sso.errors.dingtalkScriptFailed')
-            : t('sso.errors.dingtalkScriptFailed')
-          setQrError(message)
-          toast.error(message)
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [activeProvider, qrConfig])
-
-  useEffect(() => {
-    if (!scriptReady || !qrConfig || activeProvider !== 'dingtalk') {
-      return
-    }
-    if (!window.DTFrameLogin) {
-      return
-    }
-    const payload = (qrConfig.payload ?? {}) as Record<string, unknown>
-    const clientId = readPayloadString(payload, 'clientId')
-    const redirectUri = readPayloadString(payload, 'redirectUri')
-    if (!clientId || !redirectUri) {
-      setQrError(t('sso.errors.qrConfigInvalid'))
-      return
-    }
-    const scope = readPayloadString(payload, 'scope', 'openid corpid') || 'openid corpid'
-    const responseType = readPayloadString(payload, 'responseType', 'code') || 'code'
-    const prompt = readPayloadString(payload, 'prompt', 'consent')
-    const corpId = readPayloadString(payload, 'corpId')
-    const container = qrContainerRef.current
-    if (container) {
-      container.innerHTML = ''
-    }
-    window.DTFrameLogin(
-      {
-        id: DINGTALK_CONTAINER_ID,
-        width: DINGTALK_QR_SIZE,
-        height: DINGTALK_QR_SIZE
-      },
-      {
-        redirect_uri: encodeURIComponent(redirectUri),
-        client_id: clientId,
-        scope,
-        response_type: responseType,
-        state: qrConfig.state,
-        prompt: prompt ?? 'consent',
-        ...(corpId ? { corpId } : {})
-      },
-      async (result) => {
-        const authCode = resolveAuthCode(result || {})
-        const state = result?.state || qrConfig.state
-        if (!authCode) {
-          toast.error(t('sso.errors.authCodeFailed'))
-          return
-        }
-        const normalizedTenantCode = tenantCode?.trim() ?? ''
-        try {
-          const loginResult = await loginWithSso({
-            tenantCode: normalizedTenantCode,
-            provider: DINGTALK_PROVIDER,
-            authCode,
-            state,
-            inviteCode: inviteCode ?? undefined
-          })
-          if (loginResult.loginStage === 'SUCCESS') {
-            toast.success(t('form.success'))
-          }
-          handleLoginResult(loginResult)
-        } catch (error) {
-          toast.error(error instanceof Error ? error.message : t('sso.errors.loginFailed'))
-        }
-      },
-      (errorMsg) => {
-        const message = errorMsg || t('sso.errors.dingtalkLoginFailed')
-        toast.error(message)
-      }
-    )
-  }, [scriptReady, qrConfig, activeProvider, tenantCode, inviteCode, loginWithSso, handleLoginResult])
-
-  const showQrPanel = !showWorkspaceSelect && activeTab === 'sso' && activeProvider === 'dingtalk'
   const showListPanel = !showWorkspaceSelect && activeTab === 'sso' && activeProvider === null
 
   return (
@@ -687,7 +473,6 @@ export function LoginForm({ scale, ready, tenantCode, inviteCode }: LoginFormPro
             {activeTab === 'account' ? (
               <LoginFormContent
                 tenantCode={tenantCode}
-                inviteCode={inviteCode}
                 onSsoClick={() => setActiveTab('sso')}
                 onLoginSuccess={handleLoginResult}
               />
@@ -769,65 +554,6 @@ export function LoginForm({ scale, ready, tenantCode, inviteCode }: LoginFormPro
             )}
           </>
         )}
-
-        {showQrPanel ? (
-          <div
-            className={cn(
-              'absolute inset-0 z-20 flex flex-col bg-white dark:bg-[#020617]',
-              paddingClassMap.md
-            )}
-          >
-            <div aria-hidden className="min-h-[60px] mb-1 md:mb-2 pointer-events-none" />
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">{t('sso.qr.title')}</h3>
-                <p className={`mt-1 ${TYPOGRAPHY.legal} text-slate-400 dark:text-slate-500`}>{t('sso.qr.subtitle')}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveProvider(null)
-                  setQrConfig(null)
-                  setQrError(null)
-                }}
-                className={`${TYPOGRAPHY.legal} text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300`}
-              >
-                {t('sso.panel.back')}
-              </button>
-            </div>
-            <div className="mt-2 flex flex-col items-center gap-3 max-h-80 overflow-y-auto overscroll-contain scrollbar-invisible">
-              <div
-                className={`bg-slate-50 dark:bg-slate-800/70 rounded-xl border border-slate-100 dark:border-slate-700 flex items-center justify-center ${surfaceSizeClassMap.lg}`}
-              >
-                {qrLoading ? (
-                  <Loader2 size={22} className="animate-spin text-slate-400" />
-                ) : (
-                  <div id={DINGTALK_CONTAINER_ID} ref={qrContainerRef} className="w-full h-full" />
-                )}
-              </div>
-              {qrError ? (
-                <div className={`${TYPOGRAPHY.legal} text-rose-500`}>{qrError}</div>
-              ) : null}
-              <div className={`flex flex-col items-center gap-1.5 ${TYPOGRAPHY.legal} text-slate-400 dark:text-slate-500`}>
-                <div className="flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-                  <span>{t('sso.qr.scanTip')}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-                  <span>{t('sso.qr.expires')}</span>
-                </div>
-                <a href="#" className="text-indigo-500 hover:text-indigo-600 dark:text-indigo-300 dark:hover:text-indigo-200">
-                  {t('sso.qr.help')}
-                </a>
-              </div>
-            </div>
-            <div className="text-legal text-slate-400 dark:text-slate-500 text-center mt-3 select-none min-h-[48px]">
-              <p className="font-mono tracking-wide">© {new Date().getFullYear()} {t('brand.name')} {t('brand.tagline')}</p>
-              <p className="mt-1 text-slate-500 dark:text-slate-400">{t('brand.slogan')}</p>
-            </div>
-          </div>
-        ) : null}
 
         {/* 底部版权区域 - 固定高度防止中英文切换时布局抖动 */}
         {!showWorkspaceSelect ? (

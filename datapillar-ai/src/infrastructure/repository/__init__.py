@@ -11,7 +11,6 @@
 from src.infrastructure.repository.knowledge import (
     MetricDTO,
     ModifierDTO,
-    Neo4jGraphSearch,
     Neo4jKGWritebackRepository,
     Neo4jMetricSearch,
     Neo4jNodeSearch,
@@ -35,7 +34,6 @@ __all__ = [
     "Neo4jMetricSearch",
     "Neo4jSemanticSearch",
     "Neo4jNodeSearch",
-    "Neo4jGraphSearch",
     "Neo4jKGWritebackRepository",
     # DTOs
     "WordRootDTO",

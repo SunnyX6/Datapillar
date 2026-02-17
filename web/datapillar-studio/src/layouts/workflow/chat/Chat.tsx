@@ -61,7 +61,9 @@ export function ChatPanel() {
   const resetStudio = useWorkflowStudioStore((state) => state.reset)
   const setInitialized = useWorkflowStudioStore((state) => state.setInitialized)
   const selectedModelId = useWorkflowStudioStore((state) => state.selectedModelId)
+  const defaultModelId = useWorkflowStudioStore((state) => state.defaultModelId)
   const setSelectedModelId = useWorkflowStudioStore((state) => state.setSelectedModelId)
+  const setDefaultModelId = useWorkflowStudioStore((state) => state.setDefaultModelId)
   const [input, setInput] = useState('')
   const [showHistory, setShowHistory] = useState(false)
   const [forceScrollVersion, setForceScrollVersion] = useState(0)
@@ -115,7 +117,12 @@ export function ChatPanel() {
   useLayoutEffect(() => {
     if (!cacheReady || hasHydratedFromCacheRef.current) return
     const cache = useWorkflowStudioCacheStore.getState()
-    const hasCacheState = cache.messages.length > 0 || cache.workflow.nodes.length > 0 || cache.lastPrompt.length > 0
+    const hasCacheState =
+      cache.messages.length > 0 ||
+      cache.workflow.nodes.length > 0 ||
+      cache.lastPrompt.length > 0 ||
+      cache.selectedModelId !== DEFAULT_WORKFLOW_MODEL_ID ||
+      cache.defaultModelId !== DEFAULT_WORKFLOW_MODEL_ID
     if (hasCacheState) {
       const runtime = useWorkflowStudioStore.getState()
       const hasRuntimeState =
@@ -127,7 +134,8 @@ export function ChatPanel() {
           lastPrompt: cache.lastPrompt,
           isInitialized: cache.isInitialized,
           isWaitingForResume: false,
-          selectedModelId: cache.selectedModelId
+          selectedModelId: cache.selectedModelId,
+          defaultModelId: cache.defaultModelId
         })
       }
     }
@@ -149,7 +157,8 @@ export function ChatPanel() {
         lastPrompt: runtime.lastPrompt,
         isInitialized: runtime.isInitialized,
         virtuosoState,
-        selectedModelId: runtime.selectedModelId
+        selectedModelId: runtime.selectedModelId,
+        defaultModelId: runtime.defaultModelId
       })
     }
     const handle = virtuosoRef.current
@@ -385,6 +394,11 @@ export function ChatPanel() {
     navigate('/profile/llm/models')
   }, [navigate])
 
+  const handleSetDefaultModel = useCallback((modelId: string) => {
+    setDefaultModelId(modelId)
+    setSelectedModelId(modelId)
+  }, [setDefaultModelId, setSelectedModelId])
+
   const showCommandNotice = useCallback((message: string) => {
     const totalDuration = 3000
     const fadeDuration = 200
@@ -598,9 +612,10 @@ export function ChatPanel() {
         isWaitingForResume={isWaitingForResume}
         canSend={canSend}
         selectedModelId={selectedModelId}
-        defaultModelId={DEFAULT_WORKFLOW_MODEL_ID}
+        defaultModelId={defaultModelId}
         modelOptions={WORKFLOW_MODEL_OPTIONS}
         onModelChange={setSelectedModelId}
+        onDefaultModelChange={handleSetDefaultModel}
         onManageModels={handleManageModels}
         commandOptions={CHAT_COMMAND_OPTIONS}
         onCommand={handleCommand}

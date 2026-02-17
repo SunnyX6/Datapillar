@@ -7,6 +7,13 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+/**
+ * 用户组件
+ * 负责用户核心逻辑实现
+ *
+ * @author Sunny
+ * @date 2026-01-01
+ */
 
 @Data
 @TableName("users")
@@ -24,11 +31,6 @@ public class User {
     private Integer status;
     private Integer deleted;
 
-    @TableField(exist = false)
-    private String tokenSign;  // 已迁移到 tenant_users，保留字段避免旧逻辑误用
-
-    @TableField(exist = false)
-    private LocalDateTime tokenExpireTime;  // 已迁移到 tenant_users
 
     @TableField("created_at")
     private LocalDateTime createdAt;

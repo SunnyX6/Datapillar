@@ -4,11 +4,14 @@ import java.util.List;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
- * SQL 请求/响应 DTO
+ * SQL数据传输对象
+ * 定义SQL数据传输结构
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 public class SqlDto {
 
@@ -16,6 +19,7 @@ public class SqlDto {
      * SQL 执行请求
      */
     @Data
+    @Schema(name = "SqlExecuteRequest")
     public static class ExecuteRequest {
 
         /**
@@ -44,6 +48,7 @@ public class SqlDto {
      * SQL 执行结果
      */
     @Data
+    @Schema(name = "SqlExecuteResult")
     public static class ExecuteResult {
 
         /**
@@ -104,6 +109,7 @@ public class SqlDto {
      * 列定义
      */
     @Data
+    @Schema(name = "SqlColumnSchema")
     public static class ColumnSchema {
 
         /**
@@ -134,6 +140,7 @@ public class SqlDto {
      * Catalog 列表响应
      */
     @Data
+    @Schema(name = "SqlCatalogListResponse")
     public static class CatalogListResponse {
         private List<String> catalogs;
         private String currentCatalog;
@@ -143,6 +150,7 @@ public class SqlDto {
      * Database 列表响应
      */
     @Data
+    @Schema(name = "SqlDatabaseListResponse")
     public static class DatabaseListResponse {
         private List<String> databases;
         private String currentDatabase;
@@ -152,6 +160,7 @@ public class SqlDto {
      * Table 列表响应
      */
     @Data
+    @Schema(name = "SqlTableListResponse")
     public static class TableListResponse {
         private List<String> tables;
     }

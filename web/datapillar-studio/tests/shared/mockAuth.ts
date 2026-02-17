@@ -1,15 +1,11 @@
-import type { Page } from '@playwright/test'
+import type { Page, Route } from '@playwright/test'
 
 type ApiResponse<T> = {
-  status: number
-  code: string
-  message: string
-  data: T
-  timestamp: string
+  code: number
+  data?: T
 }
 
 type MockLoginResult = {
-  loginStage: 'SUCCESS'
   userId: number
   tenantId: number
   username: string
@@ -19,15 +15,11 @@ type MockLoginResult = {
 }
 
 const buildApiResponse = <T,>(data: T): ApiResponse<T> => ({
-  status: 200,
-  code: 'OK',
-  message: '成功',
-  data,
-  timestamp: new Date().toISOString()
+  code: 0,
+  data
 })
 
 const buildLoginResult = (username: string): MockLoginResult => ({
-  loginStage: 'SUCCESS',
   userId: 10001,
   tenantId: 0,
   username,
@@ -39,15 +31,15 @@ const buildLoginResult = (username: string): MockLoginResult => ({
 export const mockAuthRoutes = async (page: Page) => {
   let lastUsername = process.env.PLAYWRIGHT_USERNAME ?? 'mock-user'
 
-  await page.route('**/api/auth/**', async (route) => {
+  const handler = async (route: Route) => {
     const request = route.request()
     const { pathname } = new URL(request.url())
 
-    if (pathname.endsWith('/login') || pathname.endsWith('/login/tenant') || pathname.endsWith('/sso/login')) {
+    if (pathname.endsWith('/login') || pathname.endsWith('/login/sso')) {
       try {
-        const payload = request.postDataJSON() as { username?: string }
-        if (payload?.username) {
-          lastUsername = payload.username
+        const payload = request.postDataJSON() as { loginAlias?: string }
+        if (payload?.loginAlias) {
+          lastUsername = payload.loginAlias
         }
       } catch {
         // 忽略解析失败，使用默认用户名
@@ -62,12 +54,11 @@ export const mockAuthRoutes = async (page: Page) => {
       return
     }
 
-    if (pathname.endsWith('/token-info')) {
+    if (pathname.endsWith('/validate')) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(buildApiResponse({
-          valid: true,
           remainingSeconds: 3600,
           username: lastUsername,
           userId: 10001,
@@ -81,7 +72,7 @@ export const mockAuthRoutes = async (page: Page) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(buildApiResponse(null))
+        body: JSON.stringify({ code: 0 })
       })
       return
     }
@@ -90,7 +81,7 @@ export const mockAuthRoutes = async (page: Page) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(buildApiResponse(null))
+        body: JSON.stringify({ code: 0 })
       })
       return
     }
@@ -98,7 +89,11 @@ export const mockAuthRoutes = async (page: Page) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(buildApiResponse(null))
+      body: JSON.stringify({ code: 0 })
     })
-  })
+  }
+
+  await page.route('**/api/auth/**', handler)
+  await page.route('**/api/login', handler)
+  await page.route('**/api/login/**', handler)
 }

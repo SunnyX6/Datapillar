@@ -8,16 +8,17 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
- * 租户实体
+ * 租户组件
+ * 负责租户核心逻辑实现
+ *
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Data
 @TableName("tenants")
 public class Tenant {
     @TableId(type = IdType.AUTO)
     private Long id;
-
-    @TableField("parent_id")
-    private Long parentId;
 
     private String code;
 
@@ -29,10 +30,6 @@ public class Tenant {
     private String encryptPublicKey;
 
     private Integer status;
-
-    private Integer level;
-
-    private String path;
 
     @TableField("created_at")
     private LocalDateTime createdAt;

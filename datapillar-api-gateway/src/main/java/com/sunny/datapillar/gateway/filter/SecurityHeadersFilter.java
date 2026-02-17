@@ -8,6 +8,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+/**
+ * 安全Headers过滤器
+ * 负责安全Headers请求过滤与上下文控制
+ *
+ * @author Sunny
+ * @date 2026-01-01
+ */
 
 @Component
 public class SecurityHeadersFilter implements GlobalFilter, Ordered {

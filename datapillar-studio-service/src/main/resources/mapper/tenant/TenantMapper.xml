@@ -8,19 +8,4 @@
         WHERE code = #{code}
         LIMIT 1
     </select>
-
-    <update id="updateHierarchy">
-        UPDATE tenants
-        SET path = REPLACE(path, #{oldPath}, #{newPath}),
-            level = level + #{delta}
-        WHERE path = #{oldPath}
-           OR path LIKE CONCAT(#{oldPath}, /%)
-    </update>
-
-    <update id="updateEncryptPublicKey">
-        UPDATE tenants
-        SET encrypt_public_key = #{encryptPublicKey}
-        WHERE id = #{id}
-    </update>
-
 </mapper>

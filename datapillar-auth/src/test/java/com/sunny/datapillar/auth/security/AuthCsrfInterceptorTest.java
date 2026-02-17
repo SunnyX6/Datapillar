@@ -1,13 +1,15 @@
 package com.sunny.datapillar.auth.security;
 
+import com.sunny.datapillar.auth.config.AuthSecurityProperties;
 import com.sunny.datapillar.common.error.ErrorCode;
 import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.common.utils.JwtUtil;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -25,12 +27,11 @@ class AuthCsrfInterceptorTest {
         properties.getCsrf().setCookieName("csrf-token");
         properties.getCsrf().setRefreshHeaderName("X-Refresh-CSRF-Token");
         properties.getCsrf().setRefreshCookieName("refresh-csrf-token");
-        properties.setAllowedOrigins(List.of("http://localhost:3001"));
 
-        CsrfTokenService csrfTokenService = mock(CsrfTokenService.class);
-        JwtTokenUtil jwtTokenUtil = mock(JwtTokenUtil.class);
+        CsrfTokenStore csrfTokenStore = mock(CsrfTokenStore.class);
+        JwtUtil jwtUtil = mock(JwtUtil.class);
 
-        AuthCsrfInterceptor interceptor = new AuthCsrfInterceptor(properties, csrfTokenService, jwtTokenUtil);
+        AuthCsrfInterceptor interceptor = new AuthCsrfInterceptor(properties, csrfTokenStore, jwtUtil);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setMethod("POST");
@@ -45,13 +46,15 @@ class AuthCsrfInterceptorTest {
 
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        when(jwtTokenUtil.getTenantId("valid-refresh-token")).thenReturn(10L);
-        when(jwtTokenUtil.getUserId("valid-refresh-token")).thenReturn(1L);
-        when(csrfTokenService.validateRefreshToken(10L, 1L, "refresh-csrf-token-value")).thenReturn(true);
+        Claims refreshClaims = Jwts.claims().setSubject("1").add("tenantId", 10L).build();
+        when(jwtUtil.parseToken("valid-refresh-token")).thenReturn(refreshClaims);
+        when(jwtUtil.getTenantId(refreshClaims)).thenReturn(10L);
+        when(jwtUtil.getUserId(refreshClaims)).thenReturn(1L);
+        when(csrfTokenStore.validateRefreshToken(10L, 1L, "refresh-csrf-token-value")).thenReturn(true);
 
         assertTrue(interceptor.preHandle(request, response, new Object()));
-        verify(csrfTokenService).validateRefreshToken(10L, 1L, "refresh-csrf-token-value");
-        verify(csrfTokenService, never()).validateToken(10L, 1L, "refresh-csrf-token-value");
+        verify(csrfTokenStore).validateRefreshToken(10L, 1L, "refresh-csrf-token-value");
+        verify(csrfTokenStore, never()).validateToken(10L, 1L, "refresh-csrf-token-value");
     }
 
     @Test
@@ -62,16 +65,15 @@ class AuthCsrfInterceptorTest {
         properties.getCsrf().setCookieName("csrf-token");
         properties.getCsrf().setRefreshHeaderName("X-Refresh-CSRF-Token");
         properties.getCsrf().setRefreshCookieName("refresh-csrf-token");
-        properties.setAllowedOrigins(List.of("http://localhost:3001"));
 
-        CsrfTokenService csrfTokenService = mock(CsrfTokenService.class);
-        JwtTokenUtil jwtTokenUtil = mock(JwtTokenUtil.class);
+        CsrfTokenStore csrfTokenStore = mock(CsrfTokenStore.class);
+        JwtUtil jwtUtil = mock(JwtUtil.class);
 
-        AuthCsrfInterceptor interceptor = new AuthCsrfInterceptor(properties, csrfTokenService, jwtTokenUtil);
+        AuthCsrfInterceptor interceptor = new AuthCsrfInterceptor(properties, csrfTokenStore, jwtUtil);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setMethod("POST");
-        request.setRequestURI("/auth/logout");
+        request.setRequestURI("/login/logout");
         request.addHeader("Origin", "http://localhost:3001");
         request.addHeader("X-CSRF-Token", "csrf-token-value");
         request.setCookies(
@@ -82,13 +84,15 @@ class AuthCsrfInterceptorTest {
 
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        when(jwtTokenUtil.getTenantId("expired-access-token"))
+        Claims refreshClaims = Jwts.claims().setSubject("1").add("tenantId", 10L).build();
+        when(jwtUtil.parseToken("expired-access-token"))
                 .thenThrow(new BusinessException(ErrorCode.TOKEN_EXPIRED));
-        when(jwtTokenUtil.getTenantId("valid-refresh-token")).thenReturn(10L);
-        when(jwtTokenUtil.getUserId("valid-refresh-token")).thenReturn(1L);
-        when(csrfTokenService.validateToken(10L, 1L, "csrf-token-value")).thenReturn(true);
+        when(jwtUtil.parseToken("valid-refresh-token")).thenReturn(refreshClaims);
+        when(jwtUtil.getTenantId(refreshClaims)).thenReturn(10L);
+        when(jwtUtil.getUserId(refreshClaims)).thenReturn(1L);
+        when(csrfTokenStore.validateToken(10L, 1L, "csrf-token-value")).thenReturn(true);
 
         assertTrue(interceptor.preHandle(request, response, new Object()));
-        verify(csrfTokenService).validateToken(10L, 1L, "csrf-token-value");
+        verify(csrfTokenStore).validateToken(10L, 1L, "csrf-token-value");
     }
 }

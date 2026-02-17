@@ -9,15 +9,19 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
- * 任务 DTO
+ * 任务数据传输对象
+ * 定义任务数据传输结构
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 public class JobDto {
 
     @Data
+    @Schema(name = "JobCreate")
     public static class Create {
         @NotBlank(message = "任务名称不能为空")
         private String jobName;
@@ -43,6 +47,7 @@ public class JobDto {
     }
 
     @Data
+    @Schema(name = "JobUpdate")
     public static class Update {
         private String jobName;
         private Long jobType;
@@ -57,6 +62,7 @@ public class JobDto {
     }
 
     @Data
+    @Schema(name = "JobResponse")
     public static class Response {
         private Long id;
         private Long workflowId;
@@ -81,6 +87,7 @@ public class JobDto {
     // ==================== 布局 ====================
 
     @Data
+    @Schema(name = "JobLayoutSave")
     public static class LayoutSave {
         @NotEmpty(message = "位置列表不能为空")
         @Valid
@@ -88,6 +95,7 @@ public class JobDto {
     }
 
     @Data
+    @Schema(name = "JobPosition")
     public static class Position {
         @NotNull(message = "任务 ID 不能为空")
         private Long jobId;

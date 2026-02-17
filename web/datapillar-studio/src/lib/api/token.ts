@@ -28,17 +28,23 @@ function extractErrorMessage(error: unknown): string {
 
 export async function getTokenInfo(): Promise<TokenInfo> {
   try {
-    const response = await tokenClient.get<ApiResponse<TokenInfo>>('/token-info')
+    const response = await tokenClient.get<ApiResponse<TokenInfo>>('/validate')
+    if (typeof response.data.data === 'undefined') {
+      throw new Error('接口响应缺少 data 字段')
+    }
     return response.data.data
   } catch (error) {
+    if (error instanceof Error) {
+      throw error
+    }
     throw new Error(extractErrorMessage(error))
   }
 }
 
 export async function isAuthenticated(): Promise<boolean> {
   try {
-    const tokenInfo = await getTokenInfo()
-    return tokenInfo.valid
+    await getTokenInfo()
+    return true
   } catch {
     return false
   }

@@ -13,12 +13,11 @@ import reactor.core.publisher.Mono;
 import java.util.UUID;
 
 /**
- * 链路追踪过滤器
- * 为每个请求生成唯一的 TraceId，用于日志追踪和问题排查
+ * 链路追踪ID过滤器
+ * 负责链路追踪ID请求过滤与上下文控制
  *
  * @author Sunny
- * @version 1.0.0
- * @since 2025-12-08
+ * @date 2026-01-01
  */
 @Slf4j
 @Component

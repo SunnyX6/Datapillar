@@ -70,15 +70,6 @@
         VALUES (#{tenantId}, #{userId}, #{objectId}, #{permissionId})
     </insert>
 
-    <select id="selectByIdAndTokenSign" resultType="com.sunny.datapillar.studio.module.user.entity.User">
-        SELECT u.*
-        FROM users u
-        INNER JOIN tenant_users tu ON tu.user_id = u.id
-        WHERE tu.tenant_id = #{tenantId}
-          AND tu.token_sign = #{tokenSign}
-          AND u.id = #{userId}
-          AND u.deleted = 0
-    </select>
 
     <select id="selectUsersByTenantId" resultType="com.sunny.datapillar.studio.module.user.entity.User">
         SELECT u.*
@@ -89,7 +80,7 @@
           AND u.deleted = 0
     </select>
 
-    <select id="selectUsersByTenantIdPage" resultType="com.sunny.datapillar.studio.module.user.entity.User">
+    <select id="selectUsersByTenantIdAndStatus" resultType="com.sunny.datapillar.studio.module.user.entity.User">
         SELECT u.*
         FROM users u
         INNER JOIN tenant_users tu ON tu.user_id = u.id

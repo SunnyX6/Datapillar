@@ -10,9 +10,11 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 /**
- * 工作流实体 - 对应 job_workflow 表
+ * 任务工作流组件
+ * 负责任务工作流核心逻辑实现
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Data
 @TableName("job_workflow")

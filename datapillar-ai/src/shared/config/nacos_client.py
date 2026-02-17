@@ -312,6 +312,8 @@ def resolve_service_ip() -> str:
 
 def _build_client_config(config: NacosBootstrapConfig):
     heartbeat_millis = max(config.heartbeat_interval, 1) * 1000
+    log_dir = os.getenv("NACOS_LOG_DIR", "/tmp/datapillar-logs/nacos")
+    cache_dir = os.getenv("NACOS_CACHE_DIR", "/tmp/datapillar-logs/nacos/cache")
     return (
         ClientConfigBuilder()
         .server_address(config.server_addr)
@@ -319,6 +321,8 @@ def _build_client_config(config: NacosBootstrapConfig):
         .username(config.username)
         .password(config.password)
         .log_level("INFO")
+        .log_dir(log_dir)
+        .cache_dir(cache_dir)
         .heart_beat_interval(heartbeat_millis)
         .build()
     )

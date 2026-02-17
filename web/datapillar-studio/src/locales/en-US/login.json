@@ -74,5 +74,68 @@
   "footer": {
     "noAccount": "Don't have an account?",
     "register": "Request Trial"
+  },
+  "setup": {
+    "brandTagline": "Setup Wizard",
+    "step1": {
+      "title": "Welcome to Datapillar",
+      "subtitle": "Create your workspace to start building data pipelines."
+    },
+    "step2": {
+      "back": "Back to organization setup",
+      "title": "Admin Setup",
+      "subtitle": "Secure your workspace with administrator credentials."
+    },
+    "step3": {
+      "title": "Provisioning Workspace",
+      "subtitle": "This usually takes about 30 seconds.",
+      "waitingMigration": "Waiting for database migration to finish...",
+      "logFile": "setup_log.sh"
+    },
+    "step4": {
+      "title": "You're all set!"
+    },
+    "form": {
+      "orgName": {
+        "label": "Organization Name",
+        "placeholder": "Organization name"
+      },
+      "username": {
+        "label": "Username",
+        "placeholder": "Username"
+      },
+      "email": {
+        "label": "Work Email",
+        "placeholder": "Administrator email"
+      },
+      "password": {
+        "label": "Password",
+        "placeholder": "Login password"
+      },
+      "terms": {
+        "prefix": "I agree to the",
+        "link": "Terms of Service"
+      }
+    },
+    "actions": {
+      "continue": "Continue",
+      "install": "Install & Provision Environment",
+      "toLogin": "Go to sign in"
+    },
+    "logs": {
+      "initializing": "Initializing Datapillar environment...",
+      "connectingVault": "Connecting to secure vault (us-east-1)...",
+      "generatingKeys": "Generating 4096-bit RSA keys...",
+      "provisioningIsolation": "Provisioning isolation layer...",
+      "deployingEngine": "Deploying analytics engine v3.0...",
+      "compilingAssets": "Compiling visualization assets...",
+      "optimizingPlanner": "Optimizing query planner...",
+      "verifyingIntegrity": "Verifying system integrity...",
+      "finalizing": "Finalizing setup..."
+    },
+    "footer": {
+      "privacy": "Privacy",
+      "terms": "Terms"
+    }
   }
 }

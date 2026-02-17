@@ -10,9 +10,11 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.sunny.datapillar.auth.entity.User;
 
 /**
- * 用户 Mapper 接口
+ * 用户Mapper
+ * 负责用户数据访问与持久化映射
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Mapper
 public interface UserMapper extends BaseMapper<User> {
@@ -38,9 +40,4 @@ public interface UserMapper extends BaseMapper<User> {
      */
     List<Map<String, Object>> selectMenusByUserId(@Param("tenantId") Long tenantId,
                                                   @Param("userId") Long userId);
-
-    /**
-     * 查询租户下所有菜单（用于平台超管 assume）
-     */
-    List<Map<String, Object>> selectMenusByTenantId(@Param("tenantId") Long tenantId);
 }

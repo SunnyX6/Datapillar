@@ -1,5 +1,12 @@
-import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
-import { isApiSuccess, type ApiResponse, type ApiError } from '@/types/api'
+import axios, { AxiosHeaders, type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
+import {
+  isApiResponse as isApiDataResponse,
+  isApiSuccess,
+  isErrorResponse as isApiErrorResponse,
+  type ApiResponse,
+  type ApiError,
+  type ErrorResponse
+} from '@/types/api'
 
 interface ApiClientOptions {
   baseURL: string
@@ -10,16 +17,18 @@ interface ApiClientOptions {
 type RetryConfig = InternalAxiosRequestConfig & { _retry?: boolean }
 
 const AUTH_BASE_URL = '/api/auth'
+const LOGIN_BASE_URL = '/api/login'
 const CSRF_COOKIE_NAME = 'csrf-token'
 const CSRF_HEADER_NAME = 'X-CSRF-Token'
 const REFRESH_CSRF_COOKIE_NAME = 'refresh-csrf-token'
 const REFRESH_CSRF_HEADER_NAME = 'X-Refresh-CSRF-Token'
 const AUTH_ENDPOINTS = {
-  login: `${AUTH_BASE_URL}/login`,
-  logout: `${AUTH_BASE_URL}/logout`,
-  refresh: `${AUTH_BASE_URL}/refresh`,
-  tokenInfo: `${AUTH_BASE_URL}/token-info`
+  loginBase: LOGIN_BASE_URL,
+  logout: `${LOGIN_BASE_URL}/logout`,
+  refresh: `${AUTH_BASE_URL}/refresh`
 }
+const SETUP_REDIRECT_PATH = '/setup'
+const SETUP_ERROR_MESSAGES = new Set(['系统尚未完成初始化', '系统初始化数据未就绪'])
 
 const refreshClient = axios.create({
   baseURL: AUTH_BASE_URL,
@@ -42,7 +51,7 @@ function getCookieValue(name: string): string | null {
 }
 
 function attachCsrfHeader(
-  headers: Record<string, string>,
+  headers: AxiosHeaders,
   cookieName: string = CSRF_COOKIE_NAME,
   headerName: string = CSRF_HEADER_NAME
 ): void {
@@ -50,13 +59,13 @@ function attachCsrfHeader(
   if (!token) {
     return
   }
-  if (!headers[headerName]) {
-    headers[headerName] = token
+  if (!headers.has(headerName)) {
+    headers.set(headerName, token)
   }
 }
 
 refreshClient.interceptors.request.use((config) => {
-  const headers = (config.headers ?? {}) as Record<string, string>
+  const headers = AxiosHeaders.from(config.headers)
   attachCsrfHeader(headers, REFRESH_CSRF_COOKIE_NAME, REFRESH_CSRF_HEADER_NAME)
   config.headers = headers
   return config
@@ -69,24 +78,70 @@ export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler
 }
 
-function isApiResponse(data: unknown): data is ApiResponse<unknown> {
-  if (!data || typeof data !== 'object') {
-    return false
-  }
-  const candidate = data as Record<string, unknown>
-  return typeof candidate.status === 'number' &&
-    typeof candidate.code === 'string' &&
-    typeof candidate.message === 'string' &&
-    'data' in candidate &&
-    typeof candidate.timestamp === 'string'
+function isStandardApiResponse(data: unknown): data is ApiResponse<unknown> {
+  return isApiDataResponse(data)
 }
 
-function buildApiError(data: ApiResponse<unknown>): ApiError {
-  const error = new Error(data.message || 'Request failed') as ApiError
+function isStandardErrorResponse(data: unknown): data is ErrorResponse {
+  return isApiErrorResponse(data)
+}
+
+function buildApiError(data: ApiResponse<unknown> | ErrorResponse, status?: number): ApiError {
+  const message = isStandardErrorResponse(data) ? data.message : `Request failed (code: ${data.code})`
+  const error = new Error(message) as ApiError
   error.code = data.code
-  error.status = data.status
+  error.status = status
   error.response = data
   return error
+}
+
+function shouldRedirectToSetup(message: unknown): boolean {
+  return typeof message === 'string' && SETUP_ERROR_MESSAGES.has(message)
+}
+
+function redirectToSetup(): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+  if (window.location.pathname === SETUP_REDIRECT_PATH) {
+    return
+  }
+  window.location.replace(SETUP_REDIRECT_PATH)
+}
+
+function extractErrorMessage(data: unknown): string | null {
+  if (!data || typeof data !== 'object') {
+    return null
+  }
+  const candidate = data as { message?: unknown }
+  return typeof candidate.message === 'string' ? candidate.message : null
+}
+
+function handleSetupApiResponse(data: unknown): boolean {
+  const message = extractErrorMessage(data)
+  if (!shouldRedirectToSetup(message)) {
+    return false
+  }
+  redirectToSetup()
+  return true
+}
+
+function handleSetupError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false
+  }
+
+  const message = extractErrorMessage(error)
+  if (shouldRedirectToSetup(message)) {
+    redirectToSetup()
+    return true
+  }
+
+  if (axios.isAxiosError(error)) {
+    return handleSetupApiResponse(error.response?.data)
+  }
+
+  return false
 }
 
 function getRequestUrl(config: InternalAxiosRequestConfig): string {
@@ -97,7 +152,7 @@ function getRequestUrl(config: InternalAxiosRequestConfig): string {
 
 function shouldSkipAuthHandling(config: InternalAxiosRequestConfig): boolean {
   const requestUrl = getRequestUrl(config)
-  return requestUrl.startsWith(AUTH_ENDPOINTS.login) ||
+  return requestUrl.startsWith(AUTH_ENDPOINTS.loginBase) ||
     requestUrl.startsWith(AUTH_ENDPOINTS.logout) ||
     requestUrl.startsWith(AUTH_ENDPOINTS.refresh)
 }
@@ -122,7 +177,7 @@ function normalizePath(url: string): string {
 
 function shouldSkipAuthHandlingForUrl(url: string): boolean {
   const path = normalizePath(url)
-  return path.startsWith(AUTH_ENDPOINTS.login) ||
+  return path.startsWith(AUTH_ENDPOINTS.loginBase) ||
     path.startsWith(AUTH_ENDPOINTS.logout) ||
     path.startsWith(AUTH_ENDPOINTS.refresh)
 }
@@ -130,15 +185,30 @@ function shouldSkipAuthHandlingForUrl(url: string): boolean {
 async function refreshAccessToken(): Promise<void> {
   if (!refreshPromise) {
     refreshPromise = refreshClient
-      .post<ApiResponse<void>>('/refresh')
+      .post<ApiResponse<void> | ErrorResponse>('/refresh')
       .then((response) => {
         const data = response.data
-        if (!isApiResponse(data)) {
+        if (isStandardErrorResponse(data)) {
+          handleSetupApiResponse(data)
+          throw buildApiError(data, response.status)
+        }
+        if (!isStandardApiResponse(data)) {
           throw new Error('Invalid API response')
         }
         if (!isApiSuccess(data)) {
-          throw buildApiError(data)
+          handleSetupApiResponse(data)
+          throw buildApiError(data, response.status)
         }
+      })
+      .catch((error: unknown) => {
+        const responseData = axios.isAxiosError(error) ? error.response?.data : undefined
+        if (
+          handleSetupApiResponse(responseData) &&
+          (isStandardApiResponse(responseData) || isStandardErrorResponse(responseData))
+        ) {
+          throw buildApiError(responseData, axios.isAxiosError(error) ? error.response?.status : undefined)
+        }
+        throw error
       })
       .finally(() => {
         refreshPromise = null
@@ -174,7 +244,7 @@ export function createApiClient(options: ApiClientOptions): AxiosInstance {
   })
 
   client.interceptors.request.use((config) => {
-    const headers = (config.headers ?? {}) as Record<string, string>
+    const headers = AxiosHeaders.from(config.headers)
     attachCsrfHeader(headers)
     config.headers = headers
     return config
@@ -186,15 +256,28 @@ export function createApiClient(options: ApiClientOptions): AxiosInstance {
         return response
       }
       const data = response.data
-      if (!isApiResponse(data)) {
+      if (isStandardErrorResponse(data)) {
+        handleSetupApiResponse(data)
+        return Promise.reject(buildApiError(data, response.status))
+      }
+      if (!isStandardApiResponse(data)) {
         return Promise.reject(new Error('Invalid API response'))
       }
       if (!isApiSuccess(data)) {
-        return Promise.reject(buildApiError(data))
+        handleSetupApiResponse(data)
+        return Promise.reject(buildApiError(data, response.status))
       }
       return response
     },
     async (error: AxiosError) => {
+      const responseData = error.response?.data
+      if (handleSetupApiResponse(responseData)) {
+        if (isStandardApiResponse(responseData) || isStandardErrorResponse(responseData)) {
+          return Promise.reject(buildApiError(responseData, error.response?.status))
+        }
+        return Promise.reject(error)
+      }
+
       if (shouldAttemptRefresh(error)) {
         const config = error.config as RetryConfig
         config._retry = true
@@ -202,7 +285,9 @@ export function createApiClient(options: ApiClientOptions): AxiosInstance {
           await refreshAccessToken()
           return client(config)
         } catch (refreshError) {
-          unauthorizedHandler?.()
+          if (!handleSetupError(refreshError)) {
+            unauthorizedHandler?.()
+          }
           return Promise.reject(refreshError)
         }
       }
@@ -215,9 +300,8 @@ export function createApiClient(options: ApiClientOptions): AxiosInstance {
       }
 
       if (validateResponse) {
-        const responseData = error.response?.data
-        if (isApiResponse(responseData)) {
-          return Promise.reject(buildApiError(responseData))
+        if (isStandardApiResponse(responseData) || isStandardErrorResponse(responseData)) {
+          return Promise.reject(buildApiError(responseData, error.response?.status))
         }
       }
 
@@ -245,17 +329,41 @@ export async function fetchWithAuthRetry(
   requestInit.headers = headers
   const firstResponse = await fetch(input, requestInit)
 
+  if (!shouldSkipAuthHandlingForUrl(requestUrl)) {
+    try {
+      const responseData = await firstResponse.clone().json()
+      if (handleSetupApiResponse(responseData)) {
+        return firstResponse
+      }
+    } catch {
+      // ignore non-json response body
+    }
+  }
+
   if (firstResponse.status !== 401 || shouldSkipAuthHandlingForUrl(requestUrl)) {
     return firstResponse
   }
 
   try {
     await refreshAccessToken()
-  } catch {
-    unauthorizedHandler?.()
+  } catch (error) {
+    if (!handleSetupError(error)) {
+      unauthorizedHandler?.()
+    }
     return firstResponse
   }
 
   const retryInput = input instanceof Request ? input.clone() : input
-  return fetch(retryInput, requestInit)
+  const retryResponse = await fetch(retryInput, requestInit)
+
+  if (!shouldSkipAuthHandlingForUrl(requestUrl)) {
+    try {
+      const responseData = await retryResponse.clone().json()
+      handleSetupApiResponse(responseData)
+    } catch {
+      // ignore non-json response body
+    }
+  }
+
+  return retryResponse
 }

@@ -12,28 +12,34 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.sunny.datapillar.studio.context.TenantContextHolder;
-import com.sunny.datapillar.studio.module.features.dto.FeatureObjectDto;
-import com.sunny.datapillar.studio.module.features.dto.FeatureEntitlementDto;
-import com.sunny.datapillar.studio.module.features.entity.Permission;
-import com.sunny.datapillar.studio.module.features.mapper.FeatureObjectMapper;
-import com.sunny.datapillar.studio.module.features.mapper.PermissionMapper;
-import com.sunny.datapillar.studio.module.features.mapper.TenantFeaturePermissionMapper;
-import com.sunny.datapillar.studio.module.features.util.PermissionLevelUtil;
+import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
+import com.sunny.datapillar.studio.module.tenant.dto.FeatureEntitlementDto;
+import com.sunny.datapillar.studio.module.tenant.entity.Permission;
+import com.sunny.datapillar.studio.module.tenant.mapper.FeatureObjectMapper;
+import com.sunny.datapillar.studio.module.tenant.mapper.PermissionMapper;
+import com.sunny.datapillar.studio.module.tenant.mapper.TenantFeaturePermissionMapper;
+import com.sunny.datapillar.studio.module.tenant.util.PermissionLevelUtil;
 import com.sunny.datapillar.studio.module.user.dto.RoleDto;
 import com.sunny.datapillar.studio.module.user.entity.Role;
 import com.sunny.datapillar.studio.module.user.entity.RolePermission;
 import com.sunny.datapillar.studio.module.user.mapper.RoleMapper;
 import com.sunny.datapillar.studio.module.user.service.RoleService;
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.sunny.datapillar.common.exception.BadRequestException;
+import com.sunny.datapillar.common.exception.UnauthorizedException;
+import com.sunny.datapillar.common.exception.ForbiddenException;
+import com.sunny.datapillar.common.exception.NotFoundException;
+import com.sunny.datapillar.common.exception.AlreadyExistsException;
 
 /**
- * 角色服务实现类
+ * 角色服务实现
+ * 实现角色业务流程与规则校验
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Slf4j
 @Service
@@ -49,7 +55,7 @@ public class RoleServiceImpl implements RoleService {
     public RoleDto.Response getRoleById(Long id) {
         Role role = roleMapper.selectById(id);
         if (role == null) {
-            throw new BusinessException(ErrorCode.ROLE_NOT_FOUND, id);
+            throw new NotFoundException("角色不存在: roleId=%s", id);
         }
 
         RoleDto.Response response = new RoleDto.Response();
@@ -62,7 +68,7 @@ public class RoleServiceImpl implements RoleService {
     public Long createRole(RoleDto.Create dto) {
         Long tenantId = getRequiredTenantId();
         if (roleMapper.findByName(tenantId, dto.getName()) != null) {
-            throw new BusinessException(ErrorCode.ROLE_ALREADY_EXISTS, dto.getName());
+            throw new AlreadyExistsException("角色代码已存在: %s", dto.getName());
         }
 
         Role role = new Role();
@@ -88,13 +94,13 @@ public class RoleServiceImpl implements RoleService {
         Long tenantId = getRequiredTenantId();
         Role existingRole = roleMapper.selectById(id);
         if (existingRole == null) {
-            throw new BusinessException(ErrorCode.ROLE_NOT_FOUND, id);
+            throw new NotFoundException("角色不存在: roleId=%s", id);
         }
 
         if (dto.getName() != null && !dto.getName().isBlank()) {
             Role roleWithSameName = roleMapper.findByName(tenantId, dto.getName());
             if (roleWithSameName != null && !roleWithSameName.getId().equals(id)) {
-                throw new BusinessException(ErrorCode.ROLE_ALREADY_EXISTS, dto.getName());
+                throw new AlreadyExistsException("角色代码已存在: %s", dto.getName());
             }
             existingRole.setName(dto.getName());
         }
@@ -119,7 +125,7 @@ public class RoleServiceImpl implements RoleService {
     public void deleteRole(Long id) {
         Role role = roleMapper.selectById(id);
         if (role == null) {
-            throw new BusinessException(ErrorCode.ROLE_NOT_FOUND, id);
+            throw new NotFoundException("角色不存在: roleId=%s", id);
         }
 
         Long tenantId = getRequiredTenantId();
@@ -161,7 +167,7 @@ public class RoleServiceImpl implements RoleService {
     public List<FeatureObjectDto.ObjectPermission> getRolePermissions(Long roleId, String scope) {
         Role role = roleMapper.selectById(roleId);
         if (role == null) {
-            throw new BusinessException(ErrorCode.ROLE_NOT_FOUND, roleId);
+            throw new NotFoundException("角色不存在: roleId=%s", roleId);
         }
         Long tenantId = getRequiredTenantId();
         String normalizedScope = scope == null ? "ALL" : scope.trim().toUpperCase(Locale.ROOT);
@@ -183,7 +189,7 @@ public class RoleServiceImpl implements RoleService {
     public void updateRolePermissions(Long roleId, List<FeatureObjectDto.Assignment> permissions) {
         Role role = roleMapper.selectById(roleId);
         if (role == null) {
-            throw new BusinessException(ErrorCode.ROLE_NOT_FOUND, roleId);
+            throw new NotFoundException("角色不存在: roleId=%s", roleId);
         }
         Long tenantId = getRequiredTenantId();
         roleMapper.deleteRolePermissions(tenantId, roleId);
@@ -209,12 +215,12 @@ public class RoleServiceImpl implements RoleService {
             Long permissionId = resolvedPermission.getId();
             FeatureEntitlementDto.PermissionLimit limit = limitMap.get(entry.getKey());
             if (limit == null || limit.getStatus() == null || limit.getStatus() != 1) {
-                throw new BusinessException(ErrorCode.FORBIDDEN);
+                throw new ForbiddenException("无权限访问");
             }
             int limitLevel = limit.getPermissionLevel() == null ? 0 : limit.getPermissionLevel();
             int permissionLevel = resolvedPermission.getLevel() == null ? 0 : resolvedPermission.getLevel();
             if (permissionLevel > limitLevel) {
-                throw new BusinessException(ErrorCode.FORBIDDEN);
+                throw new ForbiddenException("无权限访问");
             }
 
             RolePermission rolePermission = new RolePermission();
@@ -282,7 +288,7 @@ public class RoleServiceImpl implements RoleService {
     private Long getRequiredTenantId() {
         Long tenantId = TenantContextHolder.getTenantId();
         if (tenantId == null) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+            throw new UnauthorizedException("未授权访问");
         }
         return tenantId;
     }
@@ -304,22 +310,22 @@ public class RoleServiceImpl implements RoleService {
                                          Map<String, Permission> permissionMap,
                                          Map<Long, Permission> permissionByIdMap) {
         if (assignment == null) {
-            throw new BusinessException(ErrorCode.INVALID_ARGUMENT);
+            throw new BadRequestException("参数错误");
         }
         if (assignment.getPermissionId() != null) {
             Permission permission = permissionByIdMap.get(assignment.getPermissionId());
             if (permission == null) {
-                throw new BusinessException(ErrorCode.INVALID_ARGUMENT, String.valueOf(assignment.getPermissionId()));
+                throw new BadRequestException("参数错误", String.valueOf(assignment.getPermissionId()));
             }
             return permission;
         }
         String code = normalizePermissionCode(assignment.getPermissionCode());
         if (code == null) {
-            throw new BusinessException(ErrorCode.INVALID_ARGUMENT);
+            throw new BadRequestException("参数错误");
         }
         Permission permission = permissionMap.get(code);
         if (permission == null) {
-            throw new BusinessException(ErrorCode.INVALID_ARGUMENT, assignment.getPermissionCode());
+            throw new BadRequestException("参数错误", assignment.getPermissionCode());
         }
         return permission;
     }

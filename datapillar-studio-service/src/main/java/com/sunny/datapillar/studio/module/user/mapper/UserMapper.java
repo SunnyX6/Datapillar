@@ -11,9 +11,11 @@ import com.sunny.datapillar.studio.module.user.entity.UserPermission;
 import com.sunny.datapillar.studio.module.user.entity.UserRole;
 
 /**
- * 用户 Mapper 接口
+ * 用户Mapper
+ * 负责用户数据访问与持久化映射
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Mapper
 public interface UserMapper extends BaseMapper<User> {
@@ -63,12 +65,6 @@ public interface UserMapper extends BaseMapper<User> {
      */
     void insertUserPermission(UserPermission userPermission);
 
-    /**
-     * 根据用户ID和Token签名查询用户
-     */
-    User selectByIdAndTokenSign(@Param("tenantId") Long tenantId,
-                                @Param("userId") Long userId,
-                                @Param("tokenSign") String tokenSign);
 
     /**
      * 按租户查询用户列表
@@ -76,11 +72,10 @@ public interface UserMapper extends BaseMapper<User> {
     List<User> selectUsersByTenantId(@Param("tenantId") Long tenantId);
 
     /**
-     * 按租户分页查询用户列表
+     * 按租户和状态查询用户列表
      */
-    List<User> selectUsersByTenantIdPage(com.baomidou.mybatisplus.core.metadata.IPage<User> page,
-                                         @Param("tenantId") Long tenantId,
-                                         @Param("status") Integer status);
+    List<User> selectUsersByTenantIdAndStatus(@Param("tenantId") Long tenantId,
+                                              @Param("status") Integer status);
 
     /**
      * 按租户查询用户详情

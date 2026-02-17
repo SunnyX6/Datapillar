@@ -12,9 +12,11 @@ import com.sunny.datapillar.studio.module.workflow.dto.WorkflowDto;
 import com.sunny.datapillar.studio.module.workflow.entity.JobWorkflow;
 
 /**
- * 工作流 Mapper 接口
+ * 任务工作流Mapper
+ * 负责任务工作流数据访问与持久化映射
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 @Mapper
 public interface JobWorkflowMapper extends BaseMapper<JobWorkflow> {

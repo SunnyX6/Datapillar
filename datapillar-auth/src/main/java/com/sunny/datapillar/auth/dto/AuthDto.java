@@ -2,52 +2,32 @@ package com.sunny.datapillar.auth.dto;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
- * 认证 DTO
+ * 认证数据传输对象
+ * 定义认证数据传输结构
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 public class AuthDto {
 
     // ==================== 登录 ====================
 
     @Data
-    public static class LoginRequest {
-        private String tenantCode;
-
-        @NotBlank(message = "用户名不能为空")
-        private String username;
-
-        @NotBlank(message = "密码不能为空")
-        private String password;
-
-        /** 记住我（7天 vs 30天） */
-        private Boolean rememberMe = false;
-
-        /** 邀请码（首次入库必填） */
-        private String inviteCode;
-
-        /** 邮箱（邀请匹配用，可选） */
-        @Email(message = "邮箱格式不正确")
-        private String email;
-
-        /** 手机号（邀请匹配用，可选） */
-        private String phone;
-    }
-
-    @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @Schema(name = "AuthLoginResponse")
     public static class LoginResponse {
         private Long userId;
         private Long tenantId;
@@ -60,16 +40,15 @@ public class AuthDto {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(name = "AuthLoginResult")
     public static class LoginResult {
-        /** SUCCESS / TENANT_SELECT */
+        /** 仅在需要租户选择时返回 TENANT_SELECT */
         private String loginStage;
-        /** 多租户选择时返回 */
-        private String loginToken;
-        /** 多租户选择时返回 */
+        /** 可用租户列表；SUCCESS 场景下第一个为当前租户 */
         private List<TenantOption> tenants;
 
         private Long userId;
-        private Long tenantId;
         private String username;
         private String email;
         private List<RoleInfo> roles;
@@ -77,8 +56,32 @@ public class AuthDto {
     }
 
     @Data
+    @Schema(name = "AuthLoginFlowRequest")
+    public static class LoginFlowRequest {
+        @NotBlank(message = "stage 不能为空")
+        private String stage;
+
+        private Boolean rememberMe;
+
+        private String loginAlias;
+
+        private String password;
+
+        private String tenantCode;
+
+        private String provider;
+
+        private String code;
+
+        private String state;
+
+        private Long tenantId;
+    }
+
+    @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @Schema(name = "AuthTenantOption")
     public static class TenantOption {
         private Long tenantId;
         private String tenantCode;
@@ -88,6 +91,7 @@ public class AuthDto {
     }
 
     @Data
+    @Schema(name = "AuthLoginTenantRequest")
     public static class LoginTenantRequest {
         @NotBlank(message = "loginToken 不能为空")
         private String loginToken;
@@ -99,6 +103,7 @@ public class AuthDto {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @Schema(name = "AuthRoleInfo")
     public static class RoleInfo {
         private Long id;
         private String name;
@@ -108,6 +113,7 @@ public class AuthDto {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @Schema(name = "AuthMenuInfo")
     public static class MenuInfo {
         private Long id;
         private String name;
@@ -122,6 +128,7 @@ public class AuthDto {
     // ==================== Token ====================
 
     @Data
+    @Schema(name = "AuthTokenRequest")
     public static class TokenRequest {
         @NotBlank(message = "Token 不能为空")
         private String token;
@@ -132,6 +139,7 @@ public class AuthDto {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @Schema(name = "AuthTokenResponse")
     public static class TokenResponse {
         private boolean valid;
         private Long userId;
@@ -155,8 +163,8 @@ public class AuthDto {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @Schema(name = "AuthTokenInfo")
     public static class TokenInfo {
-        private Boolean valid;
         private Long remainingSeconds;
         private Long expirationTime;
         private Long issuedAt;
@@ -170,26 +178,7 @@ public class AuthDto {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class SsoLoginRequest {
-        @NotBlank(message = "租户编码不能为空")
-        private String tenantCode;
-
-        @NotBlank(message = "SSO 提供方不能为空")
-        private String provider;
-
-        @NotBlank(message = "授权码不能为空")
-        private String authCode;
-
-        @NotBlank(message = "state 不能为空")
-        private String state;
-
-        /** 邀请码（首次入库必填） */
-        private String inviteCode;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
+    @Schema(name = "AuthSsoQrResponse")
     public static class SsoQrResponse {
         /** SDK / URL */
         private String type;
@@ -206,6 +195,7 @@ public class AuthDto {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @Schema(name = "AuthOAuth2TokenRequest")
     public static class OAuth2TokenRequest {
         private String grantType;
         private String username;
@@ -218,6 +208,7 @@ public class AuthDto {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @Schema(name = "AuthOAuth2TokenResponse")
     public static class OAuth2TokenResponse {
         @JsonProperty("access_token")
         private String accessToken;

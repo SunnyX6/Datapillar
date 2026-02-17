@@ -6,9 +6,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.sunny.datapillar.studio.module.workflow.dto.WorkflowDto;
 
 /**
- * 工作流服务接口
+ * 工作流服务
+ * 提供工作流业务能力与领域服务
  *
- * @author sunny
+ * @author Sunny
+ * @date 2026-01-01
  */
 public interface WorkflowService {
 

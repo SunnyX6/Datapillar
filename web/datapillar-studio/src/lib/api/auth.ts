@@ -6,13 +6,18 @@
 
 import { createApiClient } from '@/lib/api/client'
 import type { ApiResponse } from '@/types/api'
-import type { LoginRequest, LoginResult, LoginTenantRequest, SsoLoginRequest, SsoQrResponse } from '@/types/auth'
+import type {
+  LoginResult,
+  LoginTenantRequest,
+  PasswordLoginRequest,
+  SsoLoginRequest
+} from '@/types/auth'
 
 /**
  * Auth API 客户端
  */
-const authClient = createApiClient({
-  baseURL: '/api/auth',
+const loginClient = createApiClient({
+  baseURL: '/api/login',
   timeout: 30000
 })
 
@@ -32,51 +37,60 @@ function extractErrorMessage(error: unknown): string {
   return '未知错误'
 }
 
-/**
- * 调用登录接口
- */
-export async function login(request: LoginRequest): Promise<LoginResult> {
-  try {
-    const response = await authClient.post<ApiResponse<LoginResult>>('/login', request)
-    return response.data.data
-  } catch (error) {
-    throw new Error(extractErrorMessage(error))
+function extractApiData<T>(response: ApiResponse<T>): T {
+  if (typeof response.data === 'undefined') {
+    throw new Error('接口响应缺少 data 字段')
   }
+  return response.data
 }
 
 /**
- * 获取 SSO 扫码配置
+ * 账号密码登录（stage=AUTH）
  */
-export async function getSsoQr(tenantCode: string, provider: string): Promise<SsoQrResponse> {
+export async function login(request: PasswordLoginRequest): Promise<LoginResult> {
   try {
-    const response = await authClient.get<ApiResponse<SsoQrResponse>>('/sso/qr', {
-      params: { tenantCode, provider }
+    const response = await loginClient.post<ApiResponse<LoginResult>>('', {
+      stage: 'AUTH',
+      loginAlias: request.loginAlias,
+      password: request.password,
+      rememberMe: request.rememberMe,
+      tenantCode: request.tenantCode
     })
-    return response.data.data
+    return extractApiData(response.data)
   } catch (error) {
     throw new Error(extractErrorMessage(error))
   }
 }
 
 /**
- * SSO 登录
+ * SSO 登录（stage=AUTH）
  */
-export async function ssoLogin(request: SsoLoginRequest): Promise<LoginResult> {
+export async function loginSso(request: SsoLoginRequest): Promise<LoginResult> {
   try {
-    const response = await authClient.post<ApiResponse<LoginResult>>('/sso/login', request)
-    return response.data.data
+    const response = await loginClient.post<ApiResponse<LoginResult>>('/sso', {
+      stage: 'AUTH',
+      provider: request.provider,
+      code: request.code,
+      state: request.state,
+      rememberMe: request.rememberMe,
+      tenantCode: request.tenantCode
+    })
+    return extractApiData(response.data)
   } catch (error) {
     throw new Error(extractErrorMessage(error))
   }
 }
 
 /**
- * 完成租户选择登录
+ * 完成租户选择登录（stage=TENANT_SELECT）
  */
 export async function loginTenant(request: LoginTenantRequest): Promise<LoginResult> {
   try {
-    const response = await authClient.post<ApiResponse<LoginResult>>('/login/tenant', request)
-    return response.data.data
+    const response = await loginClient.post<ApiResponse<LoginResult>>('', {
+      stage: 'TENANT_SELECT',
+      tenantId: request.tenantId
+    })
+    return extractApiData(response.data)
   } catch (error) {
     throw new Error(extractErrorMessage(error))
   }
@@ -87,7 +101,7 @@ export async function loginTenant(request: LoginTenantRequest): Promise<LoginRes
  */
 export async function logout(): Promise<void> {
   try {
-    await authClient.post<ApiResponse<void>>('/logout')
+    await loginClient.post<ApiResponse<void>>('/logout')
   } catch (error) {
     console.error('登出失败:', error)
   }

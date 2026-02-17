@@ -11,12 +11,11 @@ import org.springframework.context.annotation.Configuration;
 import java.time.Duration;
 
 /**
- * Resilience4j 熔断配置
- * 提供熔断和超时保护
+ * Resilience4j配置
+ * 负责Resilience4j配置装配与Bean初始化
  *
  * @author Sunny
- * @version 1.0.0
- * @since 2025-12-08
+ * @date 2026-01-01
  */
 @Configuration
 public class Resilience4jConfig {

@@ -17,6 +17,12 @@ spring:
     time-zone: Asia/Shanghai
     serialization:
       WRITE_DATES_AS_TIMESTAMPS: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    validate-on-migrate: true
+    clean-disabled: true
   data:
     redis:
       host: ${REDIS_HOST}
@@ -41,11 +47,9 @@ mybatis-plus:
       update-strategy: IGNORED
 
 springdoc:
+  use-fqn: true
   api-docs:
     enabled: true
-  swagger-ui:
-    enabled: true
-    path: /swagger-ui.html
 
 # Actuator 健康检查（与服务同端口）
 management:
@@ -104,16 +108,49 @@ sql:
   max-rows: ${SQL_MAX_ROWS:200}
   execution-timeout: ${SQL_TIMEOUT:300000}
 
-# 密钥存储配置
+# 安全配置
 security:
-  key-storage:
-    type: ${KEY_STORAGE_TYPE}
-    local:
-      path: ${KEY_STORAGE_LOCAL_PATH}
-    object:
-      endpoint: ${KEY_STORAGE_OBJECT_ENDPOINT}
-      bucket: ${KEY_STORAGE_OBJECT_BUCKET}
-      access-key: ${KEY_STORAGE_OBJECT_ACCESS_KEY}
-      secret-key: ${KEY_STORAGE_OBJECT_SECRET_KEY}
-      region: ${KEY_STORAGE_OBJECT_REGION}
-      prefix: ${KEY_STORAGE_OBJECT_PREFIX}
+  gateway-assertion:
+    enabled: true
+    header-name: X-Gateway-Assertion
+    issuer: datapillar-gateway
+    audience: datapillar-studio-service
+    key-id: gw-prod-2026-02
+    public-key-path: ${GATEWAY_ASSERTION_PUBLIC_KEY_PATH}
+    previous-key-id: ${GATEWAY_ASSERTION_PREVIOUS_KEY_ID:}
+    previous-public-key-path: ${GATEWAY_ASSERTION_PREVIOUS_PUBLIC_KEY_PATH:}
+    max-clock-skew-seconds: 5
+
+datapillar:
+  rpc:
+    group: ${DUBBO_GROUP:datapillar}
+    version: ${DUBBO_VERSION:1.0.0}
+
+# Dubbo 配置
+
+dubbo:
+  application:
+    name: datapillar-studio-service
+    qos-enable: ${DUBBO_QOS_ENABLE:false}
+    qos-port: ${DUBBO_QOS_PORT:33333}
+    register-mode: interface
+    migration:
+      step: FORCE_INTERFACE
+    service-discovery:
+      migration: FORCE_INTERFACE
+  protocol:
+    name: tri
+    port: -1
+  registry:
+    address: nacos://${NACOS_SERVER_ADDR}
+    group: ${NACOS_GROUP:DATAPILLAR}
+    register-mode: interface
+    parameters:
+      namespace: ${NACOS_NAMESPACE}
+      username: ${NACOS_USERNAME}
+      password: ${NACOS_PASSWORD}
+  consumer:
+    check: ${DUBBO_CONSUMER_CHECK:false}
+    timeout: ${DUBBO_CONSUMER_TIMEOUT:5000}
+    parameters:
+      migration.step: FORCE_INTERFACE

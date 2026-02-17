@@ -7,6 +7,8 @@ from dynaconf import Dynaconf
 
 from src.shared.config.exceptions import ConfigurationError
 from src.shared.config.nacos_client import (
+    NacosBootstrapConfig,
+    _build_client_config,
     apply_nacos_config,
     load_nacos_config,
     parse_nacos_config_content,
@@ -153,3 +155,49 @@ def test_settings_module_disables_env_override(monkeypatch: pytest.MonkeyPatch):
     settings_module = importlib.import_module("src.shared.config.settings")
     reloaded = importlib.reload(settings_module)
     assert reloaded.settings.get("mysql_host") is None
+
+
+def test_build_client_config_uses_env_log_cache_dir(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("NACOS_LOG_DIR", "/tmp/custom-nacos-log")
+    monkeypatch.setenv("NACOS_CACHE_DIR", "/tmp/custom-nacos-cache")
+
+    config = NacosBootstrapConfig(
+        server_addr="127.0.0.1:8848",
+        namespace="dev",
+        username="nacos",
+        password="nacos",
+        group="DATAPILLAR",
+        data_id="datapillar-ai.yaml",
+        service_name="datapillar-ai",
+        cluster_name="DEFAULT",
+        ephemeral=True,
+        heartbeat_interval=5,
+        watch_enabled=True,
+    )
+
+    client_config = _build_client_config(config)
+    assert client_config.log_dir == "/tmp/custom-nacos-log"
+    assert client_config.cache_dir == "/tmp/custom-nacos-cache"
+
+
+def test_build_client_config_uses_safe_default_dirs(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("NACOS_LOG_DIR", raising=False)
+    monkeypatch.delenv("NACOS_CACHE_DIR", raising=False)
+
+    config = NacosBootstrapConfig(
+        server_addr="127.0.0.1:8848",
+        namespace="dev",
+        username="nacos",
+        password="nacos",
+        group="DATAPILLAR",
+        data_id="datapillar-ai.yaml",
+        service_name="datapillar-ai",
+        cluster_name="DEFAULT",
+        ephemeral=True,
+        heartbeat_interval=5,
+        watch_enabled=True,
+    )
+
+    client_config = _build_client_config(config)
+    assert client_config.log_dir == "/tmp/datapillar-logs/nacos"
+    assert client_config.cache_dir == "/tmp/datapillar-logs/nacos/cache"
