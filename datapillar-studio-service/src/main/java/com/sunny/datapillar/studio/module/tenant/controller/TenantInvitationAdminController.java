@@ -30,26 +30,24 @@ import com.sunny.datapillar.common.exception.BadRequestException;
  */
 @Tag(name = "租户邀请", description = "租户邀请接口")
 @RestController
-@RequestMapping("/admin/tenants/{tenantId}")
+@RequestMapping("/admin/tenant/current/invitations")
 @RequiredArgsConstructor
 public class TenantInvitationAdminController {
 
     private final TenantInvitationAdminService tenantInvitationAdminService;
 
     @Operation(summary = "创建邀请")
-    @PostMapping("/invitation")
+    @PostMapping
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> create(@PathVariable Long tenantId,
-                                    @Valid @RequestBody InvitationDto.Create dto) {
+    public ApiResponse<Void> create(@Valid @RequestBody InvitationDto.Create dto) {
         tenantInvitationAdminService.createInvitation(dto);
         return ApiResponse.ok();
     }
 
     @Operation(summary = "获取邀请列表")
-    @GetMapping("/invitations")
+    @GetMapping
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<InvitationDto.Response>> list(@PathVariable Long tenantId,
-                                                          @RequestParam(required = false) Integer status) {
+    public ApiResponse<List<InvitationDto.Response>> list(@RequestParam(required = false) Integer status) {
         List<UserInvitation> invitations = tenantInvitationAdminService.listInvitations(status);
         List<InvitationDto.Response> data = invitations.stream()
                 .map(invitation -> {
@@ -62,10 +60,9 @@ public class TenantInvitationAdminController {
     }
 
     @Operation(summary = "更新邀请")
-    @PatchMapping("/invitation/{invitationId}")
+    @PatchMapping("/{invitationId}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> update(@PathVariable Long tenantId,
-                                    @PathVariable Long invitationId,
+    public ApiResponse<Void> update(@PathVariable Long invitationId,
                                     @Valid @RequestBody InvitationDto.ActionRequest request) {
         String action = request == null ? null : request.getAction();
         if (action != null && "CANCEL".equalsIgnoreCase(action)) {

@@ -27,20 +27,28 @@ public class TraceIdFilter implements GlobalFilter, Ordered {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         // 检查请求中是否已有 TraceId（来自上游）
         String traceId = exchange.getRequest().getHeaders().getFirst(HeaderConstants.HEADER_TRACE_ID);
+        String requestId = exchange.getRequest().getHeaders().getFirst(HeaderConstants.HEADER_REQUEST_ID);
 
         if (traceId == null || traceId.isEmpty()) {
             // 生成新的 TraceId
             traceId = generateTraceId();
         }
+        if (requestId == null || requestId.isEmpty()) {
+            // 生成新的 RequestId
+            requestId = generateRequestId();
+        }
 
         // 将 TraceId 注入请求头，传递给下游服务
         String finalTraceId = traceId;
+        String finalRequestId = requestId;
         ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                 .header(HeaderConstants.HEADER_TRACE_ID, finalTraceId)
+                .header(HeaderConstants.HEADER_REQUEST_ID, finalRequestId)
                 .build();
 
-        // 将 TraceId 添加到响应头，方便客户端追踪
+        // 将 TraceId / RequestId 添加到响应头，方便客户端追踪
         exchange.getResponse().getHeaders().add(HeaderConstants.HEADER_TRACE_ID, finalTraceId);
+        exchange.getResponse().getHeaders().add(HeaderConstants.HEADER_REQUEST_ID, finalRequestId);
 
         return chain.filter(exchange.mutate().request(mutatedRequest).build());
     }
@@ -51,6 +59,16 @@ public class TraceIdFilter implements GlobalFilter, Ordered {
      */
     private String generateTraceId() {
         return String.format("%d-%s",
+                System.currentTimeMillis(),
+                UUID.randomUUID().toString().substring(0, 8));
+    }
+
+    /**
+     * 生成 RequestId
+     * 格式：req-时间戳(毫秒)-随机数
+     */
+    private String generateRequestId() {
+        return String.format("req-%d-%s",
                 System.currentTimeMillis(),
                 UUID.randomUUID().toString().substring(0, 8));
     }

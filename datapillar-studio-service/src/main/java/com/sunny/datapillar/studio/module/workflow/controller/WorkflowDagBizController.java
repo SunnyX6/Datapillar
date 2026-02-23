@@ -21,9 +21,9 @@ import org.springframework.web.bind.annotation.RestController;
  * @author Sunny
  * @date 2026-01-01
  */
-@Tag(name = "工作流DAG管理", description = "工作流发布与 DAG 查询")
+@Tag(name = "工作流DAG", description = "工作流DAG接口")
 @RestController
-@RequestMapping("/biz/projects/{projectId}/workflow/{id}")
+@RequestMapping("/biz/workflows/{workflowId}")
 @RequiredArgsConstructor
 public class WorkflowDagBizController {
 
@@ -35,49 +35,47 @@ public class WorkflowDagBizController {
 
     @Operation(summary = "发布工作流")
     @PostMapping("/publish")
-    public ApiResponse<Map<String, Object>> publish(@PathVariable Long projectId, @PathVariable Long id) {
-        workflowDagBizService.publishWorkflow(id);
+    public ApiResponse<Map<String, Object>> publish(@PathVariable Long workflowId) {
+        workflowDagBizService.publishWorkflow(workflowId);
         return ApiResponse.ok(Map.of());
     }
 
     @Operation(summary = "暂停工作流")
     @PostMapping("/pause")
-    public ApiResponse<Map<String, Object>> pause(@PathVariable Long projectId, @PathVariable Long id) {
-        workflowDagBizService.pauseWorkflow(id);
+    public ApiResponse<Map<String, Object>> pause(@PathVariable Long workflowId) {
+        workflowDagBizService.pauseWorkflow(workflowId);
         return ApiResponse.ok(Map.of());
     }
 
     @Operation(summary = "恢复工作流")
     @PostMapping("/resume")
-    public ApiResponse<Map<String, Object>> resume(@PathVariable Long projectId, @PathVariable Long id) {
-        workflowDagBizService.resumeWorkflow(id);
+    public ApiResponse<Map<String, Object>> resume(@PathVariable Long workflowId) {
+        workflowDagBizService.resumeWorkflow(workflowId);
         return ApiResponse.ok(Map.of());
     }
 
     @Operation(summary = "获取 DAG 详情")
     @GetMapping("/dag")
-    public ApiResponse<JsonNode> getDagDetail(@PathVariable Long projectId, @PathVariable Long id) {
-        return ApiResponse.ok(workflowDagBizService.getDagDetail(id));
+    public ApiResponse<JsonNode> getDagDetail(@PathVariable Long workflowId) {
+        return ApiResponse.ok(workflowDagBizService.getDagDetail(workflowId));
     }
 
     @Operation(summary = "获取 DAG 版本列表")
     @GetMapping("/dag/versions")
-    public ApiResponse<JsonNode> getDagVersions(@PathVariable Long projectId,
-                                                @PathVariable Long id,
+    public ApiResponse<JsonNode> getDagVersions(@PathVariable Long workflowId,
                                                 @RequestParam(required = false) Integer limit,
                                                 @RequestParam(required = false) Integer offset,
                                                 @RequestParam(required = false) Integer maxLimit) {
         int resolvedMaxLimit = maxLimit == null || maxLimit <= 0 ? DEFAULT_MAX_LIMIT : maxLimit;
         int resolvedLimit = limit == null || limit <= 0 ? DEFAULT_LIMIT : Math.min(limit, resolvedMaxLimit);
         int resolvedOffset = offset == null || offset < 0 ? DEFAULT_OFFSET : offset;
-        return ApiResponse.ok(workflowDagBizService.getDagVersions(id, resolvedLimit, resolvedOffset));
+        return ApiResponse.ok(workflowDagBizService.getDagVersions(workflowId, resolvedLimit, resolvedOffset));
     }
 
     @Operation(summary = "获取 DAG 版本详情")
     @GetMapping("/dag/versions/{versionNumber}")
-    public ApiResponse<JsonNode> getDagVersion(@PathVariable Long projectId,
-                                               @PathVariable Long id,
+    public ApiResponse<JsonNode> getDagVersion(@PathVariable Long workflowId,
                                                @PathVariable int versionNumber) {
-        return ApiResponse.ok(workflowDagBizService.getDagVersion(id, versionNumber));
+        return ApiResponse.ok(workflowDagBizService.getDagVersion(workflowId, versionNumber));
     }
 }

@@ -25,6 +25,7 @@ from src.infrastructure.repository.knowledge.dto import (
     ValueDomainDTO,
     WordRootDTO,
 )
+from src.shared.context import get_current_tenant_id
 
 _ALLOWED_NODE_LABELS: set[str] = {
     "Knowledge",
@@ -52,6 +53,17 @@ _ALLOWED_COLUMN_PROPERTIES: set[str] = {
     "name",
     "properties",
 }
+
+
+def _require_tenant_id() -> int:
+    tenant_id = get_current_tenant_id()
+    if tenant_id is None:
+        raise ValueError("缺少 tenant 上下文")
+    return int(tenant_id)
+
+
+async def _run_with_tenant(session: Any, query: str, **params: Any) -> Any:
+    return await arun_cypher(session, query, tenantId=_require_tenant_id(), **params)
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,10 +108,11 @@ class Metadata:
         query = """
         MATCH (n:Knowledge)
         WHERE n.embedding IS NOT NULL
+          AND n.tenantId = $tenantId
           AND n.embeddingProvider = $provider
         RETURN n.id AS id
         """
-        result = await arun_cypher(session, query, provider=provider)
+        result = await _run_with_tenant(session, query, provider=provider)
         records = await result.data()
         return {r["id"] for r in records if r.get("id")}
 
@@ -115,10 +128,11 @@ class Metadata:
         query = """
         MATCH (n:Knowledge)
         WHERE n.embedding IS NOT NULL
+          AND n.tenantId = $tenantId
           AND (n.embeddingProvider IS NULL OR n.embeddingProvider <> $provider)
         RETURN count(n) AS count
         """
-        result = await arun_cypher(session, query, provider=provider)
+        result = await _run_with_tenant(session, query, provider=provider)
         record = await result.single()
         return int(record["count"]) if record and record.get("count") is not None else 0
 
@@ -138,12 +152,12 @@ class Metadata:
         Metadata._assert_node_label(node_label)
         query = f"""
         UNWIND $data AS item
-        MATCH (n:{node_label} {{id: item.id}})
+        MATCH (n:{node_label} {{id: item.id, tenantId: $tenantId}})
         SET n.embedding = item.embedding,
             n.embeddingProvider = $provider,
             n.embeddingUpdatedAt = datetime()
         """
-        await arun_cypher(session, query, data=list(data), provider=provider)
+        await _run_with_tenant(session, query, data=list(data), provider=provider)
 
     # ==================== 基础节点：Catalog/Schema/Table/Column ====================
 
@@ -162,9 +176,10 @@ class Metadata:
         return_tags: bool = False,
     ) -> list[str] | None:
         query = """
-        MERGE (c:Catalog:Knowledge {id: $id})
+        MERGE (c:Catalog:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
             c.id = $id,
+            c.tenantId = $tenantId,
             c.name = $name,
             c.metalake = $metalake,
             c.catalogType = $catalogType,
@@ -178,12 +193,13 @@ class Metadata:
             c.provider = COALESCE($provider, c.provider),
             c.description = COALESCE($description, c.description),
             c.properties = COALESCE($properties, c.properties),
+            c.tenantId = $tenantId,
             c.updatedAt = datetime()
         """
         if return_tags:
             query += "\nRETURN c.tags as tags\n"
 
-        result = await arun_cypher(
+        result = await _run_with_tenant(
             session,
             query,
             id=id,
@@ -218,9 +234,10 @@ class Metadata:
         写入 Schema 节点（不写 Catalog->Schema 关系）。
         """
         query = """
-        MERGE (s:Schema:Knowledge {id: $id})
+        MERGE (s:Schema:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
             s.id = $id,
+            s.tenantId = $tenantId,
             s.name = $name,
             s.description = $description,
             s.properties = $properties,
@@ -229,12 +246,13 @@ class Metadata:
         ON MATCH SET
             s.description = COALESCE($description, s.description),
             s.properties = COALESCE($properties, s.properties),
+            s.tenantId = $tenantId,
             s.updatedAt = datetime()
         """
         if return_tags:
             query += "\nRETURN s.tags as tags\n"
 
-        result = await arun_cypher(
+        result = await _run_with_tenant(
             session,
             query,
             id=id,
@@ -264,9 +282,10 @@ class Metadata:
         """
         payload = payload or TableUpsertPayload()
         query = """
-        MERGE (t:Table:Knowledge {id: $id})
+        MERGE (t:Table:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
             t.id = $id,
+            t.tenantId = $tenantId,
             t.name = $name,
             t.producer = $producer,
             t.description = $description,
@@ -285,12 +304,13 @@ class Metadata:
             t.producer = COALESCE($producer, t.producer),
             t.description = COALESCE($description, t.description),
             t.properties = COALESCE($properties, t.properties),
+            t.tenantId = $tenantId,
             t.updatedAt = datetime()
         """
         if return_tags:
             query += "\nRETURN t.tags as tags\n"
 
-        result = await arun_cypher(
+        result = await _run_with_tenant(
             session,
             query,
             id=id,
@@ -325,9 +345,10 @@ class Metadata:
         """
         query = """
         UNWIND $columns AS col
-        MERGE (c:Column:Knowledge {id: col.id})
+        MERGE (c:Column:Knowledge {id: col.id, tenantId: $tenantId})
         ON CREATE SET
             c.id = col.id,
+            c.tenantId = $tenantId,
             c.name = col.name,
             c.dataType = col.dataType,
             c.description = col.description,
@@ -339,10 +360,11 @@ class Metadata:
         ON MATCH SET
             c.dataType = COALESCE(col.dataType, c.dataType),
             c.description = COALESCE(col.description, c.description),
+            c.tenantId = $tenantId,
             c.updatedAt = datetime()
         RETURN c.id as id, c.tags as tags
         """
-        result = await arun_cypher(session, query, columns=list(columns))
+        result = await _run_with_tenant(session, query, columns=list(columns))
         records = [record async for record in result]
         return {r["id"]: r.get("tags") for r in records if r.get("id")}
 
@@ -363,9 +385,10 @@ class Metadata:
         写入观测到的单个 Column 节点（不写 Table->Column 关系）。
         """
         query = """
-        MERGE (c:Column:Knowledge {id: $columnId})
+        MERGE (c:Column:Knowledge {id: $columnId, tenantId: $tenantId})
         ON CREATE SET
             c.id = $columnId,
+            c.tenantId = $tenantId,
             c.name = $name,
             c.dataType = $dataType,
             c.description = $description,
@@ -377,9 +400,10 @@ class Metadata:
         ON MATCH SET
             c.dataType = COALESCE($dataType, c.dataType),
             c.description = COALESCE($description, c.description),
+            c.tenantId = $tenantId,
             c.updatedAt = datetime()
         """
-        await arun_cypher(
+        await _run_with_tenant(
             session,
             query,
             columnId=column_id,
@@ -408,9 +432,10 @@ class Metadata:
         写入 Column 定义快照（仅节点；ON MATCH 覆盖 nullable/autoIncrement/defaultValue，保持历史语义）。
         """
         query = """
-        MERGE (col:Column:Knowledge {id: $id})
+        MERGE (col:Column:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
             col.id = $id,
+            col.tenantId = $tenantId,
             col.name = $name,
             col.dataType = $dataType,
             col.description = $description,
@@ -425,9 +450,10 @@ class Metadata:
             col.nullable = $nullable,
             col.autoIncrement = $autoIncrement,
             col.defaultValue = $defaultValue,
+            col.tenantId = $tenantId,
             col.updatedAt = datetime()
         """
-        await arun_cypher(
+        await _run_with_tenant(
             session,
             query,
             id=id,
@@ -447,12 +473,12 @@ class Metadata:
         valid_column_ids: Sequence[str],
     ) -> int:
         query = """
-        MATCH (t:Table {id: $tableId})-[:HAS_COLUMN]->(c:Column)
+        MATCH (t:Table {id: $tableId, tenantId: $tenantId})-[:HAS_COLUMN]->(c:Column {tenantId: $tenantId})
         WHERE NOT c.id IN $validColumnIds
         DETACH DELETE c
         RETURN count(c) as deletedCount
         """
-        result = await arun_cypher(
+        result = await _run_with_tenant(
             session,
             query,
             tableId=table_id,
@@ -468,11 +494,11 @@ class Metadata:
         table_id: str,
     ) -> None:
         query = """
-        MATCH (t:Table {id: $tableId})
-        OPTIONAL MATCH (t)-[:HAS_COLUMN]->(c:Column)
+        MATCH (t:Table {id: $tableId, tenantId: $tenantId})
+        OPTIONAL MATCH (t)-[:HAS_COLUMN]->(c:Column {tenantId: $tenantId})
         DETACH DELETE t, c
         """
-        await arun_cypher(session, query, tableId=table_id)
+        await _run_with_tenant(session, query, tableId=table_id)
 
     @staticmethod
     async def delete_schema_cascade(
@@ -481,13 +507,13 @@ class Metadata:
         schema_id: str,
     ) -> None:
         query = """
-        MATCH (s:Schema {id: $schemaId})
-        OPTIONAL MATCH (s)-[:HAS_TABLE]->(t:Table)
-        OPTIONAL MATCH (t)-[:HAS_COLUMN]->(c:Column)
-        OPTIONAL MATCH (s)-[:HAS_METRIC]->(m)
+        MATCH (s:Schema {id: $schemaId, tenantId: $tenantId})
+        OPTIONAL MATCH (s)-[:HAS_TABLE]->(t:Table {tenantId: $tenantId})
+        OPTIONAL MATCH (t)-[:HAS_COLUMN]->(c:Column {tenantId: $tenantId})
+        OPTIONAL MATCH (s)-[:HAS_METRIC]->(m {tenantId: $tenantId})
         DETACH DELETE s, t, c, m
         """
-        await arun_cypher(session, query, schemaId=schema_id)
+        await _run_with_tenant(session, query, schemaId=schema_id)
 
     @staticmethod
     async def delete_catalog_cascade(
@@ -496,14 +522,14 @@ class Metadata:
         catalog_id: str,
     ) -> None:
         query = """
-        MATCH (cat:Catalog {id: $catalogId})
-        OPTIONAL MATCH (cat)-[:HAS_SCHEMA]->(s:Schema)
-        OPTIONAL MATCH (s)-[:HAS_TABLE]->(t:Table)
-        OPTIONAL MATCH (t)-[:HAS_COLUMN]->(c:Column)
-        OPTIONAL MATCH (s)-[:HAS_METRIC]->(m)
+        MATCH (cat:Catalog {id: $catalogId, tenantId: $tenantId})
+        OPTIONAL MATCH (cat)-[:HAS_SCHEMA]->(s:Schema {tenantId: $tenantId})
+        OPTIONAL MATCH (s)-[:HAS_TABLE]->(t:Table {tenantId: $tenantId})
+        OPTIONAL MATCH (t)-[:HAS_COLUMN]->(c:Column {tenantId: $tenantId})
+        OPTIONAL MATCH (s)-[:HAS_METRIC]->(m {tenantId: $tenantId})
         DETACH DELETE cat, s, t, c, m
         """
-        await arun_cypher(session, query, catalogId=catalog_id)
+        await _run_with_tenant(session, query, catalogId=catalog_id)
 
     @staticmethod
     async def delete_column(
@@ -512,10 +538,10 @@ class Metadata:
         column_id: str,
     ) -> None:
         query = """
-        MATCH (c:Column {id: $columnId})
+        MATCH (c:Column {id: $columnId, tenantId: $tenantId})
         DETACH DELETE c
         """
-        await arun_cypher(session, query, columnId=column_id)
+        await _run_with_tenant(session, query, columnId=column_id)
 
     @staticmethod
     async def rename_column(
@@ -530,15 +556,16 @@ class Metadata:
         列重命名（迁移属性，只写 Column 节点，不写 Table->Column 关系）。
         """
         query = """
-        MATCH (c:Column {id: $oldColumnId})
+        MATCH (c:Column {id: $oldColumnId, tenantId: $tenantId})
         WITH c, c.dataType as dataType, c.description as description,
              c.nullable as nullable, c.autoIncrement as autoIncrement,
              c.defaultValue as defaultValue
         DETACH DELETE c
         WITH dataType, description, nullable, autoIncrement, defaultValue
-        MERGE (nc:Column:Knowledge {id: $newColumnId})
+        MERGE (nc:Column:Knowledge {id: $newColumnId, tenantId: $tenantId})
         ON CREATE SET
             nc.id = $newColumnId,
+            nc.tenantId = $tenantId,
             nc.name = $newColumnName,
             nc.dataType = dataType,
             nc.description = description,
@@ -554,10 +581,11 @@ class Metadata:
             nc.nullable = COALESCE(nullable, nc.nullable),
             nc.autoIncrement = COALESCE(autoIncrement, nc.autoIncrement),
             nc.defaultValue = COALESCE(defaultValue, nc.defaultValue),
+            nc.tenantId = $tenantId,
             nc.updatedAt = datetime()
         RETURN description
         """
-        result = await arun_cypher(
+        result = await _run_with_tenant(
             session,
             query,
             oldColumnId=old_column_id,
@@ -576,11 +604,16 @@ class Metadata:
         description: str | None,
     ) -> str | None:
         query = """
-        MATCH (t:Table {id: $tableId})
+        MATCH (t:Table {id: $tableId, tenantId: $tenantId})
         SET t.description = $description, t.updatedAt = datetime()
         RETURN t.name AS name
         """
-        result = await arun_cypher(session, query, tableId=table_id, description=description)
+        result = await _run_with_tenant(
+            session,
+            query,
+            tableId=table_id,
+            description=description,
+        )
         record = await result.single()
         return record["name"] if record else None
 
@@ -592,10 +625,10 @@ class Metadata:
         properties: Any,
     ) -> None:
         query = """
-        MATCH (t:Table {id: $tableId})
+        MATCH (t:Table {id: $tableId, tenantId: $tenantId})
         SET t.properties = $properties, t.updatedAt = datetime()
         """
-        await arun_cypher(session, query, tableId=table_id, properties=properties)
+        await _run_with_tenant(session, query, tableId=table_id, properties=properties)
 
     @staticmethod
     async def update_column_property(
@@ -607,11 +640,11 @@ class Metadata:
     ) -> dict[str, Any] | None:
         Metadata._assert_column_property(property_name)
         query = f"""
-        MATCH (c:Column {{id: $columnId}})
+        MATCH (c:Column {{id: $columnId, tenantId: $tenantId}})
         SET c.{property_name} = $value, c.updatedAt = datetime()
         RETURN c.name AS name, c.description AS description
         """
-        result = await arun_cypher(session, query, columnId=column_id, value=value)
+        result = await _run_with_tenant(session, query, columnId=column_id, value=value)
         record = await result.single()
         return dict(record) if record else None
 
@@ -628,13 +661,13 @@ class Metadata:
     ) -> dict[str, Any] | None:
         Metadata._assert_node_label(node_label)
         query = f"""
-        MATCH (n:{node_label} {{id: $nodeId}})
+        MATCH (n:{node_label} {{id: $nodeId, tenantId: $tenantId}})
         SET n.tags = $tags, n.updatedAt = datetime()
         """
         if return_fields:
             query += "\nRETURN n.id as id, n.name as name, n.description as description\n"
 
-        result = await arun_cypher(session, query, nodeId=node_id, tags=list(tags))
+        result = await _run_with_tenant(session, query, nodeId=node_id, tags=list(tags))
         if not return_fields:
             return None
         record = await result.single()
@@ -658,9 +691,10 @@ class Metadata:
     ) -> None:
         Metadata._assert_node_label(label)
         query = f"""
-        MERGE (m:{label}:Knowledge {{id: $id}})
+        MERGE (m:{label}:Knowledge {{id: $id, tenantId: $tenantId}})
         ON CREATE SET
             m.id = $id,
+            m.tenantId = $tenantId,
             m.code = $code,
             m.name = $name,
             m.description = $description,
@@ -675,9 +709,10 @@ class Metadata:
             m.unit = COALESCE($unit, m.unit),
             m.aggregationLogic = COALESCE($aggregationLogic, m.aggregationLogic),
             m.calculationFormula = COALESCE($calculationFormula, m.calculationFormula),
+            m.tenantId = $tenantId,
             m.updatedAt = datetime()
         """
-        await arun_cypher(
+        await _run_with_tenant(
             session,
             query,
             id=id,
@@ -709,9 +744,10 @@ class Metadata:
         """
         Metadata._assert_node_label(label)
         query = f"""
-        MERGE (m:{label}:Knowledge {{id: $id}})
+        MERGE (m:{label}:Knowledge {{id: $id, tenantId: $tenantId}})
         ON CREATE SET
             m.id = $id,
+            m.tenantId = $tenantId,
             m.code = $code,
             m.name = $name,
             m.description = $description,
@@ -722,9 +758,10 @@ class Metadata:
             m.createdAt = datetime()
         ON MATCH SET
             m.description = COALESCE($description, m.description),
+            m.tenantId = $tenantId,
             m.updatedAt = datetime()
         """
-        await arun_cypher(
+        await _run_with_tenant(
             session,
             query,
             id=id,
@@ -747,15 +784,16 @@ class Metadata:
         if node_label:
             Metadata._assert_node_label(node_label)
             query = f"""
-            MATCH (n:{node_label} {{id: $id}})
+            MATCH (n:{node_label} {{id: $id, tenantId: $tenantId}})
             DETACH DELETE n
             """
         else:
             query = """
             MATCH (n {id: $id})
+            WHERE n.tenantId = $tenantId
             DETACH DELETE n
             """
-        await arun_cypher(session, query, id=node_id)
+        await _run_with_tenant(session, query, id=node_id)
 
     @staticmethod
     async def delete_metric(
@@ -765,18 +803,20 @@ class Metadata:
     ) -> None:
         query = """
         MATCH (m {id: $metricId})
-        WHERE m:AtomicMetric OR m:DerivedMetric OR m:CompositeMetric
+        WHERE (m:AtomicMetric OR m:DerivedMetric OR m:CompositeMetric)
+          AND m.tenantId = $tenantId
         DETACH DELETE m
         """
-        await arun_cypher(session, query, metricId=metric_id)
+        await _run_with_tenant(session, query, metricId=metric_id)
 
     @staticmethod
     async def upsert_wordroot(session: Any, dto: WordRootDTO) -> None:
         """写入 WordRoot 节点（必须先构建 DTO 验证）"""
         query = """
-        MERGE (w:WordRoot:Knowledge {id: $id})
+        MERGE (w:WordRoot:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
             w.id = $id,
+            w.tenantId = $tenantId,
             w.code = $code,
             w.name = $name,
             w.dataType = $dataType,
@@ -787,9 +827,10 @@ class Metadata:
             w.name = COALESCE($name, w.name),
             w.dataType = COALESCE($dataType, w.dataType),
             w.description = COALESCE($description, w.description),
+            w.tenantId = $tenantId,
             w.updatedAt = datetime()
         """
-        await arun_cypher(
+        await _run_with_tenant(
             session,
             query,
             id=dto.id,
@@ -804,9 +845,10 @@ class Metadata:
     async def upsert_modifier(session: Any, dto: ModifierDTO) -> None:
         """写入 Modifier 节点（必须先构建 DTO 验证）"""
         query = """
-        MERGE (m:Modifier:Knowledge {id: $id})
+        MERGE (m:Modifier:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
             m.id = $id,
+            m.tenantId = $tenantId,
             m.code = $code,
             m.name = $name,
             m.modifierType = $modifierType,
@@ -817,9 +859,10 @@ class Metadata:
             m.name = COALESCE($name, m.name),
             m.modifierType = COALESCE($modifierType, m.modifierType),
             m.description = COALESCE($description, m.description),
+            m.tenantId = $tenantId,
             m.updatedAt = datetime()
         """
-        await arun_cypher(
+        await _run_with_tenant(
             session,
             query,
             id=dto.id,
@@ -834,9 +877,10 @@ class Metadata:
     async def upsert_unit(session: Any, dto: UnitDTO) -> None:
         """写入 Unit 节点（必须先构建 DTO 验证）"""
         query = """
-        MERGE (u:Unit:Knowledge {id: $id})
+        MERGE (u:Unit:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
             u.id = $id,
+            u.tenantId = $tenantId,
             u.code = $code,
             u.name = $name,
             u.symbol = $symbol,
@@ -847,9 +891,10 @@ class Metadata:
             u.name = COALESCE($name, u.name),
             u.symbol = COALESCE($symbol, u.symbol),
             u.description = COALESCE($description, u.description),
+            u.tenantId = $tenantId,
             u.updatedAt = datetime()
         """
-        await arun_cypher(
+        await _run_with_tenant(
             session,
             query,
             id=dto.id,
@@ -864,9 +909,10 @@ class Metadata:
     async def upsert_valuedomain(session: Any, dto: ValueDomainDTO) -> None:
         """写入 ValueDomain 节点（必须先构建 DTO 验证）"""
         query = """
-        MERGE (v:ValueDomain:Knowledge {id: $id})
+        MERGE (v:ValueDomain:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
             v.id = $id,
+            v.tenantId = $tenantId,
             v.code = $code,
             v.name = $name,
             v.domainType = $domainType,
@@ -883,9 +929,10 @@ class Metadata:
             v.items = COALESCE($items, v.items),
             v.dataType = COALESCE($dataType, v.dataType),
             v.description = COALESCE($description, v.description),
+            v.tenantId = $tenantId,
             v.updatedAt = datetime()
         """
-        await arun_cypher(
+        await _run_with_tenant(
             session,
             query,
             id=dto.id,
@@ -913,9 +960,10 @@ class Metadata:
     ) -> None:
         """创建或更新 Tag 节点"""
         query = """
-        MERGE (t:Tag:Knowledge {id: $id})
+        MERGE (t:Tag:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
             t.id = $id,
+            t.tenantId = $tenantId,
             t.name = $name,
             t.description = $description,
             t.properties = $properties,
@@ -925,9 +973,10 @@ class Metadata:
             t.name = $name,
             t.description = COALESCE($description, t.description),
             t.properties = COALESCE($properties, t.properties),
+            t.tenantId = $tenantId,
             t.updatedAt = datetime()
         """
-        await arun_cypher(
+        await _run_with_tenant(
             session,
             query,
             id=id,
@@ -941,7 +990,7 @@ class Metadata:
     async def delete_tag(session: Any, *, tag_id: str) -> None:
         """删除 Tag 节点及其所有 HAS_TAG 关系"""
         query = """
-        MATCH (t:Tag {id: $tagId})
+        MATCH (t:Tag {id: $tagId, tenantId: $tenantId})
         DETACH DELETE t
         """
-        await arun_cypher(session, query, tagId=tag_id)
+        await _run_with_tenant(session, query, tagId=tag_id)

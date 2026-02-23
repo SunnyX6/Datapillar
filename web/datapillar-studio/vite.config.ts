@@ -7,6 +7,10 @@ import path from 'path'
 export default defineConfig(({ mode }) => {
   // 加载环境变量
   const env = loadEnv(mode, process.cwd(), '')
+  const gatewayUrl = env.VITE_GATEWAY_URL?.trim()
+  if (!gatewayUrl) {
+    throw new Error('缺少环境变量 VITE_GATEWAY_URL')
+  }
   return {
     plugins: [
       tailwindcss(),
@@ -26,7 +30,7 @@ export default defineConfig(({ mode }) => {
       // 统一代理到 Gateway，由 Gateway 负责路由
       proxy: {
         '/api': {
-          target: env.VITE_GATEWAY_URL ,
+          target: gatewayUrl,
           changeOrigin: true,
           secure: false
         }

@@ -31,10 +31,10 @@ function normalizeProvider(providerCode?: string | null): LlmProvider {
 
 function normalizeModelType(modelType?: string | null): ModelCategory {
   const normalized = modelType?.trim().toUpperCase()
-  if (!normalized) {
-    return 'chat'
+  if (!normalized || !MODEL_TYPE_MAPPING[normalized]) {
+    throw new Error(`Unsupported model type: ${modelType ?? ''}`)
   }
-  return MODEL_TYPE_MAPPING[normalized] ?? 'chat'
+  return MODEL_TYPE_MAPPING[normalized]
 }
 
 function formatContextGroup(contextTokens?: number | null): string {
@@ -86,6 +86,8 @@ export function mapAdminModelToRecord(model: StudioLlmModel): ModelRecord {
   const provider = normalizeProvider(model.providerCode)
   const type = normalizeModelType(model.modelType)
   const contextGroup = formatContextGroup(model.contextTokens)
+  const normalizedBaseUrl = model.baseUrl?.trim()
+  const normalizedMaskedApiKey = model.maskedApiKey?.trim()
 
   return {
     id: model.modelId,
@@ -103,6 +105,8 @@ export function mapAdminModelToRecord(model: StudioLlmModel): ModelRecord {
       outputPrice: formatPrice(model.outputPriceUsd),
       params: model.embeddingDimension ? `${model.embeddingDimension} dims` : undefined
     },
+    baseUrl: normalizedBaseUrl && normalizedBaseUrl.length > 0 ? normalizedBaseUrl : undefined,
+    maskedApiKey: normalizedMaskedApiKey && normalizedMaskedApiKey.length > 0 ? normalizedMaskedApiKey : undefined,
     hasApiKey: model.hasApiKey,
     status: model.status
   }

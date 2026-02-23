@@ -13,6 +13,4 @@ import java.util.List;
 public interface UserPermissionService {
 
     List<FeatureObjectDto.ObjectPermission> listPermissions(Long userId);
-
-    void updatePermissions(Long userId, List<FeatureObjectDto.Assignment> permissions);
 }

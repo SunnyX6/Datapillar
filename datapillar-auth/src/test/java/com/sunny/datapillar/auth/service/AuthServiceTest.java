@@ -12,8 +12,7 @@ import com.sunny.datapillar.auth.security.JwtToken;
 import com.sunny.datapillar.auth.security.SessionStateStore;
 import com.sunny.datapillar.auth.service.impl.AuthServiceImpl;
 import com.sunny.datapillar.auth.service.support.UserAccessReader;
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.common.exception.UnauthorizedException;
 import com.sunny.datapillar.common.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -106,11 +105,12 @@ class AuthServiceTest {
         AuthDto.TokenRequest request = new AuthDto.TokenRequest();
         request.setToken("token");
 
-        when(jwtUtil.parseToken("token")).thenThrow(new BusinessException(ErrorCode.TOKEN_EXPIRED));
+        when(jwtUtil.parseToken("token")).thenThrow(new UnauthorizedException("Token已过期"));
 
-        BusinessException exception = assertThrows(BusinessException.class, () -> authService.validateToken(request));
+        UnauthorizedException exception =
+                assertThrows(UnauthorizedException.class, () -> authService.validateToken(request));
 
-        assertEquals(ErrorCode.TOKEN_EXPIRED, exception.getErrorCode());
+        assertEquals("Token已过期", exception.getMessage());
     }
 
     private Claims buildClaims(String tokenType,

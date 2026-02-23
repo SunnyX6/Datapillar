@@ -9,6 +9,7 @@
 
 // Auth Store - 认证相关状态管理
 export { useAuthStore } from './authStore'
+export { useSetupStore, type SetupGuardStatus } from './setupStore'
 
 // Theme Store - 主题相关状态管理
 export {

@@ -9,9 +9,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -21,9 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
  * @author Sunny
  * @date 2026-01-01
  */
-@Tag(name = "租户功能授权审计", description = "租户功能授权审计接口")
+@Tag(name = "租户功能", description = "租户功能接口")
 @RestController
-@RequestMapping("/admin/tenants/{tenantId}/features/audits")
+@RequestMapping("/admin/tenant/current/features/audits")
 @RequiredArgsConstructor
 public class TenantFeatureAuditAdminController {
 
@@ -32,7 +30,7 @@ public class TenantFeatureAuditAdminController {
     @Operation(summary = "获取租户功能授权审计")
     @GetMapping
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<TenantFeatureAudit>> audit(@PathVariable Long tenantId) {
+    public ApiResponse<List<TenantFeatureAudit>> audit() {
         return ApiResponse.ok(tenantFeatureAuditAdminService.listAudits());
     }
 }

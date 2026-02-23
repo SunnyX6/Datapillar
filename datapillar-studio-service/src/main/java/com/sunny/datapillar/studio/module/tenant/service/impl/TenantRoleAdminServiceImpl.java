@@ -50,4 +50,9 @@ public class TenantRoleAdminServiceImpl implements TenantRoleAdminService {
     public void updateRolePermissions(Long roleId, List<FeatureObjectDto.Assignment> permissions) {
         roleService.updateRolePermissions(roleId, permissions);
     }
+
+    @Override
+    public RoleDto.MembersResponse getRoleMembers(Long roleId, Integer status) {
+        return roleService.getRoleMembers(roleId, status);
+    }
 }

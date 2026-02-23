@@ -15,8 +15,9 @@ import random
 from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import TYPE_CHECKING, ParamSpec, TypeVar
+
 from datapillar_oneagentic.exception.base import RecoveryAction
-from datapillar_oneagentic.exception.llm.classifier import LLMErrorClassifier
+from datapillar_oneagentic.exception.policy import action_for
 
 if TYPE_CHECKING:
     from datapillar_oneagentic.providers.llm.config import RetryConfig
@@ -76,25 +77,33 @@ def with_retry(
                     return await func(*args, **kwargs)
                 except Exception as e:
                     last_error = e
-                    _, action = LLMErrorClassifier.classify(e)
+                    action = action_for(e)
 
                     if action != RecoveryAction.RETRY:
                         logger.warning(
-                            f"[Retry] Non-retryable error; failing fast | func={func.__name__} | error={e}"
+                            "[Retry] Non-retryable error; failing fast | func=%s | error=%s",
+                            func.__name__,
+                            e,
                         )
                         raise
 
                     if attempt >= retries:
                         logger.error(
-                            f"[Retry] Retries exhausted | func={func.__name__} | "
-                            f"attempts={attempt + 1} | error={e}"
+                            "[Retry] Retries exhausted | func=%s | attempts=%s | error=%s",
+                            func.__name__,
+                            attempt + 1,
+                            e,
                         )
                         raise
 
                     delay = calculate_retry_delay(config, attempt)
                     logger.warning(
-                        f"[Retry] Retry {attempt + 1}/{retries} failed; "
-                        f"retrying in {delay:.2f}s | func={func.__name__} | error={e}"
+                        "[Retry] Retry %s/%s failed; retrying in %.2fs | func=%s | error=%s",
+                        attempt + 1,
+                        retries,
+                        delay,
+                        func.__name__,
+                        e,
                     )
 
                     if on_retry:
@@ -133,7 +142,7 @@ def with_retry_sync(
                     return func(*args, **kwargs)
                 except Exception as e:
                     last_error = e
-                    _, action = LLMErrorClassifier.classify(e)
+                    action = action_for(e)
 
                     if action != RecoveryAction.RETRY:
                         raise
@@ -143,8 +152,12 @@ def with_retry_sync(
 
                     delay = calculate_retry_delay(config, attempt)
                     logger.warning(
-                        f"[Retry] Retry {attempt + 1}/{retries} failed; "
-                        f"retrying in {delay:.2f}s | func={func.__name__} | error={e}"
+                        "[Retry] Retry %s/%s failed; retrying in %.2fs | func=%s | error=%s",
+                        attempt + 1,
+                        retries,
+                        delay,
+                        func.__name__,
+                        e,
                     )
 
                     if on_retry:

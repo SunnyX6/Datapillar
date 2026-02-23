@@ -4,16 +4,16 @@ import pytest
 from pydantic import BaseModel
 
 import datapillar_oneagentic.runtime.executor as executor_module
+from datapillar_oneagentic.context.compaction.compact_policy import CompactResult
 from datapillar_oneagentic.core.agent import AgentSpec
 from datapillar_oneagentic.core.config import AgentConfig
 from datapillar_oneagentic.core.status import ExecutionStatus
 from datapillar_oneagentic.events import EventBus
+from datapillar_oneagentic.messages import Message, Messages
+from datapillar_oneagentic.messages.adapters.langchain import to_langchain
 from datapillar_oneagentic.runtime.executor import AgentExecutor
 from datapillar_oneagentic.todo.session_todo import SessionTodoList, TodoUpdate
 from datapillar_oneagentic.todo.tool import extract_todo_updates
-from datapillar_oneagentic.context.compaction.compact_policy import CompactResult
-from datapillar_oneagentic.messages import Message, Messages
-from datapillar_oneagentic.messages.adapters.langchain import to_langchain
 
 
 class _OutputSchema(BaseModel):
@@ -108,7 +108,6 @@ async def test_audit_updates(monkeypatch) -> None:
     await executor._append_todo_audit(
         state=state,
         result_status=ExecutionStatus.COMPLETED,
-        failure_kind=None,
         deliverable={"ok": True},
         error=None,
         messages=messages,

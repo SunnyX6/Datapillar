@@ -45,11 +45,6 @@
             WHERE ur.tenant_id = #{tenantId}
               AND rp.tenant_id = #{tenantId}
               AND ur.user_id = #{userId}
-            UNION
-            SELECT up.permission_id
-            FROM user_permission_overrides up
-            WHERE up.tenant_id = #{tenantId}
-              AND up.user_id = #{userId}
         )
     </select>
 
@@ -61,16 +56,6 @@
         INSERT INTO user_roles (tenant_id, user_id, role_id) VALUES (#{tenantId}, #{userId}, #{roleId})
     </insert>
 
-    <delete id="deleteUserPermissions">
-        DELETE FROM user_permission_overrides WHERE tenant_id = #{tenantId} AND user_id = #{userId}
-    </delete>
-
-    <insert id="insertUserPermission">
-        INSERT INTO user_permission_overrides (tenant_id, user_id, object_id, permission_id)
-        VALUES (#{tenantId}, #{userId}, #{objectId}, #{permissionId})
-    </insert>
-
-
     <select id="selectUsersByTenantId" resultType="com.sunny.datapillar.studio.module.user.entity.User">
         SELECT u.*
         FROM users u
@@ -81,13 +66,22 @@
     </select>
 
     <select id="selectUsersByTenantIdAndStatus" resultType="com.sunny.datapillar.studio.module.user.entity.User">
-        SELECT u.*
+        SELECT u.id,
+               u.tenant_id,
+               u.username,
+               u.password,
+               u.nickname,
+               u.email,
+               u.phone,
+               tu.status AS status,
+               u.deleted,
+               u.created_at,
+               u.updated_at
         FROM users u
         INNER JOIN tenant_users tu ON tu.user_id = u.id
         WHERE tu.tenant_id = #{tenantId}
-          AND tu.status = 1
           <if test="status != null">
-            AND u.status = #{status}
+            AND tu.status = #{status}
           </if>
           AND u.deleted = 0
         ORDER BY u.id DESC

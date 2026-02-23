@@ -39,8 +39,8 @@ i18n
   .use(initReactI18next) // 绑定 react-i18next
   .init({
     resources,
-    lng: 'en-US', // 默认语言：英文
-    fallbackLng: 'en-US', // 回退语言
+    lng: 'zh-CN', // 默认语言：中文
+    fallbackLng: 'zh-CN', // 回退语言
     defaultNS: 'common', // 默认命名空间
     ns: ['common', 'login', 'navigation'], // 支持的命名空间
 

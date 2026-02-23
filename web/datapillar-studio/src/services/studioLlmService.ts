@@ -1,99 +1,118 @@
-import { createApiClient } from '@/lib/api/client'
-import type { ApiResponse } from '@/types/api'
-import { pickDefinedParams, requireApiData } from './studioCommon'
+import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/lib/api'
+import { pickDefinedParams } from './studioCommon'
+import type {
+  ConnectAdminLlmModelRequest,
+  ConnectAdminLlmModelResponse,
+  CreateAdminLlmModelRequest,
+  CreateAdminLlmProviderRequest,
+  ListAdminModelsParams,
+  ListAdminUserModelsParams,
+  StudioLlmModel,
+  StudioLlmModelUsage,
+  StudioLlmProvider,
+  UpdateAdminLlmProviderRequest
+} from '@/types/studio/llm'
 
-const studioAdminClient = createApiClient({
-  baseURL: '/api/studio/admin',
-  timeout: 30000
-})
-
-const studioBizClient = createApiClient({
-  baseURL: '/api/studio/biz',
-  timeout: 30000
-})
-
-export interface StudioLlmModel {
-  id: number
-  modelId: string
-  name: string
-  providerId: number
-  providerCode: string
-  providerName: string
-  modelType: string
-  description?: string | null
-  tags?: string[] | null
-  contextTokens?: number | null
-  inputPriceUsd?: string | null
-  outputPriceUsd?: string | null
-  embeddingDimension?: number | null
-  baseUrl?: string | null
-  status: string
-  hasApiKey: boolean
-  createdBy: number
-  updatedBy: number
-  createdAt: string
-  updatedAt: string
-}
-
-export interface StudioLlmModelUsage {
-  id: number
-  userId: number
-  aiModelId: number
-  modelId: string
-  modelName: string
-  modelType: string
-  modelStatus: string
-  providerId: number
-  providerCode: string
-  providerName: string
-  status: number
-  isDefault: boolean
-  totalCostUsd?: string | null
-  grantedBy?: number | null
-  grantedAt?: string | null
-  lastUsedAt?: string | null
-  updatedAt?: string | null
-}
-
-export interface ListAdminModelsParams {
-  keyword?: string
-  provider?: string
-  modelType?: string
-}
+export type {
+  ConnectAdminLlmModelRequest,
+  ConnectAdminLlmModelResponse,
+  CreateAdminLlmModelRequest,
+  CreateAdminLlmProviderRequest,
+  ListAdminModelsParams,
+  ListAdminUserModelsParams,
+  StudioLlmModel,
+  StudioLlmModelUsage,
+  StudioLlmProvider,
+  UpdateAdminLlmProviderRequest
+} from '@/types/studio/llm'
 
 export async function listAdminModels(
   params: ListAdminModelsParams = {}
 ): Promise<StudioLlmModel[]> {
-  const response = await studioAdminClient.get<ApiResponse<StudioLlmModel[]>>('/llms/models', {
+  return requestData<StudioLlmModel[]>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.llm.models,
     params: pickDefinedParams({
       keyword: params.keyword,
       provider: params.provider,
       model_type: params.modelType
     })
   })
-  return requireApiData(response.data)
 }
 
-export interface ListAdminUserModelsParams {
-  onlyEnabled?: boolean
+export async function createAdminModel(request: CreateAdminLlmModelRequest): Promise<StudioLlmModel> {
+  return requestData<StudioLlmModel, CreateAdminLlmModelRequest>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.llm.model,
+    method: 'POST',
+    data: request
+  })
+}
+
+export async function connectAdminModel(
+  modelPk: number,
+  request: ConnectAdminLlmModelRequest
+): Promise<ConnectAdminLlmModelResponse> {
+  return requestData<ConnectAdminLlmModelResponse, ConnectAdminLlmModelRequest>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.llm.modelConnect(modelPk),
+    method: 'POST',
+    data: request
+  })
+}
+
+export async function listAdminProviders(): Promise<StudioLlmProvider[]> {
+  return requestData<StudioLlmProvider[]>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.llm.providers
+  })
+}
+
+export async function createAdminProvider(request: CreateAdminLlmProviderRequest): Promise<void> {
+  await requestEnvelope<void, CreateAdminLlmProviderRequest>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.llm.provider,
+    method: 'POST',
+    data: request
+  })
+}
+
+export async function updateAdminProvider(
+  providerCode: string,
+  request: UpdateAdminLlmProviderRequest
+): Promise<void> {
+  await requestEnvelope<void, UpdateAdminLlmProviderRequest>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.llm.providerDetail(encodeURIComponent(providerCode)),
+    method: 'PATCH',
+    data: request
+  })
+}
+
+export async function deleteAdminProvider(providerCode: string): Promise<void> {
+  await requestEnvelope<void>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.llm.providerDetail(encodeURIComponent(providerCode)),
+    method: 'DELETE'
+  })
 }
 
 export async function listAdminUserModels(
   userId: number,
   params: ListAdminUserModelsParams = {}
 ): Promise<StudioLlmModelUsage[]> {
-  const response = await studioAdminClient.get<ApiResponse<StudioLlmModelUsage[]>>(
-    `/llms/users/${userId}/models`,
-    {
-      params: pickDefinedParams({
-        onlyEnabled: params.onlyEnabled
-      })
-    }
-  )
-  return requireApiData(response.data)
+  return requestData<StudioLlmModelUsage[]>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.llm.userModels(userId),
+    params: pickDefinedParams({
+      onlyEnabled: params.onlyEnabled
+    })
+  })
 }
 
 export async function listCurrentUserModels(): Promise<StudioLlmModelUsage[]> {
-  const response = await studioBizClient.get<ApiResponse<StudioLlmModelUsage[]>>('/llms/models')
-  return requireApiData(response.data)
+  return requestData<StudioLlmModelUsage[]>({
+    baseURL: API_BASE.studioBiz,
+    url: API_PATH.llm.models
+  })
 }

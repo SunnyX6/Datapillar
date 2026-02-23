@@ -1,7 +1,8 @@
 package com.sunny.datapillar.studio.filter;
 
+import com.sunny.datapillar.common.constant.ErrorType;
 import com.sunny.datapillar.common.exception.ServiceUnavailableException;
-import com.sunny.datapillar.common.exception.UnauthorizedException;
+import com.sunny.datapillar.common.exception.RequiredException;
 import com.sunny.datapillar.studio.handler.SecurityExceptionHandler;
 import com.sunny.datapillar.studio.module.setup.entity.SystemBootstrap;
 import com.sunny.datapillar.studio.module.setup.mapper.SystemBootstrapMapper;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -77,12 +79,20 @@ public class SetupStateFilter extends OncePerRequestFilter {
             CachedState state = currentState();
             if (!state.schemaReady()) {
                 securityExceptionHandler.writeError(
-                        response, new ServiceUnavailableException("系统初始化数据未就绪"));
+                        response,
+                        new RequiredException(
+                                ErrorType.REQUIRED,
+                                Map.of("reason", "SETUP_SCHEMA_NOT_READY"),
+                                "系统初始化数据未就绪"));
                 return;
             }
             if (!state.setupCompleted()) {
                 securityExceptionHandler.writeError(
-                        response, new UnauthorizedException("系统尚未完成初始化"));
+                        response,
+                        new RequiredException(
+                                ErrorType.REQUIRED,
+                                Map.of("reason", "SETUP_REQUIRED"),
+                                "系统尚未完成初始化"));
                 return;
             }
             chain.doFilter(request, response);

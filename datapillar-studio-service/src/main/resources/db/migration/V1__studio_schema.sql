@@ -5,8 +5,8 @@ CREATE TABLE tenants (
   code VARCHAR(64) NOT NULL COMMENT '租户编码',
   name VARCHAR(128) NOT NULL COMMENT '租户名称',
   type VARCHAR(32) NOT NULL COMMENT '租户类型',
-  encrypt_public_key TEXT NOT NULL COMMENT '租户公钥（API Key 加密）',
-  status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1启用，0禁用',
+  encrypt_public_key TEXT NOT NULL COMMENT '租户公钥（由auth生成）',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1激活，0禁用',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   UNIQUE KEY uq_tenant_code (code)
@@ -150,10 +150,12 @@ CREATE TABLE roles (
   description VARCHAR(255) NULL COMMENT '角色说明',
   status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1启用，0禁用',
   sort INT NOT NULL DEFAULT 0 COMMENT '排序值',
+  is_builtin TINYINT NOT NULL DEFAULT 0 COMMENT '是否内置角色：1是，0否',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   UNIQUE KEY uq_role_name (tenant_id, name),
   KEY idx_role_tenant (tenant_id),
+  KEY idx_role_builtin (tenant_id, is_builtin, sort, id),
   CONSTRAINT fk_role_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色';
 
@@ -184,21 +186,6 @@ CREATE TABLE role_permissions (
   CONSTRAINT fk_role_permission_object FOREIGN KEY (object_id) REFERENCES feature_objects(id),
   CONSTRAINT fk_role_permission_permission FOREIGN KEY (permission_id) REFERENCES permissions(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色权限关系';
-
-CREATE TABLE user_permission_overrides (
-  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
-  tenant_id BIGINT NOT NULL COMMENT '租户ID',
-  user_id BIGINT NOT NULL COMMENT '用户ID',
-  object_id BIGINT NOT NULL COMMENT '功能对象ID',
-  permission_id BIGINT NOT NULL COMMENT '权限ID',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  UNIQUE KEY uq_user_permission (tenant_id, user_id, object_id, permission_id),
-  KEY idx_user_permission_user (tenant_id, user_id),
-  KEY idx_user_permission_object (tenant_id, object_id),
-  CONSTRAINT fk_user_permission_user FOREIGN KEY (user_id) REFERENCES users(id),
-  CONSTRAINT fk_user_permission_object FOREIGN KEY (object_id) REFERENCES feature_objects(id),
-  CONSTRAINT fk_user_permission_permission FOREIGN KEY (permission_id) REFERENCES permissions(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户权限覆盖';
 
 CREATE TABLE tenant_feature_permissions (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '授权ID',
@@ -324,31 +311,54 @@ CREATE TABLE ai_model (
   CONSTRAINT fk_ai_model_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 模型（租户模型池）';
 
+CREATE TABLE ai_model_grant (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '授权ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  user_id BIGINT NOT NULL COMMENT '用户ID',
+  model_id BIGINT NOT NULL COMMENT '模型ID（关联 ai_model.id）',
+  permission_id BIGINT NOT NULL COMMENT '权限ID（关联 permissions.id）',
+  is_default TINYINT NOT NULL DEFAULT 0 COMMENT '是否默认模型：1是，0否',
+  granted_by BIGINT NULL COMMENT '授权人用户ID',
+  granted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '授权时间',
+  updated_by BIGINT NULL COMMENT '更新人用户ID',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  expires_at DATETIME NULL DEFAULT NULL COMMENT '过期时间，NULL表示不过期',
+  default_slot TINYINT GENERATED ALWAYS AS (
+    CASE WHEN is_default = 1 THEN 1 ELSE NULL END
+  ) STORED COMMENT '默认约束辅助列',
+  UNIQUE KEY uq_ai_model_grant_tenant_user_model (tenant_id, user_id, model_id),
+  UNIQUE KEY uq_ai_model_grant_tenant_user_default (tenant_id, user_id, default_slot),
+  KEY idx_ai_model_grant_tenant_user_permission (tenant_id, user_id, permission_id),
+  KEY idx_ai_model_grant_tenant_model_permission (tenant_id, model_id, permission_id),
+  KEY idx_ai_model_grant_tenant_expires (tenant_id, expires_at),
+  CONSTRAINT fk_ai_model_grant_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+  CONSTRAINT fk_ai_model_grant_tenant_user FOREIGN KEY (tenant_id, user_id) REFERENCES tenant_users(tenant_id, user_id),
+  CONSTRAINT fk_ai_model_grant_tenant_model FOREIGN KEY (tenant_id, model_id) REFERENCES ai_model(tenant_id, id),
+  CONSTRAINT fk_ai_model_grant_permission FOREIGN KEY (permission_id) REFERENCES permissions(id),
+  CONSTRAINT fk_ai_model_grant_granted_by FOREIGN KEY (tenant_id, granted_by) REFERENCES tenant_users(tenant_id, user_id),
+  CONSTRAINT fk_ai_model_grant_updated_by FOREIGN KEY (tenant_id, updated_by) REFERENCES tenant_users(tenant_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 模型授权关系';
+
 CREATE TABLE ai_usage (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   user_id BIGINT NOT NULL COMMENT '用户ID',
   model_id BIGINT NOT NULL COMMENT '模型ID（关联 ai_model.id）',
-  status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1启用，0禁用',
-  is_default TINYINT NOT NULL DEFAULT 0 COMMENT '是否默认模型：1是，0否',
+  call_count BIGINT NOT NULL DEFAULT 0 COMMENT '调用次数',
+  prompt_tokens BIGINT NOT NULL DEFAULT 0 COMMENT '输入Token累计',
+  completion_tokens BIGINT NOT NULL DEFAULT 0 COMMENT '输出Token累计',
+  total_tokens BIGINT NOT NULL DEFAULT 0 COMMENT '总Token累计',
   total_cost_usd DECIMAL(18,8) NOT NULL DEFAULT 0 COMMENT '累计费用（USD）',
-  granted_by BIGINT NULL COMMENT '下发人用户ID（租户管理员）',
-  granted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '下发时间',
   last_used_at DATETIME NULL COMMENT '最近使用时间',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  default_slot TINYINT GENERATED ALWAYS AS (
-    CASE WHEN is_default = 1 THEN 1 ELSE NULL END
-  ) STORED COMMENT '默认约束辅助列',
   UNIQUE KEY uq_ai_usage_tenant_user_model (tenant_id, user_id, model_id),
-  UNIQUE KEY uq_ai_usage_tenant_user_default (tenant_id, user_id, default_slot),
-  KEY idx_ai_usage_tenant_user (tenant_id, user_id),
-  KEY idx_ai_usage_tenant_model (tenant_id, model_id),
-  KEY idx_ai_usage_tenant_status (tenant_id, status),
+  KEY idx_ai_usage_tenant_user_last_used (tenant_id, user_id, last_used_at),
+  KEY idx_ai_usage_tenant_model_last_used (tenant_id, model_id, last_used_at),
   CONSTRAINT fk_ai_usage_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id),
   CONSTRAINT fk_ai_usage_tenant_user FOREIGN KEY (tenant_id, user_id) REFERENCES tenant_users(tenant_id, user_id),
-  CONSTRAINT fk_ai_usage_tenant_model FOREIGN KEY (tenant_id, model_id) REFERENCES ai_model(tenant_id, id),
-  CONSTRAINT fk_ai_usage_granted_by FOREIGN KEY (tenant_id, granted_by) REFERENCES tenant_users(tenant_id, user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 模型下发与用户费用汇总';
+  CONSTRAINT fk_ai_usage_tenant_model FOREIGN KEY (tenant_id, model_id) REFERENCES ai_model(tenant_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 模型使用统计';
 
 -- =========================
 -- Studio 业务数据

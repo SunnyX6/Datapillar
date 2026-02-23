@@ -31,8 +31,7 @@ public interface InvitationService {
     /**
      * 邀请接受（被邀请用户操作）。
      *
-     * @param tenantId 目标租户
      * @param inviteCode 邀请码
      */
-    void acceptInvitation(Long tenantId, String inviteCode);
+    void acceptInvitation(String inviteCode);
 }

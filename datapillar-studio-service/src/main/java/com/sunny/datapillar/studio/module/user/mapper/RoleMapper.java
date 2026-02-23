@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.sunny.datapillar.studio.module.user.dto.RoleDto;
 import com.sunny.datapillar.studio.module.user.entity.Role;
 import com.sunny.datapillar.studio.module.user.entity.RolePermission;
 
@@ -45,4 +46,26 @@ public interface RoleMapper extends BaseMapper<Role> {
      * 插入角色权限关联
      */
     void insertRolePermission(RolePermission rolePermission);
+
+    /**
+     * 查询租户角色列表（含成员数量）
+     */
+    List<RoleDto.Response> selectRoleListWithMemberCount(@Param("tenantId") Long tenantId);
+
+    /**
+     * 统计角色下成员数量
+     */
+    long countUsersByRoleId(@Param("tenantId") Long tenantId, @Param("roleId") Long roleId);
+
+    /**
+     * 查询租户最大排序值
+     */
+    Integer selectMaxSortByTenant(@Param("tenantId") Long tenantId);
+
+    /**
+     * 查询角色成员明细
+     */
+    List<RoleDto.MemberItem> selectRoleMembers(@Param("tenantId") Long tenantId,
+                                               @Param("roleId") Long roleId,
+                                               @Param("status") Integer status);
 }

@@ -1,29 +1,36 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-02-06
 
-"""
-OpenLineage Sink 服务
+"""OpenLineage Sink 服务。"""
 
-负责接收 OpenLineage 事件并入队处理。
-"""
+from __future__ import annotations
 
 import logging
 from typing import Any
 
-from src.modules.openlineage.core.event_processor import get_event_processor
+from src.modules.openlineage.core.event_processor import (
+    QueuedOpenLineageEvent,
+    get_event_processor,
+)
 from src.modules.openlineage.schemas.events import RunEvent
+from src.shared.exception import InternalException, ServiceUnavailableException
 
 logger = logging.getLogger(__name__)
 
 
 class OpenLineageSinkService:
-    """OpenLineage Sink 服务（接收事件并入队）"""
+    """OpenLineage Sink 服务（接收事件并入队）。"""
 
     def __init__(self) -> None:
         self._processor = get_event_processor()
 
-    async def handle_event(self, event: RunEvent) -> dict[str, Any]:
+    async def handle_event(
+        self,
+        event: RunEvent,
+        *,
+        tenant_id: int,
+        operator_user_id: int,
+    ) -> dict[str, Any]:
         input_details = []
         for item in event.inputs:
             detail = {"namespace": item.namespace, "name": item.name}
@@ -50,6 +57,8 @@ class OpenLineageSinkService:
             "openlineage_event_received",
             extra={
                 "data": {
+                    "tenant_id": tenant_id,
+                    "operator_user_id": operator_user_id,
                     "event_type": str(event.eventType) if event.eventType else None,
                     "job_namespace": event.job.namespace,
                     "inputs": input_details,
@@ -58,7 +67,22 @@ class OpenLineageSinkService:
             },
         )
 
-        return await self._processor.put(event)
+        queued_event = QueuedOpenLineageEvent(
+            tenant_id=tenant_id,
+            operator_user_id=operator_user_id,
+            event=event,
+        )
+        try:
+            result = await self._processor.put(queued_event)
+        except Exception as exc:
+            raise InternalException("OpenLineage 事件入队失败", cause=exc) from exc
 
-    def get_stats(self) -> dict[str, Any]:
-        return self._processor.stats
+        if not result.get("success"):
+            raise ServiceUnavailableException("事件队列已满")
+
+        return result
+
+    def get_stats(self, *, tenant_id: int | None = None) -> dict[str, Any]:
+        if tenant_id is None:
+            return self._processor.stats
+        return self._processor.get_tenant_stats(tenant_id)

@@ -22,11 +22,11 @@ from langgraph.errors import GraphInterrupt
 from langgraph.types import Command
 
 from datapillar_oneagentic.a2a.tool import create_a2a_tools
+from datapillar_oneagentic.context.compaction import Compactor
 from datapillar_oneagentic.core.agent import AgentSpec
 from datapillar_oneagentic.core.config import AgentConfig
-from datapillar_oneagentic.core.context import AgentContext, AbortInterrupt, DelegationSignal
-from datapillar_oneagentic.exception import AgentError, AgentErrorCategory, AgentErrorClassifier
-from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
+from datapillar_oneagentic.core.context import AbortInterrupt, AgentContext, DelegationSignal
+from datapillar_oneagentic.core.status import ExecutionStatus
 from datapillar_oneagentic.core.types import AgentResult, SessionKey
 from datapillar_oneagentic.events import (
     AgentCompletedEvent,
@@ -34,16 +34,20 @@ from datapillar_oneagentic.events import (
     AgentStartedEvent,
     EventBus,
 )
-from datapillar_oneagentic.mcp.tool import MCPToolkit
-from datapillar_oneagentic.context.compaction import Compactor
-from datapillar_oneagentic.providers.llm.llm import ResilientChatModel
 from datapillar_oneagentic.exception import (
-    LLMError,
-    LLMErrorCategory,
+    AgentExecutionFailedException,
+    AgentResultInvalidException,
+    ContextLengthExceededException,
+    DatapillarException,
+    ExceptionMapper,
     RecoveryAction,
+    action_for,
     calculate_retry_delay,
 )
-from datapillar_oneagentic.tools.delegation import create_delegation_tools
+from datapillar_oneagentic.mcp.tool import MCPToolkit
+from datapillar_oneagentic.messages import Messages
+from datapillar_oneagentic.providers.llm.llm import ResilientChatModel
+from datapillar_oneagentic.state import StateBuilder
 from datapillar_oneagentic.todo.audit import audit_todo_updates
 from datapillar_oneagentic.todo.session_todo import SessionTodoList
 from datapillar_oneagentic.todo.tool import (
@@ -51,8 +55,7 @@ from datapillar_oneagentic.todo.tool import (
     create_todo_tools,
     extract_todo_updates,
 )
-from datapillar_oneagentic.state import StateBuilder
-from datapillar_oneagentic.messages import Messages
+from datapillar_oneagentic.tools.delegation import create_delegation_tools
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +153,6 @@ class AgentExecutor:
         *,
         state: dict,
         result_status: ExecutionStatus,
-        failure_kind: FailureKind | None,
         deliverable: Any,
         error: str | None,
         messages: Messages,
@@ -165,7 +167,7 @@ class AgentExecutor:
         if extract_todo_updates(messages):
             return
 
-        if result_status == ExecutionStatus.FAILED and failure_kind == FailureKind.SYSTEM:
+        if result_status == ExecutionStatus.FAILED:
             return
 
         try:
@@ -208,7 +210,7 @@ class AgentExecutor:
             AgentResult or Command (delegation).
 
         Raises:
-            LLMError / AgentError: raised on failure for upstream handling.
+            DatapillarException: raised on failure for upstream handling.
 
         Notes:
             - MCP tools use short-lived connections (connect per run, close after).
@@ -223,12 +225,9 @@ class AgentExecutor:
         ctx: AgentContext | None = None
 
         if not query:
-            raise AgentError(
+            raise AgentResultInvalidException(
                 "query must not be empty",
                 agent_id=spec.id,
-                category=AgentErrorCategory.BUSINESS,
-                action=RecoveryAction.FAIL_FAST,
-                failure_kind=FailureKind.BUSINESS,
             )
 
         # Load MCP and A2A tools (short-lived connections).
@@ -250,13 +249,10 @@ class AgentExecutor:
             )
 
             if spec.agent_class is None:
-                raise AgentError(
+                raise AgentExecutionFailedException(
                     f"Agent {spec.id} has agent_class=None. "
                     "Register the agent with @agent or set AgentSpec.agent_class explicitly.",
                     agent_id=spec.id,
-                    category=AgentErrorCategory.PROTOCOL,
-                    action=RecoveryAction.FAIL_FAST,
-                    failure_kind=FailureKind.SYSTEM,
                 )
 
             agent_timeout = spec.get_timeout_seconds(self._agent_config)
@@ -297,11 +293,14 @@ class AgentExecutor:
                         messages=ctx._messages if ctx is not None else Messages(),
                     )
 
-                except LLMError as error:
+                except GraphInterrupt:
+                    raise
+
+                except DatapillarException as error:
                     if error.agent_id is None:
                         error.attach_agent_id(spec.id)
 
-                    if error.category == LLMErrorCategory.CONTEXT and not context_retry_used:
+                    if isinstance(error, ContextLengthExceededException) and not context_retry_used:
                         logger.warning(
                             f"[{spec.name}] Context limit exceeded; compressing messages and retrying"
                         )
@@ -309,27 +308,7 @@ class AgentExecutor:
                         context_retry_used = True
                         continue
 
-                    if error.action == RecoveryAction.RETRY and retry_count < max_retries:
-                        delay = calculate_retry_delay(retry_config, retry_count)
-                        retry_count += 1
-                        logger.warning(
-                            f"[{spec.name}] LLM retry {retry_count}/{max_retries} "
-                            f"after {delay:.2f}s: {error}"
-                        )
-                        await asyncio.sleep(delay)
-                        continue
-
-                    await self._emit_failed_event(
-                        spec,
-                        key,
-                        start_time,
-                        str(error),
-                        f"LLMError:{error.category.value}",
-                    )
-                    raise
-
-                except AgentError as error:
-                    if error.action == RecoveryAction.RETRY and retry_count < max_retries:
+                    if action_for(error) == RecoveryAction.RETRY and retry_count < max_retries:
                         delay = calculate_retry_delay(retry_config, retry_count)
                         retry_count += 1
                         logger.warning(
@@ -344,20 +323,21 @@ class AgentExecutor:
                         key,
                         start_time,
                         str(error),
-                        f"AgentError:{error.category.value}",
+                        type(error).__name__,
                     )
                     raise
 
-                except GraphInterrupt:
-                    raise
                 except Exception as exc:
-                    agent_error = AgentErrorClassifier.from_exception(agent_id=spec.id, error=exc)
-                    if agent_error.action == RecoveryAction.RETRY and retry_count < max_retries:
+                    mapped_error = ExceptionMapper.map_agent_error(
+                        exc,
+                        agent_id=spec.id,
+                    )
+                    if action_for(mapped_error) == RecoveryAction.RETRY and retry_count < max_retries:
                         delay = calculate_retry_delay(retry_config, retry_count)
                         retry_count += 1
                         logger.warning(
                             f"[{spec.name}] System retry {retry_count}/{max_retries} "
-                            f"after {delay:.2f}s: {agent_error}"
+                            f"after {delay:.2f}s: {mapped_error}"
                         )
                         await asyncio.sleep(delay)
                         continue
@@ -366,42 +346,37 @@ class AgentExecutor:
                         spec,
                         key,
                         start_time,
-                        str(agent_error),
-                        f"AgentError:{agent_error.category.value}",
+                        str(mapped_error),
+                        type(mapped_error).__name__,
                     )
-                    raise agent_error
+                    raise mapped_error from None
 
                 if result is None:
-                    agent_error = AgentError(
+                    agent_error = AgentResultInvalidException(
                         "run() returned None",
                         agent_id=spec.id,
-                        category=AgentErrorCategory.PROTOCOL,
-                        action=RecoveryAction.FAIL_FAST,
-                        failure_kind=FailureKind.SYSTEM,
                     )
                     await self._emit_failed_event(
                         spec,
                         key,
                         start_time,
                         str(agent_error),
-                        "AgentError:protocol",
+                        type(agent_error).__name__,
                     )
                     raise agent_error
 
                 if isinstance(result, AgentResult):
                     if result.status == ExecutionStatus.FAILED:
-                        failure_kind = result.failure_kind or FailureKind.BUSINESS
-                        agent_error = AgentErrorClassifier.from_failure(
+                        agent_error = AgentExecutionFailedException(
+                            result.error or "Agent execution failed",
                             agent_id=spec.id,
-                            error=result.error or "Agent execution failed",
-                            failure_kind=failure_kind,
                         )
                         await self._emit_failed_event(
                             spec,
                             key,
                             start_time,
                             str(agent_error),
-                            f"AgentError:{agent_error.category.value}",
+                            type(agent_error).__name__,
                         )
                         raise agent_error
 
@@ -409,19 +384,16 @@ class AgentExecutor:
                         return result
 
                     if result.status != ExecutionStatus.COMPLETED:
-                        agent_error = AgentError(
+                        agent_error = AgentResultInvalidException(
                             f"Agent {spec.id} returned an unknown status: {result.status}",
                             agent_id=spec.id,
-                            category=AgentErrorCategory.PROTOCOL,
-                            action=RecoveryAction.FAIL_FAST,
-                            failure_kind=FailureKind.SYSTEM,
                         )
                         await self._emit_failed_event(
                             spec,
                             key,
                             start_time,
                             str(agent_error),
-                            "AgentError:protocol",
+                            type(agent_error).__name__,
                         )
                         raise agent_error
 
@@ -449,7 +421,6 @@ class AgentExecutor:
                     await self._append_todo_audit(
                         state=state,
                         result_status=ExecutionStatus.COMPLETED,
-                        failure_kind=None,
                         deliverable=deliverable,
                         error=None,
                         messages=result_messages,
@@ -462,21 +433,18 @@ class AgentExecutor:
                         messages=result_messages,
                     )
 
-                agent_error = AgentError(
+                agent_error = AgentResultInvalidException(
                     f"Agent {spec.id} run() returned the wrong type: "
                     f"expected {spec.deliverable_schema.__name__}, "
                     f"got {type(deliverable).__name__}",
                     agent_id=spec.id,
-                    category=AgentErrorCategory.PROTOCOL,
-                    action=RecoveryAction.FAIL_FAST,
-                    failure_kind=FailureKind.SYSTEM,
                 )
                 await self._emit_failed_event(
                     spec,
                     key,
                     start_time,
                     str(agent_error),
-                    "AgentError:protocol",
+                    type(agent_error).__name__,
                 )
                 raise agent_error
 

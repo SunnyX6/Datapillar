@@ -2,9 +2,9 @@
 
 INSERT INTO permissions (code, name, description, level, sort, status)
 VALUES
-  ('READ', '读', '只读权限', 1, 1, 1),
-  ('WRITE', '写', '编辑权限', 2, 2, 1),
-  ('ADMIN', '管理', '管理权限', 3, 3, 1)
+  ('DISABLE', '禁止', '禁用权限', 0, 1, 1),
+  ('READ', '查看', '查看权限', 1, 2, 1),
+  ('ADMIN', '管理', '管理权限', 2, 3, 1)
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   description = VALUES(description),
@@ -83,7 +83,7 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO feature_objects (parent_id, type, name, category_id, path, location, description, sort, status)
 VALUES
   (NULL, 'MENU', '个人中心', NULL, '/profile', 'PROFILE', NULL, 1, 1),
-  (NULL, 'MENU', '功能权限', NULL, '/profile/permission', 'PROFILE', NULL, 2, 1),
+  (NULL, 'MENU', '权限配置', NULL, '/profile/permission', 'PROFILE', NULL, 2, 1),
   (NULL, 'MENU', 'AI 配置', NULL, '/profile/llm/models', 'PROFILE', NULL, 3, 1)
 ON DUPLICATE KEY UPDATE
   parent_id = VALUES(parent_id),

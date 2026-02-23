@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-28
 
@@ -27,13 +26,21 @@ from datapillar_oneagentic.knowledge import (
 from datapillar_oneagentic.providers.llm.config import EmbeddingConfig
 from datapillar_oneagentic.storage.config import VectorStoreConfig
 
-from src.infrastructure.crypto.key_crypto import decrypt_api_key, is_encrypted
-from src.infrastructure.keystore import get_key_storage
 from src.infrastructure.repository.rag import DocumentRepository, JobRepository, NamespaceRepository
 from src.infrastructure.repository.system.ai_model import Model as AiModelRepository
+from src.infrastructure.repository.system.tenant import Tenant as TenantRepository
+from src.infrastructure.rpc.crypto import auth_crypto_rpc_client, is_encrypted_ciphertext
 from src.modules.rag.sse import job_event_hub
 from src.modules.rag.storage import StorageManager
 from src.shared.config.runtime import get_knowledge_wiki_config
+from src.shared.context import get_current_tenant_code, get_current_tenant_id
+from src.shared.exception import (
+    BadRequestException,
+    ConflictException,
+    InternalException,
+    NotFoundException,
+    ServiceUnavailableException,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +53,19 @@ class KnowledgeWikiService:
         self._embedding_batch_size = int(cfg["embedding_batch_size"])
         self._progress_step = int(cfg["progress_step"])
 
-    def list_namespaces(self, user_id: int, *, limit: int, offset: int) -> tuple[list[dict], int]:
-        return NamespaceRepository.list_by_user(user_id, limit=limit, offset=offset)
+    def list_namespaces(
+        self,
+        tenant_id: int,
+        user_id: int,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[dict], int]:
+        return NamespaceRepository.list_by_user(tenant_id, user_id, limit=limit, offset=offset)
 
-    def create_namespace(self, user_id: int, payload: dict[str, Any]) -> int:
+    def create_namespace(self, tenant_id: int, user_id: int, payload: dict[str, Any]) -> int:
         payload = {
+            "tenant_id": tenant_id,
             "namespace": payload["namespace"],
             "description": payload.get("description"),
             "created_by": user_id,
@@ -58,14 +73,21 @@ class KnowledgeWikiService:
         }
         return NamespaceRepository.create(payload)
 
-    def update_namespace(self, user_id: int, namespace_id: int, fields: dict[str, Any]) -> int:
-        return NamespaceRepository.update(namespace_id, user_id, fields)
+    def update_namespace(
+        self,
+        tenant_id: int,
+        user_id: int,
+        namespace_id: int,
+        fields: dict[str, Any],
+    ) -> int:
+        return NamespaceRepository.update(namespace_id, tenant_id, user_id, fields)
 
-    def delete_namespace(self, user_id: int, namespace_id: int) -> int:
-        return NamespaceRepository.soft_delete(namespace_id, user_id)
+    def delete_namespace(self, tenant_id: int, user_id: int, namespace_id: int) -> int:
+        return NamespaceRepository.soft_delete(namespace_id, tenant_id, user_id)
 
     def list_documents(
         self,
+        tenant_id: int,
         user_id: int,
         namespace_id: int,
         *,
@@ -76,6 +98,7 @@ class KnowledgeWikiService:
     ) -> tuple[list[dict[str, Any]], int]:
         rows, total = DocumentRepository.list_by_namespace(
             namespace_id,
+            tenant_id,
             user_id,
             status=status,
             keyword=keyword,
@@ -84,25 +107,32 @@ class KnowledgeWikiService:
         )
         return [self._normalize_document(row) for row in rows], total
 
-    def get_document(self, user_id: int, document_id: int) -> dict[str, Any] | None:
-        doc = DocumentRepository.get(document_id, user_id)
+    def get_document(self, tenant_id: int, user_id: int, document_id: int) -> dict[str, Any] | None:
+        doc = DocumentRepository.get(document_id, tenant_id, user_id)
         return self._normalize_document(doc) if doc else None
 
-    def update_document(self, user_id: int, document_id: int, fields: dict[str, Any]) -> int:
-        return DocumentRepository.update(document_id, user_id, fields)
+    def update_document(
+        self,
+        tenant_id: int,
+        user_id: int,
+        document_id: int,
+        fields: dict[str, Any],
+    ) -> int:
+        return DocumentRepository.update(document_id, tenant_id, user_id, fields)
 
     async def upload_document(
         self,
         *,
+        tenant_id: int,
         user_id: int,
         namespace_id: int,
         filename: str,
         content: bytes,
         title: str | None,
     ) -> dict[str, Any]:
-        namespace = NamespaceRepository.get(namespace_id, user_id)
+        namespace = NamespaceRepository.get(namespace_id, tenant_id, user_id)
         if not namespace:
-            raise ValueError("namespace not found")
+            raise NotFoundException("namespace 不存在")
         doc_uid = _normalize_doc_uid(_generate_doc_uid())
 
         storage_result = await self._storage.save(
@@ -115,6 +145,7 @@ class KnowledgeWikiService:
 
         document_id = DocumentRepository.create(
             {
+                "tenant_id": tenant_id,
                 "namespace_id": namespace_id,
                 "doc_uid": doc_uid,
                 "title": resolved_title,
@@ -150,19 +181,24 @@ class KnowledgeWikiService:
         chunk_mode: str | None,
         chunk_config_json: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        document = DocumentRepository.get(document_id, user_id)
+        document = DocumentRepository.get(document_id, tenant_id, user_id)
         if not document:
-            raise ValueError("document not found")
+            raise NotFoundException("document 不存在")
 
         embedding_model_id = document.get("embedding_model_id")
         if not embedding_model_id:
-            raise ValueError("embedding_model_id is required")
-        self._ensure_namespace_embedding(int(document["namespace_id"]), int(embedding_model_id))
+            raise BadRequestException("embedding_model_id 不能为空")
+        self._ensure_namespace_embedding(
+            int(document["namespace_id"]),
+            tenant_id,
+            int(embedding_model_id),
+        )
         _normalize_doc_uid(document.get("doc_uid"))
 
         resolved_chunk = self._resolve_chunk_config(chunk_mode, chunk_config_json)
         DocumentRepository.update(
             document_id,
+            tenant_id,
             user_id,
             {
                 "chunk_mode": resolved_chunk.mode,
@@ -172,7 +208,13 @@ class KnowledgeWikiService:
             },
         )
 
-        job_id = self._create_job(int(document["namespace_id"]), document_id, user_id, job_type="chunk")
+        job_id = self._create_job(
+            int(document["namespace_id"]),
+            document_id,
+            tenant_id,
+            user_id,
+            job_type="chunk",
+        )
         asyncio.create_task(
             self._run_chunk_job(
                 job_id=job_id,
@@ -187,21 +229,28 @@ class KnowledgeWikiService:
         return {
             "job_id": job_id,
             "status": "queued",
-            "sse_url": f"/api/ai/knowledge/wiki/jobs/{job_id}/sse",
+            "sse_url": f"/api/ai/biz/knowledge/wiki/jobs/{job_id}/sse",
         }
 
-    def get_job(self, user_id: int, job_id: int) -> dict[str, Any] | None:
-        return JobRepository.get(job_id, user_id)
+    def get_job(self, tenant_id: int, user_id: int, job_id: int) -> dict[str, Any] | None:
+        return JobRepository.get(job_id, tenant_id, user_id)
 
     def list_jobs(
         self,
+        tenant_id: int,
         user_id: int,
         document_id: int,
         *,
         limit: int,
         offset: int,
     ) -> tuple[list[dict[str, Any]], int]:
-        return JobRepository.list_by_document(document_id, user_id, limit=limit, offset=offset)
+        return JobRepository.list_by_document(
+            document_id,
+            tenant_id,
+            user_id,
+            limit=limit,
+            offset=offset,
+        )
 
     async def list_chunks(
         self,
@@ -213,12 +262,14 @@ class KnowledgeWikiService:
         offset: int,
         keyword: str | None,
     ) -> tuple[list[dict[str, Any]], int]:
-        document = DocumentRepository.get(document_id, user_id)
+        document = DocumentRepository.get(document_id, tenant_id, user_id)
         if not document:
-            return [], 0
+            raise NotFoundException("document 不存在")
         doc_uid = _normalize_doc_uid(document.get("doc_uid"))
 
-        namespace_value = self._get_namespace_value(int(document["namespace_id"]), user_id)
+        namespace_value = self._get_namespace_value(
+            int(document["namespace_id"]), tenant_id, user_id
+        )
         embedding_model = self._get_embedding_model(int(document["embedding_model_id"]), tenant_id)
         service = self._build_service(namespace=namespace_value, model=embedding_model)
         rows = await service.list_chunks(
@@ -246,12 +297,18 @@ class KnowledgeWikiService:
     ) -> dict[str, Any]:
         doc_uid = _parse_doc_uid(chunk_id)
         if not doc_uid:
-            raise ValueError("invalid chunk_id")
-        document = DocumentRepository.get_by_doc_uid(doc_uid, user_id)
+            raise BadRequestException("chunk_id 格式错误")
+        document = DocumentRepository.get_by_doc_uid(doc_uid, tenant_id, user_id)
         if not document:
-            raise ValueError("document not found")
+            raise NotFoundException("document 不存在")
         namespace_id = int(document["namespace_id"])
-        job_id = self._create_job(namespace_id, int(document["document_id"]), user_id, job_type="reembed")
+        job_id = self._create_job(
+            namespace_id,
+            int(document["document_id"]),
+            tenant_id,
+            user_id,
+            job_type="reembed",
+        )
         asyncio.create_task(
             self._run_chunk_edit_job(
                 job_id=job_id,
@@ -259,22 +316,25 @@ class KnowledgeWikiService:
                 chunk_id=chunk_id,
                 content=content,
                 tenant_id=tenant_id,
+                user_id=user_id,
             )
         )
         return {
             "job_id": job_id,
             "status": "queued",
-            "sse_url": f"/api/ai/knowledge/wiki/jobs/{job_id}/sse",
+            "sse_url": f"/api/ai/biz/knowledge/wiki/jobs/{job_id}/sse",
         }
 
     async def delete_chunk(self, *, user_id: int, tenant_id: int, chunk_id: str) -> int:
         doc_uid = _parse_doc_uid(chunk_id)
         if not doc_uid:
-            raise ValueError("invalid chunk_id")
-        document = DocumentRepository.get_by_doc_uid(doc_uid, user_id)
+            raise BadRequestException("chunk_id 格式错误")
+        document = DocumentRepository.get_by_doc_uid(doc_uid, tenant_id, user_id)
         if not document:
-            raise ValueError("document not found")
-        namespace_value = self._get_namespace_value(int(document["namespace_id"]), user_id)
+            raise NotFoundException("document 不存在")
+        namespace_value = self._get_namespace_value(
+            int(document["namespace_id"]), tenant_id, user_id
+        )
         embedding_model = self._get_embedding_model(int(document["embedding_model_id"]), tenant_id)
         service = self._build_service(namespace=namespace_value, model=embedding_model)
         deleted = await service.delete_chunks(chunk_ids=[chunk_id], namespace=namespace_value)
@@ -282,17 +342,20 @@ class KnowledgeWikiService:
         if deleted:
             DocumentRepository.update(
                 int(document["document_id"]),
+                tenant_id,
                 user_id,
                 {"chunk_count": max(int(document.get("chunk_count") or 0) - deleted, 0)},
             )
         return deleted
 
-    async def retrieve(self, *, user_id: int, tenant_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+    async def retrieve(
+        self, *, user_id: int, tenant_id: int, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         namespace_id = int(payload["namespace_id"])
-        self._ensure_namespace_owner(user_id, namespace_id)
-        model_id = self._resolve_namespace_embedding_model(namespace_id)
+        self._ensure_namespace_owner(tenant_id, user_id, namespace_id)
+        model_id = self._resolve_namespace_embedding_model(namespace_id, tenant_id)
         embedding_model = self._get_embedding_model(model_id, tenant_id)
-        namespace_value = self._get_namespace_value(namespace_id, user_id)
+        namespace_value = self._get_namespace_value(namespace_id, tenant_id, user_id)
         service = self._build_service(namespace=namespace_value, model=embedding_model)
 
         default_retrieve = KnowledgeRetrieveConfig()
@@ -312,6 +375,7 @@ class KnowledgeWikiService:
 
         doc_uids = self._resolve_scope_doc_uids(
             user_id=user_id,
+            tenant_id=tenant_id,
             namespace_id=namespace_id,
             payload=payload,
         )
@@ -351,16 +415,22 @@ class KnowledgeWikiService:
         return {"hits": hits, "latency_ms": latency_ms}
 
     async def delete_document(self, *, user_id: int, tenant_id: int, document_id: int) -> int:
-        document = DocumentRepository.get(document_id, user_id)
+        document = DocumentRepository.get(document_id, tenant_id, user_id)
         if not document:
-            return 0
+            raise NotFoundException("document 不存在")
         if document.get("doc_uid"):
-            namespace_value = self._get_namespace_value(int(document["namespace_id"]), user_id)
-            embedding_model = self._get_embedding_model(int(document["embedding_model_id"]), tenant_id)
+            namespace_value = self._get_namespace_value(
+                int(document["namespace_id"]),
+                tenant_id,
+                user_id,
+            )
+            embedding_model = self._get_embedding_model(
+                int(document["embedding_model_id"]), tenant_id
+            )
             service = self._build_service(namespace=namespace_value, model=embedding_model)
             await service.delete_document(doc_id=document["doc_uid"], namespace=namespace_value)
             await service.close()
-        return DocumentRepository.soft_delete(document_id, user_id)
+        return DocumentRepository.soft_delete(document_id, tenant_id, user_id)
 
     async def _run_chunk_job(
         self,
@@ -373,14 +443,14 @@ class KnowledgeWikiService:
         chunk_mode: str,
         chunk_config: KnowledgeChunkConfig,
     ) -> None:
-        JobRepository.mark_running(job_id)
-        job_snapshot = JobRepository.get(job_id, user_id)
+        JobRepository.mark_running(job_id, tenant_id)
+        job_snapshot = JobRepository.get(job_id, tenant_id, user_id)
         if job_snapshot:
             await job_event_hub.publish(job_id, _build_progress_event(job_snapshot))
 
-        document = DocumentRepository.get(document_id, user_id)
+        document = DocumentRepository.get(document_id, tenant_id, user_id)
         if not document:
-            JobRepository.mark_error(job_id, "document not found")
+            JobRepository.mark_error(job_id, tenant_id, "document not found")
             await job_event_hub.publish(
                 job_id, _build_done_event(job_id, "error", "document not found", 0, 0, 0)
             )
@@ -388,8 +458,14 @@ class KnowledgeWikiService:
             return
 
         try:
-            embedding_model = self._get_embedding_model(int(document["embedding_model_id"]), tenant_id)
-            namespace_value = self._get_namespace_value(int(document["namespace_id"]), int(document["created_by"]))
+            embedding_model = self._get_embedding_model(
+                int(document["embedding_model_id"]), tenant_id
+            )
+            namespace_value = self._get_namespace_value(
+                int(document["namespace_id"]),
+                tenant_id,
+                user_id,
+            )
             doc_uid = _normalize_doc_uid(document.get("doc_uid"))
             service = self._build_service(namespace=namespace_value, model=embedding_model)
             try:
@@ -410,11 +486,12 @@ class KnowledgeWikiService:
                     progress = int(processed * 100 / total) if total else 0
                     JobRepository.update_progress(
                         job_id,
+                        tenant_id,
                         processed_chunks=processed,
                         total_chunks=total,
                         progress=progress,
                     )
-                    job_snapshot = JobRepository.get(job_id, user_id)
+                    job_snapshot = JobRepository.get(job_id, tenant_id, user_id)
                     if job_snapshot:
                         await job_event_hub.publish(job_id, _build_progress_event(job_snapshot))
 
@@ -432,12 +509,13 @@ class KnowledgeWikiService:
 
             preview = previews[0] if previews else None
             if not preview or not preview.chunks:
-                raise ValueError("no chunks generated")
+                raise InternalException("未生成分块")
 
             total_chunks = len(preview.chunks)
 
             DocumentRepository.update(
                 document_id,
+                tenant_id,
                 user_id,
                 {
                     "doc_uid": doc_uid,
@@ -449,21 +527,27 @@ class KnowledgeWikiService:
                     "last_chunked_at": _now_time_str(),
                 },
             )
-            JobRepository.mark_success(job_id, processed_chunks=total_chunks, total_chunks=total_chunks)
-            job_snapshot = JobRepository.get(job_id, user_id)
+            JobRepository.mark_success(
+                job_id,
+                tenant_id,
+                processed_chunks=total_chunks,
+                total_chunks=total_chunks,
+            )
+            job_snapshot = JobRepository.get(job_id, tenant_id, user_id)
             if job_snapshot:
                 await job_event_hub.publish(job_id, _build_done_event_from_job(job_snapshot))
             await job_event_hub.close(job_id)
 
         except Exception as exc:
             logger.error("Chunk job failed: %s", exc, exc_info=True)
-            JobRepository.mark_error(job_id, str(exc))
+            JobRepository.mark_error(job_id, tenant_id, str(exc))
             DocumentRepository.update(
                 document_id,
+                tenant_id,
                 user_id,
                 {"status": "error", "error_message": str(exc)},
             )
-            job_snapshot = JobRepository.get(job_id, user_id)
+            job_snapshot = JobRepository.get(job_id, tenant_id, user_id)
             if job_snapshot:
                 await job_event_hub.publish(job_id, _build_done_event_from_job(job_snapshot))
             else:
@@ -481,15 +565,22 @@ class KnowledgeWikiService:
         chunk_id: str,
         content: str,
         tenant_id: int,
+        user_id: int,
     ) -> None:
-        JobRepository.mark_running(job_id)
-        job_snapshot = JobRepository.get(job_id, int(document["created_by"]))
+        JobRepository.mark_running(job_id, tenant_id)
+        job_snapshot = JobRepository.get(job_id, tenant_id, user_id)
         if job_snapshot:
             await job_event_hub.publish(job_id, _build_progress_event(job_snapshot))
 
         try:
-            embedding_model = self._get_embedding_model(int(document["embedding_model_id"]), tenant_id)
-            namespace_value = self._get_namespace_value(int(document["namespace_id"]), int(document["created_by"]))
+            embedding_model = self._get_embedding_model(
+                int(document["embedding_model_id"]), tenant_id
+            )
+            namespace_value = self._get_namespace_value(
+                int(document["namespace_id"]),
+                tenant_id,
+                user_id,
+            )
             service = self._build_service(namespace=namespace_value, model=embedding_model)
             try:
                 await service.upsert_chunks(
@@ -499,15 +590,15 @@ class KnowledgeWikiService:
             finally:
                 await service.close()
 
-            JobRepository.mark_success(job_id, processed_chunks=1, total_chunks=1)
-            job_snapshot = JobRepository.get(job_id, int(document["created_by"]))
+            JobRepository.mark_success(job_id, tenant_id, processed_chunks=1, total_chunks=1)
+            job_snapshot = JobRepository.get(job_id, tenant_id, user_id)
             if job_snapshot:
                 await job_event_hub.publish(job_id, _build_done_event_from_job(job_snapshot))
             await job_event_hub.close(job_id)
         except Exception as exc:
             logger.error("Chunk edit failed: %s", exc, exc_info=True)
-            JobRepository.mark_error(job_id, str(exc))
-            job_snapshot = JobRepository.get(job_id, int(document["created_by"]))
+            JobRepository.mark_error(job_id, tenant_id, str(exc))
+            job_snapshot = JobRepository.get(job_id, tenant_id, user_id)
             if job_snapshot:
                 await job_event_hub.publish(job_id, _build_done_event_from_job(job_snapshot))
             else:
@@ -530,26 +621,54 @@ class KnowledgeWikiService:
             config.mode = chunk_mode
         return config
 
-    def _get_embedding_model(self, model_id: int, tenant_id: int) -> dict[str, Any]:
+    def _get_embedding_model(
+        self,
+        model_id: int,
+        tenant_id: int,
+        tenant_code: str | None = None,
+    ) -> dict[str, Any]:
         model = AiModelRepository.get_model(model_id, tenant_id)
         if not model:
-            raise ValueError("embedding model not found")
+            raise BadRequestException("embedding model 不存在")
         if model.get("model_type") != "embeddings":
-            raise ValueError("model_type is not embeddings")
+            raise BadRequestException("embedding model 类型错误")
         if model.get("status") != "ACTIVE":
-            raise ValueError("embedding model is not active")
+            raise BadRequestException("embedding model 未启用")
         encrypted_key = model.get("api_key")
         if not encrypted_key:
-            raise ValueError("embedding model api_key is required")
-        if not is_encrypted(encrypted_key):
-            raise ValueError("embedding model api_key 未加密")
+            raise BadRequestException("embedding model api_key 未配置")
+        if not is_encrypted_ciphertext(encrypted_key):
+            raise BadRequestException("embedding model api_key 加密格式无效")
         if not model.get("embedding_dimension"):
-            raise ValueError("embedding_dimension is required")
-        private_key = get_key_storage().load_private_key(tenant_id)
-        decrypted_key = decrypt_api_key(private_key, encrypted_key)
+            raise BadRequestException("embedding_dimension 未配置")
+        resolved_tenant_code = self._resolve_tenant_code(tenant_id, tenant_code)
+        try:
+            decrypted_key = auth_crypto_rpc_client.decrypt_llm_api_key_sync(
+                tenant_code=resolved_tenant_code,
+                ciphertext=encrypted_key,
+            )
+        except Exception as exc:
+            raise ServiceUnavailableException(
+                "embedding model api_key 解密失败", cause=exc
+            ) from exc
         normalized = dict(model)
         normalized["api_key"] = decrypted_key
         return normalized
+
+    def _resolve_tenant_code(self, tenant_id: int, tenant_code: str | None) -> str:
+        normalized_input = str(tenant_code or "").strip()
+        if normalized_input:
+            return normalized_input
+
+        scope_tenant_code = str(get_current_tenant_code() or "").strip()
+        scope_tenant_id = get_current_tenant_id()
+        if scope_tenant_code and scope_tenant_id == tenant_id:
+            return scope_tenant_code
+
+        resolved = TenantRepository.get_code(tenant_id)
+        if resolved:
+            return resolved
+        raise BadRequestException("tenant_code 不存在")
 
     def _build_knowledge_config(
         self,
@@ -594,32 +713,38 @@ class KnowledgeWikiService:
         normalized.pop("embedding_dimension", None)
         return normalized
 
-    def _ensure_namespace_owner(self, user_id: int, namespace_id: int) -> None:
-        namespace = NamespaceRepository.get(namespace_id, user_id)
+    def _ensure_namespace_owner(self, tenant_id: int, user_id: int, namespace_id: int) -> None:
+        namespace = NamespaceRepository.get(namespace_id, tenant_id, user_id)
         if not namespace:
-            raise ValueError("namespace not found")
+            raise NotFoundException("namespace 不存在")
 
-    def _get_namespace_value(self, namespace_id: int, user_id: int) -> str:
-        namespace = NamespaceRepository.get(namespace_id, user_id)
+    def _get_namespace_value(self, namespace_id: int, tenant_id: int, user_id: int) -> str:
+        namespace = NamespaceRepository.get(namespace_id, tenant_id, user_id)
         if not namespace:
-            raise ValueError("namespace not found")
+            raise NotFoundException("namespace 不存在")
         return namespace["namespace"]
 
-    def _ensure_namespace_embedding(self, namespace_id: int, embedding_model_id: int) -> None:
-        model_ids = DocumentRepository.list_namespace_embedding_models(namespace_id)
+    def _ensure_namespace_embedding(
+        self,
+        namespace_id: int,
+        tenant_id: int,
+        embedding_model_id: int,
+    ) -> None:
+        model_ids = DocumentRepository.list_namespace_embedding_models(namespace_id, tenant_id)
         if model_ids and embedding_model_id not in model_ids:
-            raise ValueError("namespace embedding_model_id mismatch")
+            raise ConflictException("namespace embedding_model_id 冲突")
 
-    def _resolve_namespace_embedding_model(self, namespace_id: int) -> int:
-        model_ids = DocumentRepository.list_namespace_embedding_models(namespace_id)
+    def _resolve_namespace_embedding_model(self, namespace_id: int, tenant_id: int) -> int:
+        model_ids = DocumentRepository.list_namespace_embedding_models(namespace_id, tenant_id)
         if not model_ids:
-            raise ValueError("namespace has no embedding_model")
+            raise BadRequestException("namespace 未配置 embedding_model")
         return model_ids[0]
 
     def _resolve_scope_doc_uids(
         self,
         *,
         user_id: int,
+        tenant_id: int,
         namespace_id: int,
         payload: dict[str, Any],
     ) -> list[str] | None:
@@ -635,11 +760,21 @@ class KnowledgeWikiService:
         doc_uids: list[str] = []
         for item in doc_ids:
             if isinstance(item, int) or (isinstance(item, str) and item.isdigit()):
-                document = DocumentRepository.get(int(item), user_id)
-                if document and document.get("doc_uid"):
+                document = DocumentRepository.get(int(item), tenant_id, user_id)
+                if (
+                    document
+                    and int(document["namespace_id"]) == namespace_id
+                    and document.get("doc_uid")
+                ):
                     doc_uids.append(document["doc_uid"])
             elif isinstance(item, str):
-                doc_uids.append(item)
+                document = DocumentRepository.get_by_doc_uid(item, tenant_id, user_id)
+                if (
+                    document
+                    and int(document["namespace_id"]) == namespace_id
+                    and document.get("doc_uid")
+                ):
+                    doc_uids.append(document["doc_uid"])
         return list({uid for uid in doc_uids if uid})
 
     def _chunk_to_dict(self, chunk) -> dict[str, Any]:
@@ -653,9 +788,17 @@ class KnowledgeWikiService:
             "embedding_status": "synced",
         }
 
-    def _create_job(self, namespace_id: int, document_id: int, user_id: int, job_type: str) -> int:
+    def _create_job(
+        self,
+        namespace_id: int,
+        document_id: int,
+        tenant_id: int,
+        user_id: int,
+        job_type: str,
+    ) -> int:
         return JobRepository.create(
             {
+                "tenant_id": tenant_id,
                 "namespace_id": namespace_id,
                 "document_id": document_id,
                 "job_type": job_type,
@@ -683,14 +826,14 @@ def _generate_doc_uid() -> str:
 
 def _normalize_doc_uid(doc_uid: str | None) -> str:
     if doc_uid is None:
-        raise ValueError("doc_uid is required")
+        raise BadRequestException("doc_uid 不能为空")
     value = str(doc_uid).strip()
     if not value:
-        raise ValueError("doc_uid is required")
+        raise BadRequestException("doc_uid 不能为空")
     if ":" in value:
-        raise ValueError("doc_uid cannot contain ':'")
+        raise BadRequestException("doc_uid 不能包含 ':'")
     if len(value) > 64:
-        raise ValueError("doc_uid length must be <= 64")
+        raise BadRequestException("doc_uid 长度不能超过 64")
     return value
 
 
@@ -724,7 +867,9 @@ def _build_progress_event(job: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _build_done_event(job_id: int, status: str, message: str, progress: int, processed: int, total: int):
+def _build_done_event(
+    job_id: int, status: str, message: str, progress: int, processed: int, total: int
+):
     payload = {
         "job_id": job_id,
         "status": status,

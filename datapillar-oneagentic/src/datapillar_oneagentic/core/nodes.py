@@ -26,29 +26,31 @@ from langgraph.store.base import BaseStore
 from langgraph.types import Command
 
 from datapillar_oneagentic.context import ContextCollector, ContextScenario
-from datapillar_oneagentic.exception import AgentError, AgentErrorCategory, AgentErrorClassifier
-from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
-from datapillar_oneagentic.core.types import AgentResult, SessionKey
 from datapillar_oneagentic.core.graphs.mapreduce.reducer import reduce_map_results
 from datapillar_oneagentic.core.graphs.mapreduce.schemas import (
     MapReducePlan,
     MapReduceResult,
     MapReduceTask,
 )
+from datapillar_oneagentic.core.status import ExecutionStatus
+from datapillar_oneagentic.core.types import AgentResult, SessionKey
+from datapillar_oneagentic.exception import (
+    AgentExecutionFailedException,
+    AgentResultInvalidException,
+)
+from datapillar_oneagentic.messages import Messages
+from datapillar_oneagentic.messages.adapters.langchain import to_langchain
+from datapillar_oneagentic.state import StateBuilder
 from datapillar_oneagentic.todo.session_todo import SessionTodoList, TodoUpdate
 from datapillar_oneagentic.todo.store import (
     apply_todo_plan,
     apply_todo_updates,
 )
 from datapillar_oneagentic.todo.tool import extract_todo_plan, extract_todo_updates
-from datapillar_oneagentic.exception import RecoveryAction
-from datapillar_oneagentic.state import StateBuilder
-from datapillar_oneagentic.messages.adapters.langchain import to_langchain
-from datapillar_oneagentic.messages import Messages
 
 if TYPE_CHECKING:
-    from datapillar_oneagentic.core.agent import AgentSpec
     from datapillar_oneagentic.context.timeline.recorder import TimelineRecorder
+    from datapillar_oneagentic.core.agent import AgentSpec
     from datapillar_oneagentic.knowledge import KnowledgeConfig, KnowledgeService
 
 
@@ -334,13 +336,10 @@ class NodeFactory:
         session_id = sb.session_id
 
         if result is not None and hasattr(result, "status") and result.status == ExecutionStatus.FAILED:
-            failure_kind = getattr(result, "failure_kind", None) or FailureKind.BUSINESS
-            agent_error = AgentErrorClassifier.from_failure(
+            raise AgentExecutionFailedException(
+                getattr(result, "error", None) or "Agent execution failed",
                 agent_id=agent_id,
-                error=getattr(result, "error", None) or "Agent execution failed",
-                failure_kind=failure_kind,
             )
-            raise agent_error
 
         # Persist agent deliverables to the store.
         deliverable_saved = await self._persist_deliverable(
@@ -389,7 +388,6 @@ class NodeFactory:
         sb.memory.append_execution_summary(
             agent_id=agent_id,
             execution_status=getattr(result, "status", None) if result else None,
-            failure_kind=getattr(result, "failure_kind", None) if result else None,
             error=getattr(result, "error", None) if result else None,
             deliverable_key=agent_id if deliverable_saved else None,
         )
@@ -398,7 +396,6 @@ class NodeFactory:
         if result and hasattr(result, "status"):
             sb.routing.finish_agent(
                 status=result.status,
-                failure_kind=getattr(result, "failure_kind", None),
                 error=getattr(result, "error", None),
             )
         else:
@@ -429,33 +426,24 @@ class NodeFactory:
             sb = StateBuilder(state)
             task_data = sb.mapreduce.snapshot().current_task
             if not task_data:
-                raise AgentError(
+                raise AgentResultInvalidException(
                     "MapReduce worker did not find task data",
                     agent_id="mapreduce_worker",
-                    category=AgentErrorCategory.PROTOCOL,
-                    action=RecoveryAction.FAIL_FAST,
-                    failure_kind=FailureKind.SYSTEM,
                 )
 
             try:
                 task = MapReduceTask.model_validate(task_data)
             except Exception as exc:
-                raise AgentError(
+                raise AgentResultInvalidException(
                     f"MapReduce worker task parsing failed: {exc}",
                     agent_id="mapreduce_worker",
-                    category=AgentErrorCategory.PROTOCOL,
-                    action=RecoveryAction.FAIL_FAST,
-                    failure_kind=FailureKind.SYSTEM,
-                    original=exc,
+                    cause=exc,
                 ) from exc
 
             if task.agent_id not in worker_ids:
-                raise AgentError(
+                raise AgentResultInvalidException(
                     f"MapReduce worker task assigned invalid agent: {task.agent_id}",
                     agent_id=task.agent_id,
-                    category=AgentErrorCategory.PROTOCOL,
-                    action=RecoveryAction.FAIL_FAST,
-                    failure_kind=FailureKind.SYSTEM,
                 )
 
             executor = self._get_executor(task.agent_id)
@@ -487,25 +475,18 @@ class NodeFactory:
             compression_context = _normalize_context_value(worker_state.get("compression_context"))
 
             if isinstance(result, Command):
-                raise AgentError(
+                raise AgentResultInvalidException(
                     f"MapReduce worker does not support delegation: {task.agent_id}",
                     agent_id=task.agent_id,
-                    category=AgentErrorCategory.PROTOCOL,
-                    action=RecoveryAction.FAIL_FAST,
-                    failure_kind=FailureKind.SYSTEM,
                 )
             if result is not None and hasattr(result, "status") and result.status == ExecutionStatus.FAILED:
-                failure_kind = getattr(result, "failure_kind", None) or FailureKind.BUSINESS
-                agent_error = AgentErrorClassifier.from_failure(
+                raise AgentExecutionFailedException(
+                    getattr(result, "error", None) or "MapReduce worker execution failed",
                     agent_id=task.agent_id,
-                    error=getattr(result, "error", None) or "MapReduce worker execution failed",
-                    failure_kind=failure_kind,
                 )
-                raise agent_error
             if result is not None and hasattr(result, "status") and result.status == ExecutionStatus.ABORTED:
                 sb.routing.finish_agent(
                     status=ExecutionStatus.ABORTED,
-                    failure_kind=None,
                     error=getattr(result, "error", None),
                 )
                 return Command(update=sb.patch())
@@ -530,7 +511,6 @@ class NodeFactory:
                 status=getattr(result, "status", ExecutionStatus.FAILED),
                 output=output,
                 error=getattr(result, "error", None),
-                failure_kind=getattr(result, "failure_kind", None),
                 todo_updates=todo_updates,
             )
             sb.mapreduce.append_results([map_result.model_dump(mode="json")])
@@ -610,7 +590,7 @@ class NodeFactory:
             )
             if deliverable_saved:
                 sb.deliverables.record_saved(reducer_agent_id)
-            sb.routing.finish_agent(status=ExecutionStatus.COMPLETED, failure_kind=None, error=None)
+            sb.routing.finish_agent(status=ExecutionStatus.COMPLETED, error=None)
 
             todo_data = sb.todo.snapshot().todo
             if todo_data:

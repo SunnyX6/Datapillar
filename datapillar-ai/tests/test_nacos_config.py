@@ -8,10 +8,12 @@ from dynaconf import Dynaconf
 from src.shared.config.exceptions import ConfigurationError
 from src.shared.config.nacos_client import (
     NacosBootstrapConfig,
+    _is_usable_service_ip,
     _build_client_config,
     apply_nacos_config,
     load_nacos_config,
     parse_nacos_config_content,
+    resolve_service_ip,
 )
 from src.shared.config.runtime import clear_runtime_config_cache
 
@@ -87,6 +89,17 @@ def _valid_runtime_config() -> dict[str, object]:
         },
         "security": {
             "default_tenant_id": 1,
+            "gateway_assertion": {
+                "enabled": True,
+                "header_name": "X-Gateway-Assertion",
+                "issuer": "datapillar-auth",
+                "audience": "datapillar-ai",
+                "key_id": "auth-dev-2026-02",
+                "public_key_path": "classpath:shared/auth/security/gateway-assertion-dev-public.pem",
+                "previous_key_id": "",
+                "previous_public_key_path": "",
+                "max_clock_skew_seconds": 5,
+            },
             "key_storage": {
                 "type": "local",
                 "local_path": "/data/datapillar/privkeys",
@@ -201,3 +214,41 @@ def test_build_client_config_uses_safe_default_dirs(monkeypatch: pytest.MonkeyPa
     client_config = _build_client_config(config)
     assert client_config.log_dir == "/tmp/datapillar-logs/nacos"
     assert client_config.cache_dir == "/tmp/datapillar-logs/nacos/cache"
+
+
+@pytest.mark.parametrize(
+    ("ip", "expected"),
+    [
+        ("192.168.0.100", True),
+        ("10.0.0.3", True),
+        ("127.0.0.1", False),
+        ("0.0.0.0", False),
+        ("169.254.1.1", False),
+        ("198.18.0.1", False),
+        ("198.19.255.254", False),
+        ("", False),
+        ("not-an-ip", False),
+    ],
+)
+def test_is_usable_service_ip(ip: str, expected: bool):
+    assert _is_usable_service_ip(ip) is expected
+
+
+def test_resolve_service_ip_fails_fast_on_invalid_nacos_service_ip(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("NACOS_SERVICE_IP", "198.18.0.1")
+    monkeypatch.setenv("POD_IP", "192.168.0.100")
+    monkeypatch.setenv("HOST_IP", "192.168.0.101")
+
+    with pytest.raises(ConfigurationError, match="服务注册 IP 非法"):
+        resolve_service_ip()
+
+
+def test_resolve_service_ip_requires_explicit_env(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("NACOS_SERVICE_IP", raising=False)
+    monkeypatch.delenv("POD_IP", raising=False)
+    monkeypatch.delenv("HOST_IP", raising=False)
+
+    with pytest.raises(ConfigurationError, match="缺少服务注册 IP"):
+        resolve_service_ip()

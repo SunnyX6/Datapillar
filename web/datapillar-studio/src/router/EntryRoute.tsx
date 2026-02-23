@@ -1,45 +1,35 @@
-import { useEffect } from "react"
-import { useNavigate } from "react-router-dom"
-import { getSetupStatus } from "@/lib/api/setup"
-import { useAuthStore } from "@/stores"
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { handleAppError, normalizeAxiosError } from '@/lib/error-center'
+import { useAuthStore } from '@/stores'
 
-const SETUP_PATH = "/setup"
-const HOME_PATH = "/home"
-const LOGIN_PATH = "/login"
-const SERVER_ERROR_PATH = "/500"
+const HOME_PATH = '/home'
+const LOGIN_PATH = '/login'
 
-type EntryRouteTarget = "setup" | "home" | "login" | "server-error"
+type EntryRouteTarget = 'home' | 'login' | 'halt'
 
 let entryRouteTargetPromise: Promise<EntryRouteTarget> | null = null
 
-function isSetupPath(): boolean {
-  if (typeof window === "undefined") {
-    return false
-  }
-  return window.location.pathname === SETUP_PATH
-}
-
-async function resolveEntryRouteTarget(initializeAuth: () => Promise<void>): Promise<EntryRouteTarget> {
-  try {
-    const setupStatus = await getSetupStatus()
-    if (!setupStatus.initialized) {
-      return "setup"
-    }
-  } catch {
-    return "server-error"
-  }
-
+async function resolveEntryRouteTarget(
+  initializeAuth: () => Promise<void>,
+): Promise<EntryRouteTarget> {
   try {
     await initializeAuth()
-  } catch {
-    return "server-error"
+  } catch (error) {
+    handleAppError(
+      normalizeAxiosError(error, {
+        module: 'router/entry-route',
+        isCoreRequest: true,
+      }),
+    )
+    return 'halt'
   }
 
-  return useAuthStore.getState().isAuthenticated ? "home" : "login"
+  return useAuthStore.getState().isAuthenticated ? 'home' : 'login'
 }
 
 /**
- * 应用入口路由：先判定初始化状态，再做登录态分流。
+ * 应用入口路由：仅负责登录态分流。
  */
 export function EntryRoute() {
   const navigate = useNavigate()
@@ -50,32 +40,24 @@ export function EntryRoute() {
     let cancelled = false
 
     if (!entryRouteTargetPromise) {
-      entryRouteTargetPromise = resolveEntryRouteTarget(initializeAuth).finally(() => {
-        entryRouteTargetPromise = null
-      })
+      entryRouteTargetPromise = resolveEntryRouteTarget(initializeAuth).finally(
+        () => {
+          entryRouteTargetPromise = null
+        },
+      )
     }
 
     void entryRouteTargetPromise.then((target) => {
-      if (cancelled || isSetupPath()) {
+      if (cancelled) {
         return
       }
-
-      if (target === "setup") {
-        navigate(SETUP_PATH, { replace: true })
-        return
-      }
-
-      if (target === "home") {
+      if (target === 'home') {
         navigate(HOME_PATH, { replace: true })
         return
       }
-
-      if (target === "server-error") {
-        navigate(SERVER_ERROR_PATH, { replace: true })
-        return
+      if (target === 'login') {
+        navigate(LOGIN_PATH, { replace: true })
       }
-
-      navigate(LOGIN_PATH, { replace: true })
     })
 
     return () => {
@@ -86,6 +68,5 @@ export function EntryRoute() {
   if (loading) {
     return null
   }
-
   return null
 }

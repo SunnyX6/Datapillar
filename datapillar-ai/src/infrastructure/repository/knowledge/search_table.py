@@ -31,10 +31,19 @@ logger = logging.getLogger(__name__)
 class Neo4jTableSearch:
     """Neo4j 表查询服务"""
 
+    _SYSTEM_CREATORS = ["OPENLINEAGE", "GRAVITINO_SYNC", "system", "SYSTEM"]
+
     # Table 混合检索返回格式（HybridCypherRetriever）
     _TABLE_RETRIEVAL_QUERY = """
     OPTIONAL MATCH (s:Schema)-[:HAS_TABLE]->(node)
     OPTIONAL MATCH (c:Catalog)-[:HAS_SCHEMA]->(s)
+    WHERE ($tenantId IS NULL OR coalesce(node.tenantId, s.tenantId, c.tenantId) = $tenantId)
+      AND (
+        $userId IS NULL
+        OR node.createdBy IS NULL
+        OR toString(node.createdBy) = toString($userId)
+        OR node.createdBy IN $systemCreators
+      )
     RETURN
         node.id AS node_id,
         'Table' AS type,
@@ -54,11 +63,17 @@ class Neo4jTableSearch:
     # =========================================================================
 
     @classmethod
-    def list_catalogs(cls, limit: int = 50) -> list[dict[str, Any]]:
+    def list_catalogs(
+        cls,
+        limit: int = 50,
+        *,
+        tenant_id: int | None = None,
+    ) -> list[dict[str, Any]]:
         """列出 Catalog 列表（导航用途）"""
         safe_limit = min(max(int(limit), 1), 2000)
         cypher = """
         MATCH (c:Catalog)
+        WHERE ($tenantId IS NULL OR c.tenantId = $tenantId)
         RETURN
             c.id AS node_id,
             c.name AS name,
@@ -70,14 +85,24 @@ class Neo4jTableSearch:
         try:
             driver = Neo4jClient.get_driver()
             with driver.session(database=settings.neo4j_database) as session:
-                result = run_cypher(session, cypher, {"limit": safe_limit})
+                result = run_cypher(
+                    session,
+                    cypher,
+                    {"limit": safe_limit, "tenantId": tenant_id},
+                )
                 return [convert_neo4j_types(r) for r in (result.data() or [])]
         except Exception as e:
             logger.error(f"列出 Catalog 失败: {e}")
             return []
 
     @classmethod
-    def list_schemas(cls, catalog: str, limit: int = 200) -> list[dict[str, Any]]:
+    def list_schemas(
+        cls,
+        catalog: str,
+        limit: int = 200,
+        *,
+        tenant_id: int | None = None,
+    ) -> list[dict[str, Any]]:
         """列出指定 Catalog 下的 Schema 列表（导航用途）"""
         if not (isinstance(catalog, str) and catalog.strip()):
             return []
@@ -85,6 +110,7 @@ class Neo4jTableSearch:
         safe_limit = min(max(int(limit), 1), 2000)
         cypher = """
         MATCH (c:Catalog {name: $catalog})-[:HAS_SCHEMA]->(s:Schema)
+        WHERE ($tenantId IS NULL OR (c.tenantId = $tenantId AND s.tenantId = $tenantId))
         RETURN
             s.id AS node_id,
             s.name AS name,
@@ -97,7 +123,13 @@ class Neo4jTableSearch:
             driver = Neo4jClient.get_driver()
             with driver.session(database=settings.neo4j_database) as session:
                 result = run_cypher(
-                    session, cypher, {"catalog": catalog.strip(), "limit": safe_limit}
+                    session,
+                    cypher,
+                    {
+                        "catalog": catalog.strip(),
+                        "limit": safe_limit,
+                        "tenantId": tenant_id,
+                    },
                 )
                 return [convert_neo4j_types(r) for r in (result.data() or [])]
         except Exception as e:
@@ -112,6 +144,8 @@ class Neo4jTableSearch:
         keyword: str | None = None,
         cursor: str | None = None,
         limit: int = 200,
+        *,
+        tenant_id: int | None = None,
     ) -> list[dict[str, Any]]:
         """列出指定 Catalog + Schema 下的 Table 列表（导航用途，支持 cursor 翻页）"""
         if not (isinstance(catalog, str) and catalog.strip()):
@@ -128,6 +162,7 @@ class Neo4jTableSearch:
         MATCH (c:Catalog {name: $catalog})-[:HAS_SCHEMA]->(s:Schema {name: $schema})-[:HAS_TABLE]->(t:Table)
         WHERE ($keyword = '' OR toLower(t.name) CONTAINS toLower($keyword))
           AND ($cursor = '' OR t.name > $cursor)
+          AND ($tenantId IS NULL OR (c.tenantId = $tenantId AND s.tenantId = $tenantId AND t.tenantId = $tenantId))
         RETURN
             t.id AS node_id,
             t.name AS name,
@@ -148,6 +183,7 @@ class Neo4jTableSearch:
                         "keyword": kw,
                         "cursor": cur,
                         "page_size": safe_limit + 1,
+                        "tenantId": tenant_id,
                     },
                 )
                 rows = [convert_neo4j_types(r) for r in (result.data() or [])]
@@ -174,6 +210,9 @@ class Neo4jTableSearch:
         catalog: str,
         schema: str,
         table: str,
+        *,
+        tenant_id: int | None = None,
+        user_id: int | None = None,
     ) -> dict[str, Any] | None:
         """
         获取表基本信息
@@ -188,6 +227,13 @@ class Neo4jTableSearch:
         """
         cypher = """
         MATCH (cat:Catalog {name: $catalog})-[:HAS_SCHEMA]->(sch:Schema {name: $schema})-[:HAS_TABLE]->(t:Table {name: $table})
+        WHERE ($tenantId IS NULL OR (cat.tenantId = $tenantId AND sch.tenantId = $tenantId AND t.tenantId = $tenantId))
+          AND (
+            $userId IS NULL
+            OR t.createdBy IS NULL
+            OR toString(t.createdBy) = toString($userId)
+            OR t.createdBy IN $systemCreators
+          )
         OPTIONAL MATCH (t)-[:HAS_COLUMN]->(col:Column)
         WITH t, count(col) AS column_count
         RETURN
@@ -200,7 +246,16 @@ class Neo4jTableSearch:
             driver = Neo4jClient.get_driver()
             with driver.session(database=settings.neo4j_database) as session:
                 result = run_cypher(
-                    session, cypher, {"catalog": catalog, "schema": schema, "table": table}
+                    session,
+                    cypher,
+                    {
+                        "catalog": catalog,
+                        "schema": schema,
+                        "table": table,
+                        "tenantId": tenant_id,
+                        "userId": user_id,
+                        "systemCreators": cls._SYSTEM_CREATORS,
+                    },
                 )
                 record = result.single()
 
@@ -225,6 +280,9 @@ class Neo4jTableSearch:
         catalog: str,
         schema: str,
         table: str,
+        *,
+        tenant_id: int | None = None,
+        user_id: int | None = None,
     ) -> dict[str, Any] | None:
         """
         获取表详情（含列和值域）
@@ -239,6 +297,13 @@ class Neo4jTableSearch:
         """
         cypher = """
         MATCH (cat:Catalog {name: $catalog})-[:HAS_SCHEMA]->(sch:Schema {name: $schema})-[:HAS_TABLE]->(t:Table {name: $table})
+        WHERE ($tenantId IS NULL OR (cat.tenantId = $tenantId AND sch.tenantId = $tenantId AND t.tenantId = $tenantId))
+          AND (
+            $userId IS NULL
+            OR t.createdBy IS NULL
+            OR toString(t.createdBy) = toString($userId)
+            OR t.createdBy IN $systemCreators
+          )
         OPTIONAL MATCH (t)-[:HAS_COLUMN]->(col:Column)
         OPTIONAL MATCH (col)-[:HAS_VALUE_DOMAIN]->(vd:ValueDomain)
         WITH t, col, vd
@@ -265,7 +330,16 @@ class Neo4jTableSearch:
             driver = Neo4jClient.get_driver()
             with driver.session(database=settings.neo4j_database) as session:
                 result = run_cypher(
-                    session, cypher, {"catalog": catalog, "schema": schema, "table": table}
+                    session,
+                    cypher,
+                    {
+                        "catalog": catalog,
+                        "schema": schema,
+                        "table": table,
+                        "tenantId": tenant_id,
+                        "userId": user_id,
+                        "systemCreators": cls._SYSTEM_CREATORS,
+                    },
                 )
                 record = result.single()
 
@@ -294,6 +368,9 @@ class Neo4jTableSearch:
         schema: str,
         table: str,
         direction: str = "both",
+        *,
+        tenant_id: int | None = None,
+        user_id: int | None = None,
     ) -> dict[str, Any]:
         """
         获取表血缘关系
@@ -310,9 +387,17 @@ class Neo4jTableSearch:
 
         cypher = """
         MATCH (source:Table)-[:INPUT_OF]->(sql:SQL)-[:OUTPUT_TO]->(target:Table)
+        WHERE ($tenantId IS NULL OR (source.tenantId = $tenantId AND sql.tenantId = $tenantId AND target.tenantId = $tenantId))
+          AND (
+            $userId IS NULL
+            OR sql.createdBy IS NULL
+            OR toString(sql.createdBy) = toString($userId)
+            OR sql.createdBy IN $systemCreators
+          )
         WITH source, target, sql
         MATCH (source)<-[:HAS_TABLE]-(source_schema:Schema)
         MATCH (target)<-[:HAS_TABLE]-(target_schema:Schema)
+        WHERE ($tenantId IS NULL OR (source_schema.tenantId = $tenantId AND target_schema.tenantId = $tenantId))
         RETURN DISTINCT
             source_schema.name + '.' + source.name AS source_table,
             target_schema.name + '.' + target.name AS target_table,
@@ -323,7 +408,15 @@ class Neo4jTableSearch:
         try:
             driver = Neo4jClient.get_driver()
             with driver.session(database=settings.neo4j_database) as session:
-                result = run_cypher(session, cypher)
+                result = run_cypher(
+                    session,
+                    cypher,
+                    {
+                        "tenantId": tenant_id,
+                        "userId": user_id,
+                        "systemCreators": cls._SYSTEM_CREATORS,
+                    },
+                )
                 records = result.data()
 
                 upstream = []
@@ -420,6 +513,9 @@ class Neo4jTableSearch:
         cls,
         source_tables: list[str],
         target_table: str,
+        *,
+        tenant_id: int | None = None,
+        user_id: int | None = None,
     ) -> dict[str, Any] | None:
         """
         根据血缘关系精准查找 SQL
@@ -449,6 +545,13 @@ class Neo4jTableSearch:
         MATCH {target_match}
         MATCH (source:Table)-[:INPUT_OF]->(sql:SQL)-[:OUTPUT_TO]->(target)
         WHERE source.name IN $source_names
+          AND ($tenantId IS NULL OR (source.tenantId = $tenantId AND target.tenantId = $tenantId AND sql.tenantId = $tenantId))
+          AND (
+            $userId IS NULL
+            OR sql.createdBy IS NULL
+            OR toString(sql.createdBy) = toString($userId)
+            OR sql.createdBy IN $systemCreators
+          )
         WITH sql, target, collect(DISTINCT source.name) AS source_tables
         RETURN
             sql.id AS sql_id,
@@ -462,7 +565,13 @@ class Neo4jTableSearch:
         LIMIT 1
         """
 
-        params: dict[str, Any] = {"source_names": source_names, "target_name": target_name}
+        params: dict[str, Any] = {
+            "source_names": source_names,
+            "target_name": target_name,
+            "tenantId": tenant_id,
+            "userId": user_id,
+            "systemCreators": cls._SYSTEM_CREATORS,
+        }
         if target_schema:
             params["target_schema"] = target_schema
 
@@ -487,6 +596,7 @@ class Neo4jTableSearch:
         top_k: int = 3,
         min_score: float = 0.55,
         tenant_id: int | None = None,
+        user_id: int | None = None,
     ) -> list[dict[str, Any]]:
         """
         混合搜索表（向量 + 全文）
@@ -534,6 +644,11 @@ class Neo4jTableSearch:
             results = retriever.search(
                 query_text=query,
                 top_k=top_k,
+                query_params={
+                    "tenantId": tenant_id,
+                    "userId": user_id,
+                    "systemCreators": cls._SYSTEM_CREATORS,
+                },
                 ranker=HybridSearchRanker.LINEAR,
                 alpha=0.6,
             )

@@ -2,7 +2,6 @@ package com.sunny.datapillar.studio.module.user.service.impl;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -13,31 +12,26 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.sunny.datapillar.studio.module.tenant.dto.FeatureEntitlementDto;
 import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
-import com.sunny.datapillar.studio.module.user.dto.UserDto;
 import com.sunny.datapillar.studio.module.tenant.entity.Permission;
+import com.sunny.datapillar.studio.module.tenant.mapper.FeatureObjectMapper;
 import com.sunny.datapillar.studio.module.user.entity.TenantUser;
 import com.sunny.datapillar.studio.module.user.entity.User;
 import com.sunny.datapillar.studio.module.user.entity.Role;
-import com.sunny.datapillar.studio.module.user.entity.UserPermission;
 import com.sunny.datapillar.studio.module.user.entity.UserRole;
 import com.sunny.datapillar.studio.module.tenant.mapper.PermissionMapper;
-import com.sunny.datapillar.studio.module.tenant.mapper.FeatureObjectMapper;
-import com.sunny.datapillar.studio.module.tenant.mapper.TenantFeaturePermissionMapper;
 import com.sunny.datapillar.studio.module.tenant.util.PermissionLevelUtil;
+import com.sunny.datapillar.studio.module.user.dto.UserDto;
 import com.sunny.datapillar.studio.module.user.mapper.RoleMapper;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
 import com.sunny.datapillar.studio.module.user.service.UserService;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
-import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.sunny.datapillar.common.exception.BadRequestException;
 import com.sunny.datapillar.common.exception.UnauthorizedException;
-import com.sunny.datapillar.common.exception.ForbiddenException;
 import com.sunny.datapillar.common.exception.NotFoundException;
 import com.sunny.datapillar.common.exception.AlreadyExistsException;
 import com.sunny.datapillar.common.exception.ConflictException;
@@ -54,12 +48,14 @@ import com.sunny.datapillar.common.exception.ConflictException;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
+    private static final int MEMBER_STATUS_ENABLED = 1;
+    private static final int MEMBER_STATUS_DISABLED = 0;
+
     private final UserMapper userMapper;
     private final TenantUserMapper tenantUserMapper;
     private final PasswordEncoder passwordEncoder;
     private final PermissionMapper permissionMapper;
     private final FeatureObjectMapper featureObjectMapper;
-    private final TenantFeaturePermissionMapper tenantFeaturePermissionMapper;
     private final RoleMapper roleMapper;
 
     @Override
@@ -193,7 +189,6 @@ public class UserServiceImpl implements UserService {
 
         tenantUserMapper.deleteByTenantIdAndUserId(tenantId, id);
         userMapper.deleteUserRoles(tenantId, id);
-        userMapper.deleteUserPermissions(tenantId, id);
 
         log.info("Removed tenant member: tenantId={}, id={}", tenantId, id);
     }
@@ -216,6 +211,23 @@ public class UserServiceImpl implements UserService {
     public List<User> listUsers(Integer status) {
         Long tenantId = getRequiredTenantId();
         return userMapper.selectUsersByTenantIdAndStatus(tenantId, status);
+    }
+
+    @Override
+    @Transactional
+    public void updateTenantMemberStatus(Long userId, Integer status) {
+        Long tenantId = getRequiredTenantId();
+        if (userId == null
+                || status == null
+                || (status != MEMBER_STATUS_ENABLED && status != MEMBER_STATUS_DISABLED)) {
+            throw new BadRequestException("参数错误");
+        }
+        TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, userId);
+        if (tenantUser == null) {
+            throw new NotFoundException("用户不存在: %s", userId);
+        }
+        tenantUser.setStatus(status);
+        tenantUserMapper.updateById(tenantUser);
     }
 
     @Override
@@ -264,20 +276,10 @@ public class UserServiceImpl implements UserService {
         List<FeatureObjectDto.ObjectPermission> objects = featureObjectMapper.selectFeatureObjectsAll(tenantId);
         List<FeatureObjectDto.RoleSource> roleSources =
                 featureObjectMapper.selectUserRoleSources(tenantId, userId);
-        List<FeatureObjectDto.Assignment> overrides =
-                featureObjectMapper.selectUserOverridePermissions(tenantId, userId);
         Map<String, Permission> permissionMap = getPermissionMap();
 
         Map<Long, List<FeatureObjectDto.RoleSource>> roleSourceMap = roleSources == null ? new HashMap<>()
                 : roleSources.stream().collect(Collectors.groupingBy(FeatureObjectDto.RoleSource::getObjectId));
-        Map<Long, String> overrideMap = new HashMap<>();
-        if (overrides != null) {
-            for (FeatureObjectDto.Assignment assignment : overrides) {
-                if (assignment != null && assignment.getObjectId() != null) {
-                    overrideMap.put(assignment.getObjectId(), normalizePermissionCode(assignment.getPermissionCode()));
-                }
-            }
-        }
 
         List<FeatureObjectDto.ObjectPermission> result = new ArrayList<>();
         if (objects == null) {
@@ -289,61 +291,11 @@ public class UserServiceImpl implements UserService {
             object.setRoleSources(sources);
 
             String rolePermission = calculateRoleMaxPermission(sources, permissionMap);
-            String userOverride = overrideMap.get(objectId);
-            object.setUserOverrideCode(userOverride);
-            String maxPermission = calculateMaxPermission(permissionMap, rolePermission, userOverride);
             String tenantLimit = object.getTenantPermissionCode();
-            object.setPermissionCode(PermissionLevelUtil.minCode(permissionMap, maxPermission, tenantLimit));
+            object.setPermissionCode(PermissionLevelUtil.minCode(permissionMap, rolePermission, tenantLimit));
             result.add(object);
         }
         return result;
-    }
-
-    @Override
-    @Transactional
-    public void updateUserPermissions(Long userId, List<FeatureObjectDto.Assignment> permissions) {
-        Long tenantId = getRequiredTenantId();
-        if (userMapper.selectByIdAndTenantId(tenantId, userId) == null) {
-            throw new NotFoundException("用户不存在: %s", userId);
-        }
-        userMapper.deleteUserPermissions(tenantId, userId);
-
-        if (permissions == null || permissions.isEmpty()) {
-            return;
-        }
-
-        Map<String, Permission> permissionMap = getPermissionMap();
-        Map<Long, Permission> permissionByIdMap = getPermissionByIdMap(permissionMap);
-        Map<Long, FeatureEntitlementDto.PermissionLimit> limitMap = getTenantPermissionLimitMap(tenantId);
-        Map<Long, FeatureObjectDto.Assignment> uniqueAssignments = new LinkedHashMap<>();
-        for (FeatureObjectDto.Assignment assignment : permissions) {
-            if (assignment == null || assignment.getObjectId() == null) {
-                continue;
-            }
-            uniqueAssignments.put(assignment.getObjectId(), assignment);
-        }
-
-        for (Map.Entry<Long, FeatureObjectDto.Assignment> entry : uniqueAssignments.entrySet()) {
-            FeatureObjectDto.Assignment assignment = entry.getValue();
-            Permission resolvedPermission = resolvePermission(assignment, permissionMap, permissionByIdMap);
-            Long permissionId = resolvedPermission.getId();
-            FeatureEntitlementDto.PermissionLimit limit = limitMap.get(entry.getKey());
-            if (limit == null || limit.getStatus() == null || limit.getStatus() != 1) {
-                throw new ForbiddenException("无权限访问");
-            }
-            int limitLevel = limit.getPermissionLevel() == null ? 0 : limit.getPermissionLevel();
-            int permissionLevel = resolvedPermission.getLevel() == null ? 0 : resolvedPermission.getLevel();
-            if (permissionLevel > limitLevel) {
-                throw new ForbiddenException("无权限访问");
-            }
-
-            UserPermission userPermission = new UserPermission();
-            userPermission.setTenantId(tenantId);
-            userPermission.setUserId(userId);
-            userPermission.setObjectId(entry.getKey());
-            userPermission.setPermissionId(permissionId);
-            userMapper.insertUserPermission(userPermission);
-        }
     }
 
     @Override
@@ -391,76 +343,14 @@ public class UserServiceImpl implements UserService {
         return map;
     }
 
-    private Map<Long, FeatureEntitlementDto.PermissionLimit> getTenantPermissionLimitMap(Long tenantId) {
-        List<FeatureEntitlementDto.PermissionLimit> limits =
-                tenantFeaturePermissionMapper.selectPermissionLimits(tenantId);
-        Map<Long, FeatureEntitlementDto.PermissionLimit> map = new HashMap<>();
-        if (limits == null) {
-            return map;
-        }
-        for (FeatureEntitlementDto.PermissionLimit limit : limits) {
-            if (limit != null && limit.getObjectId() != null) {
-                map.put(limit.getObjectId(), limit);
-            }
-        }
-        return map;
-    }
-
-    private String normalizePermissionCode(String code) {
-        return PermissionLevelUtil.normalizeCode(code);
-    }
-
     private String calculateRoleMaxPermission(List<FeatureObjectDto.RoleSource> sources,
                                               Map<String, Permission> permissionMap) {
         if (sources == null || sources.isEmpty()) {
-            return "NONE";
+            return "DISABLE";
         }
         List<String> codes = sources.stream()
                 .map(FeatureObjectDto.RoleSource::getPermissionCode)
                 .collect(Collectors.toList());
         return PermissionLevelUtil.maxCode(permissionMap, codes);
-    }
-
-    private String calculateMaxPermission(Map<String, Permission> permissionMap,
-                                          String rolePermission,
-                                          String userOverride) {
-        return PermissionLevelUtil.maxCode(permissionMap, rolePermission, userOverride);
-    }
-
-    private Map<Long, Permission> getPermissionByIdMap(Map<String, Permission> permissionMap) {
-        Map<Long, Permission> map = new HashMap<>();
-        if (permissionMap == null) {
-            return map;
-        }
-        for (Permission permission : permissionMap.values()) {
-            if (permission != null && permission.getId() != null) {
-                map.put(permission.getId(), permission);
-            }
-        }
-        return map;
-    }
-
-    private Permission resolvePermission(FeatureObjectDto.Assignment assignment,
-                                         Map<String, Permission> permissionMap,
-                                         Map<Long, Permission> permissionByIdMap) {
-        if (assignment == null) {
-            throw new BadRequestException("参数错误");
-        }
-        if (assignment.getPermissionId() != null) {
-            Permission permission = permissionByIdMap.get(assignment.getPermissionId());
-            if (permission == null) {
-                throw new BadRequestException("参数错误", String.valueOf(assignment.getPermissionId()));
-            }
-            return permission;
-        }
-        String code = normalizePermissionCode(assignment.getPermissionCode());
-        if (code == null) {
-            throw new BadRequestException("参数错误");
-        }
-        Permission permission = permissionMap.get(code);
-        if (permission == null) {
-            throw new BadRequestException("参数错误", assignment.getPermissionCode());
-        }
-        return permission;
     }
 }

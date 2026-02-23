@@ -1,32 +1,17 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
-"""
-OpenLineage Sink API
+"""OpenLineage Sink API。"""
 
-提供 HTTP 端点接收 OpenLineage 事件
-
-配置示例（Producer 端 openlineage.yml）：
-```yaml
-transport:
-  type: http
-  url: http://datapillar-ai:7003
-  endpoint: /api/ai/openlineage
-```
-"""
+from __future__ import annotations
 
 from typing import Any
 
-import logging
-from fastapi import APIRouter, Request, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Request
 
-from src.modules.openlineage.service import OpenLineageSinkService
 from src.modules.openlineage.schemas.events import RunEvent
-from src.shared.web import ApiResponse
-
-logger = logging.getLogger(__name__)
+from src.modules.openlineage.service import OpenLineageSinkService
+from src.shared.web import ApiResponse, ApiSuccessResponseSchema
 
 router = APIRouter()
 _service: OpenLineageSinkService | None = None
@@ -52,59 +37,28 @@ def _get_service() -> OpenLineageSinkService:
 
 注意：retry、rate_limit、filter 由 Producer 端配置
 """,
+    response_model=ApiSuccessResponseSchema,
 )
-async def receive_event(request: Request, event: RunEvent):
-    """接收 OpenLineage 事件"""
-    try:
-        service = _get_service()
-        result = await service.handle_event(event)
-
-        if not result.get("success"):
-            error = result.get("error", "Unknown error")
-            if "Queue full" in error:
-                status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-                code = "SERVICE_UNAVAILABLE"
-            else:
-                status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-                code = "INTERNAL_ERROR"
-            return JSONResponse(
-                status_code=status_code,
-                content=ApiResponse.error(
-                    request=request,
-                    status=status_code,
-                    code=code,
-                    message=error,
-                ),
-            )
-
-        return ApiResponse.success(
-            request=request,
-            data={
-                "success": True,
-                "queued": True,
-                "queue_size": result.get("queue_size"),
-                "message": "Event queued",
-            },
-        )
-
-    except Exception as e:
-        logger.error(
-            "receive_event_failed",
-            extra={"data": {"error": str(e)}},
-        )
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=ApiResponse.error(
-                request=request,
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                code="INTERNAL_ERROR",
-                message=str(e),
-            ),
-        )
+async def receive_event(request: Request, event: RunEvent) -> dict[str, Any]:
+    """接收 OpenLineage 事件。"""
+    current_user = request.state.current_user
+    result = await _get_service().handle_event(
+        event,
+        tenant_id=current_user.tenant_id,
+        operator_user_id=current_user.user_id,
+    )
+    return ApiResponse.success(
+        data={
+            "success": True,
+            "queued": True,
+            "queue_size": result.get("queue_size"),
+            "message": "Event queued",
+        },
+    )
 
 
 @router.get("/stats", summary="获取统计信息")
 async def get_stats(request: Request) -> dict[str, Any]:
-    """获取统计信息"""
-    service = _get_service()
-    return ApiResponse.success(request=request, data=service.get_stats())
+    """获取统计信息。"""
+    current_user = request.state.current_user
+    return ApiResponse.success(data=_get_service().get_stats(tenant_id=current_user.tenant_id))

@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package datapillar.security.v1;
+
+option java_multiple_files = true;
+option java_package = "com.sunny.datapillar.common.rpc.security.v1";
+
+import "datapillar/security/v1/common.proto";
+
+message CheckAuthenticationRequest {
+  RpcMeta meta = 1;
+  string token = 2;
+  string method = 3;
+  string path = 4;
+  int64 tenant_id_hint = 5;
+}
+
+message CheckAuthenticationResponse {
+  bool authenticated = 1;
+  DenyCode deny_code = 2;
+  string message = 3;
+  Principal principal = 4;
+  string gateway_assertion = 5;
+}
+
+service AuthenticationService {
+  rpc CheckAuthentication(CheckAuthenticationRequest) returns (CheckAuthenticationResponse);
+}

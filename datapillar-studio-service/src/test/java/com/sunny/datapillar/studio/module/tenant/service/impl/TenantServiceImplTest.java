@@ -1,16 +1,18 @@
 package com.sunny.datapillar.studio.module.tenant.service.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.sunny.datapillar.common.exception.AlreadyExistsException;
 import com.sunny.datapillar.studio.module.tenant.dto.TenantDto;
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantMapper;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoGenericClient;
+import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,7 +26,7 @@ class TenantServiceImplTest {
     @Mock
     private TenantMapper tenantMapper;
     @Mock
-    private AuthCryptoGenericClient authCryptoClient;
+    private AuthCryptoRpcClient authCryptoClient;
 
     private TenantServiceImpl tenantService;
 
@@ -34,8 +36,14 @@ class TenantServiceImplTest {
     }
 
     @Test
-    void createTenant_shouldInsertOnlyOnceAndNotDoSecondUpdate() {
+    void createTenant_shouldEnsureKeyThenInsertActiveTenant() {
         when(tenantMapper.selectByCode("tenant-acme")).thenReturn(null);
+        when(authCryptoClient.ensureTenantKey("tenant-acme"))
+                .thenReturn(new AuthCryptoRpcClient.TenantKeySnapshot(
+                        "tenant-acme",
+                        "-----BEGIN PUBLIC KEY-----mock-----END PUBLIC KEY-----",
+                        "v1",
+                        "fp-1"));
         when(tenantMapper.insert(any(Tenant.class))).thenAnswer(invocation -> {
             Tenant tenant = invocation.getArgument(0);
             tenant.setId(101L);
@@ -52,11 +60,12 @@ class TenantServiceImplTest {
         assertEquals(101L, tenantId);
         ArgumentCaptor<Tenant> tenantCaptor = ArgumentCaptor.forClass(Tenant.class);
         verify(tenantMapper).insert(tenantCaptor.capture());
+        verify(authCryptoClient).ensureTenantKey(eq("tenant-acme"));
         verify(tenantMapper, never()).updateById(any(Tenant.class));
-        verify(authCryptoClient).savePrivateKey(eq(101L), any(String.class));
         assertEquals("tenant-acme", tenantCaptor.getValue().getCode());
         assertEquals("ACME", tenantCaptor.getValue().getName());
         assertEquals("ENTERPRISE", tenantCaptor.getValue().getType());
+        assertEquals("-----BEGIN PUBLIC KEY-----mock-----END PUBLIC KEY-----", tenantCaptor.getValue().getEncryptPublicKey());
         assertEquals(1, tenantCaptor.getValue().getStatus());
     }
 
@@ -80,5 +89,24 @@ class TenantServiceImplTest {
         assertEquals("tenant-acme", tenantCaptor.getValue().getCode());
         assertEquals("New Name", tenantCaptor.getValue().getName());
         assertEquals("ENTERPRISE", tenantCaptor.getValue().getType());
+    }
+
+    @Test
+    void createTenant_shouldPropagatePrivateKeyAlreadyExists() {
+        when(tenantMapper.selectByCode("tenant-acme")).thenReturn(null);
+        when(authCryptoClient.ensureTenantKey("tenant-acme"))
+                .thenThrow(new AlreadyExistsException("私钥文件已存在: tenant-acme"));
+
+        TenantDto.Create dto = new TenantDto.Create();
+        dto.setCode("tenant-acme");
+        dto.setName("ACME");
+        dto.setType("ENTERPRISE");
+
+        AlreadyExistsException ex = assertThrows(
+                AlreadyExistsException.class,
+                () -> tenantService.createTenant(dto));
+
+        assertEquals("私钥文件已存在: tenant-acme", ex.getMessage());
+        verify(tenantMapper, never()).insert(any(Tenant.class));
     }
 }

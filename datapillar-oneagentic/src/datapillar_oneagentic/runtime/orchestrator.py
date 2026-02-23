@@ -21,9 +21,9 @@ from typing import Any
 from langgraph.graph import StateGraph
 from langgraph.types import Command
 
-from datapillar_oneagentic.exception import AgentError
+from datapillar_oneagentic.context import ContextBuilder
 from datapillar_oneagentic.core.process import Process
-from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind, is_failed
+from datapillar_oneagentic.core.status import ExecutionStatus, is_failed
 from datapillar_oneagentic.core.types import SessionKey
 from datapillar_oneagentic.events import (
     AgentStartedEvent,
@@ -40,11 +40,10 @@ from datapillar_oneagentic.events import (
     ToolFailedEvent,
     build_event_payload,
 )
+from datapillar_oneagentic.exception import DatapillarException
 from datapillar_oneagentic.providers.llm.llm import extract_thinking
-from datapillar_oneagentic.context import ContextBuilder
 from datapillar_oneagentic.state import StateBuilder
 from datapillar_oneagentic.utils.time import now_ms
-from datapillar_oneagentic.exception import LLMError
 
 logger = logging.getLogger(__name__)
 
@@ -253,44 +252,20 @@ class Orchestrator:
 
     def _build_error_event(self, error: Exception, *, key: SessionKey, start_time: int) -> dict:
         """Build an error SSE event for streaming responses."""
-        if isinstance(error, LLMError):
+        if isinstance(error, DatapillarException):
             agent_id = error.agent_id
-            agent_name = self._get_agent_name(agent_id) if agent_id else None
-            detail_parts = [
-                f"category={error.category.value}",
-                f"action={error.action.value}",
-            ]
+            detail_parts = [f"exception={type(error).__name__}"]
             if error.provider:
                 detail_parts.append(f"provider={error.provider}")
             if error.model:
                 detail_parts.append(f"model={error.model}")
+            if error.status_code is not None:
+                detail_parts.append(f"status_code={error.status_code}")
+            if error.vendor_code:
+                detail_parts.append(f"vendor_code={error.vendor_code}")
             if agent_id:
                 detail_parts.append(f"agent_id={agent_id}")
             detail_parts.append(f"error={str(error)}")
-            return build_event_payload(
-                event=EventType.AGENT_FAILED,
-                key=key,
-                agent_id=agent_id or "system",
-                agent_name=agent_name or "system",
-                duration_ms=now_ms() - start_time,
-                data={
-                    "error": {
-                        "message": "LLM execution failed",
-                        "detail": "; ".join(detail_parts),
-                        "error_type": "llm",
-                    }
-                },
-            )
-
-        if isinstance(error, AgentError):
-            agent_id = error.agent_id
-            detail_parts = [
-                f"category={error.category.value}",
-                f"action={error.action.value}",
-                f"failure_kind={error.failure_kind.value}",
-                f"agent_id={agent_id}",
-                f"error={str(error)}",
-            ]
             return build_event_payload(
                 event=EventType.AGENT_FAILED,
                 key=key,
@@ -299,9 +274,9 @@ class Orchestrator:
                 duration_ms=now_ms() - start_time,
                 data={
                     "error": {
-                        "message": "Agent execution failed",
+                        "message": "Execution failed",
                         "detail": "; ".join(detail_parts),
-                        "error_type": "agent",
+                        "error_type": type(error).__name__,
                     }
                 },
             )
@@ -804,13 +779,11 @@ class Orchestrator:
                         # Build agent end event.
                         agent_status = ExecutionStatus.COMPLETED
                         agent_error = None
-                        agent_failure_kind = None
                         if isinstance(node_output, dict):
                             agent_status = node_output.get(
                                 "last_agent_status", ExecutionStatus.COMPLETED
                             )
                             agent_error = node_output.get("last_agent_error")
-                            agent_failure_kind = node_output.get("last_agent_failure_kind")
 
                         if agent_status == ExecutionStatus.ABORTED:
                             aborted = True
@@ -820,11 +793,6 @@ class Orchestrator:
                             break
 
                         if is_failed(agent_status):
-                            error_type = (
-                                agent_failure_kind.value
-                                if isinstance(agent_failure_kind, FailureKind)
-                                else "agent"
-                            )
                             yield build_event_payload(
                                 event=EventType.AGENT_FAILED,
                                 key=key,
@@ -834,7 +802,7 @@ class Orchestrator:
                                     "error": {
                                         "message": "Agent execution failed",
                                         "detail": agent_error or "Execution failed",
-                                        "error_type": error_type,
+                                        "error_type": "agent",
                                     }
                                 },
                             )

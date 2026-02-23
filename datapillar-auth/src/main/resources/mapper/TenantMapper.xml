@@ -3,7 +3,7 @@
 <mapper namespace="com.sunny.datapillar.auth.mapper.TenantMapper">
 
     <select id="selectByCode" resultType="com.sunny.datapillar.auth.entity.Tenant">
-        SELECT id, code, status
+        SELECT id, code, encrypt_public_key, status
         FROM tenants
         WHERE code = #{code}
     </select>

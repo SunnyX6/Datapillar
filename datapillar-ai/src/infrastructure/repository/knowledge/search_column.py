@@ -23,10 +23,19 @@ logger = logging.getLogger(__name__)
 class Neo4jColumnSearch:
     """Neo4j 列查询服务"""
 
+    _SYSTEM_CREATORS = ["OPENLINEAGE", "GRAVITINO_SYNC", "system", "SYSTEM"]
+
     _COLUMN_RETRIEVAL_QUERY = """
     OPTIONAL MATCH (t:Table)-[:HAS_COLUMN]->(node)
     OPTIONAL MATCH (s:Schema)-[:HAS_TABLE]->(t)
     OPTIONAL MATCH (c:Catalog)-[:HAS_SCHEMA]->(s)
+    WHERE ($tenantId IS NULL OR coalesce(node.tenantId, t.tenantId, s.tenantId, c.tenantId) = $tenantId)
+      AND (
+        $userId IS NULL
+        OR node.createdBy IS NULL
+        OR toString(node.createdBy) = toString($userId)
+        OR node.createdBy IN $systemCreators
+      )
     RETURN
         node.id AS node_id,
         'Column' AS type,
@@ -51,6 +60,7 @@ class Neo4jColumnSearch:
         top_k: int = 3,
         min_score: float = 0.55,
         tenant_id: int | None = None,
+        user_id: int | None = None,
     ) -> list[dict[str, Any]]:
         """
         混合搜索列（向量 + 全文）
@@ -95,6 +105,11 @@ class Neo4jColumnSearch:
             results = retriever.search(
                 query_text=query,
                 top_k=top_k,
+                query_params={
+                    "tenantId": tenant_id,
+                    "userId": user_id,
+                    "systemCreators": cls._SYSTEM_CREATORS,
+                },
                 ranker=HybridSearchRanker.LINEAR,
                 alpha=0.6,
             )

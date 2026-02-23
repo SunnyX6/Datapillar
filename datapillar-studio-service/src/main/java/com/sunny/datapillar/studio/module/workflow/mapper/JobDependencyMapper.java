@@ -32,7 +32,9 @@ public interface JobDependencyMapper extends BaseMapper<JobDependency> {
     /**
      * 删除指定的依赖关系
      */
-    int deleteDependency(@Param("jobId") Long jobId, @Param("parentJobId") Long parentJobId);
+    int deleteDependency(@Param("workflowId") Long workflowId,
+                         @Param("jobId") Long jobId,
+                         @Param("parentJobId") Long parentJobId);
 
     /**
      * 根据工作流ID删除所有依赖（逻辑删除）

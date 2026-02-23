@@ -24,9 +24,4 @@ public class UserPermissionServiceImpl implements UserPermissionService {
     public List<FeatureObjectDto.ObjectPermission> listPermissions(Long userId) {
         return userService.getUserPermissions(userId);
     }
-
-    @Override
-    public void updatePermissions(Long userId, List<FeatureObjectDto.Assignment> permissions) {
-        userService.updateUserPermissions(userId, permissions);
-    }
 }

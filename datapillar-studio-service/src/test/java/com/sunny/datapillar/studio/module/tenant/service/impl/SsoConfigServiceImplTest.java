@@ -6,19 +6,20 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.common.exception.BadRequestException;
 import com.sunny.datapillar.studio.context.TenantContext;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
 import com.sunny.datapillar.studio.module.tenant.dto.SsoConfigDto;
 import com.sunny.datapillar.studio.module.tenant.entity.TenantSsoConfig;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantSsoConfigMapper;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoGenericClient;
+import com.sunny.datapillar.studio.module.tenant.service.TenantCodeResolver;
+import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -35,15 +36,18 @@ class SsoConfigServiceImplTest {
     @Mock
     private TenantSsoConfigMapper tenantSsoConfigMapper;
     @Mock
-    private AuthCryptoGenericClient authCryptoClient;
+    private AuthCryptoRpcClient authCryptoClient;
+    @Mock
+    private TenantCodeResolver tenantCodeResolver;
 
     private SsoConfigServiceImpl service;
 
     @BeforeEach
     void setUp() {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), TenantSsoConfig.class);
-        TenantContextHolder.set(new TenantContext(1L, null, null, false));
-        service = new SsoConfigServiceImpl(tenantSsoConfigMapper, authCryptoClient, new ObjectMapper());
+        TenantContextHolder.set(new TenantContext(1L, "tenant-1", null, null, false));
+        service = new SsoConfigServiceImpl(tenantSsoConfigMapper, authCryptoClient, tenantCodeResolver, new ObjectMapper());
+        lenient().when(tenantCodeResolver.requireTenantCode(1L)).thenReturn("tenant-1");
     }
 
     @AfterEach
@@ -58,9 +62,8 @@ class SsoConfigServiceImplTest {
         dto.setStatus(1);
         dto.setConfig(buildConfig("client", "secret", "https://redirect"));
 
-        BusinessException exception = assertThrows(BusinessException.class, () -> service.createConfig(dto));
-
-        assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
+        BadRequestException exception = assertThrows(BadRequestException.class, () -> service.createConfig(dto));
+        assertEquals("参数错误", exception.getMessage());
     }
 
     @Test
@@ -70,9 +73,8 @@ class SsoConfigServiceImplTest {
         dto.setStatus(1);
         dto.setConfig(buildConfig("client", null, "https://redirect"));
 
-        BusinessException exception = assertThrows(BusinessException.class, () -> service.createConfig(dto));
-
-        assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
+        BadRequestException exception = assertThrows(BadRequestException.class, () -> service.createConfig(dto));
+        assertEquals("参数错误", exception.getMessage());
     }
 
     @Test
@@ -82,9 +84,8 @@ class SsoConfigServiceImplTest {
         dto.setStatus(2);
         dto.setConfig(buildConfig("client", "secret", "https://redirect"));
 
-        BusinessException exception = assertThrows(BusinessException.class, () -> service.createConfig(dto));
-
-        assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
+        BadRequestException exception = assertThrows(BadRequestException.class, () -> service.createConfig(dto));
+        assertEquals("参数错误", exception.getMessage());
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.sunny.datapillar.auth.handler;
 
-import com.sunny.datapillar.common.constant.ErrorConstants;
+import com.sunny.datapillar.common.constant.Code;
+import com.sunny.datapillar.common.constant.ErrorType;
 import com.sunny.datapillar.common.exception.InternalException;
 import com.sunny.datapillar.common.response.ErrorResponse;
 import org.junit.jupiter.api.Test;
@@ -23,8 +24,8 @@ class AuthControllerExceptionHandlerTest {
         ErrorResponse errorResponse = handler.handleDatapillarRuntimeException(exception, response);
 
         assertEquals(500, response.getStatus());
-        assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
-        assertEquals("InternalException", errorResponse.getType());
+        assertEquals(Code.INTERNAL_ERROR, errorResponse.getCode());
+        assertEquals(ErrorType.INTERNAL_ERROR, errorResponse.getType());
         assertEquals("db_connect_failed", errorResponse.getMessage());
         assertTrue(errorResponse.getStack() != null && !errorResponse.getStack().isEmpty());
     }
@@ -37,8 +38,8 @@ class AuthControllerExceptionHandlerTest {
         ErrorResponse errorResponse = handler.handleException(exception, response);
 
         assertEquals(500, response.getStatus());
-        assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
-        assertEquals("IllegalStateException", errorResponse.getType());
+        assertEquals(Code.INTERNAL_ERROR, errorResponse.getCode());
+        assertEquals(ErrorType.INTERNAL_ERROR, errorResponse.getType());
         assertEquals("mysql_unreachable", errorResponse.getMessage());
     }
 }

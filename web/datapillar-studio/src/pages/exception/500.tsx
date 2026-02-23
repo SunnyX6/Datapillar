@@ -1,36 +1,74 @@
 import { useState } from 'react'
 import { Activity, CheckCircle2, Copy, RefreshCw, ServerCrash } from 'lucide-react'
+import { getLastFatalError } from '@/lib/error-center'
+import { getStudioServiceHealth } from '@/services/healthService'
+import { cn, formatTime } from '@/lib/utils'
 
-const SERVICE_STATUS_URL = '/api/studio/setup/status'
+const HEALTHY_SERVICE_STATUS = new Set(['UP', 'OK', 'HEALTHY'])
 
-function buildErrorId(): string {
-  return `REF-${Math.random().toString(36).slice(2, 11).toUpperCase()}`
+type ServiceHealthState = 'idle' | 'checking' | 'healthy' | 'unhealthy'
+
+function resolveServiceHealthStatus(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object' || !('status' in payload)) {
+    return null
+  }
+  const status = (payload as { status?: unknown }).status
+  if (typeof status !== 'string' || !status.trim()) {
+    return null
+  }
+  return status.trim().toUpperCase()
 }
 
 export function ServerErrorPage() {
-  const [errorId] = useState(buildErrorId)
+  const [fatalError] = useState(() => getLastFatalError())
   const [copied, setCopied] = useState(false)
+  const [serviceHealthState, setServiceHealthState] = useState<ServiceHealthState>('idle')
+  const referenceId = fatalError?.requestId ?? fatalError?.traceId ?? 'N/A'
+  const hasReferenceId = referenceId !== 'N/A'
+  const errorTime = fatalError?.timestamp ? formatTime(fatalError.timestamp) : '-'
 
   const handleRetry = () => {
     window.location.replace('/')
   }
 
-  const handleServiceStatus = () => {
-    const popup = window.open(SERVICE_STATUS_URL, '_blank', 'noopener,noreferrer')
-    if (!popup) {
-      window.location.assign(SERVICE_STATUS_URL)
+  const handleServiceStatus = async () => {
+    if (serviceHealthState === 'checking') {
+      return
+    }
+    setServiceHealthState('checking')
+    try {
+      const payload = await getStudioServiceHealth()
+      const status = resolveServiceHealthStatus(payload)
+      if (status && HEALTHY_SERVICE_STATUS.has(status)) {
+        setServiceHealthState('healthy')
+        return
+      }
+      setServiceHealthState('unhealthy')
+    } catch {
+      setServiceHealthState('unhealthy')
     }
   }
 
   const handleCopy = async () => {
+    if (!hasReferenceId) {
+      return
+    }
     try {
-      await navigator.clipboard.writeText(errorId)
+      await navigator.clipboard.writeText(referenceId)
       setCopied(true)
       window.setTimeout(() => setCopied(false), 2000)
     } catch {
       setCopied(false)
     }
   }
+
+  const serviceStatusLabel = serviceHealthState === 'checking'
+    ? '检查中...'
+    : serviceHealthState === 'healthy'
+      ? '服务健康'
+      : serviceHealthState === 'unhealthy'
+        ? '服务异常'
+        : '查看服务状态'
 
   return (
     <div className="relative flex min-h-dvh w-full items-center justify-center overflow-hidden bg-slate-50 selection:bg-rose-100 selection:text-rose-600">
@@ -82,10 +120,28 @@ export function ServerErrorPage() {
           <button
             type="button"
             onClick={handleServiceStatus}
-            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-medium text-slate-700 transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-lg"
+            data-testid="server-health-button"
+            disabled={serviceHealthState === 'checking'}
+            className={cn(
+              'inline-flex items-center justify-center rounded-full border px-6 py-3 text-sm font-medium transition-all duration-300',
+              serviceHealthState === 'healthy'
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-100/70 hover:shadow-lg'
+                : serviceHealthState === 'checking'
+                  ? 'border-amber-300 bg-amber-50 text-amber-700 cursor-wait'
+                  : 'border-rose-300 bg-rose-50 text-rose-600 hover:-translate-y-0.5 hover:border-rose-400 hover:bg-rose-100/70 hover:shadow-lg'
+            )}
           >
-            <Activity className="mr-2 h-4 w-4 text-slate-400" />
-            查看服务状态
+            <Activity
+              className={cn(
+                'mr-2 h-4 w-4',
+                serviceHealthState === 'healthy'
+                  ? 'text-emerald-500'
+                  : serviceHealthState === 'checking'
+                    ? 'text-amber-500 animate-pulse'
+                    : 'text-rose-500'
+              )}
+            />
+            {serviceStatusLabel}
           </button>
         </div>
 
@@ -93,19 +149,25 @@ export function ServerErrorPage() {
           <button
             type="button"
             onClick={handleCopy}
-            className="inline-flex items-center gap-2 rounded-full border border-transparent bg-slate-100/50 px-4 py-2 text-slate-500 transition-all duration-300 hover:border-slate-200 hover:bg-white hover:text-indigo-600 hover:shadow-md"
+            className="inline-flex items-center gap-2 rounded-full border border-transparent bg-slate-100/50 px-4 py-2 text-slate-500 transition-all duration-300 hover:border-slate-200 hover:bg-white hover:text-indigo-600 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!hasReferenceId}
           >
-            <span className="text-xs font-semibold tracking-wider uppercase opacity-70">Error ID</span>
-            <span className="border-l border-slate-300 pl-2 font-mono text-sm font-medium">{errorId}</span>
-            {copied ? (
+            <span className="text-xs font-semibold tracking-wider uppercase opacity-70">Request ID</span>
+            <span className="border-l border-slate-300 pl-2 font-mono text-sm font-medium">{referenceId}</span>
+            {copied && hasReferenceId ? (
               <CheckCircle2 className="ml-1 h-3.5 w-3.5 text-green-500" />
             ) : (
-              <Copy className="ml-1 h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+              <Copy className={`ml-1 h-3.5 w-3.5 transition-opacity ${hasReferenceId ? 'opacity-0 group-hover:opacity-100' : 'opacity-0'}`} />
             )}
           </button>
           <p className="mt-3 text-xs text-slate-400 opacity-0 transition-opacity duration-500 group-hover:opacity-100">
-            点击复制 ID 发送给支持团队
+            {hasReferenceId ? '点击复制 Request ID 并提供给支持团队' : '当前错误未返回可追踪 ID'}
           </p>
+          <div className="mt-4 space-y-1 text-xs text-slate-500">
+            <p>模块：{fatalError?.module ?? '-'}</p>
+            <p>状态码：{fatalError?.status ?? '-'}</p>
+            <p>发生时间：{errorTime}</p>
+          </div>
         </div>
       </div>
 

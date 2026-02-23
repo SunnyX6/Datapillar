@@ -5,6 +5,7 @@
 import { Suspense, lazy, type LazyExoticComponent, type ComponentType } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
 import { PrivateRoute } from './PrivateRoute'
+import { RouteErrorBoundary } from './RouteErrorBoundary'
 
 const loadingFallback = (
   <div className="flex min-h-dvh items-center justify-center bg-slate-50 text-slate-500 dark:bg-[#020617]">
@@ -19,6 +20,7 @@ const withSuspense = (Component: LazyExoticComponent<ComponentType>) => (
 )
 
 const LazyEntryRoute = lazy(() => import('./EntryRoute').then(m => ({ default: m.EntryRoute })))
+const LazySetupGuardRoute = lazy(() => import('./SetupGuardRoute').then(m => ({ default: m.SetupGuardRoute })))
 const LazyLoginPage = lazy(() => import('@/pages/login').then(m => ({ default: m.LoginPage })))
 const LazySetupPage = lazy(() => import('@/pages/setup').then(m => ({ default: m.SetupPage })))
 const LazyInvitePage = lazy(() => import('@/pages/invite').then(m => ({ default: m.InvitePage })))
@@ -67,125 +69,135 @@ const LazyNotFoundPage = lazy(() => import('@/pages/exception').then(m => ({ def
 
 export const router = createBrowserRouter([
   {
-    path: '/',
-    element: withSuspense(LazyEntryRoute)
-  },
-  {
-    path: '/login',
-    element: withSuspense(LazyLoginPage)
-  },
-  {
-    path: '/setup',
-    element: withSuspense(LazySetupPage)
-  },
-  {
-    path: '/invite',
-    element: withSuspense(LazyInvitePage)
-  },
-  {
-    path: '/500',
-    element: withSuspense(LazyServerErrorPage)
-  },
-  {
-    element: <PrivateRoute />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
-        element: withSuspense(LazyMainLayout),
+        path: '/500',
+        element: withSuspense(LazyServerErrorPage)
+      },
+      {
+        element: withSuspense(LazySetupGuardRoute),
         children: [
           {
-            path: '/home',
-            element: withSuspense(LazyDashboardPage)
+            path: '/',
+            element: withSuspense(LazyEntryRoute)
           },
           {
-            path: '/projects',
-            element: withSuspense(LazyProjectsPage)
+            path: '/login',
+            element: withSuspense(LazyLoginPage)
           },
           {
-            path: '/collaboration',
-            element: withSuspense(LazyCollaborationPage)
+            path: '/setup',
+            element: withSuspense(LazySetupPage)
           },
           {
-            path: '/workflow',
-            element: withSuspense(LazyWorkflowStudioPage)
+            path: '/invite',
+            element: withSuspense(LazyInvitePage)
           },
           {
-            path: '/wiki',
-            element: withSuspense(LazyWikiPage)
+            element: <PrivateRoute />,
+            children: [
+              {
+                element: withSuspense(LazyMainLayout),
+                children: [
+                  {
+                    path: '/home',
+                    element: withSuspense(LazyDashboardPage)
+                  },
+                  {
+                    path: '/projects',
+                    element: withSuspense(LazyProjectsPage)
+                  },
+                  {
+                    path: '/collaboration',
+                    element: withSuspense(LazyCollaborationPage)
+                  },
+                  {
+                    path: '/workflow',
+                    element: withSuspense(LazyWorkflowStudioPage)
+                  },
+                  {
+                    path: '/wiki',
+                    element: withSuspense(LazyWikiPage)
+                  },
+                  {
+                    path: '/data-tracking',
+                    element: withSuspense(LazyDataTrackingPage)
+                  },
+                  {
+                    path: '/ide',
+                    element: withSuspense(LazyOneIdePage)
+                  },
+                  {
+                    path: '/ide/sql',
+                    element: withSuspense(LazySqlEditorPage)
+                  },
+                  {
+                    path: '/profile',
+                    element: withSuspense(LazyProfilePage)
+                  },
+                  {
+                    path: '/profile/permission',
+                    element: withSuspense(LazyPermissionPage)
+                  },
+                  {
+                    path: '/profile/llm/models',
+                    element: withSuspense(LazyModelManagementPage)
+                  },
+                  {
+                    path: '/governance/metadata',
+                    element: withSuspense(LazyGovernanceMetadataPage)
+                  },
+                  {
+                    path: '/governance/metadata/catalogs/:catalogName',
+                    element: withSuspense(LazyGovernanceMetadataPage)
+                  },
+                  {
+                    path: '/governance/metadata/catalogs/:catalogName/schemas/:schemaName',
+                    element: withSuspense(LazyGovernanceMetadataPage)
+                  },
+                  {
+                    path: '/governance/metadata/catalogs/:catalogName/schemas/:schemaName/tables/:tableName',
+                    element: withSuspense(LazyGovernanceMetadataPage)
+                  },
+                  {
+                    path: '/governance/semantic',
+                    element: withSuspense(LazyGovernanceSemanticPage)
+                  },
+                  {
+                    path: '/governance/semantic/metrics',
+                    element: withSuspense(LazyGovernanceMetricPage)
+                  },
+                  {
+                    path: '/governance/semantic/wordroots',
+                    element: withSuspense(LazyGovernanceWordRootPage)
+                  },
+                  {
+                    path: '/governance/semantic/standards/datatypes',
+                    element: withSuspense(LazyGovernanceDataTypePage)
+                  },
+                  {
+                    path: '/governance/semantic/standards/valuedomains',
+                    element: withSuspense(LazyGovernanceValueDomainPage)
+                  },
+                  {
+                    path: '/governance/semantic/standards/security',
+                    element: withSuspense(LazyGovernanceClassificationPage)
+                  },
+                  {
+                    path: '/governance/knowledge',
+                    element: withSuspense(LazyGovernanceKnowledgePage)
+                  }
+                ]
+              }
+            ]
           },
           {
-            path: '/data-tracking',
-            element: withSuspense(LazyDataTrackingPage)
+            path: '*',
+            element: withSuspense(LazyNotFoundPage)
           },
-          {
-            path: '/ide',
-            element: withSuspense(LazyOneIdePage)
-          },
-          {
-            path: '/ide/sql',
-            element: withSuspense(LazySqlEditorPage)
-          },
-          {
-            path: '/profile',
-            element: withSuspense(LazyProfilePage)
-          },
-          {
-            path: '/profile/permission',
-            element: withSuspense(LazyPermissionPage)
-          },
-          {
-            path: '/profile/llm/models',
-            element: withSuspense(LazyModelManagementPage)
-          },
-          {
-            path: '/governance/metadata',
-            element: withSuspense(LazyGovernanceMetadataPage)
-          },
-          {
-            path: '/governance/metadata/catalogs/:catalogName',
-            element: withSuspense(LazyGovernanceMetadataPage)
-          },
-          {
-            path: '/governance/metadata/catalogs/:catalogName/schemas/:schemaName',
-            element: withSuspense(LazyGovernanceMetadataPage)
-          },
-          {
-            path: '/governance/metadata/catalogs/:catalogName/schemas/:schemaName/tables/:tableName',
-            element: withSuspense(LazyGovernanceMetadataPage)
-          },
-          {
-            path: '/governance/semantic',
-            element: withSuspense(LazyGovernanceSemanticPage)
-          },
-          {
-            path: '/governance/semantic/metrics',
-            element: withSuspense(LazyGovernanceMetricPage)
-          },
-          {
-            path: '/governance/semantic/wordroots',
-            element: withSuspense(LazyGovernanceWordRootPage)
-          },
-          {
-            path: '/governance/semantic/standards/datatypes',
-            element: withSuspense(LazyGovernanceDataTypePage)
-          },
-          {
-            path: '/governance/semantic/standards/valuedomains',
-            element: withSuspense(LazyGovernanceValueDomainPage)
-          },
-          {
-            path: '/governance/semantic/standards/security',
-            element: withSuspense(LazyGovernanceClassificationPage)
-          },
-          {
-            path: '/governance/knowledge',
-            element: withSuspense(LazyGovernanceKnowledgePage)
-          }
         ]
       }
     ]
-  },
-  {
-    path: '*',
-    element: withSuspense(LazyNotFoundPage)
   }
 ])

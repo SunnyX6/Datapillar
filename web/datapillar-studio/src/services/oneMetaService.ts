@@ -4,20 +4,17 @@
  * 负责catalog、schema、table等物理层资产管理
  */
 
-import {
-  gravitinoGet as get,
-  gravitinoPost as post,
-  gravitinoPut as put,
-  gravitinoDelete as del
-} from '@/lib/api/gravitino'
+import { API_BASE, requestRaw } from '@/lib/api'
+import type { ApiError, ApiResponse } from '@/types/api'
 import type {
   GravitinoBaseResponse,
   GravitinoEntityListResponse,
   GravitinoCatalogResponse,
   GravitinoSchemaResponse,
   GravitinoTableResponse,
-  GravitinoIndexDTO
-} from '@/types/oneMeta'
+  GravitinoIndexDTO,
+  GravitinoErrorResponse
+} from '@/types/onemeta/metadata'
 
 /**
  * 前端 Catalog 类型
@@ -63,6 +60,61 @@ export interface TableItem {
   indexes?: GravitinoIndexDTO[]
 }
 
+function extractOneMetaMessage(response: GravitinoBaseResponse): string {
+  const candidate = response as GravitinoErrorResponse & { message?: string }
+  if (typeof candidate.message === 'string' && candidate.message.trim().length > 0) {
+    return candidate.message
+  }
+  return `操作失败 (code: ${response.code})`
+}
+
+function ensureOneMetaSuccess<T extends GravitinoBaseResponse>(response: T): T {
+  if (response.code !== 0) {
+    const error = new Error(extractOneMetaMessage(response)) as ApiError
+    error.code = response.code
+    error.response = response as unknown as ApiResponse<unknown>
+    throw error
+  }
+  return response
+}
+
+async function oneMetaGet<T extends GravitinoBaseResponse>(url: string): Promise<T> {
+  const response = await requestRaw<T>({
+    baseURL: API_BASE.oneMeta,
+    url
+  })
+  return ensureOneMetaSuccess(response)
+}
+
+async function oneMetaPost<T extends GravitinoBaseResponse>(url: string, data?: unknown): Promise<T> {
+  const response = await requestRaw<T, unknown>({
+    baseURL: API_BASE.oneMeta,
+    url,
+    method: 'POST',
+    data
+  })
+  return ensureOneMetaSuccess(response)
+}
+
+async function oneMetaPut<T extends GravitinoBaseResponse>(url: string, data?: unknown): Promise<T> {
+  const response = await requestRaw<T, unknown>({
+    baseURL: API_BASE.oneMeta,
+    url,
+    method: 'PUT',
+    data
+  })
+  return ensureOneMetaSuccess(response)
+}
+
+async function oneMetaDelete<T extends GravitinoBaseResponse>(url: string): Promise<T> {
+  const response = await requestRaw<T>({
+    baseURL: API_BASE.oneMeta,
+    url,
+    method: 'DELETE'
+  })
+  return ensureOneMetaSuccess(response)
+}
+
 /**
  * Metalake 名称（硬编码，需要 URL 编码）
  */
@@ -103,7 +155,7 @@ export function mapProviderToIcon(provider: string): string {
  * 获取 Catalog 列表（包含完整信息）
  */
 export async function fetchCatalogs(): Promise<CatalogItem[]> {
-  const response = await get<GravitinoCatalogListResponse>(
+  const response = await oneMetaGet<GravitinoCatalogListResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs?details=true`
   )
 
@@ -127,7 +179,7 @@ export async function fetchCatalogs(): Promise<CatalogItem[]> {
  * 获取 Schema 列表
  */
 export async function fetchSchemas(catalogName: string): Promise<SchemaItem[]> {
-  const response = await get<GravitinoEntityListResponse>(
+  const response = await oneMetaGet<GravitinoEntityListResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${encodeURIComponent(catalogName)}/schemas`
   )
 
@@ -145,7 +197,7 @@ export async function fetchSchemas(catalogName: string): Promise<SchemaItem[]> {
  * 获取 Schema 详情（底层 schema 后端会自动同步）
  */
 export async function getSchema(catalogName: string, schemaName: string): Promise<SchemaItem> {
-  const response = await get<GravitinoSchemaResponse>(
+  const response = await oneMetaGet<GravitinoSchemaResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${encodeURIComponent(catalogName)}/schemas/${encodeURIComponent(schemaName)}`
   )
 
@@ -162,7 +214,7 @@ export async function getSchema(catalogName: string, schemaName: string): Promis
  * 获取 Table 列表
  */
 export async function fetchTables(catalogName: string, schemaName: string): Promise<TableItem[]> {
-  const response = await get<GravitinoEntityListResponse>(
+  const response = await oneMetaGet<GravitinoEntityListResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${encodeURIComponent(catalogName)}/schemas/${encodeURIComponent(schemaName)}/tables`
   )
 
@@ -181,7 +233,7 @@ export async function fetchTables(catalogName: string, schemaName: string): Prom
  * 获取 Table 详情（后端会自动将表列同步到 gravitino）
  */
 export async function getTable(catalogName: string, schemaName: string, tableName: string): Promise<TableItem> {
-  const response = await get<GravitinoTableResponse>(
+  const response = await oneMetaGet<GravitinoTableResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${encodeURIComponent(catalogName)}/schemas/${encodeURIComponent(schemaName)}/tables/${encodeURIComponent(tableName)}`
   )
 
@@ -229,7 +281,7 @@ export interface UpdateCatalogRequest {
  * 测试 Catalog 连接
  */
 export async function testCatalogConnection(data: CreateCatalogRequest): Promise<void> {
-  await post<GravitinoBaseResponse>(
+  await oneMetaPost<GravitinoBaseResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/testConnection`,
     data
   )
@@ -239,7 +291,7 @@ export async function testCatalogConnection(data: CreateCatalogRequest): Promise
  * 创建 Catalog
  */
 export async function createCatalog(data: CreateCatalogRequest): Promise<CatalogItem> {
-  const response = await post<GravitinoCatalogResponse>(
+  const response = await oneMetaPost<GravitinoCatalogResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs`,
     data
   )
@@ -258,7 +310,7 @@ export async function createCatalog(data: CreateCatalogRequest): Promise<Catalog
  * 更新 Catalog
  */
 export async function updateCatalog(catalogName: string, data: UpdateCatalogRequest): Promise<CatalogItem> {
-  const response = await put<GravitinoCatalogResponse>(
+  const response = await oneMetaPut<GravitinoCatalogResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${encodeURIComponent(catalogName)}`,
     data
   )
@@ -277,7 +329,7 @@ export async function updateCatalog(catalogName: string, data: UpdateCatalogRequ
  * 删除 Catalog
  */
 export async function deleteCatalog(catalogName: string): Promise<void> {
-  await del<GravitinoBaseResponse>(
+  await oneMetaDelete<GravitinoBaseResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${encodeURIComponent(catalogName)}`
   )
 }
@@ -307,7 +359,7 @@ export interface UpdateSchemaRequest {
  * 创建 Schema
  */
 export async function createSchema(catalogName: string, data: CreateSchemaRequest): Promise<SchemaItem> {
-  const response = await post<GravitinoSchemaResponse>(
+  const response = await oneMetaPost<GravitinoSchemaResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${encodeURIComponent(catalogName)}/schemas`,
     data
   )
@@ -329,7 +381,7 @@ export async function updateSchema(
   schemaName: string,
   data: UpdateSchemaRequest
 ): Promise<SchemaItem> {
-  const response = await put<GravitinoSchemaResponse>(
+  const response = await oneMetaPut<GravitinoSchemaResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${encodeURIComponent(catalogName)}/schemas/${encodeURIComponent(schemaName)}`,
     data
   )
@@ -347,7 +399,7 @@ export async function updateSchema(
  * 删除 Schema
  */
 export async function deleteSchema(catalogName: string, schemaName: string): Promise<void> {
-  await del<GravitinoBaseResponse>(
+  await oneMetaDelete<GravitinoBaseResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${encodeURIComponent(catalogName)}/schemas/${encodeURIComponent(schemaName)}`
   )
 }
@@ -402,7 +454,7 @@ export async function createTable(
   schemaName: string,
   data: CreateTableRequest
 ): Promise<TableItem> {
-  const response = await post<GravitinoTableResponse>(
+  const response = await oneMetaPost<GravitinoTableResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${encodeURIComponent(catalogName)}/schemas/${encodeURIComponent(schemaName)}/tables`,
     data
   )
@@ -430,7 +482,7 @@ export async function updateTable(
   tableName: string,
   data: UpdateTableRequest
 ): Promise<TableItem> {
-  const response = await put<GravitinoTableResponse>(
+  const response = await oneMetaPut<GravitinoTableResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${encodeURIComponent(catalogName)}/schemas/${encodeURIComponent(schemaName)}/tables/${encodeURIComponent(tableName)}`,
     data
   )
@@ -453,7 +505,7 @@ export async function updateTable(
  * 删除 Table
  */
 export async function deleteTable(catalogName: string, schemaName: string, tableName: string): Promise<void> {
-  await del<GravitinoBaseResponse>(
+  await oneMetaDelete<GravitinoBaseResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${encodeURIComponent(catalogName)}/schemas/${encodeURIComponent(schemaName)}/tables/${encodeURIComponent(tableName)}`
   )
 }
@@ -489,7 +541,7 @@ export type MetadataObjectType = 'CATALOG' | 'SCHEMA' | 'TABLE' | 'COLUMN'
  * @param fullName 完整名称 (如: catalog.schema.table.column)
  */
 export async function getObjectTags(objectType: MetadataObjectType, fullName: string): Promise<string[]> {
-  const response = await get<{ code: number; names?: string[] }>(
+  const response = await oneMetaGet<{ code: number; names?: string[] }>(
     `/metalakes/${METALAKE_NAME}/objects/${objectType}/${encodeURIComponent(fullName)}/tags`
   )
   return response.names || []
@@ -501,15 +553,11 @@ export async function getObjectTags(objectType: MetadataObjectType, fullName: st
  * @param fullName 完整名称
  * @param tagName 标签名称
  */
-export async function getObjectTag(objectType: MetadataObjectType, fullName: string, tagName: string): Promise<TagResponse['tag'] | null> {
-  try {
-    const response = await get<TagResponse>(
-      `/metalakes/${METALAKE_NAME}/objects/${objectType}/${encodeURIComponent(fullName)}/tags/${encodeURIComponent(tagName)}`
-    )
-    return response.tag
-  } catch {
-    return null
-  }
+export async function getObjectTag(objectType: MetadataObjectType, fullName: string, tagName: string): Promise<TagResponse['tag']> {
+  const response = await oneMetaGet<TagResponse>(
+    `/metalakes/${METALAKE_NAME}/objects/${objectType}/${encodeURIComponent(fullName)}/tags/${encodeURIComponent(tagName)}`
+  )
+  return response.tag
 }
 
 /**
@@ -525,7 +573,7 @@ export async function associateObjectTags(
   tagsToAdd: string[],
   tagsToRemove: string[]
 ): Promise<string[]> {
-  const response = await post<GravitinoEntityListResponse>(
+  const response = await oneMetaPost<GravitinoEntityListResponse>(
     `/metalakes/${METALAKE_NAME}/objects/${objectType}/${encodeURIComponent(fullName)}/tags`,
     { tagsToAdd, tagsToRemove }
   )
@@ -536,7 +584,7 @@ export async function associateObjectTags(
  * 获取所有标签
  */
 export async function fetchAllTags(): Promise<Array<{ name: string; comment?: string }>> {
-  const response = await get<TagListResponse>(
+  const response = await oneMetaGet<TagListResponse>(
     `/metalakes/${METALAKE_NAME}/tags?details=true`
   )
   return response.tags || []
@@ -546,10 +594,9 @@ export async function fetchAllTags(): Promise<Array<{ name: string; comment?: st
  * 创建标签
  */
 export async function createTag(name: string, comment?: string, properties?: Record<string, string>): Promise<TagResponse['tag']> {
-  const response = await post<TagResponse>(
+  const response = await oneMetaPost<TagResponse>(
     `/metalakes/${METALAKE_NAME}/tags`,
     { name, comment, properties }
   )
   return response.tag
 }
-

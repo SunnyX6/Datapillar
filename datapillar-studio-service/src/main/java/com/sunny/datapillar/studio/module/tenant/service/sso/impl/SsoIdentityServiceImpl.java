@@ -10,12 +10,13 @@ import com.sunny.datapillar.studio.module.tenant.entity.TenantSsoConfig;
 import com.sunny.datapillar.studio.module.tenant.entity.UserIdentity;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantSsoConfigMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.UserIdentityMapper;
+import com.sunny.datapillar.studio.module.tenant.service.TenantCodeResolver;
 import com.sunny.datapillar.studio.module.tenant.service.sso.provider.DingtalkBindingClient;
 import com.sunny.datapillar.studio.module.tenant.service.sso.provider.model.DingtalkUserInfo;
 import com.sunny.datapillar.studio.module.tenant.service.sso.SsoIdentityService;
 import com.sunny.datapillar.studio.module.user.entity.TenantUser;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoGenericClient;
+import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -49,7 +50,8 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
     private final TenantSsoConfigMapper tenantSsoConfigMapper;
     private final TenantUserMapper tenantUserMapper;
     private final DingtalkBindingClient dingtalkBindingClient;
-    private final AuthCryptoGenericClient authCryptoClient;
+    private final AuthCryptoRpcClient authCryptoClient;
+    private final TenantCodeResolver tenantCodeResolver;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -90,9 +92,10 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
 
         TenantSsoConfig config = loadEnabledConfig(tenantId, provider);
         Map<String, Object> configMap = readConfigMap(config.getConfigJson());
+        String tenantCode = tenantCodeResolver.requireTenantCode(tenantId);
         String clientId = trimToNull(readString(configMap, "clientId"));
         String encodedSecret = trimToNull(readString(configMap, "clientSecret"));
-        String clientSecret = decryptClientSecret(tenantId, encodedSecret);
+        String clientSecret = decryptClientSecret(tenantCode, encodedSecret);
         String redirectUri = trimToNull(readString(configMap, "redirectUri"));
         if (clientId == null || clientSecret == null || redirectUri == null) {
             throw new BadRequestException("参数错误");
@@ -234,11 +237,11 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
         return tenantId;
     }
 
-    private String decryptClientSecret(Long tenantId, String encoded) {
+    private String decryptClientSecret(String tenantCode, String encoded) {
         try {
-            return authCryptoClient.decryptSsoClientSecret(tenantId, encoded);
+            return authCryptoClient.decryptSsoClientSecret(tenantCode, encoded);
         } catch (IllegalArgumentException ex) {
-            throw new InternalException(ex, "SSO配置无效: %s");
+            throw new InternalException(ex, "SSO配置无效: %s", "clientSecret");
         }
     }
 }

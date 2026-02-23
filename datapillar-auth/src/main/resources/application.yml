@@ -15,4 +15,5 @@ spring:
         namespace: ${NACOS_NAMESPACE}
         username: ${NACOS_USERNAME}
         password: ${NACOS_PASSWORD}
+        ip: ${NACOS_SERVICE_IP}
         group: ${NACOS_GROUP:DATAPILLAR}

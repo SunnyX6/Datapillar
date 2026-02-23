@@ -11,6 +11,7 @@ public final class GatewayAssertionClaims {
 
     public static final String AUDIENCE = "aud";
     public static final String TENANT_ID = "tenantId";
+    public static final String TENANT_CODE = "tenantCode";
     public static final String USERNAME = "username";
     public static final String EMAIL = "email";
     public static final String ROLES = "roles";

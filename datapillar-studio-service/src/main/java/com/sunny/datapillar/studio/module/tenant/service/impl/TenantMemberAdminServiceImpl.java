@@ -1,6 +1,5 @@
 package com.sunny.datapillar.studio.module.tenant.service.impl;
 
-import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
 import com.sunny.datapillar.studio.module.tenant.service.TenantMemberAdminService;
 import com.sunny.datapillar.studio.module.user.dto.RoleDto;
 import com.sunny.datapillar.studio.module.user.dto.UserDto;
@@ -31,6 +30,11 @@ public class TenantMemberAdminServiceImpl implements TenantMemberAdminService {
     }
 
     @Override
+    public void updateMemberStatus(Long userId, Integer status) {
+        userService.updateTenantMemberStatus(userId, status);
+    }
+
+    @Override
     public void updateUser(Long userId, UserDto.Update dto) {
         userService.updateUser(userId, dto);
     }
@@ -45,13 +49,4 @@ public class TenantMemberAdminServiceImpl implements TenantMemberAdminService {
         userService.assignRoles(userId, roleIds);
     }
 
-    @Override
-    public List<FeatureObjectDto.ObjectPermission> getUserPermissions(Long userId) {
-        return userService.getUserPermissions(userId);
-    }
-
-    @Override
-    public void updateUserPermissions(Long userId, List<FeatureObjectDto.Assignment> permissions) {
-        userService.updateUserPermissions(userId, permissions);
-    }
 }

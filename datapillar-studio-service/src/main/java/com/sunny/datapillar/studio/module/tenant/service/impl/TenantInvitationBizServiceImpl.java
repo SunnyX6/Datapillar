@@ -19,7 +19,7 @@ public class TenantInvitationBizServiceImpl implements TenantInvitationBizServic
     private final InvitationService invitationService;
 
     @Override
-    public void acceptInvitation(Long tenantId, String inviteCode) {
-        invitationService.acceptInvitation(tenantId, inviteCode);
+    public void acceptInvitation(String inviteCode) {
+        invitationService.acceptInvitation(inviteCode);
     }
 }

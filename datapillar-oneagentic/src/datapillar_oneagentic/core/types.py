@@ -18,8 +18,9 @@ from typing import Any, Self
 
 from pydantic import BaseModel, Field
 
-from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
+from datapillar_oneagentic.core.status import ExecutionStatus
 from datapillar_oneagentic.messages import Messages
+
 
 @dataclass(frozen=True, slots=True)
 class SessionKey:
@@ -74,14 +75,13 @@ class AgentResult(BaseModel):
 
     Status semantics:
     - completed: agent completed successfully
-    - failed: execution failed (use failure_kind for business/system)
+    - failed: execution failed
     - aborted: user aborted interrupt
     """
 
     model_config = {"arbitrary_types_allowed": True}
 
     status: ExecutionStatus = Field(..., description="Execution status")
-    failure_kind: FailureKind | None = Field(None, description="Failure kind (status=failed)")
     deliverable: Any | None = Field(None, description="Deliverable")
     deliverable_type: str | None = Field(None, description="Deliverable type")
     error: str | None = Field(None, description="Error message")
@@ -107,24 +107,13 @@ class AgentResult(BaseModel):
         cls,
         error: str,
         messages: Messages | None = None,
-        failure_kind: FailureKind = FailureKind.BUSINESS,
     ) -> AgentResult:
-        """Create a business failure result."""
+        """Create a failure result."""
         return cls(
             status=ExecutionStatus.FAILED,
-            failure_kind=failure_kind,
             error=error,
             messages=messages or Messages(),
         )
-
-    @classmethod
-    def system_error(
-        cls,
-        error: str,
-        messages: Messages | None = None,
-    ) -> AgentResult:
-        """Compatibility entrypoint: system error result (failed + system)."""
-        return cls.failed(error=error, messages=messages, failure_kind=FailureKind.SYSTEM)
 
     @classmethod
     def aborted(

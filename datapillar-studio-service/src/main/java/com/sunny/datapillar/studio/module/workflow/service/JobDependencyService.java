@@ -31,5 +31,5 @@ public interface JobDependencyService {
     /**
      * 删除依赖关系
      */
-    void deleteDependency(Long jobId, Long parentJobId);
+    void deleteDependency(Long workflowId, Long jobId, Long parentJobId);
 }

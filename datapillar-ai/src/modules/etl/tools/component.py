@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from src.infrastructure.repository import Component
 from src.modules.etl.tools.registry import etl_tool
+from src.shared.context import get_current_tenant_id
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,9 @@ class ListComponentInput(BaseModel):
     """获取组件列表的参数（无参数）"""
 
 
-@etl_tool("list_component", tool_type="Component", desc="列出可用组件", args_schema=ListComponentInput)
+@etl_tool(
+    "list_component", tool_type="Component", desc="列出可用组件", args_schema=ListComponentInput
+)
 def list_component() -> str:
     """
     获取企业支持的所有大数据组件列表
@@ -44,9 +47,18 @@ def list_component() -> str:
     - {}
     """
     logger.info("list_component()")
+    tenant_id = get_current_tenant_id()
+    if tenant_id is None:
+        return json.dumps(
+            {
+                "error": "缺少租户上下文",
+                "components": [],
+            },
+            ensure_ascii=False,
+        )
 
     try:
-        results = Component.list_active()
+        results = Component.list_active(tenant_id=tenant_id)
 
         if not results:
             return json.dumps(
@@ -61,6 +73,8 @@ def list_component() -> str:
         for row in results:
             # 解析 config_schema
             config_schema = row.get("config_schema")
+            if config_schema is None:
+                config_schema = row.get("job_params")
             if isinstance(config_schema, str):
                 try:
                     config_schema = json.loads(config_schema)

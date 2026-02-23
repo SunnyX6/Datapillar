@@ -28,6 +28,8 @@ export interface ModelRecord {
   type: ModelCategory
   contextGroup: string
   stats: ModelStats
+  baseUrl?: string
+  maskedApiKey?: string
   hasApiKey?: boolean
   status?: string
   isNew?: boolean

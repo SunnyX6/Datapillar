@@ -35,14 +35,6 @@ class AgentStatus(StrEnum):
     FAILED = "failed"
     ABORTED = "aborted"
 
-
-class FailureKind(StrEnum):
-    """Failure kind (only meaningful when FAILED)."""
-
-    BUSINESS = "business"
-    SYSTEM = "system"
-
-
 class ProcessStage(StrEnum):
     """Process stage (internal stage such as ReAct, not a status)."""
 

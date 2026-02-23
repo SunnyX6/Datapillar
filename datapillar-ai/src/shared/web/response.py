@@ -2,45 +2,34 @@
 # @author Sunny
 # @date 2026-01-28
 
-"""
-API 统一响应封装（对齐 datapillar-studio ApiResponse）
-"""
+"""API 统一响应封装（统一 code/type/context 标准）。"""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import Request
+from pydantic import BaseModel, Field
+
+from src.shared.web.code import Code
 
 
 class ApiResponse:
-    """统一 API 响应构造器（对齐 datapillar-studio ApiResponse）"""
+    """统一 API 响应构造器。"""
 
-    @staticmethod
-    def _now_iso() -> str:
-        return datetime.now(timezone.utc).isoformat()
+    SUCCESS_CODE = Code.OK
 
     @classmethod
     def success(
         cls,
         *,
-        request: Request,
-        data: Any,
-        message: str = "Success",
+        data: Any | None = None,
         limit: int | None = None,
         offset: int | None = None,
         total: int | None = None,
     ) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "status": 200,
-            "code": "OK",
-            "message": message,
-            "data": data,
-            "timestamp": cls._now_iso(),
-            "path": request.url.path,
-            "traceId": request.headers.get("X-Trace-Id"),
-        }
+        payload: dict[str, Any] = {"code": cls.SUCCESS_CODE}
+        if data is not None:
+            payload["data"] = data
         if limit is not None:
             payload["limit"] = limit
         if offset is not None:
@@ -53,35 +42,43 @@ class ApiResponse:
     def error(
         cls,
         *,
-        request: Request,
-        status: int,
-        code: str,
+        code: int,
+        error_type: str,
         message: str,
+        context: dict[str, str] | None = None,
+        trace_id: str | None = None,
+        retryable: bool | None = None,
     ) -> dict[str, Any]:
-        return {
-            "status": status,
+        payload: dict[str, Any] = {
             "code": code,
+            "type": error_type,
             "message": message,
-            "data": None,
-            "timestamp": cls._now_iso(),
-            "path": request.url.path,
-            "traceId": request.headers.get("X-Trace-Id"),
         }
+        if context:
+            payload["context"] = context
+        if trace_id:
+            payload["traceId"] = trace_id
+        if retryable is not None:
+            payload["retryable"] = retryable
+        return payload
+
+
+class ApiSuccessResponseSchema(BaseModel):
+    """OpenAPI 文档用成功响应结构。"""
+
+    code: int = Field(default=ApiResponse.SUCCESS_CODE, description="业务状态码，0 表示成功")
+    data: Any | None = Field(default=None, description="业务数据")
 
 
 def build_success(
     *,
-    request: Request,
-    data: Any,
-    message: str = "Success",
+    data: Any | None = None,
     limit: int | None = None,
     offset: int | None = None,
     total: int | None = None,
 ) -> dict[str, Any]:
     return ApiResponse.success(
-        request=request,
         data=data,
-        message=message,
         limit=limit,
         offset=offset,
         total=total,
@@ -90,9 +87,18 @@ def build_success(
 
 def build_error(
     *,
-    request: Request,
-    status: int,
-    code: str,
+    code: int,
+    error_type: str,
     message: str,
+    context: dict[str, str] | None = None,
+    trace_id: str | None = None,
+    retryable: bool | None = None,
 ) -> dict[str, Any]:
-    return ApiResponse.error(request=request, status=status, code=code, message=message)
+    return ApiResponse.error(
+        code=code,
+        error_type=error_type,
+        message=message,
+        context=context,
+        trace_id=trace_id,
+        retryable=retryable,
+    )

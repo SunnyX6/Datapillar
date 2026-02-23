@@ -65,6 +65,9 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
                 detail.errorCode(),
                 detail.type(),
                 detail.message(),
+                detail.context(),
+                detail.traceId(),
+                detail.retryable(),
                 detail.stack());
         return writeResponse(response, HttpStatus.valueOf(detail.httpStatus()), body);
     }
@@ -113,8 +116,7 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
             log.error("网关响应序列化失败", e);
             List<String> stack = ExceptionMapper.resolve(e).stack();
             String fallback = String.format(
-                    "{\"code\":1002,\"message\":\"响应序列化失败\",\"type\":\"%s\",\"stack\":%s}",
-                    e.getClass().getSimpleName(),
+                    "{\"code\":500,\"message\":\"响应序列化失败\",\"type\":\"INTERNAL_ERROR\",\"retryable\":false,\"stack\":%s}",
                     toJsonArray(stack));
             return response.writeWith(Mono.just(response.bufferFactory().wrap(fallback.getBytes(StandardCharsets.UTF_8))));
         }

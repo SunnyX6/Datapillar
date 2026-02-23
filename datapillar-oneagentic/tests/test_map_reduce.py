@@ -4,8 +4,6 @@ import pytest
 from pydantic import BaseModel, Field
 
 from datapillar_oneagentic.core.agent import AgentSpec
-from datapillar_oneagentic.exception import AgentError, AgentErrorCategory
-from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
 from datapillar_oneagentic.core.graphs.mapreduce.planner import create_mapreduce_plan
 from datapillar_oneagentic.core.graphs.mapreduce.reducer import reduce_map_results
 from datapillar_oneagentic.core.graphs.mapreduce.schemas import (
@@ -14,6 +12,12 @@ from datapillar_oneagentic.core.graphs.mapreduce.schemas import (
     MapReduceResult,
     MapReduceTask,
     MapReduceTaskOutput,
+)
+from datapillar_oneagentic.core.status import ExecutionStatus
+from datapillar_oneagentic.exception import (
+    AgentExecutionFailedException,
+    RecoveryAction,
+    action_for,
 )
 
 
@@ -118,13 +122,12 @@ async def test_map_results2() -> None:
             description="task1",
             input="do1",
             status=ExecutionStatus.FAILED,
-            failure_kind=FailureKind.SYSTEM,
             error="boom",
         )
     ]
 
     llm = _DummyLLM(_OutputSchema(summary="final"))
-    with pytest.raises(AgentError) as exc_info:
+    with pytest.raises(AgentExecutionFailedException) as exc_info:
         await reduce_map_results(
             plan=plan,
             results=results,
@@ -133,5 +136,4 @@ async def test_map_results2() -> None:
         )
 
     error = exc_info.value
-    assert error.category == AgentErrorCategory.SYSTEM
-    assert error.failure_kind == FailureKind.SYSTEM
+    assert action_for(error) == RecoveryAction.FAIL_FAST

@@ -29,8 +29,8 @@ import com.sunny.datapillar.auth.service.login.method.sso.model.SsoToken;
 import com.sunny.datapillar.auth.service.login.method.sso.model.SsoUserInfo;
 import com.sunny.datapillar.auth.service.login.method.sso.provider.SsoProvider;
 import com.sunny.datapillar.auth.service.support.UserAccessReader;
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.common.exception.ForbiddenException;
+import com.sunny.datapillar.common.exception.UnauthorizedException;
 import com.sunny.datapillar.common.utils.JwtUtil;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +43,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -92,7 +93,6 @@ class LoginServiceImplTest {
     @BeforeEach
     void setUp() {
         when(ssoProvider.provider()).thenReturn("dingtalk");
-        when(userAccessReader.loadRoleTypes(anyLong(), anyLong())).thenReturn(List.of());
 
         PasswordLoginMethod passwordLoginMethod = new PasswordLoginMethod(
                 userMapper, tenantMapper, tenantUserMapper, passwordEncoder, loginAttemptTracker
@@ -157,6 +157,9 @@ class LoginServiceImplTest {
         tenantUser.setUserId(1L);
         tenantUser.setStatus(1);
         when(tenantUserMapper.selectByTenantIdAndUserId(10L, 1L)).thenReturn(tenantUser);
+        AuthDto.TenantOption tenantOption = new AuthDto.TenantOption(10L, "demo", "demo", 1, 1);
+        when(tenantUserMapper.selectTenantOptionsByUserId(1L)).thenReturn(List.of(tenantOption));
+        when(userAccessReader.loadRoleTypes(10L, 1L)).thenReturn(List.of());
 
         AuthDto.LoginResponse loginResponse = new AuthDto.LoginResponse();
         loginResponse.setUserId(1L);
@@ -172,13 +175,17 @@ class LoginServiceImplTest {
         when(jwtToken.getAccessTokenExpiration()).thenReturn(3600L);
         when(jwtToken.getRefreshTokenExpiration(true)).thenReturn(2_592_000L);
 
-        AuthDto.LoginResult result = loginService.login(command, "127.0.0.1", mockResponse());
+        HttpServletResponse response = mockResponse();
+        AuthDto.LoginResult result = loginService.login(command, "127.0.0.1", response);
 
-        assertEquals("SUCCESS", result.getLoginStage());
-        assertEquals(10L, result.getTenantId());
-        assertEquals("demo", result.getTenantCode());
-        assertEquals("access-token", result.getAccessToken());
-        assertEquals("refresh-token", result.getRefreshToken());
+        assertNull(result.getLoginStage());
+        assertEquals(1L, result.getUserId());
+        assertEquals("sunny", result.getUsername());
+        assertEquals("sunny@datapillar.com", result.getEmail());
+        assertEquals(1, result.getTenants().size());
+        assertEquals(10L, result.getTenants().get(0).getTenantId());
+        assertEquals("demo", result.getTenants().get(0).getTenantCode());
+        verify(authCookieManager).setAuthCookies(response, "access-token", "refresh-token", true);
     }
 
     @Test
@@ -207,10 +214,10 @@ class LoginServiceImplTest {
         when(ssoProvider.extractExternalUserId(userInfo)).thenReturn("union-1");
         when(userIdentityMapper.selectByProviderAndExternalUserId(10L, "dingtalk", "union-1")).thenReturn(null);
 
-        BusinessException exception = assertThrows(BusinessException.class,
+        ForbiddenException exception = assertThrows(ForbiddenException.class,
                 () -> loginService.login(command, "127.0.0.1", mockResponse()));
 
-        assertEquals(ErrorCode.FORBIDDEN, exception.getErrorCode());
+        assertEquals("无权限访问", exception.getMessage());
         verify(userMapper, never()).selectById(anyLong());
         verify(userIdentityMapper, never()).insert(any(UserIdentity.class));
     }
@@ -219,54 +226,39 @@ class LoginServiceImplTest {
     void login_shouldRejectSsoWhenStateInvalid() {
         LoginCommand command = buildSsoCommand();
 
-        Tenant tenant = new Tenant();
-        tenant.setId(10L);
-        tenant.setCode("demo");
-        tenant.setStatus(1);
-        when(tenantMapper.selectById(10L)).thenReturn(tenant);
         when(ssoStateStore.consumeOrThrow("state-1", null, "dingtalk"))
-                .thenThrow(new BusinessException(ErrorCode.SSO_STATE_INVALID));
+                .thenThrow(new UnauthorizedException("SSO state 无效"));
 
-        BusinessException exception = assertThrows(BusinessException.class,
+        UnauthorizedException exception = assertThrows(UnauthorizedException.class,
                 () -> loginService.login(command, "127.0.0.1", mockResponse()));
 
-        assertEquals(ErrorCode.SSO_STATE_INVALID, exception.getErrorCode());
+        assertEquals("SSO state 无效", exception.getMessage());
     }
 
     @Test
     void login_shouldRejectSsoWhenStateExpired() {
         LoginCommand command = buildSsoCommand();
 
-        Tenant tenant = new Tenant();
-        tenant.setId(10L);
-        tenant.setCode("demo");
-        tenant.setStatus(1);
-        when(tenantMapper.selectById(10L)).thenReturn(tenant);
         when(ssoStateStore.consumeOrThrow("state-1", null, "dingtalk"))
-                .thenThrow(new BusinessException(ErrorCode.SSO_STATE_EXPIRED));
+                .thenThrow(new UnauthorizedException("SSO state 已过期"));
 
-        BusinessException exception = assertThrows(BusinessException.class,
+        UnauthorizedException exception = assertThrows(UnauthorizedException.class,
                 () -> loginService.login(command, "127.0.0.1", mockResponse()));
 
-        assertEquals(ErrorCode.SSO_STATE_EXPIRED, exception.getErrorCode());
+        assertEquals("SSO state 已过期", exception.getMessage());
     }
 
     @Test
     void login_shouldRejectSsoWhenStateReplayed() {
         LoginCommand command = buildSsoCommand();
 
-        Tenant tenant = new Tenant();
-        tenant.setId(10L);
-        tenant.setCode("demo");
-        tenant.setStatus(1);
-        when(tenantMapper.selectById(10L)).thenReturn(tenant);
         when(ssoStateStore.consumeOrThrow("state-1", null, "dingtalk"))
-                .thenThrow(new BusinessException(ErrorCode.SSO_STATE_REPLAYED));
+                .thenThrow(new UnauthorizedException("SSO state 已被重复使用"));
 
-        BusinessException exception = assertThrows(BusinessException.class,
+        UnauthorizedException exception = assertThrows(UnauthorizedException.class,
                 () -> loginService.login(command, "127.0.0.1", mockResponse()));
 
-        assertEquals(ErrorCode.SSO_STATE_REPLAYED, exception.getErrorCode());
+        assertEquals("SSO state 已被重复使用", exception.getMessage());
     }
 
     private LoginCommand buildSsoCommand() {

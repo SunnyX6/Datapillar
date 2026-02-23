@@ -25,6 +25,6 @@ public class WebMvcSecurityConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(authCsrfInterceptor)
-                .addPathPatterns("/auth/**", "/login/**", "/proxy/**");
+                .addPathPatterns("/auth/**", "/login/**");
     }
 }

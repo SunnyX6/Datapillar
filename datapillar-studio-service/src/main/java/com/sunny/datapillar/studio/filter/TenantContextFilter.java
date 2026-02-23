@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.Set;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
@@ -26,6 +27,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class TenantContextFilter extends OncePerRequestFilter {
 
     private static final String TENANT_ID_KEY = "tenantId";
+    private static final String TENANT_CODE_KEY = "tenantCode";
     private static final String ACTOR_USER_ID_KEY = "actorUserId";
     private static final String ACTOR_TENANT_ID_KEY = "actorTenantId";
     private static final String IMPERSONATION_KEY = "impersonation";
@@ -80,13 +82,20 @@ public class TenantContextFilter extends OncePerRequestFilter {
                     response, new UnauthorizedException("gateway_assertion_tenant_id_missing"));
             return;
         }
+        String tenantCode = assertionContext.tenantCode();
+        if (!StringUtils.hasText(tenantCode)) {
+            securityExceptionHandler.writeError(
+                    response, new UnauthorizedException("gateway_assertion_tenant_code_missing"));
+            return;
+        }
 
         boolean impersonation = assertionContext.impersonation();
         Long actorUserId = assertionContext.actorUserId();
         Long actorTenantId = assertionContext.actorTenantId();
 
-        TenantContextHolder.set(new TenantContext(tenantId, actorUserId, actorTenantId, impersonation));
+        TenantContextHolder.set(new TenantContext(tenantId, tenantCode, actorUserId, actorTenantId, impersonation));
         MDC.put(TENANT_ID_KEY, String.valueOf(tenantId));
+        MDC.put(TENANT_CODE_KEY, tenantCode);
         if (actorUserId != null) {
             MDC.put(ACTOR_USER_ID_KEY, String.valueOf(actorUserId));
         }
@@ -100,6 +109,7 @@ public class TenantContextFilter extends OncePerRequestFilter {
         } finally {
             TenantContextHolder.clear();
             MDC.remove(TENANT_ID_KEY);
+            MDC.remove(TENANT_CODE_KEY);
             MDC.remove(ACTOR_USER_ID_KEY);
             MDC.remove(ACTOR_TENANT_ID_KEY);
             MDC.remove(IMPERSONATION_KEY);

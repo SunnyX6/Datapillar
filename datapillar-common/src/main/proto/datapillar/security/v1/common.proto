@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package datapillar.security.v1;
+
+option java_multiple_files = true;
+option java_package = "com.sunny.datapillar.common.rpc.security.v1";
+
+message RpcMeta {
+  string protocol_version = 1;
+  string caller_service = 2;
+  string trace_id = 3;
+  string request_id = 4;
+  string client_ip = 5;
+  map<string, string> attrs = 6;
+}
+
+message Error {
+  int32 code = 1;
+  string type = 2;
+  string message = 3;
+  map<string, string> context = 4;
+  string trace_id = 5;
+  bool retryable = 6;
+}
+
+message Principal {
+  int64 user_id = 1;
+  int64 tenant_id = 2;
+  string username = 3;
+  string email = 4;
+  repeated string roles = 5;
+  bool impersonation = 6;
+  int64 actor_user_id = 7;
+  int64 actor_tenant_id = 8;
+  string sid = 9;
+  string jti = 10;
+  string tenant_code = 11;
+}
+
+enum DenyCode {
+  DENY_CODE_UNSPECIFIED = 0;
+  TOKEN_MISSING = 1;
+  TOKEN_INVALID = 2;
+  TOKEN_EXPIRED = 3;
+  SESSION_REVOKED = 4;
+  TENANT_DISABLED = 5;
+  USER_DISABLED = 6;
+  PERMISSION_DENIED = 7;
+  SYSTEM_UNAVAILABLE = 8;
+}

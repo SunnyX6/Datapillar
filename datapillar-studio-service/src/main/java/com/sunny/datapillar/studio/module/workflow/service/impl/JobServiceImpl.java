@@ -44,10 +44,11 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
-    public JobDto.Response getJobDetail(Long id) {
+    public JobDto.Response getJobDetail(Long workflowId, Long id) {
+        getWorkflowJobOrThrow(workflowId, id);
         JobDto.Response job = jobInfoMapper.selectJobDetail(id);
         if (job == null) {
-            throw new NotFoundException("任务不存在: jobId=%s", id);
+            throw new NotFoundException("任务不存在: workflowId=%s, jobId=%s", workflowId, id);
         }
         return job;
     }
@@ -78,11 +79,8 @@ public class JobServiceImpl implements JobService {
 
     @Override
     @Transactional
-    public void updateJob(Long id, JobDto.Update dto) {
-        JobInfo jobInfo = jobInfoMapper.selectById(id);
-        if (jobInfo == null) {
-            throw new NotFoundException("任务不存在: jobId=%s", id);
-        }
+    public void updateJob(Long workflowId, Long id, JobDto.Update dto) {
+        JobInfo jobInfo = getWorkflowJobOrThrow(workflowId, id);
 
         if (dto.getJobName() != null) {
             jobInfo.setJobName(dto.getJobName());
@@ -125,11 +123,8 @@ public class JobServiceImpl implements JobService {
 
     @Override
     @Transactional
-    public void deleteJob(Long id) {
-        JobInfo jobInfo = jobInfoMapper.selectById(id);
-        if (jobInfo == null) {
-            throw new NotFoundException("任务不存在: jobId=%s", id);
-        }
+    public void deleteJob(Long workflowId, Long id) {
+        getWorkflowJobOrThrow(workflowId, id);
 
         // 删除相关依赖
         dependencyMapper.deleteByJobId(id);
@@ -137,6 +132,14 @@ public class JobServiceImpl implements JobService {
         jobInfoMapper.deleteById(id);
 
         log.info("Deleted job: id={}", id);
+    }
+
+    private JobInfo getWorkflowJobOrThrow(Long workflowId, Long jobId) {
+        JobInfo jobInfo = jobInfoMapper.selectById(jobId);
+        if (jobInfo == null || !workflowId.equals(jobInfo.getWorkflowId())) {
+            throw new NotFoundException("任务不存在: workflowId=%s, jobId=%s", workflowId, jobId);
+        }
+        return jobInfo;
     }
 
     @Override

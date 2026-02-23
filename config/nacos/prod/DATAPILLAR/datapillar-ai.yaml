@@ -90,6 +90,16 @@ sql_summary:
 
 security:
   default_tenant_id: 1
+  gateway_assertion:
+    enabled: true
+    header_name: "X-Gateway-Assertion"
+    issuer: "datapillar-auth"
+    audience: "datapillar-ai"
+    key_id: "${AUTH_ASSERTION_KEY_ID}"
+    public_key_path: "${AUTH_ASSERTION_PUBLIC_KEY_PATH}"
+    previous_key_id: "${AUTH_ASSERTION_PREVIOUS_KEY_ID:}"
+    previous_public_key_path: "${AUTH_ASSERTION_PREVIOUS_PUBLIC_KEY_PATH:}"
+    max_clock_skew_seconds: 5
   key_storage:
     type: "local"
     local_path: "./data/datapillar/privkeys"

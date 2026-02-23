@@ -13,8 +13,8 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.common.exception.AlreadyExistsException;
+import com.sunny.datapillar.common.exception.ServiceUnavailableException;
 import com.sunny.datapillar.studio.context.TenantContext;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
 import com.sunny.datapillar.studio.module.tenant.entity.FeatureObject;
@@ -144,10 +144,10 @@ class SetupServiceImplTest {
     void initialize_shouldRejectWhenSchemaNotReady() {
         when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(null);
 
-        BusinessException exception = assertThrows(BusinessException.class,
+        ServiceUnavailableException exception = assertThrows(ServiceUnavailableException.class,
                 () -> setupService.initialize(buildInitializeRequest()));
 
-        assertEquals(ErrorCode.SERVICE_UNAVAILABLE, exception.getErrorCode());
+        assertEquals("服务不可用", exception.getMessage());
     }
 
     @Test
@@ -155,10 +155,10 @@ class SetupServiceImplTest {
         SystemBootstrap bootstrap = bootstrap(1);
         when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap);
 
-        BusinessException exception = assertThrows(BusinessException.class,
+        AlreadyExistsException exception = assertThrows(AlreadyExistsException.class,
                 () -> setupService.initialize(buildInitializeRequest()));
 
-        assertEquals(ErrorCode.DUPLICATE_RESOURCE, exception.getErrorCode());
+        assertEquals("资源已存在", exception.getMessage());
     }
 
     @Test
@@ -166,6 +166,7 @@ class SetupServiceImplTest {
         when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap(0));
         when(tenantMapper.selectByCode(any())).thenReturn(null);
         when(tenantService.createTenant(any())).thenReturn(100L);
+        when(tenantMapper.selectById(100L)).thenReturn(tenant(100L, "tenant-acme-data"));
         when(userMapper.selectByUsernameGlobal(any())).thenReturn(null);
         when(userMapper.selectOne(any())).thenReturn(null);
         when(tenantUserMapper.selectByTenantIdAndUserId(100L, 200L)).thenAnswer(invocation -> {
@@ -229,20 +230,21 @@ class SetupServiceImplTest {
         existingUser.setId(999L);
         when(userMapper.selectByUsernameGlobal("sunny")).thenReturn(existingUser);
 
-        BusinessException exception = assertThrows(BusinessException.class,
+        AlreadyExistsException exception = assertThrows(AlreadyExistsException.class,
                 () -> setupService.initialize(buildInitializeRequest()));
 
-        assertEquals(ErrorCode.DUPLICATE_RESOURCE, exception.getErrorCode());
+        assertEquals("资源已存在", exception.getMessage());
     }
 
     @Test
     void initialize_shouldRestorePreviousTenantContextAfterExecution() {
-        TenantContext previousContext = new TenantContext(88L, 99L, 88L, false);
+        TenantContext previousContext = new TenantContext(88L, "tenant-prev", 99L, 88L, false);
         TenantContextHolder.set(previousContext);
 
         when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap(0));
         when(tenantMapper.selectByCode(any())).thenReturn(null);
         when(tenantService.createTenant(any())).thenReturn(100L);
+        when(tenantMapper.selectById(100L)).thenReturn(tenant(100L, "tenant-acme-data"));
         when(userMapper.selectByUsernameGlobal(any())).thenReturn(null);
         when(userMapper.selectOne(any())).thenReturn(null);
         when(userMapper.insert(any(User.class))).thenAnswer(invocation -> {
@@ -283,5 +285,12 @@ class SetupServiceImplTest {
         bootstrap.setId(1);
         bootstrap.setSetupCompleted(setupCompleted);
         return bootstrap;
+    }
+
+    private com.sunny.datapillar.studio.module.tenant.entity.Tenant tenant(Long id, String code) {
+        com.sunny.datapillar.studio.module.tenant.entity.Tenant tenant = new com.sunny.datapillar.studio.module.tenant.entity.Tenant();
+        tenant.setId(id);
+        tenant.setCode(code);
+        return tenant;
     }
 }

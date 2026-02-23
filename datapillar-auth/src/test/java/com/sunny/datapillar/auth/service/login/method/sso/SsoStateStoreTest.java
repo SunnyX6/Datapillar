@@ -41,11 +41,11 @@ class SsoStateStoreTest {
         ReflectionTestUtils.setField(stateStore, "stateTtlSeconds", 300L);
         ReflectionTestUtils.setField(stateStore, "replayStateTtlSeconds", 3600L);
         ReflectionTestUtils.setField(stateStore, "stateBytes", 24);
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
     }
 
     @Test
     void createState_shouldGenerateUrlSafeStateWithConfiguredEntropy() {
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(Boolean.TRUE);
 
         String state = stateStore.createState(10L, "dingtalk");
@@ -62,6 +62,7 @@ class SsoStateStoreTest {
 
     @Test
     void createState_shouldGenerateUniqueStates() {
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(Boolean.TRUE);
 
         Set<String> states = new HashSet<>();

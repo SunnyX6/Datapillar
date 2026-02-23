@@ -54,8 +54,8 @@ const applyTheme = (theme: ThemeMode) => {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
-      // 初始状态（默认深色，适合数据平台）
-      mode: 'dark',
+      // 初始状态（默认浅色）
+      mode: 'light',
 
       /**
        * 设置主题模式

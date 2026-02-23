@@ -177,10 +177,11 @@ public class AuthDto {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Schema(name = "AuthAccessContext")
-    public static class AccessContext {
+    @Schema(name = "AuthAuthenticationContext")
+    public static class AuthenticationContext {
         private Long userId;
         private Long tenantId;
+        private String tenantCode;
         private String username;
         private String email;
         private List<String> roles;

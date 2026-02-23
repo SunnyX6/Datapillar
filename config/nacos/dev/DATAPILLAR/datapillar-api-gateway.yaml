@@ -1,5 +1,6 @@
 server:
   port: 7000
+  address: ${SERVER_ADDRESS:0.0.0.0}
   forward-headers-strategy: framework
 
 spring:
@@ -24,6 +25,7 @@ spring:
                 allowedMethods:
                   - GET
                   - POST
+                  - PATCH
                   - PUT
                   - DELETE
                   - OPTIONS
@@ -84,13 +86,32 @@ spring:
               predicates:
                 - Path=/api/studio/setup,/api/studio/setup/**
 
-            # 6. 受保护业务接口统一交由 Auth 服务认证并转发
-            - id: protected-service
-              uri: lb://datapillar-auth
+            # 6. Studio 健康检查接口（无需登录）
+            - id: studio-health
+              uri: lb://datapillar-studio-service
+              order: -10
               predicates:
-                - Path=/api/studio/**,/api/ai/**,/api/onemeta/**
+                - Path=/api/studio/actuator/health,/api/studio/actuator/health/**
+
+            # 7. Studio 业务接口（受保护）
+            - id: studio-service
+              uri: lb://datapillar-studio-service
+              predicates:
+                - Path=/api/studio/**
+
+            # 8. AI 业务接口（受保护）
+            - id: ai-service
+              uri: lb://datapillar-ai
+              predicates:
+                - Path=/api/ai/**
+
+            # 9. OneMeta 接口（受保护）
+            - id: onemeta-service
+              uri: lb://datapillar-gravitino
+              predicates:
+                - Path=/api/onemeta/**
               filters:
-                - RewritePath=/api(?<segment>/?.*), /proxy/api${segment}
+                - RewritePath=/api/onemeta(?<segment>/?.*), /api${segment}
 
   # Redis 配置（用于限流）
   data:
@@ -110,6 +131,8 @@ scalar:
       default: true
     - title: Studio API
       url: /api/studio/v3/api-docs
+    - title: AI API
+      url: /api/ai/openapi.json
 
 # 安全配置（严格模式）
 security:
@@ -117,10 +140,57 @@ security:
   trusted-proxies:
     - 127.0.0.1/32
     - ::1/128
+  authentication:
+    enabled: true
+    protocol-version: security.v1
+    auth-token-cookie-name: auth-token
+    protected-path-prefixes:
+      - /api/studio
+      - /api/ai
+      - /api/onemeta
+    public-path-prefixes:
+      - /api/login
+      - /api/auth
+      - /api/studio/setup
+      - /api/studio/actuator/health
+      - /api/studio/v3/api-docs
+      - /api/ai/openapi.json
+      - /api/docs
   headers:
     enabled: true
     hsts-max-age-seconds: 31536000
     include-sub-domains: true
+
+datapillar:
+  rpc:
+    group: ${DUBBO_GROUP:datapillar}
+    version: ${DUBBO_VERSION:1.0.0}
+
+dubbo:
+  application:
+    name: datapillar-api-gateway
+    qos-enable: ${DUBBO_QOS_ENABLE:false}
+    register-mode: interface
+    migration:
+      step: FORCE_INTERFACE
+    service-discovery:
+      migration: FORCE_INTERFACE
+  protocol:
+    name: tri
+    port: -1
+  registry:
+    address: nacos://${NACOS_SERVER_ADDR}
+    group: ${NACOS_GROUP:DATAPILLAR}
+    register-mode: interface
+    parameters:
+      namespace: ${NACOS_NAMESPACE}
+      username: ${NACOS_USERNAME}
+      password: ${NACOS_PASSWORD}
+  consumer:
+    check: ${DUBBO_CONSUMER_CHECK:false}
+    timeout: ${DUBBO_CONSUMER_TIMEOUT:3000}
+    parameters:
+      migration.step: FORCE_INTERFACE
 
 # Resilience4j 熔断配置
 resilience4j:

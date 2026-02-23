@@ -9,9 +9,9 @@ package com.sunny.datapillar.auth.security.keystore;
  */
 public interface KeyStorage {
 
-    void savePrivateKey(Long tenantId, byte[] pemBytes);
+    void savePrivateKey(String tenantCode, byte[] privateKeyPemBytes);
 
-    byte[] loadPrivateKey(Long tenantId);
+    byte[] loadPrivateKey(String tenantCode);
 
-    boolean exists(Long tenantId);
+    boolean existsPrivateKey(String tenantCode);
 }

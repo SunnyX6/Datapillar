@@ -53,4 +53,9 @@ public interface RoleService {
      * 更新角色权限（全量覆盖）
      */
     void updateRolePermissions(Long roleId, List<FeatureObjectDto.Assignment> permissions);
+
+    /**
+     * 获取角色成员
+     */
+    RoleDto.MembersResponse getRoleMembers(Long roleId, Integer status);
 }

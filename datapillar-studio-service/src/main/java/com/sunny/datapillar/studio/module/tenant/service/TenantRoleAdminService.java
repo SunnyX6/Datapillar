@@ -24,4 +24,6 @@ public interface TenantRoleAdminService {
     List<FeatureObjectDto.ObjectPermission> getRolePermissions(Long roleId, String scope);
 
     void updateRolePermissions(Long roleId, List<FeatureObjectDto.Assignment> permissions);
+
+    RoleDto.MembersResponse getRoleMembers(Long roleId, Integer status);
 }

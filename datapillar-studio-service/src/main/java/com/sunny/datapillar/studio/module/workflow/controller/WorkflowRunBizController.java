@@ -24,9 +24,9 @@ import org.springframework.web.bind.annotation.RestController;
  * @author Sunny
  * @date 2026-01-01
  */
-@Tag(name = "工作流运行管理", description = "工作流运行与运行时任务管理")
+@Tag(name = "工作流运行", description = "工作流运行接口")
 @RestController
-@RequestMapping("/biz/projects/{projectId}/workflows/{id}")
+@RequestMapping("/biz/workflows/{workflowId}")
 @RequiredArgsConstructor
 public class WorkflowRunBizController {
 
@@ -37,18 +37,16 @@ public class WorkflowRunBizController {
     private final WorkflowRunBizService workflowRunBizService;
 
     @Operation(summary = "触发工作流运行")
-    @PostMapping("/run")
-    public ApiResponse<Void> trigger(@PathVariable Long projectId,
-                                     @PathVariable Long id,
+    @PostMapping("/runs")
+    public ApiResponse<Void> trigger(@PathVariable Long workflowId,
                                      @RequestBody(required = false) WorkflowDto.TriggerRequest request) {
-        workflowRunBizService.triggerWorkflow(id, request);
+        workflowRunBizService.triggerWorkflow(workflowId, request);
         return ApiResponse.ok();
     }
 
     @Operation(summary = "获取运行列表")
     @GetMapping("/runs")
-    public ApiResponse<JsonNode> getRuns(@PathVariable Long projectId,
-                                         @PathVariable Long id,
+    public ApiResponse<JsonNode> getRuns(@PathVariable Long workflowId,
                                          @RequestParam(required = false) Integer limit,
                                          @RequestParam(required = false) Integer offset,
                                          @RequestParam(required = false) Integer maxLimit,
@@ -56,71 +54,64 @@ public class WorkflowRunBizController {
         int resolvedMaxLimit = maxLimit == null || maxLimit <= 0 ? DEFAULT_MAX_LIMIT : maxLimit;
         int resolvedLimit = limit == null || limit <= 0 ? DEFAULT_LIMIT : Math.min(limit, resolvedMaxLimit);
         int resolvedOffset = offset == null || offset < 0 ? DEFAULT_OFFSET : offset;
-        return ApiResponse.ok(workflowRunBizService.getWorkflowRuns(id, resolvedLimit, resolvedOffset, state));
+        return ApiResponse.ok(workflowRunBizService.getWorkflowRuns(workflowId, resolvedLimit, resolvedOffset, state));
     }
 
     @Operation(summary = "获取运行详情")
     @GetMapping("/runs/{runId}")
-    public ApiResponse<JsonNode> getRun(@PathVariable Long projectId,
-                                        @PathVariable Long id,
+    public ApiResponse<JsonNode> getRun(@PathVariable Long workflowId,
                                         @PathVariable String runId) {
-        return ApiResponse.ok(workflowRunBizService.getWorkflowRun(id, runId));
+        return ApiResponse.ok(workflowRunBizService.getWorkflowRun(workflowId, runId));
     }
 
     @Operation(summary = "获取任务列表")
     @GetMapping("/runs/{runId}/jobs")
-    public ApiResponse<JsonNode> getJobs(@PathVariable Long projectId,
-                                         @PathVariable Long id,
+    public ApiResponse<JsonNode> getJobs(@PathVariable Long workflowId,
                                          @PathVariable String runId) {
-        return ApiResponse.ok(workflowRunBizService.getRunJobs(id, runId));
+        return ApiResponse.ok(workflowRunBizService.getRunJobs(workflowId, runId));
     }
 
     @Operation(summary = "获取任务详情")
     @GetMapping("/runs/{runId}/jobs/{jobId}")
-    public ApiResponse<JsonNode> getJob(@PathVariable Long projectId,
-                                        @PathVariable Long id,
+    public ApiResponse<JsonNode> getJob(@PathVariable Long workflowId,
                                         @PathVariable String runId,
                                         @PathVariable String jobId) {
-        return ApiResponse.ok(workflowRunBizService.getRunJob(id, runId, jobId));
+        return ApiResponse.ok(workflowRunBizService.getRunJob(workflowId, runId, jobId));
     }
 
     @Operation(summary = "获取任务日志")
     @GetMapping("/runs/{runId}/jobs/{jobId}/logs")
-    public ApiResponse<JsonNode> getJobLogs(@PathVariable Long projectId,
-                                            @PathVariable Long id,
+    public ApiResponse<JsonNode> getJobLogs(@PathVariable Long workflowId,
                                             @PathVariable String runId,
                                             @PathVariable String jobId,
                                             @RequestParam(defaultValue = "-1") int tryNumber) {
-        return ApiResponse.ok(workflowRunBizService.getJobLogs(id, runId, jobId, tryNumber));
+        return ApiResponse.ok(workflowRunBizService.getJobLogs(workflowId, runId, jobId, tryNumber));
     }
 
     @Operation(summary = "重跑任务")
     @PostMapping("/runs/{runId}/jobs/{jobId}/rerun")
-    public ApiResponse<JsonNode> rerunJob(@PathVariable Long projectId,
-                                          @PathVariable Long id,
+    public ApiResponse<JsonNode> rerunJob(@PathVariable Long workflowId,
                                           @PathVariable String runId,
                                           @PathVariable String jobId,
                                           @RequestBody(required = false) WorkflowDto.RerunJobRequest request) {
-        return ApiResponse.ok(workflowRunBizService.rerunJob(id, runId, jobId, request));
+        return ApiResponse.ok(workflowRunBizService.rerunJob(workflowId, runId, jobId, request));
     }
 
     @Operation(summary = "设置任务状态")
-    @PatchMapping("/runs/{runId}/job/{jobId}/state")
-    public ApiResponse<Void> setJobState(@PathVariable Long projectId,
-                                         @PathVariable Long id,
+    @PatchMapping("/runs/{runId}/jobs/{jobId}/state")
+    public ApiResponse<Void> setJobState(@PathVariable Long workflowId,
                                          @PathVariable String runId,
                                          @PathVariable String jobId,
                                          @Valid @RequestBody WorkflowDto.SetJobStateRequest request) {
-        workflowRunBizService.setJobState(id, runId, jobId, request);
+        workflowRunBizService.setJobState(workflowId, runId, jobId, request);
         return ApiResponse.ok();
     }
 
     @Operation(summary = "批量清除任务")
     @PostMapping("/runs/{runId}/clear")
-    public ApiResponse<JsonNode> clearJobs(@PathVariable Long projectId,
-                                           @PathVariable Long id,
+    public ApiResponse<JsonNode> clearJobs(@PathVariable Long workflowId,
                                            @PathVariable String runId,
                                            @Valid @RequestBody WorkflowDto.ClearJobsRequest request) {
-        return ApiResponse.ok(workflowRunBizService.clearJobs(id, runId, request));
+        return ApiResponse.ok(workflowRunBizService.clearJobs(workflowId, runId, request));
     }
 }

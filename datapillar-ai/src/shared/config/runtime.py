@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-02-06
 
@@ -123,9 +122,42 @@ class KeyStorageRuntimeConfig(BaseModel):
         return self
 
 
+class GatewayAssertionRuntimeConfig(BaseModel):
+    enabled: bool
+    header_name: str
+    issuer: str
+    audience: str
+    key_id: str
+    public_key_path: str
+    previous_key_id: str | None = None
+    previous_public_key_path: str | None = None
+    max_clock_skew_seconds: int = Field(ge=0, le=60)
+
+    @field_validator("header_name", "issuer", "audience", "key_id", "public_key_path")
+    @classmethod
+    def _validate_non_empty(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("不能为空字符串")
+        return normalized
+
+    @model_validator(mode="after")
+    def _validate_previous_key_pair(self) -> Self:
+        has_previous_key_id = bool(self.previous_key_id and self.previous_key_id.strip())
+        has_previous_public_key_path = bool(
+            self.previous_public_key_path and self.previous_public_key_path.strip()
+        )
+        if has_previous_key_id != has_previous_public_key_path:
+            raise ValueError(
+                "security.gateway_assertion.previous_key_id 与 previous_public_key_path 必须同时配置"
+            )
+        return self
+
+
 class SecurityRuntimeConfig(BaseModel):
     default_tenant_id: int = Field(ge=1)
     key_storage: KeyStorageRuntimeConfig
+    gateway_assertion: GatewayAssertionRuntimeConfig
 
 
 class RuntimeConfigContract(BaseModel):

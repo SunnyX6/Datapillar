@@ -3,14 +3,17 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel, Field
 
+from datapillar_oneagentic.context.timeline.recorder import TimelineRecorder
 from datapillar_oneagentic.core.agent import AgentSpec
 from datapillar_oneagentic.core.context import AgentContext
-from datapillar_oneagentic.exception import AgentError, AgentErrorCategory
 from datapillar_oneagentic.core.nodes import NodeFactory
-from datapillar_oneagentic.core.status import FailureKind
 from datapillar_oneagentic.core.types import AgentResult
-from datapillar_oneagentic.context.timeline.recorder import TimelineRecorder
 from datapillar_oneagentic.events import EventBus
+from datapillar_oneagentic.exception import (
+    AgentExecutionFailedException,
+    RecoveryAction,
+    action_for,
+)
 from datapillar_oneagentic.messages import Message, Messages
 from datapillar_oneagentic.messages.adapters.langchain import to_langchain
 from datapillar_oneagentic.state import StateBuilder
@@ -93,7 +96,7 @@ async def test_fail_fast() -> None:
         error="Need more information",
         messages=Messages([Message.user("additional details")]),
     )
-    with pytest.raises(AgentError) as exc_info:
+    with pytest.raises(AgentExecutionFailedException) as exc_info:
         await nf._handle_result(  # type: ignore[arg-type]
             state=state,
             agent_id="a1",
@@ -103,8 +106,7 @@ async def test_fail_fast() -> None:
         )
 
     error = exc_info.value
-    assert error.category == AgentErrorCategory.BUSINESS
-    assert error.failure_kind == FailureKind.BUSINESS
+    assert action_for(error) == RecoveryAction.FAIL_FAST
 
 
 def test_state_builder() -> None:

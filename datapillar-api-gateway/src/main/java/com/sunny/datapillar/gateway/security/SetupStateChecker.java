@@ -1,5 +1,7 @@
 package com.sunny.datapillar.gateway.security;
 
+import com.sunny.datapillar.common.constant.Code;
+import com.sunny.datapillar.common.constant.ErrorType;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Map;
@@ -23,10 +25,6 @@ import reactor.core.publisher.Mono;
 @Slf4j
 @Component
 public class SetupStateChecker {
-
-    private static final String CODE_OK = "OK";
-    private static final String CODE_SETUP_SCHEMA_NOT_READY = "SETUP_SCHEMA_NOT_READY";
-    private static final String CODE_SETUP_REQUIRED = "SETUP_REQUIRED";
 
     private static final String STUDIO_SERVICE_ID = "datapillar-studio-service";
     private static final String STATUS_ENDPOINT = "/api/studio/setup/status";
@@ -113,29 +111,49 @@ public class SetupStateChecker {
             throw new IllegalStateException("setup 状态响应为空");
         }
 
-        Object codeObject = response.get("code");
-        if (!(codeObject instanceof String code) || code.isBlank()) {
+        Integer code = parseCode(response.get("code"));
+        if (code == null) {
             throw new IllegalStateException("setup 状态响应缺少 code 字段");
         }
 
-        if (CODE_SETUP_SCHEMA_NOT_READY.equals(code)) {
+        if (code == Code.OK) {
+            Object dataObject = response.get("data");
+            if (!(dataObject instanceof Map<?, ?> dataMap)) {
+                throw new IllegalStateException("setup 状态响应缺少 data 字段");
+            }
+
+            boolean schemaReady = parseBoolean(dataMap.get("schemaReady"));
+            boolean initialized = parseBoolean(dataMap.get("initialized"));
+            return new SetupState(true, schemaReady, initialized);
+        }
+
+        String type = response.get("type") instanceof String value ? value : null;
+        if (code == Code.SERVICE_UNAVAILABLE && ErrorType.REQUIRED.equals(type)) {
+            Map<?, ?> context = response.get("context") instanceof Map<?, ?> map ? map : Map.of();
+            String reason = context.get("reason") instanceof String value ? value : null;
+            if ("SETUP_SCHEMA_NOT_READY".equals(reason)) {
+                return new SetupState(true, false, false);
+            }
+            if ("SETUP_REQUIRED".equals(reason)) {
+                return new SetupState(true, true, false);
+            }
             return new SetupState(true, false, false);
         }
-        if (CODE_SETUP_REQUIRED.equals(code)) {
-            return new SetupState(true, true, false);
-        }
-        if (!CODE_OK.equals(code)) {
-            throw new IllegalStateException("setup 状态响应 code 非 OK: " + code);
-        }
+        throw new IllegalStateException("setup 状态响应 code 非 OK: " + code);
+    }
 
-        Object dataObject = response.get("data");
-        if (!(dataObject instanceof Map<?, ?> dataMap)) {
-            throw new IllegalStateException("setup 状态响应缺少 data 字段");
+    private Integer parseCode(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
         }
-
-        boolean schemaReady = parseBoolean(dataMap.get("schemaReady"));
-        boolean initialized = parseBoolean(dataMap.get("initialized"));
-        return new SetupState(true, schemaReady, initialized);
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Integer.parseInt(text.trim());
+            } catch (NumberFormatException ignore) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private boolean parseBoolean(Object value) {

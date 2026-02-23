@@ -3,7 +3,7 @@ package com.sunny.datapillar.studio.context;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantMapper;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoGenericClient;
+import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,7 @@ public class TenantKeyCheck implements ApplicationRunner {
     private static final int MAX_ID_LOG_SIZE = 20;
 
     private final TenantMapper tenantMapper;
-    private final AuthCryptoGenericClient authCryptoClient;
+    private final AuthCryptoRpcClient authCryptoClient;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -40,8 +40,9 @@ public class TenantKeyCheck implements ApplicationRunner {
             return;
         }
 
-        List<Long> missingPublicKeyTenantIds = new ArrayList<>();
-        List<Long> missingPrivateKeyTenantIds = new ArrayList<>();
+        List<Long> missingTenantCodeIds = new ArrayList<>();
+        List<Long> missingTenantPublicKeyIds = new ArrayList<>();
+        List<Long> missingOrInvalidKeyTenantIds = new ArrayList<>();
 
         for (Tenant tenant : tenants) {
             Long tenantId = tenant.getId();
@@ -49,28 +50,36 @@ public class TenantKeyCheck implements ApplicationRunner {
                 continue;
             }
 
+            String tenantCode = tenant.getCode();
+            if (!StringUtils.hasText(tenantCode)) {
+                missingTenantCodeIds.add(tenantId);
+                continue;
+            }
             if (!StringUtils.hasText(tenant.getEncryptPublicKey())) {
-                missingPublicKeyTenantIds.add(tenantId);
+                missingTenantPublicKeyIds.add(tenantId);
             }
 
             try {
-                if (!authCryptoClient.existsPrivateKey(tenantId)) {
-                    missingPrivateKeyTenantIds.add(tenantId);
+                AuthCryptoRpcClient.TenantKeyStatus keyStatus = authCryptoClient.getTenantKeyStatus(tenantCode);
+                if (!keyStatus.exists() || !"READY".equalsIgnoreCase(keyStatus.status())) {
+                    missingOrInvalidKeyTenantIds.add(tenantId);
                 }
             } catch (RuntimeException ex) {
-                throw new IllegalStateException("租户私钥存储检查失败: tenantId=" + tenantId, ex);
+                throw new IllegalStateException("租户私钥存储检查失败: tenantId=" + tenantId + ", tenantCode=" + tenantCode, ex);
             }
         }
 
-        if (missingPublicKeyTenantIds.isEmpty() && missingPrivateKeyTenantIds.isEmpty()) {
+        if (missingTenantCodeIds.isEmpty() && missingTenantPublicKeyIds.isEmpty() && missingOrInvalidKeyTenantIds.isEmpty()) {
             log.info("租户密钥完整性检查通过: tenantCount={}", tenants.size());
             return;
         }
 
-        String message = "租户密钥完整性检查失败: missingPublicKeyTenantIds="
-                + formatIds(missingPublicKeyTenantIds)
-                + ", missingPrivateKeyTenantIds="
-                + formatIds(missingPrivateKeyTenantIds);
+        String message = "租户密钥完整性检查失败: missingTenantCodeTenantIds="
+                + formatIds(missingTenantCodeIds)
+                + ", missingTenantPublicKeyTenantIds="
+                + formatIds(missingTenantPublicKeyIds)
+                + ", missingOrInvalidKeyTenantIds="
+                + formatIds(missingOrInvalidKeyTenantIds);
         log.error(message);
         throw new IllegalStateException(message);
     }

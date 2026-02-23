@@ -19,10 +19,12 @@ from __future__ import annotations
 
 import operator
 from typing import Annotated, Any
+
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
-from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
+from datapillar_oneagentic.core.status import ExecutionStatus
+
 
 class Blackboard(TypedDict, total=False):
     """
@@ -67,7 +69,6 @@ class Blackboard(TypedDict, total=False):
 
     # Agent execution status
     last_agent_status: ExecutionStatus | None
-    last_agent_failure_kind: FailureKind | None
     last_agent_error: str | None
 
     # Session-level Todo (team progress tracking)
@@ -103,7 +104,6 @@ def create_blackboard(
         deliverable_keys=[],
         compression_context=None,
         last_agent_status=None,
-        last_agent_failure_kind=None,
         last_agent_error=None,
         todo=None,
         # MapReduce mode

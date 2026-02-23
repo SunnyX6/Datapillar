@@ -102,10 +102,59 @@ class Model:
         )
         try:
             with MySQLClient.get_engine().connect() as conn:
-                row = conn.execute(query, {"id": model_id, "tenant_id": tenant_id}).mappings().fetchone()
+                row = (
+                    conn.execute(query, {"id": model_id, "tenant_id": tenant_id})
+                    .mappings()
+                    .fetchone()
+                )
                 return dict(row) if row else None
         except Exception as e:
             logger.error(f"获取模型 #{model_id} 失败: {e}")
+            return None
+
+    @staticmethod
+    def get_active_chat_model(
+        *,
+        tenant_id: int,
+        provider_code: str,
+        model_id: str,
+    ) -> dict[str, Any] | None:
+        query = text(
+            f"""
+            SELECT {_MODEL_FIELDS}
+            FROM ai_model AS m
+            JOIN ai_provider AS p ON m.provider_id = p.id
+            WHERE m.tenant_id = :tenant_id
+              AND p.code = :provider_code
+              AND m.model_id = :model_id
+              AND m.model_type = 'chat'
+              AND m.status = 'ACTIVE'
+            LIMIT 1
+            """
+        )
+        try:
+            with MySQLClient.get_engine().connect() as conn:
+                row = (
+                    conn.execute(
+                        query,
+                        {
+                            "tenant_id": tenant_id,
+                            "provider_code": provider_code,
+                            "model_id": model_id,
+                        },
+                    )
+                    .mappings()
+                    .fetchone()
+                )
+                return dict(row) if row else None
+        except Exception as e:
+            logger.error(
+                "查询模型失败: tenant=%s provider=%s model=%s err=%s",
+                tenant_id,
+                provider_code,
+                model_id,
+                e,
+            )
             return None
 
 

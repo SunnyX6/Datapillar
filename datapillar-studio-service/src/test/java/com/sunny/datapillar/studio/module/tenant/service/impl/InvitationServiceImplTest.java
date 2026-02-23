@@ -10,8 +10,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.common.exception.UnauthorizedException;
+import com.sunny.datapillar.studio.context.TenantContext;
+import com.sunny.datapillar.studio.context.TenantContextHolder;
 import com.sunny.datapillar.studio.module.tenant.entity.UserInvitation;
 import com.sunny.datapillar.studio.module.tenant.entity.UserInvitationRole;
 import com.sunny.datapillar.studio.module.tenant.mapper.UserInvitationMapper;
@@ -70,13 +71,14 @@ class InvitationServiceImplTest {
     @AfterEach
     void tearDown() {
         RequestContextHolder.resetRequestAttributes();
+        TenantContextHolder.clear();
     }
 
     @Test
     void acceptInvitation_shouldBindMemberAndRolesWhenInvitationValid() {
         Long tenantId = 100L;
         Long userId = 200L;
-        bindCurrentUser(userId, 1L, "alice@example.com");
+        bindCurrentUser(userId, tenantId, "alice@example.com");
 
         UserInvitation invitation = pendingInvitation(tenantId, "alice@example.com", LocalDateTime.now().plusDays(1));
         when(userInvitationMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(invitation);
@@ -91,7 +93,7 @@ class InvitationServiceImplTest {
         when(roleMapper.selectById(302L)).thenReturn(role(302L, tenantId));
         when(userRoleMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
 
-        invitationService.acceptInvitation(tenantId, " code-001 ");
+        invitationService.acceptInvitation(" code-001 ");
 
         verify(userInvitationMapper).update(isNull(), any());
         verify(tenantUserMapper).insert(any(TenantUser.class));
@@ -102,17 +104,17 @@ class InvitationServiceImplTest {
     void acceptInvitation_shouldRejectWhenInviteExpired() {
         Long tenantId = 100L;
         Long userId = 200L;
-        bindCurrentUser(userId, 1L, "alice@example.com");
+        bindCurrentUser(userId, tenantId, "alice@example.com");
 
         UserInvitation invitation = pendingInvitation(tenantId, "alice@example.com", LocalDateTime.now().minusMinutes(1));
         when(userInvitationMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(invitation);
         when(userMapper.selectById(userId)).thenReturn(user(userId, "alice@example.com", "13900001234"));
         when(userInvitationMapper.update(isNull(), any())).thenReturn(1);
 
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> invitationService.acceptInvitation(tenantId, "EXPIRED-001"));
+        UnauthorizedException exception = assertThrows(UnauthorizedException.class,
+                () -> invitationService.acceptInvitation("EXPIRED-001"));
 
-        assertEquals(ErrorCode.INVITE_EXPIRED, exception.getErrorCode());
+        assertEquals("邀请码已过期", exception.getMessage());
         verify(tenantUserMapper, never()).insert(any(TenantUser.class));
         verify(userRoleMapper, never()).insert(any(UserRole.class));
     }
@@ -121,16 +123,16 @@ class InvitationServiceImplTest {
     void acceptInvitation_shouldRejectWhenInviteeDoesNotMatchCurrentUser() {
         Long tenantId = 100L;
         Long userId = 200L;
-        bindCurrentUser(userId, 1L, "bob@example.com");
+        bindCurrentUser(userId, tenantId, "bob@example.com");
 
         UserInvitation invitation = pendingInvitation(tenantId, "alice@example.com", LocalDateTime.now().plusDays(1));
         when(userInvitationMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(invitation);
         when(userMapper.selectById(userId)).thenReturn(user(userId, "bob@example.com", "13900001234"));
 
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> invitationService.acceptInvitation(tenantId, "MISMATCH-001"));
+        UnauthorizedException exception = assertThrows(UnauthorizedException.class,
+                () -> invitationService.acceptInvitation("MISMATCH-001"));
 
-        assertEquals(ErrorCode.INVITE_MISMATCH, exception.getErrorCode());
+        assertEquals("邀请信息与登录身份不匹配", exception.getMessage());
         verify(userInvitationMapper, never()).update(isNull(), any());
         verify(tenantUserMapper, never()).insert(any(TenantUser.class));
     }
@@ -139,16 +141,16 @@ class InvitationServiceImplTest {
     void acceptInvitation_shouldRejectWhenInvitationAlreadyAccepted() {
         Long tenantId = 100L;
         Long userId = 200L;
-        bindCurrentUser(userId, 1L, "alice@example.com");
+        bindCurrentUser(userId, tenantId, "alice@example.com");
 
         UserInvitation invitation = pendingInvitation(tenantId, "alice@example.com", LocalDateTime.now().plusDays(1));
         invitation.setStatus(1);
         when(userInvitationMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(invitation);
 
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> invitationService.acceptInvitation(tenantId, "USED-001"));
+        UnauthorizedException exception = assertThrows(UnauthorizedException.class,
+                () -> invitationService.acceptInvitation("USED-001"));
 
-        assertEquals(ErrorCode.INVITE_ALREADY_USED, exception.getErrorCode());
+        assertEquals("邀请码已被使用", exception.getMessage());
         verify(userMapper, never()).selectById(any());
     }
 
@@ -157,6 +159,7 @@ class InvitationServiceImplTest {
         GatewayAssertionContext context = new GatewayAssertionContext(
                 userId,
                 tenantId,
+                "tenant-" + tenantId,
                 "tester",
                 email,
                 List.of("USER"),
@@ -167,6 +170,7 @@ class InvitationServiceImplTest {
         );
         GatewayAssertionContext.attach(request, context);
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        TenantContextHolder.set(new TenantContext(tenantId, "tenant-" + tenantId, null, null, false));
     }
 
     private UserInvitation pendingInvitation(Long tenantId, String inviteeEmail, LocalDateTime expiresAt) {

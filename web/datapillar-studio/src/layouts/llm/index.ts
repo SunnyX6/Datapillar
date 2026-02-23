@@ -1,1 +1,1 @@
-export { ModelManagementView } from './ModelManagementView'
+export { LLMManagementView } from './LLMManagementView'

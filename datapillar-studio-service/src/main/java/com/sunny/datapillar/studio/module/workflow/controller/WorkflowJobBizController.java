@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -27,9 +28,9 @@ import lombok.RequiredArgsConstructor;
  * @author Sunny
  * @date 2026-01-01
  */
-@Tag(name = "任务管理", description = "工作流下的任务 CRUD 操作")
+@Tag(name = "工作流任务", description = "工作流任务接口")
 @RestController
-@RequestMapping("/biz/projects/{projectId}/workflows/{workflowId}")
+@RequestMapping("/biz/workflows/{workflowId}")
 @RequiredArgsConstructor
 public class WorkflowJobBizController {
 
@@ -37,9 +38,7 @@ public class WorkflowJobBizController {
 
     @Operation(summary = "获取工作流下的所有任务")
     @GetMapping("/jobs")
-    public ApiResponse<List<JobDto.Response>> list(
-            @PathVariable Long projectId,
-            @PathVariable Long workflowId) {
+    public ApiResponse<List<JobDto.Response>> list(@PathVariable Long workflowId) {
         List<JobDto.Response> result = workflowJobBizService.getJobsByWorkflowId(workflowId);
         return ApiResponse.ok(result);
     }
@@ -47,17 +46,15 @@ public class WorkflowJobBizController {
     @Operation(summary = "获取任务详情")
     @GetMapping("/jobs/{id}")
     public ApiResponse<JobDto.Response> detail(
-            @PathVariable Long projectId,
             @PathVariable Long workflowId,
             @PathVariable Long id) {
-        JobDto.Response result = workflowJobBizService.getJobDetail(id);
+        JobDto.Response result = workflowJobBizService.getJobDetail(workflowId, id);
         return ApiResponse.ok(result);
     }
 
     @Operation(summary = "创建任务")
-    @PostMapping("/job")
+    @PostMapping("/jobs")
     public ApiResponse<Void> create(
-            @PathVariable Long projectId,
             @PathVariable Long workflowId,
             @Valid @RequestBody JobDto.Create dto) {
         workflowJobBizService.createJob(workflowId, dto);
@@ -65,30 +62,27 @@ public class WorkflowJobBizController {
     }
 
     @Operation(summary = "更新任务")
-    @PutMapping("/job/{id}")
+    @PatchMapping("/jobs/{id}")
     public ApiResponse<Void> update(
-            @PathVariable Long projectId,
             @PathVariable Long workflowId,
             @PathVariable Long id,
             @Valid @RequestBody JobDto.Update dto) {
-        workflowJobBizService.updateJob(id, dto);
+        workflowJobBizService.updateJob(workflowId, id, dto);
         return ApiResponse.ok();
     }
 
     @Operation(summary = "删除任务")
-    @DeleteMapping("/job/{id}")
+    @DeleteMapping("/jobs/{id}")
     public ApiResponse<Void> delete(
-            @PathVariable Long projectId,
             @PathVariable Long workflowId,
             @PathVariable Long id) {
-        workflowJobBizService.deleteJob(id);
+        workflowJobBizService.deleteJob(workflowId, id);
         return ApiResponse.ok();
     }
 
     @Operation(summary = "批量更新任务位置")
     @PutMapping("/jobs/layout")
     public ApiResponse<Void> updateLayout(
-            @PathVariable Long projectId,
             @PathVariable Long workflowId,
             @Valid @RequestBody JobDto.LayoutSave dto) {
         workflowJobBizService.updateJobPositions(workflowId, dto);

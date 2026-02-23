@@ -14,6 +14,7 @@ class CurrentUser(BaseModel):
 
     user_id: int
     tenant_id: int
+    tenant_code: str
     username: str
     email: str | None = None
 

@@ -168,10 +168,11 @@ public class InvitationServiceImpl implements InvitationService {
 
     @Override
     @Transactional
-    public void acceptInvitation(Long tenantId, String inviteCode) {
-        if (tenantId == null || inviteCode == null || inviteCode.isBlank()) {
+    public void acceptInvitation(String inviteCode) {
+        if (inviteCode == null || inviteCode.isBlank()) {
             throw new BadRequestException("参数错误");
         }
+        Long tenantId = getRequiredTenantId();
 
         String normalizedInviteCode = inviteCode.trim().toUpperCase(Locale.ROOT);
         UserInvitation invitation = loadInvitation(tenantId, normalizedInviteCode);

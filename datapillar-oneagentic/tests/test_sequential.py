@@ -23,7 +23,7 @@ async def test_stop_failed() -> None:
     async def node_failed(state):
         executed.append("a1")
         sb = StateBuilder(state)
-        sb.routing.finish_agent(status=ExecutionStatus.FAILED, failure_kind=None, error=None)
+        sb.routing.finish_agent(status=ExecutionStatus.FAILED, error=None)
         return Command(update=sb.patch())
 
     async def run_node(state):

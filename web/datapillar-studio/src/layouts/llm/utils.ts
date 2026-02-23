@@ -26,6 +26,12 @@ export const connectModel = (connectedIds: string[], modelId: string) => {
   return [...connectedIds, modelId]
 }
 
+export const collectConnectedModelIds = (models: Array<Pick<ModelRecord, 'id' | 'hasApiKey'>>) => {
+  return models
+    .filter((model) => Boolean(model.hasApiKey))
+    .map((model) => model.id)
+}
+
 export const toggleModelSelection = (selectedIds: string[], modelId: string, maxSelection = MAX_COMPARE_MODELS) => {
   if (selectedIds.includes(modelId)) {
     return selectedIds.filter((id) => id !== modelId)

@@ -3,13 +3,14 @@ package com.sunny.datapillar.studio.module.tenant.service.sso.impl;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.common.exception.AlreadyExistsException;
+import com.sunny.datapillar.common.exception.ForbiddenException;
 import com.sunny.datapillar.studio.context.TenantContext;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
 import com.sunny.datapillar.studio.module.tenant.dto.SsoIdentityDto;
@@ -17,11 +18,12 @@ import com.sunny.datapillar.studio.module.tenant.entity.TenantSsoConfig;
 import com.sunny.datapillar.studio.module.tenant.entity.UserIdentity;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantSsoConfigMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.UserIdentityMapper;
+import com.sunny.datapillar.studio.module.tenant.service.TenantCodeResolver;
 import com.sunny.datapillar.studio.module.tenant.service.sso.provider.DingtalkBindingClient;
 import com.sunny.datapillar.studio.module.tenant.service.sso.provider.model.DingtalkUserInfo;
 import com.sunny.datapillar.studio.module.user.entity.TenantUser;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoGenericClient;
+import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
 import java.util.Map;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.AfterEach;
@@ -43,7 +45,9 @@ class SsoIdentityServiceImplTest {
     @Mock
     private DingtalkBindingClient dingtalkBindingClient;
     @Mock
-    private AuthCryptoGenericClient authCryptoClient;
+    private AuthCryptoRpcClient authCryptoClient;
+    @Mock
+    private TenantCodeResolver tenantCodeResolver;
 
     private SsoIdentityServiceImpl service;
 
@@ -51,15 +55,17 @@ class SsoIdentityServiceImplTest {
     void setUp() {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), UserIdentity.class);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), TenantSsoConfig.class);
-        TenantContextHolder.set(new TenantContext(1L, null, null, false));
+        TenantContextHolder.set(new TenantContext(1L, "tenant-1", null, null, false));
         service = new SsoIdentityServiceImpl(
                 userIdentityMapper,
                 tenantSsoConfigMapper,
                 tenantUserMapper,
                 dingtalkBindingClient,
                 authCryptoClient,
+                tenantCodeResolver,
                 new ObjectMapper()
         );
+        lenient().when(tenantCodeResolver.requireTenantCode(1L)).thenReturn("tenant-1");
     }
 
     @AfterEach
@@ -90,7 +96,7 @@ class SsoIdentityServiceImplTest {
                 "redirectUri", "https://redirect"
         )));
         when(tenantSsoConfigMapper.selectOne(any())).thenReturn(config);
-        when(authCryptoClient.decryptSsoClientSecret(1L, "ENCv1:secret")).thenReturn("secret");
+        when(authCryptoClient.decryptSsoClientSecret("tenant-1", "ENCv1:secret")).thenReturn("secret");
 
         DingtalkUserInfo userInfo = new DingtalkUserInfo("union-001", "{\"unionId\":\"union-001\"}");
         when(dingtalkBindingClient.fetchUserInfo("client", "secret", "code-001")).thenReturn(userInfo);
@@ -115,9 +121,8 @@ class SsoIdentityServiceImplTest {
 
         when(tenantUserMapper.selectByTenantIdAndUserId(1L, 100L)).thenReturn(null);
 
-        BusinessException exception = assertThrows(BusinessException.class, () -> service.bindByCode(request));
-
-        assertEquals(ErrorCode.FORBIDDEN, exception.getErrorCode());
+        ForbiddenException exception = assertThrows(ForbiddenException.class, () -> service.bindByCode(request));
+        assertEquals("无权限访问", exception.getMessage());
     }
 
     @Test
@@ -143,15 +148,14 @@ class SsoIdentityServiceImplTest {
                 "redirectUri", "https://redirect"
         )));
         when(tenantSsoConfigMapper.selectOne(any())).thenReturn(config);
-        when(authCryptoClient.decryptSsoClientSecret(1L, "ENCv1:secret")).thenReturn("secret");
+        when(authCryptoClient.decryptSsoClientSecret("tenant-1", "ENCv1:secret")).thenReturn("secret");
 
         DingtalkUserInfo userInfo = new DingtalkUserInfo("union-001", "{\"unionId\":\"union-001\"}");
         when(dingtalkBindingClient.fetchUserInfo("client", "secret", "code-001")).thenReturn(userInfo);
         when(userIdentityMapper.selectOne(any())).thenReturn(new UserIdentity());
 
-        BusinessException exception = assertThrows(BusinessException.class, () -> service.bindByCode(request));
-
-        assertEquals(ErrorCode.DUPLICATE_RESOURCE, exception.getErrorCode());
+        AlreadyExistsException exception = assertThrows(AlreadyExistsException.class, () -> service.bindByCode(request));
+        assertEquals("资源已存在", exception.getMessage());
     }
 
     @Test

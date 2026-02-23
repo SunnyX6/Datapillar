@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -6,6 +6,8 @@ import {
   ArrowRight,
   Bot,
   Check,
+  Eye,
+  EyeOff,
   ChevronDown,
   ChevronRight,
   Copy,
@@ -21,22 +23,30 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Maximize2,
+  Pencil,
+  Trash2,
+  User,
   X
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card, Modal, ModalCancelButton, ModalPrimaryButton, Select } from '@/components/ui'
+import { Button, Card, Modal, ModalCancelButton, ModalPrimaryButton, Select, Tooltip } from '@/components/ui'
 import { cardWidthClassMap, contentMaxWidthClassMap, drawerWidthClassMap, iconSizeToken, menuWidthClassMap, panelWidthClassMap, tableColumnWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
-import { listAdminModels } from '@/services/studioLlmService'
+import {
+  connectAdminModel,
+  createAdminModel,
+  deleteAdminProvider,
+  createAdminProvider,
+  listAdminModels,
+  listAdminProviders,
+  type StudioLlmProvider,
+  type UpdateAdminLlmProviderRequest,
+  updateAdminProvider
+} from '@/services/studioLlmService'
+import { createLlmPlaygroundStream } from '@/services/aiLlmPlaygroundService'
 import { mapAdminModelToRecord, resolveProviderLabel } from './modelAdapters'
-import { MAX_COMPARE_MODELS, connectModel, filterModels, toggleModelSelection } from './utils'
+import { MAX_COMPARE_MODELS, collectConnectedModelIds, connectModel, filterModels, toggleModelSelection } from './utils'
 import type { LlmProvider, ModelCategory, ModelFilters, ModelRecord } from './types'
-
-const TYPE_OPTIONS: Array<{ label: string; value: ModelCategory }> = [
-  { label: 'Chat', value: 'chat' },
-  { label: 'Embeddings', value: 'embeddings' },
-  { label: 'Reranking', value: 'reranking' }
-]
 
 const MODEL_TYPE_OPTIONS: Array<{ label: string; value: ModelCategory }> = [
   { label: 'Chat', value: 'chat' },
@@ -45,6 +55,22 @@ const MODEL_TYPE_OPTIONS: Array<{ label: string; value: ModelCategory }> = [
   { label: 'Code', value: 'code' }
 ]
 
+const CONTEXT_LENGTH_OPTIONS: Array<{ label: string; value: string }> = [
+  { label: '32K', value: '32768' },
+  { label: '64K', value: '65536' },
+  { label: '128K', value: '128K' },
+  { label: '256K', value: '256K' },
+  { label: '512K', value: '512K' },
+  { label: '1M', value: '1M' }
+]
+
+const MODEL_TYPE_API_MAP: Record<ModelCategory, 'chat' | 'embeddings' | 'reranking' | 'code'> = {
+  chat: 'chat',
+  embeddings: 'embeddings',
+  reranking: 'reranking',
+  code: 'code'
+}
+
 const DEFAULT_PROVIDER: LlmProvider = 'openai'
 
 const emptyCreateForm = {
@@ -52,16 +78,59 @@ const emptyCreateForm = {
   name: '',
   provider: DEFAULT_PROVIDER,
   baseUrl: '',
+  apiKey: '',
   description: '',
   modelType: 'chat' as ModelCategory
 }
 
+const emptyProviderCreateForm = {
+  code: '',
+  name: '',
+  baseUrl: '',
+  modelIds: [] as string[]
+}
+
+const emptyProviderEditForm = {
+  code: '',
+  name: '',
+  baseUrl: '',
+  modelIds: [] as string[]
+}
+
 const getProviderLabel = (model: ModelRecord) => resolveProviderLabel(model.provider, model.providerLabel)
+
+function normalizeProviderCode(code?: string | null): LlmProvider | null {
+  const normalizedCode = code?.trim().toLowerCase()
+  if (!normalizedCode) {
+    return null
+  }
+  return normalizedCode as LlmProvider
+}
+
+function normalizeProviderModelIds(modelIds?: string[] | null): string[] {
+  if (!Array.isArray(modelIds) || modelIds.length === 0) {
+    return []
+  }
+  const normalized = modelIds
+    .map((modelId) => modelId.trim())
+    .filter((modelId) => modelId.length > 0)
+  return Array.from(new Set(normalized))
+}
+
+function normalizeProviderBaseUrl(baseUrl?: string | null): string {
+  const normalized = baseUrl?.trim()
+  return normalized && normalized.length > 0 ? normalized : ''
+}
+
+function resolveErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
 
 export function ModelManagementView() {
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [models, setModels] = useState<ModelRecord[]>([])
+  const [providers, setProviders] = useState<StudioLlmProvider[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(true)
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([])
   const [connectedModelIds, setConnectedModelIds] = useState<string[]>([])
@@ -71,9 +140,28 @@ export function ModelManagementView() {
   const [isCompareOpen, setIsCompareOpen] = useState(false)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState(emptyCreateForm)
+  const [isCreateApiKeyVisible, setIsCreateApiKeyVisible] = useState(false)
+  const [isCreatingModel, setIsCreatingModel] = useState(false)
+  const [isCreateProviderOpen, setIsCreateProviderOpen] = useState(false)
+  const [isEditProviderOpen, setIsEditProviderOpen] = useState(false)
+  const [providerCreateForm, setProviderCreateForm] = useState(emptyProviderCreateForm)
+  const [providerEditForm, setProviderEditForm] = useState(emptyProviderEditForm)
+  const [isCreatingProvider, setIsCreatingProvider] = useState(false)
+  const [isUpdatingProvider, setIsUpdatingProvider] = useState(false)
+  const [isDeletingProvider, setIsDeletingProvider] = useState(false)
 
   const providerOptions = useMemo<Array<{ label: string; value: LlmProvider }>>(() => {
     const providerMap = new Map<string, string>()
+    providers.forEach((provider) => {
+      const normalizedCode = provider.code?.trim().toLowerCase()
+      if (!normalizedCode || providerMap.has(normalizedCode)) {
+        return
+      }
+      providerMap.set(
+        normalizedCode,
+        resolveProviderLabel(normalizedCode as LlmProvider, provider.name)
+      )
+    })
     models.forEach((model) => {
       if (!providerMap.has(model.provider)) {
         providerMap.set(model.provider, resolveProviderLabel(model.provider, model.providerLabel))
@@ -83,27 +171,48 @@ export function ModelManagementView() {
       value: value as LlmProvider,
       label
     }))
-  }, [models])
+  }, [models, providers])
 
-  const contextOptions = useMemo(() => {
-    return Array.from(new Set(models.map((model) => model.contextGroup)))
-      .filter((context) => context.trim().length > 0)
-      .map((value) => ({ label: value, value }))
-  }, [models])
+  const contextOptions = CONTEXT_LENGTH_OPTIONS
+
+  const filterTypeOptions = MODEL_TYPE_OPTIONS
+
+  const providerModelIdMap = useMemo(() => {
+    const map = new Map<LlmProvider, string[]>()
+    providers.forEach((provider) => {
+      const providerCode = normalizeProviderCode(provider.code)
+      if (!providerCode) {
+        return
+      }
+      map.set(providerCode, normalizeProviderModelIds(provider.modelIds))
+    })
+    return map
+  }, [providers])
+
+  const providerBaseUrlMap = useMemo(() => {
+    const map = new Map<LlmProvider, string>()
+    providers.forEach((provider) => {
+      const providerCode = normalizeProviderCode(provider.code)
+      if (!providerCode) {
+        return
+      }
+      map.set(providerCode, normalizeProviderBaseUrl(provider.baseUrl))
+    })
+    return map
+  }, [providers])
 
   const modelIdOptions = useMemo(() => {
-    const filtered = createForm.provider
-      ? models.filter((model) => model.provider === createForm.provider)
-      : models
-    return filtered.map((model) => ({ value: model.id, label: model.id }))
-  }, [createForm.provider, models])
+    const modelIds = providerModelIdMap.get(createForm.provider) ?? []
+    return modelIds.map((modelId) => ({ value: modelId, label: modelId }))
+  }, [createForm.provider, providerModelIdMap])
 
   const filteredModels = useMemo(() => filterModels(models, searchQuery, filters), [models, searchQuery, filters])
 
   const buildCreateForm = (provider: LlmProvider = providerOptions[0]?.value ?? DEFAULT_PROVIDER) => ({
     ...emptyCreateForm,
     provider,
-    modelId: models.find((model) => model.provider === provider)?.id ?? ''
+    modelId: providerModelIdMap.get(provider)?.[0] ?? '',
+    baseUrl: providerBaseUrlMap.get(provider) ?? ''
   })
 
   useEffect(() => {
@@ -112,26 +221,44 @@ export function ModelManagementView() {
     const syncModels = async () => {
       setIsLoadingModels(true)
       try {
-        const response = await listAdminModels()
+        const [response, providerResponse] = await Promise.all([
+          listAdminModels(),
+          listAdminProviders().catch(() => [])
+        ])
         if (ignore) {
           return
         }
         const nextModels = response.map(mapAdminModelToRecord)
+        setProviders(providerResponse)
         setModels(nextModels)
-        setConnectedModelIds(
-          nextModels
-            .filter((model) => model.hasApiKey)
-            .map((model) => model.id)
-        )
+        setConnectedModelIds(collectConnectedModelIds(nextModels))
         setCreateForm((prev) => {
-          const nextProvider = nextModels.some((model) => model.provider === prev.provider)
-            ? prev.provider
-            : (nextModels[0]?.provider ?? DEFAULT_PROVIDER)
-          const nextModelId = nextModels.find((model) => model.provider === nextProvider)?.id ?? ''
+          const providerCodeSet = new Set<LlmProvider>()
+          const providerModelIdMapFromResponse = new Map<LlmProvider, string[]>()
+          const providerBaseUrlMapFromResponse = new Map<LlmProvider, string>()
+
+          providerResponse.forEach((provider) => {
+            const providerCode = normalizeProviderCode(provider.code)
+            if (!providerCode) {
+              return
+            }
+            providerCodeSet.add(providerCode)
+            providerModelIdMapFromResponse.set(providerCode, normalizeProviderModelIds(provider.modelIds))
+            providerBaseUrlMapFromResponse.set(providerCode, normalizeProviderBaseUrl(provider.baseUrl))
+          })
+
+          const firstProviderCode = normalizeProviderCode(providerResponse[0]?.code)
+          const fallbackProvider = firstProviderCode ?? DEFAULT_PROVIDER
+          const nextProvider = providerCodeSet.has(prev.provider) ? prev.provider : fallbackProvider
+          const nextProviderModelIds = providerModelIdMapFromResponse.get(nextProvider) ?? []
+          const nextModelId = nextProviderModelIds.includes(prev.modelId) ? prev.modelId : (nextProviderModelIds[0] ?? '')
+          const nextBaseUrl = providerBaseUrlMapFromResponse.get(nextProvider) ?? ''
+
           return {
             ...prev,
             provider: nextProvider,
-            modelId: nextModelId
+            modelId: nextModelId,
+            baseUrl: nextBaseUrl
           }
         })
       } catch (error) {
@@ -140,6 +267,7 @@ export function ModelManagementView() {
         }
         const message = error instanceof Error ? error.message : String(error)
         toast.error(`加载模型失败：${message}`)
+        setProviders([])
         setModels([])
         setConnectedModelIds([])
       } finally {
@@ -166,12 +294,32 @@ export function ModelManagementView() {
     setActiveModelId(null)
   }, [activeModelId, models])
 
+  useEffect(() => {
+    const allowedProviders = new Set(providerOptions.map((option) => option.value))
+    const allowedTypes = new Set(filterTypeOptions.map((option) => option.value))
+    const allowedContexts = new Set(contextOptions.map((option) => option.value))
+    setFilters((prev) => {
+      const nextProviders = prev.providers.filter((provider) => allowedProviders.has(provider))
+      const nextTypes = prev.types.filter((type) => allowedTypes.has(type))
+      const nextContexts = prev.contexts.filter((context) => allowedContexts.has(context))
+      if (
+        nextProviders.length === prev.providers.length
+        && nextTypes.length === prev.types.length
+        && nextContexts.length === prev.contexts.length
+      ) {
+        return prev
+      }
+      return { ...prev, providers: nextProviders, types: nextTypes, contexts: nextContexts }
+    })
+  }, [contextOptions, filterTypeOptions, providerOptions])
+
   const toggleFilter = <T extends keyof ModelFilters>(group: T, value: ModelFilters[T][number]) => {
     setFilters((prev) => {
-      const nextValues = prev[group].includes(value)
-        ? prev[group].filter((item) => item !== value)
-        : [...prev[group], value]
-      return { ...prev, [group]: nextValues }
+      const currentValues = prev[group] as Array<ModelFilters[T][number]>
+      const nextValues = currentValues.includes(value)
+        ? currentValues.filter((item) => item !== value)
+        : [...currentValues, value]
+      return { ...prev, [group]: nextValues } as ModelFilters
     })
   }
 
@@ -198,32 +346,367 @@ export function ModelManagementView() {
     setActiveModelId(modelId)
   }
 
-  const handleConnectModel = (modelId: string) => {
-    setConnectedModelIds((prev) => connectModel(prev, modelId))
-    setDrawerTab('playground')
+  const handleConnectModel = async (
+    model: ModelRecord,
+    request: { apiKey: string; baseUrl?: string }
+  ): Promise<boolean> => {
+    if (!model.modelPk) {
+      toast.error('模型主键缺失，无法连接')
+      return false
+    }
+
+    const normalizedApiKey = request.apiKey.trim()
+    if (!normalizedApiKey) {
+      toast.error('API Key 不能为空')
+      return false
+    }
+
+    const normalizedBaseUrl = request.baseUrl?.trim()
+    try {
+      await connectAdminModel(model.modelPk, {
+        apiKey: normalizedApiKey,
+        baseUrl: normalizedBaseUrl || undefined
+      })
+
+      const nextModels = (await listAdminModels()).map(mapAdminModelToRecord)
+      setModels(nextModels)
+      setConnectedModelIds(collectConnectedModelIds(nextModels))
+      setDrawerTab('playground')
+      toast.success(`模型连接成功：${model.name}`)
+      return true
+    } catch (error) {
+      const message = resolveErrorMessage(error)
+      toast.error(`模型连接失败：${message}`)
+      return false
+    }
   }
 
   const handleProviderChange = (value: LlmProvider) => {
-    const nextOptions = models.filter((model) => model.provider === value)
-    const nextModelId = nextOptions[0]?.id ?? ''
+    const nextModelId = providerModelIdMap.get(value)?.[0] ?? ''
+    const nextBaseUrl = providerBaseUrlMap.get(value) ?? ''
     setCreateForm((prev) => ({
       ...prev,
       provider: value,
-      modelId: nextModelId
+      modelId: nextModelId,
+      baseUrl: nextBaseUrl
     }))
+  }
+
+  const handleOpenCreateProviderModal = () => {
+    setProviderCreateForm(emptyProviderCreateForm)
+    setIsCreateProviderOpen(true)
+  }
+
+  const handleCloseCreateProviderModal = () => {
+    if (isCreatingProvider) {
+      return
+    }
+    setIsCreateProviderOpen(false)
+    setProviderCreateForm(emptyProviderCreateForm)
+  }
+
+  const handleAddCreateProviderModelId = () => {
+    setProviderCreateForm((prev) => ({
+      ...prev,
+      modelIds: [...prev.modelIds, '']
+    }))
+  }
+
+  const handleChangeCreateProviderModelId = (index: number, value: string) => {
+    setProviderCreateForm((prev) => ({
+      ...prev,
+      modelIds: prev.modelIds.map((modelId, modelIndex) => (modelIndex === index ? value : modelId))
+    }))
+  }
+
+  const handleRemoveCreateProviderModelId = (index: number) => {
+    setProviderCreateForm((prev) => ({
+      ...prev,
+      modelIds: prev.modelIds.filter((_, modelIndex) => modelIndex !== index)
+    }))
+  }
+
+  const handleAddEditProviderModelId = () => {
+    setProviderEditForm((prev) => ({
+      ...prev,
+      modelIds: [...prev.modelIds, '']
+    }))
+  }
+
+  const handleChangeEditProviderModelId = (index: number, value: string) => {
+    setProviderEditForm((prev) => ({
+      ...prev,
+      modelIds: prev.modelIds.map((modelId, modelIndex) => (modelIndex === index ? value : modelId))
+    }))
+  }
+
+  const handleRemoveEditProviderModelId = (index: number) => {
+    setProviderEditForm((prev) => ({
+      ...prev,
+      modelIds: prev.modelIds.filter((_, modelIndex) => modelIndex !== index)
+    }))
+  }
+
+  const refreshProviders = async (): Promise<StudioLlmProvider[]> => {
+    const nextProviders = await listAdminProviders()
+    setProviders(nextProviders)
+    return nextProviders
+  }
+
+  const handleOpenEditProviderModal = (providerValue: string) => {
+    const providerCode = normalizeProviderCode(providerValue)
+    if (!providerCode) {
+      toast.error('Provider 无效')
+      return
+    }
+    const provider = providers.find((item) => normalizeProviderCode(item.code) === providerCode)
+    if (!provider) {
+      toast.error(`未找到 Provider：${providerCode}`)
+      return
+    }
+    setProviderEditForm({
+      code: providerCode,
+      name: provider.name?.trim() ?? '',
+      baseUrl: normalizeProviderBaseUrl(provider.baseUrl),
+      modelIds: normalizeProviderModelIds(provider.modelIds)
+    })
+    setIsEditProviderOpen(true)
+  }
+
+  const handleDeleteProviderFromList = async (providerValue: string) => {
+    if (isDeletingProvider) {
+      return
+    }
+    const providerCode = normalizeProviderCode(providerValue)
+    if (!providerCode) {
+      toast.error('Provider 无效')
+      return
+    }
+    const provider = providers.find((item) => normalizeProviderCode(item.code) === providerCode)
+    if (!provider) {
+      toast.error(`未找到 Provider：${providerCode}`)
+      return
+    }
+
+    setIsDeletingProvider(true)
+    try {
+      await deleteAdminProvider(providerCode)
+      const nextProviders = await refreshProviders()
+      setCreateForm((prev) => {
+        if (prev.provider !== providerCode) {
+          return prev
+        }
+        const fallbackProvider = normalizeProviderCode(nextProviders[0]?.code) ?? DEFAULT_PROVIDER
+        const fallbackModelIds = normalizeProviderModelIds(
+          nextProviders.find((item) => normalizeProviderCode(item.code) === fallbackProvider)?.modelIds
+        )
+        const fallbackBaseUrl = normalizeProviderBaseUrl(
+          nextProviders.find((item) => normalizeProviderCode(item.code) === fallbackProvider)?.baseUrl
+        )
+        return {
+          ...prev,
+          provider: fallbackProvider,
+          modelId: fallbackModelIds[0] ?? '',
+          baseUrl: fallbackBaseUrl
+        }
+      })
+
+      if (normalizeProviderCode(providerEditForm.code) === providerCode) {
+        setIsEditProviderOpen(false)
+        setProviderEditForm(emptyProviderEditForm)
+      }
+      toast.success(`已删除 Provider：${providerCode}`)
+    } catch (error) {
+      const message = resolveErrorMessage(error)
+      toast.error(`删除 Provider 失败：${message}`)
+    } finally {
+      setIsDeletingProvider(false)
+    }
+  }
+
+  const handleCloseEditProviderModal = () => {
+    if (isUpdatingProvider || isDeletingProvider) {
+      return
+    }
+    setIsEditProviderOpen(false)
+    setProviderEditForm(emptyProviderEditForm)
+  }
+
+  const handleCreateProvider = async () => {
+    if (isCreatingProvider) {
+      return
+    }
+    const providerCode = normalizeProviderCode(providerCreateForm.code)
+    if (!providerCode) {
+      toast.error('Provider code 不能为空')
+      return
+    }
+    const providerName = providerCreateForm.name.trim()
+    const baseUrl = providerCreateForm.baseUrl.trim()
+    const createModelIds = normalizeProviderModelIds(providerCreateForm.modelIds)
+
+    setIsCreatingProvider(true)
+    try {
+      await createAdminProvider({
+        code: providerCode,
+        name: providerName || undefined,
+        baseUrl: baseUrl || undefined
+      })
+      if (createModelIds.length > 0) {
+        await updateAdminProvider(providerCode, { addModelIds: createModelIds })
+      }
+      const nextProviders = await refreshProviders()
+      const provider = nextProviders.find((item) => normalizeProviderCode(item.code) === providerCode)
+      const nextModelId = normalizeProviderModelIds(provider?.modelIds)[0] ?? ''
+      const nextBaseUrl = normalizeProviderBaseUrl(provider?.baseUrl)
+
+      setCreateForm((prev) => ({
+        ...prev,
+        provider: providerCode,
+        modelId: nextModelId,
+        baseUrl: nextBaseUrl
+      }))
+      setIsCreateProviderOpen(false)
+      setProviderCreateForm(emptyProviderCreateForm)
+      toast.success(`已新增 Provider：${providerCode}`)
+    } catch (error) {
+      const message = resolveErrorMessage(error)
+      toast.error(`新增 Provider 失败：${message}`)
+    } finally {
+      setIsCreatingProvider(false)
+    }
+  }
+
+  const handleUpdateProvider = async () => {
+    if (isUpdatingProvider) {
+      return
+    }
+    const providerCode = normalizeProviderCode(providerEditForm.code)
+    if (!providerCode) {
+      toast.error('Provider 无效')
+      return
+    }
+    const currentProvider = providers.find((item) => normalizeProviderCode(item.code) === providerCode)
+    if (!currentProvider) {
+      toast.error(`未找到 Provider：${providerCode}`)
+      return
+    }
+
+    const currentName = currentProvider.name?.trim() ?? ''
+    const currentBaseUrl = normalizeProviderBaseUrl(currentProvider.baseUrl)
+    const currentModelIds = normalizeProviderModelIds(currentProvider.modelIds)
+
+    const nextName = providerEditForm.name.trim()
+    const nextBaseUrl = providerEditForm.baseUrl.trim()
+    const nextModelIds = normalizeProviderModelIds(providerEditForm.modelIds)
+
+    if (!nextName && currentName) {
+      toast.error('Provider 名称不能为空')
+      return
+    }
+
+    const addModelIds = nextModelIds.filter((modelId) => !currentModelIds.includes(modelId))
+    const removeModelIds = currentModelIds.filter((modelId) => !nextModelIds.includes(modelId))
+
+    const request: UpdateAdminLlmProviderRequest = {}
+    if (nextName !== currentName && nextName.length > 0) {
+      request.name = nextName
+    }
+    if (nextBaseUrl !== currentBaseUrl) {
+      request.baseUrl = nextBaseUrl
+    }
+    if (addModelIds.length > 0) {
+      request.addModelIds = addModelIds
+    }
+    if (removeModelIds.length > 0) {
+      request.removeModelIds = removeModelIds
+    }
+
+    if (Object.keys(request).length === 0) {
+      toast.message('未检测到任何变更')
+      return
+    }
+
+    setIsUpdatingProvider(true)
+    try {
+      await updateAdminProvider(providerCode, request)
+      const nextProviders = await refreshProviders()
+      const updatedProvider = nextProviders.find((item) => normalizeProviderCode(item.code) === providerCode)
+      const normalizedBaseUrl = normalizeProviderBaseUrl(updatedProvider?.baseUrl)
+      const normalizedModelIds = normalizeProviderModelIds(updatedProvider?.modelIds)
+
+      setCreateForm((prev) => {
+        if (prev.provider !== providerCode) {
+          return prev
+        }
+        return {
+          ...prev,
+          modelId: normalizedModelIds.includes(prev.modelId) ? prev.modelId : (normalizedModelIds[0] ?? ''),
+          baseUrl: normalizedBaseUrl
+        }
+      })
+      setProviderEditForm({
+        code: providerCode,
+        name: updatedProvider?.name?.trim() ?? nextName,
+        baseUrl: normalizedBaseUrl,
+        modelIds: normalizedModelIds
+      })
+      setIsEditProviderOpen(false)
+      toast.success(`已更新 Provider：${providerCode}`)
+    } catch (error) {
+      const message = resolveErrorMessage(error)
+      toast.error(`更新 Provider 失败：${message}`)
+    } finally {
+      setIsUpdatingProvider(false)
+    }
   }
 
   const isCreateValid = createForm.modelId.trim().length > 0 && createForm.name.trim().length > 0 && createForm.provider && createForm.modelType
 
   const handleCloseCreateModal = () => {
+    if (isCreatingModel) {
+      return
+    }
     setIsCreateOpen(false)
     setCreateForm(buildCreateForm())
+    setIsCreateApiKeyVisible(false)
   }
 
-  const handleCreateModel = () => {
-    if (!isCreateValid) return
-    setIsCreateOpen(false)
-    setCreateForm(buildCreateForm())
+  const handleCreateModel = async () => {
+    if (!isCreateValid || isCreatingModel) {
+      return
+    }
+
+    setIsCreatingModel(true)
+    try {
+      const createdModel = await createAdminModel({
+        modelId: createForm.modelId.trim(),
+        name: createForm.name.trim(),
+        providerCode: createForm.provider,
+        modelType: MODEL_TYPE_API_MAP[createForm.modelType],
+        description: createForm.description.trim() || undefined,
+        baseUrl: createForm.baseUrl.trim() || undefined,
+        apiKey: createForm.apiKey.trim() || undefined
+      })
+      const createdRecord = mapAdminModelToRecord(createdModel)
+
+      setModels((prev) => {
+        const next = prev.filter((item) => item.id !== createdRecord.id)
+        return [createdRecord, ...next]
+      })
+      if (createdRecord.hasApiKey) {
+        setConnectedModelIds((prev) => connectModel(prev, createdRecord.id))
+      }
+      setIsCreateOpen(false)
+      setCreateForm(buildCreateForm())
+      setIsCreateApiKeyVisible(false)
+      toast.success(`已添加模型：${createdRecord.name}`)
+    } catch (error) {
+      const message = resolveErrorMessage(error)
+      toast.error(`添加模型失败：${message}`)
+    } finally {
+      setIsCreatingModel(false)
+    }
   }
 
   const selectedModels = useMemo(
@@ -234,7 +717,9 @@ export function ModelManagementView() {
     () => models.find((model) => model.id === activeModelId) ?? null,
     [activeModelId, models]
   )
-  const isActiveModelConnected = activeModel ? connectedModelIds.includes(activeModel.id) : false
+  const isActiveModelConnected = activeModel
+    ? connectedModelIds.includes(activeModel.id) || Boolean(activeModel.hasApiKey)
+    : false
 
   return (
     <section className="flex h-full w-full overflow-hidden bg-white dark:bg-slate-900 @container">
@@ -244,11 +729,16 @@ export function ModelManagementView() {
           options={providerOptions}
           selected={filters.providers}
           onToggle={(value) => toggleFilter('providers', value as LlmProvider)}
+          onAddOption={handleOpenCreateProviderModal}
+          onEditOption={handleOpenEditProviderModal}
+          onDeleteOption={(value) => {
+            void handleDeleteProviderFromList(value)
+          }}
           defaultOpen
         />
         <FilterSection
           title="模型类型 (Type)"
-          options={TYPE_OPTIONS}
+          options={filterTypeOptions}
           selected={filters.types}
           onToggle={(value) => toggleFilter('types', value as ModelCategory)}
           defaultOpen
@@ -342,7 +832,7 @@ export function ModelManagementView() {
           ) : viewMode === 'list' ? (
             <div className="space-y-2">
               {filteredModels.map((model) => {
-                const isConnected = connectedModelIds.includes(model.id)
+                const isConnected = connectedModelIds.includes(model.id) || Boolean(model.hasApiKey)
                 const isSelected = selectedModelIds.includes(model.id)
                 const isSelectionDisabled = !isSelected && selectedModelIds.length >= MAX_COMPARE_MODELS
                 return (
@@ -363,7 +853,7 @@ export function ModelManagementView() {
           ) : (
             <div className="grid grid-cols-1 @md:grid-cols-2 @xl:grid-cols-3 gap-4 pb-4">
               {filteredModels.map((model) => {
-                const isConnected = connectedModelIds.includes(model.id)
+                const isConnected = connectedModelIds.includes(model.id) || Boolean(model.hasApiKey)
                 const isSelected = selectedModelIds.includes(model.id)
                 const isSelectionDisabled = !isSelected && selectedModelIds.length >= MAX_COMPARE_MODELS
                 return (
@@ -431,8 +921,8 @@ export function ModelManagementView() {
         title="添加模型"
         footerRight={
           <>
-            <ModalCancelButton onClick={handleCloseCreateModal} />
-            <ModalPrimaryButton onClick={handleCreateModel} disabled={!isCreateValid}>
+            <ModalCancelButton onClick={handleCloseCreateModal} disabled={isCreatingModel} />
+            <ModalPrimaryButton onClick={handleCreateModel} disabled={!isCreateValid || isCreatingModel} loading={isCreatingModel}>
               确认添加
             </ModalPrimaryButton>
           </>
@@ -467,6 +957,31 @@ export function ModelManagementView() {
 
           <div>
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              API Key（可选）
+            </label>
+            <div className="relative">
+              <input
+                type={isCreateApiKeyVisible ? 'text' : 'password'}
+                value={createForm.apiKey}
+                onChange={(event) => setCreateForm((prev) => ({ ...prev, apiKey: event.target.value }))}
+                placeholder="sk-..."
+                className="w-full pl-3 pr-10 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+              />
+              <Button
+                type="button"
+                onClick={() => setIsCreateApiKeyVisible((prev) => !prev)}
+                variant="ghost"
+                size="tiny"
+                className="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 dark:text-slate-500 hover:text-indigo-500 transition-colors"
+                aria-label={isCreateApiKeyVisible ? '隐藏 API Key' : '显示 API Key'}
+              >
+                {isCreateApiKeyVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+              </Button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
               Provider <span className="text-rose-500">*</span>
             </label>
             <Select
@@ -486,6 +1001,7 @@ export function ModelManagementView() {
               value={createForm.modelId}
               onChange={(value) => setCreateForm((prev) => ({ ...prev, modelId: value }))}
               options={modelIdOptions}
+              placeholder={modelIdOptions.length > 0 ? '请选择模型 ID' : '该 Provider 暂无可选 modelIds'}
               dropdownHeader="选择模型 ID"
               size="sm"
             />
@@ -514,6 +1030,201 @@ export function ModelManagementView() {
               placeholder="模型描述（可选）"
               className="w-full min-h-[88px] px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 resize-none"
             />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isCreateProviderOpen}
+        onClose={handleCloseCreateProviderModal}
+        size="sm"
+        title="新增供应商 (Provider)"
+        footerRight={
+          <>
+            <ModalCancelButton onClick={handleCloseCreateProviderModal} disabled={isCreatingProvider} />
+            <ModalPrimaryButton
+              onClick={handleCreateProvider}
+              disabled={!normalizeProviderCode(providerCreateForm.code)}
+              loading={isCreatingProvider}
+            >
+              确认新增
+            </ModalPrimaryButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              Provider Code <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={providerCreateForm.code}
+              onChange={(event) => setProviderCreateForm((prev) => ({ ...prev, code: event.target.value }))}
+              placeholder="如：openai"
+              className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            />
+          </div>
+          <div>
+            <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              Provider 名称
+            </label>
+            <input
+              type="text"
+              value={providerCreateForm.name}
+              onChange={(event) => setProviderCreateForm((prev) => ({ ...prev, name: event.target.value }))}
+              placeholder="如：OpenAI"
+              className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            />
+          </div>
+          <div>
+            <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              Base URL
+            </label>
+            <input
+              type="text"
+              value={providerCreateForm.baseUrl}
+              onChange={(event) => setProviderCreateForm((prev) => ({ ...prev, baseUrl: event.target.value }))}
+              placeholder="https://api.example.com/v1"
+              className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-caption font-medium text-slate-700 dark:text-slate-300">支持的模型ID</label>
+              <button
+                type="button"
+                onClick={handleAddCreateProviderModelId}
+                className="text-caption text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+              >
+                + 添加
+              </button>
+            </div>
+            {providerCreateForm.modelIds.length === 0 ? (
+              <div className="py-3 text-center text-caption text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+                暂无模型 ID
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar">
+                {providerCreateForm.modelIds.map((modelId, index) => (
+                  <div key={`create-provider-model-${index}`} className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={modelId}
+                      onChange={(event) => handleChangeCreateProviderModelId(index, event.target.value)}
+                      placeholder="如：gpt-4o-mini"
+                      className="flex-1 min-w-0 px-2.5 py-2 text-body-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveCreateProviderModelId(index)}
+                      className="p-1.5 text-slate-300 hover:text-rose-500 rounded transition-colors flex-shrink-0"
+                      title="删除模型 ID"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isEditProviderOpen}
+        onClose={handleCloseEditProviderModal}
+        size="sm"
+        title={`编辑供应商：${providerEditForm.code || '-'}`}
+        footerRight={
+          <>
+            <ModalCancelButton onClick={handleCloseEditProviderModal} disabled={isUpdatingProvider || isDeletingProvider} />
+            <ModalPrimaryButton
+              onClick={handleUpdateProvider}
+              disabled={!normalizeProviderCode(providerEditForm.code) || isDeletingProvider}
+              loading={isUpdatingProvider}
+            >
+              保存更新
+            </ModalPrimaryButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              Provider Code
+            </label>
+            <input
+              type="text"
+              value={providerEditForm.code}
+              disabled
+              className="w-full px-3 py-2 text-body-sm text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/70 cursor-not-allowed"
+            />
+          </div>
+          <div>
+            <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              Provider 名称
+            </label>
+            <input
+              type="text"
+              value={providerEditForm.name}
+              onChange={(event) => setProviderEditForm((prev) => ({ ...prev, name: event.target.value }))}
+              placeholder="如：OpenAI"
+              className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            />
+          </div>
+          <div>
+            <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+              Base URL
+            </label>
+            <input
+              type="text"
+              value={providerEditForm.baseUrl}
+              onChange={(event) => setProviderEditForm((prev) => ({ ...prev, baseUrl: event.target.value }))}
+              placeholder="https://api.example.com/v1"
+              className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-caption font-medium text-slate-700 dark:text-slate-300">支持的模型ID</label>
+              <button
+                type="button"
+                onClick={handleAddEditProviderModelId}
+                className="text-caption text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+              >
+                + 添加
+              </button>
+            </div>
+            {providerEditForm.modelIds.length === 0 ? (
+              <div className="py-3 text-center text-caption text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+                暂无模型 ID
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar">
+                {providerEditForm.modelIds.map((modelId, index) => (
+                  <div key={`edit-provider-model-${index}`} className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={modelId}
+                      onChange={(event) => handleChangeEditProviderModelId(index, event.target.value)}
+                      placeholder="如：gpt-4o-mini"
+                      className="flex-1 min-w-0 px-2.5 py-2 text-body-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveEditProviderModelId(index)}
+                      className="p-1.5 text-slate-300 hover:text-rose-500 rounded transition-colors flex-shrink-0"
+                      title="删除模型 ID"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="mt-1 text-micro text-slate-400">保存时会自动计算新增和移除的 modelIds。</p>
           </div>
         </div>
       </Modal>
@@ -668,7 +1379,11 @@ type ChatMessage = {
   id: string
   role: 'assistant' | 'user'
   content: string
+  reasoning?: string
+  thinkingEnabled?: boolean
 }
+
+type PendingIndicatorPhase = 'hidden' | 'entering' | 'visible' | 'leaving'
 
 function buildWelcomeMessage(model: ModelRecord): ChatMessage {
   return {
@@ -689,40 +1404,291 @@ function ModelDrawer({
   isConnected: boolean
   defaultTab: 'config' | 'playground'
   onClose: () => void
-  onConnect: (modelId: string) => void
+  onConnect: (model: ModelRecord, request: { apiKey: string; baseUrl?: string }) => Promise<boolean>
 }) {
   const [activeTab, setActiveTab] = useState<'config' | 'playground'>(isConnected ? defaultTab : 'config')
   const [isEditing, setIsEditing] = useState(false)
   const [apiKey, setApiKey] = useState('')
-  const [baseUrl, setBaseUrl] = useState('')
+  const [baseUrl, setBaseUrl] = useState(model.baseUrl ?? '')
+  const [isConnecting, setIsConnecting] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([buildWelcomeMessage(model)])
+  const [collapsedReasoningMessageIds, setCollapsedReasoningMessageIds] = useState<string[]>([])
   const [draft, setDraft] = useState('')
   const [temperature, setTemperature] = useState(0.7)
-  const [maxTokens, setMaxTokens] = useState(1024)
-  const [systemInstruction, setSystemInstruction] = useState('你是 Datapillar 的模型评测助手，擅长回答与数据工程相关的问题。')
+  const [topP, setTopP] = useState(0.9)
+  const [thinkingEnabled, setThinkingEnabled] = useState(false)
+  const [systemInstruction, setSystemInstruction] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [streamingAssistantMessageId, setStreamingAssistantMessageId] = useState<string | null>(null)
+  const [pendingAssistantMessageId, setPendingAssistantMessageId] = useState<string | null>(null)
+  const [pendingIndicatorPhase, setPendingIndicatorPhase] = useState<PendingIndicatorPhase>('hidden')
+  const streamCancelRef = useRef<(() => void) | null>(null)
+  const messageEndRef = useRef<HTMLDivElement | null>(null)
+  const pendingAssistantMessageIdRef = useRef<string | null>(null)
+  const pendingIndicatorPhaseRef = useRef<PendingIndicatorPhase>('hidden')
+  const pendingShownAtRef = useRef(0)
+  const pendingEnterTimerRef = useRef<number | null>(null)
+  const pendingMinDurationTimerRef = useRef<number | null>(null)
+  const pendingLeaveTimerRef = useRef<number | null>(null)
+
+  const updatePendingIndicatorPhase = (phase: PendingIndicatorPhase) => {
+    pendingIndicatorPhaseRef.current = phase
+    setPendingIndicatorPhase(phase)
+  }
+
+  const clearPendingIndicatorTimers = () => {
+    if (pendingEnterTimerRef.current) {
+      window.clearTimeout(pendingEnterTimerRef.current)
+      pendingEnterTimerRef.current = null
+    }
+    if (pendingMinDurationTimerRef.current) {
+      window.clearTimeout(pendingMinDurationTimerRef.current)
+      pendingMinDurationTimerRef.current = null
+    }
+    if (pendingLeaveTimerRef.current) {
+      window.clearTimeout(pendingLeaveTimerRef.current)
+      pendingLeaveTimerRef.current = null
+    }
+  }
+
+  const resetPendingIndicator = () => {
+    clearPendingIndicatorTimers()
+    pendingShownAtRef.current = 0
+    pendingAssistantMessageIdRef.current = null
+    setPendingAssistantMessageId(null)
+    updatePendingIndicatorPhase('hidden')
+  }
+
+  const startPendingIndicator = (assistantMessageId: string) => {
+    clearPendingIndicatorTimers()
+    pendingShownAtRef.current = Date.now()
+    pendingAssistantMessageIdRef.current = assistantMessageId
+    setPendingAssistantMessageId(assistantMessageId)
+    updatePendingIndicatorPhase('entering')
+    pendingEnterTimerRef.current = window.setTimeout(() => {
+      if (pendingAssistantMessageIdRef.current !== assistantMessageId) {
+        return
+      }
+      updatePendingIndicatorPhase('visible')
+      pendingEnterTimerRef.current = null
+    }, 120)
+  }
+
+  const hidePendingIndicator = (assistantMessageId: string, force = false) => {
+    if (pendingAssistantMessageIdRef.current !== assistantMessageId) {
+      return
+    }
+    if (pendingIndicatorPhaseRef.current === 'hidden' || pendingIndicatorPhaseRef.current === 'leaving') {
+      return
+    }
+
+    const leave = () => {
+      if (pendingAssistantMessageIdRef.current !== assistantMessageId) {
+        return
+      }
+      updatePendingIndicatorPhase('leaving')
+      pendingLeaveTimerRef.current = window.setTimeout(() => {
+        if (pendingAssistantMessageIdRef.current !== assistantMessageId) {
+          return
+        }
+        pendingAssistantMessageIdRef.current = null
+        setPendingAssistantMessageId(null)
+        updatePendingIndicatorPhase('hidden')
+        pendingShownAtRef.current = 0
+        pendingLeaveTimerRef.current = null
+      }, 100)
+    }
+
+    clearPendingIndicatorTimers()
+    if (force) {
+      leave()
+      return
+    }
+
+    const elapsed = Date.now() - pendingShownAtRef.current
+    const remaining = Math.max(0, 250 - elapsed)
+    if (remaining <= 0) {
+      leave()
+      return
+    }
+    pendingMinDurationTimerRef.current = window.setTimeout(() => {
+      leave()
+      pendingMinDurationTimerRef.current = null
+    }, remaining)
+  }
+
+  const cancelStreaming = () => {
+    streamCancelRef.current?.()
+    streamCancelRef.current = null
+    resetPendingIndicator()
+    setIsStreaming(false)
+    setStreamingAssistantMessageId(null)
+  }
+
+  useEffect(() => {
+    return () => {
+      streamCancelRef.current?.()
+      streamCancelRef.current = null
+      clearPendingIndicatorTimers()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (activeTab !== 'playground') {
+      return
+    }
+    let rafId = 0
+    rafId = window.requestAnimationFrame(() => {
+      messageEndRef.current?.scrollIntoView({ block: 'end', behavior: 'auto' })
+    })
+    return () => {
+      if (rafId) {
+        window.cancelAnimationFrame(rafId)
+      }
+    }
+  }, [activeTab, messages])
 
   const handleSend = () => {
     const trimmed = draft.trim()
-    if (!trimmed) return
+    if (!trimmed || isStreaming) return
+    cancelStreaming()
+
+    const userMessageId = `user-${Date.now()}`
+    const assistantMessageId = `assistant-${Date.now()}`
+    const assistantThinkingEnabled = thinkingEnabled
     setMessages((prev) => [
       ...prev,
       {
-        id: `user-${Date.now()}`,
+        id: userMessageId,
         role: 'user',
         content: trimmed
+      },
+      {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: '',
+        reasoning: assistantThinkingEnabled ? '' : undefined,
+        thinkingEnabled: assistantThinkingEnabled
       }
     ])
     setDraft('')
+
+    setIsStreaming(true)
+    setStreamingAssistantMessageId(assistantMessageId)
+    startPendingIndicator(assistantMessageId)
+    streamCancelRef.current = createLlmPlaygroundStream(
+      {
+        providerCode: model.provider,
+        modelId: model.id,
+        message: trimmed,
+        modelConfig: {
+          temperature,
+          topP,
+          thinkingEnabled: assistantThinkingEnabled,
+          systemInstruction: systemInstruction.trim()
+        }
+      },
+      {
+        onDelta: (delta) => {
+          hidePendingIndicator(assistantMessageId)
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantMessageId
+                ? { ...message, content: `${message.content}${delta}` }
+                : message
+            )
+          )
+        },
+        onReasoningDelta: (delta) => {
+          if (!assistantThinkingEnabled) {
+            return
+          }
+          hidePendingIndicator(assistantMessageId)
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantMessageId
+                ? { ...message, reasoning: `${message.reasoning ?? ''}${delta}` }
+                : message
+            )
+          )
+        },
+        onDone: (event) => {
+          hidePendingIndicator(assistantMessageId)
+          setMessages((prev) =>
+            prev.map((item) => {
+              if (item.id !== assistantMessageId) {
+                return item
+              }
+
+              const nextContent = item.content.trim()
+                ? item.content
+                : (event.content.trim() ? event.content : item.content)
+              const nextReasoning = assistantThinkingEnabled
+                ? (item.reasoning?.trim()
+                  ? item.reasoning
+                  : (event.reasoning?.trim() ? event.reasoning : item.reasoning))
+                : item.reasoning
+
+              if (nextContent === item.content && nextReasoning === item.reasoning) {
+                return item
+              }
+
+              return {
+                ...item,
+                content: nextContent,
+                reasoning: nextReasoning
+              }
+            })
+          )
+          streamCancelRef.current = null
+          setIsStreaming(false)
+          setStreamingAssistantMessageId(null)
+        },
+        onError: (message) => {
+          hidePendingIndicator(assistantMessageId, true)
+          setMessages((prev) =>
+            prev.map((item) =>
+              item.id === assistantMessageId && !item.content.trim()
+                ? { ...item, content: '模型暂时无响应，请稍后重试。' }
+                : item
+            )
+          )
+          toast.error(`Playground 调用失败：${message}`)
+          streamCancelRef.current = null
+          setIsStreaming(false)
+          setStreamingAssistantMessageId(null)
+        }
+      }
+    )
   }
 
   const handleReset = () => {
+    cancelStreaming()
     setMessages([buildWelcomeMessage(model)])
+    setCollapsedReasoningMessageIds([])
     setDraft('')
   }
 
-  const handleConnect = () => {
-    if (!apiKey.trim()) return
-    onConnect(model.id)
+  const toggleReasoningCollapse = (messageId: string) => {
+    setCollapsedReasoningMessageIds((prev) => (
+      prev.includes(messageId)
+        ? prev.filter((id) => id !== messageId)
+        : [...prev, messageId]
+    ))
+  }
+
+  const handleConnect = async () => {
+    if (!apiKey.trim() || isConnecting) return
+    setIsConnecting(true)
+    const connected = await onConnect(model, {
+      apiKey: apiKey.trim(),
+      baseUrl: baseUrl.trim() || undefined
+    })
+    setIsConnecting(false)
+    if (!connected) {
+      return
+    }
+    setApiKey('')
     setIsEditing(false)
     setActiveTab('playground')
   }
@@ -829,7 +1795,11 @@ function ModelDrawer({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setIsEditing(true)}
+                      onClick={() => {
+                        setBaseUrl(model.baseUrl ?? '')
+                        setApiKey('')
+                        setIsEditing(true)
+                      }}
                       className="h-9 w-9 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:border-indigo-300 transition-colors flex items-center justify-center"
                       aria-label="修改配置"
                     >
@@ -849,7 +1819,9 @@ function ModelDrawer({
                         type="password"
                         value={apiKey}
                         onChange={(event) => setApiKey(event.target.value)}
-                        placeholder={`sk-... (${getProviderLabel(model)} Key)`}
+                        placeholder={model.maskedApiKey
+                          ? `${model.maskedApiKey}（输入新 Key 覆盖）`
+                          : `sk-... (${getProviderLabel(model)} Key)`}
                         className="w-full h-9 pl-8 pr-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-caption text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all font-mono"
                         autoFocus
                       />
@@ -875,11 +1847,13 @@ function ModelDrawer({
                   <div className="pt-0.5">
                     <button
                       type="button"
-                      onClick={handleConnect}
-                      disabled={!apiKey.trim()}
+                      onClick={() => {
+                        void handleConnect()
+                      }}
+                      disabled={!apiKey.trim() || isConnecting}
                       className="w-full h-9 bg-indigo-400 hover:bg-indigo-500 text-white text-caption font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Save &amp; Connect
+                      {isConnecting ? 'Connecting...' : 'Save & Connect'}
                       <ArrowRight size={16} className="ml-2" />
                     </button>
                     <p className={`${TYPOGRAPHY.nano} text-center text-slate-400 mt-2 flex items-center justify-center`}>
@@ -895,27 +1869,109 @@ function ModelDrawer({
         <div className="flex-1 min-h-0 flex">
           <div className="flex-1 min-w-0 flex flex-col">
             <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  {message.role === 'assistant' && (
-                    <div className="mr-3 mt-1 size-7 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 flex items-center justify-center flex-shrink-0">
-                      <Bot size={14} />
+              {messages.map((message) => {
+                if (message.role === 'assistant') {
+                  const allowReasoningUi = message.thinkingEnabled === true
+                  const reasoningContent = (message.reasoning ?? '').trim()
+                  const hasReasoning = reasoningContent.length > 0
+                  const isReasoningCollapsed = hasReasoning && collapsedReasoningMessageIds.includes(message.id)
+                  const isCurrentStreamingAssistant = isStreaming && message.id === streamingAssistantMessageId
+                  const isReasoningStreaming = allowReasoningUi && isCurrentStreamingAssistant
+                  const shouldShowReasoningBlock = allowReasoningUi && (hasReasoning || isReasoningStreaming)
+                  const isPendingIndicatorVisible = pendingAssistantMessageId === message.id && pendingIndicatorPhase !== 'hidden'
+                  const hasContent = Boolean(message.content)
+                  const shouldHoldContentForPending = isPendingIndicatorVisible && !shouldShowReasoningBlock && hasContent
+                  const shouldShowContent = hasContent && !shouldHoldContentForPending
+                  const shouldShowPendingBlock = isPendingIndicatorVisible && !shouldShowReasoningBlock && !shouldShowContent
+                  const pendingContainerAnimationClass = pendingIndicatorPhase === 'entering'
+                    ? 'animate-llm-pending-enter'
+                    : (pendingIndicatorPhase === 'leaving' ? 'animate-llm-pending-leave' : '')
+
+                  return (
+                    <div key={message.id} className="flex justify-start">
+                      <div className="mr-3 mt-1 size-7 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 flex items-center justify-center flex-shrink-0">
+                        <Bot size={14} />
+                      </div>
+                      <div className="max-w-[70%] flex flex-col">
+                        {shouldShowReasoningBlock && (
+                          <div className={`rounded-xl border border-slate-200/80 dark:border-slate-600/70 bg-slate-50/80 dark:bg-slate-900/60 px-3 py-2 ${
+                            shouldShowContent ? 'rounded-b-none' : ''
+                          }`}>
+                            {hasReasoning ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleReasoningCollapse(message.id)}
+                                className="w-full flex items-center justify-between gap-2 text-left text-micro font-semibold text-slate-500 dark:text-slate-300"
+                              >
+                                <span className="uppercase tracking-wide">思考过程</span>
+                                {isReasoningCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                              </button>
+                            ) : (
+                              <div className="text-micro font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wide">思考过程</div>
+                            )}
+                            {hasReasoning ? (
+                              !isReasoningCollapsed && (
+                                <div className="mt-2 pt-2 border-t border-slate-200/70 dark:border-slate-700 whitespace-pre-wrap text-caption text-slate-600 dark:text-slate-300 leading-relaxed">
+                                  {reasoningContent}
+                                </div>
+                              )
+                            ) : (
+                              <div className="mt-2 pt-2 border-t border-slate-200/70 dark:border-slate-700 text-caption text-slate-500 dark:text-slate-400">
+                                思考中...
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {shouldShowContent && (
+                          <div className={`rounded-2xl px-4 py-3 text-body-sm shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200 ${
+                            shouldShowReasoningBlock ? 'rounded-t-none border-t-0' : ''
+                          }`}>
+                            {message.content}
+                          </div>
+                        )}
+                        {shouldShowPendingBlock && (
+                          <div
+                            role="status"
+                            aria-live="polite"
+                            className={`rounded-2xl px-4 py-3 text-body-sm shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 ${pendingContainerAnimationClass}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="flex space-x-1">
+                                <div
+                                  className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-llm-pending-dot"
+                                  style={{ animationDelay: '0ms' }}
+                                />
+                                <div
+                                  className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-llm-pending-dot"
+                                  style={{ animationDelay: '150ms' }}
+                                />
+                                <div
+                                  className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-llm-pending-dot"
+                                  style={{ animationDelay: '300ms' }}
+                                />
+                              </div>
+                              <span className="text-micro font-semibold text-indigo-500 tracking-tight">处理中...</span>
+                              <span className="sr-only">AI 正在生成响应</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                  <div
-                    className={`max-w-[70%] rounded-2xl px-4 py-3 text-body-sm shadow-sm ${
-                      message.role === 'assistant'
-                        ? 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200'
-                        : 'bg-indigo-600 text-white'
-                    }`}
-                  >
-                    {message.content}
+                  )
+                }
+
+                return (
+                  <div key={message.id} className="flex justify-end">
+                    <div className="max-w-[70%] rounded-2xl px-4 py-3 text-body-sm shadow-sm bg-indigo-600 text-white">
+                      {message.content}
+                    </div>
+                    <div className="ml-3 mt-1 size-7 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-200 flex items-center justify-center flex-shrink-0">
+                      <User size={14} />
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
+              <div ref={messageEndRef} />
             </div>
 
             <div className="border-t border-slate-200 dark:border-slate-800 p-4">
@@ -925,20 +1981,27 @@ function ModelDrawer({
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter') handleSend()
+                    if (event.nativeEvent.isComposing) {
+                      return
+                    }
+                    if (event.key === 'Enter' && !isStreaming) {
+                      event.preventDefault()
+                      handleSend()
+                    }
                   }}
                   placeholder={`Message ${model.name}...`}
                   className="flex-1 bg-transparent outline-none text-body-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 group-focus-within:placeholder:text-slate-500 transition-colors"
+                  disabled={isStreaming}
                 />
                 <button
                   type="button"
                   onClick={handleSend}
                   className={`size-8 rounded-lg flex items-center justify-center transition-all active:scale-95 ${
-                    draft.trim()
+                    draft.trim() && !isStreaming
                       ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-md shadow-indigo-500/20'
                       : 'bg-slate-200 text-slate-400 cursor-not-allowed dark:bg-slate-700'
                   }`}
-                  disabled={!draft.trim()}
+                  disabled={!draft.trim() || isStreaming}
                   aria-label="发送消息"
                 >
                   <Send size={14} />
@@ -958,13 +2021,19 @@ function ModelDrawer({
 
             <div className="mt-5 space-y-5">
               <div>
-                <label className="block text-caption font-semibold text-slate-600 dark:text-slate-300 mb-2">系统指令</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-caption font-semibold text-slate-600 dark:text-slate-300">
+                    System Instruction
+                  </label>
+                  <span className="text-micro font-mono text-slate-500">{systemInstruction.length}/2000</span>
+                </div>
                 <textarea
                   value={systemInstruction}
-                  onChange={(event) => setSystemInstruction(event.target.value)}
+                  onChange={(event) => setSystemInstruction(event.target.value.slice(0, 2000))}
+                  placeholder="可选：输入系统级指令（例如回复风格、约束）"
                   rows={4}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-caption text-slate-500 dark:text-slate-300 resize-none focus:outline-none focus:border-indigo-500/50"
-              />
+                  className="w-full resize-y min-h-[84px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-caption text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all"
+                />
               </div>
 
               <div>
@@ -985,18 +2054,41 @@ function ModelDrawer({
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-caption font-semibold text-slate-600 dark:text-slate-300">Max Tokens</label>
-                  <span className="text-micro font-mono text-slate-500">{maxTokens}</span>
+                  <label className="text-caption font-semibold text-slate-600 dark:text-slate-300">Top P</label>
+                  <span className="text-micro font-mono text-slate-500">{topP.toFixed(2)}</span>
                 </div>
                 <input
                   type="range"
-                  min="256"
-                  max="4096"
-                  step="128"
-                  value={maxTokens}
-                  onChange={(event) => setMaxTokens(parseInt(event.target.value, 10))}
-                  className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer accent-blue-500 focus:outline-none"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={topP}
+                  onChange={(event) => setTopP(parseFloat(event.target.value))}
+                  className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer accent-indigo-500 focus:outline-none"
                 />
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2">
+                <div>
+                  <p className="text-caption font-semibold text-slate-600 dark:text-slate-300">开启思考</p>
+                  <p className="text-micro text-slate-400">仅在模型支持时生效</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setThinkingEnabled((prev) => !prev)}
+                  className={`h-6 w-11 rounded-full border transition-colors ${
+                    thinkingEnabled
+                      ? 'border-indigo-500 bg-indigo-500'
+                      : 'border-slate-300 bg-slate-200 dark:border-slate-600 dark:bg-slate-700'
+                  }`}
+                  aria-label="切换思考模式"
+                >
+                  <span
+                    className={`block h-5 w-5 rounded-full bg-white transition-transform ${
+                      thinkingEnabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
               </div>
 
               <button
@@ -1019,46 +2111,110 @@ function FilterSection({
   options,
   selected,
   onToggle,
+  onAddOption,
+  onEditOption,
+  onDeleteOption,
   defaultOpen = false
 }: {
   title: string
   options: Array<{ label: string; value: string }>
   selected: string[]
   onToggle: (value: string) => void
+  onAddOption?: () => void
+  onEditOption?: (value: string) => void
+  onDeleteOption?: (value: string) => void
   defaultOpen?: boolean
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
   return (
     <div className="mb-6">
-      <button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center justify-between w-full text-body-sm font-medium text-slate-900 dark:text-slate-100 mb-3 hover:text-slate-600 transition-colors"
-      >
-        {title}
-        {isOpen ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
-      </button>
+      <div className="flex items-center justify-between mb-3">
+        <button
+          type="button"
+          onClick={() => setIsOpen((prev) => !prev)}
+          className="text-body-sm font-medium text-slate-900 dark:text-slate-100 hover:text-slate-600 transition-colors"
+        >
+          {title}
+        </button>
+        <div className="flex items-center gap-1">
+          {onAddOption && isOpen && (
+            <Tooltip content="新增供应商" side="top">
+              <button
+                type="button"
+                onClick={onAddOption}
+                className="p-1 rounded text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-all"
+              >
+                <Plus size={14} />
+              </button>
+            </Tooltip>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsOpen((prev) => !prev)}
+            className="p-1 rounded text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-all"
+            title={isOpen ? '收起' : '展开'}
+          >
+            {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </button>
+        </div>
+      </div>
 
       {isOpen && (
         <div className="space-y-2.5">
           {options.map((option) => {
             const isChecked = selected.includes(option.value)
             return (
-              <label key={option.value} className="flex items-center group cursor-pointer">
-                <div className="relative flex items-center justify-center w-4 h-4 mr-3 border border-slate-300 dark:border-slate-600 rounded hover:border-slate-400 transition-colors bg-white dark:bg-slate-950">
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => onToggle(option.value)}
-                    className="peer appearance-none w-full h-full cursor-pointer absolute inset-0 z-10"
-                  />
-                  <Check size={10} className="text-slate-900 dark:text-slate-100 opacity-0 peer-checked:opacity-100 transition-opacity" strokeWidth={3} />
-                </div>
-                <span className="text-body-sm text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors">
-                  {option.label}
-                </span>
-              </label>
+              <div key={option.value} className="group flex items-center gap-2">
+                <label className="flex items-center flex-1 cursor-pointer">
+                  <div className="relative flex items-center justify-center w-4 h-4 mr-3 border border-slate-300 dark:border-slate-600 rounded hover:border-slate-400 transition-colors bg-white dark:bg-slate-950">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => onToggle(option.value)}
+                      className="peer appearance-none w-full h-full cursor-pointer absolute inset-0 z-10"
+                    />
+                    <Check size={10} className="text-slate-900 dark:text-slate-100 opacity-0 peer-checked:opacity-100 transition-opacity" strokeWidth={3} />
+                  </div>
+                  <span className="text-body-sm text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors truncate">
+                    {option.label}
+                  </span>
+                </label>
+                {(onEditOption || onDeleteOption) && (
+                  <div className="flex items-center gap-0.5">
+                    {onEditOption && (
+                      <Tooltip content={`编辑 ${option.label}`} side="top">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            onEditOption(option.value)
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-all"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      </Tooltip>
+                    )}
+                    {onDeleteOption && (
+                      <Tooltip content={`删除 ${option.label}`} side="top">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            onDeleteOption(option.value)
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </Tooltip>
+                    )}
+                  </div>
+                )}
+              </div>
             )
           })}
         </div>

@@ -5,7 +5,8 @@
 # 版本: 1.4.0
 
 set -o pipefail
-
+export NO_PROXY=127.0.0.1,localhost
+export no_proxy=127.0.0.1,localhost
 # 颜色定义
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -53,6 +54,10 @@ if is_invalid_dubbo_ip "${TRI_DUBBO_IP_TO_REGISTRY:-}"; then
 else
     export TRI_DUBBO_IP_TO_REGISTRY
 fi
+# 统一服务注册 IP，强制显式配置，禁止自动探测网卡导致注册漂移
+export NACOS_SERVICE_IP="$DUBBO_IP_TO_REGISTRY"
+# 服务监听 IP（Java/Python），可按环境覆盖；默认全网卡监听
+export SERVER_ADDRESS="${SERVER_ADDRESS:-0.0.0.0}"
 
 # 本地构建/运行目录（避免写入用户目录权限问题）
 export MAVEN_REPO_LOCAL="${MAVEN_REPO_LOCAL:-/tmp/m2}"
@@ -96,6 +101,7 @@ echo "🚀 Datapillar 本地调试启动中..."
 echo "📁 项目目录: $PROJECT_ROOT"
 echo "📝 日志目录: $LOG_HOME"
 echo "🌐 Dubbo 注册IP: $DUBBO_IP_TO_REGISTRY"
+echo "🌐 服务监听IP: $SERVER_ADDRESS"
 echo ""
 
 # 检查端口是否被占用
@@ -225,7 +231,7 @@ start_java_service() {
     fi
 
     # 启动服务（保留启动日志，便于排障）
-    nohup java -Duser.home="$JAVA_LOCAL_HOME" -Dfile.encoding=UTF-8 -DLOG_HOME="$LOG_HOME" -DJM.LOG.PATH="$NACOS_LOG_DIR" -DJM.SNAPSHOT.PATH="$NACOS_LOG_DIR/snapshot" -Ddubbo.application.register-mode=interface -Ddubbo.registry.register-mode=interface -jar "$jar_path" >"$startup_log" 2>&1 &
+    nohup java -Duser.home="$JAVA_LOCAL_HOME" -Dfile.encoding=UTF-8 -DLOG_HOME="$LOG_HOME" -DJM.LOG.PATH="$NACOS_LOG_DIR" -DJM.SNAPSHOT.PATH="$NACOS_LOG_DIR/snapshot" -Ddubbo.application.register-mode=interface -Ddubbo.registry.register-mode=interface -jar "$jar_path" --server.address="$SERVER_ADDRESS" >"$startup_log" 2>&1 &
     local pid=$!
     echo "$pid" > /tmp/${service_name}.pid
 
@@ -278,7 +284,7 @@ start_ai_service() {
     HOME="$AI_LOCAL_HOME" \
     NACOS_LOG_DIR="$NACOS_LOG_DIR" \
     NACOS_CACHE_DIR="$NACOS_CACHE_DIR" \
-    nohup uv run uvicorn src.app:app --host 0.0.0.0 --port $AI_PORT >"$startup_log" 2>&1 &
+    nohup uv run uvicorn src.app:app --host "$SERVER_ADDRESS" --port $AI_PORT >"$startup_log" 2>&1 &
     local pid=$!
     echo "$pid" > /tmp/datapillar-ai.pid
 

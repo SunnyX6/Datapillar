@@ -1,8 +1,7 @@
 package com.sunny.datapillar.auth.security;
 
 import com.sunny.datapillar.auth.config.AuthSecurityProperties;
-import com.sunny.datapillar.common.error.ErrorCode;
-import com.sunny.datapillar.common.exception.BusinessException;
+import com.sunny.datapillar.common.exception.UnauthorizedException;
 import com.sunny.datapillar.common.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -73,7 +72,7 @@ class AuthCsrfInterceptorTest {
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setMethod("POST");
-        request.setRequestURI("/login/logout");
+        request.setRequestURI("/auth/revoke");
         request.addHeader("Origin", "http://localhost:3001");
         request.addHeader("X-CSRF-Token", "csrf-token-value");
         request.setCookies(
@@ -86,7 +85,7 @@ class AuthCsrfInterceptorTest {
 
         Claims refreshClaims = Jwts.claims().setSubject("1").add("tenantId", 10L).build();
         when(jwtUtil.parseToken("expired-access-token"))
-                .thenThrow(new BusinessException(ErrorCode.TOKEN_EXPIRED));
+                .thenThrow(new UnauthorizedException("Token已过期"));
         when(jwtUtil.parseToken("valid-refresh-token")).thenReturn(refreshClaims);
         when(jwtUtil.getTenantId(refreshClaims)).thenReturn(10L);
         when(jwtUtil.getUserId(refreshClaims)).thenReturn(1L);

@@ -5,6 +5,7 @@ import com.sunny.datapillar.common.security.EdDsaJwtSupport;
 import com.sunny.datapillar.common.security.GatewayAssertionClaims;
 import io.jsonwebtoken.Jwts;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.security.PrivateKey;
 import java.time.Instant;
@@ -36,8 +37,15 @@ public class AuthAssertionSigner {
     }
 
     public String sign(AssertionPayload payload) {
+        return sign(payload, properties.getAudience());
+    }
+
+    public String sign(AssertionPayload payload, String audience) {
         if (!properties.isEnabled()) {
             throw new IllegalStateException("认证断言功能未启用");
+        }
+        if (!StringUtils.hasText(audience)) {
+            throw new IllegalArgumentException("认证断言 audience 不能为空");
         }
 
         Instant now = Instant.now();
@@ -49,8 +57,9 @@ public class AuthAssertionSigner {
                 .id(UUID.randomUUID().toString())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiresAt))
-                .claim(GatewayAssertionClaims.AUDIENCE, properties.getAudience())
+                .claim(GatewayAssertionClaims.AUDIENCE, audience)
                 .claim(GatewayAssertionClaims.TENANT_ID, payload.tenantId())
+                .claim(GatewayAssertionClaims.TENANT_CODE, payload.tenantCode())
                 .claim(GatewayAssertionClaims.USERNAME, payload.username())
                 .claim(GatewayAssertionClaims.EMAIL, payload.email())
                 .claim(GatewayAssertionClaims.ROLES, payload.roles())
@@ -70,6 +79,7 @@ public class AuthAssertionSigner {
     public record AssertionPayload(
             Long userId,
             Long tenantId,
+            String tenantCode,
             String username,
             String email,
             List<String> roles,

@@ -9,8 +9,9 @@ import com.sunny.datapillar.studio.context.TenantContextHolder;
 import com.sunny.datapillar.studio.module.tenant.dto.SsoConfigDto;
 import com.sunny.datapillar.studio.module.tenant.entity.TenantSsoConfig;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantSsoConfigMapper;
+import com.sunny.datapillar.studio.module.tenant.service.TenantCodeResolver;
 import com.sunny.datapillar.studio.module.tenant.service.sso.SsoConfigService;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoGenericClient;
+import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -41,7 +42,8 @@ public class SsoConfigServiceImpl implements SsoConfigService {
     private static final int STATUS_DISABLED = 0;
 
     private final TenantSsoConfigMapper tenantSsoConfigMapper;
-    private final AuthCryptoGenericClient authCryptoClient;
+    private final AuthCryptoRpcClient authCryptoClient;
+    private final TenantCodeResolver tenantCodeResolver;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -77,7 +79,8 @@ public class SsoConfigServiceImpl implements SsoConfigService {
             throw new AlreadyExistsException("资源已存在", provider);
         }
 
-        Map<String, Object> configMap = mergeConfig(tenantId, new HashMap<>(), dto.getConfig());
+        String tenantCode = tenantCodeResolver.requireTenantCode(tenantId);
+        Map<String, Object> configMap = mergeConfig(tenantCode, new HashMap<>(), dto.getConfig());
         requireDingtalkRequiredFields(configMap);
 
         TenantSsoConfig config = new TenantSsoConfig();
@@ -113,8 +116,9 @@ public class SsoConfigServiceImpl implements SsoConfigService {
             config.setBaseUrl(trimToNull(dto.getBaseUrl()));
         }
         if (dto.getConfig() != null) {
+            String tenantCode = tenantCodeResolver.requireTenantCode(tenantId);
             Map<String, Object> existingMap = readJsonAsMap(config.getConfigJson());
-            Map<String, Object> merged = mergeConfig(tenantId, existingMap, dto.getConfig());
+            Map<String, Object> merged = mergeConfig(tenantCode, existingMap, dto.getConfig());
             requireDingtalkRequiredFields(merged);
             config.setConfigJson(writeJson(merged));
         }
@@ -143,7 +147,7 @@ public class SsoConfigServiceImpl implements SsoConfigService {
         return response;
     }
 
-    private Map<String, Object> mergeConfig(Long tenantId, Map<String, Object> base, SsoConfigDto.DingtalkConfig input) {
+    private Map<String, Object> mergeConfig(String tenantCode, Map<String, Object> base, SsoConfigDto.DingtalkConfig input) {
         if (input == null) {
             throw new BadRequestException("参数错误");
         }
@@ -162,7 +166,7 @@ public class SsoConfigServiceImpl implements SsoConfigService {
         if (input.getClientSecret() != null) {
             String clientSecret = trimToNull(input.getClientSecret());
             if (clientSecret != null) {
-                merged.put("clientSecret", encryptClientSecret(tenantId, clientSecret));
+                merged.put("clientSecret", encryptClientSecret(tenantCode, clientSecret));
             }
         }
 
@@ -251,11 +255,11 @@ public class SsoConfigServiceImpl implements SsoConfigService {
         return value == null ? null : String.valueOf(value);
     }
 
-    private String encryptClientSecret(Long tenantId, String secret) {
+    private String encryptClientSecret(String tenantCode, String secret) {
         try {
-            return authCryptoClient.encryptSsoClientSecret(tenantId, secret);
+            return authCryptoClient.encryptSsoClientSecret(tenantCode, secret);
         } catch (IllegalArgumentException ex) {
-            throw new InternalException(ex, "SSO配置无效: %s");
+            throw new InternalException(ex, "SSO配置无效: %s", "clientSecret");
         }
     }
 

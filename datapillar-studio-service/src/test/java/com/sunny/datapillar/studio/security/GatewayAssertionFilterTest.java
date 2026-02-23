@@ -85,6 +85,7 @@ class GatewayAssertionFilterTest {
         GatewayAssertionContext context = new GatewayAssertionContext(
                 1L,
                 10L,
+                "tenant-10",
                 "sunny",
                 "sunny@datapillar.test",
                 List.of("ADMIN"),

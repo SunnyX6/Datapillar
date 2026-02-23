@@ -21,7 +21,7 @@ public interface JobService {
     /**
      * 获取任务详情
      */
-    JobDto.Response getJobDetail(Long id);
+    JobDto.Response getJobDetail(Long workflowId, Long id);
 
     /**
      * 创建任务
@@ -31,12 +31,12 @@ public interface JobService {
     /**
      * 更新任务
      */
-    void updateJob(Long id, JobDto.Update dto);
+    void updateJob(Long workflowId, Long id, JobDto.Update dto);
 
     /**
      * 删除任务
      */
-    void deleteJob(Long id);
+    void deleteJob(Long workflowId, Long id);
 
     /**
      * 批量更新任务位置

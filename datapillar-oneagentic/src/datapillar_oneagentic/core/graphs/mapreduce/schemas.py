@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
+from datapillar_oneagentic.core.status import ExecutionStatus
 
 
 class MapReduceTaskOutput(BaseModel):
@@ -57,7 +57,6 @@ class MapReduceResult(BaseModel):
     description: str = Field(..., description="Task description")
     input: str = Field(..., description="Task input")
     status: ExecutionStatus = Field(..., description="Execution status")
-    failure_kind: FailureKind | None = Field(default=None, description="Failure kind (optional)")
     output: dict | None = Field(default=None, description="Task output")
     error: str | None = Field(default=None, description="Error details")
     todo_updates: list[dict] = Field(default_factory=list, description="Todo updates (optional)")
