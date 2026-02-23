@@ -1,5 +1,5 @@
-import { ModelManagementView } from '@/layouts/llm'
+import { LLMManagementView } from '@/layouts/llm'
 
 export function ModelManagementPage() {
-  return <ModelManagementView />
+  return <LLMManagementView />
 }

@@ -2,7 +2,12 @@ package com.sunny.datapillar.auth.security.keystore.impl;
 
 import com.sunny.datapillar.auth.config.KeyStorageProperties;
 import com.sunny.datapillar.auth.security.keystore.KeyStorage;
+import com.sunny.datapillar.common.constant.ErrorType;
+import com.sunny.datapillar.common.exception.AlreadyExistsException;
+import com.sunny.datapillar.common.exception.NotFoundException;
+import com.sunny.datapillar.common.exception.ServiceUnavailableException;
 import java.net.URI;
+import java.util.Map;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
@@ -44,29 +49,37 @@ public class ObjectStorageKeyStorage implements KeyStorage {
     }
 
     @Override
-    public void savePrivateKey(Long tenantId, byte[] pemBytes) {
-        validateTenantId(tenantId);
-        validatePemBytes(pemBytes);
-        if (exists(tenantId)) {
-            throw new IllegalStateException("租户私钥已存在: " + tenantId);
+    public void savePrivateKey(String tenantCode, byte[] privateKeyPemBytes) {
+        String normalizedTenantCode = validateTenantCode(tenantCode);
+        validatePemBytes(privateKeyPemBytes);
+        if (existsPrivateKey(normalizedTenantCode)) {
+            throw new AlreadyExistsException(
+                    ErrorType.TENANT_PRIVATE_KEY_ALREADY_EXISTS,
+                    Map.of("tenantCode", normalizedTenantCode),
+                    "私钥文件已存在");
         }
-        String key = resolveKey(tenantId);
-        PutObjectRequest request = PutObjectRequest.builder()
+
+        String privateKey = resolvePrivateKey(normalizedTenantCode);
+        PutObjectRequest privateRequest = PutObjectRequest.builder()
                 .bucket(bucket)
-                .key(key)
+                .key(privateKey)
                 .contentType("application/x-pem-file")
                 .build();
         try {
-            s3Client.putObject(request, RequestBody.fromBytes(pemBytes));
+            s3Client.putObject(privateRequest, RequestBody.fromBytes(privateKeyPemBytes));
         } catch (S3Exception ex) {
-            throw new IllegalStateException("写入私钥失败: " + key, ex);
+            throw new ServiceUnavailableException(
+                    ex,
+                    ErrorType.KEY_STORAGE_UNAVAILABLE,
+                    Map.of("tenantCode", normalizedTenantCode),
+                    "密钥存储服务不可用");
         }
     }
 
     @Override
-    public byte[] loadPrivateKey(Long tenantId) {
-        validateTenantId(tenantId);
-        String key = resolveKey(tenantId);
+    public byte[] loadPrivateKey(String tenantCode) {
+        String normalizedTenantCode = validateTenantCode(tenantCode);
+        String key = resolvePrivateKey(normalizedTenantCode);
         GetObjectRequest request = GetObjectRequest.builder()
                 .bucket(bucket)
                 .key(key)
@@ -76,18 +89,32 @@ public class ObjectStorageKeyStorage implements KeyStorage {
             return bytes.asByteArray();
         } catch (S3Exception ex) {
             if (ex.statusCode() == 404) {
-                throw new IllegalStateException("租户私钥不存在: " + tenantId);
+                throw new NotFoundException(
+                        ErrorType.TENANT_KEY_NOT_FOUND,
+                        Map.of("tenantCode", normalizedTenantCode),
+                        "租户密钥不存在");
             }
-            throw new IllegalStateException("读取私钥失败: " + key, ex);
+            throw new ServiceUnavailableException(
+                    ex,
+                    ErrorType.KEY_STORAGE_UNAVAILABLE,
+                    Map.of("tenantCode", normalizedTenantCode),
+                    "密钥存储服务不可用");
         }
     }
 
     @Override
-    public boolean exists(Long tenantId) {
-        if (tenantId == null || tenantId <= 0) {
+    public boolean existsPrivateKey(String tenantCode) {
+        if (tenantCode == null || tenantCode.isBlank()) {
             return false;
         }
-        String key = resolveKey(tenantId);
+        String normalizedTenantCode = tenantCode.trim();
+        if (normalizedTenantCode.contains("/") || normalizedTenantCode.contains("\\") || normalizedTenantCode.contains("..")) {
+            return false;
+        }
+        return objectExists(resolvePrivateKey(normalizedTenantCode));
+    }
+
+    private boolean objectExists(String key) {
         HeadObjectRequest request = HeadObjectRequest.builder()
                 .bucket(bucket)
                 .key(key)
@@ -99,7 +126,11 @@ public class ObjectStorageKeyStorage implements KeyStorage {
             if (ex.statusCode() == 404) {
                 return false;
             }
-            throw new IllegalStateException("检查私钥失败: " + key, ex);
+            throw new ServiceUnavailableException(
+                    ex,
+                    ErrorType.KEY_STORAGE_UNAVAILABLE,
+                    Map.of("objectKey", key),
+                    "密钥存储服务不可用");
         }
     }
 
@@ -136,8 +167,8 @@ public class ObjectStorageKeyStorage implements KeyStorage {
         return StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey));
     }
 
-    private String resolveKey(Long tenantId) {
-        return prefix + "/" + tenantId + "/private.pem";
+    private String resolvePrivateKey(String tenantCode) {
+        return prefix + "/" + tenantCode + "/private.pem";
     }
 
     private String normalizeBucket(String bucket) {
@@ -171,10 +202,15 @@ public class ObjectStorageKeyStorage implements KeyStorage {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private void validateTenantId(Long tenantId) {
-        if (tenantId == null || tenantId <= 0) {
-            throw new IllegalArgumentException("tenantId 无效");
+    private String validateTenantCode(String tenantCode) {
+        if (tenantCode == null || tenantCode.isBlank()) {
+            throw new IllegalArgumentException("tenantCode 无效");
         }
+        String normalized = tenantCode.trim();
+        if (normalized.contains("/") || normalized.contains("\\") || normalized.contains("..")) {
+            throw new IllegalArgumentException("tenantCode 无效");
+        }
+        return normalized;
     }
 
     private void validatePemBytes(byte[] pemBytes) {

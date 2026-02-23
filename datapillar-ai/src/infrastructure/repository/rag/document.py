@@ -17,6 +17,7 @@ class DocumentRepository:
     @staticmethod
     def list_by_namespace(
         namespace_id: int,
+        tenant_id: int,
         user_id: int,
         *,
         status: str | None,
@@ -24,8 +25,17 @@ class DocumentRepository:
         limit: int,
         offset: int,
     ) -> tuple[list[dict[str, Any]], int]:
-        filters = ["namespace_id = :namespace_id", "created_by = :created_by", "is_deleted = 0"]
-        params: dict[str, Any] = {"namespace_id": namespace_id, "created_by": user_id}
+        filters = [
+            "namespace_id = :namespace_id",
+            "tenant_id = :tenant_id",
+            "created_by = :created_by",
+            "is_deleted = 0",
+        ]
+        params: dict[str, Any] = {
+            "namespace_id": namespace_id,
+            "tenant_id": tenant_id,
+            "created_by": user_id,
+        }
         if status:
             filters.append("status = :status")
             params["status"] = status
@@ -75,7 +85,7 @@ class DocumentRepository:
         return rows, int(total or 0)
 
     @staticmethod
-    def get(document_id: int, user_id: int) -> dict[str, Any] | None:
+    def get(document_id: int, tenant_id: int, user_id: int) -> dict[str, Any] | None:
         query = text(
             """
             SELECT
@@ -101,17 +111,29 @@ class DocumentRepository:
               created_at,
               updated_at
             FROM knowledge_document
-            WHERE document_id = :document_id AND created_by = :created_by AND is_deleted = 0
+            WHERE document_id = :document_id
+              AND tenant_id = :tenant_id
+              AND created_by = :created_by
+              AND is_deleted = 0
             """
         )
         with MySQLClient.get_engine().connect() as conn:
-            row = conn.execute(
-                query, {"document_id": document_id, "created_by": user_id}
-            ).mappings().fetchone()
+            row = (
+                conn.execute(
+                    query,
+                    {
+                        "document_id": document_id,
+                        "tenant_id": tenant_id,
+                        "created_by": user_id,
+                    },
+                )
+                .mappings()
+                .fetchone()
+            )
             return dict(row) if row else None
 
     @staticmethod
-    def get_by_doc_uid(doc_uid: str, user_id: int) -> dict[str, Any] | None:
+    def get_by_doc_uid(doc_uid: str, tenant_id: int, user_id: int) -> dict[str, Any] | None:
         query = text(
             """
             SELECT
@@ -137,24 +159,44 @@ class DocumentRepository:
               created_at,
               updated_at
             FROM knowledge_document
-            WHERE doc_uid = :doc_uid AND created_by = :created_by AND is_deleted = 0
+            WHERE doc_uid = :doc_uid
+              AND tenant_id = :tenant_id
+              AND created_by = :created_by
+              AND is_deleted = 0
             """
         )
         with MySQLClient.get_engine().connect() as conn:
-            row = conn.execute(query, {"doc_uid": doc_uid, "created_by": user_id}).mappings().fetchone()
+            row = (
+                conn.execute(
+                    query,
+                    {
+                        "doc_uid": doc_uid,
+                        "tenant_id": tenant_id,
+                        "created_by": user_id,
+                    },
+                )
+                .mappings()
+                .fetchone()
+            )
             return dict(row) if row else None
 
     @staticmethod
-    def list_namespace_embedding_models(namespace_id: int) -> list[int]:
+    def list_namespace_embedding_models(namespace_id: int, tenant_id: int) -> list[int]:
         query = text(
             """
             SELECT DISTINCT embedding_model_id
             FROM knowledge_document
-            WHERE namespace_id = :namespace_id AND is_deleted = 0 AND embedding_model_id IS NOT NULL
+            WHERE namespace_id = :namespace_id
+              AND tenant_id = :tenant_id
+              AND is_deleted = 0
+              AND embedding_model_id IS NOT NULL
             """
         )
         with MySQLClient.get_engine().connect() as conn:
-            rows = conn.execute(query, {"namespace_id": namespace_id}).fetchall()
+            rows = conn.execute(
+                query,
+                {"namespace_id": namespace_id, "tenant_id": tenant_id},
+            ).fetchall()
             return [int(row[0]) for row in rows if row and row[0] is not None]
 
     @staticmethod
@@ -162,6 +204,7 @@ class DocumentRepository:
         query = text(
             """
             INSERT INTO knowledge_document (
+              tenant_id,
               namespace_id,
               doc_uid,
               title,
@@ -181,6 +224,7 @@ class DocumentRepository:
               last_chunked_at,
               created_by
             ) VALUES (
+              :tenant_id,
               :namespace_id,
               :doc_uid,
               :title,
@@ -207,7 +251,7 @@ class DocumentRepository:
             return int(result.lastrowid)
 
     @staticmethod
-    def update(document_id: int, user_id: int, fields: dict[str, Any]) -> int:
+    def update(document_id: int, tenant_id: int, user_id: int, fields: dict[str, Any]) -> int:
         if not fields:
             return 0
         sets = ", ".join([f"{key} = :{key}" for key in fields])
@@ -215,23 +259,41 @@ class DocumentRepository:
             f"""
             UPDATE knowledge_document
             SET {sets}
-            WHERE document_id = :document_id AND created_by = :created_by AND is_deleted = 0
+            WHERE document_id = :document_id
+              AND tenant_id = :tenant_id
+              AND created_by = :created_by
+              AND is_deleted = 0
             """
         )
-        params = {"document_id": document_id, "created_by": user_id, **fields}
+        params = {
+            "document_id": document_id,
+            "tenant_id": tenant_id,
+            "created_by": user_id,
+            **fields,
+        }
         with MySQLClient.get_engine().begin() as conn:
             result = conn.execute(query, params)
             return int(result.rowcount or 0)
 
     @staticmethod
-    def soft_delete(document_id: int, user_id: int) -> int:
+    def soft_delete(document_id: int, tenant_id: int, user_id: int) -> int:
         query = text(
             """
             UPDATE knowledge_document
             SET is_deleted = 1
-            WHERE document_id = :document_id AND created_by = :created_by AND is_deleted = 0
+            WHERE document_id = :document_id
+              AND tenant_id = :tenant_id
+              AND created_by = :created_by
+              AND is_deleted = 0
             """
         )
         with MySQLClient.get_engine().begin() as conn:
-            result = conn.execute(query, {"document_id": document_id, "created_by": user_id})
+            result = conn.execute(
+                query,
+                {
+                    "document_id": document_id,
+                    "tenant_id": tenant_id,
+                    "created_by": user_id,
+                },
+            )
             return int(result.rowcount or 0)

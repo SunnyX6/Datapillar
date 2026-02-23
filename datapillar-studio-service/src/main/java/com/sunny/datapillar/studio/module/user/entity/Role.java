@@ -33,6 +33,9 @@ public class Role {
 
     private Integer sort;
 
+    @TableField("is_builtin")
+    private Integer isBuiltin;
+
     @TableField("created_at")
     private LocalDateTime createdAt;
 

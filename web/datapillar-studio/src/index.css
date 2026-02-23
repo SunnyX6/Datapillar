@@ -407,6 +407,48 @@
     animation: fade-in-up 0.4s ease-out;
   }
 
+  @keyframes llm-pending-dot {
+    0%,
+    100% {
+      opacity: 0.25;
+      transform: translateY(0) scale(0.85);
+    }
+    50% {
+      opacity: 1;
+      transform: translateY(-1px) scale(1);
+    }
+  }
+
+  @keyframes llm-pending-enter {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes llm-pending-leave {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  .animate-llm-pending-dot {
+    animation: llm-pending-dot 0.9s ease-in-out infinite;
+  }
+
+  .animate-llm-pending-enter {
+    animation: llm-pending-enter 0.12s ease-out forwards;
+  }
+
+  .animate-llm-pending-leave {
+    animation: llm-pending-leave 0.1s ease-in forwards;
+  }
+
   /* Monaco Editor 行号区域边框 */
   .monaco-editor .margin {
     border-right: 1px solid #e2e8f0;

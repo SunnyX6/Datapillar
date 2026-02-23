@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 class Neo4jMetricSearch:
     """Neo4j 指标查询服务"""
 
+    _SYSTEM_CREATORS = ["OPENLINEAGE", "GRAVITINO_SYNC", "system", "SYSTEM"]
+
     # Metric 上下文查询 Cypher 模板
     _METRIC_CYPHER = """
     UNWIND $element_ids AS eid
@@ -48,7 +50,13 @@ class Neo4jMetricSearch:
     """
 
     @classmethod
-    def get_metric_context(cls, codes: list[str]) -> list[dict]:
+    def get_metric_context(
+        cls,
+        codes: list[str],
+        *,
+        tenant_id: int | None = None,
+        user_id: int | None = None,
+    ) -> list[dict]:
         """
         根据指标 code 列表查询指标详情
 
@@ -64,8 +72,29 @@ class Neo4jMetricSearch:
         cypher = """
         UNWIND $codes AS code
         OPTIONAL MATCH (m:AtomicMetric {code: code})
+        WHERE ($tenantId IS NULL OR m.tenantId = $tenantId)
+          AND (
+            $userId IS NULL
+            OR m.createdBy IS NULL
+            OR toString(m.createdBy) = toString($userId)
+            OR m.createdBy IN $systemCreators
+          )
         OPTIONAL MATCH (d:DerivedMetric {code: code})
+        WHERE ($tenantId IS NULL OR d.tenantId = $tenantId)
+          AND (
+            $userId IS NULL
+            OR d.createdBy IS NULL
+            OR toString(d.createdBy) = toString($userId)
+            OR d.createdBy IN $systemCreators
+          )
         OPTIONAL MATCH (c:CompositeMetric {code: code})
+        WHERE ($tenantId IS NULL OR c.tenantId = $tenantId)
+          AND (
+            $userId IS NULL
+            OR c.createdBy IS NULL
+            OR toString(c.createdBy) = toString($userId)
+            OR c.createdBy IN $systemCreators
+          )
         WITH code,
              COALESCE(m, d, c) AS metric,
              CASE
@@ -88,7 +117,16 @@ class Neo4jMetricSearch:
         try:
             driver = Neo4jClient.get_driver()
             with driver.session(database=settings.neo4j_database) as session:
-                result = run_cypher(session, cypher, {"codes": codes})
+                result = run_cypher(
+                    session,
+                    cypher,
+                    {
+                        "codes": codes,
+                        "tenantId": tenant_id,
+                        "userId": user_id,
+                        "systemCreators": cls._SYSTEM_CREATORS,
+                    },
+                )
                 records = result.data()
 
             logger.debug(f"从 Neo4j 获取 {len(records)} 个指标上下文")
@@ -116,6 +154,7 @@ class Neo4jMetricSearch:
         top_k: int = 3,
         min_score: float = 0.55,
         tenant_id: int | None = None,
+        user_id: int | None = None,
     ) -> list[dict[str, Any]]:
         """
         混合搜索指标
@@ -168,6 +207,13 @@ class Neo4jMetricSearch:
         def hybrid_search_single(config: dict[str, str]) -> list[dict[str, Any]]:
             results: list[dict[str, Any]] = []
             retrieval_query = f"""
+            WHERE ($tenantId IS NULL OR node.tenantId = $tenantId)
+              AND (
+                $userId IS NULL
+                OR node.createdBy IS NULL
+                OR toString(node.createdBy) = toString($userId)
+                OR node.createdBy IN $systemCreators
+              )
             RETURN
                 node.id AS node_id,
                 '{config["metric_type"]}' AS type,
@@ -191,6 +237,11 @@ class Neo4jMetricSearch:
                 search_result = retriever.search(
                     query_text=query,
                     top_k=top_k,
+                    query_params={
+                        "tenantId": tenant_id,
+                        "userId": user_id,
+                        "systemCreators": cls._SYSTEM_CREATORS,
+                    },
                     ranker=HybridSearchRanker.LINEAR,
                     alpha=0.6,
                 )

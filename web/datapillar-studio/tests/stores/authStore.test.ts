@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuthStore } from '@/stores'
 
-vi.mock('@/lib/api/auth', () => ({
+vi.mock('@/services/authService', () => ({
   login: vi.fn().mockResolvedValue({
     userId: 10001,
     username: 'mock-user',

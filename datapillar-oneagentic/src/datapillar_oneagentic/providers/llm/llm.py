@@ -34,6 +34,23 @@ from datapillar_oneagentic.events import (
     LLMCallFailedEvent,
     LLMCallStartedEvent,
 )
+from datapillar_oneagentic.exception import (
+    CircuitBreaker,
+    CircuitBreakerError,
+    CircuitBreakerRegistry,
+    ExceptionMapper,
+    RecoveryAction,
+    action_for,
+    calculate_retry_delay,
+)
+from datapillar_oneagentic.messages import Message, Messages
+from datapillar_oneagentic.messages.adapters.langchain import (
+    from_langchain,
+    is_langchain_list,
+    is_langchain_message,
+    to_langchain,
+)
+from datapillar_oneagentic.messages.adapters.langchain_patch import apply_zhipuai_patch
 from datapillar_oneagentic.providers.llm.config import LLMConfig, RetryConfig
 from datapillar_oneagentic.providers.llm.llm_cache import create_llm_cache
 from datapillar_oneagentic.providers.llm.rate_limiter import RateLimitManager
@@ -43,24 +60,6 @@ from datapillar_oneagentic.providers.llm.vendor_cache import (
     VendorCachePolicy,
     apply_vendor_cache,
     build_openai_extra_body,
-)
-from datapillar_oneagentic.messages import Message, Messages
-from datapillar_oneagentic.messages.adapters.langchain import (
-    from_langchain,
-    is_langchain_message,
-    is_langchain_list,
-    to_langchain,
-)
-from datapillar_oneagentic.messages.adapters.langchain_patch import apply_zhipuai_patch
-from datapillar_oneagentic.exception import (
-    CircuitBreaker,
-    CircuitBreakerRegistry,
-    ExceptionMapper,
-    LLMError,
-    LLMErrorCategory,
-    LLMErrorClassifier,
-    RecoveryAction,
-    calculate_retry_delay,
 )
 
 logger = logging.getLogger(__name__)
@@ -144,6 +143,7 @@ class LLMProviderConfig:
     base_url: str | None = None
     enable_thinking: bool = False
     thinking_budget_tokens: int | None = None
+    streaming: bool = False
 
 
 # ==================== Resilient wrapper ====================
@@ -228,6 +228,31 @@ class ResilientChatModel:
         async with self._rate_limit_manager.acquire(self._provider):
             return await self._invoke_with_resilience(input, config, **kwargs)
 
+    async def astream(
+        self,
+        input: Messages,
+        config: dict | None = None,
+        **kwargs,
+    ):
+        """Async streaming call."""
+        if not isinstance(input, Messages):
+            raise TypeError("LLM calls only accept Messages")
+
+        langchain_input = to_langchain(input)
+        stream_method = getattr(self._llm, "astream", None)
+        if not callable(stream_method):
+            yield await self.ainvoke(input, config, **kwargs)
+            return
+
+        if self._rate_limit_manager is None:
+            async for chunk in stream_method(langchain_input, config, **kwargs):
+                yield _normalize_llm_result(chunk)
+            return
+
+        async with self._rate_limit_manager.acquire(self._provider):
+            async for chunk in stream_method(langchain_input, config, **kwargs):
+                yield _normalize_llm_result(chunk)
+
     async def _invoke_with_resilience(
         self,
         input: Messages,
@@ -243,15 +268,6 @@ class ResilientChatModel:
         langchain_input = to_langchain(input)
 
         for attempt in range(retries + 1):
-            if self._circuit_breaker and not await self._circuit_breaker.allow_request():
-                raise LLMError(
-                    "LLM service circuit is open",
-                    category=LLMErrorCategory.CIRCUIT_OPEN,
-                    action=RecoveryAction.CIRCUIT_BREAK,
-                    provider=self._provider,
-                    model=self._model_name,
-                )
-
             start_time = time.time()
             if self._event_bus is not None:
                 await self._event_bus.emit(
@@ -265,6 +281,9 @@ class ResilientChatModel:
                 )
 
             try:
+                if self._circuit_breaker and not await self._circuit_breaker.allow_request():
+                    raise CircuitBreakerError("llm")
+
                 result = await asyncio.wait_for(
                     self._llm.ainvoke(langchain_input, config, **kwargs),
                     timeout=self.timeout,
@@ -278,60 +297,26 @@ class ResilientChatModel:
                 asyncio.create_task(self._track_usage_async(normalized, start_time=start_time))
                 return normalized
 
-            except TimeoutError as e:
-                await self._emit_llm_failed(e, start_time=start_time)
-                last_error = LLMError(
-                    f"LLM call timed out ({self.timeout}s)",
-                    category=LLMErrorCategory.TIMEOUT,
-                    action=RecoveryAction.RETRY,
+            except CircuitBreakerError as error:
+                await self._emit_llm_failed(error, start_time=start_time)
+                raise
+
+            except Exception as error:
+                mapped_error = ExceptionMapper.map_llm_error(
+                    error,
                     provider=self._provider,
                     model=self._model_name,
-                    original=e,
                 )
+                await self._emit_llm_failed(mapped_error, start_time=start_time)
+                last_error = mapped_error
+                recovery_action = action_for(mapped_error)
+                if recovery_action != RecoveryAction.RETRY:
+                    raise mapped_error from None
+
                 if self._circuit_breaker:
                     await self._circuit_breaker.record_failure()
                 if attempt >= retries:
-                    raise last_error from None
-
-            except Exception as e:
-                if isinstance(e, LLMError):
-                    await self._emit_llm_failed(e, start_time=start_time)
-                    last_error = e
-                    if e.action == RecoveryAction.RETRY:
-                        if self._circuit_breaker:
-                            await self._circuit_breaker.record_failure()
-                        if attempt >= retries:
-                            raise
-                    else:
-                        raise
-                elif ExceptionMapper.is_context_exceeded(e):
-                    await self._emit_llm_failed(e, start_time=start_time)
-                    raise LLMError(
-                        str(e),
-                        category=LLMErrorCategory.CONTEXT,
-                        action=RecoveryAction.FAIL_FAST,
-                        provider=self._provider,
-                        model=self._model_name,
-                        original=e,
-                    ) from e
-                else:
-                    await self._emit_llm_failed(e, start_time=start_time)
-                    category, action = LLMErrorClassifier.classify(e)
-                    last_error = LLMError(
-                        str(e),
-                        category=category,
-                        action=action,
-                        provider=self._provider,
-                        model=self._model_name,
-                        original=e,
-                    )
-                    if action == RecoveryAction.RETRY:
-                        if self._circuit_breaker:
-                            await self._circuit_breaker.record_failure()
-                        if attempt >= retries:
-                            raise last_error from None
-                    else:
-                        raise last_error from None
+                    raise mapped_error from None
 
             delay = calculate_retry_delay(self._retry_config, attempt)
             logger.warning(
@@ -516,7 +501,7 @@ class LLMFactory:
                 api_key=config.api_key,
                 base_url=config.base_url,
                 model=config.model_name,
-                streaming=False,
+                streaming=config.streaming,
             )
 
         if provider in ("claude", "anthropic"):
@@ -526,7 +511,7 @@ class LLMFactory:
                 api_key=config.api_key,
                 base_url=config.base_url if config.base_url else None,
                 model=config.model_name,
-                streaming=False,
+                streaming=config.streaming,
             )
             if config.enable_thinking:
                 thinking_config = {"type": "enabled"}
@@ -540,7 +525,7 @@ class LLMFactory:
             llm = ChatZhipuAI(
                 zhipuai_api_key=config.api_key,
                 model_name=config.model_name,
-                streaming=False,
+                streaming=config.streaming,
             )
             thinking_type = "enabled" if config.enable_thinking else "disabled"
             return llm.bind(thinking={"type": thinking_type})
@@ -550,12 +535,12 @@ class LLMFactory:
             ChatOpenAI = cast(Any, _ChatOpenAI)
             llm = ChatOpenAI(
                 api_key=config.api_key,
-                base_url=config.base_url or "https://api.deepseek.com/v1",
+                base_url=config.base_url,
                 model=config.model_name,
-                streaming=False,
+                streaming=config.streaming,
             )
             if config.enable_thinking:
-                return llm.bind(extra_body={"enable_thinking": False})
+                return llm.bind(extra_body={"enable_thinking": True})
             return llm
 
         if provider == "openrouter":
@@ -563,19 +548,19 @@ class LLMFactory:
             ChatOpenAI = cast(Any, _ChatOpenAI)
             return ChatOpenAI(
                 api_key=config.api_key,
-                base_url=config.base_url or "https://openrouter.ai/api/v1",
+                base_url=config.base_url,
                 model=config.model_name,
-                streaming=False,
+                streaming=config.streaming,
             )
 
         if provider == "ollama":
             from langchain_openai import ChatOpenAI as _ChatOpenAI
             ChatOpenAI = cast(Any, _ChatOpenAI)
             return ChatOpenAI(
-                api_key="ollama",
-                base_url=config.base_url or "http://localhost:11434/v1",
+                api_key=config.api_key,
+                base_url=config.base_url,
                 model=config.model_name,
-                streaming=False,
+                streaming=config.streaming,
             )
 
         raise ValueError(f"Unsupported LLM provider: {provider}")
@@ -605,7 +590,7 @@ class LLMProvider:
         if cache_instance is not None:
             set_llm_cache(cache_instance)
 
-    def _build_provider_config(self) -> LLMProviderConfig:
+    def _build_provider_config(self, *, streaming: bool) -> LLMProviderConfig:
         return LLMProviderConfig(
             provider=self._config.provider,
             model_name=self._config.model,
@@ -613,6 +598,7 @@ class LLMProvider:
             base_url=self._config.base_url,
             enable_thinking=self._config.enable_thinking,
             thinking_budget_tokens=self._config.thinking_budget_tokens,
+            streaming=streaming,
         )
 
     def _cleanup_cache(self) -> None:
@@ -631,10 +617,12 @@ class LLMProvider:
         Get a resilient LLM instance.
         """
         temperature = kwargs.get("temperature", self._config.temperature)
+        top_p = kwargs.get("top_p")
         max_tokens = kwargs.get("max_tokens")
+        streaming = bool(kwargs.get("streaming", False))
         schema_key = f"{output_schema.__module__}.{output_schema.__qualname__}" if output_schema else None
 
-        provider_config = self._build_provider_config()
+        provider_config = self._build_provider_config(streaming=streaming)
         vendor_policy = self._vendor_cache.get_policy(provider_config.provider)
         cache_key = (
             provider_config.provider,
@@ -643,7 +631,9 @@ class LLMProvider:
             provider_config.base_url,
             provider_config.enable_thinking,
             provider_config.thinking_budget_tokens,
+            provider_config.streaming,
             temperature,
+            top_p,
             max_tokens,
             schema_key,
             vendor_policy.cache_key() if vendor_policy else None,
@@ -665,6 +655,8 @@ class LLMProvider:
             bind_kwargs = {}
             if temperature is not None:
                 bind_kwargs["temperature"] = temperature
+            if top_p is not None:
+                bind_kwargs["top_p"] = top_p
             if max_tokens is not None:
                 bind_kwargs["max_tokens"] = max_tokens
             if bind_kwargs and hasattr(llm, "bind"):

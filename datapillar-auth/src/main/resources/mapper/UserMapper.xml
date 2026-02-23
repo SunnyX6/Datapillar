@@ -48,18 +48,14 @@
             o.sort,
             CASE
                 WHEN LEAST(
-                    MAX(CASE p.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END),
-                    MAX(CASE tp.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END)
-                ) >= 3 THEN 'ADMIN'
+                    MAX(CASE p.code WHEN 'ADMIN' THEN 2 WHEN 'READ' THEN 1 WHEN 'DISABLE' THEN 0 ELSE 0 END),
+                    MAX(CASE tp.code WHEN 'ADMIN' THEN 2 WHEN 'READ' THEN 1 WHEN 'DISABLE' THEN 0 ELSE 0 END)
+                ) >= 2 THEN 'ADMIN'
                 WHEN LEAST(
-                    MAX(CASE p.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END),
-                    MAX(CASE tp.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END)
-                ) >= 2 THEN 'WRITE'
-                WHEN LEAST(
-                    MAX(CASE p.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END),
-                    MAX(CASE tp.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END)
+                    MAX(CASE p.code WHEN 'ADMIN' THEN 2 WHEN 'READ' THEN 1 WHEN 'DISABLE' THEN 0 ELSE 0 END),
+                    MAX(CASE tp.code WHEN 'ADMIN' THEN 2 WHEN 'READ' THEN 1 WHEN 'DISABLE' THEN 0 ELSE 0 END)
                 ) >= 1 THEN 'READ'
-                ELSE 'NONE'
+                ELSE 'DISABLE'
             END AS permission_code
         FROM feature_objects o
         LEFT JOIN feature_object_categories c ON o.category_id = c.id
@@ -75,11 +71,6 @@
             WHERE ur.tenant_id = #{tenantId}
               AND rp.tenant_id = #{tenantId}
               AND ur.user_id = #{userId}
-            UNION ALL
-            SELECT up.object_id, up.permission_id
-            FROM user_permission_overrides up
-            WHERE up.tenant_id = #{tenantId}
-              AND up.user_id = #{userId}
         ) rel ON rel.object_id = o.id
         INNER JOIN permissions p ON p.id = rel.permission_id
         WHERE o.type = 'MENU'

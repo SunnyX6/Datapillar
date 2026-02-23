@@ -25,7 +25,7 @@
     },
     "profile": {
       "profile": "个人中心",
-      "permission": "功能权限",
+      "permission": "权限配置",
       "models": "AI 配置",
       "billing": "账单",
       "logout": "退出登录"
@@ -38,7 +38,7 @@
       "observe": "观测"
     },
     "items": {
-      "wiki": "知识 Wiki",
+      "wiki": "知识百科",
       "workflow": "工作流构建",
       "ide": "统一开发 IDE",
       "catalog": "数据目录",

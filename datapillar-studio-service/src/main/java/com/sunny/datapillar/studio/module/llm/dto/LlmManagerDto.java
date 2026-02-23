@@ -47,6 +47,7 @@ public class LlmManagerDto {
         private String outputPriceUsd;
         private Integer embeddingDimension;
         private String baseUrl;
+        private String maskedApiKey;
         private String status;
         private Boolean hasApiKey;
         private Long createdBy;
@@ -68,13 +69,33 @@ public class LlmManagerDto {
         private Long providerId;
         private String providerCode;
         private String providerName;
-        private Integer status;
+        private Long permissionId;
+        private String permissionCode;
+        private Integer permissionLevel;
         private Boolean isDefault;
+        private String callCount;
+        private String promptTokens;
+        private String completionTokens;
+        private String totalTokens;
         private String totalCostUsd;
         private Long grantedBy;
         private LocalDateTime grantedAt;
+        private Long updatedBy;
+        private LocalDateTime expiresAt;
         private LocalDateTime lastUsedAt;
         private LocalDateTime updatedAt;
+    }
+
+    @Data
+    @Schema(name = "LlmManagerModelGrantRequest")
+    public static class ModelGrantRequest {
+        @NotBlank(message = "permission_code 不能为空")
+        @Size(max = 32, message = "permission_code 长度不能超过 32")
+        private String permissionCode;
+
+        private Boolean isDefault;
+
+        private LocalDateTime expiresAt;
     }
 
     @Data
@@ -114,6 +135,9 @@ public class LlmManagerDto {
 
         @Size(max = 255, message = "base_url 长度不能超过 255")
         private String baseUrl;
+
+        @Size(max = 2048, message = "api_key 长度不能超过 2048")
+        private String apiKey;
     }
 
     @Data

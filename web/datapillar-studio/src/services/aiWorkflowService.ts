@@ -5,93 +5,27 @@
  * 协议版本：v3（统一 stream 事件）
  */
 
-import { fetchWithAuthRetry } from '@/lib/api/client'
+import { API_BASE, API_PATH, openSse, requestData, requestEnvelope } from '@/lib/api'
+import type {
+  AbortWorkflowResult,
+  SseEvent,
+  StreamCallbacks
+} from '@/types/ai/workflow'
 
-/**
- * SSE 事件类型
- */
-export type SseEventType = 'stream'
-
-export type ActivityEvent = 'llm' | 'tool' | 'interrupt'
-
-export type ProcessStatus = 'running' | 'waiting' | 'done' | 'error' | 'aborted'
-
-export interface StreamInterrupt {
-  options: string[]
-  interrupt_id?: string
-}
-
-export interface ProcessActivity {
-  agent_cn: string
-  agent_en: string
-  summary: string
-  event: ActivityEvent
-  event_name: string
-  status: ProcessStatus
-  interrupt?: StreamInterrupt
-  recommendations?: string[]
-}
-
-export type StreamStatus = 'running' | 'done' | 'error' | 'aborted'
-
-export interface StreamEvent {
-  ts: number
-  run_id: string
-  status: StreamStatus
-  activity?: ProcessActivity | null
-  workflow?: WorkflowResponse | null
-}
-
-export type SseEvent = StreamEvent
-
-/**
- * Job 响应
- */
-export interface JobResponse {
-  id: number | null
-  jobName: string
-  jobType: number | null
-  jobTypeCode: string
-  jobTypeName: string | null
-  jobParams: Record<string, unknown>
-  timeoutSeconds: number
-  maxRetryTimes: number
-  retryInterval: number
-  priority: number
-  positionX: number
-  positionY: number
-  description: string | null
-}
-
-/**
- * 依赖响应
- */
-export interface DependencyResponse {
-  jobId: number
-  parentJobId: number
-}
-
-/**
- * 工作流响应
- */
-export interface WorkflowResponse {
-  workflowName: string
-  triggerType: number
-  triggerValue: string | null
-  timeoutSeconds: number
-  maxRetryTimes: number
-  priority: number
-  description: string | null
-  jobs: JobResponse[]
-  dependencies: DependencyResponse[]
-}
-
-/**
- * 消息回调
- */
-export interface StreamCallbacks {
-  onEvent: (event: SseEvent) => void
-}
+export type {
+  ActivityEvent,
+  ProcessActivity,
+  ProcessStatus,
+  SseEvent,
+  SseEventType,
+  StreamCallbacks,
+  StreamInterrupt,
+  StreamStatus,
+  WorkflowResponse,
+  JobResponse,
+  DependencyResponse,
+  AbortWorkflowResult
+} from '@/types/ai/workflow'
 
 /**
  * 生成唯一会话 ID
@@ -134,27 +68,27 @@ export function createWorkflowStream(
       }
 
       // 统一使用 /workflow/chat 端点
-      const response = await fetchWithAuthRetry('/api/ai/etl/workflow/chat', {
+      await requestEnvelope<{ success: boolean; stream_url: string }, {
+        userInput: string | null
+        sessionId: string
+        resumeValue?: unknown
+      }>({
+        baseURL: API_BASE.aiWorkflow,
+        url: API_PATH.workflow.chat,
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+        data: {
           userInput,
           sessionId,
           resumeValue
-        }),
-        credentials: 'include'
+        }
       })
-
-      if (!response.ok) {
-        emitLocalError('请求失败', `HTTP ${response.status}: ${response.statusText}`)
-        return
-      }
 
       if (closed) return
 
-      eventSource = new EventSource(`/api/ai/etl/workflow/sse?sessionId=${encodeURIComponent(sessionId)}`, {
+      eventSource = openSse({
+        baseURL: API_BASE.aiWorkflow,
+        url: API_PATH.workflow.sse,
+        params: { sessionId },
         withCredentials: true
       })
 
@@ -220,23 +154,15 @@ export function createWorkflowStream(
 export async function abortWorkflow(
   sessionId: string,
   interruptId?: string
-): Promise<{ success: boolean; aborted: boolean; message: string }> {
+): Promise<AbortWorkflowResult> {
   const payload: { sessionId: string; interruptId?: string } = { sessionId }
   if (interruptId) {
     payload.interruptId = interruptId
   }
-  const response = await fetchWithAuthRetry('/api/ai/etl/workflow/abort', {
+  return requestData<AbortWorkflowResult, { sessionId: string; interruptId?: string }>({
+    baseURL: API_BASE.aiWorkflow,
+    url: API_PATH.workflow.abort,
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(payload),
-    credentials: 'include'
+    data: payload
   })
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-  }
-
-  return response.json()
 }

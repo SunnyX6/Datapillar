@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Check, CheckCircle2, Eye } from 'lucide-react'
+import { ArrowRight, Check, CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { AppLayout, SplitGrid, useLayout } from '@/layouts/responsive'
 import { BrandLogo, Button, ThemeToggle, LanguageToggle } from '@/components'
 import { DemoCanvas } from '@/pages/login/DemoCanvas'
 import { paddingClassMap } from '@/design-tokens/dimensions'
 import { cn } from '@/lib/utils'
-import { getSetupStatus, initializeSetup, type SetupStatusResponse, type SetupStep as SetupStatusStep, type SetupStepStatus } from '@/lib/api/setup'
+import { getSetupStatus, initializeSetup } from '@/services/setupService'
+import { useSetupStore } from '@/stores'
+import type { SetupStatusResponse, SetupStep as SetupStatusStep, SetupStepStatus } from '@/types/setup'
 
 type SetupUiStep = 1 | 2 | 3 | 4
 
@@ -87,7 +89,10 @@ const SETUP_PRIMARY_BUTTON_CLASS = cn(
   'disabled:cursor-not-allowed disabled:bg-indigo-400'
 )
 
-function InputGroup({ label, type = 'text', value, onChange, placeholder, required }: InputGroupProps) {
+export function InputGroup({ label, type = 'text', value, onChange, placeholder, required }: InputGroupProps) {
+  const [showPassword, setShowPassword] = useState(false)
+  const inputType = type === 'password' ? (showPassword ? 'text' : 'password') : type
+
   return (
     <div className="group">
       <label className={`mb-2 block transition-colors group-focus-within:text-indigo-500 ${SETUP_LABEL_CLASS}`}>
@@ -95,7 +100,7 @@ function InputGroup({ label, type = 'text', value, onChange, placeholder, requir
       </label>
       <div className="relative">
         <input
-          type={type}
+          type={inputType}
           className={SETUP_INPUT_CLASS}
           placeholder={placeholder}
           value={value}
@@ -103,9 +108,14 @@ function InputGroup({ label, type = 'text', value, onChange, placeholder, requir
           required={required}
         />
         {type === 'password' && (
-          <span className="absolute top-1/2 right-3 -translate-y-1/2 text-slate-400">
-            <Eye className="h-5 w-5" />
-          </span>
+          <button
+            type="button"
+            onClick={() => setShowPassword((previous) => !previous)}
+            className="absolute top-1/2 right-3 -translate-y-1/2 text-slate-400 hover:text-indigo-500 transition-colors"
+            aria-label={showPassword ? '隐藏密码' : '显示密码'}
+          >
+            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+          </button>
         )}
       </div>
     </div>
@@ -115,6 +125,7 @@ function InputGroup({ label, type = 'text', value, onChange, placeholder, requir
 export function SetupPage() {
   const { t } = useTranslation('login')
   const navigate = useNavigate()
+  const applySetupStatus = useSetupStore((state) => state.applySetupStatus)
   const [step, setStep] = useState<SetupUiStep>(1)
   const [formData, setFormData] = useState<SetupFormData>({
     organizationName: '',
@@ -174,6 +185,7 @@ export function SetupPage() {
     try {
       const status = await getSetupStatus()
       setSetupStatus(status)
+      applySetupStatus(status)
       const currentStep = stepRef.current
 
       if (status.initialized && currentStep !== 4) {
@@ -199,7 +211,7 @@ export function SetupPage() {
     } catch (error) {
       toast.error(getErrorMessage(error))
     }
-  }, [navigate])
+  }, [applySetupStatus, navigate])
 
   useEffect(() => {
     void syncSetupStatus()
@@ -353,6 +365,7 @@ export function SetupPage() {
 
                             const latestStatus = await getSetupStatus()
                             setSetupStatus(latestStatus)
+                            applySetupStatus(latestStatus)
                             setSchemaWaiting(!latestStatus.schemaReady)
                             setLogs(buildLogsFromSteps(latestStatus.steps))
                             setInstallProgress(100)
@@ -522,11 +535,11 @@ export function SetupPage() {
                     <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100 text-green-600 shadow-inner">
                       <CheckCircle2 className="h-10 w-10" />
                     </div>
-                    <h2 className="mb-2 text-base font-semibold text-slate-900 dark:text-slate-100">{t('setup.step4.title')}</h2>
+                    <h2 className="mb-2 text-sm font-semibold text-slate-900 dark:text-slate-100">{t('setup.step4.title')}</h2>
                     <Button
                       type="button"
                       onClick={() => navigate('/login')}
-                      size="normal"
+                      size="small"
                       className={SETUP_PRIMARY_BUTTON_CLASS}
                     >
                       {t('setup.actions.toLogin')}

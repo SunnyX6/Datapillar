@@ -2,7 +2,7 @@
  * 指标表单组件专用类型
  */
 
-import type { MetricType } from '@/types/metric'
+import type { MetricType } from '@/types/onemeta/semantic'
 
 /** 度量列 */
 export interface MeasureColumn {

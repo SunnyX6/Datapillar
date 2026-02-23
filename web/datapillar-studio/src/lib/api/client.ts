@@ -1,5 +1,11 @@
 import axios, { AxiosHeaders, type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
 import {
+  handleAppError,
+  normalizeApiPayloadError,
+  normalizeAxiosError,
+  type ErrorAction
+} from '@/lib/error-center'
+import {
   isApiResponse as isApiDataResponse,
   isApiSuccess,
   isErrorResponse as isApiErrorResponse,
@@ -7,6 +13,7 @@ import {
   type ApiError,
   type ErrorResponse
 } from '@/types/api'
+import { API_ABSOLUTE_PATH, API_BASE, API_PATH } from './endpoints'
 
 interface ApiClientOptions {
   baseURL: string
@@ -16,19 +23,18 @@ interface ApiClientOptions {
 
 type RetryConfig = InternalAxiosRequestConfig & { _retry?: boolean }
 
-const AUTH_BASE_URL = '/api/auth'
-const LOGIN_BASE_URL = '/api/login'
+const AUTH_BASE_URL = API_BASE.auth
+const LOGIN_BASE_URL = API_BASE.login
 const CSRF_COOKIE_NAME = 'csrf-token'
 const CSRF_HEADER_NAME = 'X-CSRF-Token'
 const REFRESH_CSRF_COOKIE_NAME = 'refresh-csrf-token'
 const REFRESH_CSRF_HEADER_NAME = 'X-Refresh-CSRF-Token'
 const AUTH_ENDPOINTS = {
   loginBase: LOGIN_BASE_URL,
-  logout: `${LOGIN_BASE_URL}/logout`,
-  refresh: `${AUTH_BASE_URL}/refresh`
+  logout: `${LOGIN_BASE_URL}${API_PATH.login.logout}`,
+  refresh: `${AUTH_BASE_URL}${API_PATH.auth.refresh}`
 }
-const SETUP_REDIRECT_PATH = '/setup'
-const SETUP_ERROR_MESSAGES = new Set(['系统尚未完成初始化', '系统初始化数据未就绪'])
+const CORE_FAILURE_PATHS = new Set([API_ABSOLUTE_PATH.setupStatus, AUTH_ENDPOINTS.refresh])
 
 const refreshClient = axios.create({
   baseURL: AUTH_BASE_URL,
@@ -95,55 +101,6 @@ function buildApiError(data: ApiResponse<unknown> | ErrorResponse, status?: numb
   return error
 }
 
-function shouldRedirectToSetup(message: unknown): boolean {
-  return typeof message === 'string' && SETUP_ERROR_MESSAGES.has(message)
-}
-
-function redirectToSetup(): void {
-  if (typeof window === 'undefined') {
-    return
-  }
-  if (window.location.pathname === SETUP_REDIRECT_PATH) {
-    return
-  }
-  window.location.replace(SETUP_REDIRECT_PATH)
-}
-
-function extractErrorMessage(data: unknown): string | null {
-  if (!data || typeof data !== 'object') {
-    return null
-  }
-  const candidate = data as { message?: unknown }
-  return typeof candidate.message === 'string' ? candidate.message : null
-}
-
-function handleSetupApiResponse(data: unknown): boolean {
-  const message = extractErrorMessage(data)
-  if (!shouldRedirectToSetup(message)) {
-    return false
-  }
-  redirectToSetup()
-  return true
-}
-
-function handleSetupError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') {
-    return false
-  }
-
-  const message = extractErrorMessage(error)
-  if (shouldRedirectToSetup(message)) {
-    redirectToSetup()
-    return true
-  }
-
-  if (axios.isAxiosError(error)) {
-    return handleSetupApiResponse(error.response?.data)
-  }
-
-  return false
-}
-
 function getRequestUrl(config: InternalAxiosRequestConfig): string {
   const baseURL = config.baseURL ?? ''
   const url = config.url ?? ''
@@ -157,16 +114,6 @@ function shouldSkipAuthHandling(config: InternalAxiosRequestConfig): boolean {
     requestUrl.startsWith(AUTH_ENDPOINTS.refresh)
 }
 
-function getFetchUrl(input: RequestInfo | URL): string {
-  if (typeof input === 'string') {
-    return input
-  }
-  if (input instanceof URL) {
-    return input.toString()
-  }
-  return input.url
-}
-
 function normalizePath(url: string): string {
   try {
     return new URL(url, 'http://localhost').pathname
@@ -175,38 +122,70 @@ function normalizePath(url: string): string {
   }
 }
 
-function shouldSkipAuthHandlingForUrl(url: string): boolean {
-  const path = normalizePath(url)
-  return path.startsWith(AUTH_ENDPOINTS.loginBase) ||
-    path.startsWith(AUTH_ENDPOINTS.logout) ||
-    path.startsWith(AUTH_ENDPOINTS.refresh)
+function isCoreFailureRequest(url: string): boolean {
+  return CORE_FAILURE_PATHS.has(normalizePath(url))
+}
+
+function handleApiPayloadFailure(
+  payload: ApiResponse<unknown> | ErrorResponse,
+  status: number | undefined,
+  requestUrl: string,
+  method?: string,
+  headers?: unknown
+): ErrorAction {
+  return handleAppError(
+    normalizeApiPayloadError(payload, {
+      module: 'api/client',
+      status,
+      requestUrl,
+      method,
+      isCoreRequest: isCoreFailureRequest(requestUrl),
+      headers
+    }),
+    { onUnauthorized: unauthorizedHandler }
+  )
+}
+
+function handleAxiosFailure(error: unknown): ErrorAction {
+  const axiosError = axios.isAxiosError(error) ? error : undefined
+  const config = axiosError?.config as InternalAxiosRequestConfig | undefined
+  const requestUrl = config ? getRequestUrl(config) : undefined
+  const method = config?.method?.toUpperCase()
+  const isCoreRequest = requestUrl ? isCoreFailureRequest(requestUrl) : false
+
+  return handleAppError(
+    normalizeAxiosError(error, {
+      module: 'api/client',
+      requestUrl,
+      method,
+      isCoreRequest
+    }),
+    { onUnauthorized: unauthorizedHandler }
+  )
 }
 
 async function refreshAccessToken(): Promise<void> {
   if (!refreshPromise) {
     refreshPromise = refreshClient
-      .post<ApiResponse<void> | ErrorResponse>('/refresh')
+      .post<ApiResponse<void> | ErrorResponse>(API_PATH.auth.refresh)
       .then((response) => {
         const data = response.data
+        const requestUrl = AUTH_ENDPOINTS.refresh
         if (isStandardErrorResponse(data)) {
-          handleSetupApiResponse(data)
+          handleApiPayloadFailure(data, response.status, requestUrl, 'POST', response.headers)
           throw buildApiError(data, response.status)
         }
         if (!isStandardApiResponse(data)) {
           throw new Error('Invalid API response')
         }
         if (!isApiSuccess(data)) {
-          handleSetupApiResponse(data)
+          handleApiPayloadFailure(data, response.status, requestUrl, 'POST', response.headers)
           throw buildApiError(data, response.status)
         }
       })
       .catch((error: unknown) => {
-        const responseData = axios.isAxiosError(error) ? error.response?.data : undefined
-        if (
-          handleSetupApiResponse(responseData) &&
-          (isStandardApiResponse(responseData) || isStandardErrorResponse(responseData))
-        ) {
-          throw buildApiError(responseData, axios.isAxiosError(error) ? error.response?.status : undefined)
+        if (axios.isAxiosError(error)) {
+          handleAxiosFailure(error)
         }
         throw error
       })
@@ -256,27 +235,24 @@ export function createApiClient(options: ApiClientOptions): AxiosInstance {
         return response
       }
       const data = response.data
+      const requestUrl = getRequestUrl(response.config as InternalAxiosRequestConfig)
+      const method = response.config.method?.toUpperCase()
+
       if (isStandardErrorResponse(data)) {
-        handleSetupApiResponse(data)
+        handleApiPayloadFailure(data, response.status, requestUrl, method, response.headers)
         return Promise.reject(buildApiError(data, response.status))
       }
       if (!isStandardApiResponse(data)) {
         return Promise.reject(new Error('Invalid API response'))
       }
       if (!isApiSuccess(data)) {
-        handleSetupApiResponse(data)
+        handleApiPayloadFailure(data, response.status, requestUrl, method, response.headers)
         return Promise.reject(buildApiError(data, response.status))
       }
       return response
     },
     async (error: AxiosError) => {
       const responseData = error.response?.data
-      if (handleSetupApiResponse(responseData)) {
-        if (isStandardApiResponse(responseData) || isStandardErrorResponse(responseData)) {
-          return Promise.reject(buildApiError(responseData, error.response?.status))
-        }
-        return Promise.reject(error)
-      }
 
       if (shouldAttemptRefresh(error)) {
         const config = error.config as RetryConfig
@@ -285,7 +261,8 @@ export function createApiClient(options: ApiClientOptions): AxiosInstance {
           await refreshAccessToken()
           return client(config)
         } catch (refreshError) {
-          if (!handleSetupError(refreshError)) {
+          const action = handleAxiosFailure(refreshError)
+          if (action.type === 'local' || action.type === 'none' || action.type === 'toast') {
             unauthorizedHandler?.()
           }
           return Promise.reject(refreshError)
@@ -294,76 +271,33 @@ export function createApiClient(options: ApiClientOptions): AxiosInstance {
 
       if (error.response?.status === 401) {
         const config = error.config as RetryConfig | undefined
-        if (config && !shouldSkipAuthHandling(config)) {
-          unauthorizedHandler?.()
-        }
-      }
-
-      if (validateResponse) {
-        if (isStandardApiResponse(responseData) || isStandardErrorResponse(responseData)) {
+        if (validateResponse && (isStandardApiResponse(responseData) || isStandardErrorResponse(responseData))) {
+          const requestUrl = config ? getRequestUrl(config) : ''
+          const method = config?.method?.toUpperCase()
+          const skipAuthHandling = config ? shouldSkipAuthHandling(config) : false
+          if (!skipAuthHandling) {
+            handleApiPayloadFailure(responseData, error.response?.status, requestUrl, method, error.response?.headers)
+          }
           return Promise.reject(buildApiError(responseData, error.response?.status))
         }
+        if (config && !shouldSkipAuthHandling(config)) {
+          handleAxiosFailure(error)
+        }
+        return Promise.reject(error)
       }
 
+      if (validateResponse && (isStandardApiResponse(responseData) || isStandardErrorResponse(responseData))) {
+        const config = error.config as InternalAxiosRequestConfig | undefined
+        const requestUrl = config ? getRequestUrl(config) : ''
+        const method = config?.method?.toUpperCase()
+        handleApiPayloadFailure(responseData, error.response?.status, requestUrl, method, error.response?.headers)
+        return Promise.reject(buildApiError(responseData, error.response?.status))
+      }
+
+      handleAxiosFailure(error)
       return Promise.reject(error)
     }
   )
 
   return client
-}
-
-export async function fetchWithAuthRetry(
-  input: RequestInfo | URL,
-  init: RequestInit = {}
-): Promise<Response> {
-  const requestUrl = getFetchUrl(input)
-  const requestInit: RequestInit = {
-    ...init,
-    credentials: init.credentials ?? 'include'
-  }
-  const headers = new Headers(requestInit.headers ?? {})
-  const csrfToken = getCookieValue(CSRF_COOKIE_NAME)
-  if (csrfToken && !headers.has(CSRF_HEADER_NAME)) {
-    headers.set(CSRF_HEADER_NAME, csrfToken)
-  }
-  requestInit.headers = headers
-  const firstResponse = await fetch(input, requestInit)
-
-  if (!shouldSkipAuthHandlingForUrl(requestUrl)) {
-    try {
-      const responseData = await firstResponse.clone().json()
-      if (handleSetupApiResponse(responseData)) {
-        return firstResponse
-      }
-    } catch {
-      // ignore non-json response body
-    }
-  }
-
-  if (firstResponse.status !== 401 || shouldSkipAuthHandlingForUrl(requestUrl)) {
-    return firstResponse
-  }
-
-  try {
-    await refreshAccessToken()
-  } catch (error) {
-    if (!handleSetupError(error)) {
-      unauthorizedHandler?.()
-    }
-    return firstResponse
-  }
-
-  const retryInput = input instanceof Request ? input.clone() : input
-  const retryResponse = await fetch(retryInput, requestInit)
-
-  if (!shouldSkipAuthHandlingForUrl(requestUrl)) {
-    try {
-      const responseData = await retryResponse.clone().json()
-      handleSetupApiResponse(responseData)
-    } catch {
-      // ignore non-json response body
-    }
-  }
-
-  return retryResponse
 }

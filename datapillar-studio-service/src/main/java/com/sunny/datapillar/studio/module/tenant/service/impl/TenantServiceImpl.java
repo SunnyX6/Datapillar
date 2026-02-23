@@ -1,15 +1,11 @@
 package com.sunny.datapillar.studio.module.tenant.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.sunny.datapillar.common.crypto.RsaKeyPairGenerator;
-import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
 import com.sunny.datapillar.studio.module.tenant.dto.TenantDto;
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantMapper;
 import com.sunny.datapillar.studio.module.tenant.service.TenantService;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoGenericClient;
-import java.nio.charset.StandardCharsets;
-import java.security.KeyPair;
+import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
@@ -19,6 +15,7 @@ import com.sunny.datapillar.common.exception.BadRequestException;
 import com.sunny.datapillar.common.exception.NotFoundException;
 import com.sunny.datapillar.common.exception.AlreadyExistsException;
 import com.sunny.datapillar.common.exception.InternalException;
+import org.springframework.util.StringUtils;
 
 /**
  * 租户服务实现
@@ -31,10 +28,10 @@ import com.sunny.datapillar.common.exception.InternalException;
 @RequiredArgsConstructor
 public class TenantServiceImpl implements TenantService {
 
-    private static final int STATUS_ENABLED = 1;
+    private static final int STATUS_ACTIVE = 1;
 
     private final TenantMapper tenantMapper;
-    private final AuthCryptoGenericClient authCryptoClient;
+    private final AuthCryptoRpcClient authCryptoClient;
 
     @Override
     public List<Tenant> listTenants(Integer status) {
@@ -47,7 +44,6 @@ public class TenantServiceImpl implements TenantService {
     }
 
     @Override
-    @Transactional
     public Long createTenant(TenantDto.Create dto) {
         if (dto == null) {
             throw new BadRequestException("参数错误");
@@ -56,25 +52,21 @@ public class TenantServiceImpl implements TenantService {
             throw new AlreadyExistsException("资源已存在", dto.getCode());
         }
 
-        KeyPair keyPair = RsaKeyPairGenerator.generateRsaKeyPair();
-        String publicKeyPem = RsaKeyPairGenerator.toPublicKeyPem(keyPair.getPublic());
-        byte[] privateKeyPem = RsaKeyPairGenerator.toPrivateKeyPem(keyPair.getPrivate());
+        AuthCryptoRpcClient.TenantKeySnapshot keySnapshot = authCryptoClient.ensureTenantKey(dto.getCode());
+        if (keySnapshot == null || !StringUtils.hasText(keySnapshot.publicKeyPem())) {
+            throw new InternalException("服务器内部错误");
+        }
 
         Tenant tenant = new Tenant();
         tenant.setCode(dto.getCode());
         tenant.setName(dto.getName());
         tenant.setType(dto.getType());
-        tenant.setEncryptPublicKey(publicKeyPem);
-        tenant.setStatus(STATUS_ENABLED);
-
-        tenantMapper.insert(tenant);
-
-        try {
-            authCryptoClient.savePrivateKey(tenant.getId(), new String(privateKeyPem, StandardCharsets.US_ASCII));
-        } catch (RuntimeException ex) {
-            throw new InternalException(ex, "服务器内部错误");
+        tenant.setEncryptPublicKey(keySnapshot.publicKeyPem());
+        tenant.setStatus(STATUS_ACTIVE);
+        int inserted = tenantMapper.insert(tenant);
+        if (inserted == 0 || tenant.getId() == null) {
+            throw new InternalException("服务器内部错误");
         }
-
         return tenant.getId();
     }
 
@@ -120,5 +112,4 @@ public class TenantServiceImpl implements TenantService {
         tenant.setStatus(status);
         tenantMapper.updateById(tenant);
     }
-
 }

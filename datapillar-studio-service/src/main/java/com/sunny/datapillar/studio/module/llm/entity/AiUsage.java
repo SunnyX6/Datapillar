@@ -31,23 +31,26 @@ public class AiUsage {
     @TableField("model_id")
     private Long modelId;
 
-    @TableField("status")
-    private Integer status;
+    @TableField("call_count")
+    private Long callCount;
 
-    @TableField("is_default")
-    private Boolean isDefault;
+    @TableField("prompt_tokens")
+    private Long promptTokens;
+
+    @TableField("completion_tokens")
+    private Long completionTokens;
+
+    @TableField("total_tokens")
+    private Long totalTokens;
 
     @TableField("total_cost_usd")
     private BigDecimal totalCostUsd;
 
-    @TableField("granted_by")
-    private Long grantedBy;
-
-    @TableField("granted_at")
-    private LocalDateTime grantedAt;
-
     @TableField("last_used_at")
     private LocalDateTime lastUsedAt;
+
+    @TableField("created_at")
+    private LocalDateTime createdAt;
 
     @TableField("updated_at")
     private LocalDateTime updatedAt;

@@ -18,19 +18,20 @@ from functools import lru_cache
 
 from datapillar_oneagentic.messages import Message, Messages
 from datapillar_oneagentic.providers.llm import LLMProvider
+
 from src.infrastructure.llm.config import get_datapillar_config
 from src.infrastructure.repository.knowledge import (
     Neo4jMetricSearch,
     Neo4jSemanticSearch,
     Neo4jTableSearch,
 )
-from src.shared.config.runtime import get_default_tenant_id
 from src.modules.governance.metric.schemas import (
     AIFillOutput,
     AIFillRequest,
     AIFillResponse,
     MetricType,
 )
+from src.shared.config.runtime import get_default_tenant_id
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +136,13 @@ COMPOSITE_FILL_PROMPT = """你专门为用户生成复合指标。
 class MetricAIService:
     """指标 AI 治理服务"""
 
-    async def fill(self, request: AIFillRequest, *, tenant_id: int | None = None) -> AIFillResponse:
+    async def fill(
+        self,
+        request: AIFillRequest,
+        *,
+        tenant_id: int | None = None,
+        user_id: int | None = None,
+    ) -> AIFillResponse:
         """
         AI 填写表单
 
@@ -150,18 +157,30 @@ class MetricAIService:
 
         # 1. 按需检索语义资产（基于用户输入的语义）
         semantic_assets = self._search_semantic_assets(
-            request.user_input, tenant_id=resolved_tenant_id
+            request.user_input,
+            tenant_id=resolved_tenant_id,
+            user_id=user_id,
         )
 
         # 2. 获取表上下文
-        table_context = self._get_table_context(request)
+        table_context = self._get_table_context(
+            request,
+            tenant_id=resolved_tenant_id,
+            user_id=user_id,
+        )
 
         # 3. 获取指标上下文（派生/复合指标用）
-        metric_context = self._get_metric_context(request)
+        metric_context = self._get_metric_context(
+            request,
+            tenant_id=resolved_tenant_id,
+            user_id=user_id,
+        )
 
         # 4. 获取推荐结果（用于 success=false 时返回）
         _, recommendations_list = self._get_recommendations(
-            request, tenant_id=resolved_tenant_id
+            request,
+            tenant_id=resolved_tenant_id,
+            user_id=user_id,
         )
 
         # 5. 构建 prompt
@@ -195,7 +214,13 @@ class MetricAIService:
         recs = recommendations_list if not output.success else []
         return AIFillResponse.from_output(output, recs)
 
-    def _get_table_context(self, request: AIFillRequest) -> str:
+    def _get_table_context(
+        self,
+        request: AIFillRequest,
+        *,
+        tenant_id: int | None = None,
+        user_id: int | None = None,
+    ) -> str:
         """获取表上下文"""
         ctx = request.context
         catalog, schema, table = None, None, None
@@ -211,7 +236,13 @@ class MetricAIService:
                 catalog, schema, table = payload.ref_catalog, payload.ref_schema, payload.ref_table
 
         if catalog and schema and table:
-            result = Neo4jTableSearch.get_table_detail(catalog, schema, table)
+            result = Neo4jTableSearch.get_table_detail(
+                catalog,
+                schema,
+                table,
+                tenant_id=tenant_id,
+                user_id=user_id,
+            )
             if result:
                 logger.info(f"[context] 获取表 {table}, {len(result.get('columns') or [])} 列")
                 return json.dumps(
@@ -226,7 +257,13 @@ class MetricAIService:
 
         return "无表信息"
 
-    def _get_metric_context(self, request: AIFillRequest) -> str:
+    def _get_metric_context(
+        self,
+        request: AIFillRequest,
+        *,
+        tenant_id: int | None = None,
+        user_id: int | None = None,
+    ) -> str:
         """获取指标上下文（派生/复合指标用）"""
         ctx = request.context
         codes: list[str] = []
@@ -244,7 +281,11 @@ class MetricAIService:
         if not codes:
             return "无指标信息"
 
-        metrics = Neo4jMetricSearch.get_metric_context(codes)
+        metrics = Neo4jMetricSearch.get_metric_context(
+            codes,
+            tenant_id=tenant_id,
+            user_id=user_id,
+        )
         if not metrics:
             logger.warning(f"[context] 未找到指标: {codes}")
             return "无指标信息"
@@ -269,15 +310,31 @@ class MetricAIService:
         return json.dumps(result, ensure_ascii=False, indent=2)
 
     def _get_recommendations(
-        self, request: AIFillRequest, *, tenant_id: int | None = None
+        self,
+        request: AIFillRequest,
+        *,
+        tenant_id: int | None = None,
+        user_id: int | None = None,
     ) -> tuple[str, list]:
         """获取推荐结果，返回 (格式化字符串, 原始列表)"""
         if request.context.metric_type == MetricType.ATOMIC:
-            return self._recommend_tables(request.user_input, tenant_id=tenant_id)
+            return self._recommend_tables(
+                request.user_input,
+                tenant_id=tenant_id,
+                user_id=user_id,
+            )
         elif request.context.metric_type == MetricType.DERIVED:
             # 派生指标：推荐指标 + 表/列，统一按 score 排序
-            _, metrics_list = self._recommend_metrics(request.user_input, tenant_id=tenant_id)
-            _, tables_list = self._recommend_tables(request.user_input, tenant_id=tenant_id)
+            _, metrics_list = self._recommend_metrics(
+                request.user_input,
+                tenant_id=tenant_id,
+                user_id=user_id,
+            )
+            _, tables_list = self._recommend_tables(
+                request.user_input,
+                tenant_id=tenant_id,
+                user_id=user_id,
+            )
             combined = metrics_list + tables_list
             # 统一按 score 降序排列
             combined.sort(key=lambda x: x.get("score", 0), reverse=True)
@@ -286,14 +343,26 @@ class MetricAIService:
                 combined,
             )
         else:
-            return self._recommend_metrics(request.user_input, tenant_id=tenant_id)
+            return self._recommend_metrics(
+                request.user_input,
+                tenant_id=tenant_id,
+                user_id=user_id,
+            )
 
     def _recommend_tables(
-        self, user_input: str, *, tenant_id: int | None = None
+        self,
+        user_input: str,
+        *,
+        tenant_id: int | None = None,
+        user_id: int | None = None,
     ) -> tuple[str, list]:
         """推荐表和列，返回 (格式化字符串, 原始列表)"""
         start = time.time()
-        raw_results = Neo4jTableSearch.search_tables(query=user_input, tenant_id=tenant_id)
+        raw_results = Neo4jTableSearch.search_tables(
+            query=user_input,
+            tenant_id=tenant_id,
+            user_id=user_id,
+        )
 
         if not raw_results:
             logger.info(f"[recommend] 推荐表/列无结果, 耗时 {time.time() - start:.3f}s")
@@ -393,11 +462,19 @@ class MetricAIService:
         )
 
     def _recommend_metrics(
-        self, user_input: str, *, tenant_id: int | None = None
+        self,
+        user_input: str,
+        *,
+        tenant_id: int | None = None,
+        user_id: int | None = None,
     ) -> tuple[str, list]:
         """推荐指标，返回 (格式化字符串, 原始列表)"""
         start = time.time()
-        raw_results = Neo4jMetricSearch.search_metrics(query=user_input, tenant_id=tenant_id)
+        raw_results = Neo4jMetricSearch.search_metrics(
+            query=user_input,
+            tenant_id=tenant_id,
+            user_id=user_id,
+        )
 
         if not raw_results:
             logger.info(f"[recommend] 推荐指标无结果, 耗时 {time.time() - start:.3f}s")
@@ -456,13 +533,18 @@ class MetricAIService:
             )
 
     def _search_semantic_assets(
-        self, user_input: str, *, tenant_id: int | None = None
+        self,
+        user_input: str,
+        *,
+        tenant_id: int | None = None,
+        user_id: int | None = None,
     ) -> str:
         """按需检索语义资产（混合检索：向量+全文）"""
         assets = Neo4jSemanticSearch.search_semantic_assets(
             query=user_input,
             top_k=15,
             tenant_id=tenant_id,
+            user_id=user_id,
         )
         return self._format_semantic_assets(assets)
 

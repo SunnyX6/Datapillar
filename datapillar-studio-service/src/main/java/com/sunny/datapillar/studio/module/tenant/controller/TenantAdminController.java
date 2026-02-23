@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
  * @author Sunny
  * @date 2026-01-01
  */
-@Tag(name = "租户管理", description = "租户管理接口")
+@Tag(name = "租户", description = "租户接口")
 @RestController
 @RequestMapping("/admin")
 @RequiredArgsConstructor

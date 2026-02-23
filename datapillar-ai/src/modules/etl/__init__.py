@@ -30,4 +30,6 @@ from src.modules.etl import agents as _agents  # noqa: F401
 # 导出 router 供路由自动注册
 from src.modules.etl.api import router
 
-__all__ = ["router"]
+MODULE_SCOPE = "biz"
+
+__all__ = ["router", "MODULE_SCOPE"]

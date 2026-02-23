@@ -92,3 +92,126 @@
 - `useResponsive/useBreakpoint` 不再硬编码断点。
 - 1920/2560 视口下页面行为与现状一致。
 - `npm run lint` 通过。
+
+---
+
+## 11. 前端请求统一改造方案（v1.0）
+
+### 11.1 现状诊断（请求层）
+- 请求栈分裂：`axios` 主客户端、`fetchWithAuthRetry`、`gravitino` 独立客户端三套逻辑并存，入口不统一。
+- 错误处理重复且信息丢失：多处手写 `extractErrorMessage + throw new Error(...)`，将结构化错误打平成字符串。
+- 返回语义不一致：有的接口抛异常，有的接口吞错并返回业务对象（如 `success: false`），调用方心智负担高。
+- 协议处理不一致：有的接口走标准 `ApiResponse`，有的接口 `validateResponse: false` 走裸响应。
+- 特殊通道各写各的：上传、SSE、健康检查在不同模块自行维护，缺少统一规范。
+- 现有可复用模式未推广：`studioCommon` 已经定义了分页与参数规范，但只在部分服务使用。
+
+### 11.2 改造目标
+- 单一请求入口：业务层仅调用统一 Request SDK，不直接接触 `axios/fetch`。
+- 单一错误模型：所有失败统一归一为结构化错误（`status/code/message/requestId/traceId/retryable`）。
+- 单一返回契约：明确“抛异常模式”与“Result 模式”的使用边界，禁止混用。
+- 单一特殊通道规范：Upload/SSE/Health 走统一扩展适配，不再散落实现。
+
+### 11.3 最终目录结构（强制）
+
+```text
+src/
+  lib/
+    api/
+      client.ts
+      request.ts
+      endpoints.ts
+      index.ts
+
+  services/
+    authService.ts
+    setupService.ts
+    healthService.ts
+    studioCommon.ts
+    studioProjectService.ts
+    studioWorkflowService.ts
+    studioTenantAdminService.ts
+    studioLlmService.ts
+    sqlService.ts
+    knowledgeWikiService.ts
+    knowledgeGraphService.ts
+    aiWorkflowService.ts
+    oneMetaService.ts
+    oneMetaSemanticService.ts
+    metricAIService.ts
+
+  types/
+    api.ts
+    auth.ts
+    setup.ts
+    studio/
+      project.ts
+      workflow.ts
+      tenant.ts
+      llm.ts
+    ai/
+      knowledge.ts
+      workflow.ts
+      metric.ts
+    onemeta/
+      metadata.ts
+      semantic.ts
+```
+
+### 11.4 文件命名规范（强制）
+- `src/lib/api` 仅允许通用短名文件：`client.ts`、`request.ts`、`endpoints.ts`、`index.ts`。
+- `src/services` 统一 `*Service.ts` 命名；通用工具保留 `studioCommon.ts` 这类 `*Common.ts`。
+- `src/types/api.ts` 仅放传输层通用契约；业务 DTO 必须放 `src/types/<domain>`。
+- 禁止新增 `contracts` 目录，避免无意义中间层。
+
+### 11.5 各目录职责
+
+#### `src/lib/api`
+- `client.ts`：HTTP 基座（axios 实例、拦截器、CSRF、401 刷新、错误中心接入）。
+- `request.ts`：统一请求入口（JSON/RAW/UPLOAD/SSE 的调用收口）。
+- `endpoints.ts`：统一管理 API 基础路径与资源路径（含动态路径构造函数），禁止散落硬编码 URL。
+- `index.ts`：统一导出 API 基础能力。
+
+#### `src/services`
+- 仅做业务语义封装：参数组装、响应映射、领域函数命名。
+- `authService.ts`、`setupService.ts` 作为认证与初始化领域 API 的唯一入口。
+- 不直接创建 axios 实例，不直接调用裸 `fetch`，不做全局错误分流决策。
+
+#### `src/types`
+- `api.ts`：通用协议与错误契约（`ApiResponse`、`ErrorResponse`、`ApiError`、类型守卫）。
+- `auth.ts/setup.ts`：认证与初始化相关 DTO。
+- `studio/project.ts`：项目域 DTO，包含项目列表分页参数与分页结果契约（`limit/offset/maxLimit`）。
+- `studio/workflow.ts`：工作流域 DTO，包含工作流列表、运行列表、DAG 版本列表的分页参数与结果契约。
+- `studio/*`、`ai/*`、`onemeta/*`：按前端领域拆分后端 DTO，禁止混在一个大文件。
+
+### 11.6 分层依赖约束（强制）
+- 依赖方向：`pages/layouts/stores -> services -> lib/api -> error-center`。
+- 禁止反向依赖：`lib/api` 不得依赖 `services/pages/layouts`。
+- 禁止跨层直连：页面与 store 不得直接 `axios/fetch` 调后端。
+
+### 11.7 代码结构治理红线
+- `src/services` 禁止 `axios.create`。
+- `src/services` 禁止直接裸 `fetch(`（SSE 白名单由 `request.ts` 统一出口处理）。
+- 禁止服务层继续使用 `throw new Error(extractErrorMessage(...))` 这类字符串打平逻辑。
+- 禁止将所有后端契约塞入单个 `types/api.ts`。
+
+### 11.8 实施阶段
+
+#### 阶段 1：基座收敛
+- 固化 `client.ts/request.ts/endpoints.ts` 四件套。
+- 将路径常量迁移到 `endpoints.ts`，清理散落硬编码。
+
+#### 阶段 2：类型收敛
+- `types/api.ts` 只保留通用协议。
+- 将领域 DTO 拆分到 `types/auth.ts`、`types/setup.ts`、`types/studio/*`、`types/ai/*`、`types/onemeta/*`。
+
+#### 阶段 3：服务层迁移
+- 按 `services/*Service.ts` 逐个迁移到统一请求入口。
+- 移除重复错误提取与重复 `requireApiData`。
+
+#### 阶段 4：特殊通道统一
+- Upload、SSE、Health 检查统一从 `request.ts` 暴露调用，不允许各页面私自实现。
+
+#### 阶段 5：验收
+- 请求入口统一到 `lib/api/request.ts`。
+- 契约类型完成领域拆分，`types/api.ts` 不再膨胀。
+- 同类错误在不同页面行为一致，可追踪 `requestId/traceId`。

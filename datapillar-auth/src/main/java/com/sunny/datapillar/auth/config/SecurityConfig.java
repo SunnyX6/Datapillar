@@ -26,7 +26,7 @@ import com.sunny.datapillar.common.utils.JwtUtil;
 
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties({AuthSecurityProperties.class, AuthProxyProperties.class})
+@EnableConfigurationProperties(AuthSecurityProperties.class)
 public class SecurityConfig {
 
     private final TraceIdFilter traceIdFilter;
@@ -75,7 +75,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/v3/api-docs/**").permitAll()
                         // 所有认证相关接口都允许访问
-                        .requestMatchers("/auth/**", "/login/**", "/proxy/**").permitAll()
+                        .requestMatchers("/auth/**", "/login/**").permitAll()
                         // 其他请求拒绝访问
                         .anyRequest().denyAll()
                 )

@@ -1,128 +1,72 @@
-import { createApiClient } from '@/lib/api/client'
-import type { ApiResponse } from '@/types/api'
-import { pickDefinedParams, requireApiData } from './studioCommon'
+import { API_BASE, API_PATH, requestData } from '@/lib/api'
+import { pickDefinedParams } from './studioCommon'
+import type {
+  ListTenantSsoIdentitiesParams,
+  StudioTenant,
+  StudioTenantFeatureAudit,
+  StudioTenantInvitation,
+  StudioTenantSsoIdentity,
+  StudioTenantUser
+} from '@/types/studio/tenant'
 
-const studioAdminClient = createApiClient({
-  baseURL: '/api/studio/admin',
-  timeout: 30000
-})
-
-export interface StudioTenant {
-  id: number
-  code: string
-  name: string
-  type: string
-  status: number
-  createdAt: string
-  updatedAt: string
-}
-
-export interface StudioTenantUser {
-  id: number
-  tenantId: number
-  username: string
-  nickname?: string | null
-  email?: string | null
-  phone?: string | null
-  status: number
-  createdAt: string
-  updatedAt: string
-}
-
-export interface StudioTenantInvitation {
-  id: number
-  tenantId: number
-  inviteeEmail?: string | null
-  inviteeMobile?: string | null
-  status: number
-  inviteCode: string
-  expiresAt: string
-  createdAt: string
-}
-
-export interface StudioTenantFeatureAudit {
-  id: number
-  tenantId: number
-  objectId: number
-  action: string
-  beforeStatus?: number | null
-  afterStatus?: number | null
-  beforePermissionId?: number | null
-  afterPermissionId?: number | null
-  operatorUserId?: number | null
-  operatorTenantId?: number | null
-  requestId?: string | null
-  createdAt: string
-}
-
-export interface StudioTenantSsoIdentity {
-  id: number
-  userId: number
-  provider: string
-  externalUserId: string
-  createdAt: string
-  updatedAt: string
-}
+export type {
+  ListTenantSsoIdentitiesParams,
+  StudioTenant,
+  StudioTenantFeatureAudit,
+  StudioTenantInvitation,
+  StudioTenantSsoIdentity,
+  StudioTenantUser
+} from '@/types/studio/tenant'
 
 export async function listTenants(status?: number): Promise<StudioTenant[]> {
-  const response = await studioAdminClient.get<ApiResponse<StudioTenant[]>>('/tenants', {
+  return requestData<StudioTenant[]>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.tenantAdmin.tenants,
     params: pickDefinedParams({ status })
   })
-  return requireApiData(response.data)
 }
 
 export async function listTenantUsers(
-  tenantId: number,
+  _tenantId: number,
   status?: number
 ): Promise<StudioTenantUser[]> {
-  const response = await studioAdminClient.get<ApiResponse<StudioTenantUser[]>>(
-    `/tenants/${tenantId}/users`,
-    {
-      params: pickDefinedParams({ status })
-    }
-  )
-  return requireApiData(response.data)
+  return requestData<StudioTenantUser[]>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.tenantAdmin.users,
+    params: pickDefinedParams({ status })
+  })
 }
 
 export async function listTenantInvitations(
-  tenantId: number,
+  _tenantId: number,
   status?: number
 ): Promise<StudioTenantInvitation[]> {
-  const response = await studioAdminClient.get<ApiResponse<StudioTenantInvitation[]>>(
-    `/tenants/${tenantId}/invitations`,
-    {
-      params: pickDefinedParams({ status })
-    }
-  )
-  return requireApiData(response.data)
+  return requestData<StudioTenantInvitation[]>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.tenantAdmin.invitations,
+    params: pickDefinedParams({ status })
+  })
 }
 
 export async function listTenantFeatureAudits(
-  tenantId: number
+  _tenantId: number
 ): Promise<StudioTenantFeatureAudit[]> {
-  const response = await studioAdminClient.get<ApiResponse<StudioTenantFeatureAudit[]>>(
-    `/tenants/${tenantId}/features/audits`
-  )
-  return requireApiData(response.data)
-}
-
-export interface ListTenantSsoIdentitiesParams {
-  provider?: string
-  userId?: number
+  return requestData<StudioTenantFeatureAudit[]>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.tenantAdmin.featureAudits
+  })
 }
 
 export async function listTenantSsoIdentities(
-  tenantId: number,
+  _tenantId: number,
   params: ListTenantSsoIdentitiesParams = {}
 ): Promise<StudioTenantSsoIdentity[]> {
-  const response = await studioAdminClient.get<ApiResponse<StudioTenantSsoIdentity[]>>(
-    `/tenants/${tenantId}/sso/identities`,
-    {
-      params: pickDefinedParams({
-        provider: params.provider,
-        userId: params.userId
-      })
-    }
-  )
-  return requireApiData(response.data)
+  return requestData<StudioTenantSsoIdentity[]>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.tenantAdmin.ssoIdentities,
+    params: pickDefinedParams({
+      provider: params.provider,
+      userId: params.userId
+    })
+  })
 }

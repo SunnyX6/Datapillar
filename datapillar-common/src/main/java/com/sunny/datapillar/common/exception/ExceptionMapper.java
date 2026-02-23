@@ -1,10 +1,13 @@
 package com.sunny.datapillar.common.exception;
 
-import com.sunny.datapillar.common.constant.ErrorConstants;
+import com.sunny.datapillar.common.constant.Code;
+import com.sunny.datapillar.common.constant.ErrorType;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import org.slf4j.MDC;
 
 /**
  * 异常Mapper
@@ -25,39 +28,71 @@ public final class ExceptionMapper {
         String message = resolveMessage(target);
         String type = target.getClass().getSimpleName();
         List<String> stack = getStackTrace(target);
+        String traceId = resolveTraceId();
 
-        if (target instanceof BadRequestException || target instanceof IllegalArgumentException) {
-            return new ExceptionDetail(400, ErrorConstants.ILLEGAL_ARGUMENTS_CODE, type, message, stack, false);
+        if (target instanceof DatapillarRuntimeException runtimeException) {
+            return new ExceptionDetail(
+                    runtimeException.getCode(),
+                    runtimeException.getCode(),
+                    runtimeException.getType(),
+                    message,
+                    stack,
+                    runtimeException.getContext(),
+                    traceId,
+                    runtimeException.isRetryable(),
+                    resolveServerError(runtimeException));
         }
-        if (target instanceof UnauthorizedException) {
-            return new ExceptionDetail(401, ErrorConstants.UNAUTHORIZED_CODE, type, message, stack, false);
-        }
-        if (target instanceof ForbiddenException) {
-            return new ExceptionDetail(403, ErrorConstants.FORBIDDEN_CODE, type, message, stack, false);
-        }
-        if (target instanceof NotFoundException) {
-            return new ExceptionDetail(404, ErrorConstants.NOT_FOUND_CODE, type, message, stack, false);
-        }
-        if (target instanceof AlreadyExistsException) {
-            return new ExceptionDetail(409, ErrorConstants.ALREADY_EXISTS_CODE, type, message, stack, false);
-        }
-        if (target instanceof ConflictException) {
-            return new ExceptionDetail(409, ErrorConstants.CONFLICT_CODE, type, message, stack, false);
-        }
-        if (target instanceof TooManyRequestsException) {
-            return new ExceptionDetail(429, ErrorConstants.TOO_MANY_REQUESTS_CODE, type, message, stack, false);
+        if (target instanceof IllegalArgumentException) {
+            return buildDetail(
+                    Code.BAD_REQUEST,
+                    ErrorType.BAD_REQUEST,
+                    message,
+                    stack,
+                    Map.of(),
+                    traceId,
+                    false,
+                    false);
         }
         if (target instanceof UnsupportedOperationException) {
-            return new ExceptionDetail(405, ErrorConstants.UNSUPPORTED_OPERATION_CODE, type, message, stack, false);
+            return buildDetail(
+                    Code.METHOD_NOT_ALLOWED,
+                    ErrorType.METHOD_NOT_ALLOWED,
+                    message,
+                    stack,
+                    Map.of(),
+                    traceId,
+                    false,
+                    false);
         }
-        if (target instanceof ConnectionFailedException) {
-            return new ExceptionDetail(502, ErrorConstants.CONNECTION_FAILED_CODE, type, message, stack, true);
-        }
-        if (target instanceof ServiceUnavailableException) {
-            return new ExceptionDetail(503, ErrorConstants.SERVICE_UNAVAILABLE_CODE, type, message, stack, true);
-        }
+        return buildDetail(
+                Code.INTERNAL_ERROR,
+                ErrorType.INTERNAL_ERROR,
+                message,
+                stack,
+                Map.of(),
+                traceId,
+                false,
+                true);
+    }
 
-        return new ExceptionDetail(500, ErrorConstants.INTERNAL_ERROR_CODE, type, message, stack, true);
+    private static ExceptionDetail buildDetail(int code,
+                                               String type,
+                                               String message,
+                                               List<String> stack,
+                                               Map<String, String> context,
+                                               String traceId,
+                                               boolean retryable,
+                                               boolean serverError) {
+        return new ExceptionDetail(
+                code,
+                code,
+                type,
+                message,
+                stack,
+                context == null ? Map.of() : Map.copyOf(context),
+                traceId,
+                retryable,
+                serverError);
     }
 
     private static String resolveMessage(Throwable throwable) {
@@ -72,6 +107,28 @@ public final class ExceptionMapper {
         }
 
         return DEFAULT_INTERNAL_MESSAGE;
+    }
+
+    private static boolean resolveServerError(DatapillarRuntimeException exception) {
+        if (exception == null) {
+            return true;
+        }
+        if (ErrorType.REQUIRED.equals(exception.getType())) {
+            return false;
+        }
+        return exception.getCode() >= Code.INTERNAL_ERROR;
+    }
+
+    private static String resolveTraceId() {
+        String traceId = MDC.get("traceId");
+        if (traceId != null && !traceId.isBlank()) {
+            return traceId;
+        }
+        String fallback = MDC.get("trace_id");
+        if (fallback != null && !fallback.isBlank()) {
+            return fallback;
+        }
+        return null;
     }
 
     private static List<String> getStackTrace(Throwable throwable) {
@@ -93,6 +150,9 @@ public final class ExceptionMapper {
             String type,
             String message,
             List<String> stack,
+            Map<String, String> context,
+            String traceId,
+            boolean retryable,
             boolean serverError) {
     }
 }

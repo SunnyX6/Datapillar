@@ -6,22 +6,39 @@
 API 路由聚合
 
 自动扫描 modules 目录，根据模块配置注册路由
-统一前缀: /api/ai/
+统一前缀: /api/ai/{biz|admin}/（由 app 统一挂载 /api/ai）
 """
 
 import importlib
 import logging
 import pkgutil
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 import src.modules as modules_pkg
+from src.shared.auth.dependencies import require_admin_role
 
 api_router = APIRouter()
 logger = logging.getLogger(__name__)
+_SUPPORTED_SCOPES = {"biz", "admin"}
+_DEFAULT_SCOPE = "biz"
 
 
-def _register_module(module_path: str, parent_prefix: str = "/ai") -> None:
+def _normalize_scope(raw_scope: object, *, module_path: str) -> str:
+    scope = str(raw_scope or _DEFAULT_SCOPE).strip().lower()
+    if scope not in _SUPPORTED_SCOPES:
+        logger.warning("模块 scope 非法，已回退 biz: %s, scope=%s", module_path, raw_scope)
+        return _DEFAULT_SCOPE
+    return scope
+
+
+def _scope_dependencies(scope: str) -> list:
+    if scope == "admin":
+        return [Depends(require_admin_role)]
+    return []
+
+
+def _register_module(module_path: str, *, parent_scope: str | None) -> None:
     """
     递归注册模块路由
 
@@ -47,9 +64,15 @@ def _register_module(module_path: str, parent_prefix: str = "/ai") -> None:
     prefix = getattr(module, "MODULE_PREFIX", f"/{module_name}")
     tags = getattr(module, "MODULE_TAGS", [module_name.replace("_", " ").title()])
 
-    full_prefix = f"{parent_prefix}{prefix}"
+    scope = _normalize_scope(getattr(module, "MODULE_SCOPE", parent_scope), module_path=module_path)
+    full_prefix = f"/{scope}{prefix}"
 
-    api_router.include_router(router, prefix=full_prefix, tags=tags)
+    api_router.include_router(
+        router,
+        prefix=full_prefix,
+        tags=tags,
+        dependencies=_scope_dependencies(scope),
+    )
 
 
 def _scan_modules() -> None:
@@ -69,8 +92,17 @@ def _scan_modules() -> None:
                 pkg = importlib.import_module(module_path)
                 sub_path = pkg.__path__
 
+                parent_scope = _normalize_scope(
+                    getattr(pkg, "MODULE_SCOPE", _DEFAULT_SCOPE),
+                    module_path=module_path,
+                )
+
                 # 先尝试注册父模块本身
-                _register_module(module_path)
+                _register_module(module_path, parent_scope=parent_scope)
+
+                scan_submodules = bool(getattr(pkg, "MODULE_SCAN_SUBMODULES", True))
+                if not scan_submodules:
+                    continue
 
                 # 再扫描子模块
                 for _, submodname, subispkg in pkgutil.iter_modules(sub_path):
@@ -79,7 +111,7 @@ def _scan_modules() -> None:
                     sub_module_path = f"{module_path}.{submodname}"
                     if subispkg:
                         # 子模块是包，使用父模块名作为前缀的一部分
-                        _register_submodule(sub_module_path, modname)
+                        _register_submodule(sub_module_path, modname, parent_scope)
                     else:
                         pass  # 非包的子模块不处理
 
@@ -88,11 +120,11 @@ def _scan_modules() -> None:
                     "模块扫描失败，路由可能不完整: %s, error=%s", module_path, exc, exc_info=True
                 )
         else:
-            _register_module(module_path)
+            _register_module(module_path, parent_scope=_DEFAULT_SCOPE)
 
 
-def _register_submodule(module_path: str, parent_name: str) -> None:
-    """注册子模块，路径为 /ai/{parent}/{submodule}"""
+def _register_submodule(module_path: str, parent_name: str, parent_scope: str) -> None:
+    """注册子模块，路径为 /{scope}/{parent}/{submodule}"""
     try:
         module = importlib.import_module(module_path)
     except Exception as exc:
@@ -107,9 +139,15 @@ def _register_submodule(module_path: str, parent_name: str) -> None:
     prefix = getattr(module, "MODULE_PREFIX", f"/{module_name}")
     tags = getattr(module, "MODULE_TAGS", [f"{parent_name}/{module_name}"])
 
-    full_prefix = f"/ai/{parent_name}{prefix}"
+    scope = _normalize_scope(getattr(module, "MODULE_SCOPE", parent_scope), module_path=module_path)
+    full_prefix = f"/{scope}/{parent_name}{prefix}"
 
-    api_router.include_router(router, prefix=full_prefix, tags=tags)
+    api_router.include_router(
+        router,
+        prefix=full_prefix,
+        tags=tags,
+        dependencies=_scope_dependencies(scope),
+    )
 
 
 # 执行自动扫描注册

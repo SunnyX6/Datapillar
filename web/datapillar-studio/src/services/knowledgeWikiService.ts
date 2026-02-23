@@ -1,106 +1,39 @@
 /**
  * 知识 Wiki API 服务
  *
- * 对接 /api/ai/knowledge/wiki
+ * 对接 /api/ai/biz/knowledge/wiki
  */
 
-import { createApiClient, fetchWithAuthRetry } from '@/lib/api/client'
-import { isApiResponse, isApiSuccess, isErrorResponse, type ApiResponse, type ErrorResponse } from '@/types/api'
+import {
+  API_BASE,
+  API_PATH,
+  requestData,
+  requestEnvelope,
+  requestUploadData
+} from '@/lib/api'
+import type { ApiResponse } from '@/types/api'
+import type {
+  ChunkApi,
+  ChunkConfigPayload,
+  ChunkJobResponse,
+  DocumentApi,
+  NamespaceApi,
+  PageResult,
+  RetrieveResponseApi,
+  UploadResponse
+} from '@/types/ai/knowledge'
 
-export interface PageResult<T> {
-  items: T[]
-  total: number
-  limit: number
-  offset: number
-}
-
-export interface NamespaceApi {
-  namespace_id: number
-  namespace: string
-  description: string | null
-  status: number
-  created_by: number
-  created_at: string
-  updated_at: string
-  doc_count?: number
-}
-
-export interface DocumentApi {
-  document_id: number
-  namespace_id: number
-  doc_uid?: string | null
-  title: string
-  file_type: string
-  size_bytes: number
-  status: string
-  chunk_count: number
-  token_count: number
-  error_message?: string | null
-  chunk_mode?: string | null
-  chunk_config_json?: Record<string, unknown> | null
-  last_chunked_at?: string | null
-  created_by?: number
-  created_at: string
-  updated_at: string
-}
-
-export interface UploadResponse {
-  document_id: number
-  status: string
-}
-
-export interface ChunkApi {
-  chunk_id: string
-  doc_id: string
-  doc_title: string
-  content: string
-  token_count: number
-  updated_at: string
-  embedding_status: string
-}
-
-export interface ChunkJobResponse {
-  job_id: number
-  status: string
-  sse_url?: string | null
-}
-
-export interface RetrieveHitApi {
-  chunk_id: string
-  doc_id: string
-  doc_title: string
-  score: number
-  content: string
-}
-
-export interface RetrieveResponseApi {
-  hits: RetrieveHitApi[]
-  latency_ms: number
-}
-
-export interface ChunkConfigPayload {
-  chunk_mode?: string | null
-  chunk_config_json?: Record<string, unknown> | null
-  reembed?: boolean
-}
-
-const wikiClient = createApiClient({
-  baseURL: '/api/ai/knowledge/wiki',
-  timeout: 30000
-})
-
-function extractErrorMessage(error: unknown): string {
-  if (error && typeof error === 'object' && 'response' in error) {
-    const axiosError = error as { response?: { data?: { message?: string } } }
-    if (axiosError.response?.data?.message) {
-      return axiosError.response.data.message
-    }
-  }
-  if (error instanceof Error) {
-    return error.message
-  }
-  return '未知错误'
-}
+export type {
+  ChunkApi,
+  ChunkConfigPayload,
+  ChunkJobResponse,
+  DocumentApi,
+  NamespaceApi,
+  PageResult,
+  RetrieveHitApi,
+  RetrieveResponseApi,
+  UploadResponse
+} from '@/types/ai/knowledge'
 
 function buildPageResult<T>(payload: ApiResponse<T[]>): PageResult<T> {
   return {
@@ -111,68 +44,53 @@ function buildPageResult<T>(payload: ApiResponse<T[]>): PageResult<T> {
   }
 }
 
-function requireApiData<T>(payload: ApiResponse<T>): T {
-  if (typeof payload.data === 'undefined') {
-    throw new Error('接口响应缺少 data 字段')
-  }
-  return payload.data
-}
-
 export async function listNamespaces(
   limit: number = 50,
   offset: number = 0
 ): Promise<PageResult<NamespaceApi>> {
-  try {
-    const response = await wikiClient.get<ApiResponse<NamespaceApi[]>>('/namespaces', {
-      params: { limit, offset }
-    })
-    return buildPageResult(response.data)
-  } catch (error) {
-    throw new Error(extractErrorMessage(error))
-  }
+  const response = await requestEnvelope<NamespaceApi[]>({
+    baseURL: API_BASE.aiKnowledgeWiki,
+    url: API_PATH.knowledgeWiki.namespaces,
+    params: { limit, offset }
+  })
+  return buildPageResult(response)
 }
 
 export async function createNamespace(payload: {
   namespace: string
   description?: string | null
 }): Promise<number> {
-  try {
-    const response = await wikiClient.post<ApiResponse<{ namespace_id: number }>>('/namespaces', payload)
-    return requireApiData(response.data).namespace_id
-  } catch (error) {
-    throw new Error(extractErrorMessage(error))
-  }
+  const data = await requestData<{ namespace_id: number }, { namespace: string; description?: string | null }>({
+    baseURL: API_BASE.aiKnowledgeWiki,
+    url: API_PATH.knowledgeWiki.namespaces,
+    method: 'POST',
+    data: payload
+  })
+  return data.namespace_id
 }
 
 export async function listDocuments(
   namespaceId: number,
   options: { status?: string; keyword?: string; limit?: number; offset?: number } = {}
 ): Promise<PageResult<DocumentApi>> {
-  try {
-    const response = await wikiClient.get<ApiResponse<DocumentApi[]>>(
-      `/namespaces/${namespaceId}/documents`,
-      {
-        params: {
-          status: options.status,
-          keyword: options.keyword,
-          limit: options.limit ?? 50,
-          offset: options.offset ?? 0
-        }
-      }
-    )
-    return buildPageResult(response.data)
-  } catch (error) {
-    throw new Error(extractErrorMessage(error))
-  }
+  const response = await requestEnvelope<DocumentApi[]>({
+    baseURL: API_BASE.aiKnowledgeWiki,
+    url: API_PATH.knowledgeWiki.namespaceDocuments(namespaceId),
+    params: {
+      status: options.status,
+      keyword: options.keyword,
+      limit: options.limit ?? 50,
+      offset: options.offset ?? 0
+    }
+  })
+  return buildPageResult(response)
 }
 
 export async function getDocument(documentId: number): Promise<DocumentApi> {
-  try {
-    const response = await wikiClient.get<ApiResponse<DocumentApi>>(`/documents/${documentId}`)
-    return requireApiData(response.data)
-  } catch (error) {
-    throw new Error(extractErrorMessage(error))
-  }
+  return requestData<DocumentApi>({
+    baseURL: API_BASE.aiKnowledgeWiki,
+    url: API_PATH.knowledgeWiki.document(documentId)
+  })
 }
 
 export async function uploadDocument(
@@ -186,39 +104,24 @@ export async function uploadDocument(
     formData.append('title', title)
   }
 
-  const response = await fetchWithAuthRetry(`/api/ai/knowledge/wiki/namespaces/${namespaceId}/documents/upload`, {
+  return requestUploadData<UploadResponse>({
+    baseURL: API_BASE.aiKnowledgeWiki,
+    url: API_PATH.knowledgeWiki.namespaceDocumentsUpload(namespaceId),
     method: 'POST',
-    body: formData,
-    credentials: 'include'
+    data: formData
   })
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`)
-  }
-
-  const payload = (await response.json()) as ApiResponse<UploadResponse> | ErrorResponse
-  if (isApiResponse<UploadResponse>(payload) && isApiSuccess(payload)) {
-    return requireApiData(payload)
-  }
-  if (isErrorResponse(payload)) {
-    throw new Error(payload.message || '上传失败')
-  }
-  throw new Error('上传失败')
 }
 
 export async function startChunkJob(
   documentId: number,
   payload: ChunkConfigPayload
 ): Promise<ChunkJobResponse> {
-  try {
-    const response = await wikiClient.post<ApiResponse<ChunkJobResponse>>(
-      `/documents/${documentId}/chunk`,
-      payload
-    )
-    return requireApiData(response.data)
-  } catch (error) {
-    throw new Error(extractErrorMessage(error))
-  }
+  return requestData<ChunkJobResponse, ChunkConfigPayload>({
+    baseURL: API_BASE.aiKnowledgeWiki,
+    url: API_PATH.knowledgeWiki.documentChunk(documentId),
+    method: 'POST',
+    data: payload
+  })
 }
 
 export async function listChunks(
@@ -226,35 +129,30 @@ export async function listChunks(
   limit: number = 200,
   offset: number = 0
 ): Promise<PageResult<ChunkApi>> {
-  try {
-    const response = await wikiClient.get<ApiResponse<ChunkApi[]>>(
-      `/documents/${documentId}/chunks`,
-      {
-        params: { limit, offset }
-      }
-    )
-    return buildPageResult(response.data)
-  } catch (error) {
-    throw new Error(extractErrorMessage(error))
-  }
+  const response = await requestEnvelope<ChunkApi[]>({
+    baseURL: API_BASE.aiKnowledgeWiki,
+    url: API_PATH.knowledgeWiki.documentChunks(documentId),
+    params: { limit, offset }
+  })
+  return buildPageResult(response)
 }
 
 export async function updateChunk(chunkId: string, content: string): Promise<ChunkJobResponse> {
-  try {
-    const response = await wikiClient.patch<ApiResponse<ChunkJobResponse>>(`/chunks/${chunkId}`, { content })
-    return requireApiData(response.data)
-  } catch (error) {
-    throw new Error(extractErrorMessage(error))
-  }
+  return requestData<ChunkJobResponse, { content: string }>({
+    baseURL: API_BASE.aiKnowledgeWiki,
+    url: API_PATH.knowledgeWiki.chunk(chunkId),
+    method: 'PATCH',
+    data: { content }
+  })
 }
 
 export async function deleteChunk(chunkId: string): Promise<number> {
-  try {
-    const response = await wikiClient.delete<ApiResponse<{ deleted: number }>>(`/chunks/${chunkId}`)
-    return requireApiData(response.data).deleted
-  } catch (error) {
-    throw new Error(extractErrorMessage(error))
-  }
+  const data = await requestData<{ deleted: number }>({
+    baseURL: API_BASE.aiKnowledgeWiki,
+    url: API_PATH.knowledgeWiki.chunk(chunkId),
+    method: 'DELETE'
+  })
+  return data.deleted
 }
 
 export async function retrieve(payload: {
@@ -268,10 +166,20 @@ export async function retrieve(payload: {
   top_k?: number
   score_threshold?: number | null
 }): Promise<RetrieveResponseApi> {
-  try {
-    const response = await wikiClient.post<ApiResponse<RetrieveResponseApi>>('/retrieve', payload)
-    return requireApiData(response.data)
-  } catch (error) {
-    throw new Error(extractErrorMessage(error))
-  }
+  return requestData<RetrieveResponseApi, {
+    namespace_id: number
+    query: string
+    search_scope?: string
+    document_ids?: Array<string | number>
+    retrieval_mode?: string
+    rerank_enabled?: boolean
+    rerank_model?: string | null
+    top_k?: number
+    score_threshold?: number | null
+  }>({
+    baseURL: API_BASE.aiKnowledgeWiki,
+    url: API_PATH.knowledgeWiki.retrieve,
+    method: 'POST',
+    data: payload
+  })
 }

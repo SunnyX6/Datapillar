@@ -18,5 +18,5 @@ public interface WorkflowDependencyBizService {
 
     Long createDependency(Long workflowId, JobDependencyDto.Create dto);
 
-    void deleteDependency(Long jobId, Long parentJobId);
+    void deleteDependency(Long workflowId, Long jobId, Long parentJobId);
 }

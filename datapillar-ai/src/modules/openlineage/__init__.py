@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
@@ -17,13 +16,13 @@ OpenLineage Sink 模块
 - 监控统计
 
 API 端点：
-- POST /api/ai/openlineage - 接收事件
-- GET /api/ai/openlineage/stats - 统计信息
+- POST /api/ai/admin/openlineage - 接收事件
+- GET /api/ai/admin/openlineage/stats - 统计信息
 
 配置示例（Gravitino openlineage.conf）：
 ```
 gravitino.openlineage.transport.url = http://datapillar-ai:7003
-gravitino.openlineage.transport.endpoint = /api/ai/openlineage
+gravitino.openlineage.transport.endpoint = /api/ai/admin/openlineage
 ```
 """
 
@@ -43,8 +42,11 @@ from src.modules.openlineage.schemas.events import (
     RunEvent,
 )
 
+MODULE_SCOPE = "admin"
+
 __all__ = [
     "router",
+    "MODULE_SCOPE",
     "EventProcessor",
     "get_event_processor",
     "EmbeddingProcessor",

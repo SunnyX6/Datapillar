@@ -1,6 +1,5 @@
 package com.sunny.datapillar.studio.filter;
 
-import com.sunny.datapillar.common.constant.HeaderConstants;
 import com.sunny.datapillar.common.exception.UnauthorizedException;
 import com.sunny.datapillar.studio.handler.SecurityExceptionHandler;
 import com.sunny.datapillar.studio.security.GatewayAssertionContext;
@@ -94,13 +93,6 @@ public class GatewayAssertionFilter extends OncePerRequestFilter {
             }
 
             GatewayAssertionContext.attach(request, context);
-            request.setAttribute(HeaderConstants.HEADER_USER_ID, context.userId());
-            request.setAttribute(HeaderConstants.HEADER_TENANT_ID, context.tenantId());
-            request.setAttribute(HeaderConstants.HEADER_USERNAME, context.username());
-            request.setAttribute(HeaderConstants.HEADER_EMAIL, context.email());
-            request.setAttribute(HeaderConstants.HEADER_IMPERSONATION, context.impersonation());
-            request.setAttribute(HeaderConstants.HEADER_ACTOR_USER_ID, context.actorUserId());
-            request.setAttribute(HeaderConstants.HEADER_ACTOR_TENANT_ID, context.actorTenantId());
 
             List<SimpleGrantedAuthority> authorities = context.roles().stream()
                     .map(role -> role == null ? "" : role.trim())

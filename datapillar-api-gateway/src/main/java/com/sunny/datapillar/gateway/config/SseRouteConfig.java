@@ -4,9 +4,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.config.GatewayProperties;
 import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.cloud.gateway.route.RouteDefinition;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.List;
+import java.util.Optional;
 
 /**
  * SseRoute配置
@@ -20,36 +24,48 @@ import org.springframework.context.annotation.Configuration;
 @RequiredArgsConstructor
 public class SseRouteConfig {
 
+    private static final String AI_SERVICE_ROUTE_ID = "ai-service";
+    private static final String SSE_ROUTE_ID = "ai-sse-etl";
+    private static final String SSE_BIZ_PATH = "/api/ai/biz/etl/workflow/sse";
+
     private final GatewayProperties gatewayProperties;
 
     /**
-     * 从 YAML 配置中获取 ai-service 路由的 URI
+     * 从路由配置中解析 SSE 目标路由。
      */
-    private String getAiServiceUri() {
-        var routes = gatewayProperties.getRoutes();
+    private Optional<String> resolveSseTargetUri() {
+        List<RouteDefinition> routes = gatewayProperties.getRoutes();
+        if (routes == null || routes.isEmpty()) {
+            return Optional.empty();
+        }
 
         return routes.stream()
-            .filter(route -> "ai-service".equals(route.getId()))
-            .findFirst()
-            .map(route -> route.getUri().toString())
-            .orElseThrow(() -> new IllegalStateException("未找到 ai-service 路由配置"));
+                .filter(route -> AI_SERVICE_ROUTE_ID.equals(route.getId()))
+                .map(route -> route.getUri().toString())
+                .findFirst()
+                .filter(uri -> !uri.isBlank());
     }
 
     @Bean
     public RouteLocator sseRoutes(RouteLocatorBuilder builder) {
-        String aiServiceUri = getAiServiceUri();
+        Optional<String> targetUri = resolveSseTargetUri();
+        if (targetUri.isEmpty()) {
+            log.warn("未找到 ai-service 路由配置，跳过 SSE 专用路由");
+            return builder.routes().build();
+        }
 
         return builder.routes()
-            // AI SSE 服务 - ETL 工作流
-            .route("ai-sse-etl", r -> r
-                .order(0)
-                .path("/api/ai/etl/workflow/sse")
-                .filters(f -> f
-                    .addResponseHeader("X-Accel-Buffering", "no")
-                    .addResponseHeader("Cache-Control", "no-cache")
+                // AI SSE 服务 - ETL 工作流
+                .route(SSE_ROUTE_ID, r -> r
+                        .order(0)
+                        .path(SSE_BIZ_PATH)
+                        .filters(f -> {
+                            return f
+                                    .addResponseHeader("X-Accel-Buffering", "no")
+                                    .addResponseHeader("Cache-Control", "no-cache");
+                        })
+                        .uri(targetUri.get())
                 )
-                .uri(aiServiceUri)
-            )
-            .build();
+                .build();
     }
 }

@@ -25,9 +25,16 @@ logger = logging.getLogger(__name__)
 class Neo4jSemanticSearch:
     """Neo4j 语义资产查询服务（词根、修饰符、单位）"""
 
+    _SYSTEM_CREATORS = ["OPENLINEAGE", "GRAVITINO_SYNC", "system", "SYSTEM"]
+
     @classmethod
     def search_semantic_assets(
-        cls, query: str, top_k: int = 10, min_score: float = 0.55, tenant_id: int | None = None
+        cls,
+        query: str,
+        top_k: int = 10,
+        min_score: float = 0.55,
+        tenant_id: int | None = None,
+        user_id: int | None = None,
     ) -> dict[str, list[Any]]:
         """
         根据用户输入语义检索相关的词根、修饰符、单位（混合检索：向量+全文）
@@ -57,6 +64,13 @@ class Neo4jSemanticSearch:
                 "vector_index": "wordroot_embedding",
                 "fulltext_index": "wordroot_fulltext",
                 "retrieval_query": """
+                WHERE ($tenantId IS NULL OR node.tenantId = $tenantId)
+                  AND (
+                    $userId IS NULL
+                    OR node.createdBy IS NULL
+                    OR toString(node.createdBy) = toString($userId)
+                    OR node.createdBy IN $systemCreators
+                  )
                 RETURN
                     node.code AS code,
                     node.name AS name,
@@ -70,6 +84,13 @@ class Neo4jSemanticSearch:
                 "vector_index": "modifier_embedding",
                 "fulltext_index": "modifier_fulltext",
                 "retrieval_query": """
+                WHERE ($tenantId IS NULL OR node.tenantId = $tenantId)
+                  AND (
+                    $userId IS NULL
+                    OR node.createdBy IS NULL
+                    OR toString(node.createdBy) = toString($userId)
+                    OR node.createdBy IN $systemCreators
+                  )
                 RETURN
                     node.code AS code,
                     node.modifierType AS modifierType,
@@ -82,6 +103,13 @@ class Neo4jSemanticSearch:
                 "vector_index": "unit_embedding",
                 "fulltext_index": "unit_fulltext",
                 "retrieval_query": """
+                WHERE ($tenantId IS NULL OR node.tenantId = $tenantId)
+                  AND (
+                    $userId IS NULL
+                    OR node.createdBy IS NULL
+                    OR toString(node.createdBy) = toString($userId)
+                    OR node.createdBy IN $systemCreators
+                  )
                 RETURN
                     node.code AS code,
                     node.name AS name,
@@ -116,6 +144,11 @@ class Neo4jSemanticSearch:
                 search_result = retriever.search(
                     query_text=query,
                     top_k=top_k,
+                    query_params={
+                        "tenantId": tenant_id,
+                        "userId": user_id,
+                        "systemCreators": cls._SYSTEM_CREATORS,
+                    },
                     ranker=HybridSearchRanker.LINEAR,
                     alpha=0.6,
                 )

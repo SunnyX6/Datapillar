@@ -1,5 +1,6 @@
 server:
   port: 7001
+  address: ${SERVER_ADDRESS:0.0.0.0}
   servlet:
     context-path: /
 
@@ -111,23 +112,6 @@ security:
     ttl-seconds: 20
     key-id: auth-dev-2026-02
     private-key-path: ${AUTH_ASSERTION_PRIVATE_KEY_PATH:classpath:security/gateway-assertion-dev-private.pem}
-
-# 认证代理路由配置
-auth:
-  proxy:
-    connect-timeout-ms: ${AUTH_PROXY_CONNECT_TIMEOUT_MS:3000}
-    read-timeout-ms: ${AUTH_PROXY_READ_TIMEOUT_MS:30000}
-    routes:
-      - path-prefix: /api/studio
-        service-id: datapillar-studio-service
-        target-prefix: /api/studio
-        assertion-enabled: true
-      - path-prefix: /api/ai
-        service-id: datapillar-ai
-        target-prefix: /api/ai
-      - path-prefix: /api/onemeta
-        service-id: datapillar-gravitino
-        target-prefix: /api
 
 # SSO 配置
 sso:

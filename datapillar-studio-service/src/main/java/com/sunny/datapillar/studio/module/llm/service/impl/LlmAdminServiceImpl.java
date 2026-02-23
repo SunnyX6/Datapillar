@@ -1,6 +1,7 @@
 package com.sunny.datapillar.studio.module.llm.service.impl;
 
 import com.sunny.datapillar.studio.module.llm.dto.LlmManagerDto;
+import com.sunny.datapillar.studio.module.llm.dto.LlmProviderDto;
 import com.sunny.datapillar.studio.module.llm.enums.AiModelType;
 import com.sunny.datapillar.studio.module.llm.service.LlmAdminService;
 import com.sunny.datapillar.studio.module.llm.service.LlmManagerService;
@@ -24,6 +25,21 @@ public class LlmAdminServiceImpl implements LlmAdminService {
     @Override
     public List<LlmManagerDto.ProviderResponse> listProviders() {
         return llmManagerService.listProviders();
+    }
+
+    @Override
+    public void createProvider(Long userId, LlmProviderDto.CreateRequest request) {
+        llmManagerService.createProvider(userId, request);
+    }
+
+    @Override
+    public void updateProvider(Long userId, String providerCode, LlmProviderDto.UpdateRequest request) {
+        llmManagerService.updateProvider(userId, providerCode, request);
+    }
+
+    @Override
+    public void deleteProvider(Long userId, String providerCode) {
+        llmManagerService.deleteProvider(userId, providerCode);
     }
 
     @Override
@@ -62,12 +78,15 @@ public class LlmAdminServiceImpl implements LlmAdminService {
     }
 
     @Override
-    public LlmManagerDto.ModelUsageResponse grantUserModelUsage(Long operatorUserId, Long targetUserId, Long modelId) {
-        return llmManagerService.grantUserModelUsage(operatorUserId, targetUserId, modelId);
+    public LlmManagerDto.ModelUsageResponse upsertUserModelGrant(Long operatorUserId,
+                                                                  Long targetUserId,
+                                                                  Long modelId,
+                                                                  LlmManagerDto.ModelGrantRequest request) {
+        return llmManagerService.upsertUserModelGrant(operatorUserId, targetUserId, modelId, request);
     }
 
     @Override
-    public void revokeUserModelUsage(Long operatorUserId, Long targetUserId, Long modelId) {
-        llmManagerService.revokeUserModelUsage(operatorUserId, targetUserId, modelId);
+    public void deleteUserModelGrant(Long operatorUserId, Long targetUserId, Long modelId) {
+        llmManagerService.deleteUserModelGrant(operatorUserId, targetUserId, modelId);
     }
 }

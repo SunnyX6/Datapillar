@@ -23,9 +23,7 @@ from typing import Annotated, Any, TypeVar, get_args, get_origin
 import json_repair
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
-from datapillar_oneagentic.exception.base import RecoveryAction
-from datapillar_oneagentic.exception.llm.categories import LLMErrorCategory
-from datapillar_oneagentic.exception.llm.errors import LLMError
+from datapillar_oneagentic.exception import StructuredOutputInvalidException
 
 logger = logging.getLogger(__name__)
 
@@ -300,7 +298,7 @@ def parse_structured_output(
         Parsed Pydantic model instance.
 
     Raises:
-        LLMError: raised on parsing failures.
+        StructuredOutputInvalidException: raised on parsing failures.
     """
     if isinstance(text, schema):
         return text
@@ -320,23 +318,19 @@ def parse_structured_output(
                     if not strict and raw_text:
                         try:
                             return parse_structured_output(raw_text, schema, strict=False)
-                        except LLMError as fallback_error:
+                        except StructuredOutputInvalidException as fallback_error:
                             detail = f"Schema validation failed: {e}; fallback parsing failed: {fallback_error}"
                             _log_structured_failure(raw, parsing_error)
-                            raise LLMError(
+                            raise StructuredOutputInvalidException(
                                 _build_error_message(schema, detail=detail),
-                                category=LLMErrorCategory.STRUCTURED_OUTPUT,
-                                action=RecoveryAction.FAIL_FAST,
-                                original=e,
+                                cause=e,
                                 raw=raw,
                                 parsing_error=parsing_error,
                             ) from fallback_error
                     _log_structured_failure(raw, parsing_error)
-                    raise LLMError(
+                    raise StructuredOutputInvalidException(
                         _build_error_message(schema, detail=f"Schema validation failed: {e}"),
-                        category=LLMErrorCategory.STRUCTURED_OUTPUT,
-                        action=RecoveryAction.FAIL_FAST,
-                        original=e,
+                        cause=e,
                         raw=raw,
                         parsing_error=parsing_error,
                     ) from e
@@ -347,22 +341,18 @@ def parse_structured_output(
                 if not strict and raw_text:
                     try:
                         return parse_structured_output(raw_text, schema, strict=False)
-                    except LLMError as fallback_error:
+                    except StructuredOutputInvalidException as fallback_error:
                         detail = f"{detail}; fallback parsing failed: {fallback_error}"
                 _log_structured_failure(raw, parsing_error)
-                raise LLMError(
+                raise StructuredOutputInvalidException(
                     _build_error_message(schema, detail=detail),
-                    category=LLMErrorCategory.STRUCTURED_OUTPUT,
-                    action=RecoveryAction.FAIL_FAST,
-                    original=parsing_error if isinstance(parsing_error, Exception) else None,
+                    cause=parsing_error if isinstance(parsing_error, Exception) else None,
                     raw=raw,
                     parsing_error=parsing_error,
                 )
             _log_structured_failure(raw, parsing_error)
-            raise LLMError(
+            raise StructuredOutputInvalidException(
                 _build_error_message(schema, detail="Parser did not return a valid parsed value"),
-                category=LLMErrorCategory.STRUCTURED_OUTPUT,
-                action=RecoveryAction.FAIL_FAST,
                 raw=raw,
                 parsing_error=parsing_error,
             )
@@ -370,27 +360,21 @@ def parse_structured_output(
         try:
             return schema.model_validate(normalize_jsonish(text))
         except ValidationError as e:
-            raise LLMError(
+            raise StructuredOutputInvalidException(
                 _build_error_message(schema, detail=f"Schema validation failed: {e}"),
-                category=LLMErrorCategory.STRUCTURED_OUTPUT,
-                action=RecoveryAction.FAIL_FAST,
-                original=e,
+                cause=e,
                 raw=text,
             ) from e
 
     if not isinstance(text, str):
-        raise LLMError(
+        raise StructuredOutputInvalidException(
             _build_error_message(schema, detail=f"Unsupported output type: {type(text)}"),
-            category=LLMErrorCategory.STRUCTURED_OUTPUT,
-            action=RecoveryAction.FAIL_FAST,
             raw=text,
         )
 
     if not text or not text.strip():
-        raise LLMError(
+        raise StructuredOutputInvalidException(
             _build_error_message(schema, detail="Output text is empty"),
-            category=LLMErrorCategory.STRUCTURED_OUTPUT,
-            action=RecoveryAction.FAIL_FAST,
             raw=text,
         )
 
@@ -403,11 +387,9 @@ def parse_structured_output(
     except ValidationError as e:
         errors.append(f"Direct parsing failed: {e}")
         if strict:
-            raise LLMError(
+            raise StructuredOutputInvalidException(
                 _build_error_message(schema, detail=f"Schema validation failed: {e}"),
-                category=LLMErrorCategory.STRUCTURED_OUTPUT,
-                action=RecoveryAction.FAIL_FAST,
-                original=e,
+                cause=e,
                 raw=text,
             ) from e
 
@@ -471,10 +453,8 @@ def parse_structured_output(
         errors.append(coercion_error)
 
     error_summary = "; ".join(errors)
-    raise LLMError(
+    raise StructuredOutputInvalidException(
         _build_error_message(schema, detail=f"All parsing attempts failed: {error_summary}"),
-        category=LLMErrorCategory.STRUCTURED_OUTPUT,
-        action=RecoveryAction.FAIL_FAST,
         raw=text,
     )
 
@@ -658,10 +638,8 @@ def parse_args(
     if isinstance(args, str):
         return parse_structured_output(args, schema)
 
-    raise LLMError(
+    raise StructuredOutputInvalidException(
         _build_error_message(schema, detail=f"Unsupported tool arguments type: {type(args)}"),
-        category=LLMErrorCategory.INVALID_INPUT,
-        action=RecoveryAction.FAIL_FAST,
         raw=args,
     )
 

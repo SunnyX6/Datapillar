@@ -92,6 +92,7 @@ public class GatewayAssertionVerifier {
         return new GatewayAssertionContext(
                 userId,
                 tenantId,
+                claims.get(GatewayAssertionClaims.TENANT_CODE, String.class),
                 claims.get(GatewayAssertionClaims.USERNAME, String.class),
                 claims.get(GatewayAssertionClaims.EMAIL, String.class),
                 roles,

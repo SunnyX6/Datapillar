@@ -88,12 +88,12 @@ public class JobDependencyServiceImpl implements JobDependencyService {
 
     @Override
     @Transactional
-    public void deleteDependency(Long jobId, Long parentJobId) {
-        int deleted = dependencyMapper.deleteDependency(jobId, parentJobId);
+    public void deleteDependency(Long workflowId, Long jobId, Long parentJobId) {
+        int deleted = dependencyMapper.deleteDependency(workflowId, jobId, parentJobId);
         if (deleted == 0) {
             throw new NotFoundException("依赖关系不存在");
         }
-        log.info("Deleted dependency: jobId={}, parentJobId={}", jobId, parentJobId);
+        log.info("Deleted dependency: workflowId={}, jobId={}, parentJobId={}", workflowId, jobId, parentJobId);
     }
 
     /**

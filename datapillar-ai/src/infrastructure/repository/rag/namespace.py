@@ -15,7 +15,13 @@ from src.infrastructure.database.mysql import MySQLClient
 
 class NamespaceRepository:
     @staticmethod
-    def list_by_user(user_id: int, *, limit: int, offset: int) -> tuple[list[dict[str, Any]], int]:
+    def list_by_user(
+        tenant_id: int,
+        user_id: int,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[dict[str, Any]], int]:
         query = text(
             """
             SELECT
@@ -31,11 +37,11 @@ class NamespaceRepository:
             LEFT JOIN (
               SELECT namespace_id, COUNT(1) AS doc_count
               FROM knowledge_document
-              WHERE created_by = :created_by AND is_deleted = 0
+              WHERE tenant_id = :tenant_id AND created_by = :created_by AND is_deleted = 0
               GROUP BY namespace_id
             ) AS doc_stats
               ON doc_stats.namespace_id = ns.namespace_id
-            WHERE ns.created_by = :created_by AND ns.is_deleted = 0
+            WHERE ns.tenant_id = :tenant_id AND ns.created_by = :created_by AND ns.is_deleted = 0
             ORDER BY ns.updated_at DESC, ns.namespace_id DESC
             LIMIT :limit OFFSET :offset
             """
@@ -44,18 +50,26 @@ class NamespaceRepository:
             """
             SELECT COUNT(1) AS total
             FROM knowledge_namespace
-            WHERE created_by = :created_by AND is_deleted = 0
+            WHERE tenant_id = :tenant_id AND created_by = :created_by AND is_deleted = 0
             """
         )
 
-        params = {"created_by": user_id, "limit": limit, "offset": offset}
+        params = {
+            "tenant_id": tenant_id,
+            "created_by": user_id,
+            "limit": limit,
+            "offset": offset,
+        }
         with MySQLClient.get_engine().connect() as conn:
             rows = [dict(row) for row in conn.execute(query, params).mappings()]
-            total = conn.execute(count_query, {"created_by": user_id}).scalar_one()
+            total = conn.execute(
+                count_query,
+                {"tenant_id": tenant_id, "created_by": user_id},
+            ).scalar_one()
         return rows, int(total or 0)
 
     @staticmethod
-    def get(namespace_id: int, user_id: int) -> dict[str, Any] | None:
+    def get(namespace_id: int, tenant_id: int, user_id: int) -> dict[str, Any] | None:
         query = text(
             """
             SELECT
@@ -67,13 +81,25 @@ class NamespaceRepository:
               created_at,
               updated_at
             FROM knowledge_namespace
-            WHERE namespace_id = :namespace_id AND created_by = :created_by AND is_deleted = 0
+            WHERE namespace_id = :namespace_id
+              AND tenant_id = :tenant_id
+              AND created_by = :created_by
+              AND is_deleted = 0
             """
         )
         with MySQLClient.get_engine().connect() as conn:
-            row = conn.execute(
-                query, {"namespace_id": namespace_id, "created_by": user_id}
-            ).mappings().fetchone()
+            row = (
+                conn.execute(
+                    query,
+                    {
+                        "namespace_id": namespace_id,
+                        "tenant_id": tenant_id,
+                        "created_by": user_id,
+                    },
+                )
+                .mappings()
+                .fetchone()
+            )
             return dict(row) if row else None
 
     @staticmethod
@@ -81,9 +107,9 @@ class NamespaceRepository:
         query = text(
             """
             INSERT INTO knowledge_namespace (
-              namespace, description, created_by, status
+              tenant_id, namespace, description, created_by, status
             ) VALUES (
-              :namespace, :description, :created_by, :status
+              :tenant_id, :namespace, :description, :created_by, :status
             )
             """
         )
@@ -92,31 +118,58 @@ class NamespaceRepository:
             return int(result.lastrowid)
 
     @staticmethod
-    def update(namespace_id: int, user_id: int, fields: dict[str, Any]) -> int:
+    def update(namespace_id: int, tenant_id: int, user_id: int, fields: dict[str, Any]) -> int:
         if not fields:
             return 0
-        sets = ", ".join([f"{key} = :{key}" for key in fields])
+        allowed_fields = {"namespace", "description", "status"}
+        safe_fields = {key: value for key, value in fields.items() if key in allowed_fields}
+        if not safe_fields:
+            return 0
+
         query = text(
-            f"""
+            """
             UPDATE knowledge_namespace
-            SET {sets}
-            WHERE namespace_id = :namespace_id AND created_by = :created_by AND is_deleted = 0
+            SET
+              namespace = COALESCE(:namespace, namespace),
+              description = COALESCE(:description, description),
+              status = COALESCE(:status, status)
+            WHERE namespace_id = :namespace_id
+              AND tenant_id = :tenant_id
+              AND created_by = :created_by
+              AND is_deleted = 0
             """
         )
-        params = {"namespace_id": namespace_id, "created_by": user_id, **fields}
+        params = {
+            "namespace_id": namespace_id,
+            "tenant_id": tenant_id,
+            "created_by": user_id,
+            "namespace": safe_fields.get("namespace"),
+            "description": safe_fields.get("description"),
+            "status": safe_fields.get("status"),
+        }
         with MySQLClient.get_engine().begin() as conn:
             result = conn.execute(query, params)
             return int(result.rowcount or 0)
 
     @staticmethod
-    def soft_delete(namespace_id: int, user_id: int) -> int:
+    def soft_delete(namespace_id: int, tenant_id: int, user_id: int) -> int:
         query = text(
             """
             UPDATE knowledge_namespace
             SET is_deleted = 1
-            WHERE namespace_id = :namespace_id AND created_by = :created_by AND is_deleted = 0
+            WHERE namespace_id = :namespace_id
+              AND tenant_id = :tenant_id
+              AND created_by = :created_by
+              AND is_deleted = 0
             """
         )
         with MySQLClient.get_engine().begin() as conn:
-            result = conn.execute(query, {"namespace_id": namespace_id, "created_by": user_id})
+            result = conn.execute(
+                query,
+                {
+                    "namespace_id": namespace_id,
+                    "tenant_id": tenant_id,
+                    "created_by": user_id,
+                },
+            )
             return int(result.rowcount or 0)

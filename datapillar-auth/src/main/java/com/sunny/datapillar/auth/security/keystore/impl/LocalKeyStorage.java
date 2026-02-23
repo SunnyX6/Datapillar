@@ -2,10 +2,16 @@ package com.sunny.datapillar.auth.security.keystore.impl;
 
 import com.sunny.datapillar.auth.config.KeyStorageProperties;
 import com.sunny.datapillar.auth.security.keystore.KeyStorage;
+import com.sunny.datapillar.common.constant.ErrorType;
+import com.sunny.datapillar.common.exception.AlreadyExistsException;
+import com.sunny.datapillar.common.exception.NotFoundException;
+import com.sunny.datapillar.common.exception.ServiceUnavailableException;
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Map;
 
 /**
  * Local密钥Storage组件
@@ -27,48 +33,79 @@ public class LocalKeyStorage implements KeyStorage {
     }
 
     @Override
-    public void savePrivateKey(Long tenantId, byte[] pemBytes) {
-        if (tenantId == null || tenantId <= 0) {
-            throw new IllegalArgumentException("tenantId 无效");
-        }
-        if (pemBytes == null || pemBytes.length == 0) {
+    public void savePrivateKey(String tenantCode, byte[] privateKeyPemBytes) {
+        String normalizedTenantCode = normalizeTenantCode(tenantCode);
+        if (privateKeyPemBytes == null || privateKeyPemBytes.length == 0) {
             throw new IllegalArgumentException("私钥内容为空");
         }
-        Path target = resolvePath(tenantId);
+        Path privateTarget = resolvePrivatePath(normalizedTenantCode);
         try {
-            Files.createDirectories(target.getParent());
-            Files.write(target, pemBytes, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            Files.createDirectories(privateTarget.getParent());
+            Files.write(
+                    privateTarget,
+                    privateKeyPemBytes,
+                    StandardOpenOption.CREATE_NEW,
+                    StandardOpenOption.WRITE);
+        } catch (FileAlreadyExistsException ex) {
+            throw new AlreadyExistsException(
+                    ErrorType.TENANT_PRIVATE_KEY_ALREADY_EXISTS,
+                    Map.of("tenantCode", normalizedTenantCode),
+                    "私钥文件已存在");
         } catch (IOException ex) {
-            throw new IllegalStateException("写入私钥失败: " + target, ex);
+            throw new ServiceUnavailableException(
+                    ex,
+                    ErrorType.KEY_STORAGE_UNAVAILABLE,
+                    Map.of("tenantCode", normalizedTenantCode),
+                    "密钥存储服务不可用");
         }
     }
 
     @Override
-    public byte[] loadPrivateKey(Long tenantId) {
-        if (tenantId == null || tenantId <= 0) {
-            throw new IllegalArgumentException("tenantId 无效");
-        }
-        Path target = resolvePath(tenantId);
+    public byte[] loadPrivateKey(String tenantCode) {
+        String normalizedTenantCode = normalizeTenantCode(tenantCode);
+        Path target = resolvePrivatePath(normalizedTenantCode);
         if (!Files.exists(target)) {
-            throw new IllegalStateException("租户私钥不存在: " + tenantId);
+            throw new NotFoundException(
+                    ErrorType.TENANT_KEY_NOT_FOUND,
+                    Map.of("tenantCode", normalizedTenantCode),
+                    "租户密钥不存在");
         }
         try {
             return Files.readAllBytes(target);
         } catch (IOException ex) {
-            throw new IllegalStateException("读取私钥失败: " + target, ex);
+            throw new ServiceUnavailableException(
+                    ex,
+                    ErrorType.KEY_STORAGE_UNAVAILABLE,
+                    Map.of("tenantCode", normalizedTenantCode),
+                    "密钥存储服务不可用");
         }
     }
 
     @Override
-    public boolean exists(Long tenantId) {
-        if (tenantId == null || tenantId <= 0) {
+    public boolean existsPrivateKey(String tenantCode) {
+        if (tenantCode == null || tenantCode.isBlank()) {
             return false;
         }
-        Path target = resolvePath(tenantId);
-        return Files.exists(target);
+        String normalized = tenantCode.trim();
+        if (normalized.contains("/") || normalized.contains("\\") || normalized.contains("..")) {
+            return false;
+        }
+        Path privateTarget = resolvePrivatePath(normalized);
+        return Files.exists(privateTarget);
     }
 
-    private Path resolvePath(Long tenantId) {
-        return basePath.resolve(String.valueOf(tenantId)).resolve("private.pem");
+    private Path resolvePrivatePath(String tenantCode) {
+        return basePath.resolve(tenantCode).resolve("private.pem");
+    }
+
+    private String normalizeTenantCode(String tenantCode) {
+        if (tenantCode == null || tenantCode.isBlank()) {
+            throw new IllegalArgumentException("tenantCode 无效");
+        }
+        String normalized = tenantCode.trim();
+        if (normalized.contains("/") || normalized.contains("\\") || normalized.contains("..")) {
+            throw new IllegalArgumentException("tenantCode 无效");
+        }
+        return normalized;
     }
 }

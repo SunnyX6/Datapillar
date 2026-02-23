@@ -12,10 +12,11 @@ import {
   Table,
   Unlock
 } from 'lucide-react'
+import { Card } from '@/components/ui'
 import { panelWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { cn } from '@/lib/utils'
-import type { UserItem } from './Permission'
+import type { UserDataPrivilege } from './Permission'
 
 type AssetType = 'metalake' | 'catalog' | 'schema' | 'table'
 
@@ -165,15 +166,19 @@ const Switch = ({
 )
 
 interface DataPermissionProps {
-  user: UserItem
+  subject: {
+    id: string
+    dataPrivileges?: UserDataPrivilege[]
+  }
+  onPrivilegesChange?: (privileges: UserDataPrivilege[]) => void
 }
 
-export function DataPermission({ user }: DataPermissionProps) {
+export function DataPermission({ subject, onPrivilegesChange }: DataPermissionProps) {
   const [selectedAssetId, setSelectedAssetId] = useState<string>('metalake_prod')
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(['metalake_prod', 'cat_pg_payment']))
   const [localPrivileges, setLocalPrivileges] = useState<Record<string, string[]>>(() => {
     const privs: Record<string, string[]> = {}
-    user.dataPrivileges?.forEach((item) => {
+    subject.dataPrivileges?.forEach((item) => {
       privs[item.assetId] = item.privileges
     })
     return privs
@@ -249,7 +254,17 @@ export function DataPermission({ user }: DataPermissionProps) {
     setLocalPrivileges((prev) => {
       const current = prev[selectedAssetId] ?? []
       const next = current.includes(privilege) ? current.filter((p) => p !== privilege) : [...current, privilege]
-      return { ...prev, [selectedAssetId]: next }
+      const nextPrivilegesMap = { ...prev, [selectedAssetId]: next }
+      if (next.length === 0) {
+        delete nextPrivilegesMap[selectedAssetId]
+      }
+      onPrivilegesChange?.(
+        Object.entries(nextPrivilegesMap).map(([assetId, privileges]) => ({
+          assetId,
+          privileges
+        }))
+      )
+      return nextPrivilegesMap
     })
   }
 
@@ -310,7 +325,7 @@ export function DataPermission({ user }: DataPermissionProps) {
   }
 
   return (
-    <div className="flex h-full border rounded-xl border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900/90 shadow-none dark:shadow-none ring-1 ring-slate-100 dark:ring-slate-800/60">
+    <Card variant="default" padding="none" className="flex h-full overflow-hidden shadow-none dark:shadow-none">
       <div className={cn(panelWidthClassMap.medium, 'bg-slate-50/50 dark:bg-slate-900/70 border-r border-slate-200 dark:border-slate-800 flex flex-col')}>
         <div className="p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
           <Layers size={14} />
@@ -359,10 +374,10 @@ export function DataPermission({ user }: DataPermissionProps) {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 bg-slate-50/30 dark:bg-slate-950/35 custom-scrollbar">
-              <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl shadow-none dark:shadow-none overflow-hidden">
-                {privilegeGroups.map((group, idx) => (
-                  <div key={group.name} className={cn(idx !== privilegeGroups.length - 1 && 'border-b border-slate-100 dark:border-slate-800')}>
-                    <div className="px-5 py-2.5 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800/80 backdrop-blur-sm flex items-center justify-between">
+              <div className="space-y-3">
+                {privilegeGroups.map((group) => (
+                  <Card key={group.name} variant="default" padding="none" className="rounded-xl overflow-hidden shadow-none dark:shadow-none">
+                    <div className="px-5 py-2.5 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
                       <h5
                         className={cn(
                           'text-xs font-bold uppercase tracking-wider flex items-center gap-2',
@@ -434,7 +449,7 @@ export function DataPermission({ user }: DataPermissionProps) {
                         )
                       })}
                     </div>
-                  </div>
+                  </Card>
                 ))}
               </div>
             </div>
@@ -446,6 +461,6 @@ export function DataPermission({ user }: DataPermissionProps) {
           </div>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

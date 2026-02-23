@@ -14,16 +14,15 @@ Core components:
 Example:
 ```python
 from datapillar_oneagentic.context.compaction import get_compactor
-from datapillar_oneagentic.exception import LLMError, LLMErrorCategory
+from datapillar_oneagentic.exception import ContextLengthExceededException
 
 compactor = get_compactor(llm=llm)
 
 try:
     result = await llm.ainvoke(messages)
-except LLMError as exc:
-    if exc.category == LLMErrorCategory.CONTEXT:
-        compressed_messages, result = await compactor.compact(messages)
-        # Retry with compressed messages
+except ContextLengthExceededException:
+    compressed_messages, result = await compactor.compact(messages)
+    # Retry with compressed messages
 ```
 """
 

@@ -4,16 +4,7 @@
  * 负责 SQL 执行相关的 API 调用
  */
 
-import { createApiClient } from '@/lib/api/client'
-import type { ApiResponse } from '@/types/api'
-
-/**
- * SQL API 客户端
- */
-const sqlClient = createApiClient({
-  baseURL: '/api/studio/biz/sql',
-  timeout: 300000
-})
+import { API_BASE, API_PATH, requestData } from '@/lib/api'
 
 /**
  * 列定义
@@ -48,43 +39,12 @@ export interface ExecuteResult {
   message?: string
 }
 
-/**
- * 从错误中提取错误信息
- */
-function extractErrorMessage(error: unknown): string {
-  if (error && typeof error === 'object' && 'response' in error) {
-    const axiosError = error as { response?: { data?: { message?: string } } }
-    if (axiosError.response?.data?.message) {
-      return axiosError.response.data.message
-    }
-  }
-  if (error instanceof Error) {
-    return error.message
-  }
-  return '未知错误'
-}
-
-function requireApiData<T>(payload: ApiResponse<T>): T {
-  if (typeof payload.data === 'undefined') {
-    throw new Error('接口响应缺少 data 字段')
-  }
-  return payload.data
-}
-
-/**
- * 执行 SQL
- */
 export async function executeSql(request: ExecuteRequest): Promise<ExecuteResult> {
-  try {
-    const response = await sqlClient.post<ApiResponse<ExecuteResult>>('/execute', request)
-    return requireApiData(response.data)
-  } catch (error) {
-    return {
-      success: false,
-      error: extractErrorMessage(error),
-      rowCount: 0,
-      hasMore: false,
-      executionTime: 0
-    }
-  }
+  return requestData<ExecuteResult, ExecuteRequest>({
+    baseURL: API_BASE.studioSql,
+    url: API_PATH.sql.execute,
+    method: 'POST',
+    timeout: 300000,
+    data: request
+  })
 }

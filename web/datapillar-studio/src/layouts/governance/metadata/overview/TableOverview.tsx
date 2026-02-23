@@ -29,7 +29,7 @@ import { formatTime } from '@/lib/utils'
 import { type TableAsset } from '../type/types'
 import { getTable, associateObjectTags, getObjectTags, createTag } from '@/services/oneMetaService'
 import { fetchValueDomains, type ValueDomainDTO } from '@/services/oneMetaSemanticService'
-import type { GravitinoIndexDTO } from '@/types/oneMeta'
+import type { GravitinoIndexDTO } from '@/types/onemeta/metadata'
 import { Card, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui'
 
 const VALUE_DOMAIN_TAG_PREFIX = 'vd:'

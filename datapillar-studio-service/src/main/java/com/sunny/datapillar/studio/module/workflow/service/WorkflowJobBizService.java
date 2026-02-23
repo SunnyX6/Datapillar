@@ -14,13 +14,13 @@ public interface WorkflowJobBizService {
 
     List<JobDto.Response> getJobsByWorkflowId(Long workflowId);
 
-    JobDto.Response getJobDetail(Long id);
+    JobDto.Response getJobDetail(Long workflowId, Long id);
 
     Long createJob(Long workflowId, JobDto.Create dto);
 
-    void updateJob(Long id, JobDto.Update dto);
+    void updateJob(Long workflowId, Long id, JobDto.Update dto);
 
-    void deleteJob(Long id);
+    void deleteJob(Long workflowId, Long id);
 
     void updateJobPositions(Long workflowId, JobDto.LayoutSave dto);
 }

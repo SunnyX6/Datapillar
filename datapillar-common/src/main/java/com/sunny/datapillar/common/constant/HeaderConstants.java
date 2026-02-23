@@ -10,7 +10,9 @@ package com.sunny.datapillar.common.constant;
 public final class HeaderConstants {
 
     public static final String HEADER_TRACE_ID = "X-Trace-Id";
+    public static final String HEADER_REQUEST_ID = "X-Request-Id";
     public static final String HEADER_TENANT_ID = "X-Tenant-Id";
+    public static final String HEADER_TENANT_CODE = "X-Tenant-Code";
     public static final String HEADER_USER_ID = "X-User-Id";
     public static final String HEADER_USERNAME = "X-Username";
     public static final String HEADER_EMAIL = "X-User-Email";

@@ -40,5 +40,5 @@ public interface AuthService {
     /**
      * 解析 access token 并返回网关断言所需的认证上下文。
      */
-    AuthDto.AccessContext resolveAccessContext(String accessToken);
+    AuthDto.AuthenticationContext resolveAuthenticationContext(String token);
 }

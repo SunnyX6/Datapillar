@@ -36,7 +36,7 @@ public class WorkflowDependencyBizServiceImpl implements WorkflowDependencyBizSe
     }
 
     @Override
-    public void deleteDependency(Long jobId, Long parentJobId) {
-        jobDependencyService.deleteDependency(jobId, parentJobId);
+    public void deleteDependency(Long workflowId, Long jobId, Long parentJobId) {
+        jobDependencyService.deleteDependency(workflowId, jobId, parentJobId);
     }
 }

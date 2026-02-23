@@ -358,8 +358,8 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public AuthDto.AccessContext resolveAccessContext(String accessToken) {
-        Claims claims = parseAccessClaims(accessToken);
+    public AuthDto.AuthenticationContext resolveAuthenticationContext(String token) {
+        Claims claims = parseAccessClaims(token);
 
         Long userId = jwtUtil.getUserId(claims);
         Long tenantId = jwtUtil.getTenantId(claims);
@@ -392,9 +392,10 @@ public class AuthServiceImpl implements AuthService {
 
         String sid = jwtUtil.getSessionId(claims);
         String accessJti = jwtUtil.getTokenId(claims);
-        return AuthDto.AccessContext.builder()
+        return AuthDto.AuthenticationContext.builder()
                 .userId(userId)
                 .tenantId(tenantId)
+                .tenantCode(tenant.getCode())
                 .username(jwtUtil.getUsername(claims))
                 .email(jwtUtil.getEmail(claims))
                 .roles(EdDsaJwtSupport.toStringList(claims.get("roles")))

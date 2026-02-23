@@ -29,17 +29,14 @@ import logging
 from typing import Any
 
 from datapillar_oneagentic.core.agent import AgentSpec
-from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind, ProcessStage
 from datapillar_oneagentic.core.graphs.react.planner import create_plan, replan
 from datapillar_oneagentic.core.graphs.react.reflector import decide_next_action, reflect
 from datapillar_oneagentic.core.graphs.react.schemas import Plan
-from datapillar_oneagentic.state.blackboard import Blackboard
+from datapillar_oneagentic.core.status import ExecutionStatus, ProcessStage
 from datapillar_oneagentic.state import StateBuilder
+from datapillar_oneagentic.state.blackboard import Blackboard
 
 logger = logging.getLogger(__name__)
-
-# Max fast-retry count for system errors.
-MAX_ERROR_RETRIES = 3
 
 # Max replan attempts to prevent infinite loops.
 MAX_REPLAN_DEPTH = 5
@@ -196,7 +193,6 @@ def _decide_next_step(
             # Agent finished; check execution result.
             last_status = routing.last_status
             last_error = routing.last_error
-            last_failure_kind = routing.last_failure_kind
             error_retry_count = sb.react.snapshot().error_retry_count
 
             if last_status == ExecutionStatus.COMPLETED:
@@ -216,44 +212,9 @@ def _decide_next_step(
                 sb.react.set_error_retry(0)
                 return "finalize"
 
-            elif last_status == ExecutionStatus.FAILED and last_failure_kind == FailureKind.SYSTEM:
-                # System error: fast retry.
-                error_retry_count += 1
-                if error_retry_count < MAX_ERROR_RETRIES:
-                    logger.warning(
-                        f"ReAct: task {current_task.id} system error "
-                        f"({error_retry_count}/{MAX_ERROR_RETRIES}); fast retry: {last_error}"
-                    )
-                    current_task.status = ExecutionStatus.PENDING
-                    # Validate agent_id.
-                    agent_id = current_task.assigned_agent
-                    if agent_id not in agent_ids:
-                        logger.error(f"ReAct: Agent {agent_id} not in available list")
-                        current_task.mark_failed(f"Agent {agent_id} not found")
-                        return "reflect"
-                    sb.routing.activate(agent_id)
-                    sb.memory.append_task_instruction(
-                        task_id=current_task.id,
-                        description=current_task.description,
-                    )
-                    sb.react.set_error_retry(error_retry_count)
-                    return "execute"
-                else:
-                    logger.error(
-                        f"ReAct: task {current_task.id} system error; failed after {MAX_ERROR_RETRIES} retries"
-                    )
-                    current_task.mark_failed(
-                        f"System error (retried {MAX_ERROR_RETRIES} times): {last_error}"
-                    )
-                    plan.status = ExecutionStatus.FAILED
-                    plan.stage = ProcessStage.REFLECTING
-                    sb.routing.clear_active()
-                    sb.react.set_error_retry(0)
-                    return "finalize"
-
             elif last_status == ExecutionStatus.FAILED:
-                current_task.mark_failed(last_error or "Business failure")
-                logger.warning(f"ReAct: task {current_task.id} business failure: {last_error}")
+                current_task.mark_failed(last_error or "Execution failed")
+                logger.warning(f"ReAct: task {current_task.id} failed: {last_error}")
                 error_retry_count = 0
                 sb.react.set_error_retry(error_retry_count)
 

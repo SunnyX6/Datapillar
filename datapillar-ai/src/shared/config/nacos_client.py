@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-02-04
 
@@ -14,9 +13,10 @@ from __future__ import annotations
 
 import logging
 import os
-import socket
+from ipaddress import ip_address, ip_network
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 import yaml
 from dynaconf import Dynaconf
@@ -39,6 +39,7 @@ from src.shared.config.runtime import (
 logger = logging.getLogger(__name__)
 
 ConfigChangeListener = Callable[[str, str, str, str], Awaitable[None]]
+_nacos_runtime_cache: NacosRuntime | None = None
 
 
 @dataclass(frozen=True)
@@ -78,6 +79,10 @@ class NacosRuntime:
     @property
     def config(self) -> NacosBootstrapConfig:
         return self._config
+
+    @property
+    def naming_client(self) -> NacosNamingService:
+        return self._naming_client
 
     async def register_service(self, port: int) -> None:
         if self._registered:
@@ -163,6 +168,8 @@ class NacosRuntime:
         await self._naming_client.shutdown()
         await self._config_client.shutdown()
         self._shutdown = True
+        if _nacos_runtime_cache is self:
+            set_nacos_runtime(None)
 
 
 async def bootstrap_nacos(settings: Dynaconf) -> NacosRuntime:
@@ -185,16 +192,30 @@ async def bootstrap_nacos(settings: Dynaconf) -> NacosRuntime:
                 settings,
             )
 
-        return NacosRuntime(
+        runtime = NacosRuntime(
             naming_client=naming_client,
             config_client=config_client,
             config=config,
             config_listener=listener,
         )
+        set_nacos_runtime(runtime)
+        return runtime
     except Exception:
         await naming_client.shutdown()
         await config_client.shutdown()
+        set_nacos_runtime(None)
         raise
+
+
+def set_nacos_runtime(runtime: NacosRuntime | None) -> None:
+    global _nacos_runtime_cache
+    _nacos_runtime_cache = runtime
+
+
+def get_nacos_runtime() -> NacosRuntime:
+    if _nacos_runtime_cache is None:
+        raise ConfigurationError("Nacos 运行时未初始化")
+    return _nacos_runtime_cache
 
 
 async def load_nacos_config(client: Any, data_id: str, group: str) -> dict[str, Any]:
@@ -220,9 +241,7 @@ def parse_nacos_config_content(
     try:
         data = yaml.safe_load(content)
     except Exception as exc:
-        raise ConfigurationError(
-            f"Nacos 配置解析失败: dataId={data_id}, group={group}"
-        ) from exc
+        raise ConfigurationError(f"Nacos 配置解析失败: dataId={data_id}, group={group}") from exc
     if data is None:
         raise ConfigurationError(f"Nacos 配置为空: dataId={data_id}, group={group}")
     if not isinstance(data, dict):
@@ -289,31 +308,36 @@ def _resolve_change_pair(
 
 
 def resolve_service_ip() -> str:
-    """优先使用显式环境变量，其次探测本机 IP"""
+    """使用显式环境变量解析服务 IP（禁止自动探测）"""
     for key in ("NACOS_SERVICE_IP", "POD_IP", "HOST_IP"):
         value = os.getenv(key)
+        if value and _is_usable_service_ip(value):
+            return value.strip()
         if value:
-            return value
+            raise ConfigurationError(f"服务注册 IP 非法: {key}={value}")
+    raise ConfigurationError("缺少服务注册 IP，请显式配置 NACOS_SERVICE_IP")
 
-    try:
-        host_ip = socket.gethostbyname(socket.gethostname())
-        if host_ip and not host_ip.startswith("127."):
-            return host_ip
-    except Exception:
-        pass
 
+def _is_usable_service_ip(value: str) -> bool:
+    text = value.strip()
+    if not text:
+        return False
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.connect(("8.8.8.8", 80))
-            return sock.getsockname()[0]
-    except Exception as exc:
-        raise ConfigurationError("无法解析服务 IP，请显式配置 NACOS_SERVICE_IP") from exc
+        parsed = ip_address(text)
+    except ValueError:
+        return False
+    if parsed.is_loopback or parsed.is_unspecified or parsed.is_multicast or parsed.is_link_local:
+        return False
+    # RFC 2544 基准测试保留网段，不应作为服务注册地址。
+    if parsed.version == 4 and parsed in ip_network("198.18.0.0/15"):
+        return False
+    return True
 
 
 def _build_client_config(config: NacosBootstrapConfig):
     heartbeat_millis = max(config.heartbeat_interval, 1) * 1000
-    log_dir = os.getenv("NACOS_LOG_DIR", "/tmp/datapillar-logs/nacos")
-    cache_dir = os.getenv("NACOS_CACHE_DIR", "/tmp/datapillar-logs/nacos/cache")
+    log_dir = os.getenv("NACOS_LOG_DIR", "/tmp/datapillar-logs/nacos")  # noqa: S108
+    cache_dir = os.getenv("NACOS_CACHE_DIR", "/tmp/datapillar-logs/nacos/cache")  # noqa: S108
     return (
         ClientConfigBuilder()
         .server_address(config.server_addr)

@@ -26,6 +26,11 @@ public final class TenantContextHolder {
         return context == null ? null : context.getTenantId();
     }
 
+    public static String getTenantCode() {
+        TenantContext context = CONTEXT.get();
+        return context == null ? null : context.getTenantCode();
+    }
+
     public static Long getActorUserId() {
         TenantContext context = CONTEXT.get();
         return context == null ? null : context.getActorUserId();

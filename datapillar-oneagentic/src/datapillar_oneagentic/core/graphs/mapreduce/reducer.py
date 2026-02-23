@@ -15,12 +15,12 @@ import json
 import logging
 from typing import Any
 
-from datapillar_oneagentic.context import ContextBuilder
 from pydantic import BaseModel
 
-from datapillar_oneagentic.exception import AgentErrorClassifier
-from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
+from datapillar_oneagentic.context import ContextBuilder
 from datapillar_oneagentic.core.graphs.mapreduce.schemas import MapReducePlan, MapReduceResult
+from datapillar_oneagentic.core.status import ExecutionStatus
+from datapillar_oneagentic.exception import AgentExecutionFailedException
 from datapillar_oneagentic.utils.prompt_format import format_markdown
 from datapillar_oneagentic.utils.structured_output import parse_structured_output
 
@@ -114,15 +114,13 @@ async def reduce_map_results(
         if result.status in (ExecutionStatus.FAILED, ExecutionStatus.ABORTED)
     ]
     if failed_results:
-        failure_kind = failed_results[0].failure_kind or FailureKind.BUSINESS
         detail = "; ".join(
             f"{item.task_id}/{item.agent_id}:{item.error or 'Unknown error'}"
             for item in failed_results
         )
-        raise AgentErrorClassifier.from_failure(
+        raise AgentExecutionFailedException(
+            f"MapReduce map phase failed: {detail}",
             agent_id=failed_results[0].agent_id,
-            error=f"MapReduce map phase failed: {detail}",
-            failure_kind=failure_kind,
         )
 
     content = _format_results(plan, results)

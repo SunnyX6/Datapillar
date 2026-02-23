@@ -10,7 +10,6 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,26 +22,25 @@ import org.springframework.web.bind.annotation.RestController;
  * @author Sunny
  * @date 2026-01-01
  */
-@Tag(name = "租户功能授权", description = "租户功能授权接口")
+@Tag(name = "租户功能", description = "租户功能接口")
 @RestController
-@RequestMapping("/admin/tenants/{tenantId}")
+@RequestMapping("/admin/tenant/current/features")
 @RequiredArgsConstructor
 public class TenantFeatureAdminController {
 
     private final TenantFeatureAdminService tenantFeatureAdminService;
 
     @Operation(summary = "获取租户功能授权列表")
-    @GetMapping("/features")
+    @GetMapping
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<FeatureEntitlementDto.Item>> list(@PathVariable Long tenantId) {
+    public ApiResponse<List<FeatureEntitlementDto.Item>> list() {
         return ApiResponse.ok(tenantFeatureAdminService.listEntitlements());
     }
 
     @Operation(summary = "更新租户功能授权")
-    @PutMapping("/features")
+    @PutMapping
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> update(@PathVariable Long tenantId,
-                                    @Valid @RequestBody List<FeatureEntitlementDto.UpdateItem> items) {
+    public ApiResponse<Void> update(@Valid @RequestBody List<FeatureEntitlementDto.UpdateItem> items) {
         tenantFeatureAdminService.updateEntitlements(items);
         return ApiResponse.ok(null);
     }

@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package datapillar.security.v1;
+
+option java_multiple_files = true;
+option java_package = "com.sunny.datapillar.common.rpc.security.v1";
+
+import "datapillar/security/v1/common.proto";
+
+message EncryptRequest {
+  RpcMeta meta = 1;
+  string tenant_code = 2;
+  string purpose = 3;
+  string plaintext = 4;
+}
+
+message EncryptResponse {
+  string ciphertext = 1;
+}
+
+message EncryptResult {
+  oneof result {
+    EncryptResponse data = 1;
+    Error error = 2;
+  }
+}
+
+message DecryptRequest {
+  RpcMeta meta = 1;
+  string tenant_code = 2;
+  string purpose = 3;
+  string ciphertext = 4;
+}
+
+message DecryptResponse {
+  string plaintext = 1;
+}
+
+message DecryptResult {
+  oneof result {
+    DecryptResponse data = 1;
+    Error error = 2;
+  }
+}
+
+message EnsureTenantKeyRequest {
+  RpcMeta meta = 1;
+  string tenant_code = 2;
+}
+
+message EnsureTenantKeyResponse {
+  bool success = 1;
+  string tenant_code = 2;
+  string public_key_pem = 3;
+  string key_version = 4;
+  string fingerprint = 5;
+}
+
+message EnsureTenantKeyResult {
+  oneof result {
+    EnsureTenantKeyResponse data = 1;
+    Error error = 2;
+  }
+}
+
+message GetTenantKeyStatusRequest {
+  RpcMeta meta = 1;
+  string tenant_code = 2;
+}
+
+message GetTenantKeyStatusResponse {
+  bool exists = 1;
+  string tenant_code = 2;
+  string status = 3;
+  string key_version = 4;
+  string fingerprint = 5;
+}
+
+message GetTenantKeyStatusResult {
+  oneof result {
+    GetTenantKeyStatusResponse data = 1;
+    Error error = 2;
+  }
+}
+
+service CryptoService {
+  rpc EnsureTenantKey(EnsureTenantKeyRequest) returns (EnsureTenantKeyResult);
+  rpc Encrypt(EncryptRequest) returns (EncryptResult);
+  rpc Decrypt(DecryptRequest) returns (DecryptResult);
+  rpc GetTenantKeyStatus(GetTenantKeyStatusRequest) returns (GetTenantKeyStatusResult);
+}

@@ -51,6 +51,11 @@ public interface UserService {
     List<User> listUsers(Integer status);
 
     /**
+     * 更新当前租户成员状态
+     */
+    void updateTenantMemberStatus(Long userId, Integer status);
+
+    /**
      * 为用户分配角色
      */
     void assignRoles(Long userId, List<Long> roleIds);
@@ -69,11 +74,6 @@ public interface UserService {
      * 获取用户权限
      */
     List<FeatureObjectDto.ObjectPermission> getUserPermissions(Long userId);
-
-    /**
-     * 更新用户权限（全量覆盖）
-     */
-    void updateUserPermissions(Long userId, List<FeatureObjectDto.Assignment> permissions);
 
     /**
      * 更新当前用户个人信息

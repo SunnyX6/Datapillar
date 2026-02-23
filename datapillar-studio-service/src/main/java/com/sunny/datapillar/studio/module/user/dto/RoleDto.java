@@ -1,11 +1,9 @@
 package com.sunny.datapillar.studio.module.user.dto;
 
-import java.util.List;
-
-import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
-
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.time.LocalDateTime;
+import java.util.List;
 import lombok.Data;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -30,8 +28,6 @@ public class RoleDto {
 
         @Size(max = 16, message = "角色类型长度不能超过16个字符")
         private String type;
-
-        private List<FeatureObjectDto.Assignment> permissions;
     }
 
     @Data
@@ -45,8 +41,6 @@ public class RoleDto {
 
         @Size(max = 16, message = "角色类型长度不能超过16个字符")
         private String type;
-
-        private List<FeatureObjectDto.Assignment> permissions;
     }
 
     @Data
@@ -59,5 +53,32 @@ public class RoleDto {
         private String description;
         private Integer status;
         private Integer sort;
+        private Integer isBuiltin;
+        private Long memberCount;
+    }
+
+    @Data
+    @Schema(name = "RoleMemberItem")
+    public static class MemberItem {
+        private Long userId;
+        private String username;
+        private String nickname;
+        private String email;
+        private String phone;
+        private Integer memberStatus;
+        private LocalDateTime joinedAt;
+        private LocalDateTime assignedAt;
+    }
+
+    @Data
+    @Schema(name = "RoleMembersResponse")
+    public static class MembersResponse {
+        private Long roleId;
+        private String roleName;
+        private String roleType;
+        private Integer roleStatus;
+        private Integer roleBuiltin;
+        private Long memberCount;
+        private List<MemberItem> members;
     }
 }

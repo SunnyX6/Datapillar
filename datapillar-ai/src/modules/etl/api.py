@@ -1,12 +1,9 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
-"""
-ETL 模块 API 路由
+"""ETL 模块 API 路由。"""
 
-提供工作流生成相关的 API 接口
-"""
+from __future__ import annotations
 
 import logging
 from typing import Any
@@ -14,25 +11,25 @@ from typing import Any
 from datapillar_oneagentic import Datapillar
 from datapillar_oneagentic.core.types import SessionKey
 from datapillar_oneagentic.sse import StreamManager
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from src.modules.etl.agents import create_etl_team
 from src.modules.etl.sse_protocol import RunRegistry, adapt_sse_stream
-from src.shared.web import ApiResponse
+from src.shared.exception import BadRequestException, InternalException
+from src.shared.web import ApiResponse, ApiSuccessResponseSchema
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# 全局 SSE 流管理器
 etl_stream_manager = StreamManager()
 etl_run_registry = RunRegistry()
 
 
 class WorkflowRequest(BaseModel):
-    """工作流生成请求"""
+    """工作流生成请求。"""
 
     user_input: str | None = Field(None, alias="userInput", description="用户输入")
     session_id: str | None = Field(None, alias="sessionId", description="会话ID")
@@ -44,7 +41,7 @@ class WorkflowRequest(BaseModel):
 
 
 def _get_team(request: Request) -> Datapillar:
-    """获取 ETL 团队实例"""
+    """获取 ETL 团队实例。"""
     current_user = request.state.current_user
     tenant_id = current_user.tenant_id
     teams: dict[int, Datapillar] | None = getattr(request.app.state, "etl_teams", None)
@@ -83,20 +80,14 @@ class _TeamOrchestratorAdapter:
             yield event
 
 
-@router.post("/workflow/chat")
-async def chat(payload: WorkflowRequest, request: Request):
-    """
-    统一的 ETL 多智能体工作流入口
-
-    自动判断场景：
-    - 有 resume_value：interrupt 恢复
-    - 有 user_input：新消息（后端自动判断是新会话还是续聊）
-    """
+@router.post("/chat", response_model=ApiSuccessResponseSchema)
+async def chat(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
+    """统一的 ETL 多智能体工作流入口。"""
     current_user = request.state.current_user
     team = _get_team(request)
 
     if not payload.session_id:
-        raise HTTPException(status_code=400, detail="sessionId 不能为空")
+        raise BadRequestException("sessionId 不能为空")
 
     user_id = str(current_user.user_id)
     key = _build_session_key(team, payload.session_id, user_id)
@@ -105,7 +96,10 @@ async def chat(payload: WorkflowRequest, request: Request):
     if payload.resume_value is not None:
         etl_run_registry.start_run(str(key))
         logger.info(
-            f"[ETL Resume] user={current_user.username}, userId={user_id}, sessionId={payload.session_id}"
+            "[ETL Resume] user=%s, userId=%s, sessionId=%s",
+            current_user.username,
+            user_id,
+            payload.session_id,
         )
         await etl_stream_manager.chat(
             orchestrator=orchestrator,
@@ -115,11 +109,14 @@ async def chat(payload: WorkflowRequest, request: Request):
         )
     else:
         if not payload.user_input:
-            raise HTTPException(status_code=400, detail="userInput 不能为空")
+            raise BadRequestException("userInput 不能为空")
 
         etl_run_registry.start_run(str(key))
         logger.info(
-            f"[ETL Chat] user={current_user.username}, userId={user_id}, sessionId={payload.session_id}"
+            "[ETL Chat] user=%s, userId=%s, sessionId=%s",
+            current_user.username,
+            user_id,
+            payload.session_id,
         )
         await etl_stream_manager.chat(
             orchestrator=orchestrator,
@@ -129,17 +126,34 @@ async def chat(payload: WorkflowRequest, request: Request):
         )
 
     return ApiResponse.success(
-        request=request,
         data={
             "success": True,
-            "stream_url": f"/api/ai/etl/workflow/sse?sessionId={payload.session_id}",
+            "stream_url": f"/api/ai/biz/etl/sse?sessionId={payload.session_id}",
         },
     )
 
 
-@router.get("/workflow/sse")
-async def workflow_sse(request: Request, session_id: str = Query(..., alias="sessionId")):
-    """SSE/JSON 事件流：前端可用 Last-Event-ID 重连重放（断线续传）"""
+@router.get(
+    "/sse",
+    response_class=EventSourceResponse,
+    responses={
+        200: {
+            "description": "SSE 事件流",
+            "content": {
+                "text/event-stream": {
+                    "schema": {
+                        "type": "string",
+                        "example": "event: connected\\ndata: {\"event\":\"connected\"}\\n\\n",
+                    }
+                }
+            },
+        }
+    },
+)
+async def workflow_sse(
+    request: Request, session_id: str = Query(..., alias="sessionId")
+) -> EventSourceResponse:
+    """SSE/JSON 事件流：前端可用 Last-Event-ID 重连重放（断线续传）。"""
     current_user = request.state.current_user
     team = _get_team(request)
 
@@ -178,18 +192,20 @@ async def workflow_sse(request: Request, session_id: str = Query(..., alias="ses
     )
 
 
-@router.post("/session/clear")
-async def clear_session(payload: WorkflowRequest, request: Request):
-    """清除会话历史"""
+@router.post("/session/clear", response_model=ApiSuccessResponseSchema)
+async def clear_session(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
+    """清除会话历史。"""
     current_user = request.state.current_user
     team = _get_team(request)
 
     if not payload.session_id:
-        raise HTTPException(status_code=400, detail="sessionId 不能为空")
+        raise BadRequestException("sessionId 不能为空")
 
     logger.info(
-        f"[Clear] user={current_user.username}, userId={current_user.user_id}, "
-        f"sessionId={payload.session_id}"
+        "[Clear] user=%s, userId=%s, sessionId=%s",
+        current_user.username,
+        current_user.user_id,
+        payload.session_id,
     )
 
     key = _build_session_key(team, payload.session_id, str(current_user.user_id))
@@ -198,13 +214,12 @@ async def clear_session(payload: WorkflowRequest, request: Request):
         await team.clear_session(session_id=key.session_id)
     except Exception as exc:
         logger.error("清理 checkpoint 失败: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail="清理会话失败") from exc
+        raise InternalException("清理会话失败", cause=exc) from exc
 
     etl_stream_manager.clear_session(key=key)
     etl_run_registry.finish_run(str(key))
 
     return ApiResponse.success(
-        request=request,
         data={
             "success": True,
             "message": "历史对话已清除",
@@ -212,26 +227,23 @@ async def clear_session(payload: WorkflowRequest, request: Request):
     )
 
 
-@router.post("/workflow/abort")
-async def abort_workflow(payload: WorkflowRequest, request: Request):
-    """
-    打断当前 run
-
-    打断的是 run（当前执行），不是 session（对话历史）。
-    用户可以在打断后继续在同一个 session 发送新消息。
-    """
+@router.post("/abort", response_model=ApiSuccessResponseSchema)
+async def abort_workflow(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
+    """打断当前 run。"""
     current_user = request.state.current_user
 
     if not payload.session_id:
-        raise HTTPException(status_code=400, detail="sessionId 不能为空")
+        raise BadRequestException("sessionId 不能为空")
 
     user_id = str(current_user.user_id)
     team = _get_team(request)
     key = _build_session_key(team, payload.session_id, user_id)
 
     logger.info(
-        f"[Abort] user={current_user.username}, userId={user_id}, "
-        f"sessionId={payload.session_id}"
+        "[Abort] user=%s, userId=%s, sessionId=%s",
+        current_user.username,
+        user_id,
+        payload.session_id,
     )
 
     if payload.interrupt_id:
@@ -245,11 +257,11 @@ async def abort_workflow(payload: WorkflowRequest, request: Request):
             key=key,
         )
         message = "已停止" if aborted else "没有正在运行的任务"
+
     if aborted:
         etl_run_registry.finish_run(str(key))
 
     return ApiResponse.success(
-        request=request,
         data={
             "success": True,
             "aborted": aborted,
@@ -258,53 +270,40 @@ async def abort_workflow(payload: WorkflowRequest, request: Request):
     )
 
 
-@router.post("/session/compact")
-async def compact_session(payload: WorkflowRequest, request: Request):
-    """
-    手动压缩会话记忆
-
-    类似 Claude Code 的 /compact 命令。
-    当前框架暂未启用压缩能力，会返回 not_implemented。
-    """
+@router.post("/session/compact", response_model=ApiSuccessResponseSchema)
+async def compact_session(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
+    """手动压缩会话记忆。"""
     current_user = request.state.current_user
     team = _get_team(request)
 
     if not payload.session_id:
-        raise HTTPException(status_code=400, detail="sessionId 不能为空")
+        raise BadRequestException("sessionId 不能为空")
 
     user_id = str(current_user.user_id)
     key = _build_session_key(team, payload.session_id, user_id)
 
     logger.info(
-        f"[Compact] user={current_user.username}, userId={user_id}, "
-        f"sessionId={payload.session_id}"
+        "[Compact] user=%s, userId=%s, sessionId=%s",
+        current_user.username,
+        user_id,
+        payload.session_id,
     )
 
     try:
         result = await team.compact_session(session_id=key.session_id)
     except Exception as exc:
         logger.error("压缩失败: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail="压缩失败") from exc
+        raise InternalException("压缩失败", cause=exc) from exc
 
-    return ApiResponse.success(request=request, data=result)
+    return ApiResponse.success(data=result)
 
 
-@router.get("/session/stats")
+@router.get("/session/stats", response_model=ApiSuccessResponseSchema)
 async def get_session_stats(
     request: Request,
     session_id: str = Query(..., alias="sessionId"),
-):
-    """
-    获取会话统计信息
-
-    返回：
-    - session_id: 会话 ID
-    - namespace: 命名空间
-    - exists: 是否存在
-    - message_count: 消息数量
-    - deliverables_count: 交付物数量
-    - active_agent: 当前活跃 Agent
-    """
+) -> dict[str, Any]:
+    """获取会话统计信息。"""
     current_user = request.state.current_user
     team = _get_team(request)
     key = _build_session_key(team, session_id, str(current_user.user_id))
@@ -313,6 +312,6 @@ async def get_session_stats(
         stats = await team.get_session_stats(session_id=key.session_id)
     except Exception as exc:
         logger.error("获取统计信息失败: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail="获取统计信息失败") from exc
+        raise InternalException("获取统计信息失败", cause=exc) from exc
 
-    return ApiResponse.success(request=request, data=stats)
+    return ApiResponse.success(data=stats)

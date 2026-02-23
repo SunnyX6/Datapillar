@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_COMPARE_MODELS, connectModel, filterModels, toggleModelSelection } from '@/layouts/llm/utils'
+import { MAX_COMPARE_MODELS, collectConnectedModelIds, connectModel, filterModels, toggleModelSelection } from '@/layouts/llm/utils'
 import type { ModelFilters, ModelRecord } from '@/layouts/llm/types'
 
 describe('LLM 筛选工具函数', () => {
@@ -57,6 +57,15 @@ describe('LLM 筛选工具函数', () => {
       'openai/gpt-4o',
       'deepseek/deepseek-chat-v3'
     ])
+  })
+
+  it('提取已连接模型 ID 时忽略未连接模型', () => {
+    const connectedIds = collectConnectedModelIds([
+      { id: 'model-a', hasApiKey: true },
+      { id: 'model-b', hasApiKey: false },
+      { id: 'model-c', hasApiKey: undefined }
+    ])
+    expect(connectedIds).toEqual(['model-a'])
   })
 
   it('限制对比选择数量并允许取消', () => {

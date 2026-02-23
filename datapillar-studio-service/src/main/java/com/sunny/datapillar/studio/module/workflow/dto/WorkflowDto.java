@@ -21,6 +21,7 @@ public class WorkflowDto {
     @Data
     @Schema(name = "WorkflowCreate")
     public static class Create {
+        @NotNull(message = "项目ID不能为空")
         private Long projectId;
 
         @NotBlank(message = "工作流名称不能为空")

@@ -3,40 +3,37 @@ import { describe, expect, it, vi } from 'vitest'
 import { act } from 'react-dom/test-utils'
 import { createRoot } from 'react-dom/client'
 import { FunctionalPermission } from '@/layouts/profile/permission/FunctionalPermission'
-import type { RoleDefinition, UserItem } from '@/layouts/profile/permission/Permission'
+import type { RoleDefinition } from '@/layouts/profile/permission/Permission'
 
 const basePermissions: RoleDefinition['permissions'] = [
   {
-    id: 'asset.catalog',
-    name: '元数据目录',
-    category: '数据资产',
-    description: '浏览数据目录与资产信息',
-    level: 'READ'
+    objectId: 101,
+    objectName: '元数据目录',
+    objectPath: '/governance/metadata',
+    objectType: 'MENU',
+    location: 'governance',
+    categoryName: '数据资产',
+    level: 'READ',
+    tenantLevel: 'ADMIN',
   },
   {
-    id: 'build.workflow',
-    name: '工作流编排',
-    category: '开发与发布',
-    description: '编排与调度数据工作流',
-    level: 'NONE'
-  }
+    objectId: 202,
+    objectName: '工作流编排',
+    objectPath: '/workflow',
+    objectType: 'MENU',
+    location: 'workflow',
+    categoryName: '开发与发布',
+    level: 'DISABLE',
+    tenantLevel: 'READ',
+  },
 ]
 
 const role: RoleDefinition = {
   id: 'role_dev',
+  type: 'USER',
   name: '研发工程师',
   description: '用于测试',
-  permissions: basePermissions
-}
-
-const user: UserItem = {
-  id: 'u-1',
-  name: '测试用户',
-  email: 'test@datapillar.io',
-  roleId: 'role_dev',
-  status: '已激活',
-  lastActive: '刚刚',
-  customPermissions: [{ id: 'asset.catalog', level: 'WRITE' }]
+  permissions: basePermissions,
 }
 
 const render = (ui: JSX.Element) => {
@@ -49,7 +46,10 @@ const render = (ui: JSX.Element) => {
   return { container, root }
 }
 
-const unmount = (root: ReturnType<typeof createRoot>, container: HTMLDivElement) => {
+const unmount = (
+  root: ReturnType<typeof createRoot>,
+  container: HTMLDivElement,
+) => {
   act(() => {
     root.unmount()
   })
@@ -60,24 +60,30 @@ describe('FunctionalPermission', () => {
   it('角色模式渲染权限项', () => {
     const onUpdate = vi.fn()
     const { container, root } = render(
-      <FunctionalPermission mode="role" role={role} onUpdatePermission={onUpdate} />
+      <FunctionalPermission role={role} onUpdatePermission={onUpdate} />,
     )
 
     expect(container.textContent).toContain('元数据目录')
-    expect(container.textContent).toContain('浏览数据目录与资产信息')
+    expect(container.textContent).toContain('/governance/metadata')
 
     unmount(root, container)
   })
 
-  it('用户模式显示继承与覆盖提示', () => {
+  it('点击权限按钮时回调角色权限更新', () => {
     const onUpdate = vi.fn()
     const { container, root } = render(
-      <FunctionalPermission mode="user" role={role} user={user} onUpdatePermission={onUpdate} />
+      <FunctionalPermission role={role} onUpdatePermission={onUpdate} />,
     )
 
-    expect(container.textContent).toContain('独立权限配置模式')
-    expect(container.textContent).toContain('覆盖继承')
-    expect(container.textContent).toContain('继承自角色')
+    const firstPermissionDisableButton = container.querySelector('button')
+    expect(firstPermissionDisableButton).not.toBeNull()
+    act(() => {
+      firstPermissionDisableButton?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true }),
+      )
+    })
+
+    expect(onUpdate).toHaveBeenCalledWith(101, 'DISABLE')
 
     unmount(root, container)
   })

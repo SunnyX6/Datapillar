@@ -19,17 +19,17 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class SessionStateStore {
 
-    private static final String ROTATE_SESSION_SCRIPT = "local status=redis.call(GET, KEYS[1]); "
-            + "if status~=ARGV[1] then return __SESSION_INACTIVE__; end; "
-            + "local refreshJti=redis.call(GET, KEYS[2]); "
-            + "if (not refreshJti) or refreshJti~=ARGV[2] then return __REFRESH_REUSED__; end; "
-            + "local oldAccess=redis.call(GET, KEYS[3]); "
-            + "redis.call(SET, KEYS[2], ARGV[3], EX, ARGV[5]); "
-            + "redis.call(SET, KEYS[3], ARGV[4], EX, ARGV[5]); "
-            + "redis.call(EXPIRE, KEYS[1], ARGV[5]); "
-            + "redis.call(EXPIRE, KEYS[4], ARGV[5]); "
-            + "redis.call(EXPIRE, KEYS[5], ARGV[5]); "
-            + "if oldAccess then return oldAccess; else return ; end;";
+    private static final String ROTATE_SESSION_SCRIPT = "local status=redis.call('GET', KEYS[1]); "
+            + "if status~=ARGV[1] then return '__SESSION_INACTIVE__'; end; "
+            + "local refreshJti=redis.call('GET', KEYS[2]); "
+            + "if (not refreshJti) or refreshJti~=ARGV[2] then return '__REFRESH_REUSED__'; end; "
+            + "local oldAccess=redis.call('GET', KEYS[3]); "
+            + "redis.call('SET', KEYS[2], ARGV[3], 'EX', ARGV[5]); "
+            + "redis.call('SET', KEYS[3], ARGV[4], 'EX', ARGV[5]); "
+            + "redis.call('EXPIRE', KEYS[1], ARGV[5]); "
+            + "redis.call('EXPIRE', KEYS[4], ARGV[5]); "
+            + "redis.call('EXPIRE', KEYS[5], ARGV[5]); "
+            + "if oldAccess then return oldAccess; else return ''; end;";
 
     private static final long REVOKED_MARK_SECONDS = 604800L;
 

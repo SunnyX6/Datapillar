@@ -9,5 +9,5 @@ package com.sunny.datapillar.studio.module.tenant.service;
  */
 public interface TenantInvitationBizService {
 
-    void acceptInvitation(Long tenantId, String inviteCode);
+    void acceptInvitation(String inviteCode);
 }

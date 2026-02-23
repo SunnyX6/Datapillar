@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
@@ -8,11 +7,10 @@ OpenLineage 事件处理器
 接收事件 → 队列缓冲 → 批量写入 Neo4j
 """
 
+import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
-
-import logging
 
 from src.infrastructure.repository.neo4j_uow import neo4j_async_session
 from src.modules.openlineage.core.queue import AsyncEventQueue, QueueConfig
@@ -21,6 +19,7 @@ from src.modules.openlineage.schemas.events import RunEvent
 from src.modules.openlineage.writers.lineage_writer import LineageWriter
 from src.modules.openlineage.writers.metadata_writer import MetadataWriter
 from src.shared.config.runtime import get_runtime_config
+from src.shared.context import reset_request_scope, set_request_scope
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +43,15 @@ class ProcessorStats:
             "events_failed": self.events_failed,
             "uptime_seconds": round(uptime, 2),
         }
+
+
+@dataclass(frozen=True)
+class QueuedOpenLineageEvent:
+    """OpenLineage 入队事件（含租户与操作人上下文）。"""
+
+    tenant_id: int
+    operator_user_id: int
+    event: RunEvent
 
 
 class EventProcessor:
@@ -70,6 +78,7 @@ class EventProcessor:
 
         self._config = get_runtime_config().openlineage_sink
         self._stats = ProcessorStats()
+        self._tenant_stats: dict[int, ProcessorStats] = {}
 
         # 初始化队列
         queue_config = QueueConfig(
@@ -90,6 +99,13 @@ class EventProcessor:
             "event_processor_initialized",
             extra={"data": {"config": self._config.model_dump()}},
         )
+
+    def _get_or_create_tenant_stats(self, tenant_id: int) -> ProcessorStats:
+        tenant_stats = self._tenant_stats.get(tenant_id)
+        if tenant_stats is None:
+            tenant_stats = ProcessorStats()
+            self._tenant_stats[tenant_id] = tenant_stats
+        return tenant_stats
 
     async def start(self, paused: bool = True) -> None:
         """
@@ -114,7 +130,7 @@ class EventProcessor:
             extra={"data": {"stats": self._stats.to_dict()}},
         )
 
-    async def put(self, event: RunEvent) -> dict[str, Any]:
+    async def put(self, queued_event: QueuedOpenLineageEvent) -> dict[str, Any]:
         """
         接收事件入队
 
@@ -122,11 +138,14 @@ class EventProcessor:
             处理结果
         """
         self._stats.events_received += 1
+        tenant_stats = self._get_or_create_tenant_stats(queued_event.tenant_id)
+        tenant_stats.events_received += 1
 
-        if not await self._queue.put(event):
+        if not await self._queue.put(queued_event):
             return {"success": False, "error": "Queue full"}
 
         self._stats.events_queued += 1
+        tenant_stats.events_queued += 1
         return {
             "success": True,
             "queued": True,
@@ -161,12 +180,33 @@ class EventProcessor:
 
         result["metadata_writer"] = self._metadata_writer.get_detailed_stats()
         result["lineage_writer"] = self._lineage_writer.get_detailed_stats()
+        result["tenants"] = {
+            str(tenant_id): tenant_stats.to_dict()
+            for tenant_id, tenant_stats in sorted(self._tenant_stats.items())
+        }
 
         return result
 
-    async def _process_batch(self, events: list[RunEvent]) -> None:
+    def get_tenant_stats(self, tenant_id: int) -> dict[str, Any]:
+        """获取租户维度统计。"""
+        tenant_stats = self._get_or_create_tenant_stats(tenant_id)
+        result = tenant_stats.to_dict()
+        queue_stats = self._queue.stats
+        result["queue"] = {
+            "current_size": queue_stats.current_size,
+            "total_received": queue_stats.total_received,
+            "total_processed": queue_stats.total_processed,
+            "total_failed": queue_stats.total_failed,
+        }
+        return result
+
+    async def _process_batch(self, events: list[QueuedOpenLineageEvent]) -> None:
         """批量处理事件"""
-        for event in events:
+        for queued_event in events:
+            event = queued_event.event
+            tenant_id = queued_event.tenant_id
+            tenant_stats = self._get_or_create_tenant_stats(tenant_id)
+            token = set_request_scope(tenant_id, queued_event.operator_user_id)
             try:
                 async with neo4j_async_session() as session:
                     plans = self._plan_builder.build(event)
@@ -176,17 +216,34 @@ class EventProcessor:
                     await self._lineage_writer.write(session, plans.lineage)
 
                 self._stats.events_processed += 1
+                tenant_stats.events_processed += 1
                 logger.debug(
                     "event_processed",
-                    extra={"data": {"job": event.job.name}},
+                    extra={
+                        "data": {
+                            "job": event.job.name,
+                            "tenant_id": tenant_id,
+                            "operator_user_id": queued_event.operator_user_id,
+                        }
+                    },
                 )
 
             except Exception as e:
                 self._stats.events_failed += 1
+                tenant_stats.events_failed += 1
                 logger.error(
                     "event_process_failed",
-                    extra={"data": {"job": event.job.name, "error": str(e)}},
+                    extra={
+                        "data": {
+                            "job": event.job.name,
+                            "tenant_id": tenant_id,
+                            "operator_user_id": queued_event.operator_user_id,
+                            "error": str(e),
+                        }
+                    },
                 )
+            finally:
+                reset_request_scope(token)
 
 
 _event_processor: EventProcessor | None = None

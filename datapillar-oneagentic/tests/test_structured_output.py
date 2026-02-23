@@ -5,7 +5,11 @@ import json
 import pytest
 from pydantic import BaseModel
 
-from datapillar_oneagentic.exception import LLMError, LLMErrorCategory
+from datapillar_oneagentic.exception import (
+    RecoveryAction,
+    StructuredOutputInvalidException,
+    action_for,
+)
 from datapillar_oneagentic.utils.structured_output import (
     ModelCapabilities,
     extract_json,
@@ -95,21 +99,21 @@ def test_parse_structured7() -> None:
         "parsed": None,
         "parsing_error": "bad",
     }
-    with pytest.raises(LLMError) as exc:
+    with pytest.raises(StructuredOutputInvalidException) as exc:
         parse_structured_output(result, _Payload, strict=True)
     error = exc.value
-    assert error.category == LLMErrorCategory.STRUCTURED_OUTPUT
+    assert action_for(error) == RecoveryAction.FAIL_FAST
     assert error.raw == "raw"
     assert error.parsing_error == "bad"
 
 
 def test_parse_structured8() -> None:
-    with pytest.raises(LLMError):
+    with pytest.raises(StructuredOutputInvalidException):
         parse_structured_output("- summary: ok", _MarkdownPayload)
 
 
 def test_parse_structured9() -> None:
-    with pytest.raises(LLMError):
+    with pytest.raises(StructuredOutputInvalidException):
         parse_structured_output("   ", _Payload)
 
 

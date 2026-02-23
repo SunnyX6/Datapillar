@@ -1,7 +1,9 @@
 package com.sunny.datapillar.auth.service.login.method.sso;
 
-import com.sunny.datapillar.auth.security.keystore.KeyStorage;
+import com.sunny.datapillar.auth.security.keystore.TenantKeyService;
+import com.sunny.datapillar.common.exception.BadRequestException;
 import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
+import com.sunny.datapillar.common.exception.InternalException;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
@@ -15,8 +17,6 @@ import javax.crypto.spec.SecretKeySpec;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import com.sunny.datapillar.common.exception.BadRequestException;
-import com.sunny.datapillar.common.exception.InternalException;
 
 /**
  * 单点登录SecretCodec组件
@@ -33,9 +33,9 @@ public class SsoSecretCodec {
     private static final int GCM_NONCE_BYTES = 12;
     private static final int GCM_TAG_BITS = 128;
 
-    private final KeyStorage keyStorage;
+    private final TenantKeyService tenantKeyService;
 
-    public String decryptSecret(Long tenantId, String encoded) {
+    public String decryptSecret(String tenantCode, String encoded) {
         if (!StringUtils.hasText(encoded)) {
             return null;
         }
@@ -44,7 +44,7 @@ public class SsoSecretCodec {
         }
         try {
             byte[] payload = Base64.getDecoder().decode(encoded.substring(ENC_PREFIX.length()));
-            PrivateKey privateKey = parsePrivateKey(loadTenantPrivateKey(tenantId));
+            PrivateKey privateKey = parsePrivateKey(loadTenantPrivateKey(tenantCode));
             int encryptedKeyLength = resolveEncryptedKeyLength(privateKey);
             if (payload.length <= encryptedKeyLength + GCM_NONCE_BYTES) {
                 throw new InternalException("SSO配置无效: %s", "clientSecret");
@@ -62,12 +62,12 @@ public class SsoSecretCodec {
         }
     }
 
-    private byte[] loadTenantPrivateKey(Long tenantId) {
-        if (tenantId == null || tenantId <= 0) {
+    private byte[] loadTenantPrivateKey(String tenantCode) {
+        if (!StringUtils.hasText(tenantCode)) {
             throw new BadRequestException("参数错误");
         }
         try {
-            byte[] privateKey = keyStorage.loadPrivateKey(tenantId);
+            byte[] privateKey = tenantKeyService.loadPrivateKey(tenantCode.trim());
             if (privateKey == null || privateKey.length == 0) {
                 throw new InternalException("SSO配置无效: %s", "tenant_private_key_missing");
             }

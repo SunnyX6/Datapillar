@@ -1,6 +1,7 @@
 package com.sunny.datapillar.studio.module.llm.service;
 
 import com.sunny.datapillar.studio.module.llm.dto.LlmManagerDto;
+import com.sunny.datapillar.studio.module.llm.dto.LlmProviderDto;
 import com.sunny.datapillar.studio.module.llm.enums.AiModelType;
 import java.util.List;
 
@@ -14,6 +15,12 @@ import java.util.List;
 public interface LlmManagerService {
 
     List<LlmManagerDto.ProviderResponse> listProviders();
+
+    void createProvider(Long userId, LlmProviderDto.CreateRequest request);
+
+    void updateProvider(Long userId, String providerCode, LlmProviderDto.UpdateRequest request);
+
+    void deleteProvider(Long userId, String providerCode);
 
     List<LlmManagerDto.ModelResponse> listModels(String keyword,
                                                   String providerCode,
@@ -34,9 +41,12 @@ public interface LlmManagerService {
                                                                 Long targetUserId,
                                                                 boolean onlyEnabled);
 
-    LlmManagerDto.ModelUsageResponse grantUserModelUsage(Long operatorUserId, Long targetUserId, Long modelId);
+    LlmManagerDto.ModelUsageResponse upsertUserModelGrant(Long operatorUserId,
+                                                           Long targetUserId,
+                                                           Long modelId,
+                                                           LlmManagerDto.ModelGrantRequest request);
 
-    void revokeUserModelUsage(Long operatorUserId, Long targetUserId, Long modelId);
+    void deleteUserModelGrant(Long operatorUserId, Long targetUserId, Long modelId);
 
     LlmManagerDto.ModelUsageResponse setUserDefaultModel(Long operatorUserId, Long targetUserId, Long modelId);
 }

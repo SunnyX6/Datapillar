@@ -1,92 +1,69 @@
-import { createApiClient } from '@/lib/api/client'
-import type { ApiResponse } from '@/types/api'
-import {
-  pickDefinedParams,
-  requireApiData,
-  type StudioPageParams,
-  type StudioPageResult,
-  toPageResult
-} from './studioCommon'
+import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/lib/api'
+import { pickDefinedParams, toPageResult } from './studioCommon'
+import type {
+  ListDagVersionsParams,
+  ListStudioWorkflowsResult,
+  ListStudioWorkflowsParams,
+  ListWorkflowRunsParams,
+  StudioWorkflowItem
+} from '@/types/studio/workflow'
 
-const studioBizClient = createApiClient({
-  baseURL: '/api/studio/biz',
-  timeout: 30000
-})
-
-export interface StudioWorkflowItem {
-  id: number
-  projectId: number
-  projectName?: string | null
-  workflowName: string
-  triggerType: number
-  status: number
-  description?: string | null
-  jobCount?: number | null
-  createdAt: string
-  updatedAt: string
-}
-
-export interface ListStudioWorkflowsParams extends StudioPageParams {
-  workflowName?: string
-  status?: number
-}
+export type {
+  ListDagVersionsParams,
+  ListStudioWorkflowsResult,
+  ListStudioWorkflowsParams,
+  ListWorkflowRunsParams,
+  StudioWorkflowItem
+} from '@/types/studio/workflow'
 
 export async function listWorkflows(
   projectId: number,
   params: ListStudioWorkflowsParams = {}
-): Promise<StudioPageResult<StudioWorkflowItem>> {
-  const response = await studioBizClient.get<ApiResponse<StudioWorkflowItem[]>>(
-    `/projects/${projectId}/workflows`,
-    {
-      params: pickDefinedParams({
-        workflowName: params.workflowName,
-        status: params.status,
-        limit: params.limit,
-        offset: params.offset,
-        maxLimit: params.maxLimit
-      })
-    }
-  )
-  return toPageResult(response.data)
-}
-
-export interface ListWorkflowRunsParams extends StudioPageParams {
-  state?: string
+): Promise<ListStudioWorkflowsResult> {
+  const response = await requestEnvelope<StudioWorkflowItem[]>({
+    baseURL: API_BASE.studioBiz,
+    url: API_PATH.workflow.list,
+    params: pickDefinedParams({
+      projectId,
+      workflowName: params.workflowName,
+      status: params.status,
+      limit: params.limit,
+      offset: params.offset,
+      maxLimit: params.maxLimit
+    })
+  })
+  return toPageResult(response)
 }
 
 export async function listWorkflowRuns(
-  projectId: number,
+  _projectId: number,
   workflowId: number,
   params: ListWorkflowRunsParams = {}
 ): Promise<Record<string, unknown>> {
-  const response = await studioBizClient.get<ApiResponse<Record<string, unknown>>>(
-    `/projects/${projectId}/workflows/${workflowId}/runs`,
-    {
-      params: pickDefinedParams({
-        state: params.state,
-        limit: params.limit,
-        offset: params.offset,
-        maxLimit: params.maxLimit
-      })
-    }
-  )
-  return requireApiData(response.data)
+  return requestData<Record<string, unknown>>({
+    baseURL: API_BASE.studioBiz,
+    url: API_PATH.workflow.runs(workflowId),
+    params: pickDefinedParams({
+      state: params.state,
+      limit: params.limit,
+      offset: params.offset,
+      maxLimit: params.maxLimit
+    })
+  })
 }
 
 export async function listDagVersions(
-  projectId: number,
+  _projectId: number,
   workflowId: number,
-  params: StudioPageParams = {}
+  params: ListDagVersionsParams = {}
 ): Promise<Record<string, unknown>> {
-  const response = await studioBizClient.get<ApiResponse<Record<string, unknown>>>(
-    `/projects/${projectId}/workflow/${workflowId}/dag/versions`,
-    {
-      params: pickDefinedParams({
-        limit: params.limit,
-        offset: params.offset,
-        maxLimit: params.maxLimit
-      })
-    }
-  )
-  return requireApiData(response.data)
+  return requestData<Record<string, unknown>>({
+    baseURL: API_BASE.studioBiz,
+    url: API_PATH.workflow.dagVersions(workflowId),
+    params: pickDefinedParams({
+      limit: params.limit,
+      offset: params.offset,
+      maxLimit: params.maxLimit
+    })
+  })
 }

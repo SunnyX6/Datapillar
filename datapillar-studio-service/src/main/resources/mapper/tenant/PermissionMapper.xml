@@ -20,11 +20,6 @@
             WHERE ur.user_id = #{userId}
               AND ur.tenant_id = #{tenantId}
               AND rp.tenant_id = #{tenantId}
-            UNION
-            SELECT up.permission_id
-            FROM user_permission_overrides up
-            WHERE up.user_id = #{userId}
-              AND up.tenant_id = #{tenantId}
         )
     </select>
 

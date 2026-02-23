@@ -26,8 +26,8 @@ public class WorkflowJobBizServiceImpl implements WorkflowJobBizService {
     }
 
     @Override
-    public JobDto.Response getJobDetail(Long id) {
-        return jobService.getJobDetail(id);
+    public JobDto.Response getJobDetail(Long workflowId, Long id) {
+        return jobService.getJobDetail(workflowId, id);
     }
 
     @Override
@@ -36,13 +36,13 @@ public class WorkflowJobBizServiceImpl implements WorkflowJobBizService {
     }
 
     @Override
-    public void updateJob(Long id, JobDto.Update dto) {
-        jobService.updateJob(id, dto);
+    public void updateJob(Long workflowId, Long id, JobDto.Update dto) {
+        jobService.updateJob(workflowId, id, dto);
     }
 
     @Override
-    public void deleteJob(Long id) {
-        jobService.deleteJob(id);
+    public void deleteJob(Long workflowId, Long id) {
+        jobService.deleteJob(workflowId, id);
     }
 
     @Override

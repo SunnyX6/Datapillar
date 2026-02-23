@@ -1,5 +1,6 @@
 server:
   port: 7002
+  address: ${SERVER_ADDRESS:0.0.0.0}
   servlet:
     context-path: /api/studio
 

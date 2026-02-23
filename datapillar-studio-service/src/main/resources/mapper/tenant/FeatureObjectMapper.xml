@@ -33,10 +33,9 @@
                c.name AS category_name,
                tp.code AS tenant_permission_code,
                CASE rp.permission_level
-                   WHEN 3 THEN 'ADMIN'
-                   WHEN 2 THEN 'WRITE'
+                   WHEN 2 THEN 'ADMIN'
                    WHEN 1 THEN 'READ'
-                   ELSE 'NONE'
+                   ELSE 'DISABLE'
                END AS permission_code
         FROM feature_objects o
         LEFT JOIN feature_object_categories c
@@ -48,7 +47,7 @@
         INNER JOIN permissions tp ON tp.id = tfe.permission_id
         LEFT JOIN (
             SELECT rp.object_id,
-                   MAX(CASE p.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END) AS permission_level
+                   MAX(CASE p.code WHEN 'ADMIN' THEN 2 WHEN 'READ' THEN 1 WHEN 'DISABLE' THEN 0 ELSE 0 END) AS permission_level
             FROM role_permissions rp
             INNER JOIN permissions p ON p.id = rp.permission_id
             WHERE rp.role_id = #{roleId}
@@ -69,10 +68,9 @@
                c.name AS category_name,
                tp.code AS tenant_permission_code,
                CASE rp.permission_level
-                   WHEN 3 THEN 'ADMIN'
-                   WHEN 2 THEN 'WRITE'
+                   WHEN 2 THEN 'ADMIN'
                    WHEN 1 THEN 'READ'
-                   ELSE 'NONE'
+                   ELSE 'DISABLE'
                END AS permission_code
         FROM feature_objects o
         LEFT JOIN feature_object_categories c
@@ -84,7 +82,7 @@
         INNER JOIN permissions tp ON tp.id = tfe.permission_id
         INNER JOIN (
             SELECT rp.object_id,
-                   MAX(CASE p.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END) AS permission_level
+                   MAX(CASE p.code WHEN 'ADMIN' THEN 2 WHEN 'READ' THEN 1 WHEN 'DISABLE' THEN 0 ELSE 0 END) AS permission_level
             FROM role_permissions rp
             INNER JOIN permissions p ON p.id = rp.permission_id
             WHERE rp.role_id = #{roleId}
@@ -99,11 +97,10 @@
         SELECT rp.object_id AS object_id,
                r.id AS role_id,
                r.name AS role_name,
-               CASE MAX(CASE p.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END)
-                   WHEN 3 THEN 'ADMIN'
-                   WHEN 2 THEN 'WRITE'
+               CASE MAX(CASE p.code WHEN 'ADMIN' THEN 2 WHEN 'READ' THEN 1 WHEN 'DISABLE' THEN 0 ELSE 0 END)
+                   WHEN 2 THEN 'ADMIN'
                    WHEN 1 THEN 'READ'
-                   ELSE 'NONE'
+                   ELSE 'DISABLE'
                END AS permission_code
         FROM role_permissions rp
         INNER JOIN permissions p ON p.id = rp.permission_id
@@ -114,21 +111,6 @@
           AND rp.tenant_id = #{tenantId}
           AND r.tenant_id = #{tenantId}
         GROUP BY rp.object_id, r.id, r.name
-    </select>
-
-    <select id="selectUserOverridePermissions" resultType="com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto$Assignment">
-        SELECT up.object_id AS object_id,
-               CASE MAX(CASE p.code WHEN 'ADMIN' THEN 3 WHEN 'WRITE' THEN 2 WHEN 'READ' THEN 1 ELSE 0 END)
-                   WHEN 3 THEN 'ADMIN'
-                   WHEN 2 THEN 'WRITE'
-                   WHEN 1 THEN 'READ'
-                   ELSE 'NONE'
-               END AS permission_code
-        FROM user_permission_overrides up
-        INNER JOIN permissions p ON p.id = up.permission_id
-        WHERE up.user_id = #{userId}
-          AND up.tenant_id = #{tenantId}
-        GROUP BY up.object_id
     </select>
 
     <select id="findByUserId" resultType="com.sunny.datapillar.studio.module.tenant.entity.FeatureObject">
@@ -150,11 +132,6 @@
                 WHERE ur.user_id = #{userId}
                   AND ur.tenant_id = #{tenantId}
                   AND rp.tenant_id = #{tenantId}
-                UNION
-                SELECT up.object_id
-                FROM user_permission_overrides up
-                WHERE up.user_id = #{userId}
-                  AND up.tenant_id = #{tenantId}
           )
         ORDER BY o.sort ASC, o.id ASC
     </select>

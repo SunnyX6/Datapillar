@@ -38,7 +38,6 @@ public class FeatureObjectDto {
         private Long categoryId;
         private String categoryName;
         private String permissionCode;
-        private String userOverrideCode;
         private String tenantPermissionCode;
         private List<RoleSource> roleSources;
     }

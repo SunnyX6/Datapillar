@@ -13,9 +13,9 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -28,9 +28,9 @@ import org.springframework.web.bind.annotation.RestController;
  * @author Sunny
  * @date 2026-01-01
  */
-@Tag(name = "工作流管理", description = "工作流 CRUD 接口")
+@Tag(name = "工作流", description = "工作流接口")
 @RestController
-@RequestMapping("/biz/projects/{projectId}")
+@RequestMapping("/biz/workflows")
 @RequiredArgsConstructor
 public class WorkflowBizController {
 
@@ -42,9 +42,9 @@ public class WorkflowBizController {
 
     @OpenApiPaged
     @Operation(summary = "获取项目的工作流列表")
-    @GetMapping("/workflows")
+    @GetMapping
     public ApiResponse<List<WorkflowDto.ListItem>> list(
-            @PathVariable Long projectId,
+            @RequestParam Long projectId,
             @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) Integer offset,
             @RequestParam(required = false) Integer maxLimit,
@@ -60,39 +60,31 @@ public class WorkflowBizController {
     }
 
     @Operation(summary = "获取工作流详情")
-    @GetMapping("/workflows/{id}")
-    public ApiResponse<WorkflowDto.Response> detail(
-            @PathVariable Long projectId,
-            @PathVariable Long id) {
-        return ApiResponse.ok(workflowBizService.getWorkflowDetail(id));
+    @GetMapping("/{workflowId}")
+    public ApiResponse<WorkflowDto.Response> detail(@PathVariable Long workflowId) {
+        return ApiResponse.ok(workflowBizService.getWorkflowDetail(workflowId));
     }
 
     @Operation(summary = "创建工作流")
-    @PostMapping("/workflow")
-    public ApiResponse<Void> create(
-            @PathVariable Long projectId,
-            @Valid @RequestBody WorkflowDto.Create dto) {
-        dto.setProjectId(projectId);
+    @PostMapping
+    public ApiResponse<Void> create(@Valid @RequestBody WorkflowDto.Create dto) {
         workflowBizService.createWorkflow(dto);
         return ApiResponse.ok();
     }
 
     @Operation(summary = "更新工作流")
-    @PutMapping("/workflow/{id}")
+    @PatchMapping("/{workflowId}")
     public ApiResponse<Void> update(
-            @PathVariable Long projectId,
-            @PathVariable Long id,
+            @PathVariable Long workflowId,
             @Valid @RequestBody WorkflowDto.Update dto) {
-        workflowBizService.updateWorkflow(id, dto);
+        workflowBizService.updateWorkflow(workflowId, dto);
         return ApiResponse.ok();
     }
 
     @Operation(summary = "删除工作流")
-    @DeleteMapping("/workflow/{id}")
-    public ApiResponse<Void> delete(
-            @PathVariable Long projectId,
-            @PathVariable Long id) {
-        workflowBizService.deleteWorkflow(id);
+    @DeleteMapping("/{workflowId}")
+    public ApiResponse<Void> delete(@PathVariable Long workflowId) {
+        workflowBizService.deleteWorkflow(workflowId);
         return ApiResponse.ok();
     }
 }

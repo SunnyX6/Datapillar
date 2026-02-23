@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
@@ -15,10 +14,11 @@ from functools import lru_cache
 
 from datapillar_oneagentic import DatapillarConfig
 
-from src.infrastructure.crypto.key_crypto import decrypt_api_key, is_encrypted
-from src.infrastructure.keystore import get_key_storage
 from src.infrastructure.repository.system.ai_model import Model
+from src.infrastructure.repository.system.tenant import Tenant
+from src.infrastructure.rpc.crypto import auth_crypto_rpc_client, is_encrypted_ciphertext
 from src.shared.config.runtime import get_agent_config, get_default_tenant_id, get_llm_config
+from src.shared.context import get_current_tenant_code, get_current_tenant_id
 
 
 def _coerce_dict(value: object) -> dict[str, object]:
@@ -31,8 +31,11 @@ def _coerce_dict(value: object) -> dict[str, object]:
 
 
 @lru_cache(maxsize=128)
-def get_datapillar_config(tenant_id: int | None = None) -> DatapillarConfig:
+def get_datapillar_config(
+    tenant_id: int | None = None, tenant_code: str | None = None
+) -> DatapillarConfig:
     resolved_tenant_id = tenant_id or get_default_tenant_id()
+    resolved_tenant_code = _resolve_tenant_code(resolved_tenant_id, tenant_code)
 
     chat_model = Model.get_chat_default(resolved_tenant_id)
     if not chat_model:
@@ -47,8 +50,8 @@ def get_datapillar_config(tenant_id: int | None = None) -> DatapillarConfig:
         raise ValueError("Embedding 模型必须配置 embedding_dimension")
 
     llm_config = _coerce_dict(get_llm_config())
-    chat_api_key = _decrypt_api_key(resolved_tenant_id, chat_model.get("api_key"))
-    embedding_api_key = _decrypt_api_key(resolved_tenant_id, embedding_model.get("api_key"))
+    chat_api_key = _decrypt_api_key(resolved_tenant_code, chat_model.get("api_key"))
+    embedding_api_key = _decrypt_api_key(resolved_tenant_code, embedding_model.get("api_key"))
     llm_config.update(
         {
             "provider": chat_model.get("provider_code"),
@@ -72,10 +75,28 @@ def get_datapillar_config(tenant_id: int | None = None) -> DatapillarConfig:
     )
 
 
-def _decrypt_api_key(tenant_id: int, encrypted_value: str | None) -> str:
+def _decrypt_api_key(tenant_code: str, encrypted_value: str | None) -> str:
     if not encrypted_value or not encrypted_value.strip():
         raise ValueError("api_key 为空")
-    if not is_encrypted(encrypted_value):
+    if not is_encrypted_ciphertext(encrypted_value):
         raise ValueError("api_key 未加密")
-    private_key = get_key_storage().load_private_key(tenant_id)
-    return decrypt_api_key(private_key, encrypted_value)
+    return auth_crypto_rpc_client.decrypt_llm_api_key_sync(
+        tenant_code=tenant_code,
+        ciphertext=encrypted_value,
+    )
+
+
+def _resolve_tenant_code(tenant_id: int, tenant_code: str | None) -> str:
+    normalized_input = str(tenant_code or "").strip()
+    if normalized_input:
+        return normalized_input
+
+    scope_tenant_code = str(get_current_tenant_code() or "").strip()
+    scope_tenant_id = get_current_tenant_id()
+    if scope_tenant_code and scope_tenant_id == tenant_id:
+        return scope_tenant_code
+
+    resolved = Tenant.get_code(tenant_id)
+    if resolved:
+        return resolved
+    raise ValueError("tenant_code 不存在")

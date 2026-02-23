@@ -59,10 +59,12 @@ public class SetupServiceImpl implements SetupService {
     private static final String DEFAULT_TENANT_TYPE = "ENTERPRISE";
     private static final String ADMIN_ROLE_TYPE = "ADMIN";
     private static final String ADMIN_ROLE_NAME = "超级管理员";
+    private static final int ADMIN_ROLE_SORT = 0;
     private static final String ADMIN_PERMISSION_CODE = "ADMIN";
     private static final String GRANT_SOURCE_SYSTEM = "SYSTEM";
 
     private static final int STATUS_ENABLED = 1;
+    private static final int ROLE_BUILTIN = 1;
     private static final int USER_NOT_DELETED = 0;
     private static final int MAX_TENANT_CODE_LENGTH = 64;
     private static final String DEFAULT_TENANT_CODE_PREFIX = "tenant";
@@ -134,8 +136,9 @@ public class SetupServiceImpl implements SetupService {
 
         Long tenantId = createTenant(request);
         User adminUser = createAdminUser(tenantId, request);
+        String tenantCode = requireTenantCode(tenantId);
         TenantContext previousContext = TenantContextHolder.get();
-        TenantContext setupContext = new TenantContext(tenantId, adminUser.getId(), tenantId, false);
+        TenantContext setupContext = new TenantContext(tenantId, tenantCode, adminUser.getId(), tenantId, false);
         TenantContextHolder.set(setupContext);
         try {
             bindTenantUser(tenantId, adminUser.getId());
@@ -220,6 +223,17 @@ public class SetupServiceImpl implements SetupService {
         return tenantService.createTenant(tenant);
     }
 
+    private String requireTenantCode(Long tenantId) {
+        if (tenantId == null || tenantId <= 0) {
+            throw new InternalException("服务器内部错误");
+        }
+        com.sunny.datapillar.studio.module.tenant.entity.Tenant tenant = tenantMapper.selectById(tenantId);
+        if (tenant == null || !StringUtils.hasText(tenant.getCode())) {
+            throw new InternalException("服务器内部错误");
+        }
+        return tenant.getCode().trim();
+    }
+
     private User createAdminUser(Long tenantId, SetupInitializeRequest request) {
         String email = resolveAdminEmail(request);
         String username = resolveAdminUsername(request);
@@ -272,7 +286,8 @@ public class SetupServiceImpl implements SetupService {
         if (existing != null) {
             existing.setType(ADMIN_ROLE_TYPE);
             existing.setStatus(STATUS_ENABLED);
-            existing.setSort(1);
+            existing.setSort(ADMIN_ROLE_SORT);
+            existing.setIsBuiltin(ROLE_BUILTIN);
             roleMapper.updateById(existing);
             return existing;
         }
@@ -283,7 +298,8 @@ public class SetupServiceImpl implements SetupService {
         role.setName(ADMIN_ROLE_NAME);
         role.setDescription("系统内置管理员");
         role.setStatus(STATUS_ENABLED);
-        role.setSort(1);
+        role.setSort(ADMIN_ROLE_SORT);
+        role.setIsBuiltin(ROLE_BUILTIN);
         int inserted = roleMapper.insert(role);
         if (inserted == 0 || role.getId() == null) {
             throw new InternalException("服务器内部错误");

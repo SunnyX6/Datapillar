@@ -24,7 +24,7 @@ import com.sunny.datapillar.common.exception.UnauthorizedException;
  * @author Sunny
  * @date 2026-01-01
  */
-@Tag(name = "LLM业务接口", description = "当前用户模型查询与默认模型设置")
+@Tag(name = "LLM", description = "LLM 接口")
 @RestController
 @RequestMapping("/biz/llms")
 @RequiredArgsConstructor

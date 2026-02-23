@@ -4,14 +4,10 @@
  * 负责词根、指标、修饰符、单位、值域等语义层资产管理
  */
 
-import {
-  gravitinoGet as get,
-  gravitinoPost as post,
-  gravitinoPut as put,
-  gravitinoDelete as del
-} from '@/lib/api/gravitino'
-import type { GravitinoBaseResponse } from '@/types/oneMeta'
-import type { MetricType, Metric, WordRootDTO, UnitDTO, MetricModifierDTO } from '@/types/metric'
+import { API_BASE, requestRaw } from '@/lib/api'
+import type { ApiError, ApiResponse } from '@/types/api'
+import type { GravitinoBaseResponse } from '@/types/onemeta/metadata'
+import type { MetricType, Metric, WordRootDTO, UnitDTO, MetricModifierDTO } from '@/types/onemeta/semantic'
 
 // 重新导出 API 类型供外部使用
 export type { MetricType, Metric, WordRootDTO, UnitDTO, MetricModifierDTO }
@@ -22,6 +18,61 @@ export const METALAKE_NAME = 'OneMeta'
 /** 语义层默认 Catalog 和 Schema */
 export const SEMANTIC_CATALOG = 'OneDS'
 export const SEMANTIC_SCHEMA = 'OneDS'
+
+function extractOneMetaMessage(response: GravitinoBaseResponse): string {
+  const candidate = response as { message?: unknown }
+  if (typeof candidate.message === 'string' && candidate.message.trim().length > 0) {
+    return candidate.message
+  }
+  return `操作失败 (code: ${response.code})`
+}
+
+function ensureOneMetaSuccess<T extends GravitinoBaseResponse>(response: T): T {
+  if (response.code !== 0) {
+    const error = new Error(extractOneMetaMessage(response)) as ApiError
+    error.code = response.code
+    error.response = response as unknown as ApiResponse<unknown>
+    throw error
+  }
+  return response
+}
+
+async function oneMetaGet<T extends GravitinoBaseResponse>(url: string): Promise<T> {
+  const response = await requestRaw<T>({
+    baseURL: API_BASE.oneMeta,
+    url
+  })
+  return ensureOneMetaSuccess(response)
+}
+
+async function oneMetaPost<T extends GravitinoBaseResponse>(url: string, data?: unknown): Promise<T> {
+  const response = await requestRaw<T, unknown>({
+    baseURL: API_BASE.oneMeta,
+    url,
+    method: 'POST',
+    data
+  })
+  return ensureOneMetaSuccess(response)
+}
+
+async function oneMetaPut<T extends GravitinoBaseResponse>(url: string, data?: unknown): Promise<T> {
+  const response = await requestRaw<T, unknown>({
+    baseURL: API_BASE.oneMeta,
+    url,
+    method: 'PUT',
+    data
+  })
+  return ensureOneMetaSuccess(response)
+}
+
+async function oneMetaDelete<T extends GravitinoBaseResponse>(url: string): Promise<T> {
+  const response = await requestRaw<T>({
+    baseURL: API_BASE.oneMeta,
+    url,
+    method: 'DELETE'
+  })
+  return ensureOneMetaSuccess(response)
+}
 
 // ============================================
 // WordRoot 词根管理
@@ -64,7 +115,7 @@ export async function fetchWordRoots(offset = 0, limit = 20): Promise<{
   offset: number
   limit: number
 }> {
-  const response = await get<WordRootListResponse>(
+  const response = await oneMetaGet<WordRootListResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/wordroots?offset=${offset}&limit=${limit}`
   )
 
@@ -80,7 +131,7 @@ export async function fetchWordRoots(offset = 0, limit = 20): Promise<{
  * 获取词根详情
  */
 export async function getWordRoot(code: string): Promise<WordRootDTO> {
-  const response = await get<WordRootResponse>(
+  const response = await oneMetaGet<WordRootResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/wordroots/${encodeURIComponent(code)}`
   )
   return response.root
@@ -90,7 +141,7 @@ export async function getWordRoot(code: string): Promise<WordRootDTO> {
  * 创建词根
  */
 export async function createWordRoot(data: CreateWordRootRequest): Promise<WordRootDTO> {
-  const response = await post<WordRootResponse>(
+  const response = await oneMetaPost<WordRootResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/wordroots`,
     data
   )
@@ -101,7 +152,7 @@ export async function createWordRoot(data: CreateWordRootRequest): Promise<WordR
  * 删除词根
  */
 export async function deleteWordRoot(code: string): Promise<void> {
-  await del<GravitinoBaseResponse>(
+  await oneMetaDelete<GravitinoBaseResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/wordroots/${encodeURIComponent(code)}`
   )
 }
@@ -110,7 +161,7 @@ export async function deleteWordRoot(code: string): Promise<void> {
  * 更新词根
  */
 export async function updateWordRoot(code: string, data: UpdateWordRootRequest): Promise<WordRootDTO> {
-  const response = await put<WordRootResponse>(
+  const response = await oneMetaPut<WordRootResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/wordroots/${encodeURIComponent(code)}`,
     data
   )
@@ -171,7 +222,7 @@ export async function fetchMetrics(offset = 0, limit = 20): Promise<{
   offset: number
   limit: number
 }> {
-  const response = await get<MetricListResponse>(
+  const response = await oneMetaGet<MetricListResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics?offset=${offset}&limit=${limit}`
   )
 
@@ -187,7 +238,7 @@ export async function fetchMetrics(offset = 0, limit = 20): Promise<{
  * 获取指标详情
  */
 export async function getMetric(code: string): Promise<Metric> {
-  const response = await get<MetricResponse>(
+  const response = await oneMetaGet<MetricResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/${encodeURIComponent(code)}`
   )
   return response.metric
@@ -197,7 +248,7 @@ export async function getMetric(code: string): Promise<Metric> {
  * 注册指标
  */
 export async function registerMetric(data: RegisterMetricRequest): Promise<Metric> {
-  const response = await post<MetricResponse>(
+  const response = await oneMetaPost<MetricResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics`,
     data
   )
@@ -208,7 +259,7 @@ export async function registerMetric(data: RegisterMetricRequest): Promise<Metri
  * 删除指标
  */
 export async function deleteMetric(code: string): Promise<void> {
-  await del<GravitinoBaseResponse>(
+  await oneMetaDelete<GravitinoBaseResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/${encodeURIComponent(code)}`
   )
 }
@@ -230,7 +281,7 @@ export async function updateMetric(code: string, data: UpdateMetricRequest): Pro
     updates.push({ '@type': 'updateDataType', newDataType: data.dataType })
   }
 
-  const response = await put<MetricResponse>(
+  const response = await oneMetaPut<MetricResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/${encodeURIComponent(code)}`,
     { updates }
   )
@@ -284,7 +335,7 @@ interface MetricVersionListResponse extends GravitinoBaseResponse {
  * 获取指标版本号列表
  */
 export async function fetchMetricVersionNumbers(code: string): Promise<number[]> {
-  const response = await get<MetricVersionListResponse>(
+  const response = await oneMetaGet<MetricVersionListResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/${encodeURIComponent(code)}/versions`
   )
   return response.versions || []
@@ -294,7 +345,7 @@ export async function fetchMetricVersionNumbers(code: string): Promise<number[]>
  * 获取指标版本详情
  */
 export async function fetchMetricVersion(code: string, version: number): Promise<MetricVersionItem> {
-  const response = await get<MetricVersionResponse>(
+  const response = await oneMetaGet<MetricVersionResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/${encodeURIComponent(code)}/versions/${version}`
   )
   return response.version
@@ -324,7 +375,7 @@ export async function alterMetricVersion(
   version: number,
   data: AlterMetricVersionRequest
 ): Promise<MetricVersionItem> {
-  const response = await put<MetricVersionResponse>(
+  const response = await oneMetaPut<MetricVersionResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/${encodeURIComponent(code)}/versions/${version}`,
     data
   )
@@ -335,7 +386,7 @@ export async function alterMetricVersion(
  * 切换指标当前版本
  */
 export async function switchMetricVersion(code: string, version: number): Promise<MetricVersionItem> {
-  const response = await put<MetricVersionResponse>(
+  const response = await oneMetaPut<MetricVersionResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/${encodeURIComponent(code)}/switch/versions/${version}`,
     {}
   )
@@ -383,7 +434,7 @@ export async function fetchUnits(offset = 0, limit = 50): Promise<{
   offset: number
   limit: number
 }> {
-  const response = await get<UnitListResponse>(
+  const response = await oneMetaGet<UnitListResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/units?offset=${offset}&limit=${limit}`
   )
 
@@ -399,7 +450,7 @@ export async function fetchUnits(offset = 0, limit = 50): Promise<{
  * 获取单位详情
  */
 export async function getUnit(code: string): Promise<UnitDTO> {
-  const response = await get<UnitResponse>(
+  const response = await oneMetaGet<UnitResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/units/${encodeURIComponent(code)}`
   )
   return response.unit
@@ -409,7 +460,7 @@ export async function getUnit(code: string): Promise<UnitDTO> {
  * 创建单位
  */
 export async function createUnit(data: CreateUnitRequest): Promise<UnitDTO> {
-  const response = await post<UnitResponse>(
+  const response = await oneMetaPost<UnitResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/units`,
     data
   )
@@ -420,7 +471,7 @@ export async function createUnit(data: CreateUnitRequest): Promise<UnitDTO> {
  * 删除单位
  */
 export async function deleteUnit(code: string): Promise<void> {
-  await del<GravitinoBaseResponse>(
+  await oneMetaDelete<GravitinoBaseResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/units/${encodeURIComponent(code)}`
   )
 }
@@ -429,7 +480,7 @@ export async function deleteUnit(code: string): Promise<void> {
  * 更新单位
  */
 export async function updateUnit(code: string, data: UpdateUnitRequest): Promise<UnitDTO> {
-  const response = await put<UnitResponse>(
+  const response = await oneMetaPut<UnitResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/units/${encodeURIComponent(code)}`,
     data
   )
@@ -476,7 +527,7 @@ export async function fetchModifiers(offset = 0, limit = 50): Promise<{
   offset: number
   limit: number
 }> {
-  const response = await get<ModifierListResponse>(
+  const response = await oneMetaGet<ModifierListResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/modifiers?offset=${offset}&limit=${limit}`
   )
 
@@ -492,7 +543,7 @@ export async function fetchModifiers(offset = 0, limit = 50): Promise<{
  * 获取修饰符详情
  */
 export async function getModifier(code: string): Promise<MetricModifierDTO> {
-  const response = await get<ModifierResponse>(
+  const response = await oneMetaGet<ModifierResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/modifiers/${encodeURIComponent(code)}`
   )
   return response.modifier
@@ -502,7 +553,7 @@ export async function getModifier(code: string): Promise<MetricModifierDTO> {
  * 创建修饰符
  */
 export async function createModifier(data: CreateModifierRequest): Promise<MetricModifierDTO> {
-  const response = await post<ModifierResponse>(
+  const response = await oneMetaPost<ModifierResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/modifiers`,
     data
   )
@@ -513,7 +564,7 @@ export async function createModifier(data: CreateModifierRequest): Promise<Metri
  * 删除修饰符
  */
 export async function deleteModifier(code: string): Promise<void> {
-  await del<GravitinoBaseResponse>(
+  await oneMetaDelete<GravitinoBaseResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/modifiers/${encodeURIComponent(code)}`
   )
 }
@@ -522,7 +573,7 @@ export async function deleteModifier(code: string): Promise<void> {
  * 更新修饰符
  */
 export async function updateModifier(code: string, data: UpdateModifierRequest): Promise<MetricModifierDTO> {
-  const response = await put<ModifierResponse>(
+  const response = await oneMetaPut<ModifierResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/metrics/modifiers/${encodeURIComponent(code)}`,
     data
   )
@@ -590,7 +641,7 @@ export async function fetchValueDomains(offset = 0, limit = 20): Promise<{
   offset: number
   limit: number
 }> {
-  const response = await get<ValueDomainListResponse>(
+  const response = await oneMetaGet<ValueDomainListResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/valuedomains?offset=${offset}&limit=${limit}`
   )
 
@@ -607,7 +658,7 @@ export async function fetchValueDomains(offset = 0, limit = 20): Promise<{
  * @param domainCode 值域编码，如 ORDER_STATUS
  */
 export async function fetchValueDomainsByCode(domainCode: string): Promise<ValueDomainItemDTO[]> {
-  const response = await get<ValueDomainListResponse>(
+  const response = await oneMetaGet<ValueDomainListResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/valuedomains?offset=0&limit=100`
   )
   const domain = (response.valueDomains || []).find((d) => d.domainCode === domainCode)
@@ -623,7 +674,7 @@ interface ValueDomainResponse extends GravitinoBaseResponse {
  * 创建值域
  */
 export async function createValueDomain(data: CreateValueDomainRequest): Promise<ValueDomainDTO> {
-  const response = await post<ValueDomainResponse>(
+  const response = await oneMetaPost<ValueDomainResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/valuedomains`,
     data
   )
@@ -635,7 +686,7 @@ export async function createValueDomain(data: CreateValueDomainRequest): Promise
  * @param domainCode 值域编码
  */
 export async function deleteValueDomain(domainCode: string): Promise<void> {
-  await del<GravitinoBaseResponse>(
+  await oneMetaDelete<GravitinoBaseResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/valuedomains/${encodeURIComponent(domainCode)}`
   )
 }
@@ -657,7 +708,7 @@ export async function updateValueDomain(
   domainCode: string,
   data: UpdateValueDomainRequest
 ): Promise<ValueDomainDTO> {
-  const response = await put<ValueDomainResponse>(
+  const response = await oneMetaPut<ValueDomainResponse>(
     `/metalakes/${METALAKE_NAME}/catalogs/${SEMANTIC_CATALOG}/schemas/${SEMANTIC_SCHEMA}/valuedomains/${encodeURIComponent(domainCode)}`,
     data
   )
@@ -685,7 +736,7 @@ interface TagNamesResponse extends GravitinoBaseResponse {
  * @param fullName 对象全名（如 catalog.schema.domainCode）
  */
 export async function getObjectTags(objectType: string, fullName: string): Promise<string[]> {
-  const response = await get<TagNamesResponse>(
+  const response = await oneMetaGet<TagNamesResponse>(
     `/metalakes/${METALAKE_NAME}/objects/${objectType}/${encodeURIComponent(fullName)}/tags`
   )
   return response.names || []
@@ -702,7 +753,7 @@ export async function associateObjectTags(
   fullName: string,
   request: TagsAssociateRequest
 ): Promise<string[]> {
-  const response = await post<TagNamesResponse>(
+  const response = await oneMetaPost<TagNamesResponse>(
     `/metalakes/${METALAKE_NAME}/objects/${objectType}/${encodeURIComponent(fullName)}/tags`,
     request
   )

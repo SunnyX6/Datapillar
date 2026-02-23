@@ -32,9 +32,6 @@ public interface FeatureObjectMapper extends BaseMapper<FeatureObject> {
     List<RoleSource> selectUserRoleSources(@Param("tenantId") Long tenantId,
                                            @Param("userId") Long userId);
 
-    List<FeatureObjectDto.Assignment> selectUserOverridePermissions(@Param("tenantId") Long tenantId,
-                                                                    @Param("userId") Long userId);
-
     /**
      * 根据用户ID查询可访问的功能对象列表
      */

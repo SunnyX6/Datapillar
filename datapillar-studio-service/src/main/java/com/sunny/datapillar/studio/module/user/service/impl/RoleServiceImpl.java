@@ -24,7 +24,6 @@ import com.sunny.datapillar.studio.module.user.entity.Role;
 import com.sunny.datapillar.studio.module.user.entity.RolePermission;
 import com.sunny.datapillar.studio.module.user.mapper.RoleMapper;
 import com.sunny.datapillar.studio.module.user.service.RoleService;
-import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +32,7 @@ import com.sunny.datapillar.common.exception.UnauthorizedException;
 import com.sunny.datapillar.common.exception.ForbiddenException;
 import com.sunny.datapillar.common.exception.NotFoundException;
 import com.sunny.datapillar.common.exception.AlreadyExistsException;
+import com.sunny.datapillar.common.exception.ConflictException;
 
 /**
  * 角色服务实现
@@ -46,6 +46,9 @@ import com.sunny.datapillar.common.exception.AlreadyExistsException;
 @RequiredArgsConstructor
 public class RoleServiceImpl implements RoleService {
 
+    private static final int BUILTIN_ROLE_ENABLED = 1;
+    private static final int CUSTOM_ROLE_FLAG = 0;
+
     private final RoleMapper roleMapper;
     private final PermissionMapper permissionMapper;
     private final FeatureObjectMapper featureObjectMapper;
@@ -53,10 +56,8 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     public RoleDto.Response getRoleById(Long id) {
-        Role role = roleMapper.selectById(id);
-        if (role == null) {
-            throw new NotFoundException("角色不存在: roleId=%s", id);
-        }
+        Long tenantId = getRequiredTenantId();
+        Role role = requireRoleInTenant(id, tenantId);
 
         RoleDto.Response response = new RoleDto.Response();
         BeanUtils.copyProperties(role, response);
@@ -77,12 +78,11 @@ public class RoleServiceImpl implements RoleService {
         role.setDescription(dto.getDescription());
         String normalizedType = normalizeRoleType(dto.getType());
         role.setType(normalizedType == null ? "USER" : normalizedType);
+        role.setIsBuiltin(CUSTOM_ROLE_FLAG);
+        Integer maxSort = roleMapper.selectMaxSortByTenant(tenantId);
+        role.setSort((maxSort == null ? 0 : maxSort) + 1);
 
         roleMapper.insert(role);
-
-        if (dto.getPermissions() != null) {
-            updateRolePermissions(role.getId(), dto.getPermissions());
-        }
 
         log.info("Created role: id={}, name={}", role.getId(), role.getName());
         return role.getId();
@@ -92,10 +92,8 @@ public class RoleServiceImpl implements RoleService {
     @Transactional
     public void updateRole(Long id, RoleDto.Update dto) {
         Long tenantId = getRequiredTenantId();
-        Role existingRole = roleMapper.selectById(id);
-        if (existingRole == null) {
-            throw new NotFoundException("角色不存在: roleId=%s", id);
-        }
+        Role existingRole = requireRoleInTenant(id, tenantId);
+        ensureRoleMutable(existingRole);
 
         if (dto.getName() != null && !dto.getName().isBlank()) {
             Role roleWithSameName = roleMapper.findByName(tenantId, dto.getName());
@@ -113,22 +111,19 @@ public class RoleServiceImpl implements RoleService {
 
         roleMapper.updateById(existingRole);
 
-        if (dto.getPermissions() != null) {
-            updateRolePermissions(id, dto.getPermissions());
-        }
-
         log.info("Updated role: id={}", id);
     }
 
     @Override
     @Transactional
     public void deleteRole(Long id) {
-        Role role = roleMapper.selectById(id);
-        if (role == null) {
-            throw new NotFoundException("角色不存在: roleId=%s", id);
-        }
-
         Long tenantId = getRequiredTenantId();
+        Role role = requireRoleInTenant(id, tenantId);
+        ensureRoleMutable(role);
+        long memberCount = roleMapper.countUsersByRoleId(tenantId, id);
+        if (memberCount > 0) {
+            throw new ConflictException("角色下存在成员，无法删除");
+        }
         roleMapper.deleteById(id);
         roleMapper.deleteRolePermissions(tenantId, id);
         roleMapper.deleteUserRolesByRoleId(tenantId, id);
@@ -139,16 +134,24 @@ public class RoleServiceImpl implements RoleService {
     @Override
     public List<RoleDto.Response> getRoleList() {
         Long tenantId = getRequiredTenantId();
-        LambdaQueryWrapper<Role> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Role::getTenantId, tenantId);
-        List<Role> roles = roleMapper.selectList(wrapper);
-        return roles.stream()
-                .map(role -> {
-                    RoleDto.Response dto = new RoleDto.Response();
-                    BeanUtils.copyProperties(role, dto);
-                    return dto;
-                })
-                .toList();
+        return roleMapper.selectRoleListWithMemberCount(tenantId);
+    }
+
+    @Override
+    public RoleDto.MembersResponse getRoleMembers(Long roleId, Integer status) {
+        Long tenantId = getRequiredTenantId();
+        Role role = requireRoleInTenant(roleId, tenantId);
+        List<RoleDto.MemberItem> members = roleMapper.selectRoleMembers(tenantId, roleId, status);
+
+        RoleDto.MembersResponse response = new RoleDto.MembersResponse();
+        response.setRoleId(role.getId());
+        response.setRoleName(role.getName());
+        response.setRoleType(role.getType());
+        response.setRoleStatus(role.getStatus());
+        response.setRoleBuiltin(role.getIsBuiltin());
+        response.setMemberCount((long) members.size());
+        response.setMembers(members);
+        return response;
     }
 
     @Override
@@ -165,11 +168,8 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     public List<FeatureObjectDto.ObjectPermission> getRolePermissions(Long roleId, String scope) {
-        Role role = roleMapper.selectById(roleId);
-        if (role == null) {
-            throw new NotFoundException("角色不存在: roleId=%s", roleId);
-        }
         Long tenantId = getRequiredTenantId();
+        requireRoleInTenant(roleId, tenantId);
         String normalizedScope = scope == null ? "ALL" : scope.trim().toUpperCase(Locale.ROOT);
         Map<String, Permission> permissionMap = getPermissionMap();
         if ("ASSIGNED".equals(normalizedScope)) {
@@ -187,11 +187,9 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional
     public void updateRolePermissions(Long roleId, List<FeatureObjectDto.Assignment> permissions) {
-        Role role = roleMapper.selectById(roleId);
-        if (role == null) {
-            throw new NotFoundException("角色不存在: roleId=%s", roleId);
-        }
         Long tenantId = getRequiredTenantId();
+        Role role = requireRoleInTenant(roleId, tenantId);
+        ensureRoleMutable(role);
         roleMapper.deleteRolePermissions(tenantId, roleId);
 
         if (permissions == null || permissions.isEmpty()) {
@@ -270,6 +268,23 @@ public class RoleServiceImpl implements RoleService {
             return null;
         }
         return type.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private Role requireRoleInTenant(Long roleId, Long tenantId) {
+        LambdaQueryWrapper<Role> query = new LambdaQueryWrapper<>();
+        query.eq(Role::getId, roleId)
+                .eq(Role::getTenantId, tenantId);
+        Role role = roleMapper.selectOne(query);
+        if (role == null) {
+            throw new NotFoundException("角色不存在: roleId=%s", roleId);
+        }
+        return role;
+    }
+
+    private void ensureRoleMutable(Role role) {
+        if (role != null && role.getIsBuiltin() != null && role.getIsBuiltin() == BUILTIN_ROLE_ENABLED) {
+            throw new ForbiddenException("内置角色不允许修改或删除");
+        }
     }
 
     private void applyTenantPermissionLimit(List<FeatureObjectDto.ObjectPermission> items,

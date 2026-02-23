@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantMapper;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoGenericClient;
+import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,16 +22,19 @@ class TenantKeyCheckTest {
     private TenantMapper tenantMapper;
 
     @Mock
-    private AuthCryptoGenericClient authCryptoClient;
+    private AuthCryptoRpcClient authCryptoClient;
 
     @Test
     void run_shouldPassWhenAllTenantKeysAreReady() {
         Tenant tenant = new Tenant();
         tenant.setId(1L);
-        tenant.setEncryptPublicKey("public-key");
+        tenant.setCode("tenant-1");
+        tenant.setEncryptPublicKey("-----BEGIN PUBLIC KEY-----mock-----END PUBLIC KEY-----");
 
         when(tenantMapper.selectList(any())).thenReturn(List.of(tenant));
-        when(authCryptoClient.existsPrivateKey(1L)).thenReturn(true);
+        when(authCryptoClient.getTenantKeyStatus("tenant-1"))
+                .thenReturn(new AuthCryptoRpcClient.TenantKeyStatus(
+                        true, "tenant-1", "READY", "v1", "fp-1"));
 
         TenantKeyCheck check = new TenantKeyCheck(tenantMapper, authCryptoClient);
 
@@ -42,20 +45,23 @@ class TenantKeyCheckTest {
     void run_shouldFailWhenTenantKeyPairIncomplete() {
         Tenant tenant1 = new Tenant();
         tenant1.setId(1L);
-        tenant1.setEncryptPublicKey(null);
+        tenant1.setCode(null);
 
         Tenant tenant2 = new Tenant();
         tenant2.setId(2L);
-        tenant2.setEncryptPublicKey("public-key-2");
+        tenant2.setCode("tenant-2");
+        tenant2.setEncryptPublicKey(null);
 
         when(tenantMapper.selectList(any())).thenReturn(List.of(tenant1, tenant2));
-        when(authCryptoClient.existsPrivateKey(1L)).thenReturn(true);
-        when(authCryptoClient.existsPrivateKey(2L)).thenReturn(false);
+        when(authCryptoClient.getTenantKeyStatus("tenant-2"))
+                .thenReturn(new AuthCryptoRpcClient.TenantKeyStatus(
+                        false, "tenant-2", "MISSING", "", ""));
 
         TenantKeyCheck check = new TenantKeyCheck(tenantMapper, authCryptoClient);
 
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> check.run(null));
-        assertTrue(exception.getMessage().contains("missingPublicKeyTenantIds=[1]"));
-        assertTrue(exception.getMessage().contains("missingPrivateKeyTenantIds=[2]"));
+        assertTrue(exception.getMessage().contains("missingTenantCodeTenantIds=[1]"));
+        assertTrue(exception.getMessage().contains("missingTenantPublicKeyTenantIds=[2]"));
+        assertTrue(exception.getMessage().contains("missingOrInvalidKeyTenantIds=[2]"));
     }
 }

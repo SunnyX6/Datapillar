@@ -14,6 +14,8 @@ import java.util.Map;
  */
 public final class PermissionLevelUtil {
 
+    private static final String DISABLE_CODE = "DISABLE";
+
     private PermissionLevelUtil() {
     }
 
@@ -22,7 +24,7 @@ public final class PermissionLevelUtil {
             return null;
         }
         String normalized = code.trim().toUpperCase(Locale.ROOT);
-        return normalized.isEmpty() || "NONE".equals(normalized) ? null : normalized;
+        return normalized.isEmpty() ? null : normalized;
     }
 
     public static int level(Map<String, Permission> permissionMap, String code) {
@@ -42,7 +44,7 @@ public final class PermissionLevelUtil {
 
     public static String maxCode(Map<String, Permission> permissionMap, Collection<String> codes) {
         if (codes == null || codes.isEmpty()) {
-            return "NONE";
+            return DISABLE_CODE;
         }
         String maxCode = null;
         int maxLevel = 0;
@@ -53,27 +55,27 @@ public final class PermissionLevelUtil {
                 maxCode = normalizeCode(code);
             }
         }
-        return maxCode == null ? "NONE" : maxCode;
+        return maxCode == null ? DISABLE_CODE : maxCode;
     }
 
     public static String maxCode(Map<String, Permission> permissionMap, String codeA, String codeB) {
         int levelA = level(permissionMap, codeA);
         int levelB = level(permissionMap, codeB);
         if (levelA >= levelB) {
-            return normalizeCode(codeA) == null ? "NONE" : normalizeCode(codeA);
+            return normalizeCode(codeA) == null ? DISABLE_CODE : normalizeCode(codeA);
         }
-        return normalizeCode(codeB) == null ? "NONE" : normalizeCode(codeB);
+        return normalizeCode(codeB) == null ? DISABLE_CODE : normalizeCode(codeB);
     }
 
     public static String minCode(Map<String, Permission> permissionMap, String codeA, String codeB) {
         int levelA = level(permissionMap, codeA);
         int levelB = level(permissionMap, codeB);
         if (levelA == 0 || levelB == 0) {
-            return "NONE";
+            return DISABLE_CODE;
         }
         if (levelA <= levelB) {
-            return normalizeCode(codeA) == null ? "NONE" : normalizeCode(codeA);
+            return normalizeCode(codeA) == null ? DISABLE_CODE : normalizeCode(codeA);
         }
-        return normalizeCode(codeB) == null ? "NONE" : normalizeCode(codeB);
+        return normalizeCode(codeB) == null ? DISABLE_CODE : normalizeCode(codeB);
     }
 }

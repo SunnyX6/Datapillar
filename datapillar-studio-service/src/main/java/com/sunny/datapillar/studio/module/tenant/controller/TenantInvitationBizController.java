@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,9 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
  * @author Sunny
  * @date 2026-01-01
  */
-@Tag(name = "租户邀请业务", description = "租户邀请业务接口")
+@Tag(name = "租户邀请", description = "租户邀请接口")
 @RestController
-@RequestMapping("/biz/tenants/{tenantId}/invitation")
+@RequestMapping("/biz/tenant/current/invitations")
 @RequiredArgsConstructor
 public class TenantInvitationBizController {
 
@@ -31,9 +30,8 @@ public class TenantInvitationBizController {
 
     @Operation(summary = "接受邀请")
     @PostMapping("/accept")
-    public ApiResponse<Map<String, Object>> accept(@PathVariable Long tenantId,
-                                                   @Valid @RequestBody InvitationDto.AcceptRequest request) {
-        tenantInvitationBizService.acceptInvitation(tenantId, request.getInviteCode());
+    public ApiResponse<Map<String, Object>> accept(@Valid @RequestBody InvitationDto.AcceptRequest request) {
+        tenantInvitationBizService.acceptInvitation(request.getInviteCode());
         return ApiResponse.ok(Map.of());
     }
 }

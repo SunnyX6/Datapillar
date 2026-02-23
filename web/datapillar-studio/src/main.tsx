@@ -4,7 +4,9 @@ import { RouterProvider } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { router } from './router'
-import { useThemeStore, useI18nStore } from '@/stores'
+import { AppRuntimeErrorBoundary } from './router/AppRuntimeErrorBoundary'
+import { handleAppError, normalizeRuntimeError } from '@/lib/error-center'
+import { useThemeStore, useI18nStore, useAuthStore } from '@/stores'
 import '@/lib/i18n' // 初始化 i18n
 import './index.css' // Tailwind CSS
 
@@ -20,6 +22,8 @@ export function App() {
     useThemeStore.getState().initialize()
     // 初始化国际化系统
     useI18nStore.getState().initialize()
+    // 初始化认证状态（页面直刷 /home 时也要先恢复会话）
+    void useAuthStore.getState().initializeAuth()
   }, [])
 
   // 监听语言变化，动态更新网站标题
@@ -27,9 +31,45 @@ export function App() {
     document.title = t('site.title')
   }, [t, i18n.language])
 
+  // 兜底捕获非 React 渲染阶段的运行时错误（如未处理 Promise 异常）
+  useEffect(() => {
+    const handleWindowError = (event: ErrorEvent) => {
+      const runtimeError = event.error ?? new Error(event.message)
+      handleAppError(
+        normalizeRuntimeError(runtimeError, {
+          module: 'runtime/window-error',
+          isCoreRequest: true,
+          raw: {
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno
+          }
+        })
+      )
+    }
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      handleAppError(
+        normalizeRuntimeError(event.reason, {
+          module: 'runtime/unhandled-rejection',
+          isCoreRequest: true
+        })
+      )
+    }
+
+    window.addEventListener('error', handleWindowError)
+    window.addEventListener('unhandledrejection', handleUnhandledRejection)
+    return () => {
+      window.removeEventListener('error', handleWindowError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+    }
+  }, [])
+
   return (
     <>
-      <RouterProvider router={router} />
+      <AppRuntimeErrorBoundary>
+        <RouterProvider router={router} />
+      </AppRuntimeErrorBoundary>
       <Toaster position="top-right" richColors />
     </>
   )
@@ -43,28 +83,11 @@ if (!rootElement) {
 
 const root = ReactDOM.createRoot(rootElement)
 
-const renderApp = () => {
-  try {
-    root.render(
-      <StrictMode>
-        <App />
-      </StrictMode>
-    )
-  } catch (error) {
-    document.body.innerHTML = `
-    <div style="padding: 40px; font-family: monospace;">
-      <h1 style="color: red;">应用启动失败</h1>
-      <pre style="background: #f5f5f5; padding: 20px; border-radius: 8px; overflow: auto;">
-${error instanceof Error ? error.message : String(error)}
-
-${error instanceof Error && error.stack ? error.stack : ''}
-      </pre>
-    </div>
-  `
-}
-}
-
-renderApp()
+root.render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+)
 
 if (import.meta.hot) {
   import.meta.hot.accept()

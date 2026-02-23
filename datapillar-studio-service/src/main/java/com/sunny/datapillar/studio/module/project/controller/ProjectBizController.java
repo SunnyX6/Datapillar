@@ -14,8 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,9 +27,9 @@ import org.springframework.web.bind.annotation.RestController;
  * @author Sunny
  * @date 2026-01-01
  */
-@Tag(name = "项目管理", description = "项目管理相关接口")
+@Tag(name = "项目", description = "项目接口")
 @RestController
-@RequestMapping("/biz")
+@RequestMapping("/biz/users/me/projects")
 @RequiredArgsConstructor
 public class ProjectBizController {
 
@@ -41,7 +41,7 @@ public class ProjectBizController {
 
     @OpenApiPaged
     @Operation(summary = "获取用户的项目列表")
-    @GetMapping("/projects")
+    @GetMapping
     public ApiResponse<List<ProjectDto.Response>> list(ProjectDto.Query query) {
         int resolvedMaxLimit = query.getMaxLimit() == null || query.getMaxLimit() <= 0
                 ? DEFAULT_MAX_LIMIT
@@ -58,14 +58,14 @@ public class ProjectBizController {
     }
 
     @Operation(summary = "获取项目详情")
-    @GetMapping("/projects/{id}")
+    @GetMapping("/{id}")
     public ApiResponse<ProjectDto.Response> detail(@PathVariable Long id) {
         Long userId = UserContextUtil.getRequiredUserId();
         return ApiResponse.ok(projectBizService.getProjectById(id, userId));
     }
 
     @Operation(summary = "创建项目")
-    @PostMapping("/project")
+    @PostMapping
     public ApiResponse<Void> create(@Valid @RequestBody ProjectDto.Create dto) {
         Long userId = UserContextUtil.getRequiredUserId();
         projectBizService.createProject(dto, userId);
@@ -73,7 +73,7 @@ public class ProjectBizController {
     }
 
     @Operation(summary = "更新项目")
-    @PutMapping("/project/{id}")
+    @PatchMapping("/{id}")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody ProjectDto.Update dto) {
         Long userId = UserContextUtil.getRequiredUserId();
         projectBizService.updateProject(id, dto, userId);
@@ -81,7 +81,7 @@ public class ProjectBizController {
     }
 
     @Operation(summary = "删除项目")
-    @DeleteMapping("/project/{id}")
+    @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         Long userId = UserContextUtil.getRequiredUserId();
         projectBizService.deleteProject(id, userId);

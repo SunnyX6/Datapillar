@@ -6,6 +6,7 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
     # FastAPI框架
     "fastapi>=0.109.0",
+    "scalar-fastapi>=1.4.0",
     "python-multipart>=0.0.9",
     "uvicorn[standard]>=0.27.0",
     "pydantic>=2.6.0",
@@ -26,18 +27,18 @@ dependencies = [
     # 工具库
     "dynaconf>=3.2.0",
     "httpx>=0.28.1,<0.29.0",
+    "apache-dubbo>=0.4.0",
+    "grpcio>=1.76.0",
     "pyyaml>=6.0.1",
     # SQL 解析（血缘分析）
     "sqlglot>=26.0.0",
     # JWT认证
-    "pyjwt>=2.8.0",
+    "pyjwt[crypto]>=2.8.0",
     "sqlalchemy>=2.0.0",
     # JSON 修复（处理 LLM 输出的畸形 JSON）
     "json-repair>=0.30.0",
     # 高性能哈希（内容去重）
     "xxhash>=3.4.0",
-    # 加解密（API Key 保护）
-    "cryptography>=42.0.0",
     "nacos-sdk-python>=3.0.3,<3.0.4",
 ]
 

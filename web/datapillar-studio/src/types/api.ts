@@ -10,6 +10,9 @@ export interface ErrorResponse {
   code: number
   type: string
   message: string
+  context?: Record<string, string>
+  traceId?: string
+  retryable?: boolean
   stack?: string[]
 }
 
@@ -68,12 +71,18 @@ export function createErrorResponse(
   code: number,
   type: string,
   message: string,
+  context?: Record<string, string>,
+  traceId?: string,
+  retryable?: boolean,
   stack?: string[]
 ): ErrorResponse {
   return {
     code,
     type,
     message,
+    context,
+    traceId,
+    retryable,
     stack
   }
 }

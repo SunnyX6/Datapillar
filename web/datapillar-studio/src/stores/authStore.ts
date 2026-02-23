@@ -14,8 +14,8 @@ import {
   loginSso as apiLoginSso,
   loginTenant as apiLoginTenant,
   logout as apiLogout
-} from '@/lib/api/auth'
-import { setUnauthorizedHandler } from '@/lib/api/client'
+} from '@/services/authService'
+import { setUnauthorizedHandler } from '@/lib/api'
 import {
   isTenantSelectResult,
   type LoginResult,
@@ -98,7 +98,7 @@ export const useAuthStore = create<AuthStore>()(
   persist(
     (set, get) => ({
       user: null,
-      loading: false,
+      loading: true,
       error: null,
       isAuthenticated: false,
       sessionExpiresAt: null,

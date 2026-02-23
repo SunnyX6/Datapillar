@@ -38,8 +38,8 @@ const changeI18nLanguage = (language: Language) => {
 export const useI18nStore = create<I18nState>()(
   persist(
     (set, get) => ({
-      // 初始状态（默认英文）
-      language: 'en-US',
+      // 初始状态（默认中文）
+      language: 'zh-CN',
 
       /**
        * 设置语言

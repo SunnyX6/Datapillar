@@ -192,9 +192,36 @@ export function TopNav({
     [menus]
   )
   const profileItems = useMemo(() => {
-    if (!profileMenu) return []
-    return [profileMenu, ...(profileMenu.children ?? [])].filter((item) => item.path !== '/profile/permission')
-  }, [profileMenu])
+    const itemMap = new Map<string, Menu>()
+    const dynamicItems = profileMenu ? [profileMenu, ...(profileMenu.children ?? [])] : []
+
+    dynamicItems.forEach((item) => {
+      if (!item?.path) return
+      if (!itemMap.has(item.path)) {
+        itemMap.set(item.path, item)
+      }
+    })
+
+    if (!itemMap.has('/profile')) {
+      itemMap.set('/profile', {
+        id: -1001,
+        name: t('top.profile.profile', { defaultValue: '个人中心' }),
+        path: '/profile',
+        location: 'PROFILE'
+      })
+    }
+
+    if (!itemMap.has('/profile/permission')) {
+      itemMap.set('/profile/permission', {
+        id: -1002,
+        name: t('top.profile.permission', { defaultValue: '权限配置' }),
+        path: '/profile/permission',
+        location: 'PROFILE'
+      })
+    }
+
+    return Array.from(itemMap.values())
+  }, [profileMenu, t])
 
   const isMenuActive = (path: string) => {
     if (path === '/home') {

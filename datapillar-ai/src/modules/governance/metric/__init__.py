@@ -5,9 +5,11 @@
 """
 指标 AI 治理模块
 
-路由: /api/ai/governance/metric
+路由: /api/ai/biz/governance/metric
 """
 
 from src.modules.governance.metric.api import router
 
-__all__ = ["router"]
+MODULE_SCOPE = "biz"
+
+__all__ = ["router", "MODULE_SCOPE"]

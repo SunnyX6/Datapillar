@@ -2,7 +2,7 @@
 # @author Sunny
 # @date 2026-02-07
 
-"""租户数据访问（加解密公钥读取）。"""
+"""租户数据访问。"""
 
 from __future__ import annotations
 
@@ -16,6 +16,27 @@ logger = logging.getLogger(__name__)
 
 
 class Tenant:
+    @staticmethod
+    def get_code(tenant_id: int) -> str | None:
+        query = text(
+            """
+            SELECT code
+            FROM tenants
+            WHERE id = :tenant_id
+            LIMIT 1
+            """
+        )
+        try:
+            with MySQLClient.get_engine().connect() as conn:
+                row = conn.execute(query, {"tenant_id": tenant_id}).fetchone()
+                if not row:
+                    return None
+                value = str(row[0] or "").strip()
+                return value or None
+        except Exception as exc:
+            logger.error("获取租户编码失败: %s", exc)
+            return None
+
     @staticmethod
     def get_encrypt_public_key(tenant_id: int) -> str | None:
         query = text(

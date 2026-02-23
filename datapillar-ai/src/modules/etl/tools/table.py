@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 
 from src.infrastructure.repository.knowledge import Neo4jColumnSearch, Neo4jTableSearch
 from src.modules.etl.tools.registry import etl_tool
+from src.shared.context import get_current_tenant_id, get_current_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +109,11 @@ def _tool_success(data: dict) -> str:
     return json.dumps(data, ensure_ascii=False)
 
 
+def _resolve_scope() -> tuple[int | None, int | None]:
+    """解析当前请求租户/用户上下文。"""
+    return get_current_tenant_id(), get_current_user_id()
+
+
 def _parse_table_path(path: str) -> tuple[str, str, str] | None:
     """
     解析表路径
@@ -150,16 +156,21 @@ def list_catalogs(limit: int = 5) -> str:
     }
     """
     logger.info(f"list_catalogs(limit={limit})")
+    tenant_id, _ = _resolve_scope()
+    if tenant_id is None:
+        return _tool_error("缺少租户上下文")
 
     try:
-        catalogs = Neo4jTableSearch.list_catalogs(limit=limit)
+        catalogs = Neo4jTableSearch.list_catalogs(limit=limit, tenant_id=tenant_id)
         return _tool_success({"catalogs": catalogs, "count": len(catalogs)})
     except Exception as e:
         logger.error(f"list_catalogs 执行失败: {e}", exc_info=True)
         return _tool_error("查询失败")
 
 
-@etl_tool("list_schemas", tool_type="Schema", desc="列出目录下 schema", args_schema=ListSchemasInput)
+@etl_tool(
+    "list_schemas", tool_type="Schema", desc="列出目录下 schema", args_schema=ListSchemasInput
+)
 def list_schemas(catalog: str, limit: int = 5) -> str:
     """
     列出指定 Catalog 下的 Schema 列表
@@ -186,9 +197,12 @@ def list_schemas(catalog: str, limit: int = 5) -> str:
         return _tool_error("catalog 不能为空")
 
     catalog = catalog.strip()
+    tenant_id, _ = _resolve_scope()
+    if tenant_id is None:
+        return _tool_error("缺少租户上下文")
 
     try:
-        schemas = Neo4jTableSearch.list_schemas(catalog=catalog, limit=limit)
+        schemas = Neo4jTableSearch.list_schemas(catalog=catalog, limit=limit, tenant_id=tenant_id)
         if not schemas:
             return _tool_error("未找到任何 Schema")
 
@@ -248,6 +262,9 @@ def list_tables(
 
     catalog = catalog.strip()
     schema_name = schema_name.strip()
+    tenant_id, _ = _resolve_scope()
+    if tenant_id is None:
+        return _tool_error("缺少租户上下文")
 
     try:
         tables = Neo4jTableSearch.list_tables(
@@ -255,6 +272,7 @@ def list_tables(
             schema=schema_name,
             keyword=keyword,
             limit=limit,
+            tenant_id=tenant_id,
         )
         if not tables:
             hint = f"{catalog}.{schema_name}"
@@ -319,12 +337,17 @@ def search_tables(query: str, top_k: int = 10) -> str:
 
     if not (isinstance(query, str) and query.strip()):
         return _tool_error("query 不能为空")
+    tenant_id, user_id = _resolve_scope()
+    if tenant_id is None:
+        return _tool_error("缺少租户上下文")
 
     try:
         # 使用向量搜索
         results = Neo4jTableSearch.search_tables(
             query=query.strip(),
             top_k=top_k,
+            tenant_id=tenant_id,
+            user_id=user_id,
         )
 
         # 过滤只保留 Table 类型
@@ -392,12 +415,17 @@ def search_columns(query: str, top_k: int = 10) -> str:
 
     if not (isinstance(query, str) and query.strip()):
         return _tool_error("query 不能为空")
+    tenant_id, user_id = _resolve_scope()
+    if tenant_id is None:
+        return _tool_error("缺少租户上下文")
 
     try:
         # 使用向量搜索
         results = Neo4jColumnSearch.search_columns(
             query=query.strip(),
             top_k=top_k,
+            tenant_id=tenant_id,
+            user_id=user_id,
         )
 
         # 过滤只保留 Column 类型
@@ -475,9 +503,18 @@ def get_table_detail(path: str) -> str:
         return _tool_error("路径格式错误，应为 catalog.schema.table")
 
     catalog, schema, table = parsed
+    tenant_id, user_id = _resolve_scope()
+    if tenant_id is None:
+        return _tool_error("缺少租户上下文")
 
     try:
-        detail = Neo4jTableSearch.get_table_detail(catalog, schema, table)
+        detail = Neo4jTableSearch.get_table_detail(
+            catalog,
+            schema,
+            table,
+            tenant_id=tenant_id,
+            user_id=user_id,
+        )
 
         if not detail:
             return _tool_error("未找到表")
@@ -498,7 +535,9 @@ def get_table_detail(path: str) -> str:
         return _tool_error("查询失败")
 
 
-@etl_tool("get_table_lineage", tool_type="Table", desc="获取表血缘", args_schema=GetTableLineageInput)
+@etl_tool(
+    "get_table_lineage", tool_type="Table", desc="获取表血缘", args_schema=GetTableLineageInput
+)
 def get_table_lineage(path: str, direction: str = "both") -> str:
     """
     获取表血缘关系
@@ -532,9 +571,18 @@ def get_table_lineage(path: str, direction: str = "both") -> str:
         return _tool_error("路径格式错误，应为 catalog.schema.table")
 
     catalog, schema, table = parsed
+    tenant_id, user_id = _resolve_scope()
+    if tenant_id is None:
+        return _tool_error("缺少租户上下文")
 
     try:
-        lineage = Neo4jTableSearch.get_table_lineage(schema, table, direction)
+        lineage = Neo4jTableSearch.get_table_lineage(
+            schema,
+            table,
+            direction,
+            tenant_id=tenant_id,
+            user_id=user_id,
+        )
 
         if not lineage.get("upstream") and not lineage.get("downstream"):
             return _tool_error("未找到表的血缘关系")
@@ -608,11 +656,19 @@ def get_lineage_sql(source_tables: list[str], target_table: str) -> str:
     if not source_schema_tables:
         return _tool_error("源表路径列表为空或格式错误")
 
-    target_catalog, target_schema, target_table_name = target_parsed
+    _target_catalog, target_schema, target_table_name = target_parsed
     target_schema_table = f"{target_schema}.{target_table_name}"
+    tenant_id, user_id = _resolve_scope()
+    if tenant_id is None:
+        return _tool_error("缺少租户上下文")
 
     try:
-        result = Neo4jTableSearch.find_lineage_sql(source_schema_tables, target_schema_table)
+        result = Neo4jTableSearch.find_lineage_sql(
+            source_schema_tables,
+            target_schema_table,
+            tenant_id=tenant_id,
+            user_id=user_id,
+        )
 
         if not result:
             return _tool_error("未找到血缘 SQL")

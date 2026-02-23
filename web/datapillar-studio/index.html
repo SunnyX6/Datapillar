@@ -15,20 +15,19 @@
         try {
           const stored = localStorage.getItem('theme-storage')
 
-          // 默认深色主题（适合数据平台）
-          let mode = 'dark'
+          // 默认浅色主题
+          let mode = 'light'
 
           if (stored) {
             const { state } = JSON.parse(stored)
-            mode = state?.mode || 'dark'
+            mode = state?.mode || 'light'
           }
 
           if (mode === 'dark') {
             document.documentElement.classList.add('dark')
           }
         } catch (e) {
-          // 解析失败，默认深色主题
-          document.documentElement.classList.add('dark')
+          // 解析失败，保持浅色主题
         }
       })()
     </script>

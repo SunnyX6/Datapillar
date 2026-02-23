@@ -6,7 +6,8 @@
 
 from src.modules.rag.api import router
 
+MODULE_SCOPE = "biz"
 MODULE_PREFIX = "/knowledge/wiki"
 MODULE_TAGS = ["Knowledge Wiki"]
 
-__all__ = ["router", "MODULE_PREFIX", "MODULE_TAGS"]
+__all__ = ["router", "MODULE_SCOPE", "MODULE_PREFIX", "MODULE_TAGS"]

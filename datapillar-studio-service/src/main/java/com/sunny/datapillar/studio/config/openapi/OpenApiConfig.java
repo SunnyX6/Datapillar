@@ -34,6 +34,9 @@ public class OpenApiConfig {
     private static final String TAG_GROUPS_EXTENSION_KEY = "x-tagGroups";
     private static final Set<String> PAGE_FIELDS = Set.of("limit", "offset", "total");
     private static final String DATA_FIELD = "data";
+    private static final String CODE_FIELD = "code";
+    private static final Integer SUCCESS_CODE = 0;
+    private static final String SUCCESS_CODE_DESC = "业务状态码，0 表示成功";
     private static final Map<String, List<String>> MODULE_TAG_GROUPS = buildModuleTagGroups();
 
     @Bean
@@ -84,6 +87,7 @@ public class OpenApiConfig {
                 if (containsVoidDataField(adjustedSchema)) {
                     adjustedSchema = removeDataField(adjustedSchema);
                 }
+                adjustedSchema = normalizeSuccessCodeField(adjustedSchema);
                 if (adjustedSchema != targetSchema) {
                     mediaType.setSchema(adjustedSchema);
                 }
@@ -138,7 +142,7 @@ public class OpenApiConfig {
         if (schema.getProperties() == null || schema.getProperties().isEmpty()) {
             return false;
         }
-        if (!schema.getProperties().containsKey("code") || !schema.getProperties().containsKey("data")) {
+        if (!schema.getProperties().containsKey(CODE_FIELD) || !schema.getProperties().containsKey(DATA_FIELD)) {
             return false;
         }
         return PAGE_FIELDS.stream().anyMatch(schema.getProperties()::containsKey);
@@ -148,7 +152,7 @@ public class OpenApiConfig {
         if (schema.getProperties() == null || !schema.getProperties().containsKey(DATA_FIELD)) {
             return false;
         }
-        if (!schema.getProperties().containsKey("code")) {
+        if (!schema.getProperties().containsKey(CODE_FIELD)) {
             return false;
         }
         Schema<?> dataSchema = schema.getProperties().get(DATA_FIELD);
@@ -162,6 +166,38 @@ public class OpenApiConfig {
             return false;
         }
         return dataSchema.getType() == null || "object".equals(dataSchema.getType());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Schema<?> normalizeSuccessCodeField(Schema<?> schema) {
+        if (schema.getProperties() == null || !schema.getProperties().containsKey(CODE_FIELD)) {
+            return schema;
+        }
+        Schema<?> codeSchema = schema.getProperties().get(CODE_FIELD);
+        if (codeSchema == null) {
+            return schema;
+        }
+
+        boolean unchanged = SUCCESS_CODE.equals(codeSchema.getExample())
+                && SUCCESS_CODE.equals(codeSchema.getDefault())
+                && SUCCESS_CODE_DESC.equals(codeSchema.getDescription());
+        if (unchanged) {
+            return schema;
+        }
+
+        Schema<?> copied = Json.mapper().convertValue(schema, Schema.class);
+        Map<String, Schema> properties = copied.getProperties();
+        if (properties == null) {
+            return schema;
+        }
+        Schema<?> copiedCodeSchema = properties.get(CODE_FIELD);
+        if (copiedCodeSchema == null) {
+            return schema;
+        }
+        copiedCodeSchema.setExample(SUCCESS_CODE);
+        copiedCodeSchema.setDefault(SUCCESS_CODE);
+        copiedCodeSchema.setDescription(SUCCESS_CODE_DESC);
+        return copied;
     }
 
     private Schema<?> resolveSchema(OpenAPI openApi, Schema<?> schema) {
@@ -231,30 +267,24 @@ public class OpenApiConfig {
         Map<String, List<String>> groups = new LinkedHashMap<>();
         groups.put("setup", List.of("系统初始化"));
         groups.put("tenant", List.of(
-                "租户管理",
-                "租户成员管理",
-                "租户角色管理",
+                "租户",
+                "租户成员",
+                "租户角色",
                 "租户邀请",
-                "租户邀请业务",
-                "租户功能授权",
-                "租户功能授权审计",
-                "租户SSO管理"));
+                "租户功能",
+                "租户SSO"));
         groups.put("user", List.of(
-                "用户管理",
+                "用户",
                 "用户资料",
-                "用户角色",
-                "用户角色管理",
-                "用户权限",
-                "用户权限管理",
-                "用户功能对象"));
-        groups.put("project", List.of("项目管理"));
+                "用户权限"));
+        groups.put("project", List.of("项目"));
         groups.put("workflow", List.of(
-                "工作流管理",
-                "工作流DAG管理",
-                "工作流运行管理",
-                "任务管理",
-                "依赖管理"));
-        groups.put("llm", List.of("LLM管理", "LLM业务接口"));
+                "工作流",
+                "工作流DAG",
+                "工作流运行",
+                "工作流任务",
+                "工作流依赖"));
+        groups.put("llm", List.of("LLM"));
         groups.put("sql", List.of("SQL"));
         groups.put("system", List.of("健康检查"));
         return groups;

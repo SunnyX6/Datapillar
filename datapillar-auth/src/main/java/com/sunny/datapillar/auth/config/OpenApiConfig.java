@@ -24,6 +24,9 @@ public class OpenApiConfig {
 
     private static final Set<String> PAGE_FIELDS = Set.of("limit", "offset", "total");
     private static final String DATA_FIELD = "data";
+    private static final String CODE_FIELD = "code";
+    private static final Integer SUCCESS_CODE = 0;
+    private static final String SUCCESS_CODE_DESC = "业务状态码，0 表示成功";
 
     @Bean
     public OpenApiCustomizer authApiResponseOpenApiCustomizer() {
@@ -55,6 +58,7 @@ public class OpenApiConfig {
                                 if (containsVoidDataField(adjustedSchema)) {
                                     adjustedSchema = removeDataField(adjustedSchema);
                                 }
+                                adjustedSchema = normalizeSuccessCodeField(adjustedSchema);
                                 if (adjustedSchema != targetSchema) {
                                     mediaType.setSchema(adjustedSchema);
                                 }
@@ -96,7 +100,7 @@ public class OpenApiConfig {
         if (schema.getProperties() == null || schema.getProperties().isEmpty()) {
             return false;
         }
-        if (!schema.getProperties().containsKey("code") || !schema.getProperties().containsKey("data")) {
+        if (!schema.getProperties().containsKey(CODE_FIELD) || !schema.getProperties().containsKey(DATA_FIELD)) {
             return false;
         }
         return PAGE_FIELDS.stream().anyMatch(schema.getProperties()::containsKey);
@@ -106,7 +110,7 @@ public class OpenApiConfig {
         if (schema.getProperties() == null || !schema.getProperties().containsKey(DATA_FIELD)) {
             return false;
         }
-        if (!schema.getProperties().containsKey("code")) {
+        if (!schema.getProperties().containsKey(CODE_FIELD)) {
             return false;
         }
         Schema<?> dataSchema = schema.getProperties().get(DATA_FIELD);
@@ -120,6 +124,38 @@ public class OpenApiConfig {
             return false;
         }
         return dataSchema.getType() == null || "object".equals(dataSchema.getType());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Schema<?> normalizeSuccessCodeField(Schema<?> schema) {
+        if (schema.getProperties() == null || !schema.getProperties().containsKey(CODE_FIELD)) {
+            return schema;
+        }
+        Schema<?> codeSchema = schema.getProperties().get(CODE_FIELD);
+        if (codeSchema == null) {
+            return schema;
+        }
+
+        boolean unchanged = SUCCESS_CODE.equals(codeSchema.getExample())
+                && SUCCESS_CODE.equals(codeSchema.getDefault())
+                && SUCCESS_CODE_DESC.equals(codeSchema.getDescription());
+        if (unchanged) {
+            return schema;
+        }
+
+        Schema<?> copied = Json.mapper().convertValue(schema, Schema.class);
+        Map<String, Schema> properties = copied.getProperties();
+        if (properties == null) {
+            return schema;
+        }
+        Schema<?> copiedCodeSchema = properties.get(CODE_FIELD);
+        if (copiedCodeSchema == null) {
+            return schema;
+        }
+        copiedCodeSchema.setExample(SUCCESS_CODE);
+        copiedCodeSchema.setDefault(SUCCESS_CODE);
+        copiedCodeSchema.setDescription(SUCCESS_CODE_DESC);
+        return copied;
     }
 
     private Schema<?> resolveSchema(OpenAPI openApi, Schema<?> schema) {

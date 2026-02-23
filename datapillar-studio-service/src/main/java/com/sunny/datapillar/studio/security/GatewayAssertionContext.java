@@ -15,6 +15,7 @@ import java.util.List;
 public record GatewayAssertionContext(
         Long userId,
         Long tenantId,
+        String tenantCode,
         String username,
         String email,
         List<String> roles,

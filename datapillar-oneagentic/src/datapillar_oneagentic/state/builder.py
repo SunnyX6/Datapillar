@@ -19,13 +19,12 @@ from typing import Any, Iterable, Mapping
 from langgraph.types import Overwrite
 
 from datapillar_oneagentic.context.timeline.timeline import Timeline
-from datapillar_oneagentic.core.status import ExecutionStatus, FailureKind
+from datapillar_oneagentic.core.status import ExecutionStatus
 from datapillar_oneagentic.core.types import SessionKey
 from datapillar_oneagentic.messages import Message, Messages
 from datapillar_oneagentic.messages.adapters.langchain import from_langchain, to_langchain
 from datapillar_oneagentic.messages.adapters.langgraph import remove_all_messages
 from datapillar_oneagentic.state.blackboard import Blackboard
-
 
 BLACKBOARD_KEYS = frozenset(Blackboard.__annotations__.keys())
 
@@ -48,7 +47,6 @@ class RoutingSnapshot:
     active_agent: str | None
     assigned_task: str | None
     last_status: ExecutionStatus | None
-    last_failure_kind: FailureKind | None
     last_error: str | None
 
 
@@ -319,7 +317,6 @@ class MemoryModule:
         *,
         agent_id: str,
         execution_status: ExecutionStatus | str | None,
-        failure_kind: FailureKind | str | None,
         error: str | None,
         deliverable_key: str | None,
     ) -> None:
@@ -328,7 +325,6 @@ class MemoryModule:
             agent_id=agent_id,
             task_id=task_id,
             status=execution_status,
-            failure_kind=failure_kind,
             error=error,
             deliverable_key=deliverable_key,
         )
@@ -396,7 +392,6 @@ class MemoryModule:
         agent_id: str,
         task_id: str | None,
         status: ExecutionStatus | str | None,
-        failure_kind: FailureKind | str | None,
         error: str | None,
         deliverable_key: str | None,
     ) -> Message:
@@ -406,9 +401,6 @@ class MemoryModule:
         if status:
             status_value = status.value if hasattr(status, "value") else status
             parts.append(f"status={status_value}")
-        if failure_kind:
-            kind_value = failure_kind.value if hasattr(failure_kind, "value") else failure_kind
-            parts.append(f"failure_kind={kind_value}")
         if deliverable_key:
             parts.append(f"deliverable={deliverable_key}")
         if error:
@@ -429,7 +421,6 @@ class RoutingModule:
         assigned_task = str(task_value) if task_value is not None else None
 
         last_status = self._state.get("last_agent_status")
-        last_failure_kind = self._state.get("last_agent_failure_kind")
         last_error_value = self._state.get("last_agent_error")
         last_error = str(last_error_value) if last_error_value is not None else None
 
@@ -437,9 +428,6 @@ class RoutingModule:
             active_agent=active_agent,
             assigned_task=assigned_task,
             last_status=last_status if isinstance(last_status, ExecutionStatus) else last_status,
-            last_failure_kind=(
-                last_failure_kind if isinstance(last_failure_kind, FailureKind) else last_failure_kind
-            ),
             last_error=last_error,
         )
 
@@ -459,21 +447,18 @@ class RoutingModule:
         self,
         *,
         status: ExecutionStatus | None,
-        failure_kind: FailureKind | None,
         error: str | None,
     ) -> None:
         self._patch.set("last_agent_status", status)
-        self._patch.set("last_agent_failure_kind", failure_kind)
         self._patch.set("last_agent_error", error)
 
     def finish_agent(
         self,
         *,
         status: ExecutionStatus | None,
-        failure_kind: FailureKind | None,
         error: str | None,
     ) -> None:
-        self.set_last_result(status=status, failure_kind=failure_kind, error=error)
+        self.set_last_result(status=status, error=error)
         self.clear_active()
         self.clear_task()
 

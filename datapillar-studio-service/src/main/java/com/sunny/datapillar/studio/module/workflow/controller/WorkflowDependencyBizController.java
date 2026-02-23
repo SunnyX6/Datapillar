@@ -27,9 +27,9 @@ import lombok.RequiredArgsConstructor;
  * @author Sunny
  * @date 2026-01-01
  */
-@Tag(name = "依赖管理", description = "工作流下的任务依赖关系操作")
+@Tag(name = "工作流依赖", description = "工作流依赖接口")
 @RestController
-@RequestMapping("/biz/projects/{projectId}/workflows/{workflowId}")
+@RequestMapping("/biz/workflows/{workflowId}")
 @RequiredArgsConstructor
 public class WorkflowDependencyBizController {
 
@@ -37,17 +37,14 @@ public class WorkflowDependencyBizController {
 
     @Operation(summary = "获取工作流下的所有依赖")
     @GetMapping("/dependencies")
-    public ApiResponse<List<JobDependencyDto.Response>> list(
-            @PathVariable Long projectId,
-            @PathVariable Long workflowId) {
+    public ApiResponse<List<JobDependencyDto.Response>> list(@PathVariable Long workflowId) {
         List<JobDependencyDto.Response> result = workflowDependencyBizService.getDependenciesByWorkflowId(workflowId);
         return ApiResponse.ok(result);
     }
 
     @Operation(summary = "创建依赖关系")
-    @PostMapping("/dependency")
+    @PostMapping("/dependencies")
     public ApiResponse<Void> create(
-            @PathVariable Long projectId,
             @PathVariable Long workflowId,
             @Valid @RequestBody JobDependencyDto.Create dto) {
         workflowDependencyBizService.createDependency(workflowId, dto);
@@ -55,13 +52,12 @@ public class WorkflowDependencyBizController {
     }
 
     @Operation(summary = "删除依赖关系")
-    @DeleteMapping("/dependency")
+    @DeleteMapping("/dependencies")
     public ApiResponse<Void> delete(
-            @PathVariable Long projectId,
             @PathVariable Long workflowId,
             @RequestParam Long jobId,
             @RequestParam Long parentJobId) {
-        workflowDependencyBizService.deleteDependency(jobId, parentJobId);
+        workflowDependencyBizService.deleteDependency(workflowId, jobId, parentJobId);
         return ApiResponse.ok();
     }
 }

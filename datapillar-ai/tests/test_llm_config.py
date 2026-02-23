@@ -20,19 +20,21 @@ def _clear_config_cache():
 def _mock_models(monkeypatch: pytest.MonkeyPatch) -> None:
     chat_model = {
         "provider_code": "openai",
-        "api_key": "db-key",
+        "api_key": "ENCv1:chat",
         "model_id": "openai/gpt-4o",
         "base_url": "https://api.openai.com/v1",
     }
     embedding_model = {
         "provider_code": "openai",
-        "api_key": "embed-key",
+        "api_key": "ENCv1:embed",
         "model_id": "openai/text-embedding-3-small",
         "base_url": "https://api.openai.com/v1",
         "embedding_dimension": 1536,
     }
-    monkeypatch.setattr(config_module.Model, "get_chat_default", lambda: chat_model)
-    monkeypatch.setattr(config_module.Model, "get_embedding_default", lambda: embedding_model)
+    monkeypatch.setattr(config_module.Model, "get_chat_default", lambda _tenant_id: chat_model)
+    monkeypatch.setattr(
+        config_module.Model, "get_embedding_default", lambda _tenant_id: embedding_model
+    )
 
 
 def test_get_datapillar_config_merges_settings(monkeypatch: pytest.MonkeyPatch):
@@ -61,12 +63,20 @@ def test_get_datapillar_config_merges_settings(monkeypatch: pytest.MonkeyPatch):
     }
     monkeypatch.setattr(config_module, "get_llm_config", lambda: llm_config)
     monkeypatch.setattr(config_module, "get_agent_config", lambda: agent_config)
+    monkeypatch.setattr(config_module, "get_default_tenant_id", lambda: 1)
+    monkeypatch.setattr(config_module.Tenant, "get_code", lambda tenant_id: f"tenant-{tenant_id}")
+    monkeypatch.setattr(
+        config_module.auth_crypto_rpc_client,
+        "decrypt_llm_api_key_sync",
+        lambda *, tenant_code, ciphertext: f"{tenant_code}:{ciphertext}",
+    )
     _mock_models(monkeypatch)
 
     config = config_module.get_datapillar_config()
 
     assert config.llm.provider == "openai"
     assert config.llm.model == "openai/gpt-4o"
+    assert config.llm.api_key == "tenant-1:ENCv1:chat"
     assert config.llm.retry.max_retries == 3
     assert config.llm.cache.backend == "redis"
     assert config.llm.cache.redis_url == "redis://127.0.0.1:6379/0"
@@ -74,6 +84,7 @@ def test_get_datapillar_config_merges_settings(monkeypatch: pytest.MonkeyPatch):
     assert config.agent.checkpointer.type == "redis"
     assert config.agent.checkpointer.url == "redis://127.0.0.1:6379/0"
     assert config.embedding.model == "openai/text-embedding-3-small"
+    assert config.embedding.api_key == "tenant-1:ENCv1:embed"
 
 
 def test_get_datapillar_config_requires_runtime_sections(monkeypatch: pytest.MonkeyPatch):
@@ -82,6 +93,8 @@ def test_get_datapillar_config_requires_runtime_sections(monkeypatch: pytest.Mon
 
     monkeypatch.setattr(config_module, "get_llm_config", _raise_missing_llm)
     monkeypatch.setattr(config_module, "get_agent_config", lambda: {"max_steps": 5})
+    monkeypatch.setattr(config_module, "get_default_tenant_id", lambda: 1)
+    monkeypatch.setattr(config_module.Tenant, "get_code", lambda tenant_id: f"tenant-{tenant_id}")
     _mock_models(monkeypatch)
 
     with pytest.raises(ConfigurationError):

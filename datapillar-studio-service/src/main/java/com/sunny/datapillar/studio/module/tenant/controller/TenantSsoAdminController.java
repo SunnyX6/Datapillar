@@ -30,9 +30,9 @@ import com.sunny.datapillar.common.exception.BadRequestException;
  * @author Sunny
  * @date 2026-01-01
  */
-@Tag(name = "租户SSO管理", description = "租户SSO配置与绑定管理接口")
+@Tag(name = "租户SSO", description = "租户SSO接口")
 @RestController
-@RequestMapping("/admin/tenants/{tenantId}/sso")
+@RequestMapping("/admin/tenant/current/sso")
 @RequiredArgsConstructor
 public class TenantSsoAdminController {
 
@@ -44,15 +44,14 @@ public class TenantSsoAdminController {
     @Operation(summary = "获取SSO配置列表")
     @GetMapping("/configs")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<SsoConfigDto.Response>> listConfigs(@PathVariable Long tenantId) {
+    public ApiResponse<List<SsoConfigDto.Response>> listConfigs() {
         return ApiResponse.ok(tenantSsoAdminService.listConfigs());
     }
 
     @Operation(summary = "创建SSO配置")
-    @PostMapping("/config")
+    @PostMapping("/configs")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> createConfig(@PathVariable Long tenantId,
-                                          @Valid @RequestBody SsoConfigDto.Create dto) {
+    public ApiResponse<Void> createConfig(@Valid @RequestBody SsoConfigDto.Create dto) {
         if (dto == null) {
             throw new BadRequestException("参数错误");
         }
@@ -66,10 +65,9 @@ public class TenantSsoAdminController {
     }
 
     @Operation(summary = "更新SSO配置")
-    @PatchMapping("/config/{configId}")
+    @PatchMapping("/configs/{configId}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> updateConfig(@PathVariable Long tenantId,
-                                          @PathVariable Long configId,
+    public ApiResponse<Void> updateConfig(@PathVariable Long configId,
                                           @Valid @RequestBody SsoConfigDto.Update dto) {
         if (dto != null) {
             validateStatus(dto.getStatus());
@@ -82,8 +80,7 @@ public class TenantSsoAdminController {
     @Operation(summary = "查询SSO绑定列表")
     @GetMapping("/identities")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<SsoIdentityDto.Item>> listIdentities(@PathVariable Long tenantId,
-                                                                 @RequestParam(required = false) String provider,
+    public ApiResponse<List<SsoIdentityDto.Item>> listIdentities(@RequestParam(required = false) String provider,
                                                                  @RequestParam(required = false) Long userId) {
         String normalizedProvider = normalizeProvider(provider, false);
         if (normalizedProvider != null) {
@@ -93,10 +90,9 @@ public class TenantSsoAdminController {
     }
 
     @Operation(summary = "通过授权码绑定SSO账号")
-    @PostMapping("/identity/bind/code")
+    @PostMapping("/identities/bind/code")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> bindByCode(@PathVariable Long tenantId,
-                                        @Valid @RequestBody SsoIdentityDto.BindByCodeRequest request) {
+    public ApiResponse<Void> bindByCode(@Valid @RequestBody SsoIdentityDto.BindByCodeRequest request) {
         if (request == null) {
             throw new BadRequestException("参数错误");
         }
@@ -108,9 +104,9 @@ public class TenantSsoAdminController {
     }
 
     @Operation(summary = "解绑SSO账号")
-    @DeleteMapping("/identity/{identityId}")
+    @DeleteMapping("/identities/{identityId}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> unbind(@PathVariable Long tenantId, @PathVariable Long identityId) {
+    public ApiResponse<Void> unbind(@PathVariable Long identityId) {
         tenantSsoAdminService.unbind(identityId);
         return ApiResponse.ok();
     }
