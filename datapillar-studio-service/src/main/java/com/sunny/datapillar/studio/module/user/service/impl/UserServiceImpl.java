@@ -74,8 +74,6 @@ public class UserServiceImpl implements UserService {
 
         UserDto.Response response = new UserDto.Response();
         BeanUtils.copyProperties(user, response);
-        response.setPermissions(getUserPermissionCodes(id));
-
         return response;
     }
 
@@ -201,7 +199,6 @@ public class UserServiceImpl implements UserService {
                 .map(user -> {
                     UserDto.Response response = new UserDto.Response();
                     BeanUtils.copyProperties(user, response);
-                    response.setPermissions(getUserPermissionCodes(user.getId()));
                     return response;
                 })
                 .toList();
@@ -288,7 +285,6 @@ public class UserServiceImpl implements UserService {
         for (FeatureObjectDto.ObjectPermission object : objects) {
             Long objectId = object.getObjectId();
             List<FeatureObjectDto.RoleSource> sources = roleSourceMap.getOrDefault(objectId, new ArrayList<>());
-            object.setRoleSources(sources);
 
             String rolePermission = calculateRoleMaxPermission(sources, permissionMap);
             String tenantLimit = object.getTenantPermissionCode();

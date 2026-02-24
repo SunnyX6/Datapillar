@@ -24,7 +24,6 @@ import reactor.core.publisher.Mono;
 
 import java.net.ConnectException;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -65,10 +64,7 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
                 detail.errorCode(),
                 detail.type(),
                 detail.message(),
-                detail.context(),
-                detail.traceId(),
-                detail.retryable(),
-                detail.stack());
+                detail.traceId());
         return writeResponse(response, HttpStatus.valueOf(detail.httpStatus()), body);
     }
 
@@ -114,27 +110,12 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
             return response.writeWith(Mono.just(response.bufferFactory().wrap(bytes)));
         } catch (JsonProcessingException e) {
             log.error("网关响应序列化失败", e);
-            List<String> stack = ExceptionMapper.resolve(e).stack();
+            String traceId = ExceptionMapper.resolve(e).traceId();
             String fallback = String.format(
-                    "{\"code\":500,\"message\":\"响应序列化失败\",\"type\":\"INTERNAL_ERROR\",\"retryable\":false,\"stack\":%s}",
-                    toJsonArray(stack));
+                    "{\"code\":500,\"message\":\"响应序列化失败\",\"type\":\"INTERNAL_ERROR\",\"traceId\":\"%s\"}",
+                    escapeJson(traceId));
             return response.writeWith(Mono.just(response.bufferFactory().wrap(fallback.getBytes(StandardCharsets.UTF_8))));
         }
-    }
-
-    private String toJsonArray(List<String> values) {
-        if (values == null || values.isEmpty()) {
-            return "[]";
-        }
-        StringBuilder builder = new StringBuilder("[");
-        for (int i = 0; i < values.size(); i++) {
-            if (i > 0) {
-                builder.append(',');
-            }
-            builder.append('"').append(escapeJson(values.get(i))).append('"');
-        }
-        builder.append(']');
-        return builder.toString();
     }
 
     private String escapeJson(String value) {

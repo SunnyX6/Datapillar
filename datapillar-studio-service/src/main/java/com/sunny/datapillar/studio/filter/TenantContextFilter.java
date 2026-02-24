@@ -36,7 +36,8 @@ public class TenantContextFilter extends OncePerRequestFilter {
             "/actuator/health",
             "/actuator/info",
             "/v3/api-docs",
-            "/setup"
+            "/setup",
+            "/biz/invitations"
     );
 
     private final SecurityExceptionHandler securityExceptionHandler;

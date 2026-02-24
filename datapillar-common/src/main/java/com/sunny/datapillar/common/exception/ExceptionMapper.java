@@ -2,11 +2,6 @@ package com.sunny.datapillar.common.exception;
 
 import com.sunny.datapillar.common.constant.Code;
 import com.sunny.datapillar.common.constant.ErrorType;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
 import org.slf4j.MDC;
 
 /**
@@ -27,7 +22,6 @@ public final class ExceptionMapper {
         Throwable target = throwable == null ? new InternalException(DEFAULT_INTERNAL_MESSAGE) : throwable;
         String message = resolveMessage(target);
         String type = target.getClass().getSimpleName();
-        List<String> stack = getStackTrace(target);
         String traceId = resolveTraceId();
 
         if (target instanceof DatapillarRuntimeException runtimeException) {
@@ -36,10 +30,7 @@ public final class ExceptionMapper {
                     runtimeException.getCode(),
                     runtimeException.getType(),
                     message,
-                    stack,
-                    runtimeException.getContext(),
                     traceId,
-                    runtimeException.isRetryable(),
                     resolveServerError(runtimeException));
         }
         if (target instanceof IllegalArgumentException) {
@@ -47,10 +38,7 @@ public final class ExceptionMapper {
                     Code.BAD_REQUEST,
                     ErrorType.BAD_REQUEST,
                     message,
-                    stack,
-                    Map.of(),
                     traceId,
-                    false,
                     false);
         }
         if (target instanceof UnsupportedOperationException) {
@@ -58,40 +46,28 @@ public final class ExceptionMapper {
                     Code.METHOD_NOT_ALLOWED,
                     ErrorType.METHOD_NOT_ALLOWED,
                     message,
-                    stack,
-                    Map.of(),
                     traceId,
-                    false,
                     false);
         }
         return buildDetail(
                 Code.INTERNAL_ERROR,
                 ErrorType.INTERNAL_ERROR,
                 message,
-                stack,
-                Map.of(),
                 traceId,
-                false,
                 true);
     }
 
     private static ExceptionDetail buildDetail(int code,
                                                String type,
                                                String message,
-                                               List<String> stack,
-                                               Map<String, String> context,
                                                String traceId,
-                                               boolean retryable,
                                                boolean serverError) {
         return new ExceptionDetail(
                 code,
                 code,
                 type,
                 message,
-                stack,
-                context == null ? Map.of() : Map.copyOf(context),
                 traceId,
-                retryable,
                 serverError);
     }
 
@@ -131,28 +107,12 @@ public final class ExceptionMapper {
         return null;
     }
 
-    private static List<String> getStackTrace(Throwable throwable) {
-        if (throwable == null) {
-            return null;
-        }
-
-        StringWriter sw = new StringWriter();
-        try (PrintWriter pw = new PrintWriter(sw)) {
-            throwable.printStackTrace(pw);
-        }
-
-        return Arrays.asList(sw.toString().split("\\n"));
-    }
-
     public record ExceptionDetail(
             int httpStatus,
             int errorCode,
             String type,
             String message,
-            List<String> stack,
-            Map<String, String> context,
             String traceId,
-            boolean retryable,
             boolean serverError) {
     }
 }

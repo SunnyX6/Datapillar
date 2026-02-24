@@ -4,12 +4,14 @@
 
     <select id="selectFeatureObjectsAll" resultType="com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto$ObjectPermission">
         SELECT o.id AS object_id,
+               o.parent_id AS parent_id,
                o.name AS object_name,
                o.path AS object_path,
                o.type AS object_type,
                o.location AS location,
                o.category_id AS category_id,
                c.name AS category_name,
+               o.sort AS sort,
                tp.code AS tenant_permission_code
         FROM feature_objects o
         LEFT JOIN feature_object_categories c
@@ -25,12 +27,14 @@
 
     <select id="selectRoleObjectPermissionsAll" resultType="com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto$ObjectPermission">
         SELECT o.id AS object_id,
+               o.parent_id AS parent_id,
                o.name AS object_name,
                o.path AS object_path,
                o.type AS object_type,
                o.location AS location,
                o.category_id AS category_id,
                c.name AS category_name,
+               o.sort AS sort,
                tp.code AS tenant_permission_code,
                CASE rp.permission_level
                    WHEN 2 THEN 'ADMIN'
@@ -60,12 +64,14 @@
 
     <select id="selectRoleObjectPermissionsAssigned" resultType="com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto$ObjectPermission">
         SELECT o.id AS object_id,
+               o.parent_id AS parent_id,
                o.name AS object_name,
                o.path AS object_path,
                o.type AS object_type,
                o.location AS location,
                o.category_id AS category_id,
                c.name AS category_name,
+               o.sort AS sort,
                tp.code AS tenant_permission_code,
                CASE rp.permission_level
                    WHEN 2 THEN 'ADMIN'

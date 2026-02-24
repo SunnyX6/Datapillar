@@ -58,25 +58,29 @@ const menus: Menu[] = [
     id: 1,
     name: 'Home',
     path: '/home',
-    location: 'TOP'
+    location: 'TOP',
+    permissionCode: 'READ'
   },
   {
     id: 2,
     name: 'Governance',
     path: '/governance',
     location: 'TOP',
+    permissionCode: 'READ',
     children: [
       {
         id: 3,
         name: 'Metadata',
         path: '/governance/metadata',
-        location: 'TOP'
+        location: 'TOP',
+        permissionCode: 'READ'
       },
       {
         id: 4,
         name: 'Semantic',
         path: '/governance/semantic',
-        location: 'TOP'
+        location: 'TOP',
+        permissionCode: 'READ'
       }
     ]
   }
@@ -113,6 +117,19 @@ const findButtonByText = (root: ParentNode, text: string) => {
 const findByText = (root: ParentNode, text: string) => {
   const nodes = Array.from(root.querySelectorAll('*'))
   return nodes.find((node) => node.textContent?.includes(text)) ?? null
+}
+
+const findByExactText = (root: ParentNode, text: string) => {
+  const nodes = Array.from(root.querySelectorAll('*'))
+  return nodes.find((node) => node.textContent?.trim() === text) ?? null
+}
+
+const findAvatarButton = (root: ParentNode) => {
+  const buttons = Array.from(root.querySelectorAll('button'))
+  return (
+    buttons.find((button) => button.querySelector('.bg-gradient-to-tr')) ??
+    null
+  )
 }
 
 const findPanelRoot = (node: HTMLElement | null) => {
@@ -182,6 +199,37 @@ describe('TopNav', () => {
     })
 
     expect(findByText(document.body, 'top.dropdown.governanceHeader')).toBeNull()
+
+    unmount(root, container)
+  })
+
+  it('does not inject profile permission menu when backend does not return it', () => {
+    const { container, root } = render(
+      <TopNav
+        isDark={false}
+        toggleTheme={vi.fn()}
+        user={user}
+        menus={menus}
+        currentPath="/home"
+        onNavigate={vi.fn()}
+        onLogout={vi.fn()}
+        isSidebarCollapsed={false}
+        onToggleSidebar={vi.fn()}
+        onProfile={vi.fn()}
+      />,
+    )
+
+    const avatarText = findByExactText(container, 'Te')
+    expect(avatarText).toBeTruthy()
+
+    const avatarButton = findAvatarButton(container) as HTMLButtonElement | null
+    expect(avatarButton).toBeTruthy()
+
+    act(() => {
+      avatarButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(findByText(document.body, 'top.profile.permission')).toBeNull()
 
     unmount(root, container)
   })

@@ -3,9 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { useTranslation } from 'react-i18next'
-import { router } from './router'
-import { AppRuntimeErrorBoundary } from './router/AppRuntimeErrorBoundary'
-import { handleAppError, normalizeRuntimeError } from '@/lib/error-center'
+import { router } from '@/router'
 import { useThemeStore, useI18nStore, useAuthStore } from '@/stores'
 import '@/lib/i18n' // 初始化 i18n
 import './index.css' // Tailwind CSS
@@ -31,45 +29,9 @@ export function App() {
     document.title = t('site.title')
   }, [t, i18n.language])
 
-  // 兜底捕获非 React 渲染阶段的运行时错误（如未处理 Promise 异常）
-  useEffect(() => {
-    const handleWindowError = (event: ErrorEvent) => {
-      const runtimeError = event.error ?? new Error(event.message)
-      handleAppError(
-        normalizeRuntimeError(runtimeError, {
-          module: 'runtime/window-error',
-          isCoreRequest: true,
-          raw: {
-            filename: event.filename,
-            lineno: event.lineno,
-            colno: event.colno
-          }
-        })
-      )
-    }
-
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      handleAppError(
-        normalizeRuntimeError(event.reason, {
-          module: 'runtime/unhandled-rejection',
-          isCoreRequest: true
-        })
-      )
-    }
-
-    window.addEventListener('error', handleWindowError)
-    window.addEventListener('unhandledrejection', handleUnhandledRejection)
-    return () => {
-      window.removeEventListener('error', handleWindowError)
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
-    }
-  }, [])
-
   return (
     <>
-      <AppRuntimeErrorBoundary>
-        <RouterProvider router={router} />
-      </AppRuntimeErrorBoundary>
+      <RouterProvider router={router} />
       <Toaster position="top-right" richColors />
     </>
   )

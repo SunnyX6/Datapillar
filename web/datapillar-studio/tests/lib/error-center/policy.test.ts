@@ -15,41 +15,35 @@ function createError(overrides: Partial<AppError> = {}): AppError {
 }
 
 describe('error-center policy', () => {
-  it('setup required 错误码时重定向到 /setup', () => {
+  it('默认策略应返回 local，由业务层决定流程', () => {
     const action = decideErrorAction(createError({
-      url: '/api/studio/setup/status',
-      method: 'GET',
-      status: 503,
-      code: 503,
-      errorType: 'REQUIRED',
-      isCoreRequest: true
+      status: 401,
+      code: 401,
+      errorType: 'UNAUTHORIZED'
     }))
 
-    expect(action).toEqual({ type: 'redirect', to: '/setup', replace: true })
+    expect(action).toEqual({ type: 'local', reason: 'handled-by-caller' })
   })
 
-  it('setup 状态接口 503 非 setup-required 错误码时重定向到 /500', () => {
+  it('preferToast=true 时返回 toast', () => {
     const action = decideErrorAction(createError({
-      url: '/api/studio/setup/status',
-      method: 'GET',
       status: 503,
       code: 503,
       errorType: 'SERVICE_UNAVAILABLE',
-      isCoreRequest: true
-    }))
+      message: '服务不可用'
+    }), {
+      preferToast: true
+    })
 
-    expect(action).toEqual({ type: 'redirect', to: '/500', replace: true })
+    expect(action).toEqual({ type: 'toast', level: 'error', message: '服务不可用' })
   })
 
-  it('非 setup 接口 401 仍走 logout', () => {
+  it('runtime/router 错误不由错误中心主动驱动流程', () => {
     const action = decideErrorAction(createError({
-      url: '/api/studio/projects',
-      method: 'GET',
-      status: 401,
-      code: 401,
-      isCoreRequest: false
+      source: 'runtime',
+      severity: 'fatal'
     }))
 
-    expect(action).toEqual({ type: 'logout' })
+    expect(action).toEqual({ type: 'none' })
   })
 })

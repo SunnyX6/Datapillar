@@ -1,23 +1,64 @@
+import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Sidebar } from './navigation/Sidebar'
 import { TopNav } from './navigation/TopNav'
 import { useThemeStore, useAuthStore, useLayoutStore } from '@/stores'
-
-const MOCK_USER = {
-  name: 'S. Engineer',
-  role: 'Data Engineer',
-  email: 'engineer@datapillar.ai'
-}
+import { getMyProfile, type StudioUserProfile } from '@/services/studioUserProfileService'
 
 export function MainLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const mode = useThemeStore((state) => state.mode)
   const setMode = useThemeStore((state) => state.setMode)
-  const menus = useAuthStore((state) => state.user?.menus ?? [])
+  const authUser = useAuthStore((state) => state.user)
+  const menus = authUser?.menus ?? []
   const isDark = mode === 'dark'
   const isSidebarCollapsed = useLayoutStore((state) => state.isSidebarCollapsed)
   const toggleSidebar = useLayoutStore((state) => state.toggleSidebar)
+  const [profile, setProfile] = useState<StudioUserProfile | null>(null)
+
+  useEffect(() => {
+    if (!authUser?.userId) {
+      return
+    }
+
+    let isCancelled = false
+
+    const loadProfile = async () => {
+      try {
+        const response = await getMyProfile()
+        if (isCancelled) {
+          return
+        }
+        setProfile(response)
+      } catch {
+        if (isCancelled) {
+          return
+        }
+        setProfile(null)
+      }
+    }
+
+    void loadProfile()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [authUser?.userId])
+
+  const topNavUser = useMemo(() => {
+    const profileNickname = profile?.nickname?.trim()
+    const profileUsername = profile?.username?.trim()
+    const authUsername = authUser?.username?.trim()
+    const name = profileNickname || profileUsername || authUsername || 'User'
+    const email = profile?.email?.trim() || authUser?.email?.trim() || undefined
+
+    return {
+      name,
+      email
+    }
+  }, [authUser?.email, authUser?.username, profile])
 
   const handleToggleSidebar = () => {
     toggleSidebar()
@@ -27,9 +68,18 @@ export function MainLayout() {
     setMode(isDark ? 'light' : 'dark')
   }
 
-  const handleLogout = async () => {
-    await useAuthStore.getState().logout()
-    navigate('/login')
+  const handleLogout = () => {
+    void (async () => {
+      try {
+        const result = await useAuthStore.getState().logout()
+        if (result.outcome === 'SUCCESS' || result.outcome === 'ALREADY_EXPIRED') {
+          return
+        }
+        toast.error(result.message ?? '退出登录失败，请稍后重试')
+      } catch {
+        toast.error('退出登录失败，请稍后重试')
+      }
+    })()
   }
 
   const handleNavigate = (targetPath: string) => {
@@ -59,7 +109,7 @@ export function MainLayout() {
         <TopNav
           isDark={isDark}
           toggleTheme={handleToggleTheme}
-          user={MOCK_USER}
+          user={topNavUser}
           menus={menus}
           currentPath={location.pathname}
           onNavigate={handleNavigate}

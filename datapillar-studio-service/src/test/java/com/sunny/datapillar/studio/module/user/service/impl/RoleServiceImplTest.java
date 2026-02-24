@@ -11,6 +11,8 @@ import static org.mockito.Mockito.when;
 import com.sunny.datapillar.common.exception.NotFoundException;
 import com.sunny.datapillar.studio.context.TenantContext;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
+import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
+import com.sunny.datapillar.studio.module.tenant.entity.Permission;
 import com.sunny.datapillar.studio.module.tenant.mapper.FeatureObjectMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.PermissionMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantFeaturePermissionMapper;
@@ -96,5 +98,65 @@ class RoleServiceImplTest {
 
         assertTrue(exception.getMessage().contains("角色不存在"));
         verify(roleMapper, never()).selectRoleMembers(any(), any(), any());
+    }
+
+    @Test
+    void getRolePermissions_shouldBuildTreeAndApplyTenantLimit() {
+        Role role = new Role();
+        role.setId(5L);
+        role.setTenantId(10L);
+        when(roleMapper.selectOne(any())).thenReturn(role);
+
+        when(permissionMapper.selectSystemPermissions()).thenReturn(
+                List.of(
+                        permission(1L, "DISABLE", 0),
+                        permission(2L, "READ", 1),
+                        permission(3L, "ADMIN", 2)
+                )
+        );
+
+        FeatureObjectDto.ObjectPermission governance = new FeatureObjectDto.ObjectPermission();
+        governance.setObjectId(100L);
+        governance.setParentId(null);
+        governance.setObjectName("数据治理");
+        governance.setSort(2);
+        governance.setPermissionCode("ADMIN");
+        governance.setTenantPermissionCode("ADMIN");
+
+        FeatureObjectDto.ObjectPermission metadata = new FeatureObjectDto.ObjectPermission();
+        metadata.setObjectId(101L);
+        metadata.setParentId(100L);
+        metadata.setObjectName("元数据");
+        metadata.setSort(1);
+        metadata.setPermissionCode("ADMIN");
+        metadata.setTenantPermissionCode("READ");
+
+        FeatureObjectDto.ObjectPermission projects = new FeatureObjectDto.ObjectPermission();
+        projects.setObjectId(200L);
+        projects.setParentId(null);
+        projects.setObjectName("项目");
+        projects.setSort(1);
+        projects.setPermissionCode("READ");
+        projects.setTenantPermissionCode("ADMIN");
+
+        when(featureObjectMapper.selectRoleObjectPermissionsAll(10L, 5L))
+                .thenReturn(List.of(governance, metadata, projects));
+
+        List<FeatureObjectDto.ObjectPermission> permissions = roleService.getRolePermissions(5L, "ALL");
+
+        assertEquals(2, permissions.size());
+        assertEquals(200L, permissions.get(0).getObjectId());
+        assertEquals(100L, permissions.get(1).getObjectId());
+        assertEquals(1, permissions.get(1).getChildren().size());
+        assertEquals(101L, permissions.get(1).getChildren().get(0).getObjectId());
+        assertEquals("READ", permissions.get(1).getChildren().get(0).getPermissionCode());
+    }
+
+    private Permission permission(Long id, String code, Integer level) {
+        Permission permission = new Permission();
+        permission.setId(id);
+        permission.setCode(code);
+        permission.setLevel(level);
+        return permission;
     }
 }

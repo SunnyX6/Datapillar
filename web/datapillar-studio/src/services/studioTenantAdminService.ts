@@ -1,19 +1,21 @@
 import { API_BASE, API_PATH, requestData } from '@/lib/api'
 import { pickDefinedParams } from './studioCommon'
 import type {
+  CreateTenantInvitationRequest,
+  CreateTenantInvitationResponse,
   ListTenantSsoIdentitiesParams,
   StudioTenant,
   StudioTenantFeatureAudit,
-  StudioTenantInvitation,
   StudioTenantSsoIdentity,
   StudioTenantUser
 } from '@/types/studio/tenant'
 
 export type {
+  CreateTenantInvitationRequest,
+  CreateTenantInvitationResponse,
   ListTenantSsoIdentitiesParams,
   StudioTenant,
   StudioTenantFeatureAudit,
-  StudioTenantInvitation,
   StudioTenantSsoIdentity,
   StudioTenantUser
 } from '@/types/studio/tenant'
@@ -37,14 +39,15 @@ export async function listTenantUsers(
   })
 }
 
-export async function listTenantInvitations(
+export async function createTenantInvitation(
   _tenantId: number,
-  status?: number
-): Promise<StudioTenantInvitation[]> {
-  return requestData<StudioTenantInvitation[]>({
+  request: CreateTenantInvitationRequest
+): Promise<CreateTenantInvitationResponse> {
+  return requestData<CreateTenantInvitationResponse, CreateTenantInvitationRequest>({
     baseURL: API_BASE.studioAdmin,
     url: API_PATH.tenantAdmin.invitations,
-    params: pickDefinedParams({ status })
+    method: 'POST',
+    data: request
   })
 }
 

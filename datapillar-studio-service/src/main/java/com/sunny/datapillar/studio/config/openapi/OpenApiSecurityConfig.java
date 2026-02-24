@@ -129,6 +129,9 @@ public class OpenApiSecurityConfig {
         if (path == null) {
             return false;
         }
+        if (path.startsWith("/biz/invitations")) {
+            return false;
+        }
         return path.startsWith("/biz/") || path.startsWith("/admin/");
     }
 }

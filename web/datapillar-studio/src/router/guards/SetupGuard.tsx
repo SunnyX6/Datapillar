@@ -1,18 +1,14 @@
 import { useEffect } from 'react'
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet } from 'react-router-dom'
 import { useSetupStore } from '@/stores'
 
 const SETUP_PATH = '/setup'
-
-function isSetupPath(pathname: string): boolean {
-  return pathname === SETUP_PATH
-}
+const SERVER_ERROR_PATH = '/500'
 
 /**
- * 全局 Setup 守门路由：任何页面进入前先校验初始化状态。
+ * 初始化守卫：仅负责 setup 状态检查。
  */
-export function SetupGuardRoute() {
-  const location = useLocation()
+export function SetupGuard() {
   const guardStatus = useSetupStore((state) => state.guardStatus)
   const initialized = useSetupStore((state) => state.initialized)
   const refreshSetupStatus = useSetupStore((state) => state.refreshSetupStatus)
@@ -29,10 +25,10 @@ export function SetupGuardRoute() {
   }
 
   if (guardStatus === 'error') {
-    return <Navigate to="/500" replace />
+    return <Navigate to={SERVER_ERROR_PATH} replace />
   }
 
-  if (!initialized && !isSetupPath(location.pathname)) {
+  if (!initialized) {
     return <Navigate to={SETUP_PATH} replace />
   }
 

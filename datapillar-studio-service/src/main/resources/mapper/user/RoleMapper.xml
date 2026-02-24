@@ -16,6 +16,13 @@
           AND name = #{name}
     </select>
 
+    <select id="selectByIdForUpdate" resultType="com.sunny.datapillar.studio.module.user.entity.Role">
+        SELECT *
+        FROM roles
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
     <delete id="deleteRolePermissions">
         DELETE FROM role_permissions WHERE role_id = #{roleId} AND tenant_id = #{tenantId}
     </delete>

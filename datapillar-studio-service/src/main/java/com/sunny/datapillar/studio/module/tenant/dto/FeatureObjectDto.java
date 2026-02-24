@@ -31,15 +31,17 @@ public class FeatureObjectDto {
     @Schema(name = "FeatureObjectObjectPermission")
     public static class ObjectPermission {
         private Long objectId;
+        private Long parentId;
         private String objectName;
         private String objectPath;
         private String objectType;
         private String location;
         private Long categoryId;
         private String categoryName;
+        private Integer sort;
         private String permissionCode;
         private String tenantPermissionCode;
-        private List<RoleSource> roleSources;
+        private List<ObjectPermission> children;
     }
 
     @Data

@@ -1,42 +1,36 @@
 package com.sunny.datapillar.studio.module.tenant.service.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.sunny.datapillar.common.exception.UnauthorizedException;
-import com.sunny.datapillar.studio.context.TenantContext;
+import com.sunny.datapillar.common.exception.NotFoundException;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
+import com.sunny.datapillar.studio.module.tenant.dto.InvitationDto;
+import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.entity.UserInvitation;
 import com.sunny.datapillar.studio.module.tenant.entity.UserInvitationRole;
+import com.sunny.datapillar.studio.module.tenant.mapper.TenantMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.UserInvitationMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.UserInvitationRoleMapper;
 import com.sunny.datapillar.studio.module.user.entity.Role;
-import com.sunny.datapillar.studio.module.user.entity.TenantUser;
 import com.sunny.datapillar.studio.module.user.entity.User;
-import com.sunny.datapillar.studio.module.user.entity.UserRole;
 import com.sunny.datapillar.studio.module.user.mapper.RoleMapper;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserRoleMapper;
-import com.sunny.datapillar.studio.security.GatewayAssertionContext;
 import java.time.LocalDateTime;
-import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class InvitationServiceImplTest {
@@ -53,6 +47,10 @@ class InvitationServiceImplTest {
     private TenantUserMapper tenantUserMapper;
     @Mock
     private UserRoleMapper userRoleMapper;
+    @Mock
+    private TenantMapper tenantMapper;
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     private InvitationServiceImpl invitationService;
 
@@ -64,146 +62,75 @@ class InvitationServiceImplTest {
                 roleMapper,
                 userMapper,
                 tenantUserMapper,
-                userRoleMapper
+                userRoleMapper,
+                tenantMapper,
+                passwordEncoder
         );
     }
 
     @AfterEach
     void tearDown() {
-        RequestContextHolder.resetRequestAttributes();
         TenantContextHolder.clear();
     }
 
     @Test
-    void acceptInvitation_shouldBindMemberAndRolesWhenInvitationValid() {
-        Long tenantId = 100L;
-        Long userId = 200L;
-        bindCurrentUser(userId, tenantId, "alice@example.com");
-
-        UserInvitation invitation = pendingInvitation(tenantId, "alice@example.com", LocalDateTime.now().plusDays(1));
-        when(userInvitationMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(invitation);
-        when(userMapper.selectById(userId)).thenReturn(user(userId, "alice@example.com", "13900001234"));
-        when(userInvitationMapper.update(isNull(), any())).thenReturn(1);
-        when(tenantUserMapper.selectByTenantIdAndUserId(tenantId, userId)).thenReturn(null);
-        when(tenantUserMapper.countByUserId(userId)).thenReturn(0);
-        when(userInvitationRoleMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(
-                invitationRole(301L), invitationRole(302L)
-        ));
-        when(roleMapper.selectById(301L)).thenReturn(role(301L, tenantId));
-        when(roleMapper.selectById(302L)).thenReturn(role(302L, tenantId));
-        when(userRoleMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
-
-        invitationService.acceptInvitation(" code-001 ");
-
-        verify(userInvitationMapper).update(isNull(), any());
-        verify(tenantUserMapper).insert(any(TenantUser.class));
-        verify(userRoleMapper, times(2)).insert(any(UserRole.class));
-    }
-
-    @Test
-    void acceptInvitation_shouldRejectWhenInviteExpired() {
-        Long tenantId = 100L;
-        Long userId = 200L;
-        bindCurrentUser(userId, tenantId, "alice@example.com");
-
-        UserInvitation invitation = pendingInvitation(tenantId, "alice@example.com", LocalDateTime.now().minusMinutes(1));
-        when(userInvitationMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(invitation);
-        when(userMapper.selectById(userId)).thenReturn(user(userId, "alice@example.com", "13900001234"));
-        when(userInvitationMapper.update(isNull(), any())).thenReturn(1);
-
-        UnauthorizedException exception = assertThrows(UnauthorizedException.class,
-                () -> invitationService.acceptInvitation("EXPIRED-001"));
-
-        assertEquals("邀请码已过期", exception.getMessage());
-        verify(tenantUserMapper, never()).insert(any(TenantUser.class));
-        verify(userRoleMapper, never()).insert(any(UserRole.class));
-    }
-
-    @Test
-    void acceptInvitation_shouldRejectWhenInviteeDoesNotMatchCurrentUser() {
-        Long tenantId = 100L;
-        Long userId = 200L;
-        bindCurrentUser(userId, tenantId, "bob@example.com");
-
-        UserInvitation invitation = pendingInvitation(tenantId, "alice@example.com", LocalDateTime.now().plusDays(1));
-        when(userInvitationMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(invitation);
-        when(userMapper.selectById(userId)).thenReturn(user(userId, "bob@example.com", "13900001234"));
-
-        UnauthorizedException exception = assertThrows(UnauthorizedException.class,
-                () -> invitationService.acceptInvitation("MISMATCH-001"));
-
-        assertEquals("邀请信息与登录身份不匹配", exception.getMessage());
-        verify(userInvitationMapper, never()).update(isNull(), any());
-        verify(tenantUserMapper, never()).insert(any(TenantUser.class));
-    }
-
-    @Test
-    void acceptInvitation_shouldRejectWhenInvitationAlreadyAccepted() {
-        Long tenantId = 100L;
-        Long userId = 200L;
-        bindCurrentUser(userId, tenantId, "alice@example.com");
-
-        UserInvitation invitation = pendingInvitation(tenantId, "alice@example.com", LocalDateTime.now().plusDays(1));
-        invitation.setStatus(1);
-        when(userInvitationMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(invitation);
-
-        UnauthorizedException exception = assertThrows(UnauthorizedException.class,
-                () -> invitationService.acceptInvitation("USED-001"));
-
-        assertEquals("邀请码已被使用", exception.getMessage());
-        verify(userMapper, never()).selectById(any());
-    }
-
-    private void bindCurrentUser(Long userId, Long tenantId, String email) {
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        GatewayAssertionContext context = new GatewayAssertionContext(
-                userId,
-                tenantId,
-                "tenant-" + tenantId,
-                "tester",
-                email,
-                List.of("USER"),
-                false,
-                null,
-                null,
-                "token-1"
-        );
-        GatewayAssertionContext.attach(request, context);
-        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
-        TenantContextHolder.set(new TenantContext(tenantId, "tenant-" + tenantId, null, null, false));
-    }
-
-    private UserInvitation pendingInvitation(Long tenantId, String inviteeEmail, LocalDateTime expiresAt) {
+    void getInvitationByCode_shouldReturnDetailWhenInvitationExists() {
         UserInvitation invitation = new UserInvitation();
         invitation.setId(1L);
-        invitation.setTenantId(tenantId);
-        invitation.setInviteCode("INVITE-001");
-        invitation.setInviteeEmail(inviteeEmail);
-        invitation.setInviteeKey(inviteeEmail);
+        invitation.setTenantId(100L);
+        invitation.setInviterUserId(200L);
+        invitation.setInviteCode("INV-001");
         invitation.setStatus(0);
-        invitation.setExpiresAt(expiresAt);
-        return invitation;
-    }
+        invitation.setExpiresAt(LocalDateTime.now().plusDays(1));
+        when(userInvitationMapper.selectByInviteCode("INV-001")).thenReturn(invitation);
 
-    private User user(Long id, String email, String phone) {
-        User user = new User();
-        user.setId(id);
-        user.setEmail(email);
-        user.setPhone(phone);
-        return user;
-    }
+        UserInvitationRole invitationRole = new UserInvitationRole();
+        invitationRole.setInvitationId(1L);
+        invitationRole.setRoleId(301L);
+        when(userInvitationRoleMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(invitationRole);
 
-    private UserInvitationRole invitationRole(Long roleId) {
-        UserInvitationRole role = new UserInvitationRole();
-        role.setInvitationId(1L);
-        role.setRoleId(roleId);
-        return role;
-    }
-
-    private Role role(Long roleId, Long tenantId) {
         Role role = new Role();
-        role.setId(roleId);
-        role.setTenantId(tenantId);
-        return role;
+        role.setId(301L);
+        role.setTenantId(100L);
+        role.setName("Data Analyst");
+        when(roleMapper.selectById(301L)).thenReturn(role);
+
+        Tenant tenant = new Tenant();
+        tenant.setId(100L);
+        tenant.setName("Data Engineering Core");
+        when(tenantMapper.selectById(100L)).thenReturn(tenant);
+
+        User inviter = new User();
+        inviter.setId(200L);
+        inviter.setNickname("Sarah Chen");
+        when(userMapper.selectById(200L)).thenReturn(inviter);
+
+        InvitationDto.DetailResponse response = invitationService.getInvitationByCode(" inv-001 ");
+
+        assertEquals("INV-001", response.getInviteCode());
+        assertEquals("Data Engineering Core", response.getTenantName());
+        assertEquals(301L, response.getRoleId());
+        assertEquals("Data Analyst", response.getRoleName());
+        assertEquals("Sarah Chen", response.getInviterName());
+        assertEquals(0, response.getStatus());
+        assertNull(TenantContextHolder.getTenantId());
+        verify(userInvitationMapper).selectByInviteCode("INV-001");
+    }
+
+    @Test
+    void registerInvitation_shouldThrowNotFoundWhenInvitationMissing() {
+        InvitationDto.RegisterRequest request = new InvitationDto.RegisterRequest();
+        request.setInviteCode("INV-404");
+        request.setUsername("member_user");
+        request.setEmail("new.user@datapillar.ai");
+        request.setPassword("123456");
+
+        when(userInvitationMapper.selectByInviteCodeForUpdate("INV-404")).thenReturn(null);
+
+        NotFoundException exception = assertThrows(NotFoundException.class,
+                () -> invitationService.registerInvitation(request));
+
+        assertEquals("资源不存在", exception.getMessage());
+        verify(userInvitationMapper).selectByInviteCodeForUpdate("INV-404");
     }
 }

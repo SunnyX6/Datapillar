@@ -93,9 +93,6 @@ public abstract class BaseControllerExceptionHandler {
                 detail.errorCode(),
                 detail.type(),
                 detail.message(),
-                detail.context(),
-                detail.traceId(),
-                detail.retryable(),
-                detail.stack());
+                detail.traceId());
     }
 }

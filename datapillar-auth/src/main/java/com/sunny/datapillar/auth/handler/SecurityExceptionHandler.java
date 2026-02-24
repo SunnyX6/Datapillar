@@ -61,10 +61,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
                 detail.errorCode(),
                 detail.type(),
                 detail.message(),
-                detail.context(),
-                detail.traceId(),
-                detail.retryable(),
-                detail.stack());
+                detail.traceId());
 
         response.getWriter().write(objectMapper.writeValueAsString(body));
     }

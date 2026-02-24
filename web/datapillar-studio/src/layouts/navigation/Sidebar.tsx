@@ -23,6 +23,7 @@ import {
 import { Tooltip } from '@/components/ui'
 import { ExpandToggle } from './ExpandToggle'
 import type { Menu } from '@/types/auth'
+import { isMenuVisible } from '@/router/access/routeAccess'
 
 interface SidebarProps {
   menus: Menu[]
@@ -108,7 +109,10 @@ export function Sidebar({ menus, onNavigate, currentPath, collapsed, onToggleCol
     }
   }
 
-  const sidebarMenus = useMemo(() => menus.filter((menu) => menu.location === 'SIDEBAR'), [menus])
+  const sidebarMenus = useMemo(
+    () => menus.filter((menu) => menu.location === 'SIDEBAR' && isMenuVisible(menu)),
+    [menus],
+  )
 
   const groupedMenus = useMemo(() => {
     const groups: Array<{ key: string; name: string; items: Menu[] }> = []

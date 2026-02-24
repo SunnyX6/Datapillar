@@ -3,8 +3,8 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
-import { SetupGuardRoute } from '@/router/SetupGuardRoute'
-import { useAuthStore, useSetupStore } from '@/stores'
+import { SetupGuard } from '@/router/guards/SetupGuard'
+import { useSetupStore } from '@/stores'
 import { getSetupStatus } from '@/services/setupService'
 
 vi.mock('@/services/setupService', () => ({
@@ -24,7 +24,7 @@ const renderWithRouter = (initialEntry: string): RenderResult => {
     [
       {
         path: '/',
-        element: <SetupGuardRoute />,
+        element: <SetupGuard />,
         children: [
           {
             path: 'home',
@@ -37,6 +37,18 @@ const renderWithRouter = (initialEntry: string): RenderResult => {
           {
             path: 'setup',
             element: <div>setup-page</div>
+          },
+          {
+            path: 'login',
+            element: <div>login-page</div>
+          },
+          {
+            path: 'invite',
+            element: <div>invite-page</div>
+          },
+          {
+            path: '500',
+            element: <div>server-error-page</div>
           }
         ]
       }
@@ -71,17 +83,12 @@ const cleanup = (root: Root, container: HTMLDivElement) => {
   container.remove()
 }
 
-describe('SetupGuardRoute', () => {
+describe('SetupGuard', () => {
   beforeEach(() => {
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
     localStorage.clear()
     vi.clearAllMocks()
     useSetupStore.getState().resetSetupStatus()
-    useAuthStore.setState({
-      loading: false,
-      isAuthenticated: true,
-      error: null
-    })
     mockedGetSetupStatus.mockResolvedValue({
       schemaReady: true,
       initialized: true,
@@ -111,4 +118,5 @@ describe('SetupGuardRoute', () => {
 
     cleanup(root, container)
   })
+
 })

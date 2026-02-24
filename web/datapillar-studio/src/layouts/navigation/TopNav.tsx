@@ -28,6 +28,7 @@ import { useTranslation } from 'react-i18next'
 import { iconSizeToken, inputContainerWidthClassMap, menuWidthClassMap } from '@/design-tokens/dimensions'
 import { Button } from '@/components/ui'
 import type { Menu } from '@/types/auth'
+import { isMenuVisible } from '@/router/access/routeAccess'
 
 const LANGUAGE_OPTIONS: { id: Language; label: string }[] = [
   { id: 'zh-CN', label: '简体中文' },
@@ -36,7 +37,6 @@ const LANGUAGE_OPTIONS: { id: Language; label: string }[] = [
 
 interface UserInfo {
   name: string
-  role: string
   email?: string
 }
 
@@ -68,6 +68,14 @@ export function TopNav({
   const navigate = useNavigate()
   const location = useLocation()
   const authUser = useAuthStore((state) => state.user)
+  const normalizedUserName = useMemo(() => {
+    const name = user.name.trim()
+    return name.length > 0 ? name : 'User'
+  }, [user.name])
+  const normalizedUserEmail = useMemo(() => {
+    const email = user.email?.trim()
+    return email && email.length > 0 ? email : '-'
+  }, [user.email])
   const language = useI18nStore((state) => state.language)
   const setLanguage = useI18nStore((state) => state.setLanguage)
   const { t, i18n } = useTranslation('navigation')
@@ -185,43 +193,31 @@ export function TopNav({
     setIsDropdownOpen(false)
   }
 
-  const topMenus = useMemo(() => menus.filter((menu) => menu.location === 'TOP'), [menus])
-  const governanceMenu = useMemo(() => topMenus.find((menu) => menu.path === '/governance'), [topMenus])
-  const profileMenu = useMemo(
-    () => menus.find((menu) => menu.location === 'PROFILE' && menu.path === '/profile') ?? menus.find((menu) => menu.location === 'PROFILE'),
-    [menus]
+  const topMenus = useMemo(
+    () => menus.filter((menu) => menu.location === 'TOP' && isMenuVisible(menu)),
+    [menus],
   )
+  const governanceMenu = useMemo(() => topMenus.find((menu) => menu.path === '/governance'), [topMenus])
   const profileItems = useMemo(() => {
     const itemMap = new Map<string, Menu>()
-    const dynamicItems = profileMenu ? [profileMenu, ...(profileMenu.children ?? [])] : []
 
-    dynamicItems.forEach((item) => {
-      if (!item?.path) return
-      if (!itemMap.has(item.path)) {
-        itemMap.set(item.path, item)
-      }
-    })
-
-    if (!itemMap.has('/profile')) {
-      itemMap.set('/profile', {
-        id: -1001,
-        name: t('top.profile.profile', { defaultValue: '个人中心' }),
-        path: '/profile',
-        location: 'PROFILE'
+    const collectProfileItems = (items: Menu[]) => {
+      items.forEach((item) => {
+        if (!item || !isMenuVisible(item)) {
+          return
+        }
+        if (item.location === 'PROFILE' && item.path && !itemMap.has(item.path)) {
+          itemMap.set(item.path, item)
+        }
+        if (Array.isArray(item.children) && item.children.length > 0) {
+          collectProfileItems(item.children)
+        }
       })
     }
 
-    if (!itemMap.has('/profile/permission')) {
-      itemMap.set('/profile/permission', {
-        id: -1002,
-        name: t('top.profile.permission', { defaultValue: '权限配置' }),
-        path: '/profile/permission',
-        location: 'PROFILE'
-      })
-    }
-
+    collectProfileItems(menus)
     return Array.from(itemMap.values())
-  }, [profileMenu, t])
+  }, [menus])
 
   const isMenuActive = (path: string) => {
     if (path === '/home') {
@@ -587,7 +583,9 @@ export function TopNav({
                         </span>
                       </div>
                       <div className="p-2">
-                        {(menu.children ?? []).map((child) => {
+                        {(menu.children ?? [])
+                          .filter((child) => isMenuVisible(child))
+                          .map((child) => {
                           const meta = getGovernanceItemMeta(child.path)
                           const Icon = meta.icon
                           return (
@@ -733,7 +731,7 @@ export function TopNav({
           <Button type="button" variant="ghost" size="iconSm" className="flex items-center gap-2" onClick={() => setIsDropdownOpen((prev) => !prev)}>
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 p-px hover:shadow-md transition-shadow">
               <div className="w-full h-full rounded-full bg-white dark:bg-slate-900 flex items-center justify-center text-caption uppercase text-slate-700 dark:text-slate-200">
-                {user.name.slice(0, 2)}
+                {normalizedUserName.slice(0, 2)}
               </div>
             </div>
           </Button>
@@ -747,8 +745,8 @@ export function TopNav({
                 className={`fixed z-[1000000] ${menuWidthClassMap.large} bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right top-[var(--dropdown-top)] right-[calc(100vw-var(--dropdown-right))]`}
               >
                 <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-900/50">
-                  <p className="text-body-sm font-semibold text-slate-800 dark:text-slate-200">{user.name}</p>
-                  <p className="text-caption text-slate-500 truncate">{user.email || 'engineer@datapillar.ai'}</p>
+                  <p className="text-body-sm font-semibold text-slate-800 dark:text-slate-200">{normalizedUserName}</p>
+                  <p className="text-caption text-slate-500 truncate">{normalizedUserEmail}</p>
                 </div>
 
                 <div className="p-1">

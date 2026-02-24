@@ -2,8 +2,7 @@ import axios, { AxiosHeaders, type AxiosError, type AxiosInstance, type Internal
 import {
   handleAppError,
   normalizeApiPayloadError,
-  normalizeAxiosError,
-  type ErrorAction
+  normalizeAxiosError
 } from '@/lib/error-center'
 import {
   isApiResponse as isApiDataResponse,
@@ -21,6 +20,13 @@ interface ApiClientOptions {
   validateResponse?: boolean
 }
 
+interface AuthLifecycleCallbacks {
+  canRefresh: () => boolean
+  onRefreshStart: () => void
+  onRefreshEnd: () => void
+  onSessionExpired: () => void
+}
+
 type RetryConfig = InternalAxiosRequestConfig & { _retry?: boolean }
 
 const AUTH_BASE_URL = API_BASE.auth
@@ -34,7 +40,7 @@ const AUTH_ENDPOINTS = {
   logout: `${LOGIN_BASE_URL}${API_PATH.login.logout}`,
   refresh: `${AUTH_BASE_URL}${API_PATH.auth.refresh}`
 }
-const CORE_FAILURE_PATHS = new Set([API_ABSOLUTE_PATH.setupStatus, AUTH_ENDPOINTS.refresh])
+const CORE_FAILURE_PATHS = new Set<string>([API_ABSOLUTE_PATH.setupStatus])
 
 const refreshClient = axios.create({
   baseURL: AUTH_BASE_URL,
@@ -78,10 +84,10 @@ refreshClient.interceptors.request.use((config) => {
 })
 
 let refreshPromise: Promise<void> | null = null
-let unauthorizedHandler: (() => void) | null = null
+let authLifecycleCallbacks: AuthLifecycleCallbacks | null = null
 
-export function setUnauthorizedHandler(handler: (() => void) | null): void {
-  unauthorizedHandler = handler
+export function setAuthLifecycleCallbacks(callbacks: AuthLifecycleCallbacks | null): void {
+  authLifecycleCallbacks = callbacks
 }
 
 function isStandardApiResponse(data: unknown): data is ApiResponse<unknown> {
@@ -132,8 +138,8 @@ function handleApiPayloadFailure(
   requestUrl: string,
   method?: string,
   headers?: unknown
-): ErrorAction {
-  return handleAppError(
+): void {
+  handleAppError(
     normalizeApiPayloadError(payload, {
       module: 'api/client',
       status,
@@ -141,31 +147,30 @@ function handleApiPayloadFailure(
       method,
       isCoreRequest: isCoreFailureRequest(requestUrl),
       headers
-    }),
-    { onUnauthorized: unauthorizedHandler }
+    })
   )
 }
 
-function handleAxiosFailure(error: unknown): ErrorAction {
+function handleAxiosFailure(error: unknown): void {
   const axiosError = axios.isAxiosError(error) ? error : undefined
   const config = axiosError?.config as InternalAxiosRequestConfig | undefined
   const requestUrl = config ? getRequestUrl(config) : undefined
   const method = config?.method?.toUpperCase()
   const isCoreRequest = requestUrl ? isCoreFailureRequest(requestUrl) : false
 
-  return handleAppError(
+  handleAppError(
     normalizeAxiosError(error, {
       module: 'api/client',
       requestUrl,
       method,
       isCoreRequest
-    }),
-    { onUnauthorized: unauthorizedHandler }
+    })
   )
 }
 
 async function refreshAccessToken(): Promise<void> {
   if (!refreshPromise) {
+    authLifecycleCallbacks?.onRefreshStart()
     refreshPromise = refreshClient
       .post<ApiResponse<void> | ErrorResponse>(API_PATH.auth.refresh)
       .then((response) => {
@@ -183,14 +188,9 @@ async function refreshAccessToken(): Promise<void> {
           throw buildApiError(data, response.status)
         }
       })
-      .catch((error: unknown) => {
-        if (axios.isAxiosError(error)) {
-          handleAxiosFailure(error)
-        }
-        throw error
-      })
       .finally(() => {
         refreshPromise = null
+        authLifecycleCallbacks?.onRefreshEnd()
       })
   }
   return refreshPromise
@@ -207,11 +207,19 @@ function shouldAttemptRefresh(error: AxiosError): boolean {
     return false
   }
 
+  if (!authLifecycleCallbacks || !authLifecycleCallbacks.canRefresh()) {
+    return false
+  }
+
   if (shouldSkipAuthHandling(config)) {
     return false
   }
 
   return true
+}
+
+function handleSessionExpired(): void {
+  authLifecycleCallbacks?.onSessionExpired()
 }
 
 export function createApiClient(options: ApiClientOptions): AxiosInstance {
@@ -260,28 +268,20 @@ export function createApiClient(options: ApiClientOptions): AxiosInstance {
         try {
           await refreshAccessToken()
           return client(config)
-        } catch (refreshError) {
-          const action = handleAxiosFailure(refreshError)
-          if (action.type === 'local' || action.type === 'none' || action.type === 'toast') {
-            unauthorizedHandler?.()
-          }
-          return Promise.reject(refreshError)
+        } catch (refreshFailure) {
+          handleSessionExpired()
+          return Promise.reject(refreshFailure)
         }
       }
 
       if (error.response?.status === 401) {
         const config = error.config as RetryConfig | undefined
-        if (validateResponse && (isStandardApiResponse(responseData) || isStandardErrorResponse(responseData))) {
-          const requestUrl = config ? getRequestUrl(config) : ''
-          const method = config?.method?.toUpperCase()
-          const skipAuthHandling = config ? shouldSkipAuthHandling(config) : false
-          if (!skipAuthHandling) {
-            handleApiPayloadFailure(responseData, error.response?.status, requestUrl, method, error.response?.headers)
-          }
-          return Promise.reject(buildApiError(responseData, error.response?.status))
+        const skipAuthHandling = config ? shouldSkipAuthHandling(config) : false
+        if (!skipAuthHandling) {
+          handleSessionExpired()
         }
-        if (config && !shouldSkipAuthHandling(config)) {
-          handleAxiosFailure(error)
+        if (validateResponse && (isStandardApiResponse(responseData) || isStandardErrorResponse(responseData))) {
+          return Promise.reject(buildApiError(responseData, error.response?.status))
         }
         return Promise.reject(error)
       }
