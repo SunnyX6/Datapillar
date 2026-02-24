@@ -26,18 +26,6 @@ public class UserInvitation {
     @TableField("inviter_user_id")
     private Long inviterUserId;
 
-    @TableField("invitee_email")
-    private String inviteeEmail;
-
-    @TableField("invitee_mobile")
-    private String inviteeMobile;
-
-    @TableField("invitee_key")
-    private String inviteeKey;
-
-    @TableField("active_invitee_key")
-    private String activeInviteeKey;
-
     @TableField("invite_code")
     private String inviteCode;
 

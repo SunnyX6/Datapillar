@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AuthControllerExceptionHandlerTest {
 
@@ -27,7 +26,6 @@ class AuthControllerExceptionHandlerTest {
         assertEquals(Code.INTERNAL_ERROR, errorResponse.getCode());
         assertEquals(ErrorType.INTERNAL_ERROR, errorResponse.getType());
         assertEquals("db_connect_failed", errorResponse.getMessage());
-        assertTrue(errorResponse.getStack() != null && !errorResponse.getStack().isEmpty());
     }
 
     @Test

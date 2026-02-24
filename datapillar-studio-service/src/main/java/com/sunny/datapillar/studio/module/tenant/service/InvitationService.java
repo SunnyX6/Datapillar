@@ -1,8 +1,6 @@
 package com.sunny.datapillar.studio.module.tenant.service;
 
 import com.sunny.datapillar.studio.module.tenant.dto.InvitationDto;
-import com.sunny.datapillar.studio.module.tenant.entity.UserInvitation;
-import java.util.List;
 
 /**
  * 邀请服务
@@ -19,19 +17,12 @@ public interface InvitationService {
     InvitationDto.CreateResponse createInvitation(InvitationDto.Create dto);
 
     /**
-     * 查询邀请列表（租户管理员操作）。
+     * 根据邀请码查询邀请详情（匿名可访问）。
      */
-    List<UserInvitation> listInvitations(Integer status);
+    InvitationDto.DetailResponse getInvitationByCode(String inviteCode);
 
     /**
-     * 取消邀请（租户管理员操作）。
+     * 邀请注册（匿名用户操作）。
      */
-    void cancelInvitation(Long invitationId);
-
-    /**
-     * 邀请接受（被邀请用户操作）。
-     *
-     * @param inviteCode 邀请码
-     */
-    void acceptInvitation(String inviteCode);
+    void registerInvitation(InvitationDto.RegisterRequest request);
 }

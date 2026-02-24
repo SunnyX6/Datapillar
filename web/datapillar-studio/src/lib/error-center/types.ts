@@ -24,21 +24,14 @@ export interface AppError {
 
 export type ErrorAction =
   | { type: 'toast'; level: 'warn' | 'error'; message: string }
-  | { type: 'redirect'; to: '/setup' | '/500'; replace: boolean }
-  | { type: 'logout' }
   | { type: 'local'; reason: string }
   | { type: 'none' }
 
 export interface ErrorDecisionOptions {
   preferToast?: boolean
-  allowServerErrorRedirect?: boolean
 }
 
-export interface ErrorDispatchOptions {
-  onUnauthorized?: (() => void) | null
-}
-
-export interface HandleAppErrorOptions extends ErrorDecisionOptions, ErrorDispatchOptions {}
+export type HandleAppErrorOptions = ErrorDecisionOptions
 
 export interface FatalErrorSnapshot {
   message: string

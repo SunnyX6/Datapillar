@@ -1,12 +1,12 @@
 package com.sunny.datapillar.studio.module.tenant.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.Size;
-import java.time.LocalDateTime;
-import java.util.List;
-import lombok.Data;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import java.time.OffsetDateTime;
+import lombok.Data;
 
 /**
  * 邀请数据传输对象
@@ -20,16 +20,11 @@ public class InvitationDto {
     @Data
     @Schema(name = "InvitationCreate")
     public static class Create {
-        @Size(max = 128, message = "邮箱长度不能超过128个字符")
-        private String inviteeEmail;
+        @NotNull(message = "角色不能为空")
+        private Long roleId;
 
-        @Size(max = 32, message = "手机号长度不能超过32个字符")
-        private String inviteeMobile;
-
-        @NotEmpty(message = "角色不能为空")
-        private List<Long> roleIds;
-
-        private LocalDateTime expiresAt;
+        @NotNull(message = "过期时间不能为空")
+        private OffsetDateTime expiresAt;
     }
 
     @Data
@@ -37,34 +32,44 @@ public class InvitationDto {
     public static class CreateResponse {
         private Long invitationId;
         private String inviteCode;
-        private LocalDateTime expiresAt;
+        private String inviteUri;
+        private OffsetDateTime expiresAt;
+        private String tenantName;
+        private Long roleId;
+        private String roleName;
+        private String inviterName;
     }
 
     @Data
-    @Schema(name = "InvitationResponse")
-    public static class Response {
-        private Long id;
-        private Long tenantId;
-        private String inviteeEmail;
-        private String inviteeMobile;
-        private Integer status;
+    @Schema(name = "InvitationDetailResponse")
+    public static class DetailResponse {
         private String inviteCode;
-        private LocalDateTime expiresAt;
-        private LocalDateTime createdAt;
+        private String tenantName;
+        private Long roleId;
+        private String roleName;
+        private String inviterName;
+        private OffsetDateTime expiresAt;
+        private Integer status;
     }
 
     @Data
-    @Schema(name = "InvitationActionRequest")
-    public static class ActionRequest {
-        @NotBlank(message = "操作不能为空")
-        private String action;
-    }
-
-    @Data
-    @Schema(name = "InvitationAcceptRequest")
-    public static class AcceptRequest {
+    @Schema(name = "InvitationRegisterRequest")
+    public static class RegisterRequest {
         @NotBlank(message = "邀请码不能为空")
         @Size(max = 64, message = "邀请码长度不能超过64个字符")
         private String inviteCode;
+
+        @NotBlank(message = "用户名不能为空")
+        @Size(max = 64, message = "用户名长度不能超过64个字符")
+        private String username;
+
+        @NotBlank(message = "邮箱不能为空")
+        @Email(message = "邮箱格式不正确")
+        @Size(max = 128, message = "邮箱长度不能超过128个字符")
+        private String email;
+
+        @NotBlank(message = "密码不能为空")
+        @Size(min = 6, max = 255, message = "密码长度必须在6-255个字符之间")
+        private String password;
     }
 }

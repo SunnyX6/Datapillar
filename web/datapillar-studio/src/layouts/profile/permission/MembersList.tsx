@@ -32,6 +32,7 @@ const STATUS_STYLES: Record<UserStatus, string> = {
 
 interface MembersListProps {
   role: RoleDefinition
+  selectedRoleId: string
   users: UserItem[]
   onUpdateUserModelAccess: (
     userId: string,
@@ -46,6 +47,7 @@ interface MembersListProps {
 
 export function MembersList({
   role,
+  selectedRoleId,
   users,
   onUpdateUserModelAccess,
   showToolbar = true,
@@ -240,10 +242,11 @@ export function MembersList({
       </Table>
 
       <InviteMemberModal
-        key={`${role.id}-${isAddModalOpen ? 'open' : 'closed'}`}
+        key={`${selectedRoleId}-${isAddModalOpen ? 'open' : 'closed'}`}
         isOpen={isAddModalOpen}
         onClose={onCloseAddModal ?? (() => {})}
         role={role}
+        roleId={selectedRoleId}
       />
 
       {selectedUser && (

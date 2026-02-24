@@ -36,6 +36,9 @@ export const API_PATH = {
     create: '/users/me/projects',
     detail: (projectId: number) => `/users/me/projects/${projectId}`
   },
+  userProfile: {
+    me: '/users/me/profile'
+  },
   workflow: {
     list: '/workflows',
     runs: (workflowId: number) => `/workflows/${workflowId}/runs`,
@@ -56,6 +59,10 @@ export const API_PATH = {
     invitations: '/tenant/current/invitations',
     featureAudits: '/tenant/current/features/audits',
     ssoIdentities: '/tenant/current/sso/identities'
+  },
+  invitation: {
+    detail: (inviteCode: string) => `/invitations/${inviteCode}`,
+    register: '/invitations/register'
   },
   llm: {
     models: '/llms/models',

@@ -1,5 +1,7 @@
 package com.sunny.datapillar.studio.module.tenant.service;
 
+import com.sunny.datapillar.studio.module.tenant.dto.InvitationDto;
+
 /**
  * 租户邀请业务服务
  * 提供租户邀请业务业务能力与领域服务
@@ -9,5 +11,7 @@ package com.sunny.datapillar.studio.module.tenant.service;
  */
 public interface TenantInvitationBizService {
 
-    void acceptInvitation(String inviteCode);
+    InvitationDto.DetailResponse getInvitationByCode(String inviteCode);
+
+    void registerInvitation(InvitationDto.RegisterRequest request);
 }

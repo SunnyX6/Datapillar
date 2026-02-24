@@ -20,15 +20,37 @@ export interface StudioTenantUser {
   updatedAt: string
 }
 
-export interface StudioTenantInvitation {
-  id: number
-  tenantId: number
-  inviteeEmail?: string | null
-  inviteeMobile?: string | null
-  status: number
-  inviteCode: string
+export interface CreateTenantInvitationRequest {
+  roleId: number
   expiresAt: string
-  createdAt: string
+}
+
+export interface CreateTenantInvitationResponse {
+  invitationId: number
+  inviteCode: string
+  inviteUri: string
+  expiresAt: string
+  tenantName: string
+  roleId: number
+  roleName: string
+  inviterName: string
+}
+
+export interface InvitationRegisterRequest {
+  inviteCode: string
+  username: string
+  email: string
+  password: string
+}
+
+export interface InvitationDetailResponse {
+  inviteCode: string
+  tenantName: string
+  roleId: number
+  roleName: string
+  inviterName: string
+  expiresAt: string | null
+  status: number
 }
 
 export interface StudioTenantFeatureAudit {

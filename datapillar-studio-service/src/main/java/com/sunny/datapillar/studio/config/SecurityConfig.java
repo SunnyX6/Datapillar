@@ -60,6 +60,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/v3/api-docs/**").permitAll()
                         .requestMatchers("/setup/**").permitAll()
+                        .requestMatchers("/biz/invitations/**").permitAll()
                         // 所有请求都需要认证（Gateway 已验证，这里信任 Gateway）
                         .anyRequest().authenticated()
                 )

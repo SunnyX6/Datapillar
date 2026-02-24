@@ -26,16 +26,19 @@ export type UserStatus = '已激活' | '已邀请' | '已禁用'
 
 interface PermissionResourceBase {
   objectId: number
+  parentId?: number
   objectName: string
   objectPath?: string
   objectType?: string
   location?: string
+  sort: number
   categoryName: string
 }
 
 export interface PermissionResource extends PermissionResourceBase {
   level: PermissionLevel
   tenantLevel: PermissionLevel
+  children: PermissionResource[]
 }
 
 export type RoleType = 'ADMIN' | 'USER'
@@ -105,13 +108,16 @@ function mapRolePermissionToResource(
 ): PermissionResource {
   return {
     objectId: permission.objectId,
+    parentId: permission.parentId ?? undefined,
     objectName: permission.objectName,
     objectPath: permission.objectPath?.trim() || undefined,
     objectType: permission.objectType?.trim() || undefined,
     location: permission.location?.trim() || undefined,
+    sort: permission.sort ?? 0,
     categoryName: permission.categoryName?.trim() || '未分类',
     level: normalizePermissionLevel(permission.permissionCode),
     tenantLevel: normalizePermissionLevel(permission.tenantPermissionCode),
+    children: (permission.children ?? []).map(mapRolePermissionToResource),
   }
 }
 
@@ -129,11 +135,63 @@ function mapStudioRoleToDefinition(role: StudioRole): RoleDefinition {
   }
 }
 
+function flattenPermissionResources(resources: PermissionResource[]): PermissionResource[] {
+  return resources.flatMap((resource) => [resource, ...flattenPermissionResources(resource.children)])
+}
+
+function sortPermissionResources(resources: PermissionResource[]): PermissionResource[] {
+  return [...resources]
+    .sort((a, b) => {
+      if (a.sort !== b.sort) {
+        return a.sort - b.sort
+      }
+      return a.objectId - b.objectId
+    })
+    .map((resource) => ({
+      ...resource,
+      children: sortPermissionResources(resource.children),
+    }))
+}
+
 function toRolePermissionAssignments(resources: PermissionResource[]) {
-  return resources.map((resource) => ({
+  return flattenPermissionResources(resources).map((resource) => ({
     objectId: resource.objectId,
     permissionCode: resource.level,
   }))
+}
+
+function updatePermissionTree(
+  resources: PermissionResource[],
+  objectId: number,
+  level: PermissionLevel,
+): { resources: PermissionResource[]; updated: boolean } {
+  let updated = false
+  const nextResources = resources.map((resource) => {
+    const childUpdate = updatePermissionTree(resource.children, objectId, level)
+    const nextChildren = childUpdate.resources
+    const childChanged = childUpdate.updated
+
+    if (resource.objectId === objectId) {
+      updated = true
+      return {
+        ...resource,
+        level,
+        children: nextChildren,
+      }
+    }
+
+    if (childChanged) {
+      updated = true
+      return {
+        ...resource,
+        children: nextChildren,
+      }
+    }
+
+    return resource
+  })
+
+  return { resources: nextResources, updated }
 }
 
 export function PermissionLayout() {
@@ -197,8 +255,8 @@ export function PermissionLayout() {
           role.id === roleId
             ? {
                 ...role,
-                permissions: permissionsFromBackend.map(
-                  mapRolePermissionToResource,
+                permissions: sortPermissionResources(
+                  permissionsFromBackend.map(mapRolePermissionToResource),
                 ),
               }
             : role,
@@ -322,15 +380,25 @@ export function PermissionLayout() {
     if (!tenantId || !selectedRole) {
       return
     }
+    if (selectedRole.isSystem) {
+      toast.error('内置角色不允许修改功能权限')
+      return
+    }
     const roleId = Number(selectedRole.id)
     if (!Number.isFinite(roleId)) {
       toast.error('角色ID无效，无法更新功能权限')
       return
     }
 
-    const nextPermissions = selectedRole.permissions.map((permission) =>
-      permission.objectId === objectId ? { ...permission, level } : permission,
+    const updateResult = updatePermissionTree(
+      selectedRole.permissions,
+      objectId,
+      level,
     )
+    if (!updateResult.updated) {
+      return
+    }
+    const nextPermissions = updateResult.resources
 
     setRoleDefinitions((prev) =>
       prev.map((role) => {
@@ -575,6 +643,7 @@ export function PermissionLayout() {
               {activeTab === 'members' && (
                 <MembersList
                   role={selectedRole}
+                  selectedRoleId={selectedRoleId}
                   users={users}
                   onUpdateUserModelAccess={handleUserAiPermissionUpdate}
                   showToolbar={false}
@@ -587,6 +656,7 @@ export function PermissionLayout() {
                 <FunctionalPermission
                   role={selectedRole}
                   onUpdatePermission={handleRolePermissionUpdate}
+                  readonly={Boolean(selectedRole.isSystem)}
                   className="px-6 py-6 animate-in fade-in zoom-in-95 duration-200"
                 />
               )}

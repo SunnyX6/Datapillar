@@ -16,7 +16,6 @@ export type {
   StudioRoleMember,
   StudioRolePermission,
   StudioRolePermissionScope,
-  StudioRolePermissionSource,
   StudioRoleMembersResponse,
   StudioRoleType,
   UpdateStudioRolePermissionAssignment,

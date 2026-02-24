@@ -47,24 +47,19 @@ export interface UpdateStudioRoleRequest {
 
 export type StudioRolePermissionScope = 'ALL' | 'ASSIGNED'
 
-export interface StudioRolePermissionSource {
-  objectId: number
-  roleId: number
-  roleName: string
-  permissionCode: string
-}
-
 export interface StudioRolePermission {
   objectId: number
+  parentId?: number | null
   objectName: string
   objectPath?: string | null
   objectType?: string | null
   location?: string | null
   categoryId?: number | null
   categoryName?: string | null
+  sort?: number | null
   permissionCode?: string | null
   tenantPermissionCode?: string | null
-  roleSources?: StudioRolePermissionSource[] | null
+  children?: StudioRolePermission[] | null
 }
 
 export interface UpdateStudioRolePermissionAssignment {

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   Activity,
   ArrowUpRight,
@@ -15,6 +15,8 @@ import {
 } from 'lucide-react'
 import { Button, Card } from '@/components/ui'
 import { contentMaxWidthClassMap } from '@/design-tokens/dimensions'
+import { useAuthStore } from '@/stores'
+import { getMyProfile, type StudioUserProfile } from '@/services/studioUserProfileService'
 
 const PROFILE_TAGS = ['Data Reliability', 'AI Copilot', 'Cost Guardrails']
 
@@ -147,11 +149,43 @@ const CONTACTS: Contact[] = [
 ]
 
 export function ProfileLayout() {
+  const userId = useAuthStore((state) => state.user?.userId)
+  const [profile, setProfile] = useState<StudioUserProfile | null>(null)
+
+  useEffect(() => {
+    if (!userId) {
+      return
+    }
+
+    let isCancelled = false
+
+    const loadProfile = async () => {
+      try {
+        const response = await getMyProfile()
+        if (isCancelled) {
+          return
+        }
+        setProfile(response)
+      } catch {
+        if (isCancelled) {
+          return
+        }
+        setProfile(null)
+      }
+    }
+
+    void loadProfile()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [userId])
+
   return (
     <section className="flex h-full w-full overflow-hidden bg-white dark:bg-slate-900 selection:bg-indigo-500/30 @container">
       <div className="flex-1 overflow-auto p-4 @md:p-6 @xl:p-8 custom-scrollbar">
         <div className={`${contentMaxWidthClassMap.full} w-full mx-auto flex flex-col gap-4 @md:gap-6 text-body`}>
-          <ProfileHeader />
+          <ProfileHeader profile={profile} />
           <div className="grid grid-cols-12 gap-4 @md:gap-6 auto-rows-[minmax(0,1fr)]">
             {STAT_METRICS.map((metric) => (
               <BentoCard key={metric.label} className="col-span-12 @md:col-span-4">
@@ -181,7 +215,31 @@ export function ProfileLayout() {
   )
 }
 
-function ProfileHeader() {
+function ProfileHeader({ profile }: { profile: StudioUserProfile | null }) {
+  const profileName = useMemo(() => {
+    const nickname = profile?.nickname?.trim()
+    if (nickname) {
+      return nickname
+    }
+
+    const username = profile?.username?.trim()
+    if (username) {
+      return username
+    }
+
+    return 'Sunny Engineer'
+  }, [profile?.nickname, profile?.username])
+
+  const profileEmail = useMemo(() => {
+    const email = profile?.email?.trim()
+    return email || '暂未设置邮箱'
+  }, [profile?.email])
+
+  const profilePhone = useMemo(() => {
+    const phone = profile?.phone?.trim()
+    return phone || '暂未设置手机号'
+  }, [profile?.phone])
+
   return (
     <Card
       padding="md"
@@ -192,12 +250,17 @@ function ProfileHeader() {
           <div className="flex items-start gap-4">
             <div className="w-14 h-14 @md:w-16 @md:h-16 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-rose-500 p-0.5">
               <div className="w-full h-full rounded-[1rem] bg-white dark:bg-[#030712] flex items-center justify-center text-lg font-black text-transparent bg-clip-text bg-gradient-to-br from-slate-900 to-slate-600 dark:from-white dark:to-slate-300">
-                SE
+                {profileName.slice(0, 2).toUpperCase()}
               </div>
             </div>
             <div>
               <p className="text-legal uppercase tracking-[0.35em] text-slate-400 dark:text-slate-500">Principal Builder</p>
-              <h1 className="text-heading @md:text-title font-semibold text-slate-900 dark:text-white tracking-tight mt-1">Sunny Engineer</h1>
+              <h1 className="text-heading @md:text-title font-semibold text-slate-900 dark:text-white tracking-tight mt-1">{profileName}</h1>
+              <p className="text-body-sm text-slate-500 dark:text-slate-400 mt-2">
+                工作邮箱：<span className="font-medium text-slate-700 dark:text-slate-200">{profileEmail}</span>
+                {' · '}
+                手机：<span className="font-medium text-slate-700 dark:text-slate-200">{profilePhone}</span>
+              </p>
               <p className="text-body-sm text-slate-500 dark:text-slate-400 mt-2 max-w-3xl">
                 Owns the federated data operating model for <span className="font-medium text-indigo-600 dark:text-indigo-300">Acme Corp</span>, orchestrating ingestion, AI quality guardrails, and governed activation layers.
               </p>

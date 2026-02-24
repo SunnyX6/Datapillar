@@ -43,8 +43,8 @@
             o.path,
             o.parent_id,
             o.location,
-            CASE WHEN o.location = 'SIDEBAR' THEN o.category_id ELSE NULL END AS category_id,
-            CASE WHEN o.location = 'SIDEBAR' THEN c.name ELSE NULL END AS category_name,
+            o.category_id AS category_id,
+            c.name AS category_name,
             o.sort,
             CASE
                 WHEN LEAST(

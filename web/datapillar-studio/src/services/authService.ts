@@ -62,8 +62,8 @@ export async function loginTenant(request: LoginTenantRequest): Promise<LoginRes
   })
 }
 
-export async function logout(): Promise<void> {
-  await requestEnvelope<void>({
+export async function logout() {
+  return requestEnvelope<string>({
     baseURL: API_BASE.login,
     url: API_PATH.login.logout,
     method: 'POST'

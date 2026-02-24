@@ -1,5 +1,5 @@
 import { toast } from 'sonner'
-import type { AppError, ErrorAction, ErrorDispatchOptions, FatalErrorSnapshot } from './types'
+import type { AppError, ErrorAction, FatalErrorSnapshot } from './types'
 import { FATAL_ERROR_STORAGE_KEY } from './types'
 
 function isBrowser(): boolean {
@@ -19,26 +19,12 @@ function buildFatalSnapshot(error: AppError): FatalErrorSnapshot {
   }
 }
 
-function persistFatalError(error: AppError): void {
+export function persistFatalError(error: AppError): void {
   if (!isBrowser()) {
     return
   }
   const snapshot = buildFatalSnapshot(error)
   sessionStorage.setItem(FATAL_ERROR_STORAGE_KEY, JSON.stringify(snapshot))
-}
-
-function safeRedirect(to: '/setup' | '/500', replace: boolean): void {
-  if (!isBrowser()) {
-    return
-  }
-  if (window.location.pathname === to) {
-    return
-  }
-  if (replace) {
-    window.location.replace(to)
-    return
-  }
-  window.location.assign(to)
 }
 
 export function getLastFatalError(): FatalErrorSnapshot | null {
@@ -57,33 +43,13 @@ export function getLastFatalError(): FatalErrorSnapshot | null {
   }
 }
 
-export function dispatchErrorAction(
-  action: ErrorAction,
-  error: AppError,
-  options: ErrorDispatchOptions = {}
-): void {
-  if (action.type === 'toast') {
-    if (action.level === 'warn') {
-      toast(action.message)
-      return
-    }
-    toast.error(action.message)
+export function dispatchErrorAction(action: ErrorAction): void {
+  if (action.type !== 'toast') {
     return
   }
-
-  if (action.type === 'logout') {
-    if (options.onUnauthorized) {
-      options.onUnauthorized()
-      return
-    }
-    toast.error(error.message)
+  if (action.level === 'warn') {
+    toast(action.message)
     return
   }
-
-  if (action.type === 'redirect') {
-    if (action.to === '/500') {
-      persistFatalError(error)
-    }
-    safeRedirect(action.to, action.replace)
-  }
+  toast.error(action.message)
 }

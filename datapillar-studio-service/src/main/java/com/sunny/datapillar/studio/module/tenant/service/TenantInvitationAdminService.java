@@ -1,8 +1,6 @@
 package com.sunny.datapillar.studio.module.tenant.service;
 
 import com.sunny.datapillar.studio.module.tenant.dto.InvitationDto;
-import com.sunny.datapillar.studio.module.tenant.entity.UserInvitation;
-import java.util.List;
 
 /**
  * 租户邀请管理服务
@@ -14,8 +12,4 @@ import java.util.List;
 public interface TenantInvitationAdminService {
 
     InvitationDto.CreateResponse createInvitation(InvitationDto.Create dto);
-
-    List<UserInvitation> listInvitations(Integer status);
-
-    void cancelInvitation(Long invitationId);
 }

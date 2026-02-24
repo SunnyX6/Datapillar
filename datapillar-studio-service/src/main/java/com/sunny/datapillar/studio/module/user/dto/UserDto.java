@@ -101,7 +101,5 @@ public class UserDto {
         private Integer status;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
-        private List<RoleDto.Response> roles;
-        private List<String> permissions;
     }
 }

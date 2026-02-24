@@ -1,6 +1,8 @@
 package com.sunny.datapillar.studio.module.user.service.impl;
 
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -176,12 +178,12 @@ public class RoleServiceImpl implements RoleService {
             List<FeatureObjectDto.ObjectPermission> items =
                     featureObjectMapper.selectRoleObjectPermissionsAssigned(tenantId, roleId);
             applyTenantPermissionLimit(items, permissionMap);
-            return items;
+            return buildPermissionTree(items);
         }
         List<FeatureObjectDto.ObjectPermission> items =
                 featureObjectMapper.selectRoleObjectPermissionsAll(tenantId, roleId);
         applyTenantPermissionLimit(items, permissionMap);
-        return items;
+        return buildPermissionTree(items);
     }
 
     @Override
@@ -297,6 +299,55 @@ public class RoleServiceImpl implements RoleService {
             String currentCode = item.getPermissionCode();
             String effective = PermissionLevelUtil.minCode(permissionMap, currentCode, tenantCode);
             item.setPermissionCode(effective);
+        }
+    }
+
+    private List<FeatureObjectDto.ObjectPermission> buildPermissionTree(List<FeatureObjectDto.ObjectPermission> items) {
+        if (items == null || items.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        Map<Long, FeatureObjectDto.ObjectPermission> nodeMap = new LinkedHashMap<>();
+        for (FeatureObjectDto.ObjectPermission item : items) {
+            if (item == null || item.getObjectId() == null) {
+                continue;
+            }
+            item.setChildren(new ArrayList<>());
+            nodeMap.put(item.getObjectId(), item);
+        }
+
+        List<FeatureObjectDto.ObjectPermission> roots = new ArrayList<>();
+        for (FeatureObjectDto.ObjectPermission item : items) {
+            if (item == null || item.getObjectId() == null) {
+                continue;
+            }
+            Long parentId = item.getParentId();
+            if (parentId == null) {
+                roots.add(item);
+                continue;
+            }
+            FeatureObjectDto.ObjectPermission parent = nodeMap.get(parentId);
+            if (parent == null) {
+                roots.add(item);
+                continue;
+            }
+            parent.getChildren().add(item);
+        }
+
+        sortPermissionNodes(roots);
+        return roots;
+    }
+
+    private void sortPermissionNodes(List<FeatureObjectDto.ObjectPermission> nodes) {
+        if (nodes == null || nodes.isEmpty()) {
+            return;
+        }
+
+        nodes.sort(Comparator.comparingInt((FeatureObjectDto.ObjectPermission item) -> item.getSort() == null ? 0 : item.getSort())
+                .thenComparing(item -> item.getObjectId() == null ? 0L : item.getObjectId()));
+
+        for (FeatureObjectDto.ObjectPermission node : nodes) {
+            sortPermissionNodes(node.getChildren());
         }
     }
 

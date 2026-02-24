@@ -36,7 +36,8 @@ public class GatewayAssertionFilter extends OncePerRequestFilter {
             "/actuator/health",
             "/actuator/info",
             "/v3/api-docs",
-            "/setup"
+            "/setup",
+            "/biz/invitations"
     );
 
     private final GatewayAssertionProperties properties;

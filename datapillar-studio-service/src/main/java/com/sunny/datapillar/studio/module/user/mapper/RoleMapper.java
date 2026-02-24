@@ -33,6 +33,11 @@ public interface RoleMapper extends BaseMapper<Role> {
                     @Param("name") String name);
 
     /**
+     * 根据角色ID查询并加锁
+     */
+    Role selectByIdForUpdate(@Param("id") Long id);
+
+    /**
      * 删除角色权限关联
      */
     void deleteRolePermissions(@Param("tenantId") Long tenantId, @Param("roleId") Long roleId);

@@ -1,4 +1,4 @@
-import { dispatchErrorAction, getLastFatalError } from './dispatch'
+import { dispatchErrorAction, getLastFatalError, persistFatalError } from './dispatch'
 import {
   normalizeApiPayloadError,
   normalizeAxiosError,
@@ -28,6 +28,9 @@ export function handleAppError(
 ) {
   const action = decideErrorAction(error, options)
   reportAppError(error, action)
-  dispatchErrorAction(action, error, options)
+  if (error.severity === 'fatal') {
+    persistFatalError(error)
+  }
+  dispatchErrorAction(action)
   return action
 }

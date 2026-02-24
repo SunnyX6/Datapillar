@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Copy, Shield } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button, Modal } from '@/components/ui'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
+import { createTenantInvitation, type CreateTenantInvitationResponse } from '@/services/studioTenantAdminService'
 import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 import type { RoleDefinition } from './Permission'
@@ -10,37 +12,114 @@ interface InviteMemberModalProps {
   isOpen: boolean
   onClose: () => void
   role: RoleDefinition
+  roleId?: string
 }
 
-function buildInviteCode(roleId: string) {
-  const roleSegment = roleId.replace('role_', '').slice(0, 6).toUpperCase()
-  const randomSegment =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()
-      : Math.random().toString(36).slice(2, 12).toUpperCase()
-  return `${roleSegment}${randomSegment}`
+function parseRoleId(rawRoleId: string): number | null {
+  const normalized = rawRoleId.trim().replace(/^role_/i, '')
+  const parsed = Number.parseInt(normalized, 10)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
-export function InviteMemberModal({ isOpen, onClose, role }: InviteMemberModalProps) {
-  const tenantCode = useAuthStore((state) => state.user?.tenantCode?.trim() ?? '')
+function buildDefaultExpiresAt(): string {
+  const sevenDaysLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  return sevenDaysLater.toISOString()
+}
+
+const inflightInvitationRequest = new Map<string, Promise<CreateTenantInvitationResponse>>()
+
+function buildInviteRequestKey(tenantId: number, roleId: number): string {
+  return `${tenantId}:${roleId}`
+}
+
+function getOrCreateInvitationRequest(tenantId: number, roleId: number): Promise<CreateTenantInvitationResponse> {
+  const key = buildInviteRequestKey(tenantId, roleId)
+  const existingRequest = inflightInvitationRequest.get(key)
+  if (existingRequest) {
+    return existingRequest
+  }
+
+  const request = createTenantInvitation(tenantId, {
+    roleId,
+    expiresAt: buildDefaultExpiresAt()
+  }).finally(() => {
+    inflightInvitationRequest.delete(key)
+  })
+
+  inflightInvitationRequest.set(key, request)
+  return request
+}
+
+function buildAbsoluteInviteLink(inviteUri: string): string {
+  const normalized = inviteUri.trim()
+  if (!normalized) {
+    return ''
+  }
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized
+  }
+  try {
+    return new URL(normalized, window.location.origin).toString()
+  } catch {
+    return normalized
+  }
+}
+
+export function InviteMemberModal({ isOpen, onClose, role, roleId }: InviteMemberModalProps) {
+  const tenantId = useAuthStore((state) => state.user?.tenantId)
   const [copied, setCopied] = useState(false)
+  const [inviteLink, setInviteLink] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
 
-  const inviteCode = useMemo(() => buildInviteCode(role.id), [role.id])
+  const resolvedRoleId = roleId?.trim() || role.id
+  const resolvedRoleNumericId = useMemo(() => parseRoleId(resolvedRoleId), [resolvedRoleId])
 
-  const inviteLink = useMemo(() => {
-    const params = new URLSearchParams()
-    if (tenantCode) {
-      params.set('tenantCode', tenantCode)
+  useEffect(() => {
+    if (!isOpen) {
+      return
     }
-    params.set('inviteCode', inviteCode)
-    params.set('roleId', role.id)
-    const origin = typeof window !== 'undefined' ? window.location.origin : ''
-    const path = `/invite?${params.toString()}`
-    return origin ? `${origin}${path}` : path
-  }, [inviteCode, role.id, tenantCode])
+
+    if (!tenantId || !resolvedRoleNumericId) {
+      setInviteLink('')
+      return
+    }
+
+    let cancelled = false
+    setIsGenerating(true)
+    setCopied(false)
+
+    const generateInviteLink = async () => {
+      try {
+        const response = await getOrCreateInvitationRequest(tenantId, resolvedRoleNumericId)
+        if (cancelled) {
+          return
+        }
+        setInviteLink(buildAbsoluteInviteLink(response.inviteUri))
+      } catch (error) {
+        if (cancelled) {
+          return
+        }
+        setInviteLink('')
+        const message = error instanceof Error ? error.message : String(error)
+        toast.error(`生成邀请链接失败：${message}`)
+      } finally {
+        if (!cancelled) {
+          setIsGenerating(false)
+        }
+      }
+    }
+
+    void generateInviteLink()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen, resolvedRoleNumericId, tenantId])
 
   const handleCopy = async () => {
-    if (!inviteLink) return
+    if (!inviteLink) {
+      return
+    }
     try {
       await navigator.clipboard.writeText(inviteLink)
       setCopied(true)
@@ -48,6 +127,10 @@ export function InviteMemberModal({ isOpen, onClose, role }: InviteMemberModalPr
       setCopied(false)
     }
   }
+
+  const inviteText = isGenerating
+    ? '正在生成邀请链接...'
+    : inviteLink || '邀请链接生成失败，请关闭后重试'
 
   return (
     <Modal
@@ -61,12 +144,13 @@ export function InviteMemberModal({ isOpen, onClose, role }: InviteMemberModalPr
           <div className={cn(TYPOGRAPHY.bodySm, 'font-semibold text-slate-500 dark:text-slate-400 mb-4')}>专属邀请链接</div>
           <div className="flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-4">
             <div className={cn(TYPOGRAPHY.body, 'flex-1 min-w-0 truncate font-mono text-slate-800 dark:text-slate-200')}>
-              {inviteLink}
+              {inviteText}
             </div>
             <button
               type="button"
               onClick={handleCopy}
-              className="inline-flex size-11 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white transition-colors"
+              disabled={!inviteLink || isGenerating}
+              className="inline-flex size-11 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               aria-label="复制邀请链接"
             >
               <Copy size={18} />

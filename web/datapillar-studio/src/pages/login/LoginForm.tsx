@@ -20,6 +20,7 @@ import { paddingClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { cn } from '@/lib/utils'
 import { isTenantSelectResult, type LoginResult, type TenantOption } from '@/types/auth'
+import { resolveFirstAccessibleRoute } from '@/router/access/routeAccess'
 import { WorkspaceSelectPanel } from './WorkspaceSelect'
 
 /**
@@ -165,7 +166,12 @@ export function LoginFormContent({ tenantCode, onSsoClick, onLoginSuccess }: Log
         return
       }
       if (!isTenantSelectResult(result)) {
-        navigate('/home')
+        const targetPath = resolveFirstAccessibleRoute(result.menus)
+        if (!targetPath) {
+          toast.error('当前账号暂无可访问页面，请联系管理员配置权限。')
+          return
+        }
+        navigate(targetPath)
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '登录失败，请重试')
@@ -407,16 +413,30 @@ export function LoginForm({ scale, ready, tenantCode }: LoginFormProps) {
       setTenantOptions(result.tenants)
       return
     }
+    const targetPath = resolveFirstAccessibleRoute(result.menus)
+    if (!targetPath) {
+      toast.error('当前账号暂无可访问页面，请联系管理员配置权限。')
+      return
+    }
     setTenantOptions([])
-    navigate('/home')
+    navigate(targetPath)
   }, [navigate])
 
   const handleWorkspaceSelect = useCallback(async (tenantId: number) => {
     try {
       setTenantSelectLoading(true)
-      await loginTenant(tenantId)
+      const result = await loginTenant(tenantId)
+      if (isTenantSelectResult(result)) {
+        toast.error('租户选择未完成，请重试。')
+        return
+      }
+      const targetPath = resolveFirstAccessibleRoute(result.menus)
+      if (!targetPath) {
+        toast.error('当前账号暂无可访问页面，请联系管理员配置权限。')
+        return
+      }
       setTenantOptions([])
-      navigate('/home')
+      navigate(targetPath)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '登录失败，请重试')
     } finally {

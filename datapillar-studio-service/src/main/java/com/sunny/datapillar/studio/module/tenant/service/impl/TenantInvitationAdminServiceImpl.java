@@ -1,10 +1,8 @@
 package com.sunny.datapillar.studio.module.tenant.service.impl;
 
 import com.sunny.datapillar.studio.module.tenant.dto.InvitationDto;
-import com.sunny.datapillar.studio.module.tenant.entity.UserInvitation;
 import com.sunny.datapillar.studio.module.tenant.service.InvitationService;
 import com.sunny.datapillar.studio.module.tenant.service.TenantInvitationAdminService;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -24,15 +22,5 @@ public class TenantInvitationAdminServiceImpl implements TenantInvitationAdminSe
     @Override
     public InvitationDto.CreateResponse createInvitation(InvitationDto.Create dto) {
         return invitationService.createInvitation(dto);
-    }
-
-    @Override
-    public List<UserInvitation> listInvitations(Integer status) {
-        return invitationService.listInvitations(status);
-    }
-
-    @Override
-    public void cancelInvitation(Long invitationId) {
-        invitationService.cancelInvitation(invitationId);
     }
 }

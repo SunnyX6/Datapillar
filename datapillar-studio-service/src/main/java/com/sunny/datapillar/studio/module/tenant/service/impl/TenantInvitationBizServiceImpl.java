@@ -1,5 +1,6 @@
 package com.sunny.datapillar.studio.module.tenant.service.impl;
 
+import com.sunny.datapillar.studio.module.tenant.dto.InvitationDto;
 import com.sunny.datapillar.studio.module.tenant.service.InvitationService;
 import com.sunny.datapillar.studio.module.tenant.service.TenantInvitationBizService;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,12 @@ public class TenantInvitationBizServiceImpl implements TenantInvitationBizServic
     private final InvitationService invitationService;
 
     @Override
-    public void acceptInvitation(String inviteCode) {
-        invitationService.acceptInvitation(inviteCode);
+    public InvitationDto.DetailResponse getInvitationByCode(String inviteCode) {
+        return invitationService.getInvitationByCode(inviteCode);
+    }
+
+    @Override
+    public void registerInvitation(InvitationDto.RegisterRequest request) {
+        invitationService.registerInvitation(request);
     }
 }
