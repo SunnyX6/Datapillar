@@ -240,6 +240,8 @@ code_review.sh.log
 *.bak
 *.orig
 .claude/
+.claudeignore
+.codexignore
 CLAUDE.md
 **/CLAUDE.md
 AGENTS.md
