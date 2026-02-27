@@ -1,16 +1,14 @@
 package com.sunny.datapillar.studio.handler;
 
-import com.sunny.datapillar.common.exception.AlreadyExistsException;
-import com.sunny.datapillar.common.exception.BadRequestException;
 import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
 import com.sunny.datapillar.common.exception.ExceptionMapper;
 import com.sunny.datapillar.common.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
@@ -34,41 +32,25 @@ public abstract class BaseControllerExceptionHandler {
         return buildErrorResponse(exception, response);
     }
 
-    @ExceptionHandler(DuplicateKeyException.class)
-    public ErrorResponse handleDuplicateKeyException(DuplicateKeyException exception, HttpServletResponse response) {
-        String message = resolveDuplicateKeyMessage(exception);
-        return handleDatapillarRuntimeException(
-                new AlreadyExistsException(exception, message),
-                response);
-    }
-
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
     public ErrorResponse handleValidationException(Exception exception, HttpServletResponse response) {
         Map<String, String> errors = new HashMap<>();
 
         if (exception instanceof MethodArgumentNotValidException ex) {
-            ex.getBindingResult().getAllErrors().forEach((error) -> {
-                String fieldName = ((FieldError) error).getField();
-                String errorMessage = error.getDefaultMessage();
-                errors.put(fieldName, errorMessage);
-            });
+            ex.getBindingResult().getAllErrors().forEach((error) -> errors.put(resolveErrorKey(error), error.getDefaultMessage()));
         } else if (exception instanceof BindException ex) {
-            ex.getBindingResult().getAllErrors().forEach((error) -> {
-                String fieldName = ((FieldError) error).getField();
-                String errorMessage = error.getDefaultMessage();
-                errors.put(fieldName, errorMessage);
-            });
+            ex.getBindingResult().getAllErrors().forEach((error) -> errors.put(resolveErrorKey(error), error.getDefaultMessage()));
         }
 
         String message = errors.isEmpty() ? "参数验证失败" : errors.toString();
-        return handleDatapillarRuntimeException(new BadRequestException(exception, message), response);
+        return handleDatapillarRuntimeException(new com.sunny.datapillar.common.exception.BadRequestException(exception, message), response);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ErrorResponse handleIllegalArgumentException(IllegalArgumentException exception,
                                                         HttpServletResponse response) {
         String message = exception.getMessage() == null ? "参数错误" : exception.getMessage();
-        return handleDatapillarRuntimeException(new BadRequestException(exception, message), response);
+        return handleDatapillarRuntimeException(new com.sunny.datapillar.common.exception.BadRequestException(exception, message), response);
     }
 
     @ExceptionHandler(Exception.class)
@@ -76,8 +58,11 @@ public abstract class BaseControllerExceptionHandler {
         return buildErrorResponse(exception, response);
     }
 
-    protected String resolveDuplicateKeyMessage(DuplicateKeyException exception) {
-        return "数据已存在";
+    private String resolveErrorKey(ObjectError error) {
+        if (error instanceof FieldError fieldError) {
+            return fieldError.getField();
+        }
+        return error.getObjectName();
     }
 
     private ErrorResponse buildErrorResponse(Throwable throwable, HttpServletResponse response) {

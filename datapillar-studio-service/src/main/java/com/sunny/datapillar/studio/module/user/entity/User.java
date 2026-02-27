@@ -28,6 +28,7 @@ public class User {
     private String nickname;
     private String email;
     private String phone;
+    private Integer level;
     private Integer status;
     private Integer deleted;
 

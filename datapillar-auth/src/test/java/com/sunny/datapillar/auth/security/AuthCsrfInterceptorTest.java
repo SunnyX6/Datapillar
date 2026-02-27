@@ -85,7 +85,7 @@ class AuthCsrfInterceptorTest {
 
         Claims refreshClaims = Jwts.claims().setSubject("1").add("tenantId", 10L).build();
         when(jwtUtil.parseToken("expired-access-token"))
-                .thenThrow(new UnauthorizedException("Token已过期"));
+                .thenThrow(new com.sunny.datapillar.common.exception.UnauthorizedException("Token已过期"));
         when(jwtUtil.parseToken("valid-refresh-token")).thenReturn(refreshClaims);
         when(jwtUtil.getTenantId(refreshClaims)).thenReturn(10L);
         when(jwtUtil.getUserId(refreshClaims)).thenReturn(1L);

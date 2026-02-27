@@ -1,7 +1,19 @@
 package com.sunny.datapillar.studio.module.llm.service.impl;
 
-import com.sunny.datapillar.studio.module.llm.dto.LlmManagerDto;
-import com.sunny.datapillar.studio.module.llm.dto.LlmProviderDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.llm.enums.AiModelType;
 import com.sunny.datapillar.studio.module.llm.service.LlmAdminService;
 import com.sunny.datapillar.studio.module.llm.service.LlmManagerService;
@@ -23,17 +35,17 @@ public class LlmAdminServiceImpl implements LlmAdminService {
     private final LlmManagerService llmManagerService;
 
     @Override
-    public List<LlmManagerDto.ProviderResponse> listProviders() {
+    public List<LlmProviderResponse> listProviders() {
         return llmManagerService.listProviders();
     }
 
     @Override
-    public void createProvider(Long userId, LlmProviderDto.CreateRequest request) {
+    public void createProvider(Long userId, LlmProviderCreateRequest request) {
         llmManagerService.createProvider(userId, request);
     }
 
     @Override
-    public void updateProvider(Long userId, String providerCode, LlmProviderDto.UpdateRequest request) {
+    public void updateProvider(Long userId, String providerCode, LlmProviderUpdateRequest request) {
         llmManagerService.updateProvider(userId, providerCode, request);
     }
 
@@ -43,50 +55,50 @@ public class LlmAdminServiceImpl implements LlmAdminService {
     }
 
     @Override
-    public List<LlmManagerDto.ModelResponse> listModels(String keyword,
-                                                         String providerCode,
-                                                         AiModelType modelType,
-                                                         Long userId) {
+    public List<LlmModelResponse> listModels(String keyword,
+                                                 String providerCode,
+                                                 AiModelType modelType,
+                                                 Long userId) {
         return llmManagerService.listModels(keyword, providerCode, modelType, userId);
     }
 
     @Override
-    public LlmManagerDto.ModelResponse getModel(Long userId, Long modelId) {
-        return llmManagerService.getModel(userId, modelId);
+    public LlmModelResponse getModel(Long userId, Long aiModelId) {
+        return llmManagerService.getModel(userId, aiModelId);
     }
 
     @Override
-    public LlmManagerDto.ModelResponse createModel(Long userId, LlmManagerDto.CreateRequest request) {
+    public LlmModelResponse createModel(Long userId, LlmModelCreateRequest request) {
         return llmManagerService.createModel(userId, request);
     }
 
     @Override
-    public LlmManagerDto.ModelResponse updateModel(Long userId, Long modelId, LlmManagerDto.UpdateRequest request) {
-        return llmManagerService.updateModel(userId, modelId, request);
+    public LlmModelResponse updateModel(Long userId, Long aiModelId, LlmModelUpdateRequest request) {
+        return llmManagerService.updateModel(userId, aiModelId, request);
     }
 
     @Override
-    public void deleteModel(Long userId, Long modelId) {
-        llmManagerService.deleteModel(userId, modelId);
+    public void deleteModel(Long userId, Long aiModelId) {
+        llmManagerService.deleteModel(userId, aiModelId);
     }
 
     @Override
-    public List<LlmManagerDto.ModelUsageResponse> listUserModelUsages(Long operatorUserId,
-                                                                        Long targetUserId,
-                                                                        boolean onlyEnabled) {
-        return llmManagerService.listUserModelUsages(operatorUserId, targetUserId, onlyEnabled);
+    public List<LlmUserModelPermissionResponse> listUserModelPermissions(Long operatorUserId,
+                                                                                   Long targetUserId,
+                                                                                   boolean onlyEnabled) {
+        return llmManagerService.listUserModelPermissions(operatorUserId, targetUserId, onlyEnabled);
     }
 
     @Override
-    public LlmManagerDto.ModelUsageResponse upsertUserModelGrant(Long operatorUserId,
-                                                                  Long targetUserId,
-                                                                  Long modelId,
-                                                                  LlmManagerDto.ModelGrantRequest request) {
-        return llmManagerService.upsertUserModelGrant(operatorUserId, targetUserId, modelId, request);
+    public void upsertUserModelGrant(Long operatorUserId,
+                                     Long targetUserId,
+                                     Long aiModelId,
+                                     LlmUserModelGrantRequest request) {
+        llmManagerService.upsertUserModelGrant(operatorUserId, targetUserId, aiModelId, request);
     }
 
     @Override
-    public void deleteUserModelGrant(Long operatorUserId, Long targetUserId, Long modelId) {
-        llmManagerService.deleteUserModelGrant(operatorUserId, targetUserId, modelId);
+    public void deleteUserModelGrant(Long operatorUserId, Long targetUserId, Long aiModelId) {
+        llmManagerService.deleteUserModelGrant(operatorUserId, targetUserId, aiModelId);
     }
 }

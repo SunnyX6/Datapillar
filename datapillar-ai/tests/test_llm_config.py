@@ -21,13 +21,13 @@ def _mock_models(monkeypatch: pytest.MonkeyPatch) -> None:
     chat_model = {
         "provider_code": "openai",
         "api_key": "ENCv1:chat",
-        "model_id": "openai/gpt-4o",
+        "provider_model_id": "openai/gpt-4o",
         "base_url": "https://api.openai.com/v1",
     }
     embedding_model = {
         "provider_code": "openai",
         "api_key": "ENCv1:embed",
-        "model_id": "openai/text-embedding-3-small",
+        "provider_model_id": "openai/text-embedding-3-small",
         "base_url": "https://api.openai.com/v1",
         "embedding_dimension": 1536,
     }

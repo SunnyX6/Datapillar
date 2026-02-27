@@ -1,8 +1,21 @@
 package com.sunny.datapillar.studio.module.tenant.service;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
-import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
 
 /**
  * 功能Object服务
@@ -16,15 +29,15 @@ public interface FeatureObjectService {
     /**
      * 根据用户ID查询可访问的功能对象列表
      */
-    List<FeatureObjectDto.TreeNode> getFeatureObjectsByUserId(Long userId, String location);
+    List<FeatureTreeNodeItem> getFeatureObjectsByUserId(Long userId, String location);
 
     /**
      * 查询所有可见功能对象
      */
-    List<FeatureObjectDto.TreeNode> getAllVisibleFeatureObjects();
+    List<FeatureTreeNodeItem> getAllVisibleFeatureObjects();
 
     /**
      * 构建功能对象树
      */
-    List<FeatureObjectDto.TreeNode> buildFeatureObjectTree(List<FeatureObjectDto.TreeNode> featureObjects);
+    List<FeatureTreeNodeItem> buildFeatureObjectTree(List<FeatureTreeNodeItem> featureObjects);
 }

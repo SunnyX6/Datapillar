@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { KnowledgeSpace } from '@/layouts/wiki/types'
+import type { KnowledgeSpace } from '@/features/wiki/utils/types'
 import {
   formatBytes,
   getNextSpaceColor,
@@ -8,7 +8,7 @@ import {
   normalizeSpaceName,
   normalizeDocumentStatus,
   SPACE_COLOR_PALETTE
-} from '@/layouts/wiki/utils'
+} from '@/features/wiki/utils'
 
 describe('知识空间工具函数', () => {
   const spaces: KnowledgeSpace[] = [

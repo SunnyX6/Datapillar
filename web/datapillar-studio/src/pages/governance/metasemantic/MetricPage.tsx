@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MetricExplorer, MetricOverview } from '@/layouts/governance/metasemantic'
-import type { Metric } from '@/layouts/governance/metasemantic'
+import { MetricExplorer, MetricOverview } from '@/features/governance/ui/metasemantic'
+import type { Metric } from '@/features/governance/ui/metasemantic'
 
 export function GovernanceMetricPage() {
   const navigate = useNavigate()

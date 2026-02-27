@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { KnowledgeSpace } from '@/layouts/wiki/types'
-import { getNamespaceFormStatus } from '@/layouts/wiki/utils'
+import type { KnowledgeSpace } from '@/features/wiki/utils/types'
+import { getNamespaceFormStatus } from '@/features/wiki/utils'
 
 describe('知识空间创建表单状态', () => {
   const spaces: KnowledgeSpace[] = [

@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.workflow.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -7,8 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.sunny.datapillar.studio.module.workflow.service.dag.DagBuilder;
 import com.sunny.datapillar.studio.module.workflow.service.dag.DagValidationException;
-import com.sunny.datapillar.studio.module.workflow.dto.JobDependencyDto;
-import com.sunny.datapillar.studio.module.workflow.dto.JobDto;
 import com.sunny.datapillar.studio.module.workflow.entity.JobDependency;
 import com.sunny.datapillar.studio.module.workflow.entity.JobInfo;
 import com.sunny.datapillar.studio.module.workflow.entity.JobWorkflow;
@@ -39,38 +51,38 @@ public class JobDependencyServiceImpl implements JobDependencyService {
     private final JobWorkflowMapper workflowMapper;
 
     @Override
-    public List<JobDependencyDto.Response> getDependenciesByWorkflowId(Long workflowId) {
+    public List<JobDependencyResponse> getDependenciesByWorkflowId(Long workflowId) {
         return dependencyMapper.selectByWorkflowId(workflowId);
     }
 
     @Override
-    public List<JobDependencyDto.Response> getDependenciesByJobId(Long jobId) {
+    public List<JobDependencyResponse> getDependenciesByJobId(Long jobId) {
         return dependencyMapper.selectByJobId(jobId);
     }
 
     @Override
     @Transactional
-    public Long createDependency(Long workflowId, JobDependencyDto.Create dto) {
+    public Long createDependency(Long workflowId, JobDependencyCreateRequest dto) {
         // 验证工作流
         JobWorkflow workflow = workflowMapper.selectById(workflowId);
         if (workflow == null) {
-            throw new NotFoundException("工作流不存在: workflowId=%s", workflowId);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", workflowId);
         }
 
         // 验证任务
         JobInfo job = jobInfoMapper.selectById(dto.getJobId());
         if (job == null || !job.getWorkflowId().equals(workflowId)) {
-            throw new NotFoundException("任务不存在: jobId=%s", dto.getJobId());
+            throw new com.sunny.datapillar.common.exception.NotFoundException("任务不存在: jobId=%s", dto.getJobId());
         }
 
         JobInfo parentJob = jobInfoMapper.selectById(dto.getParentJobId());
         if (parentJob == null || !parentJob.getWorkflowId().equals(workflowId)) {
-            throw new NotFoundException("任务不存在: jobId=%s", dto.getParentJobId());
+            throw new com.sunny.datapillar.common.exception.NotFoundException("任务不存在: jobId=%s", dto.getParentJobId());
         }
 
         // 检查依赖是否已存在
         if (dependencyMapper.existsDependency(dto.getJobId(), dto.getParentJobId()) > 0) {
-            throw new ConflictException("依赖关系已存在");
+            throw new com.sunny.datapillar.common.exception.ConflictException("依赖关系已存在");
         }
 
         // 验证添加后不会产生循环依赖
@@ -91,7 +103,7 @@ public class JobDependencyServiceImpl implements JobDependencyService {
     public void deleteDependency(Long workflowId, Long jobId, Long parentJobId) {
         int deleted = dependencyMapper.deleteDependency(workflowId, jobId, parentJobId);
         if (deleted == 0) {
-            throw new NotFoundException("依赖关系不存在");
+            throw new com.sunny.datapillar.common.exception.NotFoundException("依赖关系不存在");
         }
         log.info("Deleted dependency: workflowId={}, jobId={}, parentJobId={}", workflowId, jobId, parentJobId);
     }
@@ -101,19 +113,19 @@ public class JobDependencyServiceImpl implements JobDependencyService {
      */
     private void validateNoCycle(Long workflowId, Long jobId, Long parentJobId) {
         // 获取工作流下所有任务
-        List<JobDto.Response> jobs = jobInfoMapper.selectJobsByWorkflowId(workflowId);
+        List<JobResponse> jobs = jobInfoMapper.selectJobsByWorkflowId(workflowId);
         // 获取现有依赖
-        List<JobDependencyDto.Response> dependencies = dependencyMapper.selectByWorkflowId(workflowId);
+        List<JobDependencyResponse> dependencies = dependencyMapper.selectByWorkflowId(workflowId);
 
         DagBuilder dagBuilder = new DagBuilder();
 
         // 添加所有节点
-        for (JobDto.Response job : jobs) {
+        for (JobResponse job : jobs) {
             dagBuilder.addNode(job.getId());
         }
 
         // 添加现有边
-        for (JobDependencyDto.Response dep : dependencies) {
+        for (JobDependencyResponse dep : dependencies) {
             dagBuilder.addEdge(dep.getParentJobId(), dep.getJobId());
         }
 
@@ -124,7 +136,7 @@ public class JobDependencyServiceImpl implements JobDependencyService {
         try {
             dagBuilder.validate();
         } catch (DagValidationException e) {
-            throw new BadRequestException("工作流存在循环依赖");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("工作流存在循环依赖");
         }
     }
 }

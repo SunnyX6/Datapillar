@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { buildTicketTitle, isTicketMentioned, normalizeTags } from '@/layouts/collaboration/utils'
-import type { Ticket, UserProfile } from '@/layouts/collaboration/types'
+import { buildTicketTitle, isTicketMentioned, normalizeTags } from '@/features/collaboration/utils'
+import type { Ticket, UserProfile } from '@/features/collaboration/utils/types'
 
 describe('normalizeTags', () => {
   it('空字符串时返回空数组', () => {

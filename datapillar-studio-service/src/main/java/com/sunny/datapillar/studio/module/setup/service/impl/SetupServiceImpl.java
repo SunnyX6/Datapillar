@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.setup.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
@@ -11,15 +25,9 @@ import com.sunny.datapillar.studio.module.tenant.entity.TenantFeaturePermission;
 import com.sunny.datapillar.studio.module.tenant.mapper.FeatureObjectMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.PermissionMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantFeaturePermissionMapper;
-import com.sunny.datapillar.studio.module.setup.dto.SetupInitializeRequest;
-import com.sunny.datapillar.studio.module.setup.dto.SetupInitializeResponse;
-import com.sunny.datapillar.studio.module.setup.dto.SetupStatusResponse;
-import com.sunny.datapillar.studio.module.setup.dto.SetupStepStatus;
-import com.sunny.datapillar.studio.module.setup.dto.SetupDto;
 import com.sunny.datapillar.studio.module.setup.entity.SystemBootstrap;
 import com.sunny.datapillar.studio.module.setup.mapper.SystemBootstrapMapper;
 import com.sunny.datapillar.studio.module.setup.service.SetupService;
-import com.sunny.datapillar.studio.module.tenant.dto.TenantDto;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantMapper;
 import com.sunny.datapillar.studio.module.tenant.service.TenantService;
 import com.sunny.datapillar.studio.module.user.entity.Role;
@@ -58,13 +66,13 @@ public class SetupServiceImpl implements SetupService {
 
     private static final String DEFAULT_TENANT_TYPE = "ENTERPRISE";
     private static final String ADMIN_ROLE_TYPE = "ADMIN";
-    private static final String ADMIN_ROLE_NAME = "超级管理员";
+    private static final String ADMIN_ROLE_NAME = "平台超管";
     private static final int ADMIN_ROLE_SORT = 0;
     private static final String ADMIN_PERMISSION_CODE = "ADMIN";
     private static final String GRANT_SOURCE_SYSTEM = "SYSTEM";
 
     private static final int STATUS_ENABLED = 1;
-    private static final int ROLE_BUILTIN = 1;
+    private static final int PLATFORM_SUPER_ADMIN_LEVEL = 0;
     private static final int USER_NOT_DELETED = 0;
     private static final int MAX_TENANT_CODE_LENGTH = 64;
     private static final String DEFAULT_TENANT_CODE_PREFIX = "tenant";
@@ -123,15 +131,15 @@ public class SetupServiceImpl implements SetupService {
     @Transactional
     public SetupInitializeResponse initialize(SetupInitializeRequest request) {
         if (request == null) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
 
         SystemBootstrap bootstrap = systemBootstrapMapper.selectByIdForUpdate(SYSTEM_BOOTSTRAP_ID);
         if (bootstrap == null) {
-            throw new ServiceUnavailableException("服务不可用", "数据库迁移未完成");
+            throw new com.sunny.datapillar.common.exception.ServiceUnavailableException("服务不可用", "数据库迁移未完成");
         }
         if (isSetupCompleted(bootstrap)) {
-            throw new AlreadyExistsException("资源已存在", "系统已初始化");
+            throw new com.sunny.datapillar.common.exception.AlreadyExistsException("资源已存在", "系统已初始化");
         }
 
         Long tenantId = createTenant(request);
@@ -155,7 +163,7 @@ public class SetupServiceImpl implements SetupService {
             bootstrap.setSetupCompletedAt(LocalDateTime.now());
             int updated = systemBootstrapMapper.updateById(bootstrap);
             if (updated == 0) {
-                throw new InternalException("服务器内部错误");
+                throw new com.sunny.datapillar.common.exception.InternalException("服务器内部错误");
             }
         } finally {
             restoreTenantContext(previousContext);
@@ -173,7 +181,7 @@ public class SetupServiceImpl implements SetupService {
                 && bootstrap.getSetupCompleted() == SETUP_COMPLETED;
     }
 
-    private List<SetupDto.StepStatus> buildStepStatuses(boolean schemaReady, boolean initialized) {
+    private List<SetupStepStatusItem> buildStepStatuses(boolean schemaReady, boolean initialized) {
         return List.of(
                 createStepStatus(
                         STEP_SCHEMA_MIGRATION,
@@ -206,8 +214,8 @@ public class SetupServiceImpl implements SetupService {
         return STEP_STATUS_IN_PROGRESS;
     }
 
-    private SetupDto.StepStatus createStepStatus(String code, String name, String description, String status) {
-        SetupStepStatus stepStatus = new SetupStepStatus();
+    private SetupStepStatusItem createStepStatus(String code, String name, String description, String status) {
+        SetupStepStatusItem stepStatus = new SetupStepStatusItem();
         stepStatus.setCode(code);
         stepStatus.setName(name);
         stepStatus.setDescription(description);
@@ -216,7 +224,7 @@ public class SetupServiceImpl implements SetupService {
     }
 
     private Long createTenant(SetupInitializeRequest request) {
-        TenantDto.Create tenant = new TenantDto.Create();
+        TenantCreateRequest tenant = new TenantCreateRequest();
         tenant.setCode(resolveTenantCode(request));
         tenant.setName(resolveTenantName(request));
         tenant.setType(DEFAULT_TENANT_TYPE);
@@ -225,11 +233,11 @@ public class SetupServiceImpl implements SetupService {
 
     private String requireTenantCode(Long tenantId) {
         if (tenantId == null || tenantId <= 0) {
-            throw new InternalException("服务器内部错误");
+            throw new com.sunny.datapillar.common.exception.InternalException("服务器内部错误");
         }
         com.sunny.datapillar.studio.module.tenant.entity.Tenant tenant = tenantMapper.selectById(tenantId);
         if (tenant == null || !StringUtils.hasText(tenant.getCode())) {
-            throw new InternalException("服务器内部错误");
+            throw new com.sunny.datapillar.common.exception.InternalException("服务器内部错误");
         }
         return tenant.getCode().trim();
     }
@@ -242,7 +250,7 @@ public class SetupServiceImpl implements SetupService {
         emailQuery.eq(User::getEmail, email)
                 .eq(User::getDeleted, USER_NOT_DELETED);
         if (userMapper.selectOne(emailQuery) != null) {
-            throw new AlreadyExistsException("资源已存在", email);
+            throw new com.sunny.datapillar.common.exception.AlreadyExistsException("资源已存在", email);
         }
 
         User user = new User();
@@ -251,12 +259,13 @@ public class SetupServiceImpl implements SetupService {
         user.setPassword(ARGON2_PASSWORD_ENCODER.encode(resolveAdminPassword(request)));
         user.setNickname(resolveAdminDisplayName(request));
         user.setEmail(email);
+        user.setLevel(PLATFORM_SUPER_ADMIN_LEVEL);
         user.setStatus(STATUS_ENABLED);
         user.setDeleted(USER_NOT_DELETED);
 
         int inserted = userMapper.insert(user);
         if (inserted == 0 || user.getId() == null) {
-            throw new InternalException("服务器内部错误");
+            throw new com.sunny.datapillar.common.exception.InternalException("服务器内部错误");
         }
         return user;
     }
@@ -287,7 +296,7 @@ public class SetupServiceImpl implements SetupService {
             existing.setType(ADMIN_ROLE_TYPE);
             existing.setStatus(STATUS_ENABLED);
             existing.setSort(ADMIN_ROLE_SORT);
-            existing.setIsBuiltin(ROLE_BUILTIN);
+            existing.setLevel(PLATFORM_SUPER_ADMIN_LEVEL);
             roleMapper.updateById(existing);
             return existing;
         }
@@ -296,13 +305,13 @@ public class SetupServiceImpl implements SetupService {
         role.setTenantId(tenantId);
         role.setType(ADMIN_ROLE_TYPE);
         role.setName(ADMIN_ROLE_NAME);
-        role.setDescription("系统内置管理员");
+        role.setDescription("平台最高权限角色");
+        role.setLevel(PLATFORM_SUPER_ADMIN_LEVEL);
         role.setStatus(STATUS_ENABLED);
         role.setSort(ADMIN_ROLE_SORT);
-        role.setIsBuiltin(ROLE_BUILTIN);
         int inserted = roleMapper.insert(role);
         if (inserted == 0 || role.getId() == null) {
-            throw new InternalException("服务器内部错误");
+            throw new com.sunny.datapillar.common.exception.InternalException("服务器内部错误");
         }
         return role;
     }
@@ -327,7 +336,7 @@ public class SetupServiceImpl implements SetupService {
     private void grantTenantAndRolePermissions(Long tenantId, Long operatorUserId, Long roleId) {
         Permission adminPermission = permissionMapper.selectSystemByCode(ADMIN_PERMISSION_CODE);
         if (adminPermission == null || adminPermission.getId() == null) {
-            throw new InternalException("服务器内部错误");
+            throw new com.sunny.datapillar.common.exception.InternalException("服务器内部错误");
         }
 
         LambdaQueryWrapper<FeatureObject> activeObjectQuery = new LambdaQueryWrapper<>();
@@ -414,7 +423,7 @@ public class SetupServiceImpl implements SetupService {
     private String resolveAdminUsername(SetupInitializeRequest request) {
         String username = normalizeRequiredText(request.getUsername(), "管理员用户名不能为空");
         if (userMapper.selectByUsernameGlobal(username) != null) {
-            throw new AlreadyExistsException("资源已存在", username);
+            throw new com.sunny.datapillar.common.exception.AlreadyExistsException("资源已存在", username);
         }
         return username;
     }
@@ -457,7 +466,7 @@ public class SetupServiceImpl implements SetupService {
             }
         }
 
-        throw new AlreadyExistsException("资源已存在", normalizedBase);
+        throw new com.sunny.datapillar.common.exception.AlreadyExistsException("资源已存在", normalizedBase);
     }
 
     private String normalizeCode(String value) {
@@ -498,7 +507,7 @@ public class SetupServiceImpl implements SetupService {
 
     private String normalizeRequiredText(String value, String message) {
         if (!StringUtils.hasText(value)) {
-            throw new IllegalArgumentException(message);
+            throw new com.sunny.datapillar.common.exception.BadRequestException(message);
         }
         return value.trim();
     }

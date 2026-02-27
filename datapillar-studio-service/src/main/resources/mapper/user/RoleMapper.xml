@@ -37,16 +37,16 @@
     </insert>
 
     <select id="selectRoleListWithMemberCount"
-            resultType="com.sunny.datapillar.studio.module.user.dto.RoleDto$Response">
+            resultType="com.sunny.datapillar.studio.dto.user.response.RoleResponse">
         SELECT
             r.id AS id,
             r.tenant_id AS tenantId,
             r.type AS type,
             r.name AS name,
             r.description AS description,
+            r.level AS level,
             r.status AS status,
             r.sort AS sort,
-            r.is_builtin AS isBuiltin,
             COALESCE(ur.member_count, 0) AS memberCount
         FROM roles r
         LEFT JOIN (
@@ -73,13 +73,14 @@
     </select>
 
     <select id="selectRoleMembers"
-            resultType="com.sunny.datapillar.studio.module.user.dto.RoleDto$MemberItem">
+            resultType="com.sunny.datapillar.studio.dto.user.response.RoleMemberItem">
         SELECT
             u.id AS userId,
             u.username AS username,
             u.nickname AS nickname,
             u.email AS email,
             u.phone AS phone,
+            u.level AS userLevel,
             tu.status AS memberStatus,
             tu.joined_at AS joinedAt,
             ur.created_at AS assignedAt
@@ -97,5 +98,15 @@
           AND u.deleted = 0
         ORDER BY ur.created_at DESC, ur.user_id DESC
     </select>
+
+    <delete id="deleteRoleMembersByUserIds">
+        DELETE FROM user_roles
+        WHERE tenant_id = #{tenantId}
+          AND role_id = #{roleId}
+          AND user_id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+    </delete>
 
 </mapper>

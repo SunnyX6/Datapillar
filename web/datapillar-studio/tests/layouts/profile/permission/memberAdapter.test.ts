@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   mapRoleMemberToUserItem,
   mapRoleMembersToUserItems
-} from '@/layouts/profile/permission/memberAdapter'
-import type { StudioRoleMember } from '@/types/studio/role'
+} from '@/features/profile/utils/memberAdapter'
+import type { StudioRoleMember } from '@/services/types/studio/role'
 
 describe('memberAdapter', () => {
   it('应将角色成员映射为页面用户模型', () => {

@@ -1,6 +1,11 @@
 package com.sunny.datapillar.auth.service.login.method;
 
-import com.sunny.datapillar.auth.dto.AuthDto;
+import com.sunny.datapillar.auth.dto.auth.request.*;
+import com.sunny.datapillar.auth.dto.auth.response.*;
+import com.sunny.datapillar.auth.dto.login.request.*;
+import com.sunny.datapillar.auth.dto.login.response.*;
+import com.sunny.datapillar.auth.dto.oauth.request.*;
+import com.sunny.datapillar.auth.dto.oauth.response.*;
 import com.sunny.datapillar.auth.entity.Tenant;
 import com.sunny.datapillar.auth.entity.User;
 import com.sunny.datapillar.auth.mapper.TenantMapper;
@@ -45,12 +50,12 @@ public class PasswordLoginMethod implements LoginMethod {
     @Override
     public LoginSubject authenticate(LoginCommand command) {
         if (command == null) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         String loginAlias = trimToNull(command.getLoginAlias());
         String password = trimToNull(command.getPassword());
         if (loginAlias == null || password == null) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
 
         String tenantCode = trimToNull(command.getTenantCode());
@@ -60,20 +65,20 @@ public class PasswordLoginMethod implements LoginMethod {
         User user = findUserByLoginAlias(loginAlias);
         if (user == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
             loginAttemptTracker.recordFailure(tenantCode, loginAlias, clientIp);
-            throw new UnauthorizedException("用户名或密码错误");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("用户名或密码错误");
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
-            throw new ForbiddenException("用户已被禁用");
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("用户已被禁用");
         }
         loginAttemptTracker.clearFailures(tenantCode, loginAlias, clientIp);
 
         if (tenantCode != null) {
             Tenant tenant = tenantMapper.selectByCode(tenantCode);
             if (tenant == null) {
-                throw new UnauthorizedException("租户不存在: %s", tenantCode);
+                throw new com.sunny.datapillar.common.exception.UnauthorizedException("租户不存在: %s", tenantCode);
             }
             if (tenant.getStatus() == null || tenant.getStatus() != 1) {
-                throw new ForbiddenException("租户已被禁用: tenantId=%s", tenant.getId());
+                throw new com.sunny.datapillar.common.exception.ForbiddenException("租户已被禁用: tenantId=%s", tenant.getId());
             }
             return LoginSubject.builder()
                     .user(user)
@@ -82,18 +87,18 @@ public class PasswordLoginMethod implements LoginMethod {
                     .build();
         }
 
-        List<AuthDto.TenantOption> options = tenantUserMapper.selectTenantOptionsByUserId(user.getId());
+        List<TenantOptionItem> options = tenantUserMapper.selectTenantOptionsByUserId(user.getId());
         if (options == null || options.isEmpty()) {
-            throw new ForbiddenException("无权限访问");
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("无权限访问");
         }
         if (options.size() == 1) {
-            AuthDto.TenantOption option = options.get(0);
+            TenantOptionItem option = options.get(0);
             Tenant tenant = tenantMapper.selectById(option.getTenantId());
             if (tenant == null) {
-                throw new UnauthorizedException("租户不存在: %s", String.valueOf(option.getTenantId()));
+                throw new com.sunny.datapillar.common.exception.UnauthorizedException("租户不存在: %s", String.valueOf(option.getTenantId()));
             }
             if (tenant.getStatus() == null || tenant.getStatus() != 1) {
-                throw new ForbiddenException("租户已被禁用: tenantId=%s", tenant.getId());
+                throw new com.sunny.datapillar.common.exception.ForbiddenException("租户已被禁用: tenantId=%s", tenant.getId());
             }
             return LoginSubject.builder()
                     .user(user)

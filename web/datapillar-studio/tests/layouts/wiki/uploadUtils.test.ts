@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getFileNameFromUrl, inferDocumentTypeFromName } from '@/layouts/wiki/utils'
+import { getFileNameFromUrl, inferDocumentTypeFromName } from '@/features/wiki/utils'
 
 describe('文档上传工具函数', () => {
   it('可以从文件名推断文档类型', () => {

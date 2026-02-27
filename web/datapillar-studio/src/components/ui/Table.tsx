@@ -8,7 +8,7 @@
 
 import type { HTMLAttributes, ReactNode, ThHTMLAttributes, TdHTMLAttributes } from 'react'
 import { Loader2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/utils'
 import { useInfiniteScroll } from '@/hooks'
 
 type TableLayout = 'fixed' | 'auto'

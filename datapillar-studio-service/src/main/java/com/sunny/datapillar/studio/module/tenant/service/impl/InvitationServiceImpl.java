@@ -1,16 +1,36 @@
 package com.sunny.datapillar.studio.module.tenant.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.sunny.datapillar.common.exception.AlreadyExistsException;
-import com.sunny.datapillar.common.exception.BadRequestException;
-import com.sunny.datapillar.common.exception.ConflictException;
-import com.sunny.datapillar.common.exception.InternalException;
-import com.sunny.datapillar.common.exception.NotFoundException;
-import com.sunny.datapillar.common.exception.UnauthorizedException;
+import com.sunny.datapillar.common.exception.db.DbStorageException;
+import com.sunny.datapillar.common.exception.db.SQLExceptionUtils;
 import com.sunny.datapillar.studio.context.TenantContext;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
-import com.sunny.datapillar.studio.module.tenant.dto.InvitationDto;
+import com.sunny.datapillar.studio.exception.translator.StudioDbExceptionTranslator;
+import com.sunny.datapillar.studio.exception.translator.StudioDbScene;
+import com.sunny.datapillar.studio.exception.invitation.InvalidInvitationRequestException;
+import com.sunny.datapillar.studio.exception.invitation.InvitationAlreadyUsedException;
+import com.sunny.datapillar.studio.exception.invitation.InvitationExpiredException;
+import com.sunny.datapillar.studio.exception.invitation.InvitationInactiveException;
+import com.sunny.datapillar.studio.exception.invitation.InvitationInternalException;
+import com.sunny.datapillar.studio.exception.invitation.InvitationInviterNotFoundException;
+import com.sunny.datapillar.studio.exception.invitation.InvitationNotFoundException;
+import com.sunny.datapillar.studio.exception.invitation.InvitationTenantNotFoundException;
+import com.sunny.datapillar.studio.exception.invitation.InvitationUnauthorizedException;
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.entity.UserInvitation;
 import com.sunny.datapillar.studio.module.tenant.entity.UserInvitationRole;
@@ -61,6 +81,7 @@ public class InvitationServiceImpl implements InvitationService {
 
     private static final int STATUS_ENABLED = 1;
     private static final int DELETED_NO = 0;
+    private static final int USER_LEVEL_DEFAULT = 100;
 
     private static final String CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int CODE_LENGTH = 12;
@@ -74,44 +95,45 @@ public class InvitationServiceImpl implements InvitationService {
     private final UserRoleMapper userRoleMapper;
     private final TenantMapper tenantMapper;
     private final PasswordEncoder passwordEncoder;
+    private final StudioDbExceptionTranslator studioDbExceptionTranslator;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Override
     @Transactional
-    public InvitationDto.CreateResponse createInvitation(InvitationDto.Create dto) {
+    public InvitationCreateResponse createInvitation(InvitationCreateRequest dto) {
         if (dto == null) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidInvitationRequestException();
         }
 
         Long tenantId = getRequiredTenantId();
         Long roleId = dto.getRoleId();
         if (roleId == null) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidInvitationRequestException();
         }
 
         Role role = roleMapper.selectByIdForUpdate(roleId);
         if (role == null || !tenantId.equals(role.getTenantId())) {
-            throw new NotFoundException("资源不存在");
+            throw new InvitationNotFoundException();
         }
 
         OffsetDateTime expiresAt = dto.getExpiresAt();
         if (expiresAt == null) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidInvitationRequestException();
         }
         LocalDateTime expiresAtValue = expiresAt.toLocalDateTime();
         if (!expiresAtValue.isAfter(LocalDateTime.now())) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidInvitationRequestException();
         }
 
         Long inviterUserId = UserContextUtil.getRequiredUserId();
         User inviter = userMapper.selectById(inviterUserId);
         if (inviter == null) {
-            throw new NotFoundException("用户不存在: %s", inviterUserId);
+            throw new InvitationInviterNotFoundException("用户不存在: %s", inviterUserId);
         }
         Tenant tenant = tenantMapper.selectById(tenantId);
         if (tenant == null) {
-            throw new NotFoundException("租户不存在: %s", tenantId);
+            throw new InvitationTenantNotFoundException("租户不存在: %s", tenantId);
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -133,23 +155,27 @@ public class InvitationServiceImpl implements InvitationService {
         invitation.setExpiresAt(expiresAtValue);
         invitation.setCreatedAt(now);
         invitation.setUpdatedAt(now);
-        userInvitationMapper.insert(invitation);
+        try {
+            userInvitationMapper.insert(invitation);
 
-        UserInvitationRole relation = new UserInvitationRole();
-        relation.setInvitationId(invitation.getId());
-        relation.setRoleId(roleId);
-        userInvitationRoleMapper.insert(relation);
+            UserInvitationRole relation = new UserInvitationRole();
+            relation.setInvitationId(invitation.getId());
+            relation.setRoleId(roleId);
+            userInvitationRoleMapper.insert(relation);
+        } catch (RuntimeException re) {
+            throw translateDbException(re, StudioDbScene.STUDIO_GENERIC);
+        }
 
         return buildCreateResponse(invitation, expiresAt, tenant, role, inviter);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public InvitationDto.DetailResponse getInvitationByCode(String inviteCode) {
+    public InvitationDetailResponse getInvitationByCode(String inviteCode) {
         String normalizedInviteCode = normalizeInviteCode(inviteCode);
         UserInvitation invitation = userInvitationMapper.selectByInviteCode(normalizedInviteCode);
         if (invitation == null) {
-            throw new NotFoundException("资源不存在");
+            throw new InvitationNotFoundException();
         }
 
         Long tenantId = invitation.getTenantId();
@@ -157,16 +183,16 @@ public class InvitationServiceImpl implements InvitationService {
         return withTenantContext(tenantId, () -> {
             Role role = roleMapper.selectById(roleId);
             if (role == null || !tenantId.equals(role.getTenantId())) {
-                throw new NotFoundException("资源不存在");
+                throw new InvitationNotFoundException();
             }
 
             Tenant tenant = tenantMapper.selectById(tenantId);
             if (tenant == null) {
-                throw new NotFoundException("资源不存在");
+                throw new InvitationNotFoundException();
             }
 
             User inviter = userMapper.selectById(invitation.getInviterUserId());
-            InvitationDto.DetailResponse response = new InvitationDto.DetailResponse();
+            InvitationDetailResponse response = new InvitationDetailResponse();
             response.setInviteCode(invitation.getInviteCode());
             response.setTenantName(tenant.getName());
             response.setRoleId(role.getId());
@@ -183,9 +209,9 @@ public class InvitationServiceImpl implements InvitationService {
 
     @Override
     @Transactional
-    public void registerInvitation(InvitationDto.RegisterRequest request) {
+    public void registerInvitation(InvitationRegisterRequest request) {
         if (request == null) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidInvitationRequestException();
         }
 
         String inviteCode = normalizeInviteCode(request.getInviteCode());
@@ -195,7 +221,7 @@ public class InvitationServiceImpl implements InvitationService {
 
         UserInvitation invitation = lockInvitation(inviteCode);
         if (invitation == null) {
-            throw new NotFoundException("资源不存在");
+            throw new InvitationNotFoundException();
         }
         Long tenantId = invitation.getTenantId();
 
@@ -203,8 +229,6 @@ public class InvitationServiceImpl implements InvitationService {
             LocalDateTime now = LocalDateTime.now();
             validateInvitationStatus(invitation, now);
 
-            ensureUsernameNotExists(username);
-            ensureEmailNotExists(email);
             Long userId = createInvitedUser(tenantId, username, email, password, now);
 
             ensureTenantMember(tenantId, userId, now);
@@ -226,10 +250,10 @@ public class InvitationServiceImpl implements InvitationService {
 
     private <T> T withTenantContext(Long tenantId, Supplier<T> action) {
         if (tenantId == null) {
-            throw new InternalException("服务器内部错误");
+            throw new InvitationInternalException();
         }
         if (action == null) {
-            throw new InternalException("服务器内部错误");
+            throw new InvitationInternalException();
         }
 
         TenantContext previous = TenantContextHolder.get();
@@ -262,7 +286,7 @@ public class InvitationServiceImpl implements InvitationService {
                 .last("LIMIT 1");
         UserInvitationRole relation = userInvitationRoleMapper.selectOne(roleQuery);
         if (relation == null || relation.getRoleId() == null) {
-            throw new NotFoundException("资源不存在");
+            throw new InvitationNotFoundException();
         }
         return relation.getRoleId();
     }
@@ -270,22 +294,22 @@ public class InvitationServiceImpl implements InvitationService {
     private void validateInvitationStatus(UserInvitation invitation, LocalDateTime now) {
         Integer status = invitation.getStatus();
         if (status == null || status == STATUS_CANCELLED) {
-            throw new ConflictException("邀请码已失效");
+            throw new InvitationInactiveException();
         }
         if (status == STATUS_ACCEPTED) {
-            throw new ConflictException("邀请码已被使用");
+            throw new InvitationAlreadyUsedException();
         }
         if (status == STATUS_EXPIRED) {
-            throw new ConflictException("邀请码已过期");
+            throw new InvitationExpiredException();
         }
         if (status != STATUS_PENDING) {
-            throw new ConflictException("邀请码已失效");
+            throw new InvitationInactiveException();
         }
 
         LocalDateTime expiresAt = invitation.getExpiresAt();
         if (expiresAt != null && expiresAt.isBefore(now)) {
             markInvitationExpired(invitation.getId(), now);
-            throw new ConflictException("邀请码已过期");
+            throw new InvitationExpiredException();
         }
     }
 
@@ -307,23 +331,6 @@ public class InvitationServiceImpl implements InvitationService {
         return status;
     }
 
-    private void ensureUsernameNotExists(String username) {
-        User existedByUsername = userMapper.selectByUsernameGlobal(username);
-        if (existedByUsername != null) {
-            throw new AlreadyExistsException("资源已存在");
-        }
-    }
-
-    private void ensureEmailNotExists(String email) {
-        LambdaQueryWrapper<User> emailQuery = new LambdaQueryWrapper<>();
-        emailQuery.eq(User::getEmail, email)
-                .eq(User::getDeleted, DELETED_NO)
-                .last("LIMIT 1");
-        if (userMapper.selectOne(emailQuery) != null) {
-            throw new AlreadyExistsException("资源已存在");
-        }
-    }
-
     private Long createInvitedUser(Long tenantId,
                                    String username,
                                    String email,
@@ -335,14 +342,19 @@ public class InvitationServiceImpl implements InvitationService {
         user.setNickname(username);
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(password));
+        user.setLevel(USER_LEVEL_DEFAULT);
         user.setStatus(STATUS_ENABLED);
         user.setDeleted(DELETED_NO);
         user.setCreatedAt(now);
         user.setUpdatedAt(now);
-        userMapper.insert(user);
+        try {
+            userMapper.insert(user);
+        } catch (RuntimeException re) {
+            throw translateDbException(re, StudioDbScene.STUDIO_INVITATION_REGISTER);
+        }
 
         if (user.getId() == null) {
-            throw new InternalException("服务器内部错误");
+            throw new InvitationInternalException();
         }
         return user.getId();
     }
@@ -366,7 +378,7 @@ public class InvitationServiceImpl implements InvitationService {
                 .set(UserInvitation::getUpdatedAt, now);
         int updated = userInvitationMapper.update(null, update);
         if (updated == 0) {
-            throw new ConflictException("邀请码已被使用");
+            throw new InvitationAlreadyUsedException();
         }
     }
 
@@ -399,13 +411,13 @@ public class InvitationServiceImpl implements InvitationService {
             }
         }
         if (roleIds.isEmpty()) {
-            throw new NotFoundException("资源不存在");
+            throw new InvitationNotFoundException();
         }
 
         for (Long roleId : roleIds) {
             Role role = roleMapper.selectById(roleId);
             if (role == null || !tenantId.equals(role.getTenantId())) {
-                throw new NotFoundException("资源不存在");
+                throw new InvitationNotFoundException();
             }
 
             LambdaQueryWrapper<UserRole> query = new LambdaQueryWrapper<>();
@@ -429,7 +441,7 @@ public class InvitationServiceImpl implements InvitationService {
     private Long getRequiredTenantId() {
         Long tenantId = TenantContextHolder.getTenantId();
         if (tenantId == null) {
-            throw new UnauthorizedException("未授权访问");
+            throw new InvitationUnauthorizedException();
         }
         return tenantId;
     }
@@ -449,40 +461,40 @@ public class InvitationServiceImpl implements InvitationService {
 
     private String normalizeInviteCode(String inviteCode) {
         if (inviteCode == null || inviteCode.isBlank()) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidInvitationRequestException();
         }
         return inviteCode.trim().toUpperCase(Locale.ROOT);
     }
 
     private String normalizeRequiredEmail(String email) {
         if (email == null) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidInvitationRequestException();
         }
         String normalized = email.trim().toLowerCase(Locale.ROOT);
         if (normalized.isEmpty()) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidInvitationRequestException();
         }
         return normalized;
     }
 
     private String normalizeRequiredUsername(String username) {
         if (username == null) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidInvitationRequestException();
         }
         String normalized = username.trim();
         if (normalized.isEmpty()) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidInvitationRequestException();
         }
         return normalized;
     }
 
     private String normalizeRequiredText(String value) {
         if (value == null) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidInvitationRequestException();
         }
         String normalized = value.trim();
         if (normalized.isEmpty()) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidInvitationRequestException();
         }
         return normalized;
     }
@@ -497,7 +509,7 @@ public class InvitationServiceImpl implements InvitationService {
                 return code;
             }
         }
-        throw new InternalException("服务器内部错误");
+        throw new InvitationInternalException();
     }
 
     private String generateInviteCode() {
@@ -538,12 +550,12 @@ public class InvitationServiceImpl implements InvitationService {
         return userInvitationMapper.selectOne(invitationQuery);
     }
 
-    private InvitationDto.CreateResponse buildCreateResponse(UserInvitation invitation,
+    private InvitationCreateResponse buildCreateResponse(UserInvitation invitation,
                                                              OffsetDateTime expiresAt,
                                                              Tenant tenant,
                                                              Role role,
                                                              User inviter) {
-        InvitationDto.CreateResponse response = new InvitationDto.CreateResponse();
+        InvitationCreateResponse response = new InvitationCreateResponse();
         response.setInvitationId(invitation.getId());
         response.setInviteCode(invitation.getInviteCode());
         response.setInviteUri(buildInviteUri(invitation.getInviteCode()));
@@ -553,6 +565,14 @@ public class InvitationServiceImpl implements InvitationService {
         response.setRoleName(role.getName());
         response.setInviterName(resolveInviterName(inviter));
         return response;
+    }
+
+    private RuntimeException translateDbException(RuntimeException runtimeException, StudioDbScene scene) {
+        DbStorageException dbException = SQLExceptionUtils.translate(runtimeException);
+        if (dbException == null) {
+            return runtimeException;
+        }
+        return studioDbExceptionTranslator.map(scene, dbException);
     }
 
     private String buildInviteUri(String inviteCode) {

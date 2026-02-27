@@ -2,15 +2,21 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { createPortal } from 'react-dom'
 import { ArrowUp, Check, ChevronDown, Command, Star, Zap } from 'lucide-react'
 import { Tooltip } from './Tooltip'
-import { cn } from '@/lib/utils'
+import { cn } from '@/utils'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 
 export type ChatModelOption = {
-  id: string
-  label: string
+  id?: string | number
+  aiModelId?: number
+  label?: string
   badge?: string
   tone?: 'emerald' | 'violet' | 'blue' | string
   providerLabel?: string
+  providerModelId?: string
+  modelName?: string
+  providerCode?: string
+  providerName?: string
+  isDefault?: boolean
 }
 
 export type ChatCommandOption = {
@@ -32,16 +38,97 @@ export type ChatInputProps = {
   onCompositionEnd: () => void
   onKeyDown: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => void
   onFocus?: () => void
-  selectedModelId: string
-  defaultModelId?: string
+  selectedModelId: number | null
+  defaultModelId?: number | null
   modelOptions: ChatModelOption[]
-  onModelChange: (value: string) => void
-  onDefaultModelChange?: (value: string) => void
-  onManageModels?: () => void
+  onModelChange: (value: number) => void
+  onDefaultModelChange?: (value: number) => void
   /** 模型下拉卡片头部文案 */
   modelDropdownHeader?: string
   commandOptions: ChatCommandOption[]
   onCommand: (commandId: string) => void
+}
+
+type ResolvedChatModelOption = {
+  aiModelId: number
+  providerModelId: string
+  label: string
+  badge: string
+  tone: string
+  providerLabel: string
+}
+
+const DROPDOWN_VIEWPORT_MARGIN = 12
+const DROPDOWN_OFFSET = 8
+const MODEL_DROPDOWN_HEADER_HEIGHT = 42
+const MODEL_DROPDOWN_LIST_PADDING = 12
+const MODEL_DROPDOWN_ITEM_HEIGHT = 44
+const COMMAND_DROPDOWN_MIN_HEIGHT = 156
+
+function resolveDropdownTop(rect: DOMRect, dropdownHeight: number): number {
+  const spaceBelow = window.innerHeight - rect.bottom - DROPDOWN_VIEWPORT_MARGIN
+  const spaceAbove = rect.top - DROPDOWN_VIEWPORT_MARGIN
+  const prefersOpenUp = spaceBelow < dropdownHeight && spaceAbove > spaceBelow
+  const nextTop = prefersOpenUp ? rect.top - dropdownHeight - DROPDOWN_OFFSET : rect.bottom + DROPDOWN_OFFSET
+  const minTop = DROPDOWN_VIEWPORT_MARGIN
+  const maxTop = Math.max(minTop, window.innerHeight - dropdownHeight - DROPDOWN_VIEWPORT_MARGIN)
+  return Math.max(minTop, Math.min(nextTop, maxTop))
+}
+
+function estimateModelDropdownHeight(modelCount: number): number {
+  const resolvedCount = Math.max(1, modelCount)
+  return MODEL_DROPDOWN_HEADER_HEIGHT + MODEL_DROPDOWN_LIST_PADDING + resolvedCount * MODEL_DROPDOWN_ITEM_HEIGHT
+}
+
+function resolveToneFromProvider(providerCode?: string): string {
+  const normalized = providerCode?.trim().toLowerCase()
+  if (!normalized) {
+    return 'blue'
+  }
+  if (normalized.includes('openai')) {
+    return 'emerald'
+  }
+  if (normalized.includes('anthropic')) {
+    return 'violet'
+  }
+  return 'blue'
+}
+
+function resolveModelProviderLabel(providerModelId: string, providerLabel: string): string {
+  if (!providerLabel || providerLabel === '-') {
+    return providerModelId
+  }
+  return `${providerModelId} · ${providerLabel}`
+}
+
+function resolveModelOption(option: ChatModelOption): ResolvedChatModelOption | null {
+  const rawId = typeof option.id === 'string' || typeof option.id === 'number' ? option.id : null
+  const resolvedAiModelId =
+    option.aiModelId
+    ?? (typeof rawId === 'number' && Number.isInteger(rawId) && rawId > 0 ? rawId : null)
+  if (!resolvedAiModelId) {
+    return null
+  }
+
+  const resolvedProviderModelId =
+    option.providerModelId?.trim()
+    || (typeof rawId === 'string' ? rawId.trim() : '')
+    || String(resolvedAiModelId)
+  const resolvedLabel = option.modelName?.trim() || option.label?.trim() || resolvedProviderModelId
+  const resolvedProviderName =
+    option.providerName?.trim() ||
+    option.providerLabel?.trim() ||
+    option.providerCode?.trim().toUpperCase() ||
+    '-'
+
+  return {
+    aiModelId: resolvedAiModelId,
+    providerModelId: resolvedProviderModelId,
+    label: resolvedLabel,
+    badge: option.badge?.trim() || resolvedLabel.charAt(0).toUpperCase() || 'M',
+    tone: option.tone ?? resolveToneFromProvider(option.providerCode),
+    providerLabel: resolveModelProviderLabel(resolvedProviderModelId, resolvedProviderName)
+  }
 }
 
 export function ChatInput({
@@ -61,7 +148,6 @@ export function ChatInput({
   modelOptions,
   onModelChange,
   onDefaultModelChange,
-  onManageModels,
   modelDropdownHeader = '选择模型',
   commandOptions,
   onCommand
@@ -76,13 +162,23 @@ export function ChatInput({
   const commandTriggerRef = useRef<HTMLButtonElement | null>(null)
   const commandDropdownRef = useRef<HTMLDivElement | null>(null)
   const [commandDropdownPos, setCommandDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
-  const resolvedModelId = selectedModelId || defaultModelId || modelOptions[0]?.id || ''
-  const resolvedDefaultModelId = defaultModelId || modelOptions[0]?.id || ''
-  const selectedModel = useMemo(
-    () => modelOptions.find((model) => model.id === resolvedModelId) ?? modelOptions[0],
-    [modelOptions, resolvedModelId]
+  const normalizedModelOptions = useMemo(
+    () =>
+      modelOptions
+        .map(resolveModelOption)
+        .filter((item): item is ResolvedChatModelOption => item !== null),
+    [modelOptions]
   )
-  const hasModels = modelOptions.length > 0
+  const resolvedModelId = selectedModelId ?? defaultModelId ?? normalizedModelOptions[0]?.aiModelId ?? null
+  const resolvedDefaultModelId = defaultModelId ?? null
+  const selectedModel = useMemo(
+    () => normalizedModelOptions.find((model) => model.aiModelId === resolvedModelId) ?? normalizedModelOptions[0],
+    [normalizedModelOptions, resolvedModelId]
+  )
+  const hasModels = normalizedModelOptions.length > 0
+  const noModelPermissionHint = '请联系管理员授权LLM模型'
+  const modelButtonLabel = hasModels ? (selectedModel?.label ?? '选择模型') : noModelPermissionHint
+  const modelButtonTitle = hasModels ? '选择模型' : noModelPermissionHint
   const hasCommands = commandOptions.length > 0
 
   const modelToneClassMap: Record<string, string> = {
@@ -132,13 +228,9 @@ export function ChatInput({
       if (!trigger) return
       const rect = trigger.getBoundingClientRect()
       const dropdownWidth = Math.max(rect.width, 240)
-      const dropdownHeight = 248
-      const spaceBelow = window.innerHeight - rect.bottom - 16
-      const spaceAbove = rect.top - 16
-      const left = Math.max(12, Math.min(rect.left, window.innerWidth - dropdownWidth - 12))
-      const top = spaceBelow < dropdownHeight && spaceAbove > spaceBelow
-        ? rect.top - dropdownHeight - 8
-        : rect.bottom + 8
+      const dropdownHeight = estimateModelDropdownHeight(normalizedModelOptions.length)
+      const left = Math.max(DROPDOWN_VIEWPORT_MARGIN, Math.min(rect.left, window.innerWidth - dropdownWidth - DROPDOWN_VIEWPORT_MARGIN))
+      const top = resolveDropdownTop(rect, dropdownHeight)
       setModelDropdownPos({ top, left, width: dropdownWidth })
     }
     updatePosition()
@@ -148,7 +240,7 @@ export function ChatInput({
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [modelOpen])
+  }, [modelOpen, normalizedModelOptions.length])
 
   useLayoutEffect(() => {
     if (!commandOpen) return
@@ -157,13 +249,9 @@ export function ChatInput({
       if (!trigger) return
       const rect = trigger.getBoundingClientRect()
       const dropdownWidth = 220
-      const dropdownHeight = 156
-      const spaceBelow = window.innerHeight - rect.bottom - 16
-      const spaceAbove = rect.top - 16
-      const left = Math.max(12, Math.min(rect.left, window.innerWidth - dropdownWidth - 12))
-      const top = spaceBelow < dropdownHeight && spaceAbove > spaceBelow
-        ? rect.top - dropdownHeight - 8
-        : rect.bottom + 8
+      const dropdownHeight = COMMAND_DROPDOWN_MIN_HEIGHT
+      const left = Math.max(DROPDOWN_VIEWPORT_MARGIN, Math.min(rect.left, window.innerWidth - dropdownWidth - DROPDOWN_VIEWPORT_MARGIN))
+      const top = resolveDropdownTop(rect, dropdownHeight)
       setCommandDropdownPos({ top, left, width: dropdownWidth })
     }
     updatePosition()
@@ -173,7 +261,7 @@ export function ChatInput({
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [commandOpen])
+  }, [commandOpen, commandOptions.length])
 
   const modelDropdownStyle = useMemo(() => {
     if (!modelDropdownPos) return undefined
@@ -236,7 +324,7 @@ export function ChatInput({
                     ? 'bg-gray-100 border-gray-200 text-gray-700 dark:bg-slate-800/70 dark:border-slate-700 dark:text-slate-100'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/70'
                 )}
-                title="选择模型"
+                title={modelButtonTitle}
               >
                 <span
                   className={cn(
@@ -247,7 +335,7 @@ export function ChatInput({
                 >
                   {selectedModel?.badge ?? 'M'}
                 </span>
-                <span className="min-w-0 truncate">{selectedModel?.label ?? '选择模型'}</span>
+                <span className="min-w-0 truncate">{modelButtonLabel}</span>
                 <ChevronDown size={12} className={cn('text-gray-400 transition-transform', modelOpen && 'rotate-180')} />
               </button>
               <span className="mx-1 h-4 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
@@ -329,24 +417,21 @@ export function ChatInput({
             style={modelDropdownStyle}
             className="fixed z-[1000000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 top-[var(--dropdown-top)] left-[var(--dropdown-left)] w-[var(--dropdown-width)]"
           >
-            <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700/70 flex items-center justify-between">
+            <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700/70">
               <span className="text-micro font-semibold text-slate-400 uppercase tracking-wider">{modelDropdownHeader}</span>
-              <span className={`${TYPOGRAPHY.micro} font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700`}>
-                PRO
-              </span>
             </div>
             <div className="p-1.5" role="listbox">
-              {modelOptions.map((model) => {
-                const isSelected = model.id === resolvedModelId
-                const isDefault = model.id === resolvedDefaultModelId
+              {normalizedModelOptions.map((model) => {
+                const isSelected = model.aiModelId === resolvedModelId
+                const isDefault = model.aiModelId === resolvedDefaultModelId
                 return (
                   <button
-                    key={model.id}
+                    key={model.aiModelId}
                     type="button"
                     role="option"
                     aria-selected={isSelected}
                     onClick={() => {
-                      onModelChange(model.id)
+                      onModelChange(model.aiModelId)
                       closeModelMenu()
                     }}
                     className={cn(
@@ -376,7 +461,7 @@ export function ChatInput({
                           event.preventDefault()
                           event.stopPropagation()
                           if (isDefault) return
-                          onDefaultModelChange(model.id)
+                          onDefaultModelChange(model.aiModelId)
                         }}
                         title={isDefault ? '默认模型' : '设为默认模型'}
                         aria-label={isDefault ? '默认模型' : '设为默认模型'}
@@ -394,24 +479,6 @@ export function ChatInput({
                   </button>
                 )
               })}
-            </div>
-            <div className="border-t border-slate-100 dark:border-slate-700/70 px-2 py-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  onManageModels?.()
-                  closeModelMenu()
-                }}
-                disabled={!onManageModels}
-                className={cn(
-                  'w-full text-left px-2 py-1.5 text-xs font-medium rounded-lg transition-colors',
-                  onManageModels
-                    ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/60'
-                    : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
-                )}
-              >
-                Manage Models...
-              </button>
             </div>
           </div>,
           document.body

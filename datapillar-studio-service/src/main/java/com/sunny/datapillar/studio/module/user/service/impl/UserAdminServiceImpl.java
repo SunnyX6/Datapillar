@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.user.service.impl;
 
-import com.sunny.datapillar.studio.module.user.dto.UserDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.user.service.UserAdminService;
 import com.sunny.datapillar.studio.module.user.service.UserService;
 import java.util.List;
@@ -21,22 +34,22 @@ public class UserAdminServiceImpl implements UserAdminService {
     private final UserService userService;
 
     @Override
-    public List<UserDto.Response> listUsers() {
+    public List<UserResponse> listUsers() {
         return userService.getUserList();
     }
 
     @Override
-    public UserDto.Response getUser(Long userId) {
+    public UserResponse getUser(Long userId) {
         return userService.getUserById(userId);
     }
 
     @Override
-    public Long createUser(UserDto.Create request) {
+    public Long createUser(UserCreateRequest request) {
         return userService.createUser(request);
     }
 
     @Override
-    public void updateUser(Long userId, UserDto.Update request) {
+    public void updateUser(Long userId, UserUpdateRequest request) {
         userService.updateUser(userId, request);
     }
 

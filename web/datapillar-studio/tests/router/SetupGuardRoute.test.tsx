@@ -3,8 +3,8 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
-import { SetupGuard } from '@/router/guards/SetupGuard'
-import { useSetupStore } from '@/stores'
+import { SetupGate } from '@/router/guards/SetupGate'
+import { useSetupStore } from '@/state'
 import { getSetupStatus } from '@/services/setupService'
 
 vi.mock('@/services/setupService', () => ({
@@ -24,7 +24,7 @@ const renderWithRouter = (initialEntry: string): RenderResult => {
     [
       {
         path: '/',
-        element: <SetupGuard />,
+        element: <SetupGate />,
         children: [
           {
             path: 'home',
@@ -83,7 +83,7 @@ const cleanup = (root: Root, container: HTMLDivElement) => {
   container.remove()
 }
 
-describe('SetupGuard', () => {
+describe('SetupGate', () => {
   beforeEach(() => {
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
     localStorage.clear()

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { canAccessRouteByMenus, resolveFirstAccessibleRoute } from '@/router/access/routeAccess'
-import type { Menu } from '@/types/auth'
+import { canAccessRouteByMenus, resolveFirstAccessibleRoute } from '@/router/access/menuAccess'
+import type { Menu } from '@/services/types/auth'
 
-describe('routeAccess', () => {
+describe('menuAccess', () => {
   it('does not allow profile permission route when only profile menu is granted', () => {
     const menus: Menu[] = [
       {

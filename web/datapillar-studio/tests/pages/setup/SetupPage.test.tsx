@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { InputGroup, SetupPage } from '@/pages/setup'
 import { getSetupStatus } from '@/services/setupService'
-import { useSetupStore } from '@/stores'
+import { useSetupStore } from '@/state'
 
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>()
@@ -46,7 +46,7 @@ vi.mock('@/components', () => ({
   LanguageToggle: () => <div data-testid="language-toggle" />
 }))
 
-vi.mock('@/pages/login/DemoCanvas', () => ({
+vi.mock('@/features/auth/ui/DemoCanvas', () => ({
   DemoCanvas: () => <div data-testid="demo-canvas" />
 }))
 

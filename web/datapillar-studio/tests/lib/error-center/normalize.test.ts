@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeApiPayloadError } from '@/lib/error-center'
-import type { ErrorResponse } from '@/types/api'
+import { normalizeApiPayloadError } from '@/api/errorCenter'
+import type { ErrorResponse } from '@/api/types/api'
 
 describe('error-center normalize', () => {
   it('从响应头提取 requestId 和 traceId', () => {

@@ -4,9 +4,14 @@ import { RouterProvider } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { router } from '@/router'
-import { useThemeStore, useI18nStore, useAuthStore } from '@/stores'
-import '@/lib/i18n' // 初始化 i18n
+import { useI18nStore } from '@/state'
+import { useAuthBootstrap } from '@/app/auth'
+import { useThemeBootstrap } from '@/app/theme'
+import { installToastCopyAction } from '@/app/toast'
+import '@/app/i18n' // 初始化 i18n
 import './index.css' // Tailwind CSS
+
+installToastCopyAction()
 
 /**
  * 应用初始化组件
@@ -14,14 +19,12 @@ import './index.css' // Tailwind CSS
  */
 export function App() {
   const { t, i18n } = useTranslation('common')
+  useThemeBootstrap()
+  useAuthBootstrap()
 
   useEffect(() => {
-    // 初始化主题系统
-    useThemeStore.getState().initialize()
     // 初始化国际化系统
     useI18nStore.getState().initialize()
-    // 初始化认证状态（页面直刷 /home 时也要先恢复会话）
-    void useAuthStore.getState().initializeAuth()
   }, [])
 
   // 监听语言变化，动态更新网站标题

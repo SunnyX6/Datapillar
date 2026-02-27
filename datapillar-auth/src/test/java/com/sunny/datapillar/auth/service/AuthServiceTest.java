@@ -1,6 +1,11 @@
 package com.sunny.datapillar.auth.service;
 
-import com.sunny.datapillar.auth.dto.AuthDto;
+import com.sunny.datapillar.auth.dto.auth.request.*;
+import com.sunny.datapillar.auth.dto.auth.response.*;
+import com.sunny.datapillar.auth.dto.login.request.*;
+import com.sunny.datapillar.auth.dto.login.response.*;
+import com.sunny.datapillar.auth.dto.oauth.request.*;
+import com.sunny.datapillar.auth.dto.oauth.response.*;
 import com.sunny.datapillar.auth.entity.Tenant;
 import com.sunny.datapillar.auth.entity.TenantUser;
 import com.sunny.datapillar.auth.entity.User;
@@ -60,7 +65,7 @@ class AuthServiceTest {
 
     @Test
     void validateToken_shouldReturnSuccess_withoutTokenSign() {
-        AuthDto.TokenRequest request = new AuthDto.TokenRequest();
+        TokenRequest request = new TokenRequest();
         request.setToken("token");
 
         Claims claims = buildClaims("access", new Date(System.currentTimeMillis() + 60000),
@@ -91,7 +96,7 @@ class AuthServiceTest {
         tenantUser.setStatus(1);
         when(tenantUserMapper.selectByTenantIdAndUserId(10L, 1L)).thenReturn(tenantUser);
 
-        AuthDto.TokenResponse response = authService.validateToken(request);
+        TokenResponse response = authService.validateToken(request);
 
         assertTrue(response.isValid());
         assertEquals(1L, response.getUserId());
@@ -102,10 +107,10 @@ class AuthServiceTest {
 
     @Test
     void validateToken_shouldThrowWhenExpired() {
-        AuthDto.TokenRequest request = new AuthDto.TokenRequest();
+        TokenRequest request = new TokenRequest();
         request.setToken("token");
 
-        when(jwtUtil.parseToken("token")).thenThrow(new UnauthorizedException("Token已过期"));
+        when(jwtUtil.parseToken("token")).thenThrow(new com.sunny.datapillar.common.exception.UnauthorizedException("Token已过期"));
 
         UnauthorizedException exception =
                 assertThrows(UnauthorizedException.class, () -> authService.validateToken(request));

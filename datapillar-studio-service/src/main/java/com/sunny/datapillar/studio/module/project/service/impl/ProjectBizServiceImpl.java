@@ -1,7 +1,20 @@
 package com.sunny.datapillar.studio.module.project.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.sunny.datapillar.studio.module.project.dto.ProjectDto;
 import com.sunny.datapillar.studio.module.project.service.ProjectBizService;
 import com.sunny.datapillar.studio.module.project.service.ProjectService;
 import lombok.RequiredArgsConstructor;
@@ -21,22 +34,22 @@ public class ProjectBizServiceImpl implements ProjectBizService {
     private final ProjectService projectService;
 
     @Override
-    public IPage<ProjectDto.Response> getProjectPage(ProjectDto.Query query, Long userId) {
+    public IPage<ProjectResponse> getProjectPage(ProjectQueryRequest query, Long userId) {
         return projectService.getProjectPage(query, userId);
     }
 
     @Override
-    public ProjectDto.Response getProjectById(Long id, Long userId) {
+    public ProjectResponse getProjectById(Long id, Long userId) {
         return projectService.getProjectById(id, userId);
     }
 
     @Override
-    public Long createProject(ProjectDto.Create dto, Long userId) {
+    public Long createProject(ProjectCreateRequest dto, Long userId) {
         return projectService.createProject(dto, userId);
     }
 
     @Override
-    public void updateProject(Long id, ProjectDto.Update dto, Long userId) {
+    public void updateProject(Long id, ProjectUpdateRequest dto, Long userId) {
         projectService.updateProject(id, dto, userId);
     }
 

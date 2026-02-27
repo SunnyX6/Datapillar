@@ -1,8 +1,41 @@
 import js from '@eslint/js'
+import importPlugin from 'eslint-plugin-import'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
+
+const deprecatedDimensionImport = {
+  name: '@/design-tokens/dimensions',
+  importNames: ['LAYOUT_DIMENSIONS'],
+  message: '❌ 已废弃 LAYOUT_DIMENSIONS，请使用 dimensions.ts 中的 ClassMap（cardWidthClassMap / modalWidthClassMap / contentMaxWidthClassMap / paddingClassMap / gapClassMap / sidebarWidthClassMap 等）。'
+}
+
+const baseRestrictedPatterns = [
+  '@/lib/*',
+  '@/shared/*',
+  '@/features/**/api/**',
+  '@/features/**/service/**',
+  '@/features/**/lib/**',
+  '@/router/access/routeAccess',
+  '@/router/routes/*',
+  '@/stores/*',
+  '@/contexts/*',
+  '@/types/*',
+]
+
+function createRestrictedImports(extraPatterns = [], extraPaths = [], extraPatternObjects = []) {
+  const patternGroup = [...baseRestrictedPatterns, ...extraPatterns]
+  const patterns = [
+    ...(patternGroup.length > 0 ? [{ group: patternGroup }] : []),
+    ...extraPatternObjects,
+  ]
+
+  return ['error', {
+    paths: [deprecatedDimensionImport, ...extraPaths],
+    patterns,
+  }]
+}
 
 export default tseslint.config(
   { ignores: ['dist', 'node_modules', '*.config.js', '*.config.ts', 'examples'] },
@@ -14,6 +47,7 @@ export default tseslint.config(
       globals: globals.browser,
     },
     plugins: {
+      import: importPlugin,
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
     },
@@ -28,15 +62,9 @@ export default tseslint.config(
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_'
       }],
-      'no-restricted-imports': ['error', {
-        paths: [
-          {
-            name: '@/design-tokens/dimensions',
-            importNames: ['LAYOUT_DIMENSIONS'],
-            message: '❌ 已废弃 LAYOUT_DIMENSIONS，请使用 dimensions.ts 中的 ClassMap（cardWidthClassMap / modalWidthClassMap / contentMaxWidthClassMap / paddingClassMap / gapClassMap / sidebarWidthClassMap 等）。'
-          }
-        ]
-      }],
+      'import/no-cycle': ['error', { maxDepth: 1 }],
+      'import/no-self-import': 'error',
+      'no-restricted-imports': createRestrictedImports(),
 
       // ==================== 响应式强制规则 ====================
       // 目标：开发时只关注业务逻辑，响应式自动适配
@@ -94,5 +122,103 @@ export default tseslint.config(
         }
       ]
     },
+  },
+  {
+    files: ['src/pages/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': createRestrictedImports(['@/app/*', '@/router/*', '@/api/*', '@/services/*'])
+    }
+  },
+  {
+    files: ['src/layouts/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': createRestrictedImports([
+        '@/app/*',
+        '@/router/*',
+        '@/pages/*',
+        '@/features/**',
+        '@/api/**'
+      ], [], [{
+        regex: '^@/services/(?!types/|menuPermissionService$).+',
+        message: '❌ layouts 只能依赖 services 的类型定义或 menuPermissionService，禁止接入业务服务调用。'
+      }])
+    }
+  },
+  {
+    files: ['src/state/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': createRestrictedImports(['@/features/*'])
+    }
+  },
+  {
+    files: ['src/state/**/*.{ts,tsx}'],
+    ignores: [
+      'src/state/authStore.ts',
+      'src/state/setupStore.ts',
+      'src/state/themeStore.ts',
+      'src/state/i18nStore.ts',
+      'src/state/layoutStore.ts',
+      'src/state/searchStore.ts',
+      'src/state/index.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': ['error', {
+        selector: 'Program',
+        message: '❌ src/state 只允许全局共享状态文件。业务模块状态必须放到 src/features/*/state。'
+      }]
+    }
+  },
+  {
+    files: ['src/features/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': createRestrictedImports([
+        '@/app/*',
+        '@/router/*',
+        '@/pages/*',
+        '@/layouts/navigation/*',
+        '@/layouts/MainLayout',
+        '@/layouts/MainLayout/*'
+      ], [
+        {
+          name: '@/state',
+          importNames: [
+            'useWorkflowStudioStore',
+            'useWorkflowStudioCacheStore',
+            'useComponentStore',
+            'useMetadataStore',
+            'useKnowledgeGraphStore',
+            'useSemanticStatsStore',
+            'AgentActivity',
+            'ProcessActivity',
+            'ChatMessage'
+          ],
+          message: '❌ 业务状态请从对应 feature 的 state 目录导入，不允许从 @/state 导入。'
+        }
+      ])
+    }
+  },
+  {
+    files: ['src/features/**/utils/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': createRestrictedImports(['@/api/*', '@/services/*'])
+    }
+  },
+  {
+    files: ['src/services/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': createRestrictedImports(['@/app/*', '@/router/*', '@/pages/*', '@/layouts/*', '@/features/*'])
+    }
+  },
+  {
+    files: ['src/api/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': createRestrictedImports(['@/app/*', '@/router/*', '@/pages/*', '@/layouts/*', '@/features/*', '@/services/*', '@/components/*'])
+    }
+  },
+  {
+    files: ['src/utils/**/*.{ts,tsx}', 'src/hooks/**/*.{ts,tsx}', 'src/config/**/*.{ts,tsx}', 'src/design-tokens/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': createRestrictedImports(['@/app/*', '@/router/*', '@/pages/*', '@/layouts/*', '@/features/*', '@/services/*', '@/api/*', '@/components/*'])
+    }
   },
 )

@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.user.controller;
 
-import com.sunny.datapillar.studio.module.user.dto.UserDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.user.service.UserAdminService;
 import com.sunny.datapillar.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,21 +49,21 @@ public class UserAdminController {
     @Operation(summary = "获取用户列表")
     @GetMapping("/users")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<UserDto.Response>> list() {
+    public ApiResponse<List<UserResponse>> list() {
         return ApiResponse.ok(userAdminService.listUsers());
     }
 
     @Operation(summary = "获取用户详情")
     @GetMapping("/users/{id}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<UserDto.Response> detail(@PathVariable Long id) {
+    public ApiResponse<UserResponse> detail(@PathVariable Long id) {
         return ApiResponse.ok(userAdminService.getUser(id));
     }
 
     @Operation(summary = "创建用户")
     @PostMapping("/user")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> create(@Valid @RequestBody UserDto.Create dto) {
+    public ApiResponse<Void> create(@Valid @RequestBody UserCreateRequest dto) {
         userAdminService.createUser(dto);
         return ApiResponse.ok();
     }
@@ -58,7 +71,7 @@ public class UserAdminController {
     @Operation(summary = "更新用户")
     @PutMapping("/user/{id}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody UserDto.Update dto) {
+    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody UserUpdateRequest dto) {
         userAdminService.updateUser(id, dto);
         return ApiResponse.ok();
     }

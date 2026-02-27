@@ -1,7 +1,19 @@
 package com.sunny.datapillar.studio.module.tenant.service;
 
-import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
-import com.sunny.datapillar.studio.module.user.dto.RoleDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
@@ -13,17 +25,19 @@ import java.util.List;
  */
 public interface TenantRoleAdminService {
 
-    List<RoleDto.Response> getRoleList();
+    List<RoleResponse> getRoleList();
 
-    Long createRole(RoleDto.Create dto);
+    Long createRole(RoleCreateRequest dto);
 
-    void updateRole(Long roleId, RoleDto.Update dto);
+    void updateRole(Long roleId, RoleUpdateRequest dto);
 
     void deleteRole(Long roleId);
 
-    List<FeatureObjectDto.ObjectPermission> getRolePermissions(Long roleId, String scope);
+    List<FeatureObjectPermissionItem> getRolePermissions(Long roleId, String scope);
 
-    void updateRolePermissions(Long roleId, List<FeatureObjectDto.Assignment> permissions);
+    void updateRolePermissions(Long roleId, List<RoleFeatureAssignmentItem> permissions);
 
-    RoleDto.MembersResponse getRoleMembers(Long roleId, Integer status);
+    RoleMembersResponse getRoleMembers(Long roleId, Integer status);
+
+    void removeRoleMembers(Long roleId, List<Long> userIds);
 }

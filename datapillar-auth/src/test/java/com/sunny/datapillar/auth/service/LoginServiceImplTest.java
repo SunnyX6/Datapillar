@@ -1,6 +1,11 @@
 package com.sunny.datapillar.auth.service;
 
-import com.sunny.datapillar.auth.dto.AuthDto;
+import com.sunny.datapillar.auth.dto.auth.request.*;
+import com.sunny.datapillar.auth.dto.auth.response.*;
+import com.sunny.datapillar.auth.dto.login.request.*;
+import com.sunny.datapillar.auth.dto.login.response.*;
+import com.sunny.datapillar.auth.dto.oauth.request.*;
+import com.sunny.datapillar.auth.dto.oauth.response.*;
 import com.sunny.datapillar.auth.entity.Tenant;
 import com.sunny.datapillar.auth.entity.TenantUser;
 import com.sunny.datapillar.auth.entity.User;
@@ -157,11 +162,11 @@ class LoginServiceImplTest {
         tenantUser.setUserId(1L);
         tenantUser.setStatus(1);
         when(tenantUserMapper.selectByTenantIdAndUserId(10L, 1L)).thenReturn(tenantUser);
-        AuthDto.TenantOption tenantOption = new AuthDto.TenantOption(10L, "demo", "demo", 1, 1);
+        TenantOptionItem tenantOption = new TenantOptionItem(10L, "demo", "demo", 1, 1);
         when(tenantUserMapper.selectTenantOptionsByUserId(1L)).thenReturn(List.of(tenantOption));
         when(userAccessReader.loadRoleTypes(10L, 1L)).thenReturn(List.of());
 
-        AuthDto.LoginResponse loginResponse = new AuthDto.LoginResponse();
+        LoginResponse loginResponse = new LoginResponse();
         loginResponse.setUserId(1L);
         loginResponse.setTenantId(10L);
         loginResponse.setUsername("sunny");
@@ -176,7 +181,7 @@ class LoginServiceImplTest {
         when(jwtToken.getRefreshTokenExpiration(true)).thenReturn(2_592_000L);
 
         HttpServletResponse response = mockResponse();
-        AuthDto.LoginResult result = loginService.login(command, "127.0.0.1", response);
+        LoginResultResponse result = loginService.login(command, "127.0.0.1", response);
 
         assertNull(result.getLoginStage());
         assertEquals(1L, result.getUserId());
@@ -227,7 +232,7 @@ class LoginServiceImplTest {
         LoginCommand command = buildSsoCommand();
 
         when(ssoStateStore.consumeOrThrow("state-1", null, "dingtalk"))
-                .thenThrow(new UnauthorizedException("SSO state 无效"));
+                .thenThrow(new com.sunny.datapillar.common.exception.UnauthorizedException("SSO state 无效"));
 
         UnauthorizedException exception = assertThrows(UnauthorizedException.class,
                 () -> loginService.login(command, "127.0.0.1", mockResponse()));
@@ -240,7 +245,7 @@ class LoginServiceImplTest {
         LoginCommand command = buildSsoCommand();
 
         when(ssoStateStore.consumeOrThrow("state-1", null, "dingtalk"))
-                .thenThrow(new UnauthorizedException("SSO state 已过期"));
+                .thenThrow(new com.sunny.datapillar.common.exception.UnauthorizedException("SSO state 已过期"));
 
         UnauthorizedException exception = assertThrows(UnauthorizedException.class,
                 () -> loginService.login(command, "127.0.0.1", mockResponse()));
@@ -253,7 +258,7 @@ class LoginServiceImplTest {
         LoginCommand command = buildSsoCommand();
 
         when(ssoStateStore.consumeOrThrow("state-1", null, "dingtalk"))
-                .thenThrow(new UnauthorizedException("SSO state 已被重复使用"));
+                .thenThrow(new com.sunny.datapillar.common.exception.UnauthorizedException("SSO state 已被重复使用"));
 
         UnauthorizedException exception = assertThrows(UnauthorizedException.class,
                 () -> loginService.login(command, "127.0.0.1", mockResponse()));

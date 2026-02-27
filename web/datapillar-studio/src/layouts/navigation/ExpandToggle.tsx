@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/utils'
 
 interface ExpandToggleProps {
   variant: 'sidebar' | 'topnav'

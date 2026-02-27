@@ -1,7 +1,20 @@
 package com.sunny.datapillar.studio.module.workflow.controller;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.sunny.datapillar.studio.module.workflow.dto.WorkflowDto;
 import com.sunny.datapillar.studio.module.workflow.service.WorkflowRunBizService;
 import com.sunny.datapillar.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,7 +52,7 @@ public class WorkflowRunBizController {
     @Operation(summary = "触发工作流运行")
     @PostMapping("/runs")
     public ApiResponse<Void> trigger(@PathVariable Long workflowId,
-                                     @RequestBody(required = false) WorkflowDto.TriggerRequest request) {
+                                     @RequestBody(required = false) WorkflowTriggerRequest request) {
         workflowRunBizService.triggerWorkflow(workflowId, request);
         return ApiResponse.ok();
     }
@@ -93,7 +106,7 @@ public class WorkflowRunBizController {
     public ApiResponse<JsonNode> rerunJob(@PathVariable Long workflowId,
                                           @PathVariable String runId,
                                           @PathVariable String jobId,
-                                          @RequestBody(required = false) WorkflowDto.RerunJobRequest request) {
+                                          @RequestBody(required = false) WorkflowRerunJobRequest request) {
         return ApiResponse.ok(workflowRunBizService.rerunJob(workflowId, runId, jobId, request));
     }
 
@@ -102,7 +115,7 @@ public class WorkflowRunBizController {
     public ApiResponse<Void> setJobState(@PathVariable Long workflowId,
                                          @PathVariable String runId,
                                          @PathVariable String jobId,
-                                         @Valid @RequestBody WorkflowDto.SetJobStateRequest request) {
+                                         @Valid @RequestBody WorkflowSetJobStatusRequest request) {
         workflowRunBizService.setJobState(workflowId, runId, jobId, request);
         return ApiResponse.ok();
     }
@@ -111,7 +124,7 @@ public class WorkflowRunBizController {
     @PostMapping("/runs/{runId}/clear")
     public ApiResponse<JsonNode> clearJobs(@PathVariable Long workflowId,
                                            @PathVariable String runId,
-                                           @Valid @RequestBody WorkflowDto.ClearJobsRequest request) {
+                                           @Valid @RequestBody WorkflowClearJobsRequest request) {
         return ApiResponse.ok(workflowRunBizService.clearJobs(workflowId, runId, request));
     }
 }

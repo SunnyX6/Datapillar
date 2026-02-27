@@ -1,4 +1,4 @@
-import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/lib/api'
+import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/api'
 import { pickDefinedParams } from './studioCommon'
 import type {
   CreateStudioRoleRequest,
@@ -8,7 +8,7 @@ import type {
   StudioRoleMembersResponse,
   UpdateStudioRolePermissionAssignment,
   UpdateStudioRoleRequest
-} from '@/types/studio/role'
+} from '@/services/types/studio/role'
 
 export type {
   CreateStudioRoleRequest,
@@ -20,7 +20,7 @@ export type {
   StudioRoleType,
   UpdateStudioRolePermissionAssignment,
   UpdateStudioRoleRequest
-} from '@/types/studio/role'
+} from '@/services/types/studio/role'
 
 export async function listTenantRoles(_tenantId: number): Promise<StudioRole[]> {
   return requestData<StudioRole[]>({
@@ -74,6 +74,21 @@ export async function getTenantRoleMembers(
     baseURL: API_BASE.studioAdmin,
     url: API_PATH.tenantAdmin.roleMembers(roleId),
     params: pickDefinedParams({ status })
+  })
+}
+
+export async function removeTenantRoleMembers(
+  _tenantId: number,
+  roleId: number,
+  userIds: number[]
+): Promise<void> {
+  await requestEnvelope<void, { userIds: number[] }>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.tenantAdmin.roleMembers(roleId),
+    method: 'DELETE',
+    data: {
+      userIds
+    }
   })
 }
 

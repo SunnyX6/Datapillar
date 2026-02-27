@@ -1,5 +1,5 @@
 import type { HTMLAttributes } from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/utils'
 
 type GridVariant = 'dashboard' | 'two-column' | 'three-column'
 type GapScale = 'none' | 'xs' | 'sm' | 'md' | 'lg'

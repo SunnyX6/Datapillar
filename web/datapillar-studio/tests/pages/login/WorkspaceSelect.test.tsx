@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act } from 'react-dom/test-utils'
 import { createRoot } from 'react-dom/client'
-import { WorkspaceSelectPanel } from '@/pages/login/WorkspaceSelect'
+import { WorkspaceSelectPanel } from '@/features/auth/ui/WorkspaceSelect'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { decideErrorAction } from '@/lib/error-center/policy'
-import type { AppError } from '@/lib/error-center'
+import { decideErrorAction } from '@/api/errorCenter/policy'
+import type { AppError } from '@/api/errorCenter'
 
 function createError(overrides: Partial<AppError> = {}): AppError {
   return {

@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.tenant.service.sso.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -13,7 +27,7 @@ import com.sunny.datapillar.common.exception.AlreadyExistsException;
 import com.sunny.datapillar.common.exception.ForbiddenException;
 import com.sunny.datapillar.studio.context.TenantContext;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
-import com.sunny.datapillar.studio.module.tenant.dto.SsoIdentityDto;
+import com.sunny.datapillar.studio.exception.translator.StudioDbExceptionTranslator;
 import com.sunny.datapillar.studio.module.tenant.entity.TenantSsoConfig;
 import com.sunny.datapillar.studio.module.tenant.entity.UserIdentity;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantSsoConfigMapper;
@@ -24,6 +38,7 @@ import com.sunny.datapillar.studio.module.tenant.service.sso.provider.model.Ding
 import com.sunny.datapillar.studio.module.user.entity.TenantUser;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
 import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
+import java.sql.SQLException;
 import java.util.Map;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.AfterEach;
@@ -63,7 +78,8 @@ class SsoIdentityServiceImplTest {
                 dingtalkBindingClient,
                 authCryptoClient,
                 tenantCodeResolver,
-                new ObjectMapper()
+                new ObjectMapper(),
+                new StudioDbExceptionTranslator()
         );
         lenient().when(tenantCodeResolver.requireTenantCode(1L)).thenReturn("tenant-1");
     }
@@ -75,7 +91,7 @@ class SsoIdentityServiceImplTest {
 
     @Test
     void bindByCode_shouldCreateIdentityWhenValid() throws Exception {
-        SsoIdentityDto.BindByCodeRequest request = new SsoIdentityDto.BindByCodeRequest();
+        SsoIdentityBindByCodeRequest request = new SsoIdentityBindByCodeRequest();
         request.setUserId(100L);
         request.setProvider("dingtalk");
         request.setAuthCode("code-001");
@@ -100,7 +116,6 @@ class SsoIdentityServiceImplTest {
 
         DingtalkUserInfo userInfo = new DingtalkUserInfo("union-001", "{\"unionId\":\"union-001\"}");
         when(dingtalkBindingClient.fetchUserInfo("client", "secret", "code-001")).thenReturn(userInfo);
-        when(userIdentityMapper.selectOne(any())).thenReturn(null);
         when(userIdentityMapper.insert(any(UserIdentity.class))).thenAnswer(invocation -> {
             UserIdentity identity = invocation.getArgument(0);
             identity.setId(10L);
@@ -114,7 +129,7 @@ class SsoIdentityServiceImplTest {
 
     @Test
     void bindByCode_shouldRejectNonMember() {
-        SsoIdentityDto.BindByCodeRequest request = new SsoIdentityDto.BindByCodeRequest();
+        SsoIdentityBindByCodeRequest request = new SsoIdentityBindByCodeRequest();
         request.setUserId(100L);
         request.setProvider("dingtalk");
         request.setAuthCode("code-001");
@@ -122,12 +137,12 @@ class SsoIdentityServiceImplTest {
         when(tenantUserMapper.selectByTenantIdAndUserId(1L, 100L)).thenReturn(null);
 
         ForbiddenException exception = assertThrows(ForbiddenException.class, () -> service.bindByCode(request));
-        assertEquals("无权限访问", exception.getMessage());
+        assertEquals("无SSO绑定权限", exception.getMessage());
     }
 
     @Test
     void bindByCode_shouldRejectDuplicateBinding() throws Exception {
-        SsoIdentityDto.BindByCodeRequest request = new SsoIdentityDto.BindByCodeRequest();
+        SsoIdentityBindByCodeRequest request = new SsoIdentityBindByCodeRequest();
         request.setUserId(100L);
         request.setProvider("dingtalk");
         request.setAuthCode("code-001");
@@ -152,10 +167,11 @@ class SsoIdentityServiceImplTest {
 
         DingtalkUserInfo userInfo = new DingtalkUserInfo("union-001", "{\"unionId\":\"union-001\"}");
         when(dingtalkBindingClient.fetchUserInfo("client", "secret", "code-001")).thenReturn(userInfo);
-        when(userIdentityMapper.selectOne(any())).thenReturn(new UserIdentity());
+        when(userIdentityMapper.insert(any(UserIdentity.class))).thenThrow(new RuntimeException(
+                new SQLException("Duplicate entry union-001 for key uq_user_identity", "23000", 1062)));
 
         AlreadyExistsException exception = assertThrows(AlreadyExistsException.class, () -> service.bindByCode(request));
-        assertEquals("资源已存在", exception.getMessage());
+        assertEquals("SSO身份已存在", exception.getMessage());
     }
 
     @Test

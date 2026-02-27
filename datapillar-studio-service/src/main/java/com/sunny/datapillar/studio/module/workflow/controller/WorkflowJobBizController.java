@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.workflow.controller;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -12,7 +26,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.sunny.datapillar.studio.module.workflow.dto.JobDto;
 import com.sunny.datapillar.studio.module.workflow.service.WorkflowJobBizService;
 import com.sunny.datapillar.common.response.ApiResponse;
 
@@ -38,17 +51,17 @@ public class WorkflowJobBizController {
 
     @Operation(summary = "获取工作流下的所有任务")
     @GetMapping("/jobs")
-    public ApiResponse<List<JobDto.Response>> list(@PathVariable Long workflowId) {
-        List<JobDto.Response> result = workflowJobBizService.getJobsByWorkflowId(workflowId);
+    public ApiResponse<List<JobResponse>> list(@PathVariable Long workflowId) {
+        List<JobResponse> result = workflowJobBizService.getJobsByWorkflowId(workflowId);
         return ApiResponse.ok(result);
     }
 
     @Operation(summary = "获取任务详情")
     @GetMapping("/jobs/{id}")
-    public ApiResponse<JobDto.Response> detail(
+    public ApiResponse<JobResponse> detail(
             @PathVariable Long workflowId,
             @PathVariable Long id) {
-        JobDto.Response result = workflowJobBizService.getJobDetail(workflowId, id);
+        JobResponse result = workflowJobBizService.getJobDetail(workflowId, id);
         return ApiResponse.ok(result);
     }
 
@@ -56,7 +69,7 @@ public class WorkflowJobBizController {
     @PostMapping("/jobs")
     public ApiResponse<Void> create(
             @PathVariable Long workflowId,
-            @Valid @RequestBody JobDto.Create dto) {
+            @Valid @RequestBody JobCreateRequest dto) {
         workflowJobBizService.createJob(workflowId, dto);
         return ApiResponse.ok();
     }
@@ -66,7 +79,7 @@ public class WorkflowJobBizController {
     public ApiResponse<Void> update(
             @PathVariable Long workflowId,
             @PathVariable Long id,
-            @Valid @RequestBody JobDto.Update dto) {
+            @Valid @RequestBody JobUpdateRequest dto) {
         workflowJobBizService.updateJob(workflowId, id, dto);
         return ApiResponse.ok();
     }
@@ -84,7 +97,7 @@ public class WorkflowJobBizController {
     @PutMapping("/jobs/layout")
     public ApiResponse<Void> updateLayout(
             @PathVariable Long workflowId,
-            @Valid @RequestBody JobDto.LayoutSave dto) {
+            @Valid @RequestBody JobLayoutSaveRequest dto) {
         workflowJobBizService.updateJobPositions(workflowId, dto);
         return ApiResponse.ok();
     }

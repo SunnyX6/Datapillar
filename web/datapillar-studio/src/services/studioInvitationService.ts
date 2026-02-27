@@ -1,7 +1,7 @@
-import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/lib/api'
-import type { InvitationDetailResponse, InvitationRegisterRequest } from '@/types/studio/tenant'
+import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/api'
+import type { InvitationDetailResponse, InvitationRegisterRequest } from '@/services/types/studio/tenant'
 
-export type { InvitationDetailResponse, InvitationRegisterRequest } from '@/types/studio/tenant'
+export type { InvitationDetailResponse, InvitationRegisterRequest } from '@/services/types/studio/tenant'
 
 export async function getInvitationByCode(
   inviteCode: string

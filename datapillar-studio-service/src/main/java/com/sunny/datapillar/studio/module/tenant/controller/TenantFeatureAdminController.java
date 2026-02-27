@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.tenant.controller;
 
-import com.sunny.datapillar.studio.module.tenant.dto.FeatureEntitlementDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.tenant.service.TenantFeatureAdminService;
 import com.sunny.datapillar.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,14 +46,14 @@ public class TenantFeatureAdminController {
     @Operation(summary = "获取租户功能授权列表")
     @GetMapping
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<FeatureEntitlementDto.Item>> list() {
+    public ApiResponse<List<TenantFeatureItem>> list() {
         return ApiResponse.ok(tenantFeatureAdminService.listEntitlements());
     }
 
     @Operation(summary = "更新租户功能授权")
     @PutMapping
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> update(@Valid @RequestBody List<FeatureEntitlementDto.UpdateItem> items) {
+    public ApiResponse<Void> update(@Valid @RequestBody List<TenantFeatureUpdateItem> items) {
         tenantFeatureAdminService.updateEntitlements(items);
         return ApiResponse.ok(null);
     }

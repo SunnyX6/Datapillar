@@ -7,7 +7,7 @@
  */
 
 import type { HTMLAttributes, ReactNode } from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/utils'
 import { cardWidthClassMap, type CardWidth } from '@/design-tokens/dimensions'
 
 type CardVariant = 'default' | 'interactive'

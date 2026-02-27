@@ -38,7 +38,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
                          org.springframework.security.core.AuthenticationException authException)
             throws IOException, ServletException {
         log.warn("未授权访问: {}", authException.getMessage(), authException);
-        writeError(response, new UnauthorizedException(authException, "未授权访问"));
+        writeError(response, new com.sunny.datapillar.common.exception.UnauthorizedException(authException, "未授权访问"));
     }
 
     @Override
@@ -46,7 +46,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
                        AccessDeniedException accessDeniedException)
             throws IOException, ServletException {
         log.warn("无权限访问: {}", accessDeniedException.getMessage(), accessDeniedException);
-        writeError(response, new ForbiddenException(accessDeniedException, "无权限访问"));
+        writeError(response, new com.sunny.datapillar.common.exception.ForbiddenException(accessDeniedException, "无权限访问"));
     }
 
     public void writeError(HttpServletResponse response,

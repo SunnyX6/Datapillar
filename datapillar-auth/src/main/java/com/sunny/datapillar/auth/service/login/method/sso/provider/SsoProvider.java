@@ -1,7 +1,7 @@
 package com.sunny.datapillar.auth.service.login.method.sso.provider;
 
+import com.sunny.datapillar.auth.dto.login.response.SsoQrResponse;
 import com.sunny.datapillar.auth.service.login.method.sso.model.SsoProviderConfig;
-import com.sunny.datapillar.auth.service.login.method.sso.model.SsoQrResponse;
 import com.sunny.datapillar.auth.service.login.method.sso.model.SsoToken;
 import com.sunny.datapillar.auth.service.login.method.sso.model.SsoUserInfo;
 

@@ -1,7 +1,13 @@
 # @author Sunny
 # @date 2026-02-19
 
-"""LLM 管理模块。"""
+"""
+LLM 管理模块。
+
+DEPRECATED:
+- 该模块保留给历史链路兼容
+- ETL 新链路不再依赖本模块
+"""
 
 from src.modules.llm.api import router
 

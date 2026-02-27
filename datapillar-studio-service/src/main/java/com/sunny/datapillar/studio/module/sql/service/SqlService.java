@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.sql.service;
 
-import com.sunny.datapillar.studio.module.sql.dto.SqlDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 
 /**
  * SQL服务
@@ -17,14 +30,14 @@ public interface SqlService {
      * @param request 执行请求
      * @return 执行结果
      */
-    SqlDto.ExecuteResult executeSql(SqlDto.ExecuteRequest request);
+    SqlExecuteResponse executeSql(SqlExecuteRequest request);
 
     /**
      * 获取 Catalog 列表
      *
      * @return Catalog 列表
      */
-    SqlDto.CatalogListResponse listCatalogs();
+    SqlCatalogListResponse listCatalogs();
 
     /**
      * 获取 Database 列表
@@ -32,7 +45,7 @@ public interface SqlService {
      * @param catalog Catalog 名称（可选）
      * @return Database 列表
      */
-    SqlDto.DatabaseListResponse listDatabases(String catalog);
+    SqlDatabaseListResponse listDatabases(String catalog);
 
     /**
      * 获取 Table 列表
@@ -41,7 +54,7 @@ public interface SqlService {
      * @param database Database 名称（可选）
      * @return Table 列表
      */
-    SqlDto.TableListResponse listTables(String catalog, String database);
+    SqlTableListResponse listTables(String catalog, String database);
 
     /**
      * 检查服务是否可用

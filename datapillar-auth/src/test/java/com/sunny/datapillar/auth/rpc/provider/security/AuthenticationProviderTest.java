@@ -1,6 +1,11 @@
 package com.sunny.datapillar.auth.rpc.provider.security;
 
-import com.sunny.datapillar.auth.dto.AuthDto;
+import com.sunny.datapillar.auth.dto.auth.request.*;
+import com.sunny.datapillar.auth.dto.auth.response.*;
+import com.sunny.datapillar.auth.dto.login.request.*;
+import com.sunny.datapillar.auth.dto.login.response.*;
+import com.sunny.datapillar.auth.dto.oauth.request.*;
+import com.sunny.datapillar.auth.dto.oauth.response.*;
 import com.sunny.datapillar.auth.security.AuthAssertionSigner;
 import com.sunny.datapillar.auth.service.AuthService;
 import com.sunny.datapillar.common.exception.UnauthorizedException;
@@ -34,7 +39,7 @@ class AuthenticationProviderTest {
 
     @Test
     void shouldAllowAndBuildPrincipalForStudio() {
-        AuthDto.AuthenticationContext context = AuthDto.AuthenticationContext.builder()
+        AuthenticationContextResponse context = AuthenticationContextResponse.builder()
                 .userId(1L)
                 .tenantId(2L)
                 .username("sunny")
@@ -76,7 +81,7 @@ class AuthenticationProviderTest {
 
     @Test
     void shouldBuildAiAssertionWhenAiResourceRequested() {
-        AuthDto.AuthenticationContext context = AuthDto.AuthenticationContext.builder()
+        AuthenticationContextResponse context = AuthenticationContextResponse.builder()
                 .userId(8L)
                 .tenantId(9L)
                 .username("ai-user")
@@ -103,7 +108,7 @@ class AuthenticationProviderTest {
     @Test
     void shouldMapExpiredTokenToDenyCode() {
         when(authService.resolveAuthenticationContext("expired-token"))
-                .thenThrow(new UnauthorizedException("Token已过期"));
+                .thenThrow(new com.sunny.datapillar.common.exception.UnauthorizedException("Token已过期"));
 
         CheckAuthenticationResponse response = provider.checkAuthentication(CheckAuthenticationRequest.newBuilder()
                 .setToken("expired-token")

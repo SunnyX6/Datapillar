@@ -13,8 +13,8 @@ import com.sunny.datapillar.auth.service.login.LoginSubject;
 import com.sunny.datapillar.auth.service.login.method.sso.SsoConfigReader;
 import com.sunny.datapillar.auth.service.login.method.sso.SsoStateStore;
 import com.sunny.datapillar.auth.service.login.method.sso.SsoStateStore.StatePayload;
+import com.sunny.datapillar.auth.dto.login.response.SsoQrResponse;
 import com.sunny.datapillar.auth.service.login.method.sso.model.SsoProviderConfig;
-import com.sunny.datapillar.auth.service.login.method.sso.model.SsoQrResponse;
 import com.sunny.datapillar.auth.service.login.method.sso.model.SsoToken;
 import com.sunny.datapillar.auth.service.login.method.sso.model.SsoUserInfo;
 import com.sunny.datapillar.auth.service.login.method.sso.provider.SsoProvider;
@@ -72,11 +72,11 @@ public class SsoLoginMethod implements LoginMethod {
 
     public SsoQrResponse buildQr(Long tenantId, String provider) {
         if (tenantId == null) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         String normalizedProvider = normalize(provider);
         if (normalizedProvider == null) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         String state = ssoStateStore.createState(tenantId, normalizedProvider);
         SsoProviderConfig config = ssoConfigReader.loadConfig(tenantId, normalizedProvider);
@@ -86,27 +86,27 @@ public class SsoLoginMethod implements LoginMethod {
     @Override
     public LoginSubject authenticate(LoginCommand command) {
         if (command == null) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         String provider = normalize(command.getProvider());
         String code = trimToNull(command.getCode());
         String state = trimToNull(command.getState());
         if (provider == null || code == null || state == null) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
 
         StatePayload statePayload = ssoStateStore.consumeOrThrow(state, null, provider);
         Long tenantId = statePayload.getTenantId();
         if (tenantId == null || tenantId <= 0) {
-            throw new UnauthorizedException("SSO state 无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("SSO state 无效");
         }
 
         Tenant tenant = tenantMapper.selectById(tenantId);
         if (tenant == null) {
-            throw new UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
         }
         if (tenant.getStatus() == null || tenant.getStatus() != 1) {
-            throw new ForbiddenException("租户已被禁用: tenantId=%s", tenantId);
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("租户已被禁用: tenantId=%s", tenantId);
         }
 
         SsoProviderConfig config = ssoConfigReader.loadConfig(tenantId, provider);
@@ -115,17 +115,17 @@ public class SsoLoginMethod implements LoginMethod {
         SsoUserInfo userInfo = ssoProvider.fetchUserInfo(config, token);
         String externalUserId = trimToNull(ssoProvider.extractExternalUserId(userInfo));
         if (externalUserId == null) {
-            throw new InternalException("SSO用户标识缺失");
+            throw new com.sunny.datapillar.common.exception.InternalException("SSO用户标识缺失");
         }
 
         UserIdentity identity = userIdentityMapper.selectByProviderAndExternalUserId(tenantId, provider, externalUserId);
         if (identity == null) {
-            throw new ForbiddenException("无权限访问");
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("无权限访问");
         }
 
         User user = userMapper.selectById(identity.getUserId());
         if (user == null) {
-            throw new NotFoundException("用户不存在: %s", identity.getUserId());
+            throw new com.sunny.datapillar.common.exception.NotFoundException("用户不存在: %s", identity.getUserId());
         }
 
         return LoginSubject.builder()
@@ -138,7 +138,7 @@ public class SsoLoginMethod implements LoginMethod {
     private SsoProvider getProvider(String provider) {
         SsoProvider ssoProvider = providerMap.get(normalize(provider));
         if (ssoProvider == null) {
-            throw new BadRequestException("SSO提供方不存在: %s", provider);
+            throw new com.sunny.datapillar.common.exception.BadRequestException("SSO提供方不存在: %s", provider);
         }
         return ssoProvider;
     }

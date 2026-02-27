@@ -1,23 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { DataTypeExplorer } from '@/layouts/governance/metasemantic/explorer/DataTypeExplorer'
-
-/** 数据类型定义 - 基于 Gravitino Types.java */
-export interface DataTypeItem {
-  id: string
-  name: string
-  label: string
-  category: 'INTEGRAL' | 'FRACTION' | 'STRING' | 'DATETIME' | 'COMPLEX'
-  icon: string
-  description: string
-  badge?: string
-  hasPrecision?: boolean
-  hasScale?: boolean
-  maxPrecision?: number
-  maxScale?: number
-  hasLength?: boolean
-  maxLength?: number
-}
+import { DataTypeExplorer } from '@/features/governance/ui/metasemantic/explorer/DataTypeExplorer'
+import type { DataTypeItem } from '@/features/governance/ui/metasemantic/types'
 
 export function GovernanceDataTypePage() {
   const navigate = useNavigate()

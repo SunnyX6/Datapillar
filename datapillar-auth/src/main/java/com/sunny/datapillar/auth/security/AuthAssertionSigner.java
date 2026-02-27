@@ -1,6 +1,7 @@
 package com.sunny.datapillar.auth.security;
 
 import com.sunny.datapillar.auth.config.AuthSecurityProperties;
+import com.sunny.datapillar.auth.exception.security.AuthAssertionAudienceInvalidException;
 import com.sunny.datapillar.common.security.EdDsaJwtSupport;
 import com.sunny.datapillar.common.security.GatewayAssertionClaims;
 import io.jsonwebtoken.Jwts;
@@ -45,7 +46,7 @@ public class AuthAssertionSigner {
             throw new IllegalStateException("认证断言功能未启用");
         }
         if (!StringUtils.hasText(audience)) {
-            throw new IllegalArgumentException("认证断言 audience 不能为空");
+            throw new AuthAssertionAudienceInvalidException("认证断言 audience 不能为空");
         }
 
         Instant now = Instant.now();

@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.sql.service.impl;
 
-import com.sunny.datapillar.studio.module.sql.dto.SqlDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.sql.service.SqlBizService;
 import com.sunny.datapillar.studio.module.sql.service.SqlService;
 import lombok.RequiredArgsConstructor;
@@ -20,22 +33,22 @@ public class SqlBizServiceImpl implements SqlBizService {
     private final SqlService sqlService;
 
     @Override
-    public SqlDto.ExecuteResult executeSql(SqlDto.ExecuteRequest request) {
+    public SqlExecuteResponse executeSql(SqlExecuteRequest request) {
         return sqlService.executeSql(request);
     }
 
     @Override
-    public SqlDto.CatalogListResponse listCatalogs() {
+    public SqlCatalogListResponse listCatalogs() {
         return sqlService.listCatalogs();
     }
 
     @Override
-    public SqlDto.DatabaseListResponse listDatabases(String catalog) {
+    public SqlDatabaseListResponse listDatabases(String catalog) {
         return sqlService.listDatabases(catalog);
     }
 
     @Override
-    public SqlDto.TableListResponse listTables(String catalog, String database) {
+    public SqlTableListResponse listTables(String catalog, String database) {
         return sqlService.listTables(catalog, database);
     }
 

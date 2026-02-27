@@ -1,12 +1,25 @@
 package com.sunny.datapillar.studio.module.workflow.mapper;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.sunny.datapillar.studio.module.workflow.dto.JobDto;
 import com.sunny.datapillar.studio.module.workflow.entity.JobInfo;
 
 /**
@@ -22,17 +35,17 @@ public interface JobInfoMapper extends BaseMapper<JobInfo> {
     /**
      * 查询工作流下的所有任务（含组件信息）
      */
-    List<JobDto.Response> selectJobsByWorkflowId(@Param("workflowId") Long workflowId);
+    List<JobResponse> selectJobsByWorkflowId(@Param("workflowId") Long workflowId);
 
     /**
      * 查询单个任务详情（含组件信息）
      */
-    JobDto.Response selectJobDetail(@Param("id") Long id);
+    JobResponse selectJobDetail(@Param("id") Long id);
 
     /**
      * 批量更新任务位置
      */
-    int batchUpdatePositions(@Param("positions") List<JobDto.Position> positions);
+    int batchUpdatePositions(@Param("positions") List<JobPositionItem> positions);
 
     /**
      * 根据工作流ID删除所有任务（逻辑删除）

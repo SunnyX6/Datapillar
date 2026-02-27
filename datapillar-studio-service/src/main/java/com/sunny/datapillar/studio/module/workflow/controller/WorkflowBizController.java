@@ -1,9 +1,22 @@
 package com.sunny.datapillar.studio.module.workflow.controller;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sunny.datapillar.studio.config.openapi.OpenApiPaged;
-import com.sunny.datapillar.studio.module.workflow.dto.WorkflowDto;
 import com.sunny.datapillar.studio.module.workflow.service.WorkflowBizService;
 import com.sunny.datapillar.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,7 +56,7 @@ public class WorkflowBizController {
     @OpenApiPaged
     @Operation(summary = "获取项目的工作流列表")
     @GetMapping
-    public ApiResponse<List<WorkflowDto.ListItem>> list(
+    public ApiResponse<List<WorkflowListItemResponse>> list(
             @RequestParam Long projectId,
             @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) Integer offset,
@@ -54,20 +67,20 @@ public class WorkflowBizController {
         int resolvedLimit = limit == null || limit <= 0 ? DEFAULT_LIMIT : Math.min(limit, resolvedMaxLimit);
         int resolvedOffset = offset == null || offset < 0 ? DEFAULT_OFFSET : offset;
         long current = (resolvedOffset / resolvedLimit) + 1L;
-        Page<WorkflowDto.ListItem> page = Page.of(current, resolvedLimit);
-        IPage<WorkflowDto.ListItem> result = workflowBizService.getWorkflowPage(page, projectId, workflowName, status);
+        Page<WorkflowListItemResponse> page = Page.of(current, resolvedLimit);
+        IPage<WorkflowListItemResponse> result = workflowBizService.getWorkflowPage(page, projectId, workflowName, status);
         return ApiResponse.page(result.getRecords(), resolvedLimit, resolvedOffset, result.getTotal());
     }
 
     @Operation(summary = "获取工作流详情")
     @GetMapping("/{workflowId}")
-    public ApiResponse<WorkflowDto.Response> detail(@PathVariable Long workflowId) {
+    public ApiResponse<WorkflowResponse> detail(@PathVariable Long workflowId) {
         return ApiResponse.ok(workflowBizService.getWorkflowDetail(workflowId));
     }
 
     @Operation(summary = "创建工作流")
     @PostMapping
-    public ApiResponse<Void> create(@Valid @RequestBody WorkflowDto.Create dto) {
+    public ApiResponse<Void> create(@Valid @RequestBody WorkflowCreateRequest dto) {
         workflowBizService.createWorkflow(dto);
         return ApiResponse.ok();
     }
@@ -76,7 +89,7 @@ public class WorkflowBizController {
     @PatchMapping("/{workflowId}")
     public ApiResponse<Void> update(
             @PathVariable Long workflowId,
-            @Valid @RequestBody WorkflowDto.Update dto) {
+            @Valid @RequestBody WorkflowUpdateRequest dto) {
         workflowBizService.updateWorkflow(workflowId, dto);
         return ApiResponse.ok();
     }

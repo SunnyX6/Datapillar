@@ -1,5 +1,6 @@
 package com.sunny.datapillar.auth.config;
 
+import com.sunny.datapillar.auth.exception.security.KeyStorageConfigInvalidException;
 import com.sunny.datapillar.auth.security.keystore.KeyStorage;
 import com.sunny.datapillar.auth.security.keystore.impl.LocalKeyStorage;
 import com.sunny.datapillar.auth.security.keystore.impl.ObjectStorageKeyStorage;
@@ -28,7 +29,7 @@ public class KeyStorageConfig {
         return switch (type) {
             case "local" -> new LocalKeyStorage(properties);
             case "object" -> new ObjectStorageKeyStorage(properties);
-            default -> throw new IllegalArgumentException("不支持的密钥存储类型: " + type);
+            default -> throw new KeyStorageConfigInvalidException("不支持的密钥存储类型: " + type);
         };
     }
 

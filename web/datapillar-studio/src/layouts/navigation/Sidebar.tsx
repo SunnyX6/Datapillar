@@ -22,8 +22,8 @@ import {
 } from '@/design-tokens/dimensions'
 import { Tooltip } from '@/components/ui'
 import { ExpandToggle } from './ExpandToggle'
-import type { Menu } from '@/types/auth'
-import { isMenuVisible } from '@/router/access/routeAccess'
+import type { Menu } from '@/services/types/auth'
+import { isMenuVisible } from '@/services/menuPermissionService'
 
 interface SidebarProps {
   menus: Menu[]

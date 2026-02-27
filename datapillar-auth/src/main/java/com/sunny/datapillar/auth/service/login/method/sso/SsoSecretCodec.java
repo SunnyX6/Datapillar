@@ -40,14 +40,14 @@ public class SsoSecretCodec {
             return null;
         }
         if (!encoded.startsWith(ENC_PREFIX)) {
-            throw new InternalException("SSO配置无效: %s", "clientSecret");
+            throw new com.sunny.datapillar.common.exception.InternalException("SSO配置无效: %s", "clientSecret");
         }
         try {
             byte[] payload = Base64.getDecoder().decode(encoded.substring(ENC_PREFIX.length()));
             PrivateKey privateKey = parsePrivateKey(loadTenantPrivateKey(tenantCode));
             int encryptedKeyLength = resolveEncryptedKeyLength(privateKey);
             if (payload.length <= encryptedKeyLength + GCM_NONCE_BYTES) {
-                throw new InternalException("SSO配置无效: %s", "clientSecret");
+                throw new com.sunny.datapillar.common.exception.InternalException("SSO配置无效: %s", "clientSecret");
             }
             byte[] encryptedAesKey = Arrays.copyOfRange(payload, 0, encryptedKeyLength);
             byte[] nonce = Arrays.copyOfRange(payload, encryptedKeyLength, encryptedKeyLength + GCM_NONCE_BYTES);
@@ -58,24 +58,24 @@ public class SsoSecretCodec {
         } catch (DatapillarRuntimeException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new InternalException(ex, "SSO配置无效: %s", "clientSecret");
+            throw new com.sunny.datapillar.common.exception.InternalException(ex, "SSO配置无效: %s", "clientSecret");
         }
     }
 
     private byte[] loadTenantPrivateKey(String tenantCode) {
         if (!StringUtils.hasText(tenantCode)) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         try {
             byte[] privateKey = tenantKeyService.loadPrivateKey(tenantCode.trim());
             if (privateKey == null || privateKey.length == 0) {
-                throw new InternalException("SSO配置无效: %s", "tenant_private_key_missing");
+                throw new com.sunny.datapillar.common.exception.InternalException("SSO配置无效: %s", "tenant_private_key_missing");
             }
             return privateKey;
         } catch (DatapillarRuntimeException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new InternalException(ex, "SSO配置无效: %s", "tenant_private_key_missing");
+            throw new com.sunny.datapillar.common.exception.InternalException(ex, "SSO配置无效: %s", "tenant_private_key_missing");
         }
     }
 

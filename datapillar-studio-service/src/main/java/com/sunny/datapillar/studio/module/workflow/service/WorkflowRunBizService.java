@@ -1,7 +1,20 @@
 package com.sunny.datapillar.studio.module.workflow.service;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.sunny.datapillar.studio.module.workflow.dto.WorkflowDto;
 
 /**
  * 工作流Run业务服务
@@ -12,7 +25,7 @@ import com.sunny.datapillar.studio.module.workflow.dto.WorkflowDto;
  */
 public interface WorkflowRunBizService {
 
-    JsonNode triggerWorkflow(Long id, WorkflowDto.TriggerRequest request);
+    JsonNode triggerWorkflow(Long id, WorkflowTriggerRequest request);
 
     JsonNode getWorkflowRuns(Long id, int limit, int offset, String state);
 
@@ -24,9 +37,9 @@ public interface WorkflowRunBizService {
 
     JsonNode getJobLogs(Long id, String runId, String jobId, int tryNumber);
 
-    JsonNode rerunJob(Long id, String runId, String jobId, WorkflowDto.RerunJobRequest request);
+    JsonNode rerunJob(Long id, String runId, String jobId, WorkflowRerunJobRequest request);
 
-    JsonNode setJobState(Long id, String runId, String jobId, WorkflowDto.SetJobStateRequest request);
+    JsonNode setJobState(Long id, String runId, String jobId, WorkflowSetJobStatusRequest request);
 
-    JsonNode clearJobs(Long id, String runId, WorkflowDto.ClearJobsRequest request);
+    JsonNode clearJobs(Long id, String runId, WorkflowClearJobsRequest request);
 }

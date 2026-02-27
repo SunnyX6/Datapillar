@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.tenant.service.impl;
 
-import com.sunny.datapillar.studio.module.tenant.dto.TenantDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.service.TenantAdminService;
 import com.sunny.datapillar.studio.module.tenant.service.TenantService;
@@ -27,17 +40,17 @@ public class TenantAdminServiceImpl implements TenantAdminService {
     }
 
     @Override
-    public Long createTenant(TenantDto.Create dto) {
+    public Long createTenant(TenantCreateRequest dto) {
         return tenantService.createTenant(dto);
     }
 
     @Override
-    public TenantDto.Response getTenant(Long tenantId) {
+    public TenantResponse getTenant(Long tenantId) {
         return tenantService.getTenant(tenantId);
     }
 
     @Override
-    public void updateTenant(Long tenantId, TenantDto.Update dto) {
+    public void updateTenant(Long tenantId, TenantUpdateRequest dto) {
         tenantService.updateTenant(tenantId, dto);
     }
 

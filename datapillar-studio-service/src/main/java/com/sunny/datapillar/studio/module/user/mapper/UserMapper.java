@@ -69,4 +69,11 @@ public interface UserMapper extends BaseMapper<User> {
      * 按租户查询用户详情
      */
     User selectByIdAndTenantId(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
+
+    /**
+     * 查询租户内指定等级及以上的用户ID（level 越小权限越高）
+     */
+    List<Long> selectUserIdsByMaxLevel(@Param("tenantId") Long tenantId,
+                                       @Param("userIds") List<Long> userIds,
+                                       @Param("maxLevel") Integer maxLevel);
 }

@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sunny.datapillar.studio.module.project.mapper.ProjectMapper">
 
-    <resultMap id="ResponseResult" type="com.sunny.datapillar.studio.module.project.dto.ProjectDto$Response">
+    <resultMap id="ResponseResult" type="com.sunny.datapillar.studio.dto.project.response.ProjectResponse">
         <result property="id" column="id"/>
         <result property="name" column="name"/>
         <result property="description" column="description"/>

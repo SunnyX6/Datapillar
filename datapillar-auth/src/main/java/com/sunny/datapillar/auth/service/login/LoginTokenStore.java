@@ -44,7 +44,7 @@ public class LoginTokenStore {
 
     public String issue(LoginTokenPayload payload) {
         if (payload == null || payload.getUserId() == null) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         String token = UUID.randomUUID().toString().replace("-", "");
         String key = buildKey(token);
@@ -53,23 +53,23 @@ public class LoginTokenStore {
             stringRedisTemplate.opsForValue().set(key, value, Duration.ofSeconds(Math.max(1L, ttlSeconds)));
             return token;
         } catch (Exception ex) {
-            throw new InternalException(ex, "服务器内部错误");
+            throw new com.sunny.datapillar.common.exception.InternalException(ex, "服务器内部错误");
         }
     }
 
     public LoginTokenPayload consumeOrThrow(String token) {
         if (token == null || token.isBlank()) {
-            throw new UnauthorizedException("Token无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token无效");
         }
         String key = buildKey(token);
         String value = stringRedisTemplate.execute(consumeScript, List.of(key));
         if (value == null || value.isBlank()) {
-            throw new UnauthorizedException("Token无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token无效");
         }
         try {
             return objectMapper.readValue(value, LoginTokenPayload.class);
         } catch (Exception ex) {
-            throw new UnauthorizedException(ex, "Token无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException(ex, "Token无效");
         }
     }
 

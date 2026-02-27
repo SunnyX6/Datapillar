@@ -80,7 +80,7 @@ public class SetupStateFilter extends OncePerRequestFilter {
             if (!state.schemaReady()) {
                 securityExceptionHandler.writeError(
                         response,
-                        new RequiredException(
+                        new com.sunny.datapillar.common.exception.RequiredException(
                                 ErrorType.REQUIRED,
                                 Map.of("reason", "SETUP_SCHEMA_NOT_READY"),
                                 "系统初始化数据未就绪"));
@@ -89,7 +89,7 @@ public class SetupStateFilter extends OncePerRequestFilter {
             if (!state.setupCompleted()) {
                 securityExceptionHandler.writeError(
                         response,
-                        new RequiredException(
+                        new com.sunny.datapillar.common.exception.RequiredException(
                                 ErrorType.REQUIRED,
                                 Map.of("reason", "SETUP_REQUIRED"),
                                 "系统尚未完成初始化"));
@@ -98,7 +98,7 @@ public class SetupStateFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
         } catch (Exception ex) {
             log.error("初始化状态校验失败", ex);
-            securityExceptionHandler.writeError(response, new ServiceUnavailableException(ex, "服务不可用"));
+            securityExceptionHandler.writeError(response, new com.sunny.datapillar.common.exception.ServiceUnavailableException(ex, "服务不可用"));
         }
     }
 

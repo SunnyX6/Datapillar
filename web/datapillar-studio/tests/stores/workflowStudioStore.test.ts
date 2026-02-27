@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useWorkflowStudioStore } from '@/stores'
-import { DEFAULT_WORKFLOW_MODEL_ID } from '@/config/workflowModels'
+import { DEFAULT_WORKFLOW_AI_MODEL_ID, useWorkflowStudioStore } from '@/features/workflow/state'
 import { emptyWorkflowGraph } from '@/services/workflowStudioService'
 
-const CLAUDE_MODEL_ID = 'anthropic/claude-3.5-sonnet'
-const DEEPSEEK_MODEL_ID = 'deepseek/deepseek-chat-v3'
+const CLAUDE_AI_MODEL_ID = 3001
+const DEEPSEEK_AI_MODEL_ID = 3002
 
 const resetWorkflowStore = () => {
   useWorkflowStudioStore.setState({
@@ -12,8 +11,8 @@ const resetWorkflowStore = () => {
     isGenerating: false,
     isWaitingForResume: false,
     isInitialized: false,
-    selectedModelId: DEFAULT_WORKFLOW_MODEL_ID,
-    defaultModelId: DEFAULT_WORKFLOW_MODEL_ID,
+    selectedAiModelId: DEFAULT_WORKFLOW_AI_MODEL_ID,
+    defaultAiModelId: DEFAULT_WORKFLOW_AI_MODEL_ID,
     workflow: emptyWorkflowGraph,
     lastPrompt: ''
   })
@@ -30,22 +29,22 @@ describe('workflowStudioStore', () => {
       workflow: emptyWorkflowGraph,
       lastPrompt: '',
       isInitialized: false,
-      defaultModelId: CLAUDE_MODEL_ID
+      defaultAiModelId: CLAUDE_AI_MODEL_ID
     })
 
     const state = useWorkflowStudioStore.getState()
-    expect(state.defaultModelId).toBe(CLAUDE_MODEL_ID)
-    expect(state.selectedModelId).toBe(CLAUDE_MODEL_ID)
+    expect(state.defaultAiModelId).toBe(CLAUDE_AI_MODEL_ID)
+    expect(state.selectedAiModelId).toBe(CLAUDE_AI_MODEL_ID)
   })
 
   it('reset 后应保留当前默认模型，并将选中模型重置为默认模型', () => {
-    useWorkflowStudioStore.getState().setDefaultModelId(DEEPSEEK_MODEL_ID)
-    useWorkflowStudioStore.getState().setSelectedModelId(CLAUDE_MODEL_ID)
+    useWorkflowStudioStore.getState().setDefaultAiModelId(DEEPSEEK_AI_MODEL_ID)
+    useWorkflowStudioStore.getState().setSelectedAiModelId(CLAUDE_AI_MODEL_ID)
 
     useWorkflowStudioStore.getState().reset()
 
     const state = useWorkflowStudioStore.getState()
-    expect(state.defaultModelId).toBe(DEEPSEEK_MODEL_ID)
-    expect(state.selectedModelId).toBe(DEEPSEEK_MODEL_ID)
+    expect(state.defaultAiModelId).toBe(DEEPSEEK_AI_MODEL_ID)
+    expect(state.selectedAiModelId).toBe(DEEPSEEK_AI_MODEL_ID)
   })
 })

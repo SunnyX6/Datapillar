@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.tenant.service.sso.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -15,7 +29,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sunny.datapillar.common.exception.BadRequestException;
 import com.sunny.datapillar.studio.context.TenantContext;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
-import com.sunny.datapillar.studio.module.tenant.dto.SsoConfigDto;
+import com.sunny.datapillar.studio.exception.translator.StudioDbExceptionTranslator;
 import com.sunny.datapillar.studio.module.tenant.entity.TenantSsoConfig;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantSsoConfigMapper;
 import com.sunny.datapillar.studio.module.tenant.service.TenantCodeResolver;
@@ -46,7 +60,13 @@ class SsoConfigServiceImplTest {
     void setUp() {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), TenantSsoConfig.class);
         TenantContextHolder.set(new TenantContext(1L, "tenant-1", null, null, false));
-        service = new SsoConfigServiceImpl(tenantSsoConfigMapper, authCryptoClient, tenantCodeResolver, new ObjectMapper());
+        service = new SsoConfigServiceImpl(
+                tenantSsoConfigMapper,
+                authCryptoClient,
+                tenantCodeResolver,
+                new ObjectMapper(),
+                new StudioDbExceptionTranslator()
+        );
         lenient().when(tenantCodeResolver.requireTenantCode(1L)).thenReturn("tenant-1");
     }
 
@@ -57,35 +77,35 @@ class SsoConfigServiceImplTest {
 
     @Test
     void createConfig_shouldRejectInvalidProvider() {
-        SsoConfigDto.Create dto = new SsoConfigDto.Create();
+        SsoConfigCreateRequest dto = new SsoConfigCreateRequest();
         dto.setProvider("wecom");
         dto.setStatus(1);
         dto.setConfig(buildConfig("client", "secret", "https://redirect"));
 
         BadRequestException exception = assertThrows(BadRequestException.class, () -> service.createConfig(dto));
-        assertEquals("参数错误", exception.getMessage());
+        assertEquals("不支持的SSO供应商", exception.getMessage());
     }
 
     @Test
     void createConfig_shouldRejectMissingRequiredFields() {
-        SsoConfigDto.Create dto = new SsoConfigDto.Create();
+        SsoConfigCreateRequest dto = new SsoConfigCreateRequest();
         dto.setProvider("dingtalk");
         dto.setStatus(1);
         dto.setConfig(buildConfig("client", null, "https://redirect"));
 
         BadRequestException exception = assertThrows(BadRequestException.class, () -> service.createConfig(dto));
-        assertEquals("参数错误", exception.getMessage());
+        assertEquals("SSO配置参数错误", exception.getMessage());
     }
 
     @Test
     void createConfig_shouldRejectInvalidStatus() {
-        SsoConfigDto.Create dto = new SsoConfigDto.Create();
+        SsoConfigCreateRequest dto = new SsoConfigCreateRequest();
         dto.setProvider("dingtalk");
         dto.setStatus(2);
         dto.setConfig(buildConfig("client", "secret", "https://redirect"));
 
         BadRequestException exception = assertThrows(BadRequestException.class, () -> service.createConfig(dto));
-        assertEquals("参数错误", exception.getMessage());
+        assertEquals("SSO配置参数错误", exception.getMessage());
     }
 
     @Test
@@ -106,17 +126,17 @@ class SsoConfigServiceImplTest {
 
         when(tenantSsoConfigMapper.selectList(any())).thenReturn(List.of(config));
 
-        List<SsoConfigDto.Response> responses = service.listConfigs();
+        List<SsoConfigResponse> responses = service.listConfigs();
 
         assertEquals(1, responses.size());
-        SsoConfigDto.Response response = responses.get(0);
+        SsoConfigResponse response = responses.get(0);
         assertTrue(Boolean.TRUE.equals(response.getHasClientSecret()));
         assertNotNull(response.getConfig());
         assertNull(response.getConfig().getClientSecret());
     }
 
-    private SsoConfigDto.DingtalkConfig buildConfig(String clientId, String clientSecret, String redirectUri) {
-        SsoConfigDto.DingtalkConfig config = new SsoConfigDto.DingtalkConfig();
+    private SsoDingtalkConfigItem buildConfig(String clientId, String clientSecret, String redirectUri) {
+        SsoDingtalkConfigItem config = new SsoDingtalkConfigItem();
         config.setClientId(clientId);
         config.setClientSecret(clientSecret);
         config.setRedirectUri(redirectUri);

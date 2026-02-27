@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.workflow.mapper;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
@@ -8,7 +22,6 @@ import org.apache.ibatis.annotations.Param;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.sunny.datapillar.studio.module.workflow.dto.WorkflowDto;
 import com.sunny.datapillar.studio.module.workflow.entity.JobWorkflow;
 
 /**
@@ -24,8 +37,8 @@ public interface JobWorkflowMapper extends BaseMapper<JobWorkflow> {
     /**
      * 分页查询工作流列表
      */
-    IPage<WorkflowDto.ListItem> selectWorkflowPage(
-            Page<WorkflowDto.ListItem> page,
+    IPage<WorkflowListItemResponse> selectWorkflowPage(
+            Page<WorkflowListItemResponse> page,
             @Param("projectId") Long projectId,
             @Param("workflowName") String workflowName,
             @Param("status") Integer status
@@ -34,7 +47,7 @@ public interface JobWorkflowMapper extends BaseMapper<JobWorkflow> {
     /**
      * 查询工作流详情（含项目信息）
      */
-    WorkflowDto.Response selectWorkflowDetail(@Param("id") Long id);
+    WorkflowResponse selectWorkflowDetail(@Param("id") Long id);
 
     /**
      * 根据项目查询工作流列表

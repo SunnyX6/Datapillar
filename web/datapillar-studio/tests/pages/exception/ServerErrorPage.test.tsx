@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client'
 import { ServerErrorPage } from '@/pages/exception'
 import { getStudioServiceHealth } from '@/services/healthService'
 
-vi.mock('@/lib/error-center', () => ({
+vi.mock('@/api/errorCenter', () => ({
   getLastFatalError: vi.fn(() => null)
 }))
 

@@ -20,6 +20,7 @@ CREATE TABLE users (
   nickname VARCHAR(64) NULL COMMENT '昵称',
   email VARCHAR(128) NULL COMMENT '邮箱',
   phone VARCHAR(32) NULL COMMENT '手机号',
+  level INT NOT NULL DEFAULT 100 COMMENT '用户等级（数值越小权限越高）',
   status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1启用，0禁用',
   deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0否，1是',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -148,14 +149,14 @@ CREATE TABLE roles (
   type ENUM('ADMIN','USER') NOT NULL DEFAULT 'USER' COMMENT '角色类型',
   name VARCHAR(64) NOT NULL COMMENT '角色名称',
   description VARCHAR(255) NULL COMMENT '角色说明',
+  level INT NOT NULL DEFAULT 100 COMMENT '角色等级（数值越小权限越高）',
   status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1启用，0禁用',
   sort INT NOT NULL DEFAULT 0 COMMENT '排序值',
-  is_builtin TINYINT NOT NULL DEFAULT 0 COMMENT '是否内置角色：1是，0否',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   UNIQUE KEY uq_role_name (tenant_id, name),
   KEY idx_role_tenant (tenant_id),
-  KEY idx_role_builtin (tenant_id, is_builtin, sort, id),
+  KEY idx_role_level (tenant_id, level, sort, id),
   CONSTRAINT fk_role_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色';
 
@@ -278,7 +279,7 @@ CREATE TABLE ai_provider (
 CREATE TABLE ai_model (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '模型ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
-  model_id VARCHAR(128) NOT NULL COMMENT '模型ID（前端唯一，如 openai/gpt-4o）',
+  provider_model_id VARCHAR(128) NOT NULL COMMENT '模型ID（供应商内唯一）',
   name VARCHAR(128) NOT NULL COMMENT '展示名称',
   provider_id BIGINT NOT NULL COMMENT '供应商ID',
   model_type ENUM('chat','embeddings','reranking','code') NOT NULL COMMENT '模型类型',
@@ -295,7 +296,7 @@ CREATE TABLE ai_model (
   updated_by BIGINT NULL COMMENT '更新人用户ID（审计）',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  UNIQUE KEY uq_ai_model_tenant_model (tenant_id, model_id),
+  UNIQUE KEY uq_ai_model_tenant_provider_model (tenant_id, provider_id, provider_model_id),
   KEY idx_ai_model_tenant_provider_type (tenant_id, provider_id, model_type),
   KEY idx_ai_model_tenant_id (tenant_id, id),
   CONSTRAINT fk_ai_model_provider FOREIGN KEY (provider_id) REFERENCES ai_provider(id),

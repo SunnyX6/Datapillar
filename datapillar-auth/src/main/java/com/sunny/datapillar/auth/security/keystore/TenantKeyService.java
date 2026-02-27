@@ -43,7 +43,7 @@ public class TenantKeyService {
         boolean privateKeyExists = keyStorage.existsPrivateKey(normalizedTenantCode);
         if (tenant == null) {
             if (privateKeyExists) {
-                throw new AlreadyExistsException(
+                throw new com.sunny.datapillar.common.exception.AlreadyExistsException(
                         ErrorType.TENANT_PRIVATE_KEY_ALREADY_EXISTS,
                         context,
                         "私钥文件已存在");
@@ -54,24 +54,24 @@ public class TenantKeyService {
         String publicKeyPem = normalizePublicKey(tenant.getEncryptPublicKey());
         boolean publicKeyExists = StringUtils.hasText(publicKeyPem);
         if (privateKeyExists && publicKeyExists) {
-            throw new AlreadyExistsException(
+            throw new com.sunny.datapillar.common.exception.AlreadyExistsException(
                     ErrorType.TENANT_PRIVATE_KEY_ALREADY_EXISTS,
                     context,
                     "私钥文件已存在");
         }
         if (privateKeyExists && !publicKeyExists) {
-            throw new ConflictException(
+            throw new com.sunny.datapillar.common.exception.ConflictException(
                     ErrorType.TENANT_PUBLIC_KEY_MISSING,
                     context,
                     "租户密钥数据不一致");
         }
         if (publicKeyExists && !privateKeyExists) {
-            throw new ConflictException(
+            throw new com.sunny.datapillar.common.exception.ConflictException(
                     ErrorType.TENANT_PRIVATE_KEY_MISSING,
                     context,
                     "租户密钥数据不一致");
         }
-        throw new ConflictException(
+        throw new com.sunny.datapillar.common.exception.ConflictException(
                 ErrorType.TENANT_PUBLIC_KEY_MISSING,
                 context,
                 "租户密钥数据不一致");
@@ -127,7 +127,7 @@ public class TenantKeyService {
         String normalizedTenantCode = requireTenantCode(tenantCode);
         String publicKeyPem = loadPublicKeyFromDatabase(normalizedTenantCode);
         if (!StringUtils.hasText(publicKeyPem)) {
-            throw new NotFoundException(
+            throw new com.sunny.datapillar.common.exception.NotFoundException(
                     ErrorType.TENANT_KEY_NOT_FOUND,
                     tenantContext(normalizedTenantCode),
                     "租户密钥不存在");
@@ -141,25 +141,25 @@ public class TenantKeyService {
 
     private String requireTenantCode(String tenantCode) {
         if (!StringUtils.hasText(tenantCode)) {
-            throw new BadRequestException(ErrorType.TENANT_KEY_INVALID, Map.of(), "参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException(ErrorType.TENANT_KEY_INVALID, Map.of(), "参数错误");
         }
         String normalized = tenantCode.trim();
         if (normalized.contains("/") || normalized.contains("\\") || normalized.contains("..")) {
-            throw new BadRequestException(ErrorType.TENANT_KEY_INVALID, Map.of(), "参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException(ErrorType.TENANT_KEY_INVALID, Map.of(), "参数错误");
         }
         return normalized;
     }
 
     private String computeFingerprint(String publicKeyPem) {
         if (!StringUtils.hasText(publicKeyPem)) {
-            throw new InternalException(ErrorType.TENANT_KEY_INVALID, Map.of(), "租户密钥无效");
+            throw new com.sunny.datapillar.common.exception.InternalException(ErrorType.TENANT_KEY_INVALID, Map.of(), "租户密钥无效");
         }
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(publicKeyPem.getBytes(StandardCharsets.US_ASCII));
             return toHex(hash);
         } catch (NoSuchAlgorithmException ex) {
-            throw new InternalException(ex, ErrorType.TENANT_KEY_INVALID, Map.of(), "租户密钥无效");
+            throw new com.sunny.datapillar.common.exception.InternalException(ex, ErrorType.TENANT_KEY_INVALID, Map.of(), "租户密钥无效");
         }
     }
 

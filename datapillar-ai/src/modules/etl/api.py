@@ -12,12 +12,13 @@ from datapillar_oneagentic import Datapillar
 from datapillar_oneagentic.core.types import SessionKey
 from datapillar_oneagentic.sse import StreamManager
 from fastapi import APIRouter, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sse_starlette.sse import EventSourceResponse
 
 from src.modules.etl.agents import create_etl_team
+from src.modules.etl.model_runtime import build_etl_datapillar_config
 from src.modules.etl.sse_protocol import RunRegistry, adapt_sse_stream
-from src.shared.exception import BadRequestException, InternalException
+from src.shared.exception import BadRequestException, ConflictException, InternalException
 from src.shared.web import ApiResponse, ApiSuccessResponseSchema
 
 logger = logging.getLogger(__name__)
@@ -28,37 +29,103 @@ etl_stream_manager = StreamManager()
 etl_run_registry = RunRegistry()
 
 
+class WorkflowChatModel(BaseModel):
+    """工作流 Chat 模型标识。"""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    ai_model_id: int = Field(..., alias="aiModelId", gt=0)
+    provider_model_id: str = Field(..., alias="providerModelId", min_length=1)
+
+
 class WorkflowRequest(BaseModel):
     """工作流生成请求。"""
+
+    model_config = ConfigDict(populate_by_name=True)
 
     user_input: str | None = Field(None, alias="userInput", description="用户输入")
     session_id: str | None = Field(None, alias="sessionId", description="会话ID")
     resume_value: Any | None = Field(None, alias="resumeValue", description="interrupt 恢复数据")
     interrupt_id: str | None = Field(None, alias="interruptId", description="interrupt 标识")
-
-    class Config:
-        populate_by_name = True
+    model: WorkflowChatModel | None = Field(None, alias="model", description="本次会话模型")
 
 
-def _get_team(request: Request) -> Datapillar:
-    """获取 ETL 团队实例。"""
-    current_user = request.state.current_user
-    tenant_id = current_user.tenant_id
-    teams: dict[int, Datapillar] | None = getattr(request.app.state, "etl_teams", None)
+def _get_session_teams(request: Request) -> dict[str, Datapillar]:
+    teams: dict[str, Datapillar] | None = getattr(request.app.state, "etl_session_teams", None)
     if teams is None:
         teams = {}
-        request.app.state.etl_teams = teams
+        request.app.state.etl_session_teams = teams
+    return teams
 
-    team = teams.get(tenant_id)
-    if team is None:
-        team = create_etl_team(tenant_id=tenant_id)
-        teams[tenant_id] = team
 
+def _get_session_models(request: Request) -> dict[str, tuple[int, str]]:
+    models: dict[str, tuple[int, str]] | None = getattr(
+        request.app.state, "etl_session_models", None
+    )
+    if models is None:
+        models = {}
+        request.app.state.etl_session_models = models
+    return models
+
+
+def _build_namespace(tenant_id: int) -> str:
+    return f"etl_team_{tenant_id}"
+
+
+def _build_session_key(*, tenant_id: int, session_id: str, user_id: str) -> SessionKey:
+    return SessionKey(
+        namespace=_build_namespace(tenant_id),
+        session_id=f"{user_id}:{session_id}",
+    )
+
+
+def _normalize_provider_model_id(provider_model_id: str) -> str:
+    normalized = provider_model_id.strip()
+    if not normalized:
+        raise BadRequestException("model.providerModelId 不能为空")
+    return normalized
+
+
+def _get_bound_team(request: Request, storage_key: str) -> Datapillar | None:
+    return _get_session_teams(request).get(storage_key)
+
+
+def _resolve_session_team(
+    *,
+    request: Request,
+    tenant_id: int,
+    tenant_code: str,
+    user_id: int,
+    key: SessionKey,
+    requested_model: tuple[int, str],
+) -> Datapillar:
+    storage_key = str(key)
+    session_models = _get_session_models(request)
+    bound_model = session_models.get(storage_key)
+    if bound_model and bound_model != requested_model:
+        raise ConflictException("同一 sessionId 不允许切换 model")
+
+    team = _get_bound_team(request, storage_key)
+    if team is not None:
+        if not bound_model:
+            session_models[storage_key] = requested_model
+        return team
+
+    config = build_etl_datapillar_config(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        tenant_code=tenant_code,
+        ai_model_id=requested_model[0],
+        provider_model_id=requested_model[1],
+    )
+    team = create_etl_team(
+        config=config,
+        namespace=key.namespace,
+        tenant_id=tenant_id,
+    )
+    _get_session_teams(request)[storage_key] = team
+    session_models[storage_key] = requested_model
     return team
-
-
-def _build_session_key(team: Datapillar, session_id: str, user_id: str) -> SessionKey:
-    return SessionKey(namespace=team.namespace, session_id=f"{user_id}:{session_id}")
 
 
 class _TeamOrchestratorAdapter:
@@ -84,22 +151,42 @@ class _TeamOrchestratorAdapter:
 async def chat(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
     """统一的 ETL 多智能体工作流入口。"""
     current_user = request.state.current_user
-    team = _get_team(request)
 
     if not payload.session_id:
         raise BadRequestException("sessionId 不能为空")
+    if payload.model is None:
+        raise BadRequestException("model 不能为空")
 
-    user_id = str(current_user.user_id)
-    key = _build_session_key(team, payload.session_id, user_id)
+    user_id = current_user.user_id
+    user_id_str = str(user_id)
+    requested_model = (
+        payload.model.ai_model_id,
+        _normalize_provider_model_id(payload.model.provider_model_id),
+    )
+    key = _build_session_key(
+        tenant_id=current_user.tenant_id,
+        session_id=payload.session_id,
+        user_id=user_id_str,
+    )
+    team = _resolve_session_team(
+        request=request,
+        tenant_id=current_user.tenant_id,
+        tenant_code=current_user.tenant_code,
+        user_id=user_id,
+        key=key,
+        requested_model=requested_model,
+    )
     orchestrator = _TeamOrchestratorAdapter(team)
 
     if payload.resume_value is not None:
         etl_run_registry.start_run(str(key))
         logger.info(
-            "[ETL Resume] user=%s, userId=%s, sessionId=%s",
+            "[ETL Resume] user=%s, userId=%s, sessionId=%s, aiModelId=%s, providerModelId=%s",
             current_user.username,
-            user_id,
+            user_id_str,
             payload.session_id,
+            requested_model[0],
+            requested_model[1],
         )
         await etl_stream_manager.chat(
             orchestrator=orchestrator,
@@ -113,10 +200,12 @@ async def chat(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
 
         etl_run_registry.start_run(str(key))
         logger.info(
-            "[ETL Chat] user=%s, userId=%s, sessionId=%s",
+            "[ETL Chat] user=%s, userId=%s, sessionId=%s, aiModelId=%s, providerModelId=%s",
             current_user.username,
-            user_id,
+            user_id_str,
             payload.session_id,
+            requested_model[0],
+            requested_model[1],
         )
         await etl_stream_manager.chat(
             orchestrator=orchestrator,
@@ -128,7 +217,6 @@ async def chat(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
     return ApiResponse.success(
         data={
             "success": True,
-            "stream_url": f"/api/ai/biz/etl/sse?sessionId={payload.session_id}",
         },
     )
 
@@ -155,7 +243,6 @@ async def workflow_sse(
 ) -> EventSourceResponse:
     """SSE/JSON 事件流：前端可用 Last-Event-ID 重连重放（断线续传）。"""
     current_user = request.state.current_user
-    team = _get_team(request)
 
     last_event_id_raw = request.headers.get("Last-Event-ID")
     last_event_id: int | None = None
@@ -165,8 +252,15 @@ async def workflow_sse(
         except ValueError:
             last_event_id = None
 
-    key = _build_session_key(team, session_id, str(current_user.user_id))
+    key = _build_session_key(
+        tenant_id=current_user.tenant_id,
+        session_id=session_id,
+        user_id=str(current_user.user_id),
+    )
     storage_key = str(key)
+    if storage_key not in _get_session_models(request):
+        raise BadRequestException("会话未初始化，请先调用 /chat")
+
     run_id = etl_run_registry.get_run(storage_key) or etl_run_registry.start_run(storage_key)
 
     def _finish_run() -> None:
@@ -196,7 +290,6 @@ async def workflow_sse(
 async def clear_session(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
     """清除会话历史。"""
     current_user = request.state.current_user
-    team = _get_team(request)
 
     if not payload.session_id:
         raise BadRequestException("sessionId 不能为空")
@@ -208,16 +301,25 @@ async def clear_session(payload: WorkflowRequest, request: Request) -> dict[str,
         payload.session_id,
     )
 
-    key = _build_session_key(team, payload.session_id, str(current_user.user_id))
+    key = _build_session_key(
+        tenant_id=current_user.tenant_id,
+        session_id=payload.session_id,
+        user_id=str(current_user.user_id),
+    )
+    storage_key = str(key)
+    team = _get_bound_team(request, storage_key)
 
-    try:
-        await team.clear_session(session_id=key.session_id)
-    except Exception as exc:
-        logger.error("清理 checkpoint 失败: %s", exc, exc_info=True)
-        raise InternalException("清理会话失败", cause=exc) from exc
+    if team is not None:
+        try:
+            await team.clear_session(session_id=key.session_id)
+        except Exception as exc:
+            logger.error("清理 checkpoint 失败: %s", exc, exc_info=True)
+            raise InternalException("清理会话失败", cause=exc) from exc
 
     etl_stream_manager.clear_session(key=key)
-    etl_run_registry.finish_run(str(key))
+    etl_run_registry.finish_run(storage_key)
+    _get_session_teams(request).pop(storage_key, None)
+    _get_session_models(request).pop(storage_key, None)
 
     return ApiResponse.success(
         data={
@@ -236,8 +338,11 @@ async def abort_workflow(payload: WorkflowRequest, request: Request) -> dict[str
         raise BadRequestException("sessionId 不能为空")
 
     user_id = str(current_user.user_id)
-    team = _get_team(request)
-    key = _build_session_key(team, payload.session_id, user_id)
+    key = _build_session_key(
+        tenant_id=current_user.tenant_id,
+        session_id=payload.session_id,
+        user_id=user_id,
+    )
 
     logger.info(
         "[Abort] user=%s, userId=%s, sessionId=%s",
@@ -274,13 +379,19 @@ async def abort_workflow(payload: WorkflowRequest, request: Request) -> dict[str
 async def compact_session(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
     """手动压缩会话记忆。"""
     current_user = request.state.current_user
-    team = _get_team(request)
 
     if not payload.session_id:
         raise BadRequestException("sessionId 不能为空")
 
     user_id = str(current_user.user_id)
-    key = _build_session_key(team, payload.session_id, user_id)
+    key = _build_session_key(
+        tenant_id=current_user.tenant_id,
+        session_id=payload.session_id,
+        user_id=user_id,
+    )
+    team = _get_bound_team(request, str(key))
+    if team is None:
+        raise BadRequestException("会话不存在或已过期")
 
     logger.info(
         "[Compact] user=%s, userId=%s, sessionId=%s",
@@ -305,8 +416,14 @@ async def get_session_stats(
 ) -> dict[str, Any]:
     """获取会话统计信息。"""
     current_user = request.state.current_user
-    team = _get_team(request)
-    key = _build_session_key(team, session_id, str(current_user.user_id))
+    key = _build_session_key(
+        tenant_id=current_user.tenant_id,
+        session_id=session_id,
+        user_id=str(current_user.user_id),
+    )
+    team = _get_bound_team(request, str(key))
+    if team is None:
+        raise BadRequestException("会话不存在或已过期")
 
     try:
         stats = await team.get_session_stats(session_id=key.session_id)

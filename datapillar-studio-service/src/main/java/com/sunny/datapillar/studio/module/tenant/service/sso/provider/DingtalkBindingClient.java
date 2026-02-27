@@ -9,11 +9,11 @@ import com.aliyun.teaopenapi.models.Config;
 import com.aliyun.teautil.models.RuntimeOptions;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
+import com.sunny.datapillar.studio.exception.sso.InvalidSsoIdentityRequestException;
+import com.sunny.datapillar.studio.exception.sso.SsoProviderUnavailableException;
 import com.sunny.datapillar.studio.module.tenant.service.sso.provider.model.DingtalkUserInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import com.sunny.datapillar.common.exception.BadRequestException;
-import com.sunny.datapillar.common.exception.InternalException;
 
 /**
  * DingtalkBinding客户端
@@ -30,7 +30,7 @@ public class DingtalkBindingClient {
 
     public DingtalkUserInfo fetchUserInfo(String clientId, String clientSecret, String authCode) {
         if (isBlank(clientId) || isBlank(clientSecret) || isBlank(authCode)) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidSsoIdentityRequestException();
         }
         try {
             com.aliyun.dingtalkoauth2_1_0.Client oauthClient = new com.aliyun.dingtalkoauth2_1_0.Client(buildConfig());
@@ -44,7 +44,7 @@ public class DingtalkBindingClient {
                     ? null
                     : tokenResponse.getBody().getAccessToken();
             if (isBlank(accessToken)) {
-                throw new InternalException("SSO请求失败: %s", "dingtalk_access_token_missing");
+                throw new SsoProviderUnavailableException();
             }
 
             Client contactClient = new Client(buildConfig());
@@ -52,17 +52,17 @@ public class DingtalkBindingClient {
             headers.xAcsDingtalkAccessToken = accessToken;
             GetUserResponse userResponse = contactClient.getUserWithOptions("me", headers, new RuntimeOptions());
             if (userResponse == null || userResponse.getBody() == null) {
-                throw new InternalException("SSO请求失败: %s", "dingtalk_user_info_missing");
+                throw new SsoProviderUnavailableException();
             }
             String unionId = userResponse.getBody().getUnionId();
             if (isBlank(unionId)) {
-                throw new InternalException("SSO用户标识缺失");
+                throw new SsoProviderUnavailableException();
             }
             return new DingtalkUserInfo(unionId, objectMapper.writeValueAsString(userResponse.getBody()));
         } catch (DatapillarRuntimeException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new InternalException("SSO请求失败: %s", ex.getMessage());
+            throw new SsoProviderUnavailableException(ex);
         }
     }
 

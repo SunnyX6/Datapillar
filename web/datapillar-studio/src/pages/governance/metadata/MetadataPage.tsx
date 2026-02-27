@@ -1,4 +1,4 @@
-import { MetadataView } from '@/layouts/governance/MetadataView'
+import { MetadataView } from '@/features/governance/ui/MetadataView'
 
 export function GovernanceMetadataPage() {
   return (

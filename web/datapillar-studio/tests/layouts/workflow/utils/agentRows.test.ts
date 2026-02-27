@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentActivity } from '@/stores'
-import { upsertAgentActivityByAgent } from '@/layouts/workflow/utils/agentRows'
+import type { AgentActivity } from '@/features/workflow/state'
+import { upsertAgentActivityByAgent } from '@/features/workflow/utils/agentRows'
 
 const buildActivity = (overrides: Partial<AgentActivity>): AgentActivity => ({
   id: 'analyst:llm',

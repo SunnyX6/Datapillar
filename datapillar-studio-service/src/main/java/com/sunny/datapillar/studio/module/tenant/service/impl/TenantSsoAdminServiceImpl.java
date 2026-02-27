@@ -1,7 +1,19 @@
 package com.sunny.datapillar.studio.module.tenant.service.impl;
 
-import com.sunny.datapillar.studio.module.tenant.dto.SsoConfigDto;
-import com.sunny.datapillar.studio.module.tenant.dto.SsoIdentityDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.tenant.service.TenantSsoAdminService;
 import com.sunny.datapillar.studio.module.tenant.service.sso.SsoConfigService;
 import com.sunny.datapillar.studio.module.tenant.service.sso.SsoIdentityService;
@@ -24,27 +36,27 @@ public class TenantSsoAdminServiceImpl implements TenantSsoAdminService {
     private final SsoIdentityService ssoIdentityService;
 
     @Override
-    public List<SsoConfigDto.Response> listConfigs() {
+    public List<SsoConfigResponse> listConfigs() {
         return ssoConfigService.listConfigs();
     }
 
     @Override
-    public Long createConfig(SsoConfigDto.Create dto) {
+    public Long createConfig(SsoConfigCreateRequest dto) {
         return ssoConfigService.createConfig(dto);
     }
 
     @Override
-    public void updateConfig(Long configId, SsoConfigDto.Update dto) {
+    public void updateConfig(Long configId, SsoConfigUpdateRequest dto) {
         ssoConfigService.updateConfig(configId, dto);
     }
 
     @Override
-    public List<SsoIdentityDto.Item> listIdentities(String provider, Long userId) {
+    public List<SsoIdentityItem> listIdentities(String provider, Long userId) {
         return ssoIdentityService.list(provider, userId);
     }
 
     @Override
-    public Long bindByCode(SsoIdentityDto.BindByCodeRequest request) {
+    public Long bindByCode(SsoIdentityBindByCodeRequest request) {
         return ssoIdentityService.bindByCode(request);
     }
 

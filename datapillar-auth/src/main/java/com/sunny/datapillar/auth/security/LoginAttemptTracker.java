@@ -41,7 +41,7 @@ public class LoginAttemptTracker {
         if (locked != null) {
             log.warn("security_event event=login_locked tenantCode={} username={} clientIp={}",
                     tenantCode, username, clientIp);
-            throw new TooManyRequestsException("登录失败次数过多，请稍后重试");
+            throw new com.sunny.datapillar.common.exception.TooManyRequestsException("登录失败次数过多，请稍后重试");
         }
     }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHAT_COMMAND_OPTIONS } from '@/layouts/workflow/chat/commandLibrary'
+import { CHAT_COMMAND_OPTIONS } from '@/features/workflow/ui/chat/commandLibrary'
 
 describe('command library options', () => {
   it('包含 /clear 与 /compact', () => {

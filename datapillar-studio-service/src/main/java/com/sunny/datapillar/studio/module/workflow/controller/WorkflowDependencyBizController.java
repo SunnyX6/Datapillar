@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.workflow.controller;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -11,7 +25,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.sunny.datapillar.studio.module.workflow.dto.JobDependencyDto;
 import com.sunny.datapillar.studio.module.workflow.service.WorkflowDependencyBizService;
 import com.sunny.datapillar.common.response.ApiResponse;
 
@@ -37,8 +50,8 @@ public class WorkflowDependencyBizController {
 
     @Operation(summary = "获取工作流下的所有依赖")
     @GetMapping("/dependencies")
-    public ApiResponse<List<JobDependencyDto.Response>> list(@PathVariable Long workflowId) {
-        List<JobDependencyDto.Response> result = workflowDependencyBizService.getDependenciesByWorkflowId(workflowId);
+    public ApiResponse<List<JobDependencyResponse>> list(@PathVariable Long workflowId) {
+        List<JobDependencyResponse> result = workflowDependencyBizService.getDependenciesByWorkflowId(workflowId);
         return ApiResponse.ok(result);
     }
 
@@ -46,7 +59,7 @@ public class WorkflowDependencyBizController {
     @PostMapping("/dependencies")
     public ApiResponse<Void> create(
             @PathVariable Long workflowId,
-            @Valid @RequestBody JobDependencyDto.Create dto) {
+            @Valid @RequestBody JobDependencyCreateRequest dto) {
         workflowDependencyBizService.createDependency(workflowId, dto);
         return ApiResponse.ok();
     }

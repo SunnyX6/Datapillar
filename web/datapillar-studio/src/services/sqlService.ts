@@ -4,7 +4,7 @@
  * 负责 SQL 执行相关的 API 调用
  */
 
-import { API_BASE, API_PATH, requestData } from '@/lib/api'
+import { API_BASE, API_PATH, requestData } from '@/api'
 
 /**
  * 列定义

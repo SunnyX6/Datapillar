@@ -26,7 +26,7 @@
         WHERE email = #{email}
     </select>
 
-    <select id="selectRolesByUserId" resultType="com.sunny.datapillar.auth.dto.AuthDto$RoleInfo">
+    <select id="selectRolesByUserId" resultType="com.sunny.datapillar.auth.dto.login.response.RoleItem">
         SELECT r.id, r.name, r.type
         FROM roles r
         INNER JOIN user_roles ur ON r.id = ur.role_id

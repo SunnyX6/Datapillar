@@ -90,15 +90,15 @@ public class SsoStateStore {
                     return state;
                 }
             } catch (Exception ex) {
-                throw new InternalException(ex, "SSO state 生成失败");
+                throw new com.sunny.datapillar.common.exception.InternalException(ex, "SSO state 生成失败");
             }
         }
-        throw new InternalException("SSO state 生成失败");
+        throw new com.sunny.datapillar.common.exception.InternalException("SSO state 生成失败");
     }
 
     public StatePayload consumeOrThrow(String state, Long expectedTenantId, String expectedProvider) {
         if (state == null || state.isBlank()) {
-            throw new UnauthorizedException("SSO state 无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("SSO state 无效");
         }
         String result = stringRedisTemplate.execute(
                 consumeScript,
@@ -107,28 +107,28 @@ public class SsoStateStore {
         );
 
         if (result == null || RESULT_INVALID.equals(result)) {
-            throw new UnauthorizedException("SSO state 无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("SSO state 无效");
         }
         if (RESULT_EXPIRED.equals(result)) {
-            throw new UnauthorizedException("SSO state 已过期");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("SSO state 已过期");
         }
         if (RESULT_REPLAYED.equals(result)) {
-            throw new UnauthorizedException("SSO state 已被重复使用");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("SSO state 已被重复使用");
         }
 
         StatePayload payload;
         try {
             payload = objectMapper.readValue(result, StatePayload.class);
         } catch (Exception ex) {
-            throw new UnauthorizedException(ex, "SSO state 无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException(ex, "SSO state 无效");
         }
 
         if (expectedTenantId != null && (payload.getTenantId() == null || !expectedTenantId.equals(payload.getTenantId()))) {
-            throw new UnauthorizedException("SSO state 无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("SSO state 无效");
         }
         String normalizedExpectedProvider = normalize(expectedProvider);
         if (normalizedExpectedProvider != null && !normalizedExpectedProvider.equals(payload.getProvider())) {
-            throw new UnauthorizedException("SSO state 无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("SSO state 无效");
         }
         return payload;
     }

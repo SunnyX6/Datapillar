@@ -111,7 +111,7 @@ public class CryptoProvider implements CryptoService {
             requirePurpose(request == null ? null : request.getPurpose());
             String plaintext = request == null ? null : request.getPlaintext();
             if (!StringUtils.hasText(plaintext)) {
-                throw new BadRequestException(
+                throw new com.sunny.datapillar.common.exception.BadRequestException(
                         ErrorType.TENANT_KEY_INVALID,
                         Map.of("tenantCode", validTenantCode),
                         "参数错误");
@@ -122,7 +122,7 @@ public class CryptoProvider implements CryptoService {
             EncryptResponse data = EncryptResponse.newBuilder().setCiphertext(ciphertext).build();
             return EncryptResult.newBuilder().setData(data).build();
         } catch (IllegalArgumentException ex) {
-            return EncryptResult.newBuilder().setError(toRpcError(new InternalException(
+            return EncryptResult.newBuilder().setError(toRpcError(new com.sunny.datapillar.common.exception.InternalException(
                     ex,
                     ErrorType.TENANT_KEY_INVALID,
                     tenantContext(tenantCode),
@@ -147,7 +147,7 @@ public class CryptoProvider implements CryptoService {
             requirePurpose(request == null ? null : request.getPurpose());
             String ciphertext = request == null ? null : request.getCiphertext();
             if (!StringUtils.hasText(ciphertext)) {
-                throw new BadRequestException(
+                throw new com.sunny.datapillar.common.exception.BadRequestException(
                         ErrorType.CIPHERTEXT_INVALID,
                         Map.of("tenantCode", validTenantCode),
                         "参数错误");
@@ -158,7 +158,7 @@ public class CryptoProvider implements CryptoService {
             DecryptResponse data = DecryptResponse.newBuilder().setPlaintext(plaintext).build();
             return DecryptResult.newBuilder().setData(data).build();
         } catch (IllegalArgumentException ex) {
-            return DecryptResult.newBuilder().setError(toRpcError(new BadRequestException(
+            return DecryptResult.newBuilder().setError(toRpcError(new com.sunny.datapillar.common.exception.BadRequestException(
                     ErrorType.CIPHERTEXT_INVALID,
                     tenantContext(tenantCode),
                     "参数错误"))).build();
@@ -176,18 +176,18 @@ public class CryptoProvider implements CryptoService {
 
     private String requireTenantCode(String tenantCode) {
         if (!StringUtils.hasText(tenantCode)) {
-            throw new BadRequestException(ErrorType.TENANT_KEY_INVALID, Map.of(), "参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException(ErrorType.TENANT_KEY_INVALID, Map.of(), "参数错误");
         }
         return tenantCode.trim();
     }
 
     private String requirePurpose(String purpose) {
         if (!StringUtils.hasText(purpose)) {
-            throw new BadRequestException(ErrorType.PURPOSE_NOT_ALLOWED, Map.of(), "参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException(ErrorType.PURPOSE_NOT_ALLOWED, Map.of(), "参数错误");
         }
         String normalized = purpose.trim();
         if (!ALLOWED_PURPOSES.contains(normalized)) {
-            throw new BadRequestException(
+            throw new com.sunny.datapillar.common.exception.BadRequestException(
                     ErrorType.PURPOSE_NOT_ALLOWED,
                     Map.of("purpose", normalized),
                     "参数错误");
@@ -196,7 +196,7 @@ public class CryptoProvider implements CryptoService {
     }
 
     private DatapillarRuntimeException wrapStorageFailure(Exception ex, String tenantCode) {
-        return new ServiceUnavailableException(
+        return new com.sunny.datapillar.common.exception.ServiceUnavailableException(
                 ex,
                 ErrorType.KEY_STORAGE_UNAVAILABLE,
                 tenantContext(tenantCode),

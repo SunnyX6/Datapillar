@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sunny.datapillar.studio.module.workflow.mapper.JobWorkflowMapper">
 
-    <resultMap id="ListItemResult" type="com.sunny.datapillar.studio.module.workflow.dto.WorkflowDto$ListItem">
+    <resultMap id="ListItemResult" type="com.sunny.datapillar.studio.dto.workflow.response.WorkflowListItemResponse">
         <result property="id" column="id"/>
         <result property="projectId" column="project_id"/>
         <result property="projectName" column="project_name"/>
@@ -15,7 +15,7 @@
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
-    <resultMap id="ResponseResult" type="com.sunny.datapillar.studio.module.workflow.dto.WorkflowDto$Response">
+    <resultMap id="ResponseResult" type="com.sunny.datapillar.studio.dto.workflow.response.WorkflowResponse">
         <result property="id" column="id"/>
         <result property="projectId" column="project_id"/>
         <result property="projectName" column="project_name"/>

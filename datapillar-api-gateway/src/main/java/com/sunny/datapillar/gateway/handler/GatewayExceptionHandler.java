@@ -79,24 +79,24 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
                     ? status.getReasonPhrase()
                     : responseStatusException.getReason();
             return switch (status) {
-                case BAD_REQUEST -> new BadRequestException(ex, reason);
-                case UNAUTHORIZED -> new UnauthorizedException(ex, reason);
-                case FORBIDDEN -> new ForbiddenException(ex, reason);
-                case NOT_FOUND -> new NotFoundException(ex, reason);
-                case SERVICE_UNAVAILABLE -> new ServiceUnavailableException(ex, reason);
-                default -> new InternalException(ex, reason);
+                case BAD_REQUEST -> new com.sunny.datapillar.gateway.exception.base.GatewayBadRequestException(ex, reason);
+                case UNAUTHORIZED -> new com.sunny.datapillar.gateway.exception.base.GatewayUnauthorizedException(ex, reason);
+                case FORBIDDEN -> new com.sunny.datapillar.gateway.exception.base.GatewayForbiddenException(ex, reason);
+                case NOT_FOUND -> new com.sunny.datapillar.gateway.exception.base.GatewayNotFoundException(ex, reason);
+                case SERVICE_UNAVAILABLE -> new com.sunny.datapillar.gateway.exception.base.GatewayServiceUnavailableException(ex, reason);
+                default -> new com.sunny.datapillar.gateway.exception.base.GatewayInternalException(ex, reason);
             };
         }
 
         if (ex instanceof ConnectException) {
-            return new ServiceUnavailableException(ex, "服务连接失败");
+            return new com.sunny.datapillar.gateway.exception.base.GatewayServiceUnavailableException(ex, "服务连接失败");
         }
 
         if (ex instanceof TimeoutException) {
-            return new ServiceUnavailableException(ex, "服务响应超时");
+            return new com.sunny.datapillar.gateway.exception.base.GatewayServiceUnavailableException(ex, "服务响应超时");
         }
 
-        return new InternalException(ex, "网关内部错误");
+        return new com.sunny.datapillar.gateway.exception.base.GatewayInternalException(ex, "网关内部错误");
     }
 
     private Mono<Void> writeResponse(ServerHttpResponse response,

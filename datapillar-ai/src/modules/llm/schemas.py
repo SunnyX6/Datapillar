@@ -1,7 +1,12 @@
 # @author Sunny
 # @date 2026-02-19
 
-"""LLM Playground 请求契约。"""
+"""
+LLM Playground 请求契约。
+
+DEPRECATED:
+- 该模块保留给历史链路兼容
+"""
 
 from __future__ import annotations
 
@@ -24,8 +29,7 @@ class PlaygroundChatRequest(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    provider_code: str = Field(alias="providerCode")
-    model_id: str = Field(alias="modelId")
+    ai_model_id: int = Field(alias="aiModelId", gt=0)
     message: str
     model_options: PlaygroundModelConfig = Field(
         default_factory=PlaygroundModelConfig,

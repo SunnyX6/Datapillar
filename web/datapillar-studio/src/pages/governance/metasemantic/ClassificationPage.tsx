@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { ClassificationExplorer } from '@/layouts/governance/metasemantic/explorer/ClassificationExplorer'
+import { ClassificationExplorer } from '@/features/governance/ui/metasemantic/explorer/ClassificationExplorer'
 
 export function GovernanceClassificationPage() {
   const navigate = useNavigate()

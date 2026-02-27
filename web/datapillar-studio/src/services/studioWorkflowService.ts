@@ -1,4 +1,4 @@
-import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/lib/api'
+import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/api'
 import { pickDefinedParams, toPageResult } from './studioCommon'
 import type {
   ListDagVersionsParams,
@@ -6,7 +6,7 @@ import type {
   ListStudioWorkflowsParams,
   ListWorkflowRunsParams,
   StudioWorkflowItem
-} from '@/types/studio/workflow'
+} from '@/services/types/studio/workflow'
 
 export type {
   ListDagVersionsParams,
@@ -14,7 +14,7 @@ export type {
   ListStudioWorkflowsParams,
   ListWorkflowRunsParams,
   StudioWorkflowItem
-} from '@/types/studio/workflow'
+} from '@/services/types/studio/workflow'
 
 export async function listWorkflows(
   projectId: number,

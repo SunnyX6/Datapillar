@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.user.service;
 
-import com.sunny.datapillar.studio.module.user.dto.UserDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 
 /**
  * 用户Profile业务服务
@@ -11,7 +24,7 @@ import com.sunny.datapillar.studio.module.user.dto.UserDto;
  */
 public interface UserProfileBizService {
 
-    UserDto.Response getProfile(Long userId);
+    UserResponse getProfile(Long userId);
 
-    void updateProfile(Long userId, UserDto.UpdateProfile request);
+    void updateProfile(Long userId, UserProfileUpdateRequest request);
 }

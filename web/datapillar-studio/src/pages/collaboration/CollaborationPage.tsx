@@ -1,4 +1,4 @@
-import { CollaborationView } from '@/layouts/collaboration'
+import { CollaborationView } from '@/features/collaboration'
 
 export function CollaborationPage() {
   return <CollaborationView />

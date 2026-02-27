@@ -1,4 +1,4 @@
-import { OneIdeView } from '@/layouts/ide/OneIdeView'
+import { OneIdeView } from '@/features/ide/ui/OneIdeView'
 
 export function OneIdePage() {
   return <OneIdeView />

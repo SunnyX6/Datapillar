@@ -7,7 +7,7 @@
  */
 
 import { useState, useMemo } from 'react'
-import { useLanguage } from '@/stores'
+import { useLanguage } from '@/state'
 
 /**
  * 工作流节点配置

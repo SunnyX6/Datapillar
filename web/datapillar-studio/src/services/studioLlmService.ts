@@ -1,4 +1,4 @@
-import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/lib/api'
+import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/api'
 import { pickDefinedParams } from './studioCommon'
 import type {
   ConnectAdminLlmModelRequest,
@@ -7,11 +7,13 @@ import type {
   CreateAdminLlmProviderRequest,
   ListAdminModelsParams,
   ListAdminUserModelsParams,
+  StudioCurrentUserModelPermission,
+  StudioAdminUserModelPermission,
   StudioLlmModel,
-  StudioLlmModelUsage,
   StudioLlmProvider,
+  UpsertAdminUserModelGrantRequest,
   UpdateAdminLlmProviderRequest
-} from '@/types/studio/llm'
+} from '@/services/types/studio/llm'
 
 export type {
   ConnectAdminLlmModelRequest,
@@ -20,11 +22,13 @@ export type {
   CreateAdminLlmProviderRequest,
   ListAdminModelsParams,
   ListAdminUserModelsParams,
+  StudioCurrentUserModelPermission,
+  StudioAdminUserModelPermission,
   StudioLlmModel,
-  StudioLlmModelUsage,
   StudioLlmProvider,
+  UpsertAdminUserModelGrantRequest,
   UpdateAdminLlmProviderRequest
-} from '@/types/studio/llm'
+} from '@/services/types/studio/llm'
 
 export async function listAdminModels(
   params: ListAdminModelsParams = {}
@@ -43,19 +47,19 @@ export async function listAdminModels(
 export async function createAdminModel(request: CreateAdminLlmModelRequest): Promise<StudioLlmModel> {
   return requestData<StudioLlmModel, CreateAdminLlmModelRequest>({
     baseURL: API_BASE.studioAdmin,
-    url: API_PATH.llm.model,
+    url: API_PATH.llm.models,
     method: 'POST',
     data: request
   })
 }
 
 export async function connectAdminModel(
-  modelPk: number,
+  aiModelId: number,
   request: ConnectAdminLlmModelRequest
 ): Promise<ConnectAdminLlmModelResponse> {
   return requestData<ConnectAdminLlmModelResponse, ConnectAdminLlmModelRequest>({
     baseURL: API_BASE.studioAdmin,
-    url: API_PATH.llm.modelConnect(modelPk),
+    url: API_PATH.llm.modelConnect(aiModelId),
     method: 'POST',
     data: request
   })
@@ -100,8 +104,8 @@ export async function deleteAdminProvider(providerCode: string): Promise<void> {
 export async function listAdminUserModels(
   userId: number,
   params: ListAdminUserModelsParams = {}
-): Promise<StudioLlmModelUsage[]> {
-  return requestData<StudioLlmModelUsage[]>({
+): Promise<StudioAdminUserModelPermission[]> {
+  return requestData<StudioAdminUserModelPermission[]>({
     baseURL: API_BASE.studioAdmin,
     url: API_PATH.llm.userModels(userId),
     params: pickDefinedParams({
@@ -110,9 +114,41 @@ export async function listAdminUserModels(
   })
 }
 
-export async function listCurrentUserModels(): Promise<StudioLlmModelUsage[]> {
-  return requestData<StudioLlmModelUsage[]>({
+export async function upsertAdminUserModelGrant(
+  userId: number,
+  aiModelId: number,
+  request: UpsertAdminUserModelGrantRequest
+): Promise<void> {
+  await requestEnvelope<void, UpsertAdminUserModelGrantRequest>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.llm.userModel(userId, aiModelId),
+    method: 'PUT',
+    data: request
+  })
+}
+
+export async function deleteAdminUserModelGrant(
+  userId: number,
+  aiModelId: number
+): Promise<void> {
+  await requestEnvelope<void>({
+    baseURL: API_BASE.studioAdmin,
+    url: API_PATH.llm.userModel(userId, aiModelId),
+    method: 'DELETE'
+  })
+}
+
+export async function listCurrentUserModels(): Promise<StudioCurrentUserModelPermission[]> {
+  return requestData<StudioCurrentUserModelPermission[]>({
     baseURL: API_BASE.studioBiz,
     url: API_PATH.llm.models
+  })
+}
+
+export async function setCurrentUserDefaultModel(aiModelId: number): Promise<void> {
+  await requestEnvelope<void>({
+    baseURL: API_BASE.studioBiz,
+    url: API_PATH.llm.currentUserDefaultModel(aiModelId),
+    method: 'PUT'
   })
 }

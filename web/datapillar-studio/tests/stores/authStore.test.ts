@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useAuthStore } from '@/stores'
+import { useAuthStore } from '@/state'
 import { logout as apiLogout } from '@/services/authService'
 
 vi.mock('@/services/authService', () => ({

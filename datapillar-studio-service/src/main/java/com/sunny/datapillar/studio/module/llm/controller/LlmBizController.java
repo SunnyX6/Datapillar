@@ -1,9 +1,22 @@
 package com.sunny.datapillar.studio.module.llm.controller;
 
-import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
-import com.sunny.datapillar.studio.module.llm.dto.LlmManagerDto;
-import com.sunny.datapillar.studio.module.llm.service.LlmBizService;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
+import com.sunny.datapillar.common.exception.UnauthorizedException;
 import com.sunny.datapillar.common.response.ApiResponse;
+import com.sunny.datapillar.studio.module.llm.service.LlmBizService;
 import com.sunny.datapillar.studio.util.UserContextUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,9 +26,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.sunny.datapillar.common.exception.UnauthorizedException;
 
 /**
  * 大模型业务控制器
@@ -34,25 +45,25 @@ public class LlmBizController {
 
     @Operation(summary = "获取当前用户模型")
     @GetMapping("/models")
-    public ApiResponse<List<LlmManagerDto.ModelUsageResponse>> list() {
+    public ApiResponse<List<LlmUserModelPermissionResponse>> list() {
         Long currentUserId = getRequiredCurrentUserId();
-        return ApiResponse.ok(llmBizService.listCurrentUserModelUsages(
+        return ApiResponse.ok(llmBizService.listCurrentUserModelPermissions(
                 currentUserId,
                 true));
     }
 
     @Operation(summary = "设置当前用户默认模型")
-    @PutMapping("/model/{modelId}/default")
-    public ApiResponse<Void> setDefault(@PathVariable Long modelId) {
+    @PutMapping("/models/{aiModelId}/default")
+    public ApiResponse<Void> setDefault(@PathVariable Long aiModelId) {
         Long currentUserId = getRequiredCurrentUserId();
-        llmBizService.setCurrentUserDefaultModel(currentUserId, modelId);
+        llmBizService.setCurrentUserDefaultModel(currentUserId, aiModelId);
         return ApiResponse.ok();
     }
 
     private Long getRequiredCurrentUserId() {
         Long userId = UserContextUtil.getUserId();
         if (userId == null || userId <= 0) {
-            throw new UnauthorizedException("未授权访问");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("未授权访问");
         }
         return userId;
     }

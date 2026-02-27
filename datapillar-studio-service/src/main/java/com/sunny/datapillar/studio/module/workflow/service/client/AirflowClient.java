@@ -77,13 +77,13 @@ public class AirflowClient {
                         return cachedToken;
                     }
                 }
-                throw new InternalException("Airflow 认证失败", "Failed to get Airflow token, response code: " + response.code());
+                throw new com.sunny.datapillar.common.exception.InternalException("Airflow 认证失败", "Failed to get Airflow token, response code: " + response.code());
             }
         } catch (DatapillarRuntimeException e) {
             throw e;
         } catch (Exception e) {
             log.error("Failed to authenticate with Airflow: {}", e.getMessage());
-            throw new InternalException("Airflow 认证失败", "Airflow authentication failed: " + e.getMessage());
+            throw new com.sunny.datapillar.common.exception.InternalException("Airflow 认证失败", "Airflow authentication failed: " + e.getMessage());
         }
     }
 
@@ -105,7 +105,7 @@ public class AirflowClient {
             throw e;
         } catch (Exception e) {
             log.error("Airflow GET {} failed: {}", path, e.getMessage());
-            throw new InternalException("Airflow 请求失败: %s", "Airflow request failed: " + e.getMessage());
+            throw new com.sunny.datapillar.common.exception.InternalException("Airflow 请求失败: %s", "Airflow request failed: " + e.getMessage());
         }
     }
 
@@ -132,7 +132,7 @@ public class AirflowClient {
             throw e;
         } catch (Exception e) {
             log.error("Airflow POST {} failed: {}", path, e.getMessage());
-            throw new InternalException("Airflow 请求失败: %s", "Airflow request failed: " + e.getMessage());
+            throw new com.sunny.datapillar.common.exception.InternalException("Airflow 请求失败: %s", "Airflow request failed: " + e.getMessage());
         }
     }
 
@@ -158,7 +158,7 @@ public class AirflowClient {
             throw e;
         } catch (Exception e) {
             log.error("Airflow PATCH {} failed: {}", path, e.getMessage());
-            throw new InternalException("Airflow 请求失败: %s", "Airflow request failed: " + e.getMessage());
+            throw new com.sunny.datapillar.common.exception.InternalException("Airflow 请求失败: %s", "Airflow request failed: " + e.getMessage());
         }
     }
 
@@ -180,7 +180,7 @@ public class AirflowClient {
             throw e;
         } catch (Exception e) {
             log.error("Airflow DELETE {} failed: {}", path, e.getMessage());
-            throw new InternalException("Airflow 请求失败: %s", "Airflow request failed: " + e.getMessage());
+            throw new com.sunny.datapillar.common.exception.InternalException("Airflow 请求失败: %s", "Airflow request failed: " + e.getMessage());
         }
     }
 
@@ -195,6 +195,6 @@ public class AirflowClient {
 
         String errorBody = response.body() != null ? response.body().string() : "";
         log.error("Airflow {} {} failed: {} {}", method, path, response.code(), errorBody);
-        throw new InternalException("Airflow 请求失败: %s", "Airflow request failed: " + response.code() + " " + errorBody);
+        throw new com.sunny.datapillar.common.exception.InternalException("Airflow 请求失败: %s", "Airflow request failed: " + response.code() + " " + errorBody);
     }
 }

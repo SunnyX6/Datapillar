@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.project.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.time.LocalDateTime;
 
 import org.springframework.beans.BeanUtils;
@@ -12,7 +26,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sunny.datapillar.studio.module.project.dto.ProjectDto;
 import com.sunny.datapillar.studio.module.project.entity.Project;
 import com.sunny.datapillar.studio.module.project.enums.ProjectStatus;
 import com.sunny.datapillar.studio.module.project.mapper.ProjectMapper;
@@ -44,7 +57,7 @@ public class ProjectServiceImpl implements ProjectService {
     private final ObjectMapper objectMapper;
 
     @Override
-    public IPage<ProjectDto.Response> getProjectPage(ProjectDto.Query query, Long userId) {
+    public IPage<ProjectResponse> getProjectPage(ProjectQueryRequest query, Long userId) {
         int resolvedMaxLimit = query.getMaxLimit() == null || query.getMaxLimit() <= 0
                 ? DEFAULT_MAX_LIMIT
                 : query.getMaxLimit();
@@ -52,12 +65,12 @@ public class ProjectServiceImpl implements ProjectService {
                 ? DEFAULT_LIMIT
                 : Math.min(query.getLimit(), resolvedMaxLimit);
         int resolvedOffset = query.getOffset() == null || query.getOffset() < 0 ? DEFAULT_OFFSET : query.getOffset();
-        Page<ProjectDto.Response> page = Page.of((resolvedOffset / resolvedLimit) + 1L, resolvedLimit);
+        Page<ProjectResponse> page = Page.of((resolvedOffset / resolvedLimit) + 1L, resolvedLimit);
         return projectMapper.selectProjectPage(page, query, userId);
     }
 
     @Override
-    public IPage<ProjectDto.Response> getMyProjects(ProjectDto.Query query, Long userId, boolean isAdmin) {
+    public IPage<ProjectResponse> getMyProjects(ProjectQueryRequest query, Long userId, boolean isAdmin) {
         int resolvedMaxLimit = query.getMaxLimit() == null || query.getMaxLimit() <= 0
                 ? DEFAULT_MAX_LIMIT
                 : query.getMaxLimit();
@@ -65,22 +78,22 @@ public class ProjectServiceImpl implements ProjectService {
                 ? DEFAULT_LIMIT
                 : Math.min(query.getLimit(), resolvedMaxLimit);
         int resolvedOffset = query.getOffset() == null || query.getOffset() < 0 ? DEFAULT_OFFSET : query.getOffset();
-        Page<ProjectDto.Response> page = Page.of((resolvedOffset / resolvedLimit) + 1L, resolvedLimit);
+        Page<ProjectResponse> page = Page.of((resolvedOffset / resolvedLimit) + 1L, resolvedLimit);
         return projectMapper.selectMyProjects(page, query, userId, isAdmin);
     }
 
     @Override
-    public ProjectDto.Response getProjectById(Long id, Long userId) {
-        ProjectDto.Response project = projectMapper.selectProjectById(id, userId);
+    public ProjectResponse getProjectById(Long id, Long userId) {
+        ProjectResponse project = projectMapper.selectProjectById(id, userId);
         if (project == null) {
-            throw new ForbiddenException("无权限访问该项目: projectId=%s", id);
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("无权限访问该项目: projectId=%s", id);
         }
         return project;
     }
 
     @Override
     @Transactional
-    public Long createProject(ProjectDto.Create dto, Long userId) {
+    public Long createProject(ProjectCreateRequest dto, Long userId) {
         Project project = new Project();
         BeanUtils.copyProperties(dto, project);
 
@@ -95,7 +108,7 @@ public class ProjectServiceImpl implements ProjectService {
                 project.setTags(objectMapper.writeValueAsString(dto.getTags()));
             } catch (JsonProcessingException e) {
                 log.error("序列化标签失败", e);
-                throw new InternalException(e, "服务器内部错误");
+                throw new com.sunny.datapillar.common.exception.InternalException(e, "服务器内部错误");
             }
         } else {
             project.setTags("[]");
@@ -108,7 +121,7 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional
-    public void updateProject(Long id, ProjectDto.Update dto, Long userId) {
+    public void updateProject(Long id, ProjectUpdateRequest dto, Long userId) {
         Project existingProject = projectMapper.selectOne(
                 new LambdaQueryWrapper<Project>()
                         .eq(Project::getId, id)
@@ -116,7 +129,7 @@ public class ProjectServiceImpl implements ProjectService {
         );
 
         if (existingProject == null) {
-            throw new ForbiddenException("无权限访问该项目: projectId=%s", id);
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("无权限访问该项目: projectId=%s", id);
         }
 
         Project project = new Project();
@@ -143,7 +156,7 @@ public class ProjectServiceImpl implements ProjectService {
                 project.setTags(objectMapper.writeValueAsString(dto.getTags()));
             } catch (JsonProcessingException e) {
                 log.error("序列化标签失败", e);
-                throw new InternalException(e, "服务器内部错误");
+                throw new com.sunny.datapillar.common.exception.InternalException(e, "服务器内部错误");
             }
         }
 
@@ -161,7 +174,7 @@ public class ProjectServiceImpl implements ProjectService {
         );
 
         if (existingProject == null) {
-            throw new ForbiddenException("无权限访问该项目: projectId=%s", id);
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("无权限访问该项目: projectId=%s", id);
         }
 
         projectMapper.deleteById(id);

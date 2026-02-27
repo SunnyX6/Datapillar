@@ -1,7 +1,20 @@
 package com.sunny.datapillar.studio.module.tenant.controller;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.common.response.ApiResponse;
-import com.sunny.datapillar.studio.module.tenant.dto.InvitationDto;
 import com.sunny.datapillar.studio.module.tenant.service.TenantInvitationBizService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,13 +44,13 @@ public class TenantInvitationBizController {
 
     @Operation(summary = "根据邀请码查询邀请详情")
     @GetMapping("/{inviteCode}")
-    public ApiResponse<InvitationDto.DetailResponse> detail(@PathVariable("inviteCode") String inviteCode) {
+    public ApiResponse<InvitationDetailResponse> detail(@PathVariable("inviteCode") String inviteCode) {
         return ApiResponse.ok(tenantInvitationBizService.getInvitationByCode(inviteCode));
     }
 
     @Operation(summary = "接受邀请并注册")
     @PostMapping("/register")
-    public ApiResponse<Void> register(@Valid @RequestBody InvitationDto.RegisterRequest request) {
+    public ApiResponse<Void> register(@Valid @RequestBody InvitationRegisterRequest request) {
         tenantInvitationBizService.registerInvitation(request);
         return ApiResponse.ok();
     }

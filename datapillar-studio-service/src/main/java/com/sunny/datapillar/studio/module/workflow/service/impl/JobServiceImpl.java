@@ -1,12 +1,25 @@
 package com.sunny.datapillar.studio.module.workflow.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.sunny.datapillar.studio.module.workflow.dto.JobDto;
 import com.sunny.datapillar.studio.module.workflow.entity.JobComponent;
 import com.sunny.datapillar.studio.module.workflow.entity.JobInfo;
 import com.sunny.datapillar.studio.module.workflow.entity.JobWorkflow;
@@ -39,33 +52,33 @@ public class JobServiceImpl implements JobService {
     private final JobDependencyMapper dependencyMapper;
 
     @Override
-    public List<JobDto.Response> getJobsByWorkflowId(Long workflowId) {
+    public List<JobResponse> getJobsByWorkflowId(Long workflowId) {
         return jobInfoMapper.selectJobsByWorkflowId(workflowId);
     }
 
     @Override
-    public JobDto.Response getJobDetail(Long workflowId, Long id) {
+    public JobResponse getJobDetail(Long workflowId, Long id) {
         getWorkflowJobOrThrow(workflowId, id);
-        JobDto.Response job = jobInfoMapper.selectJobDetail(id);
+        JobResponse job = jobInfoMapper.selectJobDetail(id);
         if (job == null) {
-            throw new NotFoundException("任务不存在: workflowId=%s, jobId=%s", workflowId, id);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("任务不存在: workflowId=%s, jobId=%s", workflowId, id);
         }
         return job;
     }
 
     @Override
     @Transactional
-    public Long createJob(Long workflowId, JobDto.Create dto) {
+    public Long createJob(Long workflowId, JobCreateRequest dto) {
         // 验证工作流
         JobWorkflow workflow = workflowMapper.selectById(workflowId);
         if (workflow == null) {
-            throw new NotFoundException("工作流不存在: workflowId=%s", workflowId);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", workflowId);
         }
 
         // 验证组件类型
         JobComponent component = componentMapper.selectById(dto.getJobType());
         if (component == null) {
-            throw new NotFoundException("任务类型不存在: jobType=%s", dto.getJobType());
+            throw new com.sunny.datapillar.common.exception.NotFoundException("任务类型不存在: jobType=%s", dto.getJobType());
         }
 
         JobInfo jobInfo = new JobInfo();
@@ -79,7 +92,7 @@ public class JobServiceImpl implements JobService {
 
     @Override
     @Transactional
-    public void updateJob(Long workflowId, Long id, JobDto.Update dto) {
+    public void updateJob(Long workflowId, Long id, JobUpdateRequest dto) {
         JobInfo jobInfo = getWorkflowJobOrThrow(workflowId, id);
 
         if (dto.getJobName() != null) {
@@ -88,7 +101,7 @@ public class JobServiceImpl implements JobService {
         if (dto.getJobType() != null) {
             JobComponent component = componentMapper.selectById(dto.getJobType());
             if (component == null) {
-                throw new NotFoundException("任务类型不存在: jobType=%s", dto.getJobType());
+                throw new com.sunny.datapillar.common.exception.NotFoundException("任务类型不存在: jobType=%s", dto.getJobType());
             }
             jobInfo.setJobType(dto.getJobType());
         }
@@ -137,18 +150,18 @@ public class JobServiceImpl implements JobService {
     private JobInfo getWorkflowJobOrThrow(Long workflowId, Long jobId) {
         JobInfo jobInfo = jobInfoMapper.selectById(jobId);
         if (jobInfo == null || !workflowId.equals(jobInfo.getWorkflowId())) {
-            throw new NotFoundException("任务不存在: workflowId=%s, jobId=%s", workflowId, jobId);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("任务不存在: workflowId=%s, jobId=%s", workflowId, jobId);
         }
         return jobInfo;
     }
 
     @Override
     @Transactional
-    public void updateJobPositions(Long workflowId, JobDto.LayoutSave dto) {
+    public void updateJobPositions(Long workflowId, JobLayoutSaveRequest dto) {
         // 验证工作流
         JobWorkflow workflow = workflowMapper.selectById(workflowId);
         if (workflow == null) {
-            throw new NotFoundException("工作流不存在: workflowId=%s", workflowId);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", workflowId);
         }
 
         jobInfoMapper.batchUpdatePositions(dto.getPositions());

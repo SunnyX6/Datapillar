@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useRef, useEffect, useMemo, useLayoutEffect, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { ChatPanel } from '@/layouts/workflow/chat/Chat'
+import { ChatPanel } from '@/features/workflow/ui/chat/Chat'
 import { useLayout } from '@/layouts/responsive'
 
 const LARGE_SCREEN_WIDTH = 1440
@@ -26,7 +26,7 @@ const clampWidth = (value: number, limits: ChatWidthLimits) =>
   Math.max(limits.min, Math.min(limits.max, value))
 
 const LazyWorkflowCanvasPanel = lazy(async () => {
-  const module = await import('@/layouts/workflow/WorkflowStudio')
+  const module = await import('@/features/workflow/ui/WorkflowStudio')
   return { default: module.WorkflowCanvasPanel }
 })
 

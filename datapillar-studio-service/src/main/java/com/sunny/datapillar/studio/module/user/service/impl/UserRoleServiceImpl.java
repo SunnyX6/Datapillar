@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.user.service.impl;
 
-import com.sunny.datapillar.studio.module.user.dto.RoleDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.user.service.RoleService;
 import com.sunny.datapillar.studio.module.user.service.UserRoleService;
 import com.sunny.datapillar.studio.module.user.service.UserService;
@@ -23,7 +36,7 @@ public class UserRoleServiceImpl implements UserRoleService {
     private final UserService userService;
 
     @Override
-    public List<RoleDto.Response> listRolesByUser(Long userId) {
+    public List<RoleResponse> listRolesByUser(Long userId) {
         return roleService.getRolesByUserId(userId);
     }
 

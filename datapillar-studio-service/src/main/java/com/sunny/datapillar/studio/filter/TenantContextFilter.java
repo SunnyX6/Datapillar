@@ -73,20 +73,20 @@ public class TenantContextFilter extends OncePerRequestFilter {
         GatewayAssertionContext assertionContext = GatewayAssertionContext.current(request);
         if (assertionContext == null) {
             securityExceptionHandler.writeError(
-                    response, new UnauthorizedException("gateway_assertion_context_missing"));
+                    response, new com.sunny.datapillar.common.exception.UnauthorizedException("gateway_assertion_context_missing"));
             return;
         }
 
         Long tenantId = assertionContext.tenantId();
         if (tenantId == null) {
             securityExceptionHandler.writeError(
-                    response, new UnauthorizedException("gateway_assertion_tenant_id_missing"));
+                    response, new com.sunny.datapillar.common.exception.UnauthorizedException("gateway_assertion_tenant_id_missing"));
             return;
         }
         String tenantCode = assertionContext.tenantCode();
         if (!StringUtils.hasText(tenantCode)) {
             securityExceptionHandler.writeError(
-                    response, new UnauthorizedException("gateway_assertion_tenant_code_missing"));
+                    response, new com.sunny.datapillar.common.exception.UnauthorizedException("gateway_assertion_tenant_code_missing"));
             return;
         }
 
