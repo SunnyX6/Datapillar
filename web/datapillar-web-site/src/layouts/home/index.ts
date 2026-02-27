@@ -1,1 +1,0 @@
-export { HomeLayout } from './Home'
