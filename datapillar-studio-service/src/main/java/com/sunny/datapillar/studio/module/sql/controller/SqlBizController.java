@@ -1,7 +1,19 @@
 package com.sunny.datapillar.studio.module.sql.controller;
 
-import com.sunny.datapillar.studio.module.sql.dto.SqlExecuteRequest;
-import com.sunny.datapillar.studio.module.sql.dto.SqlExecuteResult;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.sql.service.SqlBizService;
 import com.sunny.datapillar.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,9 +43,9 @@ public class SqlBizController {
 
     @Operation(summary = "执行 SQL")
     @PostMapping("/execute")
-    public ApiResponse<SqlExecuteResult> execute(@Valid @RequestBody SqlExecuteRequest request) {
+    public ApiResponse<SqlExecuteResponse> execute(@Valid @RequestBody SqlExecuteRequest request) {
         var executeResult = sqlBizService.executeSql(request);
-        SqlExecuteResult result = new SqlExecuteResult();
+        SqlExecuteResponse result = new SqlExecuteResponse();
         BeanUtils.copyProperties(executeResult, result);
         return ApiResponse.ok(result);
     }

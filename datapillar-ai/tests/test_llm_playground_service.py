@@ -32,7 +32,7 @@ def test_build_llm_provider_applies_model_and_thinking(monkeypatch: pytest.Monke
     provider = service._build_llm_provider(
         model={
             "provider_code": "glm",
-            "model_id": "glm-4.5",
+            "provider_model_id": "glm-4.5",
             "base_url": "https://open.bigmodel.cn/api/paas/v4",
         },
         api_key="plain-key",
@@ -83,7 +83,7 @@ async def test_stream_chat_emits_text_chunks_with_top_p(monkeypatch: pytest.Monk
     def _mock_get_model(**_kwargs):
         return {
             "provider_code": "glm",
-            "model_id": "glm-4.5",
+            "provider_model_id": "glm-4.5",
             "api_key": "ENCv1:xxx",
             "base_url": "https://open.bigmodel.cn/api/paas/v4",
         }
@@ -99,8 +99,7 @@ async def test_stream_chat_emits_text_chunks_with_top_p(monkeypatch: pytest.Monk
 
     payload = PlaygroundChatRequest.model_validate(
         {
-            "providerCode": "glm",
-            "modelId": "glm-4.5",
+            "aiModelId": 88,
             "message": "你好",
             "modelConfig": {
                 "temperature": 0.7,

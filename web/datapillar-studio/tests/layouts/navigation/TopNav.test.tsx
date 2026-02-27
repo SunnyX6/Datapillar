@@ -3,7 +3,7 @@ import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
 import { act } from 'react-dom/test-utils'
 import { createRoot } from 'react-dom/client'
 import { TopNav } from '@/layouts/navigation/TopNav'
-import type { Menu } from '@/types/auth'
+import type { Menu } from '@/services/types/auth'
 
 vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
@@ -20,7 +20,7 @@ vi.mock('react-i18next', () => ({
   })
 }))
 
-vi.mock('@/stores', () => ({
+vi.mock('@/state', () => ({
   useAuthStore: (
     selector: (state: { user: { tenantName: string } | null }) => unknown
   ) =>

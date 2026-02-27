@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.user.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -12,7 +26,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
 import com.sunny.datapillar.studio.module.tenant.entity.Permission;
 import com.sunny.datapillar.studio.module.tenant.mapper.FeatureObjectMapper;
 import com.sunny.datapillar.studio.module.user.entity.TenantUser;
@@ -21,7 +34,6 @@ import com.sunny.datapillar.studio.module.user.entity.Role;
 import com.sunny.datapillar.studio.module.user.entity.UserRole;
 import com.sunny.datapillar.studio.module.tenant.mapper.PermissionMapper;
 import com.sunny.datapillar.studio.module.tenant.util.PermissionLevelUtil;
-import com.sunny.datapillar.studio.module.user.dto.UserDto;
 import com.sunny.datapillar.studio.module.user.mapper.RoleMapper;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
@@ -31,6 +43,7 @@ import com.sunny.datapillar.studio.context.TenantContextHolder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.sunny.datapillar.common.exception.BadRequestException;
+import com.sunny.datapillar.common.exception.ForbiddenException;
 import com.sunny.datapillar.common.exception.UnauthorizedException;
 import com.sunny.datapillar.common.exception.NotFoundException;
 import com.sunny.datapillar.common.exception.AlreadyExistsException;
@@ -48,6 +61,8 @@ import com.sunny.datapillar.common.exception.ConflictException;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
+    private static final int USER_LEVEL_PLATFORM_SUPER_ADMIN = 0;
+    private static final int USER_LEVEL_DEFAULT = 100;
     private static final int MEMBER_STATUS_ENABLED = 1;
     private static final int MEMBER_STATUS_DISABLED = 0;
 
@@ -65,27 +80,27 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserDto.Response getUserById(Long id) {
+    public UserResponse getUserById(Long id) {
         Long tenantId = getRequiredTenantId();
         User user = userMapper.selectByIdAndTenantId(tenantId, id);
         if (user == null) {
-            throw new NotFoundException("用户不存在: %s", id);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("用户不存在: %s", id);
         }
 
-        UserDto.Response response = new UserDto.Response();
+        UserResponse response = new UserResponse();
         BeanUtils.copyProperties(user, response);
         return response;
     }
 
     @Override
     @Transactional
-    public Long createUser(UserDto.Create dto) {
+    public Long createUser(UserCreateRequest dto) {
         Long tenantId = getRequiredTenantId();
         User existing = userMapper.selectByUsernameGlobal(dto.getUsername());
         if (existing != null) {
             TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, existing.getId());
             if (tenantUser != null && tenantUser.getStatus() != null && tenantUser.getStatus() == 1) {
-                throw new AlreadyExistsException("用户名已存在: %s", dto.getUsername());
+                throw new com.sunny.datapillar.common.exception.AlreadyExistsException("用户名已存在: %s", dto.getUsername());
             }
             if (tenantUser == null) {
                 tenantUser = new TenantUser();
@@ -114,6 +129,7 @@ public class UserServiceImpl implements UserService {
         if (dto.getPassword() != null) {
             user.setPassword(passwordEncoder.encode(dto.getPassword()));
         }
+        user.setLevel(USER_LEVEL_DEFAULT);
         user.setDeleted(0);
 
         userMapper.insert(user);
@@ -136,17 +152,17 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void updateUser(Long id, UserDto.Update dto) {
+    public void updateUser(Long id, UserUpdateRequest dto) {
         Long tenantId = getRequiredTenantId();
         User existingUser = userMapper.selectByIdAndTenantId(tenantId, id);
         if (existingUser == null) {
-            throw new NotFoundException("用户不存在: %s", id);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("用户不存在: %s", id);
         }
 
         if (dto.getUsername() != null) {
             User userWithSameName = userMapper.selectByUsernameGlobal(dto.getUsername());
             if (userWithSameName != null && !userWithSameName.getId().equals(id)) {
-                throw new ConflictException("用户名已被其他用户使用: %s", dto.getUsername());
+                throw new com.sunny.datapillar.common.exception.ConflictException("用户名已被其他用户使用: %s", dto.getUsername());
             }
             existingUser.setUsername(dto.getUsername());
         }
@@ -182,7 +198,10 @@ public class UserServiceImpl implements UserService {
         Long tenantId = getRequiredTenantId();
         User user = userMapper.selectByIdAndTenantId(tenantId, id);
         if (user == null) {
-            throw new NotFoundException("用户不存在: %s", id);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("用户不存在: %s", id);
+        }
+        if (user.getLevel() != null && user.getLevel() <= USER_LEVEL_PLATFORM_SUPER_ADMIN) {
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("平台超管用户不允许删除");
         }
 
         tenantUserMapper.deleteByTenantIdAndUserId(tenantId, id);
@@ -192,12 +211,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<UserDto.Response> getUserList() {
+    public List<UserResponse> getUserList() {
         Long tenantId = getRequiredTenantId();
         List<User> users = userMapper.selectUsersByTenantId(tenantId);
         return users.stream()
                 .map(user -> {
-                    UserDto.Response response = new UserDto.Response();
+                    UserResponse response = new UserResponse();
                     BeanUtils.copyProperties(user, response);
                     return response;
                 })
@@ -217,11 +236,11 @@ public class UserServiceImpl implements UserService {
         if (userId == null
                 || status == null
                 || (status != MEMBER_STATUS_ENABLED && status != MEMBER_STATUS_DISABLED)) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, userId);
         if (tenantUser == null) {
-            throw new NotFoundException("用户不存在: %s", userId);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("用户不存在: %s", userId);
         }
         tenantUser.setStatus(status);
         tenantUserMapper.updateById(tenantUser);
@@ -232,7 +251,7 @@ public class UserServiceImpl implements UserService {
     public void assignRoles(Long userId, List<Long> roleIds) {
         Long tenantId = getRequiredTenantId();
         if (userMapper.selectByIdAndTenantId(tenantId, userId) == null) {
-            throw new NotFoundException("用户不存在: %s", userId);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("用户不存在: %s", userId);
         }
         userMapper.deleteUserRoles(tenantId, userId);
 
@@ -241,7 +260,7 @@ public class UserServiceImpl implements UserService {
             for (Long roleId : uniqueRoles) {
                 Role role = roleMapper.selectById(roleId);
                 if (role == null || !tenantId.equals(role.getTenantId())) {
-                    throw new BadRequestException("参数错误");
+                    throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
                 }
                 UserRole userRole = new UserRole();
                 userRole.setTenantId(tenantId);
@@ -265,26 +284,26 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<FeatureObjectDto.ObjectPermission> getUserPermissions(Long userId) {
+    public List<FeatureObjectPermissionItem> getUserPermissions(Long userId) {
         Long tenantId = getRequiredTenantId();
         if (userMapper.selectByIdAndTenantId(tenantId, userId) == null) {
-            throw new NotFoundException("用户不存在: %s", userId);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("用户不存在: %s", userId);
         }
-        List<FeatureObjectDto.ObjectPermission> objects = featureObjectMapper.selectFeatureObjectsAll(tenantId);
-        List<FeatureObjectDto.RoleSource> roleSources =
+        List<FeatureObjectPermissionItem> objects = featureObjectMapper.selectFeatureObjectsAll(tenantId);
+        List<FeatureRoleSourceItem> roleSources =
                 featureObjectMapper.selectUserRoleSources(tenantId, userId);
         Map<String, Permission> permissionMap = getPermissionMap();
 
-        Map<Long, List<FeatureObjectDto.RoleSource>> roleSourceMap = roleSources == null ? new HashMap<>()
-                : roleSources.stream().collect(Collectors.groupingBy(FeatureObjectDto.RoleSource::getObjectId));
+        Map<Long, List<FeatureRoleSourceItem>> roleSourceMap = roleSources == null ? new HashMap<>()
+                : roleSources.stream().collect(Collectors.groupingBy(FeatureRoleSourceItem::getObjectId));
 
-        List<FeatureObjectDto.ObjectPermission> result = new ArrayList<>();
+        List<FeatureObjectPermissionItem> result = new ArrayList<>();
         if (objects == null) {
             return result;
         }
-        for (FeatureObjectDto.ObjectPermission object : objects) {
+        for (FeatureObjectPermissionItem object : objects) {
             Long objectId = object.getObjectId();
-            List<FeatureObjectDto.RoleSource> sources = roleSourceMap.getOrDefault(objectId, new ArrayList<>());
+            List<FeatureRoleSourceItem> sources = roleSourceMap.getOrDefault(objectId, new ArrayList<>());
 
             String rolePermission = calculateRoleMaxPermission(sources, permissionMap);
             String tenantLimit = object.getTenantPermissionCode();
@@ -296,11 +315,11 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void updateProfile(Long userId, UserDto.UpdateProfile dto) {
+    public void updateProfile(Long userId, UserProfileUpdateRequest dto) {
         Long tenantId = getRequiredTenantId();
         User user = userMapper.selectByIdAndTenantId(tenantId, userId);
         if (user == null) {
-            throw new NotFoundException("用户不存在: %s", userId);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("用户不存在: %s", userId);
         }
 
         if (dto.getNickname() != null) {
@@ -320,7 +339,7 @@ public class UserServiceImpl implements UserService {
     private Long getRequiredTenantId() {
         Long tenantId = TenantContextHolder.getTenantId();
         if (tenantId == null) {
-            throw new UnauthorizedException("未授权访问");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("未授权访问");
         }
         return tenantId;
     }
@@ -339,13 +358,13 @@ public class UserServiceImpl implements UserService {
         return map;
     }
 
-    private String calculateRoleMaxPermission(List<FeatureObjectDto.RoleSource> sources,
+    private String calculateRoleMaxPermission(List<FeatureRoleSourceItem> sources,
                                               Map<String, Permission> permissionMap) {
         if (sources == null || sources.isEmpty()) {
             return "DISABLE";
         }
         List<String> codes = sources.stream()
-                .map(FeatureObjectDto.RoleSource::getPermissionCode)
+                .map(FeatureRoleSourceItem::getPermissionCode)
                 .collect(Collectors.toList());
         return PermissionLevelUtil.maxCode(permissionMap, codes);
     }

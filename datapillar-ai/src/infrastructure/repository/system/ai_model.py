@@ -6,6 +6,10 @@
 AI 模型数据访问
 
 表：ai_model, ai_llm_usage
+
+DEPRECATED:
+- 该文件保留给历史链路（openlineage/旧接口）兼容使用
+- 新链路请使用 `ai_model_new.py`（显式模型输入，不允许默认兜底）
 """
 
 from __future__ import annotations
@@ -21,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 _MODEL_FIELDS = (
     "m.id, "
-    "m.model_id, "
+    "m.provider_model_id, "
     "m.name, "
     "m.provider_id, "
     "p.code AS provider_code, "
@@ -91,7 +95,7 @@ class Model:
             return None
 
     @staticmethod
-    def get_model(model_id: int, tenant_id: int) -> dict[str, Any] | None:
+    def get_model(ai_model_id: int, tenant_id: int) -> dict[str, Any] | None:
         query = text(
             f"""
             SELECT {_MODEL_FIELDS}
@@ -103,21 +107,20 @@ class Model:
         try:
             with MySQLClient.get_engine().connect() as conn:
                 row = (
-                    conn.execute(query, {"id": model_id, "tenant_id": tenant_id})
+                    conn.execute(query, {"id": ai_model_id, "tenant_id": tenant_id})
                     .mappings()
                     .fetchone()
                 )
                 return dict(row) if row else None
         except Exception as e:
-            logger.error(f"获取模型 #{model_id} 失败: {e}")
+            logger.error(f"获取模型 #{ai_model_id} 失败: {e}")
             return None
 
     @staticmethod
     def get_active_chat_model(
         *,
         tenant_id: int,
-        provider_code: str,
-        model_id: str,
+        ai_model_id: int,
     ) -> dict[str, Any] | None:
         query = text(
             f"""
@@ -125,8 +128,7 @@ class Model:
             FROM ai_model AS m
             JOIN ai_provider AS p ON m.provider_id = p.id
             WHERE m.tenant_id = :tenant_id
-              AND p.code = :provider_code
-              AND m.model_id = :model_id
+              AND m.id = :ai_model_id
               AND m.model_type = 'chat'
               AND m.status = 'ACTIVE'
             LIMIT 1
@@ -139,8 +141,7 @@ class Model:
                         query,
                         {
                             "tenant_id": tenant_id,
-                            "provider_code": provider_code,
-                            "model_id": model_id,
+                            "ai_model_id": ai_model_id,
                         },
                     )
                     .mappings()
@@ -149,10 +150,9 @@ class Model:
                 return dict(row) if row else None
         except Exception as e:
             logger.error(
-                "查询模型失败: tenant=%s provider=%s model=%s err=%s",
+                "查询模型失败: tenant=%s aiModelId=%s err=%s",
                 tenant_id,
-                provider_code,
-                model_id,
+                ai_model_id,
                 e,
             )
             return None

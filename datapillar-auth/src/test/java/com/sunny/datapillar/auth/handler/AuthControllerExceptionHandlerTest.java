@@ -16,7 +16,7 @@ class AuthControllerExceptionHandlerTest {
     @Test
     void handleRuntimeException_shouldReturnMappedErrorResponse() {
         MockHttpServletResponse response = new MockHttpServletResponse();
-        InternalException exception = new InternalException(
+        InternalException exception = new com.sunny.datapillar.common.exception.InternalException(
                 new IllegalStateException("mysql_unreachable"),
                 "db_connect_failed");
 

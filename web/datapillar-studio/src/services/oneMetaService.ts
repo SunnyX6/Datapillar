@@ -4,17 +4,18 @@
  * 负责catalog、schema、table等物理层资产管理
  */
 
-import { API_BASE, requestRaw } from '@/lib/api'
-import type { ApiError, ApiResponse } from '@/types/api'
+import { API_BASE, requestRaw } from '@/api'
+import type { ApiError, ApiResponse } from '@/api/types/api'
 import type {
   GravitinoBaseResponse,
   GravitinoEntityListResponse,
+  GravitinoCatalogListResponse,
   GravitinoCatalogResponse,
   GravitinoSchemaResponse,
   GravitinoTableResponse,
   GravitinoIndexDTO,
   GravitinoErrorResponse
-} from '@/types/onemeta/metadata'
+} from '@/services/types/onemeta/metadata'
 
 /**
  * 前端 Catalog 类型

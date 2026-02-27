@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { WordRootExplorer, WordRootOverview } from '@/layouts/governance/metasemantic'
-import type { WordRoot } from '@/layouts/governance/metasemantic'
+import { WordRootExplorer, WordRootOverview } from '@/features/governance/ui/metasemantic'
+import type { WordRoot } from '@/features/governance/ui/metasemantic'
 
 export function GovernanceWordRootPage() {
   const navigate = useNavigate()

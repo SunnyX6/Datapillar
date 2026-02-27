@@ -16,7 +16,7 @@
         WHERE tenant_id = #{tenantId}
     </select>
 
-    <select id="selectPermissionLimits" resultType="com.sunny.datapillar.studio.module.tenant.dto.FeatureEntitlementDto$PermissionLimit">
+    <select id="selectPermissionLimits" resultType="com.sunny.datapillar.studio.dto.tenant.response.TenantFeaturePermissionLimitItem">
         SELECT tfe.object_id AS object_id,
                tfe.status AS status,
                p.code AS permission_code,

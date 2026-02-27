@@ -1,9 +1,21 @@
 package com.sunny.datapillar.studio.module.user.service;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
-import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
-import com.sunny.datapillar.studio.module.user.dto.RoleDto;
 
 /**
  * 角色服务
@@ -17,17 +29,17 @@ public interface RoleService {
     /**
      * 根据角色ID查询角色详情
      */
-    RoleDto.Response getRoleById(Long id);
+    RoleResponse getRoleById(Long id);
 
     /**
      * 创建角色
      */
-    Long createRole(RoleDto.Create dto);
+    Long createRole(RoleCreateRequest dto);
 
     /**
      * 更新角色
      */
-    void updateRole(Long id, RoleDto.Update dto);
+    void updateRole(Long id, RoleUpdateRequest dto);
 
     /**
      * 删除角色
@@ -37,25 +49,30 @@ public interface RoleService {
     /**
      * 查询角色列表
      */
-    List<RoleDto.Response> getRoleList();
+    List<RoleResponse> getRoleList();
 
     /**
      * 根据用户ID查询角色列表
      */
-    List<RoleDto.Response> getRolesByUserId(Long userId);
+    List<RoleResponse> getRolesByUserId(Long userId);
 
     /**
      * 获取角色权限
      */
-    List<FeatureObjectDto.ObjectPermission> getRolePermissions(Long roleId, String scope);
+    List<FeatureObjectPermissionItem> getRolePermissions(Long roleId, String scope);
 
     /**
      * 更新角色权限（全量覆盖）
      */
-    void updateRolePermissions(Long roleId, List<FeatureObjectDto.Assignment> permissions);
+    void updateRolePermissions(Long roleId, List<RoleFeatureAssignmentItem> permissions);
 
     /**
      * 获取角色成员
      */
-    RoleDto.MembersResponse getRoleMembers(Long roleId, Integer status);
+    RoleMembersResponse getRoleMembers(Long roleId, Integer status);
+
+    /**
+     * 批量移除角色成员
+     */
+    void removeRoleMembers(Long roleId, List<Long> userIds);
 }

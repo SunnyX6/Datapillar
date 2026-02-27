@@ -2,8 +2,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act } from 'react-dom/test-utils'
 import { createRoot } from 'react-dom/client'
-import { FunctionalPermission } from '@/layouts/profile/permission/FunctionalPermission'
-import type { RoleDefinition } from '@/layouts/profile/permission/Permission'
+import { FunctionalPermission } from '@/features/profile/ui/permission/FunctionalPermission'
+import type { RoleDefinition } from '@/features/profile/utils/permissionTypes'
 
 const basePermissions: RoleDefinition['permissions'] = [
   {

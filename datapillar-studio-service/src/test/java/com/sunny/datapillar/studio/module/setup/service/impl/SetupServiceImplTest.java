@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.setup.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -22,11 +36,8 @@ import com.sunny.datapillar.studio.module.tenant.entity.Permission;
 import com.sunny.datapillar.studio.module.tenant.mapper.FeatureObjectMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.PermissionMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantFeaturePermissionMapper;
-import com.sunny.datapillar.studio.module.setup.dto.SetupDto;
-import com.sunny.datapillar.studio.module.setup.dto.SetupInitializeRequest;
 import com.sunny.datapillar.studio.module.setup.entity.SystemBootstrap;
 import com.sunny.datapillar.studio.module.setup.mapper.SystemBootstrapMapper;
-import com.sunny.datapillar.studio.module.tenant.dto.TenantDto;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantMapper;
 import com.sunny.datapillar.studio.module.tenant.service.TenantService;
 import com.sunny.datapillar.studio.module.user.entity.Role;
@@ -99,7 +110,7 @@ class SetupServiceImplTest {
     void getStatus_shouldReturnSchemaNotReadyWhenBootstrapMissing() {
         when(systemBootstrapMapper.selectById(1)).thenReturn(null);
 
-        SetupDto.StatusResponse response = setupService.getStatus();
+        SetupStatusResponse response = setupService.getStatus();
 
         assertFalse(response.isSchemaReady());
         assertFalse(response.isInitialized());
@@ -114,7 +125,7 @@ class SetupServiceImplTest {
     void getStatus_shouldReturnInitializationStepWhenSchemaReadyButNotInitialized() {
         when(systemBootstrapMapper.selectById(1)).thenReturn(bootstrap(0));
 
-        SetupDto.StatusResponse response = setupService.getStatus();
+        SetupStatusResponse response = setupService.getStatus();
 
         assertTrue(response.isSchemaReady());
         assertFalse(response.isInitialized());
@@ -129,7 +140,7 @@ class SetupServiceImplTest {
     void getStatus_shouldReturnCompletedStepWhenAlreadyInitialized() {
         when(systemBootstrapMapper.selectById(1)).thenReturn(bootstrap(1));
 
-        SetupDto.StatusResponse response = setupService.getStatus();
+        SetupStatusResponse response = setupService.getStatus();
 
         assertTrue(response.isSchemaReady());
         assertTrue(response.isInitialized());
@@ -199,12 +210,12 @@ class SetupServiceImplTest {
         when(tenantFeaturePermissionMapper.selectByTenantIdAndObjectId(anyLong(), anyLong())).thenReturn(null);
         when(systemBootstrapMapper.updateById(any(SystemBootstrap.class))).thenReturn(1);
 
-        SetupDto.InitializeResponse response = setupService.initialize(buildInitializeRequest());
+        SetupInitializeResponse response = setupService.initialize(buildInitializeRequest());
 
         assertEquals(100L, response.getTenantId());
         assertEquals(200L, response.getUserId());
 
-        ArgumentCaptor<TenantDto.Create> tenantCaptor = ArgumentCaptor.forClass(TenantDto.Create.class);
+        ArgumentCaptor<TenantCreateRequest> tenantCaptor = ArgumentCaptor.forClass(TenantCreateRequest.class);
         verify(tenantService).createTenant(tenantCaptor.capture());
         assertEquals("tenant-acme-data", tenantCaptor.getValue().getCode());
         assertEquals("ACME Data", tenantCaptor.getValue().getName());

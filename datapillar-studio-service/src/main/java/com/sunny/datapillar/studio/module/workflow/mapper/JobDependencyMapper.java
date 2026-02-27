@@ -1,12 +1,25 @@
 package com.sunny.datapillar.studio.module.workflow.mapper;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.sunny.datapillar.studio.module.workflow.dto.JobDependencyDto;
 import com.sunny.datapillar.studio.module.workflow.entity.JobDependency;
 
 /**
@@ -22,12 +35,12 @@ public interface JobDependencyMapper extends BaseMapper<JobDependency> {
     /**
      * 查询工作流下的所有依赖关系
      */
-    List<JobDependencyDto.Response> selectByWorkflowId(@Param("workflowId") Long workflowId);
+    List<JobDependencyResponse> selectByWorkflowId(@Param("workflowId") Long workflowId);
 
     /**
      * 查询任务的上游依赖
      */
-    List<JobDependencyDto.Response> selectByJobId(@Param("jobId") Long jobId);
+    List<JobDependencyResponse> selectByJobId(@Param("jobId") Long jobId);
 
     /**
      * 删除指定的依赖关系

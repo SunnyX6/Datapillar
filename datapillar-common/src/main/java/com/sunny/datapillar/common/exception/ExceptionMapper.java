@@ -19,7 +19,9 @@ public final class ExceptionMapper {
     }
 
     public static ExceptionDetail resolve(Throwable throwable) {
-        Throwable target = throwable == null ? new InternalException(DEFAULT_INTERNAL_MESSAGE) : throwable;
+        Throwable target = throwable == null
+                ? new InternalException(DEFAULT_INTERNAL_MESSAGE)
+                : throwable;
         String message = resolveMessage(target);
         String type = target.getClass().getSimpleName();
         String traceId = resolveTraceId();

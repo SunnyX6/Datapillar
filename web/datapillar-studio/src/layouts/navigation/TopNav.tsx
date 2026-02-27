@@ -22,13 +22,12 @@ import {
   X
 } from 'lucide-react'
 import { ExpandToggle } from './ExpandToggle'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { useAuthStore, useI18nStore, useSearchStore, type Language, type SearchContext } from '@/stores'
+import { useAuthStore, useI18nStore, useSearchStore, type Language } from '@/state'
 import { useTranslation } from 'react-i18next'
 import { iconSizeToken, inputContainerWidthClassMap, menuWidthClassMap } from '@/design-tokens/dimensions'
 import { Button } from '@/components/ui'
-import type { Menu } from '@/types/auth'
-import { isMenuVisible } from '@/router/access/routeAccess'
+import type { Menu } from '@/services/types/auth'
+import { isMenuVisible } from '@/services/menuPermissionService'
 
 const LANGUAGE_OPTIONS: { id: Language; label: string }[] = [
   { id: 'zh-CN', label: '简体中文' },
@@ -65,8 +64,6 @@ export function TopNav({
   onToggleSidebar,
   onProfile
 }: TopNavProps) {
-  const navigate = useNavigate()
-  const location = useLocation()
   const authUser = useAuthStore((state) => state.user)
   const normalizedUserName = useMemo(() => {
     const name = user.name.trim()
@@ -94,33 +91,9 @@ export function TopNav({
   // 全局搜索状态
   const searchTerm = useSearchStore((state) => state.searchTerm)
   const setSearchTerm = useSearchStore((state) => state.setSearchTerm)
-  const _searchContext = useSearchStore((state) => state.context)
-  const setSearchContext = useSearchStore((state) => state.setContext)
   const isSearchOpen = useSearchStore((state) => state.isOpen)
   const setIsSearchOpen = useSearchStore((state) => state.setIsOpen)
   const getContextConfig = useSearchStore((state) => state.getContextConfig)
-
-  // 根据路由自动设置搜索上下文
-  useEffect(() => {
-    const path = location.pathname
-    let context: SearchContext = 'default'
-
-    if (path.startsWith('/governance/metadata')) {
-      context = 'metadata'
-    } else if (path.includes('/governance/semantic/metrics')) {
-      context = 'semantic-metrics'
-    } else if (path.includes('/governance/semantic/glossary')) {
-      context = 'semantic-glossary'
-    } else if (path.startsWith('/governance/semantic')) {
-      context = 'semantic'
-    } else if (path.startsWith('/governance/knowledge')) {
-      context = 'knowledge'
-    } else if (path === '/' || path.startsWith('/dashboard')) {
-      context = 'dashboard'
-    }
-
-    setSearchContext(context)
-  }, [location.pathname, setSearchContext])
 
   // 键盘快捷键 ⌘K
   useEffect(() => {
@@ -336,7 +309,6 @@ export function TopNav({
   const getProfileIcon = (path: string) => {
     return profileIconMap[path] ?? <UserIcon size={iconSizeToken.small} className="text-slate-400" />
   }
-  const _languageLabel = language === 'zh-CN' ? t('language.zh', { defaultValue: '简体中文' }) : t('language.en', { defaultValue: 'English' })
   const orgLabel = authUser?.tenantName?.trim() ?? ''
   const orgInitial = orgLabel.slice(0, 1).toUpperCase()
 
@@ -448,7 +420,7 @@ export function TopNav({
       window.clearTimeout(governanceLeaveTimerRef.current)
       governanceLeaveTimerRef.current = null
     }
-    navigate(path)
+    onNavigate(path)
     setIsGovernanceOpen(false)
     setGovernancePos(null)
   }

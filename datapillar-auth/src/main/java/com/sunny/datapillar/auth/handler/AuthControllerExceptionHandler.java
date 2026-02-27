@@ -1,6 +1,5 @@
 package com.sunny.datapillar.auth.handler;
 
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
@@ -12,19 +11,4 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  */
 @RestControllerAdvice
 public class AuthControllerExceptionHandler extends BaseControllerExceptionHandler {
-
-    @Override
-    protected String resolveDuplicateKeyMessage(DuplicateKeyException exception) {
-        String message = exception.getMessage();
-        if (message == null) {
-            return "数据已存在";
-        }
-        if (message.contains("username")) {
-            return "用户名已存在";
-        }
-        if (message.contains("email")) {
-            return "邮箱已被注册";
-        }
-        return "数据已存在，请检查输入内容";
-    }
 }

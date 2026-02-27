@@ -1,7 +1,20 @@
 package com.sunny.datapillar.studio.module.workflow.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.sunny.datapillar.studio.module.workflow.dto.WorkflowDto;
 import com.sunny.datapillar.studio.module.workflow.service.WorkflowRunBizService;
 import com.sunny.datapillar.studio.module.workflow.service.WorkflowService;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +34,7 @@ public class WorkflowRunBizServiceImpl implements WorkflowRunBizService {
     private final WorkflowService workflowService;
 
     @Override
-    public JsonNode triggerWorkflow(Long id, WorkflowDto.TriggerRequest request) {
+    public JsonNode triggerWorkflow(Long id, WorkflowTriggerRequest request) {
         return workflowService.triggerWorkflow(id, request);
     }
 
@@ -51,17 +64,17 @@ public class WorkflowRunBizServiceImpl implements WorkflowRunBizService {
     }
 
     @Override
-    public JsonNode rerunJob(Long id, String runId, String jobId, WorkflowDto.RerunJobRequest request) {
+    public JsonNode rerunJob(Long id, String runId, String jobId, WorkflowRerunJobRequest request) {
         return workflowService.rerunJob(id, runId, jobId, request);
     }
 
     @Override
-    public JsonNode setJobState(Long id, String runId, String jobId, WorkflowDto.SetJobStateRequest request) {
+    public JsonNode setJobState(Long id, String runId, String jobId, WorkflowSetJobStatusRequest request) {
         return workflowService.setJobState(id, runId, jobId, request);
     }
 
     @Override
-    public JsonNode clearJobs(Long id, String runId, WorkflowDto.ClearJobsRequest request) {
+    public JsonNode clearJobs(Long id, String runId, WorkflowClearJobsRequest request) {
         return workflowService.clearJobs(id, runId, request);
     }
 }

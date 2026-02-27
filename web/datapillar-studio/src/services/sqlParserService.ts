@@ -12,7 +12,7 @@ import {
   TrinoSQL
 } from 'dt-sql-parser'
 import { EntityContextType } from 'dt-sql-parser'
-import type { SyntaxError } from 'dt-sql-parser'
+import type { ParseError } from 'dt-sql-parser'
 
 export type SqlDialect = 'MySQL' | 'HiveSQL' | 'SparkSQL' | 'FlinkSQL' | 'PostgreSQL' | 'TrinoSQL'
 
@@ -105,9 +105,9 @@ function generateId(prefix: string, index: number): string {
 /**
  * 从 WordRange 提取文本
  */
-function extractText(ddl: string, range: { startIndex: number; stopIndex: number } | null): string {
+function extractText(ddl: string, range: { startIndex: number; endIndex: number } | null): string {
   if (!range) return ''
-  return ddl.substring(range.startIndex, range.stopIndex + 1).replace(/^['"`]|['"`]$/g, '')
+  return ddl.substring(range.startIndex, range.endIndex + 1).replace(/^['"`]|['"`]$/g, '')
 }
 
 /**
@@ -122,7 +122,7 @@ export function parseDDL(ddl: string, provider?: string): ParsedDDL {
   if (errors.length > 0) {
     const firstError = errors[0]
     throw new Error(
-      `DDL 语法错误 (行 ${firstError.startLine}, 列 ${firstError.startCol}): ${firstError.message}`
+      `DDL 语法错误 (行 ${firstError.startLine}, 列 ${firstError.startColumn}): ${firstError.message}`
     )
   }
 
@@ -155,7 +155,7 @@ export function parseDDL(ddl: string, provider?: string): ParsedDDL {
         result.tableName = entity.text
         // 提取表注释
         if (entity['_comment']) {
-          result.tableComment = extractText(ddl, entity['_comment'] as { startIndex: number; stopIndex: number })
+          result.tableComment = extractText(ddl, entity['_comment'] as { startIndex: number; endIndex: number })
         }
         // 提取列（如果 columns 存在）
         const tableEntity = entity as { columns?: Array<{
@@ -227,7 +227,7 @@ export function parseDDL(ddl: string, provider?: string): ParsedDDL {
 /**
  * 验证 DDL 语法
  */
-export function validateDDL(ddl: string, provider?: string): SyntaxError[] {
+export function validateDDL(ddl: string, provider?: string): ParseError[] {
   const dialect = resolveDialect(provider)
   const parser = getParser(dialect)
   return parser.validate(ddl)

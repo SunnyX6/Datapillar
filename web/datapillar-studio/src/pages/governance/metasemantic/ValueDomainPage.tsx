@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { ValueDomainExplorer } from '@/layouts/governance/metasemantic/explorer/ValueDomainExplorer'
+import { ValueDomainExplorer } from '@/features/governance/ui/metasemantic/explorer/ValueDomainExplorer'
 
 export function GovernanceValueDomainPage() {
   const navigate = useNavigate()

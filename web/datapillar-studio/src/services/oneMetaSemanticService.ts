@@ -4,10 +4,10 @@
  * 负责词根、指标、修饰符、单位、值域等语义层资产管理
  */
 
-import { API_BASE, requestRaw } from '@/lib/api'
-import type { ApiError, ApiResponse } from '@/types/api'
-import type { GravitinoBaseResponse } from '@/types/onemeta/metadata'
-import type { MetricType, Metric, WordRootDTO, UnitDTO, MetricModifierDTO } from '@/types/onemeta/semantic'
+import { API_BASE, requestRaw } from '@/api'
+import type { ApiError, ApiResponse } from '@/api/types/api'
+import type { GravitinoBaseResponse } from '@/services/types/onemeta/metadata'
+import type { MetricType, Metric, WordRootDTO, UnitDTO, MetricModifierDTO } from '@/services/types/onemeta/semantic'
 
 // 重新导出 API 类型供外部使用
 export type { MetricType, Metric, WordRootDTO, UnitDTO, MetricModifierDTO }
@@ -309,8 +309,16 @@ export interface MetricVersionItem {
   refCatalogName?: string
   refSchemaName?: string
   refTableName?: string
+  refColumnName?: string
   measureColumnIds?: string
   filterColumnIds?: string
+  measureColumns?: Array<{ name: string; type: string; comment?: string }>
+  filterColumns?: Array<{
+    name: string
+    type: string
+    comment?: string
+    values?: Array<{ key: string; label: string }>
+  }>
   parentMetricCodes?: string[]
   properties?: Record<string, string>
   audit?: {

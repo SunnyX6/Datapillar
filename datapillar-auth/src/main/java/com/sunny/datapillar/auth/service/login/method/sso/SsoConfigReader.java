@@ -43,23 +43,23 @@ public class SsoConfigReader {
     public SsoProviderConfig loadConfig(Long tenantId, String provider) {
         TenantSsoConfig config = tenantSsoConfigMapper.selectByTenantIdAndProvider(tenantId, provider);
         if (config == null) {
-            throw new NotFoundException("SSO配置不存在: provider=%s", provider);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("SSO配置不存在: provider=%s", provider);
         }
         if (config.getStatus() == null || config.getStatus() != 1) {
-            throw new ForbiddenException("SSO配置已禁用: provider=%s", provider);
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("SSO配置已禁用: provider=%s", provider);
         }
         Map<String, Object> map;
         try {
             map = objectMapper.readValue(config.getConfigJson(), new TypeReference<>() {
             });
         } catch (Exception e) {
-            throw new InternalException("SSO配置无效: %s", provider);
+            throw new com.sunny.datapillar.common.exception.InternalException("SSO配置无效: %s", provider);
         }
         String encodedSecret = map.get("clientSecret") == null ? null : String.valueOf(map.get("clientSecret"));
         String tenantCode = resolveTenantCode(tenantId);
         String clientSecret = ssoSecretCodec.decryptSecret(tenantCode, encodedSecret);
         if (clientSecret == null) {
-            throw new InternalException("SSO配置无效: %s", "clientSecret");
+            throw new com.sunny.datapillar.common.exception.InternalException("SSO配置无效: %s", "clientSecret");
         }
         map.put("clientSecret", clientSecret);
         return new SsoProviderConfig(config.getProvider(), config.getBaseUrl(), map);
@@ -67,11 +67,11 @@ public class SsoConfigReader {
 
     private String resolveTenantCode(Long tenantId) {
         if (tenantId == null || tenantId <= 0) {
-            throw new InternalException("SSO配置无效: %s", "tenant_private_key_missing");
+            throw new com.sunny.datapillar.common.exception.InternalException("SSO配置无效: %s", "tenant_private_key_missing");
         }
         Tenant tenant = tenantMapper.selectById(tenantId);
         if (tenant == null || tenant.getCode() == null || tenant.getCode().isBlank()) {
-            throw new InternalException("SSO配置无效: %s", "tenant_private_key_missing");
+            throw new com.sunny.datapillar.common.exception.InternalException("SSO配置无效: %s", "tenant_private_key_missing");
         }
         return tenant.getCode().trim();
     }

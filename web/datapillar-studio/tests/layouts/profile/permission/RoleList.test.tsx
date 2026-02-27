@@ -2,8 +2,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act } from 'react-dom/test-utils'
 import { createRoot } from 'react-dom/client'
-import { RoleList } from '@/layouts/profile/permission/RoleList'
-import type { RoleItem } from '@/layouts/profile/permission/Permission'
+import { RoleList } from '@/features/profile/ui/permission/RoleList'
+import type { RoleItem } from '@/features/profile/utils/permissionTypes'
 
 const roles: RoleItem[] = [
   {

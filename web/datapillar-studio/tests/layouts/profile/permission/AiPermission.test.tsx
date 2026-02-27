@@ -2,11 +2,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act } from 'react-dom/test-utils'
 import { createRoot } from 'react-dom/client'
-import { AiPermission } from '@/layouts/profile/permission/AiPermission'
+import { AiPermission } from '@/features/profile/ui/permission/AiPermission'
 import type {
   RoleDefinition,
   UserItem,
-} from '@/layouts/profile/permission/Permission'
+} from '@/features/profile/utils/permissionTypes'
 
 const role: RoleDefinition = {
   id: 'role_dev',
@@ -15,9 +15,9 @@ const role: RoleDefinition = {
   description: '用于测试',
   permissions: [],
   aiModelPermissions: [
-    { modelId: 'model_gemini_3_pro', access: 'READ' },
-    { modelId: 'model_claude_3_5_sonnet', access: 'READ' },
-    { modelId: 'model_llama_3_1_405b', access: 'DISABLE' },
+    { aiModelId: 1, access: 'READ' },
+    { aiModelId: 2, access: 'READ' },
+    { aiModelId: 3, access: 'DISABLE' },
   ],
 }
 
@@ -28,8 +28,38 @@ const user: UserItem = {
   roleId: 'role_dev',
   status: '已激活',
   lastActive: '刚刚',
-  aiModelPermissions: [{ modelId: 'model_claude_3_5_sonnet', access: 'READ' }],
+  aiModelPermissions: [{ aiModelId: 2, access: 'READ' }],
 }
+
+const models = [
+  {
+    aiModelId: 1,
+    providerModelId: 'model_gemini_3_pro',
+    name: 'Gemini 3 Pro',
+    providerName: 'Google',
+    modelType: 'chat',
+    modelStatus: 'ACTIVE',
+    access: 'DISABLE' as const,
+  },
+  {
+    aiModelId: 2,
+    providerModelId: 'model_claude_3_5_sonnet',
+    name: 'Claude 3.5 Sonnet',
+    providerName: 'Anthropic',
+    modelType: 'chat',
+    modelStatus: 'ACTIVE',
+    access: 'READ' as const,
+  },
+  {
+    aiModelId: 3,
+    providerModelId: 'model_llama_3_1_405b',
+    name: 'Llama 3.1 405B',
+    providerName: 'Meta',
+    modelType: 'chat',
+    modelStatus: 'ACTIVE',
+    access: 'DISABLE' as const,
+  },
+]
 
 const render = (ui: JSX.Element) => {
   const container = document.createElement('div')
@@ -59,14 +89,15 @@ describe('AiPermission', () => {
         mode="user"
         role={role}
         user={user}
+        models={models}
         onUpdateModelAccess={onUpdate}
       />,
     )
 
     expect(container.textContent).toContain('独立权限配置模式')
-    expect(container.textContent).toContain('覆盖')
+    expect(container.textContent).toContain('您正在为该用户单独配置 AI 模型权限')
     expect(
-      container.querySelector('[data-testid="ai-access-model_gemini_3_pro-ADMIN"]'),
+      container.querySelector('[data-testid="ai-access-1-ADMIN"]'),
     ).not.toBeNull()
 
     unmount(root, container)
@@ -79,12 +110,13 @@ describe('AiPermission', () => {
         mode="user"
         role={role}
         user={user}
+        models={models}
         onUpdateModelAccess={onUpdate}
       />,
     )
 
     const button = container.querySelector(
-      '[data-testid="ai-access-model_llama_3_1_405b-READ"]',
+      '[data-testid="ai-access-3-READ"]',
     )
     expect(button).not.toBeNull()
 
@@ -92,7 +124,7 @@ describe('AiPermission', () => {
       button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(onUpdate).toHaveBeenCalledWith('u-1', 'model_llama_3_1_405b', 'READ')
+    expect(onUpdate).toHaveBeenCalledWith('u-1', 3, 'READ')
 
     unmount(root, container)
   })

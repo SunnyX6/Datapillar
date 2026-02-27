@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.tenant.service;
 
-import com.sunny.datapillar.studio.module.tenant.dto.TenantDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import java.util.List;
 
@@ -15,11 +28,11 @@ public interface TenantService {
 
     List<Tenant> listTenants(Integer status);
 
-    Long createTenant(TenantDto.Create dto);
+    Long createTenant(TenantCreateRequest dto);
 
-    TenantDto.Response getTenant(Long tenantId);
+    TenantResponse getTenant(Long tenantId);
 
-    void updateTenant(Long tenantId, TenantDto.Update dto);
+    void updateTenant(Long tenantId, TenantUpdateRequest dto);
 
     void updateStatus(Long tenantId, Integer status);
 }

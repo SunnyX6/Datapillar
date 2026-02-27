@@ -1,16 +1,16 @@
-import { API_BASE, API_PATH } from '@/lib/api'
+import { API_BASE, API_PATH } from '@/api'
 import type {
   LlmPlaygroundChatRequest,
   LlmPlaygroundDoneEvent,
   LlmPlaygroundStreamCallbacks
-} from '@/types/ai/llm'
+} from '@/services/types/ai/llm'
 
 export type {
   LlmPlaygroundChatRequest,
   LlmPlaygroundDoneEvent,
   LlmPlaygroundModelConfig,
   LlmPlaygroundStreamCallbacks
-} from '@/types/ai/llm'
+} from '@/services/types/ai/llm'
 
 interface ParsedSseEvent {
   event: string

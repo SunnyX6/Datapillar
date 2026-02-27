@@ -1,6 +1,7 @@
 package com.sunny.datapillar.auth.security.keystore.impl;
 
 import com.sunny.datapillar.auth.config.KeyStorageProperties;
+import com.sunny.datapillar.auth.exception.security.KeyStorageTenantCodeInvalidException;
 import com.sunny.datapillar.common.constant.Code;
 import com.sunny.datapillar.common.constant.ErrorType;
 import com.sunny.datapillar.common.exception.AlreadyExistsException;
@@ -38,7 +39,7 @@ class LocalKeyStorageTest {
         LocalKeyStorage storage = new LocalKeyStorage(properties);
 
         Assertions.assertThrows(
-                IllegalArgumentException.class,
+                KeyStorageTenantCodeInvalidException.class,
                 () -> storage.savePrivateKey(
                         "../tenant",
                         "private-key".getBytes(StandardCharsets.US_ASCII)));

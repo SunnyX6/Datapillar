@@ -25,7 +25,7 @@ public class TenantCodeResolver {
 
     public String requireTenantCode(Long tenantId) {
         if (tenantId == null || tenantId <= 0) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         TenantContext context = TenantContextHolder.get();
         if (context != null
@@ -35,7 +35,7 @@ public class TenantCodeResolver {
         }
         Tenant tenant = tenantMapper.selectById(tenantId);
         if (tenant == null || !StringUtils.hasText(tenant.getCode())) {
-            throw new NotFoundException("租户不存在: %s", tenantId);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("租户不存在: %s", tenantId);
         }
         return tenant.getCode().trim();
     }

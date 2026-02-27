@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useWorkflowStudioCacheStore } from '@/stores'
-import { DEFAULT_WORKFLOW_MODEL_ID } from '@/config/workflowModels'
+import { DEFAULT_WORKFLOW_AI_MODEL_ID, useWorkflowStudioCacheStore } from '@/features/workflow/state'
 import { emptyWorkflowGraph } from '@/services/workflowStudioService'
 
 const resetWorkflowCacheStore = () => {
@@ -12,8 +11,8 @@ const resetWorkflowCacheStore = () => {
     lastPrompt: '',
     isInitialized: false,
     virtuosoState: null,
-    selectedModelId: DEFAULT_WORKFLOW_MODEL_ID,
-    defaultModelId: DEFAULT_WORKFLOW_MODEL_ID
+    selectedAiModelId: DEFAULT_WORKFLOW_AI_MODEL_ID,
+    defaultAiModelId: DEFAULT_WORKFLOW_AI_MODEL_ID
   })
 }
 
@@ -24,7 +23,7 @@ describe('workflowStudioCacheStore', () => {
     await useWorkflowStudioCacheStore.persist.rehydrate()
   })
 
-  it('从 v3 迁移时应将 selectedModelId 回填为 defaultModelId', async () => {
+  it('旧版本缓存不做迁移，直接回退默认模型', async () => {
     const legacyModelId = 'anthropic/claude-3.5-sonnet'
 
     localStorage.setItem(
@@ -45,7 +44,7 @@ describe('workflowStudioCacheStore', () => {
     await useWorkflowStudioCacheStore.persist.rehydrate()
 
     const state = useWorkflowStudioCacheStore.getState()
-    expect(state.selectedModelId).toBe(legacyModelId)
-    expect(state.defaultModelId).toBe(legacyModelId)
+    expect(state.selectedAiModelId).toBe(DEFAULT_WORKFLOW_AI_MODEL_ID)
+    expect(state.defaultAiModelId).toBe(DEFAULT_WORKFLOW_AI_MODEL_ID)
   })
 })

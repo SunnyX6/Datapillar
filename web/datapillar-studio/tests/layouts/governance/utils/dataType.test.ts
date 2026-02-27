@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_LENGTH, DEFAULT_MAX_LENGTH, getMaxLengthForType } from '@/layouts/governance/utils/dataType'
+import { DEFAULT_LENGTH, DEFAULT_MAX_LENGTH, getMaxLengthForType } from '@/utils/dataType'
 
 describe('dataType length defaults', () => {
   it('uses 1 as the default length', () => {

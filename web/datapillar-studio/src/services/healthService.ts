@@ -1,4 +1,4 @@
-import { API_BASE, API_PATH, requestRaw } from '@/lib/api'
+import { API_BASE, API_PATH, requestRaw } from '@/api'
 
 export interface StudioServiceHealthPayload {
   status?: unknown

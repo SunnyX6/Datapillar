@@ -1,4 +1,4 @@
-import { API_BASE, API_PATH, requestData } from '@/lib/api'
+import { API_BASE, API_PATH, requestData } from '@/api'
 import { pickDefinedParams } from './studioCommon'
 import type {
   CreateTenantInvitationRequest,
@@ -8,7 +8,7 @@ import type {
   StudioTenantFeatureAudit,
   StudioTenantSsoIdentity,
   StudioTenantUser
-} from '@/types/studio/tenant'
+} from '@/services/types/studio/tenant'
 
 export type {
   CreateTenantInvitationRequest,
@@ -18,7 +18,7 @@ export type {
   StudioTenantFeatureAudit,
   StudioTenantSsoIdentity,
   StudioTenantUser
-} from '@/types/studio/tenant'
+} from '@/services/types/studio/tenant'
 
 export async function listTenants(status?: number): Promise<StudioTenant[]> {
   return requestData<StudioTenant[]>({

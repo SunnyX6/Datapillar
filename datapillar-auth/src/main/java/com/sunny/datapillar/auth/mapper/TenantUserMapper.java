@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.sunny.datapillar.auth.dto.login.response.TenantOptionItem;
 import com.sunny.datapillar.auth.entity.TenantUser;
 
 /**
@@ -22,5 +23,5 @@ public interface TenantUserMapper extends BaseMapper<TenantUser> {
 
     int countByUserId(@Param("userId") Long userId);
 
-    List<com.sunny.datapillar.auth.dto.AuthDto.TenantOption> selectTenantOptionsByUserId(@Param("userId") Long userId);
+    List<TenantOptionItem> selectTenantOptionsByUserId(@Param("userId") Long userId);
 }

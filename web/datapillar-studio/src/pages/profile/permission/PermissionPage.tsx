@@ -1,4 +1,4 @@
-import { PermissionLayout } from '@/layouts/profile/permission'
+import { PermissionLayout } from '@/features/profile/ui/permission'
 
 export function PermissionPage() {
   return <PermissionLayout />

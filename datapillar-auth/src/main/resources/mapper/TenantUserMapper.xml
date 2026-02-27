@@ -23,7 +23,7 @@
         WHERE user_id = #{userId}
     </select>
 
-    <select id="selectTenantOptionsByUserId" resultType="com.sunny.datapillar.auth.dto.AuthDto$TenantOption">
+    <select id="selectTenantOptionsByUserId" resultType="com.sunny.datapillar.auth.dto.login.response.TenantOptionItem">
         SELECT t.id AS tenant_id,
                t.code AS tenant_code,
                t.name AS tenant_name,

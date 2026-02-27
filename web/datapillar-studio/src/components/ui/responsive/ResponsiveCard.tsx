@@ -14,7 +14,7 @@
  */
 
 import type { ReactNode } from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/utils'
 import { cardWidthClassMap, type CardWidth } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 
@@ -49,6 +49,7 @@ const cardSizeClassMap: Record<CardSize, string> = {
   normal: cardWidthClassMap.normal,
   medium: cardWidthClassMap.medium,
   wide: cardWidthClassMap.wide,
+  superWide: cardWidthClassMap.superWide,
   extraWide: cardWidthClassMap.extraWide
 }
 

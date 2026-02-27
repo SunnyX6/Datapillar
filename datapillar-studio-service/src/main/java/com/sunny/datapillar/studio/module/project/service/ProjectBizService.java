@@ -1,7 +1,20 @@
 package com.sunny.datapillar.studio.module.project.service;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.sunny.datapillar.studio.module.project.dto.ProjectDto;
 
 /**
  * 项目业务服务
@@ -12,13 +25,13 @@ import com.sunny.datapillar.studio.module.project.dto.ProjectDto;
  */
 public interface ProjectBizService {
 
-    IPage<ProjectDto.Response> getProjectPage(ProjectDto.Query query, Long userId);
+    IPage<ProjectResponse> getProjectPage(ProjectQueryRequest query, Long userId);
 
-    ProjectDto.Response getProjectById(Long id, Long userId);
+    ProjectResponse getProjectById(Long id, Long userId);
 
-    Long createProject(ProjectDto.Create dto, Long userId);
+    Long createProject(ProjectCreateRequest dto, Long userId);
 
-    void updateProject(Long id, ProjectDto.Update dto, Long userId);
+    void updateProject(Long id, ProjectUpdateRequest dto, Long userId);
 
     void deleteProject(Long id, Long userId);
 }

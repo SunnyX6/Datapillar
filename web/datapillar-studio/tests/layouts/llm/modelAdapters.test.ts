@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { mapAdminModelToRecord, resolveProviderLabel } from '@/layouts/llm/modelAdapters'
+import { mapAdminModelToRecord, resolveProviderLabel } from '@/features/llm/utils/modelAdapters'
 import type { StudioLlmModel } from '@/services/studioLlmService'
 
 describe('LLM 模型适配器', () => {
   it('将后端模型响应映射为前端模型结构', () => {
     const input: StudioLlmModel = {
-      id: 101,
-      modelId: 'openai/text-embedding-3-large',
+      aiModelId: 101,
+      providerModelId: 'openai/text-embedding-3-large',
       name: 'Text Embedding 3 Large',
       providerId: 1,
       providerCode: 'OpenAI',
@@ -30,7 +30,8 @@ describe('LLM 模型适配器', () => {
 
     const record = mapAdminModelToRecord(input)
 
-    expect(record.id).toBe('openai/text-embedding-3-large')
+    expect(record.aiModelId).toBe(101)
+    expect(record.providerModelId).toBe('openai/text-embedding-3-large')
     expect(record.provider).toBe('openai')
     expect(record.type).toBe('embeddings')
     expect(record.contextGroup).toBe('8192')
@@ -48,8 +49,8 @@ describe('LLM 模型适配器', () => {
 
   it('未知模型类型不做降级映射并直接抛错', () => {
     const input: StudioLlmModel = {
-      id: 102,
-      modelId: 'custom/unknown-model',
+      aiModelId: 102,
+      providerModelId: 'custom/unknown-model',
       name: 'Unknown Model',
       providerId: 1,
       providerCode: 'custom',

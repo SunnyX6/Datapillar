@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.tenant.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -9,7 +23,6 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
 import com.sunny.datapillar.studio.context.TenantContextHolder;
-import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
 import com.sunny.datapillar.studio.module.tenant.entity.FeatureObject;
 import com.sunny.datapillar.studio.module.tenant.mapper.FeatureObjectMapper;
 import com.sunny.datapillar.studio.module.tenant.service.FeatureObjectService;
@@ -32,31 +45,31 @@ public class FeatureObjectServiceImpl implements FeatureObjectService {
     private final FeatureObjectMapper featureObjectMapper;
 
     @Override
-    public List<FeatureObjectDto.TreeNode> getFeatureObjectsByUserId(Long userId, String location) {
+    public List<FeatureTreeNodeItem> getFeatureObjectsByUserId(Long userId, String location) {
         Long tenantId = getRequiredTenantId();
         List<FeatureObject> featureObjects = featureObjectMapper.findByUserId(tenantId, userId, location);
-        List<FeatureObjectDto.TreeNode> nodes = convertToFeatureObjectNodes(featureObjects);
+        List<FeatureTreeNodeItem> nodes = convertToFeatureObjectNodes(featureObjects);
         return buildFeatureObjectTree(nodes);
     }
 
     @Override
-    public List<FeatureObjectDto.TreeNode> getAllVisibleFeatureObjects() {
+    public List<FeatureTreeNodeItem> getAllVisibleFeatureObjects() {
         Long tenantId = getRequiredTenantId();
         List<FeatureObject> featureObjects = featureObjectMapper.findAllVisible(tenantId);
-        List<FeatureObjectDto.TreeNode> nodes = convertToFeatureObjectNodes(featureObjects);
+        List<FeatureTreeNodeItem> nodes = convertToFeatureObjectNodes(featureObjects);
         return buildFeatureObjectTree(nodes);
     }
 
     @Override
-    public List<FeatureObjectDto.TreeNode> buildFeatureObjectTree(List<FeatureObjectDto.TreeNode> featureObjects) {
+    public List<FeatureTreeNodeItem> buildFeatureObjectTree(List<FeatureTreeNodeItem> featureObjects) {
         if (featureObjects == null || featureObjects.isEmpty()) {
             return new ArrayList<>();
         }
 
-        Map<Long, List<FeatureObjectDto.TreeNode>> featureObjectMap = featureObjects.stream()
+        Map<Long, List<FeatureTreeNodeItem>> featureObjectMap = featureObjects.stream()
                 .collect(Collectors.groupingBy(node -> node.getParentId() == null ? 0L : node.getParentId()));
 
-        List<FeatureObjectDto.TreeNode> rootNodes = featureObjectMap.getOrDefault(0L, new ArrayList<>());
+        List<FeatureTreeNodeItem> rootNodes = featureObjectMap.getOrDefault(0L, new ArrayList<>());
         buildChildren(rootNodes, featureObjectMap);
 
         rootNodes.sort((n1, n2) -> {
@@ -68,9 +81,9 @@ public class FeatureObjectServiceImpl implements FeatureObjectService {
         return rootNodes;
     }
 
-    private void buildChildren(List<FeatureObjectDto.TreeNode> parentNodes, Map<Long, List<FeatureObjectDto.TreeNode>> featureObjectMap) {
-        for (FeatureObjectDto.TreeNode parentNode : parentNodes) {
-            List<FeatureObjectDto.TreeNode> children = featureObjectMap.getOrDefault(parentNode.getId(), new ArrayList<>());
+    private void buildChildren(List<FeatureTreeNodeItem> parentNodes, Map<Long, List<FeatureTreeNodeItem>> featureObjectMap) {
+        for (FeatureTreeNodeItem parentNode : parentNodes) {
+            List<FeatureTreeNodeItem> children = featureObjectMap.getOrDefault(parentNode.getId(), new ArrayList<>());
             if (!children.isEmpty()) {
                 children.sort((n1, n2) -> {
                     int sort1 = n1.getSort() != null ? n1.getSort() : 0;
@@ -83,14 +96,14 @@ public class FeatureObjectServiceImpl implements FeatureObjectService {
         }
     }
 
-    private List<FeatureObjectDto.TreeNode> convertToFeatureObjectNodes(List<FeatureObject> featureObjects) {
+    private List<FeatureTreeNodeItem> convertToFeatureObjectNodes(List<FeatureObject> featureObjects) {
         return featureObjects.stream()
                 .map(this::convertToFeatureObjectNode)
                 .collect(Collectors.toList());
     }
 
-    private FeatureObjectDto.TreeNode convertToFeatureObjectNode(FeatureObject featureObject) {
-        FeatureObjectDto.TreeNode response = new FeatureObjectDto.TreeNode();
+    private FeatureTreeNodeItem convertToFeatureObjectNode(FeatureObject featureObject) {
+        FeatureTreeNodeItem response = new FeatureTreeNodeItem();
         BeanUtils.copyProperties(featureObject, response);
         return response;
     }
@@ -98,7 +111,7 @@ public class FeatureObjectServiceImpl implements FeatureObjectService {
     private Long getRequiredTenantId() {
         Long tenantId = TenantContextHolder.getTenantId();
         if (tenantId == null) {
-            throw new UnauthorizedException("未授权访问");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("未授权访问");
         }
         return tenantId;
     }

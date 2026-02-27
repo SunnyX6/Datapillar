@@ -112,9 +112,7 @@ export function useBreakpoint(
       mediaQuery.addEventListener('change', handleChange)
       return () => mediaQuery.removeEventListener('change', handleChange)
     } else {
-      // @ts-expect-error - 兼容旧版 API
       mediaQuery.addListener(handleChange)
-      // @ts-expect-error - 兼容旧版 API
       return () => mediaQuery.removeListener(handleChange)
     }
   }, [query])

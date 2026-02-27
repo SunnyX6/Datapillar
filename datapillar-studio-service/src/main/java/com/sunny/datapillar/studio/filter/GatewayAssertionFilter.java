@@ -78,7 +78,7 @@ public class GatewayAssertionFilter extends OncePerRequestFilter {
         String assertion = request.getHeader(properties.getHeaderName());
         if (assertion == null || assertion.isBlank()) {
             securityExceptionHandler.writeError(
-                    response, new UnauthorizedException("gateway_assertion_header_missing"));
+                    response, new com.sunny.datapillar.common.exception.UnauthorizedException("gateway_assertion_header_missing"));
             return;
         }
 
@@ -89,7 +89,7 @@ public class GatewayAssertionFilter extends OncePerRequestFilter {
             GatewayAssertionContext context = verifier.verify(assertion, method, path);
             if (context.tokenId() == null || context.tokenId().isBlank()) {
                 securityExceptionHandler.writeError(
-                        response, new UnauthorizedException("gateway_assertion_token_id_missing"));
+                        response, new com.sunny.datapillar.common.exception.UnauthorizedException("gateway_assertion_token_id_missing"));
                 return;
             }
 
@@ -112,7 +112,7 @@ public class GatewayAssertionFilter extends OncePerRequestFilter {
         } catch (Exception ex) {
             log.warn("security_event event=gateway_assertion_verify_failed path={} method={} reason={}",
                     path, method, ex.getMessage());
-            securityExceptionHandler.writeError(response, new UnauthorizedException(ex, "未授权访问"));
+            securityExceptionHandler.writeError(response, new com.sunny.datapillar.common.exception.UnauthorizedException(ex, "未授权访问"));
         }
     }
 

@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.sql.service;
 
-import com.sunny.datapillar.studio.module.sql.dto.SqlDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 
 /**
  * SQL业务服务
@@ -11,13 +24,13 @@ import com.sunny.datapillar.studio.module.sql.dto.SqlDto;
  */
 public interface SqlBizService {
 
-    SqlDto.ExecuteResult executeSql(SqlDto.ExecuteRequest request);
+    SqlExecuteResponse executeSql(SqlExecuteRequest request);
 
-    SqlDto.CatalogListResponse listCatalogs();
+    SqlCatalogListResponse listCatalogs();
 
-    SqlDto.DatabaseListResponse listDatabases(String catalog);
+    SqlDatabaseListResponse listDatabases(String catalog);
 
-    SqlDto.TableListResponse listTables(String catalog, String database);
+    SqlTableListResponse listTables(String catalog, String database);
 
     boolean isAvailable();
 }

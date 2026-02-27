@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.llm.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -23,8 +37,8 @@ import com.sunny.datapillar.common.exception.BadRequestException;
 import com.sunny.datapillar.common.exception.InternalException;
 import com.sunny.datapillar.studio.context.TenantContext;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
-import com.sunny.datapillar.studio.module.llm.dto.LlmManagerDto;
-import com.sunny.datapillar.studio.module.llm.dto.LlmProviderDto;
+import com.sunny.datapillar.studio.exception.llm.AiProviderAlreadyExistsException;
+import com.sunny.datapillar.studio.exception.translator.StudioDbExceptionTranslator;
 import com.sunny.datapillar.studio.module.llm.entity.AiModelGrant;
 import com.sunny.datapillar.studio.module.llm.entity.AiModel;
 import com.sunny.datapillar.studio.module.llm.entity.AiProvider;
@@ -41,6 +55,7 @@ import com.sunny.datapillar.studio.module.tenant.service.TenantCodeResolver;
 import com.sunny.datapillar.studio.module.user.entity.User;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
 import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
+import java.sql.SQLException;
 import java.util.List;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.AfterEach;
@@ -90,7 +105,8 @@ class LlmManagerServiceImplTest {
                 userMapper,
                 authCryptoClient,
                 tenantCodeResolver,
-                new ObjectMapper()
+                new ObjectMapper(),
+                new StudioDbExceptionTranslator()
         ));
         lenient().when(tenantCodeResolver.requireTenantCode(1L)).thenReturn("tenant-1");
     }
@@ -106,17 +122,49 @@ class LlmManagerServiceImplTest {
         provider.setId(1L);
         provider.setCode("openai");
         when(aiProviderMapper.selectOne(any())).thenReturn(provider);
-        when(aiModelMapper.selectCount(any())).thenReturn(1L);
+        when(aiModelMapper.insert(any(AiModel.class))).thenThrow(new RuntimeException(
+                new SQLException("Duplicate entry 'x' for key 'uq_ai_model_tenant_provider_model'", "23000", 1062)));
 
-        LlmManagerDto.CreateRequest request = new LlmManagerDto.CreateRequest();
-        request.setModelId("openai/gpt-4o");
+        LlmModelCreateRequest request = new LlmModelCreateRequest();
+        request.setProviderModelId("openai/gpt-4o");
         request.setName("GPT-4o");
         request.setProviderCode("openai");
         request.setModelType(AiModelType.CHAT);
 
         AlreadyExistsException exception = assertThrows(AlreadyExistsException.class,
                 () -> service.createModel(100L, request));
-        assertEquals("资源已存在", exception.getMessage());
+        assertEquals("AI模型已存在", exception.getMessage());
+    }
+
+    @Test
+    void createModel_shouldAllowSameProviderModelIdAcrossDifferentProviders() {
+        AiProvider provider = new AiProvider();
+        provider.setId(2L);
+        provider.setCode("anthropic");
+        provider.setName("Anthropic");
+        when(aiProviderMapper.selectOne(any())).thenReturn(provider);
+        when(aiModelMapper.insert(any(AiModel.class))).thenAnswer(invocation -> {
+            AiModel inserting = invocation.getArgument(0);
+            inserting.setId(11L);
+            return 1;
+        });
+
+        LlmModelCreateRequest request = new LlmModelCreateRequest();
+        request.setProviderModelId("shared/model");
+        request.setName("Claude Sonnet");
+        request.setProviderCode("anthropic");
+        request.setModelType(AiModelType.CHAT);
+
+        LlmModelResponse response = service.createModel(100L, request);
+
+        assertEquals(11L, response.getAiModelId());
+        assertEquals("shared/model", response.getProviderModelId());
+
+        ArgumentCaptor<AiModel> modelCaptor = ArgumentCaptor.forClass(AiModel.class);
+        verify(aiModelMapper).insert(modelCaptor.capture());
+        AiModel created = modelCaptor.getValue();
+        assertEquals(2L, created.getProviderId());
+        assertEquals("shared/model", created.getProviderModelId());
     }
 
     @Test
@@ -127,7 +175,6 @@ class LlmManagerServiceImplTest {
         provider.setName("OpenAI");
         provider.setBaseUrl("https://api.openai.com/v1");
         when(aiProviderMapper.selectOne(any())).thenReturn(provider);
-        when(aiModelMapper.selectCount(any())).thenReturn(0L);
         when(aiModelMapper.insert(any(AiModel.class))).thenAnswer(invocation -> {
             AiModel inserting = invocation.getArgument(0);
             inserting.setId(10L);
@@ -136,14 +183,14 @@ class LlmManagerServiceImplTest {
         when(authCryptoClient.encryptLlmApiKey("tenant-1", "sk-test")).thenReturn("ENCv1:encrypted");
         doNothing().when(service).verifyModelConnection(any(), any(), any(), any(), any());
 
-        LlmManagerDto.CreateRequest request = new LlmManagerDto.CreateRequest();
-        request.setModelId("openai/gpt-4o");
+        LlmModelCreateRequest request = new LlmModelCreateRequest();
+        request.setProviderModelId("openai/gpt-4o");
         request.setName("GPT-4o");
         request.setProviderCode("openai");
         request.setModelType(AiModelType.CHAT);
         request.setApiKey("sk-test");
 
-        LlmManagerDto.ModelResponse response = service.createModel(100L, request);
+        LlmModelResponse response = service.createModel(100L, request);
 
         assertTrue(Boolean.TRUE.equals(response.getHasApiKey()));
 
@@ -159,21 +206,90 @@ class LlmManagerServiceImplTest {
     }
 
     @Test
-    void createProvider_shouldNotInsertWhenCodeExists() {
+    void createModel_shouldAutoGrantForPlatformSuperAdminCreator() {
         AiProvider provider = new AiProvider();
-        provider.setId(9L);
-        provider.setCode("openrouter");
-        provider.setName("OpenRouter");
-        provider.setModelIds("[\"openrouter/model-a\"]");
+        provider.setId(1L);
+        provider.setCode("openai");
+        provider.setName("OpenAI");
         when(aiProviderMapper.selectOne(any())).thenReturn(provider);
+        when(aiModelMapper.insert(any(AiModel.class))).thenAnswer(invocation -> {
+            AiModel inserting = invocation.getArgument(0);
+            inserting.setId(10L);
+            return 1;
+        });
 
-        LlmProviderDto.CreateRequest request = new LlmProviderDto.CreateRequest();
+        User creator = new User();
+        creator.setId(100L);
+        creator.setLevel(0);
+        when(userMapper.selectByIdAndTenantId(1L, 100L)).thenReturn(creator);
+        when(permissionMapper.selectSystemPermissions()).thenReturn(defaultPermissions());
+        when(aiModelGrantMapper.insert(any(AiModelGrant.class))).thenReturn(1);
+
+        LlmModelCreateRequest request = new LlmModelCreateRequest();
+        request.setProviderModelId("openai/gpt-4o");
+        request.setName("GPT-4o");
+        request.setProviderCode("openai");
+        request.setModelType(AiModelType.CHAT);
+
+        service.createModel(100L, request);
+
+        ArgumentCaptor<AiModelGrant> grantCaptor = ArgumentCaptor.forClass(AiModelGrant.class);
+        verify(aiModelGrantMapper).insert(grantCaptor.capture());
+        AiModelGrant grant = grantCaptor.getValue();
+        assertEquals(1L, grant.getTenantId());
+        assertEquals(100L, grant.getUserId());
+        assertEquals(10L, grant.getModelId());
+        assertEquals(3L, grant.getPermissionId());
+        assertFalse(Boolean.TRUE.equals(grant.getIsDefault()));
+        assertEquals(100L, grant.getGrantedBy());
+        assertEquals(100L, grant.getUpdatedBy());
+    }
+
+    @Test
+    void createModel_shouldNotAutoGrantForNonPlatformSuperAdminCreator() {
+        AiProvider provider = new AiProvider();
+        provider.setId(1L);
+        provider.setCode("openai");
+        provider.setName("OpenAI");
+        when(aiProviderMapper.selectOne(any())).thenReturn(provider);
+        when(aiModelMapper.insert(any(AiModel.class))).thenAnswer(invocation -> {
+            AiModel inserting = invocation.getArgument(0);
+            inserting.setId(10L);
+            return 1;
+        });
+
+        User creator = new User();
+        creator.setId(101L);
+        creator.setLevel(1);
+        when(userMapper.selectByIdAndTenantId(1L, 101L)).thenReturn(creator);
+
+        LlmModelCreateRequest request = new LlmModelCreateRequest();
+        request.setProviderModelId("openai/gpt-4o");
+        request.setName("GPT-4o");
+        request.setProviderCode("openai");
+        request.setModelType(AiModelType.CHAT);
+
+        service.createModel(101L, request);
+
+        verify(aiModelGrantMapper, times(0)).insert(any(AiModelGrant.class));
+    }
+
+    @Test
+    void createProvider_shouldThrowWhenInsertHitsDuplicate() {
+        when(aiProviderMapper.insert(any(AiProvider.class))).thenThrow(new RuntimeException(
+                new SQLException("Duplicate entry 'openrouter' for key 'uq_ai_provider_code'", "23000", 1062)));
+
+        LlmProviderCreateRequest request = new LlmProviderCreateRequest();
         request.setCode("OpenRouter");
         request.setName("OpenRouter");
 
-        service.createProvider(100L, request);
+        AiProviderAlreadyExistsException exception = assertThrows(
+                AiProviderAlreadyExistsException.class,
+                () -> service.createProvider(100L, request)
+        );
+        assertEquals("AI供应商已存在", exception.getMessage());
 
-        verify(aiProviderMapper, times(0)).insert(any(AiProvider.class));
+        verify(aiProviderMapper, times(1)).insert(any(AiProvider.class));
     }
 
     @Test
@@ -187,7 +303,7 @@ class LlmManagerServiceImplTest {
         when(aiProviderMapper.selectOne(any())).thenReturn(provider);
         when(aiProviderMapper.updateById(any(AiProvider.class))).thenReturn(1);
 
-        LlmProviderDto.UpdateRequest request = new LlmProviderDto.UpdateRequest();
+        LlmProviderUpdateRequest request = new LlmProviderUpdateRequest();
         request.setName("OpenRouter");
         request.setBaseUrl("https://openrouter.ai/api/v1");
         request.setAddModelIds(List.of("openrouter/model-b", "openrouter/model-c"));
@@ -240,7 +356,7 @@ class LlmManagerServiceImplTest {
         provider.setModelIds("[\"openrouter/model-a\"]");
         when(aiProviderMapper.selectOne(any())).thenReturn(provider);
 
-        LlmProviderDto.UpdateRequest request = new LlmProviderDto.UpdateRequest();
+        LlmProviderUpdateRequest request = new LlmProviderUpdateRequest();
         request.setAddModelIds(List.of("openrouter/model-a"));
         request.setRemoveModelIds(List.of("openrouter/model-a"));
 
@@ -255,7 +371,7 @@ class LlmManagerServiceImplTest {
         AiModel model = new AiModel();
         model.setId(10L);
         model.setTenantId(1L);
-        model.setModelId("openai/gpt-4o");
+        model.setProviderModelId("openai/gpt-4o");
         model.setName("GPT-4o");
         model.setProviderId(1L);
         model.setModelType(AiModelType.CHAT);
@@ -283,7 +399,7 @@ class LlmManagerServiceImplTest {
         AiModel model = new AiModel();
         model.setId(10L);
         model.setTenantId(1L);
-        model.setModelId("openai/gpt-4o");
+        model.setProviderModelId("openai/gpt-4o");
         model.setName("GPT-4o");
         model.setProviderId(1L);
         model.setModelType(AiModelType.CHAT);
@@ -298,7 +414,7 @@ class LlmManagerServiceImplTest {
         when(aiProviderMapper.selectByIds(any())).thenReturn(List.of(provider));
         when(authCryptoClient.decryptLlmApiKey("tenant-1", "ENCv1:encrypted")).thenReturn("sk-1234567890");
 
-        List<LlmManagerDto.ModelResponse> rows = service.listModels(null, null, null, 101L);
+        List<LlmModelResponse> rows = service.listModels(null, null, null, 101L);
 
         assertEquals(1, rows.size());
         assertEquals("sk-1*****7890", rows.get(0).getMaskedApiKey());
@@ -309,7 +425,7 @@ class LlmManagerServiceImplTest {
         AiModel model = new AiModel();
         model.setId(10L);
         model.setTenantId(1L);
-        model.setModelId("openai/gpt-4o");
+        model.setProviderModelId("openai/gpt-4o");
         model.setName("GPT-4o");
         model.setProviderId(1L);
         model.setModelType(AiModelType.CHAT);
@@ -323,9 +439,9 @@ class LlmManagerServiceImplTest {
         provider.setName("OpenAI");
         when(aiProviderMapper.selectByIds(any())).thenReturn(List.of(provider));
         when(authCryptoClient.decryptLlmApiKey("tenant-1", "ENCv1:encrypted"))
-                .thenThrow(new InternalException("decrypt_failed"));
+                .thenThrow(new com.sunny.datapillar.common.exception.InternalException("decrypt_failed"));
 
-        List<LlmManagerDto.ModelResponse> rows = service.listModels(null, null, null, 101L);
+        List<LlmModelResponse> rows = service.listModels(null, null, null, 101L);
 
         assertEquals(1, rows.size());
         assertEquals("******", rows.get(0).getMaskedApiKey());
@@ -341,39 +457,19 @@ class LlmManagerServiceImplTest {
         AiModel model = new AiModel();
         model.setId(10L);
         model.setTenantId(1L);
-        model.setModelId("openai/gpt-4o");
+        model.setProviderModelId("openai/gpt-4o");
         model.setName("GPT-4o");
         model.setProviderId(1L);
         model.setModelType(AiModelType.CHAT);
         model.setStatus(AiModelStatus.ACTIVE);
         when(aiModelMapper.selectOne(any())).thenReturn(model);
-        AiModelGrant refreshed = new AiModelGrant();
-        refreshed.setId(1L);
-        refreshed.setTenantId(1L);
-        refreshed.setUserId(200L);
-        refreshed.setModelId(10L);
-        refreshed.setPermissionId(2L);
-        refreshed.setIsDefault(Boolean.FALSE);
-        when(aiModelGrantMapper.selectOne(any())).thenReturn(null, refreshed);
+        when(aiModelGrantMapper.selectOne(any())).thenReturn(null);
         when(aiModelGrantMapper.insert(any(AiModelGrant.class))).thenReturn(1);
-        when(aiUsageMapper.selectOne(any())).thenReturn(null);
 
-        AiProvider provider = new AiProvider();
-        provider.setId(1L);
-        provider.setCode("openai");
-        provider.setName("OpenAI");
-        when(aiProviderMapper.selectById(1L)).thenReturn(provider);
-
-        LlmManagerDto.ModelGrantRequest request = new LlmManagerDto.ModelGrantRequest();
+        LlmUserModelGrantRequest request = new LlmUserModelGrantRequest();
         request.setPermissionCode("READ");
         request.setIsDefault(false);
-        LlmManagerDto.ModelUsageResponse response = service.upsertUserModelGrant(101L, 200L, 10L, request);
-
-        assertEquals(200L, response.getUserId());
-        assertEquals(10L, response.getAiModelId());
-        assertEquals("openai", response.getProviderCode());
-        assertEquals("READ", response.getPermissionCode());
-        assertFalse(Boolean.TRUE.equals(response.getIsDefault()));
+        service.upsertUserModelGrant(101L, 200L, 10L, request);
 
         ArgumentCaptor<AiModelGrant> grantCaptor = ArgumentCaptor.forClass(AiModelGrant.class);
         verify(aiModelGrantMapper).insert(grantCaptor.capture());
@@ -416,7 +512,7 @@ class LlmManagerServiceImplTest {
         model.setId(10L);
         model.setTenantId(1L);
         model.setProviderId(1L);
-        model.setModelId("openai/gpt-4o");
+        model.setProviderModelId("openai/gpt-4o");
         model.setName("GPT-4o");
         model.setModelType(AiModelType.CHAT);
         model.setStatus(AiModelStatus.ACTIVE);
@@ -428,7 +524,7 @@ class LlmManagerServiceImplTest {
         provider.setName("OpenAI");
         when(aiProviderMapper.selectById(1L)).thenReturn(provider);
 
-        LlmManagerDto.ModelUsageResponse response = service.setUserDefaultModel(200L, 200L, 10L);
+        LlmUserModelUsageResponse response = service.setUserDefaultModel(200L, 200L, 10L);
 
         assertTrue(Boolean.TRUE.equals(response.getIsDefault()));
         verify(aiModelGrantMapper, times(1)).update(isNull(), any());
@@ -446,7 +542,7 @@ class LlmManagerServiceImplTest {
         model.setId(10L);
         model.setTenantId(1L);
         model.setProviderId(1L);
-        model.setModelId("openai/gpt-4o");
+        model.setProviderModelId("openai/gpt-4o");
         model.setModelType(AiModelType.CHAT);
         model.setStatus(AiModelStatus.CONNECT);
         model.setBaseUrl("https://api.openai.com/v1");
@@ -462,10 +558,10 @@ class LlmManagerServiceImplTest {
         when(authCryptoClient.encryptLlmApiKey("tenant-1", "sk-test")).thenReturn("ENCv1:encrypted");
         doNothing().when(service).verifyModelConnection(any(), any(), any(), any(), any());
 
-        LlmManagerDto.ConnectRequest request = new LlmManagerDto.ConnectRequest();
+        LlmModelConnectRequest request = new LlmModelConnectRequest();
         request.setApiKey("sk-test");
 
-        LlmManagerDto.ConnectResponse response = service.connectModel(101L, 10L, request);
+        LlmModelConnectResponse response = service.connectModel(101L, 10L, request);
 
         assertTrue(response.isConnected());
         assertTrue(response.isHasApiKey());
@@ -486,7 +582,7 @@ class LlmManagerServiceImplTest {
         model.setId(10L);
         model.setTenantId(1L);
         model.setProviderId(1L);
-        model.setModelId("openai/gpt-4o");
+        model.setProviderModelId("openai/gpt-4o");
         model.setModelType(AiModelType.CHAT);
         model.setStatus(AiModelStatus.CONNECT);
         model.setBaseUrl("https://api.openai.com/v1");
@@ -498,10 +594,10 @@ class LlmManagerServiceImplTest {
         when(aiProviderMapper.selectById(1L)).thenReturn(provider);
 
         when(authCryptoClient.encryptLlmApiKey("tenant-1", "sk-test"))
-                .thenThrow(new InternalException("tenant_public_key_missing"));
+                .thenThrow(new com.sunny.datapillar.common.exception.InternalException("tenant_public_key_missing"));
         doNothing().when(service).verifyModelConnection(any(), any(), any(), any(), any());
 
-        LlmManagerDto.ConnectRequest request = new LlmManagerDto.ConnectRequest();
+        LlmModelConnectRequest request = new LlmModelConnectRequest();
         request.setApiKey("sk-test");
 
         InternalException exception = assertThrows(InternalException.class,

@@ -1,9 +1,22 @@
 package com.sunny.datapillar.studio.module.workflow.service;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.sunny.datapillar.studio.module.workflow.dto.WorkflowDto;
 
 /**
  * 工作流服务
@@ -19,22 +32,22 @@ public interface WorkflowService {
     /**
      * 分页查询工作流列表
      */
-    IPage<WorkflowDto.ListItem> getWorkflowPage(Page<WorkflowDto.ListItem> page, Long projectId, String workflowName, Integer status);
+    IPage<WorkflowListItemResponse> getWorkflowPage(Page<WorkflowListItemResponse> page, Long projectId, String workflowName, Integer status);
 
     /**
      * 获取工作流详情（含任务和依赖）
      */
-    WorkflowDto.Response getWorkflowDetail(Long id);
+    WorkflowResponse getWorkflowDetail(Long id);
 
     /**
      * 创建工作流
      */
-    Long createWorkflow(WorkflowDto.Create dto);
+    Long createWorkflow(WorkflowCreateRequest dto);
 
     /**
      * 更新工作流
      */
-    void updateWorkflow(Long id, WorkflowDto.Update dto);
+    void updateWorkflow(Long id, WorkflowUpdateRequest dto);
 
     /**
      * 删除工作流（同时删除Airflow DAG）
@@ -78,7 +91,7 @@ public interface WorkflowService {
     /**
      * 触发工作流运行
      */
-    JsonNode triggerWorkflow(Long id, WorkflowDto.TriggerRequest request);
+    JsonNode triggerWorkflow(Long id, WorkflowTriggerRequest request);
 
     /**
      * 获取运行列表
@@ -110,15 +123,15 @@ public interface WorkflowService {
     /**
      * 重跑任务
      */
-    JsonNode rerunJob(Long id, String runId, String jobId, WorkflowDto.RerunJobRequest request);
+    JsonNode rerunJob(Long id, String runId, String jobId, WorkflowRerunJobRequest request);
 
     /**
      * 设置任务状态
      */
-    JsonNode setJobState(Long id, String runId, String jobId, WorkflowDto.SetJobStateRequest request);
+    JsonNode setJobState(Long id, String runId, String jobId, WorkflowSetJobStatusRequest request);
 
     /**
      * 批量清除任务
      */
-    JsonNode clearJobs(Long id, String runId, WorkflowDto.ClearJobsRequest request);
+    JsonNode clearJobs(Long id, String runId, WorkflowClearJobsRequest request);
 }

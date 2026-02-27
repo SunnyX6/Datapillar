@@ -1,14 +1,25 @@
 package com.sunny.datapillar.studio.module.tenant.mapper;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.sunny.datapillar.studio.module.tenant.dto.FeatureEntitlementDto;
-import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
-import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto.RoleSource;
 import com.sunny.datapillar.studio.module.tenant.entity.FeatureObject;
 
 /**
@@ -21,16 +32,16 @@ import com.sunny.datapillar.studio.module.tenant.entity.FeatureObject;
 @Mapper
 public interface FeatureObjectMapper extends BaseMapper<FeatureObject> {
 
-    List<FeatureObjectDto.ObjectPermission> selectFeatureObjectsAll(@Param("tenantId") Long tenantId);
+    List<FeatureObjectPermissionItem> selectFeatureObjectsAll(@Param("tenantId") Long tenantId);
 
-    List<FeatureObjectDto.ObjectPermission> selectRoleObjectPermissionsAll(@Param("tenantId") Long tenantId,
+    List<FeatureObjectPermissionItem> selectRoleObjectPermissionsAll(@Param("tenantId") Long tenantId,
                                                                            @Param("roleId") Long roleId);
 
-    List<FeatureObjectDto.ObjectPermission> selectRoleObjectPermissionsAssigned(@Param("tenantId") Long tenantId,
+    List<FeatureObjectPermissionItem> selectRoleObjectPermissionsAssigned(@Param("tenantId") Long tenantId,
                                                                                 @Param("roleId") Long roleId);
 
-    List<RoleSource> selectUserRoleSources(@Param("tenantId") Long tenantId,
-                                           @Param("userId") Long userId);
+    List<FeatureRoleSourceItem> selectUserRoleSources(@Param("tenantId") Long tenantId,
+                                                       @Param("userId") Long userId);
 
     /**
      * 根据用户ID查询可访问的功能对象列表
@@ -44,8 +55,8 @@ public interface FeatureObjectMapper extends BaseMapper<FeatureObject> {
      */
     List<FeatureObject> findAllVisible(@Param("tenantId") Long tenantId);
 
-    List<FeatureEntitlementDto.Item> selectFeatureEntitlements(@Param("tenantId") Long tenantId);
+    List<TenantFeatureItem> selectFeatureEntitlements(@Param("tenantId") Long tenantId);
 
-    FeatureEntitlementDto.Item selectFeatureEntitlement(@Param("tenantId") Long tenantId,
+    TenantFeatureItem selectFeatureEntitlement(@Param("tenantId") Long tenantId,
                                                         @Param("objectId") Long objectId);
 }

@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.user.service.impl;
 
-import com.sunny.datapillar.studio.module.tenant.dto.FeatureObjectDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.user.service.UserPermissionService;
 import com.sunny.datapillar.studio.module.user.service.UserService;
 import java.util.List;
@@ -21,7 +34,7 @@ public class UserPermissionServiceImpl implements UserPermissionService {
     private final UserService userService;
 
     @Override
-    public List<FeatureObjectDto.ObjectPermission> listPermissions(Long userId) {
+    public List<FeatureObjectPermissionItem> listPermissions(Long userId) {
         return userService.getUserPermissions(userId);
     }
 }

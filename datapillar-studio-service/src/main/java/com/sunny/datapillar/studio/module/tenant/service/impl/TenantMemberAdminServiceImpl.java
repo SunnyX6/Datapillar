@@ -1,8 +1,20 @@
 package com.sunny.datapillar.studio.module.tenant.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.tenant.service.TenantMemberAdminService;
-import com.sunny.datapillar.studio.module.user.dto.RoleDto;
-import com.sunny.datapillar.studio.module.user.dto.UserDto;
 import com.sunny.datapillar.studio.module.user.entity.User;
 import com.sunny.datapillar.studio.module.user.service.RoleService;
 import com.sunny.datapillar.studio.module.user.service.UserService;
@@ -35,12 +47,12 @@ public class TenantMemberAdminServiceImpl implements TenantMemberAdminService {
     }
 
     @Override
-    public void updateUser(Long userId, UserDto.Update dto) {
+    public void updateUser(Long userId, UserUpdateRequest dto) {
         userService.updateUser(userId, dto);
     }
 
     @Override
-    public List<RoleDto.Response> getRolesByUserId(Long userId) {
+    public List<RoleResponse> getRolesByUserId(Long userId) {
         return roleService.getRolesByUserId(userId);
     }
 

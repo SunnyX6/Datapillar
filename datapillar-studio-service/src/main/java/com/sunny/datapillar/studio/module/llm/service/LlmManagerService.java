@@ -1,7 +1,19 @@
 package com.sunny.datapillar.studio.module.llm.service;
 
-import com.sunny.datapillar.studio.module.llm.dto.LlmManagerDto;
-import com.sunny.datapillar.studio.module.llm.dto.LlmProviderDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.llm.enums.AiModelType;
 import java.util.List;
 
@@ -14,39 +26,43 @@ import java.util.List;
  */
 public interface LlmManagerService {
 
-    List<LlmManagerDto.ProviderResponse> listProviders();
+    List<LlmProviderResponse> listProviders();
 
-    void createProvider(Long userId, LlmProviderDto.CreateRequest request);
+    void createProvider(Long userId, LlmProviderCreateRequest request);
 
-    void updateProvider(Long userId, String providerCode, LlmProviderDto.UpdateRequest request);
+    void updateProvider(Long userId, String providerCode, LlmProviderUpdateRequest request);
 
     void deleteProvider(Long userId, String providerCode);
 
-    List<LlmManagerDto.ModelResponse> listModels(String keyword,
-                                                  String providerCode,
-                                                  AiModelType modelType,
-                                                  Long userId);
+    List<LlmModelResponse> listModels(String keyword,
+                                          String providerCode,
+                                          AiModelType modelType,
+                                          Long userId);
 
-    LlmManagerDto.ModelResponse getModel(Long userId, Long modelId);
+    LlmModelResponse getModel(Long userId, Long aiModelId);
 
-    LlmManagerDto.ModelResponse createModel(Long userId, LlmManagerDto.CreateRequest request);
+    LlmModelResponse createModel(Long userId, LlmModelCreateRequest request);
 
-    LlmManagerDto.ModelResponse updateModel(Long userId, Long modelId, LlmManagerDto.UpdateRequest request);
+    LlmModelResponse updateModel(Long userId, Long aiModelId, LlmModelUpdateRequest request);
 
-    void deleteModel(Long userId, Long modelId);
+    void deleteModel(Long userId, Long aiModelId);
 
-    LlmManagerDto.ConnectResponse connectModel(Long userId, Long modelId, LlmManagerDto.ConnectRequest request);
+    LlmModelConnectResponse connectModel(Long userId, Long aiModelId, LlmModelConnectRequest request);
 
-    List<LlmManagerDto.ModelUsageResponse> listUserModelUsages(Long operatorUserId,
-                                                                Long targetUserId,
-                                                                boolean onlyEnabled);
+    List<LlmUserModelUsageResponse> listUserModelUsages(Long operatorUserId,
+                                                                 Long targetUserId,
+                                                                 boolean onlyEnabled);
 
-    LlmManagerDto.ModelUsageResponse upsertUserModelGrant(Long operatorUserId,
-                                                           Long targetUserId,
-                                                           Long modelId,
-                                                           LlmManagerDto.ModelGrantRequest request);
+    List<LlmUserModelPermissionResponse> listUserModelPermissions(Long operatorUserId,
+                                                                            Long targetUserId,
+                                                                            boolean onlyEnabled);
 
-    void deleteUserModelGrant(Long operatorUserId, Long targetUserId, Long modelId);
+    void upsertUserModelGrant(Long operatorUserId,
+                              Long targetUserId,
+                              Long aiModelId,
+                              LlmUserModelGrantRequest request);
 
-    LlmManagerDto.ModelUsageResponse setUserDefaultModel(Long operatorUserId, Long targetUserId, Long modelId);
+    void deleteUserModelGrant(Long operatorUserId, Long targetUserId, Long aiModelId);
+
+    LlmUserModelUsageResponse setUserDefaultModel(Long operatorUserId, Long targetUserId, Long aiModelId);
 }

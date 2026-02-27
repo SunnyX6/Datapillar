@@ -73,6 +73,7 @@
                u.nickname,
                u.email,
                u.phone,
+               u.level,
                tu.status AS status,
                u.deleted,
                u.created_at,
@@ -95,6 +96,19 @@
           AND tu.status = 1
           AND u.id = #{userId}
           AND u.deleted = 0
+    </select>
+
+    <select id="selectUserIdsByMaxLevel" resultType="long">
+        SELECT u.id
+        FROM users u
+        INNER JOIN tenant_users tu ON tu.user_id = u.id
+        WHERE tu.tenant_id = #{tenantId}
+          AND u.deleted = 0
+          AND u.level &lt;= #{maxLevel}
+          AND u.id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
     </select>
 
 </mapper>

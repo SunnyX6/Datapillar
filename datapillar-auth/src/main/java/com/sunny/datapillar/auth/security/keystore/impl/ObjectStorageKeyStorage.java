@@ -1,6 +1,9 @@
 package com.sunny.datapillar.auth.security.keystore.impl;
 
 import com.sunny.datapillar.auth.config.KeyStorageProperties;
+import com.sunny.datapillar.auth.exception.security.KeyStorageConfigInvalidException;
+import com.sunny.datapillar.auth.exception.security.KeyStoragePrivateKeyInvalidException;
+import com.sunny.datapillar.auth.exception.security.KeyStorageTenantCodeInvalidException;
 import com.sunny.datapillar.auth.security.keystore.KeyStorage;
 import com.sunny.datapillar.common.constant.ErrorType;
 import com.sunny.datapillar.common.exception.AlreadyExistsException;
@@ -40,7 +43,7 @@ public class ObjectStorageKeyStorage implements KeyStorage {
 
     public ObjectStorageKeyStorage(KeyStorageProperties properties) {
         if (properties == null || properties.getObject() == null) {
-            throw new IllegalArgumentException("key_storage.object 不能为空");
+            throw new KeyStorageConfigInvalidException("key_storage.object 不能为空");
         }
         KeyStorageProperties.ObjectStore config = properties.getObject();
         this.bucket = normalizeBucket(config.getBucket());
@@ -53,7 +56,7 @@ public class ObjectStorageKeyStorage implements KeyStorage {
         String normalizedTenantCode = validateTenantCode(tenantCode);
         validatePemBytes(privateKeyPemBytes);
         if (existsPrivateKey(normalizedTenantCode)) {
-            throw new AlreadyExistsException(
+            throw new com.sunny.datapillar.common.exception.AlreadyExistsException(
                     ErrorType.TENANT_PRIVATE_KEY_ALREADY_EXISTS,
                     Map.of("tenantCode", normalizedTenantCode),
                     "私钥文件已存在");
@@ -68,7 +71,7 @@ public class ObjectStorageKeyStorage implements KeyStorage {
         try {
             s3Client.putObject(privateRequest, RequestBody.fromBytes(privateKeyPemBytes));
         } catch (S3Exception ex) {
-            throw new ServiceUnavailableException(
+            throw new com.sunny.datapillar.common.exception.ServiceUnavailableException(
                     ex,
                     ErrorType.KEY_STORAGE_UNAVAILABLE,
                     Map.of("tenantCode", normalizedTenantCode),
@@ -89,12 +92,12 @@ public class ObjectStorageKeyStorage implements KeyStorage {
             return bytes.asByteArray();
         } catch (S3Exception ex) {
             if (ex.statusCode() == 404) {
-                throw new NotFoundException(
+                throw new com.sunny.datapillar.common.exception.NotFoundException(
                         ErrorType.TENANT_KEY_NOT_FOUND,
                         Map.of("tenantCode", normalizedTenantCode),
                         "租户密钥不存在");
             }
-            throw new ServiceUnavailableException(
+            throw new com.sunny.datapillar.common.exception.ServiceUnavailableException(
                     ex,
                     ErrorType.KEY_STORAGE_UNAVAILABLE,
                     Map.of("tenantCode", normalizedTenantCode),
@@ -126,7 +129,7 @@ public class ObjectStorageKeyStorage implements KeyStorage {
             if (ex.statusCode() == 404) {
                 return false;
             }
-            throw new ServiceUnavailableException(
+            throw new com.sunny.datapillar.common.exception.ServiceUnavailableException(
                     ex,
                     ErrorType.KEY_STORAGE_UNAVAILABLE,
                     Map.of("objectKey", key),
@@ -162,7 +165,7 @@ public class ObjectStorageKeyStorage implements KeyStorage {
             return DefaultCredentialsProvider.create();
         }
         if (accessKey == null || secretKey == null) {
-            throw new IllegalArgumentException("key_storage.object.access_key/secret_key 必须同时配置");
+            throw new KeyStorageConfigInvalidException("key_storage.object.access_key/secret_key 必须同时配置");
         }
         return StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey));
     }
@@ -174,7 +177,7 @@ public class ObjectStorageKeyStorage implements KeyStorage {
     private String normalizeBucket(String bucket) {
         String normalized = normalizeText(bucket);
         if (normalized == null) {
-            throw new IllegalArgumentException("key_storage.object.bucket 不能为空");
+            throw new KeyStorageConfigInvalidException("key_storage.object.bucket 不能为空");
         }
         return normalized;
     }
@@ -204,18 +207,18 @@ public class ObjectStorageKeyStorage implements KeyStorage {
 
     private String validateTenantCode(String tenantCode) {
         if (tenantCode == null || tenantCode.isBlank()) {
-            throw new IllegalArgumentException("tenantCode 无效");
+            throw new KeyStorageTenantCodeInvalidException("tenantCode 无效");
         }
         String normalized = tenantCode.trim();
         if (normalized.contains("/") || normalized.contains("\\") || normalized.contains("..")) {
-            throw new IllegalArgumentException("tenantCode 无效");
+            throw new KeyStorageTenantCodeInvalidException("tenantCode 无效");
         }
         return normalized;
     }
 
     private void validatePemBytes(byte[] pemBytes) {
         if (pemBytes == null || pemBytes.length == 0) {
-            throw new IllegalArgumentException("私钥内容为空");
+            throw new KeyStoragePrivateKeyInvalidException("私钥内容为空");
         }
     }
 }

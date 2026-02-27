@@ -1,6 +1,11 @@
 package com.sunny.datapillar.auth.service.login;
 
-import com.sunny.datapillar.auth.dto.AuthDto;
+import com.sunny.datapillar.auth.dto.auth.request.*;
+import com.sunny.datapillar.auth.dto.auth.response.*;
+import com.sunny.datapillar.auth.dto.login.request.*;
+import com.sunny.datapillar.auth.dto.login.response.*;
+import com.sunny.datapillar.auth.dto.oauth.request.*;
+import com.sunny.datapillar.auth.dto.oauth.response.*;
 import com.sunny.datapillar.auth.entity.Tenant;
 import com.sunny.datapillar.auth.entity.TenantUser;
 import com.sunny.datapillar.auth.entity.User;
@@ -42,9 +47,9 @@ public class LoginFinalizer {
     private final UserAccessReader userAccessReader;
     private final LoginTokenStore loginTokenStore;
 
-    public AuthDto.LoginResult finalize(LoginSubject subject, Boolean rememberMe, HttpServletResponse response) {
+    public LoginResultResponse finalize(LoginSubject subject, Boolean rememberMe, HttpServletResponse response) {
         if (subject == null || subject.getUser() == null) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         if (subject.requiresTenantSelection()) {
             return buildTenantSelectResult(subject, rememberMe, response);
@@ -53,14 +58,14 @@ public class LoginFinalizer {
         User user = subject.getUser();
         Tenant tenant = subject.getTenant();
         if (tenant == null) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
 
         validateUserStatus(user);
         validateTenantStatus(tenant);
         validateTenantUser(tenant.getId(), user.getId());
 
-        List<AuthDto.TenantOption> tenantOptions = resolveTenantOptions(user.getId(), tenant.getId());
+        List<TenantOptionItem> tenantOptions = resolveTenantOptions(user.getId(), tenant.getId());
 
         String sid = UUID.randomUUID().toString();
         String accessJti = UUID.randomUUID().toString();
@@ -88,33 +93,33 @@ public class LoginFinalizer {
         authCookieManager.setAuthCookies(response, accessToken, refreshToken, rememberMe);
         authCookieManager.issueSessionCsrfCookies(tenant.getId(), user.getId(), refreshTtlSeconds, response);
 
-        AuthDto.LoginResponse loginResponse = userAccessReader.buildLoginResponse(tenant.getId(), user);
+        LoginResponse loginResponse = userAccessReader.buildLoginResponse(tenant.getId(), user);
         return buildLoginResult(loginResponse, tenantOptions);
     }
 
-    private AuthDto.LoginResult buildTenantSelectResult(LoginSubject subject,
+    private LoginResultResponse buildTenantSelectResult(LoginSubject subject,
                                                         Boolean rememberMe,
                                                         HttpServletResponse response) {
-        List<AuthDto.TenantOption> options = subject.getTenantOptions() == null ? new ArrayList<>() : subject.getTenantOptions();
+        List<TenantOptionItem> options = subject.getTenantOptions() == null ? new ArrayList<>() : subject.getTenantOptions();
         if (options.isEmpty()) {
-            throw new ForbiddenException("无权限访问");
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("无权限访问");
         }
         LoginTokenStore.LoginTokenPayload payload = new LoginTokenStore.LoginTokenPayload();
         payload.setUserId(subject.getUser().getId());
-        payload.setTenantIds(options.stream().map(AuthDto.TenantOption::getTenantId).toList());
+        payload.setTenantIds(options.stream().map(TenantOptionItem::getTenantId).toList());
         payload.setRememberMe(Boolean.TRUE.equals(rememberMe));
         payload.setLoginMethod(subject.getLoginMethod());
         String loginToken = loginTokenStore.issue(payload);
         authCookieManager.setLoginTokenCookie(response, loginToken, loginTokenStore.ttlSeconds());
-        AuthDto.LoginResult result = new AuthDto.LoginResult();
+        LoginResultResponse result = new LoginResultResponse();
         result.setLoginStage("TENANT_SELECT");
         result.setTenants(options);
         return result;
     }
 
-    private AuthDto.LoginResult buildLoginResult(AuthDto.LoginResponse loginResponse,
-                                                 List<AuthDto.TenantOption> tenantOptions) {
-        AuthDto.LoginResult result = new AuthDto.LoginResult();
+    private LoginResultResponse buildLoginResult(LoginResponse loginResponse,
+                                                 List<TenantOptionItem> tenantOptions) {
+        LoginResultResponse result = new LoginResultResponse();
         result.setTenants(tenantOptions);
         result.setUserId(loginResponse.getUserId());
         result.setUsername(loginResponse.getUsername());
@@ -124,12 +129,12 @@ public class LoginFinalizer {
         return result;
     }
 
-    private List<AuthDto.TenantOption> resolveTenantOptions(Long userId, Long currentTenantId) {
-        List<AuthDto.TenantOption> options = tenantUserMapper.selectTenantOptionsByUserId(userId);
-        List<AuthDto.TenantOption> normalized = options == null ? new ArrayList<>() : new ArrayList<>(options);
+    private List<TenantOptionItem> resolveTenantOptions(Long userId, Long currentTenantId) {
+        List<TenantOptionItem> options = tenantUserMapper.selectTenantOptionsByUserId(userId);
+        List<TenantOptionItem> normalized = options == null ? new ArrayList<>() : new ArrayList<>(options);
         int selectedIndex = -1;
         for (int index = 0; index < normalized.size(); index++) {
-            AuthDto.TenantOption option = normalized.get(index);
+            TenantOptionItem option = normalized.get(index);
             if (option != null && currentTenantId.equals(option.getTenantId())) {
                 selectedIndex = index;
                 break;
@@ -138,14 +143,14 @@ public class LoginFinalizer {
 
         if (selectedIndex >= 0) {
             if (selectedIndex > 0) {
-                AuthDto.TenantOption selected = normalized.remove(selectedIndex);
+                TenantOptionItem selected = normalized.remove(selectedIndex);
                 normalized.add(0, selected);
             }
             return normalized;
         }
 
         Tenant tenant = tenantMapper.selectById(currentTenantId);
-        AuthDto.TenantOption fallback = new AuthDto.TenantOption();
+        TenantOptionItem fallback = new TenantOptionItem();
         fallback.setTenantId(currentTenantId);
         fallback.setTenantCode(tenant == null ? String.valueOf(currentTenantId) : tenant.getCode());
         fallback.setTenantName(tenant == null ? String.valueOf(currentTenantId) : tenant.getCode());
@@ -168,23 +173,23 @@ public class LoginFinalizer {
 
     private void validateUserStatus(User user) {
         if (user.getStatus() == null || user.getStatus() != 1) {
-            throw new ForbiddenException("用户已被禁用");
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("用户已被禁用");
         }
     }
 
     private void validateTenantStatus(Tenant tenant) {
         if (tenant.getStatus() == null || tenant.getStatus() != 1) {
-            throw new ForbiddenException("租户已被禁用: tenantId=%s", tenant.getId());
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("租户已被禁用: tenantId=%s", tenant.getId());
         }
     }
 
     private void validateTenantUser(Long tenantId, Long userId) {
         TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, userId);
         if (tenantUser == null) {
-            throw new ForbiddenException("无权限访问");
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("无权限访问");
         }
         if (tenantUser.getStatus() == null || tenantUser.getStatus() != 1) {
-            throw new ForbiddenException("租户成员已被禁用: tenantId=%s,userId=%s", tenantId, userId);
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("租户成员已被禁用: tenantId=%s,userId=%s", tenantId, userId);
         }
     }
 }

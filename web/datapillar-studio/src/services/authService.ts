@@ -1,10 +1,10 @@
-import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/lib/api'
+import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/api'
 import type {
   LoginResult,
   LoginTenantRequest,
   PasswordLoginRequest,
   SsoLoginRequest
-} from '@/types/auth'
+} from '@/services/types/auth'
 
 export async function login(request: PasswordLoginRequest): Promise<LoginResult> {
   return requestData<LoginResult, {

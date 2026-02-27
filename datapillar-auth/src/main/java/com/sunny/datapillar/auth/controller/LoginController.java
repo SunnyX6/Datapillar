@@ -1,27 +1,26 @@
 package com.sunny.datapillar.auth.controller;
 
+import com.sunny.datapillar.auth.config.AuthSecurityProperties;
+import com.sunny.datapillar.auth.dto.login.request.LoginRequest;
+import com.sunny.datapillar.auth.dto.login.response.LoginResultResponse;
+import com.sunny.datapillar.auth.service.LoginService;
+import com.sunny.datapillar.auth.service.login.LoginCommand;
+import com.sunny.datapillar.auth.util.ClientIpUtil;
+import com.sunny.datapillar.auth.validation.ValidLoginRequest;
+import com.sunny.datapillar.common.response.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import java.util.Locale;
+import lombok.RequiredArgsConstructor;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.sunny.datapillar.auth.config.AuthSecurityProperties;
-import com.sunny.datapillar.auth.dto.AuthDto;
-import com.sunny.datapillar.common.response.ApiResponse;
-import com.sunny.datapillar.auth.service.LoginService;
-import com.sunny.datapillar.auth.service.login.LoginCommand;
-import com.sunny.datapillar.auth.util.ClientIpUtil;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import java.util.Locale;
-import org.springframework.util.StringUtils;
-import com.sunny.datapillar.common.exception.BadRequestException;
 
 /**
  * 登录控制器
@@ -47,23 +46,23 @@ public class LoginController {
      */
     @Operation(summary = "账号密码登录与租户选择")
     @PostMapping
-    public ApiResponse<AuthDto.LoginResult> login(@Valid @RequestBody AuthDto.LoginFlowRequest request,
-                                                  @CookieValue(name = "login-token", required = false) String loginToken,
-                                                  HttpServletRequest httpRequest,
-                                                  HttpServletResponse response) {
+    public ApiResponse<LoginResultResponse> login(
+            @Valid
+            @ValidLoginRequest(mode = ValidLoginRequest.LoginMode.PASSWORD)
+            @RequestBody LoginRequest request,
+            @CookieValue(name = "login-token", required = false) String loginToken,
+            HttpServletRequest httpRequest,
+            HttpServletResponse response) {
         String clientIp = ClientIpUtil.getClientIp(httpRequest, securityProperties.getTrustedProxies());
-        String stage = normalizeStage(request == null ? null : request.getStage());
-        if (STAGE_AUTH.equals(stage)) {
-            LoginCommand command = buildPasswordLoginCommand(request, clientIp);
-            AuthDto.LoginResult loginResponse = loginService.login(command, clientIp, response);
-            return ApiResponse.ok(loginResponse);
-        }
+        String stage = normalizeStage(request.getStage());
         if (STAGE_TENANT_SELECT.equals(stage)) {
-            Long tenantId = request == null ? null : request.getTenantId();
-            AuthDto.LoginResult loginResponse = loginService.loginWithTenant(loginToken, tenantId, response);
+            LoginResultResponse loginResponse = loginService.loginWithTenant(loginToken, request.getTenantId(), response);
             return ApiResponse.ok(loginResponse);
         }
-        throw new BadRequestException("参数错误");
+
+        LoginCommand command = buildPasswordLoginCommand(request, clientIp);
+        LoginResultResponse loginResponse = loginService.login(command, clientIp, response);
+        return ApiResponse.ok(loginResponse);
     }
 
     /**
@@ -71,23 +70,23 @@ public class LoginController {
      */
     @Operation(summary = "SSO扫码登录与租户选择")
     @PostMapping("/sso")
-    public ApiResponse<AuthDto.LoginResult> sso(@Valid @RequestBody AuthDto.LoginFlowRequest request,
-                                                @CookieValue(name = "login-token", required = false) String loginToken,
-                                                HttpServletRequest httpRequest,
-                                                HttpServletResponse response) {
+    public ApiResponse<LoginResultResponse> sso(
+            @Valid
+            @ValidLoginRequest(mode = ValidLoginRequest.LoginMode.SSO)
+            @RequestBody LoginRequest request,
+            @CookieValue(name = "login-token", required = false) String loginToken,
+            HttpServletRequest httpRequest,
+            HttpServletResponse response) {
         String clientIp = ClientIpUtil.getClientIp(httpRequest, securityProperties.getTrustedProxies());
-        String stage = normalizeStage(request == null ? null : request.getStage());
-        if (STAGE_AUTH.equals(stage)) {
-            LoginCommand command = buildSsoLoginCommand(request, clientIp);
-            AuthDto.LoginResult loginResponse = loginService.login(command, clientIp, response);
-            return ApiResponse.ok(loginResponse);
-        }
+        String stage = normalizeStage(request.getStage());
         if (STAGE_TENANT_SELECT.equals(stage)) {
-            Long tenantId = request == null ? null : request.getTenantId();
-            AuthDto.LoginResult loginResponse = loginService.loginWithTenant(loginToken, tenantId, response);
+            LoginResultResponse loginResponse = loginService.loginWithTenant(loginToken, request.getTenantId(), response);
             return ApiResponse.ok(loginResponse);
         }
-        throw new BadRequestException("参数错误");
+
+        LoginCommand command = buildSsoLoginCommand(request, clientIp);
+        LoginResultResponse loginResponse = loginService.login(command, clientIp, response);
+        return ApiResponse.ok(loginResponse);
     }
 
     /**
@@ -101,12 +100,7 @@ public class LoginController {
         return ApiResponse.ok("登出成功");
     }
 
-    private LoginCommand buildPasswordLoginCommand(AuthDto.LoginFlowRequest request, String clientIp) {
-        if (request == null) {
-            throw new BadRequestException("参数错误");
-        }
-        requireText(request.getLoginAlias());
-        requireText(request.getPassword());
+    private LoginCommand buildPasswordLoginCommand(LoginRequest request, String clientIp) {
         LoginCommand command = new LoginCommand();
         command.setMethod("password");
         command.setRememberMe(request.getRememberMe());
@@ -117,16 +111,7 @@ public class LoginController {
         return command;
     }
 
-    private LoginCommand buildSsoLoginCommand(AuthDto.LoginFlowRequest request, String clientIp) {
-        if (request == null) {
-            throw new BadRequestException("参数错误");
-        }
-        if (StringUtils.hasText(request.getLoginAlias()) || StringUtils.hasText(request.getPassword())) {
-            throw new BadRequestException("参数错误");
-        }
-        requireText(request.getProvider());
-        requireText(request.getCode());
-        requireText(request.getState());
+    private LoginCommand buildSsoLoginCommand(LoginRequest request, String clientIp) {
         LoginCommand command = new LoginCommand();
         command.setMethod("sso");
         command.setRememberMe(request.getRememberMe());
@@ -143,11 +128,5 @@ public class LoginController {
             return null;
         }
         return value.trim().toUpperCase(Locale.ROOT);
-    }
-
-    private void requireText(String value) {
-        if (!StringUtils.hasText(value)) {
-            throw new BadRequestException("参数错误");
-        }
     }
 }

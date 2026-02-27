@@ -25,7 +25,7 @@ public class SsoProviderConfig {
     public String getRequiredString(String key) {
         Object value = config != null ? config.get(key) : null;
         if (value == null || String.valueOf(value).isBlank()) {
-            throw new InternalException("SSO配置无效: %s", key);
+            throw new com.sunny.datapillar.common.exception.InternalException("SSO配置无效: %s", key);
         }
         return String.valueOf(value).trim();
     }

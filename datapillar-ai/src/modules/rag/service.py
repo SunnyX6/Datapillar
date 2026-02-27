@@ -353,8 +353,8 @@ class KnowledgeWikiService:
     ) -> dict[str, Any]:
         namespace_id = int(payload["namespace_id"])
         self._ensure_namespace_owner(tenant_id, user_id, namespace_id)
-        model_id = self._resolve_namespace_embedding_model(namespace_id, tenant_id)
-        embedding_model = self._get_embedding_model(model_id, tenant_id)
+        ai_model_id = self._resolve_namespace_embedding_model(namespace_id, tenant_id)
+        embedding_model = self._get_embedding_model(ai_model_id, tenant_id)
         namespace_value = self._get_namespace_value(namespace_id, tenant_id, user_id)
         service = self._build_service(namespace=namespace_value, model=embedding_model)
 
@@ -623,11 +623,11 @@ class KnowledgeWikiService:
 
     def _get_embedding_model(
         self,
-        model_id: int,
+        ai_model_id: int,
         tenant_id: int,
         tenant_code: str | None = None,
     ) -> dict[str, Any]:
-        model = AiModelRepository.get_model(model_id, tenant_id)
+        model = AiModelRepository.get_model(ai_model_id, tenant_id)
         if not model:
             raise BadRequestException("embedding model 不存在")
         if model.get("model_type") != "embeddings":
@@ -679,7 +679,7 @@ class KnowledgeWikiService:
         embedding = EmbeddingConfig(
             provider=model.get("provider_code"),
             api_key=model.get("api_key"),
-            model=model.get("model_id"),
+            model=model.get("provider_model_id"),
             base_url=model.get("base_url"),
             dimension=int(model.get("embedding_dimension")),
         )

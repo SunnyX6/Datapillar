@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.llm.service.impl;
 
-import com.sunny.datapillar.studio.module.llm.dto.LlmManagerDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.llm.service.LlmBizService;
 import com.sunny.datapillar.studio.module.llm.service.LlmManagerService;
 import java.util.List;
@@ -21,13 +34,13 @@ public class LlmBizServiceImpl implements LlmBizService {
     private final LlmManagerService llmManagerService;
 
     @Override
-    public List<LlmManagerDto.ModelUsageResponse> listCurrentUserModelUsages(Long currentUserId,
-                                                                               boolean onlyEnabled) {
-        return llmManagerService.listUserModelUsages(currentUserId, currentUserId, onlyEnabled);
+    public List<LlmUserModelPermissionResponse> listCurrentUserModelPermissions(Long currentUserId,
+                                                                                          boolean onlyEnabled) {
+        return llmManagerService.listUserModelPermissions(currentUserId, currentUserId, onlyEnabled);
     }
 
     @Override
-    public LlmManagerDto.ModelUsageResponse setCurrentUserDefaultModel(Long currentUserId, Long modelId) {
-        return llmManagerService.setUserDefaultModel(currentUserId, currentUserId, modelId);
+    public LlmUserModelUsageResponse setCurrentUserDefaultModel(Long currentUserId, Long aiModelId) {
+        return llmManagerService.setUserDefaultModel(currentUserId, currentUserId, aiModelId);
     }
 }

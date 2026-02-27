@@ -27,8 +27,8 @@ public class AiModel {
     @TableField("tenant_id")
     private Long tenantId;
 
-    @TableField("model_id")
-    private String modelId;
+    @TableField("provider_model_id")
+    private String providerModelId;
 
     @TableField("name")
     private String name;

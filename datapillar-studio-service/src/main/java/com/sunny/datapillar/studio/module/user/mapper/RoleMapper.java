@@ -1,12 +1,25 @@
 package com.sunny.datapillar.studio.module.user.mapper;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.sunny.datapillar.studio.module.user.dto.RoleDto;
 import com.sunny.datapillar.studio.module.user.entity.Role;
 import com.sunny.datapillar.studio.module.user.entity.RolePermission;
 
@@ -55,7 +68,7 @@ public interface RoleMapper extends BaseMapper<Role> {
     /**
      * 查询租户角色列表（含成员数量）
      */
-    List<RoleDto.Response> selectRoleListWithMemberCount(@Param("tenantId") Long tenantId);
+    List<RoleResponse> selectRoleListWithMemberCount(@Param("tenantId") Long tenantId);
 
     /**
      * 统计角色下成员数量
@@ -70,7 +83,14 @@ public interface RoleMapper extends BaseMapper<Role> {
     /**
      * 查询角色成员明细
      */
-    List<RoleDto.MemberItem> selectRoleMembers(@Param("tenantId") Long tenantId,
+    List<RoleMemberItem> selectRoleMembers(@Param("tenantId") Long tenantId,
                                                @Param("roleId") Long roleId,
                                                @Param("status") Integer status);
+
+    /**
+     * 按角色批量删除用户角色关联
+     */
+    void deleteRoleMembersByUserIds(@Param("tenantId") Long tenantId,
+                                    @Param("roleId") Long roleId,
+                                    @Param("userIds") List<Long> userIds);
 }

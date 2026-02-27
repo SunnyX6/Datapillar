@@ -2,8 +2,8 @@
 import { StrictMode, act, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { InviteMemberModal } from '@/layouts/profile/permission/InviteMemberModal'
-import type { RoleDefinition } from '@/layouts/profile/permission/Permission'
+import { InviteMemberModal } from '@/features/profile/ui/permission/InviteMemberModal'
+import type { RoleDefinition } from '@/features/profile/utils/permissionTypes'
 import type { CreateTenantInvitationResponse } from '@/services/studioTenantAdminService'
 
 const createTenantInvitationMock = vi.fn()
@@ -12,7 +12,7 @@ vi.mock('@/services/studioTenantAdminService', () => ({
   createTenantInvitation: (tenantId: number, payload: unknown) => createTenantInvitationMock(tenantId, payload)
 }))
 
-vi.mock('@/stores/authStore', () => ({
+vi.mock('@/state/authStore', () => ({
   useAuthStore: (selector: (state: { user: { tenantId: number } }) => unknown) =>
     selector({ user: { tenantId: 10 } })
 }))

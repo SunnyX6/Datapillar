@@ -4,20 +4,20 @@
  * 知识图谱使用非 SSE 接口（一次性 JSON 返回）
  */
 
-import { API_BASE, API_PATH, requestRaw } from '@/lib/api'
+import { API_BASE, API_PATH, requestRaw } from '@/api'
 import type {
   GraphData,
   GraphLink,
   GraphNode,
   Neo4jNode,
   Neo4jRelationship
-} from '@/types/ai/knowledge'
+} from '@/services/types/ai/knowledge'
 
 export type {
   GraphData,
   GraphLink,
   GraphNode
-} from '@/types/ai/knowledge'
+} from '@/services/types/ai/knowledge'
 
 /**
  * 转换 Neo4j 节点为前端节点

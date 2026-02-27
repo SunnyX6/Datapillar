@@ -1,6 +1,11 @@
 package com.sunny.datapillar.auth.rpc.provider.security;
 
-import com.sunny.datapillar.auth.dto.AuthDto;
+import com.sunny.datapillar.auth.dto.auth.request.*;
+import com.sunny.datapillar.auth.dto.auth.response.*;
+import com.sunny.datapillar.auth.dto.login.request.*;
+import com.sunny.datapillar.auth.dto.login.response.*;
+import com.sunny.datapillar.auth.dto.oauth.request.*;
+import com.sunny.datapillar.auth.dto.oauth.response.*;
 import com.sunny.datapillar.auth.security.AuthAssertionSigner;
 import com.sunny.datapillar.auth.service.AuthService;
 import com.sunny.datapillar.common.rpc.security.v1.AuthenticationService;
@@ -49,7 +54,7 @@ public class AuthenticationProvider implements AuthenticationService {
         String path = normalizePath(request.getPath());
 
         try {
-            AuthDto.AuthenticationContext context = authService.resolveAuthenticationContext(request.getToken());
+            AuthenticationContextResponse context = authService.resolveAuthenticationContext(request.getToken());
             if (context == null || context.getUserId() == null || context.getTenantId() == null) {
                 return deny(DenyCode.TOKEN_INVALID, "认证主体缺失");
             }
@@ -76,7 +81,7 @@ public class AuthenticationProvider implements AuthenticationService {
         return CompletableFuture.completedFuture(checkAuthentication(request));
     }
 
-    private Principal toPrincipal(AuthDto.AuthenticationContext context) {
+    private Principal toPrincipal(AuthenticationContextResponse context) {
         Principal.Builder builder = Principal.newBuilder()
                 .setUserId(context.getUserId() == null ? 0L : context.getUserId())
                 .setTenantId(context.getTenantId() == null ? 0L : context.getTenantId())
@@ -110,7 +115,7 @@ public class AuthenticationProvider implements AuthenticationService {
         return builder.build();
     }
 
-    private String buildGatewayAssertion(AuthDto.AuthenticationContext context, String method, String path) {
+    private String buildGatewayAssertion(AuthenticationContextResponse context, String method, String path) {
         String audience = resolveAssertionAudience(path);
         if (!StringUtils.hasText(audience)) {
             return null;

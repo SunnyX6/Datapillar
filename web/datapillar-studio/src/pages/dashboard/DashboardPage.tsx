@@ -1,4 +1,4 @@
-import { Dashboard } from '@/layouts/dashboard/Dashboard'
+import { Dashboard } from '@/features/dashboard/ui/Dashboard'
 
 export function DashboardPage() {
   return <Dashboard />

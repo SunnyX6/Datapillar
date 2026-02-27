@@ -9,7 +9,7 @@ describe('默认偏好', () => {
   })
 
   it('主题默认应为浅色', async () => {
-    const { useThemeStore } = await import('@/stores/themeStore')
+    const { useThemeStore } = await import('@/state/themeStore')
 
     expect(useThemeStore.getState().mode).toBe('light')
     useThemeStore.getState().initialize()
@@ -17,8 +17,8 @@ describe('默认偏好', () => {
   })
 
   it('语言默认应为中文', async () => {
-    const { useI18nStore } = await import('@/stores/i18nStore')
-    const i18n = (await import('@/lib/i18n')).default
+    const { useI18nStore } = await import('@/state/i18nStore')
+    const i18n = (await import('@/app/i18n')).default
 
     expect(useI18nStore.getState().language).toBe('zh-CN')
     expect(i18n.options.lng).toBe('zh-CN')

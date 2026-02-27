@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.workflow.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,9 +29,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.sunny.datapillar.studio.module.workflow.service.client.AirflowClient;
 import com.sunny.datapillar.studio.module.workflow.service.dag.DagBuilder;
 import com.sunny.datapillar.studio.module.workflow.service.dag.DagValidationException;
-import com.sunny.datapillar.studio.module.workflow.dto.JobDependencyDto;
-import com.sunny.datapillar.studio.module.workflow.dto.JobDto;
-import com.sunny.datapillar.studio.module.workflow.dto.WorkflowDto;
 import com.sunny.datapillar.studio.module.workflow.entity.JobWorkflow;
 import com.sunny.datapillar.studio.module.workflow.mapper.JobDependencyMapper;
 import com.sunny.datapillar.studio.module.workflow.mapper.JobInfoMapper;
@@ -50,21 +61,21 @@ public class WorkflowServiceImpl implements WorkflowService {
     // ==================== 工作流 CRUD ====================
 
     @Override
-    public IPage<WorkflowDto.ListItem> getWorkflowPage(Page<WorkflowDto.ListItem> page, Long projectId, String workflowName, Integer status) {
+    public IPage<WorkflowListItemResponse> getWorkflowPage(Page<WorkflowListItemResponse> page, Long projectId, String workflowName, Integer status) {
         return workflowMapper.selectWorkflowPage(page, projectId, workflowName, status);
     }
 
     @Override
-    public WorkflowDto.Response getWorkflowDetail(Long id) {
-        WorkflowDto.Response workflow = workflowMapper.selectWorkflowDetail(id);
+    public WorkflowResponse getWorkflowDetail(Long id) {
+        WorkflowResponse workflow = workflowMapper.selectWorkflowDetail(id);
         if (workflow == null) {
-            throw new NotFoundException("工作流不存在: workflowId=%s", id);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", id);
         }
 
-        List<JobDto.Response> jobs = jobInfoMapper.selectJobsByWorkflowId(id);
+        List<JobResponse> jobs = jobInfoMapper.selectJobsByWorkflowId(id);
         workflow.setJobs(jobs);
 
-        List<JobDependencyDto.Response> dependencies = dependencyMapper.selectByWorkflowId(id);
+        List<JobDependencyResponse> dependencies = dependencyMapper.selectByWorkflowId(id);
         workflow.setDependencies(dependencies);
 
         return workflow;
@@ -72,7 +83,7 @@ public class WorkflowServiceImpl implements WorkflowService {
 
     @Override
     @Transactional
-    public Long createWorkflow(WorkflowDto.Create dto) {
+    public Long createWorkflow(WorkflowCreateRequest dto) {
         JobWorkflow workflow = new JobWorkflow();
         BeanUtils.copyProperties(dto, workflow);
         workflow.setStatus(0);
@@ -84,10 +95,10 @@ public class WorkflowServiceImpl implements WorkflowService {
 
     @Override
     @Transactional
-    public void updateWorkflow(Long id, WorkflowDto.Update dto) {
+    public void updateWorkflow(Long id, WorkflowUpdateRequest dto) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new NotFoundException("工作流不存在: workflowId=%s", id);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", id);
         }
 
         if (dto.getWorkflowName() != null) {
@@ -125,7 +136,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     public void deleteWorkflow(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new NotFoundException("工作流不存在: workflowId=%s", id);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", id);
         }
 
         // 如果已发布，先删除Airflow DAG
@@ -136,7 +147,7 @@ public class WorkflowServiceImpl implements WorkflowService {
                 log.info("Deleted Airflow DAG: {}", dagId);
             } catch (Exception e) {
                 log.error("Failed to delete Airflow DAG: {}", dagId, e);
-                throw new InternalException(e, "Airflow 请求失败: %s", "删除 DAG 失败: dagId=" + dagId);
+                throw new com.sunny.datapillar.common.exception.InternalException(e, "Airflow 请求失败: %s", "删除 DAG 失败: dagId=" + dagId);
             }
         }
 
@@ -155,11 +166,11 @@ public class WorkflowServiceImpl implements WorkflowService {
     public void publishWorkflow(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new NotFoundException("工作流不存在: workflowId=%s", id);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", id);
         }
 
-        List<JobDto.Response> jobs = jobInfoMapper.selectJobsByWorkflowId(id);
-        List<JobDependencyDto.Response> dependencies = dependencyMapper.selectByWorkflowId(id);
+        List<JobResponse> jobs = jobInfoMapper.selectJobsByWorkflowId(id);
+        List<JobDependencyResponse> dependencies = dependencyMapper.selectByWorkflowId(id);
 
         validateDag(jobs, dependencies);
 
@@ -181,11 +192,11 @@ public class WorkflowServiceImpl implements WorkflowService {
     public void pauseWorkflow(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new NotFoundException("工作流不存在: workflowId=%s", id);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", id);
         }
 
         if (workflow.getStatus() != 1) {
-            throw new BadRequestException("工作流状态不正确: %s", "只有已发布的工作流才能暂停");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("工作流状态不正确: %s", "只有已发布的工作流才能暂停");
         }
 
         String dagId = buildDagId(workflow);
@@ -201,11 +212,11 @@ public class WorkflowServiceImpl implements WorkflowService {
     public void resumeWorkflow(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new NotFoundException("工作流不存在: workflowId=%s", id);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", id);
         }
 
         if (workflow.getStatus() != 2) {
-            throw new BadRequestException("工作流状态不正确: %s", "只有已暂停的工作流才能恢复");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("工作流状态不正确: %s", "只有已暂停的工作流才能恢复");
         }
 
         String dagId = buildDagId(workflow);
@@ -240,7 +251,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     // ==================== DAG Run 管理 ====================
 
     @Override
-    public JsonNode triggerWorkflow(Long id, WorkflowDto.TriggerRequest request) {
+    public JsonNode triggerWorkflow(Long id, WorkflowTriggerRequest request) {
         JobWorkflow workflow = getWorkflowById(id);
         String dagId = buildDagId(workflow);
 
@@ -301,7 +312,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     }
 
     @Override
-    public JsonNode rerunJob(Long id, String runId, String jobId, WorkflowDto.RerunJobRequest request) {
+    public JsonNode rerunJob(Long id, String runId, String jobId, WorkflowRerunJobRequest request) {
         JobWorkflow workflow = getWorkflowById(id);
         String dagId = buildDagId(workflow);
 
@@ -315,7 +326,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     }
 
     @Override
-    public JsonNode setJobState(Long id, String runId, String jobId, WorkflowDto.SetJobStateRequest request) {
+    public JsonNode setJobState(Long id, String runId, String jobId, WorkflowSetJobStatusRequest request) {
         JobWorkflow workflow = getWorkflowById(id);
         String dagId = buildDagId(workflow);
 
@@ -328,7 +339,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     }
 
     @Override
-    public JsonNode clearJobs(Long id, String runId, WorkflowDto.ClearJobsRequest request) {
+    public JsonNode clearJobs(Long id, String runId, WorkflowClearJobsRequest request) {
         JobWorkflow workflow = getWorkflowById(id);
         String dagId = buildDagId(workflow);
 
@@ -347,7 +358,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     private JobWorkflow getWorkflowById(Long id) {
         JobWorkflow workflow = workflowMapper.selectById(id);
         if (workflow == null) {
-            throw new NotFoundException("工作流不存在: workflowId=%s", id);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", id);
         }
         return workflow;
     }
@@ -359,26 +370,26 @@ public class WorkflowServiceImpl implements WorkflowService {
         return "datapillar_project_" + workflow.getProjectId() + "_workflow_" + workflow.getId();
     }
 
-    private void validateDag(List<JobDto.Response> jobs, List<JobDependencyDto.Response> dependencies) {
+    private void validateDag(List<JobResponse> jobs, List<JobDependencyResponse> dependencies) {
         DagBuilder dagBuilder = new DagBuilder();
 
-        for (JobDto.Response job : jobs) {
+        for (JobResponse job : jobs) {
             dagBuilder.addNode(job.getId());
         }
 
-        for (JobDependencyDto.Response dep : dependencies) {
+        for (JobDependencyResponse dep : dependencies) {
             dagBuilder.addEdge(dep.getParentJobId(), dep.getJobId());
         }
 
         try {
             dagBuilder.validate();
         } catch (DagValidationException e) {
-            throw new BadRequestException("工作流存在循环依赖");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("工作流存在循环依赖");
         }
     }
 
     private Map<String, Object> buildAirflowDeployRequest(JobWorkflow workflow,
-            List<JobDto.Response> jobs, List<JobDependencyDto.Response> dependencies) {
+            List<JobResponse> jobs, List<JobDependencyResponse> dependencies) {
 
         List<Map<String, Object>> jobList = jobs.stream().map(job -> Map.<String, Object>of(
                 "id", job.getId(),

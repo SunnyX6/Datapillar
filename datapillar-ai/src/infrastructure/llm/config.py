@@ -5,6 +5,10 @@
 OneAgentic 配置构建器
 
 从 ai_model 读取启用的 Chat/Embedding 模型，并合并业务侧 llm/agent 配置。
+
+DEPRECATED:
+- 该文件仅保留给历史链路兼容
+- ETL `/chat` 新链路不再依赖本文件
 """
 
 from __future__ import annotations
@@ -41,7 +45,51 @@ def get_datapillar_config(
     if not chat_model:
         raise ValueError("未找到启用的 Chat 模型，请检查 ai_model 配置")
 
-    embedding_model = Model.get_embedding_default(resolved_tenant_id)
+    return _build_datapillar_config_from_models(
+        tenant_id=resolved_tenant_id,
+        tenant_code=resolved_tenant_code,
+        chat_model=chat_model,
+    )
+
+
+def get_datapillar_config_by_chat_model(
+    *,
+    tenant_id: int,
+    tenant_code: str | None,
+    ai_model_id: int,
+    provider_model_id: str,
+) -> DatapillarConfig:
+    if ai_model_id <= 0:
+        raise ValueError("model.aiModelId 无效")
+    normalized_provider_model_id = provider_model_id.strip()
+    if not normalized_provider_model_id:
+        raise ValueError("model.providerModelId 不能为空")
+
+    resolved_tenant_code = _resolve_tenant_code(tenant_id, tenant_code)
+    chat_model = Model.get_active_chat_model(
+        tenant_id=tenant_id,
+        ai_model_id=ai_model_id,
+    )
+    if not chat_model:
+        raise ValueError("指定模型不存在或未激活")
+    model_provider_model_id = str(chat_model.get("provider_model_id") or "").strip()
+    if model_provider_model_id != normalized_provider_model_id:
+        raise ValueError("model.providerModelId 与 aiModelId 不匹配")
+
+    return _build_datapillar_config_from_models(
+        tenant_id=tenant_id,
+        tenant_code=resolved_tenant_code,
+        chat_model=chat_model,
+    )
+
+
+def _build_datapillar_config_from_models(
+    *,
+    tenant_id: int,
+    tenant_code: str,
+    chat_model: dict[str, object],
+) -> DatapillarConfig:
+    embedding_model = Model.get_embedding_default(tenant_id)
     if not embedding_model:
         raise ValueError("未找到启用的 Embedding 模型")
 
@@ -50,20 +98,20 @@ def get_datapillar_config(
         raise ValueError("Embedding 模型必须配置 embedding_dimension")
 
     llm_config = _coerce_dict(get_llm_config())
-    chat_api_key = _decrypt_api_key(resolved_tenant_code, chat_model.get("api_key"))
-    embedding_api_key = _decrypt_api_key(resolved_tenant_code, embedding_model.get("api_key"))
+    chat_api_key = _decrypt_api_key(tenant_code, chat_model.get("api_key"))
+    embedding_api_key = _decrypt_api_key(tenant_code, embedding_model.get("api_key"))
     llm_config.update(
         {
             "provider": chat_model.get("provider_code"),
             "api_key": chat_api_key,
-            "model": chat_model.get("model_id"),
+            "model": chat_model.get("provider_model_id"),
             "base_url": chat_model.get("base_url"),
         }
     )
     embedding_config = {
         "provider": embedding_model.get("provider_code"),
         "api_key": embedding_api_key,
-        "model": embedding_model.get("model_id"),
+        "model": embedding_model.get("provider_model_id"),
         "base_url": embedding_model.get("base_url"),
         "dimension": int(dimension),
     }

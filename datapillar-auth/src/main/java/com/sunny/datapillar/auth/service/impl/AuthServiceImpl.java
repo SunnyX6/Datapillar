@@ -7,7 +7,12 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
-import com.sunny.datapillar.auth.dto.AuthDto;
+import com.sunny.datapillar.auth.dto.auth.request.*;
+import com.sunny.datapillar.auth.dto.auth.response.*;
+import com.sunny.datapillar.auth.dto.login.request.*;
+import com.sunny.datapillar.auth.dto.login.response.*;
+import com.sunny.datapillar.auth.dto.oauth.request.*;
+import com.sunny.datapillar.auth.dto.oauth.response.*;
 import com.sunny.datapillar.auth.entity.Tenant;
 import com.sunny.datapillar.auth.entity.TenantUser;
 import com.sunny.datapillar.auth.entity.User;
@@ -58,9 +63,9 @@ public class AuthServiceImpl implements AuthService {
      * 刷新令牌并执行 refresh token 轮换。
      */
     @Override
-    public AuthDto.LoginResponse refreshToken(String refreshToken, HttpServletResponse response) {
+    public LoginResponse refreshToken(String refreshToken, HttpServletResponse response) {
         if (refreshToken == null || refreshToken.isBlank()) {
-            throw new UnauthorizedException("refresh token 已过期");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("refresh token 已过期");
         }
 
         try {
@@ -68,49 +73,49 @@ public class AuthServiceImpl implements AuthService {
             try {
                 refreshClaims = jwtUtil.parseToken(refreshToken);
             } catch (DatapillarRuntimeException e) {
-                throw new UnauthorizedException("refresh token 已过期");
+                throw new com.sunny.datapillar.common.exception.UnauthorizedException("refresh token 已过期");
             }
 
             String tokenType = jwtUtil.getTokenType(refreshClaims);
             if (!"refresh".equals(tokenType)) {
-                throw new UnauthorizedException("Token类型错误");
+                throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token类型错误");
             }
 
             Long userId = jwtUtil.getUserId(refreshClaims);
             Long tenantId = jwtUtil.getTenantId(refreshClaims);
             if (userId == null || tenantId == null) {
-                throw new UnauthorizedException("Token无效");
+                throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token无效");
             }
 
             String sid = jwtUtil.getSessionId(refreshClaims);
             String refreshJti = jwtUtil.getTokenId(refreshClaims);
             if (sid == null || sid.isBlank() || refreshJti == null || refreshJti.isBlank()) {
-                throw new UnauthorizedException("Token无效");
+                throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token无效");
             }
 
             Boolean rememberMe = jwtUtil.getRememberMe(refreshClaims);
             if (!sessionStateStore.isSessionActive(sid)) {
                 log.warn("security_event event=session_inactive_on_refresh sid={} tenantId={} userId={}", sid, tenantId, userId);
-                throw new UnauthorizedException("Token已被撤销，请重新登录");
+                throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token已被撤销，请重新登录");
             }
 
             Tenant tenant = tenantMapper.selectById(tenantId);
             if (tenant == null) {
-                throw new UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
+                throw new com.sunny.datapillar.common.exception.UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
             }
             if (tenant.getStatus() == null || tenant.getStatus() != 1) {
-                throw new ForbiddenException("租户已被禁用: tenantId=%s", tenantId);
+                throw new com.sunny.datapillar.common.exception.ForbiddenException("租户已被禁用: tenantId=%s", tenantId);
             }
 
             User user = userMapper.selectById(userId);
             if (user == null) {
-                throw new NotFoundException("用户不存在: %s", userId);
+                throw new com.sunny.datapillar.common.exception.NotFoundException("用户不存在: %s", userId);
             }
             validateUserStatus(user);
 
             TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, userId);
             if (tenantUser == null) {
-                throw new ForbiddenException("无权限访问");
+                throw new com.sunny.datapillar.common.exception.ForbiddenException("无权限访问");
             }
             validateTenantUserStatus(tenantUser, tenantId, userId);
 
@@ -139,13 +144,13 @@ public class AuthServiceImpl implements AuthService {
             if (rotateResult.sessionInactive()) {
                 log.warn("security_event event=session_rotate_failed sid={} tenantId={} userId={} reason=session_inactive",
                         sid, tenantId, userId);
-                throw new UnauthorizedException("Token已被撤销，请重新登录");
+                throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token已被撤销，请重新登录");
             }
             if (rotateResult.refreshReused()) {
                 sessionStateStore.revokeSession(sid);
                 log.warn("security_event event=refresh_token_reused sid={} tenantId={} userId={} jti={}",
                         sid, tenantId, userId, refreshJti);
-                throw new UnauthorizedException("Token已被撤销，请重新登录");
+                throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token已被撤销，请重新登录");
             }
 
             authCookieManager.setAuthCookies(response, newAccessToken, newRefreshToken, rememberMe);
@@ -154,7 +159,7 @@ public class AuthServiceImpl implements AuthService {
             log.info("刷新令牌成功: tenantId={}, userId={}, username={}, sid={}",
                     tenantId, user.getId(), user.getUsername(), sid);
 
-            AuthDto.LoginResponse loginResponse = new AuthDto.LoginResponse();
+            LoginResponse loginResponse = new LoginResponse();
             loginResponse.setUserId(user.getId());
             loginResponse.setTenantId(tenantId);
             loginResponse.setUsername(user.getUsername());
@@ -165,7 +170,7 @@ public class AuthServiceImpl implements AuthService {
             throw e;
         } catch (Exception e) {
             log.error("刷新令牌失败: {}", e.getMessage());
-            throw new InternalException("Token刷新失败: %s", e.getMessage());
+            throw new com.sunny.datapillar.common.exception.InternalException("Token刷新失败: %s", e.getMessage());
         }
     }
 
@@ -181,7 +186,7 @@ public class AuthServiceImpl implements AuthService {
      * 校验 access token 的签名、租户/用户状态与在线会话状态。
      */
     @Override
-    public AuthDto.TokenResponse validateToken(AuthDto.TokenRequest request) {
+    public TokenResponse validateToken(TokenRequest request) {
         Claims claims = parseAccessClaims(request.getToken());
 
         Long userId = jwtUtil.getUserId(claims);
@@ -190,20 +195,20 @@ public class AuthServiceImpl implements AuthService {
         String email = jwtUtil.getEmail(claims);
 
         if (userId == null || tenantId == null) {
-            throw new UnauthorizedException("Token无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token无效");
         }
 
         Tenant tenant = tenantMapper.selectById(tenantId);
         if (tenant == null) {
-            throw new UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
         }
         if (tenant.getStatus() == null || tenant.getStatus() != 1) {
-            throw new ForbiddenException("租户已被禁用: tenantId=%s", tenantId);
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("租户已被禁用: tenantId=%s", tenantId);
         }
 
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new UnauthorizedException("用户不存在，请重新登录");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("用户不存在，请重新登录");
         }
         validateUserStatus(user);
 
@@ -211,66 +216,72 @@ public class AuthServiceImpl implements AuthService {
         if (!impersonation) {
             TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, userId);
             if (tenantUser == null) {
-                throw new ForbiddenException("无权限访问");
+                throw new com.sunny.datapillar.common.exception.ForbiddenException("无权限访问");
             }
             validateTenantUserStatus(tenantUser, tenantId, userId);
 
         }
 
-        return AuthDto.TokenResponse.success(userId, tenantId, username, email);
+        TokenResponse response = new TokenResponse();
+        response.setValid(true);
+        response.setUserId(userId);
+        response.setTenantId(tenantId);
+        response.setUsername(username);
+        response.setEmail(email);
+        return response;
     }
 
     /**
      * 平台超管代入目标租户，替换当前会话 access token。
      */
     @Override
-    public AuthDto.LoginResponse assumeTenant(Long tenantId, String accessToken, HttpServletResponse response) {
+    public LoginResponse assumeTenant(Long tenantId, String accessToken, HttpServletResponse response) {
         if (accessToken == null || accessToken.isBlank()) {
-            throw new UnauthorizedException("Token无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token无效");
         }
         Claims claims = jwtUtil.parseToken(accessToken);
         String tokenType = jwtUtil.getTokenType(claims);
         if (!"access".equals(tokenType)) {
-            throw new UnauthorizedException("Token类型错误");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token类型错误");
         }
 
         String sid = jwtUtil.getSessionId(claims);
         String currentAccessJti = jwtUtil.getTokenId(claims);
         if (sid == null || sid.isBlank() || currentAccessJti == null || currentAccessJti.isBlank()) {
-            throw new UnauthorizedException("Token无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token无效");
         }
         if (!sessionStateStore.isAccessTokenActive(sid, currentAccessJti)) {
-            throw new UnauthorizedException("Token已被撤销，请重新登录");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token已被撤销，请重新登录");
         }
 
         Long actorUserId = jwtUtil.getUserId(claims);
         Long actorTenantId = jwtUtil.getTenantId(claims);
         if (actorUserId == null) {
-            throw new UnauthorizedException("Token无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token无效");
         }
         if (actorTenantId == null || actorTenantId != 0L) {
-            throw new ForbiddenException("无权限访问");
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("无权限访问");
         }
 
         User actor = userMapper.selectById(actorUserId);
         if (actor == null) {
-            throw new NotFoundException("用户不存在: %s", actorUserId);
+            throw new com.sunny.datapillar.common.exception.NotFoundException("用户不存在: %s", actorUserId);
         }
         validateUserStatus(actor);
 
-        List<AuthDto.RoleInfo> systemRoles = userMapper.selectRolesByUserId(0L, actorUserId);
+        List<RoleItem> systemRoles = userMapper.selectRolesByUserId(0L, actorUserId);
         boolean isAdmin = systemRoles != null && systemRoles.stream()
                 .anyMatch(role -> "ADMIN".equalsIgnoreCase(role.getType()));
         if (!isAdmin) {
-            throw new ForbiddenException("无权限访问");
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("无权限访问");
         }
 
         Tenant targetTenant = tenantMapper.selectById(tenantId);
         if (targetTenant == null) {
-            throw new UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
         }
         if (targetTenant.getStatus() == null || targetTenant.getStatus() != 1) {
-            throw new ForbiddenException("租户已被禁用: tenantId=%s", tenantId);
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("租户已被禁用: tenantId=%s", tenantId);
         }
 
         Map<String, Object> extraClaims = new HashMap<>();
@@ -291,12 +302,12 @@ public class AuthServiceImpl implements AuthService {
                 jwtToken.getAccessTokenExpiration()
         );
         if (!replaced) {
-            throw new UnauthorizedException("Token已被撤销，请重新登录");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token已被撤销，请重新登录");
         }
         authCookieManager.setAccessTokenCookie(response, newAccessToken);
         authCookieManager.issueBusinessCsrfCookie(tenantId, actorUserId, jwtToken.getAccessTokenExpiration(), response);
 
-        AuthDto.LoginResponse loginResponse = new AuthDto.LoginResponse();
+        LoginResponse loginResponse = new LoginResponse();
         loginResponse.setUserId(actor.getId());
         loginResponse.setTenantId(tenantId);
         loginResponse.setUsername(actor.getUsername());
@@ -308,33 +319,33 @@ public class AuthServiceImpl implements AuthService {
      * 返回 access token 的基础信息。
      */
     @Override
-    public AuthDto.TokenInfo getTokenInfo(String accessToken) {
+    public TokenInfoResponse getTokenInfo(String accessToken) {
         Claims claims = parseAccessClaims(accessToken);
 
         long expirationTime = claims.getExpiration().getTime();
         long now = System.currentTimeMillis();
         long remainingSeconds = Math.max(0, (expirationTime - now) / 1000);
         if (remainingSeconds <= 0) {
-            throw new UnauthorizedException("Token已过期");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token已过期");
         }
 
         Long userId = jwtUtil.getUserId(claims);
         Long tenantId = jwtUtil.getTenantId(claims);
         if (userId == null || tenantId == null) {
-            throw new UnauthorizedException("Token无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token无效");
         }
 
         Tenant tenant = tenantMapper.selectById(tenantId);
         if (tenant == null) {
-            throw new UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
         }
         if (tenant.getStatus() == null || tenant.getStatus() != 1) {
-            throw new ForbiddenException("租户已被禁用: tenantId=%s", tenantId);
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("租户已被禁用: tenantId=%s", tenantId);
         }
 
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new UnauthorizedException("用户不存在，请重新登录");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("用户不存在，请重新登录");
         }
         validateUserStatus(user);
 
@@ -342,12 +353,12 @@ public class AuthServiceImpl implements AuthService {
         if (!impersonation) {
             TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, userId);
             if (tenantUser == null) {
-                throw new ForbiddenException("无权限访问");
+                throw new com.sunny.datapillar.common.exception.ForbiddenException("无权限访问");
             }
             validateTenantUserStatus(tenantUser, tenantId, userId);
         }
 
-        return AuthDto.TokenInfo.builder()
+        return TokenInfoResponse.builder()
                 .remainingSeconds(remainingSeconds)
                 .expirationTime(expirationTime)
                 .issuedAt(claims.getIssuedAt().getTime())
@@ -358,26 +369,26 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public AuthDto.AuthenticationContext resolveAuthenticationContext(String token) {
+    public AuthenticationContextResponse resolveAuthenticationContext(String token) {
         Claims claims = parseAccessClaims(token);
 
         Long userId = jwtUtil.getUserId(claims);
         Long tenantId = jwtUtil.getTenantId(claims);
         if (userId == null || tenantId == null) {
-            throw new UnauthorizedException("Token无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token无效");
         }
 
         Tenant tenant = tenantMapper.selectById(tenantId);
         if (tenant == null) {
-            throw new UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
         }
         if (tenant.getStatus() == null || tenant.getStatus() != 1) {
-            throw new ForbiddenException("租户已被禁用: tenantId=%s", tenantId);
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("租户已被禁用: tenantId=%s", tenantId);
         }
 
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new UnauthorizedException("用户不存在，请重新登录");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("用户不存在，请重新登录");
         }
         validateUserStatus(user);
 
@@ -385,14 +396,14 @@ public class AuthServiceImpl implements AuthService {
         if (!impersonation) {
             TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, userId);
             if (tenantUser == null) {
-                throw new ForbiddenException("无权限访问");
+                throw new com.sunny.datapillar.common.exception.ForbiddenException("无权限访问");
             }
             validateTenantUserStatus(tenantUser, tenantId, userId);
         }
 
         String sid = jwtUtil.getSessionId(claims);
         String accessJti = jwtUtil.getTokenId(claims);
-        return AuthDto.AuthenticationContext.builder()
+        return AuthenticationContextResponse.builder()
                 .userId(userId)
                 .tenantId(tenantId)
                 .tenantCode(tenant.getCode())
@@ -409,22 +420,22 @@ public class AuthServiceImpl implements AuthService {
 
     private Claims parseAccessClaims(String accessToken) {
         if (accessToken == null || accessToken.isBlank()) {
-            throw new UnauthorizedException("缺少认证信息");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("缺少认证信息");
         }
 
         Claims claims = jwtUtil.parseToken(accessToken);
         String tokenType = jwtUtil.getTokenType(claims);
         if (!"access".equals(tokenType)) {
-            throw new UnauthorizedException("Token类型错误");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token类型错误");
         }
 
         String sid = jwtUtil.getSessionId(claims);
         String accessJti = jwtUtil.getTokenId(claims);
         if (sid == null || sid.isBlank() || accessJti == null || accessJti.isBlank()) {
-            throw new UnauthorizedException("Token无效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token无效");
         }
         if (!sessionStateStore.isAccessTokenActive(sid, accessJti)) {
-            throw new UnauthorizedException("Token已失效");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token已失效");
         }
 
         return claims;
@@ -432,13 +443,13 @@ public class AuthServiceImpl implements AuthService {
 
     private void validateUserStatus(User user) {
         if (user.getStatus() == null || user.getStatus() != 1) {
-            throw new ForbiddenException("用户已被禁用");
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("用户已被禁用");
         }
     }
 
     private void validateTenantUserStatus(TenantUser tenantUser, Long tenantId, Long userId) {
         if (tenantUser.getStatus() == null || tenantUser.getStatus() != 1) {
-            throw new ForbiddenException("租户成员已被禁用: tenantId=%s,userId=%s", tenantId, userId);
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("租户成员已被禁用: tenantId=%s,userId=%s", tenantId, userId);
         }
     }
 

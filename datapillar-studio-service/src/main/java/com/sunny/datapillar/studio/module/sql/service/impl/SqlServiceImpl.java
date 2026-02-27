@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.sql.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -22,9 +36,6 @@ import org.springframework.stereotype.Service;
 
 import com.sunny.datapillar.studio.config.SqlConfig;
 import com.sunny.datapillar.studio.config.GravitinoConfig;
-import com.sunny.datapillar.studio.module.sql.dto.SqlDto;
-import com.sunny.datapillar.studio.module.sql.dto.SqlDto.ColumnSchema;
-import com.sunny.datapillar.studio.module.sql.dto.SqlDto.ExecuteResult;
 import com.sunny.datapillar.studio.module.sql.service.SqlService;
 
 import jakarta.annotation.PostConstruct;
@@ -125,9 +136,9 @@ public class SqlServiceImpl implements SqlService {
     }
 
     @Override
-    public ExecuteResult executeSql(SqlDto.ExecuteRequest request) {
+    public SqlExecuteResponse executeSql(SqlExecuteRequest request) {
         if (!available) {
-            return ExecuteResult.error("SQL 服务不可用");
+            return buildErrorExecuteResponse("SQL 服务不可用");
         }
 
         long startTime = System.currentTimeMillis();
@@ -147,7 +158,7 @@ public class SqlServiceImpl implements SqlService {
             LOG.debug("执行 SQL: {}", sql);
 
             TableResult tableResult = tableEnv.executeSql(sql);
-            ExecuteResult result = buildResult(tableResult, maxRows);
+            SqlExecuteResponse result = buildResult(tableResult, maxRows);
             result.setExecutionTime(System.currentTimeMillis() - startTime);
 
             LOG.debug("SQL 执行完成, 行数: {}, 耗时: {}ms", result.getRowCount(), result.getExecutionTime());
@@ -156,14 +167,14 @@ public class SqlServiceImpl implements SqlService {
 
         } catch (Exception e) {
             LOG.error("SQL 执行失败: {}", e.getMessage(), e);
-            ExecuteResult errorResult = ExecuteResult.error(e.getMessage());
+            SqlExecuteResponse errorResult = buildErrorExecuteResponse(e.getMessage());
             errorResult.setExecutionTime(System.currentTimeMillis() - startTime);
             return errorResult;
         }
     }
 
-    private ExecuteResult buildResult(TableResult tableResult, int maxRows) {
-        ExecuteResult result = ExecuteResult.success();
+    private SqlExecuteResponse buildResult(TableResult tableResult, int maxRows) {
+        SqlExecuteResponse result = buildSuccessExecuteResponse();
 
         if (tableResult.getResultKind() == ResultKind.SUCCESS) {
             result.setMessage("OK");
@@ -177,9 +188,9 @@ public class SqlServiceImpl implements SqlService {
             // 列信息
             List<String> columnNames = schema.getColumnNames();
             List<DataType> columnTypes = schema.getColumnDataTypes();
-            List<ColumnSchema> columns = new ArrayList<>();
+            List<SqlColumnSchemaItem> columns = new ArrayList<>();
             for (int i = 0; i < columnNames.size(); i++) {
-                columns.add(new ColumnSchema(
+                columns.add(new SqlColumnSchemaItem(
                         columnNames.get(i),
                         columnTypes.get(i).toString(),
                         columnTypes.get(i).getLogicalType().isNullable()));
@@ -208,9 +219,22 @@ public class SqlServiceImpl implements SqlService {
         return result;
     }
 
+    private SqlExecuteResponse buildSuccessExecuteResponse() {
+        SqlExecuteResponse result = new SqlExecuteResponse();
+        result.setSuccess(true);
+        return result;
+    }
+
+    private SqlExecuteResponse buildErrorExecuteResponse(String errorMessage) {
+        SqlExecuteResponse result = new SqlExecuteResponse();
+        result.setSuccess(false);
+        result.setError(errorMessage);
+        return result;
+    }
+
     @Override
-    public SqlDto.CatalogListResponse listCatalogs() {
-        SqlDto.CatalogListResponse response = new SqlDto.CatalogListResponse();
+    public SqlCatalogListResponse listCatalogs() {
+        SqlCatalogListResponse response = new SqlCatalogListResponse();
         if (!available) {
             response.setCatalogs(List.of());
             return response;
@@ -221,8 +245,8 @@ public class SqlServiceImpl implements SqlService {
     }
 
     @Override
-    public SqlDto.DatabaseListResponse listDatabases(String catalog) {
-        SqlDto.DatabaseListResponse response = new SqlDto.DatabaseListResponse();
+    public SqlDatabaseListResponse listDatabases(String catalog) {
+        SqlDatabaseListResponse response = new SqlDatabaseListResponse();
         if (!available) {
             response.setDatabases(List.of());
             return response;
@@ -242,8 +266,8 @@ public class SqlServiceImpl implements SqlService {
     }
 
     @Override
-    public SqlDto.TableListResponse listTables(String catalog, String database) {
-        SqlDto.TableListResponse response = new SqlDto.TableListResponse();
+    public SqlTableListResponse listTables(String catalog, String database) {
+        SqlTableListResponse response = new SqlTableListResponse();
         if (!available) {
             response.setTables(List.of());
             return response;

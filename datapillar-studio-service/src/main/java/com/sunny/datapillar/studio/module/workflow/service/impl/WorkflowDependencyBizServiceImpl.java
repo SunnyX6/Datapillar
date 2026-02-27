@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.workflow.service.impl;
 
-import com.sunny.datapillar.studio.module.workflow.dto.JobDependencyDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.workflow.service.JobDependencyService;
 import com.sunny.datapillar.studio.module.workflow.service.WorkflowDependencyBizService;
 import java.util.List;
@@ -21,17 +34,17 @@ public class WorkflowDependencyBizServiceImpl implements WorkflowDependencyBizSe
     private final JobDependencyService jobDependencyService;
 
     @Override
-    public List<JobDependencyDto.Response> getDependenciesByWorkflowId(Long workflowId) {
+    public List<JobDependencyResponse> getDependenciesByWorkflowId(Long workflowId) {
         return jobDependencyService.getDependenciesByWorkflowId(workflowId);
     }
 
     @Override
-    public List<JobDependencyDto.Response> getDependenciesByJobId(Long jobId) {
+    public List<JobDependencyResponse> getDependenciesByJobId(Long jobId) {
         return jobDependencyService.getDependenciesByJobId(jobId);
     }
 
     @Override
-    public Long createDependency(Long workflowId, JobDependencyDto.Create dto) {
+    public Long createDependency(Long workflowId, JobDependencyCreateRequest dto) {
         return jobDependencyService.createDependency(workflowId, dto);
     }
 

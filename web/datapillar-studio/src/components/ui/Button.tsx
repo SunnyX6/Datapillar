@@ -1,6 +1,6 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react'
 import { buttonSizeClassMap as buttonSizeClassMapToken, type ButtonSize as TokenButtonSize } from '@/design-tokens/dimensions'
-import { cn } from '@/lib/utils'
+import { cn } from '@/utils'
 
 export type ButtonVariant = 'primary' | 'outline' | 'dangerOutline' | 'ghost' | 'link'
 

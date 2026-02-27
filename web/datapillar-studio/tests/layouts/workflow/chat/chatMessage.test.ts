@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentActivity } from '@/stores'
-import { getProcessRowMessage, getProcessRowTitle, getProcessStatusLabel } from '@/layouts/workflow/chat/ChatMessage'
+import type { AgentActivity } from '@/features/workflow/state'
+import { getProcessRowMessage, getProcessRowTitle, getProcessStatusLabel } from '@/features/workflow/ui/chat/chatMessageUtils'
 
 const buildActivity = (overrides: Partial<AgentActivity>): AgentActivity => ({
   id: 'analyst:llm',

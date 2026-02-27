@@ -9,7 +9,12 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.sunny.datapillar.auth.dto.AuthDto;
+import com.sunny.datapillar.auth.dto.auth.request.*;
+import com.sunny.datapillar.auth.dto.auth.response.*;
+import com.sunny.datapillar.auth.dto.login.request.*;
+import com.sunny.datapillar.auth.dto.login.response.*;
+import com.sunny.datapillar.auth.dto.oauth.request.*;
+import com.sunny.datapillar.auth.dto.oauth.response.*;
 import com.sunny.datapillar.common.response.ApiResponse;
 import com.sunny.datapillar.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -65,9 +70,9 @@ public class AuthController {
      */
     @Operation(summary = "校验当前会话并返回会话信息")
     @GetMapping("/validate")
-    public ApiResponse<AuthDto.TokenInfo> validate(
+    public ApiResponse<TokenInfoResponse> validate(
             @CookieValue(name = "auth-token", required = false) String accessToken) {
-        AuthDto.TokenInfo tokenInfo = authService.getTokenInfo(accessToken);
+        TokenInfoResponse tokenInfo = authService.getTokenInfo(accessToken);
         return ApiResponse.ok(tokenInfo);
     }
 

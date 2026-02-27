@@ -124,7 +124,7 @@ class CryptoProviderTest {
     @Test
     void ensureTenantKey_shouldReturnAlreadyExistsError() {
         when(tenantKeyService.ensureTenantKey("tenant-acme"))
-                .thenThrow(new AlreadyExistsException(
+                .thenThrow(new com.sunny.datapillar.common.exception.AlreadyExistsException(
                         ErrorType.TENANT_PRIVATE_KEY_ALREADY_EXISTS,
                         Map.of("tenantCode", "tenant-acme"),
                         "私钥文件已存在"));
@@ -143,7 +143,7 @@ class CryptoProviderTest {
     @Test
     void ensureTenantKey_shouldReturnConflictError() {
         when(tenantKeyService.ensureTenantKey("tenant-acme"))
-                .thenThrow(new ConflictException(
+                .thenThrow(new com.sunny.datapillar.common.exception.ConflictException(
                         ErrorType.TENANT_PUBLIC_KEY_MISSING,
                         Map.of("tenantCode", "tenant-acme"),
                         "租户密钥数据不一致"));

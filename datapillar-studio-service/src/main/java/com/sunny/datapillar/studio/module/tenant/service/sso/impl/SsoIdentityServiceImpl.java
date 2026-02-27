@@ -1,12 +1,37 @@
 package com.sunny.datapillar.studio.module.tenant.service.sso.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
+import com.sunny.datapillar.common.exception.db.DbStorageException;
+import com.sunny.datapillar.common.exception.db.SQLExceptionUtils;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
-import com.sunny.datapillar.studio.module.tenant.dto.SsoIdentityDto;
+import com.sunny.datapillar.studio.exception.translator.StudioDbExceptionTranslator;
+import com.sunny.datapillar.studio.exception.translator.StudioDbScene;
+import com.sunny.datapillar.studio.exception.sso.InvalidSsoIdentityRequestException;
+import com.sunny.datapillar.studio.exception.sso.SsoConfigDisabledException;
+import com.sunny.datapillar.studio.exception.sso.SsoConfigInvalidException;
+import com.sunny.datapillar.studio.exception.sso.SsoConfigNotFoundException;
+import com.sunny.datapillar.studio.exception.sso.SsoIdentityAccessDeniedException;
 import com.sunny.datapillar.studio.module.tenant.entity.TenantSsoConfig;
+import com.sunny.datapillar.studio.exception.sso.SsoIdentityNotFoundException;
+import com.sunny.datapillar.studio.exception.sso.SsoProviderUnavailableException;
+import com.sunny.datapillar.studio.exception.sso.SsoUnauthorizedException;
+import com.sunny.datapillar.studio.exception.sso.UnsupportedSsoProviderException;
 import com.sunny.datapillar.studio.module.tenant.entity.UserIdentity;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantSsoConfigMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.UserIdentityMapper;
@@ -23,15 +48,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.sunny.datapillar.common.exception.BadRequestException;
-import com.sunny.datapillar.common.exception.UnauthorizedException;
-import com.sunny.datapillar.common.exception.ForbiddenException;
-import com.sunny.datapillar.common.exception.NotFoundException;
-import com.sunny.datapillar.common.exception.AlreadyExistsException;
-import com.sunny.datapillar.common.exception.InternalException;
 
 /**
  * 单点登录Identity服务实现
@@ -53,17 +71,18 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
     private final AuthCryptoRpcClient authCryptoClient;
     private final TenantCodeResolver tenantCodeResolver;
     private final ObjectMapper objectMapper;
+    private final StudioDbExceptionTranslator studioDbExceptionTranslator;
 
     @Override
-    public List<SsoIdentityDto.Item> list(String provider, Long userId) {
+    public List<SsoIdentityItem> list(String provider, Long userId) {
         Long tenantId = getRequiredTenantId();
-        List<SsoIdentityDto.Item> items = new ArrayList<>();
+        List<SsoIdentityItem> items = new ArrayList<>();
         LambdaQueryWrapper<UserIdentity> queryWrapper = buildListWrapper(tenantId, provider, userId);
         queryWrapper.orderByDesc(UserIdentity::getUpdatedAt)
                 .orderByDesc(UserIdentity::getId);
         List<UserIdentity> records = userIdentityMapper.selectList(queryWrapper);
         for (UserIdentity record : records) {
-            SsoIdentityDto.Item item = new SsoIdentityDto.Item();
+            SsoIdentityItem item = new SsoIdentityItem();
             item.setId(record.getId());
             item.setUserId(record.getUserId());
             item.setProvider(record.getProvider());
@@ -77,17 +96,17 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
 
     @Override
     @Transactional
-    public Long bindByCode(SsoIdentityDto.BindByCodeRequest request) {
+    public Long bindByCode(SsoIdentityBindByCodeRequest request) {
         Long tenantId = getRequiredTenantId();
         if (request == null || request.getUserId() == null || request.getUserId() <= 0) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidSsoIdentityRequestException();
         }
         String provider = normalizeProvider(request.getProvider());
         validateProvider(provider);
 
         TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, request.getUserId());
         if (tenantUser == null || tenantUser.getStatus() == null || tenantUser.getStatus() != 1) {
-            throw new ForbiddenException("无权限访问");
+            throw new SsoIdentityAccessDeniedException();
         }
 
         TenantSsoConfig config = loadEnabledConfig(tenantId, provider);
@@ -98,16 +117,14 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
         String clientSecret = decryptClientSecret(tenantCode, encodedSecret);
         String redirectUri = trimToNull(readString(configMap, "redirectUri"));
         if (clientId == null || clientSecret == null || redirectUri == null) {
-            throw new BadRequestException("参数错误");
+            throw new SsoConfigInvalidException();
         }
 
         DingtalkUserInfo dingtalkUserInfo = dingtalkBindingClient.fetchUserInfo(clientId, clientSecret, request.getAuthCode());
         String externalUserId = trimToNull(dingtalkUserInfo.getUnionId());
         if (externalUserId == null) {
-            throw new InternalException("SSO用户标识缺失");
+            throw new SsoProviderUnavailableException();
         }
-
-        ensureUnique(tenantId, request.getUserId(), provider, externalUserId);
 
         UserIdentity identity = new UserIdentity();
         identity.setTenantId(tenantId);
@@ -118,8 +135,8 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
 
         try {
             userIdentityMapper.insert(identity);
-        } catch (DuplicateKeyException ex) {
-            throw new AlreadyExistsException(ex, "资源已存在");
+        } catch (RuntimeException re) {
+            throw translateDbException(re, StudioDbScene.STUDIO_SSO_IDENTITY_BIND);
         }
         return identity.getId();
     }
@@ -129,11 +146,11 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
     public void unbind(Long identityId) {
         Long tenantId = getRequiredTenantId();
         if (identityId == null || identityId <= 0) {
-            throw new BadRequestException("参数错误");
+            throw new InvalidSsoIdentityRequestException();
         }
         UserIdentity identity = userIdentityMapper.selectById(identityId);
         if (identity == null || !tenantId.equals(identity.getTenantId())) {
-            throw new NotFoundException("资源不存在");
+            throw new SsoIdentityNotFoundException();
         }
         userIdentityMapper.deleteById(identityId);
     }
@@ -160,32 +177,12 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
                 .last("LIMIT 1");
         TenantSsoConfig config = tenantSsoConfigMapper.selectOne(wrapper);
         if (config == null) {
-            throw new NotFoundException("SSO配置不存在: provider=%s", provider);
+            throw new SsoConfigNotFoundException();
         }
         if (config.getStatus() == null || config.getStatus() != 1) {
-            throw new ForbiddenException("SSO配置已禁用: provider=%s", provider);
+            throw new SsoConfigDisabledException();
         }
         return config;
-    }
-
-    private void ensureUnique(Long tenantId, Long userId, String provider, String externalUserId) {
-        LambdaQueryWrapper<UserIdentity> byExternal = new LambdaQueryWrapper<>();
-        byExternal.eq(UserIdentity::getTenantId, tenantId)
-                .eq(UserIdentity::getProvider, provider)
-                .eq(UserIdentity::getExternalUserId, externalUserId)
-                .last("LIMIT 1");
-        if (userIdentityMapper.selectOne(byExternal) != null) {
-            throw new AlreadyExistsException("资源已存在");
-        }
-
-        LambdaQueryWrapper<UserIdentity> byUser = new LambdaQueryWrapper<>();
-        byUser.eq(UserIdentity::getTenantId, tenantId)
-                .eq(UserIdentity::getUserId, userId)
-                .eq(UserIdentity::getProvider, provider)
-                .last("LIMIT 1");
-        if (userIdentityMapper.selectOne(byUser) != null) {
-            throw new AlreadyExistsException("资源已存在");
-        }
     }
 
     private Map<String, Object> readConfigMap(String configJson) {
@@ -196,7 +193,7 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
             return objectMapper.readValue(configJson, new TypeReference<>() {
             });
         } catch (Exception ex) {
-            throw new InternalException(ex, "SSO配置无效: %s", DINGTALK);
+            throw new SsoConfigInvalidException(ex);
         }
     }
 
@@ -217,7 +214,7 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
 
     private void validateProvider(String provider) {
         if (!DINGTALK.equals(provider)) {
-            throw new BadRequestException("参数错误");
+            throw new UnsupportedSsoProviderException();
         }
     }
 
@@ -232,7 +229,7 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
     private Long getRequiredTenantId() {
         Long tenantId = TenantContextHolder.getTenantId();
         if (tenantId == null) {
-            throw new UnauthorizedException("未授权访问");
+            throw new SsoUnauthorizedException();
         }
         return tenantId;
     }
@@ -241,7 +238,15 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
         try {
             return authCryptoClient.decryptSsoClientSecret(tenantCode, encoded);
         } catch (IllegalArgumentException ex) {
-            throw new InternalException(ex, "SSO配置无效: %s", "clientSecret");
+            throw new SsoConfigInvalidException(ex);
         }
+    }
+
+    private RuntimeException translateDbException(RuntimeException runtimeException, StudioDbScene scene) {
+        DbStorageException dbException = SQLExceptionUtils.translate(runtimeException);
+        if (dbException == null) {
+            return runtimeException;
+        }
+        return studioDbExceptionTranslator.map(scene, dbException);
     }
 }

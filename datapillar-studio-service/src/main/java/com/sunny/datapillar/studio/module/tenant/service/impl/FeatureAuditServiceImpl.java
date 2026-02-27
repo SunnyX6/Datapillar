@@ -28,7 +28,7 @@ public class FeatureAuditServiceImpl implements FeatureAuditService {
     public List<TenantFeatureAudit> listAudits() {
         Long tenantId = TenantContextHolder.getTenantId();
         if (tenantId == null) {
-            throw new UnauthorizedException("未授权访问");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("未授权访问");
         }
         LambdaQueryWrapper<TenantFeatureAudit> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(TenantFeatureAudit::getTenantId, tenantId)

@@ -1,4 +1,4 @@
-import { KnowledgeGraphView } from '@/layouts/governance/KnowledgeGraphView'
+import { KnowledgeGraphView } from '@/features/governance/ui/KnowledgeGraphView'
 
 export function GovernanceKnowledgePage() {
   return (

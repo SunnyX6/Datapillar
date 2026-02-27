@@ -8,7 +8,12 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
-import com.sunny.datapillar.auth.dto.AuthDto;
+import com.sunny.datapillar.auth.dto.auth.request.*;
+import com.sunny.datapillar.auth.dto.auth.response.*;
+import com.sunny.datapillar.auth.dto.login.request.*;
+import com.sunny.datapillar.auth.dto.login.response.*;
+import com.sunny.datapillar.auth.dto.oauth.request.*;
+import com.sunny.datapillar.auth.dto.oauth.response.*;
 import com.sunny.datapillar.auth.entity.User;
 import com.sunny.datapillar.auth.mapper.UserMapper;
 
@@ -30,8 +35,8 @@ public class UserAccessReader {
     /**
      * 构建登录成功响应所需的角色与菜单信息。
      */
-    public AuthDto.LoginResponse buildLoginResponse(Long tenantId, User user) {
-        AuthDto.LoginResponse loginResponse = new AuthDto.LoginResponse();
+    public LoginResponse buildLoginResponse(Long tenantId, User user) {
+        LoginResponse loginResponse = new LoginResponse();
         loginResponse.setUserId(user.getId());
         loginResponse.setTenantId(tenantId);
         loginResponse.setUsername(user.getUsername());
@@ -48,12 +53,12 @@ public class UserAccessReader {
         if (tenantId == null || userId == null) {
             return new ArrayList<>();
         }
-        List<AuthDto.RoleInfo> roles = loadRoles(tenantId, userId);
+        List<RoleItem> roles = loadRoles(tenantId, userId);
         if (roles.isEmpty()) {
             return new ArrayList<>();
         }
         List<String> roleTypes = new ArrayList<>();
-        for (AuthDto.RoleInfo role : roles) {
+        for (RoleItem role : roles) {
             if (role == null || role.getType() == null || role.getType().isBlank()) {
                 continue;
             }
@@ -62,24 +67,24 @@ public class UserAccessReader {
         return roleTypes;
     }
 
-    private List<AuthDto.RoleInfo> loadRoles(Long tenantId, Long userId) {
-        List<AuthDto.RoleInfo> roles = userMapper.selectRolesByUserId(tenantId, userId);
+    private List<RoleItem> loadRoles(Long tenantId, Long userId) {
+        List<RoleItem> roles = userMapper.selectRolesByUserId(tenantId, userId);
         return roles == null ? new ArrayList<>() : roles;
     }
 
-    private List<AuthDto.MenuInfo> loadMenus(Long tenantId, Long userId) {
+    private List<MenuItem> loadMenus(Long tenantId, Long userId) {
         List<Map<String, Object>> menuMaps = userMapper.selectMenusByUserId(tenantId, userId);
         return buildMenuTree(menuMaps);
     }
 
-    private List<AuthDto.MenuInfo> buildMenuTree(List<Map<String, Object>> menuMaps) {
+    private List<MenuItem> buildMenuTree(List<Map<String, Object>> menuMaps) {
         if (menuMaps == null || menuMaps.isEmpty()) {
             return new ArrayList<>();
         }
 
-        List<AuthDto.MenuInfo> allMenus = new ArrayList<>();
+        List<MenuItem> allMenus = new ArrayList<>();
         for (Map<String, Object> map : menuMaps) {
-            AuthDto.MenuInfo menu = new AuthDto.MenuInfo();
+            MenuItem menu = new MenuItem();
             menu.setId(((Number) map.get("id")).longValue());
             menu.setName((String) map.get("name"));
             menu.setPath((String) map.get("path"));
@@ -94,15 +99,15 @@ public class UserAccessReader {
             allMenus.add(menu);
         }
 
-        Map<Long, AuthDto.MenuInfo> menuIndex = new HashMap<>();
-        for (AuthDto.MenuInfo menu : allMenus) {
+        Map<Long, MenuItem> menuIndex = new HashMap<>();
+        for (MenuItem menu : allMenus) {
             menuIndex.put(menu.getId(), menu);
         }
 
-        List<AuthDto.MenuInfo> rootMenus = new ArrayList<>();
+        List<MenuItem> rootMenus = new ArrayList<>();
         for (int i = 0; i < menuMaps.size(); i++) {
             Map<String, Object> map = menuMaps.get(i);
-            AuthDto.MenuInfo menu = allMenus.get(i);
+            MenuItem menu = allMenus.get(i);
 
             Object parentIdObj = map.get("parent_id");
             if (parentIdObj == null) {
@@ -111,7 +116,7 @@ public class UserAccessReader {
             }
 
             Long parentId = ((Number) parentIdObj).longValue();
-            AuthDto.MenuInfo parent = menuIndex.get(parentId);
+            MenuItem parent = menuIndex.get(parentId);
             if (parent != null) {
                 parent.getChildren().add(menu);
             } else {

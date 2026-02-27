@@ -74,13 +74,13 @@ public class AuthCryptoRpcClient {
                         .setTenantCode(validTenantCode)
                         .build()));
         if (result == null) {
-            throw new ServiceUnavailableException("密钥存储服务不可用");
+            throw new com.sunny.datapillar.common.exception.ServiceUnavailableException("密钥存储服务不可用");
         }
         if (result.hasError()) {
             throw mapRpcError(result.getError());
         }
         if (!result.hasData() || !result.getData().getSuccess() || !StringUtils.hasText(result.getData().getTenantCode())) {
-            throw new InternalException("服务器内部错误");
+            throw new com.sunny.datapillar.common.exception.InternalException("服务器内部错误");
         }
         return new TenantKeySnapshot(
                 result.getData().getTenantCode(),
@@ -97,13 +97,13 @@ public class AuthCryptoRpcClient {
                         .setTenantCode(validTenantCode)
                         .build()));
         if (result == null) {
-            throw new ServiceUnavailableException("密钥存储服务不可用");
+            throw new com.sunny.datapillar.common.exception.ServiceUnavailableException("密钥存储服务不可用");
         }
         if (result.hasError()) {
             throw mapRpcError(result.getError());
         }
         if (!result.hasData()) {
-            throw new InternalException("服务器内部错误");
+            throw new com.sunny.datapillar.common.exception.InternalException("服务器内部错误");
         }
         return new TenantKeyStatus(
                 result.getData().getExists(),
@@ -116,7 +116,7 @@ public class AuthCryptoRpcClient {
     private String encrypt(String tenantCode, String purpose, String plaintext) {
         String validTenantCode = requireTenantCode(tenantCode);
         if (!StringUtils.hasText(plaintext)) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         EncryptResult result = invokeRpc(() -> cryptoService.encrypt(
                 EncryptRequest.newBuilder()
@@ -126,13 +126,13 @@ public class AuthCryptoRpcClient {
                         .setPlaintext(plaintext)
                         .build()));
         if (result == null) {
-            throw new ServiceUnavailableException("密钥存储服务不可用");
+            throw new com.sunny.datapillar.common.exception.ServiceUnavailableException("密钥存储服务不可用");
         }
         if (result.hasError()) {
             throw mapRpcError(result.getError());
         }
         if (!result.hasData() || !StringUtils.hasText(result.getData().getCiphertext())) {
-            throw new InternalException("服务器内部错误");
+            throw new com.sunny.datapillar.common.exception.InternalException("服务器内部错误");
         }
         return result.getData().getCiphertext();
     }
@@ -140,7 +140,7 @@ public class AuthCryptoRpcClient {
     private String decrypt(String tenantCode, String purpose, String ciphertext) {
         String validTenantCode = requireTenantCode(tenantCode);
         if (!StringUtils.hasText(ciphertext)) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         DecryptResult result = invokeRpc(() -> cryptoService.decrypt(
                 DecryptRequest.newBuilder()
@@ -150,13 +150,13 @@ public class AuthCryptoRpcClient {
                         .setCiphertext(ciphertext)
                         .build()));
         if (result == null) {
-            throw new ServiceUnavailableException("密钥存储服务不可用");
+            throw new com.sunny.datapillar.common.exception.ServiceUnavailableException("密钥存储服务不可用");
         }
         if (result.hasError()) {
             throw mapRpcError(result.getError());
         }
         if (!result.hasData() || !StringUtils.hasText(result.getData().getPlaintext())) {
-            throw new InternalException("服务器内部错误");
+            throw new com.sunny.datapillar.common.exception.InternalException("服务器内部错误");
         }
         return result.getData().getPlaintext();
     }
@@ -171,7 +171,7 @@ public class AuthCryptoRpcClient {
 
     private String requireTenantCode(String tenantCode) {
         if (!StringUtils.hasText(tenantCode)) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         return tenantCode.trim();
     }
@@ -188,13 +188,13 @@ public class AuthCryptoRpcClient {
 
     private DatapillarRuntimeException mapTransportException(RuntimeException ex) {
         if (ex instanceof RpcException) {
-            return new ServiceUnavailableException(
+            return new com.sunny.datapillar.common.exception.ServiceUnavailableException(
                     ex,
                     ErrorType.KEY_STORAGE_UNAVAILABLE,
                     Map.of(),
                     "密钥存储服务不可用");
         }
-        return new InternalException(ex, ErrorType.INTERNAL_ERROR, Map.of(), "服务器内部错误");
+        return new com.sunny.datapillar.common.exception.InternalException(ex, ErrorType.INTERNAL_ERROR, Map.of(), "服务器内部错误");
     }
 
     private DatapillarRuntimeException mapRpcError(com.sunny.datapillar.common.rpc.security.v1.Error rpcError) {
@@ -204,15 +204,15 @@ public class AuthCryptoRpcClient {
         String tenantCode = context.get("tenantCode");
         return switch (type) {
             case ErrorType.TENANT_PRIVATE_KEY_ALREADY_EXISTS ->
-                    new AlreadyExistsException(type, context, buildTenantMessage("私钥文件已存在", tenantCode));
+                    new com.sunny.datapillar.common.exception.AlreadyExistsException(type, context, buildTenantMessage("私钥文件已存在", tenantCode));
             case ErrorType.TENANT_PUBLIC_KEY_MISSING, ErrorType.TENANT_PRIVATE_KEY_MISSING ->
-                    new ConflictException(type, context, buildTenantMessage("租户密钥数据不一致", tenantCode));
+                    new com.sunny.datapillar.common.exception.ConflictException(type, context, buildTenantMessage("租户密钥数据不一致", tenantCode));
             case ErrorType.TENANT_KEY_NOT_FOUND ->
-                    new NotFoundException(type, context, buildTenantMessage("租户密钥不存在", tenantCode));
+                    new com.sunny.datapillar.common.exception.NotFoundException(type, context, buildTenantMessage("租户密钥不存在", tenantCode));
             case ErrorType.PURPOSE_NOT_ALLOWED, ErrorType.CIPHERTEXT_INVALID, ErrorType.TENANT_KEY_INVALID ->
-                    new BadRequestException(type, context, "参数错误");
+                    new com.sunny.datapillar.common.exception.BadRequestException(type, context, "参数错误");
             case ErrorType.KEY_STORAGE_UNAVAILABLE ->
-                    new ServiceUnavailableException(type, context, "密钥存储服务不可用");
+                    new com.sunny.datapillar.common.exception.ServiceUnavailableException(type, context, "密钥存储服务不可用");
             default -> mapByCode(code, type, context, rpcError.getMessage(), rpcError.getRetryable());
         };
     }
@@ -224,20 +224,20 @@ public class AuthCryptoRpcClient {
                                                  boolean retryable) {
         String resolvedMessage = StringUtils.hasText(message) ? message : "服务器内部错误";
         return switch (code) {
-            case Code.BAD_REQUEST -> new BadRequestException(typeOrDefault(type, ErrorType.BAD_REQUEST), context, resolvedMessage);
-            case Code.NOT_FOUND -> new NotFoundException(typeOrDefault(type, ErrorType.NOT_FOUND), context, resolvedMessage);
-            case Code.CONFLICT -> new ConflictException(typeOrDefault(type, ErrorType.CONFLICT), context, resolvedMessage);
-            case Code.SERVICE_UNAVAILABLE -> new ServiceUnavailableException(
+            case Code.BAD_REQUEST -> new com.sunny.datapillar.common.exception.BadRequestException(typeOrDefault(type, ErrorType.BAD_REQUEST), context, resolvedMessage);
+            case Code.NOT_FOUND -> new com.sunny.datapillar.common.exception.NotFoundException(typeOrDefault(type, ErrorType.NOT_FOUND), context, resolvedMessage);
+            case Code.CONFLICT -> new com.sunny.datapillar.common.exception.ConflictException(typeOrDefault(type, ErrorType.CONFLICT), context, resolvedMessage);
+            case Code.SERVICE_UNAVAILABLE -> new com.sunny.datapillar.common.exception.ServiceUnavailableException(
                     typeOrDefault(type, ErrorType.SERVICE_UNAVAILABLE),
                     context,
                     resolvedMessage);
-            case Code.BAD_GATEWAY -> new ServiceUnavailableException(
+            case Code.BAD_GATEWAY -> new com.sunny.datapillar.common.exception.ServiceUnavailableException(
                     typeOrDefault(type, ErrorType.BAD_GATEWAY),
                     context,
                     resolvedMessage);
             default -> retryable
-                    ? new ServiceUnavailableException(typeOrDefault(type, ErrorType.SERVICE_UNAVAILABLE), context, resolvedMessage)
-                    : new InternalException(typeOrDefault(type, ErrorType.INTERNAL_ERROR), context, resolvedMessage);
+                    ? new com.sunny.datapillar.common.exception.ServiceUnavailableException(typeOrDefault(type, ErrorType.SERVICE_UNAVAILABLE), context, resolvedMessage)
+                    : new com.sunny.datapillar.common.exception.InternalException(typeOrDefault(type, ErrorType.INTERNAL_ERROR), context, resolvedMessage);
         };
     }
 

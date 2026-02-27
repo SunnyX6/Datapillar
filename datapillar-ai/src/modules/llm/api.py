@@ -1,7 +1,12 @@
 # @author Sunny
 # @date 2026-02-19
 
-"""LLM Playground API。"""
+"""
+LLM Playground API。
+
+DEPRECATED:
+- 该模块保留给历史链路兼容
+"""
 
 from __future__ import annotations
 

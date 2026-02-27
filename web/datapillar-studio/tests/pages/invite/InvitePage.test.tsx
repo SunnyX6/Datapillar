@@ -28,7 +28,7 @@ vi.mock('@/services/studioInvitationService', () => ({
   registerInvitation: (payload: unknown) => registerInvitationMock(payload)
 }))
 
-vi.mock('@/stores/authStore', () => ({
+vi.mock('@/state/authStore', () => ({
   useAuthStore: {
     getState: () => ({
       logout: logoutMock,
@@ -74,7 +74,7 @@ vi.mock('@/components/ui', () => ({
   )
 }))
 
-vi.mock('@/pages/login/DemoCanvas', () => ({
+vi.mock('@/features/auth/ui/DemoCanvas', () => ({
   DemoCanvas: () => <div data-testid="demo-canvas" />
 }))
 
@@ -188,7 +188,7 @@ describe('InvitePage', () => {
     })
     expect(logoutMock).toHaveBeenCalledTimes(1)
     expect(loginMock).toHaveBeenCalledWith('member_user', '123456', false)
-    expect(navigateMock).toHaveBeenCalledWith('/home', { replace: true })
+    expect(navigateMock).toHaveBeenCalledWith('/', { replace: true })
 
     cleanup(root, container)
   })

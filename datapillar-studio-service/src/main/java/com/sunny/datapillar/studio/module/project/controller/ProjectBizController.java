@@ -1,7 +1,20 @@
 package com.sunny.datapillar.studio.module.project.controller;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.sunny.datapillar.studio.module.project.dto.ProjectDto;
 import com.sunny.datapillar.studio.module.project.service.ProjectBizService;
 import com.sunny.datapillar.studio.config.openapi.OpenApiPaged;
 import com.sunny.datapillar.common.response.ApiResponse;
@@ -42,7 +55,7 @@ public class ProjectBizController {
     @OpenApiPaged
     @Operation(summary = "获取用户的项目列表")
     @GetMapping
-    public ApiResponse<List<ProjectDto.Response>> list(ProjectDto.Query query) {
+    public ApiResponse<List<ProjectResponse>> list(ProjectQueryRequest query) {
         int resolvedMaxLimit = query.getMaxLimit() == null || query.getMaxLimit() <= 0
                 ? DEFAULT_MAX_LIMIT
                 : query.getMaxLimit();
@@ -53,20 +66,20 @@ public class ProjectBizController {
         query.setLimit(resolvedLimit);
         query.setOffset(resolvedOffset);
         Long userId = UserContextUtil.getRequiredUserId();
-        IPage<ProjectDto.Response> result = projectBizService.getProjectPage(query, userId);
+        IPage<ProjectResponse> result = projectBizService.getProjectPage(query, userId);
         return ApiResponse.page(result.getRecords(), resolvedLimit, resolvedOffset, result.getTotal());
     }
 
     @Operation(summary = "获取项目详情")
     @GetMapping("/{id}")
-    public ApiResponse<ProjectDto.Response> detail(@PathVariable Long id) {
+    public ApiResponse<ProjectResponse> detail(@PathVariable Long id) {
         Long userId = UserContextUtil.getRequiredUserId();
         return ApiResponse.ok(projectBizService.getProjectById(id, userId));
     }
 
     @Operation(summary = "创建项目")
     @PostMapping
-    public ApiResponse<Void> create(@Valid @RequestBody ProjectDto.Create dto) {
+    public ApiResponse<Void> create(@Valid @RequestBody ProjectCreateRequest dto) {
         Long userId = UserContextUtil.getRequiredUserId();
         projectBizService.createProject(dto, userId);
         return ApiResponse.ok();
@@ -74,7 +87,7 @@ public class ProjectBizController {
 
     @Operation(summary = "更新项目")
     @PatchMapping("/{id}")
-    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody ProjectDto.Update dto) {
+    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody ProjectUpdateRequest dto) {
         Long userId = UserContextUtil.getRequiredUserId();
         projectBizService.updateProject(id, dto, userId);
         return ApiResponse.ok();

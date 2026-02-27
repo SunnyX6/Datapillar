@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.tenant.controller;
 
-import com.sunny.datapillar.studio.module.tenant.dto.TenantDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.service.TenantAdminService;
 import com.sunny.datapillar.common.response.ApiResponse;
@@ -38,11 +51,11 @@ public class TenantAdminController {
     @Operation(summary = "获取租户列表")
     @GetMapping("/tenants")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<TenantDto.Response>> list(@RequestParam(required = false) Integer status) {
+    public ApiResponse<List<TenantResponse>> list(@RequestParam(required = false) Integer status) {
         List<Tenant> tenants = tenantAdminService.listTenants(status);
-        List<TenantDto.Response> data = tenants.stream()
+        List<TenantResponse> data = tenants.stream()
                 .map(tenant -> {
-                    TenantDto.Response response = new TenantDto.Response();
+                    TenantResponse response = new TenantResponse();
                     BeanUtils.copyProperties(tenant, response);
                     return response;
                 })
@@ -53,7 +66,7 @@ public class TenantAdminController {
     @Operation(summary = "创建租户")
     @PostMapping("/tenant")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> create(@Valid @RequestBody TenantDto.Create dto) {
+    public ApiResponse<Void> create(@Valid @RequestBody TenantCreateRequest dto) {
         tenantAdminService.createTenant(dto);
         return ApiResponse.ok();
     }
@@ -61,7 +74,7 @@ public class TenantAdminController {
     @Operation(summary = "获取租户详情")
     @GetMapping("/tenants/{tenantId}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<TenantDto.Response> detail(@PathVariable Long tenantId) {
+    public ApiResponse<TenantResponse> detail(@PathVariable Long tenantId) {
         return ApiResponse.ok(tenantAdminService.getTenant(tenantId));
     }
 
@@ -69,7 +82,7 @@ public class TenantAdminController {
     @PatchMapping("/tenant/{tenantId}")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ApiResponse<Void> update(@PathVariable Long tenantId,
-                                    @Valid @RequestBody TenantDto.Update dto) {
+                                    @Valid @RequestBody TenantUpdateRequest dto) {
         tenantAdminService.updateTenant(tenantId, dto);
         return ApiResponse.ok();
     }
@@ -78,7 +91,7 @@ public class TenantAdminController {
     @PatchMapping("/tenant/{tenantId}/status")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ApiResponse<Void> updateStatus(@PathVariable Long tenantId,
-                                          @RequestBody TenantDto.StatusUpdate dto) {
+                                          @RequestBody TenantStatusRequest dto) {
         Integer status = dto == null ? null : dto.getStatus();
         tenantAdminService.updateStatus(tenantId, status);
         return ApiResponse.ok();

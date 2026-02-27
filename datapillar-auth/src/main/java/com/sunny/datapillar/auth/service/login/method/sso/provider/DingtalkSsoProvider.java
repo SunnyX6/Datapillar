@@ -14,8 +14,8 @@ import com.aliyun.teaopenapi.models.Config;
 import com.aliyun.teautil.models.RuntimeOptions;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sunny.datapillar.auth.dto.login.response.SsoQrResponse;
 import com.sunny.datapillar.auth.service.login.method.sso.model.SsoProviderConfig;
-import com.sunny.datapillar.auth.service.login.method.sso.model.SsoQrResponse;
 import com.sunny.datapillar.auth.service.login.method.sso.model.SsoToken;
 import com.sunny.datapillar.auth.service.login.method.sso.model.SsoUserInfo;
 import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
@@ -73,7 +73,7 @@ public class DingtalkSsoProvider implements SsoProvider {
     @Override
     public SsoToken exchangeCode(SsoProviderConfig config, String authCode) {
         if (authCode == null || authCode.isBlank()) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         String clientId = config.getRequiredString("clientId");
         String clientSecret = config.getRequiredString("clientSecret");
@@ -87,21 +87,21 @@ public class DingtalkSsoProvider implements SsoProvider {
             GetUserTokenResponse response = client.getUserToken(request);
             if (response == null || response.getBody() == null || response.getBody().getAccessToken() == null
                     || response.getBody().getAccessToken().isBlank()) {
-                throw new InternalException("SSO请求失败: %s", "accessToken为空");
+                throw new com.sunny.datapillar.common.exception.InternalException("SSO请求失败: %s", "accessToken为空");
             }
             Map<String, Object> raw = toMap(response.getBody());
             return new SsoToken(response.getBody().getAccessToken(), null, raw);
         } catch (DatapillarRuntimeException e) {
             throw e;
         } catch (Exception e) {
-            throw new InternalException("SSO请求失败: %s", e.getMessage());
+            throw new com.sunny.datapillar.common.exception.InternalException("SSO请求失败: %s", e.getMessage());
         }
     }
 
     @Override
     public SsoUserInfo fetchUserInfo(SsoProviderConfig config, SsoToken token) {
         if (token == null || token.getAccessToken() == null || token.getAccessToken().isBlank()) {
-            throw new InternalException("SSO请求失败: %s", "accessToken为空");
+            throw new com.sunny.datapillar.common.exception.InternalException("SSO请求失败: %s", "accessToken为空");
         }
         try {
             Client client = new Client(buildOpenApiConfig());
@@ -109,7 +109,7 @@ public class DingtalkSsoProvider implements SsoProvider {
             headers.xAcsDingtalkAccessToken = token.getAccessToken();
             GetUserResponse response = client.getUserWithOptions("me", headers, new RuntimeOptions());
             if (response == null || response.getBody() == null) {
-                throw new InternalException("SSO请求失败: %s", "用户信息为空");
+                throw new com.sunny.datapillar.common.exception.InternalException("SSO请求失败: %s", "用户信息为空");
             }
             String unionId = response.getBody().getUnionId();
             String openId = response.getBody().getOpenId();
@@ -127,7 +127,7 @@ public class DingtalkSsoProvider implements SsoProvider {
         } catch (DatapillarRuntimeException e) {
             throw e;
         } catch (Exception e) {
-            throw new InternalException("SSO请求失败: %s", e.getMessage());
+            throw new com.sunny.datapillar.common.exception.InternalException("SSO请求失败: %s", e.getMessage());
         }
     }
 
@@ -147,7 +147,7 @@ public class DingtalkSsoProvider implements SsoProvider {
         try {
             return objectMapper.convertValue(value, new TypeReference<Map<String, Object>>() {});
         } catch (IllegalArgumentException e) {
-            throw new InternalException(e, "SSO请求失败: %s", "dingtalk_token_response_convert_failed");
+            throw new com.sunny.datapillar.common.exception.InternalException(e, "SSO请求失败: %s", "dingtalk_token_response_convert_failed");
         }
     }
 
@@ -155,7 +155,7 @@ public class DingtalkSsoProvider implements SsoProvider {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (Exception e) {
-            throw new InternalException(e, "SSO请求失败: %s", "dingtalk_user_info_serialize_failed");
+            throw new com.sunny.datapillar.common.exception.InternalException(e, "SSO请求失败: %s", "dingtalk_user_info_serialize_failed");
         }
     }
 

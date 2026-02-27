@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/utils'
 
 type Breakpoint = 'md' | 'lg' | 'xl' | 'never'
 type GapScale = 'none' | 'xs' | 'sm' | 'md' | 'lg'

@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.workflow.service.impl;
 
-import com.sunny.datapillar.studio.module.workflow.dto.JobDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.workflow.service.JobService;
 import com.sunny.datapillar.studio.module.workflow.service.WorkflowJobBizService;
 import java.util.List;
@@ -21,22 +34,22 @@ public class WorkflowJobBizServiceImpl implements WorkflowJobBizService {
     private final JobService jobService;
 
     @Override
-    public List<JobDto.Response> getJobsByWorkflowId(Long workflowId) {
+    public List<JobResponse> getJobsByWorkflowId(Long workflowId) {
         return jobService.getJobsByWorkflowId(workflowId);
     }
 
     @Override
-    public JobDto.Response getJobDetail(Long workflowId, Long id) {
+    public JobResponse getJobDetail(Long workflowId, Long id) {
         return jobService.getJobDetail(workflowId, id);
     }
 
     @Override
-    public Long createJob(Long workflowId, JobDto.Create dto) {
+    public Long createJob(Long workflowId, JobCreateRequest dto) {
         return jobService.createJob(workflowId, dto);
     }
 
     @Override
-    public void updateJob(Long workflowId, Long id, JobDto.Update dto) {
+    public void updateJob(Long workflowId, Long id, JobUpdateRequest dto) {
         jobService.updateJob(workflowId, id, dto);
     }
 
@@ -46,7 +59,7 @@ public class WorkflowJobBizServiceImpl implements WorkflowJobBizService {
     }
 
     @Override
-    public void updateJobPositions(Long workflowId, JobDto.LayoutSave dto) {
+    public void updateJobPositions(Long workflowId, JobLayoutSaveRequest dto) {
         jobService.updateJobPositions(workflowId, dto);
     }
 }

@@ -26,7 +26,7 @@ import {
   ChevronDown,
   Check
 } from 'lucide-react'
-import { DEFAULT_LENGTH, getMaxLengthForType, type DataTypeValue } from '@/layouts/governance/utils/dataType'
+import { DEFAULT_LENGTH, getMaxLengthForType, type DataTypeValue } from '@/utils/dataType'
 import { Button } from './Button'
 
 /** 数据类型配置 */

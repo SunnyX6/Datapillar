@@ -10,8 +10,8 @@ import {
   requestData,
   requestEnvelope,
   requestUploadData
-} from '@/lib/api'
-import type { ApiResponse } from '@/types/api'
+} from '@/api'
+import type { ApiResponse } from '@/api/types/api'
 import type {
   ChunkApi,
   ChunkConfigPayload,
@@ -21,7 +21,7 @@ import type {
   PageResult,
   RetrieveResponseApi,
   UploadResponse
-} from '@/types/ai/knowledge'
+} from '@/services/types/ai/knowledge'
 
 export type {
   ChunkApi,
@@ -33,7 +33,7 @@ export type {
   RetrieveHitApi,
   RetrieveResponseApi,
   UploadResponse
-} from '@/types/ai/knowledge'
+} from '@/services/types/ai/knowledge'
 
 function buildPageResult<T>(payload: ApiResponse<T[]>): PageResult<T> {
   return {

@@ -1,8 +1,21 @@
 package com.sunny.datapillar.studio.module.workflow.service;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
-import com.sunny.datapillar.studio.module.workflow.dto.JobDto;
 
 /**
  * 任务服务
@@ -16,22 +29,22 @@ public interface JobService {
     /**
      * 查询工作流下的所有任务
      */
-    List<JobDto.Response> getJobsByWorkflowId(Long workflowId);
+    List<JobResponse> getJobsByWorkflowId(Long workflowId);
 
     /**
      * 获取任务详情
      */
-    JobDto.Response getJobDetail(Long workflowId, Long id);
+    JobResponse getJobDetail(Long workflowId, Long id);
 
     /**
      * 创建任务
      */
-    Long createJob(Long workflowId, JobDto.Create dto);
+    Long createJob(Long workflowId, JobCreateRequest dto);
 
     /**
      * 更新任务
      */
-    void updateJob(Long workflowId, Long id, JobDto.Update dto);
+    void updateJob(Long workflowId, Long id, JobUpdateRequest dto);
 
     /**
      * 删除任务
@@ -41,5 +54,5 @@ public interface JobService {
     /**
      * 批量更新任务位置
      */
-    void updateJobPositions(Long workflowId, JobDto.LayoutSave dto);
+    void updateJobPositions(Long workflowId, JobLayoutSaveRequest dto);
 }

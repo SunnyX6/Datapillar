@@ -81,18 +81,18 @@ public class AuthCsrfInterceptor implements HandlerInterceptor {
         String headerToken = request.getHeader(headerName);
         String cookieToken = getCookieValue(request, cookieName);
         if (headerToken == null || cookieToken == null || !headerToken.equals(cookieToken)) {
-            throw new ForbiddenException("CSRF 校验失败");
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("CSRF 校验失败");
         }
 
         TokenIdentity tokenIdentity = resolveTokenIdentity(path, authCookie, refreshCookie);
         if (tokenIdentity == null) {
-            throw new ForbiddenException(new IllegalArgumentException("token_identity_missing"), "CSRF 校验失败");
+            throw new com.sunny.datapillar.common.exception.ForbiddenException(new IllegalArgumentException("token_identity_missing"), "CSRF 校验失败");
         }
         boolean valid = refreshRequest
                 ? csrfTokenStore.validateRefreshToken(tokenIdentity.tenantId(), tokenIdentity.userId(), headerToken)
                 : csrfTokenStore.validateToken(tokenIdentity.tenantId(), tokenIdentity.userId(), headerToken);
         if (!valid) {
-            throw new ForbiddenException("CSRF 校验失败");
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("CSRF 校验失败");
         }
 
         return true;
@@ -179,7 +179,7 @@ public class AuthCsrfInterceptor implements HandlerInterceptor {
             }
             return new TokenIdentity(tenantId, userId);
         } catch (DatapillarRuntimeException e) {
-            throw new ForbiddenException(e, "CSRF 校验失败", tokenName + "_parse_failed:" + e.getMessage());
+            throw new com.sunny.datapillar.common.exception.ForbiddenException(e, "CSRF 校验失败", tokenName + "_parse_failed:" + e.getMessage());
         }
     }
 

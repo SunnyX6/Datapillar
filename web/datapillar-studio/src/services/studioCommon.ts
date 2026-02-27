@@ -1,4 +1,4 @@
-import type { ApiResponse } from '@/types/api'
+import type { ApiResponse } from '@/api/types/api'
 
 export function toPageResult<T>(payload: ApiResponse<T[]>) {
   return {

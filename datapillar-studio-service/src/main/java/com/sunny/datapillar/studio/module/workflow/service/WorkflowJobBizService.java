@@ -1,6 +1,19 @@
 package com.sunny.datapillar.studio.module.workflow.service;
 
-import com.sunny.datapillar.studio.module.workflow.dto.JobDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
@@ -12,15 +25,15 @@ import java.util.List;
  */
 public interface WorkflowJobBizService {
 
-    List<JobDto.Response> getJobsByWorkflowId(Long workflowId);
+    List<JobResponse> getJobsByWorkflowId(Long workflowId);
 
-    JobDto.Response getJobDetail(Long workflowId, Long id);
+    JobResponse getJobDetail(Long workflowId, Long id);
 
-    Long createJob(Long workflowId, JobDto.Create dto);
+    Long createJob(Long workflowId, JobCreateRequest dto);
 
-    void updateJob(Long workflowId, Long id, JobDto.Update dto);
+    void updateJob(Long workflowId, Long id, JobUpdateRequest dto);
 
     void deleteJob(Long workflowId, Long id);
 
-    void updateJobPositions(Long workflowId, JobDto.LayoutSave dto);
+    void updateJobPositions(Long workflowId, JobLayoutSaveRequest dto);
 }

@@ -15,7 +15,7 @@ import { Button } from './Button'
 interface ModalProps {
   isOpen: boolean
   onClose: () => void
-  title?: string
+  title?: ReactNode
   /** 副标题，显示在标题下方 */
   subtitle?: ReactNode
   children: ReactNode

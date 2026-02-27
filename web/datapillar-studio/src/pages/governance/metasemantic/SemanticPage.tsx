@@ -1,4 +1,4 @@
-import { SemanticHubView } from '@/layouts/governance/metasemantic'
+import { SemanticHubView } from '@/features/governance/ui/metasemantic'
 
 export function GovernanceSemanticPage() {
   return <SemanticHubView />

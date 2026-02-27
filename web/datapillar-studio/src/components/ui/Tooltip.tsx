@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
-import { cn } from '@/lib/utils'
+import { cn } from '@/utils'
 
 type TooltipSide = 'top' | 'right' | 'bottom' | 'left' | 'center-bottom'
 

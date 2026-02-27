@@ -1,6 +1,11 @@
 package com.sunny.datapillar.auth.service.login;
 
-import com.sunny.datapillar.auth.dto.AuthDto;
+import com.sunny.datapillar.auth.dto.auth.request.*;
+import com.sunny.datapillar.auth.dto.auth.response.*;
+import com.sunny.datapillar.auth.dto.login.request.*;
+import com.sunny.datapillar.auth.dto.login.response.*;
+import com.sunny.datapillar.auth.dto.oauth.request.*;
+import com.sunny.datapillar.auth.dto.oauth.response.*;
 import com.sunny.datapillar.auth.entity.Tenant;
 import com.sunny.datapillar.auth.entity.User;
 import java.util.List;
@@ -22,7 +27,7 @@ public class LoginSubject {
 
     private Tenant tenant;
 
-    private List<AuthDto.TenantOption> tenantOptions;
+    private List<TenantOptionItem> tenantOptions;
 
     private String loginMethod;
 

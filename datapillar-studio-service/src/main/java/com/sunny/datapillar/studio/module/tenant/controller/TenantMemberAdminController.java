@@ -1,8 +1,20 @@
 package com.sunny.datapillar.studio.module.tenant.controller;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.tenant.service.TenantMemberAdminService;
-import com.sunny.datapillar.studio.module.user.dto.RoleDto;
-import com.sunny.datapillar.studio.module.user.dto.UserDto;
 import com.sunny.datapillar.studio.module.user.entity.User;
 import com.sunny.datapillar.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,11 +51,11 @@ public class TenantMemberAdminController {
     @Operation(summary = "获取租户成员列表")
     @GetMapping
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<UserDto.Response>> list(@RequestParam(required = false) Integer status) {
+    public ApiResponse<List<UserResponse>> list(@RequestParam(required = false) Integer status) {
         List<User> users = tenantMemberAdminService.listUsers(status);
-        List<UserDto.Response> data = users.stream()
+        List<UserResponse> data = users.stream()
                 .map(user -> {
-                    UserDto.Response response = new UserDto.Response();
+                    UserResponse response = new UserResponse();
                     BeanUtils.copyProperties(user, response);
                     return response;
                 })
@@ -55,7 +67,7 @@ public class TenantMemberAdminController {
     @PatchMapping("/{memberId}/status")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ApiResponse<Void> updateStatus(@PathVariable Long memberId,
-                                          @Valid @RequestBody UserDto.StatusUpdate request) {
+                                          @Valid @RequestBody UserStatusRequest request) {
         Integer status = request == null ? null : request.getStatus();
         tenantMemberAdminService.updateMemberStatus(memberId, status);
         return ApiResponse.ok();
@@ -64,7 +76,7 @@ public class TenantMemberAdminController {
     @Operation(summary = "获取成员角色")
     @GetMapping("/{memberId}/roles")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<RoleDto.Response>> roles(@PathVariable Long memberId) {
+    public ApiResponse<List<RoleResponse>> roles(@PathVariable Long memberId) {
         return ApiResponse.ok(tenantMemberAdminService.getRolesByUserId(memberId));
     }
 

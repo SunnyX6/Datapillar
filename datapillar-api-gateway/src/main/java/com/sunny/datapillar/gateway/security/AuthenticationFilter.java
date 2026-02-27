@@ -72,7 +72,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
 
         String token = extractToken(request);
         if (!StringUtils.hasText(token)) {
-            return Mono.error(new UnauthorizedException("缺少认证信息"));
+            return Mono.error(new com.sunny.datapillar.gateway.exception.base.GatewayUnauthorizedException("缺少认证信息"));
         }
 
         CheckAuthenticationRequest checkRequest = buildAuthenticationRequest(exchange, token, path);
@@ -85,20 +85,20 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                                                   GatewayFilterChain chain,
                                                   CheckAuthenticationResponse response) {
         if (response == null) {
-            return Mono.error(new ServiceUnavailableException("认证服务无响应"));
+            return Mono.error(new com.sunny.datapillar.gateway.exception.base.GatewayServiceUnavailableException("认证服务无响应"));
         }
 
         if (!response.getAuthenticated()) {
             String message = StringUtils.hasText(response.getMessage()) ? response.getMessage() : "认证失败";
             if (isForbidden(response.getDenyCode())) {
-                return Mono.error(new ForbiddenException(message));
+                return Mono.error(new com.sunny.datapillar.gateway.exception.base.GatewayForbiddenException(message));
             }
-            return Mono.error(new UnauthorizedException(message));
+            return Mono.error(new com.sunny.datapillar.gateway.exception.base.GatewayUnauthorizedException(message));
         }
 
         Principal principal = response.getPrincipal();
         if (principal == null || principal.getUserId() <= 0 || principal.getTenantId() <= 0) {
-            return Mono.error(new UnauthorizedException("认证主体缺失"));
+            return Mono.error(new com.sunny.datapillar.gateway.exception.base.GatewayUnauthorizedException("认证主体缺失"));
         }
 
         ServerHttpRequest mutatedRequest = exchange.getRequest().mutate().headers(headers -> {

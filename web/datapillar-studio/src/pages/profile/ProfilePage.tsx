@@ -1,4 +1,4 @@
-import { ProfileLayout } from '@/layouts/profile'
+import { ProfileLayout } from '@/features/profile'
 
 export function ProfilePage() {
   return <ProfileLayout />

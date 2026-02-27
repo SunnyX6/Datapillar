@@ -1,7 +1,19 @@
 package com.sunny.datapillar.studio.module.tenant.service;
 
-import com.sunny.datapillar.studio.module.user.dto.RoleDto;
-import com.sunny.datapillar.studio.module.user.dto.UserDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.user.entity.User;
 import java.util.List;
 
@@ -18,9 +30,9 @@ public interface TenantMemberAdminService {
 
     void updateMemberStatus(Long userId, Integer status);
 
-    void updateUser(Long userId, UserDto.Update dto);
+    void updateUser(Long userId, UserUpdateRequest dto);
 
-    List<RoleDto.Response> getRolesByUserId(Long userId);
+    List<RoleResponse> getRolesByUserId(Long userId);
 
     void assignRoles(Long userId, List<Long> roleIds);
 }

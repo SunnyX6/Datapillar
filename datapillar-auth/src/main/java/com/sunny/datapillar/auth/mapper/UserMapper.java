@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.sunny.datapillar.auth.dto.login.response.RoleItem;
 import com.sunny.datapillar.auth.entity.User;
 
 /**
@@ -32,8 +33,8 @@ public interface UserMapper extends BaseMapper<User> {
     /**
      * 查询用户的角色列表
      */
-    List<com.sunny.datapillar.auth.dto.AuthDto.RoleInfo> selectRolesByUserId(@Param("tenantId") Long tenantId,
-                                                                             @Param("userId") Long userId);
+    List<RoleItem> selectRolesByUserId(@Param("tenantId") Long tenantId,
+                                       @Param("userId") Long userId);
 
     /**
      * 查询用户可访问的菜单列表

@@ -1,7 +1,20 @@
 package com.sunny.datapillar.studio.module.tenant.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
-import com.sunny.datapillar.studio.module.tenant.dto.FeatureEntitlementDto;
 import com.sunny.datapillar.studio.module.tenant.entity.FeatureObject;
 import com.sunny.datapillar.studio.module.tenant.entity.Permission;
 import com.sunny.datapillar.studio.module.tenant.entity.TenantFeatureAudit;
@@ -48,26 +61,26 @@ public class FeatureEntitlementServiceImpl implements FeatureEntitlementService 
     private final TenantFeatureAuditMapper tenantFeatureAuditMapper;
 
     @Override
-    public List<FeatureEntitlementDto.Item> listEntitlements() {
+    public List<TenantFeatureItem> listEntitlements() {
         Long tenantId = getRequiredTenantId();
         return featureObjectMapper.selectFeatureEntitlements(tenantId);
     }
 
     @Override
-    public FeatureEntitlementDto.Item getEntitlement(Long objectId) {
+    public TenantFeatureItem getEntitlement(Long objectId) {
         Long tenantId = getRequiredTenantId();
-        FeatureEntitlementDto.Item item = featureObjectMapper.selectFeatureEntitlement(tenantId, objectId);
+        TenantFeatureItem item = featureObjectMapper.selectFeatureEntitlement(tenantId, objectId);
         if (item == null) {
-            throw new NotFoundException("资源不存在");
+            throw new com.sunny.datapillar.common.exception.NotFoundException("资源不存在");
         }
         return item;
     }
 
     @Override
     @Transactional
-    public void updateEntitlement(Long objectId, FeatureEntitlementDto.UpdateItem item) {
+    public void updateEntitlement(Long objectId, TenantFeatureUpdateItem item) {
         if (item == null) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         item.setObjectId(objectId);
         updateEntitlements(List.of(item));
@@ -75,7 +88,7 @@ public class FeatureEntitlementServiceImpl implements FeatureEntitlementService 
 
     @Override
     @Transactional
-    public void updateEntitlements(List<FeatureEntitlementDto.UpdateItem> items) {
+    public void updateEntitlements(List<TenantFeatureUpdateItem> items) {
         if (items == null || items.isEmpty()) {
             return;
         }
@@ -91,21 +104,21 @@ public class FeatureEntitlementServiceImpl implements FeatureEntitlementService 
             existingMap.put(permission.getObjectId(), permission);
         }
 
-        for (FeatureEntitlementDto.UpdateItem item : items) {
+        for (TenantFeatureUpdateItem item : items) {
             if (item == null || item.getObjectId() == null) {
                 continue;
             }
             Integer status = item.getStatus();
             if (status == null) {
-                throw new BadRequestException("参数错误");
+                throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
             }
             if (status != STATUS_ENABLED && status != STATUS_DISABLED) {
-                throw new BadRequestException("参数错误");
+                throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
             }
             Permission permission = resolvePermission(item, permissionMap, permissionByIdMap);
             FeatureObject featureObject = featureObjectMapper.selectById(item.getObjectId());
             if (featureObject == null) {
-                throw new NotFoundException("资源不存在");
+                throw new com.sunny.datapillar.common.exception.NotFoundException("资源不存在");
             }
 
             TenantFeaturePermission existing = existingMap.get(item.getObjectId());
@@ -182,23 +195,23 @@ public class FeatureEntitlementServiceImpl implements FeatureEntitlementService 
         return map;
     }
 
-    private Permission resolvePermission(FeatureEntitlementDto.UpdateItem item,
+    private Permission resolvePermission(TenantFeatureUpdateItem item,
                                          Map<String, Permission> permissionMap,
                                          Map<Long, Permission> permissionByIdMap) {
         if (item.getPermissionId() != null) {
             Permission permission = permissionByIdMap.get(item.getPermissionId());
             if (permission == null) {
-                throw new BadRequestException("参数错误", String.valueOf(item.getPermissionId()));
+                throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误", String.valueOf(item.getPermissionId()));
             }
             return permission;
         }
         String normalizedCode = PermissionLevelUtil.normalizeCode(item.getPermissionCode());
         if (normalizedCode == null) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         Permission permission = permissionMap.get(normalizedCode);
         if (permission == null) {
-            throw new BadRequestException("参数错误", normalizedCode);
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误", normalizedCode);
         }
         return permission;
     }
@@ -245,7 +258,7 @@ public class FeatureEntitlementServiceImpl implements FeatureEntitlementService 
     private Long getRequiredTenantId() {
         Long tenantId = TenantContextHolder.getTenantId();
         if (tenantId == null) {
-            throw new UnauthorizedException("未授权访问");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("未授权访问");
         }
         return tenantId;
     }

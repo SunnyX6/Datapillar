@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { API_BASE, API_PATH } from '@/lib/api'
+import { API_BASE, API_PATH } from '@/api'
 
 describe('API endpoints', () => {
   it('AI 工作流应使用 /api/ai/biz/etl 前缀', () => {

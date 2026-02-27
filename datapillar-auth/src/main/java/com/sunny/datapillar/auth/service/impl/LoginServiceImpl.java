@@ -1,6 +1,11 @@
 package com.sunny.datapillar.auth.service.impl;
 
-import com.sunny.datapillar.auth.dto.AuthDto;
+import com.sunny.datapillar.auth.dto.auth.request.*;
+import com.sunny.datapillar.auth.dto.auth.response.*;
+import com.sunny.datapillar.auth.dto.login.request.*;
+import com.sunny.datapillar.auth.dto.login.response.*;
+import com.sunny.datapillar.auth.dto.oauth.request.*;
+import com.sunny.datapillar.auth.dto.oauth.response.*;
 import com.sunny.datapillar.auth.entity.Tenant;
 import com.sunny.datapillar.auth.entity.User;
 import com.sunny.datapillar.auth.mapper.TenantMapper;
@@ -14,9 +19,8 @@ import com.sunny.datapillar.auth.service.login.LoginFinalizer;
 import com.sunny.datapillar.auth.service.login.LoginMethod;
 import com.sunny.datapillar.auth.service.login.LoginSubject;
 import com.sunny.datapillar.auth.service.login.LoginTokenStore;
-import com.sunny.datapillar.auth.service.login.exception.LoginMethodNotSupportedException;
+import com.sunny.datapillar.auth.exception.login.LoginMethodNotSupportedException;
 import com.sunny.datapillar.auth.service.login.method.SsoLoginMethod;
-import com.sunny.datapillar.auth.service.login.method.sso.model.SsoQrResponse;
 import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
 import com.sunny.datapillar.common.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
@@ -82,7 +86,7 @@ public class LoginServiceImpl implements LoginService {
     }
 
     @Override
-    public AuthDto.LoginResult login(LoginCommand command, String clientIp, HttpServletResponse response) {
+    public LoginResultResponse login(LoginCommand command, String clientIp, HttpServletResponse response) {
         if (command != null && !StringUtils.hasText(command.getClientIp())) {
             command.setClientIp(clientIp);
         }
@@ -96,23 +100,23 @@ public class LoginServiceImpl implements LoginService {
     }
 
     @Override
-    public AuthDto.LoginResult loginWithTenant(String loginToken, Long tenantId, HttpServletResponse response) {
+    public LoginResultResponse loginWithTenant(String loginToken, Long tenantId, HttpServletResponse response) {
         if (tenantId == null || tenantId <= 0) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         LoginTokenStore.LoginTokenPayload payload = loginTokenStore.consumeOrThrow(loginToken);
         List<Long> allowedTenants = payload.getTenantIds();
         if (allowedTenants == null || !allowedTenants.contains(tenantId)) {
-            throw new ForbiddenException("无权限访问");
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("无权限访问");
         }
 
         User user = userMapper.selectById(payload.getUserId());
         if (user == null) {
-            throw new NotFoundException("用户不存在: %s", payload.getUserId());
+            throw new com.sunny.datapillar.common.exception.NotFoundException("用户不存在: %s", payload.getUserId());
         }
         Tenant tenant = tenantMapper.selectById(tenantId);
         if (tenant == null) {
-            throw new UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("租户不存在: %s", String.valueOf(tenantId));
         }
 
         LoginSubject subject = LoginSubject.builder()
@@ -120,19 +124,18 @@ public class LoginServiceImpl implements LoginService {
                 .tenant(tenant)
                 .loginMethod(payload.getLoginMethod())
                 .build();
-        AuthDto.LoginResult result = loginFinalizer.finalize(subject, payload.getRememberMe(), response);
+        LoginResultResponse result = loginFinalizer.finalize(subject, payload.getRememberMe(), response);
         authCookieManager.clearLoginTokenCookie(response);
         return result;
     }
 
     @Override
-    public AuthDto.SsoQrResponse getSsoQr(String tenantCode, String provider) {
+    public SsoQrResponse getSsoQr(String tenantCode, String provider) {
         if (!StringUtils.hasText(tenantCode) || !StringUtils.hasText(provider)) {
-            throw new BadRequestException("参数错误");
+            throw new com.sunny.datapillar.common.exception.BadRequestException("参数错误");
         }
         Tenant tenant = loadTenant(tenantCode);
-        SsoQrResponse qrResponse = ssoLoginMethod.buildQr(tenant.getId(), provider);
-        return new AuthDto.SsoQrResponse(qrResponse.getType(), qrResponse.getState(), qrResponse.getPayload());
+        return ssoLoginMethod.buildQr(tenant.getId(), provider);
     }
 
     @Override
@@ -143,7 +146,7 @@ public class LoginServiceImpl implements LoginService {
                 Long userId = jwtUtil.getUserId(claims);
                 Long tenantId = jwtUtil.getTenantId(claims);
                 if (userId == null || tenantId == null) {
-                    throw new UnauthorizedException("Token无效");
+                    throw new com.sunny.datapillar.common.exception.UnauthorizedException("Token无效");
                 }
 
                 boolean impersonation = Boolean.TRUE.equals(claims.get("impersonation", Boolean.class));
@@ -183,10 +186,10 @@ public class LoginServiceImpl implements LoginService {
         String normalizedTenantCode = tenantCode.trim();
         Tenant tenant = tenantMapper.selectByCode(normalizedTenantCode);
         if (tenant == null) {
-            throw new UnauthorizedException("租户不存在: %s", normalizedTenantCode);
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("租户不存在: %s", normalizedTenantCode);
         }
         if (tenant.getStatus() == null || tenant.getStatus() != 1) {
-            throw new ForbiddenException("租户已被禁用: tenantId=%s", tenant.getId());
+            throw new com.sunny.datapillar.common.exception.ForbiddenException("租户已被禁用: tenantId=%s", tenant.getId());
         }
         return tenant;
     }

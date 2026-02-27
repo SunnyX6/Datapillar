@@ -1,9 +1,9 @@
-import { API_BASE, API_PATH, requestData } from '@/lib/api'
+import { API_BASE, API_PATH, requestData } from '@/api'
 import type {
   SetupInitializeRequest,
   SetupInitializeResponse,
   SetupStatusResponse
-} from '@/types/setup'
+} from '@/services/types/setup'
 
 export async function getSetupStatus(): Promise<SetupStatusResponse> {
   return requestData<SetupStatusResponse>({

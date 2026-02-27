@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sunny.datapillar.studio.module.workflow.mapper.JobDependencyMapper">
 
-    <resultMap id="DependencyResponseResult" type="com.sunny.datapillar.studio.module.workflow.dto.JobDependencyDto$Response">
+    <resultMap id="DependencyResponseResult" type="com.sunny.datapillar.studio.dto.workflow.response.JobDependencyResponse">
         <result property="id" column="id"/>
         <result property="workflowId" column="workflow_id"/>
         <result property="jobId" column="job_id"/>

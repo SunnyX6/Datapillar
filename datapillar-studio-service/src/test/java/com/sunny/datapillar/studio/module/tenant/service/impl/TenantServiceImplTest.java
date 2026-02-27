@@ -1,5 +1,19 @@
 package com.sunny.datapillar.studio.module.tenant.service.impl;
 
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -9,7 +23,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.sunny.datapillar.common.exception.AlreadyExistsException;
-import com.sunny.datapillar.studio.module.tenant.dto.TenantDto;
+import com.sunny.datapillar.studio.exception.translator.StudioDbExceptionTranslator;
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantMapper;
 import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
@@ -27,17 +41,18 @@ class TenantServiceImplTest {
     private TenantMapper tenantMapper;
     @Mock
     private AuthCryptoRpcClient authCryptoClient;
+    @Mock
+    private StudioDbExceptionTranslator studioDbExceptionTranslator;
 
     private TenantServiceImpl tenantService;
 
     @BeforeEach
     void setUp() {
-        tenantService = new TenantServiceImpl(tenantMapper, authCryptoClient);
+        tenantService = new TenantServiceImpl(tenantMapper, authCryptoClient, studioDbExceptionTranslator);
     }
 
     @Test
     void createTenant_shouldEnsureKeyThenInsertActiveTenant() {
-        when(tenantMapper.selectByCode("tenant-acme")).thenReturn(null);
         when(authCryptoClient.ensureTenantKey("tenant-acme"))
                 .thenReturn(new AuthCryptoRpcClient.TenantKeySnapshot(
                         "tenant-acme",
@@ -50,7 +65,7 @@ class TenantServiceImplTest {
             return 1;
         });
 
-        TenantDto.Create dto = new TenantDto.Create();
+        TenantCreateRequest dto = new TenantCreateRequest();
         dto.setCode("tenant-acme");
         dto.setName("ACME");
         dto.setType("ENTERPRISE");
@@ -78,7 +93,7 @@ class TenantServiceImplTest {
         tenant.setType("OLD");
         when(tenantMapper.selectById(101L)).thenReturn(tenant);
 
-        TenantDto.Update dto = new TenantDto.Update();
+        TenantUpdateRequest dto = new TenantUpdateRequest();
         dto.setName("New Name");
         dto.setType("ENTERPRISE");
 
@@ -93,11 +108,10 @@ class TenantServiceImplTest {
 
     @Test
     void createTenant_shouldPropagatePrivateKeyAlreadyExists() {
-        when(tenantMapper.selectByCode("tenant-acme")).thenReturn(null);
         when(authCryptoClient.ensureTenantKey("tenant-acme"))
-                .thenThrow(new AlreadyExistsException("私钥文件已存在: tenant-acme"));
+                .thenThrow(new com.sunny.datapillar.common.exception.AlreadyExistsException("私钥文件已存在: tenant-acme"));
 
-        TenantDto.Create dto = new TenantDto.Create();
+        TenantCreateRequest dto = new TenantCreateRequest();
         dto.setCode("tenant-acme");
         dto.setName("ACME");
         dto.setType("ENTERPRISE");

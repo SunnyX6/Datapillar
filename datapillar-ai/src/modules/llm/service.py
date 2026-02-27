@@ -1,7 +1,12 @@
 # @author Sunny
 # @date 2026-02-19
 
-"""LLM Playground 服务。"""
+"""
+LLM Playground 服务。
+
+DEPRECATED:
+- 该模块保留给历史链路兼容
+"""
 
 from __future__ import annotations
 
@@ -42,16 +47,14 @@ class LlmPlaygroundService:
         tenant_code: str,
         payload: PlaygroundChatRequest,
     ) -> AsyncGenerator[PlaygroundStreamDelta, None]:
-        provider_code = self._normalize_required(
-            payload.provider_code, "providerCode 不能为空"
-        ).lower()
-        model_id = self._normalize_required(payload.model_id, "modelId 不能为空")
+        ai_model_id = payload.ai_model_id
+        if ai_model_id <= 0:
+            raise BadRequestException("aiModelId 无效")
         message = self._normalize_required(payload.message, "message 不能为空")
 
         model = Model.get_active_chat_model(
             tenant_id=tenant_id,
-            provider_code=provider_code,
-            model_id=model_id,
+            ai_model_id=ai_model_id,
         )
         if not model:
             raise BadRequestException("模型不存在、未启用或未连接")
@@ -111,7 +114,7 @@ class LlmPlaygroundService:
             {
                 "provider": str(model.get("provider_code") or "").lower(),
                 "api_key": api_key,
-                "model": model.get("model_id"),
+                "model": model.get("provider_model_id"),
                 "base_url": model.get("base_url"),
                 "enable_thinking": thinking_enabled,
             }

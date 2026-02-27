@@ -1,7 +1,19 @@
 package com.sunny.datapillar.studio.module.llm.controller;
 
-import com.sunny.datapillar.studio.module.llm.dto.LlmManagerDto;
-import com.sunny.datapillar.studio.module.llm.dto.LlmProviderDto;
+import com.sunny.datapillar.studio.dto.llm.request.*;
+import com.sunny.datapillar.studio.dto.llm.response.*;
+import com.sunny.datapillar.studio.dto.project.request.*;
+import com.sunny.datapillar.studio.dto.project.response.*;
+import com.sunny.datapillar.studio.dto.setup.request.*;
+import com.sunny.datapillar.studio.dto.setup.response.*;
+import com.sunny.datapillar.studio.dto.sql.request.*;
+import com.sunny.datapillar.studio.dto.sql.response.*;
+import com.sunny.datapillar.studio.dto.tenant.request.*;
+import com.sunny.datapillar.studio.dto.tenant.response.*;
+import com.sunny.datapillar.studio.dto.user.request.*;
+import com.sunny.datapillar.studio.dto.user.response.*;
+import com.sunny.datapillar.studio.dto.workflow.request.*;
+import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.llm.enums.AiModelType;
 import com.sunny.datapillar.studio.module.llm.service.LlmAdminService;
 import com.sunny.datapillar.studio.module.llm.service.LlmConnectionService;
@@ -44,7 +56,7 @@ public class LLMAdminController {
     @Operation(summary = "获取模型池列表")
     @GetMapping("/models")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<LlmManagerDto.ModelResponse>> listModels(
+    public ApiResponse<List<LlmModelResponse>> listModels(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false, name = "provider") String providerCode,
             @RequestParam(required = false, name = "model_type") AiModelType modelType) {
@@ -56,42 +68,42 @@ public class LLMAdminController {
     }
 
     @Operation(summary = "获取模型池详情")
-    @GetMapping("/models/{modelId}")
+    @GetMapping("/models/{aiModelId}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<LlmManagerDto.ModelResponse> getModel(@PathVariable Long modelId) {
-        return ApiResponse.ok(llmAdminService.getModel(getRequiredUserId(), modelId));
+    public ApiResponse<LlmModelResponse> getModel(@PathVariable Long aiModelId) {
+        return ApiResponse.ok(llmAdminService.getModel(getRequiredUserId(), aiModelId));
     }
 
     @Operation(summary = "创建模型")
-    @PostMapping("/model")
+    @PostMapping("/models")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<LlmManagerDto.ModelResponse> createModel(
-            @Valid @RequestBody LlmManagerDto.CreateRequest request) {
+    public ApiResponse<LlmModelResponse> createModel(
+            @Valid @RequestBody LlmModelCreateRequest request) {
         return ApiResponse.ok(llmAdminService.createModel(getRequiredUserId(), request));
     }
 
     @Operation(summary = "更新模型")
-    @PatchMapping("/model/{modelId}")
+    @PatchMapping("/models/{aiModelId}")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ApiResponse<Void> updateModel(
-            @PathVariable Long modelId,
-            @Valid @RequestBody LlmManagerDto.UpdateRequest request) {
-        llmAdminService.updateModel(getRequiredUserId(), modelId, request);
+            @PathVariable Long aiModelId,
+            @Valid @RequestBody LlmModelUpdateRequest request) {
+        llmAdminService.updateModel(getRequiredUserId(), aiModelId, request);
         return ApiResponse.ok();
     }
 
     @Operation(summary = "删除模型")
-    @DeleteMapping("/model/{modelId}")
+    @DeleteMapping("/models/{aiModelId}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> deleteModel(@PathVariable Long modelId) {
-        llmAdminService.deleteModel(getRequiredUserId(), modelId);
+    public ApiResponse<Void> deleteModel(@PathVariable Long aiModelId) {
+        llmAdminService.deleteModel(getRequiredUserId(), aiModelId);
         return ApiResponse.ok();
     }
 
     @Operation(summary = "获取供应商列表")
     @GetMapping("/providers")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<LlmManagerDto.ProviderResponse>> listProviders() {
+    public ApiResponse<List<LlmProviderResponse>> listProviders() {
         return ApiResponse.ok(llmAdminService.listProviders());
     }
 
@@ -99,7 +111,7 @@ public class LLMAdminController {
     @PostMapping("/provider")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ApiResponse<Void> createProvider(
-            @Valid @RequestBody LlmProviderDto.CreateRequest request) {
+            @Valid @RequestBody LlmProviderCreateRequest request) {
         llmAdminService.createProvider(getRequiredUserId(), request);
         return ApiResponse.ok();
     }
@@ -109,7 +121,7 @@ public class LLMAdminController {
     @PreAuthorize("hasAuthority('ADMIN')")
     public ApiResponse<Void> updateProvider(
             @PathVariable String providerCode,
-            @Valid @RequestBody LlmProviderDto.UpdateRequest request) {
+            @Valid @RequestBody LlmProviderUpdateRequest request) {
         llmAdminService.updateProvider(getRequiredUserId(), providerCode, request);
         return ApiResponse.ok();
     }
@@ -123,51 +135,52 @@ public class LLMAdminController {
     }
 
     @Operation(summary = "连接模型")
-    @PostMapping("/model/{modelId}/connect")
+    @PostMapping("/models/{aiModelId}/connect")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<LlmManagerDto.ConnectResponse> connectModel(
-            @PathVariable Long modelId,
-            @Valid @RequestBody LlmManagerDto.ConnectRequest request) {
-        return ApiResponse.ok(llmConnectionService.connectModel(getRequiredUserId(), modelId, request));
+    public ApiResponse<LlmModelConnectResponse> connectModel(
+            @PathVariable Long aiModelId,
+            @Valid @RequestBody LlmModelConnectRequest request) {
+        return ApiResponse.ok(llmConnectionService.connectModel(getRequiredUserId(), aiModelId, request));
     }
 
     @Operation(summary = "获取用户模型授权")
     @GetMapping("/users/{userId}/models")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<LlmManagerDto.ModelUsageResponse>> listUserModelUsages(
+    public ApiResponse<List<LlmUserModelPermissionResponse>> listUserModelPermissions(
             @PathVariable Long userId,
             @RequestParam(required = false, defaultValue = "false") boolean onlyEnabled) {
         Long operatorUserId = getRequiredCurrentUserId();
-        return ApiResponse.ok(llmAdminService.listUserModelUsages(
+        return ApiResponse.ok(llmAdminService.listUserModelPermissions(
                 operatorUserId,
                 userId,
                 onlyEnabled));
     }
 
     @Operation(summary = "设置用户模型授权")
-    @PutMapping("/users/{userId}/model/{modelId}")
+    @PutMapping("/users/{userId}/models/{aiModelId}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<LlmManagerDto.ModelUsageResponse> upsertUserModelGrant(
+    public ApiResponse<Void> upsertUserModelGrant(
             @PathVariable Long userId,
-            @PathVariable Long modelId,
-            @Valid @RequestBody LlmManagerDto.ModelGrantRequest request) {
+            @PathVariable Long aiModelId,
+            @Valid @RequestBody LlmUserModelGrantRequest request) {
         Long operatorUserId = getRequiredCurrentUserId();
-        return ApiResponse.ok(llmAdminService.upsertUserModelGrant(operatorUserId, userId, modelId, request));
+        llmAdminService.upsertUserModelGrant(operatorUserId, userId, aiModelId, request);
+        return ApiResponse.ok();
     }
 
     @Operation(summary = "删除用户模型授权")
-    @DeleteMapping("/users/{userId}/model/{modelId}")
+    @DeleteMapping("/users/{userId}/models/{aiModelId}")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<Void> deleteUserModelGrant(@PathVariable Long userId, @PathVariable Long modelId) {
+    public ApiResponse<Void> deleteUserModelGrant(@PathVariable Long userId, @PathVariable Long aiModelId) {
         Long operatorUserId = getRequiredCurrentUserId();
-        llmAdminService.deleteUserModelGrant(operatorUserId, userId, modelId);
+        llmAdminService.deleteUserModelGrant(operatorUserId, userId, aiModelId);
         return ApiResponse.ok();
     }
 
     private Long getRequiredUserId() {
         Long userId = UserContextUtil.getUserId();
         if (userId == null) {
-            throw new UnauthorizedException("未授权访问");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("未授权访问");
         }
         return userId;
     }
@@ -175,7 +188,7 @@ public class LLMAdminController {
     private Long getRequiredCurrentUserId() {
         Long userId = UserContextUtil.getUserId();
         if (userId == null || userId <= 0) {
-            throw new UnauthorizedException("未授权访问");
+            throw new com.sunny.datapillar.common.exception.UnauthorizedException("未授权访问");
         }
         return userId;
     }

@@ -4,8 +4,8 @@
  * 通过 Gateway 调用 AI 服务
  */
 
-import { API_BASE, API_PATH, requestData } from '@/lib/api'
-import type { AIFillRequest, AIFillResponse } from '@/types/ai/metric'
+import { API_BASE, API_PATH, requestData } from '@/api'
+import type { AIFillRequest, AIFillResponse } from '@/services/types/ai/metric'
 
 export type { AIFillRequest, AIFillResponse }
 

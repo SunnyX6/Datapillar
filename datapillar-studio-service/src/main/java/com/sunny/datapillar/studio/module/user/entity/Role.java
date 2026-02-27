@@ -29,12 +29,11 @@ public class Role {
 
     private String description;
 
+    private Integer level;
+
     private Integer status;
 
     private Integer sort;
-
-    @TableField("is_builtin")
-    private Integer isBuiltin;
 
     @TableField("created_at")
     private LocalDateTime createdAt;

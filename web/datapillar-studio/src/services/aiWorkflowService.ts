@@ -5,12 +5,13 @@
  * 协议版本：v3（统一 stream 事件）
  */
 
-import { API_BASE, API_PATH, openSse, requestData, requestEnvelope } from '@/lib/api'
+import { API_BASE, API_PATH, openSse, requestData, requestEnvelope } from '@/api'
 import type {
   AbortWorkflowResult,
   SseEvent,
-  StreamCallbacks
-} from '@/types/ai/workflow'
+  StreamCallbacks,
+  WorkflowChatModel
+} from '@/services/types/ai/workflow'
 
 export type {
   ActivityEvent,
@@ -19,13 +20,14 @@ export type {
   SseEvent,
   SseEventType,
   StreamCallbacks,
+  WorkflowChatModel,
   StreamInterrupt,
   StreamStatus,
   WorkflowResponse,
   JobResponse,
   DependencyResponse,
   AbortWorkflowResult
-} from '@/types/ai/workflow'
+} from '@/services/types/ai/workflow'
 
 /**
  * 生成唯一会话 ID
@@ -40,6 +42,7 @@ export function generateSessionId(): string {
 export function createWorkflowStream(
   userInput: string | null,
   sessionId: string,
+  model: WorkflowChatModel,
   callbacks: StreamCallbacks,
   resumeValue?: unknown
 ): () => void {
@@ -68,9 +71,10 @@ export function createWorkflowStream(
       }
 
       // 统一使用 /workflow/chat 端点
-      await requestEnvelope<{ success: boolean; stream_url: string }, {
+      await requestEnvelope<{ success: boolean }, {
         userInput: string | null
         sessionId: string
+        model: WorkflowChatModel
         resumeValue?: unknown
       }>({
         baseURL: API_BASE.aiWorkflow,
@@ -79,6 +83,7 @@ export function createWorkflowStream(
         data: {
           userInput,
           sessionId,
+          model,
           resumeValue
         }
       })

@@ -2,10 +2,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act } from 'react-dom/test-utils'
 import { createRoot } from 'react-dom/client'
-import { LoginFormContent } from '@/pages/login/LoginForm'
+import { LoginFormContent } from '@/features/auth/ui/LoginForm'
 
 vi.mock('react-router-dom', () => ({
-  useNavigate: () => vi.fn()
+  useNavigate: () => vi.fn(),
+  useLocation: () => ({
+    pathname: '/login',
+    search: '',
+    hash: ''
+  })
 }))
 
 vi.mock('react-i18next', () => ({
@@ -14,7 +19,7 @@ vi.mock('react-i18next', () => ({
   })
 }))
 
-vi.mock('@/stores', () => ({
+vi.mock('@/state', () => ({
   useThemeMode: () => 'light',
   useAuthStore: (selector: (state: { login: () => Promise<unknown>; loading: boolean }) => unknown) =>
     selector({

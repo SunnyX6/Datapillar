@@ -1,11 +1,11 @@
-import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/lib/api'
+import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/api'
 import { pickDefinedParams, toPageResult } from './studioCommon'
 import type {
   CreateStudioProjectRequest,
   ListStudioProjectsParams,
   ListStudioProjectsResult,
   StudioProjectItem
-} from '@/types/studio/project'
+} from '@/services/types/studio/project'
 
 export type {
   CreateStudioProjectRequest,
@@ -13,7 +13,7 @@ export type {
   ListStudioProjectsResult,
   StudioProjectItem,
   StudioProjectStatus
-} from '@/types/studio/project'
+} from '@/services/types/studio/project'
 
 export async function listProjects(
   params: ListStudioProjectsParams = {}
