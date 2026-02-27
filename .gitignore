@@ -218,6 +218,14 @@ Cargo.lock
 *.ttf
 *.eot
 
+# 文档演示媒体（允许提交）
+!docs/assets/
+!docs/assets/*.gif
+!docs/assets/*.mp4
+!docs/assets/*.webm
+!docs/assets/*.png
+!docs/demo.mp4
+
 # ============================================
 # 其他
 # ============================================
