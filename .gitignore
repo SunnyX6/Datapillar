@@ -254,3 +254,6 @@ datapillar-gravitino/.node/
 *.out
 # 临时数据文件
 *.dat
+
+# 营销官网项目（单独部署，不纳入当前仓库提交）
+web/datapillar-web-site/
