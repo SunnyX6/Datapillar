@@ -5,7 +5,7 @@
 
 
 <p align="center">
-  <strong>依托数据治理的 <code>Agentic</code> <code>ETL</code> 数据开发平台</strong>
+  <strong>依托数据治理以及RAG的 <code>Agentic</code> <code>ETL</code> 数据开发平台</strong>
 </p>
 
 <p align="center">
