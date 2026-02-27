@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="docs/assets/brand-logo.png" alt="Datapillar Logo" width="60" align="absmiddle" />
+  <img src="docs/assets/brand-logo.png" alt="Datapillar Logo" width="56" align="absmiddle" />
   Datapillar
 </h1>
 
