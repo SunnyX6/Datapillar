@@ -1,7 +1,8 @@
-<p align="center">
-  <img src="docs/assets/brand-logo.png" alt="Datapillar Logo" width="56" />
-  <span >Datapillar</span>
-</p>
+<h1 align="center">
+  <img src="docs/assets/brand-logo.png" alt="Datapillar Logo" width="56" align="absmiddle" />
+  Datapillar
+</h1>
+
 
 <p align="center">
   <strong>治理优先的 <code>Agentic</code> <code>ETL</code> 数据开发平台</strong>
