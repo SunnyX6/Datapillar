@@ -5,9 +5,5 @@
 <h1 align="center">Datapillar</h1>
 
 <p align="center">
-  <video src="docs/demo.mp4" controls width="960"></video>
-</p>
-
-<p align="center">
-  <a href="docs/demo.mp4">如果视频未自动展示，请点击查看 demo.mp4</a>
+  <img src="docs/assets/demo.gif" alt="Datapillar Demo" width="980" />
 </p>
