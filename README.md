@@ -1,6 +1,6 @@
 <p align="center">
   <img src="docs/assets/brand-logo.png" alt="Datapillar Logo" width="56" />
-  <span style="font-size: 52px; font-weight: 700; vertical-align: -6px; margin-left: 10px;">Datapillar</span>
+  <span >Datapillar</span>
 </p>
 
 <p align="center">
