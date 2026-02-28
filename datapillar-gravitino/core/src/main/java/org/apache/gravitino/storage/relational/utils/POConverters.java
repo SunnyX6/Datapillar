@@ -902,6 +902,7 @@ public class POConverters {
       return UserPO.builder()
           .withUserId(oldUserPO.getUserId())
           .withUserName(newUser.name())
+          .withExternalUserId(oldUserPO.getExternalUserId())
           .withMetalakeId(oldUserPO.getMetalakeId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newUser.auditInfo()))
           .withCurrentVersion(nextVersion)

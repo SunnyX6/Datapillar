@@ -185,6 +185,7 @@ prepare_nacos_configs() {
         "datapillar-studio-service.yaml"
         "datapillar-api-gateway.yaml"
         "datapillar-ai.yaml"
+        "datapillar-openlineage.yaml"
     )
 
     for item in "${items[@]}"; do
@@ -332,6 +333,10 @@ start_java_service "datapillar-api-gateway" \
 # 4. 启动 AI 服务
 start_ai_service || FAILED=1
 
+# 5. 启动 OpenLineage 服务
+start_java_service "datapillar-openlineage" \
+    "$PROJECT_ROOT/datapillar-openlineage/target/datapillar-openlineage-1.0.0.jar" 7004 || FAILED=1
+
 
 echo ""
 echo "=========================================="
@@ -347,6 +352,7 @@ echo "   • API 网关:           http://localhost:7000"
 echo "   • 认证服务:           http://localhost:7001"
 echo "   • 核心业务:           http://localhost:7002"
 echo "   • AI 服务:            http://localhost:7003"
+echo "   • OpenLineage 服务:   http://localhost:7004"
 echo ""
 echo "📝 日志目录: $LOG_HOME"
 echo "   tail -f $LOG_HOME/*.startup.log"

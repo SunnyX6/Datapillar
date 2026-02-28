@@ -240,7 +240,7 @@ CREATE TABLE user_invitations (
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   inviter_user_id BIGINT NOT NULL COMMENT '邀请人用户ID',
   invite_code VARCHAR(64) NOT NULL COMMENT '邀请码',
-  status TINYINT NOT NULL DEFAULT 0 COMMENT '状态：0待接受，1已接受，2已过期，3已取消',
+  status TINYINT NOT NULL DEFAULT 0 COMMENT '状态：0待接受，1已接受，2已过期，3已取消，4处理中，5失败',
   expires_at DATETIME NULL COMMENT '过期时间',
   accepted_user_id BIGINT NULL COMMENT '接受邀请的用户ID',
   accepted_at DATETIME NULL COMMENT '接受时间',

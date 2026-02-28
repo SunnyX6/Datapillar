@@ -23,9 +23,11 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.datapillar.cache.TenantCacheKeyBuilder;
 
 /** Key for Entity cache. */
 public class EntityCacheKey {
+  private final long tenantId;
   private final NameIdentifier identifier;
   private final Entity.EntityType type;
 
@@ -37,7 +39,19 @@ public class EntityCacheKey {
    * @return A new instance of {@link EntityCacheKey}.
    */
   public static EntityCacheKey of(NameIdentifier ident, Entity.EntityType type) {
-    return new EntityCacheKey(ident, type);
+    return new EntityCacheKey(TenantCacheKeyBuilder.resolveTenantId(), ident, type);
+  }
+
+  /**
+   * Creates a new instance of {@link EntityCacheKey} with the given arguments.
+   *
+   * @param tenantId The tenant identifier of the cache key.
+   * @param ident The identifier of the entity.
+   * @param type The type of the entity.
+   * @return A new instance of {@link EntityCacheKey}.
+   */
+  public static EntityCacheKey of(long tenantId, NameIdentifier ident, Entity.EntityType type) {
+    return new EntityCacheKey(tenantId, ident, type);
   }
 
   /**
@@ -46,12 +60,18 @@ public class EntityCacheKey {
    * @param identifier The identifier of the entity.
    * @param type The type of the entity.
    */
-  EntityCacheKey(NameIdentifier identifier, Entity.EntityType type) {
+  EntityCacheKey(long tenantId, NameIdentifier identifier, Entity.EntityType type) {
+    Preconditions.checkArgument(tenantId >= 0, "tenantId cannot be negative");
     Preconditions.checkArgument(identifier != null, "identifier cannot be null");
     Preconditions.checkArgument(type != null, "type cannot be null");
 
+    this.tenantId = tenantId;
     this.identifier = identifier;
     this.type = type;
+  }
+
+  public long tenantId() {
+    return tenantId;
   }
 
   /**
@@ -72,6 +92,10 @@ public class EntityCacheKey {
     return type;
   }
 
+  public String keyPrefix() {
+    return TenantCacheKeyBuilder.buildPrefix(tenantId, identifier);
+  }
+
   /**
    * Compares two instances of {@link EntityCacheKey} for equality. The comparison is done by
    * comparing the identifier, type, and relationType of the instances.
@@ -85,7 +109,9 @@ public class EntityCacheKey {
     if (!(obj instanceof EntityCacheKey)) return false;
     EntityCacheKey other = (EntityCacheKey) obj;
 
-    return Objects.equals(identifier, other.identifier) && Objects.equals(type, other.type);
+    return tenantId == other.tenantId
+        && Objects.equals(identifier, other.identifier)
+        && Objects.equals(type, other.type);
   }
 
   /**
@@ -96,7 +122,7 @@ public class EntityCacheKey {
    */
   @Override
   public int hashCode() {
-    return Objects.hash(identifier, type);
+    return Objects.hash(tenantId, identifier, type);
   }
 
   /**
@@ -107,8 +133,6 @@ public class EntityCacheKey {
    */
   @Override
   public String toString() {
-    String stringExpr = identifier.toString() + ":" + type.toString();
-
-    return stringExpr;
+    return keyPrefix() + ":" + type.toString();
   }
 }

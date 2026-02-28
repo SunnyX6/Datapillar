@@ -22,7 +22,9 @@ package org.apache.gravitino.storage.relational.session;
 import com.google.common.base.Preconditions;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.List;
 import java.util.ServiceLoader;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
 import org.apache.gravitino.Config;
@@ -34,6 +36,7 @@ import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider;
 import org.apache.gravitino.utils.JdbcUrlUtils;
 import org.apache.ibatis.mapping.Environment;
+import org.apache.ibatis.plugin.Interceptor;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
@@ -47,6 +50,7 @@ import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
  */
 public class SqlSessionFactoryHelper {
   private static volatile SqlSessionFactory sqlSessionFactory;
+  private static final List<Interceptor> INTERCEPTORS = new CopyOnWriteArrayList<>();
   private static final SqlSessionFactoryHelper INSTANCE = new SqlSessionFactoryHelper();
 
   public static SqlSessionFactoryHelper getInstance() {
@@ -54,6 +58,16 @@ public class SqlSessionFactoryHelper {
   }
 
   private SqlSessionFactoryHelper() {}
+
+  /** Register a MyBatis interceptor before {@link #init(Config)} is called. */
+  public void registerInterceptor(Interceptor interceptor) {
+    Preconditions.checkArgument(interceptor != null, "The interceptor must not be null.");
+    boolean alreadyRegistered =
+        INTERCEPTORS.stream().anyMatch(existing -> existing.getClass() == interceptor.getClass());
+    if (!alreadyRegistered) {
+      INTERCEPTORS.add(interceptor);
+    }
+  }
 
   /**
    * Initialize the SqlSessionFactory object.
@@ -110,6 +124,7 @@ public class SqlSessionFactoryHelper {
       // Initialize the configuration
       Configuration configuration = new Configuration(environment);
       configuration.setDatabaseId(jdbcType.name().toLowerCase());
+      INTERCEPTORS.forEach(configuration::addInterceptor);
       ServiceLoader<MapperPackageProvider> loader = ServiceLoader.load(MapperPackageProvider.class);
       for (MapperPackageProvider provider : loader) {
         provider.getMapperClasses().forEach(configuration::addMapper);

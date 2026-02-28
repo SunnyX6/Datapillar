@@ -32,6 +32,8 @@ public class Privileges {
           MetadataObject.Type.CATALOG,
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.TABLE);
+  private static final Set<MetadataObject.Type> COLUMN_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(MetadataObject.Type.COLUMN);
 
   private static final Set<MetadataObject.Type> MODEL_SUPPORTED_TYPES =
       Sets.immutableEnumSet(
@@ -95,6 +97,10 @@ public class Privileges {
         return ModifyTable.allow();
       case SELECT_TABLE:
         return SelectTable.allow();
+      case SELECT_COLUMN:
+        return SelectColumn.allow();
+      case MODIFY_COLUMN:
+        return ModifyColumn.allow();
 
         // Fileset
       case CREATE_FILESET:
@@ -177,6 +183,10 @@ public class Privileges {
         return ModifyTable.deny();
       case SELECT_TABLE:
         return SelectTable.deny();
+      case SELECT_COLUMN:
+        return SelectColumn.deny();
+      case MODIFY_COLUMN:
+        return ModifyColumn.deny();
 
         // Fileset
       case CREATE_FILESET:
@@ -483,6 +493,68 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return TABLE_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to select data from a specific column. */
+  public static class SelectColumn extends GenericPrivilege<SelectColumn> {
+    private static final SelectColumn ALLOW_INSTANCE =
+        new SelectColumn(Condition.ALLOW, Name.SELECT_COLUMN);
+    private static final SelectColumn DENY_INSTANCE =
+        new SelectColumn(Condition.DENY, Name.SELECT_COLUMN);
+
+    private SelectColumn(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static SelectColumn allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static SelectColumn deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return COLUMN_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to modify a specific column. */
+  public static class ModifyColumn extends GenericPrivilege<ModifyColumn> {
+    private static final ModifyColumn ALLOW_INSTANCE =
+        new ModifyColumn(Condition.ALLOW, Name.MODIFY_COLUMN);
+    private static final ModifyColumn DENY_INSTANCE =
+        new ModifyColumn(Condition.DENY, Name.MODIFY_COLUMN);
+
+    private ModifyColumn(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ModifyColumn allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ModifyColumn deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return COLUMN_SUPPORTED_TYPES.contains(type);
     }
   }
 

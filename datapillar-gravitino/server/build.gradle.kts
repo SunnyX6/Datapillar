@@ -92,6 +92,7 @@ fun getGitCommitId(): String {
 
 tasks {
   test {
+    systemProperty("net.bytebuddy.experimental", "true")
     environment("GRAVITINO_HOME", rootDir.path)
     environment("GRAVITINO_TEST", "true")
   }

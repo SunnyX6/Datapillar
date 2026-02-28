@@ -35,8 +35,10 @@ import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Privilege;
@@ -44,6 +46,8 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
 import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
@@ -64,6 +68,9 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -558,6 +565,102 @@ public class TestPermissionOperations extends BaseOperationsTest {
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, wrongPriErrorResp.getCode());
     Assertions.assertEquals(
         IllegalPrivilegeException.class.getSimpleName(), wrongPriErrorResp.getType());
+  }
+
+  @Test
+  public void testGrantColumnPrivilegesToRole() throws IllegalAccessException {
+    Mockito.reset(manager, metalakeDispatcher);
+    RoleEntity roleEntity =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName("role")
+            .withSecurableObjects(
+                Lists.newArrayList(
+                    SecurableObjects.parse(
+                        "catalog.schema.table.col1",
+                        MetadataObject.Type.COLUMN,
+                        Lists.newArrayList(Privileges.SelectColumn.allow()))))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    when(manager.grantPrivilegeToRole(any(), any(), any(), any())).thenReturn(roleEntity);
+    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+
+    CatalogDispatcher catalogDispatcher = mock(CatalogDispatcher.class);
+    Catalog catalog = mock(Catalog.class);
+    when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
+    when(catalogDispatcher.loadCatalog(any())).thenReturn(catalog);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
+
+    TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+    Table table = mock(Table.class);
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+    when(tableDispatcher.loadTable(any())).thenReturn(table);
+    when(table.columns())
+        .thenReturn(
+            new Column[] {
+              Column.of("col1", Types.StringType.get()), Column.of("col2", Types.StringType.get())
+            });
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+
+    PrivilegeGrantRequest columnGrantRequest =
+        new PrivilegeGrantRequest(
+            Lists.newArrayList(
+                PrivilegeDTO.builder()
+                    .withName(Privilege.Name.SELECT_COLUMN)
+                    .withCondition(Privilege.Condition.ALLOW)
+                    .build()));
+    Response columnGrantResponse =
+        target(
+                "/metalakes/metalake1/permissions/roles/role1/column/catalog.schema.table.col1/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(columnGrantRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), columnGrantResponse.getStatus());
+    RoleResponse roleResponse = columnGrantResponse.readEntity(RoleResponse.class);
+    Assertions.assertEquals(0, roleResponse.getCode());
+
+    PrivilegeGrantRequest wrongColumnRequest =
+        new PrivilegeGrantRequest(
+            Lists.newArrayList(
+                PrivilegeDTO.builder()
+                    .withName(Privilege.Name.SELECT_TABLE)
+                    .withCondition(Privilege.Condition.ALLOW)
+                    .build()));
+    Response wrongColumnResponse =
+        target(
+                "/metalakes/metalake1/permissions/roles/role1/column/catalog.schema.table.col1/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(wrongColumnRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), wrongColumnResponse.getStatus());
+    ErrorResponse wrongColumnErrorResponse = wrongColumnResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE, wrongColumnErrorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalPrivilegeException.class.getSimpleName(), wrongColumnErrorResponse.getType());
+
+    PrivilegeGrantRequest wrongTableRequest =
+        new PrivilegeGrantRequest(
+            Lists.newArrayList(
+                PrivilegeDTO.builder()
+                    .withName(Privilege.Name.SELECT_COLUMN)
+                    .withCondition(Privilege.Condition.ALLOW)
+                    .build()));
+    Response wrongTableResponse =
+        target("/metalakes/metalake1/permissions/roles/role1/table/catalog.schema.table/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(wrongTableRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), wrongTableResponse.getStatus());
+    ErrorResponse wrongTableErrorResponse = wrongTableResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE, wrongTableErrorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalPrivilegeException.class.getSimpleName(), wrongTableErrorResponse.getType());
   }
 
   @Test

@@ -76,7 +76,7 @@ public class WordRootEventConverter extends BaseEventConverter {
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
-            .namespace(formatDatasetNamespace(identifier))
+            .namespace(formatDatasetNamespace(event, identifier))
             .name(formatDatasetName(identifier))
             .facets(facets)
             .build();
@@ -108,7 +108,7 @@ public class WordRootEventConverter extends BaseEventConverter {
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
-            .namespace(formatDatasetNamespace(identifier))
+            .namespace(formatDatasetNamespace(event, identifier))
             .name(formatDatasetName(identifier))
             .facets(facets)
             .build();
@@ -132,7 +132,7 @@ public class WordRootEventConverter extends BaseEventConverter {
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
-            .namespace(formatDatasetNamespace(identifier))
+            .namespace(formatDatasetNamespace(event, identifier))
             .name(formatDatasetName(identifier))
             .facets(
                 openLineage

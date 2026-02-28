@@ -73,6 +73,8 @@ public class AuthorizationUtils {
   private static final Set<Privilege.Name> TABLE_PRIVILEGES =
       Sets.immutableEnumSet(
           Privilege.Name.CREATE_TABLE, Privilege.Name.MODIFY_TABLE, Privilege.Name.SELECT_TABLE);
+  private static final Set<Privilege.Name> COLUMN_PRIVILEGES =
+      Sets.immutableEnumSet(Privilege.Name.SELECT_COLUMN, Privilege.Name.MODIFY_COLUMN);
   private static final Set<Privilege.Name> TOPIC_PRIVILEGES =
       Sets.immutableEnumSet(
           Privilege.Name.CREATE_TOPIC, Privilege.Name.PRODUCE_TOPIC, Privilege.Name.CONSUME_TOPIC);
@@ -229,6 +231,20 @@ public class AuthorizationUtils {
       PrivilegeDTO privilegeDTO, MetadataObject object, String metalake) {
     Privilege privilege = DTOConverters.fromPrivilegeDTO(privilegeDTO);
 
+    if (object.type() == MetadataObject.Type.TABLE
+        && COLUMN_PRIVILEGES.contains(privilege.name())) {
+      throw new IllegalPrivilegeException(
+          "Securable object %s type %s doesn't support column privilege %s",
+          object.fullName(), object.type(), privilege.name());
+    }
+
+    if (object.type() == MetadataObject.Type.COLUMN
+        && TABLE_PRIVILEGES.contains(privilege.name())) {
+      throw new IllegalPrivilegeException(
+          "Securable object %s type %s doesn't support table privilege %s",
+          object.fullName(), object.type(), privilege.name());
+    }
+
     if (!privilege.canBindTo(object.type())) {
       throw new IllegalPrivilegeException(
           "Securable object %s type %s don't support binding privilege %s",
@@ -236,7 +252,9 @@ public class AuthorizationUtils {
     }
 
     if (object.type() == MetadataObject.Type.CATALOG
-        || object.type() == MetadataObject.Type.SCHEMA) {
+        || object.type() == MetadataObject.Type.SCHEMA
+        || object.type() == MetadataObject.Type.TABLE
+        || object.type() == MetadataObject.Type.COLUMN) {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
       NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
       try {
@@ -244,7 +262,8 @@ public class AuthorizationUtils {
           checkCatalogType(catalogIdent, Catalog.Type.FILESET, privilege);
         }
 
-        if (TABLE_PRIVILEGES.contains(privilege.name())) {
+        if (TABLE_PRIVILEGES.contains(privilege.name())
+            || COLUMN_PRIVILEGES.contains(privilege.name())) {
           checkCatalogType(catalogIdent, Catalog.Type.RELATIONAL, privilege);
         }
 

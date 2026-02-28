@@ -80,7 +80,7 @@ entity:
   versionRetentionCount: 1
   ## The backend for the entity store, we only supports JDBC
   ##
-  relationalBackend: JDBCBackend
+  relationalBackend: DatapillarJDBCBackend
   ## The JDBC URL for the entity store
   ##
   jdbcUrl: jdbc:h2
@@ -131,7 +131,13 @@ webserver:
   ## The response header size of the built-in web server
   ##
   responseHeaderSize: 131072
-  customFilters: ""
+  customFilters: "org.apache.gravitino.datapillar.security.GatewayAssertionBridgeFilter"
+  gatewayAssertion:
+    issuer: "datapillar-auth"
+    audience: "datapillar-gravitino"
+    publicKeyPath: "conf/security/gateway-assertion-dev-public.pem"
+    clockSkewSeconds: 30
+    assertionHeader: "X-Gateway-Assertion"
 
 ## THE CONFIGURATION FOR Gravitino CATALOG
 ##
@@ -160,7 +166,7 @@ cache:
   enableWeigher: true
   ## Cache backend implementation
   ##
-  implementation: caffeine
+  implementation: org.apache.gravitino.datapillar.cache.TenantScopedEntityCache
 
 ## THE CONFIGURATION FOR authorization
 ##
@@ -168,6 +174,9 @@ authorization:
   ## Whether Gravitino enable authorization or not
   ##
   enable: false
+  ## Metadata authorization implementation
+  ##
+  impl: org.apache.gravitino.datapillar.authorization.TenantAwareAuthorizer
   ## The admins of Gravitino service, multiple admins are spitted by comma.
   ##
   serviceAdmins: anonymous

@@ -1,0 +1,143 @@
+<h1 align="center">
+  <img src="docs/assets/brand-logo.png" alt="Datapillar Logo" width="56" align="absmiddle" />
+  Datapillar
+</h1>
+
+<p align="center">
+  <a href="./README.md">English</a> | <a href="./README.zh-CN.md">简体中文</a>
+</p>
+
+
+<p align="center">
+  <strong>依托数据治理以及RAG的 <code>Agentic</code> <code>ETL</code> 数据开发平台</strong>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/METADATA_GOVERNANCE-111827?style=for-the-badge&logoColor=white" alt="Metadata Governance" />
+  <img src="https://img.shields.io/badge/ZERO--ETL_ORCHESTRATION-111827?style=for-the-badge&logoColor=white" alt="Zero-ETL Orchestration" />
+  <img src="https://img.shields.io/badge/AI_ANALYTICS-111827?style=for-the-badge&logoColor=white" alt="AI Analytics" />
+</p>
+
+<p align="center">
+  <img src="docs/assets/demo-zh.gif" alt="Datapillar Demo" width="980" />
+</p>
+
+## 技术栈
+
+### 后端与服务框架
+
+- Java 21、Spring Boot 3、Spring Cloud Gateway
+- Dubbo 3（RPC 通信）
+- Nacos（配置中心与服务注册发现）
+- Python 3.11+、FastAPI（AI 服务）
+
+### 数据与计算引擎
+
+- MySQL（业务库 `datapillar`、元数据库 `gravitino`）
+- Redis（网关限流、会话与缓存）
+- Neo4j（数仓知识库/血缘图谱）
+- Milvus（RAG 文档向量检索）
+- Apache Flink（SQL 执行）
+- Apache Gravitino（统一元数据管理）
+
+### 前端与工程化
+
+- React 19 + TypeScript + Vite
+- React Router、Zustand、Tailwind CSS
+- Vitest、Playwright、ESLint、Stylelint、Prettier
+
+## 技术架构
+
+> 架构图如下（来源：`docs/assets4/architecture.png`）
+
+![Datapillar 技术架构图](docs/assets4/architecture.png)
+
+## 本地开发快速开始（调试）
+
+### 1. 环境要求
+
+- JDK 21+
+- Maven 3.9+
+- Python 3.11+ 与 `uv`
+- Node.js 20+ 与 `npm`
+- Nacos 3.x（本地默认 `127.0.0.1:8848`）
+- MySQL 8.x、Redis、Neo4j、Milvus
+
+### 2. 启动基础依赖
+
+先确保以下依赖已在本地可访问（默认端口）：
+
+- Nacos: `127.0.0.1:8848`
+- MySQL: `127.0.0.1:3306`
+- Redis: `127.0.0.1:6379`
+- Neo4j: `127.0.0.1:7687`
+- Milvus: `127.0.0.1:19530`
+
+> 启动脚本会自动将 `config/nacos/dev/DATAPILLAR/*.yaml` 同步到 Nacos（namespace=`dev`, group=`DATAPILLAR`）。
+
+### 3. 一键启动后端服务
+
+在项目根目录执行：
+
+```bash
+./scripts/start-local-all.sh
+```
+
+> 仅用于本地开发调试，不用于生产环境。
+
+该脚本会自动编译并启动：
+
+- `datapillar-auth`（7001）
+- `datapillar-studio-service`（7002）
+- `datapillar-api-gateway`（7000）
+- `datapillar-ai`（7003）
+
+日志目录：
+
+```bash
+/tmp/datapillar-logs
+```
+
+### 4. 启动前端
+
+```bash
+cd web/datapillar-studio
+npm install
+npm run dev
+```
+
+前端默认地址：
+
+- `http://localhost:3001`
+
+### 5. 停止后端服务
+
+```bash
+./scripts/stop-local-all.sh
+```
+
+## 项目结构
+
+```text
+.
+├── config/                     # Nacos 配置模板（dev/prod）
+├── docs/                       # 项目文档与架构图
+├── scripts/                    # 本地一键启动/停止脚本
+├── datapillar-api-gateway/     # 网关服务（Spring Cloud Gateway）
+├── datapillar-auth/            # 鉴权服务
+├── datapillar-studio-service/  # 核心业务服务（多租户/SQL/工作流）
+├── datapillar-ai/              # AI 服务（FastAPI/RAG/Agent）
+├── datapillar-openlineage/     # OpenLineage Sink 服务
+├── datapillar-gravitino/       # Gravitino 元数据能力扩展
+└── web/datapillar-studio/      # 前端应用（React + Vite）
+```
+
+## 参考项目
+
+- [Apache Gravitino](https://gravitino.apache.org/)
+- [Apache Flink](https://flink.apache.org/)
+- [OpenLineage](https://openlineage.io/)
+- [Apache Dubbo](https://dubbo.apache.org/)
+- [Nacos](https://nacos.io/en-us/)
+- [Milvus](https://milvus.io/)
+- [Neo4j](https://neo4j.com/)

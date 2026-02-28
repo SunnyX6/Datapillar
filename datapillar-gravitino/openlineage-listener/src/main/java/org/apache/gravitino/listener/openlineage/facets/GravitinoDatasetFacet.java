@@ -60,6 +60,18 @@ public class GravitinoDatasetFacet implements OpenLineage.DatasetFacet {
   @JsonProperty("description")
   private final String description;
 
+  /** 租户 ID 快照 */
+  @JsonProperty("tenantId")
+  private final Long tenantId;
+
+  /** 租户编码快照 */
+  @JsonProperty("tenantCode")
+  private final String tenantCode;
+
+  /** 租户名称快照 */
+  @JsonProperty("tenantName")
+  private final String tenantName;
+
   /** 表/Schema 的扩展属性 */
   @JsonProperty("properties")
   private final Map<String, String> properties;

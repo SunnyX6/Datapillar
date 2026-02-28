@@ -43,6 +43,9 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.datapillar.cache.TenantCatalogCacheKey;
+import org.apache.gravitino.datapillar.context.TenantContext;
+import org.apache.gravitino.datapillar.context.TenantContextHolder;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -300,7 +303,8 @@ public class TestCatalogManager {
     testProperties(props, testCatalog.properties());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, testCatalog.type());
 
-    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    Assertions.assertNotNull(
+        catalogManager.getCatalogCache().getIfPresent(catalogManager.catalogCacheKey(ident)));
 
     // test before creation
     NameIdentifier ident2 = NameIdentifier.of("metalake1", "test1");
@@ -318,7 +322,8 @@ public class TestCatalogManager {
                 catalogManager.createCatalog(
                     ident2, Catalog.Type.RELATIONAL, provider, "comment", props));
     Assertions.assertTrue(exception1.getMessage().contains("Metalake metalake1 does not exist"));
-    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident2));
+    Assertions.assertNull(
+        catalogManager.getCatalogCache().getIfPresent(catalogManager.catalogCacheKey(ident2)));
 
     // test before creation
     Assertions.assertThrows(
@@ -338,7 +343,8 @@ public class TestCatalogManager {
         exception2.getMessage().contains("Catalog metalake.test1 already exists"));
 
     // Test if the catalog is already cached
-    CatalogManager.CatalogWrapper cached = catalogManager.getCatalogCache().getIfPresent(ident);
+    CatalogManager.CatalogWrapper cached =
+        catalogManager.getCatalogCache().getIfPresent(catalogManager.catalogCacheKey(ident));
     Assertions.assertNotNull(cached);
 
     // Test failed creation
@@ -355,7 +361,8 @@ public class TestCatalogManager {
             .getMessage()
             .contains("Properties or property prefixes are reserved and cannot be set"),
         exception3.getMessage());
-    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(failedIdent));
+    Assertions.assertNull(
+        catalogManager.getCatalogCache().getIfPresent(catalogManager.catalogCacheKey(failedIdent)));
     // Test failed for the second time
     Throwable exception4 =
         Assertions.assertThrows(
@@ -368,7 +375,8 @@ public class TestCatalogManager {
             .getMessage()
             .contains("Properties or property prefixes are reserved and cannot be set"),
         exception4.getMessage());
-    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(failedIdent));
+    Assertions.assertNull(
+        catalogManager.getCatalogCache().getIfPresent(catalogManager.catalogCacheKey(failedIdent)));
   }
 
   @Test
@@ -475,7 +483,8 @@ public class TestCatalogManager {
         exception.getMessage().contains("Catalog metalake.test22 does not exist"));
 
     // Load operation will cache the catalog
-    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    Assertions.assertNotNull(
+        catalogManager.getCatalogCache().getIfPresent(catalogManager.catalogCacheKey(ident)));
   }
 
   @Test
@@ -529,8 +538,10 @@ public class TestCatalogManager {
         exception.getMessage().contains("Catalog metalake.test33 does not exist"));
 
     // Alter operation will update the cache
-    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
-    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident1));
+    Assertions.assertNull(
+        catalogManager.getCatalogCache().getIfPresent(catalogManager.catalogCacheKey(ident)));
+    Assertions.assertNotNull(
+        catalogManager.getCatalogCache().getIfPresent(catalogManager.catalogCacheKey(ident1)));
   }
 
   @Test
@@ -566,7 +577,8 @@ public class TestCatalogManager {
     Assertions.assertFalse(dropped1);
 
     // Drop operation will update the cache
-    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    Assertions.assertNull(
+        catalogManager.getCatalogCache().getIfPresent(catalogManager.catalogCacheKey(ident)));
   }
 
   @Test
@@ -627,6 +639,49 @@ public class TestCatalogManager {
     Assertions.assertEquals("value2", oldCatalog.properties().get("key2"));
     Assertions.assertEquals("value3", newCatalog.properties().get("key2"));
     Assertions.assertNotEquals(oldCatalog, newCatalog);
+  }
+
+  @Test
+  void testCatalogCacheTenantIsolation() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "tenant_cache_test");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+
+    try {
+      TenantContextHolder.set(
+          TenantContext.builder()
+              .withTenantId(1L)
+              .withTenantCode("t1")
+              .withTenantName("T1")
+              .build());
+      catalogManager.loadCatalogAndWrap(ident);
+      TenantCatalogCacheKey tenantOneKey = catalogManager.catalogCacheKey(ident);
+      Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(tenantOneKey));
+
+      TenantContextHolder.set(
+          TenantContext.builder()
+              .withTenantId(2L)
+              .withTenantCode("t2")
+              .withTenantName("T2")
+              .build());
+      TenantCatalogCacheKey tenantTwoKey = catalogManager.catalogCacheKey(ident);
+      Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(tenantTwoKey));
+
+      catalogManager.loadCatalogAndWrap(ident);
+      Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(tenantTwoKey));
+      Assertions.assertNotEquals(tenantOneKey, tenantTwoKey);
+    } finally {
+      TenantContextHolder.remove();
+    }
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {

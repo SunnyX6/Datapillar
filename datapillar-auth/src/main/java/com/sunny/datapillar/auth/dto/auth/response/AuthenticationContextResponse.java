@@ -20,6 +20,8 @@ public class AuthenticationContextResponse {
 
     private String tenantCode;
 
+    private String tenantName;
+
     private String username;
 
     private String email;

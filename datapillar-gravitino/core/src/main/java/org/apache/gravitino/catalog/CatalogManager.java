@@ -30,6 +30,7 @@ import static org.apache.gravitino.metalake.MetalakeManager.metalakeInUse;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -80,6 +81,8 @@ import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.datapillar.cache.TenantCacheKeyBuilder;
+import org.apache.gravitino.datapillar.cache.TenantCatalogCacheKey;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
@@ -298,7 +301,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private final Config config;
 
-  @Getter private final Cache<NameIdentifier, CatalogWrapper> catalogCache;
+  @Getter private final Cache<TenantCatalogCacheKey, CatalogWrapper> catalogCache;
 
   private final EntityStore store;
 
@@ -473,7 +476,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
           try {
             store.put(e, false /* overwrite */);
-            catalogCache.put(ident, wrapper);
+            catalogCache.put(catalogCacheKey(ident), wrapper);
             return wrapper.catalog;
 
           } catch (EntityAlreadyExistsException e1) {
@@ -483,7 +486,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
           } catch (Exception e3) {
             wrapper.close();
-            catalogCache.invalidate(ident);
+            catalogCache.invalidate(catalogCacheKey(ident));
             LOG.error("Failed to create catalog {}", ident, e3);
             if (e3 instanceof RuntimeException) {
               throw (RuntimeException) e3;
@@ -589,7 +592,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
                   return newCatalogBuilder.build();
                 });
-            catalogCache.invalidate(ident);
+            catalogCache.invalidate(catalogCacheKey(ident));
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -628,7 +631,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
                   return newCatalogBuilder.build();
                 });
-            catalogCache.invalidate(ident);
+            catalogCache.invalidate(catalogCacheKey(ident));
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -691,7 +694,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         nameIdentifierForLock,
         LockType.WRITE,
         () -> {
-          catalogCache.invalidate(ident);
+          catalogCache.invalidate(catalogCacheKey(ident));
           try {
             CatalogEntity updatedCatalog =
                 store.update(
@@ -716,7 +719,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             CatalogEntity convertedCatalog = convertFilesetCatalogEntity(updatedCatalog);
             return Objects.requireNonNull(
                     catalogCache.get(
-                        convertedCatalog.nameIdentifier(),
+                        catalogCacheKey(convertedCatalog.nameIdentifier()),
                         id -> createCatalogWrapper(convertedCatalog, null)))
                 .catalog;
 
@@ -783,7 +786,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     }
                   });
             }
-            catalogCache.invalidate(ident);
+            catalogCache.invalidate(catalogCacheKey(ident));
             return store.delete(ident, EntityType.CATALOG, true);
 
           } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
@@ -867,7 +870,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @throws NoSuchCatalogException If the specified catalog does not exist.
    */
   public CatalogWrapper loadCatalogAndWrap(NameIdentifier ident) throws NoSuchCatalogException {
-    return catalogCache.get(ident, this::loadCatalogInternal);
+    return catalogCache.get(catalogCacheKey(ident), this::loadCatalogInternal);
   }
 
   private boolean catalogInUse(EntityStore store, NameIdentifier ident)
@@ -878,7 +881,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private boolean getCatalogInUseValue(EntityStore store, NameIdentifier catalogIdent) {
     try {
-      CatalogWrapper wrapper = catalogCache.getIfPresent(catalogIdent);
+      CatalogWrapper wrapper = catalogCache.getIfPresent(catalogCacheKey(catalogIdent));
       CatalogEntity catalogEntity;
       if (wrapper != null) {
         catalogEntity = wrapper.catalog.entity();
@@ -944,6 +947,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             });
 
     return Pair.of(upserts, deletes);
+  }
+
+  @VisibleForTesting
+  TenantCatalogCacheKey catalogCacheKey(NameIdentifier ident) {
+    return TenantCacheKeyBuilder.buildCatalogCacheKey(ident);
+  }
+
+  private CatalogWrapper loadCatalogInternal(TenantCatalogCacheKey cacheKey)
+      throws NoSuchCatalogException {
+    return loadCatalogInternal(cacheKey.identifier());
   }
 
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {

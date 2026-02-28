@@ -96,8 +96,7 @@ public final class MetricLineageEventEmitter {
         continue;
       }
 
-      Map<Long, String> columnNameMap =
-          getColumnNameMap(columnNameCache, version.refTableId());
+      Map<Long, String> columnNameMap = getColumnNameMap(columnNameCache, version.refTableId());
       MetricInfo info = buildMetricInfo(version, columnNameMap);
       eventBus.dispatchEvent(new AlterMetricEvent(user, metric.nameIdentifier(), info));
     }
@@ -125,32 +124,32 @@ public final class MetricLineageEventEmitter {
   private static Map<Long, String> getColumnNameMap(
       Map<Long, Map<Long, String>> cache, Long tableId) {
     if (tableId == null) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     return cache.computeIfAbsent(tableId, MetricLineageEventEmitter::loadColumnNameMap);
   }
 
   private static Map<Long, String> loadColumnNameMap(Long tableId) {
     if (tableId == null) {
-      return Collections.emptyMap();
+      return Map.of();
     }
     TablePO tablePO = TableMetaService.getInstance().getTablePOById(tableId);
     if (tablePO == null || tablePO.getCurrentVersion() == null) {
-      return Collections.emptyMap();
+      return Map.of();
     }
 
     List<ColumnPO> columns =
         TableColumnMetaService.getInstance()
             .getColumnsByTableIdAndVersion(tableId, tablePO.getCurrentVersion());
     if (columns.isEmpty()) {
-      return Collections.emptyMap();
+      return Map.of();
     }
 
     Map<Long, String> map = new HashMap<>(columns.size());
     for (ColumnPO column : columns) {
       map.put(column.getColumnId(), column.getColumnName());
     }
-    return map;
+    return Map.copyOf(map);
   }
 
   private static MetricInfo buildMetricInfo(
@@ -208,13 +207,13 @@ public final class MetricLineageEventEmitter {
 
   private static List<Long> parseColumnIds(String rawIds, String metricCode, String fieldType) {
     if (rawIds == null || rawIds.isBlank()) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     try {
       List<?> values = JsonUtils.anyFieldMapper().readValue(rawIds, List.class);
       if (values == null || values.isEmpty()) {
-        return Collections.emptyList();
+        return List.of();
       }
 
       List<Long> ids = new ArrayList<>(values.size());
@@ -227,19 +226,15 @@ public final class MetricLineageEventEmitter {
             try {
               ids.add(Long.parseLong(str));
             } catch (NumberFormatException e) {
-              LOG.warn(
-                  "指标列 ID 解析失败，跳过: metric={} field={} value={}",
-                  metricCode,
-                  fieldType,
-                  str);
+              LOG.warn("指标列 ID 解析失败，跳过: metric={} field={} value={}", metricCode, fieldType, str);
             }
           }
         }
       }
-      return ids;
+      return List.copyOf(ids);
     } catch (Exception e) {
       LOG.warn("指标列 ID JSON 解析失败，跳过: metric={} field={}", metricCode, fieldType);
-      return Collections.emptyList();
+      return List.of();
     }
   }
 }

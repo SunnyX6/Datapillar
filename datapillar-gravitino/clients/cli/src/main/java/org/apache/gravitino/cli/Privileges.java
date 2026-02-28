@@ -48,6 +48,12 @@ public class Privileges {
   /** Represents the privilege to select from a table. */
   public static final String SELECT_TABLE = "select_table";
 
+  /** Represents the privilege to select from a column. */
+  public static final String SELECT_COLUMN = "select_column";
+
+  /** Represents the privilege to modify a column. */
+  public static final String MODIFY_COLUMN = "modify_column";
+
   /** Represents the privilege to create a fileset. */
   public static final String CREATE_FILESET = "create_fileset";
 
@@ -85,6 +91,8 @@ public class Privileges {
     VALID_PRIVILEGES.add(CREATE_TABLE);
     VALID_PRIVILEGES.add(MODIFY_TABLE);
     VALID_PRIVILEGES.add(SELECT_TABLE);
+    VALID_PRIVILEGES.add(SELECT_COLUMN);
+    VALID_PRIVILEGES.add(MODIFY_COLUMN);
     VALID_PRIVILEGES.add(CREATE_FILESET);
     VALID_PRIVILEGES.add(WRITE_FILESET);
     VALID_PRIVILEGES.add(READ_FILESET);
@@ -128,6 +136,10 @@ public class Privileges {
         return Privilege.Name.MODIFY_TABLE;
       case SELECT_TABLE:
         return Privilege.Name.SELECT_TABLE;
+      case SELECT_COLUMN:
+        return Privilege.Name.SELECT_COLUMN;
+      case MODIFY_COLUMN:
+        return Privilege.Name.MODIFY_COLUMN;
       case CREATE_FILESET:
         return Privilege.Name.CREATE_FILESET;
       case WRITE_FILESET:

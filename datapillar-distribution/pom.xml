@@ -38,6 +38,11 @@
             <artifactId>datapillar-api-gateway</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.sunny</groupId>
+            <artifactId>datapillar-openlineage</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

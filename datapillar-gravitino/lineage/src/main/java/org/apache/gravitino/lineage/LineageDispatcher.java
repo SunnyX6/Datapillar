@@ -21,10 +21,6 @@ package org.apache.gravitino.lineage;
 
 import io.openlineage.server.OpenLineage.RunEvent;
 import java.io.Closeable;
-import java.sql.SQLException;
-import java.util.List;
-import org.apache.gravitino.lineage.model.ColumnLineage;
-import org.apache.gravitino.lineage.model.LineageGraph;
 
 /**
  * Dispatches lineage events to configured sinks after processing. Implementations should handle
@@ -58,27 +54,4 @@ public interface LineageDispatcher extends Closeable {
    *     {@code false} if the event was rejected due to the overload of lineage sinks.
    */
   boolean dispatchLineageEvent(RunEvent runEvent);
-
-  /**
-   * Query lineage graph starting from a specific node.
-   *
-   * @param nodeId Node identifier in format "type:namespace:name"
-   * @param depth Maximum traversal depth
-   * @param direction Traversal direction: "upstream", "downstream", or "both"
-   * @return LineageGraph containing nodes and edges
-   * @throws SQLException if query fails
-   */
-  LineageGraph queryLineage(String nodeId, int depth, String direction) throws SQLException;
-
-  /**
-   * Query column-level lineage for a dataset.
-   *
-   * @param namespace Dataset namespace
-   * @param datasetName Dataset name
-   * @param direction Query direction: "upstream", "downstream", or "both"
-   * @return List of column lineage relationships
-   * @throws SQLException if query fails
-   */
-  List<ColumnLineage> queryColumnLineage(String namespace, String datasetName, String direction)
-      throws SQLException;
 }

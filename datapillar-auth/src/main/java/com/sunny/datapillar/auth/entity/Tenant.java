@@ -21,6 +21,8 @@ public class Tenant {
 
     private String code;
 
+    private String name;
+
     @TableField("encrypt_public_key")
     private String encryptPublicKey;
 

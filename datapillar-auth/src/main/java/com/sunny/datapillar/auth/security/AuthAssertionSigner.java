@@ -61,6 +61,7 @@ public class AuthAssertionSigner {
                 .claim(GatewayAssertionClaims.AUDIENCE, audience)
                 .claim(GatewayAssertionClaims.TENANT_ID, payload.tenantId())
                 .claim(GatewayAssertionClaims.TENANT_CODE, payload.tenantCode())
+                .claim(GatewayAssertionClaims.TENANT_NAME, payload.tenantName())
                 .claim(GatewayAssertionClaims.USERNAME, payload.username())
                 .claim(GatewayAssertionClaims.EMAIL, payload.email())
                 .claim(GatewayAssertionClaims.ROLES, payload.roles())
@@ -81,6 +82,7 @@ public class AuthAssertionSigner {
             Long userId,
             Long tenantId,
             String tenantCode,
+            String tenantName,
             String username,
             String email,
             List<String> roles,

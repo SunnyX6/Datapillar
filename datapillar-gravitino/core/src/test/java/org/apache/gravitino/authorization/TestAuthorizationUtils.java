@@ -27,14 +27,18 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.rel.Table;
@@ -288,5 +292,39 @@ class TestAuthorizationUtils {
             NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.SCHEMA);
     Assertions.assertEquals(1, locations.size());
     Assertions.assertEquals("schemaLocation", locations.get(0));
+  }
+
+  @Test
+  void testCheckPrivilegeRejectCrossGrainPrivileges() throws IllegalAccessException {
+    CatalogDispatcher catalogDispatcher = Mockito.mock(CatalogDispatcher.class);
+    Catalog relationalCatalog = Mockito.mock(Catalog.class);
+    Mockito.when(relationalCatalog.type()).thenReturn(Catalog.Type.RELATIONAL);
+    Mockito.when(catalogDispatcher.loadCatalog(Mockito.any())).thenReturn(relationalCatalog);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
+
+    MetadataObject tableObject =
+        MetadataObjects.of("catalog.schema", "table1", MetadataObject.Type.TABLE);
+    MetadataObject columnObject =
+        MetadataObjects.of("catalog.schema.table1", "col1", MetadataObject.Type.COLUMN);
+
+    PrivilegeDTO selectColumnPrivilege =
+        PrivilegeDTO.builder()
+            .withName(Privilege.Name.SELECT_COLUMN)
+            .withCondition(Privilege.Condition.ALLOW)
+            .build();
+    PrivilegeDTO selectTablePrivilege =
+        PrivilegeDTO.builder()
+            .withName(Privilege.Name.SELECT_TABLE)
+            .withCondition(Privilege.Condition.ALLOW)
+            .build();
+
+    Assertions.assertThrows(
+        IllegalPrivilegeException.class,
+        () -> AuthorizationUtils.checkPrivilege(selectColumnPrivilege, tableObject, metalake));
+    Assertions.assertThrows(
+        IllegalPrivilegeException.class,
+        () -> AuthorizationUtils.checkPrivilege(selectTablePrivilege, columnObject, metalake));
+    Assertions.assertDoesNotThrow(
+        () -> AuthorizationUtils.checkPrivilege(selectColumnPrivilege, columnObject, metalake));
   }
 }

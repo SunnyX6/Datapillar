@@ -40,6 +40,8 @@ public class AuthenticationProvider implements AuthenticationService {
 
     private static final String STUDIO_AUDIENCE = "datapillar-studio-service";
     private static final String AI_AUDIENCE = "datapillar-ai";
+    private static final String OPENLINEAGE_AUDIENCE = "datapillar-openlineage";
+    private static final String ONEMETA_AUDIENCE = "datapillar-gravitino";
 
     private final AuthService authService;
     private final AuthAssertionSigner assertionSigner;
@@ -124,6 +126,7 @@ public class AuthenticationProvider implements AuthenticationService {
                 context.getUserId(),
                 context.getTenantId(),
                 context.getTenantCode(),
+                context.getTenantName(),
                 context.getUsername(),
                 context.getEmail(),
                 context.getRoles(),
@@ -141,6 +144,12 @@ public class AuthenticationProvider implements AuthenticationService {
         }
         if (path.startsWith("/api/ai")) {
             return AI_AUDIENCE;
+        }
+        if (path.startsWith("/api/openlineage")) {
+            return OPENLINEAGE_AUDIENCE;
+        }
+        if (path.startsWith("/api/onemeta")) {
+            return ONEMETA_AUDIENCE;
         }
         return null;
     }

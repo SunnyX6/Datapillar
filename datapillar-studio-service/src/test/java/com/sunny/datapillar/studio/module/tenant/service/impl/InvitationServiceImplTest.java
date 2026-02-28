@@ -18,6 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,13 +36,16 @@ import com.sunny.datapillar.studio.module.tenant.mapper.TenantMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.UserInvitationMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.UserInvitationRoleMapper;
 import com.sunny.datapillar.studio.module.user.entity.Role;
+import com.sunny.datapillar.studio.module.user.entity.TenantUser;
 import com.sunny.datapillar.studio.module.user.entity.User;
 import com.sunny.datapillar.studio.module.user.mapper.RoleMapper;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserRoleMapper;
+import com.sunny.datapillar.studio.rpc.gravitino.GravitinoRpcClient;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,6 +73,8 @@ class InvitationServiceImplTest {
     private TenantMapper tenantMapper;
     @Mock
     private PasswordEncoder passwordEncoder;
+    @Mock
+    private GravitinoRpcClient gravitinoRpcClient;
 
     private InvitationServiceImpl invitationService;
 
@@ -81,7 +89,8 @@ class InvitationServiceImplTest {
                 userRoleMapper,
                 tenantMapper,
                 passwordEncoder,
-                new StudioDbExceptionTranslator()
+                new StudioDbExceptionTranslator(),
+                gravitinoRpcClient
         );
     }
 
@@ -157,6 +166,10 @@ class InvitationServiceImplTest {
         UserInvitation invitation = buildPendingInvitation();
 
         when(userInvitationMapper.selectByInviteCodeForUpdate("INV-EMAIL")).thenReturn(invitation);
+        Tenant tenant = new Tenant();
+        tenant.setId(100L);
+        tenant.setCode("t100");
+        when(tenantMapper.selectById(100L)).thenReturn(tenant);
         when(passwordEncoder.encode("123456")).thenReturn("encoded-password");
         RuntimeException sqlWrapped = new RuntimeException(
                 new SQLException("Duplicate entry x@datapillar.ai for key uq_user_email", "23000", 1062));
@@ -175,6 +188,10 @@ class InvitationServiceImplTest {
         UserInvitation invitation = buildPendingInvitation();
 
         when(userInvitationMapper.selectByInviteCodeForUpdate("INV-EMAIL")).thenReturn(invitation);
+        Tenant tenant = new Tenant();
+        tenant.setId(100L);
+        tenant.setCode("t100");
+        when(tenantMapper.selectById(100L)).thenReturn(tenant);
         when(passwordEncoder.encode("123456")).thenReturn("encoded-password");
         RuntimeException sqlWrapped = new RuntimeException(
                 new SQLException("Duplicate entry member_user for key uq_user_username", "23000", 1062));
@@ -185,6 +202,94 @@ class InvitationServiceImplTest {
 
         assertEquals("用户名已存在", exception.getMessage());
         verify(userMapper).insert(any(User.class));
+    }
+
+    @Test
+    void registerInvitation_shouldProvisionUserThroughRpcAndAcceptInvitation() {
+        InvitationRegisterRequest request = buildRegisterRequest();
+        UserInvitation invitation = buildPendingInvitation();
+        invitation.setInviteCode("INV-EMAIL");
+        when(userInvitationMapper.selectByInviteCodeForUpdate("INV-EMAIL")).thenReturn(invitation);
+
+        Tenant tenant = new Tenant();
+        tenant.setId(100L);
+        tenant.setCode("t100");
+        when(tenantMapper.selectById(100L)).thenReturn(tenant);
+
+        when(passwordEncoder.encode("123456")).thenReturn("encoded-password");
+        doAnswer(invocation -> {
+            User user = invocation.getArgument(0);
+            user.setId(501L);
+            return 1;
+        }).when(userMapper).insert(any(User.class));
+
+        when(tenantUserMapper.selectByTenantIdAndUserId(100L, 501L)).thenReturn(null);
+        when(tenantUserMapper.countByUserId(501L)).thenReturn(0L);
+        when(userRoleMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(userInvitationMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(1, 1);
+
+        UserInvitationRole relation = new UserInvitationRole();
+        relation.setInvitationId(1L);
+        relation.setRoleId(301L);
+        when(userInvitationRoleMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(relation));
+
+        Role role = new Role();
+        role.setId(301L);
+        role.setTenantId(100L);
+        role.setName("ANALYST");
+        when(roleMapper.selectById(301L)).thenReturn(role);
+
+        invitationService.registerInvitation(request);
+
+        verify(gravitinoRpcClient).provisionInvitationUser(100L, "t100", 501L, "member_user", List.of());
+    }
+
+    @Test
+    void registerInvitation_shouldMarkFailedAndDisableTenantMemberWhenRpcFails() {
+        InvitationRegisterRequest request = buildRegisterRequest();
+        UserInvitation invitation = buildPendingInvitation();
+        invitation.setInviteCode("INV-EMAIL");
+        when(userInvitationMapper.selectByInviteCodeForUpdate("INV-EMAIL")).thenReturn(invitation);
+
+        Tenant tenant = new Tenant();
+        tenant.setId(100L);
+        tenant.setCode("t100");
+        when(tenantMapper.selectById(100L)).thenReturn(tenant);
+
+        when(passwordEncoder.encode("123456")).thenReturn("encoded-password");
+        doAnswer(invocation -> {
+            User user = invocation.getArgument(0);
+            user.setId(502L);
+            return 1;
+        }).when(userMapper).insert(any(User.class));
+
+        TenantUser tenantUser = new TenantUser();
+        tenantUser.setTenantId(100L);
+        tenantUser.setUserId(502L);
+        tenantUser.setStatus(1);
+        when(tenantUserMapper.selectByTenantIdAndUserId(100L, 502L)).thenReturn(tenantUser);
+        when(userRoleMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(userInvitationMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(1, 1);
+
+        UserInvitationRole relation = new UserInvitationRole();
+        relation.setInvitationId(1L);
+        relation.setRoleId(301L);
+        when(userInvitationRoleMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(relation));
+
+        Role role = new Role();
+        role.setId(301L);
+        role.setTenantId(100L);
+        role.setName("ANALYST");
+        when(roleMapper.selectById(301L)).thenReturn(role);
+        when(tenantUserMapper.countByUserId(502L)).thenReturn(0L);
+
+        doThrow(new RuntimeException("rpc error"))
+                .when(gravitinoRpcClient)
+                .provisionInvitationUser(100L, "t100", 502L, "member_user", List.of());
+
+        assertThrows(com.sunny.datapillar.studio.exception.invitation.InvitationInternalException.class,
+                () -> invitationService.registerInvitation(request));
+        verify(tenantUserMapper).updateById(any(TenantUser.class));
     }
 
     private InvitationRegisterRequest buildRegisterRequest() {

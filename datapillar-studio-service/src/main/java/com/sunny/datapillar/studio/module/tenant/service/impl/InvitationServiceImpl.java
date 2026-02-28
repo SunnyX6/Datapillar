@@ -46,6 +46,7 @@ import com.sunny.datapillar.studio.module.user.mapper.RoleMapper;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserRoleMapper;
+import com.sunny.datapillar.studio.rpc.gravitino.GravitinoRpcClient;
 import com.sunny.datapillar.studio.util.UserContextUtil;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -78,6 +79,8 @@ public class InvitationServiceImpl implements InvitationService {
     private static final int STATUS_ACCEPTED = 1;
     private static final int STATUS_EXPIRED = 2;
     private static final int STATUS_CANCELLED = 3;
+    private static final int STATUS_PROVISIONING = 4;
+    private static final int STATUS_FAILED = 5;
 
     private static final int STATUS_ENABLED = 1;
     private static final int DELETED_NO = 0;
@@ -96,6 +99,7 @@ public class InvitationServiceImpl implements InvitationService {
     private final TenantMapper tenantMapper;
     private final PasswordEncoder passwordEncoder;
     private final StudioDbExceptionTranslator studioDbExceptionTranslator;
+    private final GravitinoRpcClient gravitinoRpcClient;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -208,7 +212,7 @@ public class InvitationServiceImpl implements InvitationService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = InvitationInternalException.class)
     public void registerInvitation(InvitationRegisterRequest request) {
         if (request == null) {
             throw new InvalidInvitationRequestException();
@@ -224,6 +228,10 @@ public class InvitationServiceImpl implements InvitationService {
             throw new InvitationNotFoundException();
         }
         Long tenantId = invitation.getTenantId();
+        Tenant tenant = tenantMapper.selectById(tenantId);
+        if (tenant == null) {
+            throw new InvitationTenantNotFoundException("租户不存在: %s", tenantId);
+        }
 
         withTenantContext(tenantId, () -> {
             LocalDateTime now = LocalDateTime.now();
@@ -233,6 +241,18 @@ public class InvitationServiceImpl implements InvitationService {
 
             ensureTenantMember(tenantId, userId, now);
             grantInvitationRoles(invitation.getId(), tenantId, userId, now);
+            markInvitationProvisioning(invitation.getId(), userId, now);
+            try {
+                gravitinoRpcClient.provisionInvitationUser(
+                        tenantId,
+                        tenant.getCode(),
+                        userId,
+                        username,
+                        List.of());
+            } catch (RuntimeException rpcException) {
+                markInvitationFailed(invitation.getId(), tenantId, userId, now);
+                throw new InvitationInternalException();
+            }
             markInvitationAccepted(invitation.getId(), userId, now);
         });
     }
@@ -302,6 +322,9 @@ public class InvitationServiceImpl implements InvitationService {
         if (status == STATUS_EXPIRED) {
             throw new InvitationExpiredException();
         }
+        if (status == STATUS_PROVISIONING || status == STATUS_FAILED) {
+            throw new InvitationInactiveException();
+        }
         if (status != STATUS_PENDING) {
             throw new InvitationInactiveException();
         }
@@ -368,10 +391,23 @@ public class InvitationServiceImpl implements InvitationService {
         userInvitationMapper.update(null, update);
     }
 
-    private void markInvitationAccepted(Long invitationId, Long userId, LocalDateTime now) {
+    private void markInvitationProvisioning(Long invitationId, Long userId, LocalDateTime now) {
         LambdaUpdateWrapper<UserInvitation> update = new LambdaUpdateWrapper<>();
         update.eq(UserInvitation::getId, invitationId)
                 .eq(UserInvitation::getStatus, STATUS_PENDING)
+                .set(UserInvitation::getStatus, STATUS_PROVISIONING)
+                .set(UserInvitation::getAcceptedUserId, userId)
+                .set(UserInvitation::getUpdatedAt, now);
+        int updated = userInvitationMapper.update(null, update);
+        if (updated == 0) {
+            throw new InvitationAlreadyUsedException();
+        }
+    }
+
+    private void markInvitationAccepted(Long invitationId, Long userId, LocalDateTime now) {
+        LambdaUpdateWrapper<UserInvitation> update = new LambdaUpdateWrapper<>();
+        update.eq(UserInvitation::getId, invitationId)
+                .eq(UserInvitation::getStatus, STATUS_PROVISIONING)
                 .set(UserInvitation::getStatus, STATUS_ACCEPTED)
                 .set(UserInvitation::getAcceptedUserId, userId)
                 .set(UserInvitation::getAcceptedAt, now)
@@ -379,6 +415,22 @@ public class InvitationServiceImpl implements InvitationService {
         int updated = userInvitationMapper.update(null, update);
         if (updated == 0) {
             throw new InvitationAlreadyUsedException();
+        }
+    }
+
+    private void markInvitationFailed(Long invitationId, Long tenantId, Long userId, LocalDateTime now) {
+        LambdaUpdateWrapper<UserInvitation> update = new LambdaUpdateWrapper<>();
+        update.eq(UserInvitation::getId, invitationId)
+                .eq(UserInvitation::getStatus, STATUS_PROVISIONING)
+                .set(UserInvitation::getStatus, STATUS_FAILED)
+                .set(UserInvitation::getAcceptedUserId, userId)
+                .set(UserInvitation::getUpdatedAt, now);
+        userInvitationMapper.update(null, update);
+
+        TenantUser tenantUser = tenantUserMapper.selectByTenantIdAndUserId(tenantId, userId);
+        if (tenantUser != null) {
+            tenantUser.setStatus(0);
+            tenantUserMapper.updateById(tenantUser);
         }
     }
 

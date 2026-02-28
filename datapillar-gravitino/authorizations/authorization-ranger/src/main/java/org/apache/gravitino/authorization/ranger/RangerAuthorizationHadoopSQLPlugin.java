@@ -49,6 +49,8 @@ import org.apache.gravitino.authorization.common.ErrorMessages;
 import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges.RangerHadoopSQLPrivilege;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyResource;
+import org.apache.gravitino.datapillar.context.TenantContext;
+import org.apache.gravitino.datapillar.context.TenantContextHolder;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
@@ -86,7 +88,14 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
             RangerHadoopSQLPrivilege.ALTER,
             RangerHadoopSQLPrivilege.WRITE),
         Privilege.Name.SELECT_TABLE,
-        ImmutableSet.of(RangerHadoopSQLPrivilege.READ, RangerHadoopSQLPrivilege.SELECT));
+        ImmutableSet.of(RangerHadoopSQLPrivilege.READ, RangerHadoopSQLPrivilege.SELECT),
+        Privilege.Name.SELECT_COLUMN,
+        ImmutableSet.of(RangerHadoopSQLPrivilege.READ, RangerHadoopSQLPrivilege.SELECT),
+        Privilege.Name.MODIFY_COLUMN,
+        ImmutableSet.of(
+            RangerHadoopSQLPrivilege.UPDATE,
+            RangerHadoopSQLPrivilege.ALTER,
+            RangerHadoopSQLPrivilege.WRITE));
   }
 
   /**
@@ -103,7 +112,16 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
     for (int i = 0; i < nsMetadataObj.size() && i < policyResourceDefinesRule().size(); i++) {
       preciseFilters.put(policyResourceDefinesRule().get(i), nsMetadataObj.get(i));
     }
-    return preciseFindPolicy(authzMetadataObject, preciseFilters);
+    RangerPolicy managedPolicy = preciseFindPolicy(authzMetadataObject, preciseFilters);
+    if (managedPolicy == null) {
+      return null;
+    }
+
+    String expectedPolicyName = buildTenantPolicyName(authzMetadataObject, currentTenantId());
+    if (!expectedPolicyName.equals(managedPolicy.getName())) {
+      return null;
+    }
+    return managedPolicy;
   }
 
   /** Wildcard search the Ranger policies in the different Ranger service. */
@@ -120,7 +138,11 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
     }
 
     try {
-      return rangerClient.findPolicies(searchFilters);
+      String tenantPolicyPrefix = buildTenantPolicyPrefix(currentTenantId());
+      return rangerClient.findPolicies(searchFilters).stream()
+          .filter(
+              policy -> policy.getName() != null && policy.getName().startsWith(tenantPolicyPrefix))
+          .collect(Collectors.toList());
     } catch (RangerServiceException e) {
       throw new AuthorizationPluginException(e, "Failed to find policies in Ranger");
     }
@@ -220,23 +242,10 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                 String policyName = policy.getName();
                 int index = operationTypeIndex.get(operationType);
 
-                // Update the policy name is following Gravitino's spec
-                if (policy
-                    .getName()
-                    .equals(
-                        AuthorizationSecurableObject.DOT_JOINER.join(oldAuthzMetaObject.names()))) {
-                  List<String> policyNames =
-                      Lists.newArrayList(
-                          AuthorizationSecurableObject.DOT_SPLITTER.splitToList(policyName));
-                  Preconditions.checkArgument(
-                      policyNames.size() >= oldAuthzMetaObject.names().size(),
-                      String.format(ErrorMessages.INVALID_POLICY_NAME, policyName));
-                  if (policyNames.get(index).equals(RangerHelper.RESOURCE_ALL)) {
-                    // Doesn't need to rename the policy `*`
-                    return;
-                  }
-                  policyNames.set(index, newAuthzMetaObject.names().get(index));
-                  policy.setName(AuthorizationSecurableObject.DOT_JOINER.join(policyNames));
+                String oldTenantPolicyName =
+                    buildTenantPolicyName(oldAuthzMetaObject, currentTenantId());
+                if (oldTenantPolicyName.equals(policyName)) {
+                  policy.setName(buildTenantPolicyName(newAuthzMetaObject, currentTenantId()));
                 }
                 // Update the policy resource name to new name
                 policy
@@ -302,8 +311,12 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
     if (RangerHelper.RESOURCE_ALL.equals(authzMetadataObject.name())) {
       // Delete metalake or catalog policies in this Ranger service
       try {
+        String tenantPolicyPrefix = buildTenantPolicyPrefix(currentTenantId());
         List<RangerPolicy> policies = rangerClient.getPoliciesInService(rangerServiceName);
         policies.stream()
+            .filter(
+                policy ->
+                    policy.getName() != null && policy.getName().startsWith(tenantPolicyPrefix))
             .filter(RangerHelper::hasGravitinoManagedPolicyItem)
             .forEach(rangerHelper::removeAllGravitinoManagedPolicyItem);
       } catch (RangerServiceException e) {
@@ -386,7 +399,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
   protected RangerPolicy createPolicyAddResources(AuthorizationMetadataObject metadataObject) {
     RangerPolicy policy = new RangerPolicy();
     policy.setService(rangerServiceName);
-    policy.setName(metadataObject.fullName());
+    policy.setName(buildTenantPolicyName(metadataObject, currentTenantId()));
     List<String> nsMetadataObject = metadataObject.names();
     for (int i = 0; i < nsMetadataObject.size(); i++) {
       RangerPolicy.RangerPolicyResource policyResource =
@@ -426,7 +439,9 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
         Privilege.Name.USE_SCHEMA,
         Privilege.Name.CREATE_TABLE,
         Privilege.Name.MODIFY_TABLE,
-        Privilege.Name.SELECT_TABLE);
+        Privilege.Name.SELECT_TABLE,
+        Privilege.Name.SELECT_COLUMN,
+        Privilege.Name.MODIFY_COLUMN);
   }
 
   /**
@@ -628,15 +643,6 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                                   RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL),
                               RangerHadoopSQLMetadataObject.Type.TABLE,
                               rangerPrivileges));
-                      // Add `*.*.*` for the COLUMN permission
-                      rangerSecurableObjects.add(
-                          generateAuthorizationSecurableObject(
-                              ImmutableList.of(
-                                  RangerHelper.RESOURCE_ALL,
-                                  RangerHelper.RESOURCE_ALL,
-                                  RangerHelper.RESOURCE_ALL),
-                              RangerHadoopSQLMetadataObject.Type.COLUMN,
-                              rangerPrivileges));
                       break;
                     case SCHEMA:
                       // Add `{schema}.*` for the TABLE permission
@@ -646,15 +652,6 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                                   securableObject.name() /*Schema name*/,
                                   RangerHelper.RESOURCE_ALL),
                               RangerHadoopSQLMetadataObject.Type.TABLE,
-                              rangerPrivileges));
-                      // Add `{schema}.*.*` for the COLUMN permission
-                      rangerSecurableObjects.add(
-                          generateAuthorizationSecurableObject(
-                              ImmutableList.of(
-                                  securableObject.name() /*Schema name*/,
-                                  RangerHelper.RESOURCE_ALL,
-                                  RangerHelper.RESOURCE_ALL),
-                              RangerHadoopSQLMetadataObject.Type.COLUMN,
                               rangerPrivileges));
                       break;
                     case TABLE:
@@ -673,18 +670,42 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                                           rangerMetadataObject.names(),
                                           RangerHadoopSQLMetadataObject.Type.TABLE,
                                           rangerPrivileges));
-                                  // Add `{schema}.{table}.*` for the COLUMN permission
-                                  rangerSecurableObjects.add(
-                                      generateAuthorizationSecurableObject(
-                                          Stream.concat(
-                                                  rangerMetadataObject.names().stream(),
-                                                  Stream.of(RangerHelper.RESOURCE_ALL))
-                                              .collect(Collectors.toList()),
-                                          RangerHadoopSQLMetadataObject.Type.COLUMN,
-                                          rangerPrivileges));
                                 });
                       }
                       break;
+                    case COLUMN:
+                      throw new AuthorizationPluginException(
+                          ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                          gravitinoPrivilege.name(),
+                          securableObject.type());
+                    default:
+                      LOG.warn(
+                          ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                          gravitinoPrivilege.name(),
+                          securableObject.type());
+                  }
+                  break;
+                case SELECT_COLUMN:
+                case MODIFY_COLUMN:
+                  switch (securableObject.type()) {
+                    case COLUMN:
+                      translateMetadataObject(securableObject).stream()
+                          .forEach(
+                              rangerMetadataObject ->
+                                  rangerSecurableObjects.add(
+                                      generateAuthorizationSecurableObject(
+                                          rangerMetadataObject.names(),
+                                          RangerHadoopSQLMetadataObject.Type.COLUMN,
+                                          rangerPrivileges)));
+                      break;
+                    case TABLE:
+                    case SCHEMA:
+                    case CATALOG:
+                    case METALAKE:
+                      throw new AuthorizationPluginException(
+                          ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                          gravitinoPrivilege.name(),
+                          securableObject.type());
                     default:
                       LOG.warn(
                           ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
@@ -818,5 +839,21 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                 RangerAuthorizationProperties.JDBC_URL,
                 RangerAuthorizationProperties.DEFAULT_JDBC_URL))
         .build();
+  }
+
+  private long currentTenantId() {
+    TenantContext tenantContext = TenantContextHolder.get();
+    if (tenantContext == null || tenantContext.tenantId() <= 0) {
+      return 0L;
+    }
+    return tenantContext.tenantId();
+  }
+
+  private String buildTenantPolicyPrefix(long tenantId) {
+    return String.format("t%d:", tenantId);
+  }
+
+  private String buildTenantPolicyName(AuthorizationMetadataObject metadataObject, long tenantId) {
+    return String.format("t%d:%s", tenantId, metadataObject.fullName());
   }
 }

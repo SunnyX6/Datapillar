@@ -1,0 +1,82 @@
+CREATE TABLE lineage_events (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '物理主键',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  tenant_code VARCHAR(64) NOT NULL COMMENT '租户编码',
+  tenant_name VARCHAR(128) NOT NULL COMMENT '租户名称',
+  event_time DATETIME(6) NOT NULL COMMENT '事件时间',
+  event_type VARCHAR(32) NULL COMMENT 'RUN_EVENT 类型',
+  run_uuid CHAR(36) NULL COMMENT 'run uuid',
+  job_name VARCHAR(255) NULL COMMENT 'job 名称',
+  job_namespace VARCHAR(255) NULL COMMENT 'job 命名空间',
+  producer VARCHAR(512) NULL COMMENT '生产者',
+  _event_type VARCHAR(64) NOT NULL DEFAULT 'RUN_EVENT' COMMENT 'RUN_EVENT/DATASET_EVENT/JOB_EVENT',
+  event JSON NOT NULL COMMENT '原始事件',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '创建时间',
+  KEY idx_le_tenant_time (tenant_id, event_time DESC),
+  KEY idx_le_tenant_event_type_time (tenant_id, _event_type, event_time DESC),
+  KEY idx_le_tenant_run_time (tenant_id, run_uuid, event_time DESC),
+  KEY idx_le_tenant_job_time (tenant_id, job_namespace, job_name, event_time DESC),
+  KEY idx_le_created_at (created_at DESC),
+  CHECK (_event_type IN ('RUN_EVENT', 'DATASET_EVENT', 'JOB_EVENT'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OpenLineage 原始事件表';
+
+CREATE TABLE ol_async_task (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '任务ID',
+  task_type VARCHAR(32) NOT NULL COMMENT 'EMBEDDING/SQL_SUMMARY',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  tenant_code VARCHAR(64) NOT NULL COMMENT '租户编码',
+  resource_type VARCHAR(32) NOT NULL COMMENT '资源类型',
+  resource_id VARCHAR(128) NOT NULL COMMENT '资源ID',
+  content_hash CHAR(64) NOT NULL COMMENT '内容哈希',
+  model_fingerprint VARCHAR(256) NOT NULL COMMENT '模型指纹',
+  status VARCHAR(16) NOT NULL COMMENT '任务状态',
+  priority INT NOT NULL DEFAULT 100 COMMENT '优先级',
+  retry_count INT NOT NULL DEFAULT 0 COMMENT '重试次数',
+  max_retry INT NOT NULL DEFAULT 5 COMMENT '最大重试次数',
+  next_run_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '下次执行时间',
+  claim_token VARCHAR(64) NULL COMMENT '认领令牌',
+  claim_until DATETIME(6) NULL COMMENT '认领过期时间',
+  last_error VARCHAR(1024) NULL COMMENT '最后错误',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  UNIQUE KEY uq_task_dedup (task_type, tenant_id, resource_type, resource_id, model_fingerprint, content_hash),
+  KEY idx_task_poll (status, next_run_at, priority, id),
+  KEY idx_task_tenant (tenant_id, task_type, status, next_run_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='异步任务主表';
+
+CREATE TABLE ol_async_task_attempt (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '明细ID',
+  task_id BIGINT NOT NULL COMMENT '任务ID',
+  attempt_no INT NOT NULL COMMENT '执行次数',
+  worker_id VARCHAR(64) NOT NULL COMMENT 'worker实例ID',
+  started_at DATETIME(6) NOT NULL COMMENT '开始时间',
+  finished_at DATETIME(6) NULL COMMENT '结束时间',
+  status VARCHAR(16) NOT NULL COMMENT '状态',
+  batch_no VARCHAR(64) NULL COMMENT '批次号',
+  input_size INT NULL COMMENT '输入数量',
+  latency_ms BIGINT NULL COMMENT '耗时毫秒',
+  error_type VARCHAR(128) NULL COMMENT '错误类型',
+  error_message VARCHAR(1024) NULL COMMENT '错误信息',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  KEY idx_attempt_task (task_id, attempt_no),
+  KEY idx_attempt_batch (batch_no),
+  CONSTRAINT fk_attempt_task FOREIGN KEY (task_id) REFERENCES ol_async_task(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='异步任务执行明细';
+
+CREATE TABLE ol_async_batch (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '批次ID',
+  batch_no VARCHAR(64) NOT NULL COMMENT '批次号',
+  task_type VARCHAR(32) NOT NULL COMMENT '任务类型',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  model_fingerprint VARCHAR(256) NOT NULL COMMENT '模型指纹',
+  worker_id VARCHAR(64) NOT NULL COMMENT 'worker实例ID',
+  planned_size INT NOT NULL COMMENT '计划数',
+  success_count INT NOT NULL DEFAULT 0 COMMENT '成功数',
+  failed_count INT NOT NULL DEFAULT 0 COMMENT '失败数',
+  started_at DATETIME(6) NOT NULL COMMENT '开始时间',
+  finished_at DATETIME(6) NULL COMMENT '结束时间',
+  status VARCHAR(16) NOT NULL COMMENT '状态',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  UNIQUE KEY uq_batch_no (batch_no),
+  KEY idx_batch_tenant_type_time (tenant_id, task_type, created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='异步批次追踪';

@@ -37,10 +37,18 @@ public class UserMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
+  public String selectUserIdByMetalakeIdAndExternalUserId(
+      @Param("metalakeId") Long metalakeId, @Param("externalUserId") String externalUserId) {
+    return "SELECT user_id as userId FROM "
+        + USER_TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId} AND external_user_id = #{externalUserId}"
+        + " AND deleted_at = 0";
+  }
+
   public String selectUserMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String name) {
     return "SELECT user_id as userId, user_name as userName,"
-        + " metalake_id as metalakeId,"
+        + " external_user_id as externalUserId, metalake_id as metalakeId,"
         + " audit_info as auditInfo,"
         + " current_version as currentVersion, last_version as lastVersion,"
         + " deleted_at as deletedAt"
@@ -50,15 +58,29 @@ public class UserMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
+  public String selectUserMetaByMetalakeIdAndExternalUserId(
+      @Param("metalakeId") Long metalakeId, @Param("externalUserId") String externalUserId) {
+    return "SELECT user_id as userId, user_name as userName,"
+        + " external_user_id as externalUserId, metalake_id as metalakeId,"
+        + " audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + USER_TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId} AND external_user_id = #{externalUserId}"
+        + " AND deleted_at = 0";
+  }
+
   public String insertUserMeta(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
-        + "(user_id, user_name,"
+        + "(user_id, user_name, external_user_id,"
         + " metalake_id, audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES("
         + " #{userMeta.userId},"
         + " #{userMeta.userName},"
+        + " #{userMeta.externalUserId},"
         + " #{userMeta.metalakeId},"
         + " #{userMeta.auditInfo},"
         + " #{userMeta.currentVersion},"
@@ -70,12 +92,13 @@ public class UserMetaBaseSQLProvider {
   public String insertUserMetaOnDuplicateKeyUpdate(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
-        + "(user_id, user_name,"
+        + "(user_id, user_name, external_user_id,"
         + "metalake_id, audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES("
         + " #{userMeta.userId},"
         + " #{userMeta.userName},"
+        + " #{userMeta.externalUserId},"
         + " #{userMeta.metalakeId},"
         + " #{userMeta.auditInfo},"
         + " #{userMeta.currentVersion},"
@@ -84,6 +107,7 @@ public class UserMetaBaseSQLProvider {
         + " )"
         + " ON DUPLICATE KEY UPDATE"
         + " user_name = #{userMeta.userName},"
+        + " external_user_id = #{userMeta.externalUserId},"
         + " metalake_id = #{userMeta.metalakeId},"
         + " audit_info = #{userMeta.auditInfo},"
         + " current_version = #{userMeta.currentVersion},"
@@ -112,6 +136,7 @@ public class UserMetaBaseSQLProvider {
     return "UPDATE "
         + USER_TABLE_NAME
         + " SET user_name = #{newUserMeta.userName},"
+        + " external_user_id = #{newUserMeta.externalUserId},"
         + " metalake_id = #{newUserMeta.metalakeId},"
         + " audit_info = #{newUserMeta.auditInfo},"
         + " current_version = #{newUserMeta.currentVersion},"
@@ -119,6 +144,7 @@ public class UserMetaBaseSQLProvider {
         + " deleted_at = #{newUserMeta.deletedAt}"
         + " WHERE user_id = #{oldUserMeta.userId}"
         + " AND user_name = #{oldUserMeta.userName}"
+        + " AND external_user_id = #{oldUserMeta.externalUserId}"
         + " AND metalake_id = #{oldUserMeta.metalakeId}"
         + " AND audit_info = #{oldUserMeta.auditInfo}"
         + " AND current_version = #{oldUserMeta.currentVersion}"
@@ -128,7 +154,7 @@ public class UserMetaBaseSQLProvider {
 
   public String listUsersByRoleId(@Param("roleId") Long roleId) {
     return "SELECT us.user_id as userId, us.user_name as userName,"
-        + " us.metalake_id as metalakeId,"
+        + " us.external_user_id as externalUserId, us.metalake_id as metalakeId,"
         + " us.audit_info as auditInfo, us.current_version as currentVersion,"
         + " us.last_version as lastVersion, us.deleted_at as deletedAt"
         + " FROM "
@@ -142,7 +168,7 @@ public class UserMetaBaseSQLProvider {
 
   public String listUserPOsByMetalake(@Param("metalakeName") String metalakeName) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
-        + " ut.metalake_id as metalakeId,"
+        + " ut.external_user_id as externalUserId, ut.metalake_id as metalakeId,"
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
         + " ut.deleted_at as deletedAt"
@@ -157,7 +183,7 @@ public class UserMetaBaseSQLProvider {
 
   public String listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
-        + " ut.metalake_id as metalakeId,"
+        + " ut.external_user_id as externalUserId, ut.metalake_id as metalakeId,"
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
         + " ut.deleted_at as deletedAt,"

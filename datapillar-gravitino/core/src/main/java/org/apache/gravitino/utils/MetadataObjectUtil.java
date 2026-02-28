@@ -24,6 +24,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
@@ -173,6 +174,14 @@ public class MetadataObjectUtil {
         NameIdentifierUtil.checkColumn(identifier);
         NameIdentifier tableIdent = NameIdentifier.of(identifier.namespace().levels());
         check(env.tableDispatcher().tableExists(tableIdent), exceptionToThrowSupplier);
+        try {
+          boolean columnExists =
+              Arrays.stream(env.tableDispatcher().loadTable(tableIdent).columns())
+                  .anyMatch(column -> column.name().equals(identifier.name()));
+          check(columnExists, exceptionToThrowSupplier);
+        } catch (Exception e) {
+          throw checkNotNull(exceptionToThrowSupplier).get();
+        }
         break;
 
       case TOPIC:

@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 public class UserPO {
   private Long userId;
   private String userName;
+  private String externalUserId;
   private Long metalakeId;
   private String auditInfo;
   private Long currentVersion;
@@ -36,6 +37,10 @@ public class UserPO {
 
   public String getUserName() {
     return userName;
+  }
+
+  public String getExternalUserId() {
+    return externalUserId;
   }
 
   public Long getMetalakeId() {
@@ -69,6 +74,7 @@ public class UserPO {
     UserPO tablePO = (UserPO) o;
     return Objects.equal(getUserId(), tablePO.getUserId())
         && Objects.equal(getUserName(), tablePO.getUserName())
+        && Objects.equal(getExternalUserId(), tablePO.getExternalUserId())
         && Objects.equal(getMetalakeId(), tablePO.getMetalakeId())
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
@@ -81,6 +87,7 @@ public class UserPO {
     return Objects.hashCode(
         getUserId(),
         getUserName(),
+        getExternalUserId(),
         getMetalakeId(),
         getAuditInfo(),
         getCurrentVersion(),
@@ -102,6 +109,11 @@ public class UserPO {
 
     public Builder withUserName(String userName) {
       userPO.userName = userName;
+      return this;
+    }
+
+    public Builder withExternalUserId(String externalUserId) {
+      userPO.externalUserId = externalUserId;
       return this;
     }
 
@@ -133,6 +145,7 @@ public class UserPO {
     private void validate() {
       Preconditions.checkArgument(userPO.userId != null, "User id is required");
       Preconditions.checkArgument(userPO.userName != null, "User name is required");
+      Preconditions.checkArgument(userPO.externalUserId != null, "External user id is required");
       Preconditions.checkArgument(userPO.metalakeId != null, "Metalake id is required");
       Preconditions.checkArgument(userPO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(userPO.currentVersion != null, "Current version is required");

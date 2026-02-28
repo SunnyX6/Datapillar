@@ -30,6 +30,7 @@ class TestsPrivileges {
   void testValidPrivilege() {
     assertTrue(Privileges.isValid(Privileges.CREATE_CATALOG));
     assertTrue(Privileges.isValid(Privileges.CREATE_TABLE));
+    assertTrue(Privileges.isValid(Privileges.SELECT_COLUMN));
     assertTrue(Privileges.isValid(Privileges.CONSUME_TOPIC));
     assertTrue(Privileges.isValid(Privileges.MANAGE_GRANTS));
   }

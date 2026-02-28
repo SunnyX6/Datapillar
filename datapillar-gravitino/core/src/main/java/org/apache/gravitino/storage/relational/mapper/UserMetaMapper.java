@@ -48,9 +48,21 @@ public interface UserMetaMapper {
 
   @SelectProvider(
       type = UserMetaSQLProviderFactory.class,
+      method = "selectUserIdByMetalakeIdAndExternalUserId")
+  Long selectUserIdByMetalakeIdAndExternalUserId(
+      @Param("metalakeId") Long metalakeId, @Param("externalUserId") String externalUserId);
+
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
       method = "selectUserMetaByMetalakeIdAndName")
   UserPO selectUserMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String name);
+
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "selectUserMetaByMetalakeIdAndExternalUserId")
+  UserPO selectUserMetaByMetalakeIdAndExternalUserId(
+      @Param("metalakeId") Long metalakeId, @Param("externalUserId") String externalUserId);
 
   @InsertProvider(type = UserMetaSQLProviderFactory.class, method = "insertUserMeta")
   void insertUserMeta(@Param("userMeta") UserPO userPO);

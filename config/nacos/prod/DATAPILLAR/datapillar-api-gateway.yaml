@@ -100,7 +100,13 @@ spring:
               predicates:
                 - Path=/api/ai/**
 
-            # 9. OneMeta 接口（受保护）
+            # 9. OpenLineage Sink 接口（受保护）
+            - id: openlineage-service
+              uri: lb://datapillar-openlineage
+              predicates:
+                - Path=/api/openlineage/**
+
+            # 10. OneMeta 接口（受保护）
             - id: onemeta-service
               uri: lb://datapillar-gravitino
               predicates:
@@ -141,6 +147,7 @@ security:
     protected-path-prefixes:
       - /api/studio
       - /api/ai
+      - /api/openlineage
       - /api/onemeta
     public-path-prefixes:
       - /api/login
