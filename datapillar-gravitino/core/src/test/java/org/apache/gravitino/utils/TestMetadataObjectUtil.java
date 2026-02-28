@@ -18,12 +18,20 @@
  */
 package org.apache.gravitino.utils;
 
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestMetadataObjectUtil {
 
@@ -128,5 +136,32 @@ public class TestMetadataObjectUtil {
         MetadataObjectUtil.toEntityIdent(
             "metalake",
             MetadataObjects.of("catalog.schema.table", "column", MetadataObject.Type.COLUMN)));
+  }
+
+  @Test
+  public void testCheckMetadataObjectColumnValidation() throws IllegalAccessException {
+    TableDispatcher tableDispatcher = Mockito.mock(TableDispatcher.class);
+    Table table = Mockito.mock(Table.class);
+    Mockito.when(tableDispatcher.tableExists(Mockito.any())).thenReturn(true);
+    Mockito.when(tableDispatcher.loadTable(Mockito.any())).thenReturn(table);
+    Mockito.when(table.columns())
+        .thenReturn(
+            new Column[] {
+              Column.of("id", Types.IntegerType.get()), Column.of("name", Types.StringType.get())
+            });
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake",
+                MetadataObjects.of("catalog.schema.table", "name", MetadataObject.Type.COLUMN)));
+
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake",
+                MetadataObjects.of("catalog.schema.table", "missing", MetadataObject.Type.COLUMN)));
   }
 }

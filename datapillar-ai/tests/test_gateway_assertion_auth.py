@@ -102,11 +102,6 @@ def _build_runtime_payload(public_key_path: Path) -> dict[str, object]:
         "auth_enabled": True,
         "llm": {"retry": {"max_retries": 2}},
         "agent": {"max_steps": 10},
-        "openlineage_sink": {
-            "graceful_shutdown_timeout": 30.0,
-            "queue": {"max_size": 10000, "batch_size": 100, "flush_interval_seconds": 5.0},
-            "neo4j": {"batch_size": 50, "max_concurrent": 10},
-        },
         "sql_summary": {
             "enabled": True,
             "batch_size": 5,

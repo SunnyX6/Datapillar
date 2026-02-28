@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.UUID;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.openlineage.facets.GravitinoDatasetFacet;
 
 /** 事件转换器基类，提供共享的工具方法。 */
 public abstract class BaseEventConverter {
@@ -54,12 +55,14 @@ public abstract class BaseEventConverter {
       List<InputDataset> inputs,
       List<OutputDataset> outputs) {
 
+    long tenantId = requiredTenantId(event);
     UUID runId = UUID.randomUUID();
     ZonedDateTime eventTime =
         ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(event.eventTime()), ZoneOffset.UTC);
 
     Run run = openLineage.newRunBuilder().runId(runId).build();
-    Job job = openLineage.newJobBuilder().namespace(namespace).name(jobName).build();
+    Job job =
+        openLineage.newJobBuilder().namespace(formatJobNamespace(tenantId)).name(jobName).build();
 
     return openLineage
         .newRunEventBuilder()
@@ -75,16 +78,17 @@ public abstract class BaseEventConverter {
   /**
    * 格式化 dataset namespace。
    *
-   * <p>格式: gravitino://{metalake}/{catalog}
+   * <p>格式: gravitino://tenant/{tenantId}/{metalake}/{catalog}
    */
-  protected String formatDatasetNamespace(NameIdentifier identifier) {
+  protected String formatDatasetNamespace(Event event, NameIdentifier identifier) {
+    long tenantId = requiredTenantId(event);
     String[] parts = identifier.namespace().levels();
     if (parts.length >= 2) {
-      return String.format("gravitino://%s/%s", parts[0], parts[1]);
+      return String.format("gravitino://tenant/%d/%s/%s", tenantId, parts[0], parts[1]);
     } else if (parts.length == 1) {
-      return String.format("gravitino://%s", parts[0]);
+      return String.format("gravitino://tenant/%d/%s", tenantId, parts[0]);
     }
-    return namespace;
+    return formatJobNamespace(tenantId);
   }
 
   /**
@@ -99,5 +103,26 @@ public abstract class BaseEventConverter {
       return parts[2] + "." + identifier.name();
     }
     return identifier.name();
+  }
+
+  protected String formatJobNamespace(long tenantId) {
+    return String.format("gravitino://tenant/%d", tenantId);
+  }
+
+  protected GravitinoDatasetFacet.GravitinoDatasetFacetBuilder tenantFacetBuilder(Event event) {
+    long tenantId = requiredTenantId(event);
+    return GravitinoDatasetFacet.builder(producerUri)
+        .tenantId(tenantId)
+        .tenantCode(event.tenantCode())
+        .tenantName(event.tenantName());
+  }
+
+  private long requiredTenantId(Event event) {
+    if (event.tenantId() == null || event.tenantId() <= 0) {
+      throw new IllegalArgumentException(
+          String.format(
+              "OpenLineage event %s missing tenant_id snapshot", event.getClass().getSimpleName()));
+    }
+    return event.tenantId();
   }
 }

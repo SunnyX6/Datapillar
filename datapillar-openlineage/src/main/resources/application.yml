@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: datapillar-openlineage
+  config:
+    import: "nacos:datapillar-openlineage.yaml?group=${NACOS_GROUP:DATAPILLAR}&refreshEnabled=true"
+  cloud:
+    nacos:
+      config:
+        server-addr: ${NACOS_SERVER_ADDR}
+        namespace: ${NACOS_NAMESPACE}
+        username: ${NACOS_USERNAME}
+        password: ${NACOS_PASSWORD}
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR}
+        namespace: ${NACOS_NAMESPACE}
+        username: ${NACOS_USERNAME}
+        password: ${NACOS_PASSWORD}
+        ip: ${NACOS_SERVICE_IP}
+        group: ${NACOS_GROUP:DATAPILLAR}
+
+server:
+  servlet:
+    context-path: /api/openlineage
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+openlineage:
+  worker:
+    claim-timeout-seconds: 120
+    recovery-interval-seconds: 30
+    embedding:
+      batch-size: 32
+      recovery-limit: 64
+    sql-summary:
+      batch-size: 16
+      recovery-limit: 32

@@ -8,7 +8,7 @@ AI 模型数据访问
 表：ai_model, ai_llm_usage
 
 DEPRECATED:
-- 该文件保留给历史链路（openlineage/旧接口）兼容使用
+- 该文件保留给历史链路兼容使用
 - 新链路请使用 `ai_model_new.py`（显式模型输入，不允许默认兜底）
 """
 

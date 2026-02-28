@@ -1,0 +1,35 @@
+# Datapillar OpenLineage 生产环境配置
+
+server:
+  port: ${SERVER_PORT:8083}
+  servlet:
+    context-path: /api/openlineage
+
+spring:
+  application:
+    name: datapillar-openlineage
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:datapillar}?useSSL=false&serverTimezone=UTC&characterEncoding=utf8&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:Sunny.123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+openlineage:
+  neo4j:
+    uri: ${NEO4J_URI:bolt://localhost:7687}
+    username: ${NEO4J_USERNAME:neo4j}
+    password: ${NEO4J_PASSWORD:123456asd}
+    database: ${NEO4J_DATABASE:neo4j}
+
+logging:
+  level:
+    com.sunny.datapillar: INFO
+    org.springframework: WARN
+    root: INFO
+  file:
+    name: ${DATAPILLAR_LOG_DIR:./logs}/datapillar-openlineage.log
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
+      total-size-cap: 5GB

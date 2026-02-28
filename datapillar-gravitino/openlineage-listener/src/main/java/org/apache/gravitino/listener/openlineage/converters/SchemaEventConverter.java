@@ -67,7 +67,7 @@ public class SchemaEventConverter extends BaseEventConverter {
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
-            .namespace(formatDatasetNamespace(identifier))
+            .namespace(formatDatasetNamespace(event, identifier))
             .name(identifier.name())
             .facets(
                 openLineage
@@ -92,7 +92,7 @@ public class SchemaEventConverter extends BaseEventConverter {
     NameIdentifier identifier = event.identifier();
     SchemaInfo schemaInfo = event.updatedSchemaInfo();
 
-    GravitinoDatasetFacet gravitinoFacet = buildSchemaGravitinoFacet(schemaInfo);
+    GravitinoDatasetFacet gravitinoFacet = buildSchemaGravitinoFacet(event, schemaInfo);
 
     DatasetFacetsBuilder facetsBuilder =
         openLineage
@@ -111,7 +111,7 @@ public class SchemaEventConverter extends BaseEventConverter {
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
-            .namespace(formatDatasetNamespace(identifier))
+            .namespace(formatDatasetNamespace(event, identifier))
             .name(identifier.name())
             .facets(facetsBuilder.build())
             .build();
@@ -130,7 +130,7 @@ public class SchemaEventConverter extends BaseEventConverter {
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
-            .namespace(formatDatasetNamespace(identifier))
+            .namespace(formatDatasetNamespace(event, identifier))
             .name(identifier.name())
             .facets(
                 openLineage
@@ -154,7 +154,7 @@ public class SchemaEventConverter extends BaseEventConverter {
     NameIdentifier identifier = event.identifier();
     SchemaInfo schemaInfo = event.loadedSchemaInfo();
 
-    GravitinoDatasetFacet gravitinoFacet = buildSchemaGravitinoFacet(schemaInfo);
+    GravitinoDatasetFacet gravitinoFacet = buildSchemaGravitinoFacet(event, schemaInfo);
 
     DatasetFacetsBuilder facetsBuilder =
         openLineage
@@ -170,7 +170,7 @@ public class SchemaEventConverter extends BaseEventConverter {
     InputDataset inputDataset =
         openLineage
             .newInputDatasetBuilder()
-            .namespace(formatDatasetNamespace(identifier))
+            .namespace(formatDatasetNamespace(event, identifier))
             .name(identifier.name())
             .facets(facetsBuilder.build())
             .build();
@@ -183,13 +183,13 @@ public class SchemaEventConverter extends BaseEventConverter {
         Collections.emptyList());
   }
 
-  private GravitinoDatasetFacet buildSchemaGravitinoFacet(SchemaInfo schemaInfo) {
+  private GravitinoDatasetFacet buildSchemaGravitinoFacet(Event event, SchemaInfo schemaInfo) {
     if (schemaInfo == null) {
       return null;
     }
 
     GravitinoDatasetFacet.GravitinoDatasetFacetBuilder builder =
-        GravitinoDatasetFacet.builder(producerUri)
+        tenantFacetBuilder(event)
             .description(schemaInfo.comment())
             .properties(schemaInfo.properties());
 

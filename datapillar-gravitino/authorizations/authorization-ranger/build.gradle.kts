@@ -134,6 +134,7 @@ tasks {
 }
 
 tasks.test {
+  systemProperty("net.bytebuddy.experimental", "true")
   doFirst {
     environment("HADOOP_USER_NAME", "gravitino")
   }

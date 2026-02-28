@@ -1,0 +1,89 @@
+server:
+  port: 7004
+  address: ${SERVER_ADDRESS:0.0.0.0}
+  servlet:
+    context-path: /api/openlineage
+
+spring:
+  application:
+    name: datapillar-openlineage
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:datapillar}?useSSL=false&serverTimezone=UTC&characterEncoding=utf8&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:Sunny.123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      initializationFailTimeout: -1
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    validate-on-migrate: true
+    clean-disabled: true
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+openlineage:
+  neo4j:
+    uri: ${NEO4J_URI:bolt://localhost:7687}
+    username: ${NEO4J_USERNAME:neo4j}
+    password: ${NEO4J_PASSWORD:123456asd}
+    database: ${NEO4J_DATABASE:neo4j}
+  worker:
+    claim-timeout-seconds: 120
+    recovery-interval-seconds: 30
+    embedding:
+      batch-size: 32
+      recovery-limit: 64
+    sql-summary:
+      batch-size: 16
+      recovery-limit: 32
+
+security:
+  gateway-assertion:
+    enabled: true
+    header-name: X-Gateway-Assertion
+    issuer: datapillar-auth
+    audience: datapillar-openlineage
+    key-id: auth-dev-2026-02
+    public-key-path: ${AUTH_ASSERTION_PUBLIC_KEY_PATH:classpath:security/gateway-assertion-dev-public.pem}
+    previous-key-id: ${AUTH_ASSERTION_PREVIOUS_KEY_ID:}
+    previous-public-key-path: ${AUTH_ASSERTION_PREVIOUS_PUBLIC_KEY_PATH:}
+    max-clock-skew-seconds: 5
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+logging:
+  level:
+    com.sunny.datapillar.openlineage: INFO
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.mybatis: WARN
+    com.zaxxer.hikari: WARN
+    root: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: ${LOG_HOME:/tmp/datapillar-logs}/datapillar-openlineage.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30
+      total-size-cap: 1GB

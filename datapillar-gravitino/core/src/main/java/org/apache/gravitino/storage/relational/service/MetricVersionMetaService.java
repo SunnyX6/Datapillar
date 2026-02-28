@@ -19,7 +19,6 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,7 +69,7 @@ public class MetricVersionMetaService {
             mapper -> mapper.listMetricVersionMetasByMetricId(metricEntity.id()));
 
     if (versionPOs.isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     // 转换为 Entity
@@ -140,7 +139,7 @@ public class MetricVersionMetaService {
    */
   public List<MetricVersionEntity> listCurrentVersionsByRefTableId(Long refTableId) {
     if (refTableId == null) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     List<MetricVersionPO> versionPOs =
@@ -148,7 +147,7 @@ public class MetricVersionMetaService {
             MetricVersionMetaMapper.class,
             mapper -> mapper.listMetricVersionMetasByRefTableId(refTableId));
     if (versionPOs.isEmpty()) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     Map<Long, SchemaPO> schemaCache = new HashMap<>();
@@ -170,8 +169,7 @@ public class MetricVersionMetaService {
 
       CatalogPO catalogPO =
           catalogCache.computeIfAbsent(
-              schemaPO.getCatalogId(),
-              id -> CatalogMetaService.getInstance().getCatalogPOById(id));
+              schemaPO.getCatalogId(), id -> CatalogMetaService.getInstance().getCatalogPOById(id));
       if (catalogPO == null) {
         continue;
       }
@@ -194,6 +192,6 @@ public class MetricVersionMetaService {
       versions.add(POConverters.fromMetricVersionPO(versionPO, metricIdent));
     }
 
-    return versions;
+    return List.copyOf(versions);
   }
 }

@@ -30,8 +30,8 @@ import java.net.URI;
  *
  * <pre>
  * gravitino.openlineage.transport.type = http
- * gravitino.openlineage.transport.url = http://datapillar-ai:7003
- * gravitino.openlineage.transport.endpoint = /api/v1/lineage
+ * gravitino.openlineage.transport.url = http://127.0.0.1:7000
+ * gravitino.openlineage.transport.endpoint = /api/openlineage
  * gravitino.openlineage.transport.timeoutInMillis = 5000
  * gravitino.openlineage.transport.compression = gzip
  * gravitino.openlineage.transport.auth.type = api_key
@@ -65,11 +65,11 @@ public final class OpenLineageListenerConfig {
   /** HTTP transport URL. */
   public static final String TRANSPORT_URL = "transport.url";
 
-  /** HTTP transport endpoint (default: /api/v1/lineage). */
+  /** HTTP transport endpoint (default: /api/openlineage). */
   public static final String TRANSPORT_ENDPOINT = "transport.endpoint";
 
   /** Default endpoint. */
-  public static final String DEFAULT_ENDPOINT = "/api/v1/lineage";
+  public static final String DEFAULT_ENDPOINT = "/api/openlineage";
 
   /** HTTP transport timeout in milliseconds (default: 5000). */
   public static final String TRANSPORT_TIMEOUT = "transport.timeoutInMillis";

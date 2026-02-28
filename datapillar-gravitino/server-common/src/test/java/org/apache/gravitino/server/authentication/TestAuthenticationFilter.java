@@ -37,10 +37,29 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.datapillar.context.TenantContext;
+import org.apache.gravitino.datapillar.context.TenantContextHolder;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class TestAuthenticationFilter {
+
+  @BeforeEach
+  public void setTenantContext() {
+    TenantContextHolder.set(
+        TenantContext.builder()
+            .withTenantId(1L)
+            .withTenantCode("tenant-1")
+            .withTenantName("Tenant 1")
+            .build());
+  }
+
+  @AfterEach
+  public void clearTenantContext() {
+    TenantContextHolder.remove();
+  }
 
   @Test
   public void testDoFilterNormal() throws ServletException, IOException {
@@ -121,5 +140,26 @@ public class TestAuthenticationFilter {
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockResponse).sendError(HttpServletResponse.SC_UNAUTHORIZED, "UNAUTHORIZED");
+  }
+
+  @Test
+  public void testRejectMissingTenantContext() throws ServletException, IOException {
+    TenantContextHolder.remove();
+
+    Authenticator authenticator = mock(Authenticator.class);
+    AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
+    FilterChain mockChain = mock(FilterChain.class);
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
+        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+    when(authenticator.supportsToken(any())).thenReturn(true);
+    when(authenticator.isDataFromToken()).thenReturn(true);
+
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+    verify(mockResponse)
+        .sendError(
+            HttpServletResponse.SC_UNAUTHORIZED,
+            "Gateway assertion tenant context is required for authentication");
   }
 }

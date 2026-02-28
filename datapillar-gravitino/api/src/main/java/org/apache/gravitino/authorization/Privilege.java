@@ -69,6 +69,10 @@ public interface Privilege {
     MODIFY_TABLE(0L, 1L << 6),
     /** The privilege to select data from a table. */
     SELECT_TABLE(0L, 1L << 7),
+    /** The privilege to select data from specific columns. */
+    SELECT_COLUMN(0L, 1L << 21),
+    /** The privilege to modify specific columns. */
+    MODIFY_COLUMN(0L, 1L << 22),
     /** The privilege to create a fileset. */
     CREATE_FILESET(0L, 1L << 8),
     /** The privilege to write a fileset. */

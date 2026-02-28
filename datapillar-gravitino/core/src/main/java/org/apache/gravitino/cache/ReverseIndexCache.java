@@ -73,7 +73,7 @@ public class ReverseIndexCache {
 
   public void put(
       NameIdentifier nameIdentifier, Entity.EntityType type, EntityCacheRelationKey key) {
-    EntityCacheKey entityCacheKey = EntityCacheKey.of(nameIdentifier, type);
+    EntityCacheKey entityCacheKey = EntityCacheKey.of(key.tenantId(), nameIdentifier, type);
     String strEntityCacheKey = entityCacheKey.toString();
     List<EntityCacheKey> entityKeys =
         Lists.newArrayList(reverseIndex.getValuesForKeysStartingWith(strEntityCacheKey));

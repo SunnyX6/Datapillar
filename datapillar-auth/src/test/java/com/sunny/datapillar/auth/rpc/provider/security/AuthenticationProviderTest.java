@@ -119,4 +119,60 @@ class AuthenticationProviderTest {
         Assertions.assertFalse(response.getAuthenticated());
         Assertions.assertEquals(DenyCode.TOKEN_EXPIRED, response.getDenyCode());
     }
+
+    @Test
+    void shouldBuildOnemetaAssertionWhenOnemetaResourceRequested() {
+        AuthenticationContextResponse context = AuthenticationContextResponse.builder()
+                .userId(5L)
+                .tenantId(6L)
+                .tenantCode("tenant-6")
+                .tenantName("Tenant 6")
+                .username("meta-user")
+                .roles(List.of("ANALYST"))
+                .sessionId("sid-5")
+                .tokenId("jti-5")
+                .build();
+
+        when(authService.resolveAuthenticationContext("token-meta")).thenReturn(context);
+        when(assertionSigner.sign(any(), eq("datapillar-gravitino"))).thenReturn("meta-assertion");
+
+        CheckAuthenticationResponse response = provider.checkAuthentication(CheckAuthenticationRequest.newBuilder()
+                .setToken("token-meta")
+                .setMethod("GET")
+                .setPath("/api/onemeta/metalakes/OneMeta/catalogs")
+                .build());
+
+        Assertions.assertTrue(response.getAuthenticated());
+        Assertions.assertEquals("meta-assertion", response.getGatewayAssertion());
+        Assertions.assertEquals(5L, response.getPrincipal().getUserId());
+        Assertions.assertEquals(6L, response.getPrincipal().getTenantId());
+    }
+
+    @Test
+    void shouldBuildOpenLineageAssertionWhenOpenLineageResourceRequested() {
+        AuthenticationContextResponse context = AuthenticationContextResponse.builder()
+                .userId(7L)
+                .tenantId(8L)
+                .tenantCode("tenant-8")
+                .tenantName("Tenant 8")
+                .username("lineage-user")
+                .roles(List.of("DEVELOPER"))
+                .sessionId("sid-7")
+                .tokenId("jti-7")
+                .build();
+
+        when(authService.resolveAuthenticationContext("token-ol")).thenReturn(context);
+        when(assertionSigner.sign(any(), eq("datapillar-openlineage"))).thenReturn("openlineage-assertion");
+
+        CheckAuthenticationResponse response = provider.checkAuthentication(CheckAuthenticationRequest.newBuilder()
+                .setToken("token-ol")
+                .setMethod("POST")
+                .setPath("/api/openlineage")
+                .build());
+
+        Assertions.assertTrue(response.getAuthenticated());
+        Assertions.assertEquals("openlineage-assertion", response.getGatewayAssertion());
+        Assertions.assertEquals(7L, response.getPrincipal().getUserId());
+        Assertions.assertEquals(8L, response.getPrincipal().getTenantId());
+    }
 }

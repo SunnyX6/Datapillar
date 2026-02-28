@@ -34,6 +34,8 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.datapillar.context.TenantContext;
+import org.apache.gravitino.datapillar.context.TenantContextHolder;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
@@ -88,6 +90,37 @@ public class UserMetaService {
     return userId;
   }
 
+  private UserPO getUserPOByMetalakeIdAndExternalUserId(Long metalakeId, String externalUserId) {
+    UserPO userPO =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper ->
+                mapper.selectUserMetaByMetalakeIdAndExternalUserId(metalakeId, externalUserId));
+
+    if (userPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.USER.name().toLowerCase(),
+          externalUserId);
+    }
+    return userPO;
+  }
+
+  public Long getUserIdByMetalakeIdAndExternalUserId(Long metalakeId, String externalUserId) {
+    Long userId =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper -> mapper.selectUserIdByMetalakeIdAndExternalUserId(metalakeId, externalUserId));
+
+    if (userId == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.USER.name().toLowerCase(),
+          externalUserId);
+    }
+    return userId;
+  }
+
   public UserEntity getUserByIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
 
@@ -120,7 +153,10 @@ public class UserMetaService {
 
       Long metalakeId =
           MetalakeMetaService.getInstance().getMetalakeIdByName(userEntity.namespace().level(0));
-      UserPO.Builder builder = UserPO.builder().withMetalakeId(metalakeId);
+      UserPO.Builder builder =
+          UserPO.builder()
+              .withMetalakeId(metalakeId)
+              .withExternalUserId(resolveExternalUserId(userEntity));
       UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
 
       List<Long> roleIds = Optional.ofNullable(userEntity.roleIds()).orElse(Lists.newArrayList());
@@ -296,5 +332,23 @@ public class UserMetaService {
                         mapper.deleteUserRoleRelMetasByLegacyTimeline(legacyTimeline, limit)));
 
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
+  }
+
+  public UserEntity getUserByExternalUserId(Namespace namespace, String externalUserId) {
+    AuthorizationUtils.checkUserNamespace(namespace);
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
+    UserPO userPO = getUserPOByMetalakeIdAndExternalUserId(metalakeId, externalUserId);
+    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
+    return POConverters.fromUserPO(userPO, rolePOs, namespace);
+  }
+
+  private String resolveExternalUserId(UserEntity userEntity) {
+    if (userEntity.name() != null && userEntity.name().startsWith("uid:")) {
+      return userEntity.name();
+    }
+
+    TenantContext tenantContext = TenantContextHolder.get();
+    long tenantId = tenantContext == null ? 0L : tenantContext.tenantId();
+    return String.format("uid:%d:%d", tenantId, userEntity.id());
   }
 }

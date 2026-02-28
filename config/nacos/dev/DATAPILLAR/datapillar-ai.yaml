@@ -70,16 +70,6 @@ agent:
     type: "redis"
     url: "redis://127.0.0.1:6379/0"
 
-openlineage_sink:
-  graceful_shutdown_timeout: 30.0
-  queue:
-    max_size: 10000
-    batch_size: 100
-    flush_interval_seconds: 3.0
-  neo4j:
-    batch_size: 50
-    max_concurrent: 10
-
 sql_summary:
   enabled: true
   batch_size: 5

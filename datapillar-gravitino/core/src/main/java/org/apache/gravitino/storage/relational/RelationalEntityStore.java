@@ -40,6 +40,7 @@ import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
+import org.apache.gravitino.datapillar.storage.relational.DatapillarJDBCBackend;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.SupportsTagOperations;
@@ -57,7 +58,10 @@ public class RelationalEntityStore
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
-          Configs.DEFAULT_ENTITY_RELATIONAL_STORE, JDBCBackend.class.getCanonicalName());
+          Configs.DEFAULT_ENTITY_RELATIONAL_STORE,
+          DatapillarJDBCBackend.class.getCanonicalName(),
+          DatapillarJDBCBackend.class.getSimpleName(),
+          DatapillarJDBCBackend.class.getCanonicalName());
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
   private EntityCache cache;

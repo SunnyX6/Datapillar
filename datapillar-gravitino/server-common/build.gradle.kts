@@ -58,6 +58,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.inline)
+  testImplementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
   testImplementation(libs.commons.io)
   testImplementation(libs.minikdc) {
     exclude("org.apache.directory.api", "api-ldap-schema-data")
@@ -69,5 +70,6 @@ tasks {
   test {
     environment("GRAVITINO_HOME", rootDir.path)
     environment("GRAVITINO_TEST", "true")
+    systemProperty("net.bytebuddy.experimental", "true")
   }
 }

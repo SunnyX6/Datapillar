@@ -407,6 +407,7 @@ public class AuthServiceImpl implements AuthService {
                 .userId(userId)
                 .tenantId(tenantId)
                 .tenantCode(tenant.getCode())
+                .tenantName(tenant.getName())
                 .username(jwtUtil.getUsername(claims))
                 .email(jwtUtil.getEmail(claims))
                 .roles(EdDsaJwtSupport.toStringList(claims.get("roles")))

@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.datapillar.openlineage.dao.mapper.OpenLineageEventMapper">
+
+    <insert id="insertLineageEvent" parameterType="com.sunny.datapillar.openlineage.model.LineageEventRecord">
+        INSERT INTO lineage_events (
+            tenant_id,
+            tenant_code,
+            tenant_name,
+            event_time,
+            event_type,
+            run_uuid,
+            job_name,
+            job_namespace,
+            producer,
+            _event_type,
+            event
+        ) VALUES (
+            #{tenantId},
+            #{tenantCode},
+            #{tenantName},
+            #{eventTime},
+            #{eventType},
+            #{runUuid},
+            #{jobName},
+            #{jobNamespace},
+            #{producer},
+            #{internalEventType},
+            CAST(#{eventJson} AS JSON)
+        )
+    </insert>
+
+    <insert id="upsertAsyncTask" parameterType="com.sunny.datapillar.openlineage.model.AsyncTaskRecord">
+        INSERT INTO ol_async_task (
+            task_type,
+            tenant_id,
+            tenant_code,
+            resource_type,
+            resource_id,
+            content_hash,
+            model_fingerprint,
+            status,
+            priority,
+            retry_count,
+            max_retry,
+            next_run_at
+        ) VALUES (
+            #{taskType},
+            #{tenantId},
+            #{tenantCode},
+            #{resourceType},
+            #{resourceId},
+            #{contentHash},
+            #{modelFingerprint},
+            #{status},
+            #{priority},
+            #{retryCount},
+            #{maxRetry},
+            #{nextRunAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            id = LAST_INSERT_ID(id),
+            status = 'PENDING',
+            retry_count = 0,
+            next_run_at = VALUES(next_run_at),
+            claim_token = NULL,
+            claim_until = NULL,
+            last_error = NULL,
+            updated_at = CURRENT_TIMESTAMP(6)
+    </insert>
+
+    <select id="selectLastInsertId" resultType="java.lang.Long">
+        SELECT LAST_INSERT_ID()
+    </select>
+
+    <update id="claimTaskForPush">
+        UPDATE ol_async_task
+        SET status = 'RUNNING',
+            claim_token = #{claimToken},
+            claim_until = #{claimUntil},
+            updated_at = CURRENT_TIMESTAMP(6)
+        WHERE id = #{id}
+          AND status IN ('PENDING', 'FAILED')
+          AND (claim_until IS NULL OR claim_until &lt; CURRENT_TIMESTAMP(6))
+    </update>
+
+    <select id="selectRecoverableTaskIdsForUpdate" resultType="java.lang.Long">
+        SELECT id
+        FROM ol_async_task
+        WHERE task_type = #{taskType}
+          AND status IN ('PENDING', 'FAILED')
+          AND next_run_at &lt;= CURRENT_TIMESTAMP(6)
+          AND (claim_until IS NULL OR claim_until &lt; CURRENT_TIMESTAMP(6))
+        ORDER BY priority ASC, id ASC
+        LIMIT #{limit}
+        FOR UPDATE SKIP LOCKED
+    </select>
+
+    <update id="markClaimedTasksByIds">
+        UPDATE ol_async_task
+        SET status = 'RUNNING',
+            claim_token = #{claimToken},
+            claim_until = #{claimUntil},
+            updated_at = CURRENT_TIMESTAMP(6)
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <select id="selectTasksByIds" resultType="com.sunny.datapillar.openlineage.model.AsyncTaskRecord">
+        SELECT *
+        FROM ol_async_task
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="selectTaskById" resultType="com.sunny.datapillar.openlineage.model.AsyncTaskRecord">
+        SELECT *
+        FROM ol_async_task
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <insert id="insertTaskAttempt" parameterType="com.sunny.datapillar.openlineage.model.AsyncTaskAttemptRecord"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ol_async_task_attempt (
+            task_id,
+            attempt_no,
+            worker_id,
+            started_at,
+            status,
+            batch_no,
+            input_size
+        ) VALUES (
+            #{taskId},
+            #{attemptNo},
+            #{workerId},
+            #{startedAt},
+            #{status},
+            #{batchNo},
+            #{inputSize}
+        )
+    </insert>
+
+    <update id="updateTaskAttempt">
+        UPDATE ol_async_task_attempt
+        SET status = #{status},
+            finished_at = #{finishedAt},
+            latency_ms = #{latencyMs},
+            error_type = #{errorType},
+            error_message = #{errorMessage}
+        WHERE id = #{id}
+    </update>
+
+    <update id="markTaskSucceeded">
+        UPDATE ol_async_task
+        SET status = 'SUCCEEDED',
+            claim_token = NULL,
+            claim_until = NULL,
+            last_error = NULL,
+            updated_at = CURRENT_TIMESTAMP(6)
+        WHERE id = #{id}
+          AND claim_token = #{claimToken}
+    </update>
+
+    <update id="markTaskFailed">
+        UPDATE ol_async_task
+        SET retry_count = retry_count + 1,
+            status = CASE
+                WHEN #{dead} THEN 'DEAD'
+                ELSE 'FAILED'
+            END,
+            next_run_at = CASE
+                WHEN #{dead} THEN next_run_at
+                ELSE #{nextRunAt}
+            END,
+            claim_token = NULL,
+            claim_until = NULL,
+            last_error = #{lastError},
+            updated_at = CURRENT_TIMESTAMP(6)
+        WHERE id = #{id}
+          AND claim_token = #{claimToken}
+    </update>
+
+    <insert id="insertBatch" parameterType="com.sunny.datapillar.openlineage.model.AsyncBatchRecord">
+        INSERT INTO ol_async_batch (
+            batch_no,
+            task_type,
+            tenant_id,
+            model_fingerprint,
+            worker_id,
+            planned_size,
+            success_count,
+            failed_count,
+            started_at,
+            status
+        ) VALUES (
+            #{batchNo},
+            #{taskType},
+            #{tenantId},
+            #{modelFingerprint},
+            #{workerId},
+            #{plannedSize},
+            #{successCount},
+            #{failedCount},
+            #{startedAt},
+            #{status}
+        )
+    </insert>
+
+    <update id="updateBatch">
+        UPDATE ol_async_batch
+        SET success_count = #{successCount},
+            failed_count = #{failedCount},
+            status = #{status},
+            finished_at = #{finishedAt}
+        WHERE batch_no = #{batchNo}
+    </update>
+</mapper>

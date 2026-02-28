@@ -78,7 +78,7 @@ public class TableEventConverter extends BaseEventConverter {
     TableInfo tableInfo = event.createdTableInfo();
     NameIdentifier identifier = event.identifier();
 
-    OutputDataset outputDataset = createTableDataset(identifier, tableInfo);
+    OutputDataset outputDataset = createTableDataset(event, identifier, tableInfo);
 
     return createRunEvent(
         event,
@@ -94,7 +94,7 @@ public class TableEventConverter extends BaseEventConverter {
     TableChange[] tableChanges = event.tableChanges();
 
     List<TableChangeInfo> changes = parseTableChanges(tableChanges);
-    OutputDataset outputDataset = createAlterTableDataset(identifier, tableInfo, changes);
+    OutputDataset outputDataset = createAlterTableDataset(event, identifier, tableInfo, changes);
 
     return createRunEvent(
         event,
@@ -110,7 +110,7 @@ public class TableEventConverter extends BaseEventConverter {
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
-            .namespace(formatDatasetNamespace(identifier))
+            .namespace(formatDatasetNamespace(event, identifier))
             .name(formatDatasetName(identifier))
             .facets(
                 openLineage
@@ -134,7 +134,7 @@ public class TableEventConverter extends BaseEventConverter {
     TableInfo tableInfo = event.loadedTableInfo();
     NameIdentifier identifier = event.identifier();
 
-    InputDataset inputDataset = createTableInputDataset(identifier, tableInfo);
+    InputDataset inputDataset = createTableInputDataset(event, identifier, tableInfo);
 
     return createRunEvent(
         event,
@@ -144,89 +144,8 @@ public class TableEventConverter extends BaseEventConverter {
         Collections.emptyList());
   }
 
-  private OutputDataset createTableDataset(NameIdentifier identifier, TableInfo tableInfo) {
-    List<SchemaDatasetFacetFields> fields = new ArrayList<>();
-    List<GravitinoColumnMetadata> columnMetadataList = new ArrayList<>();
-
-    if (tableInfo != null && tableInfo.columns() != null) {
-      for (Column column : tableInfo.columns()) {
-        fields.add(
-            openLineage.newSchemaDatasetFacetFields(
-                column.name(), column.dataType().simpleString(), column.comment(), null));
-
-        columnMetadataList.add(
-            GravitinoColumnMetadata.builder()
-                .name(column.name())
-                .nullable(column.nullable())
-                .autoIncrement(column.autoIncrement())
-                .defaultValue(formatDefaultValue(column.defaultValue()))
-                .build());
-      }
-    }
-
-    SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
-    GravitinoDatasetFacet gravitinoFacet = buildGravitinoFacet(tableInfo, columnMetadataList);
-
-    DatasetFacetsBuilder facetsBuilder =
-        openLineage
-            .newDatasetFacetsBuilder()
-            .schema(schemaFacet)
-            .lifecycleStateChange(
-                openLineage.newLifecycleStateChangeDatasetFacet(
-                    OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.CREATE,
-                    null));
-
-    if (gravitinoFacet != null) {
-      facetsBuilder.put(GRAVITINO_FACET_KEY, gravitinoFacet);
-    }
-
-    return openLineage
-        .newOutputDatasetBuilder()
-        .namespace(formatDatasetNamespace(identifier))
-        .name(formatDatasetName(identifier))
-        .facets(facetsBuilder.build())
-        .build();
-  }
-
-  private InputDataset createTableInputDataset(NameIdentifier identifier, TableInfo tableInfo) {
-    List<SchemaDatasetFacetFields> fields = new ArrayList<>();
-    List<GravitinoColumnMetadata> columnMetadataList = new ArrayList<>();
-
-    if (tableInfo != null && tableInfo.columns() != null) {
-      for (Column column : tableInfo.columns()) {
-        fields.add(
-            openLineage.newSchemaDatasetFacetFields(
-                column.name(), column.dataType().simpleString(), column.comment(), null));
-
-        columnMetadataList.add(
-            GravitinoColumnMetadata.builder()
-                .name(column.name())
-                .nullable(column.nullable())
-                .autoIncrement(column.autoIncrement())
-                .defaultValue(formatDefaultValue(column.defaultValue()))
-                .build());
-      }
-    }
-
-    SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
-    GravitinoDatasetFacet gravitinoFacet = buildGravitinoFacet(tableInfo, columnMetadataList);
-
-    DatasetFacetsBuilder facetsBuilder = openLineage.newDatasetFacetsBuilder().schema(schemaFacet);
-
-    if (gravitinoFacet != null) {
-      facetsBuilder.put(GRAVITINO_FACET_KEY, gravitinoFacet);
-    }
-
-    return openLineage
-        .newInputDatasetBuilder()
-        .namespace(formatDatasetNamespace(identifier))
-        .name(formatDatasetName(identifier))
-        .facets(facetsBuilder.build())
-        .build();
-  }
-
-  private OutputDataset createAlterTableDataset(
-      NameIdentifier identifier, TableInfo tableInfo, List<TableChangeInfo> changes) {
+  private OutputDataset createTableDataset(
+      Event event, NameIdentifier identifier, TableInfo tableInfo) {
     List<SchemaDatasetFacetFields> fields = new ArrayList<>();
     List<GravitinoColumnMetadata> columnMetadataList = new ArrayList<>();
 
@@ -248,7 +167,92 @@ public class TableEventConverter extends BaseEventConverter {
 
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
     GravitinoDatasetFacet gravitinoFacet =
-        buildAlterTableFacet(tableInfo, columnMetadataList, changes);
+        buildGravitinoFacet(event, tableInfo, columnMetadataList);
+
+    DatasetFacetsBuilder facetsBuilder =
+        openLineage
+            .newDatasetFacetsBuilder()
+            .schema(schemaFacet)
+            .lifecycleStateChange(
+                openLineage.newLifecycleStateChangeDatasetFacet(
+                    OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.CREATE,
+                    null));
+
+    if (gravitinoFacet != null) {
+      facetsBuilder.put(GRAVITINO_FACET_KEY, gravitinoFacet);
+    }
+
+    return openLineage
+        .newOutputDatasetBuilder()
+        .namespace(formatDatasetNamespace(event, identifier))
+        .name(formatDatasetName(identifier))
+        .facets(facetsBuilder.build())
+        .build();
+  }
+
+  private InputDataset createTableInputDataset(
+      Event event, NameIdentifier identifier, TableInfo tableInfo) {
+    List<SchemaDatasetFacetFields> fields = new ArrayList<>();
+    List<GravitinoColumnMetadata> columnMetadataList = new ArrayList<>();
+
+    if (tableInfo != null && tableInfo.columns() != null) {
+      for (Column column : tableInfo.columns()) {
+        fields.add(
+            openLineage.newSchemaDatasetFacetFields(
+                column.name(), column.dataType().simpleString(), column.comment(), null));
+
+        columnMetadataList.add(
+            GravitinoColumnMetadata.builder()
+                .name(column.name())
+                .nullable(column.nullable())
+                .autoIncrement(column.autoIncrement())
+                .defaultValue(formatDefaultValue(column.defaultValue()))
+                .build());
+      }
+    }
+
+    SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
+    GravitinoDatasetFacet gravitinoFacet =
+        buildGravitinoFacet(event, tableInfo, columnMetadataList);
+
+    DatasetFacetsBuilder facetsBuilder = openLineage.newDatasetFacetsBuilder().schema(schemaFacet);
+
+    if (gravitinoFacet != null) {
+      facetsBuilder.put(GRAVITINO_FACET_KEY, gravitinoFacet);
+    }
+
+    return openLineage
+        .newInputDatasetBuilder()
+        .namespace(formatDatasetNamespace(event, identifier))
+        .name(formatDatasetName(identifier))
+        .facets(facetsBuilder.build())
+        .build();
+  }
+
+  private OutputDataset createAlterTableDataset(
+      Event event, NameIdentifier identifier, TableInfo tableInfo, List<TableChangeInfo> changes) {
+    List<SchemaDatasetFacetFields> fields = new ArrayList<>();
+    List<GravitinoColumnMetadata> columnMetadataList = new ArrayList<>();
+
+    if (tableInfo != null && tableInfo.columns() != null) {
+      for (Column column : tableInfo.columns()) {
+        fields.add(
+            openLineage.newSchemaDatasetFacetFields(
+                column.name(), column.dataType().simpleString(), column.comment(), null));
+
+        columnMetadataList.add(
+            GravitinoColumnMetadata.builder()
+                .name(column.name())
+                .nullable(column.nullable())
+                .autoIncrement(column.autoIncrement())
+                .defaultValue(formatDefaultValue(column.defaultValue()))
+                .build());
+      }
+    }
+
+    SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
+    GravitinoDatasetFacet gravitinoFacet =
+        buildAlterTableFacet(event, tableInfo, columnMetadataList, changes);
 
     DatasetFacetsBuilder facetsBuilder =
         openLineage
@@ -264,20 +268,20 @@ public class TableEventConverter extends BaseEventConverter {
 
     return openLineage
         .newOutputDatasetBuilder()
-        .namespace(formatDatasetNamespace(identifier))
+        .namespace(formatDatasetNamespace(event, identifier))
         .name(formatDatasetName(identifier))
         .facets(facetsBuilder.build())
         .build();
   }
 
   private GravitinoDatasetFacet buildGravitinoFacet(
-      TableInfo tableInfo, List<GravitinoColumnMetadata> columnMetadataList) {
+      Event event, TableInfo tableInfo, List<GravitinoColumnMetadata> columnMetadataList) {
     if (tableInfo == null) {
       return null;
     }
 
     GravitinoDatasetFacet.GravitinoDatasetFacetBuilder builder =
-        GravitinoDatasetFacet.builder(producerUri)
+        tenantFacetBuilder(event)
             .description(tableInfo.comment())
             .properties(tableInfo.properties())
             .columns(columnMetadataList);
@@ -314,15 +318,16 @@ public class TableEventConverter extends BaseEventConverter {
   }
 
   private GravitinoDatasetFacet buildAlterTableFacet(
+      Event event,
       TableInfo tableInfo,
       List<GravitinoColumnMetadata> columnMetadataList,
       List<TableChangeInfo> changes) {
     if (tableInfo == null) {
-      return GravitinoDatasetFacet.builder(producerUri).changes(changes).build();
+      return tenantFacetBuilder(event).changes(changes).build();
     }
 
     GravitinoDatasetFacet.GravitinoDatasetFacetBuilder builder =
-        GravitinoDatasetFacet.builder(producerUri)
+        tenantFacetBuilder(event)
             .description(tableInfo.comment())
             .properties(tableInfo.properties())
             .columns(columnMetadataList)

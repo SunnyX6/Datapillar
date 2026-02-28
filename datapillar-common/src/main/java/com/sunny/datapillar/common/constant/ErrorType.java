@@ -82,6 +82,11 @@ public final class ErrorType {
     public static final String LLM_UNAUTHORIZED = "LLM_UNAUTHORIZED";
     public static final String LLM_INTERNAL_ERROR = "LLM_INTERNAL_ERROR";
     public static final String LLM_CONNECTION_FAILED = "LLM_CONNECTION_FAILED";
+    public static final String GRAVITINO_RPC_REQUEST_INVALID = "GRAVITINO_RPC_REQUEST_INVALID";
+    public static final String GRAVITINO_RPC_PRIVILEGE_INVALID = "GRAVITINO_RPC_PRIVILEGE_INVALID";
+    public static final String GRAVITINO_RPC_OBJECT_INVALID = "GRAVITINO_RPC_OBJECT_INVALID";
+    public static final String GRAVITINO_RPC_UNAVAILABLE = "GRAVITINO_RPC_UNAVAILABLE";
+    public static final String GRAVITINO_RPC_INTERNAL_ERROR = "GRAVITINO_RPC_INTERNAL_ERROR";
 
     private ErrorType() {
     }

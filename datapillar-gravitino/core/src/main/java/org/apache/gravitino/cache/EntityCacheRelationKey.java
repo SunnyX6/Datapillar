@@ -23,6 +23,7 @@ import java.util.Objects;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.datapillar.cache.TenantCacheKeyBuilder;
 
 /** Key for Entity cache. */
 public class EntityCacheRelationKey extends EntityCacheKey {
@@ -38,7 +39,25 @@ public class EntityCacheRelationKey extends EntityCacheKey {
    */
   public static EntityCacheRelationKey of(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relationType) {
-    return new EntityCacheRelationKey(ident, type, relationType);
+    return new EntityCacheRelationKey(
+        TenantCacheKeyBuilder.resolveTenantId(), ident, type, relationType);
+  }
+
+  /**
+   * Creates a new instance of {@link EntityCacheRelationKey} with the given arguments.
+   *
+   * @param tenantId The tenant identifier of the cache key.
+   * @param ident The identifier of the entity.
+   * @param type The type of the entity.
+   * @param relationType The type of the relation, it can be null.
+   * @return A new instance of {@link EntityCacheRelationKey}.
+   */
+  public static EntityCacheRelationKey of(
+      long tenantId,
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relationType) {
+    return new EntityCacheRelationKey(tenantId, ident, type, relationType);
   }
 
   /**
@@ -49,7 +68,20 @@ public class EntityCacheRelationKey extends EntityCacheKey {
    * @return A new instance of {@link EntityCacheRelationKey}.
    */
   public static EntityCacheRelationKey of(NameIdentifier ident, Entity.EntityType type) {
-    return new EntityCacheRelationKey(ident, type, null);
+    return new EntityCacheRelationKey(TenantCacheKeyBuilder.resolveTenantId(), ident, type, null);
+  }
+
+  /**
+   * Creates a new instance of {@link EntityCacheRelationKey} with the given arguments.
+   *
+   * @param tenantId The tenant identifier of the cache key.
+   * @param ident The identifier of the entity.
+   * @param type The type of the entity.
+   * @return A new instance of {@link EntityCacheRelationKey}.
+   */
+  public static EntityCacheRelationKey of(
+      long tenantId, NameIdentifier ident, Entity.EntityType type) {
+    return new EntityCacheRelationKey(tenantId, ident, type, null);
   }
 
   /**
@@ -60,10 +92,11 @@ public class EntityCacheRelationKey extends EntityCacheKey {
    * @param relationType The type of the relation.
    */
   private EntityCacheRelationKey(
+      long tenantId,
       NameIdentifier identifier,
       Entity.EntityType type,
       SupportsRelationOperations.Type relationType) {
-    super(identifier, type);
+    super(tenantId, identifier, type);
     this.relationType = relationType;
   }
 
@@ -100,7 +133,7 @@ public class EntityCacheRelationKey extends EntityCacheKey {
    */
   @Override
   public int hashCode() {
-    return Objects.hash(super.identifier(), super.entityType(), relationType);
+    return Objects.hash(super.tenantId(), super.identifier(), super.entityType(), relationType);
   }
 
   /**
@@ -111,7 +144,7 @@ public class EntityCacheRelationKey extends EntityCacheKey {
    */
   @Override
   public String toString() {
-    String stringExpr = super.identifier().toString() + ":" + super.entityType().toString();
+    String stringExpr = super.toString();
     if (relationType != null) {
       stringExpr += ":" + relationType.name();
     }

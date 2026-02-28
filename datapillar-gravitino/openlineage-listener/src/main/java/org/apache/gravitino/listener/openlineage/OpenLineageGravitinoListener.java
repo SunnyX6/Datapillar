@@ -42,8 +42,8 @@ import org.apache.gravitino.listener.api.event.Event;
  *
  * # OpenLineage HTTP transport configuration
  * gravitino.openlineage.transport.type = http
- * gravitino.openlineage.transport.url = http://datapillar-ai:7003
- * gravitino.openlineage.transport.endpoint = /api/v1/lineage
+ * gravitino.openlineage.transport.url = http://127.0.0.1:7000
+ * gravitino.openlineage.transport.endpoint = /api/openlineage
  * gravitino.openlineage.transport.timeoutInMillis = 5000
  * gravitino.openlineage.transport.compression = gzip
  *
@@ -136,6 +136,15 @@ public class OpenLineageGravitinoListener implements EventListenerPlugin {
         // 异步发送事件（带限流和重试）
         emitEventAsync(runEvent);
       }
+    } catch (IllegalArgumentException e) {
+      if (e.getMessage() != null && e.getMessage().contains("missing tenant_id")) {
+        log.warn(
+            "Reject OpenLineage event without tenant_id snapshot: {}",
+            postEvent.getClass().getSimpleName());
+        return;
+      }
+      log.error(
+          "Failed to process OpenLineage event for: {}", postEvent.getClass().getSimpleName(), e);
     } catch (Exception e) {
       log.error(
           "Failed to process OpenLineage event for: {}", postEvent.getClass().getSimpleName(), e);

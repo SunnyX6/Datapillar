@@ -33,6 +33,7 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.datapillar.context.TenantContextHolder;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -61,6 +62,10 @@ public class AuthenticationFilter implements Filter {
         authenticators = ServerAuthenticator.getInstance().authenticators();
       } else {
         authenticators = filterAuthenticators;
+      }
+      if (TenantContextHolder.get() == null) {
+        throw new UnauthorizedException(
+            "Gateway assertion tenant context is required for authentication");
       }
       HttpServletRequest req = (HttpServletRequest) request;
       Enumeration<String> headerData = req.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION);

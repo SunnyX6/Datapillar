@@ -18,6 +18,7 @@
 --
 
 CREATE TABLE IF NOT EXISTS `metalake_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `metalake_name` VARCHAR(128) NOT NULL COMMENT 'metalake name',
     `metalake_comment` VARCHAR(256) DEFAULT '' COMMENT 'metalake comment',
@@ -28,10 +29,11 @@ CREATE TABLE IF NOT EXISTS `metalake_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'metalake last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'metalake deleted at',
     PRIMARY KEY (`metalake_id`),
-    UNIQUE KEY `uk_mn_del` (`metalake_name`, `deleted_at`)
+    UNIQUE KEY `uk_mn_del` (`tenant_id`, `metalake_name`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'metalake metadata';
 
 CREATE TABLE IF NOT EXISTS `catalog_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
     `catalog_name` VARCHAR(128) NOT NULL COMMENT 'catalog name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
@@ -44,10 +46,11 @@ CREATE TABLE IF NOT EXISTS `catalog_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'catalog last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'catalog deleted at',
     PRIMARY KEY (`catalog_id`),
-    UNIQUE KEY `uk_mid_cn_del` (`metalake_id`, `catalog_name`, `deleted_at`)
+    UNIQUE KEY `uk_mid_cn_del` (`tenant_id`, `metalake_id`, `catalog_name`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'catalog metadata';
 
 CREATE TABLE IF NOT EXISTS `schema_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `schema_name` VARCHAR(128) NOT NULL COMMENT 'schema name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
@@ -59,11 +62,12 @@ CREATE TABLE IF NOT EXISTS `schema_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'schema last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'schema deleted at',
     PRIMARY KEY (`schema_id`),
-    UNIQUE KEY `uk_cid_sn_del` (`catalog_id`, `schema_name`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`)
+    UNIQUE KEY `uk_cid_sn_del` (`tenant_id`, `catalog_id`, `schema_name`, `deleted_at`),
+    KEY `idx_mid` (`tenant_id`, `metalake_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'schema metadata';
 
 CREATE TABLE IF NOT EXISTS `table_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
     `table_name` VARCHAR(128) NOT NULL COMMENT 'table name',
     `table_comment` VARCHAR(256) DEFAULT '' COMMENT 'table comment',
@@ -75,12 +79,13 @@ CREATE TABLE IF NOT EXISTS `table_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'table deleted at',
     PRIMARY KEY (`table_id`),
-    UNIQUE KEY `uk_sid_tn_del` (`schema_id`, `table_name`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`)
+    UNIQUE KEY `uk_sid_tn_del` (`tenant_id`, `schema_id`, `table_name`, `deleted_at`),
+    KEY `idx_mid` (`tenant_id`, `metalake_id`),
+    KEY `idx_cid` (`tenant_id`, `catalog_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table metadata';
 
 CREATE TABLE IF NOT EXISTS `table_column_version_info` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
@@ -99,13 +104,14 @@ CREATE TABLE IF NOT EXISTS `table_column_version_info` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'column deleted at',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'column audit info',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_tid_ver_cid_del` (`table_id`, `table_version`, `column_id`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`),
-    KEY `idx_sid` (`schema_id`)
+    UNIQUE KEY `uk_tid_ver_cid_del` (`tenant_id`, `table_id`, `table_version`, `column_id`, `deleted_at`),
+    KEY `idx_mid` (`tenant_id`, `metalake_id`),
+    KEY `idx_cid` (`tenant_id`, `catalog_id`),
+    KEY `idx_sid` (`tenant_id`, `schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table column version info';
 
 CREATE TABLE IF NOT EXISTS `fileset_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `fileset_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'fileset id',
     `fileset_name` VARCHAR(128) NOT NULL COMMENT 'fileset name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
@@ -117,12 +123,13 @@ CREATE TABLE IF NOT EXISTS `fileset_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'fileset last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'fileset deleted at',
     PRIMARY KEY (`fileset_id`),
-    UNIQUE KEY `uk_sid_fn_del` (`schema_id`, `fileset_name`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`)
+    UNIQUE KEY `uk_sid_fn_del` (`tenant_id`, `schema_id`, `fileset_name`, `deleted_at`),
+    KEY `idx_mid` (`tenant_id`, `metalake_id`),
+    KEY `idx_cid` (`tenant_id`, `catalog_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'fileset metadata';
 
 CREATE TABLE IF NOT EXISTS `fileset_version_info` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
@@ -135,13 +142,14 @@ CREATE TABLE IF NOT EXISTS `fileset_version_info` (
     `storage_location` MEDIUMTEXT NOT NULL COMMENT 'fileset storage location',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'fileset deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_fid_ver_sto_del` (`fileset_id`, `version`, `storage_location_name`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`),
-    KEY `idx_sid` (`schema_id`)
+    UNIQUE KEY `uk_fid_ver_sto_del` (`tenant_id`, `fileset_id`, `version`, `storage_location_name`, `deleted_at`),
+    KEY `idx_mid` (`tenant_id`, `metalake_id`),
+    KEY `idx_cid` (`tenant_id`, `catalog_id`),
+    KEY `idx_sid` (`tenant_id`, `schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'fileset version info';
 
 CREATE TABLE IF NOT EXISTS `topic_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `topic_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'topic id',
     `topic_name` VARCHAR(128) NOT NULL COMMENT 'topic name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
@@ -154,24 +162,28 @@ CREATE TABLE IF NOT EXISTS `topic_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'topic last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'topic deleted at',
     PRIMARY KEY (`topic_id`),
-    UNIQUE KEY `uk_sid_tn_del` (`schema_id`, `topic_name`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`)
+    UNIQUE KEY `uk_sid_tn_del` (`tenant_id`, `schema_id`, `topic_name`, `deleted_at`),
+    KEY `idx_mid` (`tenant_id`, `metalake_id`),
+    KEY `idx_cid` (`tenant_id`, `catalog_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'topic metadata';
 
 CREATE TABLE IF NOT EXISTS `user_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
     `user_name` VARCHAR(128) NOT NULL COMMENT 'username',
+    `external_user_id` VARCHAR(256) NOT NULL COMMENT 'external user id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'user audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'user deleted at',
     PRIMARY KEY (`user_id`),
-    UNIQUE KEY `uk_mid_us_del` (`metalake_id`, `user_name`, `deleted_at`)
+    UNIQUE KEY `uk_mid_us_del` (`tenant_id`, `metalake_id`, `user_name`, `deleted_at`),
+    UNIQUE KEY `uk_tid_euid_del` (`tenant_id`, `external_user_id`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'user metadata';
 
 CREATE TABLE IF NOT EXISTS `role_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
     `role_name` VARCHAR(128) NOT NULL COMMENT 'role name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
@@ -181,10 +193,11 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'role deleted at',
     PRIMARY KEY (`role_id`),
-    UNIQUE KEY `uk_mid_rn_del` (`metalake_id`, `role_name`, `deleted_at`)
+    UNIQUE KEY `uk_mid_rn_del` (`tenant_id`, `metalake_id`, `role_name`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'role metadata';
 
 CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
     `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'The entity id of securable object',
@@ -195,11 +208,12 @@ CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'securable object last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'securable object deleted at',
     PRIMARY KEY (`id`),
-    KEY `idx_obj_rid` (`role_id`),
-    KEY `idx_obj_eid` (`metadata_object_id`)
+    KEY `idx_obj_rid` (`tenant_id`, `role_id`),
+    KEY `idx_obj_eid` (`tenant_id`, `metadata_object_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'securable object meta';
 
 CREATE TABLE IF NOT EXISTS `user_role_rel` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
     `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
@@ -208,11 +222,12 @@ CREATE TABLE IF NOT EXISTS `user_role_rel` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_ui_ri_del` (`user_id`, `role_id`, `deleted_at`),
-    KEY `idx_rid` (`role_id`)
+    UNIQUE KEY `uk_ui_ri_del` (`tenant_id`, `user_id`, `role_id`, `deleted_at`),
+    KEY `idx_rid` (`tenant_id`, `role_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'user role relation';
 
 CREATE TABLE IF NOT EXISTS `group_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'group name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
@@ -221,10 +236,11 @@ CREATE TABLE IF NOT EXISTS `group_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'group deleted at',
     PRIMARY KEY (`group_id`),
-    UNIQUE KEY `uk_mid_gr_del` (`metalake_id`, `group_name`, `deleted_at`)
+    UNIQUE KEY `uk_mid_gr_del` (`tenant_id`, `metalake_id`, `group_name`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group metadata';
 
 CREATE TABLE IF NOT EXISTS `group_role_rel` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
     `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
@@ -233,11 +249,12 @@ CREATE TABLE IF NOT EXISTS `group_role_rel` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_gi_ri_del` (`group_id`, `role_id`, `deleted_at`),
-    KEY `idx_rid` (`group_id`)
+    UNIQUE KEY `uk_gi_ri_del` (`tenant_id`, `group_id`, `role_id`, `deleted_at`),
+    KEY `idx_rid` (`tenant_id`, `group_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group role relation';
 
 CREATE TABLE IF NOT EXISTS `tag_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
     `tag_name` VARCHAR(128) NOT NULL COMMENT 'tag name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
@@ -248,10 +265,11 @@ CREATE TABLE IF NOT EXISTS `tag_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'tag deleted at',
     PRIMARY KEY (`tag_id`),
-    UNIQUE KEY `uk_mi_tn_del` (`metalake_id`, `tag_name`, `deleted_at`)
+    UNIQUE KEY `uk_mi_tn_del` (`tenant_id`, `metalake_id`, `tag_name`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'tag metadata';
 
 CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
     `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metadata object id',
@@ -261,12 +279,13 @@ CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'tag relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_ti_mi_mo_del` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
-    KEY `idx_tid` (`tag_id`),
-    KEY `idx_mid` (`metadata_object_id`)
+    UNIQUE KEY `uk_ti_mi_mo_del` (`tenant_id`, `tag_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
+    KEY `idx_tid` (`tenant_id`, `tag_id`),
+    KEY `idx_mid` (`tenant_id`, `metadata_object_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'tag metadata object relation';
 
 CREATE TABLE IF NOT EXISTS `owner_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `owner_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'owner id',
@@ -278,12 +297,13 @@ CREATE TABLE IF NOT EXISTS `owner_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'owner relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'owner relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_ow_me_del` (`owner_id`, `metadata_object_id`, `metadata_object_type`,`deleted_at`),
-    KEY `idx_oid` (`owner_id`),
-    KEY `idx_meid` (`metadata_object_id`)
+    UNIQUE KEY `uk_ow_me_del` (`tenant_id`, `owner_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
+    KEY `idx_oid` (`tenant_id`, `owner_id`),
+    KEY `idx_meid` (`tenant_id`, `metadata_object_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'owner relation';
 
 CREATE TABLE IF NOT EXISTS `model_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'model id',
     `model_name` VARCHAR(128) NOT NULL COMMENT 'model name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
@@ -295,12 +315,13 @@ CREATE TABLE IF NOT EXISTS `model_meta` (
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'model audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'model deleted at',
     PRIMARY KEY (`model_id`),
-    UNIQUE KEY `uk_sid_mn_del` (`schema_id`, `model_name`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`)
+    UNIQUE KEY `uk_sid_mn_del` (`tenant_id`, `schema_id`, `model_name`, `deleted_at`),
+    KEY `idx_mid` (`tenant_id`, `metalake_id`),
+    KEY `idx_cid` (`tenant_id`, `catalog_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'model metadata';
 
 CREATE TABLE IF NOT EXISTS `model_version_info` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
@@ -314,24 +335,26 @@ CREATE TABLE IF NOT EXISTS `model_version_info` (
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'model version audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'model version deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_mid_ver_uri_del` (`model_id`, `version`, `model_version_uri_name`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`),
-    KEY `idx_sid` (`schema_id`)
+    UNIQUE KEY `uk_mid_ver_uri_del` (`tenant_id`, `model_id`, `version`, `model_version_uri_name`, `deleted_at`),
+    KEY `idx_mid` (`tenant_id`, `metalake_id`),
+    KEY `idx_cid` (`tenant_id`, `catalog_id`),
+    KEY `idx_sid` (`tenant_id`, `schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'model version info';
 
 CREATE TABLE IF NOT EXISTS `model_version_alias_rel` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'model id',
     `model_version` INT UNSIGNED NOT NULL COMMENT 'model version',
     `model_version_alias` VARCHAR(128) NOT NULL COMMENT 'model version alias',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'model version alias deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_mi_mva_del` (`model_id`, `model_version_alias`, `deleted_at`),
-    KEY `idx_mva` (`model_version_alias`)
+    UNIQUE KEY `uk_mi_mva_del` (`tenant_id`, `model_id`, `model_version_alias`, `deleted_at`),
+    KEY `idx_mva` (`tenant_id`, `model_version_alias`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'model_version_alias_rel';
 
 CREATE TABLE IF NOT EXISTS `policy_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
     `policy_name` VARCHAR(128) NOT NULL COMMENT 'policy name',
     `policy_type` VARCHAR(64) NOT NULL COMMENT 'policy type',
@@ -341,10 +364,11 @@ CREATE TABLE IF NOT EXISTS `policy_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy deleted at',
     PRIMARY KEY (`policy_id`),
-    UNIQUE KEY `uk_mi_pn_del` (`metalake_id`, `policy_name`, `deleted_at`)
+    UNIQUE KEY `uk_mi_pn_del` (`tenant_id`, `metalake_id`, `policy_name`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy metadata';
 
 CREATE TABLE IF NOT EXISTS `policy_version_info` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
@@ -354,11 +378,12 @@ CREATE TABLE IF NOT EXISTS `policy_version_info` (
     `content` MEDIUMTEXT DEFAULT NULL COMMENT 'policy content',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_pod_ver_del` (`policy_id`, `version`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`)
+    UNIQUE KEY `uk_pod_ver_del` (`tenant_id`, `policy_id`, `version`, `deleted_at`),
+    KEY `idx_mid` (`tenant_id`, `metalake_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy version info';
 
 CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
     `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metadata object id',
@@ -368,12 +393,13 @@ CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_pi_mi_mo_del` (`policy_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
-    KEY `idx_pid` (`policy_id`),
-    KEY `idx_mid` (`metadata_object_id`)
+    UNIQUE KEY `uk_pi_mi_mo_del` (`tenant_id`, `policy_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
+    KEY `idx_pid` (`tenant_id`, `policy_id`),
+    KEY `idx_mid` (`tenant_id`, `metadata_object_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy metadata object relation';
 
 CREATE TABLE IF NOT EXISTS `statistic_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `statistic_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'statistic id',
     `statistic_name` VARCHAR(128) NOT NULL COMMENT 'statistic name',
@@ -386,12 +412,13 @@ CREATE TABLE IF NOT EXISTS `statistic_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'statistic last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'statistic deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_si_mi_mo_del` (`statistic_name`, `metadata_object_id`, `deleted_at`),
-    KEY `idx_stid` (`statistic_id`),
-    KEY `idx_moid` (`metadata_object_id`)
+    UNIQUE KEY `uk_si_mi_mo_del` (`tenant_id`, `statistic_name`, `metadata_object_id`, `deleted_at`),
+    KEY `idx_stid` (`tenant_id`, `statistic_id`),
+    KEY `idx_moid` (`tenant_id`, `metadata_object_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'statistic metadata';
 
 CREATE TABLE IF NOT EXISTS `job_template_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `job_template_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job template id',
     `job_template_name` VARCHAR(128) NOT NULL COMMENT 'job template name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
@@ -402,10 +429,11 @@ CREATE TABLE IF NOT EXISTS `job_template_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job template last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job template deleted at',
     PRIMARY KEY (`job_template_id`),
-    UNIQUE KEY `uk_mid_jtn_del` (`metalake_id`, `job_template_name`, `deleted_at`)
+    UNIQUE KEY `uk_mid_jtn_del` (`tenant_id`, `metalake_id`, `job_template_name`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'job template metadata';
 
 CREATE TABLE IF NOT EXISTS `job_run_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `job_run_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job run id',
     `job_template_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job template id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
@@ -417,9 +445,9 @@ CREATE TABLE IF NOT EXISTS `job_run_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job run last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job run deleted at',
     PRIMARY KEY (`job_run_id`),
-    UNIQUE KEY `uk_mid_jei_del` (`metalake_id`, `job_execution_id`, `deleted_at`),
-    KEY `idx_job_template_id` (`job_template_id`),
-    KEY `idx_job_execution_id` (`job_execution_id`)
+    UNIQUE KEY `uk_mid_jei_del` (`tenant_id`, `metalake_id`, `job_execution_id`, `deleted_at`),
+    KEY `idx_job_template_id` (`tenant_id`, `job_template_id`),
+    KEY `idx_job_execution_id` (`tenant_id`, `job_execution_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'job run metadata';
 
 -- ============================================
@@ -427,6 +455,7 @@ CREATE TABLE IF NOT EXISTS `job_run_meta` (
 -- ============================================
 
 CREATE TABLE IF NOT EXISTS `metric_modifier_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `modifier_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'modifier id',
     `modifier_name` VARCHAR(128) NOT NULL COMMENT 'modifier name, e.g., 近7天, 北京地区',
     `modifier_code` VARCHAR(128) NOT NULL COMMENT 'modifier code, e.g., 7d, beijing',
@@ -438,12 +467,13 @@ CREATE TABLE IF NOT EXISTS `metric_modifier_meta` (
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'modifier audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'modifier deleted at',
     PRIMARY KEY (`modifier_id`),
-    UNIQUE KEY `uk_sid_mcode_del` (`schema_id`, `modifier_code`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`)
+    UNIQUE KEY `uk_sid_mcode_del` (`tenant_id`, `schema_id`, `modifier_code`, `deleted_at`),
+    KEY `idx_mid` (`tenant_id`, `metalake_id`),
+    KEY `idx_cid` (`tenant_id`, `catalog_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '修饰符元数据表';
 
 CREATE TABLE IF NOT EXISTS `wordroot_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `root_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'root word id',
     `root_code` VARCHAR(64) NOT NULL COMMENT 'root code, e.g., amt, cnt, rate',
     `root_name` VARCHAR(128) NOT NULL COMMENT 'root name, e.g., 金额, amount',
@@ -455,12 +485,13 @@ CREATE TABLE IF NOT EXISTS `wordroot_meta` (
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'root audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'root deleted at',
     PRIMARY KEY (`root_id`),
-    UNIQUE KEY `uk_sid_rcode_del` (`schema_id`, `root_code`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`)
+    UNIQUE KEY `uk_sid_rcode_del` (`tenant_id`, `schema_id`, `root_code`, `deleted_at`),
+    KEY `idx_mid` (`tenant_id`, `metalake_id`),
+    KEY `idx_cid` (`tenant_id`, `catalog_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '词根元数据表';
 
 CREATE TABLE IF NOT EXISTS `unit_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `unit_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'unit id',
     `unit_code` VARCHAR(64) NOT NULL COMMENT 'unit code, e.g., CURRENCY, RATIO, COUNT',
     `unit_name` VARCHAR(128) NOT NULL COMMENT 'unit name, e.g., 人民币, 百分比, 个数',
@@ -472,12 +503,13 @@ CREATE TABLE IF NOT EXISTS `unit_meta` (
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'unit audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'unit deleted at',
     PRIMARY KEY (`unit_id`),
-    UNIQUE KEY `uk_sid_ucode_del` (`schema_id`, `unit_code`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`)
+    UNIQUE KEY `uk_sid_ucode_del` (`tenant_id`, `schema_id`, `unit_code`, `deleted_at`),
+    KEY `idx_mid` (`tenant_id`, `metalake_id`),
+    KEY `idx_cid` (`tenant_id`, `catalog_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '单位元数据表';
 
 CREATE TABLE IF NOT EXISTS `value_domain_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `domain_id` BIGINT(20) UNSIGNED NOT NULL COMMENT '值域唯一ID',
     `domain_code` VARCHAR(64) NOT NULL COMMENT '值域编码, e.g., ORDER_STATUS',
     `domain_name` VARCHAR(128) NOT NULL COMMENT '值域名称, e.g., 订单状态值域',
@@ -492,12 +524,13 @@ CREATE TABLE IF NOT EXISTS `value_domain_meta` (
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'deleted at',
     PRIMARY KEY (`domain_id`),
-    UNIQUE KEY `uk_sid_dcode_del` (`schema_id`, `domain_code`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`)
+    UNIQUE KEY `uk_sid_dcode_del` (`tenant_id`, `schema_id`, `domain_code`, `deleted_at`),
+    KEY `idx_mid` (`tenant_id`, `metalake_id`),
+    KEY `idx_cid` (`tenant_id`, `catalog_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '值域元数据表';
 
 CREATE TABLE IF NOT EXISTS `metric_meta` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `metric_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metric id',
     `metric_name` VARCHAR(128) NOT NULL COMMENT 'metric name',
     `metric_code` VARCHAR(256) NOT NULL COMMENT 'metric code',
@@ -513,13 +546,14 @@ CREATE TABLE IF NOT EXISTS `metric_meta` (
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'metric audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'metric deleted at',
     PRIMARY KEY (`metric_id`),
-    UNIQUE KEY `uk_sid_mcode_del` (`schema_id`, `metric_code`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`),
-    KEY `idx_type` (`metric_type`)
+    UNIQUE KEY `uk_sid_mcode_del` (`tenant_id`, `schema_id`, `metric_code`, `deleted_at`),
+    KEY `idx_mid` (`tenant_id`, `metalake_id`),
+    KEY `idx_cid` (`tenant_id`, `catalog_id`),
+    KEY `idx_type` (`tenant_id`, `metric_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '指标元数据主表';
 
 CREATE TABLE IF NOT EXISTS `metric_version_info` (
+    `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
@@ -541,10 +575,10 @@ CREATE TABLE IF NOT EXISTS `metric_version_info` (
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'version audit info in JSON format',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_mid_ver_del` (`metric_id`, `version`, `deleted_at`),
-    KEY `idx_metric_id` (`metric_id`),
-    KEY `idx_metalake` (`metalake_id`),
-    KEY `idx_catalog` (`catalog_id`),
-    KEY `idx_schema` (`schema_id`),
-    KEY `idx_ref_table` (`ref_table_id`)
+    UNIQUE KEY `uk_mid_ver_del` (`tenant_id`, `metric_id`, `version`, `deleted_at`),
+    KEY `idx_metric_id` (`tenant_id`, `metric_id`),
+    KEY `idx_metalake` (`tenant_id`, `metalake_id`),
+    KEY `idx_catalog` (`tenant_id`, `catalog_id`),
+    KEY `idx_schema` (`tenant_id`, `schema_id`),
+    KEY `idx_ref_table` (`tenant_id`, `ref_table_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '指标版本快照表';

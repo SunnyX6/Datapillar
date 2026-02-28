@@ -9,7 +9,7 @@
 #   ./bin/datapillar.sh restart studio-service  # 重启
 #   ./bin/datapillar.sh status studio-service   # 查看状态
 #
-# 支持的服务: studio-service, gateway, auth
+# 支持的服务: studio-service, gateway, auth, openlineage
 #
 
 set -e
@@ -19,12 +19,14 @@ declare -A SERVICE_MAP=(
     ["studio-service"]="com.sunny.datapillar.studio.DatapillarStudioApplication"
     ["gateway"]="com.sunny.datapillar.gateway.DatapillarGatewayApplication"
     ["auth"]="com.sunny.datapillar.auth.DatapillarAuthApplication"
+    ["openlineage"]="com.sunny.datapillar.openlineage.DatapillarOpenLineageApplication"
 )
 
 declare -A SERVICE_PORT=(
     ["studio-service"]="8081"
     ["gateway"]="8080"
     ["auth"]="8082"
+    ["openlineage"]="8083"
 )
 
 # 获取脚本所在目录
@@ -74,6 +76,7 @@ print_usage() {
     echo "  studio-service  - Studio 服务 (端口 8081)"
     echo "  gateway    - API Gateway 服务 (端口 8080)"
     echo "  auth       - Auth 认证服务 (端口 8082)"
+    echo "  openlineage - OpenLineage Sink 服务 (端口 8083)"
     echo ""
     echo "操作:"
     echo "  start      - 后台启动服务"
@@ -86,6 +89,7 @@ print_usage() {
     echo "  $0 start studio-service"
     echo "  $0 stop gateway"
     echo "  $0 status auth"
+    echo "  $0 start openlineage"
 }
 
 # 检查 Java 版本

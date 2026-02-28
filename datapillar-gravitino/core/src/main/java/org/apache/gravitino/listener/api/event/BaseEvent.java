@@ -24,6 +24,8 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.datapillar.context.TenantContext;
+import org.apache.gravitino.datapillar.context.TenantContextHolder;
 
 /**
  * The abstract base class for all events. It encapsulates common information such as the user who
@@ -35,6 +37,9 @@ public abstract class BaseEvent {
   private final String user;
   @Nullable private final NameIdentifier identifier;
   private final long eventTime;
+  @Nullable private final Long tenantId;
+  @Nullable private final String tenantCode;
+  @Nullable private final String tenantName;
 
   /**
    * Constructs an Event instance with the specified user and resource identifier details.
@@ -48,6 +53,16 @@ public abstract class BaseEvent {
     this.user = user;
     this.identifier = identifier;
     this.eventTime = System.currentTimeMillis();
+    TenantContext tenantContext = TenantContextHolder.get();
+    if (tenantContext == null) {
+      this.tenantId = null;
+      this.tenantCode = null;
+      this.tenantName = null;
+    } else {
+      this.tenantId = tenantContext.tenantId();
+      this.tenantCode = tenantContext.tenantCode();
+      this.tenantName = tenantContext.tenantName();
+    }
   }
 
   /**
@@ -80,6 +95,24 @@ public abstract class BaseEvent {
    */
   public long eventTime() {
     return eventTime;
+  }
+
+  /** Returns tenant id snapshot at event creation time. */
+  @Nullable
+  public Long tenantId() {
+    return tenantId;
+  }
+
+  /** Returns tenant code snapshot at event creation time. */
+  @Nullable
+  public String tenantCode() {
+    return tenantCode;
+  }
+
+  /** Returns tenant name snapshot at event creation time. */
+  @Nullable
+  public String tenantName() {
+    return tenantName;
   }
 
   /**

@@ -21,23 +21,6 @@ from pydantic import BaseModel, Field, ValidationError, field_validator, model_v
 from src.shared.config.exceptions import ConfigurationError
 
 
-class OpenLineageQueueRuntimeConfig(BaseModel):
-    max_size: int = Field(ge=100, le=1000000)
-    batch_size: int = Field(ge=1, le=1000)
-    flush_interval_seconds: float = Field(ge=0.1, le=60.0)
-
-
-class OpenLineageNeo4jRuntimeConfig(BaseModel):
-    batch_size: int = Field(ge=1, le=500)
-    max_concurrent: int = Field(ge=1, le=50)
-
-
-class OpenLineageSinkRuntimeConfig(BaseModel):
-    graceful_shutdown_timeout: float = Field(ge=5.0, le=120.0)
-    queue: OpenLineageQueueRuntimeConfig
-    neo4j: OpenLineageNeo4jRuntimeConfig
-
-
 class SQLSummaryRuntimeConfig(BaseModel):
     enabled: bool
     batch_size: int = Field(ge=1)
@@ -187,7 +170,6 @@ class RuntimeConfigContract(BaseModel):
     auth_enabled: bool
     llm: dict[str, Any]
     agent: dict[str, Any]
-    openlineage_sink: OpenLineageSinkRuntimeConfig
     sql_summary: SQLSummaryRuntimeConfig
     knowledge_wiki: KnowledgeWikiRuntimeConfig
     security: SecurityRuntimeConfig
@@ -270,10 +252,6 @@ def get_runtime_config() -> RuntimeConfigContract:
     if _runtime_config_cache is None:
         raise ConfigurationError("运行时配置未初始化，请先完成 Nacos 引导")
     return _runtime_config_cache
-
-
-def get_openlineage_sink_config() -> dict[str, Any]:
-    return get_runtime_config().openlineage_sink.model_dump()
 
 
 def get_sql_summary_config() -> dict[str, Any]:

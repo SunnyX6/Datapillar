@@ -14,8 +14,6 @@ dependencies = [
     "neo4j>=5.17.0",
     # Neo4j官方GraphRAG库
     "neo4j-graphrag>=1.11.0",
-    # OpenLineage（血缘事件标准）
-    "openlineage-python>=1.0.0",
     # MySQL数据库（读取AI模型配置）
     "pymysql>=1.1.0",
     # Redis（Checkpoint & Memory）

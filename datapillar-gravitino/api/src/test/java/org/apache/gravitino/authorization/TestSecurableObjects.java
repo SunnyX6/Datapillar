@@ -167,6 +167,8 @@ public class TestSecurableObjects {
     Privilege createTable = Privileges.CreateTable.allow();
     Privilege selectTable = Privileges.SelectTable.allow();
     Privilege modifyTable = Privileges.ModifyTable.allow();
+    Privilege selectColumn = Privileges.SelectColumn.allow();
+    Privilege modifyColumn = Privileges.ModifyColumn.allow();
     Privilege createFileset = Privileges.CreateFileset.allow();
     Privilege readFileset = Privileges.ReadFileset.allow();
     Privilege writeFileset = Privileges.WriteFileset.allow();
@@ -250,6 +252,26 @@ public class TestSecurableObjects {
     Assertions.assertFalse(modifyTable.canBindTo(MetadataObject.Type.FILESET));
     Assertions.assertFalse(modifyTable.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(modifyTable.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test select column
+    Assertions.assertFalse(selectColumn.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(selectColumn.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(selectColumn.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(selectColumn.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(selectColumn.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(selectColumn.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(selectColumn.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertTrue(selectColumn.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test modify column
+    Assertions.assertFalse(modifyColumn.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(modifyColumn.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(modifyColumn.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(modifyColumn.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(modifyColumn.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(modifyColumn.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(modifyColumn.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertTrue(modifyColumn.canBindTo(MetadataObject.Type.COLUMN));
 
     // Test create topic
     Assertions.assertTrue(createTopic.canBindTo(MetadataObject.Type.METALAKE));

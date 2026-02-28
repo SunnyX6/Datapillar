@@ -40,11 +40,19 @@ gravitino.server.webserver.requestHeaderSize = 131072
 # The response header size of the built-in web server
 gravitino.server.webserver.responseHeaderSize = 131072
 
+# Datapillar gateway assertion bridge filter
+gravitino.server.webserver.customFilters = org.apache.gravitino.datapillar.security.GatewayAssertionBridgeFilter
+gravitino.server.webserver.org.apache.gravitino.datapillar.security.GatewayAssertionBridgeFilter.param.issuer = datapillar-auth
+gravitino.server.webserver.org.apache.gravitino.datapillar.security.GatewayAssertionBridgeFilter.param.audience = datapillar-gravitino
+gravitino.server.webserver.org.apache.gravitino.datapillar.security.GatewayAssertionBridgeFilter.param.publicKeyPath = conf/security/gateway-assertion-dev-public.pem
+gravitino.server.webserver.org.apache.gravitino.datapillar.security.GatewayAssertionBridgeFilter.param.clockSkewSeconds = 30
+gravitino.server.webserver.org.apache.gravitino.datapillar.security.GatewayAssertionBridgeFilter.param.assertionHeader = X-Gateway-Assertion
+
 # THE CONFIGURATION FOR Gravitino ENTITY STORE
 # The entity store to use, we only supports relational
 gravitino.entity.store = relational
 # The backend for the entity store, we only supports JDBC
-gravitino.entity.store.relational = JDBCBackend
+gravitino.entity.store.relational = DatapillarJDBCBackend
 
 # The JDBC URL for the entity store (using MySQL)
 gravitino.entity.store.relational.jdbcUrl = jdbc:mysql://localhost:3306/gravitino?useSSL=false&serverTimezone=UTC&characterEncoding=utf8
@@ -72,11 +80,13 @@ gravitino.cache.enableStats = false
 # If enabled, cache entries are evicted based on their weight rather than count.
 gravitino.cache.enableWeigher = true
 # The cache implementation to use (e.g., caffeine).
-gravitino.cache.implementation = caffeine
+gravitino.cache.implementation = org.apache.gravitino.datapillar.cache.TenantScopedEntityCache
 
 # THE CONFIGURATION FOR authorization
 # Whether Gravitino enable authorization or not
 gravitino.authorization.enable = false
+# The metadata authorization implementation
+gravitino.authorization.impl = org.apache.gravitino.datapillar.authorization.TenantAwareAuthorizer
 # The admins of Gravitino service, multiple admins are spitted by comma.
 gravitino.authorization.serviceAdmins = anonymous
 
@@ -112,8 +122,8 @@ gravitino.openlineage.transport.type = http
 gravitino.openlineage.namespace = gravitino
 
 # HTTP Transport Settings
-gravitino.openlineage.transport.url = http://127.0.0.1:7003
-gravitino.openlineage.transport.endpoint = /api/ai/openlineage
+gravitino.openlineage.transport.url = http://127.0.0.1:7000
+gravitino.openlineage.transport.endpoint = /api/openlineage
 gravitino.openlineage.transport.timeoutInMillis = 5000
 gravitino.openlineage.transport.compression = gzip
 

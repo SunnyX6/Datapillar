@@ -45,6 +45,7 @@ class AuthAssertionSignerTest {
                 1L,
                 10L,
                 "tenant-acme",
+                "Tenant Acme",
                 "sunny",
                 "sunny@datapillar.test",
                 List.of("ADMIN"),
@@ -66,6 +67,7 @@ class AuthAssertionSignerTest {
         assertTrue(EdDsaJwtSupport.hasAudience(claims, "datapillar-studio-service"));
         assertEquals(10L, ((Number) claims.get(GatewayAssertionClaims.TENANT_ID)).longValue());
         assertEquals("tenant-acme", claims.get(GatewayAssertionClaims.TENANT_CODE, String.class));
+        assertEquals("Tenant Acme", claims.get(GatewayAssertionClaims.TENANT_NAME, String.class));
         assertEquals("POST", claims.get(GatewayAssertionClaims.METHOD, String.class));
         assertEquals("/api/studio/projects", claims.get(GatewayAssertionClaims.PATH, String.class));
         assertFalse(claims.getId().isBlank());

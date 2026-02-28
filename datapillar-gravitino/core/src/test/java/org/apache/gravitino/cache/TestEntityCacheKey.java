@@ -22,6 +22,8 @@ package org.apache.gravitino.cache;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.datapillar.context.TenantContext;
+import org.apache.gravitino.datapillar.context.TenantContextHolder;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -35,7 +37,7 @@ public class TestEntityCacheKey {
     EntityCacheRelationKey key =
         EntityCacheRelationKey.of(
             ident, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_GROUP_REL);
-    Assertions.assertEquals("metalake.system.role.role1:ROLE:ROLE_GROUP_REL", key.toString());
+    Assertions.assertEquals("t0:metalake.system.role.role1:ROLE:ROLE_GROUP_REL", key.toString());
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "system", "role", "role1"), key.identifier());
     Assertions.assertEquals(Entity.EntityType.ROLE, key.entityType());
@@ -43,7 +45,7 @@ public class TestEntityCacheKey {
 
     // test Store Entity
     EntityCacheRelationKey key2 = EntityCacheRelationKey.of(ident, Entity.EntityType.ROLE, null);
-    Assertions.assertEquals("metalake.system.role.role1:ROLE", key2.toString());
+    Assertions.assertEquals("t0:metalake.system.role.role1:ROLE", key2.toString());
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "system", "role", "role1"), key2.identifier());
     Assertions.assertEquals(Entity.EntityType.ROLE, key2.entityType());
@@ -140,7 +142,7 @@ public class TestEntityCacheKey {
 
     EntityCacheRelationKey key = EntityCacheRelationKey.of(ident, type);
 
-    Assertions.assertEquals("metalake.system.user.user1:USER", key.toString());
+    Assertions.assertEquals("t0:metalake.system.user.user1:USER", key.toString());
   }
 
   @Test
@@ -151,6 +153,24 @@ public class TestEntityCacheKey {
 
     EntityCacheRelationKey key = EntityCacheRelationKey.of(ident, type, relationType);
 
-    Assertions.assertEquals("metalake.system.user.user1:USER:ROLE_USER_REL", key.toString());
+    Assertions.assertEquals("t0:metalake.system.user.user1:USER:ROLE_USER_REL", key.toString());
+  }
+
+  @Test
+  public void testTenantAwareKeyIsolation() {
+    NameIdentifier ident = NameIdentifierUtil.ofUser("metalake", "user1");
+
+    TenantContextHolder.set(
+        TenantContext.builder().withTenantId(1L).withTenantCode("t1").withTenantName("T1").build());
+    EntityCacheRelationKey tenantOneKey = EntityCacheRelationKey.of(ident, Entity.EntityType.USER);
+
+    TenantContextHolder.set(
+        TenantContext.builder().withTenantId(2L).withTenantCode("t2").withTenantName("T2").build());
+    EntityCacheRelationKey tenantTwoKey = EntityCacheRelationKey.of(ident, Entity.EntityType.USER);
+    TenantContextHolder.remove();
+
+    Assertions.assertNotEquals(tenantOneKey, tenantTwoKey);
+    Assertions.assertEquals("t1:metalake.system.user.user1:USER", tenantOneKey.toString());
+    Assertions.assertEquals("t2:metalake.system.user.user1:USER", tenantTwoKey.toString());
   }
 }

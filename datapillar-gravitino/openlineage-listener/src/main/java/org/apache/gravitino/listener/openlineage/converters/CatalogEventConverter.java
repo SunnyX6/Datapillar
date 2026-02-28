@@ -89,7 +89,7 @@ public class CatalogEventConverter extends BaseEventConverter {
     CatalogInfo catalogInfo = event.updatedCatalogInfo();
 
     GravitinoDatasetFacet.GravitinoDatasetFacetBuilder facetBuilder =
-        GravitinoDatasetFacet.builder(producerUri)
+        tenantFacetBuilder(event)
             .description(catalogInfo.comment())
             .properties(catalogInfo.properties());
 
