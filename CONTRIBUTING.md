@@ -1,27 +1,29 @@
 # Contributing to Datapillar
 
-感谢你愿意参与 Datapillar。
+English | [简体中文](./CONTRIBUTING.zh-CN.md)
+
+Thanks for contributing to Datapillar.
 
 ## Ground Rules
 
-- 仅提交可编译、可运行、可验证的改动。
-- 文档、端口、脚本行为必须与代码保持一致。
-- 不要在一个 PR 里混入无关改动。
+- Only submit changes that are compilable, runnable, and verifiable.
+- Keep docs, ports, and script behavior consistent with actual code.
+- Do not mix unrelated changes in one pull request.
 
 ## Development Setup
 
 - Java: `21+`
 - Maven: `3.9+`
-- Python: `3.11+`（`uv`）
+- Python: `3.11+` with `uv`
 - Node.js: `20+`
 
-本地一键调试：
+Start local full-stack debug:
 
 ```bash
 ./scripts/start-local-all.sh
 ```
 
-停止服务：
+Stop services:
 
 ```bash
 ./scripts/stop-local-all.sh
@@ -29,22 +31,22 @@
 
 ## Validation Before PR
 
-请至少覆盖你改动涉及的检查：
+Run checks for affected modules at minimum:
 
-- Java 模块改动：
+- Java modules:
 
 ```bash
 mvn -q -pl datapillar-common,datapillar-auth,datapillar-studio-service,datapillar-api-gateway,datapillar-openlineage -am -DskipTests test-compile
 ```
 
-- AI 模块改动：
+- AI module:
 
 ```bash
 cd datapillar-ai
 uv run pytest -q
 ```
 
-- 脚本改动：
+- Local scripts:
 
 ```bash
 bash -n scripts/start-local-all.sh
@@ -53,11 +55,11 @@ bash -n scripts/stop-local-all.sh
 
 ## Pull Request Rules
 
-- 标题直接说明改动范围和目标。
-- 描述中必须包含：问题背景、方案说明、影响范围、验证方式（命令和结果）。
-- 涉及接口、端口、配置或 README 变更时，必须同步文档。
+- Use a title that states scope and purpose directly.
+- PR description must include: background, solution, impact scope, and verification commands/results.
+- If APIs, ports, configs, or README are changed, update related docs in the same PR.
 
 ## Issue Rules
 
-- Bug 请提供复现步骤、期望结果、实际结果、日志或截图。
-- Feature 请先说明业务问题，再说明方案和边界条件。
+- For bugs, provide reproduction steps, expected result, actual result, and logs/screenshots.
+- For features, describe business problem first, then proposal and boundaries.

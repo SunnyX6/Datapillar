@@ -16,6 +16,7 @@
   <img src="https://img.shields.io/badge/ZERO--ETL_ORCHESTRATION-111827?style=for-the-badge&logoColor=white" alt="Zero-ETL Orchestration" />
   <img src="https://img.shields.io/badge/AI_ANALYTICS-111827?style=for-the-badge&logoColor=white" alt="AI Analytics" />
   <img src="https://img.shields.io/github/actions/workflow/status/SunnyX6/Datapillar/ci.yml?branch=main&style=for-the-badge&label=CI" alt="CI" />
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/SunnyX6/Datapillar?style=for-the-badge&label=LICENSE" alt="License" /></a>
 </p>
 
 <p align="center">
@@ -164,6 +165,10 @@ Frontend default URL:
 ## Contributing
 
 Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening issues or pull requests.
+
+## License
+
+Licensed under the [Apache License 2.0](./LICENSE).
 
 ## Upstream References
 
