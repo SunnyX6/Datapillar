@@ -1,0 +1,45 @@
+name: Bug Report
+description: Report a reproducible defect in Datapillar.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请尽量提供可复现信息，避免“无法定位”的描述。
+  - type: input
+    id: module
+    attributes:
+      label: Affected Module
+      description: e.g. datapillar-auth / datapillar-openlineage / web/datapillar-studio
+      placeholder: datapillar-openlineage
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction Steps
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screenshots
+      description: Paste key logs (for local debug, prefer /tmp/datapillar-logs/*.startup.log)

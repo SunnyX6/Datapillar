@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate local scripts syntax
+        run: |
+          bash -n scripts/start-local-all.sh
+          bash -n scripts/stop-local-all.sh
+
+      - name: Python syntax smoke check (datapillar-ai)
+        run: python -m compileall -q datapillar-ai/src
+
+      - name: Maven test-compile (core modules)
+        run: |
+          mvn -q \
+            -pl datapillar-common,datapillar-auth,datapillar-studio-service,datapillar-api-gateway,datapillar-openlineage \
+            -am \
+            -DskipTests \
+            test-compile
