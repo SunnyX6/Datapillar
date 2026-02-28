@@ -16,11 +16,26 @@
   <img src="https://img.shields.io/badge/METADATA_GOVERNANCE-111827?style=for-the-badge&logoColor=white" alt="Metadata Governance" />
   <img src="https://img.shields.io/badge/ZERO--ETL_ORCHESTRATION-111827?style=for-the-badge&logoColor=white" alt="Zero-ETL Orchestration" />
   <img src="https://img.shields.io/badge/AI_ANALYTICS-111827?style=for-the-badge&logoColor=white" alt="AI Analytics" />
+  <img src="https://img.shields.io/github/actions/workflow/status/SunnyX6/Datapillar/ci.yml?branch=main&style=for-the-badge&label=CI" alt="CI" />
 </p>
 
 <p align="center">
   <img src="docs/assets/demo-zh.gif" alt="Datapillar Demo" width="980" />
 </p>
+
+## Datapillar 解决什么问题
+
+- 在一个平台内完成“数据治理 + AI 驱动”的数据开发流程。
+- 让元数据、血缘图谱、语义资产在多服务之间保持一致。
+- 以本地调试优先的方式支撑多模块快速迭代。
+
+## 核心能力
+
+- 基于 Datapillar Gravitino（Apache Gravitino 二开）的元数据治理能力。
+- 面向 SQL 的 Agentic ETL 与工作流执行能力。
+- OpenLineage 事件接入、异步处理与图谱持久化能力。
+- 面向 RAG 的向量检索、SQL 摘要与嵌入处理能力。
+- 一键启动多服务的本地全链路调试能力。
 
 ## 技术栈
 
@@ -47,8 +62,6 @@
 - Vitest、Playwright、ESLint、Stylelint、Prettier
 
 ## 技术架构
-
-> 架构图如下（来源：`docs/assets4/architecture.png`）
 
 ![Datapillar 技术架构图](docs/assets4/architecture.png)
 
@@ -91,6 +104,7 @@
 - `datapillar-studio-service`（7002）
 - `datapillar-api-gateway`（7000）
 - `datapillar-ai`（7003）
+- `datapillar-openlineage`（7004）
 
 日志目录：
 
@@ -131,6 +145,26 @@ npm run dev
 ├── datapillar-gravitino/       # Gravitino 元数据能力扩展
 └── web/datapillar-studio/      # 前端应用（React + Vite）
 ```
+
+## 模块职责
+
+- `datapillar-api-gateway`：统一入口、路由转发、断言透传与流量控制。
+- `datapillar-auth`：认证鉴权、租户身份管理与安全断言签发。
+- `datapillar-studio-service`：核心业务域（租户/工作流/邀请等）。
+- `datapillar-ai`：AI 编排、模型配置访问与 RAG/Agent 运行时。
+- `datapillar-openlineage`：OpenLineage 事件接入、异步分发与存储写入。
+- `datapillar-gravitino`：Datapillar 元数据治理与租户隔离扩展能力。
+
+## 常见问题（本地调试）
+
+- 端口冲突（`7000`~`7004`）：先执行 `./scripts/stop-local-all.sh` 再重启。
+- Nacos 同步/鉴权失败：检查 `scripts/start-local-all.sh` 中 Nacos 相关环境变量。
+- 编译或启动失败：查看 `/tmp/datapillar-logs/*.startup.log`。
+- 前端异常：确认网关 `http://localhost:7000` 与前端 `http://localhost:3001` 可访问。
+
+## 参与贡献
+
+提交 Issue 或 PR 前，请先阅读 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
 ## 参考项目
 

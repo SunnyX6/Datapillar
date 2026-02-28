@@ -15,11 +15,26 @@
   <img src="https://img.shields.io/badge/METADATA_GOVERNANCE-111827?style=for-the-badge&logoColor=white" alt="Metadata Governance" />
   <img src="https://img.shields.io/badge/ZERO--ETL_ORCHESTRATION-111827?style=for-the-badge&logoColor=white" alt="Zero-ETL Orchestration" />
   <img src="https://img.shields.io/badge/AI_ANALYTICS-111827?style=for-the-badge&logoColor=white" alt="AI Analytics" />
+  <img src="https://img.shields.io/github/actions/workflow/status/SunnyX6/Datapillar/ci.yml?branch=main&style=for-the-badge&label=CI" alt="CI" />
 </p>
 
 <p align="center">
   <img src="docs/assets/demo-en.gif" alt="Datapillar Demo" width="980" />
 </p>
+
+## What Datapillar Solves
+
+- Build data development workflows with governance and AI in one platform.
+- Keep metadata, lineage graph, and semantic assets synchronized across services.
+- Provide a local-debug-first workflow for rapid iteration on multi-service changes.
+
+## Core Capabilities
+
+- Metadata governance based on Datapillar Gravitino (customized from Apache Gravitino).
+- Agentic ETL and workflow execution with SQL-centric development.
+- OpenLineage ingestion and graph persistence for lineage/knowledge analysis.
+- RAG-ready AI service with vector retrieval and SQL summary/embedding processing.
+- Multi-service local startup script for full-stack debugging.
 
 ## Tech Stack
 
@@ -46,8 +61,6 @@
 - Vitest, Playwright, ESLint, Stylelint, Prettier
 
 ## Technical Architecture
-
-> Architecture diagram (`docs/assets4/architecture.png`)
 
 ![Datapillar Technical Architecture](docs/assets4/architecture.png)
 
@@ -90,6 +103,7 @@ This script compiles and starts:
 - `datapillar-studio-service` (7002)
 - `datapillar-api-gateway` (7000)
 - `datapillar-ai` (7003)
+- `datapillar-openlineage` (7004)
 
 Log directory:
 
@@ -130,6 +144,26 @@ Frontend default URL:
 ├── datapillar-gravitino/       # Gravitino metadata extensions
 └── web/datapillar-studio/      # Frontend app (React + Vite)
 ```
+
+## Module Responsibilities
+
+- `datapillar-api-gateway`: API ingress, routing, assertion relay, and traffic control.
+- `datapillar-auth`: Authentication, tenant identity, and security assertion issuing.
+- `datapillar-studio-service`: Core business domain (tenant/workflow/invitation and studio APIs).
+- `datapillar-ai`: AI-side orchestration, model config access, and RAG/agent runtime.
+- `datapillar-openlineage`: OpenLineage event ingest, async task dispatch, and storage write.
+- `datapillar-gravitino`: Datapillar-specific metadata governance and tenant-scoped extensions.
+
+## Troubleshooting (Local Debug)
+
+- Port conflict (`7000`~`7004`): run `./scripts/stop-local-all.sh`, then retry startup.
+- Nacos sync/auth issues: verify `NACOS_SERVER_ADDR`, `NACOS_NAMESPACE`, `NACOS_USERNAME`, `NACOS_PASSWORD` in `scripts/start-local-all.sh`.
+- Build/start failure: inspect `/tmp/datapillar-logs/*.startup.log`.
+- Service reachable but frontend errors: verify gateway at `http://localhost:7000` and frontend at `http://localhost:3001`.
+
+## Contributing
+
+Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening issues or pull requests.
 
 ## Upstream References
 

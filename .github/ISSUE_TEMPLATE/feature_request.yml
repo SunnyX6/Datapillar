@@ -1,0 +1,35 @@
+name: Feature Request
+description: Propose an improvement with clear scope and expected impact.
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先说问题，再说方案。避免只给“想法标题”。
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What concrete problem are you solving?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Include data flow, module impact, and API/config changes if any.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Optional
+      placeholder: Why this approach over alternatives?
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact and Risks
+      description: Mention performance, compatibility, migration, or ops impact.
