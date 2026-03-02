@@ -1,7 +1,7 @@
 # @author Sunny
 # @date 2026-01-28
 
-"""RAG 知识 Wiki API。"""
+"""RAG knowledge Wiki API."""
 
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ async def update_namespace(request: Request, namespace_id: int, payload: Namespa
     current_user = request.state.current_user
     fields = {key: value for key, value in payload.model_dump().items() if value is not None}
     if not fields:
-        raise BadRequestException("没有可更新字段")
+        raise BadRequestException("No fields to update")
 
     updated = _get_service().update_namespace(
         current_user.tenant_id,
@@ -79,7 +79,7 @@ async def update_namespace(request: Request, namespace_id: int, payload: Namespa
         fields,
     )
     if updated == 0:
-        raise NotFoundException("namespace 不存在")
+        raise NotFoundException("namespace does not exist")
 
     return ApiResponse.success(data={"updated": updated})
 
@@ -93,7 +93,7 @@ async def delete_namespace(request: Request, namespace_id: int):
         namespace_id,
     )
     if deleted == 0:
-        raise NotFoundException("namespace 不存在")
+        raise NotFoundException("namespace does not exist")
     return ApiResponse.success(data={"deleted": deleted})
 
 
@@ -125,15 +125,15 @@ async def upload_document(
     request: Request,
     namespace_id: int,
     file: Annotated[UploadFile, File(...)],
-    title: Annotated[str | None, Form(default=None)] = None,
+    title: Annotated[str | None, Form()] = None,
 ):
     current_user = request.state.current_user
     if not file:
-        raise BadRequestException("file 不能为空")
+        raise BadRequestException("file cannot be empty")
 
     content = await file.read()
     if not content:
-        raise BadRequestException("上传文件为空")
+        raise BadRequestException("The uploaded file is empty")
 
     result = await _get_service().upload_document(
         tenant_id=current_user.tenant_id,
@@ -151,7 +151,7 @@ async def get_document(request: Request, document_id: int):
     current_user = request.state.current_user
     doc = _get_service().get_document(current_user.tenant_id, current_user.user_id, document_id)
     if not doc:
-        raise NotFoundException("document 不存在")
+        raise NotFoundException("document does not exist")
     return ApiResponse.success(data=doc)
 
 
@@ -160,7 +160,7 @@ async def update_document(request: Request, document_id: int, payload: DocumentU
     current_user = request.state.current_user
     fields = {key: value for key, value in payload.model_dump().items() if value is not None}
     if not fields:
-        raise BadRequestException("没有可更新字段")
+        raise BadRequestException("No fields to update")
 
     updated = _get_service().update_document(
         current_user.tenant_id,
@@ -169,7 +169,7 @@ async def update_document(request: Request, document_id: int, payload: DocumentU
         fields,
     )
     if updated == 0:
-        raise NotFoundException("document 不存在")
+        raise NotFoundException("document does not exist")
 
     return ApiResponse.success(data={"updated": updated})
 
@@ -217,7 +217,7 @@ async def get_job(request: Request, job_id: int):
     current_user = request.state.current_user
     job = _get_service().get_job(current_user.tenant_id, current_user.user_id, job_id)
     if not job:
-        raise NotFoundException("job 不存在")
+        raise NotFoundException("job does not exist")
     return ApiResponse.success(data=job)
 
 
@@ -226,7 +226,7 @@ async def job_sse(request: Request, job_id: int):
     current_user = request.state.current_user
     job = _get_service().get_job(current_user.tenant_id, current_user.user_id, job_id)
     if not job:
-        raise NotFoundException("job 不存在")
+        raise NotFoundException("job does not exist")
 
     last_event_id = request.headers.get("Last-Event-ID")
     last_event_id_int: int | None = None

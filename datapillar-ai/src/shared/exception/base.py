@@ -1,7 +1,7 @@
 # @author Sunny
 # @date 2026-02-20
 
-"""AI 服务异常基类。"""
+"""AI Service exception base class."""
 
 from __future__ import annotations
 
@@ -9,11 +9,11 @@ from typing import Any
 
 from src.shared.web.code import Code
 
-_DEFAULT_INTERNAL_MESSAGE = "服务器内部错误"
+_DEFAULT_INTERNAL_MESSAGE = "Server internal error"
 
 
 class DatapillarException(Exception):
-    """统一业务异常基类。"""
+    """Unified business exception base class."""
 
     default_code: int = Code.INTERNAL_ERROR
     default_type: str = "INTERNAL_ERROR"
@@ -41,12 +41,15 @@ class DatapillarException(Exception):
         super().__init__(resolved)
 
 
-def _resolve_message(message: str, cause: Exception | None) -> str:
+def _resolve_message(message:str,cause:Exception | None) -> str:
     normalized = message.strip() if isinstance(message, str) else ""
     if normalized:
         return normalized
+
+    cause_message = ""
     if cause is not None:
         cause_message = str(cause).strip()
-        if cause_message:
-            return cause_message
+    if cause_message:
+        return cause_message
+
     return _DEFAULT_INTERNAL_MESSAGE
