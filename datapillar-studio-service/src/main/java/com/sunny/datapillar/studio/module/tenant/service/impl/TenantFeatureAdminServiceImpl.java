@@ -21,8 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 租户功能管理服务实现
- * 实现租户功能管理业务流程与规则校验
+ * Tenant function management service implementation Implement tenant function management business
+ * processes and rule verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -31,15 +31,15 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class TenantFeatureAdminServiceImpl implements TenantFeatureAdminService {
 
-    private final FeatureEntitlementService featureEntitlementService;
+  private final FeatureEntitlementService featureEntitlementService;
 
-    @Override
-    public List<TenantFeatureItem> listEntitlements() {
-        return featureEntitlementService.listEntitlements();
-    }
+  @Override
+  public List<TenantFeatureItem> listEntitlements() {
+    return featureEntitlementService.listEntitlements();
+  }
 
-    @Override
-    public void updateEntitlements(List<TenantFeatureUpdateItem> items) {
-        featureEntitlementService.updateEntitlements(items);
-    }
+  @Override
+  public void updateEntitlements(List<TenantFeatureUpdateItem> items) {
+    featureEntitlementService.updateEntitlements(items);
+  }
 }

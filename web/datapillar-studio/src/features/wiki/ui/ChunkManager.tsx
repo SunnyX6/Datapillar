@@ -175,7 +175,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
           return
         }
         const message = error instanceof Error ? error.message : String(error)
-        toast.error(`加载切片失败：${message}`)
+        toast.error(`Failed to load slices：${message}`)
         setChunks([])
       })
       .finally(() => {
@@ -233,22 +233,22 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
 
   const handleApplyConfig = async () => {
     if (!activeDocId) {
-      toast.warning('请先选择文档')
+      toast.warning('Please select a document first')
       return
     }
     const documentId = Number(activeDocId)
     if (!Number.isFinite(documentId)) {
-      toast.error('文档 ID 无效')
+      toast.error('Documentation ID Invalid')
       return
     }
     try {
       setIsChunking(true)
       await startChunkJob(documentId, buildChunkConfigPayload())
-      toast.success('切分任务已提交')
+      toast.success('The segmentation task has been submitted')
       setShowConfig(false)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      toast.error(`切分失败：${message}`)
+      toast.error(`Splitting failed：${message}`)
     } finally {
       setIsChunking(false)
     }
@@ -258,7 +258,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
     if (!activeChunk) return
     const nextContent = editContent.trim()
     if (!nextContent) {
-      toast.warning('切片内容不能为空')
+      toast.warning('Slice content cannot be empty')
       return
     }
     if (nextContent === activeChunk.content) return
@@ -274,10 +274,10 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
       )
       const key = `${activeChunk.docId}:${activeChunk.id}`
       setEditContentByChunkId((prev) => ({ ...prev, [key]: nextContent }))
-      toast.success('切片已更新')
+      toast.success('slice updated')
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      toast.error(`更新失败：${message}`)
+      toast.error(`Update failed：${message}`)
     } finally {
       setIsSaving(false)
     }
@@ -302,10 +302,10 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
         setChunks((prev) => prev.filter((chunk) => chunk.id !== activeChunk.id))
         setSelectedChunkId(null)
       }
-      toast.success('切片已移除')
+      toast.success('Slice removed')
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      toast.error(`移除失败：${message}`)
+      toast.error(`Removal failed：${message}`)
     } finally {
       setIsDeleting(false)
     }
@@ -333,7 +333,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
               <span className="flex items-center gap-1.5 min-w-0">
                 <FileText size={16} className="text-indigo-600 shrink-0" />
                 <span className={`min-w-0 truncate ${currentDoc ? '' : `${TYPOGRAPHY.caption} text-slate-400`}`}>
-                  {currentDoc?.title || '暂无文档'}
+                  {currentDoc?.title || 'No document yet'}
                 </span>
                 <ChevronDown size={14} className="text-slate-400 shrink-0" />
               </span>
@@ -341,7 +341,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
 
             <div className={`absolute top-full left-0 mt-2 ${menuWidthClassMap.wide} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all z-50`}>
               <div className="p-2">
-                <div className={`${TYPOGRAPHY.micro} text-slate-400 px-2 py-1 uppercase font-bold tracking-wider`}>切换文档</div>
+                <div className={`${TYPOGRAPHY.micro} text-slate-400 px-2 py-1 uppercase font-bold tracking-wider`}>Switch documents</div>
                 {availableDocs.length > 0 ? (
                   availableDocs.map((doc) => (
                     <div
@@ -354,7 +354,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                     </div>
                   ))
                 ) : (
-                  <div className={`px-3 py-2 ${TYPOGRAPHY.caption} text-slate-400`}>当前空间暂无文档</div>
+                  <div className={`px-3 py-2 ${TYPOGRAPHY.caption} text-slate-400`}>There are no documents in the current space.</div>
                 )}
               </div>
             </div>
@@ -381,7 +381,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
             <Settings size={16} className={`mr-3 ${showConfig ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'}`} />
 
             <div className="flex items-center mr-3">
-              <span className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase tracking-wider mr-2`}>切分策略:</span>
+              <span className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase tracking-wider mr-2`}>sharding strategy:</span>
               <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded px-2 py-1">
                 <span className={`${TYPOGRAPHY.caption} font-bold text-indigo-700 dark:text-indigo-200 mr-2`}>{getModeLabel(config.mode)}</span>
                 <span className="text-slate-300 border-l border-slate-300 dark:border-slate-600 h-3 mx-2"></span>
@@ -397,7 +397,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
               <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/40 rounded-t-xl">
                 <div className={`flex items-center space-x-2 ${TYPOGRAPHY.caption} text-slate-800 dark:text-slate-100 font-semibold`}>
                   <Sliders size={16} />
-                  <span>切分参数配置</span>
+                  <span>Segmentation parameter configuration</span>
                 </div>
                 <button onClick={() => setShowConfig(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                   <X size={16} />
@@ -589,7 +589,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
 
               <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-800 rounded-b-xl flex justify-between items-center">
                 <div className={`${TYPOGRAPHY.micro} text-slate-500`}>
-                  预计生成: <span className="font-bold text-slate-900 dark:text-slate-100">~{estimatedChunks} chunks</span>
+                  expected to generate: <span className="font-bold text-slate-900 dark:text-slate-100">~{estimatedChunks} chunks</span>
                 </div>
                 <Button
                   onClick={handleApplyConfig}
@@ -598,7 +598,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                   className={`${TYPOGRAPHY.caption} font-bold`}
                   disabled={isChunking || !activeDocId}
                 >
-                  应用配置并重新切分
+                  Apply configuration and re-shard
                 </Button>
               </div>
             </div>
@@ -613,16 +613,16 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
               <Search className="absolute left-2.5 top-2.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={14} />
               <input
                 type="text"
-                placeholder="搜索切片..."
+                placeholder="Search slices..."
                 className={`w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg ${TYPOGRAPHY.bodySm} focus:outline-none focus:border-indigo-400 focus:bg-white dark:focus:bg-slate-900 transition-all placeholder-slate-400`}
               />
             </div>
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar rounded-bl-xl">
             {isChunkLoading ? (
-              <div className={`px-3 py-6 text-center ${TYPOGRAPHY.caption} text-slate-400`}>加载切片中...</div>
+              <div className={`px-3 py-6 text-center ${TYPOGRAPHY.caption} text-slate-400`}>Loading slices...</div>
             ) : chunks.length === 0 ? (
-              <div className={`px-3 py-6 text-center ${TYPOGRAPHY.caption} text-slate-400`}>暂无切片</div>
+              <div className={`px-3 py-6 text-center ${TYPOGRAPHY.caption} text-slate-400`}>No slices yet</div>
             ) : (
               chunks.map((chunk, idx) => (
                 <div
@@ -652,7 +652,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
               <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center shadow-sm z-10">
                 <div>
                   <h2 className={`${TYPOGRAPHY.bodySm} font-bold text-slate-900 dark:text-slate-100 flex items-center`}>
-                    切片内容详情
+                    Slice content details
                     <span className={`ml-2 px-2 py-0.5 bg-slate-100 dark:bg-slate-800 ${TYPOGRAPHY.micro} text-slate-500 rounded-full font-normal`}>ID: {activeChunk.id}</span>
                   </h2>
                 </div>
@@ -662,14 +662,14 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                     disabled={isDeleting || !activeChunk}
                     className={`flex items-center px-3 py-1.5 ${TYPOGRAPHY.caption} font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors ${isDeleting ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
-                    <Trash2 size={14} className="mr-1.5" /> 移除
+                    <Trash2 size={14} className="mr-1.5" /> Remove
                   </button>
                   <button
                     onClick={handleResetChunk}
                     disabled={!activeChunk}
                     className={`flex items-center px-3 py-1.5 ${TYPOGRAPHY.caption} font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-200 hover:bg-indigo-100 border border-indigo-100 dark:border-indigo-500/30 rounded-lg transition-colors ${!activeChunk ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
-                    <RefreshCcw size={14} className="mr-1.5" /> 重置
+                    <RefreshCcw size={14} className="mr-1.5" /> reset
                   </button>
                 </div>
               </div>
@@ -715,7 +715,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                     <h4 className={`${TYPOGRAPHY.legal} font-bold text-slate-400 uppercase tracking-wider mb-3`}>Embedding Status</h4>
                     <div className="flex flex-col space-y-2">
                       <div className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400`}>
-                        Model: <span className="text-slate-500 dark:text-slate-300 font-mono font-medium">未配置</span>
+                        Model: <span className="text-slate-500 dark:text-slate-300 font-mono font-medium">Not configured</span>
                       </div>
                       <div className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400`}>
                         Vector ID: <span className="font-mono text-slate-400">-</span>
@@ -737,7 +737,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
               <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center rounded-br-xl">
                 <div className={`flex items-center ${TYPOGRAPHY.caption} text-slate-400`}>
                   <Info size={12} className="mr-1.5" />
-                  <span>手动修改内容会触发向量重新计算</span>
+                  <span>Manual modification of content triggers vector recalculation</span>
                 </div>
                 <Button
                   variant="primary"
@@ -747,7 +747,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                   disabled={isSaving || !activeChunk}
                 >
                   <Save size={14} />
-                  保存并更新索引
+                  Save and update index
                 </Button>
               </div>
             </>
@@ -756,8 +756,8 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
               <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
                 <Edit2 size={24} className="text-slate-300" />
               </div>
-              <p className={`${TYPOGRAPHY.bodySm} font-medium text-slate-500`}>请从左侧列表选择一个切片</p>
-              <p className={`${TYPOGRAPHY.caption} text-slate-400 mt-1`}>您可以查看详情或手动优化内容</p>
+              <p className={`${TYPOGRAPHY.bodySm} font-medium text-slate-500`}>Please select a slice from the list on the left</p>
+              <p className={`${TYPOGRAPHY.caption} text-slate-400 mt-1`}>You can view details or manually optimize content</p>
             </div>
           )}
         </div>

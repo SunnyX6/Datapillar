@@ -24,7 +24,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.gravitino.dto.dataset.UnitDTO;
 
-/** 单位响应 */
+/** unit response */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -33,15 +33,15 @@ public class UnitResponse extends BaseResponse {
   @JsonProperty("unit")
   private UnitDTO unit;
 
-  /** 无参构造函数，用于 Jackson 反序列化 */
+  /** No-argument constructor，used for Jackson Deserialization */
   public UnitResponse() {
     super(0);
   }
 
   /**
-   * 创建 UnitResponse
+   * create UnitResponse
    *
-   * @param unit 单位 DTO
+   * @param unit unit DTO
    */
   public UnitResponse(UnitDTO unit) {
     super(0);

@@ -16,13 +16,13 @@ import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
 
 /**
- * 租户邀请管理服务
- * 提供租户邀请管理业务能力与领域服务
+ * Tenant invitation management service Provide tenant invitation management business capabilities
+ * and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface TenantInvitationAdminService {
 
-    InvitationCreateResponse createInvitation(InvitationCreateRequest dto);
+  InvitationCreateResponse createInvitation(InvitationCreateRequest dto);
 }

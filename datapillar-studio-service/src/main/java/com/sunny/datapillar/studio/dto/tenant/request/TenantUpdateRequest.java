@@ -8,9 +8,9 @@ import lombok.Data;
 @Schema(name = "TenantUpdate")
 public class TenantUpdateRequest {
 
-    @Size(max = 128, message = "租户名称长度不能超过128个字符")
-    private String name;
+  @Size(max = 128, message = "The tenant name cannot be longer than128characters")
+  private String name;
 
-    @Size(max = 32, message = "租户类型长度不能超过32个字符")
-    private String type;
+  @Size(max = 32, message = "The length of the tenant type cannot exceed32characters")
+  private String type;
 }

@@ -55,7 +55,7 @@ public class TestMysqlCatalogCapability {
       Assertions.assertTrue(result.supported());
 
       // names with unicode letters
-      result = capability.specificationOnName(scope, "测试表");
+      result = capability.specificationOnName(scope, "Test table");
       Assertions.assertTrue(result.supported());
 
       result = capability.specificationOnName(scope, "tableção");

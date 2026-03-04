@@ -11,8 +11,8 @@ import type {
 const role: RoleDefinition = {
   id: 'role_dev',
   type: 'USER',
-  name: '研发工程师',
-  description: '用于测试',
+  name: 'R&D Engineer',
+  description: 'for testing',
   permissions: [],
   aiModelPermissions: [
     { aiModelId: 1, access: 'READ' },
@@ -23,11 +23,11 @@ const role: RoleDefinition = {
 
 const user: UserItem = {
   id: 'u-1',
-  name: '测试用户',
+  name: 'test user',
   email: 'test@datapillar.io',
   roleId: 'role_dev',
-  status: '已激活',
-  lastActive: '刚刚',
+  status: 'Activated',
+  lastActive: 'just now',
   aiModelPermissions: [{ aiModelId: 2, access: 'READ' }],
 }
 
@@ -82,7 +82,7 @@ const unmount = (
 }
 
 describe('AiPermission', () => {
-  it('用户模式显示独立权限提示', () => {
+  it('Display independent permission prompt in user mode', () => {
     const onUpdate = vi.fn()
     const { container, root } = render(
       <AiPermission
@@ -94,8 +94,8 @@ describe('AiPermission', () => {
       />,
     )
 
-    expect(container.textContent).toContain('独立权限配置模式')
-    expect(container.textContent).toContain('您正在为该用户单独配置 AI 模型权限')
+    expect(container.textContent).toContain('Independent permission configuration mode')
+    expect(container.textContent).toContain('You are configuring this user individually AI Model permissions')
     expect(
       container.querySelector('[data-testid="ai-access-1-ADMIN"]'),
     ).not.toBeNull()
@@ -103,7 +103,7 @@ describe('AiPermission', () => {
     unmount(root, container)
   })
 
-  it('用户模式点击权限按钮时传递用户维度参数', () => {
+  it('Pass user dimension parameters when clicking the permission button in user mode', () => {
     const onUpdate = vi.fn()
     const { container, root } = render(
       <AiPermission

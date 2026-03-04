@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper.TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.SchemaMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.Param;
@@ -27,11 +28,14 @@ import org.apache.ibatis.annotations.Param;
 public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
   @Override
   public String insertSchemaMetaOnDuplicateKeyUpdate(SchemaPO schemaPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TABLE_NAME
         + "(schema_id, schema_name, metalake_id,"
         + " catalog_id, schema_comment, properties, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{schemaMeta.schemaId},"
         + " #{schemaMeta.schemaName},"
@@ -42,7 +46,9 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " #{schemaMeta.auditInfo},"
         + " #{schemaMeta.currentVersion},"
         + " #{schemaMeta.lastVersion},"
-        + " #{schemaMeta.deletedAt}"
+        + " #{schemaMeta.deletedAt},"
+        + " "
+        + tenantId
         + " )"
         + " ON CONFLICT(schema_id) DO UPDATE SET "
         + " schema_name = #{schemaMeta.schemaName},"
@@ -58,38 +64,53 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
 
   @Override
   public String softDeleteSchemaMetasBySchemaId(Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteSchemaMetasByMetalakeId(Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteSchemaMetasByCatalogId(Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String deleteSchemaMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + TABLE_NAME
         + " WHERE schema_id IN (SELECT schema_id FROM "
         + TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit})"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 }

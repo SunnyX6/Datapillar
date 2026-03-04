@@ -5,8 +5,8 @@ import { mockAuthRoutes } from '../../shared/mockAuth'
 import { mockKnowledgeGraphRoutes } from '../../shared/mockKnowledgeGraph'
 import { collectWebVitals, initWebVitals } from '../../shared/webVitals'
 
-test.describe('数据治理性能', () => {
-  test('知识图谱 Web Vitals', async ({ page }) => {
+test.describe('Data governance performance', () => {
+  test('Knowledge graph Web Vitals', async ({ page }) => {
     const budgets = getPerfBudgets()
 
     await mockAuthRoutes(page)
@@ -15,7 +15,7 @@ test.describe('数据治理性能', () => {
     await initWebVitals(page)
     await page.goto('/governance/knowledge')
 
-    await page.getByText('加载知识图谱数据...').waitFor({ state: 'hidden' })
+    await page.getByText('Load knowledge graph data...').waitFor({ state: 'hidden' })
 
     await expect(page.getByText('Nodes:')).toBeVisible()
 

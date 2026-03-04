@@ -1,4 +1,4 @@
-# Datapillar OpenLineage 生产环境配置
+# Datapillar OpenLineage Production environment configuration
 
 server:
   port: ${SERVER_PORT:8083}
@@ -13,6 +13,8 @@ spring:
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:Sunny.123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: false
 
 openlineage:
   neo4j:

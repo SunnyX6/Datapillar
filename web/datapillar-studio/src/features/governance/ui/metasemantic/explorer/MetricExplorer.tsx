@@ -12,10 +12,10 @@ import { Button, Card, Table, TableBody, TableCell, TableHead, TableHeader, Tabl
 import { ComponentLibrarySidebar } from './ComponentLibrarySidebar'
 import { formatTime } from '@/utils'
 
-/** 每页加载数量 */
+/** Number of loads per page */
 const PAGE_SIZE = 20
 
-/** 指标类型颜色映射 */
+/** Indicator type color mapping */
 const TYPE_VARIANTS: Record<string, 'blue' | 'purple' | 'warning'> = {
   ATOMIC: 'blue',
   DERIVED: 'purple',
@@ -74,7 +74,7 @@ function MetricCard({
       </div>
 
       <p className="text-caption text-slate-500 dark:text-slate-400 line-clamp-2 mb-3 leading-relaxed">
-        {metric.comment || '暂无描述...'}
+        {metric.comment || 'No description yet...'}
       </p>
 
       <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
@@ -91,7 +91,7 @@ function MetricCard({
 	            size="iconSm"
 	            onClick={handleEdit}
 	            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-	            title="编辑"
+	            title="Edit"
 	          >
 	            <Pencil size={iconSizeToken.small} />
 	          </Button>
@@ -102,7 +102,7 @@ function MetricCard({
 	            onClick={handleDelete}
 	            disabled={deleting}
 	            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors disabled:opacity-50"
-	            title="删除"
+	            title="Delete"
 	          >
 	            {deleting ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Trash2 size={iconSizeToken.small} />}
 	          </Button>
@@ -195,7 +195,7 @@ function MetricRow({
 	            size="iconSm"
 	            onClick={handleEdit}
 	            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-	            title="编辑"
+	            title="Edit"
 	          >
 	            <Pencil size={iconSizeToken.small} />
 	          </Button>
@@ -206,7 +206,7 @@ function MetricRow({
 	            onClick={handleDelete}
 	            disabled={deleting}
 	            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors disabled:opacity-50"
-	            title="删除"
+	            title="Delete"
 	          >
 	            {deleting ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Trash2 size={iconSizeToken.small} />}
 	          </Button>
@@ -227,23 +227,23 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
   const searchTerm = useSearchStore((state) => state.searchTerm)
   const setMetricsTotal = useSemanticStatsStore((state) => state.setMetricsTotal)
 
-  // 数据状态
+  // Data status
   const [metrics, setMetrics] = useState<Metric[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  // 新建弹窗状态
+  // Create a new pop-up window state
   const [showNewModal, setShowNewModal] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // 编辑弹窗状态
+  // Edit popup status
   const [editingMetric, setEditingMetric] = useState<Metric | null>(null)
 
-  // 是否还有更多数据
+  // Is there more data?
   const hasMore = metrics.length < total
 
-  // 加载首页数据
+  // Load homepage data
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
@@ -252,13 +252,13 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
       setTotal(result.total)
       setMetricsTotal(result.total)
     } catch {
-      // 加载失败时保持空列表
+      // Keep empty list when loading fails
     } finally {
       setLoading(false)
     }
   }, [setMetricsTotal])
 
-  // 加载更多数据
+  // load more data
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
@@ -267,13 +267,13 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
       setMetrics((prev) => [...prev, ...result.items])
       setTotal(result.total)
     } catch {
-      // 加载失败
+      // Loading failed
     } finally {
       setLoadingMore(false)
     }
   }, [loadingMore, hasMore, metrics.length])
 
-  // 无限滚动
+  // infinite scroll
   const { sentinelRef } = useInfiniteScroll({
     hasMore,
     loading: loadingMore,
@@ -284,7 +284,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
     loadData()
   }, [loadData])
 
-  // 当外部传入更新的指标时，更新列表中对应项
+  // When updated indicators are passed in externally，Update the corresponding item in the list
   useEffect(() => {
     if (updatedMetric) {
       setMetrics((prev) =>
@@ -293,7 +293,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
     }
   }, [updatedMetric])
 
-  // 过滤指标
+  // Filter metrics
   const filteredMetrics = metrics.filter(
     (m) =>
       m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -301,24 +301,24 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
       (m.comment && m.comment.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
-  // 删除指标
+  // Delete indicator
   const handleDelete = (code: string) => {
     setMetrics((prev) => prev.filter((m) => m.code !== code))
     setTotal((prev) => prev - 1)
   }
 
-  // 保存新指标
+  // Save new indicator
   const handleSaveNewMetric = async (form: MetricFormData) => {
     if (saving) return
     setSaving(true)
     try {
-      // 构建完整的 dataType 字符串（包含精度）
+      // Build a complete dataType string（Contains precision）
       const dataTypeValue: DataTypeValue = {
         type: form.dataType,
         precision: form.precision,
         scale: form.scale
       }
-      // 构建 parentMetricCodes：派生指标取 baseCode，复合指标取 compositeMetrics
+      // Build parentMetricCodes：Derived index takes baseCode，Take the composite indicator compositeMetrics
       let parentMetricCodes: string[] | undefined
       if (form.type === 'DERIVED' && form.baseCode) {
         parentMetricCodes = [form.baseCode]
@@ -343,7 +343,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
           ? JSON.stringify(form.filterColumns.map(c => c.id).filter(Boolean))
           : undefined
       })
-      // 构造新指标对象，直接添加到列表
+      // Construct a new indicator object，Add directly to list
       const newMetric: Metric = {
         name: form.name.trim(),
         code: form.code.trim().toUpperCase(),
@@ -363,18 +363,18 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
       setTotal((prev) => prev + 1)
       setShowNewModal(false)
     } catch {
-      // 保存失败
+      // Save failed
     } finally {
       setSaving(false)
     }
   }
 
-  // 保存编辑的指标
+  // Save edited indicator
   const handleSaveEditMetric = async (form: MetricFormData) => {
     if (saving || !editingMetric) return
     setSaving(true)
     try {
-      // 构建完整的 dataType 字符串（包含精度）
+      // Build a complete dataType string（Contains precision）
       const dataTypeValue: DataTypeValue = {
         type: form.dataType,
         precision: form.precision,
@@ -382,7 +382,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
       }
       const fullDataType = form.dataType ? buildDataTypeString(dataTypeValue) : undefined
 
-      // 构建 parentMetricCodes：派生指标取 baseCode，复合指标取 compositeMetrics
+      // Build parentMetricCodes：Derived index takes baseCode，Take the composite indicator compositeMetrics
       let parentMetricCodes: string[] | undefined
       if (form.type === 'DERIVED' && form.baseCode) {
         parentMetricCodes = [form.baseCode]
@@ -390,7 +390,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
         parentMetricCodes = form.compositeMetrics.map((m) => m.code)
       }
 
-      // 直接调用 alterMetricVersion，会自动创建新版本
+      // call directly alterMetricVersion，A new version will be automatically created
       const versionData = await alterMetricVersion(editingMetric.code, editingMetric.currentVersion, {
         metricName: form.name.trim(),
         metricCode: form.code.trim(),
@@ -406,7 +406,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
         filterColumnIds: form.filterColumns.length > 0 ? JSON.stringify(form.filterColumns.map(c => c.id).filter(Boolean)) : undefined
       })
 
-      // 用后端返回的版本数据更新列表
+      // Update the list with the version data returned by the backend
       const updatedMetric: Metric = {
         ...editingMetric,
         name: versionData.name,
@@ -423,7 +423,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
       )
       setEditingMetric(null)
     } catch {
-      // 保存失败
+      // Save failed
     } finally {
       setSaving(false)
     }
@@ -431,7 +431,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
 
   return (
     <div className="flex-1 flex overflow-hidden bg-slate-50/40 dark:bg-slate-950/50 animate-in slide-in-from-right-4 duration-300">
-      {/* 主内容区域 */}
+      {/* main content area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 	        <div className="h-12 @md:h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 @md:px-6 flex items-center justify-between shadow-sm z-10 flex-shrink-0">
 	          <div className="flex items-center gap-2 @md:gap-3">
@@ -445,7 +445,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
 	              <ArrowLeft size={iconSizeToken.large} />
 	            </Button>
 	            <div className="flex items-center gap-2">
-	              <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">指标中心</h2>
+	              <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">indicator center</h2>
 	              <Badge variant="blue">
                 {filteredMetrics.length} / {total}
               </Badge>
@@ -476,17 +476,17 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
 
             <Button onClick={() => setShowNewModal(true)} size="header">
               <Plus size={iconSizeToken.medium} />
-              <span className="hidden @md:inline">新建指标</span>
+              <span className="hidden @md:inline">New indicator</span>
             </Button>
           </div>
         </div>
 
-        {/* 内容区域 - 高度自适应，最大不超过容器 */}
+        {/* content area - Highly adaptive，Maximum size does not exceed the container */}
         <div className="flex-1 min-h-0 p-4 @md:p-6 pb-6 @md:pb-8 overflow-auto custom-scrollbar">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16">
               <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-              <div className="text-slate-400 text-caption mt-3">加载中...</div>
+              <div className="text-slate-400 text-caption mt-3">Loading...</div>
             </div>
           ) : viewMode === 'CARD' ? (
             <>
@@ -497,11 +497,11 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
                 {filteredMetrics.length === 0 && (
                   <div className="col-span-full flex flex-col items-center justify-center py-12 @md:py-16 text-slate-400 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl @md:rounded-2xl">
                     <Box size={iconSizeToken.huge} className="opacity-20 mb-3" />
-                    <p className="text-caption @md:text-body-sm font-medium">未找到匹配的指标</p>
+                    <p className="text-caption @md:text-body-sm font-medium">No matching metric found</p>
                   </div>
                 )}
               </div>
-              {/* 哨兵元素 + 加载更多 */}
+              {/* Sentinel element + load more */}
               <div ref={sentinelRef} className="h-4" />
               {loadingMore && (
                 <div className="flex justify-center py-4">
@@ -513,7 +513,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
             <Table
               footer={
                 <>
-                  {/* 哨兵元素 + 加载更多 */}
+                  {/* Sentinel element + load more */}
                   <div ref={sentinelRef} className="h-1" />
                   {loadingMore && (
                     <div className="flex justify-center py-4 border-t border-slate-100 dark:border-slate-800">
@@ -525,15 +525,15 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
             >
               <TableHeader>
                 <TableRow>
-                  <TableHead className={tableColumnWidthClassMap['4xl']}>指标名称 / 编码</TableHead>
-                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>类型</TableHead>
-                  <TableHead className={`px-3 ${tableColumnWidthClassMap.xl} text-center`}>数据类型</TableHead>
-                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>单位</TableHead>
-                  <TableHead className="px-3">描述</TableHead>
-                  <TableHead className={`px-3 ${tableColumnWidthClassMap.xs} text-center`}>版本</TableHead>
-                  <TableHead className={`px-3 ${tableColumnWidthClassMap.md}`}>创建人</TableHead>
-                  <TableHead className={`px-3 ${tableColumnWidthClassMap['2xl']}`}>创建时间</TableHead>
-                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>操作</TableHead>
+                  <TableHead className={tableColumnWidthClassMap['4xl']}>Indicator name / encoding</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>Type</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.xl} text-center`}>data type</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>unit</TableHead>
+                  <TableHead className="px-3">Description</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.xs} text-center`}>version</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.md}`}>Creator</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap['2xl']}`}>creation time</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>Operation</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -543,7 +543,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
                 {filteredMetrics.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={9} className="py-12 @md:py-16 text-center text-slate-400 text-caption @md:text-body-sm">
-                      未找到匹配的指标
+                      No matching metric found
                     </TableCell>
                   </TableRow>
                 )}
@@ -553,10 +553,10 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
         </div>
       </div>
 
-      {/* 右侧语义组件库 */}
+      {/* Right semantic component library */}
       <ComponentLibrarySidebar />
 
-      {/* 新建指标弹窗 */}
+      {/* New indicator pop-up window */}
       <MetricFormModal
         isOpen={showNewModal}
         onClose={() => setShowNewModal(false)}
@@ -564,7 +564,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
         saving={saving}
       />
 
-      {/* 编辑指标弹窗 */}
+      {/* Edit indicator pop-up window */}
       <MetricFormModal
         isOpen={!!editingMetric}
         onClose={() => setEditingMetric(null)}

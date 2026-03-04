@@ -21,62 +21,62 @@ package org.apache.gravitino.dataset;
 import java.util.Objects;
 import org.apache.gravitino.annotation.Evolving;
 
-/** 指标变更接口 */
+/** Indicator change interface */
 @Evolving
 public interface MetricChange {
 
   /**
-   * 创建指标重命名变更
+   * Create indicator rename changes
    *
-   * @param newName 新的指标名称
-   * @return 指标变更对象
+   * @param newName New indicator name
+   * @return Indicator change object
    */
   static MetricChange rename(String newName) {
     return new RenameMetric(newName);
   }
 
   /**
-   * 创建更新指标注释的变更
+   * Create changes that update indicator annotations
    *
-   * @param newComment 新的注释
-   * @return 指标变更对象
+   * @param newComment new annotation
+   * @return Indicator change object
    */
   static MetricChange updateComment(String newComment) {
     return new UpdateComment(newComment);
   }
 
   /**
-   * 创建更新数据类型的变更
+   * Create changes that update data types
    *
-   * @param newDataType 新的数据类型
-   * @return 指标变更对象
+   * @param newDataType new data type
+   * @return Indicator change object
    */
   static MetricChange updateDataType(String newDataType) {
     return new UpdateDataType(newDataType);
   }
 
   /**
-   * 创建设置属性的变更
+   * Create changes to settings properties
    *
-   * @param property 属性名
-   * @param value 属性值
-   * @return 指标变更对象
+   * @param property attribute name
+   * @param value attribute value
+   * @return Indicator change object
    */
   static MetricChange setProperty(String property, String value) {
     return new SetProperty(property, value);
   }
 
   /**
-   * 创建删除属性的变更
+   * Create changes that delete attributes
    *
-   * @param property 属性名
-   * @return 指标变更对象
+   * @param property attribute name
+   * @return Indicator change object
    */
   static MetricChange removeProperty(String property) {
     return new RemoveProperty(property);
   }
 
-  /** 指标重命名变更 */
+  /** Indicator rename changes */
   final class RenameMetric implements MetricChange {
     private final String newName;
 
@@ -107,7 +107,7 @@ public interface MetricChange {
     }
   }
 
-  /** 更新指标注释变更 */
+  /** Update indicator annotation changes */
   final class UpdateComment implements MetricChange {
     private final String newComment;
 
@@ -138,7 +138,7 @@ public interface MetricChange {
     }
   }
 
-  /** 更新数据类型变更 */
+  /** Update data type changes */
   final class UpdateDataType implements MetricChange {
     private final String newDataType;
 
@@ -169,7 +169,7 @@ public interface MetricChange {
     }
   }
 
-  /** 设置属性变更 */
+  /** Set property changes */
   final class SetProperty implements MetricChange {
     private final String property;
     private final String value;
@@ -206,7 +206,7 @@ public interface MetricChange {
     }
   }
 
-  /** 删除属性变更 */
+  /** Delete attribute changes */
   final class RemoveProperty implements MetricChange {
     private final String property;
 

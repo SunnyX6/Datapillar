@@ -37,64 +37,69 @@ import javax.ws.rs.core.UriInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** REST API端点，用于提供OpenAPI规范（供Scalar等文档工具使用） */
+/** REST API endpoint that provides the OpenAPI specification for tools such as Scalar. */
 @Path("/openapi")
 public class OpenApiResource {
 
   private static final Logger LOG = LoggerFactory.getLogger(OpenApiResource.class);
 
   /**
-   * 获取OpenAPI规范JSON
+   * Return OpenAPI specification JSON.
    *
-   * @param uriInfo URI信息
-   * @return OpenAPI规范JSON
+   * @param uriInfo URI information
+   * @return OpenAPI specification JSON
    */
   @GET
   @Path("/openapi.json")
   @Produces(MediaType.APPLICATION_JSON)
   public Response getOpenApiJson(@Context UriInfo uriInfo) {
     try {
-      // 创建基础OpenAPI配置
+      // Create base OpenAPI configuration.
       OpenAPI openAPI = createOpenAPIConfiguration(uriInfo);
 
-      // 创建Swagger配置
+      // Create Swagger configuration.
       SwaggerConfiguration config = new SwaggerConfiguration();
       config.setOpenAPI(openAPI);
       config.setPrettyPrint(true);
 
-      // 使用Reader扫描JAX-RS资源类
+      // Scan JAX-RS resource classes with Reader.
       Reader reader = new Reader(config);
       Set<Class<?>> classes = getResourceClasses();
 
-      LOG.info("开始扫描REST资源类，共{}个类", classes.size());
+      LOG.info("Start scanning REST resource classes, total {} classes", classes.size());
       openAPI = reader.read(classes);
 
-      LOG.info("OpenAPI规范生成成功，共{}个路径", openAPI.getPaths() != null ? openAPI.getPaths().size() : 0);
+      LOG.info(
+          "OpenAPI specification generated successfully, total {} paths",
+          openAPI.getPaths() != null ? openAPI.getPaths().size() : 0);
 
       return Response.ok(io.swagger.v3.core.util.Json.mapper().writeValueAsString(openAPI)).build();
 
     } catch (Exception e) {
-      LOG.error("生成OpenAPI规范失败", e);
+      LOG.error("Failed to generate OpenAPI specification", e);
       return Response.serverError()
-          .entity("{\"error\": \"生成OpenAPI规范失败: " + e.getMessage() + "\"}")
+          .entity(
+              "{\"error\": \"Failed to generate OpenAPI specification: " + e.getMessage() + "\"}")
           .build();
     }
   }
 
   /**
-   * 创建OpenAPI配置
+   * Create OpenAPI configuration.
    *
-   * @param uriInfo URI信息
-   * @return OpenAPI对象
+   * @param uriInfo URI information
+   * @return OpenAPI object
    */
   private OpenAPI createOpenAPIConfiguration(UriInfo uriInfo) {
     OpenAPI openAPI = new OpenAPI();
 
-    // 基本信息
+    // Basic metadata.
     Info info =
         new Info()
             .title("Apache Gravitino API")
-            .description("Gravitino 是一个高性能、地理分布式的联邦元数据湖。本文档提供了完整的REST API参考。")
+            .description(
+                "Gravitino is a high-performance geographically distributed federated metadata lake. "
+                    + "This document provides a complete REST API reference.")
             .version("1.0.0")
             .contact(
                 new Contact()
@@ -108,7 +113,7 @@ public class OpenApiResource {
 
     openAPI.info(info);
 
-    // 服务器配置
+    // Server configuration.
     String baseUri = uriInfo.getBaseUri().toString().replaceAll("/+$", "");
     Server server = new Server().url(baseUri).description("Gravitino Server");
     openAPI.addServersItem(server);
@@ -117,20 +122,20 @@ public class OpenApiResource {
   }
 
   /**
-   * 获取需要扫描的资源类
+   * Get resource classes to scan.
    *
-   * @return 资源类集合
+   * @return Resource class collection
    */
   private Set<Class<?>> getResourceClasses() {
     Set<Class<?>> classes = new HashSet<>();
 
-    // 添加Metric相关的REST资源类
+    // Add metric-related REST resource classes.
     classes.add(MetricOperations.class);
     classes.add(WordRootOperations.class);
     classes.add(UnitOperations.class);
     classes.add(ValueDomainOperations.class);
 
-    // 可以继续添加其他REST资源类
+    // Additional REST resource classes can be added here.
     // classes.add(CatalogOperations.class);
     // classes.add(SchemaOperations.class);
     // etc.

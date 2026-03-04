@@ -8,53 +8,53 @@ import lombok.Data;
 @Schema(name = "LlmUserModelUsageResponse")
 public class LlmUserModelUsageResponse {
 
-    private Long id;
+  private Long id;
 
-    private Long userId;
+  private Long userId;
 
-    private Long aiModelId;
+  private Long aiModelId;
 
-    private String providerModelId;
+  private String providerModelId;
 
-    private String modelName;
+  private String modelName;
 
-    private String modelType;
+  private String modelType;
 
-    private String modelStatus;
+  private String modelStatus;
 
-    private Long providerId;
+  private Long providerId;
 
-    private String providerCode;
+  private String providerCode;
 
-    private String providerName;
+  private String providerName;
 
-    private Long permissionId;
+  private Long permissionId;
 
-    private String permissionCode;
+  private String permissionCode;
 
-    private Integer permissionLevel;
+  private Integer permissionLevel;
 
-    private Boolean isDefault;
+  private Boolean isDefault;
 
-    private String callCount;
+  private String callCount;
 
-    private String promptTokens;
+  private String promptTokens;
 
-    private String completionTokens;
+  private String completionTokens;
 
-    private String totalTokens;
+  private String totalTokens;
 
-    private String totalCostUsd;
+  private String totalCostUsd;
 
-    private Long grantedBy;
+  private Long grantedBy;
 
-    private LocalDateTime grantedAt;
+  private LocalDateTime grantedAt;
 
-    private Long updatedBy;
+  private Long updatedBy;
 
-    private LocalDateTime expiresAt;
+  private LocalDateTime expiresAt;
 
-    private LocalDateTime lastUsedAt;
+  private LocalDateTime lastUsedAt;
 
-    private LocalDateTime updatedAt;
+  private LocalDateTime updatedAt;
 }

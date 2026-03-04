@@ -2,8 +2,8 @@ import { useI18nStore } from '@/state'
 import { cn } from '@/utils'
 
 const languages = [
-  { id: 'zh-CN', label: '中' },
-  { id: 'en-US', label: 'EN' }
+  { id: 'zh-CN', label: 'zh' },
+  { id: 'en-US', label: 'en' }
 ] as const
 
 export function LanguageToggle() {

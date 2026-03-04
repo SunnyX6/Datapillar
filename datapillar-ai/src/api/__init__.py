@@ -1,12 +1,11 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-API 模块
+API module
 
-包含:
-- v1: API v1 版本路由
+contains:
+- v1: API v1 version routing
 """
 
 from src.api.router import api_router

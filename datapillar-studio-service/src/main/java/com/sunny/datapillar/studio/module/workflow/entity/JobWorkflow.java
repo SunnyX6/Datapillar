@@ -1,17 +1,14 @@
 package com.sunny.datapillar.studio.module.workflow.entity;
 
-import java.time.LocalDateTime;
-
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
-
+import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
- * 任务工作流组件
- * 负责任务工作流核心逻辑实现
+ * Task workflow components Responsible for the implementation of core logic of task workflow
  *
  * @author Sunny
  * @date 2026-01-01
@@ -20,40 +17,33 @@ import lombok.Data;
 @TableName("job_workflow")
 public class JobWorkflow {
 
-    @TableId(type = IdType.AUTO)
-    private Long id;
+  @TableId(type = IdType.AUTO)
+  private Long id;
 
-    private Long projectId;
+  private Long projectId;
 
-    private String workflowName;
+  private String workflowName;
 
-    /**
-     * 触发类型: 1-cron, 2-manual
-     */
-    private Integer triggerType;
+  /** Trigger type: 1-cron, 2-manual */
+  private Integer triggerType;
 
-    /**
-     * 触发值（cron 表达式等）
-     */
-    private String triggerValue;
+  /** trigger value（cron Expressions etc.） */
+  private String triggerValue;
 
-    private Integer timeoutSeconds;
+  private Integer timeoutSeconds;
 
-    private Integer maxRetryTimes;
+  private Integer maxRetryTimes;
 
-    private Integer priority;
+  private Integer priority;
 
-    /**
-     * 状态: 0-草稿, 1-已发布, 2-已暂停
-     */
-    private Integer status;
+  /** Status: 0-draft, 1-Published, 2-Suspended */
+  private Integer status;
 
-    private String description;
+  private String description;
 
-    @TableLogic
-    private Integer isDeleted;
+  @TableLogic private Integer isDeleted;
 
-    private LocalDateTime createdAt;
+  private LocalDateTime createdAt;
 
-    private LocalDateTime updatedAt;
+  private LocalDateTime updatedAt;
 }

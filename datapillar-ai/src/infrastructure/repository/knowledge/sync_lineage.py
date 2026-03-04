@@ -1,13 +1,11 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-知识图谱同步血缘数据访问
+Knowledge graph synchronizes bloodline data access
 
-约束：
-- 模块内禁止直接拼接/执行 Cypher
-- 所有与"血缘关系边（SQL/表级/列级/指标列/列值域）"相关的 Cypher 语句在此集中管理
+constraint:- Direct splicing is prohibited within the module/execute Cypher
+- All related to"blood relationship(SQL/table level/Ranking/indicator column/Column range)"relevant Cypher Statements are managed centrally here
 """
 
 from __future__ import annotations
@@ -22,7 +20,7 @@ from src.shared.context import get_current_tenant_id
 def _require_tenant_id() -> int:
     tenant_id = get_current_tenant_id()
     if tenant_id is None:
-        raise ValueError("缺少 tenant 上下文")
+        raise ValueError("missing tenant context")
     return int(tenant_id)
 
 
@@ -31,9 +29,9 @@ async def _run_with_tenant(session: Any, query: str, **params: Any) -> Any:
 
 
 class Lineage:
-    """知识图谱同步血缘 Neo4j 访问层（Cypher Mapper）"""
+    """Knowledge graph synchronizes lineage Neo4j access layer(Cypher Mapper)"""
 
-    # ==================== 结构关系（层级边） ====================
+    # ==================== structural relationship(hierarchical edge) ====================
 
     @staticmethod
     async def link_catalog_schema(
@@ -100,7 +98,7 @@ class Lineage:
         """
         await _run_with_tenant(session, query, schemaId=schema_id, metricId=metric_id)
 
-    # ==================== 指标父子关系：DERIVED_FROM / COMPUTED_FROM ====================
+    # ==================== Indicator parent-child relationship:DERIVED_FROM / COMPUTED_FROM ====================
 
     _ALLOWED_METRIC_LABELS: set[str] = {"AtomicMetric", "DerivedMetric", "CompositeMetric"}
     _ALLOWED_METRIC_REL_TYPES: set[str] = {"DERIVED_FROM", "COMPUTED_FROM"}
@@ -108,12 +106,12 @@ class Lineage:
     @staticmethod
     def _assert_metric_label(label: str) -> None:
         if label not in Lineage._ALLOWED_METRIC_LABELS:
-            raise ValueError(f"不支持的 Metric label: {label}")
+            raise ValueError(f"Not supported Metric label:\n    {label}")
 
     @staticmethod
     def _assert_metric_rel(rel_type: str) -> None:
         if rel_type not in Lineage._ALLOWED_METRIC_REL_TYPES:
-            raise ValueError(f"不支持的 Metric 关系类型: {rel_type}")
+            raise ValueError(f"Not supported Metric Relationship type:\n    {rel_type}")
 
     @staticmethod
     async def set_metric_parents(
@@ -125,9 +123,7 @@ class Lineage:
         parent_ids: Sequence[str],
     ) -> None:
         """
-        重置某个指标的父子关系（用于 alter_metric 等）。
-
-        注意：父指标固定为 AtomicMetric；子指标可能为 DerivedMetric / CompositeMetric。
+        Reset the parent-child relationship of an indicator(used for alter_metric Wait).Note:The parent indicator is fixed to AtomicMetric;Sub-indicators may be DerivedMetric / CompositeMetric.
         """
         Lineage._assert_metric_label(child_label)
         Lineage._assert_metric_rel(rel_type)
@@ -162,8 +158,7 @@ class Lineage:
         parent_ids: Sequence[str],
     ) -> None:
         """
-        追加写入父子关系（不删除旧关系）。
-        """
+        Append writing parent-child relationship(Do not delete old relationships)."""
         Lineage._assert_metric_label(child_label)
         Lineage._assert_metric_rel(rel_type)
 
@@ -276,7 +271,7 @@ class Lineage:
         """
         await _run_with_tenant(session, query, lineageData=list(lineage_data))
 
-    # ==================== 指标列血缘：MEASURES / FILTERS_BY ====================
+    # ==================== Index column bloodline:MEASURES / FILTERS_BY ====================
 
     @staticmethod
     async def set_metric_measures(
@@ -362,7 +357,7 @@ class Lineage:
         """
         await _run_with_tenant(session, query, metricId=metric_id, columnId=column_id)
 
-    # ==================== 列值域血缘：HAS_VALUE_DOMAIN ====================
+    # ==================== Column value field ancestry:HAS_VALUE_DOMAIN ====================
 
     @staticmethod
     async def add_column_valuedomain(
@@ -427,14 +422,14 @@ class Lineage:
         """
         await _run_with_tenant(session, query, columnId=column_id, domainCode=domain_code)
 
-    # ==================== Tag 关系边：HAS_TAG ====================
+    # ==================== Tag relationship edge:HAS_TAG ====================
 
     _ALLOWED_TAG_SOURCE_LABELS: set[str] = {"Catalog", "Schema", "Table", "Column"}
 
     @staticmethod
     def _assert_tag_label(label: str) -> None:
         if label not in Lineage._ALLOWED_TAG_SOURCE_LABELS:
-            raise ValueError(f"不支持的 Tag 源节点类型: {label}")
+            raise ValueError(f"Not supported Tag Source node type:\n    {label}")
 
     @staticmethod
     async def add_has_tag(
@@ -444,7 +439,7 @@ class Lineage:
         source_id: str,
         tag_id: str,
     ) -> dict[str, Any] | None:
-        """添加 HAS_TAG 关系边"""
+        """add HAS_TAG relationship edge"""
         Lineage._assert_tag_label(source_label)
         query = f"""
         MATCH (src:{source_label} {{id: $sourceId, tenantId: $tenantId}})
@@ -466,7 +461,7 @@ class Lineage:
         source_id: str,
         tag_id: str,
     ) -> dict[str, Any] | None:
-        """移除 HAS_TAG 关系边"""
+        """Remove HAS_TAG relationship edge"""
         Lineage._assert_tag_label(source_label)
         query = f"""
         MATCH (src:{source_label} {{id: $sourceId, tenantId: $tenantId}})-[r:HAS_TAG]->(tag:Tag {{id: $tagId, tenantId: $tenantId}})
@@ -485,7 +480,7 @@ class Lineage:
         source_id: str,
         tag_ids: Sequence[str],
     ) -> None:
-        """批量添加 HAS_TAG 关系边"""
+        """Add in batches HAS_TAG relationship edge"""
         if not tag_ids:
             return
         Lineage._assert_tag_label(source_label)
@@ -507,7 +502,7 @@ class Lineage:
         source_id: str,
         tag_ids: Sequence[str],
     ) -> None:
-        """批量移除 HAS_TAG 关系边"""
+        """Batch removal HAS_TAG relationship edge"""
         if not tag_ids:
             return
         Lineage._assert_tag_label(source_label)

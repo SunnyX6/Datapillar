@@ -1,21 +1,19 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * regarding copyright ownership.The ASF licenses this file
+ * to you under the Apache License,Version 2.0 (the
+ * "License");you may not use this file except in compliance
+ * with the License.You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * Unless required by applicable law or agreed to in writing,* software distributed under the License is distributed on an
+ * "AS IS" BASIS,WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND,either express or implied.See the License for the
  * specific language governing permissions and limitations
- * under the License.
- */
+ * under the License.*/
 package org.apache.gravitino.dataset;
 
 import java.util.Map;
@@ -35,39 +33,41 @@ import org.apache.gravitino.exceptions.WordRootAlreadyExistsException;
 import org.apache.gravitino.pagination.PagedResult;
 
 /**
- * DatasetCatalog 接口定义了在 schema 中管理数据集对象（Metric、WordRoot 等）的公共 API。 如果 catalog 实现支持数据集对象，则应实现此接口。
+ * DatasetCatalog The interface is defined in schema Manage dataset objects in(Metric,WordRoot
+ * Wait)public API.if catalog Implement support for dataset objects,You should implement this
+ * interface.
  */
 @Evolving
 public interface DatasetCatalog {
 
-  // ============================= Metric 管理 =============================
+  // ============================= Metric management =============================
 
   /**
-   * 分页列出 schema 命名空间下的指标
+   * List in pages schema Metrics under namespace
    *
-   * @param namespace schema 命名空间
-   * @param offset 偏移量
-   * @param limit 每页大小
-   * @return 分页结果，包含完整的指标数据
-   * @throws NoSuchSchemaException 如果 schema 不存在
+   * @param namespace schema namespace
+   * @param offset offset
+   * @param limit page size
+   * @return Paginated results,Contains complete indicator data
+   * @throws NoSuchSchemaException if schema does not exist
    */
   PagedResult<Metric> listMetrics(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException;
 
   /**
-   * 通过 {@link NameIdentifier} 从 catalog 获取指标元数据
+   * Pass {@link NameIdentifier} from catalog Get indicator metadata
    *
-   * @param ident 指标标识符
-   * @return 指标元数据
-   * @throws NoSuchMetricException 如果指标不存在
+   * @param ident indicator identifier
+   * @return Metric metadata
+   * @throws NoSuchMetricException If the indicator does not exist
    */
   Metric getMetric(NameIdentifier ident) throws NoSuchMetricException;
 
   /**
-   * 使用 {@link NameIdentifier} 检查指标是否存在
+   * use {@link NameIdentifier} Check if the indicator exists
    *
-   * @param ident 指标标识符
-   * @return 如果指标存在则返回 true，否则返回 false
+   * @param ident indicator identifier
+   * @return Returns if indicator exists true,Otherwise return false
    */
   default boolean metricExists(NameIdentifier ident) {
     try {
@@ -79,27 +79,28 @@ public interface DatasetCatalog {
   }
 
   /**
-   * 在 catalog 中注册指标
+   * in catalog registration indicator
    *
-   * @param ident 指标的名称标识符
-   * @param name 指标名称（中文名）
-   * @param code 指标编码
-   * @param type 指标类型
-   * @param dataType 数据类型，如 DECIMAL(18,2)
-   * @param comment 指标注释，可选，可为 null
-   * @param properties 指标属性，可选，可为 null 或空
-   * @param unit 指标单位，可选，可为 null
-   * @param parentMetricCodes 父指标编码数组（用于派生/复合指标），可选，可为 null
-   * @param calculationFormula 计算公式（用于复合指标），可选，可为 null
-   * @param refTableId 引用的Table ID（原子指标用），可选，可为 null
-   * @param refCatalogName 引用的Catalog名称（用于事件发送），可选，可为 null
-   * @param refSchemaName 引用的Schema名称（用于事件发送），可选，可为 null
-   * @param refTableName 引用的Table名称（用于事件发送），可选，可为 null
-   * @param measureColumnIds 度量列ID JSON数组，可选，可为 null
-   * @param filterColumnIds 过滤列ID JSON数组，可选，可为 null
-   * @return 注册的指标对象
-   * @throws NoSuchSchemaException 如果 schema 不存在
-   * @throws MetricAlreadyExistsException 如果指标已存在
+   * @param ident Name identifier of the indicator
+   * @param name Indicator name(Chinese name)
+   * @param code Indicator coding
+   * @param type Indicator type
+   * @param dataType data type,Such as DECIMAL(18,2)
+   * @param comment Indicator notes,Optional,can be null
+   * @param properties Indicator properties,Optional,can be null or empty
+   * @param unit Index unit,Optional,can be null
+   * @param parentMetricCodes Parent indicator encoding array(for derivation/Composite
+   *     indicator),Optional,can be null
+   * @param calculationFormula Calculation formula(for composite indicators),Optional,can be null
+   * @param refTableId quotedTable ID(For atomic indicators),Optional,can be null
+   * @param refCatalogName quotedCatalogName(for event sending),Optional,can be null
+   * @param refSchemaName quotedSchemaName(for event sending),Optional,can be null
+   * @param refTableName quotedTableName(for event sending),Optional,can be null
+   * @param measureColumnIds measure columnID JSONarray,Optional,can be null
+   * @param filterColumnIds Filter columnsID JSONarray,Optional,can be null
+   * @return Registered indicator object
+   * @throws NoSuchSchemaException if schema does not exist
+   * @throws MetricAlreadyExistsException If the indicator already exists
    */
   Metric registerMetric(
       NameIdentifier ident,
@@ -121,62 +122,64 @@ public interface DatasetCatalog {
       throws NoSuchSchemaException, MetricAlreadyExistsException;
 
   /**
-   * 从 catalog 删除指标。如果指标不存在，返回 false。 删除指标将同时删除链接到此指标的所有版本。
+   * from catalog Delete indicator.If the indicator does not exist,Return false.Deleting a metric
+   * will also delete all versions linked to this metric.*
    *
-   * @param ident 指标的名称标识符
-   * @return 如果删除指标则返回 true，如果指标不存在则返回 false
+   * @param ident Name identifier of the indicator
+   * @return Returns if indicator is deleted true,Returns if indicator does not exist false
    */
   boolean deleteMetric(NameIdentifier ident);
 
   /**
-   * 对 catalog 中的指标应用 {@link MetricChange 变更}
+   * Yes catalog Indicator applications in {@link MetricChange change}
    *
-   * @param ident 要修改的指标的 {@link NameIdentifier} 实例
-   * @param changes 要应用于指标的 {@link MetricChange} 实例
-   * @return 更新后的 {@link Metric} 实例
-   * @throws NoSuchMetricException 如果指标不存在
-   * @throws IllegalArgumentException 如果变更被实现拒绝
+   * @param ident The indicator to be modified {@link NameIdentifier} Example
+   * @param changes to be applied to the indicator {@link MetricChange} Example
+   * @return updated {@link Metric} Example
+   * @throws NoSuchMetricException If the indicator does not exist
+   * @throws IllegalArgumentException If the change is rejected by the implementation
    */
   Metric alterMetric(NameIdentifier ident, MetricChange... changes)
-      throws NoSuchMetricException, IllegalArgumentException;
+      throws NoSuchMetricException,
+          IllegalArgumentException; // ============================= MetricVersion management
 
-  // ============================= MetricVersion 管理 =============================
+  // =============================
 
   /**
-   * 通过 {@link NameIdentifier} 列出已注册指标的所有版本
+   * Pass {@link NameIdentifier} List all versions of registered indicators
    *
-   * @param ident 指标的名称标识符
-   * @return 指标的版本号数组
-   * @throws NoSuchMetricException 如果指标不存在
+   * @param ident Name identifier of the indicator
+   * @return Array of indicator version numbers
+   * @throws NoSuchMetricException If the indicator does not exist
    */
   int[] listMetricVersions(NameIdentifier ident) throws NoSuchMetricException;
 
   /**
-   * 通过 {@link NameIdentifier} 列出已注册指标的所有版本及其信息
+   * Pass {@link NameIdentifier} List all versions of registered indicators and their information
    *
-   * @param ident 指标的名称标识符
-   * @return 指标的版本信息数组
-   * @throws NoSuchMetricException 如果指标不存在
+   * @param ident Name identifier of the indicator
+   * @return Array of indicator version information
+   * @throws NoSuchMetricException If the indicator does not exist
    */
   MetricVersion[] listMetricVersionInfos(NameIdentifier ident) throws NoSuchMetricException;
 
   /**
-   * 通过 {@link NameIdentifier} 和版本号从 catalog 获取指标版本
+   * Pass {@link NameIdentifier} and version number from catalog Get indicator version
    *
-   * @param ident 指标的名称标识符
-   * @param version 指标的版本号
-   * @return 指标版本对象
-   * @throws NoSuchMetricVersionException 如果指标版本不存在
+   * @param ident Name identifier of the indicator
+   * @param version Indicator version number
+   * @return indicator version object
+   * @throws NoSuchMetricVersionException If the indicator version does not exist
    */
   MetricVersion getMetricVersion(NameIdentifier ident, int version)
       throws NoSuchMetricVersionException;
 
   /**
-   * 通过 {@link NameIdentifier} 和版本号检查指标版本是否存在
+   * Pass {@link NameIdentifier} and version number to check whether the indicator version exists
    *
-   * @param ident 指标的名称标识符
-   * @param version 指标的版本号
-   * @return 如果指标版本存在则返回 true，否则返回 false
+   * @param ident Name identifier of the indicator
+   * @param version Indicator version number
+   * @return Returns if indicator version exists true,Otherwise return false
    */
   default boolean metricVersionExists(NameIdentifier ident, int version) {
     try {
@@ -188,46 +191,48 @@ public interface DatasetCatalog {
   }
 
   /**
-   * 通过 {@link NameIdentifier} 和版本号删除指标版本
+   * Pass {@link NameIdentifier} and version number delete indicator version
    *
-   * @param ident 指标的名称标识符
-   * @param version 指标的版本号
-   * @return 如果删除指标版本则返回 true，如果指标版本不存在则返回 false
+   * @param ident Name identifier of the indicator
+   * @param version Indicator version number
+   * @return Returns if indicator version is deleted true,Returns if indicator version does not
+   *     exist false
    */
   boolean deleteMetricVersion(NameIdentifier ident, int version);
 
   /**
-   * 切换指标的当前版本到指定版本
+   * Switch the current version of the indicator to the specified version
    *
-   * @param ident 指标的名称标识符
-   * @param targetVersion 目标版本号
-   * @return 目标版本的 {@link MetricVersion} 详情
-   * @throws NoSuchMetricException 如果指标不存在
-   * @throws NoSuchMetricVersionException 如果目标版本不存在
-   * @throws IllegalArgumentException 如果目标版本号无效或等于当前版本
+   * @param ident Name identifier of the indicator
+   * @param targetVersion Target version number
+   * @return target version {@link MetricVersion} Details
+   * @throws NoSuchMetricException If the indicator does not exist
+   * @throws NoSuchMetricVersionException If the target version does not exist
+   * @throws IllegalArgumentException If the target version number is invalid or equal to the
+   *     current version
    */
   MetricVersion switchMetricVersion(NameIdentifier ident, int targetVersion)
       throws NoSuchMetricException, NoSuchMetricVersionException, IllegalArgumentException;
 
   /**
-   * 修改指定版本的信息（会自动创建新版本）
+   * Modify the information of the specified version(A new version will be automatically created)
    *
-   * @param ident 指标的名称标识符
-   * @param version 版本号
-   * @param metricName 指标名称
-   * @param metricCode 指标编码
-   * @param metricType 指标类型
-   * @param dataType 数据类型
-   * @param comment 版本注释
-   * @param unit 指标单位
-   * @param unitName 指标单位名称
-   * @param parentMetricCodes 父指标编码数组
-   * @param calculationFormula 计算公式
-   * @param refTableId 引用的Table ID
-   * @param measureColumnIds 度量列ID JSON数组
-   * @param filterColumnIds 过滤列ID JSON数组
-   * @return 更新后的版本
-   * @throws NoSuchMetricVersionException 如果版本不存在
+   * @param ident Name identifier of the indicator
+   * @param version version number
+   * @param metricName Indicator name
+   * @param metricCode Indicator coding
+   * @param metricType Indicator type
+   * @param dataType data type
+   * @param comment Release Notes
+   * @param unit Index unit
+   * @param unitName Indicator unit name
+   * @param parentMetricCodes Parent indicator encoding array
+   * @param calculationFormula Calculation formula
+   * @param refTableId quotedTable ID
+   * @param measureColumnIds measure columnID JSONarray
+   * @param filterColumnIds Filter columnsID JSONarray
+   * @return Updated version
+   * @throws NoSuchMetricVersionException if the version does not exist
    */
   MetricVersion alterMetricVersion(
       NameIdentifier ident,
@@ -244,218 +249,222 @@ public interface DatasetCatalog {
       Long refTableId,
       String measureColumnIds,
       String filterColumnIds)
-      throws NoSuchMetricVersionException;
+      throws
+          NoSuchMetricVersionException; // ============================= MetricModifier management
 
-  // ============================= MetricModifier 管理 =============================
+  // =============================
 
   /**
-   * 分页列出 schema 命名空间下的修饰符
+   * List in pages schema Modifiers under namespace
    *
-   * @param namespace schema 命名空间
-   * @param offset 偏移量
-   * @param limit 每页大小
-   * @return 分页结果，包含完整的修饰符数据
-   * @throws NoSuchSchemaException 如果 schema 不存在
+   * @param namespace schema namespace
+   * @param offset offset
+   * @param limit page size
+   * @return Paginated results,Contains complete modifier data
+   * @throws NoSuchSchemaException if schema does not exist
    */
   PagedResult<MetricModifier> listMetricModifiers(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException;
 
   /**
-   * 通过 {@link NameIdentifier} 从 catalog 获取指标修饰符
+   * Pass {@link NameIdentifier} from catalog Get indicator modifiers
    *
-   * @param ident 指标修饰符标识符
-   * @return 指标修饰符对象
+   * @param ident indicator modifier identifier
+   * @return indicator modifier object
    */
   MetricModifier getMetricModifier(NameIdentifier ident);
 
   /**
-   * 在 catalog 中创建指标修饰符
+   * in catalog Create indicator modifiers in
    *
-   * @param ident 指标修饰符的名称标识符
-   * @param code 修饰符编码
-   * @param comment 修饰符注释，可选，可为 null
-   * @param modifierType 修饰符类型，来自值域，可选，可为 null
-   * @return 创建的指标修饰符对象
-   * @throws NoSuchSchemaException 如果 schema 不存在
+   * @param ident Name identifier of the indicator modifier
+   * @param code modifier encoding
+   * @param comment Modifier annotation,Optional,can be null
+   * @param modifierType modifier type,from value range,Optional,can be null
+   * @return Created indicator modifier object
+   * @throws NoSuchSchemaException if schema does not exist
    */
   MetricModifier createMetricModifier(
       NameIdentifier ident, String code, String comment, String modifierType)
       throws NoSuchSchemaException;
 
   /**
-   * 从 catalog 删除修饰符
+   * from catalog Remove modifier
    *
-   * @param ident 修饰符的名称标识符
-   * @return 如果删除修饰符则返回 true，如果修饰符不存在则返回 false
+   * @param ident The name identifier of the modifier
+   * @return Returns if modifier is removed true,Returns if modifier does not exist false
    */
   boolean deleteMetricModifier(NameIdentifier ident);
 
   /**
-   * 修改修饰符信息
+   * Modify modifier information
    *
-   * @param ident 修饰符的名称标识符
-   * @param name 修饰符名称（可选）
-   * @param comment 修饰符注释（可选）
-   * @return 更新后的修饰符
+   * @param ident The name identifier of the modifier
+   * @param name Modifier name(Optional)
+   * @param comment Modifier annotation(Optional)
+   * @return Updated modifiers
    */
-  MetricModifier alterMetricModifier(NameIdentifier ident, String name, String comment);
+  MetricModifier alterMetricModifier(
+      NameIdentifier ident,
+      String name,
+      String comment); // ============================= WordRoot management
 
-  // ============================= WordRoot 管理 =============================
+  // =============================
 
   /**
-   * 分页列出 schema 命名空间下的词根
+   * List in pages schema Root words under namespace
    *
-   * @param namespace schema 命名空间
-   * @param offset 偏移量
-   * @param limit 每页大小
-   * @return 分页结果，包含完整的词根数据
-   * @throws NoSuchSchemaException 如果 schema 不存在
+   * @param namespace schema namespace
+   * @param offset offset
+   * @param limit page size
+   * @return Paginated results,Contains complete root data
+   * @throws NoSuchSchemaException if schema does not exist
    */
   PagedResult<WordRoot> listWordRoots(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException;
 
   /**
-   * 通过 {@link NameIdentifier} 从 catalog 获取词根
+   * Pass {@link NameIdentifier} from catalog Get the root word
    *
-   * @param ident 词根标识符
-   * @return 词根对象
-   * @throws NoSuchWordRootException 如果词根不存在
+   * @param ident root identifier
+   * @return root object
+   * @throws NoSuchWordRootException if the root does not exist
    */
   WordRoot getWordRoot(NameIdentifier ident) throws NoSuchWordRootException;
 
   /**
-   * 在 catalog 中创建词根
+   * in catalog Create root words in
    *
-   * @param ident 词根的名称标识符
-   * @param code 词根编码
-   * @param name 名称
-   * @param dataType 数据类型，如 VARCHAR(64)
-   * @param comment 词根注释，可选，可为 null
-   * @return 创建的词根对象
-   * @throws NoSuchSchemaException 如果 schema 不存在
-   * @throws WordRootAlreadyExistsException 如果词根已存在
+   * @param ident root name identifier
+   * @param code Root encoding
+   * @param name Name
+   * @param dataType data type,Such as VARCHAR(64)
+   * @param comment Root annotation,Optional,can be null
+   * @return Created stem object
+   * @throws NoSuchSchemaException if schema does not exist
+   * @throws WordRootAlreadyExistsException If the root already exists
    */
   WordRoot createWordRoot(
       NameIdentifier ident, String code, String name, String dataType, String comment)
       throws NoSuchSchemaException, WordRootAlreadyExistsException;
 
   /**
-   * 从 catalog 删除词根
+   * from catalog Remove root word
    *
-   * @param ident 词根的名称标识符
-   * @return 如果删除词根则返回 true，如果词根不存在则返回 false
+   * @param ident root name identifier
+   * @return Returns if root is removed true,Returns if root does not exist false
    */
   boolean deleteWordRoot(NameIdentifier ident);
 
   /**
-   * 更新词根信息
+   * Update root information
    *
-   * @param ident 词根的名称标识符
-   * @param name 名称
-   * @param dataType 数据类型
-   * @param comment 注释
-   * @return 更新后的词根对象
-   * @throws NoSuchWordRootException 如果词根不存在
+   * @param ident root name identifier
+   * @param name Name
+   * @param dataType data type
+   * @param comment Comment
+   * @return updated stem object
+   * @throws NoSuchWordRootException if the root does not exist
    */
   WordRoot alterWordRoot(NameIdentifier ident, String name, String dataType, String comment)
-      throws NoSuchWordRootException;
+      throws NoSuchWordRootException; // ============================= Unit management
 
-  // ============================= Unit 管理 =============================
+  // =============================
 
   /**
-   * 分页列出 schema 命名空间下的单位
+   * List in pages schema Units under namespace
    *
-   * @param namespace schema 命名空间
-   * @param offset 偏移量
-   * @param limit 每页大小
-   * @return 分页结果，包含完整的单位数据
-   * @throws NoSuchSchemaException 如果 schema 不存在
+   * @param namespace schema namespace
+   * @param offset offset
+   * @param limit page size
+   * @return Paginated results,Contains complete unit data
+   * @throws NoSuchSchemaException if schema does not exist
    */
   PagedResult<Unit> listUnits(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException;
 
   /**
-   * 通过 {@link NameIdentifier} 从 catalog 获取单位
+   * Pass {@link NameIdentifier} from catalog Get unit
    *
-   * @param ident 单位标识符
-   * @return 单位对象
-   * @throws NoSuchUnitException 如果单位不存在
+   * @param ident unit identifier
+   * @return unit object
+   * @throws NoSuchUnitException If the unit does not exist
    */
   Unit getUnit(NameIdentifier ident) throws NoSuchUnitException;
 
   /**
-   * 在 catalog 中创建单位
+   * in catalog Create units in
    *
-   * @param ident 单位的名称标识符
-   * @param code 单位编码
-   * @param name 单位名称
-   * @param symbol 单位符号
-   * @param comment 单位注释，可选，可为 null
-   * @return 创建的单位对象
-   * @throws NoSuchSchemaException 如果 schema 不存在
-   * @throws UnitAlreadyExistsException 如果单位已存在
+   * @param ident Unit name identifier
+   * @param code unit code
+   * @param name Unit name
+   * @param symbol unit symbol
+   * @param comment Unit Notes,Optional,can be null
+   * @return Created unit object
+   * @throws NoSuchSchemaException if schema does not exist
+   * @throws UnitAlreadyExistsException If the unit already exists
    */
   Unit createUnit(NameIdentifier ident, String code, String name, String symbol, String comment)
       throws NoSuchSchemaException, UnitAlreadyExistsException;
 
   /**
-   * 从 catalog 删除单位
+   * from catalog Delete unit
    *
-   * @param ident 单位的名称标识符
-   * @return 如果删除单位则返回 true，如果单位不存在则返回 false
+   * @param ident Unit name identifier
+   * @return Returns if unit is deleted true,Returns if unit does not exist false
    */
   boolean deleteUnit(NameIdentifier ident);
 
   /**
-   * 更新单位信息
+   * Update organization information
    *
-   * @param ident 单位的名称标识符
-   * @param name 单位名称
-   * @param symbol 单位符号
-   * @param comment 注释
-   * @return 更新后的单位对象
-   * @throws NoSuchUnitException 如果单位不存在
+   * @param ident Unit name identifier
+   * @param name Unit name
+   * @param symbol unit symbol
+   * @param comment Comment
+   * @return Updated unit object
+   * @throws NoSuchUnitException If the unit does not exist
    */
   Unit alterUnit(NameIdentifier ident, String name, String symbol, String comment)
-      throws NoSuchUnitException;
+      throws NoSuchUnitException; // ==================== ValueDomain Range related methods
 
-  // ==================== ValueDomain 值域相关方法 ====================
+  // ====================
 
   /**
-   * 分页列出 schema 命名空间下的值域
+   * List in pages schema Value range under namespace
    *
-   * @param namespace schema 命名空间
-   * @param offset 偏移量
-   * @param limit 每页大小
-   * @return 分页结果，包含完整的值域数据
-   * @throws NoSuchSchemaException 如果 schema 不存在
+   * @param namespace schema namespace
+   * @param offset offset
+   * @param limit page size
+   * @return Paginated results,Contains complete range data
+   * @throws NoSuchSchemaException if schema does not exist
    */
   PagedResult<ValueDomain> listValueDomains(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException;
 
   /**
-   * 通过 {@link NameIdentifier} 从 catalog 获取值域
+   * Pass {@link NameIdentifier} from catalog Get value range
    *
-   * @param ident 值域标识符 (domainCode)
-   * @return 值域对象
-   * @throws NoSuchValueDomainException 如果值域不存在
+   * @param ident range identifier (domainCode)
+   * @return range object
+   * @throws NoSuchValueDomainException If the value range does not exist
    */
   ValueDomain getValueDomain(NameIdentifier ident) throws NoSuchValueDomainException;
 
   /**
-   * 在 catalog 中创建值域
+   * in catalog Create a value range in
    *
-   * @param ident 值域的名称标识符 (domainCode)
-   * @param domainCode 值域编码
-   * @param domainName 值域名称
-   * @param domainType 值域类型 (ENUM/RANGE/REGEX)
-   * @param domainLevel 值域级别 (BUILTIN/BUSINESS)
-   * @param items 值域项列表
-   * @param comment 值域注释，可选，可为 null
-   * @param dataType 值域数据类型，如 STRING, INTEGER 等
-   * @return 创建的值域对象
-   * @throws NoSuchSchemaException 如果 schema 不存在
-   * @throws ValueDomainAlreadyExistsException 如果值域已存在
+   * @param ident The name identifier of the value field (domainCode)
+   * @param domainCode range encoding
+   * @param domainName Value field name
+   * @param domainType Range type (ENUM/RANGE/REGEX)
+   * @param domainLevel range level (BUILTIN/BUSINESS)
+   * @param items List of range items
+   * @param comment Range annotation,Optional,can be null
+   * @param dataType Value range data type,Such as STRING,INTEGER Wait
+   * @return Created value range object
+   * @throws NoSuchSchemaException if schema does not exist
+   * @throws ValueDomainAlreadyExistsException If the value range already exists
    */
   ValueDomain createValueDomain(
       NameIdentifier ident,
@@ -469,24 +478,24 @@ public interface DatasetCatalog {
       throws NoSuchSchemaException, ValueDomainAlreadyExistsException;
 
   /**
-   * 从 catalog 删除值域
+   * from catalog Delete range
    *
-   * @param ident 值域的名称标识符
-   * @return 如果删除值域则返回 true，如果值域不存在则返回 false
+   * @param ident The name identifier of the value field
+   * @return Returns if the range is deleted true,Returns if the value range does not exist false
    */
   boolean deleteValueDomain(NameIdentifier ident);
 
   /**
-   * 更新值域信息
+   * Update range information
    *
-   * @param ident 值域的名称标识符
-   * @param domainName 值域名称
-   * @param domainLevel 值域级别
-   * @param items 值域项列表
-   * @param comment 注释
-   * @param dataType 值域数据类型
-   * @return 更新后的值域对象
-   * @throws NoSuchValueDomainException 如果值域不存在
+   * @param ident The name identifier of the value field
+   * @param domainName Value field name
+   * @param domainLevel range level
+   * @param items List of range items
+   * @param comment Comment
+   * @param dataType Value range data type
+   * @return updated value range object
+   * @throws NoSuchValueDomainException If the value range does not exist
    */
   ValueDomain alterValueDomain(
       NameIdentifier ident,

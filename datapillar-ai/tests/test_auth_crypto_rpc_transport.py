@@ -54,7 +54,6 @@ async def test_call_decrypt_fallbacks_to_java_service_path_and_passes_metadata()
     request = client._build_decrypt_request(
         tenant_code="tenant-1",
         ciphertext="ENCv1:cipher",
-        caller_service="datapillar-ai",
     )
 
     try:

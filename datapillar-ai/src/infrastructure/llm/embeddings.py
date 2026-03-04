@@ -1,12 +1,10 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-Embedding 集成层
+Embedding Integration layer
 
-统一走框架 EmbeddingProvider。
-"""
+Unify the framework EmbeddingProvider."""
 
 import logging
 from functools import lru_cache
@@ -37,10 +35,9 @@ def _get_embeddings(tenant_id: int):
 
 class UnifiedEmbedder(Embedder):
     """
-    统一 Embedder（实现 neo4j-graphrag 的 Embedder 接口）
+    unify Embedder(realize neo4j-graphrag of Embedder interface)
 
-    按租户缓存实例：同一租户复用同一个 Embedder。
-    """
+    Cache instances by tenant:The same tenant reuses the same Embedder."""
 
     _instances: dict[int, "UnifiedEmbedder"] = {}
 
@@ -55,7 +52,7 @@ class UnifiedEmbedder(Embedder):
         return instance
 
     def __init__(self, tenant_id: int | None = None):
-        """使用框架 EmbeddingProvider（每个租户只初始化一次）"""
+        """Use frames EmbeddingProvider(Each tenant is only initialized once)"""
         if getattr(self, "_initialized", False):
             return
 
@@ -68,17 +65,17 @@ class UnifiedEmbedder(Embedder):
         self._embeddings = _get_embeddings(resolved_tenant_id)
         self._initialized = True
         logger.info(
-            "UnifiedEmbedder 初始化完成: %s, tenant_id=%s",
+            "UnifiedEmbedder Initialization completed:%s,tenant_id=%s",
             type(self._embeddings).__name__,
             resolved_tenant_id,
         )
 
     def embed_query(self, text: str) -> list[float]:
-        """生成单个查询的向量嵌入"""
+        """Generate vector embeddings for a single query"""
         return list(self._embeddings.embed_query(text))
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        """批量生成向量嵌入"""
+        """Generate vector embeddings in batches"""
         if not texts:
             return []
         vectors = self._embeddings.embed_documents(texts)

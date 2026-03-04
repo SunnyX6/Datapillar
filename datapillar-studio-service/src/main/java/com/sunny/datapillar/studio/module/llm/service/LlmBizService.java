@@ -17,16 +17,15 @@ import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
- * 大模型业务服务
- * 提供大模型业务业务能力与领域服务
+ * Large model business services Provide large model business capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface LlmBizService {
 
-    List<LlmUserModelPermissionResponse> listCurrentUserModelPermissions(Long currentUserId,
-                                                                                   boolean onlyEnabled);
+  List<LlmUserModelPermissionResponse> listCurrentUserModelPermissions(
+      Long currentUserId, boolean onlyEnabled);
 
-    LlmUserModelUsageResponse setCurrentUserDefaultModel(Long currentUserId, Long aiModelId);
+  LlmUserModelUsageResponse setCurrentUserDefaultModel(Long currentUserId, Long aiModelId);
 }

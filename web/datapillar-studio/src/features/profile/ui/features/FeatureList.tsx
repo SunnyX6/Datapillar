@@ -13,11 +13,11 @@ export function FeatureList({ selectedId, onSelect }: FeatureListProps) {
     <div className="w-80 flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shrink-0 h-full">
       <div className="sticky top-0 z-10 bg-white/95 dark:bg-slate-900/90 backdrop-blur border-b border-slate-100 dark:border-slate-800/80">
         <div className="h-14 px-4 flex items-center justify-between">
-          <span className={cn(TYPOGRAPHY.caption, 'font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider')}>功能列表</span>
+          <span className={cn(TYPOGRAPHY.caption, 'font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider')}>Feature list</span>
           <button
             type="button"
             className="text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-500/10 p-1.5 rounded-lg transition-colors"
-            aria-label="新增资源"
+            aria-label="Add new resources"
           >
             <Plus size={16} />
           </button>
@@ -27,7 +27,7 @@ export function FeatureList({ selectedId, onSelect }: FeatureListProps) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={12} />
             <input
               type="text"
-              placeholder="搜索资源 ID..."
+              placeholder="Search resources ID..."
               className={cn(
                 TYPOGRAPHY.legal,
                 'w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:bg-white dark:focus:bg-slate-900 focus:ring-4 focus:ring-brand-500/5 transition-all text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500'

@@ -18,14 +18,14 @@ export const login = async (page: Page) => {
   const submitButton = page.locator('form button[type="submit"]')
   await submitButton.click()
 
-  const workspaceTitle = page.getByText('选择工作空间')
+  const workspaceTitle = page.getByText('Select workspace')
   const result = await Promise.race([
     page.waitForURL('**/home', { timeout: 15000 }).then(() => 'home').catch(() => null),
     workspaceTitle.waitFor({ timeout: 15000 }).then(() => 'select').catch(() => null)
   ])
 
   if (!result) {
-    throw new Error('登录未完成，未跳转主页且未出现租户选择')
+    throw new Error('Login not completed，The homepage is not redirected and tenant selection does not appear.')
   }
 
   if (result === 'select') {

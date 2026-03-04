@@ -326,13 +326,14 @@ public class CatalogIT extends BaseIT {
 
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
-    metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, "hive", "这是中文comment", properties);
+    metalake.createCatalog(
+        catalogName, Catalog.Type.RELATIONAL, "hive", "this is chinesecomment", properties);
     Assertions.assertTrue(metalake.catalogExists(catalogName));
     Catalog catalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(catalogName, catalog.name());
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalog.type());
     Assertions.assertEquals("hive", catalog.provider());
-    Assertions.assertEquals("这是中文comment", catalog.comment());
+    Assertions.assertEquals("this is chinesecomment", catalog.comment());
     Assertions.assertTrue(catalog.properties().containsKey("metastore.uris"));
 
     metalake.disableCatalog(catalogName);

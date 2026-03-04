@@ -1,14 +1,13 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-日志配置模块
+Log configuration module
 
-从 logging.yaml 加载配置，支持：
-- 控制台输出
-- 文件轮转
-- 按模块配置日志级别
+from logging.yaml Load configuration，support：
+- console output
+- File rotation
+- Configure log levels by module
 """
 
 import logging
@@ -22,7 +21,7 @@ from datapillar_oneagentic.log.context import ContextFilter
 
 
 class ExcludeNoisyFilter(logging.Filter):
-    """过滤第三方库的噪音日志"""
+    """Filter noise logs from third-party libraries"""
 
     NOISY_LOGGERS = {"httpx", "httpcore", "neo4j", "asyncio"}
 
@@ -32,59 +31,61 @@ class ExcludeNoisyFilter(logging.Filter):
 
 def setup_logging(config_path: str | Path | None = None) -> None:
     """
-    初始化日志配置
+    Initialize log configuration
 
     Args:
-        config_path: 配置文件路径，默认为项目根目录的 logging.yaml
+        config_path: Configuration file path，Defaults to the project root directory logging.yaml
     """
     if config_path is None:
-        # 默认查找项目根目录的 logging.yaml
-        # logging.py 位于 src/shared/config/ 需要向上4层到达项目根目录
+        # By default, the project root directory is searched. logging.yaml
+        # logging.py located in src/shared/config/ need up4layer reaches the project root directory
         root_dir = Path(__file__).parent.parent.parent.parent
         config_path = root_dir / "logging.yaml"
 
     config_path_str = str(config_path)
     if not os.path.exists(config_path_str):
-        # 配置文件不存在，使用基础配置
+        # Configuration file does not exist，Use basic configuration
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s.%(msecs)03d %(levelname)-5s %(name)s - %(message)s%(context)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
         logging.getLogger().addFilter(ContextFilter())
-        logging.warning(f"日志配置文件不存在: {config_path_str}，使用默认配置")
+        logging.warning(
+            f"Log configuration file does not exist: {config_path_str}，Use default configuration"
+        )
         return
 
-    # 加载 YAML 配置
+    # Load YAML Configuration
     with open(config_path_str, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    # 处理环境变量 LOG_HOME
+    # Handle environment variables LOG_HOME
     default_log_home = str(Path(tempfile.gettempdir()) / "datapillar-logs")
     log_home = os.environ.get("LOG_HOME", default_log_home)
 
-    # 确保日志目录存在（从配置中读取）
+    # Make sure the log directory exists（Read from configuration）
     yaml_default_prefix = default_log_home
     for handler in config.get("handlers", {}).values():
         if "filename" in handler:
-            # 替换日志路径前缀
+            # Replace log path prefix
             handler["filename"] = handler["filename"].replace(yaml_default_prefix, log_home)
             log_dir = Path(handler["filename"]).parent
             log_dir.mkdir(parents=True, exist_ok=True)
 
-    # 应用配置
+    # Application configuration
     logging.config.dictConfig(config)
-    logging.info(f"日志配置已加载: {config_path_str}")
+    logging.info(f"Log configuration loaded: {config_path_str}")
 
 
 def get_logger(name: str) -> logging.Logger:
     """
-    获取 logger 实例
+    Get logger Example
 
     Args:
-        name: logger 名称，通常使用 __name__
+        name: logger Name，Commonly used __name__
 
     Returns:
-        logging.Logger 实例
+        logging.Logger Example
     """
     return logging.getLogger(name)

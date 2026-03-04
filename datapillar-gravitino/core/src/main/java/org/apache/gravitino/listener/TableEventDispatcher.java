@@ -216,7 +216,7 @@ public class TableEventDispatcher implements TableDispatcher {
       MetricLineageEventEmitter.emitForRefTable(
           eventBus, PrincipalUtils.getCurrentUserName(), tableId);
     } catch (Exception e) {
-      LOG.warn("表变更触发指标级联失败: table={}", ident, e);
+      LOG.warn("Table change triggers indicator cascade failure: table={}", ident, e);
     }
   }
 }

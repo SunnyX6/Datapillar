@@ -8,19 +8,19 @@ import lombok.Data;
 @Schema(name = "SqlExecuteResponse")
 public class SqlExecuteResponse {
 
-    private boolean success;
+  private boolean success;
 
-    private String error;
+  private String error;
 
-    private List<SqlColumnSchemaItem> columns;
+  private List<SqlColumnSchemaItem> columns;
 
-    private List<List<Object>> rows;
+  private List<List<Object>> rows;
 
-    private int rowCount;
+  private int rowCount;
 
-    private boolean hasMore;
+  private boolean hasMore;
 
-    private long executionTime;
+  private long executionTime;
 
-    private String message;
+  private String message;
 }

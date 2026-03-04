@@ -24,7 +24,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
-/** 指标版本列表响应 */
+/** Indicator version list response */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -38,7 +38,7 @@ public class MetricVersionListResponse extends BaseResponse {
     this.versions = versions;
   }
 
-  /** Jackson 反序列化使用的默认构造函数 */
+  /** Jackson Default constructor used for deserialization */
   public MetricVersionListResponse() {
     super();
     this.versions = null;

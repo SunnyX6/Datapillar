@@ -25,7 +25,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.gravitino.dto.dataset.WordRootDTO;
 
-/** 词根响应 */
+/** root response */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -39,7 +39,7 @@ public class WordRootResponse extends BaseResponse {
     this.root = root;
   }
 
-  /** Jackson 反序列化使用的默认构造函数 */
+  /** Jackson Default constructor used for deserialization */
   public WordRootResponse() {
     super();
     this.root = null;

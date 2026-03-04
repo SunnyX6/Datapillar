@@ -10,13 +10,13 @@ import lombok.Data;
 @Schema(name = "SsoIdentityBindByCodeRequest")
 public class SsoIdentityBindByCodeRequest {
 
-    @NotNull(message = "用户ID不能为空")
-    private Long userId;
+  @NotNull(message = "UserIDcannot be empty")
+  private Long userId;
 
-    @NotBlank(message = "provider不能为空")
-    @Pattern(regexp = "(?i)^dingtalk$", message = "参数错误")
-    private String provider;
+  @NotBlank(message = "providercannot be empty")
+  @Pattern(regexp = "(?i)^dingtalk$", message = "Parameter error")
+  private String provider;
 
-    @NotBlank(message = "authCode不能为空")
-    private String authCode;
+  @NotBlank(message = "authCodecannot be empty")
+  private String authCode;
 }

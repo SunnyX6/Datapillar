@@ -1,11 +1,11 @@
 package com.sunny.datapillar.studio.config;
 
-import com.sunny.datapillar.studio.filter.GatewayAssertionFilter;
 import com.sunny.datapillar.studio.filter.SetupStateFilter;
 import com.sunny.datapillar.studio.filter.TenantContextFilter;
 import com.sunny.datapillar.studio.filter.TraceIdFilter;
+import com.sunny.datapillar.studio.filter.TrustedIdentityFilter;
 import com.sunny.datapillar.studio.handler.SecurityExceptionHandler;
-import com.sunny.datapillar.studio.security.GatewayAssertionProperties;
+import com.sunny.datapillar.studio.security.TrustedIdentityProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,8 +17,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * 安全配置
- * 负责安全配置装配与Bean初始化
+ * Security configuration Responsible for safe configuration and assemblyBeaninitialization
  *
  * @author Sunny
  * @date 2026-01-01
@@ -26,49 +25,57 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
-@EnableConfigurationProperties(GatewayAssertionProperties.class)
+@EnableConfigurationProperties(TrustedIdentityProperties.class)
 public class SecurityConfig {
 
-    private final GatewayAssertionFilter gatewayAssertionFilter;
-    private final SetupStateFilter setupStateFilter;
-    private final TraceIdFilter traceIdFilter;
-    private final TenantContextFilter tenantContextFilter;
-    private final SecurityExceptionHandler securityExceptionHandler;
+  private final TrustedIdentityFilter trustedIdentityFilter;
+  private final SetupStateFilter setupStateFilter;
+  private final TraceIdFilter traceIdFilter;
+  private final TenantContextFilter tenantContextFilter;
+  private final SecurityExceptionHandler securityExceptionHandler;
 
-    public SecurityConfig(GatewayAssertionFilter gatewayAssertionFilter,
-                          SetupStateFilter setupStateFilter,
-                          TraceIdFilter traceIdFilter,
-                          TenantContextFilter tenantContextFilter,
-                          SecurityExceptionHandler securityExceptionHandler) {
-        this.gatewayAssertionFilter = gatewayAssertionFilter;
-        this.setupStateFilter = setupStateFilter;
-        this.traceIdFilter = traceIdFilter;
-        this.tenantContextFilter = tenantContextFilter;
-        this.securityExceptionHandler = securityExceptionHandler;
-    }
+  public SecurityConfig(
+      TrustedIdentityFilter trustedIdentityFilter,
+      SetupStateFilter setupStateFilter,
+      TraceIdFilter traceIdFilter,
+      TenantContextFilter tenantContextFilter,
+      SecurityExceptionHandler securityExceptionHandler) {
+    this.trustedIdentityFilter = trustedIdentityFilter;
+    this.setupStateFilter = setupStateFilter;
+    this.traceIdFilter = traceIdFilter;
+    this.tenantContextFilter = tenantContextFilter;
+    this.securityExceptionHandler = securityExceptionHandler;
+  }
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(securityExceptionHandler)
-                        .accessDeniedHandler(securityExceptionHandler))
-                .authorizeHttpRequests(auth -> auth
-                        // 健康检查与文档端点
-                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                        .requestMatchers("/v3/api-docs/**").permitAll()
-                        .requestMatchers("/setup/**").permitAll()
-                        .requestMatchers("/biz/invitations/**").permitAll()
-                        // 所有请求都需要认证（Gateway 已验证，这里信任 Gateway）
-                        .anyRequest().authenticated()
-                )
-                .addFilterBefore(traceIdFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(setupStateFilter, TraceIdFilter.class)
-                .addFilterAfter(gatewayAssertionFilter, SetupStateFilter.class)
-                .addFilterAfter(tenantContextFilter, GatewayAssertionFilter.class);
+  @Bean
+  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    http.csrf(csrf -> csrf.disable())
+        .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .exceptionHandling(
+            exception ->
+                exception
+                    .authenticationEntryPoint(securityExceptionHandler)
+                    .accessDeniedHandler(securityExceptionHandler))
+        .authorizeHttpRequests(
+            auth ->
+                auth
+                    // Health Checks and Documentation Endpoints
+                    .requestMatchers("/actuator/health/**", "/actuator/info")
+                    .permitAll()
+                    .requestMatchers("/v3/api-docs/**")
+                    .permitAll()
+                    .requestMatchers("/setup/**")
+                    .permitAll()
+                    .requestMatchers("/biz/invitations/**")
+                    .permitAll()
+                    // All requests require authentication（Gateway Verified，trust here Gateway）
+                    .anyRequest()
+                    .authenticated())
+        .addFilterBefore(traceIdFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterAfter(setupStateFilter, TraceIdFilter.class)
+        .addFilterAfter(trustedIdentityFilter, SetupStateFilter.class)
+        .addFilterAfter(tenantContextFilter, TrustedIdentityFilter.class);
 
-        return http.build();
-    }
+    return http.build();
+  }
 }

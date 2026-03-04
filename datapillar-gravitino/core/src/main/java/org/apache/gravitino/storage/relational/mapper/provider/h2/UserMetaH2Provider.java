@@ -22,12 +22,14 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE
 import static org.apache.gravitino.storage.relational.mapper.UserMetaMapper.USER_ROLE_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.UserMetaBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
 public class UserMetaH2Provider extends UserMetaBaseSQLProvider {
   @Override
   public String listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
         + " ut.external_user_id as externalUserId, ut.metalake_id as metalakeId,"
         + " ut.audit_info as auditInfo,"
@@ -40,16 +42,22 @@ public class UserMetaH2Provider extends UserMetaBaseSQLProvider {
         + " ut LEFT OUTER JOIN ("
         + " SELECT * FROM "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " WHERE deleted_at = 0)"
+        + " WHERE deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ")"
         + " AS rt ON rt.user_id = ut.user_id"
         + " LEFT OUTER JOIN ("
         + " SELECT * FROM "
         + ROLE_TABLE_NAME
-        + " WHERE deleted_at = 0)"
+        + " WHERE deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ")"
         + " AS rot ON rot.role_id = rt.role_id"
         + " WHERE "
         + " ut.deleted_at = 0 AND "
         + " ut.metalake_id = #{metalakeId}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ut", tenantId)
         + " GROUP BY ut.user_id";
   }
 }

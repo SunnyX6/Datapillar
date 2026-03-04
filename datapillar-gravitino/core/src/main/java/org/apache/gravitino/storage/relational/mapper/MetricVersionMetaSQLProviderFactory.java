@@ -67,6 +67,10 @@ public class MetricVersionMetaSQLProviderFactory {
     return getProvider().selectMetricVersionMetaByMetricIdAndVersion(metricId, version);
   }
 
+  public static String listMetricVersionMetasByRefTableId(@Param("refTableId") Long refTableId) {
+    return getProvider().listMetricVersionMetasByRefTableId(refTableId);
+  }
+
   public static String softDeleteMetricVersionsBySchemaIdAndMetricCode(
       @Param("schemaId") Long schemaId, @Param("metricCode") String metricCode) {
     return getProvider().softDeleteMetricVersionsBySchemaIdAndMetricCode(schemaId, metricCode);

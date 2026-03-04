@@ -23,7 +23,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.dataset.Metric;
 import org.apache.gravitino.meta.AuditInfo;
 
-/** Metric 接口的实现类 */
+/** Metric Implementation class of interface */
 public class MetricImpl implements Metric, Auditable {
 
   private String name;
@@ -95,7 +95,7 @@ public class MetricImpl implements Metric, Auditable {
     return auditInfo;
   }
 
-  /** Builder 类用于构建 MetricImpl 实例 */
+  /** Builder classes used to build MetricImpl Example */
   public static class Builder {
     private final MetricImpl metric;
 

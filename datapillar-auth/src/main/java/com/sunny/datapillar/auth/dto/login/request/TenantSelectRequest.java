@@ -9,9 +9,9 @@ import lombok.Data;
 @Schema(name = "AuthLoginTenantRequest")
 public class TenantSelectRequest {
 
-    @NotBlank(message = "loginToken 不能为空")
-    private String loginToken;
+  @NotBlank(message = "loginToken must not be blank")
+  private String loginToken;
 
-    @NotNull(message = "tenantId 不能为空")
-    private Long tenantId;
+  @NotNull(message = "tenantId must not be null")
+  private Long tenantId;
 }

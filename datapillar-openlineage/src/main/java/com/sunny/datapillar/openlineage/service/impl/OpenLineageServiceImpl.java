@@ -19,94 +19,100 @@ import java.util.concurrent.Executor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
-/**
- * OpenLineage 服务实现。
- */
+/** OpenLineage Service implementation. */
 @Service
 public class OpenLineageServiceImpl implements OpenLineageService {
 
-    private final OpenLineageDao openLineageDao;
-    private final OpenLineageEventDao openLineageEventDao;
-    private final AsyncTaskDispatcher asyncTaskDispatcher;
-    private final Executor openLineageExecutor;
+  private final OpenLineageDao openLineageDao;
+  private final OpenLineageEventDao openLineageEventDao;
+  private final AsyncTaskDispatcher asyncTaskDispatcher;
+  private final Executor openLineageExecutor;
 
-    public OpenLineageServiceImpl(OpenLineageDao openLineageDao,
-                                  OpenLineageEventDao openLineageEventDao,
-                                  AsyncTaskDispatcher asyncTaskDispatcher,
-                                  @Qualifier("openLineageExecutor") Executor openLineageExecutor) {
-        this.openLineageDao = openLineageDao;
-        this.openLineageEventDao = openLineageEventDao;
-        this.asyncTaskDispatcher = asyncTaskDispatcher;
-        this.openLineageExecutor = openLineageExecutor;
+  public OpenLineageServiceImpl(
+      OpenLineageDao openLineageDao,
+      OpenLineageEventDao openLineageEventDao,
+      AsyncTaskDispatcher asyncTaskDispatcher,
+      @Qualifier("openLineageExecutor") Executor openLineageExecutor) {
+    this.openLineageDao = openLineageDao;
+    this.openLineageEventDao = openLineageEventDao;
+    this.asyncTaskDispatcher = asyncTaskDispatcher;
+    this.openLineageExecutor = openLineageExecutor;
+  }
+
+  @Override
+  public CompletableFuture<Void> createAsync(
+      OpenLineage.RunEvent event, OpenLineageEventEnvelope envelope, TenantContext tenantContext) {
+    CompletableFuture<Void> openlineage =
+        CompletableFuture.runAsync(
+            () -> openLineageDao.createLineageEvent(event, envelope, tenantContext),
+            openLineageExecutor);
+    CompletableFuture<OpenLineageUpdateResult> datapillar =
+        CompletableFuture.supplyAsync(
+            () -> openLineageDao.updateDatapillarModel(event, envelope, tenantContext),
+            openLineageExecutor);
+    return CompletableFuture.allOf(datapillar, openlineage)
+        .thenCompose(ignored -> enqueueAndDispatch(datapillar.join(), tenantContext));
+  }
+
+  @Override
+  public CompletableFuture<Void> createAsync(
+      OpenLineage.DatasetEvent event,
+      OpenLineageEventEnvelope envelope,
+      TenantContext tenantContext) {
+    CompletableFuture<Void> openlineage =
+        CompletableFuture.runAsync(
+            () -> openLineageDao.createDatasetEvent(event, envelope, tenantContext),
+            openLineageExecutor);
+    CompletableFuture<OpenLineageUpdateResult> datapillar =
+        CompletableFuture.supplyAsync(
+            () -> openLineageDao.updateDatapillarModel(event, envelope, tenantContext),
+            openLineageExecutor);
+    return CompletableFuture.allOf(datapillar, openlineage)
+        .thenCompose(ignored -> enqueueAndDispatch(datapillar.join(), tenantContext));
+  }
+
+  @Override
+  public CompletableFuture<Void> createAsync(
+      OpenLineage.JobEvent event, OpenLineageEventEnvelope envelope, TenantContext tenantContext) {
+    CompletableFuture<Void> openlineage =
+        CompletableFuture.runAsync(
+            () -> openLineageDao.createJobEvent(event, envelope, tenantContext),
+            openLineageExecutor);
+    CompletableFuture<OpenLineageUpdateResult> datapillar =
+        CompletableFuture.supplyAsync(
+            () -> openLineageDao.updateDatapillarModel(event, envelope, tenantContext),
+            openLineageExecutor);
+    return CompletableFuture.allOf(datapillar, openlineage)
+        .thenCompose(ignored -> enqueueAndDispatch(datapillar.join(), tenantContext));
+  }
+
+  private CompletableFuture<Void> enqueueAndDispatch(
+      OpenLineageUpdateResult updateResult, TenantContext tenantContext) {
+    List<AsyncTaskCandidate> candidates =
+        updateResult == null ? List.of() : updateResult.taskCandidates();
+    if (candidates.isEmpty()) {
+      return CompletableFuture.completedFuture(null);
     }
 
-    @Override
-    public CompletableFuture<Void> createAsync(OpenLineage.RunEvent event,
-                                               OpenLineageEventEnvelope envelope,
-                                               TenantContext tenantContext) {
-        CompletableFuture<Void> openlineage = CompletableFuture.runAsync(
-                () -> openLineageDao.createLineageEvent(event, envelope, tenantContext),
-                openLineageExecutor);
-
-        CompletableFuture<OpenLineageUpdateResult> datapillar = CompletableFuture.supplyAsync(
-                () -> openLineageDao.updateDatapillarModel(event, envelope, tenantContext),
-                openLineageExecutor);
-
-        return CompletableFuture.allOf(datapillar, openlineage)
-                .thenCompose(ignored -> enqueueAndDispatch(datapillar.join(), tenantContext));
-    }
-
-    @Override
-    public CompletableFuture<Void> createAsync(OpenLineage.DatasetEvent event,
-                                               OpenLineageEventEnvelope envelope,
-                                               TenantContext tenantContext) {
-        CompletableFuture<Void> openlineage = CompletableFuture.runAsync(
-                () -> openLineageDao.createDatasetEvent(event, envelope, tenantContext),
-                openLineageExecutor);
-
-        CompletableFuture<OpenLineageUpdateResult> datapillar = CompletableFuture.supplyAsync(
-                () -> openLineageDao.updateDatapillarModel(event, envelope, tenantContext),
-                openLineageExecutor);
-
-        return CompletableFuture.allOf(datapillar, openlineage)
-                .thenCompose(ignored -> enqueueAndDispatch(datapillar.join(), tenantContext));
-    }
-
-    @Override
-    public CompletableFuture<Void> createAsync(OpenLineage.JobEvent event,
-                                               OpenLineageEventEnvelope envelope,
-                                               TenantContext tenantContext) {
-        CompletableFuture<Void> openlineage = CompletableFuture.runAsync(
-                () -> openLineageDao.createJobEvent(event, envelope, tenantContext),
-                openLineageExecutor);
-
-        CompletableFuture<OpenLineageUpdateResult> datapillar = CompletableFuture.supplyAsync(
-                () -> openLineageDao.updateDatapillarModel(event, envelope, tenantContext),
-                openLineageExecutor);
-
-        return CompletableFuture.allOf(datapillar, openlineage)
-                .thenCompose(ignored -> enqueueAndDispatch(datapillar.join(), tenantContext));
-    }
-
-    private CompletableFuture<Void> enqueueAndDispatch(OpenLineageUpdateResult updateResult,
-                                                       TenantContext tenantContext) {
-        List<AsyncTaskCandidate> candidates = updateResult == null ? List.of() : updateResult.taskCandidates();
-        if (candidates.isEmpty()) {
-            return CompletableFuture.completedFuture(null);
-        }
-
-        return CompletableFuture.runAsync(() -> {
-            for (AsyncTaskCandidate candidate : candidates) {
+    return CompletableFuture.runAsync(
+            () -> {
+              for (AsyncTaskCandidate candidate : candidates) {
                 long taskId = openLineageEventDao.upsertAsyncTask(tenantContext, candidate);
                 String claimToken = UUID.randomUUID().toString();
-                LocalDateTime claimUntil = LocalDateTime.now(ZoneOffset.UTC).plus(openLineageEventDao.claimTimeout());
-                boolean claimed = openLineageEventDao.claimTaskForPush(taskId, claimToken, claimUntil);
+                LocalDateTime claimUntil =
+                    LocalDateTime.now(ZoneOffset.UTC).plus(openLineageEventDao.claimTimeout());
+                boolean claimed =
+                    openLineageEventDao.claimTaskForPush(taskId, claimToken, claimUntil);
                 if (claimed) {
-                    asyncTaskDispatcher.dispatch(candidate.taskType(), taskId, claimToken);
+                  asyncTaskDispatcher.dispatch(candidate.taskType(), taskId, claimToken);
                 }
-            }
-        }, openLineageExecutor).exceptionally(throwable -> {
-            throw new OpenLineageWriteException(throwable, "enqueue/push 异步任务失败");
-        });
-    }
+              }
+            },
+            openLineageExecutor)
+        .exceptionally(
+            throwable -> {
+              throw new OpenLineageWriteException(
+                  throwable, "enqueue/push Asynchronous task failed");
+            });
+  }
 }

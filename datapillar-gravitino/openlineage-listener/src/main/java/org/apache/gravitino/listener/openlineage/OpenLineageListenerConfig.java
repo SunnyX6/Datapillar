@@ -24,9 +24,9 @@ import java.net.URI;
 /**
  * Configuration constants for OpenLineage Gravitino Listener.
  *
- * <p>配置键遵循 OpenLineage Java Client 标准格式，前缀为 transport.
+ * <p>Configuration keys follow OpenLineage Java Client standard format，The prefix is transport.
  *
- * <p>示例配置（gravitino.conf）：
+ * <p>Example configuration（gravitino.conf）：
  *
  * <pre>
  * gravitino.openlineage.transport.type = http
@@ -61,7 +61,7 @@ public final class OpenLineageListenerConfig {
   /** Default transport type. */
   public static final String DEFAULT_TRANSPORT_TYPE = "console";
 
-  // HTTP Transport 配置键
+  // HTTP Transport configuration key
   /** HTTP transport URL. */
   public static final String TRANSPORT_URL = "transport.url";
 
@@ -80,18 +80,18 @@ public final class OpenLineageListenerConfig {
   /** HTTP transport compression (none, gzip). */
   public static final String TRANSPORT_COMPRESSION = "transport.compression";
 
-  // Auth 配置键
+  // Auth configuration key
   /** Auth type (api_key). */
   public static final String TRANSPORT_AUTH_TYPE = "transport.auth.type";
 
   /** API Key for authentication. */
   public static final String TRANSPORT_AUTH_API_KEY = "transport.auth.apiKey";
 
-  // Headers 配置键前缀
+  // Headers Configuration key prefix
   /** Custom headers prefix (e.g., transport.headers.X-Tenant-Id). */
   public static final String TRANSPORT_HEADERS_PREFIX = "transport.headers.";
 
-  // 异步队列配置（限流）
+  // Asynchronous queue configuration（Current limiting）
   /** Maximum events in processing queue (default: 10000). */
   public static final String TRANSPORT_MAX_QUEUE_SIZE = "transport.maxQueueSize";
 
@@ -104,7 +104,7 @@ public final class OpenLineageListenerConfig {
   /** Default max concurrent requests. */
   public static final int DEFAULT_MAX_CONCURRENT_REQUESTS = 100;
 
-  // Retry 配置
+  // Retry Configuration
   /** Total number of retries (default: 5). */
   public static final String TRANSPORT_RETRY_TOTAL = "transport.retry.total";
 

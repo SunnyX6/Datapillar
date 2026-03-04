@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-28
 
-"""RAG 知识 Wiki 模块."""
+"""RAG knowledge Wiki module."""
 
 from src.modules.rag.api import router
 

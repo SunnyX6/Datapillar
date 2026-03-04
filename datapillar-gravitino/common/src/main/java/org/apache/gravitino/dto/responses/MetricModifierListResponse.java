@@ -27,7 +27,7 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.dataset.MetricModifierDTO;
 
-/** 指标修饰符分页列表响应，返回完整的修饰符数据 */
+/** Indicator modifier paginated list response，Return complete modifier data */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -46,12 +46,12 @@ public class MetricModifierListResponse extends BaseResponse {
   private final int limit;
 
   /**
-   * 创建修饰符列表响应
+   * Create a modifier list response
    *
-   * @param modifiers 修饰符数组
-   * @param total 总数
-   * @param offset 偏移量
-   * @param limit 每页大小
+   * @param modifiers modifier array
+   * @param total total
+   * @param offset offset
+   * @param limit page size
    */
   public MetricModifierListResponse(
       MetricModifierDTO[] modifiers, long total, int offset, int limit) {
@@ -62,7 +62,7 @@ public class MetricModifierListResponse extends BaseResponse {
     this.limit = limit;
   }
 
-  /** Jackson 反序列化用的默认构造函数 */
+  /** Jackson Default constructor for deserialization */
   public MetricModifierListResponse() {
     super();
     this.modifiers = null;

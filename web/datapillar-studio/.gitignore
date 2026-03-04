@@ -1,16 +1,16 @@
-# 数据库文件
+# database file
 *.db
 *.sqlite
 *.sqlite3
 
-# IDE 文件
+# IDE File
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
 
-# 系统文件
+# System files
 .DS_Store
 .DS_Store?
 ._*
@@ -19,12 +19,12 @@
 ehthumbs.db
 Thumbs.db
 
-# 日志文件
+# log file
 logs/
 *.log
 be/logs/
 
-# Java 编译产物
+# Java Compile product
 be/target/
 **/target/
 be/out/
@@ -38,10 +38,10 @@ be/out/
 *.rar
 *.iml
 
-# Flink 运行时（不推送）
+# Flink runtime（Do not push）
 flink/
 
-# XXL-Job 和 Gravitino 的 distribution 目录
+# XXL-Job and Gravitino of distribution Directory
 */distribution/
 xxl-job/distribution/
 gravitino/distribution/
@@ -61,51 +61,51 @@ replay_pid*
 mvnw
 mvnw.cmd
 
-# 前端依赖和构建产物
+# Front-end dependencies and build artifacts
 node_modules/**
 
 
-# 环境变量和配置文件
+# Environment variables and configuration files
 fe/.env.local
 fe/.env.production
 be/.env
 be/application-prod.yml
 be/application-dev.yml
 be/data-storage/
-# 临时文件
+# temporary files
 *.tmp
 *.temp
 .cache/
 
-# 测试覆盖率报告
+# Test coverage report
 coverage/
 *.lcov
 
-# Playwright 测试产物
+# Playwright Test product
 playwright-report/
 test-results/
 
-# 依赖分析报告
+# Dependency analysis report
 .nyc_output/
 
-# 安全相关文件
+# Security related documents
 *.pem
 *.key
 *.crt
 cookies.txt
 login_response.json
 
-# 缓存目录
+# cache directory
 .be/
 .trae/
 
-# 文档草稿和临时文件
+# Document drafts and temporary files
 .checkpoints/
 demo-ui/
 
-# 脚本执行日志
+# Script execution log
 code_review_report.md
 
-# 其他临时文件
+# Other temporary files
 quick_check.sh.log
 code_review.sh.log

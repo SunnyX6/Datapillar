@@ -28,7 +28,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.json.JsonUtils.NameIdentifierDeserializer;
 import org.apache.gravitino.json.JsonUtils.NameIdentifierSerializer;
 
-/** 分页实体列表响应 */
+/** Paginated entity list response */
 @EqualsAndHashCode(callSuper = true)
 @ToString
 public class PagedEntityListResponse extends BaseResponse {
@@ -48,12 +48,12 @@ public class PagedEntityListResponse extends BaseResponse {
   private final int limit;
 
   /**
-   * 构造分页响应
+   * Construct a paginated response
    *
-   * @param idents 实体标识符数组
-   * @param total 总数
-   * @param offset 偏移量
-   * @param limit 每页大小
+   * @param idents array of entity identifiers
+   * @param total total
+   * @param offset offset
+   * @param limit page size
    */
   public PagedEntityListResponse(NameIdentifier[] idents, long total, int offset, int limit) {
     super(0);
@@ -63,7 +63,7 @@ public class PagedEntityListResponse extends BaseResponse {
     this.limit = limit;
   }
 
-  /** 默认构造函数（用于 Jackson 反序列化） */
+  /** default constructor（used for Jackson Deserialization） */
   public PagedEntityListResponse() {
     super();
     this.idents = null;

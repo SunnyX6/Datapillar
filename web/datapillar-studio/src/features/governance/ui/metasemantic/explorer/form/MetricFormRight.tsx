@@ -40,12 +40,12 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
     }
   }, [col, onFilterToggle])
 
-  // 点击只负责切换开关
+  // Clicking is only responsible for switching the switch
   const handleFilterClick = () => {
     setOpen((prev) => !prev)
   }
 
-  // 点击外部关闭
+  // Click outside to close
   useEffect(() => {
     if (!open) return
     const handleClickOutside = (e: MouseEvent) => {
@@ -58,7 +58,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [open])
 
-  // 位置计算 - 和左侧完全一致的模式
+  // Position calculation - Exactly the same pattern as the left
   useLayoutEffect(() => {
     if (!open) return
     const updatePosition = () => {
@@ -79,7 +79,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
     }
   }, [open])
 
-  // 数据加载 - 只在首次打开且有 domainCode 时加载
+  // Data loading - Only when opened for the first time and has domainCode loading when
   const loadedRef = useRef(false)
   useEffect(() => {
     if (!open || !domainCode || loadedRef.current) return
@@ -104,7 +104,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
     }
   }
 
-  // 派生模式只看过滤列，原子模式看度量或过滤
+  // Derived mode only looks at filtered columns，Atomic mode to see metrics or filtering
   const isSelected = mode === 'derived' ? isFilter : (isMeasure || isFilter)
 
   return (
@@ -121,7 +121,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
           {domainCode && (
             <span
               className="inline-flex items-center px-1.5 py-0.5 text-micro font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 rounded-full"
-              title="已关联值域"
+              title="Associated value range"
             >
               <Pin size={8} />
             </span>
@@ -133,12 +133,12 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
       </td>
       <td className="px-4 py-2.5 w-20">
         <div className="flex items-center justify-center gap-1">
-          {/* 原子模式显示度量按钮，派生模式隐藏 */}
+          {/* Atomic mode shows metric buttons，Derived mode hidden */}
           {mode === 'atomic' && (
             <button
               type="button"
               onClick={handleMeasureClick}
-              title={isMeasure ? '取消度量' : '设为度量列'}
+              title={isMeasure ? 'Cancel measurement' : 'Set as measure column'}
               className={`p-1 rounded ${
                 isMeasure
                   ? 'bg-blue-500 text-white'
@@ -154,7 +154,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
               type="button"
               ref={filterButtonRef}
               onClick={handleFilterClick}
-              title={isFilter ? `已选${filterValues.length}个过滤值` : '设为过滤列'}
+              title={isFilter ? `Selected${filterValues.length}filter values` : 'Set as filter column'}
               className={`p-1 rounded ${
                 isFilter
                   ? 'bg-amber-500 text-white'
@@ -174,7 +174,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
                 className={`fixed ${menuWidthClassMap.large} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[1000000]`}
               >
                 <div className="p-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">选择过滤值</span>
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Select filter value</span>
                   {loadingDomain && <Loader2 size={12} className="animate-spin text-slate-400" />}
                 </div>
                 <div className="max-h-48 overflow-y-auto overscroll-contain custom-scrollbar" onWheel={(e) => e.stopPropagation()}>
@@ -200,7 +200,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
                       )
                     })
                   ) : !loadingDomain ? (
-                    <div className="py-4 text-center text-xs text-slate-400">暂无值域数据</div>
+                    <div className="py-4 text-center text-xs text-slate-400">No range data yet</div>
                   ) : null}
                 </div>
                 {filterValues.length > 0 && (
@@ -210,7 +210,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
                       onClick={() => handleFilterChange([])}
                       className="w-full text-xs text-red-500 hover:text-red-600"
                     >
-                      清除全部
+                      clear all
                     </button>
                   </div>
                 )}
@@ -245,7 +245,7 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
   const [selected, setSelected] = useState({ catalog: '', schema: '', table: '' })
   const [level, setLevel] = useState<Level>('CATALOG')
 
-  // 使用 ref 存储回调函数和当前已选列，避免 effect 依赖频繁变化
+  // use ref Store callback function and currently selected column，avoid effect Depend on frequent changes
   const callbacksRef = useRef({ onMeasureToggle, onFilterToggle, measureColumns, filterColumns })
   useLayoutEffect(() => {
     callbacksRef.current = { onMeasureToggle, onFilterToggle, measureColumns, filterColumns }
@@ -253,10 +253,10 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
 
-  // 列的值域标签映射（columnName -> domainCode），用于显示 Pin 图标
+  // Column range label mapping（columnName -> domainCode），for display Pin icon
   const [columnDomainMap, setColumnDomainMap] = useState<Map<string, string>>(new Map())
 
-  // 批量加载列的值域标签，返回 Map
+  // Bulk load range labels for columns，Return Map
   const loadColumnDomainTags = useCallback(async (catalog: string, schema: string, table: string, columnNames: string[]) => {
     const map = new Map<string, string>()
     await Promise.all(
@@ -269,20 +269,20 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
             map.set(colName, tag.slice(VALUE_DOMAIN_TAG_PREFIX.length))
           }
         } catch {
-          // 忽略单个列的错误
+          // Ignore errors for individual columns
         }
       })
     )
     return map
   }, [])
 
-  // 初始化加载数据
+  // Initialize loading data
   useEffect(() => {
     let cancelled = false
     const hasInitialRef = initialRef?.catalog && initialRef?.schema && initialRef?.table
 
     if (hasInitialRef) {
-      // 编辑模式：直接用三个参数请求表详情
+      // edit mode：Directly use three parameters to request table details
       startTransition(() => {
         setLoading(true)
         setSelected({
@@ -296,7 +296,7 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
         .then(async (data) => {
           if (cancelled) return
           const cols = data.columns?.map((c) => ({ name: c.name, type: c.dataType, comment: c.comment })) || []
-          // 先加载标签，再一起设置状态
+          // Load tags first，Let’s set the status together
           const domainMap = await loadColumnDomainTags(initialRef.catalog!, initialRef.schema!, initialRef.table!, cols.map((c) => c.name))
           if (!cancelled) {
             setColumns(cols)
@@ -313,7 +313,7 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
           if (!cancelled) setLoading(false)
         })
     } else {
-      // 新建模式：从 catalog 开始
+      // New mode：from catalog start
       fetchCatalogs()
         .then((data) => { if (!cancelled) setCatalogs(data.map((c) => c.name)) })
         .catch(() => { if (!cancelled) setCatalogs([]) })
@@ -325,12 +325,12 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
     return () => { cancelled = true }
   }, [initialRef?.catalog, initialRef?.schema, initialRef?.table, loadColumnDomainTags])
 
-  // AI 建议的列自动选中
+  // AI Suggested columns are automatically selected
   useEffect(() => {
     if (columns.length === 0) return
     const { onMeasureToggle: toggleMeasure, onFilterToggle: toggleFilter, measureColumns: measures, filterColumns: filters } = callbacksRef.current
 
-    // 处理 AI 建议的度量列
+    // Process AI Recommended metric columns
     if (aiSuggestedMeasures && aiSuggestedMeasures.length > 0) {
       const existingMeasureNames = new Set(measures.map((c) => c.name))
       aiSuggestedMeasures.forEach((colName) => {
@@ -342,7 +342,7 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
       })
     }
 
-    // 处理 AI 建议的过滤列（简单选中，不设置值域值）
+    // Process AI Suggested filter columns（Simple selection，Do not set the range value）
     if (aiSuggestedFilters && aiSuggestedFilters.length > 0) {
       const existingFilterNames = new Set(filters.map((c) => c.name))
       aiSuggestedFilters.forEach((colName) => {
@@ -385,7 +385,7 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
       setColumns([])
       setColumnDomainMap(new Map())
       setLoading(true)
-      // 通知父组件表选择变化
+      // Notify parent component of table selection changes
       onTableSelect?.(selected.catalog, selected.schema, item)
       getTable(selected.catalog, selected.schema, item)
         .then(async (data) => {
@@ -446,10 +446,10 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
   }, [selected, loadColumnDomainTags])
 
   const levels: { id: Level; label: string; icon: typeof Database; value: string }[] = [
-    { id: 'CATALOG', label: '数据源', icon: Database, value: selected.catalog },
-    { id: 'SCHEMA', label: '数据库', icon: Box, value: selected.schema },
-    { id: 'TABLE', label: '物理表', icon: Box, value: selected.table },
-    { id: 'COLUMN', label: '字段', icon: Hash, value: '' }
+    { id: 'CATALOG', label: 'data source', icon: Database, value: selected.catalog },
+    { id: 'SCHEMA', label: 'database', icon: Box, value: selected.schema },
+    { id: 'TABLE', label: 'physical table', icon: Box, value: selected.table },
+    { id: 'COLUMN', label: 'Field', icon: Hash, value: '' }
   ]
 
   const currentData = level === 'CATALOG' ? catalogs : level === 'SCHEMA' ? schemas : level === 'TABLE' ? tables : columns.map((c) => c.name)
@@ -489,7 +489,7 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
           <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
           <input
             type="text"
-            placeholder={`搜索 ${levels.find((l) => l.id === level)?.label}...`}
+            placeholder={`Search ${levels.find((l) => l.id === level)?.label}...`}
             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -505,15 +505,15 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
         ) : filteredData.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-400">
             <Box size={24} className="opacity-20 mb-2" />
-            <span className="text-xs">暂无数据</span>
+            <span className="text-xs">No data yet</span>
           </div>
         ) : level === 'COLUMN' ? (
           <table className="w-full">
             <thead className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-10">
               <tr className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                <th className="text-left px-4 py-2">列名</th>
-                <th className="text-left px-4 py-2">类型</th>
-                <th className="text-center px-4 py-2 w-20">操作</th>
+                <th className="text-left px-4 py-2">List</th>
+                <th className="text-left px-4 py-2">Type</th>
+                <th className="text-center px-4 py-2 w-20">Operation</th>
               </tr>
             </thead>
             <tbody>
@@ -565,7 +565,7 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
   )
 }
 
-/** 复合指标 - 指标选择器 */
+/** Composite indicator - Indicator selector */
 function MetricSelector({ selectedMetrics, onMetricsChange }: {
   selectedMetrics: Array<{ code: string; name: string; comment?: string }>
   onMetricsChange?: (metrics: Array<{ code: string; name: string; comment?: string }>) => void
@@ -574,12 +574,12 @@ function MetricSelector({ selectedMetrics, onMetricsChange }: {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
-  // 加载原子指标和派生指标
+  // Loading atomic and derived indicators
   useEffect(() => {
     import('@/services/oneMetaSemanticService').then(({ fetchMetrics }) => {
       fetchMetrics(0, 500)
         .then((data) => {
-          // 只取原子指标和派生指标
+          // Only take atomic indicators and derived indicators
           const filtered = data.items
             .filter((m) => m.type.toUpperCase() === 'ATOMIC' || m.type.toUpperCase() === 'DERIVED')
             .map((m) => ({ code: m.code, name: m.name, type: m.type.toUpperCase(), comment: m.comment }))
@@ -608,13 +608,13 @@ function MetricSelector({ selectedMetrics, onMetricsChange }: {
 
   return (
     <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col h-[620px]">
-      {/* 搜索 */}
+      {/* Search */}
       <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-t-2xl">
         <div className="relative">
           <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
           <input
             type="text"
-            placeholder="搜索指标..."
+            placeholder="search metrics..."
             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-emerald-500"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -622,7 +622,7 @@ function MetricSelector({ selectedMetrics, onMetricsChange }: {
         </div>
       </div>
 
-      {/* 指标列表 */}
+      {/* Indicator list */}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar">
         {loading ? (
           <div className="flex items-center justify-center h-full">
@@ -631,7 +631,7 @@ function MetricSelector({ selectedMetrics, onMetricsChange }: {
         ) : filteredMetrics.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-400">
             <Target size={24} className="opacity-20 mb-2" />
-            <span className="text-xs">暂无可用指标</span>
+            <span className="text-xs">No indicators available yet</span>
           </div>
         ) : (
           <div className="p-3 space-y-1.5">
@@ -670,7 +670,7 @@ function MetricSelector({ selectedMetrics, onMetricsChange }: {
                           ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-500'
                           : 'bg-blue-50 dark:bg-blue-900/30 text-blue-500'
                       }`}>
-                        {metric.type === 'ATOMIC' ? '原子' : '派生'}
+                        {metric.type === 'ATOMIC' ? 'atom' : 'derived'}
                       </span>
                     </div>
                   </div>
@@ -708,14 +708,14 @@ export function MetricFormRight({
   aiSuggestedMeasures,
   aiSuggestedFilters
 }: MetricFormRightProps) {
-  // 原子指标：选择物理资产（度量列 + 过滤列）
+  // Atomic indicators：Select physical assets（measure column + Filter columns）
   if (form.type === 'ATOMIC') {
     return (
       <div className="col-span-7 xl:col-span-8 flex h-full min-h-0 flex-col">
         <div className="h-full min-h-0 flex flex-col gap-1.5">
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 shrink-0">
             <Database size={14} className="text-blue-500" />
-            物理资产（选择度量列或过滤列）
+            physical assets（Select measure or filter columns）
           </label>
           <div className="flex-1 min-h-0">
             <CascadingPicker
@@ -739,14 +739,14 @@ export function MetricFormRight({
     )
   }
 
-  // 派生指标：选择物理资产（仅维度过滤列）
+  // Derived indicators：Select physical assets（Dimension filter columns only）
   if (form.type === 'DERIVED') {
     return (
       <div className="col-span-7 xl:col-span-8 flex h-full min-h-0 flex-col">
         <div className="h-full min-h-0 flex flex-col gap-1.5">
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 shrink-0">
             <Database size={14} className="text-blue-500" />
-            物理资产（选择维度列过滤）
+            physical assets（Select dimension column filter）
           </label>
           <div className="flex-1 min-h-0">
             <CascadingPicker
@@ -769,13 +769,13 @@ export function MetricFormRight({
     )
   }
 
-  // 复合指标：选择指标列表
+  // Composite indicator：Select indicator list
   return (
     <div className="col-span-7 xl:col-span-8 flex h-full min-h-0 flex-col">
       <div className="h-full min-h-0 flex flex-col gap-1.5">
         <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 shrink-0">
           <Target size={14} className="text-emerald-500" />
-          选择参与运算的指标
+          Select the indicators to participate in the calculation
         </label>
         <div className="flex-1 min-h-0">
           <MetricSelector

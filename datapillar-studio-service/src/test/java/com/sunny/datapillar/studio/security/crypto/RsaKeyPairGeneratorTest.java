@@ -9,13 +9,13 @@ import org.junit.jupiter.api.Test;
 
 class RsaKeyPairGeneratorTest {
 
-    @Test
-    void shouldGenerateKeyPairAndPem() {
-        KeyPair keyPair = RsaKeyPairGenerator.generateRsaKeyPair();
-        assertThat(keyPair).isNotNull();
-        String publicPem = RsaKeyPairGenerator.toPublicKeyPem(keyPair.getPublic());
-        byte[] privatePem = RsaKeyPairGenerator.toPrivateKeyPem(keyPair.getPrivate());
-        assertThat(publicPem).contains("BEGIN PUBLIC KEY");
-        assertThat(new String(privatePem, StandardCharsets.US_ASCII)).contains("BEGIN PRIVATE KEY");
-    }
+  @Test
+  void shouldGenerateKeyPairAndPem() {
+    KeyPair keyPair = RsaKeyPairGenerator.generateRsaKeyPair();
+    assertThat(keyPair).isNotNull();
+    String publicPem = RsaKeyPairGenerator.toPublicKeyPem(keyPair.getPublic());
+    byte[] privatePem = RsaKeyPairGenerator.toPrivateKeyPem(keyPair.getPrivate());
+    assertThat(publicPem).contains("BEGIN PUBLIC KEY");
+    assertThat(new String(privatePem, StandardCharsets.US_ASCII)).contains("BEGIN PRIVATE KEY");
+  }
 }

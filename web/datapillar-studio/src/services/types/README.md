@@ -1,1 +1,1 @@
-只放后端返回的类型，前端组件展示需要的类型放在各自的模块下面
+Only put the type returned by the backend，The types required for front-end component display are placed under their respective modules.

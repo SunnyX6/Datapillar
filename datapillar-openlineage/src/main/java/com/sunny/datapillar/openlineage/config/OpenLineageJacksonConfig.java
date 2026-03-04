@@ -5,14 +5,12 @@ import io.openlineage.client.OpenLineageClientUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * OpenLineage Jackson 配置。
- */
+/** OpenLineage Jackson Configuration. */
 @Configuration
 public class OpenLineageJacksonConfig {
 
-    @Bean(name = "openLineageObjectMapper")
-    public ObjectMapper openLineageObjectMapper() {
-        return OpenLineageClientUtils.newObjectMapper();
-    }
+  @Bean(name = "openLineageObjectMapper")
+  public ObjectMapper openLineageObjectMapper() {
+    return OpenLineageClientUtils.newObjectMapper();
+  }
 }

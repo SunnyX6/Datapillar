@@ -1,9 +1,9 @@
 /**
- * 登录页面主组件
+ * Login page main component
  *
- * 功能：
- * 1. 左右布局：左侧演示动画 + 右侧登录表单
- * 2. 响应式设计
+ * Function：
+ * 1. left and right layout：Demo animation on the left + Login form on the right
+ * 2. Responsive design
  */
 
 import { useEffect } from 'react'
@@ -14,13 +14,13 @@ import { DemoCanvas } from './DemoCanvas'
 import { LoginForm, LOGIN_FORM_BASE_HEIGHT, LOGIN_FORM_BASE_WIDTH } from './LoginForm'
 
 /**
- * 登录页面
+ * Login page
  */
 export function LoginPage() {
   const [searchParams] = useSearchParams()
   const tenantCode = searchParams.get('tenantCode')
 
-  // 禁用 body 滚动
+  // Disable body scroll
   useEffect(() => {
     const originalOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -65,7 +65,7 @@ export function LoginPage() {
             ref={rightPaneRef}
             className="relative flex h-dvh max-h-dvh w-full items-center justify-center overflow-hidden bg-white dark:bg-[#020617]"
           >
-            {/* 语言和主题切换按钮 - 固定在右上角 */}
+            {/* Language and theme switch button - pinned to upper right corner */}
             <div className="absolute top-4 right-4 z-30 flex items-center gap-3">
               <ThemeToggle />
               <LanguageToggle />

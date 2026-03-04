@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper.META_TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.FilesetMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.ibatis.annotations.Param;
@@ -27,57 +28,71 @@ import org.apache.ibatis.annotations.Param;
 public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
   @Override
   public String softDeleteFilesetMetasByMetalakeId(Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteFilesetMetasByCatalogId(Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteFilesetMetasBySchemaId(Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteFilesetMetasByFilesetId(Long filesetId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
+        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String deleteFilesetMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + META_TABLE_NAME
         + " WHERE fileset_id IN (SELECT fileset_id FROM "
         + META_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit})";
   }
 
   @Override
   public String insertFilesetMetaOnDuplicateKeyUpdate(FilesetPO filesetPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + META_TABLE_NAME
         + "(fileset_id, fileset_name, metalake_id,"
         + " catalog_id, schema_id, type, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{filesetMeta.filesetId},"
         + " #{filesetMeta.filesetName},"
@@ -88,7 +103,9 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
         + " #{filesetMeta.auditInfo},"
         + " #{filesetMeta.currentVersion},"
         + " #{filesetMeta.lastVersion},"
-        + " #{filesetMeta.deletedAt}"
+        + " #{filesetMeta.deletedAt},"
+        + " "
+        + tenantId
         + " )"
         + " ON CONFLICT(fileset_id) DO UPDATE SET"
         + " fileset_name = #{filesetMeta.filesetName},"

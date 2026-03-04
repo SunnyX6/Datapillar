@@ -1,4 +1,4 @@
-const formatMissingEnv = (key: string) => `请设置环境变量 ${key}`
+const formatMissingEnv = (key: string) => `Please set environment variables ${key}`
 
 export const getRequiredEnv = (key: string): string => {
   const value = process.env[key]
@@ -15,7 +15,7 @@ export const getNumberEnv = (key: string, fallback: number): number => {
   }
   const parsed = Number(value)
   if (Number.isNaN(parsed)) {
-    throw new Error(`${key} 必须是数字`)
+    throw new Error(`${key} Must be a number`)
   }
   return parsed
 }

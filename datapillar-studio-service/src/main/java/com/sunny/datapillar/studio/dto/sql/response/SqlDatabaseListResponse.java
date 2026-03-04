@@ -8,7 +8,7 @@ import lombok.Data;
 @Schema(name = "SqlDatabaseListResponse")
 public class SqlDatabaseListResponse {
 
-    private List<String> databases;
+  private List<String> databases;
 
-    private String currentDatabase;
+  private String currentDatabase;
 }

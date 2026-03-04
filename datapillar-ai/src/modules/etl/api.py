@@ -1,7 +1,7 @@
 # @author Sunny
 # @date 2026-01-27
 
-"""ETL 模块 API 路由。"""
+"""ETL module API routing."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ etl_run_registry = RunRegistry()
 
 
 class WorkflowChatModel(BaseModel):
-    """工作流 Chat 模型标识。"""
+    """Workflow Chat model identification."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -39,15 +39,17 @@ class WorkflowChatModel(BaseModel):
 
 
 class WorkflowRequest(BaseModel):
-    """工作流生成请求。"""
+    """Workflow generation request."""
 
     model_config = ConfigDict(populate_by_name=True)
 
-    user_input: str | None = Field(None, alias="userInput", description="用户输入")
-    session_id: str | None = Field(None, alias="sessionId", description="会话ID")
-    resume_value: Any | None = Field(None, alias="resumeValue", description="interrupt 恢复数据")
-    interrupt_id: str | None = Field(None, alias="interruptId", description="interrupt 标识")
-    model: WorkflowChatModel | None = Field(None, alias="model", description="本次会话模型")
+    user_input: str | None = Field(None, alias="userInput", description="user input")
+    session_id: str | None = Field(None, alias="sessionId", description="sessionID")
+    resume_value: Any | None = Field(
+        None, alias="resumeValue", description="interrupt Recover data"
+    )
+    interrupt_id: str | None = Field(None, alias="interruptId", description="interrupt logo")
+    model: WorkflowChatModel | None = Field(None, alias="model", description="This session model")
 
 
 def _get_session_teams(request: Request) -> dict[str, Datapillar]:
@@ -82,7 +84,7 @@ def _build_session_key(*, tenant_id: int, session_id: str, user_id: str) -> Sess
 def _normalize_provider_model_id(provider_model_id: str) -> str:
     normalized = provider_model_id.strip()
     if not normalized:
-        raise BadRequestException("model.providerModelId 不能为空")
+        raise BadRequestException("model.providerModelId cannot be empty")
     return normalized
 
 
@@ -103,7 +105,7 @@ def _resolve_session_team(
     session_models = _get_session_models(request)
     bound_model = session_models.get(storage_key)
     if bound_model and bound_model != requested_model:
-        raise ConflictException("同一 sessionId 不允许切换 model")
+        raise ConflictException("same sessionId Switch not allowed model")
 
     team = _get_bound_team(request, storage_key)
     if team is not None:
@@ -149,13 +151,13 @@ class _TeamOrchestratorAdapter:
 
 @router.post("/chat", response_model=ApiSuccessResponseSchema)
 async def chat(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
-    """统一的 ETL 多智能体工作流入口。"""
+    """unified ETL Multi-agent workflow portal."""
     current_user = request.state.current_user
 
     if not payload.session_id:
-        raise BadRequestException("sessionId 不能为空")
+        raise BadRequestException("sessionId cannot be empty")
     if payload.model is None:
-        raise BadRequestException("model 不能为空")
+        raise BadRequestException("model cannot be empty")
 
     user_id = current_user.user_id
     user_id_str = str(user_id)
@@ -196,7 +198,7 @@ async def chat(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
         )
     else:
         if not payload.user_input:
-            raise BadRequestException("userInput 不能为空")
+            raise BadRequestException("userInput cannot be empty")
 
         etl_run_registry.start_run(str(key))
         logger.info(
@@ -226,7 +228,7 @@ async def chat(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
     response_class=EventSourceResponse,
     responses={
         200: {
-            "description": "SSE 事件流",
+            "description": "SSE event stream",
             "content": {
                 "text/event-stream": {
                     "schema": {
@@ -241,7 +243,8 @@ async def chat(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
 async def workflow_sse(
     request: Request, session_id: str = Query(..., alias="sessionId")
 ) -> EventSourceResponse:
-    """SSE/JSON 事件流：前端可用 Last-Event-ID 重连重放（断线续传）。"""
+    """SSE/JSON event stream:
+    Frontend available Last-Event-ID Reconnect and playback(Resume upload after disconnection)."""
     current_user = request.state.current_user
 
     last_event_id_raw = request.headers.get("Last-Event-ID")
@@ -259,7 +262,7 @@ async def workflow_sse(
     )
     storage_key = str(key)
     if storage_key not in _get_session_models(request):
-        raise BadRequestException("会话未初始化，请先调用 /chat")
+        raise BadRequestException("Session not initialized,Please call first /chat")
 
     run_id = etl_run_registry.get_run(storage_key) or etl_run_registry.start_run(storage_key)
 
@@ -288,11 +291,11 @@ async def workflow_sse(
 
 @router.post("/session/clear", response_model=ApiSuccessResponseSchema)
 async def clear_session(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
-    """清除会话历史。"""
+    """Clear session history."""
     current_user = request.state.current_user
 
     if not payload.session_id:
-        raise BadRequestException("sessionId 不能为空")
+        raise BadRequestException("sessionId cannot be empty")
 
     logger.info(
         "[Clear] user=%s, userId=%s, sessionId=%s",
@@ -313,8 +316,8 @@ async def clear_session(payload: WorkflowRequest, request: Request) -> dict[str,
         try:
             await team.clear_session(session_id=key.session_id)
         except Exception as exc:
-            logger.error("清理 checkpoint 失败: %s", exc, exc_info=True)
-            raise InternalException("清理会话失败", cause=exc) from exc
+            logger.error("clean up checkpoint failed:%s", exc, exc_info=True)
+            raise InternalException("Cleaning session failed", cause=exc) from exc
 
     etl_stream_manager.clear_session(key=key)
     etl_run_registry.finish_run(storage_key)
@@ -324,18 +327,18 @@ async def clear_session(payload: WorkflowRequest, request: Request) -> dict[str,
     return ApiResponse.success(
         data={
             "success": True,
-            "message": "历史对话已清除",
+            "message": "Historical conversations have been cleared",
         },
     )
 
 
 @router.post("/abort", response_model=ApiSuccessResponseSchema)
 async def abort_workflow(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
-    """打断当前 run。"""
+    """interrupt current run."""
     current_user = request.state.current_user
 
     if not payload.session_id:
-        raise BadRequestException("sessionId 不能为空")
+        raise BadRequestException("sessionId cannot be empty")
 
     user_id = str(current_user.user_id)
     key = _build_session_key(
@@ -356,12 +359,12 @@ async def abort_workflow(payload: WorkflowRequest, request: Request) -> dict[str
             key=key,
             interrupt_id=payload.interrupt_id,
         )
-        message = "interrupt 已终止" if aborted else "没有等待中的 interrupt"
+        message = "interrupt terminated" if aborted else "nothing waiting interrupt"
     else:
         aborted = await etl_stream_manager.abort(
             key=key,
         )
-        message = "已停止" if aborted else "没有正在运行的任务"
+        message = "Stopped" if aborted else "No tasks running"
 
     if aborted:
         etl_run_registry.finish_run(str(key))
@@ -377,11 +380,11 @@ async def abort_workflow(payload: WorkflowRequest, request: Request) -> dict[str
 
 @router.post("/session/compact", response_model=ApiSuccessResponseSchema)
 async def compact_session(payload: WorkflowRequest, request: Request) -> dict[str, Any]:
-    """手动压缩会话记忆。"""
+    """Manually compress session memory."""
     current_user = request.state.current_user
 
     if not payload.session_id:
-        raise BadRequestException("sessionId 不能为空")
+        raise BadRequestException("sessionId cannot be empty")
 
     user_id = str(current_user.user_id)
     key = _build_session_key(
@@ -391,7 +394,7 @@ async def compact_session(payload: WorkflowRequest, request: Request) -> dict[st
     )
     team = _get_bound_team(request, str(key))
     if team is None:
-        raise BadRequestException("会话不存在或已过期")
+        raise BadRequestException("The session does not exist or has expired")
 
     logger.info(
         "[Compact] user=%s, userId=%s, sessionId=%s",
@@ -403,8 +406,8 @@ async def compact_session(payload: WorkflowRequest, request: Request) -> dict[st
     try:
         result = await team.compact_session(session_id=key.session_id)
     except Exception as exc:
-        logger.error("压缩失败: %s", exc, exc_info=True)
-        raise InternalException("压缩失败", cause=exc) from exc
+        logger.error("Compression failed:%s", exc, exc_info=True)
+        raise InternalException("Compression failed", cause=exc) from exc
 
     return ApiResponse.success(data=result)
 
@@ -414,7 +417,7 @@ async def get_session_stats(
     request: Request,
     session_id: str = Query(..., alias="sessionId"),
 ) -> dict[str, Any]:
-    """获取会话统计信息。"""
+    """Get session statistics."""
     current_user = request.state.current_user
     key = _build_session_key(
         tenant_id=current_user.tenant_id,
@@ -423,12 +426,12 @@ async def get_session_stats(
     )
     team = _get_bound_team(request, str(key))
     if team is None:
-        raise BadRequestException("会话不存在或已过期")
+        raise BadRequestException("The session does not exist or has expired")
 
     try:
         stats = await team.get_session_stats(session_id=key.session_id)
     except Exception as exc:
-        logger.error("获取统计信息失败: %s", exc, exc_info=True)
-        raise InternalException("获取统计信息失败", cause=exc) from exc
+        logger.error("Failed to obtain statistics:%s", exc, exc_info=True)
+        raise InternalException("Failed to obtain statistics", cause=exc) from exc
 
     return ApiResponse.success(data=stats)

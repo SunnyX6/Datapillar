@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import static org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper.STATISTIC_META_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.StatisticBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
 
@@ -33,11 +34,14 @@ public class StatisticPostgresSQLProvider extends StatisticBaseSQLProvider {
 
   @Override
   public String batchInsertStatisticPOsOnDuplicateKeyUpdate(List<StatisticPO> statisticPOs) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "INSERT INTO "
         + STATISTIC_META_TABLE_NAME
         + " (statistic_id, statistic_name, statistic_value, metalake_id, metadata_object_id,"
-        + " metadata_object_type, audit_info, current_version, last_version, deleted_at) VALUES "
+        + " metadata_object_type, audit_info, current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ") VALUES "
         + "<foreach collection='statisticPOs' item='item' separator=','>"
         + "(#{item.statisticId}, "
         + "#{item.statisticName}, "
@@ -48,9 +52,11 @@ public class StatisticPostgresSQLProvider extends StatisticBaseSQLProvider {
         + "#{item.auditInfo}, "
         + "#{item.currentVersion}, "
         + "#{item.lastVersion}, "
-        + "#{item.deletedAt})"
+        + "#{item.deletedAt}, "
+        + tenantId
+        + ")"
         + "</foreach>"
-        + " ON CONFLICT (statistic_name, metadata_object_id, deleted_at)"
+        + " ON CONFLICT (tenant_id, statistic_name, metadata_object_id, deleted_at)"
         + " DO UPDATE SET "
         + "  statistic_value = EXCLUDED.statistic_value,"
         + "  audit_info = EXCLUDED.audit_info,"

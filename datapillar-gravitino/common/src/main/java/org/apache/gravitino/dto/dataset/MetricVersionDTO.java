@@ -31,7 +31,7 @@ import org.apache.gravitino.dataset.Metric;
 import org.apache.gravitino.dataset.MetricVersion;
 import org.apache.gravitino.dto.AuditDTO;
 
-/** 表示指标版本的 DTO (Data Transfer Object) */
+/** Represents the indicator version DTO (Data Transfer Object) */
 @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @EqualsAndHashCode

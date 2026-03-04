@@ -39,7 +39,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** WordRoot 元数据服务类 */
+/** WordRoot Metadata service class */
 public class WordRootMetaService {
   private static final Logger LOG = LoggerFactory.getLogger(WordRootMetaService.class);
   private static final WordRootMetaService INSTANCE = new WordRootMetaService();
@@ -50,7 +50,7 @@ public class WordRootMetaService {
 
   private WordRootMetaService() {}
 
-  /** 插入 WordRoot */
+  /** Insert WordRoot */
   public void insertWordRoot(WordRootEntity wordRootEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkRoot(wordRootEntity.nameIdentifier());
@@ -75,7 +75,7 @@ public class WordRootMetaService {
     }
   }
 
-  /** 根据 namespace 列出所有 WordRoot */
+  /** According to namespace list all WordRoot */
   public List<WordRootEntity> listWordRootsByNamespace(Namespace namespace) {
     NamespaceUtil.checkRoot(namespace);
 
@@ -85,14 +85,15 @@ public class WordRootMetaService {
     List<WordRootPO> wordRootPOs =
         SessionUtils.getWithoutCommit(
             WordRootMetaMapper.class, mapper -> mapper.listWordRootPOsBySchemaId(schemaId));
-    LOG.info("DEBUG: listWordRootsByNamespace - 查询到 {} 个 WordRootPO", wordRootPOs.size());
+    LOG.info("DEBUG: listWordRootsByNamespace - Found {} a WordRootPO", wordRootPOs.size());
 
     List<WordRootEntity> result = POConverters.fromWordRootPOs(wordRootPOs, namespace);
-    LOG.info("DEBUG: listWordRootsByNamespace - 转换后返回 {} 个 Entity", result.size());
+    LOG.info(
+        "DEBUG: listWordRootsByNamespace - Return after conversion {} a Entity", result.size());
     return result;
   }
 
-  /** 分页列出 WordRoot */
+  /** List in pages WordRoot */
   public List<WordRootEntity> listWordRootsByNamespaceWithPagination(
       Namespace namespace, int offset, int limit) {
     NamespaceUtil.checkRoot(namespace);
@@ -107,7 +108,7 @@ public class WordRootMetaService {
     return POConverters.fromWordRootPOs(wordRootPOs, namespace);
   }
 
-  /** 统计 WordRoot 总数 */
+  /** statistics WordRoot total */
   public long countWordRootsByNamespace(Namespace namespace) {
     NamespaceUtil.checkRoot(namespace);
 
@@ -117,7 +118,7 @@ public class WordRootMetaService {
         WordRootMetaMapper.class, mapper -> mapper.countWordRootsBySchemaId(schemaId));
   }
 
-  /** 获取 WordRoot */
+  /** Get WordRoot */
   public WordRootEntity getWordRootByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkRoot(ident);
 
@@ -127,7 +128,7 @@ public class WordRootMetaService {
     return POConverters.fromWordRootPO(wordRootPO, ident.namespace());
   }
 
-  /** 更新 WordRoot */
+  /** update WordRoot */
   public <E extends Entity & HasIdentifier> WordRootEntity updateWordRoot(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkRoot(ident);
@@ -166,7 +167,7 @@ public class WordRootMetaService {
     }
   }
 
-  /** 删除 WordRoot */
+  /** Delete WordRoot */
   public boolean deleteWordRoot(NameIdentifier ident) {
     NameIdentifierUtil.checkRoot(ident);
 
@@ -224,7 +225,7 @@ public class WordRootMetaService {
     }
   }
 
-  /** 根据遗留时间线删除词根元数据 */
+  /** Remove root metadata based on legacy timeline */
   public int deleteWordRootMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         WordRootMetaMapper.class,

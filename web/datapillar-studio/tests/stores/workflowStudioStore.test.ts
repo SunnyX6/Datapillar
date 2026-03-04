@@ -23,7 +23,7 @@ describe('workflowStudioStore', () => {
     resetWorkflowStore()
   })
 
-  it('hydrateFromCache 只有默认模型时，当前模型应回落到默认模型', () => {
+  it('hydrateFromCache Only the default model，The current model should fall back to the default model', () => {
     useWorkflowStudioStore.getState().hydrateFromCache({
       messages: [],
       workflow: emptyWorkflowGraph,
@@ -37,7 +37,7 @@ describe('workflowStudioStore', () => {
     expect(state.selectedAiModelId).toBe(CLAUDE_AI_MODEL_ID)
   })
 
-  it('reset 后应保留当前默认模型，并将选中模型重置为默认模型', () => {
+  it('reset The current default model should be retained after，and reset the selected model to the default model', () => {
     useWorkflowStudioStore.getState().setDefaultAiModelId(DEEPSEEK_AI_MODEL_ID)
     useWorkflowStudioStore.getState().setSelectedAiModelId(CLAUDE_AI_MODEL_ID)
 

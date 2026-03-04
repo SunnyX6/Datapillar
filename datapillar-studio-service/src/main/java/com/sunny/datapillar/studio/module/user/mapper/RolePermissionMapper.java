@@ -5,12 +5,10 @@ import com.sunny.datapillar.studio.module.user.entity.RolePermission;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * 角色权限Mapper
- * 负责角色权限数据访问与持久化映射
+ * Role permissionsMapper Responsible for role permission data access and persistence mapping
  *
  * @author Sunny
  * @date 2026-01-01
  */
 @Mapper
-public interface RolePermissionMapper extends BaseMapper<RolePermission> {
-}
+public interface RolePermissionMapper extends BaseMapper<RolePermission> {}

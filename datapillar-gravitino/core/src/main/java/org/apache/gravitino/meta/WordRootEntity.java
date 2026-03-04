@@ -28,17 +28,20 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 
-/** WordRoot 实体，表示词根 */
+/** WordRoot Entity，Indicates root */
 @ToString
 public class WordRootEntity implements Entity, Auditable, HasIdentifier {
 
-  public static final Field ID = Field.required("id", Long.class, "词根的唯一 ID");
-  public static final Field CODE = Field.required("code", String.class, "词根的编码");
-  public static final Field NAMESPACE = Field.required("namespace", Namespace.class, "词根的命名空间");
-  public static final Field ROOT_NAME = Field.required("root_name", String.class, "词根的名称");
-  public static final Field DATA_TYPE = Field.optional("data_type", String.class, "词根的数据类型");
-  public static final Field COMMENT = Field.optional("comment", String.class, "词根的注释");
-  public static final Field AUDIT_INFO = Field.required("audit_info", AuditInfo.class, "词根的审计信息");
+  public static final Field ID = Field.required("id", Long.class, "the only root ID");
+  public static final Field CODE = Field.required("code", String.class, "encoding of root words");
+  public static final Field NAMESPACE =
+      Field.required("namespace", Namespace.class, "root namespace");
+  public static final Field ROOT_NAME = Field.required("root_name", String.class, "root name");
+  public static final Field DATA_TYPE = Field.optional("data_type", String.class, "Root data type");
+  public static final Field COMMENT =
+      Field.optional("comment", String.class, "Notes on root words");
+  public static final Field AUDIT_INFO =
+      Field.required("audit_info", AuditInfo.class, "Stem audit information");
 
   private Long id;
   private String code;

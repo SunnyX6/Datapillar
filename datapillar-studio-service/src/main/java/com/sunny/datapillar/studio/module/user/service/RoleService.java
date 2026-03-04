@@ -16,63 +16,47 @@ import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
-
 /**
- * 角色服务
- * 提供角色业务能力与领域服务
+ * role service Provide role business capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface RoleService {
 
-    /**
-     * 根据角色ID查询角色详情
-     */
-    RoleResponse getRoleById(Long id);
+  /** According to roleIDQuery role details */
+  RoleResponse getRoleById(Long id);
 
-    /**
-     * 创建角色
-     */
-    Long createRole(RoleCreateRequest dto);
+  /** Create a role */
+  Long createRole(RoleCreateRequest dto);
 
-    /**
-     * 更新角色
-     */
-    void updateRole(Long id, RoleUpdateRequest dto);
+  /** Update role */
+  void updateRole(Long id, RoleUpdateRequest dto);
 
-    /**
-     * 删除角色
-     */
-    void deleteRole(Long id);
+  /** Delete role */
+  void deleteRole(Long id);
 
-    /**
-     * 查询角色列表
-     */
-    List<RoleResponse> getRoleList();
+  /** Query role list */
+  List<RoleResponse> getRoleList();
 
-    /**
-     * 根据用户ID查询角色列表
-     */
-    List<RoleResponse> getRolesByUserId(Long userId);
+  /** According to userIDQuery role list */
+  List<RoleResponse> getRolesByUserId(Long userId);
 
-    /**
-     * 获取角色权限
-     */
-    List<FeatureObjectPermissionItem> getRolePermissions(Long roleId, String scope);
+  /** Get role permissions */
+  List<FeatureObjectPermissionItem> getRolePermissions(Long roleId, String scope);
 
-    /**
-     * 更新角色权限（全量覆盖）
-     */
-    void updateRolePermissions(Long roleId, List<RoleFeatureAssignmentItem> permissions);
+  /** Update role permissions（Full coverage） */
+  void updateRolePermissions(Long roleId, List<RoleFeatureAssignmentItem> permissions);
 
-    /**
-     * 获取角色成员
-     */
-    RoleMembersResponse getRoleMembers(Long roleId, Integer status);
+  /** Get role members */
+  RoleMembersResponse getRoleMembers(Long roleId, Integer status);
 
-    /**
-     * 批量移除角色成员
-     */
-    void removeRoleMembers(Long roleId, List<Long> userIds);
+  /** Remove role members in batches */
+  void removeRoleMembers(Long roleId, List<Long> userIds);
+
+  /** Get role data privileges from Gravitino */
+  List<RoleDataPrivilegeItem> getRoleDataPrivileges(Long roleId, String domain);
+
+  /** Sync role data privileges to Gravitino */
+  void updateRoleDataPrivileges(Long roleId, RoleDataPrivilegeSyncRequest request);
 }

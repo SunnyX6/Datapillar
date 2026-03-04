@@ -21,8 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 工作流Dependency业务服务实现
- * 实现工作流Dependency业务业务流程与规则校验
+ * WorkflowDependencyBusiness service implementation Implement workflowDependencyBusiness business
+ * process and rule verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -31,25 +31,25 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class WorkflowDependencyBizServiceImpl implements WorkflowDependencyBizService {
 
-    private final JobDependencyService jobDependencyService;
+  private final JobDependencyService jobDependencyService;
 
-    @Override
-    public List<JobDependencyResponse> getDependenciesByWorkflowId(Long workflowId) {
-        return jobDependencyService.getDependenciesByWorkflowId(workflowId);
-    }
+  @Override
+  public List<JobDependencyResponse> getDependenciesByWorkflowId(Long workflowId) {
+    return jobDependencyService.getDependenciesByWorkflowId(workflowId);
+  }
 
-    @Override
-    public List<JobDependencyResponse> getDependenciesByJobId(Long jobId) {
-        return jobDependencyService.getDependenciesByJobId(jobId);
-    }
+  @Override
+  public List<JobDependencyResponse> getDependenciesByJobId(Long jobId) {
+    return jobDependencyService.getDependenciesByJobId(jobId);
+  }
 
-    @Override
-    public Long createDependency(Long workflowId, JobDependencyCreateRequest dto) {
-        return jobDependencyService.createDependency(workflowId, dto);
-    }
+  @Override
+  public Long createDependency(Long workflowId, JobDependencyCreateRequest dto) {
+    return jobDependencyService.createDependency(workflowId, dto);
+  }
 
-    @Override
-    public void deleteDependency(Long workflowId, Long jobId, Long parentJobId) {
-        jobDependencyService.deleteDependency(workflowId, jobId, parentJobId);
-    }
+  @Override
+  public void deleteDependency(Long workflowId, Long jobId, Long parentJobId) {
+    jobDependencyService.deleteDependency(workflowId, jobId, parentJobId);
+  }
 }

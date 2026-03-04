@@ -5,12 +5,11 @@ import com.sunny.datapillar.studio.module.tenant.entity.TenantFeatureAudit;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * 租户功能AuditMapper
- * 负责租户功能Audit数据访问与持久化映射
+ * Tenant functionsAuditMapper Responsible for tenant functionsAuditData access and persistence
+ * mapping
  *
  * @author Sunny
  * @date 2026-01-01
  */
 @Mapper
-public interface TenantFeatureAuditMapper extends BaseMapper<TenantFeatureAudit> {
-}
+public interface TenantFeatureAuditMapper extends BaseMapper<TenantFeatureAudit> {}

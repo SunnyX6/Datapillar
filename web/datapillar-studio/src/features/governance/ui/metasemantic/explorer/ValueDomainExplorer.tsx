@@ -27,29 +27,29 @@ import {
 import { ValueDomainFormModal, type ValueDomainFormData } from './form/ValueDomainForm'
 import { cn, formatTime } from '@/utils'
 
-/** 每页加载数量 */
+/** Number of loads per page */
 const PAGE_SIZE = 20
-/** 枚举值卡片预览每页展示数量（保持卡片尺寸稳定） */
+/** Enumeration value card preview display number per page（Keep card size stable） */
 const ENUM_PREVIEW_PAGE_SIZE = 6
 
-/** 类型标签配置 */
+/** Type label configuration */
 const TYPE_CONFIG: Record<ValueDomainType, { label: string; color: string }> = {
   ENUM: { label: 'ENUM', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800' },
   RANGE: { label: 'RANGE', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' },
   REGEX: { label: 'REGEX', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800' }
 }
 
-/** 级别标签配置 */
+/** Level label configuration */
 const LEVEL_CONFIG: Record<string, { label: string; color: string }> = {
-  BUILTIN: { label: '内置', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800' },
-  BUSINESS: { label: '业务', color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700' }
+  BUILTIN: { label: 'Built-in', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800' },
+  BUSINESS: { label: 'Business', color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700' }
 }
 
 interface ValueDomainExplorerProps {
   onBack: () => void
 }
 
-/** 值域卡片组件 */
+/** Value range card component */
 function ValueDomainCard({
   domain,
   onDelete,
@@ -78,7 +78,7 @@ function ValueDomainCard({
     if (deleting || isBuiltin) return
     setDeleting(true)
     try {
-      // 直接删除整个值域
+      // Delete the entire value range directly
       await deleteValueDomain(domain.domainCode)
       onDelete(domain.domainCode)
     } catch {
@@ -112,7 +112,7 @@ function ValueDomainCard({
       variant="default"
       className="w-full group hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 duration-200"
     >
-      {/* 头部：类型标签 + 数据类型标签 + 级别标签 + 操作按钮 */}
+      {/* head：type tag + Data type tag + level label + Action button */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
           <span className={`px-2 py-0.5 text-micro font-semibold uppercase tracking-wider rounded-md border ${typeConfig.color}`}>
@@ -131,7 +131,7 @@ function ValueDomainCard({
           <button
             onClick={handleEdit}
             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-            title="编辑"
+            title="Edit"
           >
             <Pencil size={iconSizeToken.small} />
           </button>
@@ -140,7 +140,7 @@ function ValueDomainCard({
               onClick={handleDelete}
               disabled={deleting}
               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
-              title="删除"
+              title="Delete"
             >
               {deleting ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Trash2 size={iconSizeToken.small} />}
             </button>
@@ -148,11 +148,11 @@ function ValueDomainCard({
         </div>
       </div>
 
-      {/* 名称和编码 */}
+      {/* Name and code */}
       <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-body-sm mb-0.5">{domain.domainName}</h3>
       <p className="text-micro font-mono text-slate-400 dark:text-slate-500 uppercase tracking-tight mb-3">{domain.domainCode}</p>
 
-      {/* 枚举值预览区 */}
+      {/* Enum value preview area */}
       <div className="bg-black rounded-lg mb-2 h-14 flex overflow-hidden">
         <div className="flex-1 px-3 py-2 overflow-hidden">
           <div className="relative w-full h-full overflow-hidden">
@@ -177,7 +177,7 @@ function ValueDomainCard({
                     </div>
                   ) : (
                     <div className="h-full flex items-center">
-                      <span className="text-slate-500 text-micro">无枚举值</span>
+                      <span className="text-slate-500 text-micro">No enumeration value</span>
                     </div>
                   )}
                 </div>
@@ -197,11 +197,11 @@ function ValueDomainCard({
                 ? 'hover:border-emerald-400/80 text-slate-300 hover:text-emerald-300'
                 : 'text-slate-300 cursor-default opacity-50'
             )}
-            title={hasMultiplePreviewPages ? '更多' : '无更多枚举值'}
-            aria-label={hasMultiplePreviewPages ? '更多枚举值' : '无更多枚举值'}
+            title={hasMultiplePreviewPages ? 'More' : 'No more enumeration values'}
+            aria-label={hasMultiplePreviewPages ? 'More enumeration values' : 'No more enumeration values'}
           >
             <ChevronsRight size={iconSizeToken.extraLarge} className="mb-1" />
-            <span className="text-micro font-semibold tracking-wide">更多</span>
+            <span className="text-micro font-semibold tracking-wide">More</span>
           </button>
         )}
       </div>
@@ -218,14 +218,14 @@ function ValueDomainCard({
                   ? 'w-2 h-2 bg-emerald-500 dark:bg-emerald-400'
                   : 'w-1.5 h-1.5 bg-slate-200 dark:bg-slate-700'
               )}
-              aria-label={`切换到第 ${index + 1} 页`}
-              title={`第 ${index + 1} 页`}
+              aria-label={`Switch to page ${index + 1} page`}
+              title={`No. ${index + 1} page`}
             />
           ))}
         </div>
       )}
 
-      {/* 底部：创建人 + 创建时间 + 枚举数量 */}
+      {/* bottom：Creator + creation time + Enumeration quantity */}
       <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-3 text-micro text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-1.5">
@@ -238,7 +238,7 @@ function ValueDomainCard({
             <span>{formatTime(domain.audit?.createTime)}</span>
           </div>
         </div>
-        <span className="text-micro text-slate-400">{domain.items?.length || 0} 个枚举值</span>
+        <span className="text-micro text-slate-400">{domain.items?.length || 0} enumeration values</span>
       </div>
     </Card>
   )
@@ -247,21 +247,21 @@ function ValueDomainCard({
 export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
   const searchTerm = useSearchStore((state) => state.searchTerm)
 
-  // 数据状态
+  // Data status
   const [valueDomains, setValueDomains] = useState<ValueDomainDTO[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  // 模态框状态
+  // Modal state
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingDomain, setEditingDomain] = useState<ValueDomainDTO | null>(null)
   const [saving, setSaving] = useState(false)
 
-  // 是否还有更多数据
+  // Is there more data?
   const hasMore = valueDomains.length < total
 
-  // 加载首页数据
+  // Load homepage data
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
@@ -269,13 +269,13 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
       setValueDomains(result.items)
       setTotal(result.total)
     } catch {
-      // 加载失败时保持空列表
+      // Keep empty list when loading fails
     } finally {
       setLoading(false)
     }
   }, [])
 
-  // 加载更多数据
+  // load more data
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
@@ -284,13 +284,13 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
       setValueDomains((prev) => [...prev, ...result.items])
       setTotal(result.total)
     } catch {
-      // 加载失败
+      // Loading failed
     } finally {
       setLoadingMore(false)
     }
   }, [loadingMore, hasMore, valueDomains.length])
 
-  // 无限滚动
+  // infinite scroll
   const { sentinelRef } = useInfiniteScroll({
     hasMore,
     loading: loadingMore,
@@ -301,7 +301,7 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
     loadData()
   }, [loadData])
 
-  // 过滤并排序值域：BUILTIN 在前，然后按名称排序
+  // Filter and sort ranges：BUILTIN in front，then sort by name
   const filteredDomains = valueDomains
     .filter(
       (d) =>
@@ -312,14 +312,14 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
     .sort((a, b) => {
       const levelA = a.domainLevel?.toUpperCase() || 'BUSINESS'
       const levelB = b.domainLevel?.toUpperCase() || 'BUSINESS'
-      // BUILTIN 排在前面
+      // BUILTIN at the front
       if (levelA === 'BUILTIN' && levelB !== 'BUILTIN') return -1
       if (levelA !== 'BUILTIN' && levelB === 'BUILTIN') return 1
-      // 同级别按名称排序
+      // Sort by name at the same level
       return a.domainName.localeCompare(b.domainName, 'zh-CN')
     })
 
-  // 保存新值域
+  // Save new value range
   const handleSave = async (formData: ValueDomainFormData) => {
     if (saving) return
     setSaving(true)
@@ -327,7 +327,7 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
       let items: { value: string; label?: string }[] = []
 
       if (formData.domainType === 'ENUM') {
-        // ENUM: 批量创建多个枚举值
+        // ENUM: Create multiple enumeration values in batches
         items = formData.enumItems
           .filter((item) => item.key.trim())
           .map((item) => ({
@@ -335,7 +335,7 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
             label: item.value.trim() || undefined
           }))
       } else {
-        // RANGE/REGEX: 单条创建
+        // RANGE/REGEX: Single creation
         items = [{ value: formData.itemValue.trim() }]
       }
 
@@ -354,26 +354,26 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
       setTotal((prev) => prev + 1)
       setShowCreateModal(false)
     } catch {
-      // 保存失败
+      // Save failed
     } finally {
       setSaving(false)
     }
   }
 
-  // 删除值域
+  // Delete range
   const handleDelete = (domainCode: string) => {
     setValueDomains((prev) => prev.filter((d) => d.domainCode !== domainCode))
     setTotal((prev) => prev - 1)
   }
 
-  // 更新值域后重新加载数据
+  // Reload data after updating range
   const handleDomainUpdated = () => {
     loadData()
   }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-50/40 dark:bg-slate-950/50 animate-in slide-in-from-right-4 duration-300">
-      {/* 顶部导航栏 */}
+      {/* top navigation bar */}
       <div className="h-12 @md:h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 @md:px-6 flex items-center justify-between shadow-sm z-10 flex-shrink-0">
         <div className="flex items-center gap-2 @md:gap-3">
           <button
@@ -384,7 +384,7 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
           </button>
           <div className="flex items-center gap-2">
             <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">
-              值域约束 <span className="font-normal text-slate-400">(Value Domains)</span>
+              range constraints <span className="font-normal text-slate-400">(Value Domains)</span>
             </h2>
             <Badge variant="blue">
               {filteredDomains.length} / {total}
@@ -395,20 +395,20 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
           onClick={() => setShowCreateModal(true)}
           className="bg-slate-900 dark:bg-blue-600 text-white px-3 @md:px-4 py-1 @md:py-1.5 rounded-lg text-caption @md:text-body-sm font-medium flex items-center gap-1 @md:gap-1.5 shadow-md hover:bg-blue-600 dark:hover:bg-blue-500 transition-all"
         >
-          <Plus size={iconSizeToken.medium} /> <span className="hidden @md:inline">创建值域</span>
+          <Plus size={iconSizeToken.medium} /> <span className="hidden @md:inline">Create a value range</span>
         </button>
       </div>
 
-      {/* 卡片列表 */}
+      {/* card list */}
       <div className="flex-1 min-h-0 p-4 @md:p-6 overflow-auto custom-scrollbar">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-            <div className="text-slate-400 text-caption mt-3">加载中...</div>
+            <div className="text-slate-400 text-caption mt-3">Loading...</div>
           </div>
         ) : filteredDomains.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-slate-400 text-caption">
-            未找到匹配的值域
+            No matching range found
           </div>
         ) : (
           <>
@@ -422,7 +422,7 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
                 />
               ))}
             </div>
-            {/* 哨兵元素 + 加载更多 */}
+            {/* Sentinel element + load more */}
             <div ref={sentinelRef} className="h-1" />
             {loadingMore && (
               <div className="flex justify-center py-6">
@@ -433,7 +433,7 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
         )}
       </div>
 
-      {/* 创建值域模态框 */}
+      {/* Create a value field modal box */}
       <ValueDomainFormModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
@@ -441,7 +441,7 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
         saving={saving}
       />
 
-      {/* 编辑值域模态框 */}
+      {/* Edit value range modal box */}
       <EditValueDomainModal
         isOpen={editingDomain !== null}
         domain={editingDomain}
@@ -452,13 +452,13 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
   )
 }
 
-/** 编辑值域枚举项 */
+/** Edit value range enumeration items */
 interface EditEnumItem {
   key: string
   value: string
 }
 
-/** 编辑值域模态框 */
+/** Edit value range modal box */
 function EditValueDomainModal({
   isOpen,
   domain,
@@ -475,7 +475,7 @@ function EditValueDomainModal({
   const [dataType, setDataType] = useState<DataTypeValue>({ type: 'STRING' })
   const [comment, setComment] = useState('')
   const [enumItems, setEnumItems] = useState<EditEnumItem[]>([])
-  const [itemValue, setItemValue] = useState('') // RANGE/REGEX 类型的值
+  const [itemValue, setItemValue] = useState('') // RANGE/REGEX value of type
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -489,7 +489,7 @@ function EditValueDomainModal({
         value: item.label || ''
       })) || []
       setEnumItems(items)
-      // RANGE/REGEX 类型
+      // RANGE/REGEX Type
       if (domain.domainType !== 'ENUM' && domain.items?.length) {
         setItemValue(domain.items[0].value)
       } else {
@@ -498,25 +498,25 @@ function EditValueDomainModal({
     }
   }, [isOpen, domain])
 
-  // 添加枚举项
+  // Add enumeration item
   const addEnumItem = () => {
     setEnumItems([...enumItems, { key: '', value: '' }])
   }
 
-  // 删除枚举项
+  // Delete enumeration item
   const removeEnumItem = (index: number) => {
     if (enumItems.length <= 1) return
     setEnumItems(enumItems.filter((_, i) => i !== index))
   }
 
-  // 更新枚举项
+  // Update enumeration item
   const updateEnumItem = (index: number, field: 'key' | 'value', val: string) => {
     const newItems = [...enumItems]
     newItems[index] = { ...newItems[index], [field]: val }
     setEnumItems(newItems)
   }
 
-  // 校验
+  // Verify
   const isValid = (() => {
     if (!domainName.trim()) return false
     const normalizedType = domain?.domainType?.toUpperCase() || 'ENUM'
@@ -533,7 +533,7 @@ function EditValueDomainModal({
     try {
       const normalizedType = domain.domainType?.toUpperCase() || 'ENUM'
 
-      // 构建 items
+      // Build items
       let items: { value: string; label?: string }[] = []
       if (normalizedType === 'ENUM') {
         items = enumItems
@@ -546,7 +546,7 @@ function EditValueDomainModal({
         items = [{ value: itemValue.trim() }]
       }
 
-      // 直接更新整个值域
+      // Directly update the entire value range
       await updateValueDomain(domain.domainCode, {
         domainName: domainName.trim(),
         domainLevel,
@@ -558,7 +558,7 @@ function EditValueDomainModal({
       onUpdated()
       onClose()
     } catch {
-      // 更新失败
+      // Update failed
     } finally {
       setSaving(false)
     }
@@ -567,13 +567,13 @@ function EditValueDomainModal({
   if (!domain) return null
 
   const normalizedType = (domain.domainType?.toUpperCase() || 'ENUM') as ValueDomainType
-  const typeLabel = normalizedType === 'ENUM' ? '枚举型 (ENUM)' : normalizedType === 'RANGE' ? '区间型 (RANGE)' : '模式型 (REGEX)'
+  const typeLabel = normalizedType === 'ENUM' ? 'enumeration type (ENUM)' : normalizedType === 'RANGE' ? 'Interval (RANGE)' : 'pattern (REGEX)'
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="编辑值域"
+      title="Edit range"
       size="sm"
       footerRight={
         <>
@@ -583,29 +583,29 @@ function EditValueDomainModal({
             disabled={!isValid}
             loading={saving}
           >
-            保存
+            save
           </ModalPrimaryButton>
         </>
       }
     >
       <div className="space-y-4">
-        {/* 值域名称 + 编码 - 两栏布局 */}
+        {/* Value field name + encoding - two column layout */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              值域名称 <span className="text-rose-500">*</span>
+              Value field name <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
               value={domainName}
               onChange={(e) => setDomainName(e.target.value)}
-              placeholder="订单状态"
+              placeholder="Order status"
               className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
             />
           </div>
           <div>
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              值域编码
+              range encoding
             </label>
             <div className="px-3 py-2 text-body-sm font-mono uppercase bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400">
               {domain.domainCode}
@@ -613,11 +613,11 @@ function EditValueDomainModal({
           </div>
         </div>
 
-        {/* 值域类型 + 值域级别 - 两栏布局 */}
+        {/* Range type + range level - two column layout */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              值域类型
+              Range type
             </label>
             <div className="px-3 py-2 text-body-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400">
               {typeLabel}
@@ -625,25 +625,25 @@ function EditValueDomainModal({
           </div>
           <div>
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              值域级别
+              range level
             </label>
             <Select
               value={domainLevel}
               onChange={(value) => setDomainLevel(value as 'BUSINESS' | 'BUILTIN')}
               options={[
-                { value: 'BUSINESS', label: '业务级 (BUSINESS)' },
-                { value: 'BUILTIN', label: '内置级 (BUILTIN)' }
+                { value: 'BUSINESS', label: 'business level (BUSINESS)' },
+                { value: 'BUILTIN', label: 'Built-in level (BUILTIN)' }
               ]}
-              dropdownHeader="选择值域级别"
+              dropdownHeader="Select range level"
               size="sm"
             />
           </div>
         </div>
 
-        {/* 数据类型 - 窄宽 */}
+        {/* data type - Narrow and wide */}
         <div className="w-1/3">
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            数据类型 <span className="text-rose-500">*</span>
+            data type <span className="text-rose-500">*</span>
           </label>
           <DataTypeSelector
             value={dataType}
@@ -653,22 +653,22 @@ function EditValueDomainModal({
           />
         </div>
 
-        {/* 值项 - 根据类型显示不同输入 */}
+        {/* value item - Display different inputs based on type */}
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            {normalizedType === 'ENUM' ? '枚举值列表' : normalizedType === 'RANGE' ? '区间表达式' : '正则表达式'} <span className="text-rose-500">*</span>
+            {normalizedType === 'ENUM' ? 'List of enumeration values' : normalizedType === 'RANGE' ? 'interval expression' : 'regular expression'} <span className="text-rose-500">*</span>
           </label>
 
           {normalizedType === 'ENUM' ? (
-            // ENUM: 可动态添加/删除的 Key-Value 列表
+            // ENUM: Can be added dynamically/deleted Key-Value list
             <div className="space-y-2">
-              {/* 表头 */}
+              {/* Header */}
               <div className="grid grid-cols-[1fr_1fr_32px] gap-2 text-micro text-slate-400 px-1">
-                <span>值 (Key)</span>
-                <span>标签 (Value)</span>
+                <span>value (Key)</span>
+                <span>label (Value)</span>
                 <span></span>
               </div>
-              {/* 列表项 */}
+              {/* list item */}
               {enumItems.map((item, index) => (
                 <div key={index} className="grid grid-cols-[1fr_1fr_32px] gap-2 items-center">
                   <input
@@ -682,7 +682,7 @@ function EditValueDomainModal({
                     type="text"
                     value={item.value}
                     onChange={(e) => updateEnumItem(index, 'value', e.target.value)}
-                    placeholder="已支付"
+                    placeholder="paid"
                     className="w-full px-3 py-1.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
                   />
                   <button
@@ -695,38 +695,38 @@ function EditValueDomainModal({
                   </button>
                 </div>
               ))}
-              {/* 添加按钮 */}
+              {/* Add button */}
               <button
                 type="button"
                 onClick={addEnumItem}
                 className="w-full py-2 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg text-caption text-slate-500 hover:text-blue-600 hover:border-blue-400 dark:hover:border-blue-500 transition-all flex items-center justify-center gap-1"
               >
-                <Plus size={14} /> 添加枚举值
+                <Plus size={14} /> Add enumeration value
               </button>
             </div>
           ) : (
-            // RANGE/REGEX: 单输入框（只读）
+            // RANGE/REGEX: Single input box（read only）
             <div>
               <div className="px-3 py-2 text-body-sm font-mono bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400">
                 {itemValue || '-'}
               </div>
               <p className="text-micro text-slate-400 mt-1">
-                {normalizedType === 'RANGE' ? '区间表达式不可修改' : '正则表达式不可修改'}
+                {normalizedType === 'RANGE' ? 'Interval expressions cannot be modified' : 'Regular expressions cannot be modified'}
               </p>
             </div>
           )}
         </div>
 
-        {/* 备注 */}
+        {/* Remarks */}
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            备注
+            Remarks
           </label>
           <input
             type="text"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="值域说明（可选）"
+            placeholder="Value range description（Optional）"
             className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>

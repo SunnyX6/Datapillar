@@ -79,7 +79,6 @@ import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metalake.MetalakeNormalizeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
-import org.apache.gravitino.onemeta.OneMetaInitializer;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.stats.StatisticManager;
@@ -437,11 +436,6 @@ public class GravitinoEnv {
     eventListenerManager.start();
     if (manageFullComponents) {
       auxServiceManager.serviceStart();
-
-      // 初始化 OneMeta（metalake、catalog、schema）
-      OneMetaInitializer oneMetaInitializer =
-          new OneMetaInitializer(config, metalakeDispatcher, catalogDispatcher, schemaDispatcher);
-      oneMetaInitializer.initialize();
     }
   }
 
@@ -591,7 +585,7 @@ public class GravitinoEnv {
         new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
     this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
 
-    // 初始化 DatasetDispatcher（带事件分发）
+    // initialization DatasetDispatcher（With event distribution）
     org.apache.gravitino.catalog.DatasetOperationDispatcher datasetOperationDispatcher =
         new org.apache.gravitino.catalog.DatasetOperationDispatcher(
             catalogManager, entityStore, idGenerator);

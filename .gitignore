@@ -1,5 +1,5 @@
 # ============================================
-# 依赖目录
+# Dependency directory
 # ============================================
 node_modules/
 **/node_modules/
@@ -18,8 +18,9 @@ site-packages/
 .codex/
 openspec/
 data/
+.openclaw/
 # ============================================
-# 构建产物
+# Build product
 # ============================================
 target/
 **/target/
@@ -33,22 +34,24 @@ out/
 **/.next/
 
 # ============================================
-# Gradle 构建 (Gravitino)
+# Gradle Build (Gravitino)
 # ============================================
 .gradle/
 **/.gradle/
+.gradle-user-home/
+*/.gradle-user-home/
 **/gradlew
 **/gradlew.bat
 gradle/wrapper/
 
 # ============================================
-# 分发目录 (Gravitino/XXL-Job)
+# distribution directory (Gravitino)
 # ============================================
 distribution/
 **/distribution/
 
 # ============================================
-# IDE 和编辑器
+# IDE and editor
 # ============================================
 .idea/
 **/.idea/
@@ -63,7 +66,7 @@ distribution/
 **/.node/
 
 # ============================================
-# 日志文件
+# log file
 # ============================================
 logs/
 **/logs/
@@ -72,7 +75,7 @@ logs/
 nohup.out
 
 # ============================================
-# 缓存目录
+# cache directory
 # ============================================
 .cache/
 **/.cache/
@@ -97,7 +100,7 @@ graphrag_cache/
 **/.ruff_cache/
 
 # ============================================
-# Java 编译产物
+# Java Compile product
 # ============================================
 *.class
 *.jar
@@ -109,7 +112,7 @@ hs_err_pid*
 replay_pid*
 
 # ============================================
-# Python 编译产物
+# Python Compile product
 # ============================================
 *.pyc
 *.pyo
@@ -121,7 +124,7 @@ htmlcov/
 .Python
 
 # ============================================
-# 压缩文件
+# compressed file
 # ============================================
 *.zip
 *.tar.gz
@@ -131,7 +134,7 @@ htmlcov/
 *.gz
 
 # ============================================
-# 数据文件
+# data file
 # ============================================
 *.db
 *.sqlite
@@ -142,12 +145,12 @@ htmlcov/
 **/*.lance
 
 # ============================================
-# Flink 运行时
+# Flink runtime
 # ============================================
 flink/
 
 # ============================================
-# 安全相关文件
+# Security related documents
 # ============================================
 *.pem
 *.key
@@ -162,7 +165,7 @@ application-prod.yml
 application-dev.yml
 
 # ============================================
-# 测试覆盖率
+# test coverage
 # ============================================
 coverage/
 **/coverage/
@@ -170,7 +173,7 @@ coverage/
 **/*.lcov
 
 # ============================================
-# 系统文件
+# System files
 # ============================================
 .DS_Store
 **/.DS_Store
@@ -189,18 +192,17 @@ mvnw.cmd
 .mvn/
 
 # ============================================
-# 锁文件
+# lock file
 # ============================================
-package-lock.json
-pnpm-lock.yaml
-yarn.lock
+# Front-end lock files must be managed，cannot be ignored
 uv.lock
 poetry.lock
 Pipfile.lock
 Cargo.lock
+*.tsbuildinfo
 
 # ============================================
-# 媒体和资源文件 (大文件)
+# Media and resource files (large files)
 # ============================================
 *.png
 *.jpg
@@ -218,7 +220,7 @@ Cargo.lock
 *.ttf
 *.eot
 
-# 文档演示媒体（允许提交）
+# Document Presentation Media（Allow submission）
 !docs/assets/
 !docs/assets/*.gif
 !docs/assets/*.mp4
@@ -227,7 +229,7 @@ Cargo.lock
 !docs/demo.mp4
 
 # ============================================
-# 其他
+# Others
 # ============================================
 data-storage/
 demo-ui/
@@ -247,23 +249,23 @@ CLAUDE.md
 AGENTS.md
 **/AGENTS.md
 # ============================================
-# Gravitino 特定忽略 (仅忽略构建产物，保留所有源码)
+# Gravitino specific ignore (Ignore only build artifacts，Keep all source code)
 # ============================================
-# Gradle 构建缓存
+# Gradle Build cache
 datapillar-gravitino/.gradle/
 datapillar-gravitino/**/build/
-# 分发包 (构建产物)
+# Distribution package (Build product)
 datapillar-gravitino/distribution/
-# 数据目录 (运行时数据)
+# data directory (runtime data)
 datapillar-gravitino/data/
-# IDE 配置
+# IDE Configuration
 datapillar-gravitino/.idea/
 datapillar-gravitino/.vscode/
 datapillar-gravitino/.node/
-# 测试输出文件
+# test output file
 *.out
-# 临时数据文件
+# temporary data files
 *.dat
 
-# 营销官网项目（单独部署，不纳入当前仓库提交）
+# Marketing official website project（Deploy separately，Do not include submissions in the current warehouse）
 web/datapillar-web-site/

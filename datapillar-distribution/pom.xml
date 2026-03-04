@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0          http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -15,50 +12,45 @@
     <artifactId>datapillar-distribution</artifactId>
     <packaging>pom</packaging>
     <name>Datapillar Distribution</name>
-    <description>Datapillar 发行版打包模块</description>
+    <description>Datapillar Release packaging module</description>
 
     <properties>
         <distribution.dir>${project.build.directory}/datapillar-${project.version}</distribution.dir>
     </properties>
 
     <dependencies>
-        <!-- 引入所有需要打包的模块 -->
+        <!-- Import all modules that need to be packaged -->
         <dependency>
             <groupId>com.sunny</groupId>
             <artifactId>datapillar-studio-service</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.sunny</groupId>
             <artifactId>datapillar-auth</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.sunny</groupId>
             <artifactId>datapillar-api-gateway</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.sunny</groupId>
             <artifactId>datapillar-openlineage</artifactId>
-            <version>${project.version}</version>
         </dependency>
     </dependencies>
 
     <build>
         <plugins>
-            <!-- 复制依赖到 libs 目录 -->
+            <!-- Copy dependencies to libs Directory -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
-                <version>3.6.1</version>
                 <executions>
                     <execution>
                         <id>copy-dependencies</id>
-                        <phase>package</phase>
                         <goals>
                             <goal>copy-dependencies</goal>
                         </goals>
+                        <phase>package</phase>
                         <configuration>
                             <outputDirectory>${distribution.dir}/libs</outputDirectory>
                             <includeScope>runtime</includeScope>
@@ -68,11 +60,10 @@
                 </executions>
             </plugin>
 
-            <!-- 使用 assembly 插件打包 -->
+            <!-- use assembly Plug-in packaging -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.6.0</version>
                 <configuration>
                     <descriptors>
                         <descriptor>src/main/assembly/distribution.xml</descriptor>
@@ -83,35 +74,34 @@
                 <executions>
                     <execution>
                         <id>make-assembly</id>
-                        <phase>package</phase>
                         <goals>
                             <goal>single</goal>
                         </goals>
+                        <phase>package</phase>
                     </execution>
                 </executions>
             </plugin>
 
-            <!-- 复制外部 jar（如 Gravitino Flink Connector） -->
+            <!-- copy external jar（Such as Gravitino Flink Connector） -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
-                <version>3.1.0</version>
                 <executions>
                     <execution>
                         <id>copy-external-libs</id>
-                        <phase>prepare-package</phase>
                         <goals>
                             <goal>run</goal>
                         </goals>
+                        <phase>prepare-package</phase>
                         <configuration>
                             <target>
-                                <!-- 创建目录结构 -->
+                                <!-- Create directory structure -->
                                 <mkdir dir="${distribution.dir}/libs"/>
                                 <mkdir dir="${distribution.dir}/data"/>
                                 <mkdir dir="${distribution.dir}/logs"/>
 
-                                <!-- 复制 Gravitino Flink Connector（如果存在） -->
-                                <copy todir="${distribution.dir}/libs" failonerror="false">
+                                <!-- Copy Gravitino Flink Connector（if exists） -->
+                                <copy failonerror="false" todir="${distribution.dir}/libs">
                                     <fileset dir="${basedir}/../datapillar-gravitino/flink-connector/flink-runtime/build/libs">
                                         <include name="gravitino-flink-connector-runtime-*.jar"/>
                                     </fileset>

@@ -10,23 +10,23 @@ import lombok.Data;
 @Schema(name = "UserUpdate")
 public class UserUpdateRequest {
 
-    @Size(min = 3, max = 64, message = "用户名长度必须在3-64个字符之间")
-    private String username;
+  @Size(min = 3, max = 64, message = "Username length must be within3-64between characters")
+  private String username;
 
-    @Size(min = 6, max = 255, message = "密码长度必须在6-255个字符之间")
-    private String password;
+  @Size(min = 6, max = 255, message = "Password length must be within6-255between characters")
+  private String password;
 
-    @Size(max = 64, message = "昵称长度不能超过64个字符")
-    private String nickname;
+  @Size(max = 64, message = "Nickname length cannot exceed64characters")
+  private String nickname;
 
-    @Email(message = "邮箱格式不正确")
-    @Size(max = 128, message = "邮箱长度不能超过128个字符")
-    private String email;
+  @Email(message = "Email format is incorrect")
+  @Size(max = 128, message = "The length of the email cannot exceed128characters")
+  private String email;
 
-    @Size(max = 32, message = "手机号长度不能超过32个字符")
-    private String phone;
+  @Size(max = 32, message = "The length of the mobile phone number cannot exceed32characters")
+  private String phone;
 
-    private Integer status;
+  private Integer status;
 
-    private List<Long> roleIds;
+  private List<Long> roleIds;
 }

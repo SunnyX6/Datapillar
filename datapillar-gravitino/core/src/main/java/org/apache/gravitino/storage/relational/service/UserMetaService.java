@@ -29,16 +29,16 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.datapillar.context.TenantContext;
-import org.apache.gravitino.datapillar.context.TenantContextHolder;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.multitenancy.context.ExternalUserIdContextHolder;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
@@ -343,12 +343,13 @@ public class UserMetaService {
   }
 
   private String resolveExternalUserId(UserEntity userEntity) {
-    if (userEntity.name() != null && userEntity.name().startsWith("uid:")) {
-      return userEntity.name();
+    String scopedExternalUserId = ExternalUserIdContextHolder.get();
+    if (StringUtils.isNotBlank(scopedExternalUserId)) {
+      return scopedExternalUserId.trim();
     }
-
-    TenantContext tenantContext = TenantContextHolder.get();
-    long tenantId = tenantContext == null ? 0L : tenantContext.tenantId();
-    return String.format("uid:%d:%d", tenantId, userEntity.id());
+    if (StringUtils.isNotBlank(userEntity.name())) {
+      return userEntity.name().trim();
+    }
+    return String.valueOf(userEntity.id());
   }
 }

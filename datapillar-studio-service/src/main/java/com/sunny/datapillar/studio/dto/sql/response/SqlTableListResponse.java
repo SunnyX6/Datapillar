@@ -8,5 +8,5 @@ import lombok.Data;
 @Schema(name = "SqlTableListResponse")
 public class SqlTableListResponse {
 
-    private List<String> tables;
+  private List<String> tables;
 }

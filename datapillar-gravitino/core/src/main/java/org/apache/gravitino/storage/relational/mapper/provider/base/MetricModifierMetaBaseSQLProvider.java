@@ -21,50 +21,62 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.MetricModifierMetaMapper.TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.MetricModifierPO;
 import org.apache.ibatis.annotations.Param;
 
-/** MetricModifier 元数据基础 SQL Provider */
+/** MetricModifier Metadata basics SQL Provider */
 public class MetricModifierMetaBaseSQLProvider {
 
   public String listMetricModifierPOsBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT modifier_id AS modifierId, modifier_name AS modifierName, modifier_code AS modifierCode,"
         + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, modifier_comment AS modifierComment,"
         + " modifier_type AS modifierType, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String listMetricModifierPOsBySchemaIdWithPagination(
       @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT modifier_id AS modifierId, modifier_name AS modifierName, modifier_code AS modifierCode,"
         + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, modifier_comment AS modifierComment,"
         + " modifier_type AS modifierType, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + " ORDER BY modifier_id"
         + " LIMIT #{limit} OFFSET #{offset}";
   }
 
   public String countMetricModifiersBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT COUNT(*) FROM "
         + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectMetricModifierMetaBySchemaIdAndModifierCode(
       @Param("schemaId") Long schemaId, @Param("modifierCode") String modifierCode) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT modifier_id AS modifierId, modifier_name AS modifierName, modifier_code AS modifierCode,"
         + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, modifier_comment AS modifierComment,"
         + " modifier_type AS modifierType, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND modifier_code = #{modifierCode} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND modifier_code = #{modifierCode} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String listMetricModifierPOsByModifierIds(@Param("modifierIds") List<Long> modifierIds) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     StringBuilder sql = new StringBuilder();
     sql.append(
         "SELECT modifier_id AS modifierId, modifier_name AS modifierName, modifier_code AS modifierCode,"
@@ -72,7 +84,9 @@ public class MetricModifierMetaBaseSQLProvider {
             + " modifier_type AS modifierType, audit_info AS auditInfo, deleted_at AS deletedAt"
             + " FROM "
             + TABLE_NAME
-            + " WHERE deleted_at = 0 AND modifier_id IN (");
+            + " WHERE deleted_at = 0 AND "
+            + TenantSqlSupport.tenantPredicate(null, tenantId)
+            + " AND modifier_id IN (");
     for (int i = 0; i < modifierIds.size(); i++) {
       sql.append("#{modifierIds[").append(i).append("]}");
       if (i < modifierIds.size() - 1) {
@@ -86,6 +100,7 @@ public class MetricModifierMetaBaseSQLProvider {
   public String updateMetricModifierMeta(
       @Param("newMetricModifier") MetricModifierPO newMetricModifierPO,
       @Param("oldMetricModifier") MetricModifierPO oldMetricModifierPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET modifier_name = #{newMetricModifier.modifierName},"
@@ -106,6 +121,7 @@ public class MetricModifierMetaBaseSQLProvider {
         + " AND ((modifier_comment = #{oldMetricModifier.modifierComment}) OR "
         + " (modifier_comment IS NULL AND #{oldMetricModifier.modifierComment} IS NULL))"
         + " AND audit_info = #{oldMetricModifier.auditInfo}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 }

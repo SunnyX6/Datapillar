@@ -8,8 +8,7 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
- * 用户Identity组件
- * 负责用户Identity核心逻辑实现
+ * UserIdentitycomponents Responsible userIdentityCore logic implementation
  *
  * @author Sunny
  * @date 2026-01-01
@@ -18,26 +17,40 @@ import lombok.Data;
 @TableName("user_identities")
 public class UserIdentity {
 
-    @TableId(type = IdType.AUTO)
-    private Long id;
+  @TableId(type = IdType.AUTO)
+  private Long id;
 
-    @TableField("tenant_id")
-    private Long tenantId;
+  @TableField(exist = false)
+  private Long tenantId;
 
-    @TableField("user_id")
-    private Long userId;
+  @TableField("user_id")
+  private Long userId;
 
-    private String provider;
+  @TableField(exist = false)
+  private String provider;
 
-    @TableField("external_user_id")
-    private String externalUserId;
+  @TableField(exist = false)
+  private String externalUserId;
 
-    @TableField("profile_json")
-    private String profileJson;
+  private String issuer;
 
-    @TableField("created_at")
-    private LocalDateTime createdAt;
+  private String subject;
 
-    @TableField("updated_at")
-    private LocalDateTime updatedAt;
+  @TableField("identity_key")
+  private String identityKey;
+
+  @TableField("username_snapshot")
+  private String usernameSnapshot;
+
+  @TableField("email_snapshot")
+  private String emailSnapshot;
+
+  @TableField("profile_json")
+  private String profileJson;
+
+  @TableField("created_at")
+  private LocalDateTime createdAt;
+
+  @TableField("updated_at")
+  private LocalDateTime updatedAt;
 }

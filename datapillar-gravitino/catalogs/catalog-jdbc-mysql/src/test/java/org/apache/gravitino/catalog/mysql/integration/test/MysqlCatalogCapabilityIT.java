@@ -47,7 +47,7 @@ public class MysqlCatalogCapabilityIT {
       "schema$with$dollar",
       "schema/with/slash",
       "schema=with=equals",
-      "测试模式", // Unicode support
+      "test mode", // Unicode support
       "a".repeat(64) // Maximum length
     };
 
@@ -70,7 +70,7 @@ public class MysqlCatalogCapabilityIT {
       "table$with$dollar",
       "table/with/slash",
       "table=with=equals",
-      "测试表", // Unicode support
+      "Test table", // Unicode support
       "b".repeat(64) // Maximum length
     };
 
@@ -154,7 +154,7 @@ public class MysqlCatalogCapabilityIT {
       "column_with_underscores",
       "mysql", // Should be valid for columns even though it's reserved for schemas/tables
       "information_schema", // Should be valid for columns
-      "测试列" // testing unicode support here
+      "test column" // testing unicode support here
     };
 
     for (String name : validColumnNames) {

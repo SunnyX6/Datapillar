@@ -8,11 +8,11 @@ interface ExpandToggleProps {
 }
 
 /**
- * 左右通用的半圆展开/折叠按钮，保持“一个圆切成两半”的视觉
+ * Semicircular expansion for left and right use/Collapse button，keep“A circle cut in half”vision
  */
 export function ExpandToggle({ variant, onToggle, className }: ExpandToggleProps) {
   const isSidebarVariant = variant === 'sidebar'
-  const label = isSidebarVariant ? '折叠导航栏' : '展开导航栏'
+  const label = isSidebarVariant ? 'Collapse navigation bar' : 'Expand navigation bar'
 
   return (
     <button

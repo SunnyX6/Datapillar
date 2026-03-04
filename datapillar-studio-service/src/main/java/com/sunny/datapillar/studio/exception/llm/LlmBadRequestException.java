@@ -5,19 +5,19 @@ import com.sunny.datapillar.common.exception.BadRequestException;
 import java.util.Map;
 
 /**
- * LLM 请求参数异常
- * 描述 LLM 业务请求参数不合法语义
+ * LLM Request parameter exception Description LLM Business request parameters are illegal and
+ * semantic
  *
  * @author Sunny
  * @date 2026-02-26
  */
 public class LlmBadRequestException extends BadRequestException {
 
-    public LlmBadRequestException(String message, Object... args) {
-        super(ErrorType.LLM_REQUEST_INVALID, Map.of(), message, args);
-    }
+  public LlmBadRequestException(String message, Object... args) {
+    super(ErrorType.LLM_REQUEST_INVALID, Map.of(), message, args);
+  }
 
-    public LlmBadRequestException(Throwable cause, String message, Object... args) {
-        super(cause, ErrorType.LLM_REQUEST_INVALID, Map.of(), message, args);
-    }
+  public LlmBadRequestException(Throwable cause, String message, Object... args) {
+    super(cause, ErrorType.LLM_REQUEST_INVALID, Map.of(), message, args);
+  }
 }

@@ -1,16 +1,16 @@
 /**
- * i18n 国际化配置
+ * i18n International configuration
  *
- * 功能：
- * 1. 初始化 i18next
- * 2. 配置语言资源加载
- * 3. 支持 TypeScript 类型推导
+ * Function：
+ * 1. initialization i18next
+ * 2. Configure language resource loading
+ * 3. support TypeScript type inference
  */
 
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 
-// 导入语言资源
+// Import language resources
 import enCommon from '@/locales/en-US/common.json'
 import enLogin from '@/locales/en-US/login.json'
 import enNavigation from '@/locales/en-US/navigation.json'
@@ -18,7 +18,7 @@ import zhCommon from '@/locales/zh-CN/common.json'
 import zhLogin from '@/locales/zh-CN/login.json'
 import zhNavigation from '@/locales/zh-CN/navigation.json'
 
-// ==================== 语言资源配置 ====================
+// ==================== Language resource configuration ====================
 
 const resources = {
   'en-US': {
@@ -33,26 +33,26 @@ const resources = {
   }
 } as const
 
-// ==================== i18n 初始化 ====================
+// ==================== i18n initialization ====================
 
 i18n
-  .use(initReactI18next) // 绑定 react-i18next
+  .use(initReactI18next) // binding react-i18next
   .init({
     resources,
-    lng: 'zh-CN', // 默认语言：中文
-    fallbackLng: 'zh-CN', // 回退语言
-    defaultNS: 'common', // 默认命名空间
-    ns: ['common', 'login', 'navigation'], // 支持的命名空间
+    lng: 'zh-CN', // Default language：Chinese
+    fallbackLng: 'zh-CN', // fallback language
+    defaultNS: 'common', // default namespace
+    ns: ['common', 'login', 'navigation'], // Supported namespaces
 
     interpolation: {
-      escapeValue: false // React 已经防止 XSS
+      escapeValue: false // React Already prevented XSS
     },
 
     react: {
-      useSuspense: false // 禁用 Suspense，避免闪烁
+      useSuspense: false // Disable Suspense，avoid flickering
     },
 
-    debug: false // 生产环境关闭调试
+    debug: false // Turn off debugging in production environment
   })
 
 export default i18n

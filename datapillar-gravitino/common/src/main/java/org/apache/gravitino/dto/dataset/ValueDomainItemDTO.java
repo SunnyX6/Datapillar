@@ -26,7 +26,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.gravitino.dataset.ValueDomain;
 
-/** 值域枚举项 DTO，实现 ValueDomain.Item 接口 */
+/** Value range enumeration items DTO，realize ValueDomain.Item interface */
 @Getter
 @ToString
 @EqualsAndHashCode

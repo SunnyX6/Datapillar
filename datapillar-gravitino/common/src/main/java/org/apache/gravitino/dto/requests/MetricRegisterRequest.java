@@ -30,7 +30,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dataset.Metric;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** 表示注册指标的请求 */
+/** Indicates a request to register an indicator */
 @Getter
 @ToString
 @EqualsAndHashCode
@@ -83,7 +83,7 @@ public class MetricRegisterRequest implements RESTRequest {
   @JsonProperty("filterColumnIds")
   private String filterColumnIds;
 
-  /** 允许的数值数据类型 */
+  /** Allowed numeric data types */
   private static final java.util.Set<String> NUMERIC_DATA_TYPES =
       java.util.Set.of("BYTE", "SHORT", "INTEGER", "LONG", "FLOAT", "DOUBLE", "DECIMAL");
 
@@ -97,7 +97,7 @@ public class MetricRegisterRequest implements RESTRequest {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(dataType), "\"dataType\" field is required and cannot be empty");
 
-    // 校验 dataType 必须是数值类型
+    // Verify dataType Must be a numeric type
     String baseType =
         dataType.contains("(") ? dataType.substring(0, dataType.indexOf("(")) : dataType;
     Preconditions.checkArgument(
@@ -111,13 +111,13 @@ public class MetricRegisterRequest implements RESTRequest {
         StringUtils.isNotBlank(calculationFormula),
         "\"calculationFormula\" field is required and cannot be empty");
 
-    // ATOMIC 类型必须指定数据源引用
+    // ATOMIC Type must specify data source reference
     if (type == Metric.Type.ATOMIC) {
       Preconditions.checkArgument(
           refTableId != null, "\"refTableId\" is required for ATOMIC metric type");
     }
 
-    // DERIVED 和 COMPOSITE 类型必须指定 parentMetricCodes
+    // DERIVED and COMPOSITE Type must be specified parentMetricCodes
     if (type == Metric.Type.DERIVED || type == Metric.Type.COMPOSITE) {
       Preconditions.checkArgument(
           parentMetricCodes != null && parentMetricCodes.length > 0,

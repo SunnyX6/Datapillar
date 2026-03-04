@@ -1,5 +1,17 @@
 package com.sunny.datapillar.studio.module.workflow.service.impl;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sunny.datapillar.common.exception.BadRequestException;
+import com.sunny.datapillar.common.exception.NotFoundException;
+import com.sunny.datapillar.common.exception.UnauthorizedException;
+import com.sunny.datapillar.connector.airflow.AirflowConnector;
+import com.sunny.datapillar.connector.runtime.ConnectorKernel;
+import com.sunny.datapillar.connector.spi.ConnectorInvocation;
+import com.sunny.datapillar.connector.spi.IdempotencyDescriptor;
+import com.sunny.datapillar.studio.context.TenantContextHolder;
 import com.sunny.datapillar.studio.dto.llm.request.*;
 import com.sunny.datapillar.studio.dto.llm.response.*;
 import com.sunny.datapillar.studio.dto.project.request.*;
@@ -14,413 +26,475 @@ import com.sunny.datapillar.studio.dto.user.request.*;
 import com.sunny.datapillar.studio.dto.user.response.*;
 import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import org.springframework.beans.BeanUtils;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.sunny.datapillar.studio.module.workflow.service.client.AirflowClient;
-import com.sunny.datapillar.studio.module.workflow.service.dag.DagBuilder;
-import com.sunny.datapillar.studio.module.workflow.service.dag.DagValidationException;
 import com.sunny.datapillar.studio.module.workflow.entity.JobWorkflow;
 import com.sunny.datapillar.studio.module.workflow.mapper.JobDependencyMapper;
 import com.sunny.datapillar.studio.module.workflow.mapper.JobInfoMapper;
 import com.sunny.datapillar.studio.module.workflow.mapper.JobWorkflowMapper;
 import com.sunny.datapillar.studio.module.workflow.service.WorkflowService;
-
+import com.sunny.datapillar.studio.module.workflow.service.dag.DagBuilder;
+import com.sunny.datapillar.studio.module.workflow.service.dag.DagValidationException;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.sunny.datapillar.common.exception.BadRequestException;
-import com.sunny.datapillar.common.exception.NotFoundException;
-import com.sunny.datapillar.common.exception.InternalException;
+import org.springframework.beans.BeanUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
-/**
- * 工作流服务实现
- * 实现工作流业务流程与规则校验
- *
- * @author Sunny
- * @date 2026-01-01
- */
+/** Workflow service implementation. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class WorkflowServiceImpl implements WorkflowService {
 
-    private final JobWorkflowMapper workflowMapper;
-    private final JobInfoMapper jobInfoMapper;
-    private final JobDependencyMapper dependencyMapper;
-    private final AirflowClient airflowClient;
+  private static final String IDEMPOTENCY_STEP_DEPLOY = "AIRFLOW_DEPLOY";
+  private static final String IDEMPOTENCY_STEP_DELETE = "AIRFLOW_DELETE";
+  private static final String IDEMPOTENCY_STEP_PAUSE = "AIRFLOW_PAUSE";
+  private static final String IDEMPOTENCY_STEP_RESUME = "AIRFLOW_RESUME";
+  private static final String IDEMPOTENCY_STEP_TRIGGER = "AIRFLOW_TRIGGER";
+  private static final String IDEMPOTENCY_STEP_RERUN = "AIRFLOW_RERUN_TASK";
+  private static final String IDEMPOTENCY_STEP_SET_STATE = "AIRFLOW_SET_TASK_STATE";
+  private static final String IDEMPOTENCY_STEP_CLEAR = "AIRFLOW_CLEAR_TASKS";
 
-    // ==================== 工作流 CRUD ====================
+  private final JobWorkflowMapper workflowMapper;
+  private final JobInfoMapper jobInfoMapper;
+  private final JobDependencyMapper dependencyMapper;
+  private final ConnectorKernel connectorKernel;
+  private final ObjectMapper objectMapper;
 
-    @Override
-    public IPage<WorkflowListItemResponse> getWorkflowPage(Page<WorkflowListItemResponse> page, Long projectId, String workflowName, Integer status) {
-        return workflowMapper.selectWorkflowPage(page, projectId, workflowName, status);
+  @Override
+  public IPage<WorkflowListItemResponse> getWorkflowPage(
+      Page<WorkflowListItemResponse> page, Long projectId, String workflowName, Integer status) {
+    return workflowMapper.selectWorkflowPage(page, projectId, workflowName, status);
+  }
+
+  @Override
+  public WorkflowResponse getWorkflowDetail(Long id) {
+    WorkflowResponse workflow = workflowMapper.selectWorkflowDetail(id);
+    if (workflow == null) {
+      throw new NotFoundException("Workflow does not exist: workflowId=%s", id);
     }
 
-    @Override
-    public WorkflowResponse getWorkflowDetail(Long id) {
-        WorkflowResponse workflow = workflowMapper.selectWorkflowDetail(id);
-        if (workflow == null) {
-            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", id);
-        }
+    List<JobResponse> jobs = jobInfoMapper.selectJobsByWorkflowId(id);
+    workflow.setJobs(jobs);
 
-        List<JobResponse> jobs = jobInfoMapper.selectJobsByWorkflowId(id);
-        workflow.setJobs(jobs);
+    List<JobDependencyResponse> dependencies = dependencyMapper.selectByWorkflowId(id);
+    workflow.setDependencies(dependencies);
 
-        List<JobDependencyResponse> dependencies = dependencyMapper.selectByWorkflowId(id);
-        workflow.setDependencies(dependencies);
+    return workflow;
+  }
 
-        return workflow;
+  @Override
+  @Transactional
+  public Long createWorkflow(WorkflowCreateRequest dto) {
+    JobWorkflow workflow = new JobWorkflow();
+    BeanUtils.copyProperties(dto, workflow);
+    workflow.setStatus(0);
+
+    workflowMapper.insert(workflow);
+    log.info("Created workflow: id={}, name={}", workflow.getId(), workflow.getWorkflowName());
+    return workflow.getId();
+  }
+
+  @Override
+  @Transactional
+  public void updateWorkflow(Long id, WorkflowUpdateRequest dto) {
+    JobWorkflow workflow = workflowMapper.selectById(id);
+    if (workflow == null) {
+      throw new NotFoundException("Workflow does not exist: workflowId=%s", id);
     }
 
-    @Override
-    @Transactional
-    public Long createWorkflow(WorkflowCreateRequest dto) {
-        JobWorkflow workflow = new JobWorkflow();
-        BeanUtils.copyProperties(dto, workflow);
-        workflow.setStatus(0);
-
-        workflowMapper.insert(workflow);
-        log.info("Created workflow: id={}, name={}", workflow.getId(), workflow.getWorkflowName());
-        return workflow.getId();
+    if (dto.getWorkflowName() != null) {
+      workflow.setWorkflowName(dto.getWorkflowName());
+    }
+    if (dto.getTriggerType() != null) {
+      workflow.setTriggerType(dto.getTriggerType());
+      if (dto.getTriggerType() == 4 || dto.getTriggerType() == 5) {
+        workflow.setTriggerValue(null);
+      }
+    }
+    if (dto.getTriggerValue() != null) {
+      workflow.setTriggerValue(dto.getTriggerValue());
+    }
+    if (dto.getTimeoutSeconds() != null) {
+      workflow.setTimeoutSeconds(dto.getTimeoutSeconds());
+    }
+    if (dto.getMaxRetryTimes() != null) {
+      workflow.setMaxRetryTimes(dto.getMaxRetryTimes());
+    }
+    if (dto.getPriority() != null) {
+      workflow.setPriority(dto.getPriority());
+    }
+    if (dto.getDescription() != null) {
+      workflow.setDescription(dto.getDescription());
     }
 
-    @Override
-    @Transactional
-    public void updateWorkflow(Long id, WorkflowUpdateRequest dto) {
-        JobWorkflow workflow = workflowMapper.selectById(id);
-        if (workflow == null) {
-            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", id);
-        }
+    workflowMapper.updateById(workflow);
+    log.info("Updated workflow: id={}", id);
+  }
 
-        if (dto.getWorkflowName() != null) {
-            workflow.setWorkflowName(dto.getWorkflowName());
-        }
-        if (dto.getTriggerType() != null) {
-            workflow.setTriggerType(dto.getTriggerType());
-            // 手动触发(4)或API触发(5)时，清空 triggerValue
-            if (dto.getTriggerType() == 4 || dto.getTriggerType() == 5) {
-                workflow.setTriggerValue(null);
-            }
-        }
-        if (dto.getTriggerValue() != null) {
-            workflow.setTriggerValue(dto.getTriggerValue());
-        }
-        if (dto.getTimeoutSeconds() != null) {
-            workflow.setTimeoutSeconds(dto.getTimeoutSeconds());
-        }
-        if (dto.getMaxRetryTimes() != null) {
-            workflow.setMaxRetryTimes(dto.getMaxRetryTimes());
-        }
-        if (dto.getPriority() != null) {
-            workflow.setPriority(dto.getPriority());
-        }
-        if (dto.getDescription() != null) {
-            workflow.setDescription(dto.getDescription());
-        }
-
-        workflowMapper.updateById(workflow);
-        log.info("Updated workflow: id={}", id);
+  @Override
+  @Transactional
+  public void deleteWorkflow(Long id) {
+    JobWorkflow workflow = workflowMapper.selectById(id);
+    if (workflow == null) {
+      throw new NotFoundException("Workflow does not exist: workflowId=%s", id);
     }
 
-    @Override
-    @Transactional
-    public void deleteWorkflow(Long id) {
-        JobWorkflow workflow = workflowMapper.selectById(id);
-        if (workflow == null) {
-            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", id);
-        }
-
-        // 如果已发布，先删除Airflow DAG
-        if (workflow.getStatus() == 1 || workflow.getStatus() == 2) {
-            String dagId = buildDagId(workflow);
-            try {
-                airflowClient.delete("/dags/" + dagId, JsonNode.class);
-                log.info("Deleted Airflow DAG: {}", dagId);
-            } catch (Exception e) {
-                log.error("Failed to delete Airflow DAG: {}", dagId, e);
-                throw new com.sunny.datapillar.common.exception.InternalException(e, "Airflow 请求失败: %s", "删除 DAG 失败: dagId=" + dagId);
-            }
-        }
-
-        // 逻辑删除本地数据
-        dependencyMapper.deleteByWorkflowId(id);
-        jobInfoMapper.deleteByWorkflowId(id);
-        workflowMapper.deleteById(id);
-
-        log.info("Deleted workflow: id={}", id);
+    if (workflow.getStatus() == 1 || workflow.getStatus() == 2) {
+      JsonNode payload = objectMapper.createObjectNode().put("workflowId", id);
+      invokeAirflow(
+          AirflowConnector.OP_DELETE,
+          payload,
+          buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_DELETE));
+      log.info("Deleted airflow workflow: id={}", id);
     }
 
-    // ==================== DAG 管理 ====================
+    dependencyMapper.deleteByWorkflowId(id);
+    jobInfoMapper.deleteByWorkflowId(id);
+    workflowMapper.deleteById(id);
 
-    @Override
-    @Transactional
-    public void publishWorkflow(Long id) {
-        JobWorkflow workflow = workflowMapper.selectById(id);
-        if (workflow == null) {
-            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", id);
-        }
+    log.info("Deleted workflow: id={}", id);
+  }
 
-        List<JobResponse> jobs = jobInfoMapper.selectJobsByWorkflowId(id);
-        List<JobDependencyResponse> dependencies = dependencyMapper.selectByWorkflowId(id);
-
-        validateDag(jobs, dependencies);
-
-        Map<String, Object> request = buildAirflowDeployRequest(workflow, jobs, dependencies);
-
-        JsonNode response = airflowClient.post("/dags", request, JsonNode.class);
-        log.info("Published workflow to Airflow: id={}, response={}", id, response);
-
-        // 强制刷新该 DAG
-        String dagId = buildDagId(workflow);
-        airflowClient.post("/dags/" + dagId + "/reserialize", Map.of(), JsonNode.class);
-
-        workflow.setStatus(1);
-        workflowMapper.updateById(workflow);
+  @Override
+  @Transactional
+  public void publishWorkflow(Long id) {
+    JobWorkflow workflow = workflowMapper.selectById(id);
+    if (workflow == null) {
+      throw new NotFoundException("Workflow does not exist: workflowId=%s", id);
     }
 
-    @Override
-    @Transactional
-    public void pauseWorkflow(Long id) {
-        JobWorkflow workflow = workflowMapper.selectById(id);
-        if (workflow == null) {
-            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", id);
-        }
+    List<JobResponse> jobs = jobInfoMapper.selectJobsByWorkflowId(id);
+    List<JobDependencyResponse> dependencies = dependencyMapper.selectByWorkflowId(id);
+    validateDag(jobs, dependencies);
 
-        if (workflow.getStatus() != 1) {
-            throw new com.sunny.datapillar.common.exception.BadRequestException("工作流状态不正确: %s", "只有已发布的工作流才能暂停");
-        }
+    JsonNode payload = buildAirflowDeployPayload(workflow, jobs, dependencies);
+    JsonNode response =
+        invokeAirflow(
+            AirflowConnector.OP_DEPLOY,
+            payload,
+            buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_DEPLOY));
+    log.info("Published workflow to airflow: id={}, response={}", id, response);
 
-        String dagId = buildDagId(workflow);
-        airflowClient.patch("/dags/" + dagId, Map.of("is_paused", true), JsonNode.class);
+    workflow.setStatus(1);
+    workflowMapper.updateById(workflow);
+  }
 
-        workflow.setStatus(2);
-        workflowMapper.updateById(workflow);
-        log.info("Paused workflow: id={}", id);
+  @Override
+  @Transactional
+  public void pauseWorkflow(Long id) {
+    JobWorkflow workflow = workflowMapper.selectById(id);
+    if (workflow == null) {
+      throw new NotFoundException("Workflow does not exist: workflowId=%s", id);
+    }
+    if (workflow.getStatus() != 1) {
+      throw new BadRequestException(
+          "Workflow status is incorrect: %s", "Only published workflows can be paused");
     }
 
-    @Override
-    @Transactional
-    public void resumeWorkflow(Long id) {
-        JobWorkflow workflow = workflowMapper.selectById(id);
-        if (workflow == null) {
-            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", id);
-        }
+    JsonNode payload = objectMapper.createObjectNode().put("workflowId", id);
+    invokeAirflow(
+        AirflowConnector.OP_PAUSE, payload, buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_PAUSE));
 
-        if (workflow.getStatus() != 2) {
-            throw new com.sunny.datapillar.common.exception.BadRequestException("工作流状态不正确: %s", "只有已暂停的工作流才能恢复");
-        }
+    workflow.setStatus(2);
+    workflowMapper.updateById(workflow);
+    log.info("Paused workflow: id={}", id);
+  }
 
-        String dagId = buildDagId(workflow);
-        airflowClient.patch("/dags/" + dagId, Map.of("is_paused", false), JsonNode.class);
-
-        workflow.setStatus(1);
-        workflowMapper.updateById(workflow);
-        log.info("Resumed workflow: id={}", id);
+  @Override
+  @Transactional
+  public void resumeWorkflow(Long id) {
+    JobWorkflow workflow = workflowMapper.selectById(id);
+    if (workflow == null) {
+      throw new NotFoundException("Workflow does not exist: workflowId=%s", id);
+    }
+    if (workflow.getStatus() != 2) {
+      throw new BadRequestException(
+          "Workflow status is incorrect: %s", "Only paused workflows can be resumed");
     }
 
-    @Override
-    public JsonNode getDagDetail(Long id) {
-        JobWorkflow workflow = getWorkflowById(id);
-        String dagId = buildDagId(workflow);
-        return airflowClient.get("/dags/" + dagId, JsonNode.class);
+    JsonNode payload = objectMapper.createObjectNode().put("workflowId", id);
+    invokeAirflow(
+        AirflowConnector.OP_RESUME, payload, buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_RESUME));
+
+    workflow.setStatus(1);
+    workflowMapper.updateById(workflow);
+    log.info("Resumed workflow: id={}", id);
+  }
+
+  @Override
+  public JsonNode getDagDetail(Long id) {
+    getWorkflowById(id);
+    JsonNode payload = objectMapper.createObjectNode().put("workflowId", id);
+    return invokeAirflow(AirflowConnector.OP_GET_DAG, payload, null);
+  }
+
+  @Override
+  public JsonNode getDagVersions(Long id, int limit, int offset) {
+    getWorkflowById(id);
+    JsonNode payload =
+        objectMapper
+            .createObjectNode()
+            .put("workflowId", id)
+            .put("limit", limit)
+            .put("offset", offset);
+    return invokeAirflow(AirflowConnector.OP_LIST_DAG_VERSIONS, payload, null);
+  }
+
+  @Override
+  public JsonNode getDagVersion(Long id, int versionNumber) {
+    getWorkflowById(id);
+    JsonNode payload =
+        objectMapper.createObjectNode().put("workflowId", id).put("versionNumber", versionNumber);
+    return invokeAirflow(AirflowConnector.OP_GET_DAG_VERSION, payload, null);
+  }
+
+  @Override
+  public JsonNode triggerWorkflow(Long id, WorkflowTriggerRequest request) {
+    getWorkflowById(id);
+
+    var body = objectMapper.createObjectNode();
+    if (request != null) {
+      if (StringUtils.hasText(request.getLogicalDate())) {
+        body.put("logical_date", request.getLogicalDate());
+      }
+      if (request.getConf() != null) {
+        body.set("conf", objectMapper.valueToTree(request.getConf()));
+      }
     }
 
-    @Override
-    public JsonNode getDagVersions(Long id, int limit, int offset) {
-        JobWorkflow workflow = getWorkflowById(id);
-        String dagId = buildDagId(workflow);
-        return airflowClient.get("/dags/" + dagId + "/versions?limit=" + limit + "&offset=" + offset, JsonNode.class);
+    JsonNode payload = objectMapper.createObjectNode().put("workflowId", id).set("body", body);
+    return invokeAirflow(
+        AirflowConnector.OP_TRIGGER_RUN,
+        payload,
+        buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_TRIGGER));
+  }
+
+  @Override
+  public JsonNode getWorkflowRuns(Long id, int limit, int offset, String state) {
+    getWorkflowById(id);
+    var payload =
+        objectMapper
+            .createObjectNode()
+            .put("workflowId", id)
+            .put("limit", limit)
+            .put("offset", offset);
+    if (StringUtils.hasText(state)) {
+      payload.put("state", state);
+    }
+    return invokeAirflow(AirflowConnector.OP_LIST_RUNS, payload, null);
+  }
+
+  @Override
+  public JsonNode getWorkflowRun(Long id, String runId) {
+    getWorkflowById(id);
+    JsonNode payload = objectMapper.createObjectNode().put("workflowId", id).put("runId", runId);
+    return invokeAirflow(AirflowConnector.OP_GET_RUN, payload, null);
+  }
+
+  @Override
+  public JsonNode getRunJobs(Long id, String runId) {
+    getWorkflowById(id);
+    JsonNode payload = objectMapper.createObjectNode().put("workflowId", id).put("runId", runId);
+    return invokeAirflow(AirflowConnector.OP_LIST_TASKS, payload, null);
+  }
+
+  @Override
+  public JsonNode getRunJob(Long id, String runId, String jobId) {
+    getWorkflowById(id);
+    JsonNode payload =
+        objectMapper
+            .createObjectNode()
+            .put("workflowId", id)
+            .put("runId", runId)
+            .put("taskId", jobId);
+    return invokeAirflow(AirflowConnector.OP_GET_TASK, payload, null);
+  }
+
+  @Override
+  public JsonNode getJobLogs(Long id, String runId, String jobId, int tryNumber) {
+    getWorkflowById(id);
+    JsonNode payload =
+        objectMapper
+            .createObjectNode()
+            .put("workflowId", id)
+            .put("runId", runId)
+            .put("taskId", jobId)
+            .put("tryNumber", tryNumber);
+    return invokeAirflow(AirflowConnector.OP_GET_TASK_LOGS, payload, null);
+  }
+
+  @Override
+  public JsonNode rerunJob(Long id, String runId, String jobId, WorkflowRerunJobRequest request) {
+    getWorkflowById(id);
+
+    var body = objectMapper.createObjectNode();
+    if (request != null) {
+      body.put("downstream", request.isDownstream());
+      body.put("upstream", request.isUpstream());
     }
 
-    @Override
-    public JsonNode getDagVersion(Long id, int versionNumber) {
-        JobWorkflow workflow = getWorkflowById(id);
-        String dagId = buildDagId(workflow);
-        return airflowClient.get("/dags/" + dagId + "/versions/" + versionNumber, JsonNode.class);
+    JsonNode payload =
+        objectMapper
+            .createObjectNode()
+            .put("workflowId", id)
+            .put("runId", runId)
+            .put("taskId", jobId)
+            .set("body", body);
+    return invokeAirflow(
+        AirflowConnector.OP_RERUN_TASK,
+        payload,
+        buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_RERUN + ":" + runId + ":" + jobId));
+  }
+
+  @Override
+  public JsonNode setJobState(
+      Long id, String runId, String jobId, WorkflowSetJobStatusRequest request) {
+    getWorkflowById(id);
+
+    var body = objectMapper.createObjectNode();
+    body.put("new_state", request.getNewState());
+    body.put("include_upstream", request.isIncludeUpstream());
+    body.put("include_downstream", request.isIncludeDownstream());
+
+    JsonNode payload =
+        objectMapper
+            .createObjectNode()
+            .put("workflowId", id)
+            .put("runId", runId)
+            .put("taskId", jobId)
+            .set("body", body);
+    return invokeAirflow(
+        AirflowConnector.OP_SET_TASK_STATE,
+        payload,
+        buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_SET_STATE + ":" + runId + ":" + jobId));
+  }
+
+  @Override
+  public JsonNode clearJobs(Long id, String runId, WorkflowClearJobsRequest request) {
+    getWorkflowById(id);
+
+    var body = objectMapper.createObjectNode();
+    body.set("task_ids", objectMapper.valueToTree(request.getJobIds()));
+    body.put("only_failed", request.isOnlyFailed());
+    body.put("reset_dag_runs", request.isResetDagRuns());
+    body.put("include_upstream", request.isIncludeUpstream());
+    body.put("include_downstream", request.isIncludeDownstream());
+
+    JsonNode payload =
+        objectMapper.createObjectNode().put("workflowId", id).put("runId", runId).set("body", body);
+    return invokeAirflow(
+        AirflowConnector.OP_CLEAR_TASKS,
+        payload,
+        buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_CLEAR + ":" + runId));
+  }
+
+  private JobWorkflow getWorkflowById(Long id) {
+    JobWorkflow workflow = workflowMapper.selectById(id);
+    if (workflow == null) {
+      throw new NotFoundException("Workflow does not exist: workflowId=%s", id);
+    }
+    return workflow;
+  }
+
+  private void validateDag(List<JobResponse> jobs, List<JobDependencyResponse> dependencies) {
+    DagBuilder dagBuilder = new DagBuilder();
+
+    for (JobResponse job : jobs) {
+      dagBuilder.addNode(job.getId());
     }
 
-    // ==================== DAG Run 管理 ====================
-
-    @Override
-    public JsonNode triggerWorkflow(Long id, WorkflowTriggerRequest request) {
-        JobWorkflow workflow = getWorkflowById(id);
-        String dagId = buildDagId(workflow);
-
-        Map<String, Object> body = new HashMap<>();
-        if (request != null) {
-            if (request.getLogicalDate() != null) {
-                body.put("logical_date", request.getLogicalDate());
-            }
-            if (request.getConf() != null) {
-                body.put("conf", request.getConf());
-            }
-        }
-
-        return airflowClient.post("/dags/" + dagId + "/runs", body, JsonNode.class);
+    for (JobDependencyResponse dependency : dependencies) {
+      dagBuilder.addEdge(dependency.getParentJobId(), dependency.getJobId());
     }
 
-    @Override
-    public JsonNode getWorkflowRuns(Long id, int limit, int offset, String state) {
-        JobWorkflow workflow = getWorkflowById(id);
-        String dagId = buildDagId(workflow);
-
-        StringBuilder url = new StringBuilder("/dags/" + dagId + "/runs?limit=" + limit + "&offset=" + offset);
-        if (state != null && !state.isEmpty()) {
-            url.append("&state=").append(state);
-        }
-
-        return airflowClient.get(url.toString(), JsonNode.class);
+    try {
+      dagBuilder.validate();
+    } catch (DagValidationException ignored) {
+      throw new BadRequestException("Workflow has circular dependencies");
     }
+  }
 
-    @Override
-    public JsonNode getWorkflowRun(Long id, String runId) {
-        JobWorkflow workflow = getWorkflowById(id);
-        String dagId = buildDagId(workflow);
-        return airflowClient.get("/dags/" + dagId + "/runs/" + runId, JsonNode.class);
+  private JsonNode buildAirflowDeployPayload(
+      JobWorkflow workflow, List<JobResponse> jobs, List<JobDependencyResponse> dependencies) {
+
+    List<Map<String, Object>> jobList =
+        jobs.stream()
+            .map(
+                job ->
+                    Map.<String, Object>of(
+                        "id",
+                        job.getId(),
+                        "job_name",
+                        "job_" + job.getId(),
+                        "job_type",
+                        job.getJobTypeCode(),
+                        "job_params",
+                        job.getJobParams() != null ? job.getJobParams() : Map.of(),
+                        "timeout_seconds",
+                        job.getTimeoutSeconds() != null ? job.getTimeoutSeconds() : 0,
+                        "max_retry_times",
+                        job.getMaxRetryTimes() != null ? job.getMaxRetryTimes() : 0))
+            .collect(Collectors.toList());
+
+    List<Map<String, Object>> dependencyList =
+        dependencies.stream()
+            .map(
+                dep ->
+                    Map.<String, Object>of(
+                        "job_id", dep.getJobId(),
+                        "parent_job_id", dep.getParentJobId()))
+            .collect(Collectors.toList());
+
+    Map<String, Object> workflowMap =
+        Map.of(
+            "workflow_name",
+            workflow.getWorkflowName(),
+            "trigger_type",
+            workflow.getTriggerType(),
+            "trigger_value",
+            workflow.getTriggerValue() != null ? workflow.getTriggerValue() : "",
+            "timeout_seconds",
+            workflow.getTimeoutSeconds() != null ? workflow.getTimeoutSeconds() : 0,
+            "max_retry_times",
+            workflow.getMaxRetryTimes() != null ? workflow.getMaxRetryTimes() : 0,
+            "jobs",
+            jobList,
+            "dependencies",
+            dependencyList);
+
+    return objectMapper
+        .createObjectNode()
+        .put("workflowId", workflow.getId())
+        .set("workflow", objectMapper.valueToTree(workflowMap));
+  }
+
+  private JsonNode invokeAirflow(
+      String operationId, JsonNode payload, IdempotencyDescriptor idempotencyDescriptor) {
+    ConnectorInvocation.Builder builder =
+        ConnectorInvocation.builder(AirflowConnector.CONNECTOR_ID, operationId).payload(payload);
+    if (idempotencyDescriptor != null) {
+      builder.idempotency(idempotencyDescriptor);
     }
+    return connectorKernel.invoke(builder.build()).payload();
+  }
 
-    // ==================== Job 管理 ====================
+  private IdempotencyDescriptor buildWorkflowIdempotency(Long workflowId, String action) {
+    String tenantCode = requiredTenantCode();
+    String normalizedAction = action == null ? "UNKNOWN" : action.trim().toUpperCase(Locale.ROOT);
+    String key = "airflow:%s:%d:%s".formatted(tenantCode, workflowId, normalizedAction);
+    return IdempotencyDescriptor.of(key, normalizedAction);
+  }
 
-    @Override
-    public JsonNode getRunJobs(Long id, String runId) {
-        JobWorkflow workflow = getWorkflowById(id);
-        String dagId = buildDagId(workflow);
-        return airflowClient.get("/dags/" + dagId + "/runs/" + runId + "/tasks", JsonNode.class);
+  private String requiredTenantCode() {
+    String tenantCode = TenantContextHolder.getTenantCode();
+    if (!StringUtils.hasText(tenantCode)) {
+      throw new UnauthorizedException("Unauthorized access");
     }
-
-    @Override
-    public JsonNode getRunJob(Long id, String runId, String jobId) {
-        JobWorkflow workflow = getWorkflowById(id);
-        String dagId = buildDagId(workflow);
-        return airflowClient.get("/dags/" + dagId + "/runs/" + runId + "/tasks/" + jobId, JsonNode.class);
-    }
-
-    @Override
-    public JsonNode getJobLogs(Long id, String runId, String jobId, int tryNumber) {
-        JobWorkflow workflow = getWorkflowById(id);
-        String dagId = buildDagId(workflow);
-        return airflowClient.get("/dags/" + dagId + "/runs/" + runId + "/tasks/" + jobId + "/logs?try_number=" + tryNumber, JsonNode.class);
-    }
-
-    @Override
-    public JsonNode rerunJob(Long id, String runId, String jobId, WorkflowRerunJobRequest request) {
-        JobWorkflow workflow = getWorkflowById(id);
-        String dagId = buildDagId(workflow);
-
-        Map<String, Object> body = new HashMap<>();
-        if (request != null) {
-            body.put("downstream", request.isDownstream());
-            body.put("upstream", request.isUpstream());
-        }
-
-        return airflowClient.post("/dags/" + dagId + "/runs/" + runId + "/tasks/" + jobId + "/rerun", body, JsonNode.class);
-    }
-
-    @Override
-    public JsonNode setJobState(Long id, String runId, String jobId, WorkflowSetJobStatusRequest request) {
-        JobWorkflow workflow = getWorkflowById(id);
-        String dagId = buildDagId(workflow);
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("new_state", request.getNewState());
-        body.put("include_upstream", request.isIncludeUpstream());
-        body.put("include_downstream", request.isIncludeDownstream());
-
-        return airflowClient.patch("/dags/" + dagId + "/runs/" + runId + "/tasks/" + jobId + "/state", body, JsonNode.class);
-    }
-
-    @Override
-    public JsonNode clearJobs(Long id, String runId, WorkflowClearJobsRequest request) {
-        JobWorkflow workflow = getWorkflowById(id);
-        String dagId = buildDagId(workflow);
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("task_ids", request.getJobIds());
-        body.put("only_failed", request.isOnlyFailed());
-        body.put("reset_dag_runs", request.isResetDagRuns());
-        body.put("include_upstream", request.isIncludeUpstream());
-        body.put("include_downstream", request.isIncludeDownstream());
-
-        return airflowClient.post("/dags/" + dagId + "/runs/" + runId + "/clear", body, JsonNode.class);
-    }
-
-    // ==================== 私有方法 ====================
-
-    private JobWorkflow getWorkflowById(Long id) {
-        JobWorkflow workflow = workflowMapper.selectById(id);
-        if (workflow == null) {
-            throw new com.sunny.datapillar.common.exception.NotFoundException("工作流不存在: workflowId=%s", id);
-        }
-        return workflow;
-    }
-
-    /**
-     * 构建DAG ID，格式: datapillar_project_{projectId}_workflow_{workflowId}
-     */
-    private String buildDagId(JobWorkflow workflow) {
-        return "datapillar_project_" + workflow.getProjectId() + "_workflow_" + workflow.getId();
-    }
-
-    private void validateDag(List<JobResponse> jobs, List<JobDependencyResponse> dependencies) {
-        DagBuilder dagBuilder = new DagBuilder();
-
-        for (JobResponse job : jobs) {
-            dagBuilder.addNode(job.getId());
-        }
-
-        for (JobDependencyResponse dep : dependencies) {
-            dagBuilder.addEdge(dep.getParentJobId(), dep.getJobId());
-        }
-
-        try {
-            dagBuilder.validate();
-        } catch (DagValidationException e) {
-            throw new com.sunny.datapillar.common.exception.BadRequestException("工作流存在循环依赖");
-        }
-    }
-
-    private Map<String, Object> buildAirflowDeployRequest(JobWorkflow workflow,
-            List<JobResponse> jobs, List<JobDependencyResponse> dependencies) {
-
-        List<Map<String, Object>> jobList = jobs.stream().map(job -> Map.<String, Object>of(
-                "id", job.getId(),
-                "job_name", "job_" + job.getId(),
-                "job_type", job.getJobTypeCode(),
-                "job_params", job.getJobParams() != null ? job.getJobParams() : Map.of(),
-                "timeout_seconds", job.getTimeoutSeconds() != null ? job.getTimeoutSeconds() : 0,
-                "max_retry_times", job.getMaxRetryTimes() != null ? job.getMaxRetryTimes() : 0
-        )).collect(Collectors.toList());
-
-        List<Map<String, Object>> depList = dependencies.stream().map(dep -> Map.<String, Object>of(
-                "job_id", dep.getJobId(),
-                "parent_job_id", dep.getParentJobId()
-        )).collect(Collectors.toList());
-
-        Map<String, Object> workflowMap = Map.of(
-                "workflow_name", buildDagId(workflow),
-                "trigger_type", workflow.getTriggerType(),
-                "trigger_value", workflow.getTriggerValue() != null ? workflow.getTriggerValue() : "",
-                "timeout_seconds", workflow.getTimeoutSeconds() != null ? workflow.getTimeoutSeconds() : 0,
-                "max_retry_times", workflow.getMaxRetryTimes() != null ? workflow.getMaxRetryTimes() : 0,
-                "jobs", jobList,
-                "dependencies", depList
-        );
-
-        // namespace格式: project_{projectId}
-        String namespace = "project_" + workflow.getProjectId();
-
-        return Map.of(
-                "namespace", namespace,
-                "workflow", workflowMap
-        );
-    }
+    return tenantCode.trim().toLowerCase(Locale.ROOT);
+  }
 }

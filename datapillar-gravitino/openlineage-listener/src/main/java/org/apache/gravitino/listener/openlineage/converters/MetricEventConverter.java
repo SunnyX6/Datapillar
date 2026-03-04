@@ -1,21 +1,19 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * regarding copyright ownership.The ASF licenses this file
+ * to you under the Apache License,Version 2.0 (the
+ * "License");you may not use this file except in compliance
+ * with the License.You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * Unless required by applicable law or agreed to in writing,* software distributed under the License is distributed on an
+ * "AS IS" BASIS,WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND,either express or implied.See the License for the
  * specific language governing permissions and limitations
- * under the License.
- */
+ * under the License.*/
 
 package org.apache.gravitino.listener.openlineage.converters;
 
@@ -36,9 +34,9 @@ import org.apache.gravitino.listener.api.event.RegisterMetricEvent;
 import org.apache.gravitino.listener.api.info.MetricInfo;
 
 /**
- * Metric 事件转换器。
+ * Metric event converter.*
  *
- * <p>处理: RegisterMetricEvent, AlterMetricEvent, DropMetricEvent
+ * <p>Process:RegisterMetricEvent,AlterMetricEvent,DropMetricEvent
  */
 public class MetricEventConverter extends BaseEventConverter {
 
@@ -60,10 +58,8 @@ public class MetricEventConverter extends BaseEventConverter {
   private RunEvent convertRegisterMetric(RegisterMetricEvent event) {
     NameIdentifier identifier = event.identifier();
     MetricInfo metricInfo = event.registeredMetricInfo();
-
     List<SchemaDatasetFacetFields> fields = buildMetricFields(metricInfo);
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
-
     DatasetFacets facets =
         openLineage
             .newDatasetFacetsBuilder()
@@ -72,7 +68,6 @@ public class MetricEventConverter extends BaseEventConverter {
                 openLineage.newLifecycleStateChangeDatasetFacet(
                     OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.CREATE, null))
             .build();
-
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
@@ -80,7 +75,6 @@ public class MetricEventConverter extends BaseEventConverter {
             .name(formatDatasetName(identifier))
             .facets(facets)
             .build();
-
     return createRunEvent(
         event,
         "gravitino.register_metric",
@@ -92,10 +86,8 @@ public class MetricEventConverter extends BaseEventConverter {
   private RunEvent convertAlterMetric(AlterMetricEvent event) {
     NameIdentifier identifier = event.identifier();
     MetricInfo metricInfo = event.updatedMetricInfo();
-
     List<SchemaDatasetFacetFields> fields = buildMetricFields(metricInfo);
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
-
     DatasetFacets facets =
         openLineage
             .newDatasetFacetsBuilder()
@@ -104,7 +96,6 @@ public class MetricEventConverter extends BaseEventConverter {
                 openLineage.newLifecycleStateChangeDatasetFacet(
                     OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.ALTER, null))
             .build();
-
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
@@ -112,7 +103,6 @@ public class MetricEventConverter extends BaseEventConverter {
             .name(formatDatasetName(identifier))
             .facets(facets)
             .build();
-
     return createRunEvent(
         event,
         "gravitino.alter_metric",
@@ -123,12 +113,10 @@ public class MetricEventConverter extends BaseEventConverter {
 
   private RunEvent convertDropMetric(DropMetricEvent event) {
     NameIdentifier identifier = event.identifier();
-
     String code = identifier.name();
     List<SchemaDatasetFacetFields> fields = new ArrayList<>();
     fields.add(openLineage.newSchemaDatasetFacetFields("code", "STRING", code, null));
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
-
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
@@ -144,7 +132,6 @@ public class MetricEventConverter extends BaseEventConverter {
                             null))
                     .build())
             .build();
-
     return createRunEvent(
         event,
         "gravitino.drop_metric",
@@ -175,7 +162,6 @@ public class MetricEventConverter extends BaseEventConverter {
                 fields.add(
                     openLineage.newSchemaDatasetFacetFields(
                         "calculationFormula", "STRING", f, null)));
-
     String[] parentCodes = metricInfo.parentMetricCodes();
     if (parentCodes != null && parentCodes.length > 0) {
       StringBuilder sb = new StringBuilder();
@@ -218,7 +204,6 @@ public class MetricEventConverter extends BaseEventConverter {
             v ->
                 fields.add(
                     openLineage.newSchemaDatasetFacetFields("filterColumns", "JSON", v, null)));
-
     return fields;
   }
 }

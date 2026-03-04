@@ -22,7 +22,7 @@ import java.util.List;
 import org.apache.gravitino.dataset.ValueDomain;
 import org.apache.gravitino.meta.AuditInfo;
 
-/** 值域实现类 */
+/** Value domain implementation class */
 public class ValueDomainImpl implements ValueDomain {
 
   private String domainCode;

@@ -1,22 +1,22 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-工具注册管理中心（AI 项目侧）
+Tool Registration Management Center（AI Project side）
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from datapillar_oneagentic import tool as base_tool
 
 
 @dataclass(frozen=True, slots=True)
 class ToolMeta:
-    """工具元信息"""
+    """Tool meta information"""
 
     name: str
     tool_type: str
@@ -24,18 +24,18 @@ class ToolMeta:
 
 
 class ToolRegistry:
-    """工具注册中心"""
+    """Tool Registration Center"""
 
     def __init__(self) -> None:
         self._tools: dict[str, ToolMeta] = {}
 
     def register(self, name: str, tool_type: str, desc: str) -> None:
         if not isinstance(name, str) or not name.strip():
-            raise ValueError("工具名不能为空")
+            raise ValueError("Tool name cannot be empty")
         if not isinstance(tool_type, str) or not tool_type.strip():
-            raise ValueError("工具类型不能为空")
+            raise ValueError("Tool type cannot be empty")
         if not isinstance(desc, str) or not desc.strip():
-            raise ValueError("工具描述不能为空")
+            raise ValueError("Tool description cannot be empty")
         self._tools[name.strip()] = ToolMeta(
             name=name.strip(),
             tool_type=tool_type.strip(),
@@ -64,7 +64,7 @@ def etl_tool(
     return_direct: bool = False,
     infer_schema: bool = True,
 ) -> Any:
-    """AI 项目侧工具装饰器：注册工具元信息 + 生成可注入工具对象"""
+    """AI Project side tool decorator：Register tool meta information + Generate injectable tool objects"""
 
     def _create_tool(func: Callable, custom_name: str | None = None) -> Any:
         tool_instance = base_tool(

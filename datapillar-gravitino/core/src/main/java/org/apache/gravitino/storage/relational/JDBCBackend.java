@@ -58,6 +58,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.storage.relational.bootstrap.RelationalBackendBootstrapLoader;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
@@ -109,6 +110,7 @@ public class JDBCBackend implements RelationalBackend {
   public void initialize(Config config) {
     jdbcDatabase = startJDBCDatabaseIfNecessary(config);
 
+    RelationalBackendBootstrapLoader.runBeforeSqlSessionFactoryInit(config);
     SqlSessionFactoryHelper.getInstance().init(config);
     SQLExceptionConverterFactory.initConverter(config);
   }
@@ -479,7 +481,7 @@ public class JDBCBackend implements RelationalBackend {
             .deleteMetricMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case METRIC_VERSION:
-        // MetricVersion 由 MetricMetaService.deleteMetricMetasByLegacyTimeline 一起删除
+        // MetricVersion by MetricMetaService.deleteMetricMetasByLegacyTimeline Delete together
         return 0;
       case METRIC_MODIFIER:
         return MetricModifierMetaService.getInstance()

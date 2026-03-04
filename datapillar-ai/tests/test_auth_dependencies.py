@@ -21,9 +21,8 @@ def _make_request(*, roles: list[str] | None, with_user: bool = True) -> Request
         "client": ("testclient", 1234),
     }
     request = Request(scope)
-    request.state.gateway_assertion = SimpleNamespace(roles=roles or [])
     if with_user:
-        request.state.current_user = SimpleNamespace(user_id=1)
+        request.state.current_user = SimpleNamespace(user_id=1, roles=roles or [])
     return request
 
 
@@ -39,10 +38,10 @@ def test_require_admin_role_rejects_non_admin_role() -> None:
     with pytest.raises(ForbiddenException) as exc_info:
         require_admin_role(request)
 
-    assert str(exc_info.value) == "需要管理员权限"
+    assert str(exc_info.value) == "Requires administrator rights"
 
 
-def test_require_admin_role_rejects_missing_assertion_context() -> None:
+def test_require_admin_role_rejects_missing_user_context() -> None:
     scope = {
         "type": "http",
         "method": "GET",
@@ -55,10 +54,10 @@ def test_require_admin_role_rejects_missing_assertion_context() -> None:
     }
     request = Request(scope)
 
-    with pytest.raises(ForbiddenException) as exc_info:
+    with pytest.raises(UnauthorizedException) as exc_info:
         require_admin_role(request)
 
-    assert str(exc_info.value) == "需要管理员权限"
+    assert str(exc_info.value) == "Authentication information lost"
 
 
 def test_current_user_state_raises_unauthorized_when_missing() -> None:
@@ -67,4 +66,4 @@ def test_current_user_state_raises_unauthorized_when_missing() -> None:
     with pytest.raises(UnauthorizedException) as exc_info:
         current_user_state(request)
 
-    assert str(exc_info.value) == "认证信息丢失"
+    assert str(exc_info.value) == "Authentication information lost"

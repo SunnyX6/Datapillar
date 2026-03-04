@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.RoleMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.ibatis.annotations.Param;
@@ -27,29 +28,38 @@ import org.apache.ibatis.annotations.Param;
 public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
   @Override
   public String softDeleteRoleMetaByRoleId(Long roleId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ROLE_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+        + " WHERE role_id = #{roleId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteRoleMetasByMetalakeId(Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ROLE_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String insertRoleMetaOnDuplicateKeyUpdate(RolePO rolePO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + ROLE_TABLE_NAME
         + "(role_id, role_name,"
         + " metalake_id, properties,"
-        + " audit_info, current_version, last_version, deleted_at)"
+        + " audit_info, current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{roleMeta.roleId},"
         + " #{roleMeta.roleName},"
@@ -58,7 +68,9 @@ public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
         + " #{roleMeta.auditInfo},"
         + " #{roleMeta.currentVersion},"
         + " #{roleMeta.lastVersion},"
-        + " #{roleMeta.deletedAt}"
+        + " #{roleMeta.deletedAt},"
+        + " "
+        + tenantId
         + " ) ON CONFLICT (role_id) DO UPDATE SET"
         + " role_name = #{roleMeta.roleName},"
         + " metalake_id = #{roleMeta.metalakeId},"
@@ -72,10 +84,16 @@ public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
   @Override
   public String deleteRoleMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + ROLE_TABLE_NAME
         + " WHERE role_id IN (SELECT role_id FROM "
         + ROLE_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit})"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 }

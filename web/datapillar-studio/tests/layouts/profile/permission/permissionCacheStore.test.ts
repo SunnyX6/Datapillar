@@ -5,8 +5,8 @@ import type { RoleDefinition, UserItem } from '@/features/profile/utils/permissi
 const roleDefinition: RoleDefinition = {
   id: '1',
   type: 'USER',
-  name: '数据分析师',
-  description: '测试角色',
+  name: 'data analyst',
+  description: 'test role',
   permissions: [],
   memberCount: 0,
 }
@@ -16,7 +16,7 @@ const roleUser: UserItem = {
   name: 'sunny',
   email: 'sunny@datapillar.ai',
   roleId: '1',
-  status: '已激活',
+  status: 'Activated',
   lastActive: '2026-02-25 10:00:00',
 }
 
@@ -25,7 +25,7 @@ describe('permissionCacheStore', () => {
     usePermissionCacheStore.getState().reset()
   })
 
-  it('成员缓存失效时应保留成员数据，仅清理时间戳', () => {
+  it('Member data should be retained when member cache is invalidated，Clean timestamps only', () => {
     const store = usePermissionCacheStore.getState()
     store.replaceRoles([roleDefinition])
     store.setMembersData('1', [roleUser], 1)
@@ -43,14 +43,14 @@ describe('permissionCacheStore', () => {
     expect(afterInvalidate?.error).toBeNull()
   })
 
-  it('功能权限缓存失效时应保留权限树，仅清理时间戳', () => {
+  it('The permission tree should be preserved when the function permission cache is invalidated，Clean timestamps only', () => {
     const store = usePermissionCacheStore.getState()
     store.setPermissionsData('1', [
       {
         objectId: 101,
-        objectName: '元数据目录',
+        objectName: 'metadata directory',
         sort: 1,
-        categoryName: '数据资产',
+        categoryName: 'data assets',
         level: 'READ',
         tenantLevel: 'ADMIN',
         children: [],
@@ -69,7 +69,7 @@ describe('permissionCacheStore', () => {
     expect(afterInvalidate?.error).toBeNull()
   })
 
-  it('更新用户 AI 模型权限时只应更新目标用户', () => {
+  it('Update user AI Model permissions should only be updated for the target user', () => {
     const store = usePermissionCacheStore.getState()
     store.setMembersData('1', [
       roleUser,

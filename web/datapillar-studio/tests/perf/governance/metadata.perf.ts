@@ -10,8 +10,8 @@ import {
 } from '../../shared/mockOneMeta'
 import { collectWebVitals, initWebVitals } from '../../shared/webVitals'
 
-test.describe('数据治理性能', () => {
-  test('元数据中心 Web Vitals', async ({ page }) => {
+test.describe('Data governance performance', () => {
+  test('metadata center Web Vitals', async ({ page }) => {
     const budgets = getPerfBudgets()
 
     await mockAuthRoutes(page)
@@ -20,10 +20,10 @@ test.describe('数据治理性能', () => {
     await initWebVitals(page)
     await page.goto('/governance/metadata')
 
-    const expandButton = page.getByRole('button', { name: '展开元数据侧栏' })
-    const collapseButton = page.getByRole('button', { name: '收起元数据侧栏' })
+    const expandButton = page.getByRole('button', { name: 'Expand the metadata sidebar' })
+    const collapseButton = page.getByRole('button', { name: 'Collapse metadata sidebar' })
     await page.waitForSelector(
-      'button[aria-label="展开元数据侧栏"], button[aria-label="收起元数据侧栏"]',
+      'button[aria-label="Expand the metadata sidebar"], button[aria-label="Collapse metadata sidebar"]',
       { state: 'attached' }
     )
     if (await expandButton.isVisible()) {
@@ -35,7 +35,7 @@ test.describe('数据治理性能', () => {
 
     const sidebar = page.locator('aside').filter({ has: collapseButton })
     await expect(sidebar).toBeVisible()
-    await expect(sidebar.getByText('元数据中心')).toBeVisible()
+    await expect(sidebar.getByText('metadata center')).toBeVisible()
 
     const catalogLabel = sidebar.getByText(MOCK_CATALOG_NAME, { exact: true }).first()
     await expect(catalogLabel).toBeVisible()

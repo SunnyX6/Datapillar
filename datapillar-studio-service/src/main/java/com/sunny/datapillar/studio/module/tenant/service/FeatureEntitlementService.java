@@ -17,19 +17,19 @@ import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
- * 功能Entitlement服务
- * 提供功能Entitlement业务能力与领域服务
+ * FunctionEntitlementservice Provide functionalityEntitlementBusiness capabilities and domain
+ * services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface FeatureEntitlementService {
 
-    List<TenantFeatureItem> listEntitlements();
+  List<TenantFeatureItem> listEntitlements();
 
-    TenantFeatureItem getEntitlement(Long objectId);
+  TenantFeatureItem getEntitlement(Long objectId);
 
-    void updateEntitlement(Long objectId, TenantFeatureUpdateItem item);
+  void updateEntitlement(Long objectId, TenantFeatureUpdateItem item);
 
-    void updateEntitlements(List<TenantFeatureUpdateItem> items);
+  void updateEntitlements(List<TenantFeatureUpdateItem> items);
 }

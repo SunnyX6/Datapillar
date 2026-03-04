@@ -101,7 +101,7 @@ describe('SetupGate', () => {
     useSetupStore.getState().resetSetupStatus()
   })
 
-  it('页面切换时不重复请求 setup 状态', async () => {
+  it('No repeated requests when switching pages setup Status', async () => {
     const { container, root, router } = renderWithRouter('/home')
 
     await flushEffects()

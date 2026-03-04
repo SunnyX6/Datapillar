@@ -52,7 +52,7 @@ springdoc:
   api-docs:
     enabled: true
 
-# Actuator 健康检查（与服务同端口）
+# Actuator health check（Same port as service）
 management:
   endpoints:
     web:
@@ -89,7 +89,7 @@ logging:
       max-history: 30
       total-size-cap: 1GB
 
-# Airflow 配置
+# Airflow Configuration
 airflow:
   base-url: ${AIRFLOW_BASE_URL:http://localhost:8080}
   plugin-path: /plugins/datapillar
@@ -98,36 +98,32 @@ airflow:
   connect-timeout: 5000
   read-timeout: 30000
 
-# Gravitino 配置
+# Gravitino Configuration
 gravitino:
   uri: ${GRAVITINO_URI:http://localhost:8090}
   metalake: ${GRAVITINO_METALAKE:OneMeta}
 
-# SQL 执行配置
+tenant:
+  id-generator:
+    worker-id: ${TENANT_ID_GENERATOR_WORKER_ID:1}
+
+# SQL Execute configuration
 sql:
   enabled: ${SQL_ENABLED:true}
   max-rows: ${SQL_MAX_ROWS:200}
   execution-timeout: ${SQL_TIMEOUT:300000}
 
-# 安全配置
+# Security configuration
 security:
-  gateway-assertion:
+  trusted-identity:
     enabled: true
-    header-name: X-Gateway-Assertion
-    issuer: datapillar-auth
-    audience: datapillar-studio-service
-    key-id: auth-dev-2026-02
-    public-key-path: ${AUTH_ASSERTION_PUBLIC_KEY_PATH:classpath:security/gateway-assertion-dev-public.pem}
-    previous-key-id: ${AUTH_ASSERTION_PREVIOUS_KEY_ID:}
-    previous-public-key-path: ${AUTH_ASSERTION_PREVIOUS_PUBLIC_KEY_PATH:}
-    max-clock-skew-seconds: 5
 
 datapillar:
   rpc:
     group: ${DUBBO_GROUP:datapillar}
     version: ${DUBBO_VERSION:1.0.0}
 
-# Dubbo 配置
+# Dubbo Configuration
 
 dubbo:
   application:
@@ -152,6 +148,8 @@ dubbo:
       password: ${NACOS_PASSWORD}
   consumer:
     check: ${DUBBO_CONSUMER_CHECK:false}
+    cluster: ${DUBBO_CONSUMER_CLUSTER:failfast}
+    retries: ${DUBBO_CONSUMER_RETRIES:0}
     timeout: ${DUBBO_CONSUMER_TIMEOUT:5000}
     parameters:
       migration.step: FORCE_INTERFACE

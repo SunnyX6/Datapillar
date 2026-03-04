@@ -14,27 +14,27 @@ import lombok.NoArgsConstructor;
 @Schema(name = "AuthAuthenticationContext")
 public class AuthenticationContextResponse {
 
-    private Long userId;
+  private Long userId;
 
-    private Long tenantId;
+  private Long tenantId;
 
-    private String tenantCode;
+  private String tenantCode;
 
-    private String tenantName;
+  private String tenantName;
 
-    private String username;
+  private String username;
 
-    private String email;
+  private String email;
 
-    private List<String> roles;
+  private List<String> roles;
 
-    private Boolean impersonation;
+  private Boolean impersonation;
 
-    private Long actorUserId;
+  private Long actorUserId;
 
-    private Long actorTenantId;
+  private Long actorTenantId;
 
-    private String sessionId;
+  private String sessionId;
 
-    private String tokenId;
+  private String tokenId;
 }

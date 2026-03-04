@@ -9,8 +9,8 @@ interface DataTrackingTabsProps {
 
 export function DataTrackingTabs({ activeTab, onChange }: DataTrackingTabsProps) {
   const tabs: Array<{ id: TrackingTab; label: string; icon: typeof MapPin }> = [
-    { id: 'PLAN', label: '埋点方案 (Tracking Plan)', icon: MapPin },
-    { id: 'LIBRARY', label: '元事件库 (Event Library)', icon: Book }
+    { id: 'PLAN', label: 'buried point plan (Tracking Plan)', icon: MapPin },
+    { id: 'LIBRARY', label: 'meta event library (Event Library)', icon: Book }
   ]
 
   return (

@@ -1,14 +1,14 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-Gravitino 元数据库连接管理
+Gravitino Metabase connection management
 
-支持 MySQL、PostgreSQL、H2 等多种后端数据库
+support MySQL,PostgreSQL,H2 and other back-end databases
 """
 
 import logging
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import QueuePool
@@ -19,13 +19,13 @@ logger = logging.getLogger(__name__)
 
 
 class GravitinoDBClient:
-    """Gravitino 数据库连接管理器"""
+    """Gravitino Database connection manager"""
 
     _engine: Engine | None = None
 
     @classmethod
     def _build_db_url(cls) -> str:
-        """根据数据库类型构建连接 URL"""
+        """Build connections based on database type URL"""
         db_type = settings.gravitino_db_type.lower()
         host = settings.gravitino_db_host
         port = settings.gravitino_db_port
@@ -41,14 +41,14 @@ class GravitinoDBClient:
         elif db_type == "postgresql":
             return f"postgresql+psycopg2://{username}:{password}" f"@{host}:{port}/{database}"
         elif db_type == "h2":
-            # H2 通常用于测试，使用文件模式
+            # H2 Usually used for testing,Use file mode
             return f"h2+jaydebeapi:///{database}"
         else:
-            raise ValueError(f"不支持的数据库类型: {db_type}")
+            raise ValueError(f"Unsupported database type:{db_type}")
 
     @classmethod
     def get_engine(cls) -> Engine:
-        """获取 SQLAlchemy Engine"""
+        """Get SQLAlchemy Engine"""
         if cls._engine is None:
             db_url = cls._build_db_url()
             try:
@@ -82,7 +82,7 @@ class GravitinoDBClient:
 
     @classmethod
     def close(cls) -> None:
-        """关闭连接池"""
+        """Close connection pool"""
         if cls._engine:
             cls._engine.dispose()
             cls._engine = None
@@ -90,7 +90,7 @@ class GravitinoDBClient:
 
     @classmethod
     def execute_query(cls, query: str, params: dict | None = None) -> list[dict]:
-        """执行查询并返回结果"""
+        """Execute a query and return results"""
         engine = cls.get_engine()
         with engine.connect() as conn:
             result = conn.execute(text(query), params or {})

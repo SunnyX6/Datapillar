@@ -8,8 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 租户功能Audit管理服务实现
- * 实现租户功能Audit管理业务流程与规则校验
+ * Tenant functionsAuditManagement service implementation Implement tenant functionsAuditManage
+ * business processes and rule verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -18,10 +18,10 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class TenantFeatureAuditAdminServiceImpl implements TenantFeatureAuditAdminService {
 
-    private final FeatureAuditService featureAuditService;
+  private final FeatureAuditService featureAuditService;
 
-    @Override
-    public List<TenantFeatureAudit> listAudits() {
-        return featureAuditService.listAudits();
-    }
+  @Override
+  public List<TenantFeatureAudit> listAudits() {
+    return featureAuditService.listAudits();
+  }
 }

@@ -4,8 +4,8 @@ import { getPerfBudgets } from '../../shared/env'
 import { mockAuthRoutes } from '../../shared/mockAuth'
 import { collectWebVitals, initWebVitals } from '../../shared/webVitals'
 
-test.describe('协作模块性能', () => {
-  test('协作页面 Web Vitals', async ({ page }) => {
+test.describe('Collaboration module performance', () => {
+  test('Collaboration page Web Vitals', async ({ page }) => {
     const budgets = getPerfBudgets()
 
     await mockAuthRoutes(page)
@@ -13,22 +13,22 @@ test.describe('协作模块性能', () => {
     await initWebVitals(page)
     await page.goto('/collaboration')
 
-    await expect(page.getByText('协作空间 (COLLABORATION)')).toBeVisible()
+    await expect(page.getByText('collaborative space (COLLABORATION)')).toBeVisible()
 
-    const searchInput = page.getByPlaceholder('搜索工单...')
+    const searchInput = page.getByPlaceholder('Search tickets...')
     await searchInput.fill('T-1029')
 
-    const ticketTitle = page.getByRole('heading', { name: 'ETL 变更：用户归因逻辑调整', level: 3 })
+    const ticketTitle = page.getByRole('heading', { name: 'ETL change：Adjustment of user attribution logic', level: 3 })
     await expect(ticketTitle).toBeVisible()
     await ticketTitle.click()
 
-    const diffButton = page.getByRole('button', { name: '查看代码差异' })
+    const diffButton = page.getByRole('button', { name: 'View code differences' })
     await diffButton.click()
-    await page.getByRole('button', { name: '收起差异概览' }).click()
+    await page.getByRole('button', { name: 'Collapse difference overview' }).click()
 
-    const commentInput = page.getByPlaceholder('添加评论或备注...')
-    await commentInput.fill('已完成前端校验')
-    await page.getByRole('button', { name: '评论' }).click()
+    const commentInput = page.getByPlaceholder('Add a comment or note...')
+    await commentInput.fill('Front-end verification completed')
+    await page.getByRole('button', { name: 'Comment' }).click()
 
     await page.waitForTimeout(300)
 

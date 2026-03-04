@@ -1,21 +1,19 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * regarding copyright ownership.The ASF licenses this file
+ * to you under the Apache License,Version 2.0 (the
+ * "License");you may not use this file except in compliance
+ * with the License.You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * Unless required by applicable law or agreed to in writing,* software distributed under the License is distributed on an
+ * "AS IS" BASIS,WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND,either express or implied.See the License for the
  * specific language governing permissions and limitations
- * under the License.
- */
+ * under the License.*/
 
 package org.apache.gravitino.listener.openlineage.facets;
 
@@ -31,14 +29,15 @@ import lombok.Getter;
 /**
  * Gravitino Tag Facet
  *
- * <p>用于传递 Tag 关联信息，包括对象类型、添加的 Tag、移除的 Tag、最终关联的 Tag 列表。
+ * <p>used to pass Tag Related information,Include object type,added Tag,removed Tag,ultimately
+ * associated Tag list.
  */
 @Getter
 @Builder
 public class GravitinoTagFacet implements OpenLineage.DatasetFacet {
 
   private static final URI SCHEMA_URL =
-      URI.create("https://datapillar.io/spec/facets/GravitinoTagFacet.json");
+      URI.create("https://gravitino.apache.org/spec/facets/GravitinoTagFacet.json");
 
   @Getter(AccessLevel.NONE)
   @JsonProperty("_producer")
@@ -52,19 +51,19 @@ public class GravitinoTagFacet implements OpenLineage.DatasetFacet {
   @JsonProperty("_deleted")
   private final Boolean deleted;
 
-  /** 对象类型：CATALOG, SCHEMA, TABLE, COLUMN */
+  /** Object type:CATALOG,SCHEMA,TABLE,COLUMN */
   @JsonProperty("objectType")
   private final String objectType;
 
-  /** 本次添加的 Tag */
+  /** Added this time Tag */
   @JsonProperty("tagsToAdd")
   private final String[] tagsToAdd;
 
-  /** 本次移除的 Tag */
+  /** Removed this time Tag */
   @JsonProperty("tagsToRemove")
   private final String[] tagsToRemove;
 
-  /** 操作后关联的所有 Tag */
+  /** All associated after the operation Tag */
   @JsonProperty("associatedTags")
   private final String[] associatedTags;
 
@@ -88,7 +87,7 @@ public class GravitinoTagFacet implements OpenLineage.DatasetFacet {
     return new HashMap<>();
   }
 
-  /** 创建 Builder 并设置默认值 */
+  /** create Builder and set default value */
   public static GravitinoTagFacetBuilder builder(URI producer) {
     return new GravitinoTagFacetBuilder().producer(producer).schemaURL(SCHEMA_URL);
   }

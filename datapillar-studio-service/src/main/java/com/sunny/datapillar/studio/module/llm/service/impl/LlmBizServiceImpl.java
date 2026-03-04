@@ -21,8 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 大模型业务服务实现
- * 实现大模型业务业务流程与规则校验
+ * Large model business service implementation Implement large model business process and rule
+ * verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -31,16 +31,16 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class LlmBizServiceImpl implements LlmBizService {
 
-    private final LlmManagerService llmManagerService;
+  private final LlmManagerService llmManagerService;
 
-    @Override
-    public List<LlmUserModelPermissionResponse> listCurrentUserModelPermissions(Long currentUserId,
-                                                                                          boolean onlyEnabled) {
-        return llmManagerService.listUserModelPermissions(currentUserId, currentUserId, onlyEnabled);
-    }
+  @Override
+  public List<LlmUserModelPermissionResponse> listCurrentUserModelPermissions(
+      Long currentUserId, boolean onlyEnabled) {
+    return llmManagerService.listUserModelPermissions(currentUserId, currentUserId, onlyEnabled);
+  }
 
-    @Override
-    public LlmUserModelUsageResponse setCurrentUserDefaultModel(Long currentUserId, Long aiModelId) {
-        return llmManagerService.setUserDefaultModel(currentUserId, currentUserId, aiModelId);
-    }
+  @Override
+  public LlmUserModelUsageResponse setCurrentUserDefaultModel(Long currentUserId, Long aiModelId) {
+    return llmManagerService.setUserDefaultModel(currentUserId, currentUserId, aiModelId);
+  }
 }

@@ -1,37 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0  http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
     <parent>
         <groupId>com.sunny</groupId>
         <artifactId>datapillar</artifactId>
         <version>1.0.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
-
     <artifactId>datapillar-api-gateway</artifactId>
     <packaging>jar</packaging>
-
     <name>Datapillar Gateway</name>
-    <description>API 网关 - 路由、认证、限流、熔断</description>
-
+    <description>API gateway - routing,Certification,Current limiting,fuse</description>
     <dependencies>
         <!-- Datapillar Common -->
         <dependency>
             <groupId>com.sunny</groupId>
             <artifactId>datapillar-common</artifactId>
-            <version>${project.version}</version>
         </dependency>
-
-        <!-- Spring Cloud Gateway (新版 WebFlux 实现) -->
+        <!-- Spring Cloud Gateway (new version WebFlux realize) -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
         </dependency>
-
         <!-- Spring Cloud Alibaba Nacos (config + discovery) -->
         <dependency>
             <groupId>com.alibaba.cloud</groupId>
@@ -41,62 +31,48 @@
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
         </dependency>
-
-        <!-- Dubbo RPC -->
+        <!-- OAuth2 Resource Server (JWT/JWKS verification) -->
         <dependency>
-            <groupId>org.apache.dubbo</groupId>
-            <artifactId>dubbo-spring-boot-starter</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.apache.dubbo</groupId>
-            <artifactId>dubbo-nacos-spring-boot-starter</artifactId>
-        </dependency>
-
         <!-- Spring Cloud LoadBalancer (lb://) -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-loadbalancer</artifactId>
         </dependency>
-
-        <!-- Netty macOS DNS 原生支持 -->
+        <!-- Netty macOS DNS Native support -->
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-resolver-dns-native-macos</artifactId>
             <classifier>osx-aarch_64</classifier>
         </dependency>
-
         <!-- Spring Boot Actuator -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-
         <!-- Redis (for rate limiting) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
         </dependency>
-
         <!-- Resilience4j (circuit breaker) -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-circuitbreaker-reactor-resilience4j</artifactId>
         </dependency>
-
-        <!-- Scalar API 文档（WebFlux） -->
+        <!-- Scalar API Documentation(WebFlux) -->
         <dependency>
             <groupId>com.scalar.maven</groupId>
             <artifactId>scalar-webflux</artifactId>
-            <version>0.5.33</version>
         </dependency>
-
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
-
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -104,7 +80,6 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-
     <build>
         <plugins>
             <plugin>

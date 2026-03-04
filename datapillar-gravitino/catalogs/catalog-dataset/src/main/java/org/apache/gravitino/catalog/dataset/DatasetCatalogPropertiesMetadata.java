@@ -23,7 +23,7 @@ import java.util.Map;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
-/** Dataset Catalog 属性元数据 */
+/** Dataset Catalog Property metadata */
 public class DatasetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
   @Override

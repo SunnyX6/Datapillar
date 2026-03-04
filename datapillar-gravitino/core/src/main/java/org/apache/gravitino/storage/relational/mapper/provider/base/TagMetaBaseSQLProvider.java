@@ -22,12 +22,14 @@ import static org.apache.gravitino.storage.relational.mapper.TagMetaMapper.TAG_T
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.ibatis.annotations.Param;
 
 public class TagMetaBaseSQLProvider {
 
   public String listTagPOsByMetalake(@Param("metalakeName") String metalakeName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
         + " tm.metalake_id as metalakeId,"
         + " tm.tag_comment as comment,"
@@ -41,11 +43,16 @@ public class TagMetaBaseSQLProvider {
         + " tm JOIN "
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON tm.metalake_id = mm.metalake_id"
-        + " WHERE mm.metalake_name = #{metalakeName} AND tm.deleted_at = 0 AND mm.deleted_at = 0";
+        + " WHERE mm.metalake_name = #{metalakeName} AND tm.deleted_at = 0 AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId);
   }
 
   public String listTagPOsByMetalakeAndTagNames(
       @Param("metalakeName") String metalakeName, @Param("tagNames") List<String> tagNames) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
         + " tm.metalake_id as metalakeId,"
@@ -66,22 +73,32 @@ public class TagMetaBaseSQLProvider {
         + " #{tagName}"
         + " </foreach>"
         + " AND tm.deleted_at = 0 AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId)
         + "</script>";
   }
 
   public String selectTagIdByMetalakeAndName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT tm.tag_id as tagId FROM "
         + TAG_TABLE_NAME
         + " tm JOIN "
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON tm.metalake_id = mm.metalake_id"
         + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name = #{tagName}"
-        + " AND tm.deleted_at = 0 AND mm.deleted_at = 0";
+        + " AND tm.deleted_at = 0 AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId);
   }
 
   public String selectTagMetaByMetalakeAndName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
         + " tm.metalake_id as metalakeId,"
         + " tm.tag_comment as comment,"
@@ -96,15 +113,22 @@ public class TagMetaBaseSQLProvider {
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON tm.metalake_id = mm.metalake_id"
         + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name = #{tagName}"
-        + " AND tm.deleted_at = 0 AND mm.deleted_at = 0";
+        + " AND tm.deleted_at = 0 AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId);
   }
 
   public String insertTagMeta(@Param("tagMeta") TagPO tagPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TAG_TABLE_NAME
         + " (tag_id, tag_name,"
         + " metalake_id, tag_comment, properties, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{tagMeta.tagId},"
         + " #{tagMeta.tagName},"
@@ -114,16 +138,21 @@ public class TagMetaBaseSQLProvider {
         + " #{tagMeta.auditInfo},"
         + " #{tagMeta.currentVersion},"
         + " #{tagMeta.lastVersion},"
-        + " #{tagMeta.deletedAt}"
+        + " #{tagMeta.deletedAt},"
+        + " "
+        + tenantId
         + " )";
   }
 
   public String insertTagMetaOnDuplicateKeyUpdate(@Param("tagMeta") TagPO tagPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TAG_TABLE_NAME
         + "(tag_id, tag_name,"
         + " metalake_id, tag_comment, properties, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{tagMeta.tagId},"
         + " #{tagMeta.tagName},"
@@ -133,7 +162,9 @@ public class TagMetaBaseSQLProvider {
         + " #{tagMeta.auditInfo},"
         + " #{tagMeta.currentVersion},"
         + " #{tagMeta.lastVersion},"
-        + " #{tagMeta.deletedAt}"
+        + " #{tagMeta.deletedAt},"
+        + " "
+        + tenantId
         + " )"
         + " ON DUPLICATE KEY UPDATE"
         + " tag_name = #{tagMeta.tagName},"
@@ -148,6 +179,7 @@ public class TagMetaBaseSQLProvider {
 
   public String updateTagMeta(
       @Param("newTagMeta") TagPO newTagPO, @Param("oldTagMeta") TagPO oldTagPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TAG_TABLE_NAME
         + " SET tag_name = #{newTagMeta.tagName},"
@@ -165,11 +197,14 @@ public class TagMetaBaseSQLProvider {
         + " AND audit_info = #{oldTagMeta.auditInfo}"
         + " AND current_version = #{oldTagMeta.currentVersion}"
         + " AND last_version = #{oldTagMeta.lastVersion}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteTagMetaByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TAG_TABLE_NAME
         + " tm SET tm.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -177,22 +212,34 @@ public class TagMetaBaseSQLProvider {
         + " WHERE tm.metalake_id IN ("
         + " SELECT mm.metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0";
+        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId)
+        + ")"
+        + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tm", tenantId);
   }
 
   public String softDeleteTagMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TAG_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteTagMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + TAG_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 }

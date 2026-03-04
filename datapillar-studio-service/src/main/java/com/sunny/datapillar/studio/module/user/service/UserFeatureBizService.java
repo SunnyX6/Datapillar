@@ -17,13 +17,12 @@ import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
- * 用户功能业务服务
- * 提供用户功能业务业务能力与领域服务
+ * User function business services Provide user functions, business capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface UserFeatureBizService {
 
-    List<FeatureTreeNodeItem> listFeatures(Long userId, String location);
+  List<FeatureTreeNodeItem> listFeatures(Long userId, String location);
 }

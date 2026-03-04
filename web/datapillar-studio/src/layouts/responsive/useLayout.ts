@@ -10,23 +10,23 @@ interface LayoutOptions {
 
 interface LayoutResult<T extends HTMLElement> {
   ref: RefObject<T>
-  /** 延迟更新的缩放比例（性能优化，推荐使用） */
+  /** Delayed scaling of updates（Performance optimization，Recommended） */
   scale: number
-  /** 延迟更新的宽度（性能优化，推荐使用） */
+  /** Delayed update width（Performance optimization，Recommended） */
   width: number
-  /** 延迟更新的高度（性能优化，推荐使用） */
+  /** Delayed update height（Performance optimization，Recommended） */
   height: number
   ready: boolean
-  /** 实时缩放比例（用于需要立即响应的场景） */
+  /** Real-time scaling（Used for scenarios requiring immediate response） */
   immediateScale: number
 }
 
 /**
- * useLayout：监听容器尺寸并返回等比缩放信息
+ * useLayout：Monitor container size and return proportional scaling information
  *
- * - 根据 baseWidth/baseHeight 计算缩放比例
- * - scaleFactor 用于一次性调节整体大小
- * - 使用 React 19 useDeferredValue 优化性能，避免高频 resize 阻塞用户交互
+ * - According to baseWidth/baseHeight Calculate scaling
+ * - scaleFactor Used to adjust the overall size at one time
+ * - use React 19 useDeferredValue Optimize performance，avoid high frequency resize Block user interaction
  *
  * @see https://react.dev/reference/react/useDeferredValue
  */
@@ -47,7 +47,7 @@ export function useLayout<T extends HTMLElement>({
     ready: false
   }))
 
-  // React 19 useDeferredValue：自动延迟低优先级更新，根据设备性能自适应
+  // React 19 useDeferredValue：Automatically defer low priority updates，Adapt according to device performance
   const deferredState = useDeferredValue(immediateState)
 
   useIsomorphicLayoutEffect(() => {

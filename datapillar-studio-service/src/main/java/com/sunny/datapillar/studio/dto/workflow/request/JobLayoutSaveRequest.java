@@ -10,7 +10,7 @@ import lombok.Data;
 @Schema(name = "JobLayoutSave")
 public class JobLayoutSaveRequest {
 
-    @NotEmpty(message = "位置列表不能为空")
-    @Valid
-    private List<JobPositionItem> positions;
+  @NotEmpty(message = "Location list cannot be empty")
+  @Valid
+  private List<JobPositionItem> positions;
 }

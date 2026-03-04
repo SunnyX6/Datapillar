@@ -8,23 +8,23 @@ import lombok.Data;
 @Schema(name = "WorkflowListItem")
 public class WorkflowListItemResponse {
 
-    private Long id;
+  private Long id;
 
-    private Long projectId;
+  private Long projectId;
 
-    private String projectName;
+  private String projectName;
 
-    private String workflowName;
+  private String workflowName;
 
-    private Integer triggerType;
+  private Integer triggerType;
 
-    private Integer status;
+  private Integer status;
 
-    private String description;
+  private String description;
 
-    private Integer jobCount;
+  private Integer jobCount;
 
-    private LocalDateTime createdAt;
+  private LocalDateTime createdAt;
 
-    private LocalDateTime updatedAt;
+  private LocalDateTime updatedAt;
 }

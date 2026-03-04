@@ -157,7 +157,7 @@ const buildViewportPreferences = (columnCount: number, maxRows: number) => {
 }
 
 /**
- * 检查节点是否包含 AI 返回的位置信息
+ * Check if the node contains AI Returned location information
  */
 const hasAIPositions = (nodes: WorkflowNodeDefinition[]): boolean => {
   return nodes.length > 0 && nodes.every((node) => node.positionX !== undefined && node.positionY !== undefined)
@@ -177,7 +177,7 @@ export const formatWorkflowGraph = (graph: WorkflowGraph, options?: Partial<Work
     }
   }
 
-  // 如果 AI 返回了位置信息，直接使用
+  // if AI Location information returned，Use directly
   if (hasAIPositions(graph.nodes)) {
     const formattedNodes: FormattedWorkflowNode[] = graph.nodes.map((node, index) => ({
       ...node,
@@ -206,7 +206,7 @@ export const formatWorkflowGraph = (graph: WorkflowGraph, options?: Partial<Work
     }
   }
 
-  // 否则自动计算布局
+  // Otherwise, the layout is automatically calculated
   const columns = computeColumns(graph)
   const { rows, maxColumn, maxRows } = gatherRowAssignments(graph.nodes, columns)
 

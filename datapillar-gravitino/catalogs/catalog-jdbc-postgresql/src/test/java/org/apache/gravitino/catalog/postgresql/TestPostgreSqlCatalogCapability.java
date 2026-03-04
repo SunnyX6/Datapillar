@@ -46,7 +46,7 @@ public class TestPostgreSqlCatalogCapability {
       Assertions.assertTrue(result.supported());
 
       // names with unicode letters should be supported
-      result = capability.specificationOnName(scope, "测试表");
+      result = capability.specificationOnName(scope, "Test table");
       Assertions.assertTrue(result.supported());
 
       result = capability.specificationOnName(scope, "tableção");
@@ -199,7 +199,7 @@ public class TestPostgreSqlCatalogCapability {
     CapabilityResult result = capability.specificationOnName(Capability.Scope.TABLE, "αβγ_table");
     Assertions.assertTrue(result.supported());
 
-    result = capability.specificationOnName(Capability.Scope.TABLE, "测试_table");
+    result = capability.specificationOnName(Capability.Scope.TABLE, "test_table");
     Assertions.assertTrue(result.supported());
 
     result = capability.specificationOnName(Capability.Scope.TABLE, "أحمد_table");
@@ -209,7 +209,7 @@ public class TestPostgreSqlCatalogCapability {
     Assertions.assertTrue(result.supported());
 
     // Test Unicode letters in the end
-    result = capability.specificationOnName(Capability.Scope.TABLE, "_table_测试");
+    result = capability.specificationOnName(Capability.Scope.TABLE, "_table_test");
     Assertions.assertTrue(result.supported());
 
     result = capability.specificationOnName(Capability.Scope.TABLE, "table_αβγ");

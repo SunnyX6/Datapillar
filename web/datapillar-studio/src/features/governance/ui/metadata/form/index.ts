@@ -1,5 +1,5 @@
 /**
- * 表单组件统一导出
+ * Unified export of form components
  */
 
 export { CreateCatalogForm } from './CatalogForm'

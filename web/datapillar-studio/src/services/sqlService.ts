@@ -1,13 +1,13 @@
 /**
- * SQL 执行服务
+ * SQL execution service
  *
- * 负责 SQL 执行相关的 API 调用
+ * responsible SQL execution related API call
  */
 
 import { API_BASE, API_PATH, requestData } from '@/api'
 
 /**
- * 列定义
+ * Column definition
  */
 export interface ColumnSchema {
   name: string
@@ -16,7 +16,7 @@ export interface ColumnSchema {
 }
 
 /**
- * SQL 执行请求
+ * SQL Execute request
  */
 export interface ExecuteRequest {
   sql: string
@@ -26,7 +26,7 @@ export interface ExecuteRequest {
 }
 
 /**
- * SQL 执行结果
+ * SQL Execution result
  */
 export interface ExecuteResult {
   success: boolean

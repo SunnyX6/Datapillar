@@ -130,14 +130,14 @@ const KNOWLEDGE_GRAPH_COMMAND_OPTIONS: ChatCommandOption[] = [
   {
     id: 'sync',
     label: '/sync',
-    title: '同步',
-    description: '同步元数据与关系'
+    title: 'sync',
+    description: 'Synchronize metadata and relationships'
   },
   {
     id: 'rebuild',
     label: '/rebuild',
-    title: '向量重建',
-    description: '重新构建向量索引'
+    title: 'vector reconstruction',
+    description: 'Rebuild vector index'
   }
 ]
 
@@ -253,7 +253,7 @@ function filterGraphByType(type: string | null, graph: GraphData): GraphData {
       const isSourceColumn = sourceType === 'column'
       const isTargetColumn = targetType === 'column'
 
-      // 只包含与 join 相连的列
+      // only contains join connected columns
       if (nodeIds.has(sourceId) && isSourceJoin && isTargetColumn) {
         nodeIds.add(targetId)
       }
@@ -329,7 +329,7 @@ export function KnowledgeGraphView() {
   const commandNoticeClearTimerRef = useRef<number | null>(null)
   const isComposingRef = useRef(false)
 
-  // 使用全局 store 管理图数据
+  // Use global store Manage graph data
   const {
     allGraphData,
     isLoading: storeLoading,
@@ -369,7 +369,7 @@ export function KnowledgeGraphView() {
       let color = getNodeColor(node)
       if (node.health === 'warning') color = '#DC2626'
 
-      // 优先展示 service 返回的 name；若缺失则兜底 label/id
+      // Priority display service returned name；If its missing, tell me everything label/id
       const captionText =
         (node.name ?? '').toString().trim() ||
         (node as GraphNode & { label?: string }).label ||
@@ -485,12 +485,12 @@ export function KnowledgeGraphView() {
     }
   }, [activeNodeId, graphData.nodes])
 
-  // 当 store 的 allGraphData 或 filterType 变化时，更新显示的 graphData
+  // when store of allGraphData or filterType When changing，Update displayed graphData
   useEffect(() => {
     setGraphData(filterGraphByType(filterType, allGraphData))
   }, [filterType, allGraphData])
 
-  // 加载初始数据（store 内部会检查缓存）
+  // Load initial data（store The cache is checked internally）
   useEffect(() => {
     const load = async () => {
       setLoading(true)
@@ -500,7 +500,7 @@ export function KnowledgeGraphView() {
     load()
   }, [loadInitialGraph])
 
-  // store 数据变化时同步 loading 状态
+  // store Synchronize when data changes loading Status
   useEffect(() => {
     if (!storeLoading && allGraphData.nodes.length > 0) {
       setLoading(false)
@@ -524,35 +524,35 @@ export function KnowledgeGraphView() {
     }
   }, [])
 
-  // NVL 实例初始化和交互处理器管理
+  // NVL Instance initialization and interaction handler management
   useEffect(() => {
     if (loading || !containerRef.current) return
 
-    // 初始化 NVL 实例
+    // initialization NVL Example
     const nvl = new NVL(containerRef.current, nvlNodes, nvlRelationships, nvlOptions)
     nvlRef.current = nvl
 
-    // 初始化交互处理器
+    // Initialize interaction handler
     const panInteraction = new PanInteraction(nvl)
     const zoomInteraction = new ZoomInteraction(nvl)
     const dragInteraction = new DragNodeInteraction(nvl)
     const clickInteraction = new ClickInteraction(nvl)
     const hoverInteraction = new HoverInteraction(nvl)
 
-    // 监听过渡结束事件，侧边栏折叠动画完成后重新适配
+    // Listen for the transition end event，The sidebar is re-adapted after the folding animation is completed.
     const container = containerRef.current
     const handleTransitionEnd = (e: TransitionEvent) => {
-      // 检查是否是包含此容器的父元素的 width 过渡结束
+      // Checks whether it is the parent element containing this container width end of transition
       if (e.propertyName === 'width' && (e.target as HTMLElement)?.contains(container)) {
         nvlRef.current?.fit([], { animated: false })
       }
     }
     document.addEventListener('transitionend', handleTransitionEnd)
 
-    // 状态追踪（避免全量重算）
+    // status tracking（Avoid full recalculation）
     let lastSelectedId: string | null = null
 
-    // 点击回调：节点点击选中并固定卡片
+    // Click callback：Click on the node to select and pin the card
     clickInteraction.updateCallback('onNodeClick', (node: NvlNode) => {
       if (lastSelectedId && lastSelectedId !== node.id) {
         nvl.updateElementsInGraph([{ id: lastSelectedId, selected: false }], [])
@@ -565,13 +565,13 @@ export function KnowledgeGraphView() {
       setIsCardPinned(true)
     })
 
-    // 点击回调：双击解除固定
+    // Click callback：Double-click to unpin
     clickInteraction.updateCallback('onNodeDoubleClick', (node: NvlNode) => {
       nvl.unPinNode([node.id])
       setIsCardPinned(false)
     })
 
-    // 点击回调：关系点击（取消选中）
+    // Click callback：relationship click（Uncheck）
     clickInteraction.updateCallback('onRelationshipClick', () => {
       if (lastSelectedId) {
         nvl.updateElementsInGraph([{ id: lastSelectedId, selected: false }], [])
@@ -582,7 +582,7 @@ export function KnowledgeGraphView() {
       setIsCardPinned(false)
     })
 
-    // 点击回调：画布点击（取消选中和悬停）
+    // Click callback：Canvas click（Uncheck and hover）
     clickInteraction.updateCallback('onCanvasClick', () => {
       if (lastSelectedId) {
         nvl.updateElementsInGraph([{ id: lastSelectedId, selected: false }], [])
@@ -594,7 +594,7 @@ export function KnowledgeGraphView() {
       setIsCardPinned(false)
     })
 
-    // 拖拽回调：拖拽结束后固定节点
+    // Drag callback：Fixed node after dragging
     dragInteraction.updateCallback('onDragEnd', (nodes) => {
       if (!nodes?.length) return
       nvl.updateElementsInGraph(
@@ -603,7 +603,7 @@ export function KnowledgeGraphView() {
       )
     })
 
-    // 悬停回调：只更新单个节点的 hovered 状态，不触发全量重算
+    // Hover callback：Only update a single node hovered Status，Does not trigger full recalculation
     let lastHoveredId: string | null = null
     hoverInteraction.updateCallback('onHover', (element, _hitElements, _event) => {
       const node = element && !('from' in element) ? element : null
@@ -621,7 +621,7 @@ export function KnowledgeGraphView() {
       }
     })
 
-    // 清理函数
+    // Cleanup function
     return () => {
       document.removeEventListener('transitionend', handleTransitionEnd)
       panInteraction.destroy()
@@ -632,11 +632,11 @@ export function KnowledgeGraphView() {
       nvl.destroy()
       nvlRef.current = null
     }
-    // nvlNodes/nvlRelationships 在此仅用于初始化，数据更新由下方独立 useEffect 处理
+    // nvlNodes/nvlRelationships Used here only for initialization，Data is updated independently from below useEffect Process
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, nvlOptions])
 
-  // 数据更新时同步到 NVL
+  // Sync to when data is updated NVL
   useEffect(() => {
     const nvl = nvlRef.current
     if (!nvl || loading) return
@@ -688,7 +688,7 @@ export function KnowledgeGraphView() {
     if (!import.meta.env.DEV) return
     const instance = nvlRef.current
     if (!instance) return
-    // 便于本地排查，暴露 NVL 与节点数据
+    // Facilitates local investigation，exposed NVL with node data
     ;(window as unknown as { __kg?: unknown }).__kg = {
       nvl: instance,
       nodes: graphData.nodes,
@@ -706,7 +706,7 @@ export function KnowledgeGraphView() {
     setIssues((prev) => prev.filter((item) => item.id !== issueId))
     setFixingIssueId(null)
 
-    // 模拟修复：更新本地显示的 graphData（不影响 store 缓存）
+    // Simulation repair：Update local display graphData（does not affect store cache）
     setGraphData((prev) => ({
       ...prev,
       nodes: prev.nodes.map((node) =>
@@ -741,7 +741,7 @@ export function KnowledgeGraphView() {
     const command = KNOWLEDGE_GRAPH_COMMAND_OPTIONS.find((item) => item.id === commandId)
     const label = command?.label ?? `/${commandId}`
     if (commandId === 'sync' || commandId === 'rebuild') {
-      showCommandNotice(`已触发 ${label}，待后端接入后生效`)
+      showCommandNotice(`Triggered ${label}，It will take effect after the backend is connected.`)
       return
     }
   }
@@ -772,7 +772,7 @@ export function KnowledgeGraphView() {
       if (error instanceof Error && error.name === 'AbortError') {
         return
       }
-      console.error('[KG] 搜索失败:', error)
+      console.error('[KG] Search failed:', error)
     } finally {
       if (searchAbortRef.current === controller) {
         searchAbortRef.current = null
@@ -833,7 +833,7 @@ export function KnowledgeGraphView() {
             <div className="flex flex-col items-center gap-4">
               <Loader2 size={48} className="animate-spin text-indigo-500" />
               <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                加载知识图谱数据...
+                Load knowledge graph data...
               </p>
             </div>
           </div>
@@ -956,7 +956,7 @@ export function KnowledgeGraphView() {
               <div className="flex flex-col items-center justify-center gap-1 pb-1 pt-1 text-slate-400/80 dark:text-slate-500/80">
                 <button
                   type="button"
-                  aria-label="更多操作"
+                  aria-label="More actions"
                   className="p-1 rounded-md transition-colors hover:text-slate-600 hover:bg-slate-50 dark:hover:text-slate-300 dark:hover:bg-slate-800"
                 >
                   <MoreHorizontal size={14} />
@@ -1350,7 +1350,7 @@ export function KnowledgeGraphView() {
               defaultModelId={defaultAiModelId}
               modelOptions={modelOptions}
               onModelChange={setSelectedAiModelId}
-              modelDropdownHeader="选择向量模型"
+              modelDropdownHeader="Select a vector model"
               commandOptions={KNOWLEDGE_GRAPH_COMMAND_OPTIONS}
               onCommand={handleCommandAction}
             />

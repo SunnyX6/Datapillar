@@ -9,21 +9,21 @@ import lombok.Data;
 @Schema(name = "WorkflowCreate")
 public class WorkflowCreateRequest {
 
-    @NotNull(message = "项目ID不能为空")
-    private Long projectId;
+  @NotNull(message = "ProjectIDcannot be empty")
+  private Long projectId;
 
-    @NotBlank(message = "工作流名称不能为空")
-    private String workflowName;
+  @NotBlank(message = "Workflow name cannot be empty")
+  private String workflowName;
 
-    private Integer triggerType;
+  private Integer triggerType;
 
-    private String triggerValue;
+  private String triggerValue;
 
-    private Integer timeoutSeconds;
+  private Integer timeoutSeconds;
 
-    private Integer maxRetryTimes;
+  private Integer maxRetryTimes;
 
-    private Integer priority;
+  private Integer priority;
 
-    private String description;
+  private String description;
 }

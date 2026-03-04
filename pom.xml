@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.4</version>
+        <relativePath/>
+    </parent>
 
     <groupId>com.sunny</groupId>
     <artifactId>datapillar</artifactId>
@@ -16,18 +20,12 @@
     <modules>
         <module>datapillar-common</module>
         <module>datapillar-auth</module>
+        <module>datapillar-connector</module>
         <module>datapillar-studio-service</module>
         <module>datapillar-api-gateway</module>
         <module>datapillar-openlineage</module>
         <module>datapillar-distribution</module>
     </modules>
-
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.4</version>
-        <relativePath/>
-    </parent>
 
     <properties>
         <java.version>21</java.version>
@@ -46,6 +44,24 @@
         <flink.version>1.18.1</flink.version>
         <scala.binary.version>2.12</scala.binary.version>
         <protobuf.version>3.25.6</protobuf.version>
+        <bcprov.version>1.81</bcprov.version>
+        <dingtalk.version>2.1.98</dingtalk.version>
+        <aws-sdk.version>2.25.61</aws-sdk.version>
+        <guava.version>33.4.0-jre</guava.version>
+        <okhttp.version>5.1.0</okhttp.version>
+        <gravitino.version>1.0.0</gravitino.version>
+        <openlineage.version>1.29.0</openlineage.version>
+        <neo4j-java-driver.version>5.28.10</neo4j-java-driver.version>
+        <scalar.version>0.5.33</scalar.version>
+        <spotless.version>3.2.1</spotless.version>
+        <google-java-format.version>1.22.0</google-java-format.version>
+
+        <!-- Build Plugin Versions -->
+        <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+        <spring-boot-maven-plugin.version>3.5.4</spring-boot-maven-plugin.version>
+        <maven-dependency-plugin.version>3.6.1</maven-dependency-plugin.version>
+        <maven-assembly-plugin.version>3.6.0</maven-assembly-plugin.version>
+        <maven-antrun-plugin.version>3.1.0</maven-antrun-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -86,6 +102,11 @@
             <dependency>
                 <groupId>org.apache.dubbo</groupId>
                 <artifactId>dubbo-nacos-spring-boot-starter</artifactId>
+                <version>${dubbo.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.dubbo</groupId>
+                <artifactId>dubbo</artifactId>
                 <version>${dubbo.version}</version>
             </dependency>
 
@@ -144,7 +165,7 @@
                 <version>${mysql-connector.version}</version>
             </dependency>
 
-            <!-- Protobuf: Dubbo 3.3.x 依赖 GeneratedMessageV3，需锁定 3.x -->
+            <!-- Protobuf: Dubbo 3.3.x Depend on GeneratedMessageV3，Need to lock 3.x -->
             <dependency>
                 <groupId>com.google.protobuf</groupId>
                 <artifactId>protobuf-java</artifactId>
@@ -187,6 +208,112 @@
                 <artifactId>flink-streaming-java</artifactId>
                 <version>${flink.version}</version>
             </dependency>
+
+            <!-- Gravitino -->
+            <dependency>
+                <groupId>org.apache.gravitino</groupId>
+                <artifactId>gravitino-client-java</artifactId>
+                <version>${gravitino.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.gravitino</groupId>
+                <artifactId>gravitino-api</artifactId>
+                <version>${gravitino.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.gravitino</groupId>
+                <artifactId>gravitino-common</artifactId>
+                <version>${gravitino.version}</version>
+            </dependency>
+
+            <!-- Additional Dependencies -->
+            <dependency>
+                <groupId>com.scalar.maven</groupId>
+                <artifactId>scalar-webflux</artifactId>
+                <version>${scalar.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk18on</artifactId>
+                <version>${bcprov.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.aliyun</groupId>
+                <artifactId>dingtalk</artifactId>
+                <version>${dingtalk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>s3</artifactId>
+                <version>${aws-sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp-jvm</artifactId>
+                <version>${okhttp.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.openlineage</groupId>
+                <artifactId>openlineage-java</artifactId>
+                <version>${openlineage.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.neo4j.driver</groupId>
+                <artifactId>neo4j-java-driver</artifactId>
+                <version>${neo4j-java-driver.version}</version>
+            </dependency>
+
+            <!-- Datapillar Internal Modules -->
+            <dependency>
+                <groupId>com.sunny</groupId>
+                <artifactId>datapillar-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.sunny</groupId>
+                <artifactId>datapillar-auth</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.sunny</groupId>
+                <artifactId>datapillar-connector-spi</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.sunny</groupId>
+                <artifactId>datapillar-connector-runtime</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.sunny</groupId>
+                <artifactId>datapillar-connector-airflow</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.sunny</groupId>
+                <artifactId>datapillar-connector-gravitino</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.sunny</groupId>
+                <artifactId>datapillar-studio-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.sunny</groupId>
+                <artifactId>datapillar-api-gateway</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.sunny</groupId>
+                <artifactId>datapillar-openlineage</artifactId>
+                <version>${project.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -196,7 +323,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.13.0</version>
+                    <version>${maven-compiler-plugin.version}</version>
                     <configuration>
                         <source>${java.version}</source>
                         <target>${java.version}</target>
@@ -214,10 +341,59 @@
                 <plugin>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
-                    <version>3.5.4</version>
+                    <version>${spring-boot-maven-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>${maven-dependency-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-assembly-plugin</artifactId>
+                    <version>${maven-assembly-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-antrun-plugin</artifactId>
+                    <version>${maven-antrun-plugin.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <plugins>
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>${spotless.version}</version>
+                <configuration>
+                    <java>
+                        <googleJavaFormat>
+                            <version>${google-java-format.version}</version>
+                        </googleJavaFormat>
+                        <removeUnusedImports/>
+                    </java>
+                    <pom>
+                        <includes>
+                            <include>pom.xml</include>
+                        </includes>
+                        <sortPom>
+                            <nrOfIndentSpace>4</nrOfIndentSpace>
+                            <sortProperties>false</sortProperties>
+                            <sortModules>false</sortModules>
+                        </sortPom>
+                    </pom>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <phase>compile</phase>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 
 </project>

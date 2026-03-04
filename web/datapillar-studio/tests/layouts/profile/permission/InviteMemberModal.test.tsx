@@ -78,7 +78,7 @@ describe('InviteMemberModal', () => {
     createTenantInvitationMock.mockResolvedValue(response)
   })
 
-  it('严格模式下只触发一次创建邀请，并将返回的 URI 拼成当前站点链接', async () => {
+  it('In strict mode, the creation of invitation is only triggered once.，and will return URI spell the current site link', async () => {
     const { container, root } = render(
       <StrictMode>
         <InviteMemberModal isOpen onClose={() => {}} role={role} roleId="301" />

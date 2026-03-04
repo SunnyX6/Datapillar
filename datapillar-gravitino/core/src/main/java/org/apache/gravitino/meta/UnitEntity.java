@@ -28,17 +28,19 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 
-/** Unit 实体，表示单位 */
+/** Unit Entity，Representation unit */
 @ToString
 public class UnitEntity implements Entity, Auditable, HasIdentifier {
 
-  public static final Field ID = Field.required("id", Long.class, "单位的唯一 ID");
-  public static final Field CODE = Field.required("code", String.class, "单位的编码");
-  public static final Field NAMESPACE = Field.required("namespace", Namespace.class, "单位的命名空间");
-  public static final Field UNIT_NAME = Field.required("unit_name", String.class, "单位的名称");
-  public static final Field SYMBOL = Field.required("symbol", String.class, "单位的符号");
-  public static final Field COMMENT = Field.optional("comment", String.class, "单位的注释");
-  public static final Field AUDIT_INFO = Field.required("audit_info", AuditInfo.class, "单位的审计信息");
+  public static final Field ID = Field.required("id", Long.class, "units only ID");
+  public static final Field CODE = Field.required("code", String.class, "unit code");
+  public static final Field NAMESPACE =
+      Field.required("namespace", Namespace.class, "Unit namespace");
+  public static final Field UNIT_NAME = Field.required("unit_name", String.class, "Unit name");
+  public static final Field SYMBOL = Field.required("symbol", String.class, "unit symbol");
+  public static final Field COMMENT = Field.optional("comment", String.class, "Unit notes");
+  public static final Field AUDIT_INFO =
+      Field.required("audit_info", AuditInfo.class, "Unit audit information");
 
   private Long id;
   private String code;

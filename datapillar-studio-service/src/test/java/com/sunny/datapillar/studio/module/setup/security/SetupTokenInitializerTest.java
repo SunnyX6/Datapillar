@@ -17,46 +17,45 @@ import org.springframework.boot.DefaultApplicationArguments;
 @ExtendWith(MockitoExtension.class)
 class SetupTokenInitializerTest {
 
-    @Mock
-    private SystemBootstrapMapper systemBootstrapMapper;
+  @Mock private SystemBootstrapMapper systemBootstrapMapper;
 
-    private SetupTokenInitializer setupTokenInitializer;
+  private SetupTokenInitializer setupTokenInitializer;
 
-    @BeforeEach
-    void setUp() {
-        setupTokenInitializer = new SetupTokenInitializer(systemBootstrapMapper);
-    }
+  @BeforeEach
+  void setUp() {
+    setupTokenInitializer = new SetupTokenInitializer(systemBootstrapMapper);
+  }
 
-    @Test
-    void run_shouldOnlyLogWhenNotInitialized() throws Exception {
-        SystemBootstrap bootstrap = new SystemBootstrap();
-        bootstrap.setId(1);
-        bootstrap.setSetupCompleted(0);
-        when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap);
+  @Test
+  void run_shouldOnlyLogWhenNotInitialized() throws Exception {
+    SystemBootstrap bootstrap = new SystemBootstrap();
+    bootstrap.setId(1);
+    bootstrap.setSetupCompleted(0);
+    when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap);
 
-        setupTokenInitializer.run(new DefaultApplicationArguments(new String[0]));
+    setupTokenInitializer.run(new DefaultApplicationArguments(new String[0]));
 
-        verify(systemBootstrapMapper, never()).updateById(any(SystemBootstrap.class));
-    }
+    verify(systemBootstrapMapper, never()).updateById(any(SystemBootstrap.class));
+  }
 
-    @Test
-    void run_shouldSkipWhenAlreadyInitialized() throws Exception {
-        SystemBootstrap bootstrap = new SystemBootstrap();
-        bootstrap.setId(1);
-        bootstrap.setSetupCompleted(1);
-        when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap);
+  @Test
+  void run_shouldSkipWhenAlreadyInitialized() throws Exception {
+    SystemBootstrap bootstrap = new SystemBootstrap();
+    bootstrap.setId(1);
+    bootstrap.setSetupCompleted(1);
+    when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap);
 
-        setupTokenInitializer.run(new DefaultApplicationArguments(new String[0]));
+    setupTokenInitializer.run(new DefaultApplicationArguments(new String[0]));
 
-        verify(systemBootstrapMapper, never()).updateById(any(SystemBootstrap.class));
-    }
+    verify(systemBootstrapMapper, never()).updateById(any(SystemBootstrap.class));
+  }
 
-    @Test
-    void run_shouldSkipWhenBootstrapMissing() throws Exception {
-        when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(null);
+  @Test
+  void run_shouldSkipWhenBootstrapMissing() throws Exception {
+    when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(null);
 
-        setupTokenInitializer.run(new DefaultApplicationArguments(new String[0]));
+    setupTokenInitializer.run(new DefaultApplicationArguments(new String[0]));
 
-        verify(systemBootstrapMapper, never()).updateById(any(SystemBootstrap.class));
-    }
+    verify(systemBootstrapMapper, never()).updateById(any(SystemBootstrap.class));
+  }
 }

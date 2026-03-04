@@ -17,27 +17,31 @@ import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
- * 租户角色管理服务
- * 提供租户角色管理业务能力与领域服务
+ * Tenant role management service Provide tenant role management business capabilities and domain
+ * services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface TenantRoleAdminService {
 
-    List<RoleResponse> getRoleList();
+  List<RoleResponse> getRoleList();
 
-    Long createRole(RoleCreateRequest dto);
+  Long createRole(RoleCreateRequest dto);
 
-    void updateRole(Long roleId, RoleUpdateRequest dto);
+  void updateRole(Long roleId, RoleUpdateRequest dto);
 
-    void deleteRole(Long roleId);
+  void deleteRole(Long roleId);
 
-    List<FeatureObjectPermissionItem> getRolePermissions(Long roleId, String scope);
+  List<FeatureObjectPermissionItem> getRolePermissions(Long roleId, String scope);
 
-    void updateRolePermissions(Long roleId, List<RoleFeatureAssignmentItem> permissions);
+  void updateRolePermissions(Long roleId, List<RoleFeatureAssignmentItem> permissions);
 
-    RoleMembersResponse getRoleMembers(Long roleId, Integer status);
+  RoleMembersResponse getRoleMembers(Long roleId, Integer status);
 
-    void removeRoleMembers(Long roleId, List<Long> userIds);
+  void removeRoleMembers(Long roleId, List<Long> userIds);
+
+  List<RoleDataPrivilegeItem> getRoleDataPrivileges(Long roleId, String domain);
+
+  void updateRoleDataPrivileges(Long roleId, RoleDataPrivilegeSyncRequest request);
 }

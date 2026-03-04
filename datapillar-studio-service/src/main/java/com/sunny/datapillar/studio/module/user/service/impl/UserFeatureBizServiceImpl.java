@@ -21,8 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 用户功能业务服务实现
- * 实现用户功能业务业务流程与规则校验
+ * User function business service implementation Implement user function business process and rule
+ * verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -31,10 +31,10 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class UserFeatureBizServiceImpl implements UserFeatureBizService {
 
-    private final FeatureObjectService featureObjectService;
+  private final FeatureObjectService featureObjectService;
 
-    @Override
-    public List<FeatureTreeNodeItem> listFeatures(Long userId, String location) {
-        return featureObjectService.getFeatureObjectsByUserId(userId, location);
-    }
+  @Override
+  public List<FeatureTreeNodeItem> listFeatures(Long userId, String location) {
+    return featureObjectService.getFeatureObjectsByUserId(userId, location);
+  }
 }

@@ -12,14 +12,13 @@ vi.mock('@/services/authService', () => ({
       {
         tenantId: 0,
         tenantCode: 'tenant-default',
-        tenantName: '默认租户',
+        tenantName: 'Default tenant',
         status: 1,
         isDefault: 1
       }
-    ],
-    roles: [],
-    menus: []
+    ]
   }),
+  getMyMenus: vi.fn().mockResolvedValue([]),
   loginSso: vi.fn(),
   loginTenant: vi.fn(),
   logout: vi.fn()
@@ -61,7 +60,7 @@ describe('authStore', () => {
     vi.clearAllMocks()
   })
 
-  it('登录勾选记住我时设置30天过期时间', async () => {
+  it('Set when logging in and check Remember me30Expiration time in days', async () => {
     const before = Date.now()
     await useAuthStore.getState().login('mock-user', 'password', true)
 
@@ -74,7 +73,7 @@ describe('authStore', () => {
     expect(sessionExpiresAt).toBeLessThanOrEqual(before + 30 * DAY_MS + 2000)
   })
 
-  it('登录未勾选记住我时设置7天过期时间', async () => {
+  it('Set when logging in with Remember Me unchecked7Expiration time in days', async () => {
     const before = Date.now()
     await useAuthStore.getState().login('mock-user', 'password', false)
 
@@ -87,7 +86,7 @@ describe('authStore', () => {
     expect(sessionExpiresAt).toBeLessThanOrEqual(before + 7 * DAY_MS + 2000)
   })
 
-  it('initializeAuth 遇到过期会话应清理状态', async () => {
+  it('initializeAuth When encountering an expired session, the status should be cleared', async () => {
     const activeSessionState = createActiveSessionState()
     useAuthStore.setState({
       user: activeSessionState.user,
@@ -105,7 +104,7 @@ describe('authStore', () => {
     expect(state.lastRememberMe).toBe(false)
   })
 
-  it('initializeAuth 遇到有效会话时直接恢复认证状态', async () => {
+  it('initializeAuth Directly restore the authentication status when encountering a valid session', async () => {
     const activeSessionState = createActiveSessionState()
     useAuthStore.setState(activeSessionState)
 
@@ -119,7 +118,7 @@ describe('authStore', () => {
     expect(state.error).toBeNull()
   })
 
-  it('logout 请求期间保持当前登录态，响应成功后再清空本地会话', async () => {
+  it('logout Maintain current login status during request，Clear the local session after successful response', async () => {
     const activeSessionState = createActiveSessionState()
     useAuthStore.setState(activeSessionState)
 
@@ -147,7 +146,7 @@ describe('authStore', () => {
     expect(state.sessionExpiresAt).toBeNull()
   })
 
-  it('logout 后端失败时不应抛错且保留当前登录状态', async () => {
+  it('logout Should not throw an error when the backend fails and retain the current login status', async () => {
     const activeSessionState = createActiveSessionState()
     useAuthStore.setState(activeSessionState)
     vi.mocked(apiLogout).mockRejectedValueOnce(new Error('logout failed'))
@@ -162,7 +161,7 @@ describe('authStore', () => {
     expect(state.error).toBe('logout failed')
   })
 
-  it('logout 返回 401 时应按会话过期处理并清空本地会话', async () => {
+  it('logout Return 401 When the session expires, it should be processed and the local session should be cleared.', async () => {
     const activeSessionState = createActiveSessionState()
     useAuthStore.setState(activeSessionState)
     const unauthorizedError = Object.assign(new Error('unauthorized'), {
@@ -180,7 +179,7 @@ describe('authStore', () => {
     expect(state.sessionExpiresAt).toBeNull()
   })
 
-  it('logout 返回业务失败码时应保留当前登录状态', async () => {
+  it('logout The current login status should be retained when returning the business failure code.', async () => {
     const activeSessionState = createActiveSessionState()
     useAuthStore.setState(activeSessionState)
     vi.mocked(apiLogout).mockResolvedValueOnce({ code: 500, data: 'failed' })
@@ -194,7 +193,7 @@ describe('authStore', () => {
     expect(state.sessionExpiresAt).toBe(activeSessionState.sessionExpiresAt)
   })
 
-  it('并发触发 logout 时只应请求一次后端退出', async () => {
+  it('concurrent trigger logout The backend exit should only be requested once', async () => {
     const activeSessionState = createActiveSessionState()
     useAuthStore.setState(activeSessionState)
 

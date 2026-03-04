@@ -78,7 +78,7 @@ public class TableFormatOutputIT extends BaseIT {
       commandArg(GravitinoOptions.URL),
       gravitinoUrl,
       commandArg(GravitinoOptions.COMMENT),
-      "catalog, 用于测试"
+      "catalog, for testing"
     };
     Main.main(create_catalog_with_comment_args);
   }
@@ -239,7 +239,7 @@ public class TableFormatOutputIT extends BaseIT {
         "+-----------+------------+-----------------+-------------------+\n"
             + "|  Catalog  |    Type    |    Provider     |      Comment      |\n"
             + "+-----------+------------+-----------------+-------------------+\n"
-            + "| postgres2 | RELATIONAL | jdbc-postgresql | catalog, 用于测试 |\n"
+            + "| postgres2 | RELATIONAL | jdbc-postgresql | catalog, for testing |\n"
             + "+-----------+------------+-----------------+-------------------+",
         output);
   }

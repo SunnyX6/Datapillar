@@ -9,7 +9,7 @@ const mockCatalogs = [
     name: MOCK_CATALOG_NAME,
     type: 'hive',
     provider: 'hive',
-    comment: '用于前端性能自测的 Catalog'
+    comment: 'For front-end performance self-test Catalog'
   }
 ]
 
@@ -34,12 +34,12 @@ const buildTableDetail = (tableName: string) =>
   buildResponse({
     table: {
       name: tableName,
-      comment: '订单事实表（UI 自测）',
+      comment: 'order fact table（UI Self-test）',
       columns: [
-        { name: 'order_id', type: 'BIGINT', comment: '订单 ID' },
-        { name: 'user_id', type: 'BIGINT', comment: '用户 ID' },
-        { name: 'amount', type: 'DECIMAL(10,2)', comment: '订单金额' },
-        { name: 'created_at', type: 'TIMESTAMP', comment: '创建时间' }
+        { name: 'order_id', type: 'BIGINT', comment: 'Order ID' },
+        { name: 'user_id', type: 'BIGINT', comment: 'User ID' },
+        { name: 'amount', type: 'DECIMAL(10,2)', comment: 'Order amount' },
+        { name: 'created_at', type: 'TIMESTAMP', comment: 'creation time' }
       ],
       properties: {
         'table-type': 'MANAGED',
@@ -59,14 +59,14 @@ const buildValueDomains = () =>
     valueDomains: [
       {
         domainCode: 'ORDER_STATUS',
-        domainName: '订单状态',
+        domainName: 'Order status',
         domainType: 'ENUM',
         domainLevel: 'L1',
         dataType: 'STRING',
-        comment: '订单生命周期状态',
+        comment: 'Order life cycle status',
         items: [
-          { code: 'PAID', name: '已支付', order: 1 },
-          { code: 'CANCELLED', name: '已取消', order: 2 }
+          { code: 'PAID', name: 'paid', order: 1 },
+          { code: 'CANCELLED', name: 'Canceled', order: 2 }
         ]
       }
     ],
@@ -77,11 +77,11 @@ const buildValueDomains = () =>
 
 const mockMetrics = [
   {
-    name: '订单数',
+    name: 'Number of orders',
     code: 'order_count',
     type: 'ATOMIC',
     dataType: 'BIGINT',
-    comment: '订单数量指标',
+    comment: 'Order quantity indicator',
     currentVersion: 1,
     lastVersion: 1,
     audit: {
@@ -90,11 +90,11 @@ const mockMetrics = [
     }
   },
   {
-    name: '成交金额',
+    name: 'Transaction amount',
     code: 'gmv',
     type: 'DERIVED',
     dataType: 'DECIMAL(10,2)',
-    comment: '成交金额指标',
+    comment: 'Transaction amount indicator',
     currentVersion: 1,
     lastVersion: 1,
     audit: {
@@ -107,9 +107,9 @@ const mockMetrics = [
 const mockWordRoots = [
   {
     code: 'ORDER',
-    name: '订单',
+    name: 'Order',
     dataType: 'STRING',
-    comment: '订单相关语义词根',
+    comment: 'Order related semantic roots',
     audit: {
       creator: 'data-admin',
       createTime: '2024-01-01T00:00:00Z'
@@ -117,9 +117,9 @@ const mockWordRoots = [
   },
   {
     code: 'AMOUNT',
-    name: '金额',
+    name: 'Amount',
     dataType: 'DECIMAL',
-    comment: '金额相关语义词根',
+    comment: 'Amount related semantic roots',
     audit: {
       creator: 'data-admin',
       createTime: '2024-01-01T00:00:00Z'
@@ -153,10 +153,10 @@ const buildWordRootList = (offset: number, limit: number) =>
   })
 
 export const mockOneMetaRoutes = async (page: Page) => {
-  await page.route('**/api/onemeta/**', async (route) => {
+  await page.route('**/api/studio/biz/governance/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
-    const path = url.pathname.replace('/api/onemeta', '')
+    const path = url.pathname.replace(/^\/api\/studio\/biz\/governance\/(metadata|semantic)/, '')
 
     if (request.method() !== 'GET') {
       await route.fulfill({
@@ -167,7 +167,7 @@ export const mockOneMetaRoutes = async (page: Page) => {
       return
     }
 
-    if (path === '/metalakes/OneMeta/catalogs') {
+    if (path === '/catalogs') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -176,7 +176,7 @@ export const mockOneMetaRoutes = async (page: Page) => {
       return
     }
 
-    if (path === '/metalakes/OneMeta/catalogs/OneDS/schemas/OneDS/metrics') {
+    if (path === '/metrics') {
       const { offset, limit } = getListParams(url)
       await route.fulfill({
         status: 200,
@@ -186,7 +186,7 @@ export const mockOneMetaRoutes = async (page: Page) => {
       return
     }
 
-    if (path === '/metalakes/OneMeta/catalogs/OneDS/schemas/OneDS/wordroots') {
+    if (path === '/wordroots') {
       const { offset, limit } = getListParams(url)
       await route.fulfill({
         status: 200,
@@ -196,7 +196,7 @@ export const mockOneMetaRoutes = async (page: Page) => {
       return
     }
 
-    const schemasMatch = path.match(/^\/metalakes\/OneMeta\/catalogs\/([^/]+)\/schemas$/)
+    const schemasMatch = path.match(/^\/catalogs\/([^/]+)\/schemas$/)
     if (schemasMatch) {
       const catalogName = decodeURIComponent(schemasMatch[1])
       const schemas = mockSchemas[catalogName] ?? []
@@ -208,7 +208,7 @@ export const mockOneMetaRoutes = async (page: Page) => {
       return
     }
 
-    const tablesMatch = path.match(/^\/metalakes\/OneMeta\/catalogs\/([^/]+)\/schemas\/([^/]+)\/tables$/)
+    const tablesMatch = path.match(/^\/catalogs\/([^/]+)\/schemas\/([^/]+)\/tables$/)
     if (tablesMatch) {
       const catalogName = decodeURIComponent(tablesMatch[1])
       const schemaName = decodeURIComponent(tablesMatch[2])
@@ -221,7 +221,7 @@ export const mockOneMetaRoutes = async (page: Page) => {
       return
     }
 
-    const tableDetailMatch = path.match(/^\/metalakes\/OneMeta\/catalogs\/([^/]+)\/schemas\/([^/]+)\/tables\/([^/]+)$/)
+    const tableDetailMatch = path.match(/^\/catalogs\/([^/]+)\/schemas\/([^/]+)\/tables\/([^/]+)$/)
     if (tableDetailMatch) {
       const tableName = decodeURIComponent(tableDetailMatch[3])
       await route.fulfill({
@@ -232,7 +232,7 @@ export const mockOneMetaRoutes = async (page: Page) => {
       return
     }
 
-    const objectTagsMatch = path.match(/^\/metalakes\/OneMeta\/objects\/(CATALOG|SCHEMA|TABLE|COLUMN)\/.+\/tags$/)
+    const objectTagsMatch = path.match(/^\/objects\/(CATALOG|SCHEMA|TABLE|COLUMN)\/.+\/tags$/)
     if (objectTagsMatch) {
       await route.fulfill({
         status: 200,
@@ -242,7 +242,7 @@ export const mockOneMetaRoutes = async (page: Page) => {
       return
     }
 
-    if (path === '/metalakes/OneMeta/tags') {
+    if (path === '/tags') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -251,7 +251,7 @@ export const mockOneMetaRoutes = async (page: Page) => {
       return
     }
 
-    if (path === '/metalakes/OneMeta/catalogs/OneDS/schemas/OneDS/valuedomains') {
+    if (path === '/valuedomains') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

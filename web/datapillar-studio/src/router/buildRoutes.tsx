@@ -21,24 +21,24 @@ function assertRoutePolicy(routes: RouteManifestItem[]) {
   routes.forEach((route) => {
     if (route.kind === 'entry') {
       if (route.lazy) {
-        throw new Error(`入口路由不允许配置 lazy：${route.path}`)
+        throw new Error(`Ingress routing is not allowed to be configured lazy：${route.path}`)
       }
       if (!route.requireSetup || !route.requireAuth) {
-        throw new Error(`入口路由必须启用 setup/auth 守卫：${route.path}`)
+        throw new Error(`Ingress routing must be enabled setup/auth guard：${route.path}`)
       }
       return
     }
 
     if (!route.lazy) {
-      throw new Error(`非入口路由必须配置 lazy：${route.path}`)
+      throw new Error(`Non-entry routes must be configured lazy：${route.path}`)
     }
 
     if (route.kind === 'app' && (!route.requireSetup || !route.requireAuth)) {
-      throw new Error(`应用路由必须启用 setup/auth 守卫：${route.path}`)
+      throw new Error(`Application routing must be enabled setup/auth guard：${route.path}`)
     }
 
     if ((route.kind === 'setup' || route.kind === 'public') && (route.requireSetup || route.requireAuth)) {
-      throw new Error(`公开路由禁止启用 setup/auth 守卫：${route.path}`)
+      throw new Error(`Public routing is prohibited from being enabled setup/auth guard：${route.path}`)
     }
   })
 }
@@ -51,7 +51,7 @@ export function buildRoutes(): RouteObject[] {
     .map((route) => {
       const routeLoader = route.lazy
       if (!routeLoader) {
-        throw new Error(`路由缺少 lazy 配置：${route.path}`)
+        throw new Error(`Route is missing lazy Configuration：${route.path}`)
       }
       const LazyComponent = lazy(routeLoader)
       return {
@@ -65,7 +65,7 @@ export function buildRoutes(): RouteObject[] {
     .map((route) => {
       const routeLoader = route.lazy
       if (!routeLoader) {
-        throw new Error(`路由缺少 lazy 配置：${route.path}`)
+        throw new Error(`Route is missing lazy Configuration：${route.path}`)
       }
       const LazyComponent = lazy(routeLoader)
       return {
@@ -76,7 +76,7 @@ export function buildRoutes(): RouteObject[] {
 
   const entryRoute = routeManifest.find((route) => route.kind === 'entry' && route.requireSetup && route.requireAuth)
   if (!entryRoute) {
-    throw new Error('缺少根入口路由（kind=entry）配置')
+    throw new Error('Missing root entry route（kind=entry）Configuration')
   }
 
   const appRoutes: RouteObject[] = routeManifest
@@ -84,7 +84,7 @@ export function buildRoutes(): RouteObject[] {
     .map((route) => {
       const routeLoader = route.lazy
       if (!routeLoader) {
-        throw new Error(`路由缺少 lazy 配置：${route.path}`)
+        throw new Error(`Route is missing lazy Configuration：${route.path}`)
       }
       const LazyComponent = lazy(routeLoader)
       const handle: RouteHandle = {

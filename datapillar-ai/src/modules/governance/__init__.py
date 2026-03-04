@@ -1,12 +1,10 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-数据治理模块
+Data governance module
 
-包含数据治理相关的 AI 功能:
-- metric: 指标 AI 治理（智能填写、语义检查）
+Contains data governance related AI Function:- metric:indicator AI governance(Smart fill,Semantic check)
 """
 
 __all__ = []

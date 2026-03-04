@@ -25,7 +25,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.gravitino.dto.dataset.MetricModifierDTO;
 
-/** 指标修饰符响应 */
+/** Metric modifier response */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -39,7 +39,7 @@ public class MetricModifierResponse extends BaseResponse {
     this.modifier = modifier;
   }
 
-  /** Jackson 反序列化使用的默认构造函数 */
+  /** Jackson Default constructor used for deserialization */
   public MetricModifierResponse() {
     super();
     this.modifier = null;

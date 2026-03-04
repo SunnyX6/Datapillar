@@ -39,20 +39,20 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Builder for OpenLineage client with configurable transport.
  *
- * <p>支持的 transport 类型：
+ * <p>supported transport Type：
  *
  * <ul>
- *   <li>console - 日志输出（默认，用于调试）
- *   <li>http - 发送到 HTTP endpoint（生产环境推荐）
+ *   <li>console - Log output（Default，for debugging）
+ *   <li>http - send to HTTP endpoint（Recommended for production environment）
  * </ul>
  *
- * <p>支持的配置：
+ * <p>Supported configurations：
  *
  * <ul>
- *   <li>maxQueueSize - 最大队列大小（限流）
- *   <li>maxConcurrentRequests - 最大并发请求数
- *   <li>retry.total - 重试次数
- *   <li>retry.backoffFactor - 重试退避因子
+ *   <li>maxQueueSize - Maximum queue size（Current limiting）
+ *   <li>maxConcurrentRequests - Maximum number of concurrent requests
+ *   <li>retry.total - Number of retries
+ *   <li>retry.backoffFactor - Retry backoff factor
  * </ul>
  */
 @Slf4j
@@ -135,7 +135,7 @@ public class OpenLineageClientBuilder {
 
     Transport transport = createTransport(transportType);
 
-    // 初始化异步执行器和并发控制
+    // Initialize asynchronous executors and concurrency control
     initAsyncExecutor();
 
     return OpenLineageClient.builder().transport(transport).build();
@@ -158,17 +158,17 @@ public class OpenLineageClientBuilder {
         maxQueueSize);
   }
 
-  /** 获取执行器服务（用于异步发送） */
+  /** Get the executor service（for asynchronous sending） */
   public ExecutorService getExecutorService() {
     return executorService;
   }
 
-  /** 获取并发信号量（用于限流） */
+  /** Get concurrent semaphore（used to limit current） */
   public Semaphore getConcurrencySemaphore() {
     return concurrencySemaphore;
   }
 
-  /** 关闭资源 */
+  /** Close resource */
   public void shutdown() {
     if (executorService != null) {
       executorService.shutdown();
@@ -208,14 +208,14 @@ public class OpenLineageClientBuilder {
       HttpConfig httpConfig = new HttpConfig();
       httpConfig.setUrl(URI.create(url));
 
-      // 设置 endpoint
+      // settings endpoint
       String endpoint =
           properties.getOrDefault(
               OpenLineageListenerConfig.TRANSPORT_ENDPOINT,
               OpenLineageListenerConfig.DEFAULT_ENDPOINT);
       httpConfig.setEndpoint(endpoint);
 
-      // 设置 timeout
+      // settings timeout
       String timeoutStr = properties.get(OpenLineageListenerConfig.TRANSPORT_TIMEOUT);
       if (timeoutStr != null) {
         httpConfig.setTimeoutInMillis(Integer.valueOf(timeoutStr));
@@ -223,13 +223,13 @@ public class OpenLineageClientBuilder {
         httpConfig.setTimeoutInMillis(OpenLineageListenerConfig.DEFAULT_TIMEOUT);
       }
 
-      // 设置 compression
+      // settings compression
       String compression = properties.get(OpenLineageListenerConfig.TRANSPORT_COMPRESSION);
       if ("gzip".equalsIgnoreCase(compression)) {
         httpConfig.setCompression(HttpConfig.Compression.GZIP);
       }
 
-      // 设置 auth
+      // settings auth
       String authType = properties.get(OpenLineageListenerConfig.TRANSPORT_AUTH_TYPE);
       if ("api_key".equalsIgnoreCase(authType)) {
         String apiKey = properties.get(OpenLineageListenerConfig.TRANSPORT_AUTH_API_KEY);
@@ -240,7 +240,7 @@ public class OpenLineageClientBuilder {
         }
       }
 
-      // 设置 custom headers
+      // settings custom headers
       Map<String, String> headers = extractHeaders();
       if (!headers.isEmpty()) {
         httpConfig.setHeaders(headers);
@@ -254,7 +254,7 @@ public class OpenLineageClientBuilder {
     }
   }
 
-  /** 提取以 transport.headers. 为前缀的自定义 headers */
+  /** Extract with transport.headers. Customization of the prefix headers */
   private Map<String, String> extractHeaders() {
     Map<String, String> headers = new HashMap<>();
     String prefix = OpenLineageListenerConfig.TRANSPORT_HEADERS_PREFIX;

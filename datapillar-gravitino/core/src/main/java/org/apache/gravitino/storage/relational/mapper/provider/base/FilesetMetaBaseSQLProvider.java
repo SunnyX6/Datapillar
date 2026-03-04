@@ -23,12 +23,14 @@ import static org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper.M
 import static org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper.VERSION_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.ibatis.annotations.Param;
 
 public class FilesetMetaBaseSQLProvider {
 
   public String listFilesetPOsBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT fm.fileset_id, fm.fileset_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
         + " fm.type, fm.audit_info, fm.current_version, fm.last_version, fm.deleted_at,"
         + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
@@ -40,18 +42,25 @@ public class FilesetMetaBaseSQLProvider {
         + " fm INNER JOIN "
         + VERSION_TABLE_NAME
         + " vi ON fm.fileset_id = vi.fileset_id AND fm.current_version = vi.version"
-        + " WHERE fm.schema_id = #{schemaId} AND fm.deleted_at = 0 AND vi.deleted_at = 0";
+        + " WHERE fm.schema_id = #{schemaId} AND fm.deleted_at = 0 AND vi.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("fm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("vi", tenantId);
   }
 
   public String selectFilesetIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("filesetName") String name) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT fileset_id as filesetId FROM "
         + META_TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND fileset_name = #{filesetName}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String listFilesetPOsByFilesetIds(@Param("filesetIds") List<Long> filesetIds) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "SELECT fm.fileset_id, fm.fileset_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
         + " fm.type, fm.audit_info, fm.current_version, fm.last_version, fm.deleted_at,"
@@ -70,11 +79,16 @@ public class FilesetMetaBaseSQLProvider {
         + "</foreach>"
         + ") "
         + " AND fm.deleted_at = 0 AND vi.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("fm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("vi", tenantId)
         + "</script>";
   }
 
   public String selectFilesetMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("filesetName") String name) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT fm.fileset_id, fm.fileset_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
         + " fm.type, fm.audit_info, fm.current_version, fm.last_version, fm.deleted_at,"
         + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
@@ -87,10 +101,15 @@ public class FilesetMetaBaseSQLProvider {
         + VERSION_TABLE_NAME
         + " vi ON fm.fileset_id = vi.fileset_id AND fm.current_version = vi.version"
         + " WHERE fm.schema_id = #{schemaId} AND fm.fileset_name = #{filesetName}"
-        + " AND fm.deleted_at = 0 AND vi.deleted_at = 0";
+        + " AND fm.deleted_at = 0 AND vi.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("fm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("vi", tenantId);
   }
 
   public String selectFilesetMetaById(@Param("filesetId") Long filesetId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT fm.fileset_id, fm.fileset_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
         + " fm.type, fm.audit_info, fm.current_version, fm.last_version, fm.deleted_at,"
         + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
@@ -103,15 +122,22 @@ public class FilesetMetaBaseSQLProvider {
         + VERSION_TABLE_NAME
         + " vi ON fm.fileset_id = vi.fileset_id AND fm.current_version = vi.version"
         + " WHERE fm.fileset_id = #{filesetId}"
-        + " AND fm.deleted_at = 0 AND vi.deleted_at = 0";
+        + " AND fm.deleted_at = 0 AND vi.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("fm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("vi", tenantId);
   }
 
   public String insertFilesetMeta(@Param("filesetMeta") FilesetPO filesetPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + META_TABLE_NAME
         + "(fileset_id, fileset_name, metalake_id,"
         + " catalog_id, schema_id, type, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{filesetMeta.filesetId},"
         + " #{filesetMeta.filesetName},"
@@ -122,16 +148,21 @@ public class FilesetMetaBaseSQLProvider {
         + " #{filesetMeta.auditInfo},"
         + " #{filesetMeta.currentVersion},"
         + " #{filesetMeta.lastVersion},"
-        + " #{filesetMeta.deletedAt}"
+        + " #{filesetMeta.deletedAt},"
+        + " "
+        + tenantId
         + " )";
   }
 
   public String insertFilesetMetaOnDuplicateKeyUpdate(@Param("filesetMeta") FilesetPO filesetPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + META_TABLE_NAME
         + "(fileset_id, fileset_name, metalake_id,"
         + " catalog_id, schema_id, type, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{filesetMeta.filesetId},"
         + " #{filesetMeta.filesetName},"
@@ -142,7 +173,9 @@ public class FilesetMetaBaseSQLProvider {
         + " #{filesetMeta.auditInfo},"
         + " #{filesetMeta.currentVersion},"
         + " #{filesetMeta.lastVersion},"
-        + " #{filesetMeta.deletedAt}"
+        + " #{filesetMeta.deletedAt},"
+        + " "
+        + tenantId
         + " )"
         + " ON DUPLICATE KEY UPDATE"
         + " fileset_name = #{filesetMeta.filesetName},"
@@ -159,6 +192,7 @@ public class FilesetMetaBaseSQLProvider {
   public String updateFilesetMeta(
       @Param("newFilesetMeta") FilesetPO newFilesetPO,
       @Param("oldFilesetMeta") FilesetPO oldFilesetPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + META_TABLE_NAME
         + " SET fileset_name = #{newFilesetMeta.filesetName},"
@@ -179,45 +213,57 @@ public class FilesetMetaBaseSQLProvider {
         + " AND audit_info = #{oldFilesetMeta.auditInfo}"
         + " AND current_version = #{oldFilesetMeta.currentVersion}"
         + " AND last_version = #{oldFilesetMeta.lastVersion}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteFilesetMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteFilesetMetasByCatalogId(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteFilesetMetasBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteFilesetMetasByFilesetId(@Param("filesetId") Long filesetId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
+        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteFilesetMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + META_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 }

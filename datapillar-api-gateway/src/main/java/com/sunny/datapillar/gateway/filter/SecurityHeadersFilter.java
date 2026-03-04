@@ -8,50 +8,53 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+
 /**
- * 安全Headers过滤器
- * 负责安全Headers请求过滤与上下文控制
+ * safeHeadersfilter Responsible for safetyHeadersRequest filtering and context control
  *
  * @author Sunny
  * @date 2026-01-01
  */
-
 @Component
 public class SecurityHeadersFilter implements GlobalFilter, Ordered {
 
-    private final GatewaySecurityProperties securityProperties;
+  private final GatewaySecurityProperties securityProperties;
 
-    public SecurityHeadersFilter(GatewaySecurityProperties securityProperties) {
-        this.securityProperties = securityProperties;
+  public SecurityHeadersFilter(GatewaySecurityProperties securityProperties) {
+    this.securityProperties = securityProperties;
+  }
+
+  @Override
+  public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+    if (!securityProperties.getHeaders().isEnabled()) {
+      return chain.filter(exchange);
     }
 
-    @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        if (!securityProperties.getHeaders().isEnabled()) {
-            return chain.filter(exchange);
-        }
+    exchange
+        .getResponse()
+        .beforeCommit(
+            () -> {
+              HttpHeaders headers = exchange.getResponse().getHeaders();
+              headers.set("X-Content-Type-Options", "nosniff");
+              headers.set("X-Frame-Options", "DENY");
+              headers.set("Referrer-Policy", "no-referrer");
 
-        exchange.getResponse().beforeCommit(() -> {
-            HttpHeaders headers = exchange.getResponse().getHeaders();
-            headers.set("X-Content-Type-Options", "nosniff");
-            headers.set("X-Frame-Options", "DENY");
-            headers.set("Referrer-Policy", "no-referrer");
-
-            if (securityProperties.isRequireHttps()) {
-                String hstsValue = "max-age=" + securityProperties.getHeaders().getHstsMaxAgeSeconds();
+              if (securityProperties.isRequireHttps()) {
+                String hstsValue =
+                    "max-age=" + securityProperties.getHeaders().getHstsMaxAgeSeconds();
                 if (securityProperties.getHeaders().isIncludeSubDomains()) {
-                    hstsValue = hstsValue + "; includeSubDomains";
+                  hstsValue = hstsValue + "; includeSubDomains";
                 }
                 headers.set("Strict-Transport-Security", hstsValue);
-            }
-            return Mono.empty();
-        });
+              }
+              return Mono.empty();
+            });
 
-        return chain.filter(exchange);
-    }
+    return chain.filter(exchange);
+  }
 
-    @Override
-    public int getOrder() {
-        return -200;
-    }
+  @Override
+  public int getOrder() {
+    return -200;
+  }
 }

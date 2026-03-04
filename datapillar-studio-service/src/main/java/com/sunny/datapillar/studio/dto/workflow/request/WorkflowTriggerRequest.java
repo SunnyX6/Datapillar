@@ -8,7 +8,7 @@ import lombok.Data;
 @Schema(name = "WorkflowTriggerRequest")
 public class WorkflowTriggerRequest {
 
-    private String logicalDate;
+  private String logicalDate;
 
-    private Map<String, Object> conf;
+  private Map<String, Object> conf;
 }

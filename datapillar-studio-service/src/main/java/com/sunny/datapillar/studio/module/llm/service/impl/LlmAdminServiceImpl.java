@@ -22,8 +22,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 大模型管理服务实现
- * 实现大模型管理业务流程与规则校验
+ * Large model management service implementation Implement large model management business processes
+ * and rule verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -32,73 +32,68 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class LlmAdminServiceImpl implements LlmAdminService {
 
-    private final LlmManagerService llmManagerService;
+  private final LlmManagerService llmManagerService;
 
-    @Override
-    public List<LlmProviderResponse> listProviders() {
-        return llmManagerService.listProviders();
-    }
+  @Override
+  public List<LlmProviderResponse> listProviders() {
+    return llmManagerService.listProviders();
+  }
 
-    @Override
-    public void createProvider(Long userId, LlmProviderCreateRequest request) {
-        llmManagerService.createProvider(userId, request);
-    }
+  @Override
+  public void createProvider(Long userId, LlmProviderCreateRequest request) {
+    llmManagerService.createProvider(userId, request);
+  }
 
-    @Override
-    public void updateProvider(Long userId, String providerCode, LlmProviderUpdateRequest request) {
-        llmManagerService.updateProvider(userId, providerCode, request);
-    }
+  @Override
+  public void updateProvider(Long userId, String providerCode, LlmProviderUpdateRequest request) {
+    llmManagerService.updateProvider(userId, providerCode, request);
+  }
 
-    @Override
-    public void deleteProvider(Long userId, String providerCode) {
-        llmManagerService.deleteProvider(userId, providerCode);
-    }
+  @Override
+  public void deleteProvider(Long userId, String providerCode) {
+    llmManagerService.deleteProvider(userId, providerCode);
+  }
 
-    @Override
-    public List<LlmModelResponse> listModels(String keyword,
-                                                 String providerCode,
-                                                 AiModelType modelType,
-                                                 Long userId) {
-        return llmManagerService.listModels(keyword, providerCode, modelType, userId);
-    }
+  @Override
+  public List<LlmModelResponse> listModels(
+      String keyword, String providerCode, AiModelType modelType, Long userId) {
+    return llmManagerService.listModels(keyword, providerCode, modelType, userId);
+  }
 
-    @Override
-    public LlmModelResponse getModel(Long userId, Long aiModelId) {
-        return llmManagerService.getModel(userId, aiModelId);
-    }
+  @Override
+  public LlmModelResponse getModel(Long userId, Long aiModelId) {
+    return llmManagerService.getModel(userId, aiModelId);
+  }
 
-    @Override
-    public LlmModelResponse createModel(Long userId, LlmModelCreateRequest request) {
-        return llmManagerService.createModel(userId, request);
-    }
+  @Override
+  public LlmModelResponse createModel(Long userId, LlmModelCreateRequest request) {
+    return llmManagerService.createModel(userId, request);
+  }
 
-    @Override
-    public LlmModelResponse updateModel(Long userId, Long aiModelId, LlmModelUpdateRequest request) {
-        return llmManagerService.updateModel(userId, aiModelId, request);
-    }
+  @Override
+  public LlmModelResponse updateModel(Long userId, Long aiModelId, LlmModelUpdateRequest request) {
+    return llmManagerService.updateModel(userId, aiModelId, request);
+  }
 
-    @Override
-    public void deleteModel(Long userId, Long aiModelId) {
-        llmManagerService.deleteModel(userId, aiModelId);
-    }
+  @Override
+  public void deleteModel(Long userId, Long aiModelId) {
+    llmManagerService.deleteModel(userId, aiModelId);
+  }
 
-    @Override
-    public List<LlmUserModelPermissionResponse> listUserModelPermissions(Long operatorUserId,
-                                                                                   Long targetUserId,
-                                                                                   boolean onlyEnabled) {
-        return llmManagerService.listUserModelPermissions(operatorUserId, targetUserId, onlyEnabled);
-    }
+  @Override
+  public List<LlmUserModelPermissionResponse> listUserModelPermissions(
+      Long operatorUserId, Long targetUserId, boolean onlyEnabled) {
+    return llmManagerService.listUserModelPermissions(operatorUserId, targetUserId, onlyEnabled);
+  }
 
-    @Override
-    public void upsertUserModelGrant(Long operatorUserId,
-                                     Long targetUserId,
-                                     Long aiModelId,
-                                     LlmUserModelGrantRequest request) {
-        llmManagerService.upsertUserModelGrant(operatorUserId, targetUserId, aiModelId, request);
-    }
+  @Override
+  public void upsertUserModelGrant(
+      Long operatorUserId, Long targetUserId, Long aiModelId, LlmUserModelGrantRequest request) {
+    llmManagerService.upsertUserModelGrant(operatorUserId, targetUserId, aiModelId, request);
+  }
 
-    @Override
-    public void deleteUserModelGrant(Long operatorUserId, Long targetUserId, Long aiModelId) {
-        llmManagerService.deleteUserModelGrant(operatorUserId, targetUserId, aiModelId);
-    }
+  @Override
+  public void deleteUserModelGrant(Long operatorUserId, Long targetUserId, Long aiModelId) {
+    llmManagerService.deleteUserModelGrant(operatorUserId, targetUserId, aiModelId);
+  }
 }

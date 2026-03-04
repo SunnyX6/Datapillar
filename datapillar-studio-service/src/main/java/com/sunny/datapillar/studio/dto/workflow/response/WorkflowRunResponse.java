@@ -8,11 +8,11 @@ import lombok.Data;
 @Schema(name = "WorkflowRunResponse")
 public class WorkflowRunResponse {
 
-    private String runId;
+  private String runId;
 
-    private String state;
+  private String state;
 
-    private LocalDateTime startTime;
+  private LocalDateTime startTime;
 
-    private LocalDateTime endTime;
+  private LocalDateTime endTime;
 }

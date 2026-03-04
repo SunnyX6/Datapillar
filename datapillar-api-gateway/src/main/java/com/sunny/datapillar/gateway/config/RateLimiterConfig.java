@@ -9,8 +9,8 @@ import org.springframework.context.annotation.Primary;
 import reactor.core.publisher.Mono;
 
 /**
- * 限流限流器配置
- * 负责限流限流器配置装配与Bean初始化
+ * Current limiter configuration Responsible for the configuration and assembly of current
+ * limitersBeaninitialization
  *
  * @author Sunny
  * @date 2026-01-01
@@ -18,34 +18,29 @@ import reactor.core.publisher.Mono;
 @Configuration
 public class RateLimiterConfig {
 
-    private final ClientIpResolver clientIpResolver;
+  private final ClientIpResolver clientIpResolver;
 
-    public RateLimiterConfig(ClientIpResolver clientIpResolver) {
-        this.clientIpResolver = clientIpResolver;
-    }
+  public RateLimiterConfig(ClientIpResolver clientIpResolver) {
+    this.clientIpResolver = clientIpResolver;
+  }
 
-    /**
-     * 基于 IP 的限流 Key 解析器
-     */
-    @Bean
-    @Primary
-    public KeyResolver ipKeyResolver() {
-        return exchange -> Mono.just(clientIpResolver.resolve(exchange.getRequest()));
-    }
+  /** Based on IP current limit Key parser */
+  @Bean
+  @Primary
+  public KeyResolver ipKeyResolver() {
+    return exchange -> Mono.just(clientIpResolver.resolve(exchange.getRequest()));
+  }
 
-    /**
-     * 基于用户 ID 的限流 Key 解析器
-     * 用于认证后的请求
-     */
-    @Bean
-    public KeyResolver userKeyResolver() {
-        return exchange -> {
-            String userId = exchange.getRequest().getHeaders().getFirst(HeaderConstants.HEADER_USER_ID);
-            if (userId != null && !userId.isEmpty()) {
-                return Mono.just("user:" + userId);
-            }
-            // 未认证用户使用 IP
-            return ipKeyResolver().resolve(exchange).map(ip -> "ip:" + ip);
-        };
-    }
+  /** user based ID current limit Key parser For post-authentication requests */
+  @Bean
+  public KeyResolver userKeyResolver() {
+    return exchange -> {
+      String userId = exchange.getRequest().getHeaders().getFirst(HeaderConstants.HEADER_USER_ID);
+      if (userId != null && !userId.isEmpty()) {
+        return Mono.just("user:" + userId);
+      }
+      // Use by unauthenticated users IP
+      return ipKeyResolver().resolve(exchange).map(ip -> "ip:" + ip);
+    };
+  }
 }

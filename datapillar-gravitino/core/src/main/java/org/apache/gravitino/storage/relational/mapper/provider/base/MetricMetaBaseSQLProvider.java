@@ -19,31 +19,42 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import org.apache.gravitino.storage.relational.mapper.MetricMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.MetricPO;
 import org.apache.ibatis.annotations.Param;
 
 public class MetricMetaBaseSQLProvider {
 
   public String insertMetricMeta(@Param("metricMeta") MetricPO metricPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + MetricMetaMapper.TABLE_NAME
         + " (metric_id, metric_name, metric_code, metric_type, data_type, metric_unit, metalake_id, catalog_id, schema_id,"
-        + " metric_comment, current_version, last_version, audit_info, deleted_at)"
+        + " metric_comment, current_version, last_version, audit_info, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES (#{metricMeta.metricId}, #{metricMeta.metricName}, #{metricMeta.metricCode},"
         + " #{metricMeta.metricType}, #{metricMeta.dataType}, #{metricMeta.unit}, #{metricMeta.metalakeId}, #{metricMeta.catalogId},"
         + " #{metricMeta.schemaId}, #{metricMeta.metricComment}, #{metricMeta.currentVersion}, #{metricMeta.lastVersion},"
-        + " #{metricMeta.auditInfo}, #{metricMeta.deletedAt})";
+        + " #{metricMeta.auditInfo}, #{metricMeta.deletedAt}, "
+        + tenantId
+        + ")";
   }
 
   public String insertMetricMetaOnDuplicateKeyUpdate(@Param("metricMeta") MetricPO metricPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + MetricMetaMapper.TABLE_NAME
         + " (metric_id, metric_name, metric_code, metric_type, data_type, metric_unit, metalake_id, catalog_id, schema_id,"
-        + " metric_comment, current_version, last_version, audit_info, deleted_at)"
+        + " metric_comment, current_version, last_version, audit_info, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES (#{metricMeta.metricId}, #{metricMeta.metricName}, #{metricMeta.metricCode},"
         + " #{metricMeta.metricType}, #{metricMeta.dataType}, #{metricMeta.unit}, #{metricMeta.metalakeId}, #{metricMeta.catalogId},"
         + " #{metricMeta.schemaId}, #{metricMeta.metricComment}, #{metricMeta.currentVersion}, #{metricMeta.lastVersion},"
-        + " #{metricMeta.auditInfo}, #{metricMeta.deletedAt})"
+        + " #{metricMeta.auditInfo}, #{metricMeta.deletedAt}, "
+        + tenantId
+        + ")"
         + " ON DUPLICATE KEY UPDATE"
         + " metric_name = #{metricMeta.metricName},"
         + " metric_code = #{metricMeta.metricCode},"
@@ -61,17 +72,20 @@ public class MetricMetaBaseSQLProvider {
   }
 
   public String listMetricPOsBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT metric_id AS metricId, metric_name AS metricName, metric_code AS metricCode,"
         + " metric_type AS metricType, data_type AS dataType, metric_unit AS unit, metalake_id AS metalakeId, catalog_id AS catalogId,"
         + " schema_id AS schemaId, metric_comment AS metricComment, current_version AS currentVersion, last_version AS lastVersion,"
         + " audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + MetricMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String listMetricPOsBySchemaIdWithPagination(
       @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT m.metric_id AS metricId, m.metric_name AS metricName, m.metric_code AS metricCode,"
         + " m.metric_type AS metricType, m.data_type AS dataType, m.metric_unit AS unit, u.unit_name AS unitName,"
         + " m.metalake_id AS metalakeId, m.catalog_id AS catalogId,"
@@ -79,20 +93,26 @@ public class MetricMetaBaseSQLProvider {
         + " m.audit_info AS auditInfo, m.deleted_at AS deletedAt"
         + " FROM "
         + MetricMetaMapper.TABLE_NAME
-        + " m LEFT JOIN unit_meta u ON m.schema_id = u.schema_id AND m.metric_unit = u.unit_code AND u.deleted_at = 0"
+        + " m LEFT JOIN unit_meta u ON m.schema_id = u.schema_id AND m.metric_unit = u.unit_code AND u.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("u", tenantId)
         + " WHERE m.schema_id = #{schemaId} AND m.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("m", tenantId)
         + " ORDER BY m.metric_id"
         + " LIMIT #{limit} OFFSET #{offset}";
   }
 
   public String countMetricsBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT COUNT(*) FROM "
         + MetricMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectMetricMetaBySchemaIdAndMetricCode(
       @Param("schemaId") Long schemaId, @Param("metricCode") String metricCode) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT m.metric_id AS metricId, m.metric_name AS metricName, m.metric_code AS metricCode,"
         + " m.metric_type AS metricType, m.data_type AS dataType, m.metric_unit AS unit, u.unit_name AS unitName,"
         + " m.metalake_id AS metalakeId, m.catalog_id AS catalogId,"
@@ -100,19 +120,26 @@ public class MetricMetaBaseSQLProvider {
         + " m.audit_info AS auditInfo, m.deleted_at AS deletedAt"
         + " FROM "
         + MetricMetaMapper.TABLE_NAME
-        + " m LEFT JOIN unit_meta u ON m.schema_id = u.schema_id AND m.metric_unit = u.unit_code AND u.deleted_at = 0"
-        + " WHERE m.schema_id = #{schemaId} AND m.metric_code = #{metricCode} AND m.deleted_at = 0";
+        + " m LEFT JOIN unit_meta u ON m.schema_id = u.schema_id AND m.metric_unit = u.unit_code AND u.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("u", tenantId)
+        + " WHERE m.schema_id = #{schemaId} AND m.metric_code = #{metricCode} AND m.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("m", tenantId);
   }
 
   public String selectMetricIdBySchemaIdAndMetricCode(
       @Param("schemaId") Long schemaId, @Param("metricCode") String metricCode) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT metric_id"
         + " FROM "
         + MetricMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND metric_code = #{metricCode} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND metric_code = #{metricCode} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectMetricMetaByMetricId(@Param("metricId") Long metricId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT m.metric_id AS metricId, m.metric_name AS metricName, m.metric_code AS metricCode,"
         + " m.metric_type AS metricType, m.data_type AS dataType, m.metric_unit AS unit, u.unit_name AS unitName,"
         + " m.metalake_id AS metalakeId, m.catalog_id AS catalogId,"
@@ -120,52 +147,68 @@ public class MetricMetaBaseSQLProvider {
         + " m.audit_info AS auditInfo, m.deleted_at AS deletedAt"
         + " FROM "
         + MetricMetaMapper.TABLE_NAME
-        + " m LEFT JOIN unit_meta u ON m.schema_id = u.schema_id AND m.metric_unit = u.unit_code AND u.deleted_at = 0"
-        + " WHERE m.metric_id = #{metricId} AND m.deleted_at = 0";
+        + " m LEFT JOIN unit_meta u ON m.schema_id = u.schema_id AND m.metric_unit = u.unit_code AND u.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("u", tenantId)
+        + " WHERE m.metric_id = #{metricId} AND m.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("m", tenantId);
   }
 
   public String softDeleteMetricMetaBySchemaIdAndMetricCode(
       @Param("schemaId") Long schemaId, @Param("metricCode") String metricCode) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + MetricMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND metric_code = #{metricCode} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND metric_code = #{metricCode} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteMetricMetasByCatalogId(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + MetricMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteMetricMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + MetricMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteMetricMetasBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + MetricMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteMetricMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + MetricMetaMapper.TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 
   public String updateMetricMeta(
       @Param("newMetricMeta") MetricPO newMetricPO, @Param("oldMetricMeta") MetricPO oldMetricPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + MetricMetaMapper.TABLE_NAME
         + " SET metric_name = #{newMetricMeta.metricName},"
@@ -182,6 +225,7 @@ public class MetricMetaBaseSQLProvider {
         + " audit_info = #{newMetricMeta.auditInfo},"
         + " deleted_at = #{newMetricMeta.deletedAt}"
         + " WHERE metric_id = #{oldMetricMeta.metricId}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 }

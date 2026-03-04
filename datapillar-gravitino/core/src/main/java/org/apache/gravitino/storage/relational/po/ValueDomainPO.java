@@ -22,7 +22,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
-/** 值域持久化对象 */
+/** Value range persistence object */
 @Getter
 @ToString
 @EqualsAndHashCode

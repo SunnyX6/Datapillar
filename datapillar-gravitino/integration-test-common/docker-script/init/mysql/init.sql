@@ -21,7 +21,7 @@ FLUSH PRIVILEGES;
 CREATE DATABASE gt_mysql_test_all_type;
 CREATE TABLE gt_mysql_test_all_type.demo
 (
-    -- 数值类型
+    -- Numeric types
     id BIGINT PRIMARY KEY,
     tiny_col TINYINT,
     tiny_unsigned_col TINYINT UNSIGNED,
@@ -39,14 +39,14 @@ CREATE TABLE gt_mysql_test_all_type.demo
     double_unsigned_col DOUBLE UNSIGNED,
     decimal_col DECIMAL(12,6),
     decimal_unsigned_col DECIMAL(12,6) UNSIGNED,
-    -- 字符串类型
+    -- String types
     char_col CHAR(10),
     varchar_col VARCHAR(255),
     tinytext_col TINYTEXT,
     text_col TEXT,
     mediumtext_col MEDIUMTEXT,
     longtext_col LONGTEXT,
-    -- 日期时间类型
+    -- Datetime types
     date_col DATE,
     time_col TIME,
     datetime_col DATETIME,
@@ -54,17 +54,17 @@ CREATE TABLE gt_mysql_test_all_type.demo
     year_col YEAR,
     -- json
     json_col JSON,
-    -- 枚举与集合
+    -- Enum and set
     enum_col ENUM('red','green','blue'),
     set_col SET('read','write','execute'),
-    -- 二进制类型
+    -- Binary types
     binary_col BINARY(16),
     varbinary_col VARBINARY(100),
     tinyblob_col TINYBLOB,
     blob_col BLOB,
     mediumblob_col MEDIUMBLOB,
     longblob_col LONGBLOB,
-    -- 空间类型
+    -- Spatial types
     point_col POINT,
     geometry_col GEOMETRY
 );
@@ -157,42 +157,42 @@ CREATE DATABASE gt_mysql_test_column_properties;
 +----------------+-------------------------------------+------+-----+---------------------+-------------------+
 */
 CREATE TABLE gt_mysql_test_column_properties.demo_all_data_types_default_value (
-    -- 整数类型
+    -- Integer types
     col_bit BIT DEFAULT b'1',
     col_tinyint TINYINT DEFAULT 0,
     col_smallint SMALLINT DEFAULT -1,
     col_mediumint MEDIUMINT DEFAULT 100,
     col_int INT DEFAULT 1,
     col_bigint BIGINT DEFAULT 9999999,
-    -- 浮点与精确小数
+    -- Floating-point and exact decimals
     col_float FLOAT DEFAULT 0.0,
     col_double DOUBLE DEFAULT 1.23456,
     col_decimal DECIMAL(10, 2) DEFAULT 100.50,
-    -- 日期与时间
+    -- Date and time
     col_date DATE DEFAULT '2000-01-01',
     col_time TIME DEFAULT '12:30:01',
     col_datetime DATETIME DEFAULT '2025-01-01 00:00:01',
     col_timestamp TIMESTAMP DEFAULT '2025-01-01 00:00:01',
     col_year YEAR DEFAULT 2025,
-    -- 字符串类型
+    -- String types
     col_char CHAR(10) DEFAULT 'abc',
     col_varchar VARCHAR(100) DEFAULT 'Hello',
     col_tinytext TINYTEXT DEFAULT NULL,
     col_text TEXT DEFAULT NULL,
     col_mediumtext MEDIUMTEXT DEFAULT NULL,
     col_longtext LONGTEXT DEFAULT NULL,
-    -- 二进制数据
+    -- Binary data
     col_binary BINARY(5) DEFAULT 'a',
     col_varbinary VARBINARY(100) DEFAULT 'binary',
     col_blob BLOB DEFAULT NULL,
     col_mediumblob MEDIUMBLOB DEFAULT NULL,
     col_longblob LONGBLOB DEFAULT NULL,
-    -- 特殊类型
+    -- Special types
     col_enum ENUM('active', 'inactive', 'pending') DEFAULT 'pending',
     col_set SET('red', 'green', 'blue') DEFAULT 'green,blue',
     col_json JSON DEFAULT NULL,
     col_boolean BOOLEAN DEFAULT TRUE,
-    -- 空间数据类型
+    -- Spatial data types
     col_geometry GEOMETRY DEFAULT NULL,
     col_point POINT DEFAULT (POINT(0, 0))
 );

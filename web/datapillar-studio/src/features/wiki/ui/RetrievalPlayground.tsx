@@ -19,8 +19,8 @@ interface Props {
 type RetrievalMode = 'semantic' | 'hybrid'
 
 const RETRIEVAL_MODE_OPTIONS: SelectOption[] = [
-  { value: 'semantic', label: '语义' },
-  { value: 'hybrid', label: '混合' }
+  { value: 'semantic', label: 'Semantics' },
+  { value: 'hybrid', label: 'mix' }
 ]
 
 export default function RetrievalPlayground({ spaceId, spaceName, documents, isNamespaceCollapsed }: Props) {
@@ -41,7 +41,7 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
 
   const searchScopeOptions = useMemo<SelectOption[]>(() => {
     return [
-      { value: 'all', label: '全库检索 (All Documents)' },
+      { value: 'all', label: 'Full database search (All Documents)' },
       ...documents.map((doc) => ({ value: doc.id, label: doc.title }))
     ]
   }, [documents])
@@ -55,12 +55,12 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
   const handleSearch = async () => {
     if (!query.trim()) return
     if (!spaceId) {
-      toast.warning('请先选择知识空间')
+      toast.warning('Please select a knowledge space first')
       return
     }
     const namespaceId = Number(spaceId)
     if (!Number.isFinite(namespaceId)) {
-      toast.error('知识空间 ID 无效')
+      toast.error('knowledge space ID Invalid')
       return
     }
     setIsSearching(true)
@@ -79,7 +79,7 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
       setLatencyMs(response.latency_ms)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      toast.error(`检索失败：${message}`)
+      toast.error(`Retrieval failed：${message}`)
       setResults([])
       setLatencyMs(null)
     } finally {
@@ -97,10 +97,10 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
           <div className="text-center space-y-2">
             <h3 className={`${TYPOGRAPHY.subtitle} font-bold text-slate-900 dark:text-slate-100 tracking-tight flex items-center justify-center`}>
               <Zap className="mr-2 text-indigo-500" size={20} />
-              检索召回测试
+              Retrieval recall test
             </h3>
-            <p className={`${TYPOGRAPHY.bodySm} text-slate-500 dark:text-slate-400`}>模拟 Agent 运行时环境，调试混合检索与重排序效果</p>
-            <p className={`${TYPOGRAPHY.caption} text-slate-400`}>当前空间：{spaceName}</p>
+            <p className={`${TYPOGRAPHY.bodySm} text-slate-500 dark:text-slate-400`}>Simulation Agent runtime environment，Debugging mixed retrieval and reordering effects</p>
+            <p className={`${TYPOGRAPHY.caption} text-slate-400`}>current space：{spaceName}</p>
           </div>
 
           <div className="w-full relative z-20">
@@ -121,14 +121,14 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                     className={`w-full h-full px-4 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none bg-transparent ${TYPOGRAPHY.caption}`}
-                    placeholder="输入测试问题，按回车键发起检索..."
+                    placeholder="Enter test question，Press the Enter key to initiate a search..."
                   />
 
                   <div className="pr-3 flex items-center">
                     <button
                       onClick={() => setShowConfig(!showConfig)}
                       className={`p-2 rounded-lg transition-all duration-200 ${showConfig ? 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-200' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600'}`}
-                      title="参数配置"
+                      title="Parameter configuration"
                     >
                       <Sliders size={16} />
                     </button>
@@ -145,14 +145,14 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
                 <div className="bg-slate-50/50 dark:bg-slate-800/60 rounded-xl p-4 space-y-5">
                   <div className="flex items-center justify-between">
                     <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase tracking-wider flex items-center shrink-0`}>
-                      <Globe size={12} className="mr-1.5" /> 检索范围
+                      <Globe size={12} className="mr-1.5" /> Search scope
                     </label>
                     <div className="w-44">
                       <Select
                         value={searchScope}
                         onChange={(value) => setSearchScope(value)}
                         options={searchScopeOptions}
-                        dropdownHeader="检索范围"
+                        dropdownHeader="Search scope"
                         size="xs"
                       />
                     </div>
@@ -163,14 +163,14 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="flex items-center justify-between">
                       <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase tracking-wider flex items-center shrink-0`}>
-                        <Database size={12} className="mr-1.5" /> 检索模式
+                        <Database size={12} className="mr-1.5" /> Search mode
                       </label>
                       <div className="w-32">
                         <Select
                           value={retrievalMode}
                           onChange={(value) => setRetrievalMode(value as RetrievalMode)}
                           options={RETRIEVAL_MODE_OPTIONS}
-                          dropdownHeader="检索模式"
+                          dropdownHeader="Search mode"
                           size="xs"
                         />
                       </div>
@@ -178,7 +178,7 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
 
                     <div className="flex items-center justify-between">
                       <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase tracking-wider flex items-center shrink-0`}>
-                        <Layers size={12} className="mr-1.5" /> 重排序
+                        <Layers size={12} className="mr-1.5" /> Reorder
                       </label>
                       <div className="flex items-center space-x-3">
                         {enableRerank && (
@@ -242,14 +242,14 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-4 shadow-sm">
                 <Command className="text-slate-300" size={24} />
               </div>
-              <p className={`${TYPOGRAPHY.bodySm} text-slate-400`}>准备就绪，输入问题并回车</p>
+              <p className={`${TYPOGRAPHY.bodySm} text-slate-400`}>ready，Enter the question and press Enter</p>
             </div>
           ) : (
             <div className="space-y-4">
               <div className={`${resultsWidthClass} flex items-center justify-between ${TYPOGRAPHY.bodySm} px-1`}>
                 <div className="flex items-center space-x-2">
                   <span className="font-semibold text-slate-700 dark:text-slate-200 flex items-center">
-                    召回结果 ({results ? results.length : 0})
+                    Recall results ({results ? results.length : 0})
                   </span>
                   {searchScope !== 'all' && (
                     <span className={`px-1.5 py-0.5 bg-blue-50 text-blue-600 ${TYPOGRAPHY.micro} rounded border border-blue-100 flex items-center max-w-40 truncate dark:bg-blue-500/10 dark:text-blue-200 dark:border-blue-500/20`}>
@@ -261,7 +261,7 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
                     {retrievalMode} {enableRerank ? '+ Rerank' : ''}
                   </span>
                 </div>
-                <span className={`${TYPOGRAPHY.caption} text-slate-400`}>耗时 {latencyMs ?? '-'}ms</span>
+                <span className={`${TYPOGRAPHY.caption} text-slate-400`}>Time consuming {latencyMs ?? '-'}ms</span>
               </div>
 
               {results?.map((result) => (
@@ -300,7 +300,7 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
                       <span className={`${TYPOGRAPHY.micro} bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-300`}>Token ID: 89-124</span>
                     </div>
                     <button className={`${TYPOGRAPHY.caption} text-indigo-600 dark:text-indigo-200 font-medium flex items-center hover:underline`}>
-                      上下文预览 <ChevronRight size={12} />
+                      Contextual preview <ChevronRight size={12} />
                     </button>
                   </div>
                 </Card>

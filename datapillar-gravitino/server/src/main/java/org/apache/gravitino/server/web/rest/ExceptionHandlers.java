@@ -866,7 +866,8 @@ public class ExceptionHandlers {
     private static String getMetricErrorMsg(
         String metric, String operation, String schema, String reason) {
       return String.format(
-          "操作指标失败%s，操作 [%s]，所属 schema [%s]，原因 [%s]", metric, operation, schema, reason);
+          "Operation indicator failed%s，Operation [%s]，Belong schema [%s]，Reason [%s]",
+          metric, operation, schema, reason);
     }
 
     @Override
@@ -902,7 +903,8 @@ public class ExceptionHandlers {
     private static String getWordRootErrorMsg(
         String wordRoot, String operation, String schema, String reason) {
       return String.format(
-          "操作词根失败%s，操作 [%s]，所属 schema [%s]，原因 [%s]", wordRoot, operation, schema, reason);
+          "Operation root failed%s，Operation [%s]，Belong schema [%s]，Reason [%s]",
+          wordRoot, operation, schema, reason);
     }
 
     @Override
@@ -938,7 +940,8 @@ public class ExceptionHandlers {
     private static String getUnitErrorMsg(
         String unit, String operation, String schema, String reason) {
       return String.format(
-          "操作单位失败%s，操作 [%s]，所属 schema [%s]，原因 [%s]", unit, operation, schema, reason);
+          "Operation unit failed%s，Operation [%s]，Belong schema [%s]，Reason [%s]",
+          unit, operation, schema, reason);
     }
 
     @Override
@@ -974,7 +977,8 @@ public class ExceptionHandlers {
     private static String getValueDomainErrorMsg(
         String valueDomain, String operation, String schema, String reason) {
       return String.format(
-          "操作值域失败%s，操作 [%s]，所属 schema [%s]，原因 [%s]", valueDomain, operation, schema, reason);
+          "Operation range failed%s，Operation [%s]，Belong schema [%s]，Reason [%s]",
+          valueDomain, operation, schema, reason);
     }
 
     @Override

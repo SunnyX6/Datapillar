@@ -16,13 +16,13 @@ export function WordRootOverview({ wordRoot, onClose }: WordRootOverviewProps) {
           <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-sm">
             <Book size={iconSizeToken.medium} />
           </div>
-          <h2 className="text-body-sm font-semibold text-slate-800 dark:text-slate-100">词根详情</h2>
+          <h2 className="text-body-sm font-semibold text-slate-800 dark:text-slate-100">Root details</h2>
         </div>
         <button
           type="button"
           onClick={onClose}
           className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-          aria-label="关闭词根详情"
+          aria-label="Close root details"
         >
           <X size={iconSizeToken.large} className="text-slate-400" />
         </button>
@@ -36,32 +36,32 @@ export function WordRootOverview({ wordRoot, onClose }: WordRootOverviewProps) {
               {wordRoot.code}
             </span>
           </div>
-          <p className="text-slate-500 dark:text-slate-400 text-body-sm leading-relaxed">{wordRoot.comment || '暂无详细描述...'}</p>
+          <p className="text-slate-500 dark:text-slate-400 text-body-sm leading-relaxed">{wordRoot.comment || 'No detailed description yet...'}</p>
         </div>
 
         <div className="space-y-6">
           <section>
             <div className="text-micro font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Info size={iconSizeToken.small} className="text-blue-500" /> 基础信息 (Basic Info)
+              <Info size={iconSizeToken.small} className="text-blue-500" /> Basic information (Basic Info)
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-                <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">词根编码</div>
+                <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">Root encoding</div>
                 <div className="font-mono text-body-sm font-semibold text-blue-700 dark:text-blue-400 uppercase">{wordRoot.code}</div>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center">
-                <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">数据类型</div>
+                <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">data type</div>
                 <div className="font-mono text-body-sm font-semibold text-cyan-600 dark:text-cyan-400">{wordRoot.dataType || '-'}</div>
               </div>
               {wordRoot.audit?.creator && (
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-                  <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">创建人</div>
+                  <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">Creator</div>
                   <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">{wordRoot.audit.creator}</div>
                 </div>
               )}
               {wordRoot.audit?.createTime && (
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-                  <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">创建时间</div>
+                  <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">creation time</div>
                   <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">{formatTime(wordRoot.audit.createTime)}</div>
                 </div>
               )}
@@ -70,12 +70,12 @@ export function WordRootOverview({ wordRoot, onClose }: WordRootOverviewProps) {
 
           <section>
             <div className="text-micro font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <GitBranch size={iconSizeToken.small} className="text-blue-500" /> 关联字段预览
+              <GitBranch size={iconSizeToken.small} className="text-blue-500" /> Related field preview
             </div>
             <div className="h-32 rounded-xl border-2 border-dashed border-slate-100 dark:border-slate-800 flex items-center justify-center bg-slate-50/50 dark:bg-slate-800/50">
               <div className="flex flex-col items-center gap-1.5 text-slate-300 dark:text-slate-600">
                 <Layers size={iconSizeToken.huge} />
-                <span className="text-caption font-medium">关联字段加载中...</span>
+                <span className="text-caption font-medium">Related fields are loading...</span>
               </div>
             </div>
           </section>
@@ -84,10 +84,10 @@ export function WordRootOverview({ wordRoot, onClose }: WordRootOverviewProps) {
 
       <div className="p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex gap-3 flex-shrink-0">
         <button className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 py-2.5 rounded-xl font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-1.5 shadow-sm text-body-sm">
-          <Share2 size={iconSizeToken.medium} /> 资产分享
+          <Share2 size={iconSizeToken.medium} /> Asset sharing
         </button>
         <button className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-medium hover:bg-blue-700 shadow-lg transition-all flex items-center justify-center gap-1.5 text-body-sm">
-          <ExternalLink size={iconSizeToken.medium} /> 查看使用示例
+          <ExternalLink size={iconSizeToken.medium} /> View usage examples
         </button>
       </div>
     </aside>

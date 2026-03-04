@@ -111,7 +111,7 @@ describe('InvitePage', () => {
       menus: [
         {
           id: 1,
-          name: '首页',
+          name: 'Home page',
           path: '/home',
           location: 'TOP',
           permissionCode: 'READ'
@@ -129,7 +129,7 @@ describe('InvitePage', () => {
     })
   })
 
-  it('参数完整时应展示邀请注册表单并提交注册', async () => {
+  it('When the parameters are complete, the invitation registration form should be displayed and registration submitted.', async () => {
     searchParams = new URLSearchParams('inviteCode=inv-123')
     const { container, root } = render(<InvitePage />)
 
@@ -139,22 +139,22 @@ describe('InvitePage', () => {
     })
 
     expect(getInvitationByCodeMock).toHaveBeenCalledWith('inv-123')
-    expect(container.textContent).toContain('邀请你加入 Data Analyst 角色')
+    expect(container.textContent).toContain('invite you to join Data Analyst role')
     expect(container.textContent).toContain('Sarah Chen')
 
     const emailInput = container.querySelector('input[type="email"]') as HTMLInputElement | null
-    const usernameInput = container.querySelector('input[placeholder="请输入用户名"]') as HTMLInputElement | null
+    const usernameInput = container.querySelector('input[placeholder="Please enter username"]') as HTMLInputElement | null
     expect(emailInput?.value).toBe('')
     expect(emailInput?.disabled).toBe(false)
-    expect(emailInput?.placeholder).toBe('请输入工作邮箱')
+    expect(emailInput?.placeholder).toBe('Please enter your work email')
     expect(usernameInput?.value).toBe('')
     expect(usernameInput?.disabled).toBe(false)
-    expect(container.querySelector('input[placeholder="请输入真实姓名"]')).toBeNull()
+    expect(container.querySelector('input[placeholder="Please enter your real name"]')).toBeNull()
 
     const submitButton = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('接受邀请并加入')
+      button.textContent?.includes('Accept the invitation and join')
     ) as HTMLButtonElement | undefined
-    const passwordInput = container.querySelector('input[placeholder="创建登录密码"]') as HTMLInputElement | null
+    const passwordInput = container.querySelector('input[placeholder="Create login password"]') as HTMLInputElement | null
     const form = container.querySelector('form')
 
     expect(submitButton).toBeTruthy()
@@ -193,22 +193,22 @@ describe('InvitePage', () => {
     cleanup(root, container)
   })
 
-  it('缺少邀请码时应显示错误提示并禁用提交按钮', () => {
+  it('When the invitation code is missing, an error message should be displayed and the submit button should be disabled.', () => {
     searchParams = new URLSearchParams('')
     const { container, root } = render(<InvitePage />)
 
-    expect(container.textContent).toContain('邀请链接缺少邀请码')
+    expect(container.textContent).toContain('The invitation link is missing the invitation code')
     expect(getInvitationByCodeMock).not.toHaveBeenCalled()
 
     const submitButton = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('接受邀请并加入')
+      button.textContent?.includes('Accept the invitation and join')
     ) as HTMLButtonElement | undefined
     expect(submitButton?.disabled).toBe(true)
 
     cleanup(root, container)
   })
 
-  it('注册失败时应通过toast提示错误', async () => {
+  it('Should pass when registration failstoastPrompt error', async () => {
     searchParams = new URLSearchParams('inviteCode=inv-err-001')
     getInvitationByCodeMock.mockResolvedValueOnce({
       inviteCode: 'inv-err-001',
@@ -219,7 +219,7 @@ describe('InvitePage', () => {
       expiresAt: '2026-03-05T23:59:59+08:00',
       status: 0
     })
-    registerInvitationMock.mockRejectedValueOnce(new Error('邀请码已过期'))
+    registerInvitationMock.mockRejectedValueOnce(new Error('The invitation code has expired'))
     const { container, root } = render(<InvitePage />)
 
     await act(async () => {
@@ -228,8 +228,8 @@ describe('InvitePage', () => {
     })
 
     const emailInput = container.querySelector('input[type="email"]') as HTMLInputElement | null
-    const usernameInput = container.querySelector('input[placeholder="请输入用户名"]') as HTMLInputElement | null
-    const passwordInput = container.querySelector('input[placeholder="创建登录密码"]') as HTMLInputElement | null
+    const usernameInput = container.querySelector('input[placeholder="Please enter username"]') as HTMLInputElement | null
+    const passwordInput = container.querySelector('input[placeholder="Create login password"]') as HTMLInputElement | null
     const form = container.querySelector('form')
 
     act(() => {
@@ -251,7 +251,7 @@ describe('InvitePage', () => {
       form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     })
 
-    expect(toastErrorMock).toHaveBeenCalledWith('邀请码已过期')
+    expect(toastErrorMock).toHaveBeenCalledWith('The invitation code has expired')
     expect(navigateMock).not.toHaveBeenCalled()
 
     cleanup(root, container)

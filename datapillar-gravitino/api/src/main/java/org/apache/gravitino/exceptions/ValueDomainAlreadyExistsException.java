@@ -21,7 +21,7 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** 当值域已存在时抛出此异常 */
+/** This exception is thrown when the value domain already exists */
 public class ValueDomainAlreadyExistsException extends AlreadyExistsException {
 
   @FormatMethod

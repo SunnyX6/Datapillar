@@ -27,7 +27,7 @@ function resolveErrorMessage(error: unknown): string {
     return error.message
   }
 
-  return '未知错误'
+  return 'unknown error'
 }
 
 function parseRoleId(roleId: string): number | null {
@@ -92,7 +92,7 @@ export function usePermissionMembers(
         } catch (error) {
           const message = resolveErrorMessage(error)
           setMembersError(params.roleId, message)
-          toast.error(`加载角色成员失败：${message}`)
+          toast.error(`Failed to load role members：${message}`)
         }
       })()
 

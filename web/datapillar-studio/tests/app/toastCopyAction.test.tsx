@@ -62,10 +62,10 @@ describe('installToastCopyAction', () => {
     })
   })
 
-  it('仅失败提示注入复制按钮并复制消息内容', async () => {
+  it('Only the failure prompt injects the copy button and copies the message content', async () => {
     installToastCopyAction()
 
-    toast.error('角色创建失败')
+    toast.error('Character creation failed')
 
     expect(errorMock).toHaveBeenCalledTimes(1)
     const [, options] = errorMock.mock.calls[0] as [string, {
@@ -83,8 +83,8 @@ describe('installToastCopyAction', () => {
       await flushAsyncQueue()
     })
 
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('角色创建失败')
-    expect(copyButton?.textContent).toContain('已复制')
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Character creation failed')
+    expect(copyButton?.textContent).toContain('Copied')
     expect(copyButton?.style.position).toBe('absolute')
     expect(copyButton?.style.top).toBe('8px')
     expect(copyButton?.style.right).toBe('8px')
@@ -92,31 +92,31 @@ describe('installToastCopyAction', () => {
     unmountAction(root, container)
   })
 
-  it('非失败提示不注入复制按钮', () => {
+  it('Non-failure prompts do not inject the copy button', () => {
     installToastCopyAction()
 
-    toast.success('角色创建成功')
+    toast.success('Role created successfully')
 
     expect(successMock).toHaveBeenCalledTimes(1)
     const [, options] = successMock.mock.calls[0] as [string, undefined]
     expect(options).toBeUndefined()
   })
 
-  it('调用方已提供 action 时保持原始 action', () => {
+  it('The caller has provided action remain original action', () => {
     installToastCopyAction()
 
     const customAction = {
-      label: '重试',
+      label: 'Try again',
       onClick: vi.fn()
     }
-    toast.error('网络异常', { action: customAction })
+    toast.error('Network abnormality', { action: customAction })
 
     expect(errorMock).toHaveBeenCalledTimes(1)
     const [, options] = errorMock.mock.calls[0] as [string, { action: typeof customAction }]
     expect(options.action).toBe(customAction)
   })
 
-  it('复制失败时提示错误', async () => {
+  it('Prompt error when copying fails', async () => {
     installToastCopyAction()
     Object.defineProperty(globalThis.navigator, 'clipboard', {
       configurable: true,
@@ -125,7 +125,7 @@ describe('installToastCopyAction', () => {
       }
     })
 
-    toast.error('复制失败场景')
+    toast.error('Copy failure scenario')
     const [, options] = errorMock.mock.calls[0] as [string, {
       action: ReactElement
     }]
@@ -137,7 +137,7 @@ describe('installToastCopyAction', () => {
       await flushAsyncQueue()
     })
 
-    expect(copyButton?.textContent).toContain('失败')
+    expect(copyButton?.textContent).toContain('failed')
     unmountAction(root, container)
   })
 })

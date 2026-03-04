@@ -20,8 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * SQL业务服务实现
- * 实现SQL业务业务流程与规则校验
+ * SQLBusiness service implementation realizeSQLBusiness business process and rule verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -30,30 +29,30 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class SqlBizServiceImpl implements SqlBizService {
 
-    private final SqlService sqlService;
+  private final SqlService sqlService;
 
-    @Override
-    public SqlExecuteResponse executeSql(SqlExecuteRequest request) {
-        return sqlService.executeSql(request);
-    }
+  @Override
+  public SqlExecuteResponse executeSql(SqlExecuteRequest request) {
+    return sqlService.executeSql(request);
+  }
 
-    @Override
-    public SqlCatalogListResponse listCatalogs() {
-        return sqlService.listCatalogs();
-    }
+  @Override
+  public SqlCatalogListResponse listCatalogs() {
+    return sqlService.listCatalogs();
+  }
 
-    @Override
-    public SqlDatabaseListResponse listDatabases(String catalog) {
-        return sqlService.listDatabases(catalog);
-    }
+  @Override
+  public SqlDatabaseListResponse listDatabases(String catalog) {
+    return sqlService.listDatabases(catalog);
+  }
 
-    @Override
-    public SqlTableListResponse listTables(String catalog, String database) {
-        return sqlService.listTables(catalog, database);
-    }
+  @Override
+  public SqlTableListResponse listTables(String catalog, String database) {
+    return sqlService.listTables(catalog, database);
+  }
 
-    @Override
-    public boolean isAvailable() {
-        return sqlService.isAvailable();
-    }
+  @Override
+  public boolean isAvailable() {
+    return sqlService.isAvailable();
+  }
 }

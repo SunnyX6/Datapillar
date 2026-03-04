@@ -11,13 +11,13 @@ import lombok.NoArgsConstructor;
 @Schema(name = "AuthOAuth2TokenRequest")
 public class OAuth2TokenRequest {
 
-    private String grantType;
+  private String grantType;
 
-    private String username;
+  private String username;
 
-    private String password;
+  private String password;
 
-    private String clientId;
+  private String clientId;
 
-    private String clientSecret;
+  private String clientSecret;
 }

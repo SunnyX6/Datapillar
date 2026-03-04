@@ -23,8 +23,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 租户Member管理服务实现
- * 实现租户Member管理业务流程与规则校验
+ * tenantMemberManagement service implementation Implement tenantsMemberManage business processes
+ * and rule verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -33,32 +33,31 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class TenantMemberAdminServiceImpl implements TenantMemberAdminService {
 
-    private final UserService userService;
-    private final RoleService roleService;
+  private final UserService userService;
+  private final RoleService roleService;
 
-    @Override
-    public List<User> listUsers(Integer status) {
-        return userService.listUsers(status);
-    }
+  @Override
+  public List<User> listUsers(Integer status) {
+    return userService.listUsers(status);
+  }
 
-    @Override
-    public void updateMemberStatus(Long userId, Integer status) {
-        userService.updateTenantMemberStatus(userId, status);
-    }
+  @Override
+  public void updateMemberStatus(Long userId, Integer status) {
+    userService.updateTenantMemberStatus(userId, status);
+  }
 
-    @Override
-    public void updateUser(Long userId, UserUpdateRequest dto) {
-        userService.updateUser(userId, dto);
-    }
+  @Override
+  public void updateUser(Long userId, UserUpdateRequest dto) {
+    userService.updateUser(userId, dto);
+  }
 
-    @Override
-    public List<RoleResponse> getRolesByUserId(Long userId) {
-        return roleService.getRolesByUserId(userId);
-    }
+  @Override
+  public List<RoleResponse> getRolesByUserId(Long userId) {
+    return roleService.getRolesByUserId(userId);
+  }
 
-    @Override
-    public void assignRoles(Long userId, List<Long> roleIds) {
-        userService.assignRoles(userId, roleIds);
-    }
-
+  @Override
+  public void assignRoles(Long userId, List<Long> roleIds) {
+    userService.assignRoles(userId, roleIds);
+  }
 }

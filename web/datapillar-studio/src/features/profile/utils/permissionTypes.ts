@@ -1,6 +1,6 @@
 import type { PermissionLevel } from './permissionConstants'
 
-export type UserStatus = '已激活' | '已邀请' | '已禁用'
+export type UserStatus = 'Activated' | 'Invited' | 'Disabled'
 
 interface PermissionResourceBase {
   objectId: number
@@ -111,7 +111,7 @@ export function mapRolePermissionToResource(permission: RolePermissionSource): P
     objectType: permission.objectType?.trim() || undefined,
     location: permission.location?.trim() || undefined,
     sort: permission.sort ?? 0,
-    categoryName: permission.categoryName?.trim() || '未分类',
+    categoryName: permission.categoryName?.trim() || 'Uncategorized',
     level: normalizePermissionLevel(permission.permissionCode),
     tenantLevel: normalizePermissionLevel(permission.tenantPermissionCode),
     children: (permission.children ?? []).map(mapRolePermissionToResource)

@@ -1,19 +1,16 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-知识库表相关的工具
+Tools related to knowledge base tables
 
-工具分层设计：
-- list: 列表查询（list_catalogs, list_schemas, list_tables），默认 limit=5
-- search: 语义搜索（search_tables, search_columns）
-- detail: 获取详情（get_table_detail, get_table_lineage, get_lineage_sql）
+Tool layered design:- list:List query(list_catalogs,list_schemas,list_tables),Default limit=5
+- search:Semantic search(search_tables,search_columns)
+- detail:Get details(get_table_detail,get_table_lineage,get_lineage_sql)
 
-设计原则：
-- 详情工具入参使用完整路径（path），如 "catalog.schema.table"
-- 所有工具出参始终带完整路径信息（catalog, schema, table）
-- 搜索工具返回候选列表，每个候选带完整路径
+design principles:- Use the full path when entering parameters in the details tool(path),Such as "catalog.schema.table"
+- All tool output parameters always contain complete path information.(catalog,schema,table)
+- Search tool returns candidate list,Each candidate with full path
 """
 
 import json
@@ -28,101 +25,99 @@ from src.shared.context import get_current_tenant_id, get_current_user_id
 logger = logging.getLogger(__name__)
 
 
-# ==================== 工具参数 Schema ====================
+# ==================== Tool parameters Schema ====================
 
 
 class ListCatalogsInput(BaseModel):
-    """列出 Catalog 的参数"""
+    """list Catalog Parameters"""
 
-    limit: int = Field(default=5, ge=1, le=100, description="返回数量上限，默认 5")
+    limit: int = Field(default=5, ge=1, le=100, description="Return maximum quantity,Default 5")
 
 
 class ListSchemasInput(BaseModel):
-    """列出 Schema 的参数"""
+    """list Schema Parameters"""
 
-    catalog: str = Field(..., description="Catalog 名称")
-    limit: int = Field(default=5, ge=1, le=100, description="返回数量上限，默认 5")
+    catalog: str = Field(..., description="Catalog Name")
+    limit: int = Field(default=5, ge=1, le=100, description="Return maximum quantity,Default 5")
 
 
 class ListTablesInput(BaseModel):
-    """列出 Table 的参数"""
+    """list Table Parameters"""
 
-    catalog: str = Field(..., description="Catalog 名称")
-    schema_name: str = Field(..., description="Schema 名称")
-    keyword: str | None = Field(default=None, description="按表名关键字过滤（可选）")
-    limit: int = Field(default=5, ge=1, le=100, description="返回数量上限，默认 5")
+    catalog: str = Field(..., description="Catalog Name")
+    schema_name: str = Field(..., description="Schema Name")
+    keyword: str | None = Field(default=None, description="Filter by table name keyword(Optional)")
+    limit: int = Field(default=5, ge=1, le=100, description="Return maximum quantity,Default 5")
 
 
 class SearchTablesInput(BaseModel):
-    """搜索表的参数"""
+    """Search table parameters"""
 
-    query: str = Field(..., description="搜索关键词或自然语言描述")
-    top_k: int = Field(default=10, ge=1, le=50, description="返回数量上限")
+    query: str = Field(..., description="Search keywords or natural language descriptions")
+    top_k: int = Field(default=10, ge=1, le=50, description="Return maximum quantity")
 
 
 class SearchColumnsInput(BaseModel):
-    """搜索列的参数"""
+    """Search column parameters"""
 
-    query: str = Field(..., description="搜索关键词或自然语言描述")
-    top_k: int = Field(default=10, ge=1, le=50, description="返回数量上限")
+    query: str = Field(..., description="Search keywords or natural language descriptions")
+    top_k: int = Field(default=10, ge=1, le=50, description="Return maximum quantity")
 
 
 class GetTableDetailInput(BaseModel):
-    """获取表详情的参数"""
+    """Parameters to get table details"""
 
-    path: str = Field(..., description="表的完整路径：catalog.schema.table")
+    path: str = Field(..., description="full path to table:catalog.schema.table")
 
 
 class GetTableLineageInput(BaseModel):
-    """获取表级血缘的参数"""
+    """Get the parameters of table-level bloodline"""
 
-    path: str = Field(..., description="表的完整路径：catalog.schema.table")
+    path: str = Field(..., description="full path to table:catalog.schema.table")
     direction: str = Field(
         default="both",
-        description="血缘方向：upstream（上游）、downstream（下游）、both（双向）",
+        description="bloodline direction:upstream(upstream),downstream(downstream),both(Two-way)",
     )
 
 
 class GetLineageSqlInput(BaseModel):
-    """根据血缘精准查找历史 SQL 的参数"""
+    """Accurately search history based on bloodline SQL Parameters"""
 
     source_tables: list[str] = Field(
         ...,
-        description="源表路径列表，格式：catalog.schema.table",
+        description="Source table path list,Format:catalog.schema.table",
     )
     target_table: str = Field(
         ...,
-        description="目标表路径，格式：catalog.schema.table",
+        description="target table path,Format:catalog.schema.table",
     )
 
 
-# ==================== 内部辅助函数 ====================
+# ==================== Internal helper function ====================
 
 
 def _tool_error(message: str) -> str:
-    """构造工具错误响应"""
+    """Constructor error response"""
     return json.dumps({"error": message}, ensure_ascii=False)
 
 
 def _tool_success(data: dict) -> str:
-    """构造工具成功响应"""
+    """Constructor responds successfully"""
     return json.dumps(data, ensure_ascii=False)
 
 
 def _resolve_scope() -> tuple[int | None, int | None]:
-    """解析当前请求租户/用户上下文。"""
+    """Resolve the current requesting tenant/user context."""
     return get_current_tenant_id(), get_current_user_id()
 
 
 def _parse_table_path(path: str) -> tuple[str, str, str] | None:
     """
-    解析表路径
+    parse table path
 
-    参数：
-    - path: 完整路径，格式 catalog.schema.table
+    parameters:- path:full path,Format catalog.schema.table
 
-    返回：
-    - (catalog, schema, table) 或 None（解析失败）
+    Return:- (catalog,schema,table) or None(Parsing failed)
     """
     if not path or not isinstance(path, str):
         return None
@@ -135,78 +130,66 @@ def _parse_table_path(path: str) -> tuple[str, str, str] | None:
     return catalog.strip(), schema.strip(), table.strip()
 
 
-# ==================== List 工具（第二层） ====================
+# ==================== List Tools(second floor) ====================
 
 
-@etl_tool("list_catalogs", tool_type="Catalog", desc="列出目录", args_schema=ListCatalogsInput)
+@etl_tool(
+    "list_catalogs", tool_type="Catalog", desc="list directory", args_schema=ListCatalogsInput
+)
 def list_catalogs(limit: int = 5) -> str:
     """
-    列出 Catalog 列表
+    list Catalog list
 
-    ⚠️ 重要：默认只返回前 5 个（折叠显示），不是全部！
-    - 如需查看更多，请传入更大的 limit 参数（最大 100）
+    ⚠️ important:By default,only the previous 5 a(Collapse display),not all!- To see more,Please pass in a larger limit parameters(maximum 100)
 
-    输出示例：
-    {
-        "catalogs": [
-            {"name": "hive_prod", "description": "生产环境 Hive"},
-            {"name": "mysql_prod", "description": "生产环境 MySQL"}
-        ],
-        "count": 2
+    Output example:{
+    "catalogs":[{"name":"hive_prod","description":"production environment Hive"},{"name":"mysql_prod","description":"production environment MySQL"}],"count":2
     }
     """
     logger.info(f"list_catalogs(limit={limit})")
     tenant_id, _ = _resolve_scope()
     if tenant_id is None:
-        return _tool_error("缺少租户上下文")
+        return _tool_error("Missing tenant context")
 
     try:
         catalogs = Neo4jTableSearch.list_catalogs(limit=limit, tenant_id=tenant_id)
         return _tool_success({"catalogs": catalogs, "count": len(catalogs)})
     except Exception as e:
-        logger.error(f"list_catalogs 执行失败: {e}", exc_info=True)
-        return _tool_error("查询失败")
+        logger.error(f"list_catalogs Execution failed:{e}", exc_info=True)
+        return _tool_error("Query failed")
 
 
 @etl_tool(
-    "list_schemas", tool_type="Schema", desc="列出目录下 schema", args_schema=ListSchemasInput
+    "list_schemas", tool_type="Schema", desc="List directory schema", args_schema=ListSchemasInput
 )
 def list_schemas(catalog: str, limit: int = 5) -> str:
     """
-    列出指定 Catalog 下的 Schema 列表
+    list specified Catalog down Schema list
 
-    ⚠️ 重要：默认只返回前 5 个（折叠显示），不是全部！
-    - 如需查看更多，请传入更大的 limit 参数（最大 100）
+    ⚠️ important:By default,only the previous 5 a(Collapse display),not all!- To see more,Please pass in a larger limit parameters(maximum 100)
 
-    输入示例：
-    {"catalog": "hive_prod"}
+    Input example:{"catalog":"hive_prod"}
 
-    输出示例：
-    {
-        "catalog": "hive_prod",
-        "schemas": [
-            {"name": "ods", "path": "hive_prod.ods", "description": "原始数据层"},
-            {"name": "dwd", "path": "hive_prod.dwd", "description": "明细数据层"}
-        ],
-        "count": 2
+    Output example:{
+    "catalog":"hive_prod","schemas":[{"name":"ods","path":"hive_prod.ods","description":"raw data layer"},{"name":"dwd","path":"hive_prod.dwd","description":"Detailed data layer"}],"count":2
     }
     """
     logger.info(f"list_schemas(catalog='{catalog}', limit={limit})")
 
     if not (isinstance(catalog, str) and catalog.strip()):
-        return _tool_error("catalog 不能为空")
+        return _tool_error("catalog cannot be empty")
 
     catalog = catalog.strip()
     tenant_id, _ = _resolve_scope()
     if tenant_id is None:
-        return _tool_error("缺少租户上下文")
+        return _tool_error("Missing tenant context")
 
     try:
         schemas = Neo4jTableSearch.list_schemas(catalog=catalog, limit=limit, tenant_id=tenant_id)
         if not schemas:
-            return _tool_error("未找到任何 Schema")
+            return _tool_error("not found any Schema")
 
-        # 添加完整路径
+        # add full path
         for s in schemas:
             s["path"] = f"{catalog}.{s['name']}"
             s["catalog"] = catalog
@@ -219,11 +202,11 @@ def list_schemas(catalog: str, limit: int = 5) -> str:
             }
         )
     except Exception as e:
-        logger.error(f"list_schemas 执行失败: {e}", exc_info=True)
-        return _tool_error("查询失败")
+        logger.error(f"list_schemas Execution failed:{e}", exc_info=True)
+        return _tool_error("Query failed")
 
 
-@etl_tool("list_tables", tool_type="Table", desc="列出表", args_schema=ListTablesInput)
+@etl_tool("list_tables", tool_type="Table", desc="list table", args_schema=ListTablesInput)
 def list_tables(
     catalog: str,
     schema_name: str,
@@ -231,24 +214,15 @@ def list_tables(
     limit: int = 5,
 ) -> str:
     """
-    列出指定 Catalog.Schema 下的 Table 列表
+    list specified Catalog.Schema down Table list
 
-    ⚠️ 重要：默认只返回前 5 个（折叠显示），不是全部！
-    - 如需查看更多，请传入更大的 limit 参数（最大 100）
-    - 可选：使用 keyword 参数按表名关键字过滤
+    ⚠️ important:By default,only the previous 5 a(Collapse display),not all!- To see more,Please pass in a larger limit parameters(maximum 100)
+    - Optional:use keyword Parameters are filtered by table name keywords
 
-    输入示例：
-    {"catalog": "hive_prod", "schema_name": "ods"}
+    Input example:{"catalog":"hive_prod","schema_name":"ods"}
 
-    输出示例：
-    {
-        "catalog": "hive_prod",
-        "schema": "ods",
-        "tables": [
-            {"name": "t_order", "path": "hive_prod.ods.t_order", "description": "订单表"},
-            {"name": "t_user", "path": "hive_prod.ods.t_user", "description": "用户表"}
-        ],
-        "count": 2
+    Output example:{
+    "catalog":"hive_prod","schema":"ods","tables":[{"name":"t_order","path":"hive_prod.ods.t_order","description":"order form"},{"name":"t_user","path":"hive_prod.ods.t_user","description":"User table"}],"count":2
     }
     """
     logger.info(
@@ -256,15 +230,15 @@ def list_tables(
     )
 
     if not (isinstance(catalog, str) and catalog.strip()):
-        return _tool_error("catalog 不能为空")
+        return _tool_error("catalog cannot be empty")
     if not (isinstance(schema_name, str) and schema_name.strip()):
-        return _tool_error("schema_name 不能为空")
+        return _tool_error("schema_name cannot be empty")
 
     catalog = catalog.strip()
     schema_name = schema_name.strip()
     tenant_id, _ = _resolve_scope()
     if tenant_id is None:
-        return _tool_error("缺少租户上下文")
+        return _tool_error("Missing tenant context")
 
     try:
         tables = Neo4jTableSearch.list_tables(
@@ -278,9 +252,9 @@ def list_tables(
             hint = f"{catalog}.{schema_name}"
             if keyword and str(keyword).strip():
                 hint = f"{hint} (keyword={keyword})"
-            return _tool_error("未找到任何表")
+            return _tool_error("No table found")
 
-        # 添加完整路径
+        # add full path
         for t in tables:
             t["path"] = f"{catalog}.{schema_name}.{t['name']}"
             t["catalog"] = catalog
@@ -295,54 +269,44 @@ def list_tables(
             }
         )
     except Exception as e:
-        logger.error(f"list_tables 执行失败: {e}", exc_info=True)
-        return _tool_error("查询失败")
+        logger.error(f"list_tables Execution failed:{e}", exc_info=True)
+        return _tool_error("Query failed")
 
 
-# ==================== Search 工具（语义搜索） ====================
+# ==================== Search Tools(Semantic search) ====================
 
 
-@etl_tool("search_tables", tool_type="Table", desc="语义搜索表", args_schema=SearchTablesInput)
+@etl_tool(
+    "search_tables", tool_type="Table", desc="Semantic search table", args_schema=SearchTablesInput
+)
 def search_tables(query: str, top_k: int = 10) -> str:
     """
-    搜索表（语义搜索）
+    search table(Semantic search)
 
-    使用场景：
-    - 用户问"搜索订单相关的表"、"找一下用户表" → 使用此工具
-    - 用户只知道业务概念，不知道具体表名时使用
-    - 返回按相关性排序的表列表（带 score）
+    Usage scenarios:- User asked"Search order-related tables","Find the user table" → Use this tool
+    - Users only know business concepts,Use when you don't know the specific table name
+    - Returns a list of tables sorted by relevance(bring score)
 
-    ⚠️ 注意：这是语义搜索，不是精确匹配。如果用户知道确切的 catalog/schema，应使用 list_tables
+    ⚠️ Note:This is semantic search,Not an exact match.If the user knows the exact catalog/schema,should be used list_tables
 
-    输入示例：
-    {"query": "订单"}
+    Input example:{"query":"Order"}
 
-    输出示例：
-    {
-        "query": "订单",
-        "tables": [
-            {
-                "path": "hive_prod.ods.t_order",
-                "catalog": "hive_prod",
-                "schema": "ods",
-                "table": "t_order",
-                "description": "订单主表",
-                "score": 0.95
-            }
-        ],
-        "count": 1
+    Output example:{
+    "query":"Order","tables":[{
+    "path":"hive_prod.ods.t_order","catalog":"hive_prod","schema":"ods","table":"t_order","description":"Order master table","score":0.95
+    }],"count":1
     }
     """
     logger.info(f"search_tables(query='{query}', top_k={top_k})")
 
     if not (isinstance(query, str) and query.strip()):
-        return _tool_error("query 不能为空")
+        return _tool_error("query cannot be empty")
     tenant_id, user_id = _resolve_scope()
     if tenant_id is None:
-        return _tool_error("缺少租户上下文")
+        return _tool_error("Missing tenant context")
 
     try:
-        # 使用向量搜索
+        # Use vector search
         results = Neo4jTableSearch.search_tables(
             query=query.strip(),
             top_k=top_k,
@@ -350,7 +314,7 @@ def search_tables(query: str, top_k: int = 10) -> str:
             user_id=user_id,
         )
 
-        # 过滤只保留 Table 类型
+        # Filter to keep only Table Type
         tables = []
         for r in results:
             if r.get("type") == "Table":
@@ -376,51 +340,42 @@ def search_tables(query: str, top_k: int = 10) -> str:
             }
         )
     except Exception as e:
-        logger.error(f"search_tables 执行失败: {e}", exc_info=True)
-        return _tool_error("查询失败")
+        logger.error(f"search_tables Execution failed:{e}", exc_info=True)
+        return _tool_error("Query failed")
 
 
-@etl_tool("search_columns", tool_type="Column", desc="语义搜索字段", args_schema=SearchColumnsInput)
+@etl_tool(
+    "search_columns",
+    tool_type="Column",
+    desc="Semantic search fields",
+    args_schema=SearchColumnsInput,
+)
 def search_columns(query: str, top_k: int = 10) -> str:
     """
-    搜索列（语义搜索）
+    search column(Semantic search)
 
-    使用场景：
-    - 用户问"哪些表有订单状态字段"、"找一下金额相关的列" → 使用此工具
-    - 用户想找特定业务含义的字段时使用
-    - 返回按相关性排序的列列表（带 score）
+    Usage scenarios:- User asked"Which tables have order status fields","Find the column related to the amount" → Use this tool
+    - Used when users want to find fields with specific business meanings
+    - Returns a list of columns sorted by relevance(bring score)
 
-    输入示例：
-    {"query": "订单状态"}
+    Input example:{"query":"Order status"}
 
-    输出示例：
-    {
-        "query": "订单状态",
-        "columns": [
-            {
-                "path": "hive_prod.ods.t_order.order_status",
-                "catalog": "hive_prod",
-                "schema": "ods",
-                "table": "t_order",
-                "column": "order_status",
-                "dataType": "varchar",
-                "description": "订单状态",
-                "score": 0.92
-            }
-        ],
-        "count": 1
+    Output example:{
+    "query":"Order status","columns":[{
+    "path":"hive_prod.ods.t_order.order_status","catalog":"hive_prod","schema":"ods","table":"t_order","column":"order_status","dataType":"varchar","description":"Order status","score":0.92
+    }],"count":1
     }
     """
     logger.info(f"search_columns(query='{query}', top_k={top_k})")
 
     if not (isinstance(query, str) and query.strip()):
-        return _tool_error("query 不能为空")
+        return _tool_error("query cannot be empty")
     tenant_id, user_id = _resolve_scope()
     if tenant_id is None:
-        return _tool_error("缺少租户上下文")
+        return _tool_error("Missing tenant context")
 
     try:
-        # 使用向量搜索
+        # Use vector search
         results = Neo4jColumnSearch.search_columns(
             query=query.strip(),
             top_k=top_k,
@@ -428,7 +383,7 @@ def search_columns(query: str, top_k: int = 10) -> str:
             user_id=user_id,
         )
 
-        # 过滤只保留 Column 类型
+        # Filter to keep only Column Type
         columns = []
         for r in results:
             if r.get("type") == "Column":
@@ -456,56 +411,45 @@ def search_columns(query: str, top_k: int = 10) -> str:
             }
         )
     except Exception as e:
-        logger.error(f"search_columns 执行失败: {e}", exc_info=True)
-        return _tool_error("查询失败")
+        logger.error(f"search_columns Execution failed:{e}", exc_info=True)
+        return _tool_error("Query failed")
 
 
-# ==================== Detail 工具（第三层） ====================
+# ==================== Detail Tools(third floor) ====================
 
 
 @etl_tool(
     "get_table_detail",
     tool_type="Table",
-    desc="获取表详情（字段/描述）",
+    desc="Get table details(Field/Description)",
     args_schema=GetTableDetailInput,
 )
 def get_table_detail(path: str) -> str:
     """
-    获取表详情（含列和值域）
+    Get table details(Contains columns and ranges)
 
-    使用场景：
-    - 用户问"这张表有哪些字段"、"表结构是什么" → 使用此工具
-    - 验证表是否存在
-    - 获取字段类型、描述、值域等详细信息
+    Usage scenarios:- User asked"What fields does this table have?","What is the table structure" → Use this tool
+    - Verify table exists
+    - Get field type,Description,Value range and other details
 
-    ⚠️ 路径格式：必须是完整路径 catalog.schema.table
+    ⚠️ path format:Must be full path catalog.schema.table
 
-    输入示例：
-    {"path": "hive_prod.ods.t_order"}
+    Input example:{"path":"hive_prod.ods.t_order"}
 
-    输出示例：
-    {
-        "path": "hive_prod.ods.t_order",
-        "catalog": "hive_prod",
-        "schema": "ods",
-        "table": "t_order",
-        "description": "订单主表",
-        "columns": [
-            {"name": "order_id", "dataType": "bigint", "description": "订单ID"},
-            {"name": "order_status", "dataType": "varchar", "description": "订单状态"}
-        ]
+    Output example:{
+    "path":"hive_prod.ods.t_order","catalog":"hive_prod","schema":"ods","table":"t_order","description":"Order master table","columns":[{"name":"order_id","dataType":"bigint","description":"OrderID"},{"name":"order_status","dataType":"varchar","description":"Order status"}]
     }
     """
     logger.info(f"get_table_detail(path='{path}')")
 
     parsed = _parse_table_path(path)
     if not parsed:
-        return _tool_error("路径格式错误，应为 catalog.schema.table")
+        return _tool_error("Path format error,should be catalog.schema.table")
 
     catalog, schema, table = parsed
     tenant_id, user_id = _resolve_scope()
     if tenant_id is None:
-        return _tool_error("缺少租户上下文")
+        return _tool_error("Missing tenant context")
 
     try:
         detail = Neo4jTableSearch.get_table_detail(
@@ -517,7 +461,7 @@ def get_table_detail(path: str) -> str:
         )
 
         if not detail:
-            return _tool_error("未找到表")
+            return _tool_error("table not found")
 
         return _tool_success(
             {
@@ -531,49 +475,43 @@ def get_table_detail(path: str) -> str:
         )
 
     except Exception as e:
-        logger.error(f"get_table_detail 执行失败: {e}", exc_info=True)
-        return _tool_error("查询失败")
+        logger.error(f"get_table_detail Execution failed:{e}", exc_info=True)
+        return _tool_error("Query failed")
 
 
 @etl_tool(
-    "get_table_lineage", tool_type="Table", desc="获取表血缘", args_schema=GetTableLineageInput
+    "get_table_lineage",
+    tool_type="Table",
+    desc="Get table ancestry",
+    args_schema=GetTableLineageInput,
 )
 def get_table_lineage(path: str, direction: str = "both") -> str:
     """
-    获取表血缘关系
+    Get table blood relationship
 
-    使用场景：
-    - 用户问"这张表的上游是什么"、"数据从哪里来" → direction="upstream"
-    - 用户问"这张表的下游是什么"、"数据流向哪里" → direction="downstream"
-    - 用户问"血缘关系" → direction="both"
+    Usage scenarios:- User asked"What is the upstream of this table?","Where does the data come from?" → direction="upstream"
+    - User asked"What is downstream of this table?","Where does the data flow?" → direction="downstream"
+    - User asked"blood relationship" → direction="both"
 
-    ⚠️ 路径格式：必须是完整路径 catalog.schema.table
-    ⚠️ direction 参数：upstream（上游）、downstream（下游）、both（双向，默认）
+    ⚠️ path format:Must be full path catalog.schema.table
+    ⚠️ direction parameters:upstream(upstream),downstream(downstream),both(Two-way,Default)
 
-    输入示例：
-    {"path": "hive_prod.dwd.order_detail", "direction": "upstream"}
+    Input example:{"path":"hive_prod.dwd.order_detail","direction":"upstream"}
 
-    输出示例：
-    {
-        "path": "hive_prod.dwd.order_detail",
-        "catalog": "hive_prod",
-        "schema": "dwd",
-        "table": "order_detail",
-        "direction": "upstream",
-        "upstream": ["hive_prod.ods.t_order", "hive_prod.ods.t_user"],
-        "downstream": []
+    Output example:{
+    "path":"hive_prod.dwd.order_detail","catalog":"hive_prod","schema":"dwd","table":"order_detail","direction":"upstream","upstream":["hive_prod.ods.t_order","hive_prod.ods.t_user"],"downstream":[]
     }
     """
     logger.info(f"get_table_lineage(path='{path}', direction='{direction}')")
 
     parsed = _parse_table_path(path)
     if not parsed:
-        return _tool_error("路径格式错误，应为 catalog.schema.table")
+        return _tool_error("Path format error,should be catalog.schema.table")
 
     catalog, schema, table = parsed
     tenant_id, user_id = _resolve_scope()
     if tenant_id is None:
-        return _tool_error("缺少租户上下文")
+        return _tool_error("Missing tenant context")
 
     try:
         lineage = Neo4jTableSearch.get_table_lineage(
@@ -585,7 +523,7 @@ def get_table_lineage(path: str, direction: str = "both") -> str:
         )
 
         if not lineage.get("upstream") and not lineage.get("downstream"):
-            return _tool_error("未找到表的血缘关系")
+            return _tool_error("No blood relationship found for table")
 
         return _tool_success(
             {
@@ -601,51 +539,42 @@ def get_table_lineage(path: str, direction: str = "both") -> str:
         )
 
     except Exception as e:
-        logger.error(f"get_table_lineage 执行失败: {e}", exc_info=True)
-        return _tool_error("查询失败")
+        logger.error(f"get_table_lineage Execution failed:{e}", exc_info=True)
+        return _tool_error("Query failed")
 
 
 @etl_tool(
     "get_lineage_sql",
     tool_type="Table",
-    desc="根据血缘查找历史 SQL",
+    desc="Find history based on ancestry SQL",
     args_schema=GetLineageSqlInput,
 )
 def get_lineage_sql(source_tables: list[str], target_table: str) -> str:
     """
-    根据血缘关系精准查找历史 SQL
+    Accurately search history based on blood relationships SQL
 
-    使用场景：
-    - 需要参考历史 SQL 写法时使用
-    - 根据精确的源表 → 目标表关系，查找之前执行过的 SQL
-    - 用于 SQL 开发时的参考
+    Usage scenarios:- Need to refer to history SQL Use when writing
+    - According to accurate source table → target table relationship,Find previously executed SQL
+    - used for SQL Reference during development
 
-    ⚠️ 路径格式：所有表路径必须是完整路径 catalog.schema.table
+    ⚠️ path format:All table paths must be full paths catalog.schema.table
 
-    输入示例：
-    {
-        "source_tables": ["hive_prod.ods.t_order", "hive_prod.ods.t_user"],
-        "target_table": "hive_prod.dwd.order_detail"
+    Input example:{
+    "source_tables":["hive_prod.ods.t_order","hive_prod.ods.t_user"],"target_table":"hive_prod.dwd.order_detail"
     }
 
-    输出示例：
-    {
-        "source_tables": ["hive_prod.ods.t_order", "hive_prod.ods.t_user"],
-        "target_table": "hive_prod.dwd.order_detail",
-        "sql_id": "abc123",
-        "sql_content": "INSERT INTO ...",
-        "summary": "从订单主表和用户表清洗订单明细",
-        "engine": "spark"
+    Output example:{
+    "source_tables":["hive_prod.ods.t_order","hive_prod.ods.t_user"],"target_table":"hive_prod.dwd.order_detail","sql_id":"abc123","sql_content":"INSERT INTO...","summary":"Clean order details from the order master table and user table","engine":"spark"
     }
     """
     logger.info(f"get_lineage_sql(source={source_tables}, target='{target_table}')")
 
-    # 验证目标表路径
+    # Verify target table path
     target_parsed = _parse_table_path(target_table)
     if not target_parsed:
-        return _tool_error("目标表路径格式错误，应为 catalog.schema.table")
+        return _tool_error("Target table path format is wrong,should be catalog.schema.table")
 
-    # 提取 schema.table 格式（Neo4j 查询使用）
+    # Extract schema.table Format(Neo4j Query usage)
     source_schema_tables = []
     for src in source_tables:
         parsed = _parse_table_path(src)
@@ -654,13 +583,13 @@ def get_lineage_sql(source_tables: list[str], target_table: str) -> str:
             source_schema_tables.append(f"{schema}.{table}")
 
     if not source_schema_tables:
-        return _tool_error("源表路径列表为空或格式错误")
+        return _tool_error("Source table path list is empty or malformed")
 
     _target_catalog, target_schema, target_table_name = target_parsed
     target_schema_table = f"{target_schema}.{target_table_name}"
     tenant_id, user_id = _resolve_scope()
     if tenant_id is None:
-        return _tool_error("缺少租户上下文")
+        return _tool_error("Missing tenant context")
 
     try:
         result = Neo4jTableSearch.find_lineage_sql(
@@ -671,7 +600,7 @@ def get_lineage_sql(source_tables: list[str], target_table: str) -> str:
         )
 
         if not result:
-            return _tool_error("未找到血缘 SQL")
+            return _tool_error("No bloodline found SQL")
 
         return _tool_success(
             {
@@ -685,20 +614,20 @@ def get_lineage_sql(source_tables: list[str], target_table: str) -> str:
         )
 
     except Exception as e:
-        logger.error(f"get_lineage_sql 执行失败: {e}", exc_info=True)
-        return _tool_error("查询失败")
+        logger.error(f"get_lineage_sql Execution failed:{e}", exc_info=True)
+        return _tool_error("Query failed")
 
 
-# ==================== 工具列表 ====================
+# ==================== Tool list ====================
 
-# List 工具（第二层）
+# List Tools(second floor)
 LIST_TOOLS = [list_catalogs, list_schemas, list_tables]
 
-# Search 工具（语义搜索）
+# Search Tools(Semantic search)
 SEARCH_TOOLS = [search_tables, search_columns]
 
-# Detail 工具（第三层）
+# Detail Tools(third floor)
 DETAIL_TOOLS = [get_table_detail, get_table_lineage, get_lineage_sql]
 
-# 所有表相关工具
+# All table related tools
 TABLE_TOOLS = LIST_TOOLS + SEARCH_TOOLS + DETAIL_TOOLS

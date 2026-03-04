@@ -2,14 +2,6 @@ package com.sunny.datapillar.openlineage.api.dto;
 
 import lombok.Builder;
 
-/**
- * ingest 应答。
- */
+/** ingest reply. */
 @Builder
-public record IngestAckResponse(
-        String status,
-        String eventType,
-        String runId,
-        Long tenantId
-) {
-}
+public record IngestAckResponse(String status, String eventType, String runId, Long tenantId) {}

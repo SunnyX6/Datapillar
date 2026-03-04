@@ -11,9 +11,9 @@ import lombok.NoArgsConstructor;
 @Schema(name = "AuthRoleInfo")
 public class RoleItem {
 
-    private Long id;
+  private Long id;
 
-    private String name;
+  private String name;
 
-    private String type;
+  private String type;
 }

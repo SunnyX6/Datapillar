@@ -10,7 +10,7 @@ const BREAKPOINT_VAR_MAP: Record<BreakpointKey, string> = {
   '3xl': '--breakpoint-3xl'
 }
 
-// 仅用于 SSR/测试兜底，权威来源仍是 @theme 中的 --breakpoint-*
+// only for SSR/Test the bottom line，Authoritative sources are still @theme in --breakpoint-*
 const FALLBACK_BREAKPOINTS: BreakpointMap = {
   md: 1080,
   lg: 1440,

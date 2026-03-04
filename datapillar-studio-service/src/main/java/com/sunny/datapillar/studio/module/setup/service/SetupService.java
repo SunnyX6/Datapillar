@@ -16,15 +16,14 @@ import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
 
 /**
- * 初始化服务
- * 提供初始化业务能力与领域服务
+ * Initialize service Provide initial business capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface SetupService {
 
-    SetupStatusResponse getStatus();
+  SetupStatusResponse getStatus();
 
-    SetupInitializeResponse initialize(SetupInitializeRequest request);
+  SetupInitializeResponse initialize(SetupInitializeRequest request);
 }

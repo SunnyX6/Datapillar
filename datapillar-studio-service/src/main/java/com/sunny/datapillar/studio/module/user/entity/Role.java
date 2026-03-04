@@ -8,8 +8,7 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
- * 角色组件
- * 负责角色核心逻辑实现
+ * role component Responsible for the implementation of the core logic of the role
  *
  * @author Sunny
  * @date 2026-01-01
@@ -17,27 +16,27 @@ import lombok.Data;
 @Data
 @TableName("roles")
 public class Role {
-    @TableId(type = IdType.AUTO)
-    private Long id;
+  @TableId(type = IdType.AUTO)
+  private Long id;
 
-    @TableField("tenant_id")
-    private Long tenantId;
+  @TableField("tenant_id")
+  private Long tenantId;
 
-    private String type;
+  private String type;
 
-    private String name;
+  private String name;
 
-    private String description;
+  private String description;
 
-    private Integer level;
+  private Integer level;
 
-    private Integer status;
+  private Integer status;
 
-    private Integer sort;
+  private Integer sort;
 
-    @TableField("created_at")
-    private LocalDateTime createdAt;
+  @TableField("created_at")
+  private LocalDateTime createdAt;
 
-    @TableField("updated_at")
-    private LocalDateTime updatedAt;
+  @TableField("updated_at")
+  private LocalDateTime updatedAt;
 }

@@ -1,10 +1,10 @@
 /**
- * 指标表单组件专用类型
+ * Special type of indicator form component
  */
 
 import type { MetricType } from '@/services/types/onemeta/semantic'
 
-/** 度量列 */
+/** measure column */
 export interface MeasureColumn {
   id?: number
   name: string
@@ -12,7 +12,7 @@ export interface MeasureColumn {
   comment?: string
 }
 
-/** 过滤列（含值域） */
+/** Filter columns（Contains value range） */
 export interface FilterColumn {
   id?: number
   name: string
@@ -24,19 +24,19 @@ export interface FilterColumn {
   }>
 }
 
-/** 指标表单数据 */
+/** Metric form data */
 export interface MetricFormData {
   name: string
   code: string
-  /** 自定义后缀 */
+  /** Custom suffix */
   customSuffix: string
-  /** 词根组 */
+  /** root group */
   wordRoots: string[]
-  /** 聚合函数 */
+  /** aggregate function */
   aggregation: string
-  /** 修饰符（派生指标用） */
+  /** modifier（For derived indicators） */
   modifiers: string[]
-  /** 基础指标 code（派生指标用） */
+  /** Basic indicators code（For derived indicators） */
   baseCode?: string
   type: MetricType
   dataType: string
@@ -49,20 +49,20 @@ export interface MetricFormData {
   formula: string
   measureColumns: MeasureColumn[]
   filterColumns: FilterColumn[]
-  /** 原子指标的物理表引用 */
+  /** Physical table reference for atomic indicators */
   refTableId?: number
-  /** 引用的 Catalog 代码（兼容历史字段） */
+  /** quoted Catalog code（Compatible with history fields） */
   refCatalog?: string
-  /** 引用的 Schema 代码（兼容历史字段） */
+  /** quoted Schema code（Compatible with history fields） */
   refSchema?: string
-  /** 引用的 Table 代码（兼容历史字段） */
+  /** quoted Table code（Compatible with history fields） */
   refTable?: string
-  /** 引用的 Catalog 名称（只读，用于显示） */
+  /** quoted Catalog Name（read only，for display） */
   refCatalogName?: string
-  /** 引用的 Schema 名称（只读，用于显示） */
+  /** quoted Schema Name（read only，for display） */
   refSchemaName?: string
-  /** 引用的 Table 名称（只读，用于显示） */
+  /** quoted Table Name（read only，for display） */
   refTableName?: string
-  /** 复合指标引用的指标列表 */
+  /** List of indicators referenced by the composite indicator */
   compositeMetrics?: Array<{ code: string; name: string; comment?: string }>
 }

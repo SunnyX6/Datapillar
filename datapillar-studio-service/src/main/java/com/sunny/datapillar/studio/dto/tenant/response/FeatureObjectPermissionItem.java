@@ -8,27 +8,27 @@ import lombok.Data;
 @Schema(name = "FeatureObjectObjectPermission")
 public class FeatureObjectPermissionItem {
 
-    private Long objectId;
+  private Long objectId;
 
-    private Long parentId;
+  private Long parentId;
 
-    private String objectName;
+  private String objectName;
 
-    private String objectPath;
+  private String objectPath;
 
-    private String objectType;
+  private String objectType;
 
-    private String location;
+  private String location;
 
-    private Long categoryId;
+  private Long categoryId;
 
-    private String categoryName;
+  private String categoryName;
 
-    private Integer sort;
+  private Integer sort;
 
-    private String permissionCode;
+  private String permissionCode;
 
-    private String tenantPermissionCode;
+  private String tenantPermissionCode;
 
-    private List<FeatureObjectPermissionItem> children;
+  private List<FeatureObjectPermissionItem> children;
 }

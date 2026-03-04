@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-28
 
-"""API 统一响应封装（统一 code/type/context 标准）。"""
+"""API Unified response packaging(unify code/type/context Standard)."""
 
 from __future__ import annotations
 
@@ -14,7 +13,7 @@ from src.shared.web.code import Code
 
 
 class ApiResponse:
-    """统一 API 响应构造器。"""
+    """unify API response constructor."""
 
     SUCCESS_CODE = Code.OK
 
@@ -64,10 +63,12 @@ class ApiResponse:
 
 
 class ApiSuccessResponseSchema(BaseModel):
-    """OpenAPI 文档用成功响应结构。"""
+    """OpenAPI Documentation with success response structure."""
 
-    code: int = Field(default=ApiResponse.SUCCESS_CODE, description="业务状态码，0 表示成功")
-    data: Any | None = Field(default=None, description="业务数据")
+    code: int = Field(
+        default=ApiResponse.SUCCESS_CODE, description="Business status code,0 indicates success"
+    )
+    data: Any | None = Field(default=None, description="business data")
 
 
 def build_success(

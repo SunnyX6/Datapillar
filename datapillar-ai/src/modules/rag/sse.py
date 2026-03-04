@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-28
 
-"""RAG 任务 SSE 事件中心."""
+"""RAG Task SSE event center."""
 
 from __future__ import annotations
 

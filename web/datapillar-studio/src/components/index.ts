@@ -1,5 +1,5 @@
 /**
- * 组件统一导出
+ * Unified export of components
  */
 
 export * from './ui'

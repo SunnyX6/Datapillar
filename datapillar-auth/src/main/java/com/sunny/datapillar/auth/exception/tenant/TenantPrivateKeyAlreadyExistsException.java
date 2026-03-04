@@ -5,19 +5,22 @@ import com.sunny.datapillar.common.exception.AlreadyExistsException;
 import java.util.Map;
 
 /**
- * 租户私钥已存在异常
- * 描述租户私钥存储冲突语义
+ * Exception for tenant private-key storage conflicts.
  *
  * @author Sunny
  * @date 2026-02-26
  */
 public class TenantPrivateKeyAlreadyExistsException extends AlreadyExistsException {
 
-    public TenantPrivateKeyAlreadyExistsException() {
-        super(ErrorType.TENANT_PRIVATE_KEY_ALREADY_EXISTS, Map.of(), "私钥文件已存在");
-    }
+  public TenantPrivateKeyAlreadyExistsException() {
+    super(ErrorType.TENANT_PRIVATE_KEY_ALREADY_EXISTS, Map.of(), "Private key file already exists");
+  }
 
-    public TenantPrivateKeyAlreadyExistsException(Throwable cause) {
-        super(cause, ErrorType.TENANT_PRIVATE_KEY_ALREADY_EXISTS, Map.of(), "私钥文件已存在");
-    }
+  public TenantPrivateKeyAlreadyExistsException(Throwable cause) {
+    super(
+        cause,
+        ErrorType.TENANT_PRIVATE_KEY_ALREADY_EXISTS,
+        Map.of(),
+        "Private key file already exists");
+  }
 }

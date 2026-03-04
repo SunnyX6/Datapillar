@@ -84,7 +84,7 @@ export function OneIdeLeftColumn() {
   const navigate = useNavigate()
 
   const getTemplateRoute = (templateId: string): string | null => {
-    // 目前项目只落地了 SQL 编辑器入口
+    // At present, the project has only been implemented SQL Editor entry
     if (templateId === 't1') return '/ide/sql'
     return null
   }

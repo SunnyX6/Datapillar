@@ -16,43 +16,29 @@ import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
-
 /**
- * 任务服务
- * 提供任务业务能力与领域服务
+ * Task service Provide task business capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface JobService {
 
-    /**
-     * 查询工作流下的所有任务
-     */
-    List<JobResponse> getJobsByWorkflowId(Long workflowId);
+  /** Query all tasks under the workflow */
+  List<JobResponse> getJobsByWorkflowId(Long workflowId);
 
-    /**
-     * 获取任务详情
-     */
-    JobResponse getJobDetail(Long workflowId, Long id);
+  /** Get task details */
+  JobResponse getJobDetail(Long workflowId, Long id);
 
-    /**
-     * 创建任务
-     */
-    Long createJob(Long workflowId, JobCreateRequest dto);
+  /** Create tasks */
+  Long createJob(Long workflowId, JobCreateRequest dto);
 
-    /**
-     * 更新任务
-     */
-    void updateJob(Long workflowId, Long id, JobUpdateRequest dto);
+  /** update task */
+  void updateJob(Long workflowId, Long id, JobUpdateRequest dto);
 
-    /**
-     * 删除任务
-     */
-    void deleteJob(Long workflowId, Long id);
+  /** Delete task */
+  void deleteJob(Long workflowId, Long id);
 
-    /**
-     * 批量更新任务位置
-     */
-    void updateJobPositions(Long workflowId, JobLayoutSaveRequest dto);
+  /** Update task locations in batches */
+  void updateJobPositions(Long workflowId, JobLayoutSaveRequest dto);
 }

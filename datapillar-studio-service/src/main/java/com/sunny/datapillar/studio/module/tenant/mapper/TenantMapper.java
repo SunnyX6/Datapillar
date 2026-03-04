@@ -6,8 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 /**
- * 租户Mapper
- * 负责租户数据访问与持久化映射
+ * tenantMapper Responsible for tenant data access and persistence mapping
  *
  * @author Sunny
  * @date 2026-01-01
@@ -15,5 +14,5 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface TenantMapper extends BaseMapper<Tenant> {
 
-    Tenant selectByCode(@Param("code") String code);
+  Tenant selectByCode(@Param("code") String code);
 }

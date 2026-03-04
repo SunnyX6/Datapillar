@@ -1,25 +1,20 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-SQL 血缘分析器
+SQL ancestry analyzer
 
-基于 sqlglot 解析 SQL，提取表级和列级血缘关系。
-支持临时表识别和穿透。
-
-核心逻辑：
-1. 解析 SQL 提取读写表
-2. 构建依赖图
-3. 识别临时表（在 session 中创建且被读取）
-4. 穿透临时表，建立真实血缘
-5. 提取列级血缘
+Based on sqlglot parse SQL,Extract table-level and column-level blood relationships.Support temporary table identification and penetration.core logic:1.parse SQL Extract read-write table
+2.Build dependency graph
+3.Identify temporary tables(in session Created and read in)
+4.Penetrate temporary table,Establish true bloodline
+5.Extract rank lineage
 """
 
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
 
-import logging
 import sqlglot
 from sqlglot import exp
 
@@ -27,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class TableRole(str, Enum):
-    """表角色"""
+    """table role"""
 
     SOURCE = "source"
     TARGET = "target"
@@ -36,7 +31,7 @@ class TableRole(str, Enum):
 
 @dataclass
 class TableRef:
-    """表引用"""
+    """table reference"""
 
     catalog: str | None = None
     schema: str | None = None
@@ -44,7 +39,7 @@ class TableRef:
 
     @property
     def full_name(self) -> str:
-        """完整表名"""
+        """Full table name"""
         parts = [p for p in [self.catalog, self.schema, self.table] if p]
         return ".".join(parts)
 
@@ -59,20 +54,20 @@ class TableRef:
 
 @dataclass
 class ColumnRef:
-    """列引用"""
+    """column reference"""
 
     table: TableRef
     column: str
 
     @property
     def full_name(self) -> str:
-        """完整列名"""
+        """Full column name"""
         return f"{self.table.full_name}.{self.column}"
 
 
 @dataclass
 class ColumnLineage:
-    """列级血缘"""
+    """Ranked descent"""
 
     source: ColumnRef
     target: ColumnRef
@@ -81,7 +76,7 @@ class ColumnLineage:
 
 @dataclass
 class TableLineage:
-    """表级血缘"""
+    """Superficial blood"""
 
     source: TableRef
     target: TableRef
@@ -90,7 +85,7 @@ class TableLineage:
 
 @dataclass
 class LineageResult:
-    """血缘分析结果"""
+    """Bloodline analysis results"""
 
     sources: set[TableRef] = field(default_factory=set)
     targets: set[TableRef] = field(default_factory=set)
@@ -101,50 +96,43 @@ class LineageResult:
 
 class SQLLineageAnalyzer:
     """
-    SQL 血缘分析器
+    SQL ancestry analyzer
 
-    基于依赖图拓扑识别表类型：
-    - 入度=0（只读不写）→ SOURCE
-    - 出度=0（只写不读）→ TARGET
-    - 中间节点（既读又写）→ 临时表
+    Identify table types based on dependency graph topology:- degree=0(Read only but not write)→ SOURCE
+    - out degree=0(Only write but not read)→ TARGET
+    - intermediate node(both read and write)→ temporary table
     """
 
     def __init__(self, dialect: str = "hive") -> None:
         """
-        初始化分析器
+        Initialize analyzer
 
-        Args:
-            dialect: SQL 方言（hive, spark, mysql, postgres 等）
+        Args:dialect:SQL dialect(hive,spark,mysql,postgres Wait)
         """
         self.dialect = dialect
 
     def analyze_sql(self, sql: str) -> LineageResult:
         """
-        分析单条 SQL 的血缘
+        Analyze a single line SQL bloodline
 
-        Args:
-            sql: SQL 语句
+        Args:sql:SQL statement
 
-        Returns:
-            LineageResult: 血缘结果
+        Returns:LineageResult:Bloodline results
         """
         return self.analyze_session([sql])
 
     def analyze_session(self, sqls: list[str]) -> LineageResult:
         """
-        分析一个 session 中的多条 SQL
+        Analyze a session multiple of SQL
 
-        核心逻辑：
-        1. 解析每条 SQL，提取读写表
-        2. 构建依赖图
-        3. 识别临时表
-        4. 穿透临时表建立真实血缘
+        core logic:1.Parse each SQL,Extract read-write table
+        2.Build dependency graph
+        3.Identify temporary tables
+        4.Penetrate temporary table to establish real blood relationship
 
-        Args:
-            sqls: SQL 语句列表
+        Args:sqls:SQL statement list
 
-        Returns:
-            LineageResult: 血缘结果
+        Returns:LineageResult:Bloodline results
         """
         created_tables: set[TableRef] = set()
         read_tables: set[TableRef] = set()
@@ -165,19 +153,19 @@ class SQLLineageAnalyzer:
                 )
                 continue
 
-        # 临时表 = 在 session 中创建 且 被读取
+        # temporary table = in session Created in And be read
         temp_tables = created_tables & read_tables
 
-        # source = 被读取 但 不是 session 内创建的
+        # source = be read But No session created within
         sources = read_tables - created_tables
 
-        # target = 被写入 但 不是临时表
+        # target = is written But Not a temporary table
         targets = written_tables - temp_tables
 
-        # 构建表级血缘（穿透临时表）
+        # Construct table-level lineage(Penetrate temporary table)
         table_lineages = self._build_table_lineages(sql_dependencies, sources, targets, temp_tables)
 
-        # 提取列级血缘
+        # Extract rank lineage
         column_lineages = self._extract_column_lineages(sqls, sources, targets)
 
         return LineageResult(
@@ -190,13 +178,11 @@ class SQLLineageAnalyzer:
 
     def _extract_tables(self, sql: str) -> tuple[set[TableRef], set[TableRef]]:
         """
-        从 SQL 提取读取和写入的表
+        from SQL Extract read and written tables
 
-        Args:
-            sql: SQL 语句
+        Args:sql:SQL statement
 
-        Returns:
-            (读取的表集合, 写入的表集合)
+        Returns:(Read table collection,The set of tables written to)
         """
         reads: set[TableRef] = set()
         writes: set[TableRef] = set()
@@ -214,12 +200,12 @@ class SQLLineageAnalyzer:
             if statement is None:
                 continue
 
-            # 提取写入的表
+            # Extract the written table
             write_table = self._get_write_table(statement)
             if write_table:
                 writes.add(write_table)
 
-            # 提取读取的表（排除写入的表本身）
+            # Extract the read table(Exclude writing to the table itself)
             for table in statement.find_all(exp.Table):
                 table_ref = self._table_to_ref(table)
                 if table_ref and table_ref not in writes:
@@ -228,7 +214,7 @@ class SQLLineageAnalyzer:
         return reads, writes
 
     def _get_write_table(self, statement: exp.Expression) -> TableRef | None:
-        """获取写入的目标表"""
+        """Get the target table to write to"""
         # INSERT INTO
         if isinstance(statement, exp.Insert):
             table = statement.this
@@ -250,7 +236,7 @@ class SQLLineageAnalyzer:
         return None
 
     def _table_to_ref(self, table: exp.Table) -> TableRef | None:
-        """将 sqlglot Table 转换为 TableRef"""
+        """will sqlglot Table Convert to TableRef"""
         if not table.name:
             return None
 
@@ -268,20 +254,18 @@ class SQLLineageAnalyzer:
         temp_tables: set[TableRef],
     ) -> list[TableLineage]:
         """
-        构建表级血缘，穿透临时表
+        Construct table-level lineage,Penetrate temporary table
 
-        Args:
-            sql_dependencies: [(reads, writes, sql), ...]
-            sources: 源表集合
-            targets: 目标表集合
-            temp_tables: 临时表集合
+        Args:sql_dependencies:[(reads,writes,sql),...]
+        sources:Source table collection
+        targets:target table collection
+        temp_tables:temporary table collection
 
-        Returns:
-            表级血缘列表
+        Returns:List of table-level ancestry
         """
         lineages: list[TableLineage] = []
 
-        # 构建依赖图：table -> [依赖的表]
+        # Build dependency graph:table -> [Dependent tables]
         dependencies: dict[TableRef, set[TableRef]] = {}
         for reads, writes, _sql in sql_dependencies:
             for write_table in writes:
@@ -289,7 +273,7 @@ class SQLLineageAnalyzer:
                     dependencies[write_table] = set()
                 dependencies[write_table].update(reads)
 
-        # 对每个目标表，追溯到真正的源表
+        # for each target table,Trace back to the true source table
         for target in targets:
             source_tables = self._trace_sources(target, dependencies, temp_tables)
             for source in source_tables:
@@ -306,16 +290,14 @@ class SQLLineageAnalyzer:
         visited: set[TableRef] | None = None,
     ) -> set[TableRef]:
         """
-        追溯表的真正源表（穿透临时表）
+        Trace back to the real source table of the table(Penetrate temporary table)
 
-        Args:
-            table: 当前表
-            dependencies: 依赖图
-            temp_tables: 临时表集合
-            visited: 已访问的表（防止循环）
+        Args:table:current table
+        dependencies:dependency graph
+        temp_tables:temporary table collection
+        visited:visited table(Prevent loops)
 
-        Returns:
-            真正的源表集合
+        Returns:Real source table collection
         """
         if visited is None:
             visited = set()
@@ -330,7 +312,7 @@ class SQLLineageAnalyzer:
         sources: set[TableRef] = set()
         for dep in dependencies[table]:
             if dep in temp_tables:
-                # 穿透临时表
+                # Penetrate temporary table
                 sources.update(self._trace_sources(dep, dependencies, temp_tables, visited))
             else:
                 sources.add(dep)
@@ -344,23 +326,21 @@ class SQLLineageAnalyzer:
         targets: set[TableRef],
     ) -> list[ColumnLineage]:
         """
-        提取列级血缘
+        Extract rank lineage
 
-        Args:
-            sqls: SQL 语句列表
-            sources: 源表集合
-            targets: 目标表集合
+        Args:sqls:SQL statement list
+        sources:Source table collection
+        targets:target table collection
 
-        Returns:
-            列级血缘列表
+        Returns:Ranked lineage list
         """
         column_lineages: list[ColumnLineage] = []
 
-        # 构建 schema（简化版，只用于 lineage 分析）
+        # Build schema(Simplified version,only for lineage analysis)
         schema: dict[str, dict[str, str]] = {}
         for table in sources | targets:
-            # 简化处理：假设所有列类型为 string
-            # 实际使用时应从元数据获取真实 schema
+            # Simplified processing:Assume all column types are string
+            # In actual use,the true value should be obtained from metadata schema
             schema[table.full_name] = {}
 
         for sql in sqls:
@@ -380,14 +360,12 @@ class SQLLineageAnalyzer:
         self, sql: str, schema: dict[str, dict[str, str]]
     ) -> list[ColumnLineage]:
         """
-        分析单条 SQL 的列级血缘
+        Analyze a single line SQL s pedigree
 
-        Args:
-            sql: SQL 语句
-            schema: 表结构信息
+        Args:sql:SQL statement
+        schema:Table structure information
 
-        Returns:
-            列级血缘列表
+        Returns:Ranked lineage list
         """
         lineages: list[ColumnLineage] = []
 
@@ -400,15 +378,15 @@ class SQLLineageAnalyzer:
             if statement is None:
                 continue
 
-            # 只处理有输出的语句（SELECT, INSERT, CREATE AS SELECT）
+            # Only processes statements with output(SELECT,INSERT,CREATE AS SELECT)
             select = self._select_from_stmt(statement)
             if not select:
                 continue
 
-            # 获取目标表
+            # Get target table
             target_table = self._get_write_table(statement)
 
-            # 分析每个输出列
+            # Analyze each output column
             for _i, expr in enumerate(select.expressions):
                 if isinstance(expr, exp.Alias):
                     output_name = expr.alias
@@ -419,7 +397,7 @@ class SQLLineageAnalyzer:
                 else:
                     continue
 
-                # 提取源列
+                # Extract source column
                 source_columns = self._extract_source_columns(source_expr)
 
                 for source_col in source_columns:
@@ -439,7 +417,7 @@ class SQLLineageAnalyzer:
         return lineages
 
     def _select_from_stmt(self, statement: exp.Expression) -> exp.Select | None:
-        """从语句中获取 SELECT 子句"""
+        """Get from statement SELECT clause"""
         if isinstance(statement, exp.Select):
             return statement
         if isinstance(statement, exp.Insert):
@@ -453,14 +431,14 @@ class SQLLineageAnalyzer:
         return None
 
     def _extract_source_columns(self, expr: exp.Expression) -> list[ColumnRef]:
-        """从表达式中提取源列"""
+        """Extract source columns from expression"""
         columns: list[ColumnRef] = []
 
         for col in expr.find_all(exp.Column):
             table_name = col.table if col.table else ""
             schema_name = None
 
-            # 尝试解析 schema.table 格式
+            # try to parse schema.table Format
             if "." in table_name:
                 parts = table_name.split(".", 1)
                 schema_name = parts[0]
@@ -472,7 +450,7 @@ class SQLLineageAnalyzer:
         return columns
 
     def _get_transformation_type(self, expr: exp.Expression) -> str | None:
-        """获取转换类型"""
+        """Get conversion type"""
         if isinstance(expr, exp.Column):
             return "IDENTITY"
         if isinstance(expr, exp.AggFunc):

@@ -22,8 +22,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 租户单点登录管理服务实现
- * 实现租户单点登录管理业务流程与规则校验
+ * Tenant single sign-on management service implementation Implement tenant single sign-on
+ * management business process and rule verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -32,36 +32,36 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class TenantSsoAdminServiceImpl implements TenantSsoAdminService {
 
-    private final SsoConfigService ssoConfigService;
-    private final SsoIdentityService ssoIdentityService;
+  private final SsoConfigService ssoConfigService;
+  private final SsoIdentityService ssoIdentityService;
 
-    @Override
-    public List<SsoConfigResponse> listConfigs() {
-        return ssoConfigService.listConfigs();
-    }
+  @Override
+  public List<SsoConfigResponse> listConfigs() {
+    return ssoConfigService.listConfigs();
+  }
 
-    @Override
-    public Long createConfig(SsoConfigCreateRequest dto) {
-        return ssoConfigService.createConfig(dto);
-    }
+  @Override
+  public Long createConfig(SsoConfigCreateRequest dto) {
+    return ssoConfigService.createConfig(dto);
+  }
 
-    @Override
-    public void updateConfig(Long configId, SsoConfigUpdateRequest dto) {
-        ssoConfigService.updateConfig(configId, dto);
-    }
+  @Override
+  public void updateConfig(Long configId, SsoConfigUpdateRequest dto) {
+    ssoConfigService.updateConfig(configId, dto);
+  }
 
-    @Override
-    public List<SsoIdentityItem> listIdentities(String provider, Long userId) {
-        return ssoIdentityService.list(provider, userId);
-    }
+  @Override
+  public List<SsoIdentityItem> listIdentities(String provider, Long userId) {
+    return ssoIdentityService.list(provider, userId);
+  }
 
-    @Override
-    public Long bindByCode(SsoIdentityBindByCodeRequest request) {
-        return ssoIdentityService.bindByCode(request);
-    }
+  @Override
+  public Long bindByCode(SsoIdentityBindByCodeRequest request) {
+    return ssoIdentityService.bindByCode(request);
+  }
 
-    @Override
-    public void unbind(Long identityId) {
-        ssoIdentityService.unbind(identityId);
-    }
+  @Override
+  public void unbind(Long identityId) {
+    ssoIdentityService.unbind(identityId);
+  }
 }

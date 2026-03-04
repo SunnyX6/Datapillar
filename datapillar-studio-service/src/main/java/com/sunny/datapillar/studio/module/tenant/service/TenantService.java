@@ -18,21 +18,20 @@ import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import java.util.List;
 
 /**
- * 租户服务
- * 提供租户业务能力与领域服务
+ * Tenant services Provide tenant business capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface TenantService {
 
-    List<Tenant> listTenants(Integer status);
+  List<Tenant> listTenants(Integer status);
 
-    Long createTenant(TenantCreateRequest dto);
+  Long createTenant(TenantCreateRequest dto);
 
-    TenantResponse getTenant(Long tenantId);
+  TenantResponse getTenant(Long tenantId);
 
-    void updateTenant(Long tenantId, TenantUpdateRequest dto);
+  void updateTenant(Long tenantId, TenantUpdateRequest dto);
 
-    void updateStatus(Long tenantId, Integer status);
+  void updateStatus(Long tenantId, Integer status);
 }

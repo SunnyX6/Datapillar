@@ -17,23 +17,22 @@ import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
- * 工作流任务业务服务
- * 提供工作流任务业务业务能力与领域服务
+ * Workflow task business service Provide workflow task business capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface WorkflowJobBizService {
 
-    List<JobResponse> getJobsByWorkflowId(Long workflowId);
+  List<JobResponse> getJobsByWorkflowId(Long workflowId);
 
-    JobResponse getJobDetail(Long workflowId, Long id);
+  JobResponse getJobDetail(Long workflowId, Long id);
 
-    Long createJob(Long workflowId, JobCreateRequest dto);
+  Long createJob(Long workflowId, JobCreateRequest dto);
 
-    void updateJob(Long workflowId, Long id, JobUpdateRequest dto);
+  void updateJob(Long workflowId, Long id, JobUpdateRequest dto);
 
-    void deleteJob(Long workflowId, Long id);
+  void deleteJob(Long workflowId, Long id);
 
-    void updateJobPositions(Long workflowId, JobLayoutSaveRequest dto);
+  void updateJobPositions(Long workflowId, JobLayoutSaveRequest dto);
 }

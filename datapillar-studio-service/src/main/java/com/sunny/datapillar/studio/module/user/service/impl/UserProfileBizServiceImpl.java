@@ -20,8 +20,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 用户Profile业务服务实现
- * 实现用户Profile业务业务流程与规则校验
+ * UserProfileBusiness service implementation implement userProfileBusiness business process and
+ * rule verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -30,15 +30,15 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class UserProfileBizServiceImpl implements UserProfileBizService {
 
-    private final UserService userService;
+  private final UserService userService;
 
-    @Override
-    public UserResponse getProfile(Long userId) {
-        return userService.getUserById(userId);
-    }
+  @Override
+  public UserResponse getProfile(Long userId) {
+    return userService.getUserById(userId);
+  }
 
-    @Override
-    public void updateProfile(Long userId, UserProfileUpdateRequest request) {
-        userService.updateProfile(userId, request);
-    }
+  @Override
+  public void updateProfile(Long userId, UserProfileUpdateRequest request) {
+    userService.updateProfile(userId, request);
+  }
 }

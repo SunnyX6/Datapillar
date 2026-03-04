@@ -40,19 +40,11 @@ gravitino.server.webserver.requestHeaderSize = 131072
 # The response header size of the built-in web server
 gravitino.server.webserver.responseHeaderSize = 131072
 
-# Datapillar gateway assertion bridge filter
-gravitino.server.webserver.customFilters = org.apache.gravitino.datapillar.security.GatewayAssertionBridgeFilter
-gravitino.server.webserver.org.apache.gravitino.datapillar.security.GatewayAssertionBridgeFilter.param.issuer = datapillar-auth
-gravitino.server.webserver.org.apache.gravitino.datapillar.security.GatewayAssertionBridgeFilter.param.audience = datapillar-gravitino
-gravitino.server.webserver.org.apache.gravitino.datapillar.security.GatewayAssertionBridgeFilter.param.publicKeyPath = conf/security/gateway-assertion-dev-public.pem
-gravitino.server.webserver.org.apache.gravitino.datapillar.security.GatewayAssertionBridgeFilter.param.clockSkewSeconds = 30
-gravitino.server.webserver.org.apache.gravitino.datapillar.security.GatewayAssertionBridgeFilter.param.assertionHeader = X-Gateway-Assertion
-
 # THE CONFIGURATION FOR Gravitino ENTITY STORE
 # The entity store to use, we only supports relational
 gravitino.entity.store = relational
 # The backend for the entity store, we only supports JDBC
-gravitino.entity.store.relational = DatapillarJDBCBackend
+gravitino.entity.store.relational = JDBCBackend
 
 # The JDBC URL for the entity store (using MySQL)
 gravitino.entity.store.relational.jdbcUrl = jdbc:mysql://localhost:3306/gravitino?useSSL=false&serverTimezone=UTC&characterEncoding=utf8
@@ -80,13 +72,13 @@ gravitino.cache.enableStats = false
 # If enabled, cache entries are evicted based on their weight rather than count.
 gravitino.cache.enableWeigher = true
 # The cache implementation to use (e.g., caffeine).
-gravitino.cache.implementation = org.apache.gravitino.datapillar.cache.TenantScopedEntityCache
+gravitino.cache.implementation = org.apache.gravitino.extensions.multitenancy.cache.TenantScopedEntityCache
 
 # THE CONFIGURATION FOR authorization
 # Whether Gravitino enable authorization or not
-gravitino.authorization.enable = false
+gravitino.authorization.enable = true
 # The metadata authorization implementation
-gravitino.authorization.impl = org.apache.gravitino.datapillar.authorization.TenantAwareAuthorizer
+gravitino.authorization.impl = org.apache.gravitino.extensions.multitenancy.authorization.TenantAwareAuthorizer
 # The admins of Gravitino service, multiple admins are spitted by comma.
 gravitino.authorization.serviceAdmins = anonymous
 
@@ -108,47 +100,5 @@ gravitino.iceberg-rest.catalog-backend = memory
 # The warehouse directory of Iceberg catalog for Iceberg REST service
 gravitino.iceberg-rest.warehouse = /tmp/
 
-# THE CONFIGURATION FOR EVENT LISTENER
-# Event listener names, comma separated
-gravitino.eventListener.names = openlineage
-# OpenLineage Listener class
-gravitino.eventListener.openlineage.class = org.apache.gravitino.listener.openlineage.OpenLineageGravitinoListener
-
-# ==================== OpenLineage Transport Configuration ====================
-# Transport type: console (default, for debugging) or http (production)
-gravitino.openlineage.transport.type = http
-
-# Namespace for OpenLineage events (default: gravitino)
-gravitino.openlineage.namespace = gravitino
-
-# HTTP Transport Settings
-gravitino.openlineage.transport.url = http://127.0.0.1:7000
-gravitino.openlineage.transport.endpoint = /api/openlineage
-gravitino.openlineage.transport.timeoutInMillis = 5000
-gravitino.openlineage.transport.compression = gzip
-
-# Authentication (api_key)
-gravitino.openlineage.transport.auth.type = api_key
-gravitino.openlineage.transport.auth.apiKey = your-api-key
-
-# Async Queue (Rate Limiting)
-gravitino.openlineage.transport.maxQueueSize = 10000
-gravitino.openlineage.transport.maxConcurrentRequests = 100
-
-# Retry Configuration
-gravitino.openlineage.transport.retry.total = 5
-gravitino.openlineage.transport.retry.backoffFactor = 0.3
-
-# Custom Headers (optional)
-# gravitino.openlineage.transport.headers.X-Tenant-Id = default
-# gravitino.openlineage.transport.headers.X-Custom-Header = value
-
-# ==================== OneMeta Auto Initialization ====================
-# Whether to enable OneMeta auto initialization on startup
-gravitino.onemeta.enabled = true
-# The metalake name for OneMeta
-gravitino.onemeta.metalake = OneMeta
-# The dataset catalog name for OneMeta
-gravitino.onemeta.catalog.dataset = OneDS
-# The schema name for OneMeta
-gravitino.onemeta.schema.dataset = OneDS
+# Enable tenant-aware SQL rewrite extension
+gravitino.extensions.multitenancy.sqlRewrite.enabled = true

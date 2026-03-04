@@ -26,7 +26,7 @@ import org.apache.gravitino.storage.relational.po.UnitPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
-/** Unit 元数据 SQL Provider 工厂 */
+/** Unit metadata SQL Provider factory */
 public class UnitMetaSQLProviderFactory {
 
   private static final Map<JDBCBackendType, UnitMetaBaseSQLProvider> UNIT_META_SQL_PROVIDER_MAP =

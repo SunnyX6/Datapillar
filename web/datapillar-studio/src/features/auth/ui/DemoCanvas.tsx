@@ -1,13 +1,13 @@
 /**
- * 登录页面左侧演示画布
+ * Demo canvas on the left side of the login page
  *
- * 功能：
- * 1. 3D 倾斜屏幕效果
- * 2. 数据流动画（Chaos Streams → Turbine → Beam）
- * 3. 涡轮引擎动画
- * 4. 节点流转动画
- * 5. 实时日志流
- * 6. 打字机输入框
+ * Function：
+ * 1. 3D Tilt screen effect
+ * 2. Data flow animation（Chaos Streams → Turbine → Beam）
+ * 3. Turbine engine animation
+ * 4. Node flow animation
+ * 5. real-time log streaming
+ * 6. Typewriter input box
  */
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
@@ -54,7 +54,7 @@ const ORB_RING_CORE_CLASS = 'w-[45%] h-[45%]'
 const ORB_CORE_CLASS = 'w-[100px] h-[100px]'
 
 /**
- * 进度日志组件
+ * Progress log component
  */
 interface ProgressLogProps {
   lines: string[]
@@ -138,20 +138,20 @@ interface DemoCanvasProps {
 }
 
 /**
- * 演示画布组件
+ * Demo canvas component
  */
 export function DemoCanvas({ className }: DemoCanvasProps) {
   const { t } = useTranslation('login')
   const isPageVisible = usePageVisibility()
 
-  // 左右屏幕旋转状态
+  // Left and right screen rotation status
   const [leftRotated, setLeftRotated] = useState(false)
   const [rightRotated, setRightRotated] = useState(false)
 
-  // 场景管理
+  // Scene management
   const { scenario, nextScenario } = useScenario()
 
-  // 场景状态管理
+  // Scene status management
   const state = useScenarioState(scenario, nextScenario, { isActive: isPageVisible })
   const typingBoxRef = useRef<HTMLDivElement | null>(null)
   const beforeCaretText = state.currentInputText.slice(0, state.caretPosition)
@@ -182,38 +182,38 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
     }
   }, [beforeCaretText])
 
-  // 计算连接线路径（使用缩放后的坐标）
+  // Calculate connection line path（Use scaled coordinates）
   const nodeScaleRatio = 0.82
   const getEdgePath = (sourceNode: WorkflowNode, targetNode: WorkflowNode) => {
-    // 先缩放节点位置
+    // Scale the node position first
     const scaledSourceX = sourceNode.position.x * nodeScaleRatio
     const scaledSourceY = sourceNode.position.y * nodeScaleRatio
     const scaledTargetX = targetNode.position.x * nodeScaleRatio
     const scaledTargetY = targetNode.position.y * nodeScaleRatio
 
-    // 再加上缩放后的偏移量
+    // plus the scaled offset
     const scaledNodeWidth = 100 * nodeScaleRatio  // 82px
     const scaledNodeHeight = 60 * nodeScaleRatio  // 49px
 
-    // 节点容器相对于 SVG 的偏移（节点容器 500px 在 520px 中居中）
+    // Node containers are relative to SVG offset（node container 500px in 520px center in center）
     const containerOffsetX = (CENTER_BASE_WIDTH - 500) / 2  // (520 - 500) / 2 = 10px
-    const containerOffsetY = -5  // 垂直偏移，根据实际调整
+    const containerOffsetY = -5  // vertical offset，Adjust according to actual situation
 
-    const sourceX = scaledSourceX + scaledNodeWidth + containerOffsetX  // 右边缘
-    const sourceY = scaledSourceY + scaledNodeHeight / 2 + containerOffsetY  // 垂直中心
-    const targetX = scaledTargetX + containerOffsetX  // 左边缘
-    const targetY = scaledTargetY + scaledNodeHeight / 2 + containerOffsetY  // 垂直中心
+    const sourceX = scaledSourceX + scaledNodeWidth + containerOffsetX  // right edge
+    const sourceY = scaledSourceY + scaledNodeHeight / 2 + containerOffsetY  // vertical center
+    const targetX = scaledTargetX + containerOffsetX  // left edge
+    const targetY = scaledTargetY + scaledNodeHeight / 2 + containerOffsetY  // vertical center
 
     const midX = (sourceX + targetX) / 2
 
     return `M ${sourceX} ${sourceY} Q ${midX} ${sourceY}, ${midX} ${(sourceY + targetY) / 2} T ${targetX} ${targetY}`
   }
 
-  // 获取图标组件
+  // Get the icon component
   const iconLibrary = LucideIcons as unknown as Record<string, LucideIcon>
   const getIcon = (iconName: string): LucideIcon => iconLibrary[iconName] ?? ShoppingBag
 
-  // 获取颜色类名
+  // Get color class name
   const getColorClass = (color: string, type: 'border' | 'text' | 'shadow') => {
     const colorMap: Record<string, { border: string; text: string; shadow: string }> = {
       blue: {
@@ -297,7 +297,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
     const b = Math.floor(68 * (1 - progress) + 129 * progress)
     radarColor = `rgb(${r},${g},${b})`
   }
-  // 动态计算中心点，避免硬编码
+  // Dynamic calculation center point，Avoid hardcoding
   const centerWidth = CENTER_BASE_WIDTH
   const radarCenterX = centerWidth / 2
   const radarCenterY = CENTER_BASE_HEIGHT / 2 - 20
@@ -329,7 +329,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
   const panelWidth = PANEL_BASE_WIDTH
   const panelHeight = PANEL_BASE_HEIGHT
   const centerLeft = (STAGE_BASE_WIDTH - centerWidth) / 2
-  // 左中右模块共用 STAGE_SECTION_GAP，缩放时仍保持等距
+  // Shared by left, middle and right modules STAGE_SECTION_GAP，Maintain isometric distance when zooming
   const leftPanelLeft = centerLeft - STAGE_SECTION_GAP - panelWidth
   const rightPanelLeft = centerLeft + centerWidth + STAGE_SECTION_GAP
   const panelTop = (STAGE_BASE_HEIGHT - panelHeight) / 2 - 60
@@ -347,7 +347,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
           opacity: stageReady ? 1 : 0
         }}
       >
-        {/* 全局样式和动画 */}
+        {/* Global styles and animations */}
         <style>{`
         .bg-grid-pattern {
           background-image: linear-gradient(to right, rgba(99, 102, 241, 0.05) 1px, transparent 1px),
@@ -360,7 +360,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
           transform-style: preserve-3d;
         }
 
-        /* 3D 倾斜效果 */
+        /* 3D Tilt effect */
         .screen-left {
           transform: rotateY(60deg);
           transform-origin: right center;
@@ -543,7 +543,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
           }
         }
 
-        /* 数字流动画 - 原地闪烁 */
+        /* digital flow animation - Flashing in place */
         .matrix-blink {
             animation: matrix-blink 0.8s ease-in-out infinite;
         }
@@ -553,13 +553,13 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
             50% { opacity: 1; }
         }
 
-        /* 涡轮环样式 */
+        /* turbine ring style */
         .turbine-ring {
             background: conic-gradient(from 0deg, transparent 0%, rgba(99, 102, 241, 0.15) 20%, transparent 40%, rgba(99, 102, 241, 0.15) 60%, transparent 100%);
             border-radius: 50%;
         }
 
-        /* 能量粒子上升动画 - 到达中心脉冲点 */
+        /* Energy particle rising animation - Reach the center pulse point */
         @keyframes energyPulse {
           0% {
             transform: translate(-50%, 0) scale(1);
@@ -580,7 +580,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
           }
         }
 
-        /* 左侧能量粒子 - 向左上移动 */
+        /* Energy particles on the left - Move up and left */
         @keyframes energyPulseLeft {
           0% {
             transform: translate(-50%, 0) scale(1);
@@ -601,7 +601,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
           }
         }
 
-        /* 右侧能量粒子 - 向右上移动 */
+        /* Energy particles on the right - move up right */
         @keyframes energyPulseRight {
           0% {
             transform: translate(-50%, 0) scale(1);
@@ -622,7 +622,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
           }
         }
 
-        /* 能量波纹扩散动画 */
+        /* Energy ripple diffusion animation */
         @keyframes energyRipple {
           0% {
             transform: translate(-50%, -50%) scale(0.5);
@@ -634,7 +634,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
           }
         }
 
-        /* 能量光束脉冲 */
+        /* energy beam pulse */
         @keyframes beamPulse {
           0%, 100% {
             opacity: 0.3;
@@ -646,7 +646,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
           }
         }
 
-        /* 核心强化脉冲 */
+        /* core strengthening pulse */
         @keyframes corePulse {
           0%, 100% {
             box-shadow: 0 0 40px rgba(99,102,241,0.5), 0 0 80px rgba(99,102,241,0.3);
@@ -658,11 +658,11 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
 
       `}</style>
 
-      {/* 背景环境 */}
+      {/* background environment */}
       <div className="absolute inset-0 bg-grid-pattern opacity-30"></div>
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900/15 via-[#02040a] to-[#02040a]"></div>
 
-      {/* 可视化层：数据流 */}
+      {/* Visualization layer：data flow */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
         <defs>
            <linearGradient id="chaosGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -672,52 +672,52 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
            </linearGradient>
         </defs>
 
-        {/* 混乱数据流：从四面八方向中心汇聚 */}
+        {/* Chaotic data flow：Gathering towards the center from all sides */}
         <g>
-           {/* 左上角流入 */}
+           {/* upper left corner inflow */}
            <path d="M -10 0 Q 20 25 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.2" className="stream-line" />
            <path d="M 0 -10 Q 25 20 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.15" className="stream-line" style={{animationDelay: '-1.5s'}} />
            <path d="M -5 15 Q 20 30 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.18" className="stream-line" style={{animationDelay: '-3.5s'}} />
 
-           {/* 右上角流入 */}
+           {/* Inflow from upper right corner */}
            <path d="M 110 0 Q 80 25 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.2" className="stream-line" style={{animationDelay: '-2s'}} />
            <path d="M 100 -10 Q 75 20 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.18" className="stream-line" style={{animationDelay: '-4s'}} />
            <path d="M 105 20 Q 80 35 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.15" className="stream-line" style={{animationDelay: '-5.5s'}} />
 
-           {/* 左下角流入 */}
+           {/* Inflow from lower left corner */}
            <path d="M -10 100 Q 20 75 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.2" className="stream-line" style={{animationDelay: '-1s'}} />
            <path d="M 0 110 Q 25 80 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.15" className="stream-line" style={{animationDelay: '-3s'}} />
            <path d="M 15 105 Q 30 75 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.18" className="stream-line" style={{animationDelay: '-0.5s'}} />
 
-           {/* 右下角流入 */}
+           {/* Inflow from lower right corner */}
            <path d="M 110 100 Q 80 75 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.2" className="stream-line" style={{animationDelay: '-2.5s'}} />
            <path d="M 100 110 Q 75 80 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.18" className="stream-line" style={{animationDelay: '-4.5s'}} />
            <path d="M 85 105 Q 70 75 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.15" className="stream-line" style={{animationDelay: '-6s'}} />
 
-           {/* 左侧流入 */}
+           {/* left inflow */}
            <path d="M -10 50 Q 20 50 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.18" className="stream-line" style={{animationDelay: '-2.8s'}} />
            <path d="M 0 35 Q 25 42 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.15" className="stream-line" style={{animationDelay: '-5s'}} />
 
-           {/* 右侧流入 */}
+           {/* right inflow */}
            <path d="M 110 50 Q 80 50 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.18" className="stream-line" style={{animationDelay: '-3.8s'}} />
            <path d="M 100 65 Q 75 58 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.15" className="stream-line" style={{animationDelay: '-1.8s'}} />
 
-           {/* 上侧流入 */}
+           {/* upper side inflow */}
            <path d="M 50 -10 Q 50 20 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.2" className="stream-line" style={{animationDelay: '-4.2s'}} />
            <path d="M 35 0 Q 42 25 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.15" className="stream-line" style={{animationDelay: '-0.8s'}} />
 
-           {/* 下侧流入 */}
+           {/* lower side inflow */}
            <path d="M 50 110 Q 50 80 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.2" className="stream-line" style={{animationDelay: '-5.2s'}} />
            <path d="M 65 100 Q 58 75 50 50" fill="none" stroke="url(#chaosGradient)" strokeWidth="0.15" className="stream-line" style={{animationDelay: '-2.2s'}} />
         </g>
       </svg>
 
-      {/* 3D 容器 */}
+      {/* 3D container */}
       <div className="relative w-full h-full perspective-container flex items-center justify-center z-20">
 
          <div className="relative flex h-full w-full items-center justify-center">
 
-           {/* 左侧屏幕：Agent 日志 */}
+           {/* left screen：Agent Log */}
           <div
             className={cn(
               'absolute glass-panel rounded-l-xl screen-left flex flex-col overflow-hidden z-20 border-l-2 border-l-indigo-500/60 shadow-[0_0_30px_rgba(99,102,241,0.1)]',
@@ -765,7 +765,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
               </div>
            </div>
 
-           {/* 中央屏幕：业务价值流 */}
+           {/* central screen：business value stream */}
           <div
             className={cn(
               'glass-panel rounded-none screen-center flex flex-col absolute z-40 border border-indigo-500/40 bg-[#0B1120]/95',
@@ -792,11 +792,11 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
                  </div>
               </div>
 
-              {/* 画布内容 */}
+              {/* canvas content */}
               <div className="flex-1 relative overflow-hidden">
                  <div className="absolute inset-0">
 
-                    {/* 数字流背景 - 原地闪烁 */}
+                    {/* Digital flow background - Flashing in place */}
                     {(state.phase === ScenarioPhase.TYPING_INPUT || state.phase === ScenarioPhase.AGENT_ANALYZING) && (
                       <div
                         className="absolute inset-0 z-0 flex justify-around items-center overflow-hidden transition-opacity duration-1000"
@@ -827,7 +827,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
                       </div>
                     )}
 
-                    {/* SVG 层 - 雷达在工作流节点之上 */}
+                    {/* SVG layer - Radar on top of workflow nodes */}
                        <svg className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-visible">
                        <defs>
                            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
@@ -852,7 +852,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
                            </linearGradient>
                        </defs>
 
-                       {/* 中心雷达 - 居中画布，调整尺寸 */}
+                       {/* center radar - Center canvas，resize */}
                        <g style={{ opacity: radarOpacity, transition: 'opacity 0.6s ease' }}>
                          <circle cx={radarCenterX} cy={radarCenterY} r="140" fill="url(#radarGradient)" opacity="0.35" />
 
@@ -912,7 +912,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
                          ))}
                        </g>
 
-                       {/* 连接线 - 应用和节点相同的缩放和偏移 */}
+                       {/* Connecting line - Apply the same scale and offset as the node */}
                        <g>
                        {state.phase !== ScenarioPhase.TYPING_INPUT && scenario.edges.map((edge) => {
                          const sourceNode = scenario.nodes.find((n) => n.id === edge.source)
@@ -920,7 +920,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
 
                          if (!sourceNode || !targetNode) return null
 
-                         // 判断连接线是否激活
+                         // Determine whether the connection line is activated
                          const sourceIndex = scenario.nodes.findIndex((n) => n.id === edge.source)
                          const targetIndex = scenario.nodes.findIndex((n) => n.id === edge.target)
                          const isEdgeActive =
@@ -957,18 +957,18 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
 
                     </svg>
 
-                    {/* 动态渲染节点 - 整体居中缩放（相对于中央屏幕） */}
+                    {/* Dynamic rendering nodes - Overall centered scaling（relative to center screen） */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className={cn('relative pointer-events-auto', PREVIEW_CARD_SIZE_CLASS)}>
                     {scenario.nodes.map((node, index) => {
                       const Icon = getIcon(node.icon)
 
-                      // 只在 Agent 分析阶段之后才显示节点
+                      // only in Agent Nodes are displayed only after the analysis phase
                       if (state.phase === ScenarioPhase.TYPING_INPUT) {
                         return null
                       }
 
-                      // 在 Agent 分析阶段开始激活节点
+                      // in Agent The analysis phase begins with node activation
                       const isActive =
                         state.phase === ScenarioPhase.AGENT_ANALYZING ||
                         state.phase === ScenarioPhase.BUILDING ||
@@ -977,12 +977,12 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
                           ? index <= state.activeNodeIndex
                           : false
 
-                      // 计算节点的出现进度（基于 Agent 分析进度）
+                      // Compute node emergence progress（Based on Agent Analyze progress）
                       const nodeProgress = state.phase === ScenarioPhase.AGENT_ANALYZING
                         ? Math.min(100, Math.max(0, (state.leftLogProgress - (index * 100 / scenario.nodes.length)) * (scenario.nodes.length / 100)))
                         : state.leftLogProgress >= 100 ? 100 : 0
 
-                      // 动态缩放坐标以适配容器宽度（610 -> 500）
+                      // Dynamically scale coordinates to fit container width（610 -> 500）
                       const scaleRatio = 0.82
                       const scaledX = node.position.x * scaleRatio
                       const scaledY = node.position.y * scaleRatio
@@ -1023,7 +1023,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
               </div>
            </div>
 
-           {/* 右侧屏幕：构建日志 - 左边框紧贴中央屏幕右边框 */}
+           {/* right screen：Build log - The left border is close to the right border of the central screen */}
            <div
              className={`absolute glass-panel rounded-r-xl screen-right ${rightRotated ? 'flipped' : ''} flex flex-col overflow-hidden z-20 border-r-2 border-r-emerald-500/60 shadow-[0_0_30px_rgba(16,185,129,0.1)] w-[var(--panel-width)] h-[var(--panel-height)]`}
              style={
@@ -1070,7 +1070,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
          </div>
       </div>
 
-      {/* 统一涡轮引擎 - 增强辨识度 */}
+      {/* unified turbine engine - Enhance recognition */}
       <div className={cn('absolute left-1/2 bottom-[20px] flex items-center justify-center pointer-events-none z-10', ORB_MAIN_CLASS)} style={{ transform: 'translateX(-50%) rotateX(78deg)' }}>
          <div className={cn('absolute bg-indigo-500/25 blur-[80px] rounded-full', ORB_RING_CLASS)}></div>
          <div className="absolute w-full h-full rounded-full border-2 border-indigo-600/50 bg-[#0f1729] shadow-2xl shadow-indigo-500/30"></div>
@@ -1082,10 +1082,10 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
          </div>
       </div>
 
-      {/* 能量波动效果 - 对齐底座中心 */}
+      {/* energy fluctuation effect - Align base center */}
       <div className="absolute left-1/2 bottom-[20px] w-2 h-[500px] pointer-events-none z-15" style={{ transform: 'translateX(-50%)' }}>
 
-        {/* 左侧能量束 */}
+        {/* left energy beam */}
         <div
           className="absolute bottom-[200px] left-1/2 w-5 h-[280px]"
           style={{
@@ -1096,7 +1096,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
           }}
         ></div>
 
-        {/* 中间能量束 */}
+        {/* intermediate energy beam */}
         <div
           className="absolute bottom-[200px] left-1/2 w-5 h-[280px]"
           style={{
@@ -1107,7 +1107,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
           }}
         ></div>
 
-        {/* 右侧能量束 */}
+        {/* Right energy beam */}
         <div
           className="absolute bottom-[200px] left-1/2 w-5 h-[280px]"
           style={{
@@ -1119,7 +1119,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
           }}
         ></div>
 
-        {/* 能量粒子 */}
+        {/* energy particles */}
         {[...Array(6)].map((_, i) => (
           <div
             key={`particle-left-${i}`}
@@ -1176,7 +1176,7 @@ export function DemoCanvas({ className }: DemoCanvasProps) {
         ))}
       </div>
 
-      {/* 底部输入框 */}
+      {/* Bottom input box */}
       <div className="absolute bottom-[120px] z-30 w-full flex justify-center px-4">
          <div
             className={cn(

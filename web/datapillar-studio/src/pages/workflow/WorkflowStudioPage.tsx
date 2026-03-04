@@ -58,7 +58,7 @@ export function WorkflowStudioPage() {
       const containerRect = containerRef.current.getBoundingClientRect()
       const newWidth = e.clientX - containerRect.left
 
-      // 限制最小和最大宽度
+      // Limit minimum and maximum width
       if (newWidth >= chatWidthLimits.min && newWidth <= chatWidthLimits.max) {
         if (!hasManualResize) {
           setHasManualResize(true)

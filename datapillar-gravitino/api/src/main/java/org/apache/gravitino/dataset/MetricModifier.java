@@ -23,38 +23,39 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * MetricModifier 接口表示指标修饰符
+ * MetricModifier Interface represents indicator modifiers
  *
- * <p>修饰符用于对指标进行分类和标记，修饰符类型通过关联值域（ValueDomain）来定义
+ * <p>Modifiers are used to classify and label metrics，Modifier types pass through associated value
+ * fields（ValueDomain）to define
  */
 @Evolving
 public interface MetricModifier extends Auditable {
 
   /**
-   * 获取修饰符名称
+   * Get modifier name
    *
-   * @return 修饰符名称
+   * @return Modifier name
    */
   String name();
 
   /**
-   * 获取修饰符编码
+   * Get modifier encoding
    *
-   * @return 修饰符编码
+   * @return modifier encoding
    */
   String code();
 
   /**
-   * 获取修饰符注释
+   * Get modifier annotation
    *
-   * @return 修饰符注释
+   * @return Modifier annotation
    */
   String comment();
 
   /**
-   * 获取修饰符类型，来自值域
+   * Get modifier type，from value range
    *
-   * @return 修饰符类型，可为空
+   * @return modifier type，Can be null
    */
   @Nullable
   String modifierType();

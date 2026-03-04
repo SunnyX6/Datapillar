@@ -28,6 +28,7 @@ import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -35,6 +36,7 @@ public class OwnerMetaBaseSQLProvider {
   public String selectUserOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT ut.user_id as userId,"
         + " ut.user_name as userName,"
         + " ut.metalake_id as metalakeId,"
@@ -50,12 +52,16 @@ public class OwnerMetaBaseSQLProvider {
         + " WHERE ot.metadata_object_id = #{metadataObjectId} AND"
         + " ot.metadata_object_type = #{metadataObjectType} AND"
         + " ot.owner_type = 'USER' AND"
-        + " ot.deleted_at = 0 AND ut.deleted_at = 0";
+        + " ot.deleted_at = 0 AND ut.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("ot", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ut", tenantId);
   }
 
   public String selectGroupOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT gt.group_id as groupId,"
         + " gt.group_name as groupName,"
         + " gt.metalake_id as metalakeId,"
@@ -71,14 +77,20 @@ public class OwnerMetaBaseSQLProvider {
         + " WHERE ot.metadata_object_id = #{metadataObjectId} AND"
         + " ot.metadata_object_type = #{metadataObjectType} AND"
         + " ot.owner_type = 'GROUP' AND"
-        + " ot.deleted_at = 0 AND gt.deleted_at = 0";
+        + " ot.deleted_at = 0 AND gt.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("ot", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("gt", tenantId);
   }
 
   public String insertOwnerRel(@Param("ownerRelPO") OwnerRelPO ownerRelPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + OWNER_TABLE_NAME
         + "(metalake_id, metadata_object_id, metadata_object_type, owner_id, owner_type,"
-        + " audit_info, current_version, last_version, deleted_at)"
+        + " audit_info, current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES ("
         + " #{ownerRelPO.metalakeId},"
         + " #{ownerRelPO.metadataObjectId},"
@@ -88,112 +100,140 @@ public class OwnerMetaBaseSQLProvider {
         + " #{ownerRelPO.auditInfo},"
         + " #{ownerRelPO.currentVersion},"
         + " #{ownerRelPO.lastVersion},"
-        + " #{ownerRelPO.deletedAt}"
+        + " #{ownerRelPO.deletedAt},"
+        + " "
+        + tenantId
         + ")";
   }
 
   public String softDeleteOwnerRelByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + OWNER_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metadata_object_id = #{metadataObjectId} AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0";
+        + " WHERE metadata_object_id = #{metadataObjectId} AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteOwnerRelByOwnerIdAndType(
       @Param("ownerId") Long ownerId, @Param("ownerType") String ownerType) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + OWNER_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE owner_id = #{ownerId} AND owner_type = #{ownerType} AND deleted_at = 0";
+        + " WHERE owner_id = #{ownerId} AND owner_type = #{ownerType} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteOwnerRelByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE  "
         + OWNER_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at =0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at =0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteOwnerRelByCatalogId(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE  "
         + OWNER_TABLE_NAME
         + " ot SET ot.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE ot.deleted_at = 0 AND EXISTS ("
+        + " WHERE ot.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("ot", tenantId)
+        + " AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
         + " ct WHERE ct.catalog_id = #{catalogId} AND "
-        + " ct.catalog_id = ot.metadata_object_id AND ot.metadata_object_type = 'CATALOG'"
+        + " ct.catalog_id = ot.metadata_object_id AND ot.metadata_object_type = 'CATALOG' AND "
+        + TenantSqlSupport.tenantPredicate("ct", tenantId)
         + " UNION "
         + " SELECT st.catalog_id FROM "
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.catalog_id = #{catalogId} AND "
-        + " st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
+        + " st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA' AND "
+        + TenantSqlSupport.tenantPredicate("st", tenantId)
         + " UNION "
         + " SELECT tt.catalog_id FROM "
         + TopicMetaMapper.TABLE_NAME
         + " tt WHERE tt.catalog_id = #{catalogId} AND "
-        + " tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
+        + " tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC' AND "
+        + TenantSqlSupport.tenantPredicate("tt", tenantId)
         + " UNION "
         + " SELECT tat.catalog_id FROM "
         + TableMetaMapper.TABLE_NAME
         + " tat WHERE tat.catalog_id = #{catalogId} AND "
-        + " tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
+        + " tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE' AND "
+        + TenantSqlSupport.tenantPredicate("tat", tenantId)
         + " UNION "
         + " SELECT ft.catalog_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.catalog_id = #{catalogId} AND"
-        + " ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
+        + " ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET' AND "
+        + TenantSqlSupport.tenantPredicate("ft", tenantId)
         + " UNION "
         + " SELECT mt.catalog_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
-        + " mt.model_id = ot.metadata_object_id AND ot.metadata_object_type = 'MODEL'"
+        + " mt.model_id = ot.metadata_object_id AND ot.metadata_object_type = 'MODEL' AND "
+        + TenantSqlSupport.tenantPredicate("mt", tenantId)
         + ")";
   }
 
   public String softDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE  "
         + OWNER_TABLE_NAME
         + " ot SET ot.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE ot.deleted_at = 0 AND EXISTS ("
+        + " WHERE ot.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("ot", tenantId)
+        + " AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.schema_id = #{schemaId} AND"
-        + " st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
+        + " st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA' AND "
+        + TenantSqlSupport.tenantPredicate("st", tenantId)
         + " UNION "
         + " SELECT tt.schema_id FROM "
         + TopicMetaMapper.TABLE_NAME
         + " tt WHERE tt.schema_id = #{schemaId} AND "
-        + " tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
+        + " tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC' AND "
+        + TenantSqlSupport.tenantPredicate("tt", tenantId)
         + " UNION "
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
         + " tat WHERE tat.schema_id = #{schemaId} AND "
-        + " tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
+        + " tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE' AND "
+        + TenantSqlSupport.tenantPredicate("tat", tenantId)
         + " UNION "
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.schema_id = #{schemaId} AND "
-        + " ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
+        + " ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET' AND "
+        + TenantSqlSupport.tenantPredicate("ft", tenantId)
         + " UNION "
         + " SELECT mt.schema_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.schema_id = #{schemaId} AND "
-        + " mt.model_id = ot.metadata_object_id AND ot.metadata_object_type = 'MODEL'"
+        + " mt.model_id = ot.metadata_object_id AND ot.metadata_object_type = 'MODEL' AND "
+        + TenantSqlSupport.tenantPredicate("mt", tenantId)
         + ")";
   }
 
   public String deleteOwnerMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + OWNER_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 }

@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import static org.apache.gravitino.storage.relational.mapper.TagMetaMapper.TAG_TABLE_NAME;
 
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TagMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.ibatis.annotations.Param;
@@ -28,6 +29,7 @@ import org.apache.ibatis.annotations.Param;
 public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
   @Override
   public String softDeleteTagMetaByMetalakeAndTagName(String metalakeName, String tagName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TAG_TABLE_NAME
         + " tm SET deleted_at = floor(extract(epoch from(current_timestamp -"
@@ -35,26 +37,37 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
         + " WHERE tm.metalake_id IN ("
         + " SELECT mm.metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0";
+        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId)
+        + ")"
+        + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tm", tenantId);
   }
 
   @Override
   public String softDeleteTagMetasByMetalakeId(Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TAG_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String insertTagMetaOnDuplicateKeyUpdate(TagPO tagPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TAG_TABLE_NAME
         + "(tag_id, tag_name,"
         + " metalake_id, tag_comment, properties, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{tagMeta.tagId},"
         + " #{tagMeta.tagName},"
@@ -64,7 +77,9 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
         + " #{tagMeta.auditInfo},"
         + " #{tagMeta.currentVersion},"
         + " #{tagMeta.lastVersion},"
-        + " #{tagMeta.deletedAt}"
+        + " #{tagMeta.deletedAt},"
+        + " "
+        + tenantId
         + " )"
         + " ON CONFLICT(tag_id) DO UPDATE SET"
         + " tag_name = #{tagMeta.tagName},"
@@ -80,6 +95,7 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
   @Override
   public String updateTagMeta(
       @Param("newTagMeta") TagPO newTagPO, @Param("oldTagMeta") TagPO oldTagPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TAG_TABLE_NAME
         + " SET tag_name = #{newTagMeta.tagName},"
@@ -98,16 +114,24 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
         + " AND audit_info = #{oldTagMeta.auditInfo}"
         + " AND current_version = #{oldTagMeta.currentVersion}"
         + " AND last_version = #{oldTagMeta.lastVersion}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String deleteTagMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + TAG_TABLE_NAME
         + " WHERE tag_id IN (SELECT tag_id FROM "
         + TAG_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit})"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 }

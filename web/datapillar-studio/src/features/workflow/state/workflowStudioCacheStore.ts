@@ -1,9 +1,9 @@
 /**
- * Workflow Studio 缓存状态（本地持久化）
+ * Workflow Studio cache status（local persistence）
  *
- * 目标：
- * 1. 刷新页面不丢消息与画布
- * 2. 恢复聊天滚动位置与高度缓存
+ * target：
+ * 1. Refresh the page without losing the message and canvas
+ * 2. Restore chat scroll position and height caching
  */
 
 import { create } from 'zustand'

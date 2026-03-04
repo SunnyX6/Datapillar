@@ -1,13 +1,13 @@
-# -*- coding: utf-8 -*-
 """
-ETL 表类工具真实数据库测试（table.py）
+ETL table tools real database test (table.py).
 
-要求：只做真实调用，打印输入/输出，不做断言。
+Requirement: run real calls only, print input/output, do not assert.
 """
 
 from __future__ import annotations
 
 import json
+
 from src.modules.etl.tools.table import (
     get_lineage_sql,
     get_table_detail,
@@ -19,7 +19,7 @@ from src.modules.etl.tools.table import (
     search_tables,
 )
 
-# 固定输入（真实库存在的样例，可按需替换）
+# Fixed inputs (samples expected to exist in real environments; replace as needed).
 DEFAULT_CATALOG = "tt"
 DEFAULT_SCHEMA = "datapillar"
 DEFAULT_TABLE = "ai_llm_usage"
@@ -35,26 +35,26 @@ def _pretty(raw: str) -> str:
 
 def _print_tool(name: str, payload: dict, raw: str) -> None:
     print("\n" + "=" * 80)
-    print(f"工具: {name}")
-    print(f"输入: {payload}")
-    print("输出(raw):")
+    print(f"Tool: {name}")
+    print(f"Input: {payload}")
+    print("Output (raw):")
     print(raw)
     pretty = _pretty(raw)
     if pretty != raw:
-        print("输出(json):")
+        print("Output (json):")
         print(pretty)
 
 
 def test_table_tools_real_db() -> None:
-    # 1) Catalog 列表
+    # 1) Catalog list.
     raw_catalogs = list_catalogs.invoke({"limit": 50})
     _print_tool("list_catalogs", {"limit": 50}, raw_catalogs)
 
-    # 2) Schema 列表（固定 catalog）
+    # 2) Schema list (fixed catalog).
     raw_schemas = list_schemas.invoke({"catalog": DEFAULT_CATALOG, "limit": 50})
     _print_tool("list_schemas", {"catalog": DEFAULT_CATALOG, "limit": 50}, raw_schemas)
 
-    # 3) Table 列表（固定 catalog + schema）
+    # 3) Table list (fixed catalog + schema).
     raw_tables = list_tables.invoke(
         {"catalog": DEFAULT_CATALOG, "schema_name": DEFAULT_SCHEMA, "limit": 50}
     )
@@ -64,11 +64,11 @@ def test_table_tools_real_db() -> None:
         raw_tables,
     )
 
-    # 4) 表详情（固定表路径）
+    # 4) Table detail (fixed table path).
     raw_detail = get_table_detail.invoke({"path": DEFAULT_TABLE_PATH})
     _print_tool("get_table_detail", {"path": DEFAULT_TABLE_PATH}, raw_detail)
 
-    # 5) 表血缘（固定表路径）
+    # 5) Table lineage (fixed table path).
     raw_lineage = get_table_lineage.invoke({"path": DEFAULT_TABLE_PATH, "direction": "both"})
     _print_tool(
         "get_table_lineage",
@@ -76,14 +76,14 @@ def test_table_tools_real_db() -> None:
         raw_lineage,
     )
 
-    # 6) 语义搜索（固定关键词）
-    raw_search_tables = search_tables.invoke({"query": "订单", "top_k": 5})
-    _print_tool("search_tables", {"query": "订单", "top_k": 5}, raw_search_tables)
+    # 6) Semantic search (fixed keywords).
+    raw_search_tables = search_tables.invoke({"query": "Order", "top_k": 5})
+    _print_tool("search_tables", {"query": "Order", "top_k": 5}, raw_search_tables)
 
-    raw_search_columns = search_columns.invoke({"query": "金额", "top_k": 5})
-    _print_tool("search_columns", {"query": "金额", "top_k": 5}, raw_search_columns)
+    raw_search_columns = search_columns.invoke({"query": "Amount", "top_k": 5})
+    _print_tool("search_columns", {"query": "Amount", "top_k": 5}, raw_search_columns)
 
-    # 7) 血缘 SQL（固定输入）
+    # 7) Lineage SQL (fixed input).
     raw_sql = get_lineage_sql.invoke(
         {"source_tables": [DEFAULT_TABLE_PATH], "target_table": DEFAULT_TABLE_PATH}
     )

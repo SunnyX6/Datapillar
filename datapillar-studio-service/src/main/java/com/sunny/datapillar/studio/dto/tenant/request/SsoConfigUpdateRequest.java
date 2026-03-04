@@ -14,13 +14,12 @@ import lombok.Data;
 @Schema(name = "SsoConfigUpdate")
 public class SsoConfigUpdateRequest {
 
-    @Size(max = 255, message = "基础URL长度不能超过255个字符")
-    private String baseUrl;
+  @Size(max = 255, message = "BasicsURLThe length cannot exceed255characters")
+  private String baseUrl;
 
-    @Valid
-    private SsoDingtalkConfigItem config;
+  @Valid private SsoDingtalkConfigItem config;
 
-    @Min(value = 0, message = "参数错误")
-    @Max(value = 1, message = "参数错误")
-    private Integer status;
+  @Min(value = 0, message = "Parameter error")
+  @Max(value = 1, message = "Parameter error")
+  private Integer status;
 }

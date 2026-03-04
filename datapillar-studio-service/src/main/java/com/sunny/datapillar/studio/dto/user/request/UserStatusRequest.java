@@ -7,5 +7,5 @@ import lombok.Data;
 @Schema(name = "UserStatusUpdate")
 public class UserStatusRequest {
 
-    private Integer status;
+  private Integer status;
 }

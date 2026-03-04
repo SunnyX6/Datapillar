@@ -14,7 +14,7 @@ export interface TooltipProps {
   delay?: number
   disabled?: boolean
   sideOffset?: number
-  /** 触发器被点击时是否自动关闭（避免点击后 tooltip 残留） */
+  /** Whether the trigger automatically closes when it is clicked（avoid click after tooltip Residue） */
   closeOnClick?: boolean
 }
 
@@ -33,7 +33,7 @@ export function Tooltip({
   const triggerRef = useRef<HTMLDivElement | null>(null)
   const tooltipRef = useRef<HTMLDivElement | null>(null)
   const timerRef = useRef<number | null>(null)
-  // 处理“鼠标点击导致 focus”场景：避免 click 后 tooltip 因 focus 事件再次被打开
+  // Process“Mouse click causes focus”scene：avoid click after tooltip Because focus The event is opened again
   const pointerDownRef = useRef(false)
 
   useEffect(() => {

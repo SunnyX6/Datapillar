@@ -8,25 +8,25 @@ import lombok.Data;
 @Schema(name = "FeatureObjectTreeNode")
 public class FeatureTreeNodeItem {
 
-    private Long id;
+  private Long id;
 
-    private Long parentId;
+  private Long parentId;
 
-    private String type;
+  private String type;
 
-    private String name;
+  private String name;
 
-    private String path;
+  private String path;
 
-    private String location;
+  private String location;
 
-    private Integer sort;
+  private Integer sort;
 
-    private Integer status;
+  private Integer status;
 
-    private Long categoryId;
+  private Long categoryId;
 
-    private String categoryName;
+  private String categoryName;
 
-    private List<FeatureTreeNodeItem> children;
+  private List<FeatureTreeNodeItem> children;
 }

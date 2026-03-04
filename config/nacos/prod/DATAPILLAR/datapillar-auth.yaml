@@ -47,23 +47,30 @@ springdoc:
   api-docs:
     enabled: true
 
-# JWT 配置
-jwt:
-  # 对称密钥
-  secret: ${JWT_SECRET}
-  # Access Token 过期时间 (秒)
-  # 开发环境：可通过环境变量 JWT_ACCESS_EXPIRATION=60 设置为60秒来测试自动刷新
-  # 生产环境：3600秒（60分钟）
-  access-token-expiration: ${JWT_ACCESS_EXPIRATION:3600}     # 60 分钟
-  # Refresh Token 过期时间 (秒)
-  # 未勾选记住我：7 天
-  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800}  # 7 天
-  # 勾选记住我：30 天
-  refresh-token-expiration-remember: ${JWT_REFRESH_REMEMBER_EXPIRATION:2592000}  # 30 天
-  # 登录选择租户临时 Token 过期时间 (秒)
-  login-token-expiration: ${JWT_LOGIN_EXPIRATION:300}  # 5 分钟
-  # 颁发者
-  issuer: datapillar-auth
+auth:
+  authenticator: ${AUTH_AUTHENTICATOR:simple}
+  token:
+    issuer: ${AUTH_TOKEN_ISSUER:https://auth.datapillar.local}
+    audience: ${AUTH_TOKEN_AUDIENCE:datapillar-api}
+    algorithm: EdDSA
+    private-key-path: ${AUTH_TOKEN_PRIVATE_KEY_PATH}
+    public-key-path: ${AUTH_TOKEN_PUBLIC_KEY_PATH}
+    access-ttl-seconds: ${AUTH_TOKEN_ACCESS_TTL_SECONDS:3600}
+    refresh-ttl-seconds: ${AUTH_TOKEN_REFRESH_TTL_SECONDS:604800}
+    refresh-remember-ttl-seconds: ${AUTH_TOKEN_REFRESH_REMEMBER_TTL_SECONDS:2592000}
+    login-ttl-seconds: ${AUTH_TOKEN_LOGIN_TTL_SECONDS:300}
+  jwks:
+    enabled: ${AUTH_JWKS_ENABLED:true}
+    active-kid: ${AUTH_JWKS_ACTIVE_KID:auth-prod-2026-01}
+  oauth2:
+    provider: ${AUTH_OAUTH2_PROVIDER:generic}
+    authority: ${AUTH_OAUTH2_AUTHORITY:https://idp.example.com}
+    jwks-uri: ${AUTH_OAUTH2_JWKS_URI:https://idp.example.com/.well-known/jwks.json}
+    principal-fields:
+      - preferred_username
+      - email
+      - sub
+    static-public-key-path: ${AUTH_OAUTH2_STATIC_PUBLIC_KEY_PATH:}
 
 # Cookie 配置
 cookie:
@@ -79,7 +86,7 @@ security:
     cookie-name: csrf-token
     refresh-header-name: X-Refresh-CSRF-Token
     refresh-cookie-name: refresh-csrf-token
-    ttl-seconds: ${JWT_ACCESS_EXPIRATION:3600}
+    ttl-seconds: ${AUTH_TOKEN_ACCESS_TTL_SECONDS:3600}
   login:
     enabled: true
     max-attempts: 5
@@ -92,25 +99,6 @@ security:
       parallelism: 1
       memory-mb: 64
       iterations: 3
-  key-storage:
-    type: ${KEY_STORAGE_TYPE:local}
-    local:
-      path: ${KEY_STORAGE_LOCAL_PATH:/data/datapillar/privkeys}
-    object:
-      endpoint: ${KEY_STORAGE_OBJECT_ENDPOINT:}
-      bucket: ${KEY_STORAGE_OBJECT_BUCKET:}
-      access-key: ${KEY_STORAGE_OBJECT_ACCESS_KEY:}
-      secret-key: ${KEY_STORAGE_OBJECT_SECRET_KEY:}
-      region: ${KEY_STORAGE_OBJECT_REGION:}
-      prefix: ${KEY_STORAGE_OBJECT_PREFIX:privkeys}
-  gateway-assertion:
-    enabled: true
-    header-name: X-Gateway-Assertion
-    issuer: datapillar-auth
-    audience: datapillar-studio-service
-    ttl-seconds: 20
-    key-id: ${AUTH_ASSERTION_KEY_ID}
-    private-key-path: ${AUTH_ASSERTION_PRIVATE_KEY_PATH}
 
 # SSO 配置
 sso:

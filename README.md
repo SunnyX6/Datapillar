@@ -4,7 +4,7 @@
 </h1>
 
 <p align="center">
-  <a href="./README.md">English</a> | <a href="./README.zh-CN.md">简体中文</a>
+  <a href="./README.md">English</a> | <a href="./README.zh-CN.md">Simplified Chinese</a>
 </p>
 
 <p align="center">
@@ -63,7 +63,7 @@
 
 ## Technical Architecture
 
-![Datapillar Technical Architecture](docs/assets4/architecture.png)
+![Datapillar Technical Architecture](docs/assets/architecture.png)
 
 ## Local Development Quick Start (Debug)
 
@@ -96,7 +96,7 @@ Run from project root:
 ./scripts/start-local-all.sh
 ```
 
-> For local development/debug only. Do not use this script in production.
+> The startup script auto-syncs Nacos configs and starts all backend services in local debug mode.
 
 This script compiles and starts:
 
@@ -105,6 +105,7 @@ This script compiles and starts:
 - `datapillar-api-gateway` (7000)
 - `datapillar-ai` (7003)
 - `datapillar-openlineage` (7004)
+- `datapillar-gravitino` (8090)
 
 Log directory:
 
@@ -148,8 +149,8 @@ Frontend default URL:
 
 ## Module Responsibilities
 
-- `datapillar-api-gateway`: API ingress, routing, assertion relay, and traffic control.
-- `datapillar-auth`: Authentication, tenant identity, and security assertion issuing.
+- `datapillar-api-gateway`: API ingress, routing, JWT validation, and traffic control.
+- `datapillar-auth`: Identity bootstrap, tenant membership governance, and key management.
 - `datapillar-studio-service`: Core business domain (tenant/workflow/invitation and studio APIs).
 - `datapillar-ai`: AI-side orchestration, model config access, and RAG/agent runtime.
 - `datapillar-openlineage`: OpenLineage event ingest, async task dispatch, and storage write.
@@ -157,7 +158,7 @@ Frontend default URL:
 
 ## Troubleshooting (Local Debug)
 
-- Port conflict (`7000`~`7004`): run `./scripts/stop-local-all.sh`, then retry startup.
+- Port conflict (`7000`~`7004`, `8090`): run `./scripts/stop-local-all.sh`, then retry startup.
 - Nacos sync/auth issues: verify `NACOS_SERVER_ADDR`, `NACOS_NAMESPACE`, `NACOS_USERNAME`, `NACOS_PASSWORD` in `scripts/start-local-all.sh`.
 - Build/start failure: inspect `/tmp/datapillar-logs/*.startup.log`.
 - Service reachable but frontend errors: verify gateway at `http://localhost:7000` and frontend at `http://localhost:3001`.

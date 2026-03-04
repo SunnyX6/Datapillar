@@ -9,35 +9,35 @@ import lombok.Data;
 @Schema(name = "JobResponse")
 public class JobResponse {
 
-    private Long id;
+  private Long id;
 
-    private Long workflowId;
+  private Long workflowId;
 
-    private String jobName;
+  private String jobName;
 
-    private Long jobType;
+  private Long jobType;
 
-    private String jobTypeCode;
+  private String jobTypeCode;
 
-    private String jobTypeName;
+  private String jobTypeName;
 
-    private Map<String, Object> jobParams;
+  private Map<String, Object> jobParams;
 
-    private Integer timeoutSeconds;
+  private Integer timeoutSeconds;
 
-    private Integer maxRetryTimes;
+  private Integer maxRetryTimes;
 
-    private Integer retryInterval;
+  private Integer retryInterval;
 
-    private Integer priority;
+  private Integer priority;
 
-    private Double positionX;
+  private Double positionX;
 
-    private Double positionY;
+  private Double positionY;
 
-    private String description;
+  private String description;
 
-    private LocalDateTime createdAt;
+  private LocalDateTime createdAt;
 
-    private LocalDateTime updatedAt;
+  private LocalDateTime updatedAt;
 }

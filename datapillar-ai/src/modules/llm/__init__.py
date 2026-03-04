@@ -2,11 +2,8 @@
 # @date 2026-02-19
 
 """
-LLM 管理模块。
-
-DEPRECATED:
-- 该模块保留给历史链路兼容
-- ETL 新链路不再依赖本模块
+LLM Management module.DEPRECATED:- This module is reserved for historical link compatibility
+- ETL The new link no longer relies on this module
 """
 
 from src.modules.llm.api import router

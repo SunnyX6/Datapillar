@@ -9,13 +9,13 @@ import lombok.Data;
 @Schema(name = "LlmProviderCreateRequest")
 public class LlmProviderCreateRequest {
 
-    @NotBlank(message = "code 不能为空")
-    @Size(max = 32, message = "code 长度不能超过 32")
-    private String code;
+  @NotBlank(message = "code cannot be empty")
+  @Size(max = 32, message = "code The length cannot exceed 32")
+  private String code;
 
-    @Size(max = 64, message = "name 长度不能超过 64")
-    private String name;
+  @Size(max = 64, message = "name The length cannot exceed 64")
+  private String name;
 
-    @Size(max = 255, message = "base_url 长度不能超过 255")
-    private String baseUrl;
+  @Size(max = 255, message = "base_url The length cannot exceed 255")
+  private String baseUrl;
 }

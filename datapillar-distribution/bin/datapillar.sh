@@ -1,20 +1,20 @@
 #!/bin/bash
 #
-# Datapillar 统一启动脚本
+# Datapillar Unified startup script
 #
-# 用法:
-#   ./bin/datapillar.sh start studio-service    # 后台启动 studio-service
-#   ./bin/datapillar.sh run studio-service      # 前台启动（Docker/K8s）
-#   ./bin/datapillar.sh stop studio-service     # 停止
-#   ./bin/datapillar.sh restart studio-service  # 重启
-#   ./bin/datapillar.sh status studio-service   # 查看状态
+# Usage:
+#   ./bin/datapillar.sh start studio-service    # Start in background studio-service
+#   ./bin/datapillar.sh run studio-service      # Start in foreground（Docker/K8s）
+#   ./bin/datapillar.sh stop studio-service     # stop
+#   ./bin/datapillar.sh restart studio-service  # Restart
+#   ./bin/datapillar.sh status studio-service   # View status
 #
-# 支持的服务: studio-service, gateway, auth, openlineage
+# Supported services: studio-service, gateway, auth, openlineage
 #
 
 set -e
 
-# 服务配置映射
+# Service configuration mapping
 declare -A SERVICE_MAP=(
     ["studio-service"]="com.sunny.datapillar.studio.DatapillarStudioApplication"
     ["gateway"]="com.sunny.datapillar.gateway.DatapillarGatewayApplication"
@@ -29,32 +29,32 @@ declare -A SERVICE_PORT=(
     ["openlineage"]="8083"
 )
 
-# 获取脚本所在目录
+# Get the directory where the script is located
 BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATAPILLAR_HOME="$(cd "${BIN_DIR}/.." && pwd)"
 
-# 设置目录
+# Set directory
 DATAPILLAR_CONF_DIR="${DATAPILLAR_CONF_DIR:-${DATAPILLAR_HOME}/conf}"
 DATAPILLAR_LOG_DIR="${DATAPILLAR_LOG_DIR:-${DATAPILLAR_HOME}/logs}"
 DATAPILLAR_LIB_DIR="${DATAPILLAR_HOME}/libs"
 DATAPILLAR_DATA_DIR="${DATAPILLAR_HOME}/data"
 
-# 加载环境变量
+# Load environment variables
 if [[ -f "${DATAPILLAR_CONF_DIR}/datapillar-env.sh" ]]; then
     source "${DATAPILLAR_CONF_DIR}/datapillar-env.sh"
 fi
 
-# 默认 JVM 参数
+# Default JVM parameters
 DATAPILLAR_MEM="${DATAPILLAR_MEM:--Xms512m -Xmx1024m}"
 
-# Java 运行器
+# Java runner
 if [[ -n "${JAVA_HOME}" ]]; then
     JAVA_RUNNER="${JAVA_HOME}/bin/java"
 else
     JAVA_RUNNER="java"
 fi
 
-# 打印 Banner
+# Print Banner
 print_banner() {
     local version="${DATAPILLAR_VERSION:-1.0.0}"
     echo "========================================"
@@ -68,90 +68,90 @@ print_banner() {
     echo "========================================"
 }
 
-# 打印用法
+# Print usage
 print_usage() {
-    echo "用法: $0 {start|run|stop|restart|status} <service>"
+    echo "Usage: $0 {start|run|stop|restart|status} <service>"
     echo ""
-    echo "服务列表:"
-    echo "  studio-service  - Studio 服务 (端口 8081)"
-    echo "  gateway    - API Gateway 服务 (端口 8080)"
-    echo "  auth       - Auth 认证服务 (端口 8082)"
-    echo "  openlineage - OpenLineage Sink 服务 (端口 8083)"
+    echo "Service list:"
+    echo "  studio-service  - Studio service (port 8081)"
+    echo "  gateway    - API Gateway service (port 8080)"
+    echo "  auth       - Auth Authentication services (port 8082)"
+    echo "  openlineage - OpenLineage Sink service (port 8083)"
     echo ""
-    echo "操作:"
-    echo "  start      - 后台启动服务"
-    echo "  run        - 前台启动服务（适用于 Docker/K8s）"
-    echo "  stop       - 停止服务"
-    echo "  restart    - 重启服务"
-    echo "  status     - 查看服务状态"
+    echo "Operation:"
+    echo "  start      - Start service in background"
+    echo "  run        - Start service in front desk（Applicable to Docker/K8s）"
+    echo "  stop       - Stop service"
+    echo "  restart    - Restart service"
+    echo "  status     - Check service status"
     echo ""
-    echo "示例:"
+    echo "Example:"
     echo "  $0 start studio-service"
     echo "  $0 stop gateway"
     echo "  $0 status auth"
     echo "  $0 start openlineage"
 }
 
-# 检查 Java 版本
+# Check Java version
 check_java() {
     if ! command -v ${JAVA_RUNNER} &> /dev/null; then
-        echo "错误: 未找到 Java，请设置 JAVA_HOME 或确保 java 在 PATH 中"
+        echo "Error: not found Java，Please set JAVA_HOME or ensure java in PATH in"
         exit 1
     fi
 
     local java_version=$(${JAVA_RUNNER} -version 2>&1 | head -1 | cut -d'"' -f2 | cut -d'.' -f1)
     if [[ "${java_version}" -lt 17 ]]; then
-        echo "错误: Datapillar 需要 Java 17 或更高版本，当前版本: ${java_version}"
+        echo "Error: Datapillar need Java 17 or higher，Current version: ${java_version}"
         exit 1
     fi
 }
 
-# 获取服务 PID
+# Get services PID
 get_pid() {
     local service=$1
     local main_class=${SERVICE_MAP[$service]}
     ps aux | grep "${main_class}" | grep -v grep | awk '{print $2}' | head -1
 }
 
-# 检查服务状态
+# Check service status
 check_status() {
     local service=$1
     local pid=$(get_pid $service)
 
     if [[ -n "${pid}" ]]; then
-        echo "Datapillar ${service} 正在运行 [PID: ${pid}]"
+        echo "Datapillar ${service} Running [PID: ${pid}]"
         return 0
     else
-        echo "Datapillar ${service} 未运行"
+        echo "Datapillar ${service} Not running"
         return 1
     fi
 }
 
-# 启动服务（后台）
+# Start service（Backstage）
 start_service() {
     local service=$1
     local main_class=${SERVICE_MAP[$service]}
     local port=${SERVICE_PORT[$service]}
 
     if [[ -z "${main_class}" ]]; then
-        echo "错误: 未知服务 '${service}'"
+        echo "Error: Unknown service '${service}'"
         print_usage
         exit 1
     fi
 
     local pid=$(get_pid $service)
     if [[ -n "${pid}" ]]; then
-        echo "Datapillar ${service} 已在运行 [PID: ${pid}]"
+        echo "Datapillar ${service} Already running [PID: ${pid}]"
         return 0
     fi
 
-    # 创建日志目录
+    # Create log directory
     mkdir -p "${DATAPILLAR_LOG_DIR}"
 
-    # 构建 classpath
+    # Build classpath
     local classpath="${DATAPILLAR_CONF_DIR}:${DATAPILLAR_LIB_DIR}/*"
 
-    # 构建 JVM 参数
+    # Build JVM parameters
     local java_opts="${DATAPILLAR_MEM}"
     java_opts+=" -Dfile.encoding=UTF-8"
     java_opts+=" -Dlogging.file.path=${DATAPILLAR_LOG_DIR}"
@@ -159,14 +159,14 @@ start_service() {
     java_opts+=" -Dspring.profiles.active=${service}"
     java_opts+=" -Dserver.port=${port}"
 
-    # JDK 17+ 模块参数
+    # JDK 17+ Module parameters
     java_opts+=" --add-opens java.base/java.lang=ALL-UNNAMED"
     java_opts+=" --add-opens java.base/java.util=ALL-UNNAMED"
     java_opts+=" --add-opens java.base/java.nio=ALL-UNNAMED"
 
     local out_file="${DATAPILLAR_LOG_DIR}/datapillar-${service}.out"
 
-    echo "正在启动 Datapillar ${service}..."
+    echo "Starting Datapillar ${service}..."
     nohup ${JAVA_RUNNER} ${java_opts} -cp ${classpath} ${main_class} >> "${out_file}" 2>&1 &
 
     local new_pid=$!
@@ -174,33 +174,33 @@ start_service() {
 
     if kill -0 ${new_pid} 2>/dev/null; then
         print_banner
-        echo "Datapillar ${service} 启动成功 [PID: ${new_pid}]"
-        echo "日志文件: ${out_file}"
+        echo "Datapillar ${service} Started successfully [PID: ${new_pid}]"
+        echo "log file: ${out_file}"
     else
-        echo "错误: Datapillar ${service} 启动失败，请检查日志: ${out_file}"
+        echo "Error: Datapillar ${service} Startup failed，Please check the logs: ${out_file}"
         exit 1
     fi
 }
 
-# 前台运行服务（适用于 Docker/K8s）
+# Front-end service（Applicable to Docker/K8s）
 run_service() {
     local service=$1
     local main_class=${SERVICE_MAP[$service]}
     local port=${SERVICE_PORT[$service]}
 
     if [[ -z "${main_class}" ]]; then
-        echo "错误: 未知服务 '${service}'"
+        echo "Error: Unknown service '${service}'"
         print_usage
         exit 1
     fi
 
-    # 创建日志目录
+    # Create log directory
     mkdir -p "${DATAPILLAR_LOG_DIR}"
 
-    # 构建 classpath
+    # Build classpath
     local classpath="${DATAPILLAR_CONF_DIR}:${DATAPILLAR_LIB_DIR}/*"
 
-    # 构建 JVM 参数
+    # Build JVM parameters
     local java_opts="${DATAPILLAR_MEM}"
     java_opts+=" -Dfile.encoding=UTF-8"
     java_opts+=" -Dlogging.file.path=${DATAPILLAR_LOG_DIR}"
@@ -208,32 +208,32 @@ run_service() {
     java_opts+=" -Dspring.profiles.active=${service}"
     java_opts+=" -Dserver.port=${port}"
 
-    # JDK 17+ 模块参数
+    # JDK 17+ Module parameters
     java_opts+=" --add-opens java.base/java.lang=ALL-UNNAMED"
     java_opts+=" --add-opens java.base/java.util=ALL-UNNAMED"
     java_opts+=" --add-opens java.base/java.nio=ALL-UNNAMED"
 
     print_banner
-    echo "正在前台运行 Datapillar ${service} (端口: ${port})..."
+    echo "Running in the foreground Datapillar ${service} (port: ${port})..."
     exec ${JAVA_RUNNER} ${java_opts} -cp ${classpath} ${main_class}
 }
 
-# 停止服务
+# Stop service
 stop_service() {
     local service=$1
     local pid=$(get_pid $service)
 
     if [[ -z "${pid}" ]]; then
-        echo "Datapillar ${service} 未运行"
+        echo "Datapillar ${service} Not running"
         return 0
     fi
 
-    echo "正在停止 Datapillar ${service} [PID: ${pid}]..."
+    echo "Stopping Datapillar ${service} [PID: ${pid}]..."
 
-    # 优雅停止
+    # graceful stop
     kill ${pid} 2>/dev/null
 
-    # 等待进程退出
+    # Wait for process to exit
     local timeout=30
     local count=0
     while kill -0 ${pid} 2>/dev/null && [[ $count -lt $timeout ]]; do
@@ -241,16 +241,16 @@ stop_service() {
         ((count++))
     done
 
-    # 强制停止
+    # Forced stop
     if kill -0 ${pid} 2>/dev/null; then
-        echo "优雅停止超时，强制停止..."
+        echo "graceful stop timeout，Forced stop..."
         kill -9 ${pid} 2>/dev/null
     fi
 
-    echo "Datapillar ${service} 已停止"
+    echo "Datapillar ${service} Stopped"
 }
 
-# 重启服务
+# Restart service
 restart_service() {
     local service=$1
     stop_service $service
@@ -258,7 +258,7 @@ restart_service() {
     start_service $service
 }
 
-# 主逻辑
+# main logic
 main() {
     local action=$1
     local service=$2
@@ -268,13 +268,13 @@ main() {
         exit 1
     fi
 
-    # 检查 Java
+    # Check Java
     check_java
 
     case "${action}" in
         start)
             if [[ -z "${service}" ]]; then
-                echo "错误: 请指定服务名称"
+                echo "Error: Please specify service name"
                 print_usage
                 exit 1
             fi
@@ -282,7 +282,7 @@ main() {
             ;;
         run)
             if [[ -z "${service}" ]]; then
-                echo "错误: 请指定服务名称"
+                echo "Error: Please specify service name"
                 print_usage
                 exit 1
             fi
@@ -290,7 +290,7 @@ main() {
             ;;
         stop)
             if [[ -z "${service}" ]]; then
-                echo "错误: 请指定服务名称"
+                echo "Error: Please specify service name"
                 print_usage
                 exit 1
             fi
@@ -298,7 +298,7 @@ main() {
             ;;
         restart)
             if [[ -z "${service}" ]]; then
-                echo "错误: 请指定服务名称"
+                echo "Error: Please specify service name"
                 print_usage
                 exit 1
             fi
@@ -306,14 +306,14 @@ main() {
             ;;
         status)
             if [[ -z "${service}" ]]; then
-                echo "错误: 请指定服务名称"
+                echo "Error: Please specify service name"
                 print_usage
                 exit 1
             fi
             check_status $service
             ;;
         *)
-            echo "错误: 未知操作 '${action}'"
+            echo "Error: Unknown operation '${action}'"
             print_usage
             exit 1
             ;;

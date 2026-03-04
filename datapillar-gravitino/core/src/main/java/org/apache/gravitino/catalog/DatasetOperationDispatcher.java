@@ -48,7 +48,7 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.pagination.PagedResult;
 import org.apache.gravitino.storage.IdGenerator;
 
-/** DatasetOperationDispatcher 负责调度所有数据集相关的操作 */
+/** DatasetOperationDispatcher Responsible for scheduling all data set related operations */
 public class DatasetOperationDispatcher extends OperationDispatcher implements DatasetDispatcher {
 
   public DatasetOperationDispatcher(
@@ -101,7 +101,7 @@ public class DatasetOperationDispatcher extends OperationDispatcher implements D
       String filterColumnIds)
       throws NoSuchSchemaException, MetricAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    // 确保 properties 不为 null，以便生成 StringIdentifier
+    // ensure properties Not for null，in order to generate StringIdentifier
     Map<String, String> inputProperties = properties != null ? properties : new HashMap<>();
     Map<String, String> updatedProperties =
         checkAndUpdateProperties(catalogIdent, inputProperties, p -> p.metricPropertiesMetadata());
@@ -463,7 +463,7 @@ public class DatasetOperationDispatcher extends OperationDispatcher implements D
                 RuntimeException.class));
   }
 
-  // ==================== ValueDomain 值域相关方法 ====================
+  // ==================== ValueDomain Range related methods ====================
 
   @Override
   public PagedResult<ValueDomain> listValueDomains(Namespace namespace, int offset, int limit)

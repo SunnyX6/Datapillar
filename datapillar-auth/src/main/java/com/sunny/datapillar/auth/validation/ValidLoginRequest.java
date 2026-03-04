@@ -14,16 +14,16 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ValidLoginRequest {
 
-    String message() default "参数错误";
+  String message() default "Invalid parameters";
 
-    Class<?>[] groups() default {};
+  Class<?>[] groups() default {};
 
-    Class<? extends Payload>[] payload() default {};
+  Class<? extends Payload>[] payload() default {};
 
-    LoginMode mode();
+  LoginMode mode();
 
-    enum LoginMode {
-        PASSWORD,
-        SSO
-    }
+  enum LoginMode {
+    PASSWORD,
+    SSO
+  }
 }

@@ -9,17 +9,17 @@ const roles: RoleItem[] = [
   {
     id: 'role_dev',
     type: 'USER',
-    name: '研发工程师',
-    description: '用于测试',
+    name: 'R&D Engineer',
+    description: 'for testing',
     permissions: [
       {
         objectId: 101,
-        objectName: '元数据目录',
+        objectName: 'metadata directory',
         objectPath: '/governance/metadata',
         objectType: 'MENU',
         location: 'governance',
         sort: 1,
-        categoryName: '数据资产',
+        categoryName: 'data assets',
         level: 'READ',
         tenantLevel: 'ADMIN',
         children: [],
@@ -30,17 +30,17 @@ const roles: RoleItem[] = [
   {
     id: 'role_data',
     type: 'USER',
-    name: '数据分析师',
-    description: '用于删除测试',
+    name: 'data analyst',
+    description: 'for deleting tests',
     permissions: [
       {
         objectId: 101,
-        objectName: '元数据目录',
+        objectName: 'metadata directory',
         objectPath: '/governance/metadata',
         objectType: 'MENU',
         location: 'governance',
         sort: 1,
-        categoryName: '数据资产',
+        categoryName: 'data assets',
         level: 'READ',
         tenantLevel: 'ADMIN',
         children: [],
@@ -71,7 +71,7 @@ const unmount = (
 }
 
 describe('RoleList', () => {
-  it('新增角色时可选择角色类型并提交', () => {
+  it('When adding a new role, you can select the role type and submit it', () => {
     const onCreateRole = vi.fn()
     const { container, root } = render(
       <RoleList
@@ -82,7 +82,7 @@ describe('RoleList', () => {
       />,
     )
 
-    const openButton = container.querySelector('button[aria-label="新增角色"]')
+    const openButton = container.querySelector('button[aria-label="Add new role"]')
     expect(openButton).not.toBeNull()
 
     act(() => {
@@ -90,7 +90,7 @@ describe('RoleList', () => {
     })
 
     const nameInput = document.querySelector<HTMLInputElement>(
-      'input[placeholder="请输入角色名称"]',
+      'input[placeholder="Please enter a role name"]',
     )
     expect(nameInput).not.toBeNull()
 
@@ -99,7 +99,7 @@ describe('RoleList', () => {
         HTMLInputElement.prototype,
         'value',
       )?.set
-      setter?.call(nameInput, '数据管理员')
+      setter?.call(nameInput, 'data manager')
       nameInput?.dispatchEvent(new Event('input', { bubbles: true }))
     })
 
@@ -113,7 +113,7 @@ describe('RoleList', () => {
     })
 
     const createButton = Array.from(document.querySelectorAll('button')).find(
-      (button) => button.textContent?.includes('创建角色'),
+      (button) => button.textContent?.includes('Create a role'),
     )
     expect(createButton).not.toBeUndefined()
 
@@ -122,7 +122,7 @@ describe('RoleList', () => {
     })
 
     expect(onCreateRole).toHaveBeenCalledWith({
-      name: '数据管理员',
+      name: 'data manager',
       description: undefined,
       type: 'ADMIN',
     })
@@ -130,7 +130,7 @@ describe('RoleList', () => {
     unmount(root, container)
   })
 
-  it('角色有成员时禁用删除，无成员时允许删除', () => {
+  it('Disable deletion when role has members，Allow deletion when there are no members', () => {
     const onDeleteRole = vi.fn().mockResolvedValue(true)
     const { container, root } = render(
       <RoleList
@@ -143,12 +143,12 @@ describe('RoleList', () => {
     )
 
     const disabledDeleteButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="删除角色-研发工程师"]',
+      'button[aria-label="Delete role-R&D Engineer"]',
     )
     expect(disabledDeleteButton?.disabled).toBe(true)
 
     const enabledDeleteButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="删除角色-数据分析师"]',
+      'button[aria-label="Delete role-data analyst"]',
     )
     expect(enabledDeleteButton?.disabled).toBe(false)
 
@@ -157,7 +157,7 @@ describe('RoleList', () => {
     })
 
     const confirmDeleteButton = Array.from(document.querySelectorAll('button')).find(
-      (button) => button.textContent?.includes('确认删除'),
+      (button) => button.textContent?.includes('Confirm deletion'),
     )
     expect(confirmDeleteButton).not.toBeUndefined()
 
@@ -170,7 +170,7 @@ describe('RoleList', () => {
     unmount(root, container)
   })
 
-  it('点击编辑图标后可提交角色更新', () => {
+  it('Click the edit icon to submit character updates', () => {
     const onUpdateRole = vi.fn().mockResolvedValue(true)
     const { container, root } = render(
       <RoleList
@@ -183,7 +183,7 @@ describe('RoleList', () => {
     )
 
     const editButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="编辑角色-数据分析师"]',
+      'button[aria-label="Edit role-data analyst"]',
     )
     expect(editButton?.disabled).toBe(false)
 
@@ -192,7 +192,7 @@ describe('RoleList', () => {
     })
 
     const nameInput = document.querySelector<HTMLInputElement>(
-      'input[placeholder="请输入角色名称"]',
+      'input[placeholder="Please enter a role name"]',
     )
     expect(nameInput).not.toBeNull()
 
@@ -201,12 +201,12 @@ describe('RoleList', () => {
         HTMLInputElement.prototype,
         'value',
       )?.set
-      setter?.call(nameInput, '数据治理分析师')
+      setter?.call(nameInput, 'Data Governance Analyst')
       nameInput?.dispatchEvent(new Event('input', { bubbles: true }))
     })
 
     const saveButton = Array.from(document.querySelectorAll('button')).find(
-      (button) => button.textContent?.includes('保存修改'),
+      (button) => button.textContent?.includes('Save changes'),
     )
     expect(saveButton).not.toBeUndefined()
 
@@ -215,15 +215,15 @@ describe('RoleList', () => {
     })
 
     expect(onUpdateRole).toHaveBeenCalledWith('role_data', {
-      name: '数据治理分析师',
-      description: '用于删除测试',
+      name: 'Data Governance Analyst',
+      description: 'for deleting tests',
       type: 'USER',
     })
 
     unmount(root, container)
   })
 
-  it('编辑和删除按钮使用通用 Tooltip 而不是原生 title', () => {
+  it('Edit and delete buttons use universal Tooltip rather than native title', () => {
     const { container, root } = render(
       <RoleList
         roles={roles}
@@ -234,10 +234,10 @@ describe('RoleList', () => {
     )
 
     const editButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="编辑角色-研发工程师"]',
+      'button[aria-label="Edit role-R&D Engineer"]',
     )
     const disabledDeleteButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="删除角色-研发工程师"]',
+      'button[aria-label="Delete role-R&D Engineer"]',
     )
 
     expect(editButton?.getAttribute('title')).toBeNull()
@@ -248,14 +248,14 @@ describe('RoleList', () => {
         new MouseEvent('mouseover', { bubbles: true }),
       )
     })
-    expect(document.body.textContent).toContain('编辑角色')
+    expect(document.body.textContent).toContain('Edit role')
 
     act(() => {
       disabledDeleteButton?.parentElement?.dispatchEvent(
         new MouseEvent('mouseover', { bubbles: true }),
       )
     })
-    expect(document.body.textContent).toContain('角色下存在成员，无法删除')
+    expect(document.body.textContent).toContain('There are members under the role，cannot be deleted')
 
     unmount(root, container)
   })

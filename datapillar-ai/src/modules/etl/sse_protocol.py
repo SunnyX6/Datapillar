@@ -1,20 +1,19 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-ETL SSE 协议适配器（v3）
+ETL SSE protocol adapter(v3)
 
-职责：
-- 将底层 SSE 事件转换为前端协议事件（稳定字段）
-- 工具调用作为独立事件输出
+Responsibilities:- Place the bottom layer SSE Events are converted to front-end protocol events(stable field)
+- Tool calls are output as independent events
 """
 
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
-from typing import Any, AsyncGenerator, Callable
+from typing import Any
 
 from datapillar_oneagentic.utils.time import now_ms
 
@@ -132,7 +131,7 @@ def _build_activity(
     else:
         resolved_event_name = event_name or event.value
     return Activity(
-        agent_cn=agent_cn ,
+        agent_cn=agent_cn,
         agent_en=agent_en,
         summary=summary,
         event=event,
@@ -177,7 +176,7 @@ def _build_error_event(
     agent_en: str | None,
 ) -> dict[str, Any]:
     error_payload = error_payload or {}
-    summary = error_payload.get("message") or "执行失败"
+    summary = error_payload.get("message") or "Execution failed"
     detail = error_payload.get("detail")
     if detail:
         summary = f"{summary}：{detail}"
@@ -199,15 +198,15 @@ def _build_done_event(state: SseRunState) -> dict[str, Any] | None:
     workflow = state.workflow_payload if state.developer_done else None
 
     if state.developer_done and workflow:
-        name = workflow.get("workflowName") or "工作流"
+        name = workflow.get("workflowName") or "Workflow"
         return _build_stream_event(
             run_id=state.run_id,
             status=RunStatus.DONE,
             activity=_build_activity(
                 status=ActivityStatus.DONE,
-                agent_cn="数据开发工程师",
+                agent_cn="Data development engineer",
                 agent_en="developer",
-                summary=f"已生成工作流：{name}",
+                summary=f"Workflow generated:{name}",
                 event=ActivityEvent.LLM,
                 recommendations=[],
             ),
@@ -217,14 +216,14 @@ def _build_done_event(state: SseRunState) -> dict[str, Any] | None:
     if "catalog" in state.deliverables:
         summary, recommendations = _extract_activity_summary(
             state.deliverables["catalog"],
-            fallback="已完成元数据查询",
+            fallback="Metadata query completed",
         )
         return _build_stream_event(
             run_id=state.run_id,
             status=RunStatus.DONE,
             activity=_build_activity(
                 status=ActivityStatus.DONE,
-                agent_cn="元数据专员",
+                agent_cn="Metadata Specialist",
                 agent_en="catalog",
                 summary=summary,
                 event=ActivityEvent.LLM,
@@ -236,14 +235,14 @@ def _build_done_event(state: SseRunState) -> dict[str, Any] | None:
     if "reviewer" in state.deliverables:
         summary, recommendations = _extract_activity_summary(
             state.deliverables["reviewer"],
-            fallback="评审完成",
+            fallback="Review completed",
         )
         return _build_stream_event(
             run_id=state.run_id,
             status=RunStatus.DONE,
             activity=_build_activity(
                 status=ActivityStatus.DONE,
-                agent_cn="代码评审员",
+                agent_cn="code reviewer",
                 agent_en="reviewer",
                 summary=summary,
                 event=ActivityEvent.LLM,
@@ -255,14 +254,14 @@ def _build_done_event(state: SseRunState) -> dict[str, Any] | None:
     if "developer" in state.deliverables:
         summary, recommendations = _extract_activity_summary(
             state.deliverables["developer"],
-            fallback="SQL 生成完成",
+            fallback="SQL Generation completed",
         )
         return _build_stream_event(
             run_id=state.run_id,
             status=RunStatus.DONE,
             activity=_build_activity(
                 status=ActivityStatus.DONE,
-                agent_cn="数据开发工程师",
+                agent_cn="Data development engineer",
                 agent_en="developer",
                 summary=summary,
                 event=ActivityEvent.LLM,
@@ -274,14 +273,14 @@ def _build_done_event(state: SseRunState) -> dict[str, Any] | None:
     if "analyst" in state.deliverables:
         summary, recommendations = _extract_activity_summary(
             state.deliverables["analyst"],
-            fallback="需求分析完成",
+            fallback="Requirements analysis completed",
         )
         return _build_stream_event(
             run_id=state.run_id,
             status=RunStatus.DONE,
             activity=_build_activity(
                 status=ActivityStatus.DONE,
-                agent_cn="需求分析师",
+                agent_cn="Demand Analyst",
                 agent_en="analyst",
                 summary=summary,
                 event=ActivityEvent.LLM,
@@ -294,7 +293,7 @@ def _build_done_event(state: SseRunState) -> dict[str, Any] | None:
 
 
 def _normalize_interrupt_payload(payload: Any) -> tuple[str, dict[str, Any]]:
-    message = "需要补充信息才能继续。"
+    message = "Additional information is needed to continue."
     questions: list[str] = []
     options: list[str] = []
 
@@ -329,7 +328,9 @@ def _extract_option_labels(options: list[Any]) -> list[str]:
             continue
         if not isinstance(option, dict):
             continue
-        label = option.get("label") or option.get("name") or option.get("value") or option.get("path")
+        label = (
+            option.get("label") or option.get("name") or option.get("value") or option.get("path")
+        )
         if label:
             labels.append(str(label))
     return labels
@@ -350,7 +351,7 @@ def _extract_activity_summary(deliverable: Any, *, fallback: str) -> tuple[str, 
         elif answer:
             summary = answer
         elif sql:
-            summary = "SQL 生成完成"
+            summary = "SQL Generation completed"
         elif isinstance(issues, list) and issues:
             summary = str(issues[0])
         if isinstance(recs, list):
@@ -482,11 +483,7 @@ def _build_workflow_response(deliverable: Any) -> dict[str, Any] | None:
     if not isinstance(jobs, list):
         jobs = []
 
-    workflow_name = (
-        deliverable.get("name")
-        or deliverable.get("summary")
-        or "未命名工作流"
-    )
+    workflow_name = deliverable.get("name") or deliverable.get("summary") or "Unnamed workflow"
     workflow_description = deliverable.get("description") or deliverable.get("summary")
 
     job_id_map: dict[str, int] = {}
@@ -586,10 +583,14 @@ def _map_payload(payload: dict[str, Any], state: SseRunState) -> dict[str, Any] 
                 workflow = _build_workflow_response(state.deliverables["architect"])
             if workflow:
                 state.workflow_payload = workflow
-        summary, recommendations = _extract_activity_summary(
-            deliverable,
-            fallback="",
-        ) if deliverable is not None else ("", [])
+        summary, recommendations = (
+            _extract_activity_summary(
+                deliverable,
+                fallback="",
+            )
+            if deliverable is not None
+            else ("", [])
+        )
         return _build_stream_event(
             run_id=state.run_id,
             status=RunStatus.RUNNING,
@@ -627,7 +628,7 @@ def _map_payload(payload: dict[str, Any], state: SseRunState) -> dict[str, Any] 
 
     if event_type == "session.abort":
         abort_payload = (payload.get("data") or {}).get("abort") or {}
-        summary = abort_payload.get("message") or "已终止"
+        summary = abort_payload.get("message") or "terminated"
         detail = abort_payload.get("detail")
         if detail:
             summary = f"{summary}：{detail}"
@@ -697,10 +698,16 @@ async def adapt_sse_stream(
             if on_run_complete and not for_complete_called:
                 on_run_complete()
                 for_complete_called = True
-            yield {"id": str(event_id or state.last_event_id), "data": json.dumps(mapped, ensure_ascii=False)}
+            yield {
+                "id": str(event_id or state.last_event_id),
+                "data": json.dumps(mapped, ensure_ascii=False),
+            }
             return
 
-        yield {"id": str(event_id or state.last_event_id), "data": json.dumps(mapped, ensure_ascii=False)}
+        yield {
+            "id": str(event_id or state.last_event_id),
+            "data": json.dumps(mapped, ensure_ascii=False),
+        }
 
     reply = _build_done_event(state)
     if not reply:

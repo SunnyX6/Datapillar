@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * SQL 异常转换器配置
+ * SQL Exception converter configuration
  *
  * @author Sunny
  * @date 2026-02-26
@@ -16,10 +16,10 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SQLExceptionConverterConfig {
 
-    @Bean
-    public SQLExceptionConverter sqlExceptionConverter(DataSource dataSource) {
-        SQLExceptionConverter converter = SQLExceptionConverterFactory.create(dataSource);
-        SQLExceptionUtils.initialize(converter);
-        return converter;
-    }
+  @Bean
+  public SQLExceptionConverter sqlExceptionConverter(DataSource dataSource) {
+    SQLExceptionConverter converter = SQLExceptionConverterFactory.create(dataSource);
+    SQLExceptionUtils.initialize(converter);
+    return converter;
+  }
 }

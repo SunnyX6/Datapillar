@@ -146,7 +146,7 @@ public class MetadataObjectService {
       return ModelMetaService.getInstance()
           .getModelIdBySchemaIdAndModelName(schemaId, names.get(2));
     } else if (type == MetadataObject.Type.VALUE_DOMAIN) {
-      // names.get(2) 就是 domainCode
+      // names.get(2) That’s it domainCode
       return ValueDomainMetaService.getInstance()
           .getValueDomainIdBySchemaIdAndDomainCode(schemaId, names.get(2));
     }
@@ -509,7 +509,7 @@ public class MetadataObjectService {
             return;
           }
 
-          // fullName 格式: catalog.schema.domainCode
+          // fullName Format: catalog.schema.domainCode
           String fullName = DOT_JOINER.join(schemaName, domainPO.getDomainCode());
           domainIdAndNameMap.put(domainPO.getDomainId(), fullName);
         });

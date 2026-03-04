@@ -26,15 +26,15 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
-/** REST API端点，用于提供Scalar API文档UI界面 */
+/** REST APIendpoint，used to provideScalar APIDocumentationUIinterface */
 @Path("/docs")
 public class ScalarUiResource {
 
   /**
-   * 提供Scalar UI界面
+   * provideScalar UIinterface
    *
-   * @param uriInfo URI信息
-   * @return HTML响应
+   * @param uriInfo URIinformation
+   * @return HTMLresponse
    */
   @GET
   @Produces(MediaType.TEXT_HTML)
@@ -67,7 +67,7 @@ public class ScalarUiResource {
             + "    var apiReference = document.getElementById('api-reference')\n"
             + "    apiReference.dataset.configuration = JSON.stringify(configuration)\n"
             + "  </script>\n"
-            + "  <!-- 使用Scalar最新版本 (1.25.48) -->\n"
+            + "  <!-- useScalarlatest version (1.25.48) -->\n"
             + "  <script src=\"https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.25.48\"></script>\n"
             + "</body>\n"
             + "</html>";

@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper.PO
 import static org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper.POLICY_VERSION_TABLE_NAME;
 
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -29,11 +30,16 @@ public class PolicyVersionBaseSQLProvider {
 
   public String insertPolicyVersionOnDuplicateKeyUpdate(
       @Param("policyVersion") PolicyVersionPO policyVersion) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + POLICY_VERSION_TABLE_NAME
-        + " (metalake_id, policy_id, version, policy_comment, enabled, content, deleted_at) "
+        + " (metalake_id, policy_id, version, policy_comment, enabled, content, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ") "
         + "VALUES (#{policyVersion.metalakeId}, #{policyVersion.policyId}, #{policyVersion.version}, #{policyVersion.policyComment}, "
-        + "#{policyVersion.enabled}, #{policyVersion.content}, #{policyVersion.deletedAt}) "
+        + "#{policyVersion.enabled}, #{policyVersion.content}, #{policyVersion.deletedAt}, "
+        + tenantId
+        + ") "
         + "ON DUPLICATE KEY UPDATE "
         + "metalake_id = #{policyVersion.metalakeId}, "
         + "policy_id = #{policyVersion.policyId}, "
@@ -45,16 +51,22 @@ public class PolicyVersionBaseSQLProvider {
   }
 
   public String insertPolicyVersion(@Param("policyVersion") PolicyVersionPO policyVersion) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + POLICY_VERSION_TABLE_NAME
-        + " (metalake_id, policy_id, version, policy_comment, enabled, content, deleted_at) "
+        + " (metalake_id, policy_id, version, policy_comment, enabled, content, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ") "
         + "VALUES (#{policyVersion.metalakeId}, #{policyVersion.policyId}, #{policyVersion.version}, "
         + "#{policyVersion.policyComment}, #{policyVersion.enabled}, #{policyVersion.content}, "
-        + "#{policyVersion.deletedAt})";
+        + "#{policyVersion.deletedAt}, "
+        + tenantId
+        + ")";
   }
 
   public String softDeletePolicyVersionByMetalakeAndPolicyName(
       @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
         + " pv SET pv.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -62,52 +74,75 @@ public class PolicyVersionBaseSQLProvider {
         + " WHERE pv.metalake_id IN ("
         + " SELECT mm.metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
+        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId)
+        + ")"
         + " AND pv.policy_id IN ("
         + " SELECT pm.policy_id FROM "
         + POLICY_META_TABLE_NAME
         + " pm WHERE pm.policy_name = #{policyName} AND pm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pm", tenantId)
         + " AND pm.metalake_id IN ("
         + " SELECT mm.metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0))"
-        + " AND pv.deleted_at = 0";
+        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId)
+        + "))"
+        + " AND pv.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pv", tenantId);
   }
 
   public String deletePolicyVersionsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + POLICY_VERSION_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 
   public String selectPolicyVersionsByRetentionCount(
       @Param("versionRetentionCount") Long versionRetentionCount) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT policy_id as policyId, "
         + "Max(version) as version "
         + "FROM "
         + POLICY_VERSION_TABLE_NAME
         + " WHERE version > #{versionRetentionCount} AND deleted_at = 0 "
-        + "GROUP BY policy_id";
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " GROUP BY policy_id";
   }
 
   public String softDeletePolicyVersionsByRetentionLine(
       @Param("policyId") Long policyId,
       @Param("versionRetentionLine") long versionRetentionLine,
       @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE policy_id = #{policyId} AND version <= #{versionRetentionLine} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + " LIMIT #{limit}";
   }
 
   public String softDeletePolicyVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 }

@@ -127,12 +127,12 @@ export function CreateLLMModal({
       isOpen={isOpen}
       onClose={handleClose}
       size="sm"
-      title="添加模型"
+      title="Add model"
       footerRight={
         <>
           <ModalCancelButton onClick={handleClose} disabled={isSubmitting} />
           <ModalPrimaryButton onClick={handleSubmit} disabled={!isValid || isSubmitting} loading={isSubmitting}>
-            确认添加
+            Confirm to add
           </ModalPrimaryButton>
         </>
       }
@@ -140,13 +140,13 @@ export function CreateLLMModal({
       <div className="space-y-4">
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            模型名称 <span className="text-rose-500">*</span>
+            Model name <span className="text-rose-500">*</span>
           </label>
           <input
             type="text"
             value={form.name}
             onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-            placeholder="如：GPT-4o"
+            placeholder="Such as：GPT-4o"
             className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
@@ -166,7 +166,7 @@ export function CreateLLMModal({
 
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            API Key（可选）
+            API Key（Optional）
           </label>
           <div className="relative">
             <input
@@ -182,7 +182,7 @@ export function CreateLLMModal({
               variant="ghost"
               size="tiny"
               className="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 dark:text-slate-500 hover:text-indigo-500 transition-colors"
-              aria-label={isApiKeyVisible ? '隐藏 API Key' : '显示 API Key'}
+              aria-label={isApiKeyVisible ? 'hide API Key' : 'show API Key'}
             >
               {isApiKeyVisible ? <EyeOff size={14} /> : <Eye size={14} />}
             </Button>
@@ -197,46 +197,46 @@ export function CreateLLMModal({
             value={form.provider}
             onChange={(value) => handleProviderChange(value as LlmProvider)}
             options={providerOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
-            dropdownHeader="选择供应商"
+            dropdownHeader="Select supplier"
             size="sm"
           />
         </div>
 
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            模型 ID <span className="text-rose-500">*</span>
+            model ID <span className="text-rose-500">*</span>
           </label>
           <Select
             value={form.providerModelId}
             onChange={(value) => setForm((prev) => ({ ...prev, providerModelId: value }))}
             options={modelIdOptions}
-            placeholder={modelIdOptions.length > 0 ? '请选择模型 ID' : '该 Provider 暂无可选 modelIds'}
-            dropdownHeader="选择模型 ID"
+            placeholder={modelIdOptions.length > 0 ? 'Please select a model ID' : 'the Provider No options available yet modelIds'}
+            dropdownHeader="Select model ID"
             size="sm"
           />
         </div>
 
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            模型类型 <span className="text-rose-500">*</span>
+            Model type <span className="text-rose-500">*</span>
           </label>
           <Select
             value={form.modelType}
             onChange={(value) => setForm((prev) => ({ ...prev, modelType: value as ModelCategory }))}
             options={MODEL_TYPE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
-            dropdownHeader="选择模型类型"
+            dropdownHeader="Select model type"
             size="sm"
           />
         </div>
 
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            描述
+            Description
           </label>
           <textarea
             value={form.description}
             onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-            placeholder="模型描述（可选）"
+            placeholder="Model description（Optional）"
             className="w-full min-h-[88px] px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 resize-none"
           />
         </div>

@@ -1,55 +1,52 @@
 package com.sunny.datapillar.auth.security;
 
-import com.sunny.datapillar.common.utils.JwtUtil;
-import io.jsonwebtoken.Claims;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import com.sunny.datapillar.auth.config.AuthProperties;
+import io.jsonwebtoken.Claims;
+import org.junit.jupiter.api.Test;
+
 class JwtTokenTest {
 
-    private static final String SECRET = "DatapillarJwtSecretKey123456789012345678901234567890";
+  private JwtToken buildJwtToken() {
+    AuthProperties properties = new AuthProperties();
+    properties.getToken().setIssuer("https://auth.datapillar.local");
+    properties.getToken().setAudience("datapillar-api");
+    properties.getToken().setPrivateKeyPath("classpath:security/auth-token-dev-private.pem");
+    properties.getToken().setPublicKeyPath("classpath:security/auth-token-dev-public.pem");
+    properties.getToken().setAccessTtlSeconds(60);
+    properties.getToken().setRefreshTtlSeconds(604800);
+    properties.getToken().setRefreshRememberTtlSeconds(2592000);
+    properties.getToken().setLoginTtlSeconds(300);
+    properties.getJwks().setActiveKid("auth-dev-2026-01");
+    properties.validate();
+    return new JwtToken(properties);
+  }
 
-    private JwtUtil buildJwtUtil() {
-        return new JwtUtil(SECRET, "datapillar-auth");
-    }
+  @Test
+  void generateRefreshToken_shouldUseDefaultExpirationWhenRememberMeFalse() {
+    JwtToken jwtToken = buildJwtToken();
+    String token = jwtToken.generateRefreshToken(1L, 10L, false);
 
-    private JwtToken buildTokenUtil() {
-        return new JwtToken(
-                buildJwtUtil(),
-                60,
-                604800,
-                2592000,
-                300
-        );
-    }
+    Claims claims = jwtToken.parseToken(token);
+    long ttlSeconds = (claims.getExpiration().getTime() - claims.getIssuedAt().getTime()) / 1000;
 
-    @Test
-    void generateRefreshToken_shouldUseDefaultExpirationWhenRememberMeFalse() {
-        JwtToken jwtToken = buildTokenUtil();
-        JwtUtil jwtUtil = buildJwtUtil();
-        String token = jwtToken.generateRefreshToken(1L, 10L, false);
+    assertEquals(jwtToken.getRefreshTokenExpiration(false), ttlSeconds);
+    assertNotNull(jwtToken.getSessionId(claims));
+    assertNotNull(jwtToken.getTokenId(claims));
+  }
 
-        Claims claims = jwtUtil.parseToken(token);
-        long ttlSeconds = (claims.getExpiration().getTime() - claims.getIssuedAt().getTime()) / 1000;
+  @Test
+  void generateRefreshToken_shouldUseRememberExpirationWhenRememberMeTrue() {
+    JwtToken jwtToken = buildJwtToken();
+    String token = jwtToken.generateRefreshToken(1L, 10L, true);
 
-        assertEquals(jwtToken.getRefreshTokenExpiration(false), ttlSeconds);
-        assertNotNull(jwtUtil.getSessionId(claims));
-        assertNotNull(jwtUtil.getTokenId(claims));
-    }
+    Claims claims = jwtToken.parseToken(token);
+    long ttlSeconds = (claims.getExpiration().getTime() - claims.getIssuedAt().getTime()) / 1000;
 
-    @Test
-    void generateRefreshToken_shouldUseRememberExpirationWhenRememberMeTrue() {
-        JwtToken jwtToken = buildTokenUtil();
-        JwtUtil jwtUtil = buildJwtUtil();
-        String token = jwtToken.generateRefreshToken(1L, 10L, true);
-
-        Claims claims = jwtUtil.parseToken(token);
-        long ttlSeconds = (claims.getExpiration().getTime() - claims.getIssuedAt().getTime()) / 1000;
-
-        assertEquals(jwtToken.getRefreshTokenExpiration(true), ttlSeconds);
-        assertNotNull(jwtUtil.getSessionId(claims));
-        assertNotNull(jwtUtil.getTokenId(claims));
-    }
+    assertEquals(jwtToken.getRefreshTokenExpiration(true), ttlSeconds);
+    assertNotNull(jwtToken.getSessionId(claims));
+    assertNotNull(jwtToken.getTokenId(claims));
+  }
 }

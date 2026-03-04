@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        先说问题，再说方案。避免只给“想法标题”。
+        Describe the problem first, then the solution. Avoid only giving an idea title.
   - type: textarea
     id: problem
     attributes:

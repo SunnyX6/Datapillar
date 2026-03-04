@@ -176,10 +176,10 @@ public class MetalakeIT extends BaseIT {
 
   @Test
   public void testCreateMetalakeWithChinese() {
-    client.createMetalake(metalakeNameA, "这是中文comment", Collections.emptyMap());
+    client.createMetalake(metalakeNameA, "this is chinesecomment", Collections.emptyMap());
     GravitinoMetalake metalake = client.loadMetalake(metalakeNameA);
     assertEquals(metalakeNameA, metalake.name());
-    assertEquals("这是中文comment", metalake.comment());
+    assertEquals("this is chinesecomment", metalake.comment());
     assertEquals(AuthConstants.ANONYMOUS_USER, metalake.auditInfo().creator());
 
     // Test metalake name already exists

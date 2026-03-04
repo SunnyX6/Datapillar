@@ -8,8 +8,7 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
- * AI模型授权实体
- * 负责AI模型授权核心逻辑实现
+ * AIModel Authorization Entity responsibleAIModel authorization core logic implementation
  *
  * @author Sunny
  * @date 2026-02-22
@@ -18,36 +17,36 @@ import lombok.Data;
 @TableName("ai_model_grant")
 public class AiModelGrant {
 
-    @TableId(value = "id", type = IdType.AUTO)
-    private Long id;
+  @TableId(value = "id", type = IdType.AUTO)
+  private Long id;
 
-    @TableField("tenant_id")
-    private Long tenantId;
+  @TableField("tenant_id")
+  private Long tenantId;
 
-    @TableField("user_id")
-    private Long userId;
+  @TableField("user_id")
+  private Long userId;
 
-    @TableField("model_id")
-    private Long modelId;
+  @TableField("model_id")
+  private Long modelId;
 
-    @TableField("permission_id")
-    private Long permissionId;
+  @TableField("permission_id")
+  private Long permissionId;
 
-    @TableField("is_default")
-    private Boolean isDefault;
+  @TableField("is_default")
+  private Boolean isDefault;
 
-    @TableField("granted_by")
-    private Long grantedBy;
+  @TableField("granted_by")
+  private Long grantedBy;
 
-    @TableField("granted_at")
-    private LocalDateTime grantedAt;
+  @TableField("granted_at")
+  private LocalDateTime grantedAt;
 
-    @TableField("updated_by")
-    private Long updatedBy;
+  @TableField("updated_by")
+  private Long updatedBy;
 
-    @TableField("updated_at")
-    private LocalDateTime updatedAt;
+  @TableField("updated_at")
+  private LocalDateTime updatedAt;
 
-    @TableField("expires_at")
-    private LocalDateTime expiresAt;
+  @TableField("expires_at")
+  private LocalDateTime expiresAt;
 }

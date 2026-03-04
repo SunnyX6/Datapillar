@@ -23,11 +23,13 @@ import static org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper.T
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.ibatis.annotations.Param;
 
 public class CatalogMetaBaseSQLProvider {
   public String listCatalogPOsByMetalakeName(@Param("metalakeName") String metalakeName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT cm.catalog_id as catalogId, cm.catalog_name as catalogName,"
         + " cm.metalake_id as metalakeId, cm.type, cm.provider,"
         + " cm.catalog_comment as catalogComment, cm.properties, cm.audit_info as auditInfo,"
@@ -39,10 +41,15 @@ public class CatalogMetaBaseSQLProvider {
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON cm.metalake_id = mm.metalake_id"
         + " WHERE mm.metalake_name = #{metalakeName}"
-        + " AND mm.deleted_at = 0 AND cm.deleted_at = 0";
+        + " AND mm.deleted_at = 0 AND cm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("cm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId);
   }
 
   public String listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT catalog_id as catalogId, catalog_name as catalogName,"
         + " metalake_id as metalakeId, type, provider,"
         + " catalog_comment as catalogComment, properties, audit_info as auditInfo,"
@@ -50,10 +57,12 @@ public class CatalogMetaBaseSQLProvider {
         + " deleted_at as deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String listCatalogPOsByCatalogIds(@Param("catalogIds") List<Long> catalogIds) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "SELECT catalog_id as catalogId, catalog_name as catalogName,"
         + " metalake_id as metalakeId, type, provider,"
@@ -68,29 +77,40 @@ public class CatalogMetaBaseSQLProvider {
         + "</foreach>"
         + ") "
         + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + "</script>";
   }
 
   public String selectCatalogIdByName(
       @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT cm.catalog_id as catalogId FROM "
         + TABLE_NAME
         + " cm JOIN "
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON cm.metalake_id = mm.metalake_id"
         + " WHERE catalog_name = #{catalogName} AND mm.metalake_name = #{metalakeName}"
-        + " AND cm.deleted_at = 0 AND mm.deleted_at = 0";
+        + " AND cm.deleted_at = 0 AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("cm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId);
   }
 
   public String selectCatalogIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT catalog_id as catalogId FROM "
         + TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND catalog_name = #{catalogName} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND catalog_name = #{catalogName} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectCatalogMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT catalog_id as catalogId, catalog_name as catalogName,"
         + " metalake_id as metalakeId, type, provider,"
         + " catalog_comment as catalogComment, properties, audit_info as auditInfo,"
@@ -98,11 +118,14 @@ public class CatalogMetaBaseSQLProvider {
         + " deleted_at as deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND catalog_name = #{catalogName} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND catalog_name = #{catalogName} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectCatalogMetaByName(
       @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT cm.catalog_id as catalogId, cm.catalog_name as catalogName,"
         + " cm.metalake_id as metalakeId, cm.type, cm.provider,"
         + " cm.catalog_comment as catalogComment, cm.properties, cm.audit_info as auditInfo,"
@@ -114,19 +137,29 @@ public class CatalogMetaBaseSQLProvider {
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON cm.metalake_id = mm.metalake_id"
         + " WHERE cm.catalog_name = #{catalogName} AND mm.metalake_name = #{metalakeName}"
-        + " AND cm.deleted_at = 0 AND mm.deleted_at = 0";
+        + " AND cm.deleted_at = 0 AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("cm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId);
   }
 
   public String selectCatalogIdByMetalakeNameAndCatalogName(
       @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT me.metalake_id as metalakeId, ca.catalog_id as catalogId FROM "
         + TABLE_NAME
         + " ca INNER JOIN metalake_meta me ON ca.metalake_id = me.metalake_id"
         + " WHERE me.metalake_name = #{metalakeName} AND ca.catalog_name = #{catalogName} "
-        + " AND ca.deleted_at = 0 AND me.deleted_at = 0";
+        + " AND ca.deleted_at = 0 AND me.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ca", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("me", tenantId);
   }
 
   public String selectCatalogMetaById(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT catalog_id as catalogId, catalog_name as catalogName,"
         + " metalake_id as metalakeId, type, provider,"
         + " catalog_comment as catalogComment, properties, audit_info as auditInfo,"
@@ -134,15 +167,19 @@ public class CatalogMetaBaseSQLProvider {
         + " deleted_at as deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TABLE_NAME
         + "(catalog_id, catalog_name, metalake_id,"
         + " type, provider, catalog_comment, properties, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{catalogMeta.catalogId},"
         + " #{catalogMeta.catalogName},"
@@ -154,16 +191,21 @@ public class CatalogMetaBaseSQLProvider {
         + " #{catalogMeta.auditInfo},"
         + " #{catalogMeta.currentVersion},"
         + " #{catalogMeta.lastVersion},"
-        + " #{catalogMeta.deletedAt}"
+        + " #{catalogMeta.deletedAt},"
+        + " "
+        + tenantId
         + " )";
   }
 
   public String insertCatalogMetaOnDuplicateKeyUpdate(@Param("catalogMeta") CatalogPO catalogPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TABLE_NAME
         + "(catalog_id, catalog_name, metalake_id,"
         + " type, provider, catalog_comment, properties, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{catalogMeta.catalogId},"
         + " #{catalogMeta.catalogName},"
@@ -175,7 +217,9 @@ public class CatalogMetaBaseSQLProvider {
         + " #{catalogMeta.auditInfo},"
         + " #{catalogMeta.currentVersion},"
         + " #{catalogMeta.lastVersion},"
-        + " #{catalogMeta.deletedAt}"
+        + " #{catalogMeta.deletedAt},"
+        + " "
+        + tenantId
         + " )"
         + " ON DUPLICATE KEY UPDATE"
         + " catalog_name = #{catalogMeta.catalogName},"
@@ -193,6 +237,7 @@ public class CatalogMetaBaseSQLProvider {
   public String updateCatalogMeta(
       @Param("newCatalogMeta") CatalogPO newCatalogPO,
       @Param("oldCatalogMeta") CatalogPO oldCatalogPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET catalog_name = #{newCatalogMeta.catalogName},"
@@ -216,29 +261,37 @@ public class CatalogMetaBaseSQLProvider {
         + " AND audit_info = #{oldCatalogMeta.auditInfo}"
         + " AND current_version = #{oldCatalogMeta.currentVersion}"
         + " AND last_version = #{oldCatalogMeta.lastVersion}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteCatalogMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 }

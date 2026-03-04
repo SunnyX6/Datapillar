@@ -1,5 +1,6 @@
 package com.sunny.datapillar.studio.module.workflow.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.sunny.datapillar.studio.dto.llm.request.*;
 import com.sunny.datapillar.studio.dto.llm.response.*;
 import com.sunny.datapillar.studio.dto.project.request.*;
@@ -14,32 +15,30 @@ import com.sunny.datapillar.studio.dto.user.request.*;
 import com.sunny.datapillar.studio.dto.user.response.*;
 import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
-import com.fasterxml.jackson.databind.JsonNode;
 
 /**
- * 工作流Run业务服务
- * 提供工作流Run业务业务能力与领域服务
+ * WorkflowRunbusiness services Provide workflowRunBusiness capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface WorkflowRunBizService {
 
-    JsonNode triggerWorkflow(Long id, WorkflowTriggerRequest request);
+  JsonNode triggerWorkflow(Long id, WorkflowTriggerRequest request);
 
-    JsonNode getWorkflowRuns(Long id, int limit, int offset, String state);
+  JsonNode getWorkflowRuns(Long id, int limit, int offset, String state);
 
-    JsonNode getWorkflowRun(Long id, String runId);
+  JsonNode getWorkflowRun(Long id, String runId);
 
-    JsonNode getRunJobs(Long id, String runId);
+  JsonNode getRunJobs(Long id, String runId);
 
-    JsonNode getRunJob(Long id, String runId, String jobId);
+  JsonNode getRunJob(Long id, String runId, String jobId);
 
-    JsonNode getJobLogs(Long id, String runId, String jobId, int tryNumber);
+  JsonNode getJobLogs(Long id, String runId, String jobId, int tryNumber);
 
-    JsonNode rerunJob(Long id, String runId, String jobId, WorkflowRerunJobRequest request);
+  JsonNode rerunJob(Long id, String runId, String jobId, WorkflowRerunJobRequest request);
 
-    JsonNode setJobState(Long id, String runId, String jobId, WorkflowSetJobStatusRequest request);
+  JsonNode setJobState(Long id, String runId, String jobId, WorkflowSetJobStatusRequest request);
 
-    JsonNode clearJobs(Long id, String runId, WorkflowClearJobsRequest request);
+  JsonNode clearJobs(Long id, String runId, WorkflowClearJobsRequest request);
 }

@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.JobMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.JobPO;
 import org.apache.ibatis.annotations.Param;
@@ -29,25 +30,34 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
 
   @Override
   public String insertJobMetaOnDuplicateKeyUpdate(@Param("jobMeta") JobPO jobPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + JobMetaMapper.TABLE_NAME
         + " (job_run_id, job_template_id, metalake_id,"
         + " job_execution_id, job_run_status, job_finished_at, audit_info, current_version,"
-        + " last_version, deleted_at)"
+        + " last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES (#{jobMeta.jobRunId},"
         + " (SELECT job_template_id FROM "
         + JobTemplateMetaMapper.TABLE_NAME
         + " WHERE job_template_name = #{jobMeta.jobTemplateName}"
-        + " AND metalake_id = #{jobMeta.metalakeId} AND deleted_at = 0),"
+        + " AND metalake_id = #{jobMeta.metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + "),"
         + " #{jobMeta.metalakeId}, #{jobMeta.jobExecutionId},"
         + " #{jobMeta.jobRunStatus}, #{jobMeta.jobFinishedAt}, #{jobMeta.auditInfo},"
         + " #{jobMeta.currentVersion}, #{jobMeta.lastVersion},"
-        + " #{jobMeta.deletedAt})"
+        + " #{jobMeta.deletedAt}, "
+        + tenantId
+        + ")"
         + " ON CONFLICT (job_run_id) DO UPDATE SET"
         + " job_template_id = (SELECT job_template_id FROM "
         + JobTemplateMetaMapper.TABLE_NAME
         + " WHERE job_template_name = #{jobMeta.jobTemplateName}"
-        + " AND metalake_id = #{jobMeta.metalakeId} AND deleted_at = 0),"
+        + " AND metalake_id = #{jobMeta.metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + "),"
         + " metalake_id = #{jobMeta.metalakeId},"
         + " job_execution_id = #{jobMeta.jobExecutionId},"
         + " job_run_status = #{jobMeta.jobRunStatus},"
@@ -62,6 +72,7 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
   public String softDeleteJobMetaByMetalakeAndTemplate(
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateName") String jobTemplateName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
@@ -69,47 +80,62 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
         + " WHERE metalake_id IN ("
         + " SELECT metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
-        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0)"
+        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ")"
         + " AND job_template_id IN ("
         + " SELECT job_template_id FROM "
         + JobTemplateMetaMapper.TABLE_NAME
-        + " WHERE job_template_name = #{jobTemplateName} AND deleted_at = 0)"
-        + " AND deleted_at = 0";
+        + " WHERE job_template_name = #{jobTemplateName} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ")"
+        + " AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteJobMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteJobMetaByRunId(@Param("jobRunId") Long jobRunId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE job_run_id = #{jobRunId} AND deleted_at = 0";
+        + " WHERE job_run_id = #{jobRunId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteJobMetasByLegacyTimeline(@Param("legacyTimeline") Long legacyTimeline) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE job_finished_at < #{legacyTimeline} AND job_finished_at > 0 AND deleted_at = 0";
+        + " WHERE job_finished_at < #{legacyTimeline} AND job_finished_at > 0 AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String deleteJobMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + JobMetaMapper.TABLE_NAME
         + " WHERE job_run_id IN (SELECT job_run_id FROM "
         + JobMetaMapper.TABLE_NAME
-        + " WHERE deleted_at < #{legacyTimeline} AND deleted_at > 0 LIMIT #{limit})";
+        + " WHERE deleted_at < #{legacyTimeline} AND deleted_at > 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit})";
   }
 }

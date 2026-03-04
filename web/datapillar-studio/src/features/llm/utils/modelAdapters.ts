@@ -113,7 +113,7 @@ export function mapAdminModelToRecord(model: LlmModelSource): ModelRecord {
     name: model.name,
     provider,
     providerLabel: resolveProviderLabel(provider, model.providerName),
-    description: model.description?.trim() || '暂无描述',
+    description: model.description?.trim() || 'No description yet',
     tags: model.tags ?? [],
     type,
     contextGroup,

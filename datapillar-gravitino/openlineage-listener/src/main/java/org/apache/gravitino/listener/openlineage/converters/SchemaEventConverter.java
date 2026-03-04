@@ -1,21 +1,19 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * regarding copyright ownership.The ASF licenses this file
+ * to you under the Apache License,Version 2.0 (the
+ * "License");you may not use this file except in compliance
+ * with the License.You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * Unless required by applicable law or agreed to in writing,* software distributed under the License is distributed on an
+ * "AS IS" BASIS,WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND,either express or implied.See the License for the
  * specific language governing permissions and limitations
- * under the License.
- */
+ * under the License.*/
 
 package org.apache.gravitino.listener.openlineage.converters;
 
@@ -36,9 +34,9 @@ import org.apache.gravitino.listener.api.info.SchemaInfo;
 import org.apache.gravitino.listener.openlineage.facets.GravitinoDatasetFacet;
 
 /**
- * Schema 事件转换器。
+ * Schema event converter.*
  *
- * <p>处理: CreateSchemaEvent, AlterSchemaEvent, DropSchemaEvent, LoadSchemaEvent
+ * <p>Process:CreateSchemaEvent,AlterSchemaEvent,DropSchemaEvent,LoadSchemaEvent
  */
 public class SchemaEventConverter extends BaseEventConverter {
 
@@ -63,7 +61,6 @@ public class SchemaEventConverter extends BaseEventConverter {
 
   private RunEvent convertCreateSchema(CreateSchemaEvent event) {
     NameIdentifier identifier = event.identifier();
-
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
@@ -79,7 +76,6 @@ public class SchemaEventConverter extends BaseEventConverter {
                             null))
                     .build())
             .build();
-
     return createRunEvent(
         event,
         "gravitino.create_schema",
@@ -91,9 +87,7 @@ public class SchemaEventConverter extends BaseEventConverter {
   private RunEvent convertAlterSchema(AlterSchemaEvent event) {
     NameIdentifier identifier = event.identifier();
     SchemaInfo schemaInfo = event.updatedSchemaInfo();
-
     GravitinoDatasetFacet gravitinoFacet = buildSchemaGravitinoFacet(event, schemaInfo);
-
     DatasetFacetsBuilder facetsBuilder =
         openLineage
             .newDatasetFacetsBuilder()
@@ -103,7 +97,6 @@ public class SchemaEventConverter extends BaseEventConverter {
             .lifecycleStateChange(
                 openLineage.newLifecycleStateChangeDatasetFacet(
                     OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.ALTER, null));
-
     if (gravitinoFacet != null) {
       facetsBuilder.put(GRAVITINO_FACET_KEY, gravitinoFacet);
     }
@@ -115,7 +108,6 @@ public class SchemaEventConverter extends BaseEventConverter {
             .name(identifier.name())
             .facets(facetsBuilder.build())
             .build();
-
     return createRunEvent(
         event,
         "gravitino.alter_schema",
@@ -126,7 +118,6 @@ public class SchemaEventConverter extends BaseEventConverter {
 
   private RunEvent convertDropSchema(DropSchemaEvent event) {
     NameIdentifier identifier = event.identifier();
-
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
@@ -141,7 +132,6 @@ public class SchemaEventConverter extends BaseEventConverter {
                             null))
                     .build())
             .build();
-
     return createRunEvent(
         event,
         "gravitino.drop_schema",
@@ -153,16 +143,13 @@ public class SchemaEventConverter extends BaseEventConverter {
   private RunEvent convertLoadSchema(LoadSchemaEvent event) {
     NameIdentifier identifier = event.identifier();
     SchemaInfo schemaInfo = event.loadedSchemaInfo();
-
     GravitinoDatasetFacet gravitinoFacet = buildSchemaGravitinoFacet(event, schemaInfo);
-
     DatasetFacetsBuilder facetsBuilder =
         openLineage
             .newDatasetFacetsBuilder()
             .documentation(
                 openLineage.newDocumentationDatasetFacet(
                     schemaInfo != null ? schemaInfo.comment() : null));
-
     if (gravitinoFacet != null) {
       facetsBuilder.put(GRAVITINO_FACET_KEY, gravitinoFacet);
     }
@@ -174,7 +161,6 @@ public class SchemaEventConverter extends BaseEventConverter {
             .name(identifier.name())
             .facets(facetsBuilder.build())
             .build();
-
     return createRunEvent(
         event,
         "gravitino.load_schema",
@@ -192,7 +178,6 @@ public class SchemaEventConverter extends BaseEventConverter {
         tenantFacetBuilder(event)
             .description(schemaInfo.comment())
             .properties(schemaInfo.properties());
-
     Audit audit = schemaInfo.audit();
     if (audit != null) {
       GravitinoDatasetFacet.fromAudit(builder, audit);

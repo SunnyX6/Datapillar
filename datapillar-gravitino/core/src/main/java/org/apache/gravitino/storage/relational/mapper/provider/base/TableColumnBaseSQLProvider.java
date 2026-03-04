@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -27,6 +28,7 @@ public class TableColumnBaseSQLProvider {
 
   public String listColumnPOsByTableIdAndVersion(
       @Param("tableId") Long tableId, @Param("tableVersion") Long tableVersion) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT t1.column_id AS columnId, t1.column_name AS columnName,"
         + " t1.column_position AS columnPosition,"
         + " t1.metalake_id AS metalakeId, t1.catalog_id AS catalogId,"
@@ -43,70 +45,91 @@ public class TableColumnBaseSQLProvider {
         + " FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " WHERE table_id = #{tableId} AND table_version <= #{tableVersion} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + " GROUP BY column_id) t2"
         + " ON t1.column_id = t2.column_id AND t1.table_version = t2.max_table_version"
-        + " AND t1.table_id = #{tableId}";
+        + " AND t1.table_id = #{tableId}"
+        + " WHERE "
+        + TenantSqlSupport.tenantPredicate("t1", tenantId);
   }
 
   public String insertColumnPOs(@Param("columnPOs") List<ColumnPO> columnPOs) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "INSERT INTO "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + "(column_id, column_name, column_position, metalake_id, catalog_id, schema_id,"
         + " table_id, table_version,"
         + " column_type, column_comment, column_nullable, column_auto_increment,"
-        + " column_default_value, column_op_type, deleted_at, audit_info)"
+        + " column_default_value, column_op_type, deleted_at, audit_info, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES "
         + "<foreach collection='columnPOs' item='item' separator=','>"
         + "(#{item.columnId}, #{item.columnName}, #{item.columnPosition}, #{item.metalakeId},"
         + " #{item.catalogId}, #{item.schemaId}, #{item.tableId}, #{item.tableVersion},"
         + " #{item.columnType}, #{item.columnComment}, #{item.nullable}, #{item.autoIncrement},"
-        + " #{item.defaultValue}, #{item.columnOpType}, #{item.deletedAt}, #{item.auditInfo})"
+        + " #{item.defaultValue}, #{item.columnOpType}, #{item.deletedAt}, #{item.auditInfo}, "
+        + tenantId
+        + ")"
         + "</foreach>"
         + "</script>";
   }
 
   public String softDeleteColumnsByTableId(@Param("tableId") Long tableId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE table_id = #{tableId} AND deleted_at = 0";
+        + " WHERE table_id = #{tableId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteColumnsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteColumnsByCatalogId(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteColumnsBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteColumnPOsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 
   public String selectColumnIdByTableIdAndName(
       @Param("tableId") Long tableId, @Param("columnName") String name) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT"
         + "   CASE"
         + "     WHEN column_op_type = 3 THEN NULL"
@@ -115,10 +138,13 @@ public class TableColumnBaseSQLProvider {
         + " FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " WHERE table_id = #{tableId} AND column_name = #{columnName} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + " ORDER BY table_version DESC LIMIT 1";
   }
 
   public String selectColumnPOById(@Param("columnId") Long columnId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT column_id AS columnId, column_name AS columnName,"
         + " column_position AS columnPosition, metalake_id AS metalakeId, catalog_id AS catalogId,"
         + " schema_id AS schemaId, table_id AS tableId,"
@@ -130,10 +156,13 @@ public class TableColumnBaseSQLProvider {
         + " FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " WHERE column_id = #{columnId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + " ORDER BY table_version DESC LIMIT 1";
   }
 
   public String listColumnPOsByColumnIds(@Param("columnIds") List<Long> columnIds) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + " SELECT c.column_id AS columnId, c.column_name AS columnName,"
         + " c.column_position AS columnPosition, c.metalake_id AS metalakeId, c.catalog_id AS catalogId,"
@@ -154,7 +183,9 @@ public class TableColumnBaseSQLProvider {
         + "        <foreach collection='columnIds' item='columnId' separator=','>"
         + "          #{columnId}"
         + "        </foreach>"
-        + "    ) AND deleted_at = 0 GROUP BY column_id"
+        + "    ) AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " GROUP BY column_id"
         + ") latest "
         + "ON c.column_id = latest.column_id AND c.table_version = latest.max_version"
         + " WHERE c.column_id IN ("
@@ -163,6 +194,8 @@ public class TableColumnBaseSQLProvider {
         + "</foreach>"
         + ") "
         + " AND c.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("c", tenantId)
         + "</script>";
   }
 }

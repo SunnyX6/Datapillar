@@ -1,7 +1,7 @@
 # @author Sunny
 # @date 2026-02-19
 
-"""Auth 加解密 Dubbo RPC 客户端。"""
+"""Auth Encryption and decryption Dubbo RPC client."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ class _RpcEndpoint:
 
 
 class AuthCryptoRpcClient:
-    """Auth Crypto RPC 调用客户端。"""
+    """Auth Crypto RPC Call client."""
 
     def __init__(
         self,
@@ -75,7 +75,7 @@ class AuthCryptoRpcClient:
         self._lock = asyncio.Lock()
 
     async def decrypt_llm_api_key(self, *, tenant_code: str, ciphertext: str) -> str:
-        """解密 LLM API Key。"""
+        """Decrypt LLM API Key."""
         endpoint = await self._resolve_endpoint()
         request = self._build_runtime_decrypt_request(
             tenant_code=tenant_code, ciphertext=ciphertext
@@ -84,7 +84,7 @@ class AuthCryptoRpcClient:
         return self._extract_plaintext(response)
 
     def decrypt_llm_api_key_sync(self, *, tenant_code: str, ciphertext: str) -> str:
-        """同步上下文使用的解密入口。"""
+        """Decryption entry used by synchronization context."""
         coroutine = self.decrypt_llm_api_key(tenant_code=tenant_code, ciphertext=ciphertext)
         try:
             asyncio.get_running_loop()
@@ -97,12 +97,9 @@ class AuthCryptoRpcClient:
         *,
         tenant_code: str,
         ciphertext: str,
-        caller_service: str,
     ) -> DecryptRequest:
         request = DecryptRequest()
         request.meta.protocol_version = _PROTO_PROTOCOL_VERSION
-        request.meta.caller_service = caller_service
-        request.meta.attrs["caller"] = caller_service
         request.tenant_code = tenant_code
         request.purpose = _PURPOSE_LLM_API_KEY
         request.ciphertext = ciphertext
@@ -111,26 +108,24 @@ class AuthCryptoRpcClient:
     def _build_runtime_decrypt_request(self, *, tenant_code: str, ciphertext: str):
         valid_tenant_code = self._validate_tenant_code(tenant_code)
         normalized_ciphertext = self._validate_ciphertext(ciphertext)
-        caller_service = get_nacos_runtime().config.service_name
         return self._build_decrypt_request(
             tenant_code=valid_tenant_code,
             ciphertext=normalized_ciphertext,
-            caller_service=caller_service,
         )
 
     def _extract_plaintext(self, response: Any) -> str:
         if response is None:
-            raise ServiceUnavailableException("密钥存储服务不可用")
+            raise ServiceUnavailableException("Key storage service is unavailable")
 
         if response.HasField("error"):
             self._raise_rpc_error(response.error)
 
         if not response.HasField("data"):
-            raise ServiceUnavailableException("密钥存储服务不可用")
+            raise ServiceUnavailableException("Key storage service is unavailable")
 
         plaintext = str(getattr(response.data, "plaintext", "") or "").strip()
         if not plaintext:
-            raise RuntimeError("Auth Crypto RPC 返回空明文")
+            raise RuntimeError("Auth Crypto RPC Return empty plaintext")
         return plaintext
 
     async def _call_decrypt(self, *, endpoint: _RpcEndpoint, request):
@@ -154,7 +149,7 @@ class AuthCryptoRpcClient:
 
         if last_unimplemented_error is not None:
             raise last_unimplemented_error
-        raise RuntimeError("Auth Crypto RPC Decrypt 调用失败")
+        raise RuntimeError("Auth Crypto RPC Decrypt call failed")
 
     def _build_rpc_metadata(self) -> tuple[tuple[str, str], tuple[str, str]]:
         return (
@@ -184,7 +179,7 @@ class AuthCryptoRpcClient:
     def _raise_rpc_error(self, rpc_error: Any) -> None:
         code = int(getattr(rpc_error, "code", Code.INTERNAL_ERROR) or Code.INTERNAL_ERROR)
         error_type = str(getattr(rpc_error, "type", "") or "").strip()
-        message = str(getattr(rpc_error, "message", "") or "").strip() or "服务调用失败"
+        message = str(getattr(rpc_error, "message", "") or "").strip() or "Service call failed"
         context = dict(getattr(rpc_error, "context", {}) or {})
         retryable = bool(getattr(rpc_error, "retryable", False))
 
@@ -268,7 +263,7 @@ class AuthCryptoRpcClient:
         if endpoint is not None:
             return endpoint
 
-        raise RuntimeError("未发现 Auth Crypto RPC 服务实例")
+        raise RuntimeError("not found Auth Crypto RPC Service instance")
 
     async def _discover_from_service_names(
         self,
@@ -362,7 +357,9 @@ class AuthCryptoRpcClient:
                 )
             )
         except Exception as exc:
-            logger.debug("查询 Auth Crypto 服务实例失败: service=%s err=%s", service_name, exc)
+            logger.debug(
+                "Query Auth Crypto Service instance failed:service=%s err=%s", service_name, exc
+            )
             return []
         return list(result or [])
 
@@ -418,13 +415,13 @@ class AuthCryptoRpcClient:
     def _validate_tenant_code(self, tenant_code: str) -> str:
         normalized = str(tenant_code or "").strip()
         if not normalized:
-            raise ValueError("tenant_code 无效")
+            raise ValueError("tenant_code Invalid")
         return normalized
 
     def _validate_ciphertext(self, ciphertext: str) -> str:
         normalized = str(ciphertext or "").strip()
         if not normalized:
-            raise ValueError("ciphertext 不能为空")
+            raise ValueError("ciphertext cannot be empty")
         return normalized
 
     def _deduplicate(self, values: list[str]) -> list[str]:
@@ -445,7 +442,7 @@ class AuthCryptoRpcClient:
         def _runner() -> None:
             try:
                 result["value"] = asyncio.run(coroutine)
-            except BaseException as exc:  # pragma: no cover - 防御分支
+            except BaseException as exc:  # pragma:no cover - defense branch
                 error["value"] = exc
 
         thread = threading.Thread(target=_runner, daemon=True)

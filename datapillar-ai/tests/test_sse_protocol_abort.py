@@ -1,9 +1,9 @@
 """
-SSE 协议 session.abort/interrupt 映射测试
+SSE Agreement session.abort/interrupt Mapping test
 """
 
-from src.modules.etl.sse_protocol import SseRunState, _map_payload
 from src.modules.etl.schemas.sse import ActivityStatus, RunStatus
+from src.modules.etl.sse_protocol import SseRunState, _map_payload
 
 
 def test_map_payload_session_abort() -> None:

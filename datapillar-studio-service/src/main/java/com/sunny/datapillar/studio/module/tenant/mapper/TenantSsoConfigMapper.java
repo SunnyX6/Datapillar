@@ -5,13 +5,11 @@ import com.sunny.datapillar.studio.module.tenant.entity.TenantSsoConfig;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * 租户单点登录配置Mapper
- * 负责租户单点登录配置数据访问与持久化映射
+ * Tenant single sign-on configurationMapper Responsible for tenant single sign-on configuration
+ * data access and persistence mapping
  *
  * @author Sunny
  * @date 2026-01-01
  */
 @Mapper
-public interface TenantSsoConfigMapper extends BaseMapper<TenantSsoConfig> {
-
-}
+public interface TenantSsoConfigMapper extends BaseMapper<TenantSsoConfig> {}

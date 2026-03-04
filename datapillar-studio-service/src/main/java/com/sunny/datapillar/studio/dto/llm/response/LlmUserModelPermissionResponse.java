@@ -7,23 +7,23 @@ import lombok.Data;
 @Schema(name = "LlmUserModelPermissionResponse")
 public class LlmUserModelPermissionResponse {
 
-    private Long aiModelId;
+  private Long aiModelId;
 
-    private String providerModelId;
+  private String providerModelId;
 
-    private String modelName;
+  private String modelName;
 
-    private String modelType;
+  private String modelType;
 
-    private String modelStatus;
+  private String modelStatus;
 
-    private Long providerId;
+  private Long providerId;
 
-    private String providerCode;
+  private String providerCode;
 
-    private String providerName;
+  private String providerName;
 
-    private String permissionCode;
+  private String permissionCode;
 
-    private Boolean isDefault;
+  private Boolean isDefault;
 }

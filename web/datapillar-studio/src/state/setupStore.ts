@@ -23,7 +23,7 @@ function resolveErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message
   }
-  return '初始化状态检查失败'
+  return 'Initialization status check failed'
 }
 
 function buildReadyState(status: SetupStatusResponse) {

@@ -1,6 +1,7 @@
 package com.sunny.datapillar.gateway.filter;
 
 import com.sunny.datapillar.common.constant.HeaderConstants;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -10,11 +11,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import java.util.UUID;
-
 /**
- * 链路追踪ID过滤器
- * 负责链路追踪ID请求过滤与上下文控制
+ * link tracingIDfilter Responsible for link trackingIDRequest filtering and context control
  *
  * @author Sunny
  * @date 2026-01-01
@@ -23,59 +21,55 @@ import java.util.UUID;
 @Component
 public class TraceIdFilter implements GlobalFilter, Ordered {
 
-    @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        // 检查请求中是否已有 TraceId（来自上游）
-        String traceId = exchange.getRequest().getHeaders().getFirst(HeaderConstants.HEADER_TRACE_ID);
-        String requestId = exchange.getRequest().getHeaders().getFirst(HeaderConstants.HEADER_REQUEST_ID);
+  @Override
+  public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+    // Check if the request already has TraceId（from upstream）
+    String traceId = exchange.getRequest().getHeaders().getFirst(HeaderConstants.HEADER_TRACE_ID);
+    String requestId =
+        exchange.getRequest().getHeaders().getFirst(HeaderConstants.HEADER_REQUEST_ID);
 
-        if (traceId == null || traceId.isEmpty()) {
-            // 生成新的 TraceId
-            traceId = generateTraceId();
-        }
-        if (requestId == null || requestId.isEmpty()) {
-            // 生成新的 RequestId
-            requestId = generateRequestId();
-        }
-
-        // 将 TraceId 注入请求头，传递给下游服务
-        String finalTraceId = traceId;
-        String finalRequestId = requestId;
-        ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
-                .header(HeaderConstants.HEADER_TRACE_ID, finalTraceId)
-                .header(HeaderConstants.HEADER_REQUEST_ID, finalRequestId)
-                .build();
-
-        // 将 TraceId / RequestId 添加到响应头，方便客户端追踪
-        exchange.getResponse().getHeaders().add(HeaderConstants.HEADER_TRACE_ID, finalTraceId);
-        exchange.getResponse().getHeaders().add(HeaderConstants.HEADER_REQUEST_ID, finalRequestId);
-
-        return chain.filter(exchange.mutate().request(mutatedRequest).build());
+    if (traceId == null || traceId.isEmpty()) {
+      // generate new TraceId
+      traceId = generateTraceId();
+    }
+    if (requestId == null || requestId.isEmpty()) {
+      // generate new RequestId
+      requestId = generateRequestId();
     }
 
-    /**
-     * 生成 TraceId
-     * 格式：时间戳(毫秒) + 随机数
-     */
-    private String generateTraceId() {
-        return String.format("%d-%s",
-                System.currentTimeMillis(),
-                UUID.randomUUID().toString().substring(0, 8));
-    }
+    // will TraceId Inject request header，Passed to downstream services
+    String finalTraceId = traceId;
+    String finalRequestId = requestId;
+    ServerHttpRequest mutatedRequest =
+        exchange
+            .getRequest()
+            .mutate()
+            .header(HeaderConstants.HEADER_TRACE_ID, finalTraceId)
+            .header(HeaderConstants.HEADER_REQUEST_ID, finalRequestId)
+            .build();
 
-    /**
-     * 生成 RequestId
-     * 格式：req-时间戳(毫秒)-随机数
-     */
-    private String generateRequestId() {
-        return String.format("req-%d-%s",
-                System.currentTimeMillis(),
-                UUID.randomUUID().toString().substring(0, 8));
-    }
+    // will TraceId / RequestId Add to response header，Facilitate client tracking
+    exchange.getResponse().getHeaders().add(HeaderConstants.HEADER_TRACE_ID, finalTraceId);
+    exchange.getResponse().getHeaders().add(HeaderConstants.HEADER_REQUEST_ID, finalRequestId);
 
-    @Override
-    public int getOrder() {
-        // 最高优先级，在认证之前执行
-        return -200;
-    }
+    return chain.filter(exchange.mutate().request(mutatedRequest).build());
+  }
+
+  /** generate TraceId Format：Timestamp(milliseconds) + random number */
+  private String generateTraceId() {
+    return String.format(
+        "%d-%s", System.currentTimeMillis(), UUID.randomUUID().toString().substring(0, 8));
+  }
+
+  /** generate RequestId Format：req-Timestamp(milliseconds)-random number */
+  private String generateRequestId() {
+    return String.format(
+        "req-%d-%s", System.currentTimeMillis(), UUID.randomUUID().toString().substring(0, 8));
+  }
+
+  @Override
+  public int getOrder() {
+    // highest priority，Execute before authentication
+    return -200;
+  }
 }

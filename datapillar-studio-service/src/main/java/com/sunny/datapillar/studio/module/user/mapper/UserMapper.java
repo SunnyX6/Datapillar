@@ -1,17 +1,14 @@
 package com.sunny.datapillar.studio.module.user.mapper;
 
-import java.util.List;
-
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
-
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.sunny.datapillar.studio.module.user.entity.User;
 import com.sunny.datapillar.studio.module.user.entity.UserRole;
+import java.util.List;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 /**
- * 用户Mapper
- * 负责用户数据访问与持久化映射
+ * UserMapper Responsible for user data access and persistence mapping
  *
  * @author Sunny
  * @date 2026-01-01
@@ -19,61 +16,45 @@ import com.sunny.datapillar.studio.module.user.entity.UserRole;
 @Mapper
 public interface UserMapper extends BaseMapper<User> {
 
-    /**
-     * 根据用户名查询用户（包含角色信息）
-     */
-    User findByUsernameWithRoles(@Param("tenantId") Long tenantId, @Param("username") String username);
+  /** Query users based on username（Contains role information） */
+  User findByUsernameWithRoles(
+      @Param("tenantId") Long tenantId, @Param("username") String username);
 
-    /**
-     * 根据用户名查询用户
-     */
-    User findByUsername(@Param("tenantId") Long tenantId, @Param("username") String username);
+  /** Query users based on username */
+  User findByUsername(@Param("tenantId") Long tenantId, @Param("username") String username);
 
-    /**
-     * 全局查询用户（不做租户过滤）
-     */
-    User selectByUsernameGlobal(@Param("username") String username);
+  /** Query users globally（No tenant filtering） */
+  User selectByUsernameGlobal(@Param("username") String username);
 
-    /**
-     * 根据用户ID查询用户角色代码
-     */
-    List<String> getUserRoleCodes(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
+  /** According to userIDQuery user role code */
+  List<String> getUserRoleCodes(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 
-    /**
-     * 根据用户ID查询用户权限代码
-     */
-    List<String> getUserPermissionCodes(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
+  /** According to userIDQuery user permission code */
+  List<String> getUserPermissionCodes(
+      @Param("tenantId") Long tenantId, @Param("userId") Long userId);
 
-    /**
-     * 删除用户角色关联
-     */
-    void deleteUserRoles(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
+  /** Delete user role association */
+  void deleteUserRoles(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 
-    /**
-     * 插入用户角色关联
-     */
-    void insertUserRole(UserRole userRole);
+  /** Insert user role association */
+  void insertUserRole(UserRole userRole);
 
-    /**
-     * 按租户查询用户列表
-     */
-    List<User> selectUsersByTenantId(@Param("tenantId") Long tenantId);
+  /** Query user list by tenant */
+  List<User> selectUsersByTenantId(@Param("tenantId") Long tenantId);
 
-    /**
-     * 按租户和状态查询用户列表
-     */
-    List<User> selectUsersByTenantIdAndStatus(@Param("tenantId") Long tenantId,
-                                              @Param("status") Integer status);
+  /** Query user list by tenant and status */
+  List<User> selectUsersByTenantIdAndStatus(
+      @Param("tenantId") Long tenantId, @Param("status") Integer status);
 
-    /**
-     * 按租户查询用户详情
-     */
-    User selectByIdAndTenantId(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
+  /** Query user details by tenant */
+  User selectByIdAndTenantId(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 
-    /**
-     * 查询租户内指定等级及以上的用户ID（level 越小权限越高）
-     */
-    List<Long> selectUserIdsByMaxLevel(@Param("tenantId") Long tenantId,
-                                       @Param("userIds") List<Long> userIds,
-                                       @Param("maxLevel") Integer maxLevel);
+  /**
+   * Query users of a specified level and above in a tenantID（level The smaller the value, the
+   * higher the authority.）
+   */
+  List<Long> selectUserIdsByMaxLevel(
+      @Param("tenantId") Long tenantId,
+      @Param("userIds") List<Long> userIds,
+      @Param("maxLevel") Integer maxLevel);
 }

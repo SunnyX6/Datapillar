@@ -2,10 +2,7 @@
 # @date 2026-02-19
 
 """
-LLM Playground 请求契约。
-
-DEPRECATED:
-- 该模块保留给历史链路兼容
+LLM Playground request contract.DEPRECATED:- This module is reserved for historical link compatibility
 """
 
 from __future__ import annotations
@@ -14,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class PlaygroundModelConfig(BaseModel):
-    """Playground 模型参数。"""
+    """Playground Model parameters."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -25,7 +22,7 @@ class PlaygroundModelConfig(BaseModel):
 
 
 class PlaygroundChatRequest(BaseModel):
-    """Playground 聊天请求。"""
+    """Playground chat request."""
 
     model_config = ConfigDict(populate_by_name=True)
 

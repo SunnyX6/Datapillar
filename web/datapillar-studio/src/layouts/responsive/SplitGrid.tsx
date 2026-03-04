@@ -55,11 +55,11 @@ const formatColumn = (value: string | number) => {
 }
 
 /**
- * SplitGrid：可配置的双列自适应容器
+ * SplitGrid：Configurable dual-column adaptive container
  *
- * - 默认移动端堆叠，`stackAt` 控制切换断点
- * - `columns` 定义桌面端列宽，可以是百分比/`fr`/`px`
- * - `gapX`/`gapY` 统一使用 Tailwind 间距刻度
+ * - Default mobile stack，`stackAt` Control switching breakpoints
+ * - `columns` Define desktop column width，Can be a percentage/`fr`/`px`
+ * - `gapX`/`gapY` Use uniformly Tailwind spacing scale
  */
 export function SplitGrid({
   left,

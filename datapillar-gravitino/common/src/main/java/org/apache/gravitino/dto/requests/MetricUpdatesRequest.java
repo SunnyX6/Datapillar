@@ -25,7 +25,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** 表示批量更新指标的请求 */
+/** Represents a request to update metrics in batches */
 @Getter
 @EqualsAndHashCode
 @ToString
@@ -38,7 +38,7 @@ public class MetricUpdatesRequest implements RESTRequest {
     this.updates = updates;
   }
 
-  /** Jackson 反序列化使用的构造函数 */
+  /** Jackson Constructor used for deserialization */
   public MetricUpdatesRequest() {
     this(null);
   }

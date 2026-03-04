@@ -20,7 +20,7 @@ package org.apache.gravitino.storage.relational.po;
 
 import lombok.Getter;
 
-/** MetricModifier PO，对应 metric_modifier_meta 表 */
+/** MetricModifier PO，Correspond metric_modifier_meta table */
 @Getter
 public class MetricModifierPO {
   private Long modifierId;

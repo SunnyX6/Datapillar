@@ -1,16 +1,13 @@
 package com.sunny.datapillar.studio.module.workflow.mapper;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.sunny.datapillar.studio.module.workflow.entity.JobComponent;
 import java.util.List;
-
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.sunny.datapillar.studio.module.workflow.entity.JobComponent;
-
 /**
- * 任务ComponentMapper
- * 负责任务Component数据访问与持久化映射
+ * TaskComponentMapper Responsible for tasksComponentData access and persistence mapping
  *
  * @author Sunny
  * @date 2026-01-01
@@ -18,18 +15,12 @@ import com.sunny.datapillar.studio.module.workflow.entity.JobComponent;
 @Mapper
 public interface JobComponentMapper extends BaseMapper<JobComponent> {
 
-    /**
-     * 查询所有可用组件
-     */
-    List<JobComponent> selectAllComponents();
+  /** Query all available components */
+  List<JobComponent> selectAllComponents();
 
-    /**
-     * 根据 code 查询组件
-     */
-    JobComponent selectByCode(@Param("code") String code);
+  /** According to code Query component */
+  JobComponent selectByCode(@Param("code") String code);
 
-    /**
-     * 根据类型查询组件
-     */
-    List<JobComponent> selectByType(@Param("type") String type);
+  /** Query components by type */
+  List<JobComponent> selectByType(@Param("type") String type);
 }

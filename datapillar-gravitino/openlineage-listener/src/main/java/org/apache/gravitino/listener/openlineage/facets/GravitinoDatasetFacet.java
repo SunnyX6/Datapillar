@@ -1,21 +1,19 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * regarding copyright ownership.The ASF licenses this file
+ * to you under the Apache License,Version 2.0 (the
+ * "License");you may not use this file except in compliance
+ * with the License.You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * Unless required by applicable law or agreed to in writing,* software distributed under the License is distributed on an
+ * "AS IS" BASIS,WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND,either express or implied.See the License for the
  * specific language governing permissions and limitations
- * under the License.
- */
+ * under the License.*/
 
 package org.apache.gravitino.listener.openlineage.facets;
 
@@ -32,9 +30,10 @@ import lombok.Builder;
 import lombok.Getter;
 
 /**
- * Gravitino 自定义 Dataset Facet
+ * Gravitino Customize Dataset Facet
  *
- * <p>用于传递 Gravitino 特有的元数据，包括表描述、属性、审计信息等 OpenLineage 标准 facet 不支持的字段。
+ * <p>used to pass Gravitino unique metadata,Include table description,Properties,Audit
+ * information,etc.OpenLineage Standard facet Unsupported fields.
  */
 @Getter
 @Builder
@@ -42,7 +41,7 @@ import lombok.Getter;
 public class GravitinoDatasetFacet implements OpenLineage.DatasetFacet {
 
   private static final URI SCHEMA_URL =
-      URI.create("https://datapillar.io/spec/facets/GravitinoDatasetFacet.json");
+      URI.create("https://gravitino.apache.org/spec/facets/GravitinoDatasetFacet.json");
 
   @Getter(AccessLevel.NONE)
   @JsonProperty("_producer")
@@ -56,63 +55,63 @@ public class GravitinoDatasetFacet implements OpenLineage.DatasetFacet {
   @JsonProperty("_deleted")
   private final Boolean deleted;
 
-  /** 表/Schema 的描述 */
+  /** table/Schema Description */
   @JsonProperty("description")
   private final String description;
 
-  /** 租户 ID 快照 */
+  /** tenant ID Snapshot */
   @JsonProperty("tenantId")
   private final Long tenantId;
 
-  /** 租户编码快照 */
+  /** Tenant coding snapshot */
   @JsonProperty("tenantCode")
   private final String tenantCode;
 
-  /** 租户名称快照 */
+  /** Tenant name snapshot */
   @JsonProperty("tenantName")
   private final String tenantName;
 
-  /** 表/Schema 的扩展属性 */
+  /** table/Schema extended attributes */
   @JsonProperty("properties")
   private final Map<String, String> properties;
 
-  /** 分区信息（JSON 字符串） */
+  /** Partition information(JSON string) */
   @JsonProperty("partitions")
   private final String partitions;
 
-  /** 分布信息（JSON 字符串） */
+  /** Distribution information(JSON string) */
   @JsonProperty("distribution")
   private final String distribution;
 
-  /** 排序信息（JSON 字符串） */
+  /** Sort information(JSON string) */
   @JsonProperty("sortOrders")
   private final String sortOrders;
 
-  /** 索引信息（JSON 字符串） */
+  /** Index information(JSON string) */
   @JsonProperty("indexes")
   private final String indexes;
 
-  /** 创建者 */
+  /** Creator */
   @JsonProperty("creator")
   private final String creator;
 
-  /** 创建时间（ISO 8601） */
+  /** creation time(ISO 8601) */
   @JsonProperty("createTime")
   private final String createTime;
 
-  /** 最后修改者 */
+  /** last modified by */
   @JsonProperty("lastModifier")
   private final String lastModifier;
 
-  /** 最后修改时间（ISO 8601） */
+  /** last modified time(ISO 8601) */
   @JsonProperty("lastModifiedTime")
   private final String lastModifiedTime;
 
-  /** 列扩展元数据 */
+  /** Column extension metadata */
   @JsonProperty("columns")
   private final List<GravitinoColumnMetadata> columns;
 
-  /** 表变更列表（alter_table 事件时使用） */
+  /** table change list(alter_table Used during events) */
   @JsonProperty("changes")
   private final List<TableChangeInfo> changes;
 
@@ -136,33 +135,33 @@ public class GravitinoDatasetFacet implements OpenLineage.DatasetFacet {
     return new HashMap<>();
   }
 
-  /** 列扩展元数据 */
+  /** Column extension metadata */
   @Getter
   @Builder
   public static class GravitinoColumnMetadata {
-    /** 列名 */
+    /** List */
     @JsonProperty("name")
     private final String name;
 
-    /** 是否可空 */
+    /** Is it available? */
     @JsonProperty("nullable")
     private final Boolean nullable;
 
-    /** 是否自增 */
+    /** Whether to increment automatically */
     @JsonProperty("autoIncrement")
     private final Boolean autoIncrement;
 
-    /** 默认值表达式 */
+    /** default value expression */
     @JsonProperty("defaultValue")
     private final String defaultValue;
   }
 
-  /** 创建 Builder 并设置默认值 */
+  /** create Builder and set default value */
   public static GravitinoDatasetFacetBuilder builder(URI producer) {
     return new GravitinoDatasetFacetBuilder().producer(producer).schemaURL(SCHEMA_URL);
   }
 
-  /** 从 Audit 信息创建审计相关字段 */
+  /** from Audit Information creation audit related fields */
   public static GravitinoDatasetFacetBuilder fromAudit(
       GravitinoDatasetFacetBuilder builder, org.apache.gravitino.Audit audit) {
     if (audit == null) {

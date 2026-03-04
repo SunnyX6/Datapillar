@@ -79,7 +79,7 @@ function extractErrorMessage(raw: string): string {
       return record.detail
     }
   }
-  return raw || '请求失败'
+  return raw || 'Request failed'
 }
 
 function resolveDelta(rawData: string): string {
@@ -152,7 +152,7 @@ export function createLlmPlaygroundStream(
       }
 
       if (!response.body) {
-        callbacks.onError('SSE 响应流不可用')
+        callbacks.onError('SSE Response stream is not available')
         return
       }
 

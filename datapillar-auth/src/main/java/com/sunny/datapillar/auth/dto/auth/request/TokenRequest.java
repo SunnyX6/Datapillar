@@ -8,8 +8,8 @@ import lombok.Data;
 @Schema(name = "AuthTokenRequest")
 public class TokenRequest {
 
-    @NotBlank(message = "Token 不能为空")
-    private String token;
+  @NotBlank(message = "Token must not be blank")
+  private String token;
 
-    private String refreshToken;
+  private String refreshToken;
 }

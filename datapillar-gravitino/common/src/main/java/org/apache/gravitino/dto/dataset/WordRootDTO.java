@@ -29,7 +29,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.dataset.WordRoot;
 import org.apache.gravitino.dto.AuditDTO;
 
-/** 表示词根的 DTO (Data Transfer Object) */
+/** expressing root DTO (Data Transfer Object) */
 @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @EqualsAndHashCode

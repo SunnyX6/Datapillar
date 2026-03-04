@@ -1,7 +1,7 @@
 # @author Sunny
 # @date 2026-02-22
 
-"""请求上下文工具。"""
+"""Request context tool."""
 
 from src.shared.context.request_scope import (
     RequestScope,

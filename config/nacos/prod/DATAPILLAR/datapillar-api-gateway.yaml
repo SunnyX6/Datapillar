@@ -11,7 +11,7 @@ spring:
     gateway:
       server:
         webflux:
-          # 全局 CORS 配置
+          # overall situation CORS Configuration
           globalcors:
             cors-configurations:
               '[/**]':
@@ -28,7 +28,7 @@ spring:
                 allowCredentials: true
                 maxAge: 3600
 
-          # 默认过滤器
+          # Default filter
           default-filters:
             - name: RequestRateLimiter
               args:
@@ -38,19 +38,10 @@ spring:
                 key-resolver: "#{@ipKeyResolver}"
                 deny-empty-key: false
 
-          # 路由配置（全部走服务发现）
+          # Routing configuration（All go to service discovery）
           routes:
-            # 1. 登录服务 (datapillar-auth)
-            # 重写: /api/login/** → /login/**
-            - id: login-service
-              uri: lb://datapillar-auth
-              predicates:
-                - Path=/api/login/**
-              filters:
-                - RewritePath=/api/login(?<segment>/?.*), /login${segment}
-
-            # 2. 认证服务 OpenAPI 文档 (datapillar-auth)
-            # 重写: /api/auth/v3/api-docs/** → /v3/api-docs/**
+            # 1. Authentication services OpenAPI Documentation (datapillar-auth)
+            # rewrite: /api/auth/v3/api-docs/** → /v3/api-docs/**
             - id: auth-docs
               uri: lb://datapillar-auth
               order: -10
@@ -59,8 +50,8 @@ spring:
               filters:
                 - RewritePath=/api/auth/v3/api-docs(?<segment>/?.*), /v3/api-docs${segment}
 
-            # 3. 认证服务 (datapillar-auth)
-            # 重写: /api/auth/** → /auth/**
+            # 2. Authentication services (datapillar-auth)
+            # rewrite: /api/auth/** → /auth/**
             - id: auth-service
               uri: lb://datapillar-auth
               predicates:
@@ -68,53 +59,59 @@ spring:
               filters:
                 - RewritePath=/api(?<segment>/?.*), ${segment}
 
-            # 4. Studio OpenAPI 文档
+            # 3. Studio OpenAPI Documentation
             - id: studio-docs
               uri: lb://datapillar-studio-service
               order: -10
               predicates:
                 - Path=/api/studio/v3/api-docs,/api/studio/v3/api-docs/**
 
-            # 5. Studio 初始化接口（初始化前无需登录）
+            # 4. Studio Initialization interface（No need to log in before initialization）
             - id: studio-setup
               uri: lb://datapillar-studio-service
               predicates:
                 - Path=/api/studio/setup,/api/studio/setup/**
 
-            # 6. Studio 健康检查接口（无需登录）
+            # 5. Studio Health check interface（No login required）
             - id: studio-health
               uri: lb://datapillar-studio-service
               order: -10
               predicates:
                 - Path=/api/studio/actuator/health,/api/studio/actuator/health/**
 
-            # 7. Studio 业务接口（受保护）
+            # 6. Studio Business interface（protected）
             - id: studio-service
               uri: lb://datapillar-studio-service
               predicates:
                 - Path=/api/studio/**
 
-            # 8. AI 业务接口（受保护）
+            # 7. AI Business interface（protected）
             - id: ai-service
               uri: lb://datapillar-ai
               predicates:
                 - Path=/api/ai/**
 
-            # 9. OpenLineage Sink 接口（受保护）
+            # 8. OpenLineage OpenAPI Documentation
+            - id: openlineage-docs
+              uri: lb://datapillar-openlineage
+              order: -10
+              predicates:
+                - Path=/api/openlineage/v3/api-docs,/api/openlineage/v3/api-docs/**
+
+            # 9. OpenLineage Health check interface（No login required）
+            - id: openlineage-health
+              uri: lb://datapillar-openlineage
+              order: -10
+              predicates:
+                - Path=/api/openlineage/actuator/health,/api/openlineage/actuator/health/**
+
+            # 10. OpenLineage Business interface（protected）
             - id: openlineage-service
               uri: lb://datapillar-openlineage
               predicates:
                 - Path=/api/openlineage/**
 
-            # 10. OneMeta 接口（受保护）
-            - id: onemeta-service
-              uri: lb://datapillar-gravitino
-              predicates:
-                - Path=/api/onemeta/**
-              filters:
-                - RewritePath=/api/onemeta(?<segment>/?.*), /api${segment}
-
-  # Redis 配置（用于限流）
+  # Redis Configuration（used to limit current）
   data:
     redis:
       host: ${REDIS_HOST}
@@ -134,28 +131,33 @@ scalar:
       url: /api/studio/v3/api-docs
     - title: AI API
       url: /api/ai/openapi.json
+    - title: OpenLineage API
+      url: /api/openlineage/v3/api-docs
 
-# 安全配置（严格模式）
+# Security configuration（strict mode）
 security:
   require-https: true
   trusted-proxies:
     - ${TRUSTED_PROXY_CIDR_1:}
   authentication:
     enabled: true
-    protocol-version: security.v1
     auth-token-cookie-name: auth-token
+    issuer-uri: ${AUTH_ISSUER_URI}
+    audience: ${AUTH_AUDIENCE:datapillar-api}
+    username-claim: preferred_username
+    email-claim: email
     protected-path-prefixes:
       - /api/studio
       - /api/ai
       - /api/openlineage
-      - /api/onemeta
     public-path-prefixes:
-      - /api/login
       - /api/auth
       - /api/studio/setup
       - /api/studio/actuator/health
       - /api/studio/v3/api-docs
       - /api/ai/openapi.json
+      - /api/openlineage/actuator/health
+      - /api/openlineage/v3/api-docs
       - /api/docs
   headers:
     enabled: true
@@ -193,7 +195,7 @@ dubbo:
     parameters:
       migration.step: FORCE_INTERFACE
 
-# Resilience4j 熔断配置
+# Resilience4j circuit breaker configuration
 resilience4j:
   circuitbreaker:
     configs:
@@ -210,7 +212,7 @@ resilience4j:
         baseConfig: default
       ai-service:
         baseConfig: default
-        # AI 服务超时时间更长
+        # AI Service timeout is longer
         slowCallDurationThreshold: 30s
       job-service:
         baseConfig: default
@@ -222,7 +224,7 @@ resilience4j:
       ai-service:
         timeoutDuration: 60s
 
-# Actuator 健康检查（与服务同端口）
+# Actuator health check（Same port as service）
 management:
   endpoints:
     web:

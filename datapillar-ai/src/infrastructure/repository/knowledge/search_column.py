@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-Neo4j 列查询服务
+Neo4j column query service
 
-职责：提供列相关的混合检索（向量 + 全文）
+Responsibilities：Provides column-related hybrid retrieval（Vector + Full text）
 """
 
 from __future__ import annotations
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class Neo4jColumnSearch:
-    """Neo4j 列查询服务"""
+    """Neo4j column query service"""
 
     _SYSTEM_CREATORS = ["OPENLINEAGE", "GRAVITINO_SYNC", "system", "SYSTEM"]
 
@@ -63,12 +62,12 @@ class Neo4jColumnSearch:
         user_id: int | None = None,
     ) -> list[dict[str, Any]]:
         """
-        混合搜索列（向量 + 全文）
+        Mixed search columns（Vector + Full text）
 
-        参数：
-        - query: 搜索文本
-        - top_k: 返回数量上限
-        - min_score: 最小相似度阈值
+        parameters：
+        - query: Search text
+        - top_k: Return maximum quantity
+        - min_score: Minimum similarity threshold
         """
         from neo4j_graphrag.retrievers import HybridCypherRetriever
         from neo4j_graphrag.types import HybridSearchRanker, RetrieverResultItem
@@ -133,8 +132,8 @@ class Neo4jColumnSearch:
                     }
                 )
 
-            logger.debug(f"[列搜索] 总耗时: {time.time() - start:.3f}s")
+            logger.debug(f"[column search] Total time spent: {time.time() - start:.3f}s")
             return recommendations
         except Exception as e:
-            logger.error(f"混合搜索列失败: {e}")
+            logger.error(f"Mixed search columns failed: {e}")
             return []

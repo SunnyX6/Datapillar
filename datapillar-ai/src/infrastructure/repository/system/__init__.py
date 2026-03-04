@@ -1,13 +1,10 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-System 级别数据访问（系统配置/元数据）
+System level data access(System configuration/metadata)
 
-定位：
-- 存放"系统级表"的数据访问：比如 AI 模型配置、ETL 组件配置等
-- 这类查询不属于具体业务模块（etl/knowledge），属于平台系统层
+Positioning:- store"system level table"data access:For example AI Model configuration,ETL Component configuration,etc.- This type of query does not belong to specific business modules(etl/knowledge),Belongs to the platform system layer
 """
 
 from src.infrastructure.repository.system.ai_model import LlmUsage, Model

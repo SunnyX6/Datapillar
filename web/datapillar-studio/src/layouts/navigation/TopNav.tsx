@@ -30,7 +30,7 @@ import type { Menu } from '@/services/types/auth'
 import { isMenuVisible } from '@/services/menuPermissionService'
 
 const LANGUAGE_OPTIONS: { id: Language; label: string }[] = [
-  { id: 'zh-CN', label: '简体中文' },
+  { id: 'zh-CN', label: 'Simplified Chinese' },
   { id: 'en-US', label: 'English' }
 ]
 
@@ -88,14 +88,14 @@ export function TopNav({
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const governanceLeaveTimerRef = useRef<number | null>(null)
 
-  // 全局搜索状态
+  // Global search status
   const searchTerm = useSearchStore((state) => state.searchTerm)
   const setSearchTerm = useSearchStore((state) => state.setSearchTerm)
   const isSearchOpen = useSearchStore((state) => state.isOpen)
   const setIsSearchOpen = useSearchStore((state) => state.setIsOpen)
   const getContextConfig = useSearchStore((state) => state.getContextConfig)
 
-  // 键盘快捷键 ⌘K
+  // keyboard shortcuts ⌘K
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {

@@ -18,7 +18,7 @@ export function AccessControlHeader() {
             <div className={cn(TYPOGRAPHY.caption, 'mt-1 flex items-center gap-2 text-slate-400 dark:text-slate-500')}>
               <span className="font-semibold text-slate-500 dark:text-slate-300">ADMIN_SCOPE</span>
               <span className="text-slate-300 dark:text-slate-600">&gt;</span>
-              <span>身份与访问管理 (IAM)</span>
+              <span>Identity and access management (IAM)</span>
             </div>
           </div>
         </div>
@@ -30,7 +30,7 @@ export function AccessControlHeader() {
           )}
         >
           <Sliders size={iconSizeToken.small} />
-          权限架构
+          Permission structure
         </div>
       </div>
     </div>

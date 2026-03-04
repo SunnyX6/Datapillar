@@ -28,7 +28,7 @@ describe('breakpoints', () => {
     globalScope.getComputedStyle = originalGetComputedStyle
   })
 
-  it('从 CSS 变量读取断点值', () => {
+  it('from CSS Variable reading breakpoint value', () => {
     mockCssVariables({
       '--breakpoint-md': '1080px',
       '--breakpoint-lg': '1440px',
@@ -41,7 +41,7 @@ describe('breakpoints', () => {
     expect(getBreakpointValue('2xl')).toBe(2560)
   })
 
-  it('CSS 变量无效时使用兜底值', () => {
+  it('CSS Use the bottom value when the variable is invalid', () => {
     mockCssVariables({
       '--breakpoint-md': 'not-a-number'
     })
@@ -51,7 +51,7 @@ describe('breakpoints', () => {
     expect(breakpoints.xl).toBe(1920)
   })
 
-  it('无 DOM 环境时使用兜底值', () => {
+  it('None DOM Use the lowest value for the environment', () => {
     globalScope.document = undefined
     globalScope.getComputedStyle = undefined
 

@@ -8,10 +8,10 @@ import lombok.Data;
 @Schema(name = "JobPosition")
 public class JobPositionItem {
 
-    @NotNull(message = "任务 ID 不能为空")
-    private Long jobId;
+  @NotNull(message = "Task ID cannot be empty")
+  private Long jobId;
 
-    private Double positionX;
+  private Double positionX;
 
-    private Double positionY;
+  private Double positionY;
 }

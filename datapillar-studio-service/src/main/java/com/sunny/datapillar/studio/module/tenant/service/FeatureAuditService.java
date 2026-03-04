@@ -4,13 +4,12 @@ import com.sunny.datapillar.studio.module.tenant.entity.TenantFeatureAudit;
 import java.util.List;
 
 /**
- * 功能Audit服务
- * 提供功能Audit业务能力与领域服务
+ * FunctionAuditservice Provide functionalityAuditBusiness capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface FeatureAuditService {
 
-    List<TenantFeatureAudit> listAudits();
+  List<TenantFeatureAudit> listAudits();
 }

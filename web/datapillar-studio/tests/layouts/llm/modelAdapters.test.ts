@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { mapAdminModelToRecord, resolveProviderLabel } from '@/features/llm/utils/modelAdapters'
 import type { StudioLlmModel } from '@/services/studioLlmService'
 
-describe('LLM 模型适配器', () => {
-  it('将后端模型响应映射为前端模型结构', () => {
+describe('LLM model adapter', () => {
+  it('Map backend model responses to frontend model structures', () => {
     const input: StudioLlmModel = {
       aiModelId: 101,
       providerModelId: 'openai/text-embedding-3-large',
@@ -42,12 +42,12 @@ describe('LLM 模型适配器', () => {
     expect(record.hasApiKey).toBe(true)
   })
 
-  it('在缺失 providerName 时按 provider code 生成展示文案', () => {
+  it('in missing providerName time button provider code Generate display copy', () => {
     expect(resolveProviderLabel('deepseek')).toBe('DeepSeek')
     expect(resolveProviderLabel('my_provider')).toBe('My Provider')
   })
 
-  it('未知模型类型不做降级映射并直接抛错', () => {
+  it('The unknown model type does not perform downgrade mapping and directly throws an error.', () => {
     const input: StudioLlmModel = {
       aiModelId: 102,
       providerModelId: 'custom/unknown-model',

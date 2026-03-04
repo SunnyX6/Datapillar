@@ -16,33 +16,23 @@ import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
-
 /**
- * 任务Dependency服务
- * 提供任务Dependency业务能力与领域服务
+ * TaskDependencyservice Provide tasksDependencyBusiness capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface JobDependencyService {
 
-    /**
-     * 查询工作流下的所有依赖
-     */
-    List<JobDependencyResponse> getDependenciesByWorkflowId(Long workflowId);
+  /** Query all dependencies under the workflow */
+  List<JobDependencyResponse> getDependenciesByWorkflowId(Long workflowId);
 
-    /**
-     * 查询任务的上游依赖
-     */
-    List<JobDependencyResponse> getDependenciesByJobId(Long jobId);
+  /** Query the upstream dependencies of a task */
+  List<JobDependencyResponse> getDependenciesByJobId(Long jobId);
 
-    /**
-     * 创建依赖关系
-     */
-    Long createDependency(Long workflowId, JobDependencyCreateRequest dto);
+  /** Create dependencies */
+  Long createDependency(Long workflowId, JobDependencyCreateRequest dto);
 
-    /**
-     * 删除依赖关系
-     */
-    void deleteDependency(Long workflowId, Long jobId, Long parentJobId);
+  /** Remove dependencies */
+  void deleteDependency(Long workflowId, Long jobId, Long parentJobId);
 }

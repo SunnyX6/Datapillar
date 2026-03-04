@@ -1,21 +1,19 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * regarding copyright ownership.The ASF licenses this file
+ * to you under the Apache License,Version 2.0 (the
+ * "License");you may not use this file except in compliance
+ * with the License.You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * Unless required by applicable law or agreed to in writing,* software distributed under the License is distributed on an
+ * "AS IS" BASIS,WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND,either express or implied.See the License for the
  * specific language governing permissions and limitations
- * under the License.
- */
+ * under the License.*/
 package org.apache.gravitino.catalog.dataset;
 
 import com.google.common.base.Preconditions;
@@ -68,12 +66,11 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
-/** Dataset Catalog 操作类，实现所有 Metric 和 WordRoot 相关的 CRUD 操作 */
+/** Dataset Catalog Operation class,achieve all Metric and WordRoot relevant CRUD Operation */
 public class DatasetCatalogOperations extends ManagedSchemaOperations
     implements CatalogOperations, DatasetCatalog {
 
   private static final int INIT_VERSION = 1;
-
   private final EntityStore store;
 
   public DatasetCatalogOperations(EntityStore store) {
@@ -95,7 +92,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       String provider,
       String comment,
       Map<String, String> properties) {
-    // Dataset catalog 不需要连接测试
+    // Dataset catalog No connection test required
   }
 
   @Override
@@ -107,18 +104,14 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   public PagedResult<Metric> listMetrics(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException {
     NamespaceUtil.checkMetric(namespace);
-
     try {
       List<MetricEntity> metrics =
           MetricMetaService.getInstance()
               .listMetricsByNamespaceWithPagination(namespace, offset, limit);
       long total = MetricMetaService.getInstance().countMetricsByNamespace(namespace);
-
       List<Metric> metricList =
           metrics.stream().map(this::toMetricImpl).collect(Collectors.toList());
-
       return new PagedResult<>(metricList, total, offset, limit);
-
     } catch (NoSuchEntityException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
     }
@@ -127,11 +120,9 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   @Override
   public Metric getMetric(NameIdentifier ident) throws NoSuchMetricException {
     NameIdentifierUtil.checkMetric(ident);
-
     try {
       MetricEntity metric = store.get(ident, Entity.EntityType.METRIC, MetricEntity.class);
       return toMetricImpl(metric);
-
     } catch (NoSuchEntityException e) {
       throw new NoSuchMetricException(e, "Metric %s does not exist", ident);
     } catch (IOException ioe) {
@@ -142,7 +133,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   @Override
   public boolean metricExists(NameIdentifier ident) {
     NameIdentifierUtil.checkMetric(ident);
-
     try {
       return store.exists(ident, Entity.EntityType.METRIC);
     } catch (IOException ioe) {
@@ -170,11 +160,10 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       String filterColumnIds)
       throws MetricAlreadyExistsException {
     NameIdentifierUtil.checkMetric(ident);
-
     StringIdentifier stringId = StringIdentifier.fromProperties(properties);
-    Preconditions.checkArgument(stringId != null, "Property string identifier should not be null");
-
-    // 根据 unit 代码查询单位名称
+    Preconditions.checkArgument(
+        stringId != null,
+        "Property string identifier should not be null"); // According to unit Code query unit name
     String unitName = null;
     if (unit != null && !unit.isEmpty()) {
       try {
@@ -182,7 +171,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
         UnitEntity unitEntity = UnitMetaService.getInstance().getUnitByIdentifier(unitIdent);
         unitName = unitEntity.name();
       } catch (Exception e) {
-        // 单位不存在时忽略
+        // Ignore if unit does not exist
       }
     }
 
@@ -206,9 +195,8 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                     .withCreateTime(Instant.now())
                     .build())
             .build();
-
     try {
-      // 使用MetricMetaService插入指标，并传递版本相关字段
+      // useMetricMetaServiceInsert indicator,and pass version related fields
       MetricMetaService.getInstance()
           .insertMetricWithVersion(
               metric,
@@ -232,7 +220,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   @Override
   public boolean deleteMetric(NameIdentifier ident) {
     NameIdentifierUtil.checkMetric(ident);
-
     try {
       return store.delete(ident, Entity.EntityType.METRIC);
     } catch (IOException ioe) {
@@ -244,7 +231,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   public Metric alterMetric(NameIdentifier ident, MetricChange... changes)
       throws NoSuchMetricException, IllegalArgumentException {
     NameIdentifierUtil.checkMetric(ident);
-
     try {
       MetricEntity updatedEntity =
           store.update(
@@ -270,12 +256,10 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                                 .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
                                 .withLastModifiedTime(Instant.now())
                                 .build());
-
                 Map<String, String> properties =
                     entity.properties() == null
                         ? Maps.newHashMap()
                         : Maps.newHashMap(entity.properties());
-
                 for (MetricChange change : changes) {
                   if (change instanceof MetricChange.RenameMetric) {
                     builder.withName(((MetricChange.RenameMetric) change).newName());
@@ -292,16 +276,14 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                     properties.remove(removeProperty.property());
                   } else {
                     throw new IllegalArgumentException(
-                        "Unsupported metric change type: " + change.getClass().getSimpleName());
+                        "Unsupported metric change type:" + change.getClass().getSimpleName());
                   }
                 }
 
                 builder.withProperties(properties);
                 return builder.build();
               });
-
       return toMetricImpl(updatedEntity);
-
     } catch (NoSuchEntityException e) {
       throw new NoSuchMetricException(e, "Metric %s does not exist", ident);
     } catch (IOException ioe) {
@@ -315,12 +297,10 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   public int[] listMetricVersions(NameIdentifier ident) throws NoSuchMetricException {
     NameIdentifierUtil.checkMetric(ident);
     Namespace metricVersionNs = NamespaceUtil.toMetricVersionNs(ident);
-
     try {
       List<MetricVersionEntity> versions =
           store.list(metricVersionNs, MetricVersionEntity.class, Entity.EntityType.METRIC_VERSION);
       return versions.stream().mapToInt(MetricVersionEntity::version).toArray();
-
     } catch (NoSuchEntityException e) {
       throw new NoSuchMetricException(e, "Metric %s does not exist", ident);
     } catch (IOException ioe) {
@@ -332,12 +312,10 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   public MetricVersion[] listMetricVersionInfos(NameIdentifier ident) throws NoSuchMetricException {
     NameIdentifierUtil.checkMetric(ident);
     Namespace metricVersionNs = NamespaceUtil.toMetricVersionNs(ident);
-
     try {
       List<MetricVersionEntity> versions =
           store.list(metricVersionNs, MetricVersionEntity.class, Entity.EntityType.METRIC_VERSION);
       return versions.stream().map(this::toMetricVersionImpl).toArray(MetricVersion[]::new);
-
     } catch (NoSuchEntityException e) {
       throw new NoSuchMetricException(e, "Metric %s does not exist", ident);
     } catch (IOException ioe) {
@@ -351,12 +329,10 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
     NameIdentifierUtil.checkMetric(ident);
     NameIdentifier versionIdent =
         NameIdentifier.of(NamespaceUtil.toMetricVersionNs(ident), String.valueOf(version));
-
     try {
       MetricVersionEntity versionEntity =
           store.get(versionIdent, Entity.EntityType.METRIC_VERSION, MetricVersionEntity.class);
       return toMetricVersionImpl(versionEntity);
-
     } catch (NoSuchEntityException e) {
       throw new NoSuchMetricVersionException(
           e, "Metric version %s (version %d) does not exist", ident, version);
@@ -371,7 +347,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
     NameIdentifierUtil.checkMetric(ident);
     NameIdentifier versionIdent =
         NameIdentifier.of(NamespaceUtil.toMetricVersionNs(ident), String.valueOf(version));
-
     try {
       return store.delete(versionIdent, Entity.EntityType.METRIC_VERSION);
     } catch (IOException ioe) {
@@ -384,33 +359,33 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   public MetricVersion switchMetricVersion(NameIdentifier ident, int targetVersion)
       throws NoSuchMetricException, NoSuchMetricVersionException, IllegalArgumentException {
     NameIdentifierUtil.checkMetric(ident);
-
     try {
-      // 1. 获取当前指标
-      MetricEntity metricEntity = store.get(ident, Entity.EntityType.METRIC, MetricEntity.class);
-
-      // 2. 验证目标版本号在有效范围内
+      // 1.Get the current indicator
+      MetricEntity metricEntity =
+          store.get(
+              ident,
+              Entity.EntityType.METRIC,
+              MetricEntity
+                  .class); // 2.Verify that the target version number is within the valid range
       if (targetVersion < 1 || targetVersion > metricEntity.lastVersion()) {
         throw new IllegalArgumentException(
             String.format(
-                "Invalid target version %d. Version must be between 1 and %d",
+                "Invalid target version %d.Version must be between 1 and %d",
                 targetVersion, metricEntity.lastVersion()));
       }
 
-      // 3. 验证目标版本不等于当前版本
+      // 3.Verify that the target version is not equal to the current version
       if (metricEntity.currentVersion() == targetVersion) {
         throw new IllegalArgumentException(
             String.format("Metric %s is already on version %d", ident, targetVersion));
       }
 
-      // 4. 切换版本并返回目标版本详情
+      // 4.Switch versions and return target version details
       MetricVersionEntity versionEntity =
           MetricMetaService.getInstance().switchMetricCurrentVersion(ident, targetVersion);
-
       return toMetricVersionImpl(versionEntity);
-
     } catch (NoSuchEntityException e) {
-      // 判断是指标不存在还是版本不存在
+      // Determine whether the indicator does not exist or the version does not exist
       if (e.getMessage().contains("METRIC_VERSION")) {
         throw new NoSuchMetricVersionException(
             e, "Metric version %s (version %d) does not exist", ident, targetVersion);
@@ -441,7 +416,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       String filterColumnIds)
       throws NoSuchMetricVersionException {
     NameIdentifierUtil.checkMetric(ident);
-
     try {
       MetricVersionEntity updatedVersion =
           MetricMetaService.getInstance()
@@ -461,7 +435,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                   measureColumnIds,
                   filterColumnIds);
       return toMetricVersionImpl(updatedVersion);
-
     } catch (NoSuchEntityException e) {
       throw new NoSuchMetricVersionException(
           e, "Metric version %s (version %d) does not exist", ident, version);
@@ -471,7 +444,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
     }
   }
 
-  /** 将 MetricEntity 转换为 MetricImpl */
+  /** will MetricEntity Convert to MetricImpl */
   private Metric toMetricImpl(MetricEntity entity) {
     return MetricImpl.builder()
         .withName(entity.name())
@@ -488,7 +461,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
         .build();
   }
 
-  /** 将 MetricVersionEntity 转换为 MetricVersionImpl */
+  /** will MetricVersionEntity Convert to MetricVersionImpl */
   private MetricVersion toMetricVersionImpl(MetricVersionEntity entity) {
     return MetricVersionImpl.builder()
         .withId(entity.id())
@@ -517,18 +490,14 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   public PagedResult<MetricModifier> listMetricModifiers(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException {
     NamespaceUtil.checkModifier(namespace);
-
     try {
       List<MetricModifierEntity> modifiers =
           MetricModifierMetaService.getInstance()
               .listModifiersByNamespaceWithPagination(namespace, offset, limit);
       long total = MetricModifierMetaService.getInstance().countModifiersByNamespace(namespace);
-
       List<MetricModifier> modifierList =
           modifiers.stream().map(this::toModifierImpl).collect(Collectors.toList());
-
       return new PagedResult<>(modifierList, total, offset, limit);
-
     } catch (NoSuchEntityException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
     }
@@ -537,7 +506,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   @Override
   public org.apache.gravitino.dataset.MetricModifier getMetricModifier(NameIdentifier ident) {
     NameIdentifierUtil.checkModifier(ident);
-
     try {
       org.apache.gravitino.meta.MetricModifierEntity entity =
           store.get(
@@ -545,7 +513,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
               Entity.EntityType.METRIC_MODIFIER,
               org.apache.gravitino.meta.MetricModifierEntity.class);
       return toModifierImpl(entity);
-
     } catch (NoSuchEntityException e) {
       throw new RuntimeException("Metric modifier " + ident + " does not exist", e);
     } catch (IOException ioe) {
@@ -558,7 +525,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       NameIdentifier ident, String code, String comment, String modifierType)
       throws NoSuchSchemaException {
     NameIdentifierUtil.checkModifier(ident);
-
     long uid = GravitinoEnv.getInstance().idGenerator().nextId();
     org.apache.gravitino.meta.MetricModifierEntity entity =
         org.apache.gravitino.meta.MetricModifierEntity.builder()
@@ -574,7 +540,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                     .withCreateTime(Instant.now())
                     .build())
             .build();
-
     try {
       store.put(entity, false /* overwrite */);
     } catch (IOException e) {
@@ -591,7 +556,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   @Override
   public boolean deleteMetricModifier(NameIdentifier ident) {
     NameIdentifierUtil.checkModifier(ident);
-
     try {
       return store.delete(ident, Entity.EntityType.METRIC_MODIFIER);
     } catch (IOException ioe) {
@@ -603,7 +567,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   public org.apache.gravitino.dataset.MetricModifier alterMetricModifier(
       NameIdentifier ident, String name, String comment) {
     NameIdentifierUtil.checkModifier(ident);
-
     try {
       MetricModifierEntity updatedEntity =
           store.update(
@@ -626,9 +589,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                               .withLastModifiedTime(Instant.now())
                               .build())
                       .build());
-
       return toModifierImpl(updatedEntity);
-
     } catch (NoSuchEntityException e) {
       throw new RuntimeException("Metric modifier " + ident + " does not exist", e);
     } catch (IOException ioe) {
@@ -642,17 +603,13 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   public PagedResult<WordRoot> listWordRoots(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException {
     NamespaceUtil.checkRoot(namespace);
-
     try {
       List<WordRootEntity> roots =
           WordRootMetaService.getInstance()
               .listWordRootsByNamespaceWithPagination(namespace, offset, limit);
       long total = WordRootMetaService.getInstance().countWordRootsByNamespace(namespace);
-
       List<WordRoot> wordRoots = roots.stream().map(this::toRootImpl).collect(Collectors.toList());
-
       return new PagedResult<>(wordRoots, total, offset, limit);
-
     } catch (NoSuchEntityException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
     }
@@ -661,13 +618,11 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   @Override
   public org.apache.gravitino.dataset.WordRoot getWordRoot(NameIdentifier ident) {
     NameIdentifierUtil.checkRoot(ident);
-
     try {
       org.apache.gravitino.meta.WordRootEntity entity =
           store.get(
               ident, Entity.EntityType.WORDROOT, org.apache.gravitino.meta.WordRootEntity.class);
       return toRootImpl(entity);
-
     } catch (NoSuchEntityException e) {
       throw new RuntimeException("Metric root " + ident + " does not exist", e);
     } catch (IOException ioe) {
@@ -680,7 +635,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       NameIdentifier ident, String code, String name, String dataType, String comment)
       throws NoSuchSchemaException {
     NameIdentifierUtil.checkRoot(ident);
-
     long uid = GravitinoEnv.getInstance().idGenerator().nextId();
     org.apache.gravitino.meta.WordRootEntity entity =
         org.apache.gravitino.meta.WordRootEntity.builder()
@@ -696,7 +650,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                     .withCreateTime(Instant.now())
                     .build())
             .build();
-
     try {
       store.put(entity, false /* overwrite */);
     } catch (IOException e) {
@@ -713,7 +666,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   @Override
   public boolean deleteWordRoot(NameIdentifier ident) {
     NameIdentifierUtil.checkRoot(ident);
-
     try {
       return store.delete(ident, Entity.EntityType.WORDROOT);
     } catch (IOException ioe) {
@@ -725,7 +677,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   public org.apache.gravitino.dataset.WordRoot alterWordRoot(
       NameIdentifier ident, String name, String dataType, String comment) {
     NameIdentifierUtil.checkRoot(ident);
-
     try {
       WordRootEntity updatedEntity =
           store.update(
@@ -748,9 +699,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                               .withLastModifiedTime(Instant.now())
                               .build())
                       .build());
-
       return toRootImpl(updatedEntity);
-
     } catch (NoSuchEntityException e) {
       throw new RuntimeException("Word root " + ident + " does not exist", e);
     } catch (IOException ioe) {
@@ -760,7 +709,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
     }
   }
 
-  /** 将 MetricModifierEntity 转换为 ModifierImpl */
+  /** will MetricModifierEntity Convert to ModifierImpl */
   private org.apache.gravitino.dataset.MetricModifier toModifierImpl(
       org.apache.gravitino.meta.MetricModifierEntity entity) {
     return ModifierImpl.builder()
@@ -772,7 +721,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
         .build();
   }
 
-  /** 将 WordRootEntity 转换为 WordRootImpl */
+  /** will WordRootEntity Convert to WordRootImpl */
   private org.apache.gravitino.dataset.WordRoot toRootImpl(
       org.apache.gravitino.meta.WordRootEntity entity) {
     return WordRootImpl.builder()
@@ -784,23 +733,19 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
         .build();
   }
 
-  // ============================= Unit 管理 =============================
+  // ============================= Unit management =============================
 
   @Override
   public PagedResult<Unit> listUnits(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException {
     NamespaceUtil.checkUnit(namespace);
-
     try {
       List<UnitEntity> entities =
           UnitMetaService.getInstance()
               .listUnitsByNamespaceWithPagination(namespace, offset, limit);
       long total = UnitMetaService.getInstance().countUnitsByNamespace(namespace);
-
       List<Unit> unitList = entities.stream().map(this::toUnitImpl).collect(Collectors.toList());
-
       return new PagedResult<>(unitList, total, offset, limit);
-
     } catch (NoSuchEntityException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
     }
@@ -809,11 +754,9 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   @Override
   public org.apache.gravitino.dataset.Unit getUnit(NameIdentifier ident) {
     NameIdentifierUtil.checkUnit(ident);
-
     try {
       UnitEntity entity = store.get(ident, Entity.EntityType.UNIT, UnitEntity.class);
       return toUnitImpl(entity);
-
     } catch (NoSuchEntityException e) {
       throw new RuntimeException("Unit " + ident + " does not exist", e);
     } catch (IOException ioe) {
@@ -826,7 +769,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       NameIdentifier ident, String code, String name, String symbol, String comment)
       throws NoSuchSchemaException {
     NameIdentifierUtil.checkUnit(ident);
-
     long uid = GravitinoEnv.getInstance().idGenerator().nextId();
     UnitEntity entity =
         UnitEntity.builder()
@@ -842,7 +784,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                     .withCreateTime(Instant.now())
                     .build())
             .build();
-
     try {
       store.put(entity, false);
     } catch (EntityAlreadyExistsException e) {
@@ -859,7 +800,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   @Override
   public boolean deleteUnit(NameIdentifier ident) {
     NameIdentifierUtil.checkUnit(ident);
-
     try {
       return store.delete(ident, Entity.EntityType.UNIT);
     } catch (IOException ioe) {
@@ -871,7 +811,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   public org.apache.gravitino.dataset.Unit alterUnit(
       NameIdentifier ident, String name, String symbol, String comment) {
     NameIdentifierUtil.checkUnit(ident);
-
     try {
       UnitEntity updatedEntity =
           store.update(
@@ -894,9 +833,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                               .withLastModifiedTime(Instant.now())
                               .build())
                       .build());
-
       return toUnitImpl(updatedEntity);
-
     } catch (NoSuchEntityException e) {
       throw new RuntimeException("Unit " + ident + " does not exist", e);
     } catch (IOException ioe) {
@@ -906,7 +843,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
     }
   }
 
-  /** 将 UnitEntity 转换为 UnitImpl */
+  /** will UnitEntity Convert to UnitImpl */
   private org.apache.gravitino.dataset.Unit toUnitImpl(UnitEntity entity) {
     return UnitImpl.builder()
         .withCode(entity.code())
@@ -917,24 +854,20 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
         .build();
   }
 
-  // ==================== ValueDomain 值域相关方法 ====================
+  // ==================== ValueDomain Range related methods ====================
 
   @Override
   public PagedResult<ValueDomain> listValueDomains(Namespace namespace, int offset, int limit)
       throws NoSuchSchemaException {
     NamespaceUtil.checkValueDomain(namespace);
-
     try {
       List<ValueDomainEntity> entities =
           ValueDomainMetaService.getInstance()
               .listValueDomainsByNamespaceWithPagination(namespace, offset, limit);
       long total = ValueDomainMetaService.getInstance().countValueDomainsByNamespace(namespace);
-
       List<ValueDomain> valueDomainList =
           entities.stream().map(this::toValueDomainImpl).collect(Collectors.toList());
-
       return new PagedResult<>(valueDomainList, total, offset, limit);
-
     } catch (NoSuchEntityException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
     }
@@ -943,12 +876,10 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   @Override
   public org.apache.gravitino.dataset.ValueDomain getValueDomain(NameIdentifier ident) {
     NameIdentifierUtil.checkValueDomain(ident);
-
     try {
       ValueDomainEntity entity =
           store.get(ident, Entity.EntityType.VALUE_DOMAIN, ValueDomainEntity.class);
       return toValueDomainImpl(entity);
-
     } catch (NoSuchEntityException e) {
       throw new RuntimeException("ValueDomain " + ident + " does not exist", e);
     } catch (IOException ioe) {
@@ -967,12 +898,9 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       String comment,
       String dataType)
       throws NoSuchSchemaException {
-    NameIdentifierUtil.checkValueDomain(ident);
-
-    // 默认级别为 BUSINESS
+    NameIdentifierUtil.checkValueDomain(ident); // The default level is BUSINESS
     org.apache.gravitino.dataset.ValueDomain.Level level =
         domainLevel != null ? domainLevel : org.apache.gravitino.dataset.ValueDomain.Level.BUSINESS;
-
     long uid = GravitinoEnv.getInstance().idGenerator().nextId();
     ValueDomainEntity entity =
         ValueDomainEntity.builder()
@@ -991,7 +919,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                     .withCreateTime(Instant.now())
                     .build())
             .build();
-
     try {
       store.put(entity, false);
     } catch (EntityAlreadyExistsException e) {
@@ -1002,30 +929,26 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       throw new RuntimeException("Failed to create value domain " + ident, ioe);
     }
 
-    // 自动创建关联 Tag（用于 Column 引用 ValueDomain）
+    // Automatically create associations Tag(used for Column Quote ValueDomain)
     createValueDomainTag(ident, domainCode, domainName, comment);
-
     return toValueDomainImpl(entity);
   }
 
   @Override
   public boolean deleteValueDomain(NameIdentifier ident) {
-    NameIdentifierUtil.checkValueDomain(ident);
-
-    // 先获取实体，检查是否为内置值域
+    NameIdentifierUtil.checkValueDomain(
+        ident); // Get the entity first,Check if it is a built-in value range
     String domainCode = null;
     try {
       ValueDomainEntity entity =
           store.get(ident, Entity.EntityType.VALUE_DOMAIN, ValueDomainEntity.class);
-      domainCode = entity.domainCode();
-
-      // 内置值域禁止删除
+      domainCode = entity.domainCode(); // Built-in value ranges are prohibited from deletion
       if (entity.domainLevel() == org.apache.gravitino.dataset.ValueDomain.Level.BUILTIN) {
         throw new UnsupportedOperationException(
-            "Cannot delete builtin value domain: " + ident.name());
+            "Cannot delete builtin value domain:" + ident.name());
       }
     } catch (NoSuchEntityException e) {
-      // 实体不存在，直接返回 false
+      // Entity does not exist,Return directly false
       return false;
     } catch (IOException e) {
       throw new RuntimeException("Failed to get value domain " + ident, e);
@@ -1034,7 +957,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
     try {
       boolean deleted = store.delete(ident, Entity.EntityType.VALUE_DOMAIN);
       if (deleted && domainCode != null) {
-        // 删除关联 Tag
+        // Delete association Tag
         deleteValueDomainTag(ident, domainCode);
       }
       return deleted;
@@ -1052,7 +975,6 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       String comment,
       String dataType) {
     NameIdentifierUtil.checkValueDomain(ident);
-
     try {
       ValueDomainEntity updatedEntity =
           store.update(
@@ -1078,9 +1000,7 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                               .withLastModifiedTime(Instant.now())
                               .build())
                       .build());
-
       return toValueDomainImpl(updatedEntity);
-
     } catch (NoSuchEntityException e) {
       throw new RuntimeException("ValueDomain " + ident + " does not exist", e);
     } catch (IOException ioe) {
@@ -1090,15 +1010,16 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
     }
   }
 
-  /** ValueDomain Tag 前缀 */
+  /** ValueDomain Tag prefix */
   private static final String VALUE_DOMAIN_TAG_PREFIX = "vd:";
 
   /**
-   * 创建 ValueDomain 关联的 Tag
+   * create ValueDomain associated Tag
    *
-   * <p>Tag 命名规则：vd:{domainCode}，用于 Column 引用 ValueDomain
+   * <p>Tag Naming rules:vd:{domainCode},used for Column Quote ValueDomain
    *
-   * <p>Tag 只作为引用指针，不存储值域详情。查询值域详情时通过 domainCode 查询值域表。
+   * <p>Tag Only as a reference pointer,Do not store value range details.Passed when querying value
+   * range details domainCode Query value range table.
    */
   private void createValueDomainTag(
       NameIdentifier ident, String domainCode, String domainName, String comment) {
@@ -1106,24 +1027,23 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       String metalake = ident.namespace().level(0);
       String tagName = VALUE_DOMAIN_TAG_PREFIX + domainCode;
       String tagComment =
-          (domainName != null ? domainName : domainCode) + (comment != null ? ": " + comment : "");
-
-      TagDispatcher tagDispatcher = GravitinoEnv.getInstance().tagDispatcher();
-
-      // 检查 Tag 是否已存在，不存在则创建
+          (domainName != null ? domainName : domainCode) + (comment != null ? ":" + comment : "");
+      TagDispatcher tagDispatcher =
+          GravitinoEnv.getInstance()
+              .tagDispatcher(); // Check Tag Does it already exist?, Create if it does not exist
       try {
-        tagDispatcher.getTag(metalake, tagName);
-        // Tag 已存在，无需重复创建
+        tagDispatcher.getTag(metalake, tagName); // Tag Already exists,No need to re-create
       } catch (Exception e) {
-        // Tag 不存在，创建新的（properties 为空，值域详情通过查询值域表获取）
+        // Tag does not exist,create new(properties is empty,Value range details are obtained by
+        // querying the value range table)
         tagDispatcher.createTag(metalake, tagName, tagComment, Maps.newHashMap());
       }
     } catch (Exception e) {
-      // Tag 创建失败不影响 ValueDomain 创建
+      // Tag Failure to create does not affect ValueDomain create
     }
   }
 
-  /** 转义 JSON 字符串中的特殊字符 */
+  /** escape JSON special characters in string */
   @SuppressWarnings("unused")
   private String escapeJson(String str) {
     if (str == null) {
@@ -1136,20 +1056,19 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
         .replace("\t", "\\t");
   }
 
-  /** 删除 ValueDomain 关联的 Tag */
+  /** Delete ValueDomain associated Tag */
   private void deleteValueDomainTag(NameIdentifier ident, String domainCode) {
     try {
       String metalake = ident.namespace().level(0);
       String tagName = VALUE_DOMAIN_TAG_PREFIX + domainCode;
-
       TagDispatcher tagDispatcher = GravitinoEnv.getInstance().tagDispatcher();
       tagDispatcher.deleteTag(metalake, tagName);
     } catch (Exception e) {
-      // Tag 删除失败不影响 ValueDomain 删除
+      // Tag Failure to delete does not affect ValueDomain Delete
     }
   }
 
-  /** 将 ValueDomainEntity 转换为 ValueDomainImpl */
+  /** will ValueDomainEntity Convert to ValueDomainImpl */
   private org.apache.gravitino.dataset.ValueDomain toValueDomainImpl(ValueDomainEntity entity) {
     return ValueDomainImpl.builder()
         .withDomainCode(entity.domainCode())

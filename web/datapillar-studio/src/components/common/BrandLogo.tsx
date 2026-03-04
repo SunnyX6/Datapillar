@@ -1,8 +1,8 @@
 /**
- * 数蝶品牌 Logo
+ * Shudie brand Logo
  *
- * 设计理念：团队协作 + 数据蝶变
- * 多人围成圆圈，象征团队协作与数据流转
+ * design concept：Teamwork + Data butterfly
+ * Many people in a circle，Symbolizes team collaboration and data flow
  */
 
 import type { CSSProperties } from 'react'

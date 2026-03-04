@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -29,13 +30,17 @@ public class ModelVersionMetaBaseSQLProvider {
 
   public String insertModelVersionMetas(
       @Param("modelVersionMetas") List<ModelVersionPO> modelVersionPOs) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "INSERT INTO "
         + ModelVersionMetaMapper.TABLE_NAME
         + "(metalake_id, catalog_id, schema_id, model_id, version, model_version_comment,"
-        + " model_version_properties, model_version_uri_name, model_version_uri, audit_info, deleted_at)"
+        + " model_version_properties, model_version_uri_name, model_version_uri, audit_info, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " SELECT m.metalake_id, m.catalog_id, m.schema_id, m.model_id, m.model_latest_version, v.model_version_comment,"
-        + " v.model_version_properties, v.model_version_uri_name, v.model_version_uri, v.audit_info, v.deleted_at"
+        + " v.model_version_properties, v.model_version_uri_name, v.model_version_uri, v.audit_info, v.deleted_at, "
+        + tenantId
         + " FROM ("
         + "<foreach collection='modelVersionMetas' item='version' separator='UNION ALL'>"
         + " SELECT"
@@ -49,20 +54,26 @@ public class ModelVersionMetaBaseSQLProvider {
         + " (SELECT metalake_id, catalog_id, schema_id, model_id, model_latest_version"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " WHERE model_id = #{modelVersionMetas[0].modelId} AND deleted_at = 0) m"
+        + " WHERE model_id = #{modelVersionMetas[0].modelId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ") m"
         + " ON v.model_id = m.model_id"
         + "</script>";
   }
 
   public String insertModelVersionMetasWithVersionNumber(
       @Param("modelVersionMetas") List<ModelVersionPO> modelVersionPOs) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "INSERT INTO "
         + ModelVersionMetaMapper.TABLE_NAME
         + "(metalake_id, catalog_id, schema_id, model_id, version, model_version_comment,"
-        + " model_version_properties, model_version_uri_name, model_version_uri, audit_info, deleted_at)"
+        + " model_version_properties, model_version_uri_name, model_version_uri, audit_info, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " SELECT m.metalake_id, m.catalog_id, m.schema_id, m.model_id, v.model_version_number, v.model_version_comment,"
-        + " v.model_version_properties, v.model_version_uri_name, v.model_version_uri, v.audit_info, v.deleted_at"
+        + " v.model_version_properties, v.model_version_uri_name, v.model_version_uri, v.audit_info, v.deleted_at, "
+        + tenantId
         + " FROM ("
         + "<foreach collection='modelVersionMetas' item='version' separator='UNION ALL'>"
         + " SELECT"
@@ -76,34 +87,41 @@ public class ModelVersionMetaBaseSQLProvider {
         + " (SELECT metalake_id, catalog_id, schema_id, model_id"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " WHERE model_id = #{modelVersionMetas[0].modelId} AND deleted_at = 0) m"
+        + " WHERE model_id = #{modelVersionMetas[0].modelId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ") m"
         + " ON v.model_id = m.model_id"
         + "</script>";
   }
 
   public String listModelVersionMetasByModelId(@Param("modelId") Long modelId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId,"
         + " model_id AS modelId, version AS modelVersion, model_version_comment AS modelVersionComment,"
         + " model_version_properties AS modelVersionProperties, model_version_uri_name AS modelVersionUriName,"
         + " model_version_uri AS modelVersionUri, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " WHERE model_id = #{modelId} AND deleted_at = 0";
+        + " WHERE model_id = #{modelId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectModelVersionMeta(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, "
         + " model_id AS modelId, version AS modelVersion, model_version_comment AS modelVersionComment,"
         + " model_version_properties AS modelVersionProperties, model_version_uri_name AS modelVersionUriName,"
         + " model_version_uri AS modelVersionUri, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " WHERE model_id = #{modelId} AND version = #{modelVersion} AND deleted_at = 0";
+        + " WHERE model_id = #{modelId} AND version = #{modelVersion} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectModelVersionMetaByAlias(
       @Param("modelId") Long modelId, @Param("alias") String alias) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT mvi.metalake_id AS metalakeId, mvi.catalog_id AS catalogId, mvi.schema_id AS schemaId,"
         + " mvi.model_id AS modelId, mvi.version AS modelVersion, mvi.model_version_comment AS modelVersionComment,"
         + " mvi.model_version_properties AS modelVersionProperties, mvi.model_version_uri_name AS modelVersionUriName,"
@@ -116,11 +134,16 @@ public class ModelVersionMetaBaseSQLProvider {
         + " mvar"
         + " ON mvi.model_id = mvar.model_id AND mvi.version = mvar.model_version"
         + " WHERE mvi.model_id = #{modelId} AND mvar.model_version_alias = #{alias}"
-        + " AND mvi.deleted_at = 0 AND mvar.deleted_at = 0";
+        + " AND mvi.deleted_at = 0 AND mvar.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mvi", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mvar", tenantId);
   }
 
   public String softDeleteModelVersionsBySchemaIdAndModelName(
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
         + " mvi SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -129,20 +152,27 @@ public class ModelVersionMetaBaseSQLProvider {
         + " SELECT mm.model_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mm WHERE mm.schema_id = #{schemaId} AND mm.model_name = #{modelName}"
-        + " AND mm.deleted_at = 0) AND mvi.deleted_at = 0";
+        + " AND mm.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId)
+        + ") AND mvi.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("mvi", tenantId);
   }
 
   public String softDeleteModelVersionMetaByModelIdAndVersion(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE model_id = #{modelId} AND version = #{modelVersion} AND deleted_at = 0";
+        + " WHERE model_id = #{modelId} AND version = #{modelVersion} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteModelVersionMetaByModelIdAndAlias(
       @Param("modelId") Long modelId, @Param("alias") String alias) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -150,44 +180,58 @@ public class ModelVersionMetaBaseSQLProvider {
         + " WHERE model_id = #{modelId} AND version = ("
         + " SELECT model_version FROM "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " WHERE model_id = #{modelId} AND model_version_alias = #{alias} AND deleted_at = 0)"
-        + " AND deleted_at = 0";
+        + " WHERE model_id = #{modelId} AND model_version_alias = #{alias} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ")"
+        + " AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteModelVersionMetasBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteModelVersionMetasByCatalogId(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteModelVersionMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteModelVersionMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 
   public String updateModelVersionMeta(
       @Param("newModelVersionMeta") ModelVersionPO newModelVersionPO,
       @Param("oldModelVersionMeta") ModelVersionPO oldModelVersionPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
 
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
@@ -209,6 +253,7 @@ public class ModelVersionMetaBaseSQLProvider {
         + "AND model_version_comment = #{oldModelVersionMeta.modelVersionComment} "
         + "AND model_version_properties = #{oldModelVersionMeta.modelVersionProperties} "
         + "AND audit_info = #{oldModelVersionMeta.auditInfo} "
-        + "AND deleted_at = 0";
+        + "AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 }

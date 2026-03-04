@@ -29,7 +29,7 @@ import org.apache.gravitino.dataset.ValueDomain;
 import org.apache.gravitino.dto.dataset.ValueDomainItemDTO;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** 更新值域的请求 */
+/** Request to update the value range */
 @Getter
 @ToString
 @EqualsAndHashCode
@@ -54,6 +54,6 @@ public class ValueDomainUpdateRequest implements RESTRequest {
 
   @Override
   public void validate() throws IllegalArgumentException {
-    // 所有字段都可选，用于部分更新
+    // All fields are optional，for partial updates
   }
 }

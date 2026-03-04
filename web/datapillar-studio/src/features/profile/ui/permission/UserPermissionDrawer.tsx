@@ -35,7 +35,7 @@ function resolveErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message
   }
-  return '未知错误'
+  return 'unknown error'
 }
 
 function normalizeAccess(permissionCode?: string | null): AiAccessLevel {
@@ -128,7 +128,7 @@ export function UserPermissionDrawer({
   const loadAiPermissionModels = useCallback(async () => {
     if (parsedUserId === null) {
       setAiModels([])
-      setAiError('用户ID无效')
+      setAiError('UserIDInvalid')
       return
     }
 
@@ -151,13 +151,13 @@ export function UserPermissionDrawer({
   const handleAiPermissionUpdate = useCallback(
     async (userId: string, aiModelId: number, access: AiAccessLevel) => {
       if (parsedUserId === null) {
-        toast.error('用户ID无效，无法配置模型权限')
+        toast.error('UserIDInvalid，Unable to configure model permissions')
         return
       }
 
       const targetModel = aiModels.find((model) => model.aiModelId === aiModelId)
       if (!targetModel) {
-        toast.error('模型不存在，无法配置权限')
+        toast.error('Model does not exist，Unable to configure permissions')
         return
       }
 
@@ -182,7 +182,7 @@ export function UserPermissionDrawer({
         )
         onUpdateModelAccess(userId, aiModelId, access)
       } catch (error) {
-        toast.error(`更新用户 AI 模型权限失败：${resolveErrorMessage(error)}`)
+        toast.error(`Update user AI Model permission failed：${resolveErrorMessage(error)}`)
       } finally {
         setUpdatingModelId(null)
       }
@@ -220,7 +220,7 @@ export function UserPermissionDrawer({
                   'font-bold text-slate-900 dark:text-white',
                 )}
               >
-                {user.name} 的权限配置
+                {user.name} Permission configuration
               </h2>
               <div
                 className={cn(
@@ -228,7 +228,7 @@ export function UserPermissionDrawer({
                   'flex items-center gap-2 mt-1 text-slate-500 dark:text-slate-400',
                 )}
               >
-                <span>所属角色:</span>
+                <span>Role:</span>
                 <span
                   className={cn(
                     TYPOGRAPHY.caption,
@@ -240,7 +240,7 @@ export function UserPermissionDrawer({
                 {user.department && (
                   <>
                     <span className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full mx-1" />
-                    <span>部门: {user.department}</span>
+                    <span>Department: {user.department}</span>
                   </>
                 )}
               </div>
@@ -250,7 +250,7 @@ export function UserPermissionDrawer({
             type="button"
             onClick={onClose}
             className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-400 dark:text-slate-500 transition-colors"
-            aria-label="关闭"
+            aria-label="close"
           >
             <X size={20} />
           </button>
@@ -271,7 +271,7 @@ export function UserPermissionDrawer({
             )}
           >
             <Database size={16} />
-            数据权限 (Gravitino)
+            Data permissions (Gravitino)
             {user.dataPrivileges && user.dataPrivileges.length > 0 && (
               <span className="w-2 h-2 rounded-full bg-brand-500" />
             )}
@@ -289,7 +289,7 @@ export function UserPermissionDrawer({
             )}
           >
             <Sparkles size={16} />
-            AI 模型权限
+            AI Model permissions
             {hasEnabledAiPermission && (
               <span className="w-2 h-2 rounded-full bg-brand-500" />
             )}
@@ -332,7 +332,7 @@ export function UserPermissionDrawer({
             'text-slate-400 dark:text-slate-500',
           )}
         >
-          修改即时生效
+          Modifications take effect immediately
         </div>
         <div className="flex gap-3">
           <Button
@@ -341,7 +341,7 @@ export function UserPermissionDrawer({
             className="bg-brand-600 text-white hover:bg-brand-700"
           >
             <Save size={16} />
-            完成配置
+            Complete configuration
           </Button>
         </div>
       </div>

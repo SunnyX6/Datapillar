@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.U
 import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -30,11 +31,14 @@ public class UserRoleRelBaseSQLProvider {
 
   public String batchInsertUserRoleRel(
       @Param("userRoleRelList") List<UserRoleRelPO> userRoleRelList) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script> INSERT INTO "
         + USER_ROLE_RELATION_TABLE_NAME
         + "(user_id, role_id,"
         + " audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES "
         + "<foreach collection='userRoleRels' item='item' separator=','>"
         + "(#{item.userId},"
@@ -42,19 +46,25 @@ public class UserRoleRelBaseSQLProvider {
         + " #{item.auditInfo},"
         + " #{item.currentVersion},"
         + " #{item.lastVersion},"
-        + " #{item.deletedAt})"
+        + " #{item.deletedAt},"
+        + " "
+        + tenantId
+        + ")"
         + "</foreach>"
         + "</script>";
   }
 
   public String batchInsertUserRoleRelOnDuplicateKeyUpdate(
       @Param("userRoleRels") List<UserRoleRelPO> userRoleRelPOs) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "INSERT INTO "
         + USER_ROLE_RELATION_TABLE_NAME
         + "(user_id, role_id,"
         + " audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES "
         + "<foreach collection='userRoleRels' item='item' separator=','>"
         + "(#{item.userId},"
@@ -62,7 +72,10 @@ public class UserRoleRelBaseSQLProvider {
         + " #{item.auditInfo},"
         + " #{item.currentVersion},"
         + " #{item.lastVersion},"
-        + " #{item.deletedAt})"
+        + " #{item.deletedAt},"
+        + " "
+        + tenantId
+        + ")"
         + "</foreach>"
         + " ON DUPLICATE KEY UPDATE"
         + " user_id = VALUES(user_id),"
@@ -75,15 +88,19 @@ public class UserRoleRelBaseSQLProvider {
   }
 
   public String softDeleteUserRoleRelByUserId(@Param("userId") Long userId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
         + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE user_id = #{userId} AND deleted_at = 0";
+        + " WHERE user_id = #{userId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteUserRoleRelByUserAndRoles(
       @Param("userId") Long userId, @Param("roleIds") List<Long> roleIds) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
@@ -95,32 +112,47 @@ public class UserRoleRelBaseSQLProvider {
         + "</foreach>"
         + ") "
         + "AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + "</script>";
   }
 
   public String softDeleteUserRoleRelByMetalakeId(Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
         + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE user_id IN (SELECT user_id FROM "
         + USER_TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
-        + " AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ")"
+        + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteUserRoleRelByRoleId(@Param("roleId") Long roleId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
         + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+        + " WHERE role_id = #{roleId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteUserRoleRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 }

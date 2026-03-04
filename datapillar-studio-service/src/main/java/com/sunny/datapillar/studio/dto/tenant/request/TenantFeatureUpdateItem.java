@@ -7,11 +7,11 @@ import lombok.Data;
 @Schema(name = "FeatureEntitlementUpdateItem")
 public class TenantFeatureUpdateItem {
 
-    private Long objectId;
+  private Long objectId;
 
-    private Long permissionId;
+  private Long permissionId;
 
-    private String permissionCode;
+  private String permissionCode;
 
-    private Integer status;
+  private Integer status;
 }

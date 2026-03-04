@@ -7,7 +7,7 @@ describe('menuAccess', () => {
     const menus: Menu[] = [
       {
         id: 1,
-        name: '个人中心',
+        name: 'Personal Center',
         path: '/profile',
         location: 'PROFILE',
         permissionCode: 'READ',
@@ -22,14 +22,14 @@ describe('menuAccess', () => {
     const menus: Menu[] = [
       {
         id: 1,
-        name: '数据治理',
+        name: 'data governance',
         path: '/governance',
         location: 'TOP',
         permissionCode: 'READ',
         children: [
           {
             id: 2,
-            name: '元数据',
+            name: 'metadata',
             path: '/governance/metadata',
             location: 'TOP',
             permissionCode: 'READ',
@@ -51,21 +51,21 @@ describe('menuAccess', () => {
     const menus: Menu[] = [
       {
         id: 1,
-        name: '数据驾驶舱',
+        name: 'data cockpit',
         path: '/home',
         location: 'TOP',
         permissionCode: 'DISABLE',
       },
       {
         id: 2,
-        name: '项目',
+        name: 'Project',
         path: '/projects',
         location: 'TOP',
         permissionCode: 'READ',
       },
       {
         id: 3,
-        name: '个人中心',
+        name: 'Personal Center',
         path: '/profile',
         location: 'PROFILE',
         permissionCode: 'READ',

@@ -20,7 +20,7 @@ package org.apache.gravitino.storage.relational.po;
 
 import lombok.Getter;
 
-/** WordRoot PO，对应 wordroot_meta 表 */
+/** WordRoot PO，Correspond wordroot_meta table */
 @Getter
 public class WordRootPO {
   private Long rootId;

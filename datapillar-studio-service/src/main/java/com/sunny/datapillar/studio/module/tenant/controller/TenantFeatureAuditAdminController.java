@@ -1,8 +1,8 @@
 package com.sunny.datapillar.studio.module.tenant.controller;
 
+import com.sunny.datapillar.common.response.ApiResponse;
 import com.sunny.datapillar.studio.module.tenant.entity.TenantFeatureAudit;
 import com.sunny.datapillar.studio.module.tenant.service.TenantFeatureAuditAdminService;
-import com.sunny.datapillar.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
@@ -13,24 +13,24 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 租户功能Audit管理控制器
- * 负责租户功能Audit管理接口编排与请求处理
+ * Tenant functionsAuditmanagement controller Responsible for tenant functionsAuditManagement
+ * interface orchestration and request processing
  *
  * @author Sunny
  * @date 2026-01-01
  */
-@Tag(name = "租户功能", description = "租户功能接口")
+@Tag(name = "Tenant functions", description = "Tenant functional interface")
 @RestController
 @RequestMapping("/admin/tenant/current/features/audits")
 @RequiredArgsConstructor
 public class TenantFeatureAuditAdminController {
 
-    private final TenantFeatureAuditAdminService tenantFeatureAuditAdminService;
+  private final TenantFeatureAuditAdminService tenantFeatureAuditAdminService;
 
-    @Operation(summary = "获取租户功能授权审计")
-    @GetMapping
-    @PreAuthorize("hasAuthority('ADMIN')")
-    public ApiResponse<List<TenantFeatureAudit>> audit() {
-        return ApiResponse.ok(tenantFeatureAuditAdminService.listAudits());
-    }
+  @Operation(summary = "Get tenant function authorization audit")
+  @GetMapping
+  @PreAuthorize("hasAuthority('ADMIN')")
+  public ApiResponse<List<TenantFeatureAudit>> audit() {
+    return ApiResponse.ok(tenantFeatureAuditAdminService.listAudits());
+  }
 }

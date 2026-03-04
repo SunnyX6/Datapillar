@@ -10,20 +10,20 @@ import lombok.Data;
 @Schema(name = "InvitationRegisterRequest")
 public class InvitationRegisterRequest {
 
-    @NotBlank(message = "邀请码不能为空")
-    @Size(max = 64, message = "邀请码长度不能超过64个字符")
-    private String inviteCode;
+  @NotBlank(message = "Invitation code cannot be empty")
+  @Size(max = 64, message = "The length of the invitation code cannot exceed64characters")
+  private String inviteCode;
 
-    @NotBlank(message = "用户名不能为空")
-    @Size(max = 64, message = "用户名长度不能超过64个字符")
-    private String username;
+  @NotBlank(message = "Username cannot be empty")
+  @Size(max = 64, message = "Username length cannot exceed64characters")
+  private String username;
 
-    @NotBlank(message = "邮箱不能为空")
-    @Email(message = "邮箱格式不正确")
-    @Size(max = 128, message = "邮箱长度不能超过128个字符")
-    private String email;
+  @NotBlank(message = "Email cannot be empty")
+  @Email(message = "Email format is incorrect")
+  @Size(max = 128, message = "The length of the email cannot exceed128characters")
+  private String email;
 
-    @NotBlank(message = "密码不能为空")
-    @Size(min = 6, max = 255, message = "密码长度必须在6-255个字符之间")
-    private String password;
+  @NotBlank(message = "Password cannot be empty")
+  @Size(min = 6, max = 255, message = "Password length must be within6-255between characters")
+  private String password;
 }

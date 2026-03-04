@@ -46,7 +46,7 @@ function getClient(baseURL: string, timeout: number, validateResponse: boolean):
 
 function requireApiData<T>(payload: ApiResponse<T>): T {
   if (typeof payload.data === 'undefined') {
-    throw new Error('接口响应缺少 data 字段')
+    throw new Error('Interface response missing data Field')
   }
   return payload.data
 }

@@ -1,21 +1,20 @@
 """
-ETL 团队集成测试
+ETL Team integration testing
 
-验证：
-1. 团队创建和配置
-2. Agent 规格与交付物 Schema
-3. 动态模式下委派范围自动设置
+Verify：
+1. Team creation and configuration
+2. Agent Specifications and Deliverables Schema
+3. Delegation scope is automatically set in dynamic mode
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from datapillar_oneagentic import DatapillarConfig, Process
 from datapillar_oneagentic.core.agent import get_agent_spec
 
 from src.modules.etl.agents import create_etl_team
-from src.modules.etl.agents.analyst_agent import AnalystAgent, AnalysisOutput
+from src.modules.etl.agents.analyst_agent import AnalysisOutput, AnalystAgent
 from src.modules.etl.agents.architect_agent import ArchitectAgent
 from src.modules.etl.agents.catalog_agent import CatalogAgent, CatalogOutput
 from src.modules.etl.agents.developer_agent import DeveloperAgent
@@ -42,10 +41,10 @@ def etl_team(_llm_stub):
 
 
 class TestEtlTeamCreation:
-    """测试 ETL 团队创建"""
+    """test ETL Team creation"""
 
     def test_create_team_success(self, etl_team):
-        assert etl_team.name == "ETL 智能团队"
+        assert etl_team.name == "ETL smart team"
         assert etl_team.process == Process.DYNAMIC
         assert etl_team.namespace == "test_etl"
 
@@ -63,12 +62,12 @@ class TestEtlTeamCreation:
 
 
 class TestAgentSpecs:
-    """测试 Agent 规格与工具配置"""
+    """test Agent Specifications and Tool Configuration"""
 
     def test_analyst_spec(self):
         spec = get_agent_spec(AnalystAgent)
         assert spec is not None
-        assert spec.name == "需求分析师"
+        assert spec.name == "Demand Analyst"
         assert spec.deliverable_schema is AnalysisOutput
         tool_names = {tool.name for tool in spec.tools}
         assert tool_names == {"get_knowledge_navigation", "search_tables", "get_table_detail"}
@@ -76,7 +75,7 @@ class TestAgentSpecs:
     def test_catalog_spec(self):
         spec = get_agent_spec(CatalogAgent)
         assert spec is not None
-        assert spec.name == "元数据专员"
+        assert spec.name == "Metadata Specialist"
         assert spec.deliverable_schema is CatalogOutput
         tool_names = {tool.name for tool in spec.tools}
         assert tool_names == {
@@ -94,7 +93,7 @@ class TestAgentSpecs:
     def test_architect_spec(self):
         spec = get_agent_spec(ArchitectAgent)
         assert spec is not None
-        assert spec.name == "数据架构师"
+        assert spec.name == "data architect"
         assert spec.deliverable_schema is WorkflowOutput
         tool_names = {tool.name for tool in spec.tools}
         assert tool_names == {"get_knowledge_navigation", "get_table_lineage", "list_component"}
@@ -102,7 +101,7 @@ class TestAgentSpecs:
     def test_developer_spec(self):
         spec = get_agent_spec(DeveloperAgent)
         assert spec is not None
-        assert spec.name == "数据开发工程师"
+        assert spec.name == "Data development engineer"
         assert spec.deliverable_schema is WorkflowOutput
         tool_names = {tool.name for tool in spec.tools}
         assert tool_names == {
@@ -115,7 +114,7 @@ class TestAgentSpecs:
     def test_reviewer_spec(self):
         spec = get_agent_spec(ReviewerAgent)
         assert spec is not None
-        assert spec.name == "代码评审员"
+        assert spec.name == "code reviewer"
         assert spec.deliverable_schema is ReviewResult
         tool_names = {tool.name for tool in spec.tools}
         assert tool_names == {"get_knowledge_navigation"}

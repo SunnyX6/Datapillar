@@ -27,7 +27,7 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.dataset.WordRootDTO;
 
-/** 词根分页列表响应，返回完整的词根数据 */
+/** Root paginated list response，Return complete root data */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -46,12 +46,12 @@ public class WordRootListResponse extends BaseResponse {
   private final int limit;
 
   /**
-   * 创建词根列表响应
+   * Create a root list response
    *
-   * @param roots 词根数组
-   * @param total 总数
-   * @param offset 偏移量
-   * @param limit 每页大小
+   * @param roots root array
+   * @param total total
+   * @param offset offset
+   * @param limit page size
    */
   public WordRootListResponse(WordRootDTO[] roots, long total, int offset, int limit) {
     super(0);
@@ -61,7 +61,7 @@ public class WordRootListResponse extends BaseResponse {
     this.limit = limit;
   }
 
-  /** Jackson 反序列化用的默认构造函数 */
+  /** Jackson Default constructor for deserialization */
   public WordRootListResponse() {
     super();
     this.roots = null;

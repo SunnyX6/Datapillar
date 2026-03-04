@@ -28,7 +28,7 @@ import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.Update;
 import org.apache.ibatis.annotations.UpdateProvider;
 
-/** MetricModifier 元数据映射器 */
+/** MetricModifier metadata mapper */
 public interface MetricModifierMetaMapper {
   String TABLE_NAME = "metric_modifier_meta";
 

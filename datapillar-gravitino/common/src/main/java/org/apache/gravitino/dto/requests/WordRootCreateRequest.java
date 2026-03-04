@@ -28,7 +28,7 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** 创建词根的请求 */
+/** A request to create a stem */
 @Getter
 @ToString
 @EqualsAndHashCode

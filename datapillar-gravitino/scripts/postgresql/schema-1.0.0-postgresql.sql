@@ -801,9 +801,9 @@ CREATE TABLE IF NOT EXISTS metric_modifier_meta (
 
 CREATE INDEX IF NOT EXISTS metric_modifier_meta_idx_mid ON metric_modifier_meta (tenant_id, metalake_id);
 CREATE INDEX IF NOT EXISTS metric_modifier_meta_idx_cid ON metric_modifier_meta (tenant_id, catalog_id);
-COMMENT ON TABLE metric_modifier_meta IS '修饰符元数据表';
+COMMENT ON TABLE metric_modifier_meta IS 'Metric modifier metadata table';
 COMMENT ON COLUMN metric_modifier_meta.modifier_id IS 'modifier id';
-COMMENT ON COLUMN metric_modifier_meta.modifier_name IS 'modifier name, e.g., 近7天, 北京地区';
+COMMENT ON COLUMN metric_modifier_meta.modifier_name IS 'modifier name, e.g., last 7 days, Beijing area';
 COMMENT ON COLUMN metric_modifier_meta.modifier_code IS 'modifier code, e.g., 7d, beijing';
 COMMENT ON COLUMN metric_modifier_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN metric_modifier_meta.catalog_id IS 'catalog id';
@@ -831,10 +831,10 @@ CREATE TABLE IF NOT EXISTS wordroot_meta (
 
 CREATE INDEX IF NOT EXISTS wordroot_meta_idx_mid ON wordroot_meta (tenant_id, metalake_id);
 CREATE INDEX IF NOT EXISTS wordroot_meta_idx_cid ON wordroot_meta (tenant_id, catalog_id);
-COMMENT ON TABLE wordroot_meta IS '词根元数据表';
+COMMENT ON TABLE wordroot_meta IS 'Word root metadata table';
 COMMENT ON COLUMN wordroot_meta.root_id IS 'root word id';
 COMMENT ON COLUMN wordroot_meta.root_code IS 'root code, e.g., amt, cnt, rate';
-COMMENT ON COLUMN wordroot_meta.root_name IS 'root name, e.g., 金额, amount';
+COMMENT ON COLUMN wordroot_meta.root_name IS 'root name, e.g., amount, amt';
 COMMENT ON COLUMN wordroot_meta.data_type IS 'data type, e.g., STRING, INTEGER, DECIMAL(10,2)';
 COMMENT ON COLUMN wordroot_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN wordroot_meta.catalog_id IS 'catalog id';
@@ -861,11 +861,11 @@ CREATE TABLE IF NOT EXISTS unit_meta (
 
 CREATE INDEX IF NOT EXISTS unit_meta_idx_mid ON unit_meta (tenant_id, metalake_id);
 CREATE INDEX IF NOT EXISTS unit_meta_idx_cid ON unit_meta (tenant_id, catalog_id);
-COMMENT ON TABLE unit_meta IS '单位元数据表';
+COMMENT ON TABLE unit_meta IS 'Unit metadata table';
 COMMENT ON COLUMN unit_meta.unit_id IS 'unit id';
 COMMENT ON COLUMN unit_meta.unit_code IS 'unit code, e.g., CURRENCY, RATIO, COUNT';
-COMMENT ON COLUMN unit_meta.unit_name IS 'unit name, e.g., 人民币, 百分比, 个数';
-COMMENT ON COLUMN unit_meta.unit_symbol IS 'unit symbol, e.g., ¥, %, 个';
+COMMENT ON COLUMN unit_meta.unit_name IS 'unit name, e.g., CNY, percent, count';
+COMMENT ON COLUMN unit_meta.unit_symbol IS 'unit symbol, e.g., CNY, %, count';
 COMMENT ON COLUMN unit_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN unit_meta.catalog_id IS 'catalog id';
 COMMENT ON COLUMN unit_meta.schema_id IS 'schema id';
@@ -896,14 +896,14 @@ CREATE TABLE IF NOT EXISTS value_domain_meta (
 CREATE INDEX IF NOT EXISTS value_domain_meta_idx_mid ON value_domain_meta (tenant_id, metalake_id);
 CREATE INDEX IF NOT EXISTS value_domain_meta_idx_cid ON value_domain_meta (tenant_id, catalog_id);
 CREATE INDEX IF NOT EXISTS value_domain_meta_idx_domain_code ON value_domain_meta (tenant_id, domain_code);
-COMMENT ON TABLE value_domain_meta IS '值域元数据表';
-COMMENT ON COLUMN value_domain_meta.item_id IS 'item id (每行唯一标识)';
-COMMENT ON COLUMN value_domain_meta.domain_code IS 'domain code, 用于分组, e.g., ORDER_STATUS';
-COMMENT ON COLUMN value_domain_meta.domain_name IS 'domain name, e.g., 订单状态值域';
+COMMENT ON TABLE value_domain_meta IS 'Value domain metadata table';
+COMMENT ON COLUMN value_domain_meta.item_id IS 'item id (unique identifier per row)';
+COMMENT ON COLUMN value_domain_meta.domain_code IS 'domain code, used for grouping, e.g., ORDER_STATUS';
+COMMENT ON COLUMN value_domain_meta.domain_name IS 'domain name, e.g., order status domain';
 COMMENT ON COLUMN value_domain_meta.domain_type IS 'domain type: ENUM, RANGE, REGEX';
 COMMENT ON COLUMN value_domain_meta.domain_level IS 'domain level: BUILTIN, BUSINESS';
-COMMENT ON COLUMN value_domain_meta.item_value IS 'item value: 枚举值/区间表达式/正则';
-COMMENT ON COLUMN value_domain_meta.item_label IS 'item label: 显示名称';
+COMMENT ON COLUMN value_domain_meta.item_value IS 'item value: enum value/range expression/regex';
+COMMENT ON COLUMN value_domain_meta.item_label IS 'item label: display name';
 COMMENT ON COLUMN value_domain_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN value_domain_meta.catalog_id IS 'catalog id';
 COMMENT ON COLUMN value_domain_meta.schema_id IS 'schema id';
@@ -934,7 +934,7 @@ CREATE TABLE IF NOT EXISTS metric_meta (
 CREATE INDEX IF NOT EXISTS metric_meta_idx_mid ON metric_meta (tenant_id, metalake_id);
 CREATE INDEX IF NOT EXISTS metric_meta_idx_cid ON metric_meta (tenant_id, catalog_id);
 CREATE INDEX IF NOT EXISTS metric_meta_idx_type ON metric_meta (tenant_id, metric_type);
-COMMENT ON TABLE metric_meta IS '指标元数据主表';
+COMMENT ON TABLE metric_meta IS 'Metric metadata main table';
 COMMENT ON COLUMN metric_meta.metric_id IS 'metric id';
 COMMENT ON COLUMN metric_meta.metric_name IS 'metric name';
 COMMENT ON COLUMN metric_meta.metric_code IS 'metric code';
@@ -981,7 +981,7 @@ CREATE INDEX IF NOT EXISTS metric_version_info_idx_metalake ON metric_version_in
 CREATE INDEX IF NOT EXISTS metric_version_info_idx_catalog ON metric_version_info (tenant_id, catalog_id);
 CREATE INDEX IF NOT EXISTS metric_version_info_idx_schema ON metric_version_info (tenant_id, schema_id);
 CREATE INDEX IF NOT EXISTS metric_version_info_idx_ref_table ON metric_version_info (tenant_id, ref_table_id);
-COMMENT ON TABLE metric_version_info IS '指标版本快照表';
+COMMENT ON TABLE metric_version_info IS 'Metric version snapshot table';
 COMMENT ON COLUMN metric_version_info.id IS 'auto increment id';
 COMMENT ON COLUMN metric_version_info.metalake_id IS 'metalake id';
 COMMENT ON COLUMN metric_version_info.catalog_id IS 'catalog id';
@@ -993,7 +993,7 @@ COMMENT ON COLUMN metric_version_info.metric_code IS 'metric code snapshot';
 COMMENT ON COLUMN metric_version_info.metric_type IS 'metric type: ATOMIC, DERIVED, COMPOSITE';
 COMMENT ON COLUMN metric_version_info.data_type IS 'data type snapshot, e.g., STRING, INTEGER, DECIMAL(10,2)';
 COMMENT ON COLUMN metric_version_info.metric_comment IS 'metric comment snapshot';
-COMMENT ON COLUMN metric_version_info.metric_unit IS 'metric unit, e.g., 元, 个, %';
+COMMENT ON COLUMN metric_version_info.metric_unit IS 'metric unit, e.g., CNY, count, %';
 COMMENT ON COLUMN metric_version_info.parent_metric_ids IS 'parent metric ids in JSON array format, e.g., [123, 456]';
 COMMENT ON COLUMN metric_version_info.calculation_formula IS 'calculation formula, e.g., metric1 / metric2 * 100';
 COMMENT ON COLUMN metric_version_info.ref_table_id IS 'referenced table id for ATOMIC metric';

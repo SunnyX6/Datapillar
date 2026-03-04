@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-Review 数据结构
+Review data structure
 
-ReviewerAgent 的产物：ReviewResult
+ReviewerAgent product of:ReviewResult
 """
 
 import json
@@ -15,7 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 def _try_parse_json(value: object) -> object:
-    """尝试解析字符串化的 JSON"""
+    """Try parsing the stringified JSON"""
     if not isinstance(value, str):
         return value
     text = value.strip()
@@ -29,23 +28,23 @@ def _try_parse_json(value: object) -> object:
 
 class ReviewResult(BaseModel):
     """
-    Review 结果（ReviewerAgent 输出）
+    Review result(ReviewerAgent output)
 
-    passed 表示被审对象是否通过 review。
-    """
+    passed Indicates whether the object under review has passed or not review."""
 
-    passed: bool = Field(..., description="被审对象是否通过 review")
-    score: int = Field(..., ge=0, le=100, description="评分 0-100")
-    summary: str = Field(..., description="整体评价")
-    issues: list[str] = Field(default_factory=list, description="阻断级问题")
-    warnings: list[str] = Field(default_factory=list, description="警告/建议")
-    review_stage: str = Field(..., description="review 阶段：design/development")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="其他元信息")
+    passed: bool = Field(..., description="Whether the object under review passes review")
+    score: int = Field(..., ge=0, le=100, description="Rating 0-100")
+    summary: str = Field(..., description="Overall rating")
+    issues: list[str] = Field(default_factory=list, description="Blocking level problem")
+    warnings: list[str] = Field(default_factory=list, description="warning/Suggestions")
+    review_stage: str = Field(..., description="review stage:design/development")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Other meta information")
 
     @field_validator("issues", "warnings", mode="before")
     @classmethod
     def _parse_list_fields(cls, v: object) -> object:
-        """容错：null -> 空列表，字符串化 JSON -> 解析"""
+        """fault tolerance:
+        null -> empty list,stringification JSON -> parse"""
         v = _try_parse_json(v)
         if v is None:
             return []
@@ -57,7 +56,8 @@ class ReviewResult(BaseModel):
     @field_validator("metadata", mode="before")
     @classmethod
     def _parse_metadata(cls, v: object) -> object:
-        """容错：null -> 空字典，字符串化 JSON -> 解析"""
+        """fault tolerance:
+        null -> empty dictionary,stringification JSON -> parse"""
         v = _try_parse_json(v)
         if v is None:
             return {}

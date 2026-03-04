@@ -1,16 +1,15 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-全局异常类定义
+Global exception class definition
 """
 
 from typing import Any
 
 
 class BaseError(Exception):
-    """基础异常类"""
+    """Basic exception class"""
 
     def __init__(self, message: str, details: Any | None = None):
         self.message = message
@@ -19,66 +18,66 @@ class BaseError(Exception):
 
 
 class ConfigurationError(BaseError):
-    """配置错误"""
+    """Configuration error"""
 
     pass
 
 
 class DatabaseError(BaseError):
-    """数据库操作错误"""
+    """Database operation error"""
 
     pass
 
 
 class Neo4jError(DatabaseError):
-    """Neo4j 错误"""
+    """Neo4j Error"""
 
     pass
 
 
 class MySQLError(DatabaseError):
-    """MySQL 错误"""
+    """MySQL Error"""
 
     pass
 
 
 class RedisError(DatabaseError):
-    """Redis 错误"""
+    """Redis Error"""
 
     pass
 
 
 class AuthenticationError(BaseError):
-    """认证失败"""
+    """Authentication failed"""
 
     pass
 
 
 class AuthorizationError(BaseError):
-    """授权失败"""
+    """Authorization failed"""
 
     pass
 
 
 class ResourceNotFoundError(BaseError):
-    """资源未找到"""
+    """Resource not found"""
 
     pass
 
 
 class ValidationError(BaseError):
-    """数据校验失败"""
+    """Data verification failed"""
 
     pass
 
 
 class AgentExecutionError(BaseError):
-    """Agent 执行失败"""
+    """Agent Execution failed"""
 
     pass
 
 
 class LLMError(BaseError):
-    """LLM 服务错误"""
+    """LLM Service error"""
 
     pass

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { getFileNameFromUrl, inferDocumentTypeFromName } from '@/features/wiki/utils'
 
-describe('文档上传工具函数', () => {
-  it('可以从文件名推断文档类型', () => {
+describe('Document upload tool function', () => {
+  it('Document type can be inferred from file name', () => {
     expect(inferDocumentTypeFromName('report.pdf')).toBe('pdf')
     expect(inferDocumentTypeFromName('spec.DOCX')).toBe('docx')
     expect(inferDocumentTypeFromName('note.md')).toBe('md')
@@ -10,12 +10,12 @@ describe('文档上传工具函数', () => {
     expect(inferDocumentTypeFromName('unknown.bin')).toBe('txt')
   })
 
-  it('可以从 URL 中解析文件名', () => {
+  it('Can be obtained from URL Parse file name in', () => {
     expect(getFileNameFromUrl('https://wiki.corp.internal/doc/guide.pdf')).toBe('guide.pdf')
     expect(getFileNameFromUrl('https://wiki.corp.internal/doc/')).toBe('wiki.corp.internal')
   })
 
-  it('对非法 URL 返回原始字符串', () => {
+  it('to illegal URL Return original string', () => {
     expect(getFileNameFromUrl('  not-a-url  ')).toBe('not-a-url')
   })
 })

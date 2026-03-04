@@ -8,11 +8,11 @@ import lombok.Data;
 @Schema(name = "SetupStatusResponse")
 public class SetupStatusResponse {
 
-    private boolean schemaReady;
+  private boolean schemaReady;
 
-    private boolean initialized;
+  private boolean initialized;
 
-    private String currentStep;
+  private String currentStep;
 
-    private List<SetupStepStatusItem> steps;
+  private List<SetupStepStatusItem> steps;
 }

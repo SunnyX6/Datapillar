@@ -14,18 +14,18 @@ import lombok.NoArgsConstructor;
 @Schema(name = "AuthOAuth2TokenResponse")
 public class OAuth2TokenResponse {
 
-    @JsonProperty("access_token")
-    private String accessToken;
+  @JsonProperty("access_token")
+  private String accessToken;
 
-    @JsonProperty("token_type")
-    private String tokenType;
+  @JsonProperty("token_type")
+  private String tokenType;
 
-    @JsonProperty("expires_in")
-    private Long expiresIn;
+  @JsonProperty("expires_in")
+  private Long expiresIn;
 
-    @JsonProperty("refresh_token")
-    private String refreshToken;
+  @JsonProperty("refresh_token")
+  private String refreshToken;
 
-    @JsonProperty("scope")
-    private String scope;
+  @JsonProperty("scope")
+  private String scope;
 }

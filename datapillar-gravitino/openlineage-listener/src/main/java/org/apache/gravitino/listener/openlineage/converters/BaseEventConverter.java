@@ -1,21 +1,19 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * regarding copyright ownership.The ASF licenses this file
+ * to you under the Apache License,Version 2.0 (the
+ * "License");you may not use this file except in compliance
+ * with the License.You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * Unless required by applicable law or agreed to in writing,* software distributed under the License is distributed on an
+ * "AS IS" BASIS,WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND,either express or implied.See the License for the
  * specific language governing permissions and limitations
- * under the License.
- */
+ * under the License.*/
 
 package org.apache.gravitino.listener.openlineage.converters;
 
@@ -34,7 +32,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.openlineage.facets.GravitinoDatasetFacet;
 
-/** 事件转换器基类，提供共享的工具方法。 */
+/** Event converter base class,Provide shared tools and methods. */
 public abstract class BaseEventConverter {
 
   protected final OpenLineage openLineage;
@@ -47,7 +45,7 @@ public abstract class BaseEventConverter {
     this.producerUri = URI.create("https://github.com/apache/gravitino");
   }
 
-  /** 创建 OpenLineage RunEvent。 */
+  /** create OpenLineage RunEvent. */
   protected RunEvent createRunEvent(
       Event event,
       String jobName,
@@ -59,11 +57,9 @@ public abstract class BaseEventConverter {
     UUID runId = UUID.randomUUID();
     ZonedDateTime eventTime =
         ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(event.eventTime()), ZoneOffset.UTC);
-
     Run run = openLineage.newRunBuilder().runId(runId).build();
     Job job =
         openLineage.newJobBuilder().namespace(formatJobNamespace(tenantId)).name(jobName).build();
-
     return openLineage
         .newRunEventBuilder()
         .eventType(eventType)
@@ -76,9 +72,9 @@ public abstract class BaseEventConverter {
   }
 
   /**
-   * 格式化 dataset namespace。
+   * Format dataset namespace.*
    *
-   * <p>格式: gravitino://tenant/{tenantId}/{metalake}/{catalog}
+   * <p>Format:gravitino://tenant/{tenantId}/{metalake}/{catalog}
    */
   protected String formatDatasetNamespace(Event event, NameIdentifier identifier) {
     long tenantId = requiredTenantId(event);
@@ -92,9 +88,9 @@ public abstract class BaseEventConverter {
   }
 
   /**
-   * 格式化 dataset name。
+   * Format dataset name.*
    *
-   * <p>格式: {schema}.{table} 或 {name}
+   * <p>Format:{schema}.{table} or {name}
    */
   protected String formatDatasetName(NameIdentifier identifier) {
     String[] parts = identifier.namespace().levels();

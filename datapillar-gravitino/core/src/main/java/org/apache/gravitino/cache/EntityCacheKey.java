@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.datapillar.cache.TenantCacheKeyBuilder;
+import org.apache.gravitino.multitenancy.cache.TenantCacheKeyBuilder;
 
 /** Key for Entity cache. */
 public class EntityCacheKey {

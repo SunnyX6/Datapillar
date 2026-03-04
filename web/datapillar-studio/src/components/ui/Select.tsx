@@ -1,5 +1,5 @@
 /**
- * 自定义 Select 组件 - 支持深色模式
+ * Customize Select components - Support dark mode
  */
 
 import { useState, useRef, useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react'
@@ -17,17 +17,17 @@ export interface SelectProps {
   options: SelectOption[]
   onChange: (value: string) => void
   placeholder?: string
-  /** 下拉卡片头部提示文字 */
+  /** Drop-down card header prompt text */
   dropdownHeader?: string
-  /** 下拉卡片头部右侧提示文字 */
+  /** Prompt text on the right side of the drop-down card header */
   dropdownHint?: string
-  /** 下拉卡片头部右侧提示图标 */
+  /** The prompt icon on the right side of the drop-down card header */
   dropdownHintIcon?: ReactNode
-  /** 点击下拉卡片头部右侧提示 */
+  /** Click the prompt on the right side of the drop-down card header */
   onDropdownHintClick?: () => void
-  /** 下拉卡片底部输入占位文案 */
+  /** Enter the placeholder copy at the bottom of the drop-down card */
   dropdownInputPlaceholder?: string
-  /** 提交下拉卡片底部输入（回车） */
+  /** Submit input at the bottom of the drop-down card（Enter） */
   onDropdownInputSubmit?: (value: string) => Promise<void> | void
   disabled?: boolean
   size?: 'md' | 'sm' | 'xs'
@@ -38,7 +38,7 @@ export function Select({
   value,
   options,
   onChange,
-  placeholder = '请选择',
+  placeholder = 'Please select',
   dropdownHeader,
   dropdownHint,
   dropdownHintIcon,
@@ -112,7 +112,7 @@ export function Select({
     return () => window.clearTimeout(timer)
   }, [open, onDropdownInputSubmit])
 
-  // 计算下拉框样式
+  // Calculate drop-down box style
   const dropdownStyle = useMemo(() => {
     if (!dropdownPos) return undefined
     return {
@@ -243,7 +243,7 @@ export function Select({
                   type="text"
                   value={dropdownInput}
                   disabled={isSubmittingInput}
-                  placeholder={dropdownInputPlaceholder ?? '回车添加'}
+                  placeholder={dropdownInputPlaceholder ?? 'Enter to add'}
                   onChange={(event) => setDropdownInput(event.target.value)}
                   onKeyDown={handleDropdownInputSubmit}
                   className="w-full bg-transparent text-caption text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none"

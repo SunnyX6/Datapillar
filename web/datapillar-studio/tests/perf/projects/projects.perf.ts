@@ -4,8 +4,8 @@ import { getPerfBudgets } from '../../shared/env'
 import { mockAuthRoutes } from '../../shared/mockAuth'
 import { collectWebVitals, initWebVitals } from '../../shared/webVitals'
 
-test.describe('项目模块性能', () => {
-  test('项目概览 Web Vitals', async ({ page }) => {
+test.describe('Project module performance', () => {
+  test('Project overview Web Vitals', async ({ page }) => {
     const budgets = getPerfBudgets()
 
     await mockAuthRoutes(page)
@@ -13,21 +13,21 @@ test.describe('项目模块性能', () => {
     await initWebVitals(page)
     await page.goto('/projects')
 
-    await expect(page.getByText('项目概览')).toBeVisible()
+    await expect(page.getByText('Project overview')).toBeVisible()
 
     await page.mouse.wheel(0, 500)
 
-    await page.getByRole('button', { name: '创建项目' }).first().click()
-    await expect(page.getByRole('heading', { name: '创建新项目', level: 2 })).toBeVisible()
+    await page.getByRole('button', { name: 'Create project' }).first().click()
+    await expect(page.getByRole('heading', { name: 'Create new project', level: 2 })).toBeVisible()
 
     const projectName = `Perf_Project_${Date.now()}`
     await page.getByPlaceholder('e.g. User_Behavior_Analytics_v2').fill(projectName)
-    await page.getByPlaceholder('简要描述该项目的用途...').fill('前端性能自测项目')
+    await page.getByPlaceholder('Briefly describe the purpose of the project...').fill('Front-end performance self-test project')
 
-    await page.getByRole('button', { name: /实时流计算/ }).click()
+    await page.getByRole('button', { name: /real-time streaming computing/ }).click()
     await page.getByRole('button', { name: /STAGING/ }).click()
 
-    const createButton = page.getByRole('button', { name: '创建项目' }).last()
+    const createButton = page.getByRole('button', { name: 'Create project' }).last()
     await expect(createButton).toBeEnabled()
     await createButton.click()
 

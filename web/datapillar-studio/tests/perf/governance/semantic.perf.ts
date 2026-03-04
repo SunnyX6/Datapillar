@@ -5,8 +5,8 @@ import { mockAuthRoutes } from '../../shared/mockAuth'
 import { mockOneMetaRoutes } from '../../shared/mockOneMeta'
 import { collectWebVitals, initWebVitals } from '../../shared/webVitals'
 
-test.describe('数据治理性能', () => {
-  test('元语义 Web Vitals', async ({ page }) => {
+test.describe('Data governance performance', () => {
+  test('Metasemantics Web Vitals', async ({ page }) => {
     const budgets = getPerfBudgets()
 
     await mockAuthRoutes(page)
@@ -16,15 +16,15 @@ test.describe('数据治理性能', () => {
     await page.goto('/governance/semantic')
 
     await expect(page.getByRole('heading', { name: 'One Meta Semantic' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: '指标中心' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: '规范词根' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: '标准规范' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'indicator center' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'canonical root' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Standard specifications' })).toBeVisible()
 
-    await expect(page.getByRole('button', { name: '数据类型' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '值域' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '分级分类' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'data type' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'range' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Classification' })).toBeVisible()
 
-    const ctaButton = page.getByRole('button', { name: '立即开启语义增强' })
+    const ctaButton = page.getByRole('button', { name: 'Turn on semantic enhancement now' })
     await expect(ctaButton).toBeVisible()
     await ctaButton.click()
 

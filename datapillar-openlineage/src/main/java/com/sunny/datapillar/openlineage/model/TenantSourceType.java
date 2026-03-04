@@ -1,9 +1,7 @@
 package com.sunny.datapillar.openlineage.model;
 
-/**
- * 租户归属来源。
- */
+/** Tenant attribution source. */
 public enum TenantSourceType {
-    GRAVITINO,
-    COMPUTE_ENGINE
+  GRAVITINO,
+  COMPUTE_ENGINE
 }

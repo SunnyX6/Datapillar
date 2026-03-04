@@ -13,8 +13,7 @@ import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 /**
- * Redis配置
- * 负责Redis配置装配与Bean初始化
+ * RedisConfiguration responsibleRedisConfigure assembly withBeaninitialization
  *
  * @author Sunny
  * @date 2026-01-01
@@ -23,33 +22,33 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @ConditionalOnProperty(prefix = "spring.data.redis", name = "host", matchIfMissing = false)
 public class RedisConfig {
 
-    /**
-     * RedisTemplate配置
-     */
-    @Bean
-    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
-        RedisTemplate<String, Object> template = new RedisTemplate<>();
-        template.setConnectionFactory(connectionFactory);
+  /** RedisTemplateConfiguration */
+  @Bean
+  public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
+    RedisTemplate<String, Object> template = new RedisTemplate<>();
+    template.setConnectionFactory(connectionFactory);
 
-        // 使用Jackson2JsonRedisSerializer来序列化和反序列化redis的value值
-        Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
-        ObjectMapper om = new ObjectMapper();
-        om.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
-        om.activateDefaultTyping(LaissezFaireSubTypeValidator.instance, ObjectMapper.DefaultTyping.NON_FINAL);
-        jackson2JsonRedisSerializer.setObjectMapper(om);
+    // useJackson2JsonRedisSerializerto serialize and deserializeredisofvaluevalue
+    Jackson2JsonRedisSerializer<Object> jackson2JsonRedisSerializer =
+        new Jackson2JsonRedisSerializer<>(Object.class);
+    ObjectMapper om = new ObjectMapper();
+    om.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+    om.activateDefaultTyping(
+        LaissezFaireSubTypeValidator.instance, ObjectMapper.DefaultTyping.NON_FINAL);
+    jackson2JsonRedisSerializer.setObjectMapper(om);
 
-        StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();
+    StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();
 
-        // key采用String的序列化方式
-        template.setKeySerializer(stringRedisSerializer);
-        // hash的key也采用String的序列化方式
-        template.setHashKeySerializer(stringRedisSerializer);
-        // value序列化方式采用jackson
-        template.setValueSerializer(jackson2JsonRedisSerializer);
-        // hash的value序列化方式采用jackson
-        template.setHashValueSerializer(jackson2JsonRedisSerializer);
-        template.afterPropertiesSet();
+    // keyadoptStringserialization method
+    template.setKeySerializer(stringRedisSerializer);
+    // hashofkeyAlso usedStringserialization method
+    template.setHashKeySerializer(stringRedisSerializer);
+    // valueThe serialization method usesjackson
+    template.setValueSerializer(jackson2JsonRedisSerializer);
+    // hashofvalueThe serialization method usesjackson
+    template.setHashValueSerializer(jackson2JsonRedisSerializer);
+    template.afterPropertiesSet();
 
-        return template;
-    }
+    return template;
+  }
 }

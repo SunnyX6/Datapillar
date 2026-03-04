@@ -20,5 +20,8 @@ package org.apache.gravitino.catalog;
 
 import org.apache.gravitino.dataset.DatasetCatalog;
 
-/** DatasetDispatcher 接口扩展 DatasetCatalog，用于调度数据集相关的操作 */
+/**
+ * DatasetDispatcher Interface extension DatasetCatalog，Used to schedule operations related to data
+ * sets
+ */
 public interface DatasetDispatcher extends DatasetCatalog {}

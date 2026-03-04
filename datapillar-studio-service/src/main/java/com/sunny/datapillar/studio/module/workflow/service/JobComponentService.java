@@ -16,28 +16,20 @@ import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
-
 /**
- * 任务Component服务
- * 提供任务Component业务能力与领域服务
+ * TaskComponentservice Provide tasksComponentBusiness capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface JobComponentService {
 
-    /**
-     * 查询所有可用组件
-     */
-    List<JobComponentResponse> getAllComponents();
+  /** Query all available components */
+  List<JobComponentResponse> getAllComponents();
 
-    /**
-     * 根据 code 查询组件
-     */
-    JobComponentResponse getComponentByCode(String code);
+  /** According to code Query component */
+  JobComponentResponse getComponentByCode(String code);
 
-    /**
-     * 根据类型查询组件
-     */
-    List<JobComponentResponse> getComponentsByType(String type);
+  /** Query components by type */
+  List<JobComponentResponse> getComponentsByType(String type);
 }

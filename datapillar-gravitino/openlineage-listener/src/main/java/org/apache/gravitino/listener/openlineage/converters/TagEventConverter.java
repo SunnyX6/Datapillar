@@ -1,21 +1,19 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * regarding copyright ownership.The ASF licenses this file
+ * to you under the Apache License,Version 2.0 (the
+ * "License");you may not use this file except in compliance
+ * with the License.You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * Unless required by applicable law or agreed to in writing,* software distributed under the License is distributed on an
+ * "AS IS" BASIS,WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND,either express or implied.See the License for the
  * specific language governing permissions and limitations
- * under the License.
- */
+ * under the License.*/
 
 package org.apache.gravitino.listener.openlineage.converters;
 
@@ -41,9 +39,9 @@ import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.listener.openlineage.facets.GravitinoTagFacet;
 
 /**
- * Tag 事件转换器。
+ * Tag event converter.*
  *
- * <p>处理: CreateTagEvent, AlterTagEvent, DeleteTagEvent, AssociateTagsForMetadataObjectEvent
+ * <p>Process:CreateTagEvent,AlterTagEvent,DeleteTagEvent,AssociateTagsForMetadataObjectEvent
  */
 public class TagEventConverter extends BaseEventConverter {
 
@@ -65,14 +63,14 @@ public class TagEventConverter extends BaseEventConverter {
   }
 
   /**
-   * 转换 CreateTagEvent（创建 Tag 元数据）。
+   * Convert CreateTagEvent(create Tag metadata).*
    *
-   * <p>Tag 作为独立的元数据对象，namespace 格式为 gravitino://{metalake}，name 为 tagName。
+   * <p>Tag as a standalone metadata object,namespace The format is gravitino://{metalake},name for
+   * tagName.
    */
   private RunEvent convertCreateTag(CreateTagEvent event) {
     NameIdentifier identifier = event.identifier();
     TagInfo tagInfo = event.createdTagInfo();
-
     List<SchemaDatasetFacetFields> fields = new ArrayList<>();
     fields.add(openLineage.newSchemaDatasetFacetFields("name", "STRING", tagInfo.name(), null));
     if (tagInfo.comment() != null) {
@@ -88,7 +86,6 @@ public class TagEventConverter extends BaseEventConverter {
     }
 
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
-
     DatasetFacets facets =
         openLineage
             .newDatasetFacetsBuilder()
@@ -97,7 +94,6 @@ public class TagEventConverter extends BaseEventConverter {
                 openLineage.newLifecycleStateChangeDatasetFacet(
                     OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.CREATE, null))
             .build();
-
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
@@ -105,7 +101,6 @@ public class TagEventConverter extends BaseEventConverter {
             .name(identifier.name())
             .facets(facets)
             .build();
-
     return createRunEvent(
         event,
         "gravitino.create_tag",
@@ -114,11 +109,10 @@ public class TagEventConverter extends BaseEventConverter {
         Collections.singletonList(outputDataset));
   }
 
-  /** 转换 AlterTagEvent（修改 Tag 元数据）。 */
+  /** Convert AlterTagEvent(Modify Tag metadata). */
   private RunEvent convertAlterTag(AlterTagEvent event) {
     NameIdentifier identifier = event.identifier();
     TagInfo tagInfo = event.updatedTagInfo();
-
     List<SchemaDatasetFacetFields> fields = new ArrayList<>();
     fields.add(openLineage.newSchemaDatasetFacetFields("name", "STRING", tagInfo.name(), null));
     if (tagInfo.comment() != null) {
@@ -134,7 +128,6 @@ public class TagEventConverter extends BaseEventConverter {
     }
 
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
-
     DatasetFacets facets =
         openLineage
             .newDatasetFacetsBuilder()
@@ -143,7 +136,6 @@ public class TagEventConverter extends BaseEventConverter {
                 openLineage.newLifecycleStateChangeDatasetFacet(
                     OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.ALTER, null))
             .build();
-
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
@@ -151,7 +143,6 @@ public class TagEventConverter extends BaseEventConverter {
             .name(identifier.name())
             .facets(facets)
             .build();
-
     return createRunEvent(
         event,
         "gravitino.alter_tag",
@@ -161,17 +152,16 @@ public class TagEventConverter extends BaseEventConverter {
   }
 
   /**
-   * 转换 DeleteTagEvent（删除 Tag 元数据）。
+   * Convert DeleteTagEvent(Delete Tag metadata).*
    *
-   * <p>注意：Gravitino 原生事件类名为 DeleteTagEvent，但 Job 名称统一为 drop_tag。
+   * <p>Note:Gravitino Native event class name DeleteTagEvent,But Job The name is unified as
+   * drop_tag.
    */
   private RunEvent convertDropTag(DeleteTagEvent event) {
     NameIdentifier identifier = event.identifier();
-
     List<SchemaDatasetFacetFields> fields = new ArrayList<>();
     fields.add(openLineage.newSchemaDatasetFacetFields("name", "STRING", identifier.name(), null));
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
-
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
@@ -187,7 +177,6 @@ public class TagEventConverter extends BaseEventConverter {
                             null))
                     .build())
             .build();
-
     return createRunEvent(
         event,
         "gravitino.drop_tag",
@@ -197,18 +186,16 @@ public class TagEventConverter extends BaseEventConverter {
   }
 
   /**
-   * 转换 AssociateTagsForMetadataObjectEvent（关联 Tag 到元数据对象）。
+   * Convert AssociateTagsForMetadataObjectEvent(association Tag to metadata object).*
    *
-   * <p>将 Tag 关联信息作为自定义 facet 传递给 OpenLineage。
+   * <p>will Tag associated information as custom facet passed to OpenLineage.
    */
   private RunEvent convertAssociateTagsForMetadataObject(
       AssociateTagsForMetadataObjectEvent event) {
     NameIdentifier identifier = event.identifier();
     MetadataObject.Type objectType = event.objectType();
-
     String datasetNamespace = formatTagDatasetNamespace(identifier, objectType);
     String datasetName = formatTagDatasetName(identifier, objectType);
-
     GravitinoTagFacet tagFacet =
         GravitinoTagFacet.builder(producerUri)
             .objectType(objectType.name())
@@ -216,10 +203,8 @@ public class TagEventConverter extends BaseEventConverter {
             .tagsToRemove(event.tagsToRemove())
             .associatedTags(event.associatedTags())
             .build();
-
     DatasetFacetsBuilder facetsBuilder = openLineage.newDatasetFacetsBuilder();
     facetsBuilder.put("gravitinoTag", tagFacet);
-
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
@@ -227,7 +212,6 @@ public class TagEventConverter extends BaseEventConverter {
             .name(datasetName)
             .facets(facetsBuilder.build())
             .build();
-
     return createRunEvent(
         event,
         "gravitino.associate_tags",
@@ -237,11 +221,11 @@ public class TagEventConverter extends BaseEventConverter {
   }
 
   /**
-   * 格式化 Tag 元数据事件的 dataset namespace。
+   * Format Tag metadata event dataset namespace.*
    *
-   * <p>Tag 的 identifier: namespace.levels = [metalake], name = tagName
+   * <p>Tag of identifier:namespace.levels = [metalake],name = tagName
    *
-   * <p>格式：gravitino://{metalake}
+   * <p>Format:gravitino://{metalake}
    */
   private String formatTagMetadataNamespace(NameIdentifier identifier) {
     String[] parts = identifier.namespace().levels();
@@ -251,10 +235,9 @@ public class TagEventConverter extends BaseEventConverter {
     return namespace;
   }
 
-  /** 根据对象类型格式化 Tag 关联事件的 dataset namespace。 */
+  /** Format based on object type Tag related to events dataset namespace. */
   private String formatTagDatasetNamespace(NameIdentifier identifier, MetadataObject.Type type) {
     String[] parts = identifier.namespace().levels();
-
     switch (type) {
       case CATALOG:
         if (parts.length >= 1) {
@@ -278,11 +261,10 @@ public class TagEventConverter extends BaseEventConverter {
     return namespace;
   }
 
-  /** 根据对象类型格式化 Tag 关联事件的 dataset name。 */
+  /** Format based on object type Tag related to events dataset name. */
   private String formatTagDatasetName(NameIdentifier identifier, MetadataObject.Type type) {
     String[] parts = identifier.namespace().levels();
     String name = identifier.name();
-
     switch (type) {
       case CATALOG:
         return name;

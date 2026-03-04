@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-数据访问层（Repository）
+data access layer（Repository）
 
-提供数据库访问的统一接口
+Provides a unified interface for database access
 """
 
 from src.infrastructure.repository.knowledge import (
@@ -29,7 +28,7 @@ __all__ = [
     "Model",
     "LlmUsage",
     "Component",
-    # Neo4j 搜索服务
+    # Neo4j Search service
     "Neo4jTableSearch",
     "Neo4jMetricSearch",
     "Neo4jSemanticSearch",

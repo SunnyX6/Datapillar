@@ -1,7 +1,7 @@
 /**
- * 知识图谱 API 服务
+ * Knowledge graph API service
  *
- * 知识图谱使用非 SSE 接口（一次性 JSON 返回）
+ * Knowledge graph uses non- SSE interface（Disposable JSON Return）
  */
 
 import { API_BASE, API_PATH, requestRaw } from '@/api'
@@ -20,7 +20,7 @@ export type {
 } from '@/services/types/ai/knowledge'
 
 /**
- * 转换 Neo4j 节点为前端节点
+ * Convert Neo4j The node is the front-end node
  */
 function transformNode(node: Neo4jNode): GraphNode {
   const { id, type, level, properties } = node
@@ -44,7 +44,7 @@ function transformNode(node: Neo4jNode): GraphNode {
 }
 
 /**
- * 转换 Neo4j 关系为前端关系
+ * Convert Neo4j The relationship is a front-end relationship
  */
 function transformRelationship(rel: Neo4jRelationship): GraphLink {
   return {
@@ -56,7 +56,7 @@ function transformRelationship(rel: Neo4jRelationship): GraphLink {
 }
 
 /**
- * 获取初始图数据（SSE 流式）
+ * Get initial graph data（SSE streaming）
  */
 export async function fetchInitialGraph(
   limit: number = 500,
@@ -74,7 +74,7 @@ export async function fetchInitialGraph(
 }
 
 /**
- * 搜索知识图谱（非 SSE，一次性返回）
+ * Search the knowledge graph（Not SSE，One-time return）
  */
 export async function searchGraph(
   query: string,

@@ -7,8 +7,8 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 /**
- * 用户邀请角色组件
- * 负责用户邀请角色核心逻辑实现
+ * User invitation role component Responsible for implementing the core logic of user invitation
+ * roles
  *
  * @author Sunny
  * @date 2026-01-01
@@ -16,12 +16,12 @@ import lombok.Data;
 @Data
 @TableName("user_invitation_roles")
 public class UserInvitationRole {
-    @TableId(type = IdType.AUTO)
-    private Long id;
+  @TableId(type = IdType.AUTO)
+  private Long id;
 
-    @TableField("invitation_id")
-    private Long invitationId;
+  @TableField("invitation_id")
+  private Long invitationId;
 
-    @TableField("role_id")
-    private Long roleId;
+  @TableField("role_id")
+  private Long roleId;
 }

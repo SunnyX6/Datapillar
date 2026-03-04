@@ -10,6 +10,6 @@ import lombok.Data;
 @Schema(name = "RoleMemberBatchRemove")
 public class RoleMemberBatchRemoveRequest {
 
-    @NotEmpty(message = "成员ID列表不能为空")
-    private List<@NotNull(message = "成员ID不能为空") Long> userIds;
+  @NotEmpty(message = "memberIDList cannot be empty")
+  private List<@NotNull(message = "memberIDcannot be empty") Long> userIds;
 }

@@ -22,21 +22,25 @@ import static org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper.
 import static org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper.GROUP_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GroupRoleRelBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
 public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider {
   @Override
   public String softDeleteGroupRoleRelByGroupId(Long groupId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+        + " WHERE group_id = #{groupId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteGroupRoleRelByGroupAndRoles(Long groupId, List<Long> roleIds) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
@@ -48,37 +52,48 @@ public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider 
         + "</foreach>"
         + ") "
         + "AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + "</script>";
   }
 
   @Override
   public String softDeleteGroupRoleRelByMetalakeId(Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE group_id IN (SELECT group_id FROM "
         + GROUP_TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
-        + " AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ")"
+        + " AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteGroupRoleRelByRoleId(Long roleId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+        + " WHERE role_id = #{roleId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String deleteGroupRoleRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " WHERE id IN (SELECT id FROM "
         + GROUP_ROLE_RELATION_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit})";
   }
 }

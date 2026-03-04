@@ -31,7 +31,7 @@ import org.apache.gravitino.dataset.ValueDomain;
 import org.apache.gravitino.dto.dataset.ValueDomainItemDTO;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** 创建值域的请求 */
+/** Request to create a value range */
 @Getter
 @ToString
 @EqualsAndHashCode

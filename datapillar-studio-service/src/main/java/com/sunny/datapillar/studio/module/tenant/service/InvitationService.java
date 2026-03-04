@@ -16,26 +16,19 @@ import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
 
 /**
- * 邀请服务
- * 提供邀请业务能力与领域服务
+ * invitation service Provide invitation business capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface InvitationService {
 
-    /**
-     * 创建邀请（租户管理员操作）。
-     */
-    InvitationCreateResponse createInvitation(InvitationCreateRequest dto);
+  /** Create invitation(Tenant administrator operations). */
+  InvitationCreateResponse createInvitation(InvitationCreateRequest dto);
 
-    /**
-     * 根据邀请码查询邀请详情（匿名可访问）。
-     */
-    InvitationDetailResponse getInvitationByCode(String inviteCode);
+  /** Query invitation details based on invitation code(Accessible anonymously). */
+  InvitationDetailResponse getInvitationByCode(String inviteCode);
 
-    /**
-     * 邀请注册（匿名用户操作）。
-     */
-    void registerInvitation(InvitationRegisterRequest request);
+  /** Invite registration(Anonymous user operations). */
+  void registerInvitation(InvitationRegisterRequest request);
 }

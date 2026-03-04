@@ -749,10 +749,10 @@ public class DTOConverters {
   }
 
   /**
-   * 将 Metric 转换为 MetricDTO
+   * will Metric Convert to MetricDTO
    *
-   * @param metric 待转换的指标对象
-   * @return 指标 DTO
+   * @param metric Indicator object to be converted
+   * @return indicator DTO
    */
   public static MetricDTO toDTO(Metric metric) {
     return MetricDTO.builder()
@@ -771,10 +771,10 @@ public class DTOConverters {
   }
 
   /**
-   * 将 MetricVersion 转换为 MetricVersionDTO
+   * will MetricVersion Convert to MetricVersionDTO
    *
-   * @param metricVersion 待转换的指标版本对象
-   * @return 指标版本 DTO
+   * @param metricVersion Indicator version object to be converted
+   * @return Indicator version DTO
    */
   public static MetricVersionDTO toDTO(MetricVersion metricVersion) {
     return MetricVersionDTO.builder()
@@ -802,10 +802,10 @@ public class DTOConverters {
   }
 
   /**
-   * 将 Metric 数组转换为 MetricDTO 数组
+   * will Metric array converted to MetricDTO array
    *
-   * @param metrics 待转换的指标对象数组
-   * @return 指标 DTO 数组
+   * @param metrics Array of indicator objects to be converted
+   * @return indicator DTO array
    */
   public static MetricDTO[] toDTOs(Metric[] metrics) {
     if (ArrayUtils.isEmpty(metrics)) {
@@ -815,10 +815,10 @@ public class DTOConverters {
   }
 
   /**
-   * 将 MetricVersion 数组转换为 MetricVersionDTO 数组
+   * will MetricVersion array converted to MetricVersionDTO array
    *
-   * @param metricVersions 待转换的指标版本对象数组
-   * @return 指标版本 DTO 数组
+   * @param metricVersions Array of indicator version objects to be converted
+   * @return Indicator version DTO array
    */
   public static MetricVersionDTO[] toDTOs(MetricVersion[] metricVersions) {
     if (ArrayUtils.isEmpty(metricVersions)) {
@@ -828,10 +828,10 @@ public class DTOConverters {
   }
 
   /**
-   * 将 MetricModifier 接口转换为 MetricModifierDTO
+   * will MetricModifier The interface is converted to MetricModifierDTO
    *
-   * @param modifier 待转换的修饰符对象
-   * @return 修饰符 DTO
+   * @param modifier modifier object to be converted
+   * @return modifier DTO
    */
   public static MetricModifierDTO toDTO(org.apache.gravitino.dataset.MetricModifier modifier) {
     return MetricModifierDTO.builder()
@@ -844,10 +844,10 @@ public class DTOConverters {
   }
 
   /**
-   * 将 WordRoot 接口转换为 WordRootDTO
+   * will WordRoot The interface is converted to WordRootDTO
    *
-   * @param root 待转换的词根对象
-   * @return 词根 DTO
+   * @param root Root object to be converted
+   * @return root DTO
    */
   public static WordRootDTO toDTO(org.apache.gravitino.dataset.WordRoot root) {
     return WordRootDTO.builder()
@@ -860,10 +860,10 @@ public class DTOConverters {
   }
 
   /**
-   * 将 Unit 接口转换为 UnitDTO
+   * will Unit The interface is converted to UnitDTO
    *
-   * @param unit 待转换的单位对象
-   * @return 单位 DTO
+   * @param unit The unit object to be converted
+   * @return unit DTO
    */
   public static UnitDTO toDTO(org.apache.gravitino.dataset.Unit unit) {
     return UnitDTO.builder()
@@ -876,10 +876,10 @@ public class DTOConverters {
   }
 
   /**
-   * 将 ValueDomain 接口转换为 ValueDomainDTO
+   * will ValueDomain The interface is converted to ValueDomainDTO
    *
-   * @param valueDomain 待转换的值域对象
-   * @return 值域 DTO
+   * @param valueDomain The value range object to be converted
+   * @return range DTO
    */
   public static ValueDomainDTO toDTO(org.apache.gravitino.dataset.ValueDomain valueDomain) {
     List<org.apache.gravitino.dto.dataset.ValueDomainItemDTO> itemDTOs = null;

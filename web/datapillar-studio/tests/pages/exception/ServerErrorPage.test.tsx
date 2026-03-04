@@ -38,17 +38,17 @@ afterEach(() => {
 })
 
 describe('ServerErrorPage', () => {
-  it('初始为红色服务状态按钮', () => {
+  it('Initially red service status button', () => {
     const { container, root } = render(<ServerErrorPage />)
     const statusButton = container.querySelector('[data-testid="server-health-button"]') as HTMLButtonElement | null
 
-    expect(statusButton?.textContent).toContain('查看服务状态')
+    expect(statusButton?.textContent).toContain('Check service status')
     expect(statusButton?.className).toContain('text-rose-600')
 
     unmount(root, container)
   })
 
-  it('点击后健康接口返回 UP，按钮切换为绿色', async () => {
+  it('After clicking, the health interface returns UP，Button switches to green', async () => {
     const healthMock = vi.mocked(getStudioServiceHealth)
     healthMock.mockResolvedValue({ status: 'UP' })
 
@@ -60,13 +60,13 @@ describe('ServerErrorPage', () => {
     })
 
     expect(healthMock).toHaveBeenCalledTimes(1)
-    expect(statusButton?.textContent).toContain('服务健康')
+    expect(statusButton?.textContent).toContain('Serve health')
     expect(statusButton?.className).toContain('text-emerald-700')
 
     unmount(root, container)
   })
 
-  it('点击后健康接口异常，按钮保持红色异常态', async () => {
+  it('Health interface exception after clicking，The button remains red abnormally', async () => {
     const healthMock = vi.mocked(getStudioServiceHealth)
     healthMock.mockResolvedValue({ status: 'DOWN' })
 
@@ -77,7 +77,7 @@ describe('ServerErrorPage', () => {
       statusButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(statusButton?.textContent).toContain('服务异常')
+    expect(statusButton?.textContent).toContain('Service exception')
     expect(statusButton?.className).toContain('text-rose-600')
 
     unmount(root, container)

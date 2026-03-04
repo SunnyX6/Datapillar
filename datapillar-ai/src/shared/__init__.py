@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-共享组件层
+shared component layer
 
-提供跨模块共享的工具、配置、认证等组件
+Provide tools shared across modules,Configuration,Authentication and other components
 """
 
 from __future__ import annotations
@@ -20,14 +19,11 @@ if TYPE_CHECKING:
 
 def __getattr__(name: str):
     """
-    延迟导入（避免 import src.shared.<submodule> 时触发循环依赖）。
-
-    关键点：
-    - 任何 import `src.shared.config.settings` 都会先执行 `src/shared/__init__.py`
-    - 这里禁止在 import 阶段加载 model_manager / repository 等重模块
+    Delayed import(avoid import src.shared.<submodule> cyclic dependencies are triggered when).Key points:- any import `src.shared.config.settings` will be executed first `src/shared/__init__.py`
+    - It is forbidden here import Staged loading model_manager / repository Equal weight module
     """
     if name == "settings":
         from src.shared.config.settings import settings
 
-        return settings
+    return settings
     raise AttributeError(name)

@@ -27,7 +27,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** 表示切换指标版本的请求 */
+/** Represents a request to switch indicator versions */
 @Getter
 @ToString
 @EqualsAndHashCode

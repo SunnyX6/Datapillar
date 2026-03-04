@@ -12,19 +12,19 @@ import lombok.NoArgsConstructor;
 @Schema(name = "AuthMenuInfo")
 public class MenuItem {
 
-    private Long id;
+  private Long id;
 
-    private String name;
+  private String name;
 
-    private String path;
+  private String path;
 
-    private String permissionCode;
+  private String permissionCode;
 
-    private String location;
+  private String location;
 
-    private Long categoryId;
+  private Long categoryId;
 
-    private String categoryName;
+  private String categoryName;
 
-    private List<MenuItem> children;
+  private List<MenuItem> children;
 }

@@ -1,12 +1,10 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-LLM 集成层
+LLM Integration layer
 
-提供 Embedding 能力（用于图谱语义检索）。
-"""
+provide Embedding Ability(Used for graph semantic retrieval)."""
 
 from src.infrastructure.llm.embeddings import UnifiedEmbedder
 

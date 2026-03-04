@@ -8,10 +8,10 @@ import lombok.Data;
 @Schema(name = "WorkflowSetJobStateRequest")
 public class WorkflowSetJobStatusRequest {
 
-    @NotBlank(message = "状态不能为空")
-    private String newState;
+  @NotBlank(message = "Status cannot be empty")
+  private String newState;
 
-    private boolean includeUpstream = false;
+  private boolean includeUpstream = false;
 
-    private boolean includeDownstream = false;
+  private boolean includeDownstream = false;
 }

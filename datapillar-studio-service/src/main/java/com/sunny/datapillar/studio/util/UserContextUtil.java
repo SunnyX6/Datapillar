@@ -1,113 +1,93 @@
 package com.sunny.datapillar.studio.util;
 
 import com.sunny.datapillar.common.constant.HeaderConstants;
-import com.sunny.datapillar.studio.security.GatewayAssertionContext;
+import com.sunny.datapillar.studio.security.TrustedIdentityContext;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * 用户上下文工具类
- * 提供用户上下文通用工具能力
+ * User context tool class Provide user context common tool capabilities
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public final class UserContextUtil {
 
-    private UserContextUtil() {
-    }
+  private UserContextUtil() {}
 
-    /**
-     * 获取当前请求
-     */
-    private static HttpServletRequest getRequest() {
-        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
-        if (attributes instanceof ServletRequestAttributes servletAttributes) {
-            return servletAttributes.getRequest();
-        }
-        return null;
+  /** Get current request */
+  private static HttpServletRequest getRequest() {
+    RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+    if (attributes instanceof ServletRequestAttributes servletAttributes) {
+      return servletAttributes.getRequest();
     }
+    return null;
+  }
 
-    /**
-     * 获取当前用户 ID
-     */
-    public static Long getUserId() {
-        GatewayAssertionContext context = getAssertionContext();
-        return context == null ? null : context.userId();
-    }
+  /** Get current user ID */
+  public static Long getUserId() {
+    TrustedIdentityContext context = getAssertionContext();
+    return context == null ? null : context.userId();
+  }
 
-    /**
-     * 获取当前用户 ID（必须存在）
-     */
-    public static Long getRequiredUserId() {
-        Long userId = getUserId();
-        if (userId == null) {
-            throw new IllegalStateException("用户未登录或用户信息丢失");
-        }
-        return userId;
+  /** Get current user ID（must exist） */
+  public static Long getRequiredUserId() {
+    Long userId = getUserId();
+    if (userId == null) {
+      throw new IllegalStateException("The user is not logged in or the user information is lost");
     }
+    return userId;
+  }
 
-    /**
-     * 获取当前用户名
-     */
-    public static String getUsername() {
-        GatewayAssertionContext context = getAssertionContext();
-        return context == null ? null : context.username();
-    }
+  /** Get current username */
+  public static String getUsername() {
+    TrustedIdentityContext context = getAssertionContext();
+    return context == null ? null : context.username();
+  }
 
-    /**
-     * 获取当前租户ID
-     */
-    public static Long getTenantId() {
-        GatewayAssertionContext context = getAssertionContext();
-        return context == null ? null : context.tenantId();
-    }
+  /** Get current tenantID */
+  public static Long getTenantId() {
+    TrustedIdentityContext context = getAssertionContext();
+    return context == null ? null : context.tenantId();
+  }
 
-    /**
-     * 是否为平台超管授权访问
-     */
-    public static boolean isImpersonation() {
-        GatewayAssertionContext context = getAssertionContext();
-        return context != null && context.impersonation();
-    }
+  /** Whether to authorize access for platform super management */
+  public static boolean isImpersonation() {
+    TrustedIdentityContext context = getAssertionContext();
+    return context != null && context.impersonation();
+  }
 
-    /**
-     * 获取当前用户邮箱
-     */
-    public static String getEmail() {
-        GatewayAssertionContext context = getAssertionContext();
-        if (context == null) {
-            return null;
-        }
-        String email = context.email();
-        return (email == null || email.isEmpty()) ? null : email;
+  /** Get the current users email */
+  public static String getEmail() {
+    TrustedIdentityContext context = getAssertionContext();
+    if (context == null) {
+      return null;
     }
+    String email = context.email();
+    return (email == null || email.isEmpty()) ? null : email;
+  }
 
-    /**
-     * 获取链路追踪 ID
-     */
-    public static String getTraceId() {
-        HttpServletRequest request = getRequest();
-        if (request == null) {
-            return null;
-        }
-        return request.getHeader(HeaderConstants.HEADER_TRACE_ID);
+  /** Get link tracking ID */
+  public static String getTraceId() {
+    HttpServletRequest request = getRequest();
+    if (request == null) {
+      return null;
     }
+    return request.getHeader(HeaderConstants.HEADER_TRACE_ID);
+  }
 
-    /**
-     * 判断当前是否已登录
-     */
-    public static boolean isLoggedIn() {
-        return getUserId() != null;
-    }
+  /** Determine whether you are currently logged in */
+  public static boolean isLoggedIn() {
+    return getUserId() != null;
+  }
 
-    private static GatewayAssertionContext getAssertionContext() {
-        HttpServletRequest request = getRequest();
-        if (request == null) {
-            return null;
-        }
-        return GatewayAssertionContext.current(request);
+  private static TrustedIdentityContext getAssertionContext() {
+    HttpServletRequest request = getRequest();
+    if (request == null) {
+      return null;
     }
+    return TrustedIdentityContext.current(request);
+  }
 }

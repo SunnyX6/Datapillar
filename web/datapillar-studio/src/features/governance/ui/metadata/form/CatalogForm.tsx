@@ -1,5 +1,5 @@
 /**
- * Catalog 表单组件
+ * Catalog form component
  */
 
 import { forwardRef, useImperativeHandle, useState, useEffect, useCallback } from 'react'
@@ -14,7 +14,7 @@ interface ProviderOption {
   label: string
 }
 
-// Provider 配置
+// Provider Configuration
 const PROVIDER_BY_TYPE: Record<CatalogType, ProviderOption[]> = {
   RELATIONAL: [
     { value: 'hive', label: 'Apache Hive' },
@@ -60,10 +60,10 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
     })
     const [isTesting, setIsTesting] = useState(false)
 
-    // 测试连接
+    // test connection
     const handleTestConnection = useCallback(async () => {
       if (!formData.name.trim()) {
-        toast.error('请先输入 Catalog 名称')
+        toast.error('Please enter first Catalog Name')
         return
       }
       setIsTesting(true)
@@ -75,15 +75,15 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
           comment: formData.comment,
           properties: formData.properties
         })
-        toast.success('连接测试成功')
+        toast.success('Connection test successful')
       } catch {
-        // 错误已由统一客户端通过 toast 显示
+        // The error was passed by the unity client toast show
       } finally {
         setIsTesting(false)
       }
     }, [formData, catalogType, provider])
 
-    // 渲染测试连接按钮到 footer
+    // Render test connection button to footer
     useEffect(() => {
       if (onFooterLeftRender) {
         onFooterLeftRender(
@@ -99,7 +99,7 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
             )}
-            {isTesting ? '测试中...' : '测试连接'}
+            {isTesting ? 'Under test...' : 'test connection'}
           </button>
         )
       }
@@ -115,7 +115,7 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
       }),
       validate: () => {
         if (!formData.name.trim()) {
-          toast.error('请输入 Catalog 名称')
+          toast.error('Please enter Catalog Name')
           return false
         }
         return true
@@ -143,14 +143,14 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
 
   return (
     <div className="space-y-3">
-      {/* 基础信息 */}
+      {/* Basic information */}
       <div>
         <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Catalog 名称 <span className="text-red-500">*</span>
+          Catalog Name <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
-          placeholder="例如: prod_mysql_catalog"
+          placeholder="For example: prod_mysql_catalog"
           value={formData.name}
           onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
           className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
@@ -159,17 +159,17 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
 
       <div>
         <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Catalog 类型 <span className="text-red-500">*</span>
+          Catalog Type <span className="text-red-500">*</span>
         </label>
         <Select
           value={catalogType}
           onChange={(value) => handleTypeChange(value as CatalogType)}
           options={[
-            { value: 'RELATIONAL', label: '数据库' },
-            { value: 'FILESET', label: '文件集' },
-            { value: 'MESSAGING', label: '消息队列' }
+            { value: 'RELATIONAL', label: 'database' },
+            { value: 'FILESET', label: 'File set' },
+            { value: 'MESSAGING', label: 'message queue' }
           ]}
-          dropdownHeader="选择 Catalog 类型"
+          dropdownHeader="Choose Catalog Type"
           className="dark:bg-slate-900 dark:border-slate-700"
         />
       </div>
@@ -182,23 +182,23 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
           value={provider}
           onChange={handleProviderChange}
           options={PROVIDER_BY_TYPE[catalogType]}
-          dropdownHeader="选择数据源类型"
+          dropdownHeader="Select data source type"
           className="dark:bg-slate-900 dark:border-slate-700"
         />
       </div>
 
-      {/* 动态配置项 */}
+      {/* Dynamic configuration items */}
       <div className="space-y-2">
-        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">连接配置</label>
+        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Connection configuration</label>
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 space-y-2.5">
           <ProviderConfigFields provider={provider} onChange={handlePropertyChange} values={formData.properties} />
         </div>
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">描述</label>
+        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Description</label>
         <textarea
-          placeholder="Catalog 用途说明"
+          placeholder="Catalog Instructions for use"
           value={formData.comment}
           onChange={(e) => setFormData((prev) => ({ ...prev, comment: e.target.value }))}
           rows={2}
@@ -211,7 +211,7 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
 
 CreateCatalogForm.displayName = 'CreateCatalogForm'
 
-// Provider 配置字段组件
+// Provider Configure field components
 function ProviderConfigFields({
   provider,
   onChange,
@@ -223,27 +223,27 @@ function ProviderConfigFields({
 }) {
   const [customKeys, setCustomKeys] = useState<string[]>([])
 
-  // 添加自定义配置项
+  // Add custom configuration items
   const handleAddCustomField = () => {
     const newKey = `custom_${Date.now()}`
     setCustomKeys((prev) => [...prev, newKey])
   }
 
-  // 删除配置项
+  // Delete configuration item
   const handleDeleteField = (key: string) => {
     setCustomKeys((prev) => prev.filter((k) => k !== key))
-    onChange(key, '') // 清空值
+    onChange(key, '') // Clear value
   }
 
-  // 修改自定义 key
+  // Modify custom key
   const handleKeyChange = (oldKey: string, newKey: string) => {
     const oldValue = values[oldKey] || ''
     setCustomKeys((prev) => prev.map((k) => (k === oldKey ? newKey : k)))
-    onChange(oldKey, '') // 清空旧 key
-    onChange(newKey, oldValue) // 设置新 key
+    onChange(oldKey, '') // clear old key
+    onChange(newKey, oldValue) // set new key
   }
 
-  // 渲染固定字段
+  // Render fixed fields
   const renderField = (
     key: string,
     label: string,
@@ -268,7 +268,7 @@ function ProviderConfigFields({
               value={values[key] ?? options[0]?.value ?? ''}
               onChange={(value) => onChange(key, value)}
               options={options}
-              dropdownHeader={`选择${label}`}
+              dropdownHeader={`Choose${label}`}
             />
           ) : (
             <input
@@ -290,7 +290,7 @@ function ProviderConfigFields({
     )
   }
 
-  // 渲染自定义字段（可编辑 key 和 value）
+  // Render custom fields（Editable key and value）
   const renderCustomField = (tempKey: string) => {
     const actualKey = Object.keys(values).find((k) => k === tempKey || tempKey.startsWith('custom_')) || tempKey
     const displayKey = tempKey.startsWith('custom_') ? '' : actualKey
@@ -300,7 +300,7 @@ function ProviderConfigFields({
         <div className="w-1/3 flex-shrink-0">
           <input
             type="text"
-            placeholder="配置项名称"
+            placeholder="Configuration item name"
             value={displayKey}
             onChange={(e) => handleKeyChange(tempKey, e.target.value)}
             className="w-full px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
@@ -309,7 +309,7 @@ function ProviderConfigFields({
         <div className="flex-1">
           <input
             type="text"
-            placeholder="配置项值"
+            placeholder="Configuration item value"
             value={values[actualKey] || ''}
             onChange={(e) => onChange(actualKey, e.target.value)}
             className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
@@ -319,7 +319,7 @@ function ProviderConfigFields({
           type="button"
           onClick={() => handleDeleteField(tempKey)}
           className="w-4 flex-shrink-0 text-red-500 hover:text-red-600 transition-colors"
-          aria-label="删除配置项"
+          aria-label="Delete configuration item"
         >
           <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -329,19 +329,19 @@ function ProviderConfigFields({
     )
   }
 
-  // 获取预定义字段
+  // Get predefined fields
   const getFields = () => {
-    // Hive 配置
+    // Hive Configuration
     if (provider === 'hive') {
       return (
         <>
           {renderField('metastore.uris', 'Metastore URI', 'thrift://127.0.0.1:9083')}
-          {renderField('client.pool-size', '连接池大小', '1', false, 'number')}
+          {renderField('client.pool-size', 'Connection pool size', '1', false, 'number')}
         </>
       )
     }
 
-    // JDBC 类配置
+    // JDBC class configuration
     if (provider.startsWith('jdbc-')) {
       const dbType = provider.replace('jdbc-', '')
       const driverMap: Record<string, string> = {
@@ -363,15 +363,15 @@ function ProviderConfigFields({
         <>
           {renderField('jdbc-url', 'JDBC URL', urlMap[dbType] || 'jdbc://localhost:3306/db')}
           {renderField('jdbc-driver', 'JDBC Driver', driverMap[dbType] || 'com.mysql.cj.jdbc.Driver')}
-          {renderField('jdbc-user', '用户名', 'root')}
-          {renderField('jdbc-password', '密码', '', true, 'password')}
-          {renderField('jdbc.pool.min-size', '最小连接数', '2', false, 'number')}
-          {renderField('jdbc.pool.max-size', '最大连接数', '10', false, 'number')}
+          {renderField('jdbc-user', 'Username', 'root')}
+          {renderField('jdbc-password', 'Password', '', true, 'password')}
+          {renderField('jdbc.pool.min-size', 'Minimum number of connections', '2', false, 'number')}
+          {renderField('jdbc.pool.max-size', 'Maximum number of connections', '10', false, 'number')}
         </>
       )
     }
 
-    // Lakehouse 配置
+    // Lakehouse Configuration
     if (provider.startsWith('lakehouse-')) {
       const backendOptions = [
         { value: 'hive', label: 'Hive' },
@@ -386,21 +386,21 @@ function ProviderConfigFields({
         <>
           {renderField('catalog-backend', 'Catalog Backend', '', true, 'select', backendOptions)}
           {renderField('uri', 'Backend URI', 'thrift://127.0.0.1:9083')}
-          {renderField('warehouse', 'Warehouse 路径', 'hdfs://namespace/path 或 s3://bucket/path')}
+          {renderField('warehouse', 'Warehouse path', 'hdfs://namespace/path or s3://bucket/path')}
         </>
       )
     }
 
-    // Kafka 配置
+    // Kafka Configuration
     if (provider === 'kafka') {
       return <>{renderField('bootstrap.servers', 'Bootstrap Servers', 'localhost:9092')}</>
     }
 
-    // Fileset 配置
+    // Fileset Configuration
     if (provider === 'fileset') {
       return (
         <>
-          {renderField('location', '存储路径', 'hdfs://path 或 s3://bucket/path', false)}
+          {renderField('location', 'storage path', 'hdfs://path or s3://bucket/path', false)}
           {renderField('filesystem-providers', 'Filesystem Providers', 'builtin-hdfs,s3', false)}
         </>
       )
@@ -411,19 +411,19 @@ function ProviderConfigFields({
 
   return (
     <>
-      {/* 预定义字段 */}
+      {/* Predefined fields */}
       {getFields()}
 
-      {/* 自定义字段 */}
+      {/* Custom fields */}
       {customKeys.map((key) => renderCustomField(key))}
 
-      {/* 添加配置按钮 */}
+      {/* Add configuration button */}
       <button
         type="button"
         onClick={handleAddCustomField}
         className="w-full mt-2 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
       >
-        + 添加自定义配置
+        + Add custom configuration
       </button>
     </>
   )

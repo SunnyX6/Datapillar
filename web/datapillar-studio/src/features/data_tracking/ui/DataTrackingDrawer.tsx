@@ -21,7 +21,7 @@ export function DataTrackingDrawer({ isOpen, mode, onClose }: DataTrackingDrawer
         type="button"
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
         onClick={onClose}
-        aria-label="关闭埋点抽屉"
+        aria-label="Close the buried point drawer"
       />
       <aside
         className={`relative h-full ${drawerWidthClassMap.wide} bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300`}

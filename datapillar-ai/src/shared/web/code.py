@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-02-23
 
-"""统一状态码定义。"""
+"""Unified status code definition."""
 
 
 class Code:

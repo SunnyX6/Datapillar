@@ -9,45 +9,45 @@ import lombok.Data;
 @Schema(name = "LlmModelResponse")
 public class LlmModelResponse {
 
-    private Long aiModelId;
+  private Long aiModelId;
 
-    private String providerModelId;
+  private String providerModelId;
 
-    private String name;
+  private String name;
 
-    private Long providerId;
+  private Long providerId;
 
-    private String providerCode;
+  private String providerCode;
 
-    private String providerName;
+  private String providerName;
 
-    private String modelType;
+  private String modelType;
 
-    private String description;
+  private String description;
 
-    private List<String> tags;
+  private List<String> tags;
 
-    private Integer contextTokens;
+  private Integer contextTokens;
 
-    private String inputPriceUsd;
+  private String inputPriceUsd;
 
-    private String outputPriceUsd;
+  private String outputPriceUsd;
 
-    private Integer embeddingDimension;
+  private Integer embeddingDimension;
 
-    private String baseUrl;
+  private String baseUrl;
 
-    private String maskedApiKey;
+  private String maskedApiKey;
 
-    private String status;
+  private String status;
 
-    private Boolean hasApiKey;
+  private Boolean hasApiKey;
 
-    private Long createdBy;
+  private Long createdBy;
 
-    private Long updatedBy;
+  private Long updatedBy;
 
-    private LocalDateTime createdAt;
+  private LocalDateTime createdAt;
 
-    private LocalDateTime updatedAt;
+  private LocalDateTime updatedAt;
 }

@@ -23,10 +23,10 @@ import io.openlineage.client.OpenLineage.RunEvent;
 import java.net.URI;
 import java.util.Collections;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.datapillar.context.TenantContext;
-import org.apache.gravitino.datapillar.context.TenantContextHolder;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.openlineage.facets.GravitinoDatasetFacet;
+import org.apache.gravitino.multitenancy.context.TenantContext;
+import org.apache.gravitino.multitenancy.context.TenantContextHolder;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

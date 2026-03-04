@@ -23,7 +23,7 @@ describe('workflowStudioCacheStore', () => {
     await useWorkflowStudioCacheStore.persist.rehydrate()
   })
 
-  it('旧版本缓存不做迁移，直接回退默认模型', async () => {
+  it('Old version cache will not be migrated，Directly fall back to the default model', async () => {
     const legacyModelId = 'anthropic/claude-3.5-sonnet'
 
     localStorage.setItem(

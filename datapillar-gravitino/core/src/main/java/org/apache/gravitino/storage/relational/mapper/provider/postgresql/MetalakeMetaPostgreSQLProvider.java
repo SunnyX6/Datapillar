@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper.TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.MetalakeMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.ibatis.annotations.Param;
@@ -27,18 +28,23 @@ import org.apache.ibatis.annotations.Param;
 public class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseSQLProvider {
   @Override
   public String softDeleteMetalakeMetaByMetalakeId(Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String insertMetalakeMetaOnDuplicateKeyUpdate(MetalakePO metalakePO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TABLE_NAME
-        + "(metalake_id, metalake_name, metalake_comment, properties, audit_info,"
+        + "(metalake_id, metalake_name, metalake_comment, properties, audit_info, "
+        + TenantSqlSupport.tenantColumn()
+        + ","
         + " schema_version, current_version, last_version, deleted_at)"
         + " VALUES("
         + " #{metalakeMeta.metalakeId},"
@@ -46,6 +52,9 @@ public class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseSQLProvider 
         + " #{metalakeMeta.metalakeComment},"
         + " #{metalakeMeta.properties},"
         + " #{metalakeMeta.auditInfo},"
+        + " "
+        + tenantId
+        + ","
         + " #{metalakeMeta.schemaVersion},"
         + " #{metalakeMeta.currentVersion},"
         + " #{metalakeMeta.lastVersion},"
@@ -66,6 +75,7 @@ public class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseSQLProvider 
   public String updateMetalakeMeta(
       @Param("newMetalakeMeta") MetalakePO newMetalakePO,
       @Param("oldMetalakeMeta") MetalakePO oldMetalakePO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET metalake_name = #{newMetalakeMeta.metalakeName},"
@@ -85,16 +95,20 @@ public class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseSQLProvider 
         + " AND schema_version = #{oldMetalakeMeta.schemaVersion}"
         + " AND current_version = #{oldMetalakeMeta.currentVersion}"
         + " AND last_version = #{oldMetalakeMeta.lastVersion}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String deleteMetalakeMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + TABLE_NAME
         + " WHERE metalake_id IN (SELECT metalake_id FROM "
         + TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit})";
   }
 }

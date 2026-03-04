@@ -17,19 +17,19 @@ import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
- * 工作流Dependency业务服务
- * 提供工作流Dependency业务业务能力与领域服务
+ * WorkflowDependencybusiness services Provide workflowDependencyBusiness capabilities and domain
+ * services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface WorkflowDependencyBizService {
 
-    List<JobDependencyResponse> getDependenciesByWorkflowId(Long workflowId);
+  List<JobDependencyResponse> getDependenciesByWorkflowId(Long workflowId);
 
-    List<JobDependencyResponse> getDependenciesByJobId(Long jobId);
+  List<JobDependencyResponse> getDependenciesByJobId(Long jobId);
 
-    Long createDependency(Long workflowId, JobDependencyCreateRequest dto);
+  Long createDependency(Long workflowId, JobDependencyCreateRequest dto);
 
-    void deleteDependency(Long workflowId, Long jobId, Long parentJobId);
+  void deleteDependency(Long workflowId, Long jobId, Long parentJobId);
 }

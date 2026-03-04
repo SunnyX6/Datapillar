@@ -13,15 +13,15 @@ import lombok.NoArgsConstructor;
 @Schema(name = "AuthTokenInfo")
 public class TokenInfoResponse {
 
-    private Long remainingSeconds;
+  private Long remainingSeconds;
 
-    private Long expirationTime;
+  private Long expirationTime;
 
-    private Long issuedAt;
+  private Long issuedAt;
 
-    private Long userId;
+  private Long userId;
 
-    private Long tenantId;
+  private Long tenantId;
 
-    private String username;
+  private String username;
 }

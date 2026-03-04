@@ -27,6 +27,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -34,11 +35,14 @@ public class StatisticBaseSQLProvider {
 
   public String batchInsertStatisticPOsOnDuplicateKeyUpdate(
       @Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "INSERT INTO "
         + STATISTIC_META_TABLE_NAME
         + " (statistic_id, statistic_name, statistic_value, metalake_id, metadata_object_id,"
-        + " metadata_object_type, audit_info, current_version, last_version, deleted_at) VALUES "
+        + " metadata_object_type, audit_info, current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ") VALUES "
         + "<foreach collection='statisticPOs' item='item' separator=','>"
         + "(#{item.statisticId}, "
         + "#{item.statisticName}, "
@@ -49,7 +53,9 @@ public class StatisticBaseSQLProvider {
         + "#{item.auditInfo}, "
         + "#{item.currentVersion}, "
         + "#{item.lastVersion}, "
-        + "#{item.deletedAt})"
+        + "#{item.deletedAt}, "
+        + tenantId
+        + ")"
         + "</foreach>"
         + " ON DUPLICATE KEY UPDATE "
         + "  statistic_value = VALUES(statistic_value),"
@@ -62,6 +68,7 @@ public class StatisticBaseSQLProvider {
 
   public String batchDeleteStatisticPOs(
       @Param("entityId") Long entityId, @Param("statisticNames") List<String> statisticNames) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "UPDATE "
         + STATISTIC_META_TABLE_NAME
@@ -71,111 +78,150 @@ public class StatisticBaseSQLProvider {
         + "<foreach collection='statisticNames' item='item' separator=','>"
         + " #{item}"
         + "</foreach>"
-        + " ) AND deleted_at = 0 AND metadata_object_id = #{entityId}"
+        + " ) AND deleted_at = 0 AND metadata_object_id = #{entityId} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + "</script>";
   }
 
   public String softDeleteStatisticsByEntityId(@Param("entityId") Long entityId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + STATISTIC_META_TABLE_NAME
         + softDeleteSQL()
-        + " WHERE metadata_object_id = #{entityId} AND deleted_at = 0";
+        + " WHERE metadata_object_id = #{entityId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String listStatisticPOsByEntityId(
       @Param("metalakeId") Long metalakeId, @Param("entityId") Long entityId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT statistic_id as statisticId, statistic_name as statisticName, metalake_id as metalakeId,"
         + " statistic_value as statisticValue, metadata_object_id as metadataObjectId,"
         + "metadata_object_type as metadataObjectType, audit_info as auditInfo,"
         + "current_version as currentVersion, last_version as lastVersion, deleted_at as deletedAt FROM "
         + STATISTIC_META_TABLE_NAME
-        + " WHERE metadata_object_id = #{entityId} AND deleted_at = 0 AND metalake_id = #{metalakeId}";
+        + " WHERE metadata_object_id = #{entityId} AND deleted_at = 0 AND metalake_id = #{metalakeId}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteStatisticsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + STATISTIC_META_TABLE_NAME
         + " stat "
         + softDeleteSQL()
-        + " WHERE  stat.metalake_id = #{metalakeId} AND stat.deleted_at = 0";
+        + " WHERE  stat.metalake_id = #{metalakeId} AND stat.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("stat", tenantId);
   }
 
   public String softDeleteStatisticsByCatalogId(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + STATISTIC_META_TABLE_NAME
         + " stat "
         + softDeleteSQL()
-        + " WHERE stat.deleted_at = 0 AND EXISTS ("
+        + " WHERE stat.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("stat", tenantId)
+        + " AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
         + " ct WHERE ct.catalog_id = #{catalogId}  AND "
         + " ct.catalog_id = stat.metadata_object_id AND stat.metadata_object_type = 'CATALOG'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ct", tenantId)
         + " UNION "
         + " SELECT st.catalog_id FROM "
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.catalog_id = #{catalogId} AND "
         + " st.schema_id = stat.metadata_object_id AND stat.metadata_object_type = 'SCHEMA'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("st", tenantId)
         + " UNION "
         + " SELECT tt.catalog_id FROM "
         + TopicMetaMapper.TABLE_NAME
         + " tt WHERE tt.catalog_id = #{catalogId} AND "
         + " tt.topic_id = stat.metadata_object_id AND stat.metadata_object_type = 'TOPIC'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tt", tenantId)
         + " UNION "
         + " SELECT tat.catalog_id FROM "
         + TableMetaMapper.TABLE_NAME
         + " tat WHERE tat.catalog_id = #{catalogId} AND "
         + " tat.table_id = stat.metadata_object_id AND stat.metadata_object_type = 'TABLE'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tat", tenantId)
         + " UNION "
         + " SELECT ft.catalog_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.catalog_id = #{catalogId} AND"
         + " ft.fileset_id = stat.metadata_object_id AND stat.metadata_object_type = 'FILESET'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ft", tenantId)
         + " UNION "
         + " SELECT mt.catalog_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
         + " mt.model_id = stat.metadata_object_id AND stat.metadata_object_type = 'MODEL'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mt", tenantId)
         + ")";
   }
 
   public String softDeleteStatisticsBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + STATISTIC_META_TABLE_NAME
         + " stat"
         + softDeleteSQL()
-        + " WHERE stat.deleted_at = 0 AND EXISTS ("
+        + " WHERE stat.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("stat", tenantId)
+        + " AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.schema_id = #{schemaId} "
         + " AND st.schema_id = stat.metadata_object_id AND stat.metadata_object_type = 'SCHEMA'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("st", tenantId)
         + " UNION "
         + " SELECT tt.schema_id FROM "
         + TopicMetaMapper.TABLE_NAME
         + " tt WHERE tt.schema_id = #{schemaId} AND "
         + " tt.topic_id = stat.metadata_object_id AND stat.metadata_object_type = 'TOPIC'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tt", tenantId)
         + " UNION "
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
         + " tat WHERE tat.schema_id = #{schemaId} AND "
         + " tat.table_id = stat.metadata_object_id AND stat.metadata_object_type = 'TABLE'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tat", tenantId)
         + " UNION "
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.schema_id = #{schemaId} AND "
         + " ft.fileset_id = stat.metadata_object_id AND stat.metadata_object_type = 'FILESET'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ft", tenantId)
         + " UNION "
         + " SELECT mt.schema_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.schema_id = #{schemaId} AND "
         + " mt.model_id = stat.metadata_object_id AND stat.metadata_object_type = 'MODEL'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mt", tenantId)
         + ")";
   }
 
   public String deleteStatisticsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + STATISTIC_META_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 
   protected String softDeleteSQL() {

@@ -10,29 +10,29 @@ import lombok.Data;
 @Schema(name = "ProjectResponse")
 public class ProjectResponse {
 
-    private Long id;
+  private Long id;
 
-    private String name;
+  private String name;
 
-    private String description;
+  private String description;
 
-    private Long ownerId;
+  private Long ownerId;
 
-    private String ownerName;
+  private String ownerName;
 
-    private ProjectStatus status;
+  private ProjectStatus status;
 
-    private List<String> tags;
+  private List<String> tags;
 
-    private Boolean isFavorite;
+  private Boolean isFavorite;
 
-    private Boolean isVisible;
+  private Boolean isVisible;
 
-    private Integer memberCount;
+  private Integer memberCount;
 
-    private LocalDateTime lastAccessedAt;
+  private LocalDateTime lastAccessedAt;
 
-    private LocalDateTime createdAt;
+  private LocalDateTime createdAt;
 
-    private LocalDateTime updatedAt;
+  private LocalDateTime updatedAt;
 }

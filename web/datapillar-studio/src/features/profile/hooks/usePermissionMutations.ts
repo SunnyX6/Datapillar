@@ -33,7 +33,7 @@ function resolveErrorMessage(error: unknown): string {
     return error.message
   }
 
-  return '未知错误'
+  return 'unknown error'
 }
 
 export function usePermissionMutations(
@@ -54,13 +54,13 @@ export function usePermissionMutations(
       }
 
       if (selectedRole.isSystem) {
-        toast.error('平台超管角色不允许修改功能权限')
+        toast.error('Platform super management role does not allow modification of function permissions')
         return
       }
 
       const parsedRoleId = parseRoleId(selectedRole.id)
       if (parsedRoleId === null) {
-        toast.error('角色ID无效，无法更新功能权限')
+        toast.error('roleIDInvalid，Unable to update feature permissions')
         return
       }
 
@@ -81,7 +81,7 @@ export function usePermissionMutations(
       } catch (error) {
         setPermissionsData(selectedRole.id, previousPermissions)
         const message = resolveErrorMessage(error)
-        toast.error(`更新角色功能权限失败：${message}`)
+        toast.error(`Failed to update role function permissions：${message}`)
       }
     },
     [params.selectedRole, params.tenantId, setPermissionsData],

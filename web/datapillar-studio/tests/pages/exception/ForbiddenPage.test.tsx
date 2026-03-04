@@ -63,7 +63,7 @@ describe('ForbiddenPage', () => {
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   })
 
-  it('点击返回上一页后回到来源页面', async () => {
+  it('Click to return to the previous page and then return to the source page', async () => {
     const { container, root } = renderWithRouter(['/source', '/403?from=%2Fsource'], 1)
     const backButton = container.querySelector('[data-testid="forbidden-back-button"]') as HTMLButtonElement | null
 
@@ -76,7 +76,7 @@ describe('ForbiddenPage', () => {
     cleanup(root, container)
   })
 
-  it('点击回到首页后跳转到首页', async () => {
+  it('Click to return to the home page and jump to the home page.', async () => {
     const { container, root } = renderWithRouter(['/source', '/403?from=%2Fsource'], 1)
     const homeButton = container.querySelector('[data-testid="forbidden-home-button"]') as HTMLButtonElement | null
 
@@ -89,7 +89,7 @@ describe('ForbiddenPage', () => {
     cleanup(root, container)
   })
 
-  it('无可访问入口场景点击返回按钮应跳转登录页', async () => {
+  it('In the scenario where there is no accessible entrance, clicking the return button should jump to the login page.', async () => {
     const { container, root } = renderWithRouter(
       [
         '/403?reason=no-accessible-entry&from=%2Flogin',

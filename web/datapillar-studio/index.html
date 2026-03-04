@@ -9,13 +9,13 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/logo-180.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Datapillar</title>
-    <!-- 防止主题闪烁：在首屏渲染前设置主题 -->
+    <!-- Prevent theme from flickering：Set theme before first screen rendering -->
     <script>
       (function() {
         try {
           const stored = localStorage.getItem('theme-storage')
 
-          // 默认浅色主题
+          // Default light theme
           let mode = 'light'
 
           if (stored) {
@@ -27,7 +27,7 @@
             document.documentElement.classList.add('dark')
           }
         } catch (e) {
-          // 解析失败，保持浅色主题
+          // Parsing failed，Keep the light theme
         }
       })()
     </script>

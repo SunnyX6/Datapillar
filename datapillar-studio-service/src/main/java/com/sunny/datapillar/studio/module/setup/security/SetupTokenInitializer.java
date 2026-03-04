@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 初始化令牌Initializer组件
- * 负责初始化令牌Initializer核心逻辑实现
+ * initialization tokenInitializercomponents Responsible for initializing the tokenInitializerCore
+ * logic implementation
  *
  * @author Sunny
  * @date 2026-01-01
@@ -21,31 +21,32 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SetupTokenInitializer implements ApplicationRunner {
 
-    private static final int SYSTEM_BOOTSTRAP_ID = 1;
-    private static final int SETUP_COMPLETED = 1;
+  private static final int SYSTEM_BOOTSTRAP_ID = 1;
+  private static final int SETUP_COMPLETED = 1;
 
-    private final SystemBootstrapMapper systemBootstrapMapper;
+  private final SystemBootstrapMapper systemBootstrapMapper;
 
-    @Override
-    @Transactional
-    public void run(ApplicationArguments args) {
-        SystemBootstrap bootstrap;
-        try {
-            bootstrap = systemBootstrapMapper.selectByIdForUpdate(SYSTEM_BOOTSTRAP_ID);
-        } catch (RuntimeException ex) {
-            log.warn("setup 入口提示跳过：system_bootstrap 不可用", ex);
-            return;
-        }
-
-        if (bootstrap == null) {
-            log.warn("setup 入口提示跳过：system_bootstrap 不存在");
-            return;
-        }
-
-        if (bootstrap.getSetupCompleted() != null && bootstrap.getSetupCompleted() == SETUP_COMPLETED) {
-            return;
-        }
-
-        log.warn("SETUP_URL=/setup（系统未初始化，直接访问安装向导）");
+  @Override
+  @Transactional
+  public void run(ApplicationArguments args) {
+    SystemBootstrap bootstrap;
+    try {
+      bootstrap = systemBootstrapMapper.selectByIdForUpdate(SYSTEM_BOOTSTRAP_ID);
+    } catch (RuntimeException ex) {
+      log.warn("setup Entry prompt skip：system_bootstrap Not available", ex);
+      return;
     }
+
+    if (bootstrap == null) {
+      log.warn("setup Entry prompt skip：system_bootstrap does not exist");
+      return;
+    }
+
+    if (bootstrap.getSetupCompleted() != null && bootstrap.getSetupCompleted() == SETUP_COMPLETED) {
+      return;
+    }
+
+    log.warn(
+        "SETUP_URL=/setup（System is not initialized，Direct access to the installation wizard）");
+  }
 }

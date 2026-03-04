@@ -1,15 +1,13 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-知识图谱同步元数据数据访问
+Knowledge graph synchronization metadata data access
 
-约束：
-- 模块内禁止直接拼接/执行 Cypher
-- 所有与"元数据节点（Catalog/Schema/Table/Column/Metric/语义层）"相关的 Cypher 语句在此集中管理
-- 不创建任何关系（HAS_* / 血缘边等）；关系统一由 Lineage 管理
-- 事务边界由调用方（AsyncSession）控制；此层只做语句与参数映射
+constraint:- Direct splicing is prohibited within the module/execute Cypher
+- All related to"metadata node(Catalog/Schema/Table/Column/Metric/Semantic layer)"relevant Cypher Statements are managed centrally here
+- Does not create any relationship(HAS_* / blood relationship);The relationship is unified by Lineage management
+- Transaction boundaries are determined by the caller(AsyncSession)control;This layer only does statement and parameter mapping
 """
 
 from __future__ import annotations
@@ -58,7 +56,7 @@ _ALLOWED_COLUMN_PROPERTIES: set[str] = {
 def _require_tenant_id() -> int:
     tenant_id = get_current_tenant_id()
     if tenant_id is None:
-        raise ValueError("缺少 tenant 上下文")
+        raise ValueError("missing tenant context")
     return int(tenant_id)
 
 
@@ -82,19 +80,19 @@ class TableUpsertPayload:
 
 
 class Metadata:
-    """知识图谱同步元数据 Neo4j 访问层（Cypher Mapper）"""
+    """Knowledge graph synchronization metadata Neo4j access layer(Cypher Mapper)"""
 
     @staticmethod
     def _assert_node_label(node_label: str) -> None:
         if node_label not in _ALLOWED_NODE_LABELS:
-            raise ValueError(f"不支持的 Neo4j label: {node_label}")
+            raise ValueError(f"Not supported Neo4j label:\n    {node_label}")
 
     @staticmethod
     def _assert_column_property(property_name: str) -> None:
         if property_name not in _ALLOWED_COLUMN_PROPERTIES:
-            raise ValueError(f"不支持的 Column 属性更新: {property_name}")
+            raise ValueError(f"Not supported Column Property update:\n    {property_name}")
 
-    # ==================== Embedding 同步辅助 ====================
+    # ==================== Embedding Sync assist ====================
 
     @staticmethod
     async def list_embedding_ids(
@@ -103,8 +101,7 @@ class Metadata:
         provider: str,
     ) -> set[str]:
         """
-        查询 embeddingProvider 与当前 provider 匹配的节点 id 集合。
-        """
+        Query embeddingProvider with current provider matching node id collection."""
         query = """
         MATCH (n:Knowledge)
         WHERE n.embedding IS NOT NULL
@@ -123,8 +120,7 @@ class Metadata:
         provider: str,
     ) -> int:
         """
-        统计 embeddingProvider 不匹配的节点数量（需要重新向量化）。
-        """
+        statistics embeddingProvider Number of unmatched nodes(Need to be re-vectorized)."""
         query = """
         MATCH (n:Knowledge)
         WHERE n.embedding IS NOT NULL
@@ -145,9 +141,7 @@ class Metadata:
         provider: str,
     ) -> None:
         """
-        批量回写 embedding（按 label 分组后的单组写入）。
-
-        data: [{"id": "...", "embedding": [...]}, ...]
+        Batch writeback embedding(press label Single group write after grouping).data:[{"id":"...","embedding":[...]},...]
         """
         Metadata._assert_node_label(node_label)
         query = f"""
@@ -159,7 +153,7 @@ class Metadata:
         """
         await _run_with_tenant(session, query, data=list(data), provider=provider)
 
-    # ==================== 基础节点：Catalog/Schema/Table/Column ====================
+    # ==================== base node:Catalog/Schema/Table/Column ====================
 
     @staticmethod
     async def upsert_catalog(
@@ -217,7 +211,7 @@ class Metadata:
         tags = record["tags"] if record and record.get("tags") else None
         return tags
 
-    # ==================== Schema / Table / Column（仅节点写入，不写关系） ====================
+    # ==================== Schema / Table / Column(Node write only,Don't write about the relationship) ====================
 
     @staticmethod
     async def upsert_schema(
@@ -230,8 +224,89 @@ class Metadata:
         properties: str | None = None,
         return_tags: bool = False,
     ) -> list[str] | None:
-        """
-        写入 Schema 节点（不写 Catalog->Schema 关系）。
+        """t write about the relationship) ====================
+
+        @staticmethod
+        async def upsert_schema(session:Any,*,id:str,name:str,created_by:str,description:str | None = None,properties:str | None = None,return_tags:bool = False,) -> list[str] | None:
+            \"""
+        write Schema node(Dont write Catalog->Schema relationship).\"""
+        query = \"""
+        MERGE (s:Schema:Knowledge {id:$id,tenantId:$tenantId})
+        ON CREATE SET
+        s.id = $id,s.tenantId = $tenantId,s.name = $name,s.description = $description,s.properties = $properties,s.createdBy = $createdBy,s.createdAt = datetime()
+        ON MATCH SET
+        s.description = COALESCE($description,s.description),s.properties = COALESCE($properties,s.properties),s.tenantId = $tenantId,s.updatedAt = datetime()
+        \"""
+        if return_tags:
+            query += "\nRETURN s.tags as tags\n"
+
+        result = await _run_with_tenant(session,query,id=id,name=name,description=description,properties=properties,createdBy=created_by,)
+        if not return_tags:
+            return None
+        record = await result.single()
+        tags = record["tags"] if record and record.get("tags") else None
+        return tags
+
+        @staticmethod
+        async def upsert_table(session:Any,*,id:str,name:str,created_by:str,payload:TableUpsertPayload | None = None,return_tags:bool = False,) -> list[str] | None:
+            \"""
+        write Table node(Dont write Schema->Table relationship).\"""
+        payload = payload or TableUpsertPayload()
+        query = \"""
+        MERGE (t:Table:Knowledge {id:$id,tenantId:$tenantId})
+        ON CREATE SET
+        t.id = $id,t.tenantId = $tenantId,t.name = $name,t.producer = $producer,t.description = $description,t.properties = $properties,t.partitions = $partitions,t.distribution = $distribution,t.sortOrders = $sortOrders,t.indexes = $indexes,t.creator = $creator,t.createTime = $createTime,t.lastModifier = $lastModifier,t.lastModifiedTime = $lastModifiedTime,t.createdBy = $createdBy,t.createdAt = datetime()
+        ON MATCH SET
+        t.producer = COALESCE($producer,t.producer),t.description = COALESCE($description,t.description),t.properties = COALESCE($properties,t.properties),t.tenantId = $tenantId,t.updatedAt = datetime()
+        \"""
+        if return_tags:
+            query += "\nRETURN t.tags as tags\n"
+
+        result = await _run_with_tenant(session,query,id=id,name=name,producer=payload.producer,description=payload.description,properties=payload.properties,partitions=payload.partitions,distribution=payload.distribution,sortOrders=payload.sort_orders,indexes=payload.indexes,creator=payload.creator,createTime=payload.create_time,lastModifier=payload.last_modifier,lastModifiedTime=payload.last_modified_time,createdBy=created_by,)
+        if not return_tags:
+            return None
+        record = await result.single()
+        tags = record["tags"] if record and record.get("tags") else None
+        return tags
+
+        @staticmethod
+        async def upsert_columns_event(session:Any,*,columns:Sequence[Mapping[str,Any]],) -> dict[str,list[str] | None]:
+            \"""
+        write observed Column(Node only,Dont write Table->Column relationship;Keep historical semantics).\"""
+        query = \"""
+        UNWIND $columns AS col
+        MERGE (c:Column:Knowledge {id:col.id,tenantId:$tenantId})
+        ON CREATE SET
+        c.id = col.id,c.tenantId = $tenantId,c.name = col.name,c.dataType = col.dataType,c.description = col.description,c.nullable = col.nullable,c.autoIncrement = col.autoIncrement,c.defaultValue = col.defaultValue,c.createdBy = col.createdBy,c.createdAt = datetime()
+        ON MATCH SET
+        c.dataType = COALESCE(col.dataType,c.dataType),c.description = COALESCE(col.description,c.description),c.tenantId = $tenantId,c.updatedAt = datetime()
+        RETURN c.id as id,c.tags as tags
+        \"""
+        result = await _run_with_tenant(session,query,columns=list(columns))
+        records = [record async for record in result]
+        return {r["id"]:r.get("tags") for r in records if r.get("id")}
+
+        @staticmethod
+        async def upsert_column_event(session:Any,*,column_id:str,name:str,data_type:str | None,description:str | None,nullable:bool | None,auto_increment:bool | None,default_value:Any,created_by:str,) -> None:
+            \"""
+        Write the observed single Column node(Dont write Table->Column relationship).\"""
+        query = \"""
+        MERGE (c:Column:Knowledge {id:$columnId,tenantId:$tenantId})
+        ON CREATE SET
+        c.id = $columnId,c.tenantId = $tenantId,c.name = $name,c.dataType = $dataType,c.description = $description,c.nullable = $nullable,c.autoIncrement = $autoIncrement,c.defaultValue = $defaultValue,c.createdBy = $createdBy,c.createdAt = datetime()
+        ON MATCH SET
+        c.dataType = COALESCE($dataType,c.dataType),c.description = COALESCE($description,c.description),c.tenantId = $tenantId,c.updatedAt = datetime()
+        \"""
+        await _run_with_tenant(session,query,columnId=column_id,name=name,dataType=data_type,description=description,nullable=nullable,autoIncrement=auto_increment,defaultValue=default_value,createdBy=created_by,)
+
+        @staticmethod
+        async def upsert_column_sync(session:Any,*,id:str,name:str,data_type:str,description:str | None,nullable:bool,auto_increment:bool,default_value:Any,) -> None:
+            \"""
+        write Column Define snapshot(Node only;ON MATCH Cover nullable/autoIncrement/defaultValue,Keep historical semantics).\"""
+        query = \"""
+        MERGE (col:Column:Knowledge {id:$id,tenantId:$tenantId})
+        ON CREATE SET
+        col.id = $id,col.tenantId = $tenantId,col.name = $name,col.dataType = $dataType,col.description = $description,col.nullable = $nullable,col.autoIncrement = $autoIncrement,col.defaultValue = $defaultValue,col.createdBy =
         """
         query = """
         MERGE (s:Schema:Knowledge {id: $id, tenantId: $tenantId})
@@ -278,8 +353,11 @@ class Metadata:
         return_tags: bool = False,
     ) -> list[str] | None:
         """
-        写入 Table 节点（不写 Schema->Table 关系）。
-        """
+        await _run_with_tenant(session,query,catalogId=catalog_id)
+
+        @staticmethod
+        async def delete_column(session:Any,*,column_id:str,) -> None:
+            query ="""
         payload = payload or TableUpsertPayload()
         query = """
         MERGE (t:Table:Knowledge {id: $id, tenantId: $tenantId})
@@ -341,8 +419,12 @@ class Metadata:
         columns: Sequence[Mapping[str, Any]],
     ) -> dict[str, list[str] | None]:
         """
-        写入观测到的 Column（仅节点，不写 Table->Column 关系；保持历史语义）。
-        """
+        await _run_with_tenant(session,query,tableId=table_id,properties=properties)
+
+        @staticmethod
+        async def update_column_property(session:Any,*,column_id:str,property_name:str,value:Any,) -> dict[str,Any] | None:
+            Metadata._assert_column_property(property_name)
+        query = f"""
         query = """
         UNWIND $columns AS col
         MERGE (c:Column:Knowledge {id: col.id, tenantId: $tenantId})
@@ -382,8 +464,13 @@ class Metadata:
         created_by: str,
     ) -> None:
         """
-        写入观测到的单个 Column 节点（不写 Table->Column 关系）。
-        """
+        await _run_with_tenant(session,query,id=id,name=name,code=code,description=description,unit=unit,aggregationLogic=aggregation_logic,calculationFormula=calculation_formula,createdBy=created_by,)
+
+        @staticmethod
+        async def delete_node(session:Any,*,node_id:str,node_label:str | None = None,) -> None:
+            if node_label:
+                Metadata._assert_node_label(node_label)
+        query = f"""
         query = """
         MERGE (c:Column:Knowledge {id: $columnId, tenantId: $tenantId})
         ON CREATE SET
@@ -429,8 +516,11 @@ class Metadata:
         default_value: Any,
     ) -> None:
         """
-        写入 Column 定义快照（仅节点；ON MATCH 覆盖 nullable/autoIncrement/defaultValue，保持历史语义）。
-        """
+        await _run_with_tenant(session,query,id=node_id)
+
+        @staticmethod
+        async def delete_metric(session:Any,*,metric_id:str,) -> None:
+            query ="""
         query = """
         MERGE (col:Column:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
@@ -553,7 +643,12 @@ class Metadata:
         created_by: str,
     ) -> str | None:
         """
-        列重命名（迁移属性，只写 Column 节点，不写 Table->Column 关系）。
+        await _run_with_tenant(session,query,id=dto.id,code=dto.code,name=dto.name,domainType=dto.domain_type,domainLevel=dto.domain_level,items=dto.items,dataType=dto.data_type,description=dto.description,createdBy=dto.created_by,)
+
+        # ==================== Tag node(create_tag / alter_tag / drop_tag)====================
+
+        @staticmethod
+        async def upsert_tag(session:Any,*,id:str,name:str,description:str | None,properties:Mapping[str,str] | None,created_by:str,) -> None:
         """
         query = """
         MATCH (c:Column {id: $oldColumnId, tenantId: $tenantId})
@@ -648,7 +743,7 @@ class Metadata:
         record = await result.single()
         return dict(record) if record else None
 
-    # ==================== tags 属性同步（写 tags，不做业务判定） ====================
+    # ==================== tags Property synchronization(write tags,No business judgment) ====================
 
     @staticmethod
     async def set_node_tags(
@@ -673,7 +768,7 @@ class Metadata:
         record = await result.single()
         return dict(record) if record else None
 
-    # ==================== 语义层：Metric / WordRoot / Modifier / Unit / ValueDomain ====================
+    # ==================== Semantic layer:Metric / WordRoot / Modifier / Unit / ValueDomain ====================
 
     @staticmethod
     async def upsert_metric_sync(
@@ -740,7 +835,7 @@ class Metadata:
         created_by: str,
     ) -> None:
         """
-        写入观测到的 Metric：只在 ON MATCH 更新 description，保持历史语义。
+        Write the observed Metric: only update description on ON MATCH to preserve historical semantics.
         """
         Metadata._assert_node_label(label)
         query = f"""
@@ -811,7 +906,7 @@ class Metadata:
 
     @staticmethod
     async def upsert_wordroot(session: Any, dto: WordRootDTO) -> None:
-        """写入 WordRoot 节点（必须先构建 DTO 验证）"""
+        """Upsert WordRoot node (DTO must be built and validated first)."""
         query = """
         MERGE (w:WordRoot:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
@@ -843,7 +938,7 @@ class Metadata:
 
     @staticmethod
     async def upsert_modifier(session: Any, dto: ModifierDTO) -> None:
-        """写入 Modifier 节点（必须先构建 DTO 验证）"""
+        """Upsert Modifier node (DTO must be built and validated first)."""
         query = """
         MERGE (m:Modifier:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
@@ -875,7 +970,7 @@ class Metadata:
 
     @staticmethod
     async def upsert_unit(session: Any, dto: UnitDTO) -> None:
-        """写入 Unit 节点（必须先构建 DTO 验证）"""
+        """Upsert Unit node (DTO must be built and validated first)."""
         query = """
         MERGE (u:Unit:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
@@ -907,7 +1002,7 @@ class Metadata:
 
     @staticmethod
     async def upsert_valuedomain(session: Any, dto: ValueDomainDTO) -> None:
-        """写入 ValueDomain 节点（必须先构建 DTO 验证）"""
+        """Upsert ValueDomain node (DTO must be built and validated first)."""
         query = """
         MERGE (v:ValueDomain:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
@@ -946,7 +1041,7 @@ class Metadata:
             createdBy=dto.created_by,
         )
 
-    # ==================== Tag 节点（create_tag / alter_tag / drop_tag）====================
+    # ==================== Tag node(create_tag / alter_tag / drop_tag)====================
 
     @staticmethod
     async def upsert_tag(
@@ -958,7 +1053,7 @@ class Metadata:
         properties: Mapping[str, str] | None,
         created_by: str,
     ) -> None:
-        """创建或更新 Tag 节点"""
+        """Create or update a Tag node."""
         query = """
         MERGE (t:Tag:Knowledge {id: $id, tenantId: $tenantId})
         ON CREATE SET
@@ -988,7 +1083,7 @@ class Metadata:
 
     @staticmethod
     async def delete_tag(session: Any, *, tag_id: str) -> None:
-        """删除 Tag 节点及其所有 HAS_TAG 关系"""
+        """Delete a Tag node and all its HAS_TAG relationships."""
         query = """
         MATCH (t:Tag {id: $tagId, tenantId: $tenantId})
         DETACH DELETE t

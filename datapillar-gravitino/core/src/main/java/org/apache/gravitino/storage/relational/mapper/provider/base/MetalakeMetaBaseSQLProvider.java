@@ -21,12 +21,14 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper.TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.ibatis.annotations.Param;
 
 public class MetalakeMetaBaseSQLProvider {
 
   public String listMetalakePOs() {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT metalake_id as metalakeId, metalake_name as metalakeName,"
         + " metalake_comment as metalakeComment, properties,"
         + " audit_info as auditInfo, schema_version as schemaVersion,"
@@ -34,10 +36,12 @@ public class MetalakeMetaBaseSQLProvider {
         + " deleted_at as deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE deleted_at = 0";
+        + " WHERE deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectMetalakeMetaByName(@Param("metalakeName") String metalakeName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT metalake_id as metalakeId, metalake_name as metalakeName,"
         + " metalake_comment as metalakeComment, properties,"
         + " audit_info as auditInfo, schema_version as schemaVersion,"
@@ -45,10 +49,12 @@ public class MetalakeMetaBaseSQLProvider {
         + " deleted_at as deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE metalake_name = #{metalakeName} and deleted_at = 0";
+        + " WHERE metalake_name = #{metalakeName} and deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectMetalakeMetaById(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT metalake_id as metalakeId, metalake_name as metalakeName,"
         + " metalake_comment as metalakeComment, properties,"
         + " audit_info as auditInfo, schema_version as schemaVersion,"
@@ -56,17 +62,21 @@ public class MetalakeMetaBaseSQLProvider {
         + " deleted_at as deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} and deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} and deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectMetalakeIdMetaByName(@Param("metalakeName") String metalakeName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT metalake_id as metalakeId"
         + " FROM "
         + TABLE_NAME
-        + " WHERE metalake_name = #{metalakeName} and deleted_at = 0";
+        + " WHERE metalake_name = #{metalakeName} and deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String listMetalakePOsByMetalakeIds(@Param("metalakeIds") List<Long> metalakeIds) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + " SELECT metalake_id as metalakeId, metalake_name as metalakeName,"
         + " metalake_comment as metalakeComment, properties,"
@@ -76,6 +86,8 @@ public class MetalakeMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + " AND metalake_id in ("
         + "<foreach collection='metalakeIds' item='metalakeId' separator=','>"
         + "#{metalakeId}"
@@ -85,9 +97,12 @@ public class MetalakeMetaBaseSQLProvider {
   }
 
   public String insertMetalakeMeta(@Param("metalakeMeta") MetalakePO metalakePO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TABLE_NAME
-        + "(metalake_id, metalake_name, metalake_comment, properties, audit_info,"
+        + "(metalake_id, metalake_name, metalake_comment, properties, audit_info, "
+        + TenantSqlSupport.tenantColumn()
+        + ","
         + " schema_version, current_version, last_version, deleted_at)"
         + " VALUES("
         + " #{metalakeMeta.metalakeId},"
@@ -95,6 +110,9 @@ public class MetalakeMetaBaseSQLProvider {
         + " #{metalakeMeta.metalakeComment},"
         + " #{metalakeMeta.properties},"
         + " #{metalakeMeta.auditInfo},"
+        + " "
+        + tenantId
+        + ","
         + " #{metalakeMeta.schemaVersion},"
         + " #{metalakeMeta.currentVersion},"
         + " #{metalakeMeta.lastVersion},"
@@ -104,9 +122,12 @@ public class MetalakeMetaBaseSQLProvider {
 
   public String insertMetalakeMetaOnDuplicateKeyUpdate(
       @Param("metalakeMeta") MetalakePO metalakePO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TABLE_NAME
-        + "(metalake_id, metalake_name, metalake_comment, properties, audit_info,"
+        + "(metalake_id, metalake_name, metalake_comment, properties, audit_info, "
+        + TenantSqlSupport.tenantColumn()
+        + ","
         + " schema_version, current_version, last_version, deleted_at)"
         + " VALUES("
         + " #{metalakeMeta.metalakeId},"
@@ -114,6 +135,9 @@ public class MetalakeMetaBaseSQLProvider {
         + " #{metalakeMeta.metalakeComment},"
         + " #{metalakeMeta.properties},"
         + " #{metalakeMeta.auditInfo},"
+        + " "
+        + tenantId
+        + ","
         + " #{metalakeMeta.schemaVersion},"
         + " #{metalakeMeta.currentVersion},"
         + " #{metalakeMeta.lastVersion},"
@@ -133,6 +157,7 @@ public class MetalakeMetaBaseSQLProvider {
   public String updateMetalakeMeta(
       @Param("newMetalakeMeta") MetalakePO newMetalakePO,
       @Param("oldMetalakeMeta") MetalakePO oldMetalakePO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET metalake_name = #{newMetalakeMeta.metalakeName},"
@@ -151,21 +176,27 @@ public class MetalakeMetaBaseSQLProvider {
         + " AND schema_version = #{oldMetalakeMeta.schemaVersion}"
         + " AND current_version = #{oldMetalakeMeta.currentVersion}"
         + " AND last_version = #{oldMetalakeMeta.lastVersion}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteMetalakeMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 }

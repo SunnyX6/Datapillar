@@ -1,6 +1,6 @@
 /**
- * 统一的API响应类型定义
- * 与后端 ApiResponse 格式保持一致
+ * unifiedAPIResponse type definition
+ * with backend ApiResponse Keep the format consistent
  */
 
 import type { ApiResponse } from '@/api/types/api'

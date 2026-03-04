@@ -10,11 +10,11 @@ import lombok.Data;
 @Schema(name = "LlmUserModelGrantRequest")
 public class LlmUserModelGrantRequest {
 
-    @NotBlank(message = "permission_code 不能为空")
-    @Size(max = 32, message = "permission_code 长度不能超过 32")
-    private String permissionCode;
+  @NotBlank(message = "permission_code cannot be empty")
+  @Size(max = 32, message = "permission_code The length cannot exceed 32")
+  private String permissionCode;
 
-    private Boolean isDefault;
+  private Boolean isDefault;
 
-    private LocalDateTime expiresAt;
+  private LocalDateTime expiresAt;
 }

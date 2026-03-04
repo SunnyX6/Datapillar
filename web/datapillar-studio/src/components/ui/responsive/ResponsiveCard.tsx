@@ -1,14 +1,14 @@
 /**
- * 响应式卡片组件
+ * Responsive card component
  *
- * 自动适配不同屏幕尺寸，无需手动处理响应式
+ * Automatically adapt to different screen sizes，No need to handle responsiveness manually
  *
- * 使用方式：
+ * Usage：
  * ```tsx
  * <ResponsiveCard size="normal">
- *   <ResponsiveCard.Header>标题</ResponsiveCard.Header>
- *   <ResponsiveCard.Body>内容</ResponsiveCard.Body>
- *   <ResponsiveCard.Footer>底部</ResponsiveCard.Footer>
+ *   <ResponsiveCard.Header>Title</ResponsiveCard.Header>
+ *   <ResponsiveCard.Body>content</ResponsiveCard.Body>
+ *   <ResponsiveCard.Footer>bottom</ResponsiveCard.Footer>
  * </ResponsiveCard>
  * ```
  */
@@ -22,15 +22,15 @@ type CardSize = CardWidth | 'responsive'
 
 interface ResponsiveCardProps {
   children: ReactNode
-  /** 卡片尺寸（默认 responsive，自动适配）*/
+  /** card size（Default responsive，Automatic adaptation）*/
   size?: CardSize
-  /** 自定义类名 */
+  /** Custom class name */
   className?: string
-  /** 是否显示阴影 */
+  /** Whether to show shadow */
   shadow?: boolean
-  /** 是否显示边框 */
+  /** Whether to display borders */
   border?: boolean
-  /** 内边距大小 */
+  /** padding size */
   padding?: 'none' | 'sm' | 'md' | 'lg'
 }
 
@@ -77,7 +77,7 @@ export function ResponsiveCard({
   )
 }
 
-/** 卡片头部 */
+/** card header */
 ResponsiveCard.Header = function ResponsiveCardHeader({
   children,
   className
@@ -99,7 +99,7 @@ ResponsiveCard.Header = function ResponsiveCardHeader({
   )
 }
 
-/** 卡片主体 */
+/** card body */
 ResponsiveCard.Body = function ResponsiveCardBody({
   children,
   className
@@ -114,7 +114,7 @@ ResponsiveCard.Body = function ResponsiveCardBody({
   )
 }
 
-/** 卡片底部 */
+/** card bottom */
 ResponsiveCard.Footer = function ResponsiveCardFooter({
   children,
   className

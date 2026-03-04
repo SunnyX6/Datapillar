@@ -1,17 +1,17 @@
 /**
- * Stores 统一导出
+ * Stores Unified export
  *
- * 使用 Zustand 进行状态管理
- * - Auth Store: localStorage 持久化（7天/30天）
- * - Theme Store: localStorage 持久化（永久保存）
- * - I18n Store: localStorage 持久化（永久保存）
+ * use Zustand Perform status management
+ * - Auth Store: localStorage persistence（7day/30day）
+ * - Theme Store: localStorage persistence（Save permanently）
+ * - I18n Store: localStorage persistence（Save permanently）
  */
 
-// Auth Store - 认证相关状态管理
+// Auth Store - Certification related status management
 export { useAuthStore } from './authStore'
 export { useSetupStore, type SetupGuardStatus } from './setupStore'
 
-// Theme Store - 主题相关状态管理
+// Theme Store - Topic related status management
 export {
   useThemeStore,
   useThemeMode,
@@ -19,7 +19,7 @@ export {
   type ThemeMode
 } from './themeStore'
 
-// I18n Store - 国际化相关状态管理
+// I18n Store - Internationalization related status management
 export {
   useI18nStore,
   useLanguage,
@@ -27,10 +27,10 @@ export {
   type Language
 } from './i18nStore'
 
-// Layout Store - 布局偏好
+// Layout Store - Layout preferences
 export { useLayoutStore } from './layoutStore'
 
-// Search Store - 全局搜索状态
+// Search Store - Global search status
 export {
   useSearchStore,
   useSearchPlaceholder,

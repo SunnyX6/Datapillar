@@ -7,17 +7,17 @@ import lombok.Data;
 @Schema(name = "WorkflowUpdate")
 public class WorkflowUpdateRequest {
 
-    private String workflowName;
+  private String workflowName;
 
-    private Integer triggerType;
+  private Integer triggerType;
 
-    private String triggerValue;
+  private String triggerValue;
 
-    private Integer timeoutSeconds;
+  private Integer timeoutSeconds;
 
-    private Integer maxRetryTimes;
+  private Integer maxRetryTimes;
 
-    private Integer priority;
+  private Integer priority;
 
-    private String description;
+  private String description;
 }

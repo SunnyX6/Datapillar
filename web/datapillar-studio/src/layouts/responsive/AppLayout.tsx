@@ -33,11 +33,11 @@ const alignClassMap: Record<Align, string> = {
 }
 
 /**
- * AppLayout: 基础页面容器
+ * AppLayout: Basic page container
  *
- * - `surface` 控制背景/文字色
- * - `padding` / `maxWidthClassName` / `align` 用来快速调节布局
- * - 默认提供滚动容器，可通过 `scrollBehavior=\"hidden\"` 禁用
+ * - `surface` Control background/text color
+ * - `padding` / `maxWidthClassName` / `align` Used to quickly adjust the layout
+ * - Scroll container provided by default，Passable `scrollBehavior=\"hidden\"` Disable
  */
 export function AppLayout({
   children,

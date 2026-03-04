@@ -6,7 +6,7 @@ function createError(overrides: Partial<AppError> = {}): AppError {
   return {
     source: 'axios',
     module: 'api/client',
-    message: '请求失败',
+    message: 'Request failed',
     severity: 'error',
     retryable: false,
     isCoreRequest: false,
@@ -15,7 +15,7 @@ function createError(overrides: Partial<AppError> = {}): AppError {
 }
 
 describe('error-center policy', () => {
-  it('默认策略应返回 local，由业务层决定流程', () => {
+  it('The default policy should return local，The business layer determines the process', () => {
     const action = decideErrorAction(createError({
       status: 401,
       code: 401,
@@ -25,20 +25,20 @@ describe('error-center policy', () => {
     expect(action).toEqual({ type: 'local', reason: 'handled-by-caller' })
   })
 
-  it('preferToast=true 时返回 toast', () => {
+  it('preferToast=true return when toast', () => {
     const action = decideErrorAction(createError({
       status: 503,
       code: 503,
       errorType: 'SERVICE_UNAVAILABLE',
-      message: '服务不可用'
+      message: 'Service unavailable'
     }), {
       preferToast: true
     })
 
-    expect(action).toEqual({ type: 'toast', level: 'error', message: '服务不可用' })
+    expect(action).toEqual({ type: 'toast', level: 'error', message: 'Service unavailable' })
   })
 
-  it('runtime/router 错误不由错误中心主动驱动流程', () => {
+  it('runtime/router Errors are not actively driven by the error center', () => {
     const action = decideErrorAction(createError({
       source: 'runtime',
       severity: 'fatal'

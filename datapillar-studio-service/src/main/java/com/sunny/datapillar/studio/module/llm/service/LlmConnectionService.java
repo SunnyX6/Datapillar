@@ -16,13 +16,13 @@ import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
 
 /**
- * 大模型Connection服务
- * 提供大模型Connection业务能力与领域服务
+ * large modelConnectionservice Large models availableConnectionBusiness capabilities and domain
+ * services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface LlmConnectionService {
 
-    LlmModelConnectResponse connectModel(Long userId, Long aiModelId, LlmModelConnectRequest request);
+  LlmModelConnectResponse connectModel(Long userId, Long aiModelId, LlmModelConnectRequest request);
 }

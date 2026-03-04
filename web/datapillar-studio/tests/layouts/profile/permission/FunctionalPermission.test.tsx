@@ -9,24 +9,24 @@ const basePermissions: RoleDefinition['permissions'] = [
   {
     objectId: 101,
     parentId: undefined,
-    objectName: '元数据目录',
+    objectName: 'metadata directory',
     objectPath: '/governance/metadata',
     objectType: 'MENU',
     location: 'governance',
     sort: 1,
-    categoryName: '数据资产',
+    categoryName: 'data assets',
     level: 'READ',
     tenantLevel: 'ADMIN',
     children: [
       {
         objectId: 102,
         parentId: 101,
-        objectName: '字段标准',
+        objectName: 'Field standards',
         objectPath: '/governance/metadata/fields',
         objectType: 'MENU',
         location: 'governance',
         sort: 1,
-        categoryName: '数据资产',
+        categoryName: 'data assets',
         level: 'READ',
         tenantLevel: 'ADMIN',
         children: [],
@@ -36,12 +36,12 @@ const basePermissions: RoleDefinition['permissions'] = [
   {
     objectId: 202,
     parentId: undefined,
-    objectName: '工作流编排',
+    objectName: 'Workflow orchestration',
     objectPath: '/workflow',
     objectType: 'MENU',
     location: 'workflow',
     sort: 2,
-    categoryName: '开发与发布',
+    categoryName: 'Development and release',
     level: 'DISABLE',
     tenantLevel: 'READ',
     children: [],
@@ -51,8 +51,8 @@ const basePermissions: RoleDefinition['permissions'] = [
 const role: RoleDefinition = {
   id: 'role_dev',
   type: 'USER',
-  name: '研发工程师',
-  description: '用于测试',
+  name: 'R&D Engineer',
+  description: 'for testing',
   permissions: basePermissions,
 }
 
@@ -77,19 +77,19 @@ const unmount = (
 }
 
 describe('FunctionalPermission', () => {
-  it('角色模式渲染权限项', () => {
+  it('Role mode rendering permission items', () => {
     const onUpdate = vi.fn()
     const { container, root } = render(
       <FunctionalPermission role={role} onUpdatePermission={onUpdate} />,
     )
 
-    expect(container.textContent).toContain('元数据目录')
+    expect(container.textContent).toContain('metadata directory')
     expect(container.textContent).toContain('/governance/metadata')
 
     unmount(root, container)
   })
 
-  it('点击权限按钮时回调角色权限更新', () => {
+  it('Callback role permission update when the permission button is clicked', () => {
     const onUpdate = vi.fn()
     const { container, root } = render(
       <FunctionalPermission role={role} onUpdatePermission={onUpdate} />,
@@ -97,7 +97,7 @@ describe('FunctionalPermission', () => {
 
     const buttons = Array.from(container.querySelectorAll('button'))
     const firstPermissionDisableButton = buttons.find(
-      (button) => button.textContent?.trim() === '禁止',
+      (button) => button.textContent?.trim() === 'prohibited',
     )
     expect(firstPermissionDisableButton).not.toBeNull()
     act(() => {
@@ -111,7 +111,7 @@ describe('FunctionalPermission', () => {
     unmount(root, container)
   })
 
-  it('只读模式禁用权限修改', () => {
+  it('Read-only mode disables permission modification', () => {
     const onUpdate = vi.fn()
     const { container, root } = render(
       <FunctionalPermission
@@ -123,7 +123,7 @@ describe('FunctionalPermission', () => {
 
     const buttons = Array.from(container.querySelectorAll('button'))
     const firstPermissionButton = buttons.find(
-      (button) => button.textContent?.trim() === '禁止',
+      (button) => button.textContent?.trim() === 'prohibited',
     )
     expect(firstPermissionButton).not.toBeNull()
     expect(firstPermissionButton?.hasAttribute('disabled')).toBe(true)
@@ -139,31 +139,31 @@ describe('FunctionalPermission', () => {
     unmount(root, container)
   })
 
-  it('父子节点展开收起与列对齐正确', () => {
+  it('The parent and child nodes are expanded and collapsed and the columns are aligned correctly.', () => {
     const onUpdate = vi.fn()
     const { container, root } = render(
       <FunctionalPermission role={role} onUpdatePermission={onUpdate} />,
     )
 
     const toggleButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="收起子节点"]',
+      'button[aria-label="Collapse child nodes"]',
     )
     expect(toggleButton).not.toBeNull()
-    expect(container.textContent).toContain('字段标准')
+    expect(container.textContent).toContain('Field standards')
 
     act(() => {
       toggleButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    expect(container.textContent).not.toContain('字段标准')
+    expect(container.textContent).not.toContain('Field standards')
 
     const expandButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="展开子节点"]',
+      'button[aria-label="Expand child nodes"]',
     )
     expect(expandButton).not.toBeNull()
     act(() => {
       expandButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    expect(container.textContent).toContain('字段标准')
+    expect(container.textContent).toContain('Field standards')
 
     const parentRow = container.querySelector<HTMLElement>(
       '[data-testid="permission-row-101"]',

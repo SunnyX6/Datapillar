@@ -26,7 +26,7 @@ import org.apache.gravitino.storage.relational.po.ValueDomainPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
-/** ValueDomain 元数据 SQL Provider 工厂 */
+/** ValueDomain metadata SQL Provider factory */
 public class ValueDomainMetaSQLProviderFactory {
 
   private static final Map<JDBCBackendType, ValueDomainMetaBaseSQLProvider>

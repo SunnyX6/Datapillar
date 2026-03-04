@@ -1,15 +1,12 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-基础设施层
+infrastructure layer
 
-提供数据库连接、外部服务等基础设施。
-"""
+Provide database connection,Infrastructure such as external services."""
 
-__all__ = [
-    # Database
+__all__ = [  # Database
     "Neo4jClient",
     "AsyncNeo4jClient",
     "MySQLClient",
@@ -35,14 +32,8 @@ if TYPE_CHECKING:
 
 def __getattr__(name: str):
     """
-    延迟导入（避免 package import 触发数据库/配置的循环依赖）。
-
-    说明：
-    - `import src.infrastructure.llm...` 也会执行本文件；
-      如果这里 eager import database，将导致 database->config->repository->database 的循环依赖。
-    - 使用 __getattr__ 让需要 Database client 的模块仍能通过
-      `from src.infrastructure import MySQLClient` 这种写法获取对象。
-    """
+    Delayed import(avoid package import trigger database/Configuration circular dependencies).Description:- `import src.infrastructure.llm...` This file will also be executed;If here eager import database,will result in database->config->repository->database circular dependencies.- use __getattr__ let need Database client modules can still pass
+    `from src.infrastructure import MySQLClient` This way of writing gets the object."""
     if name in {
         "Neo4jClient",
         "AsyncNeo4jClient",
@@ -53,4 +44,5 @@ def __getattr__(name: str):
         from src.infrastructure import database as _db
 
         return getattr(_db, name)
+
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

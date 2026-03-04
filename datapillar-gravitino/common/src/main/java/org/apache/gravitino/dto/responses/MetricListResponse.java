@@ -27,7 +27,7 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.dataset.MetricDTO;
 
-/** 指标分页列表响应，返回完整的指标数据 */
+/** Metric paginated list response，Return complete indicator data */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -46,12 +46,12 @@ public class MetricListResponse extends BaseResponse {
   private final int limit;
 
   /**
-   * 创建指标列表响应
+   * Create metric list response
    *
-   * @param metrics 指标数组
-   * @param total 总数
-   * @param offset 偏移量
-   * @param limit 每页大小
+   * @param metrics indicator array
+   * @param total total
+   * @param offset offset
+   * @param limit page size
    */
   public MetricListResponse(MetricDTO[] metrics, long total, int offset, int limit) {
     super(0);
@@ -61,7 +61,7 @@ public class MetricListResponse extends BaseResponse {
     this.limit = limit;
   }
 
-  /** Jackson 反序列化用的默认构造函数 */
+  /** Jackson Default constructor for deserialization */
   public MetricListResponse() {
     super();
     this.metrics = null;

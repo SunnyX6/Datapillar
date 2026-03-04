@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-指标 AI 治理数据模型
+indicator AI Governance data model
 """
 
 from enum import Enum
@@ -21,21 +20,21 @@ class MetricType(str, Enum):
 
 
 class WordRoot(BaseModel):
-    """词根"""
+    """root"""
 
     code: str
     name: str
 
 
 class Modifier(BaseModel):
-    """修饰符"""
+    """modifier"""
 
     code: str
     name: str
 
 
 class MeasureColumn(BaseModel):
-    """度量列"""
+    """measure column"""
 
     name: str
     type: str
@@ -43,14 +42,14 @@ class MeasureColumn(BaseModel):
 
 
 class FilterColumnValue(BaseModel):
-    """过滤列值"""
+    """Filter column values"""
 
     key: str
     label: str
 
 
 class FilterColumn(BaseModel):
-    """过滤列（含值域）"""
+    """Filter columns（Contains value range）"""
 
     name: str
     type: str
@@ -59,7 +58,7 @@ class FilterColumn(BaseModel):
 
 
 class FormOptions(BaseModel):
-    """表单可选项（词根/修饰符/单位：前端传了就用，没传由后端从 Neo4j 获取）"""
+    """form options（root/modifier/unit：Just use it after passing it from the front end，Not transmitted by the backend from Neo4j Get）"""
 
     data_types: list[str] = Field(alias="dataTypes")
     units: list[str] | None = Field(default=None)
@@ -71,11 +70,11 @@ class FormOptions(BaseModel):
 
 
 class AtomicPayload(BaseModel):
-    """原子指标 payload"""
+    """Atomic indicators payload"""
 
     measure_columns: list[MeasureColumn] = Field(alias="measureColumns", default_factory=list)
     filter_columns: list[FilterColumn] = Field(alias="filterColumns", default_factory=list)
-    # 物理表引用，用于查询表的上下文
+    # Physical table reference，The context used to query the table
     ref_catalog: str | None = Field(alias="refCatalog", default=None)
     ref_schema: str | None = Field(alias="refSchema", default=None)
     ref_table: str | None = Field(alias="refTable", default=None)
@@ -85,7 +84,7 @@ class AtomicPayload(BaseModel):
 
 
 class BaseMetric(BaseModel):
-    """基础指标引用"""
+    """Basic indicator reference"""
 
     code: str
     name: str | None = None
@@ -93,7 +92,7 @@ class BaseMetric(BaseModel):
 
 
 class DerivedPayload(BaseModel):
-    """派生指标 payload"""
+    """Derived indicators payload"""
 
     base_metric: BaseMetric = Field(alias="baseMetric")
     modifiers: list[Modifier] = Field(default_factory=list)
@@ -107,7 +106,7 @@ class DerivedPayload(BaseModel):
 
 
 class CompositeMetricRef(BaseModel):
-    """复合指标引用的指标"""
+    """Indicators referenced by composite indicators"""
 
     code: str
     name: str | None = None
@@ -115,7 +114,7 @@ class CompositeMetricRef(BaseModel):
 
 
 class CompositePayload(BaseModel):
-    """复合指标 payload"""
+    """Composite indicator payload"""
 
     metrics: list[CompositeMetricRef] = Field(default_factory=list)
 
@@ -124,7 +123,7 @@ class CompositePayload(BaseModel):
 
 
 class FillContext(BaseModel):
-    """填写上下文"""
+    """Fill in the context"""
 
     metric_type: MetricType = Field(alias="metricType")
     payload: dict
@@ -134,28 +133,28 @@ class FillContext(BaseModel):
         populate_by_name = True
 
     def get_atomic_payload(self) -> AtomicPayload | None:
-        """获取原子指标 payload"""
+        """Get atomic indicators payload"""
         if self.metric_type == MetricType.ATOMIC:
             return AtomicPayload(**self.payload)
         return None
 
     def get_derived_payload(self) -> DerivedPayload | None:
-        """获取派生指标 payload"""
+        """Get derived metrics payload"""
         if self.metric_type == MetricType.DERIVED:
             return DerivedPayload(**self.payload)
         return None
 
     def get_composite_payload(self) -> CompositePayload | None:
-        """获取复合指标 payload"""
+        """Get composite indicator payload"""
         if self.metric_type == MetricType.COMPOSITE:
             return CompositePayload(**self.payload)
         return None
 
 
 class AIFillRequest(BaseModel):
-    """AI 填写请求"""
+    """AI Fill out the request"""
 
-    user_input: str = Field(alias="userInput", description="用户自然语言输入")
+    user_input: str = Field(alias="userInput", description="User natural language input")
     context: FillContext
 
     class Config:
@@ -163,34 +162,40 @@ class AIFillRequest(BaseModel):
 
 
 class AIFillOutput(BaseModel):
-    """AI 填写输出（LLM 生成，用于 structured output）"""
+    """AI Fill in the output（LLM generate，used for structured output）"""
 
-    success: bool = Field(..., description="是否成功生成指标，验证不通过时为 False")
+    success: bool = Field(
+        ...,
+        description="Whether the indicator was successfully generated，When the verification fails, it is False",
+    )
     message: str = Field(
-        ..., description="消息，成功时是友好提示，失败时是失败原因（使用傲娇语气）"
+        ...,
+        description="news，Friendly reminder when successful，Failure is the reason for failure（Use a arrogant tone）",
     )
 
-    # 以下字段仅在 success=True 时有值
-    name: str | None = Field(None, description="指标中文名称")
+    # The following fields are only available in success=True sometimes valuable
+    name: str | None = Field(None, description="Indicator Chinese name")
     word_roots: list[str] = Field(
-        alias="wordRoots", default_factory=list, description="选用的词根 code 列表"
+        alias="wordRoots", default_factory=list, description="chosen root word code list"
     )
-    aggregation: str | None = Field(None, description="聚合函数，如 SUM/COUNT/AVG")
+    aggregation: str | None = Field(None, description="aggregate function，Such as SUM/COUNT/AVG")
     modifiers_selected: list[str] = Field(
-        alias="modifiersSelected", default_factory=list, description="选用的修饰符 code 列表"
+        alias="modifiersSelected", default_factory=list, description="Selected modifiers code list"
     )
-    type: MetricType | None = Field(None, description="指标类型：ATOMIC/DERIVED/COMPOSITE")
-    data_type: str | None = Field(alias="dataType", default=None, description="数据类型")
-    unit: str | None = Field(None, description="单位 code，必须是语义资产上下文中的单位")
+    type: MetricType | None = Field(None, description="Indicator type：ATOMIC/DERIVED/COMPOSITE")
+    data_type: str | None = Field(alias="dataType", default=None, description="data type")
+    unit: str | None = Field(
+        None, description="unit code，Must be a unit in the semantic asset context"
+    )
     calculation_formula: str | None = Field(
-        alias="calculationFormula", default=None, description="指标计算公式"
+        alias="calculationFormula", default=None, description="Indicator calculation formula"
     )
-    comment: str | None = Field(None, description="业务描述")
+    comment: str | None = Field(None, description="Business description")
     measure_columns: list[str] = Field(
-        alias="measureColumns", default_factory=list, description="度量列名列表"
+        alias="measureColumns", default_factory=list, description="Metric column name list"
     )
     filter_columns: list[str] = Field(
-        alias="filterColumns", default_factory=list, description="过滤列名列表"
+        alias="filterColumns", default_factory=list, description="Filter list of column names"
     )
 
     class Config:
@@ -198,16 +203,16 @@ class AIFillOutput(BaseModel):
 
 
 class AIFillResponse(BaseModel):
-    """AI 填写响应"""
+    """AI Fill in the response"""
 
-    # 状态：成功/失败
+    # Status：success/failed
     success: bool = True
-    # AI 消息：始终有值，成功时是友好提示，失败时是失败原因
+    # AI news：always valuable，Friendly reminder when successful，Failure is the reason for failure
     message: str = ""
-    # 推荐列表：失败时返回推荐的表和列（由代码填充，不是 LLM 生成）
+    # Recommended list：Returns recommended tables and columns on failure（populated by code，No LLM generate）
     recommendations: list[dict] = Field(default_factory=list)
 
-    # 以下字段仅在 success=True 时有值
+    # The following fields are only available in success=True sometimes valuable
     name: str | None = None
     word_roots: list[str] = Field(alias="wordRoots", default_factory=list)
     aggregation: str | None = None
@@ -228,7 +233,7 @@ class AIFillResponse(BaseModel):
     def from_output(
         cls, output: AIFillOutput, recommendations: list[dict] | None = None
     ) -> "AIFillResponse":
-        """从 LLM 输出构建响应，附加 recommendations"""
+        """from LLM Output build response，additional recommendations"""
         return cls(
             success=output.success,
             message=output.message,

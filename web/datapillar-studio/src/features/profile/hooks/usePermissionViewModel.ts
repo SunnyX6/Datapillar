@@ -15,7 +15,7 @@ function resolveErrorMessage(error: unknown): string {
     return error.message
   }
 
-  return '未知错误'
+  return 'unknown error'
 }
 
 export function usePermissionViewModel() {
@@ -110,16 +110,16 @@ export function usePermissionViewModel() {
   const deleteMembers = useCallback(
     async (userIds: string[]): Promise<string[]> => {
       if (!tenantId) {
-        toast.error('当前租户信息缺失，无法删除成员')
+        toast.error('Current tenant information is missing，Unable to delete member')
         return []
       }
       if (!selectedRoleId) {
-        toast.error('当前角色信息缺失，无法删除成员')
+        toast.error('Current role information is missing，Unable to delete member')
         return []
       }
       const parsedRoleId = Number(selectedRoleId)
       if (!Number.isFinite(parsedRoleId)) {
-        toast.error('角色ID无效，无法删除成员')
+        toast.error('roleIDInvalid，Unable to delete member')
         return []
       }
 
@@ -142,7 +142,7 @@ export function usePermissionViewModel() {
         ),
       )
       if (parsedUserIds.length === 0) {
-        toast.error('成员ID无效，无法删除')
+        toast.error('memberIDInvalid，cannot be deleted')
         return []
       }
 
@@ -156,12 +156,12 @@ export function usePermissionViewModel() {
         )
         toast.success(
           successUserIds.length === 1
-            ? '成员删除成功'
-            : `已删除 ${successUserIds.length} 位成员`,
+            ? 'Member deleted successfully'
+            : `Deleted ${successUserIds.length} members`,
         )
         return successUserIds
       } catch (error) {
-        toast.error(`删除成员失败：${resolveErrorMessage(error)}`)
+        toast.error(`Failed to delete member：${resolveErrorMessage(error)}`)
         return []
       }
     },

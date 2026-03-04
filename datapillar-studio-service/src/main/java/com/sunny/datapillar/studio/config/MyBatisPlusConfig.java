@@ -9,31 +9,32 @@ import org.apache.ibatis.annotations.Mapper;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
 /**
- * MyBatisPlus配置
- * 负责MyBatisPlus配置装配与Bean初始化
+ * MyBatisPlusConfiguration responsibleMyBatisPlusConfigure assembly withBeaninitialization
  *
  * @author Sunny
  * @date 2026-01-01
  */
-
 @Configuration
-@MapperScan(basePackages = "com.sunny.datapillar.studio.module", annotationClass = Mapper.class)
+@MapperScan(
+    basePackages = {"com.sunny.datapillar.studio.module", "com.sunny.datapillar.studio.rpc"},
+    annotationClass = Mapper.class)
 public class MyBatisPlusConfig {
 
-    private final TenantLinePolicy tenantLinePolicy;
+  private final TenantLinePolicy tenantLinePolicy;
 
-    public MyBatisPlusConfig(TenantLinePolicy tenantLinePolicy) {
-        this.tenantLinePolicy = tenantLinePolicy;
-    }
+  public MyBatisPlusConfig(TenantLinePolicy tenantLinePolicy) {
+    this.tenantLinePolicy = tenantLinePolicy;
+  }
 
-    @Bean
-    public MybatisPlusInterceptor mybatisPlusInterceptor() {
-        MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
-        TenantLineInnerInterceptor tenantInterceptor = new TenantLineInnerInterceptor();
-        tenantInterceptor.setTenantLineHandler(tenantLinePolicy);
-        interceptor.addInnerInterceptor(tenantInterceptor);
-        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
-        return interceptor;
-    }
+  @Bean
+  public MybatisPlusInterceptor mybatisPlusInterceptor() {
+    MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+    TenantLineInnerInterceptor tenantInterceptor = new TenantLineInnerInterceptor();
+    tenantInterceptor.setTenantLineHandler(tenantLinePolicy);
+    interceptor.addInnerInterceptor(tenantInterceptor);
+    interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
+    return interceptor;
+  }
 }

@@ -10,7 +10,8 @@ export const API_BASE = {
   aiWorkflow: '/api/ai/biz/etl',
   aiMetric: '/api/ai/biz/governance/metric',
   aiLlmPlayground: '/api/ai/admin/llms',
-  oneMeta: '/api/onemeta',
+  governanceMetadata: '/api/studio/biz/governance/metadata',
+  governanceSemantic: '/api/studio/biz/governance/semantic',
   studioActuator: '/api/studio/actuator'
 } as const
 
@@ -38,6 +39,9 @@ export const API_PATH = {
   },
   userProfile: {
     me: '/users/me/profile'
+  },
+  userMenu: {
+    me: '/users/me/menu'
   },
   workflow: {
     list: '/workflows',

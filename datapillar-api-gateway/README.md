@@ -1,111 +1,94 @@
 # Datapillar API Gateway
 
-Datapillar 统一 API 网关 - 基于 Spring Cloud Gateway 4.2.x
+Datapillar unify API gateway - Based on Spring Cloud Gateway 4.2.x
 
-## 技术栈
+## technology stack
 
-- Spring Boot: 3.4.1
-- Spring Cloud: 2024.0.0 (Moorgate)
-- Spring Cloud Gateway: 4.2.5
-- Java: 21
+- Spring Boot:3.4.1
+- Spring Cloud:2024.0.0 (Moorgate)
+- Spring Cloud Gateway:4.2.5
+- Java:21
 
-## 功能特性
+## Features
 
-- ✅ 统一路由转发
-- ✅ 跨域处理（CORS）
-- ✅ 请求限流（基于 Redis）
-- ✅ 健康检查（Actuator）
-- ✅ 日志追踪
+- ✅ Unified routing and forwarding
+- ✅ Cross-domain processing(CORS)
+- ✅ Request current limit(Based on Redis)
+- ✅ health check(Actuator)
+- ✅ Log tracking
 
-## 路由配置
+## Routing configuration
 
-| 路径前缀 | 目标服务 | 端口 | 说明 |
+| path prefix | target service | port | Description |
 |---------|---------|------|------|
-| `/api/login/**` | datapillar-auth | 7001 | 登录服务 |
-| `/api/auth/**` | datapillar-auth | 7001 | 认证服务 |
-| `/api/studio/**` | datapillar-auth | 7001 | 统一鉴权后代理至 Studio |
-| `/api/ai/**` | datapillar-auth | 7001 | 统一鉴权后代理至 AI |
-| `/api/onemeta/**` | datapillar-auth | 7001 | 统一鉴权后代理至 Gravitino |
+| `/api/login/**` | datapillar-auth | 7001 | Login service |
+| `/api/auth/**` | datapillar-auth | 7001 | Authentication services |
+| `/api/studio/**` | datapillar-auth | 7001 | After unified authentication,proxy to Studio |
+| `/api/ai/**` | datapillar-auth | 7001 | After unified authentication,proxy to AI |
 
-## 启动方式
+## Start mode
 
 ```bash
-# 编译
+# compile
 mvn clean package
 
-# 运行
+# run
 java -jar target/datapillar-api-gateway-1.0.0.jar
 
-# 或者用 Maven
+# Or use Maven
 mvn spring-boot:run
 ```
 
-## 健康检查
+## health check
 
 ```bash
-# 网关健康状态
+# Gateway health status
 curl http://localhost:7000/actuator/health
 
-# 查看所有路由
+# View all routes
 curl http://localhost:7000/actuator/gateway/routes
 ```
 
-## 配置说明
+## Configuration instructions
 
-### 环境变量
+### environment variables
 
 ```bash
-# Redis 配置（仅用于限流）
+# Redis Configuration(Only for current limiting)
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
 REDIS_DATABASE=1
 ```
 
-### 路由规则
+### routing rules
 
-路由规则定义在 `src/main/resources/application.yml` 中，支持动态修改。
+Routing rules are defined in `src/main/resources/application.yml` in,Support dynamic modification.## Development Guide
 
-## 开发指南
+### Add new route
 
-### 添加新路由
-
-编辑 `application.yml`：
-
-```yaml
-spring:
-  cloud:
-    gateway:
-      routes:
-        - id: your-service
-          uri: http://localhost:9090
-          predicates:
-            - Path=/api/yourpath/**
+Edit `application.yml`:```yaml
+spring:cloud:gateway:routes:- id:your-service
+ uri:http://localhost:9090
+ predicates:- Path=/api/yourpath/**
 ```
 
-### 添加限流
+### Add current limit
 
 ```yaml
-filters:
-  - name: RequestRateLimiter
-    args:
-      redis-rate-limiter.replenishRate: 10
-      redis-rate-limiter.burstCapacity: 20
+filters:- name:RequestRateLimiter
+ args:redis-rate-limiter.replenishRate:10
+ redis-rate-limiter.burstCapacity:20
 ```
 
-## 常见问题
+## FAQ
 
-### Q: 跨域问题？
-A: 已配置全局 CORS，允许所有来源。生产环境请修改 `allowedOrigins`。
+### Q:Cross-domain issues?A:Globally configured CORS,allow all sources.Please modify the production environment `allowedOrigins`.### Q:How to view the route list?A:visit `http://localhost:7000/actuator/gateway/routes`
 
-### Q: 如何查看路由列表？
-A: 访问 `http://localhost:7000/actuator/gateway/routes`
-
-### Q: 如何禁用某个路由？
-A: 在路由配置中添加 `enabled: false`
+### Q:How to disable a route?A:Add in routing configuration `enabled:false`
 
 ---
 
-**版本**: 1.0.0
-**更新时间**: 2025-12-08
-**维护者**: Sunny
+**version**:1.0.0
+**Update time**:2025-12-08
+**maintainer**:Sunny

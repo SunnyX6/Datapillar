@@ -1,4 +1,4 @@
-# Datapillar Auth 生产环境配置
+# Datapillar Auth Production environment configuration
 
 server:
   port: ${SERVER_PORT:8082}
@@ -34,7 +34,7 @@ logging:
       max-history: 30
       total-size-cap: 5GB
 
-# JWT 配置
+# JWT Configuration
 jwt:
   secret: ${JWT_SECRET:datapillar-secret-key-please-change-in-production}
   expiration: ${JWT_EXPIRATION:86400000}

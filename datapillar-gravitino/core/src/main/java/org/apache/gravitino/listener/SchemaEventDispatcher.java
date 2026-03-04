@@ -169,7 +169,7 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
       MetricLineageEventEmitter.emitForSchema(
           eventBus, PrincipalUtils.getCurrentUserName(), schemaIdent);
     } catch (Exception e) {
-      LOG.warn("Schema变更触发指标级联失败: schema={}", ident, e);
+      LOG.warn("SchemaChange trigger indicator cascade failed: schema={}", ident, e);
     }
   }
 }

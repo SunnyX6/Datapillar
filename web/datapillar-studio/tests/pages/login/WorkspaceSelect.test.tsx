@@ -28,14 +28,14 @@ const unmount = (root: ReturnType<typeof createRoot>, container: HTMLDivElement)
 }
 
 describe('WorkspaceSelectPanel', () => {
-  it('展示工作空间列表并支持选择', () => {
+  it('Display a list of workspaces and support selection', () => {
     const onSelect = vi.fn()
     const onBack = vi.fn()
     const tenants = [
       {
         tenantId: 1,
         tenantCode: 'platform',
-        tenantName: '平台租户',
+        tenantName: 'Platform tenant',
         status: 1,
         isDefault: 1
       },
@@ -49,8 +49,8 @@ describe('WorkspaceSelectPanel', () => {
     ]
     const { container, root } = render(<WorkspaceSelectPanel tenants={tenants} onBack={onBack} onSelect={onSelect} />)
 
-    expect(container.textContent).toContain('选择工作空间')
-    expect(container.textContent).toContain('平台租户')
+    expect(container.textContent).toContain('Select workspace')
+    expect(container.textContent).toContain('Platform tenant')
     expect(container.textContent).toContain('ACME')
 
     const backButton = container.querySelector('[data-testid="workspace-select-back"]') as HTMLButtonElement | null

@@ -33,19 +33,28 @@ import org.apache.gravitino.dataset.Metric;
 @ToString
 public class MetricEntity implements Entity, Auditable, HasIdentifier {
 
-  public static final Field ID = Field.required("id", Long.class, "指标实体的唯一 ID");
-  public static final Field NAME = Field.required("name", String.class, "指标实体的名称");
-  public static final Field CODE = Field.required("code", String.class, "指标实体的编码");
-  public static final Field TYPE = Field.required("type", Metric.Type.class, "指标实体的类型");
-  public static final Field DATA_TYPE = Field.optional("data_type", String.class, "指标的数据类型");
-  public static final Field UNIT = Field.optional("unit", String.class, "指标的单位");
-  public static final Field COMMENT = Field.optional("comment", String.class, "指标实体的注释或描述");
+  public static final Field ID = Field.required("id", Long.class, "indicator entity unique ID");
+  public static final Field NAME =
+      Field.required("name", String.class, "The name of the indicator entity");
+  public static final Field CODE =
+      Field.required("code", String.class, "The encoding of the indicator entity");
+  public static final Field TYPE =
+      Field.required("type", Metric.Type.class, "Type of indicator entity");
+  public static final Field DATA_TYPE =
+      Field.optional("data_type", String.class, "Indicator data type");
+  public static final Field UNIT =
+      Field.optional("unit", String.class, "The unit of the indicator");
+  public static final Field COMMENT =
+      Field.optional("comment", String.class, "Annotation or description of the indicator entity");
   public static final Field CURRENT_VERSION =
-      Field.optional("current_version", Integer.class, "指标的当前版本号");
+      Field.optional(
+          "current_version", Integer.class, "The current version number of the indicator");
   public static final Field LAST_VERSION =
-      Field.optional("last_version", Integer.class, "指标的最新版本号");
-  public static final Field PROPERTIES = Field.optional("properties", Map.class, "指标实体的属性");
-  public static final Field AUDIT_INFO = Field.required("audit_info", AuditInfo.class, "指标实体的审计信息");
+      Field.optional("last_version", Integer.class, "The latest version number of the indicator");
+  public static final Field PROPERTIES =
+      Field.optional("properties", Map.class, "Properties of indicator entities");
+  public static final Field AUDIT_INFO =
+      Field.required("audit_info", AuditInfo.class, "Audit information for indicator entities");
 
   private Long id;
   private String name;

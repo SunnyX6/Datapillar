@@ -37,7 +37,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
-/** MetricModifier 元数据服务类 */
+/** MetricModifier Metadata service class */
 public class MetricModifierMetaService {
   private static final MetricModifierMetaService INSTANCE = new MetricModifierMetaService();
 
@@ -47,7 +47,7 @@ public class MetricModifierMetaService {
 
   private MetricModifierMetaService() {}
 
-  /** 插入 Modifier */
+  /** Insert Modifier */
   public void insertModifier(MetricModifierEntity modifierEntity, boolean overwrite)
       throws IOException {
     try {
@@ -73,7 +73,7 @@ public class MetricModifierMetaService {
     }
   }
 
-  /** 根据 namespace 列出所有 Modifier */
+  /** According to namespace list all Modifier */
   public List<MetricModifierEntity> listModifiersByNamespace(Namespace namespace) {
     NamespaceUtil.checkModifier(namespace);
 
@@ -87,7 +87,7 @@ public class MetricModifierMetaService {
     return POConverters.fromMetricModifierPOs(modifierPOs, namespace);
   }
 
-  /** 分页列出 Modifier */
+  /** List in pages Modifier */
   public List<MetricModifierEntity> listModifiersByNamespaceWithPagination(
       Namespace namespace, int offset, int limit) {
     NamespaceUtil.checkModifier(namespace);
@@ -103,7 +103,7 @@ public class MetricModifierMetaService {
     return POConverters.fromMetricModifierPOs(modifierPOs, namespace);
   }
 
-  /** 统计 Modifier 总数 */
+  /** statistics Modifier total */
   public long countModifiersByNamespace(Namespace namespace) {
     NamespaceUtil.checkModifier(namespace);
 
@@ -113,7 +113,7 @@ public class MetricModifierMetaService {
         MetricModifierMetaMapper.class, mapper -> mapper.countMetricModifiersBySchemaId(schemaId));
   }
 
-  /** 获取 Modifier */
+  /** Get Modifier */
   public MetricModifierEntity getModifierByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkModifier(ident);
 
@@ -123,7 +123,7 @@ public class MetricModifierMetaService {
     return POConverters.fromMetricModifierPO(modifierPO, ident.namespace());
   }
 
-  /** 更新 Modifier */
+  /** update Modifier */
   public <E extends Entity & HasIdentifier> MetricModifierEntity updateModifier(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkModifier(ident);
@@ -163,7 +163,7 @@ public class MetricModifierMetaService {
     }
   }
 
-  /** 删除 Modifier */
+  /** Delete Modifier */
   public boolean deleteModifier(NameIdentifier ident) {
     NameIdentifierUtil.checkModifier(ident);
 
@@ -180,7 +180,7 @@ public class MetricModifierMetaService {
     return deleteResult > 0;
   }
 
-  /** 根据 schemaId 和 code 获取 modifierId */
+  /** According to schemaId and code Get modifierId */
   public Long getModifierIdBySchemaIdAndCode(Long schemaId, String modifierCode) {
     Long modifierId =
         SessionUtils.getWithoutCommit(
@@ -240,7 +240,7 @@ public class MetricModifierMetaService {
     }
   }
 
-  /** 根据遗留时间线删除修饰符元数据 */
+  /** Remove modifier metadata based on legacy timeline */
   public int deleteMetricModifierMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         MetricModifierMetaMapper.class,

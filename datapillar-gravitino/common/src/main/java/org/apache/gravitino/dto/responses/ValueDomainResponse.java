@@ -24,7 +24,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.gravitino.dto.dataset.ValueDomainDTO;
 
-/** 值域响应 */
+/** range response */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -33,15 +33,15 @@ public class ValueDomainResponse extends BaseResponse {
   @JsonProperty("valueDomain")
   private ValueDomainDTO valueDomain;
 
-  /** 无参构造函数，用于 Jackson 反序列化 */
+  /** No-argument constructor，used for Jackson Deserialization */
   public ValueDomainResponse() {
     super(0);
   }
 
   /**
-   * 创建 ValueDomainResponse
+   * create ValueDomainResponse
    *
-   * @param valueDomain 值域 DTO
+   * @param valueDomain range DTO
    */
   public ValueDomainResponse(ValueDomainDTO valueDomain) {
     super(0);

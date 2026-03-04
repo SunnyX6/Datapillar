@@ -1,6 +1,6 @@
 /**
- * 编辑器基础骨架组件
- * 提供统一的布局结构，供各语言编辑器复用
+ * Editor basic skeleton component
+ * Provide a unified layout structure，For reuse by various language editors
  */
 
 import { useRef, useState, useCallback, useEffect } from 'react'
@@ -17,7 +17,7 @@ export interface EditorTab {
   icon?: React.ReactNode
 }
 
-/** 右键菜单项 */
+/** right click menu item */
 export interface ContextMenuItem {
   id: string
   label: string
@@ -26,7 +26,7 @@ export interface ContextMenuItem {
   disabled?: boolean
 }
 
-/** 右键菜单分组 */
+/** Right-click menu grouping */
 export interface ContextMenuGroup {
   id: string
   title: string
@@ -35,27 +35,27 @@ export interface ContextMenuGroup {
 }
 
 interface BaseEditorProps {
-  /** Tab 列表 */
+  /** Tab list */
   tabs: EditorTab[]
-  /** 当前激活的 Tab ID */
+  /** currently active Tab ID */
   activeTabId: string
-  /** Tab 切换回调 */
+  /** Tab Switch callback */
   onTabChange: (id: string) => void
-  /** Tab 关闭回调 */
+  /** Tab Close callback */
   onTabClose?: (id: string) => void
-  /** 新建 Tab 回调 */
+  /** New Tab callback */
   onAddTab?: () => void
-  /** 工具栏左侧内容 */
+  /** Contents on the left side of the toolbar */
   toolbarLeft?: React.ReactNode
-  /** 工具栏右侧内容 */
+  /** Contents on the right side of the toolbar */
   toolbarRight?: React.ReactNode
-  /** 编辑器主内容区 */
+  /** Editor main content area */
   children: React.ReactNode
-  /** 底部面板 */
+  /** bottom panel */
   bottomPanel?: React.ReactNode
-  /** 右侧面板 */
+  /** right panel */
   rightPanel?: React.ReactNode
-  /** 右键菜单分组 */
+  /** Right-click menu grouping */
   contextMenuGroups?: ContextMenuGroup[]
 }
 
@@ -72,44 +72,44 @@ export function BaseEditor({
   rightPanel,
   contextMenuGroups
 }: BaseEditorProps) {
-  // 跟踪是否应该禁用动画（新增 tab 时禁用）
+  // Track whether animation should be disabled（New tab Disabled when）
   const [skipAnimation, setSkipAnimation] = useState(false)
   const skipAnimationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 右键菜单状态
+  // Right-click menu status
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
 
-  // 包装 onAddTab，在添加 tab 时临时禁用动画
+  // packaging onAddTab，Adding tab Temporarily disable animations when
   const handleAddTab = useCallback(() => {
     if (!onAddTab) return
 
-    // 禁用动画
+    // Disable animation
     setSkipAnimation(true)
 
-    // 清除之前的定时器
+    // Clear previous timer
     if (skipAnimationTimerRef.current) {
       clearTimeout(skipAnimationTimerRef.current)
     }
 
-    // 调用原始的 onAddTab
+    // call the original onAddTab
     onAddTab()
 
-    // 延迟恢复动画
+    // Delay resume animation
     skipAnimationTimerRef.current = setTimeout(() => {
       setSkipAnimation(false)
       skipAnimationTimerRef.current = null
     }, 50)
   }, [onAddTab])
 
-  // 右键菜单处理
+  // Right-click menu processing
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     if (!contextMenuGroups || contextMenuGroups.length === 0) return
     e.preventDefault()
     setContextMenu({ x: e.clientX, y: e.clientY })
   }, [contextMenuGroups])
 
-  // 点击外部关闭菜单
+  // Click outside to close menu
   useEffect(() => {
     if (!contextMenu) return
 
@@ -133,7 +133,7 @@ export function BaseEditor({
     }
   }, [contextMenu])
 
-  // 菜单项点击
+  // Menu item click
   const handleMenuItemClick = useCallback((item: ContextMenuItem) => {
     if (item.disabled) return
     setContextMenu(null)
@@ -142,7 +142,7 @@ export function BaseEditor({
 
   return (
     <div className="flex-1 flex h-full overflow-hidden bg-white dark:bg-slate-900">
-      {/* 核心编辑器与结果区 */}
+      {/* Core editor and results area */}
       <div className="flex-1 flex flex-col min-w-0 h-full relative border-r border-slate-100 dark:border-slate-800">
 
         {/* 1. TOP TAB BAR */}
@@ -225,7 +225,7 @@ export function BaseEditor({
 
         {/* 3. EDITOR & RESULTS CONTAINER */}
         <div className="flex-1 min-h-0 relative">
-          {/* 编辑器主内容区 */}
+          {/* Editor main content area */}
           <div
             onContextMenu={handleContextMenu}
             className="absolute inset-0 overflow-hidden"
@@ -233,7 +233,7 @@ export function BaseEditor({
             {children}
           </div>
 
-          {/* 4. 底部面板（覆盖在编辑器上方，避免触发布局抖动） */}
+          {/* 4. bottom panel（Overlay over editor，Avoid triggering layout jitter） */}
           {bottomPanel && (
             <div className="absolute inset-x-0 bottom-0 z-30">
               {bottomPanel}
@@ -242,10 +242,10 @@ export function BaseEditor({
         </div>
       </div>
 
-      {/* 5. 右侧面板 */}
+      {/* 5. right panel */}
       {rightPanel}
 
-      {/* 右键菜单 - 玻璃拟态设计 */}
+      {/* right click menu - Glass mimicry design */}
       {contextMenu && contextMenuGroups && contextMenuGroups.length > 0 && createPortal(
         <AnimatePresence>
           <motion.div

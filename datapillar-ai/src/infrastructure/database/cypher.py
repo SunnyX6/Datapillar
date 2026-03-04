@@ -1,16 +1,13 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-Neo4j Cypher 执行入口（统一收口）
+Neo4j Cypher Execution entry(Unified closing)
 
-目标：
-- 统一 Neo4j 查询执行入口，便于后续做日志、审计、超时、重试、指标等横切能力
-- 把 `LiteralString | Query` 的类型约束与动态 Cypher 的现实情况解耦，避免到处散落 `cast(...)`
+target:- unify Neo4j Query execution entry,Facilitate subsequent logging,audit,timeout,Try again,Indicators and other cross-cutting capabilities
+- put `LiteralString | Query` Type constraints and dynamics of Cypher Decoupling of reality,avoid scattering `cast(...)`
 
-注意：
-- `cast` 只影响静态类型检查，不影响运行时行为
+Note:- `cast` Only affects static type checking,Does not affect runtime behavior
 """
 
 from __future__ import annotations
@@ -38,13 +35,12 @@ def run_cypher(
     **kwargs: Any,
 ) -> Any:
     """
-    同步执行 Cypher（Neo4j sync Session）
+    Synchronous execution Cypher(Neo4j sync Session)
 
-    Args:
-        session: Neo4j Session（同步）
-        query: Cypher 字符串（允许动态构造）
-        parameters: 参数字典（可选）
-        **kwargs: 额外参数（将合并进 parameters）
+    Args:session:Neo4j Session(sync)
+    query:Cypher string(Allow dynamic construction)
+    parameters:parameter dictionary(Optional)
+    **kwargs:extra parameters(will be merged into parameters)
     """
     params = _merge_params(parameters, kwargs)
     if params is None:
@@ -59,13 +55,12 @@ async def arun_cypher(
     **kwargs: Any,
 ) -> Any:
     """
-    异步执行 Cypher（Neo4j AsyncSession）
+    Asynchronous execution Cypher(Neo4j AsyncSession)
 
-    Args:
-        session: Neo4j AsyncSession（异步）
-        query: Cypher 字符串（允许动态构造）
-        parameters: 参数字典（可选）
-        **kwargs: 额外参数（将合并进 parameters）
+    Args:session:Neo4j AsyncSession(asynchronous)
+    query:Cypher string(Allow dynamic construction)
+    parameters:parameter dictionary(Optional)
+    **kwargs:extra parameters(will be merged into parameters)
     """
     params = _merge_params(parameters, kwargs)
     if params is None:

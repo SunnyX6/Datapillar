@@ -11,13 +11,13 @@ import lombok.NoArgsConstructor;
 @Schema(name = "AuthTenantOption")
 public class TenantOptionItem {
 
-    private Long tenantId;
+  private Long tenantId;
 
-    private String tenantCode;
+  private String tenantCode;
 
-    private String tenantName;
+  private String tenantName;
 
-    private Integer status;
+  private Integer status;
 
-    private Integer isDefault;
+  private Integer isDefault;
 }

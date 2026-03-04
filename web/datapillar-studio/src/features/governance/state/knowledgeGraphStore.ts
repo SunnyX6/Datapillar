@@ -1,8 +1,8 @@
 /**
- * 知识谱图 Store
+ * Knowledge graph Store
  *
- * 缓存图数据，避免重复请求
- * 注意：节点上限 500，超出后不再自动加载，需用户主动搜索
+ * Caching graph data，Avoid duplicate requests
+ * Note：Node limit 500，It will no longer load automatically after exceeding the limit.，Users are required to actively search
  */
 
 import { create } from 'zustand'
@@ -11,25 +11,25 @@ import { fetchInitialGraph, searchGraph, type GraphData, type GraphLink } from '
 const MAX_NODES = 500
 
 interface KnowledgeGraphState {
-  /** 完整图数据（合并后） */
+  /** Complete graph data（After merger） */
   allGraphData: GraphData
-  /** 是否正在加载 */
+  /** Is loading */
   isLoading: boolean
-  /** 是否已初始化 */
+  /** Has it been initialized? */
   isInitialized: boolean
 
-  /** 加载初始图数据 */
+  /** Load initial graph data */
   loadInitialGraph: (limit?: number) => Promise<void>
-  /** 搜索并合并结果 */
+  /** Search and merge results */
   searchAndMerge: (query: string, limit?: number, signal?: AbortSignal) => Promise<GraphData>
-  /** 强制刷新 */
+  /** Force refresh */
   refresh: () => Promise<void>
-  /** 清除缓存 */
+  /** clear cache */
   clear: () => void
 }
 
 /**
- * 合并图数据（去重）
+ * Merge graph data（Remove duplicates）
  */
 function mergeGraph(base: GraphData, incoming: GraphData): GraphData {
   const nodeMap = new Map(base.nodes.map(node => [node.id, node]))
@@ -62,10 +62,10 @@ export const useKnowledgeGraphStore = create<KnowledgeGraphState>((set, get) => 
   loadInitialGraph: async (limit = 100) => {
     const { isInitialized, isLoading, allGraphData } = get()
 
-    // 已初始化或正在加载，跳过
+    // Initialized or loading，skip
     if (isInitialized || isLoading) return
 
-    // 已达上限，跳过
+    // The limit has been reached，skip
     if (allGraphData.nodes.length >= MAX_NODES) return
 
     set({ isLoading: true })
@@ -76,7 +76,7 @@ export const useKnowledgeGraphStore = create<KnowledgeGraphState>((set, get) => 
         isInitialized: true
       })
     } catch (error) {
-      console.error('[KG Store] 加载图数据失败:', error)
+      console.error('[KG Store] Failed to load graph data:', error)
     } finally {
       set({ isLoading: false })
     }
@@ -88,12 +88,12 @@ export const useKnowledgeGraphStore = create<KnowledgeGraphState>((set, get) => 
     try {
       const searchResult = await searchGraph(query, limit, signal)
 
-      // 检查合并后是否超过上限
+      // Check whether the upper limit is exceeded after merging
       const merged = mergeGraph(allGraphData, searchResult)
       if (merged.nodes.length <= MAX_NODES) {
         set({ allGraphData: merged })
       }
-      // 无论是否合并，都返回搜索结果供组件使用
+      // Regardless of whether to merge，Both return search results for use by components
       return searchResult
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -102,7 +102,7 @@ export const useKnowledgeGraphStore = create<KnowledgeGraphState>((set, get) => 
       if (error instanceof Error && error.name === 'AbortError') {
         return { nodes: [], links: [] }
       }
-      console.error('[KG Store] 搜索失败:', error)
+      console.error('[KG Store] Search failed:', error)
       return { nodes: [], links: [] }
     }
   },

@@ -20,8 +20,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 租户邀请业务服务实现
- * 实现租户邀请业务业务流程与规则校验
+ * Tenant invitation business service implementation Implement tenant invitation business process
+ * and rule verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -30,15 +30,15 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class TenantInvitationBizServiceImpl implements TenantInvitationBizService {
 
-    private final InvitationService invitationService;
+  private final InvitationService invitationService;
 
-    @Override
-    public InvitationDetailResponse getInvitationByCode(String inviteCode) {
-        return invitationService.getInvitationByCode(inviteCode);
-    }
+  @Override
+  public InvitationDetailResponse getInvitationByCode(String inviteCode) {
+    return invitationService.getInvitationByCode(inviteCode);
+  }
 
-    @Override
-    public void registerInvitation(InvitationRegisterRequest request) {
-        invitationService.registerInvitation(request);
-    }
+  @Override
+  public void registerInvitation(InvitationRegisterRequest request) {
+    invitationService.registerInvitation(request);
+  }
 }

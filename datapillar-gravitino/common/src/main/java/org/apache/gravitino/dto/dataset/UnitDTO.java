@@ -29,7 +29,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.dataset.Unit;
 import org.apache.gravitino.dto.AuditDTO;
 
-/** 表示单位的 DTO (Data Transfer Object) */
+/** indicating the unit DTO (Data Transfer Object) */
 @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @EqualsAndHashCode

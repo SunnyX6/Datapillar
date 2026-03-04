@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-知识导航工具
+Knowledge navigation tools
 
-提供数仓知识导航（summary + 类型工具列表）
+Provide data warehouse knowledge navigation（summary + Type tool list）
 """
 
 import json
@@ -31,16 +30,16 @@ _BASE_NAV_TYPES = [
 
 
 class KnowledgeNavigationInput(BaseModel):
-    """获取数仓知识导航的参数（无参数）"""
+    """Get the parameters of data warehouse knowledge navigation（no parameters）"""
 
 
 def _tool_error(message: str) -> str:
-    """构造工具错误响应"""
+    """Constructor error response"""
     return json.dumps({"error": message}, ensure_ascii=False)
 
 
 def _tool_success(data: dict) -> str:
-    """构造工具成功响应"""
+    """Constructor responds successfully"""
     return json.dumps(data, ensure_ascii=False)
 
 
@@ -62,22 +61,22 @@ def build_knowledge_navigation_tool(allowed_tools: list[str]):
     @etl_tool(
         "get_knowledge_navigation",
         tool_type="Navigation",
-        desc="数仓知识导航",
+        desc="Data warehouse knowledge navigation",
         args_schema=KnowledgeNavigationInput,
     )
     def get_knowledge_navigation() -> str:
         """
-        获取数仓知识导航（summary + 类型工具列表）
+        Get data warehouse knowledge navigation（summary + Type tool list）
 
-        返回字段：
-        - summary: 各类型资产总数
-        - navigation: 类型层级与可用工具列表（不绑定具体对象）
+        Return fields：
+        - summary: Total number of assets of each type
+        - navigation: Type hierarchy and list of available tools（Not bound to specific objects）
         """
         logger.info("get_knowledge_navigation()")
 
         summary = Neo4jNodeSearch.get_knowledge_navigation()
         if summary is None:
-            return _tool_error("获取数仓知识导航失败")
+            return _tool_error("Failed to obtain data warehouse knowledge navigation")
 
         navigation = []
         for item in _build_nav_types():

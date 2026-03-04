@@ -17,21 +17,20 @@ import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
- * 用户管理服务
- * 提供用户管理业务能力与领域服务
+ * User management services Provide user management business capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface UserAdminService {
 
-    List<UserResponse> listUsers();
+  List<UserResponse> listUsers();
 
-    UserResponse getUser(Long userId);
+  UserResponse getUser(Long userId);
 
-    Long createUser(UserCreateRequest request);
+  Long createUser(UserCreateRequest request);
 
-    void updateUser(Long userId, UserUpdateRequest request);
+  void updateUser(Long userId, UserUpdateRequest request);
 
-    void deleteUser(Long userId);
+  void deleteUser(Long userId);
 }

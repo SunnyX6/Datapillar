@@ -27,7 +27,7 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.dataset.ValueDomainDTO;
 
-/** 值域分页列表响应 */
+/** Value field paginated list response */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -46,12 +46,12 @@ public class ValueDomainListResponse extends BaseResponse {
   private final int limit;
 
   /**
-   * 创建值域列表响应
+   * Create a range list response
    *
-   * @param valueDomains 值域数组
-   * @param total 值域总数
-   * @param offset 偏移量
-   * @param limit 每页大小
+   * @param valueDomains range array
+   * @param total Total number of ranges
+   * @param offset offset
+   * @param limit page size
    */
   public ValueDomainListResponse(ValueDomainDTO[] valueDomains, long total, int offset, int limit) {
     super(0);
@@ -61,7 +61,7 @@ public class ValueDomainListResponse extends BaseResponse {
     this.limit = limit;
   }
 
-  /** Jackson 反序列化用的默认构造函数 */
+  /** Jackson Default constructor for deserialization */
   public ValueDomainListResponse() {
     super();
     this.valueDomains = null;

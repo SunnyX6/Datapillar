@@ -500,27 +500,27 @@ public class FilesetCatalogIT extends BaseIT {
   public void testCreateFilesetWithChinese() throws IOException {
     // create fileset
     String filesetName = "test_create_fileset_with_chinese";
-    String storageLocation = storageLocation(filesetName) + "/中文目录test";
+    String storageLocation = storageLocation(filesetName) + "/Chinese catalogtest";
     Assertions.assertFalse(
         fileSystem.exists(new Path(storageLocation)), "storage location should not exists");
     Fileset fileset =
         createFileset(
             filesetName,
-            "这是中文comment",
+            "this is chinesecomment",
             MANAGED,
             storageLocation,
-            ImmutableMap.of("k1", "v1", "test", "中文测试test", "中文key", "test1"));
+            ImmutableMap.of("k1", "v1", "test", "Chinese testtest", "Chinesekey", "test1"));
 
     // verify fileset is created
     assertFilesetExists(filesetName);
     Assertions.assertNotNull(fileset, "fileset should be created");
-    Assertions.assertEquals("这是中文comment", fileset.comment());
+    Assertions.assertEquals("this is chinesecomment", fileset.comment());
     Assertions.assertEquals(MANAGED, fileset.type());
     Assertions.assertEquals(storageLocation, fileset.storageLocation());
     Assertions.assertEquals(4, fileset.properties().size());
     Assertions.assertEquals("v1", fileset.properties().get("k1"));
-    Assertions.assertEquals("中文测试test", fileset.properties().get("test"));
-    Assertions.assertEquals("test1", fileset.properties().get("中文key"));
+    Assertions.assertEquals("Chinese testtest", fileset.properties().get("test"));
+    Assertions.assertEquals("test1", fileset.properties().get("Chinesekey"));
     Assertions.assertEquals(
         LOCATION_NAME_UNKNOWN, fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
   }

@@ -25,7 +25,7 @@ import lombok.ToString;
 import org.apache.gravitino.dataset.ValueDomain;
 import org.apache.gravitino.dto.AuditDTO;
 
-/** 聚合后的值域 DTO，按 domainCode 分组 */
+/** Aggregated value range DTO，press domainCode Group */
 @ToString
 @EqualsAndHashCode
 public class ValueDomainGroupDTO {

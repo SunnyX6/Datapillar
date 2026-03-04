@@ -17,17 +17,17 @@ import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
- * 单点登录配置服务
- * 提供单点登录配置业务能力与领域服务
+ * Single sign-on configuration service Provide single sign-on configuration business capabilities
+ * and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface SsoConfigService {
 
-    List<SsoConfigResponse> listConfigs();
+  List<SsoConfigResponse> listConfigs();
 
-    Long createConfig(SsoConfigCreateRequest dto);
+  Long createConfig(SsoConfigCreateRequest dto);
 
-    void updateConfig(Long configId, SsoConfigUpdateRequest dto);
+  void updateConfig(Long configId, SsoConfigUpdateRequest dto);
 }

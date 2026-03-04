@@ -20,31 +20,42 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.ibatis.annotations.Param;
 
 public class ModelMetaBaseSQLProvider {
 
   public String insertModelMeta(@Param("modelMeta") ModelPO modelPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + ModelMetaMapper.TABLE_NAME
         + " (model_id, model_name, metalake_id, catalog_id, schema_id,"
-        + " model_comment, model_properties, model_latest_version, audit_info, deleted_at)"
+        + " model_comment, model_properties, model_latest_version, audit_info, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES (#{modelMeta.modelId}, #{modelMeta.modelName}, #{modelMeta.metalakeId},"
         + " #{modelMeta.catalogId}, #{modelMeta.schemaId}, #{modelMeta.modelComment},"
         + " #{modelMeta.modelProperties}, #{modelMeta.modelLatestVersion}, #{modelMeta.auditInfo},"
-        + " #{modelMeta.deletedAt})";
+        + " #{modelMeta.deletedAt}, "
+        + tenantId
+        + ")";
   }
 
   public String insertModelMetaOnDuplicateKeyUpdate(@Param("modelMeta") ModelPO modelPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + ModelMetaMapper.TABLE_NAME
         + " (model_id, model_name, metalake_id, catalog_id, schema_id,"
-        + " model_comment, model_properties, model_latest_version, audit_info, deleted_at)"
+        + " model_comment, model_properties, model_latest_version, audit_info, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES (#{modelMeta.modelId}, #{modelMeta.modelName}, #{modelMeta.metalakeId},"
         + " #{modelMeta.catalogId}, #{modelMeta.schemaId}, #{modelMeta.modelComment},"
         + " #{modelMeta.modelProperties}, #{modelMeta.modelLatestVersion}, #{modelMeta.auditInfo},"
-        + " #{modelMeta.deletedAt})"
+        + " #{modelMeta.deletedAt}, "
+        + tenantId
+        + ")"
         + " ON DUPLICATE KEY UPDATE"
         + " model_name = #{modelMeta.modelName},"
         + " metalake_id = #{modelMeta.metalakeId},"
@@ -58,16 +69,19 @@ public class ModelMetaBaseSQLProvider {
   }
 
   public String listModelPOsBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT model_id AS modelId, model_name AS modelName, metalake_id AS metalakeId,"
         + " catalog_id AS catalogId, schema_id AS schemaId, model_comment AS modelComment,"
         + " model_properties AS modelProperties, model_latest_version AS"
         + " modelLatestVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String listModelPOsByModelIds(List<Long> modelIds) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + " SELECT model_id AS modelId, model_name AS modelName, metalake_id AS metalakeId,"
         + " catalog_id AS catalogId, schema_id AS schemaId, model_comment AS modelComment,"
@@ -76,6 +90,8 @@ public class ModelMetaBaseSQLProvider {
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + " AND model_id in ("
         + "<foreach collection='modelIds' item='modelId' separator=','>"
         + "#{modelId}"
@@ -86,82 +102,105 @@ public class ModelMetaBaseSQLProvider {
 
   public String selectModelMetaBySchemaIdAndModelName(
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT model_id AS modelId, model_name AS modelName, metalake_id AS metalakeId,"
         + " catalog_id AS catalogId, schema_id AS schemaId, model_comment AS modelComment,"
         + " model_properties AS modelProperties, model_latest_version AS"
         + " modelLatestVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectModelIdBySchemaIdAndModelName(
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT model_id"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectModelMetaByModelId(@Param("modelId") Long modelId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT model_id AS modelId, model_name AS modelName, metalake_id AS metalakeId,"
         + " catalog_id AS catalogId, schema_id AS schemaId, model_comment AS modelComment,"
         + " model_properties AS modelProperties, model_latest_version AS "
         + " modelLatestVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " WHERE model_id = #{modelId} AND deleted_at = 0";
+        + " WHERE model_id = #{modelId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteModelMetaBySchemaIdAndModelName(
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteModelMetasByCatalogId(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteModelMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteModelMetasBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteModelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 
   public String updateModelLatestVersion(@Param("modelId") Long modelId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
         + " SET model_latest_version = model_latest_version + 1"
-        + " WHERE model_id = #{modelId} AND deleted_at = 0";
+        + " WHERE model_id = #{modelId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String updateModelMeta(
       @Param("newModelMeta") ModelPO newModelPO, @Param("oldModelMeta") ModelPO oldModelPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
         + " SET model_name = #{newModelMeta.modelName},"
@@ -182,6 +221,7 @@ public class ModelMetaBaseSQLProvider {
         + " AND model_properties = #{oldModelMeta.modelProperties}"
         + " AND model_latest_version = #{oldModelMeta.modelLatestVersion}"
         + " AND audit_info = #{oldModelMeta.auditInfo}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 }

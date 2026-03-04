@@ -12,9 +12,9 @@ import lombok.NoArgsConstructor;
 @Schema(name = "AuthSsoQrResponse")
 public class SsoQrResponse {
 
-    private String type;
+  private String type;
 
-    private String state;
+  private String state;
 
-    private Map<String, Object> payload;
+  private Map<String, Object> payload;
 }

@@ -2,10 +2,7 @@
 # @date 2026-02-19
 
 """
-LLM Playground 服务。
-
-DEPRECATED:
-- 该模块保留给历史链路兼容
+LLM Playground service.DEPRECATED:- This module is reserved for historical link compatibility
 """
 
 from __future__ import annotations
@@ -31,14 +28,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class PlaygroundStreamDelta:
-    """Playground 单个流式片段。"""
+    """Playground single streaming segment."""
 
     text_delta: str = ""
     thinking_delta: str = ""
 
 
 class LlmPlaygroundService:
-    """Playground 聊天服务（无会话记忆）。"""
+    """Playground chat service(No session memory)."""
 
     async def stream_chat(
         self,
@@ -49,15 +46,15 @@ class LlmPlaygroundService:
     ) -> AsyncGenerator[PlaygroundStreamDelta, None]:
         ai_model_id = payload.ai_model_id
         if ai_model_id <= 0:
-            raise BadRequestException("aiModelId 无效")
-        message = self._normalize_required(payload.message, "message 不能为空")
+            raise BadRequestException("aiModelId Invalid")
+        message = self._normalize_required(payload.message, "message cannot be empty")
 
         model = Model.get_active_chat_model(
             tenant_id=tenant_id,
             ai_model_id=ai_model_id,
         )
         if not model:
-            raise BadRequestException("模型不存在、未启用或未连接")
+            raise BadRequestException("Model does not exist,Not enabled or not connected")
 
         decrypted_api_key = await self._decrypt_api_key(
             tenant_code=tenant_code,
@@ -124,22 +121,22 @@ class LlmPlaygroundService:
 
     async def _decrypt_api_key(self, *, tenant_code: str, encrypted_value: str | None) -> str:
         if not encrypted_value or not encrypted_value.strip():
-            raise BadRequestException("模型未配置 API Key")
+            raise BadRequestException("Model not configured API Key")
         if not is_encrypted_ciphertext(encrypted_value):
-            raise BadRequestException("模型 API Key 加密格式无效")
+            raise BadRequestException("model API Key Invalid encryption format")
 
         try:
             return await auth_crypto_rpc_client.decrypt_llm_api_key(
                 tenant_code=tenant_code,
                 ciphertext=encrypted_value,
             )
-        except Exception as exc:  # pragma: no cover - 防御分支
+        except BaseException as exc:  # pragma:no cover - defense branch
             logger.error(
-                "解密模型 API Key 失败: tenantCode=%s modelKeyPresent=%s",
+                "Decrypt the model API Key failed:tenantCode=%s modelKeyPresent=%s",
                 tenant_code,
                 bool(encrypted_value),
             )
-            raise ServiceUnavailableException("模型 API Key 解密失败", cause=exc) from exc
+            raise ServiceUnavailableException("model API Key Decryption failed", cause=exc) from exc
 
     def _extract_chunk_text(self, chunk: Any) -> str:
         if isinstance(chunk, Message):

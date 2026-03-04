@@ -17,15 +17,15 @@ import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
- * 租户功能管理服务
- * 提供租户功能管理业务能力与领域服务
+ * Tenant function management service Provide tenant function management business capabilities and
+ * domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface TenantFeatureAdminService {
 
-    List<TenantFeatureItem> listEntitlements();
+  List<TenantFeatureItem> listEntitlements();
 
-    void updateEntitlements(List<TenantFeatureUpdateItem> items);
+  void updateEntitlements(List<TenantFeatureUpdateItem> items);
 }

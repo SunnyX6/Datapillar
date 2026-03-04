@@ -24,8 +24,8 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.datapillar.context.TenantContext;
-import org.apache.gravitino.datapillar.context.TenantContextHolder;
+import org.apache.gravitino.multitenancy.context.TenantContext;
+import org.apache.gravitino.multitenancy.context.TenantContextHolder;
 
 /**
  * The abstract base class for all events. It encapsulates common information such as the user who

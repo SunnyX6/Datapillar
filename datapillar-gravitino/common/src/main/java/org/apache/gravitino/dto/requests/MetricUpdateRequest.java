@@ -32,7 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dataset.MetricChange;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** 更新指标的请求 */
+/** Request to update indicators */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
 @JsonSubTypes({
@@ -53,13 +53,13 @@ import org.apache.gravitino.rest.RESTRequest;
 public interface MetricUpdateRequest extends RESTRequest {
 
   /**
-   * 返回指标变更
+   * Return indicator changes
    *
-   * @return 指标变更对象
+   * @return Indicator change object
    */
   MetricChange metricChange();
 
-  /** 重命名指标的更新请求 */
+  /** Update request to rename indicator */
   @EqualsAndHashCode
   @ToString
   class RenameMetricRequest implements MetricUpdateRequest {
@@ -88,7 +88,7 @@ public interface MetricUpdateRequest extends RESTRequest {
     }
   }
 
-  /** 设置指标属性的更新请求 */
+  /** Set update request for indicator properties */
   @EqualsAndHashCode
   @AllArgsConstructor
   @NoArgsConstructor(force = true)
@@ -114,7 +114,7 @@ public interface MetricUpdateRequest extends RESTRequest {
     }
   }
 
-  /** 移除指标属性的更新请求 */
+  /** Update request to remove indicator properties */
   @EqualsAndHashCode
   @AllArgsConstructor
   @NoArgsConstructor(force = true)
@@ -137,7 +137,7 @@ public interface MetricUpdateRequest extends RESTRequest {
     }
   }
 
-  /** 更新指标注释的更新请求 */
+  /** Update request to update indicator annotations */
   @EqualsAndHashCode
   @AllArgsConstructor
   @NoArgsConstructor(force = true)
@@ -160,7 +160,7 @@ public interface MetricUpdateRequest extends RESTRequest {
     }
   }
 
-  /** 更新指标数据类型的更新请求 */
+  /** Update request to update indicator data type */
   @EqualsAndHashCode
   @AllArgsConstructor
   @NoArgsConstructor(force = true)

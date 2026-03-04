@@ -8,12 +8,12 @@ import lombok.Data;
 @Schema(name = "SqlExecuteRequest")
 public class SqlExecuteRequest {
 
-    @NotBlank(message = "SQL 语句不能为空")
-    private String sql;
+  @NotBlank(message = "SQL Statement cannot be empty")
+  private String sql;
 
-    private String catalog;
+  private String catalog;
 
-    private String database;
+  private String database;
 
-    private Integer maxRows;
+  private Integer maxRows;
 }

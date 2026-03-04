@@ -13,8 +13,7 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * 登录Subject组件
- * 负责登录Subject核心逻辑实现
+ * Login subject model.
  *
  * @author Sunny
  * @date 2026-01-01
@@ -23,15 +22,15 @@ import lombok.Data;
 @Builder
 public class LoginSubject {
 
-    private User user;
+  private User user;
 
-    private Tenant tenant;
+  private Tenant tenant;
 
-    private List<TenantOptionItem> tenantOptions;
+  private List<TenantOptionItem> tenantOptions;
 
-    private String loginMethod;
+  private String loginMethod;
 
-    public boolean requiresTenantSelection() {
-        return tenant == null && tenantOptions != null && !tenantOptions.isEmpty();
-    }
+  public boolean requiresTenantSelection() {
+    return tenant == null && tenantOptions != null && !tenantOptions.isEmpty();
+  }
 }

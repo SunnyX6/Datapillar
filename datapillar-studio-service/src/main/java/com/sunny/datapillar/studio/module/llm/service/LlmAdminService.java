@@ -18,43 +18,38 @@ import com.sunny.datapillar.studio.module.llm.enums.AiModelType;
 import java.util.List;
 
 /**
- * 大模型管理服务
- * 提供大模型管理业务能力与领域服务
+ * Large model management services Provide large model management business capabilities and domain
+ * services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface LlmAdminService {
 
-    List<LlmProviderResponse> listProviders();
+  List<LlmProviderResponse> listProviders();
 
-    void createProvider(Long userId, LlmProviderCreateRequest request);
+  void createProvider(Long userId, LlmProviderCreateRequest request);
 
-    void updateProvider(Long userId, String providerCode, LlmProviderUpdateRequest request);
+  void updateProvider(Long userId, String providerCode, LlmProviderUpdateRequest request);
 
-    void deleteProvider(Long userId, String providerCode);
+  void deleteProvider(Long userId, String providerCode);
 
-    List<LlmModelResponse> listModels(String keyword,
-                                          String providerCode,
-                                          AiModelType modelType,
-                                          Long userId);
+  List<LlmModelResponse> listModels(
+      String keyword, String providerCode, AiModelType modelType, Long userId);
 
-    LlmModelResponse getModel(Long userId, Long aiModelId);
+  LlmModelResponse getModel(Long userId, Long aiModelId);
 
-    LlmModelResponse createModel(Long userId, LlmModelCreateRequest request);
+  LlmModelResponse createModel(Long userId, LlmModelCreateRequest request);
 
-    LlmModelResponse updateModel(Long userId, Long aiModelId, LlmModelUpdateRequest request);
+  LlmModelResponse updateModel(Long userId, Long aiModelId, LlmModelUpdateRequest request);
 
-    void deleteModel(Long userId, Long aiModelId);
+  void deleteModel(Long userId, Long aiModelId);
 
-    List<LlmUserModelPermissionResponse> listUserModelPermissions(Long operatorUserId,
-                                                                            Long targetUserId,
-                                                                            boolean onlyEnabled);
+  List<LlmUserModelPermissionResponse> listUserModelPermissions(
+      Long operatorUserId, Long targetUserId, boolean onlyEnabled);
 
-    void upsertUserModelGrant(Long operatorUserId,
-                              Long targetUserId,
-                              Long aiModelId,
-                              LlmUserModelGrantRequest request);
+  void upsertUserModelGrant(
+      Long operatorUserId, Long targetUserId, Long aiModelId, LlmUserModelGrantRequest request);
 
-    void deleteUserModelGrant(Long operatorUserId, Long targetUserId, Long aiModelId);
+  void deleteUserModelGrant(Long operatorUserId, Long targetUserId, Long aiModelId);
 }

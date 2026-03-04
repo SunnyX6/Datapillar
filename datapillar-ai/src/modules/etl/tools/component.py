@@ -1,12 +1,10 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-组件工具
+Component tools
 
-工具列表：
-- list_component: 获取企业支持的所有大数据组件列表
+Tool list:- list_component:Get a list of all enterprise-supported big data components
 """
 
 import json
@@ -22,36 +20,34 @@ logger = logging.getLogger(__name__)
 
 
 class ListComponentInput(BaseModel):
-    """获取组件列表的参数（无参数）"""
+    """Get the parameters of the component list(no parameters)"""
 
 
 @etl_tool(
-    "list_component", tool_type="Component", desc="列出可用组件", args_schema=ListComponentInput
+    "list_component",
+    tool_type="Component",
+    desc="List available components",
+    args_schema=ListComponentInput,
 )
 def list_component() -> str:
     """
-    获取企业支持的所有大数据组件列表
+    Get a list of all enterprise-supported big data components
 
-    返回可用的 Job 组件（HIVE、SPARK_SQL、SHELL 等）。
-    ArchitectAgent 必须基于这些组件来设计工作流节点。
+    Return available Job components(HIVE,SPARK_SQL,SHELL Wait).ArchitectAgent Workflow nodes must be designed based on these components.Return fields:- id:Component numbers ID(design Job filled into type_id)
+    - code:component code(Such as HIVE,SPARK_SQL,design Job filled into type)
+    - name:Component name
+    - type:Component type(SQL/SCRIPT/SYNC)
+    - description:Component description
+    - config_schema:Configuration template
 
-    返回字段：
-    - id: 组件数字 ID（设计 Job 时填充到 type_id）
-    - code: 组件代码（如 HIVE、SPARK_SQL，设计 Job 时填充到 type）
-    - name: 组件名称
-    - type: 组件类型（SQL/SCRIPT/SYNC）
-    - description: 组件描述
-    - config_schema: 配置模板
-
-    输入示例（JSON）：
-    - {}
+    Input example(JSON):- {}
     """
     logger.info("list_component()")
     tenant_id = get_current_tenant_id()
     if tenant_id is None:
         return json.dumps(
             {
-                "error": "缺少租户上下文",
+                "error": "Missing tenant context",
                 "components": [],
             },
             ensure_ascii=False,
@@ -63,7 +59,7 @@ def list_component() -> str:
         if not results:
             return json.dumps(
                 {
-                    "error": "未找到任何可用组件",
+                    "error": "No available components found",
                     "components": [],
                 },
                 ensure_ascii=False,
@@ -71,7 +67,7 @@ def list_component() -> str:
 
         components = []
         for row in results:
-            # 解析 config_schema
+            # parse config_schema
             config_schema = row.get("config_schema")
             if config_schema is None:
                 config_schema = row.get("job_params")
@@ -96,16 +92,16 @@ def list_component() -> str:
             {
                 "total": len(components),
                 "components": components,
-                "hint": "设计 Job 时，type 填组件 code，type_id 填组件 id",
+                "hint": "design Job time,type Fill in components code,type_id Fill in components id",
             },
             ensure_ascii=False,
         )
 
     except Exception as e:
-        logger.error(f"list_component 执行失败: {e}", exc_info=True)
+        logger.error(f"list_component Execution failed:{e}", exc_info=True)
         return json.dumps(
             {
-                "error": "查询失败",
+                "error": "Query failed",
                 "components": [],
             },
             ensure_ascii=False,

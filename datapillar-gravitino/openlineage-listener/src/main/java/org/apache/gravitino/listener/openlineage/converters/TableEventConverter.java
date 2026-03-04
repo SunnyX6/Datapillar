@@ -1,21 +1,19 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * regarding copyright ownership.The ASF licenses this file
+ * to you under the Apache License,Version 2.0 (the
+ * "License");you may not use this file except in compliance
+ * with the License.You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * Unless required by applicable law or agreed to in writing,* software distributed under the License is distributed on an
+ * "AS IS" BASIS,WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND,either express or implied.See the License for the
  * specific language governing permissions and limitations
- * under the License.
- */
+ * under the License.*/
 
 package org.apache.gravitino.listener.openlineage.converters;
 
@@ -48,9 +46,9 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 
 /**
- * Table 事件转换器。
+ * Table event converter.*
  *
- * <p>处理: CreateTableEvent, AlterTableEvent, DropTableEvent, LoadTableEvent
+ * <p>Process:CreateTableEvent,AlterTableEvent,DropTableEvent,LoadTableEvent
  */
 @Slf4j
 public class TableEventConverter extends BaseEventConverter {
@@ -77,9 +75,7 @@ public class TableEventConverter extends BaseEventConverter {
   private RunEvent convertCreateTable(CreateTableEvent event) {
     TableInfo tableInfo = event.createdTableInfo();
     NameIdentifier identifier = event.identifier();
-
     OutputDataset outputDataset = createTableDataset(event, identifier, tableInfo);
-
     return createRunEvent(
         event,
         "gravitino.create_table",
@@ -92,10 +88,8 @@ public class TableEventConverter extends BaseEventConverter {
     TableInfo tableInfo = event.updatedTableInfo();
     NameIdentifier identifier = event.identifier();
     TableChange[] tableChanges = event.tableChanges();
-
     List<TableChangeInfo> changes = parseTableChanges(tableChanges);
     OutputDataset outputDataset = createAlterTableDataset(event, identifier, tableInfo, changes);
-
     return createRunEvent(
         event,
         "gravitino.alter_table",
@@ -106,7 +100,6 @@ public class TableEventConverter extends BaseEventConverter {
 
   private RunEvent convertDropTable(DropTableEvent event) {
     NameIdentifier identifier = event.identifier();
-
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
@@ -121,7 +114,6 @@ public class TableEventConverter extends BaseEventConverter {
                             null))
                     .build())
             .build();
-
     return createRunEvent(
         event,
         "gravitino.drop_table",
@@ -133,9 +125,7 @@ public class TableEventConverter extends BaseEventConverter {
   private RunEvent convertLoadTable(LoadTableEvent event) {
     TableInfo tableInfo = event.loadedTableInfo();
     NameIdentifier identifier = event.identifier();
-
     InputDataset inputDataset = createTableInputDataset(event, identifier, tableInfo);
-
     return createRunEvent(
         event,
         "gravitino.load_table",
@@ -148,13 +138,11 @@ public class TableEventConverter extends BaseEventConverter {
       Event event, NameIdentifier identifier, TableInfo tableInfo) {
     List<SchemaDatasetFacetFields> fields = new ArrayList<>();
     List<GravitinoColumnMetadata> columnMetadataList = new ArrayList<>();
-
     if (tableInfo != null && tableInfo.columns() != null) {
       for (Column column : tableInfo.columns()) {
         fields.add(
             openLineage.newSchemaDatasetFacetFields(
                 column.name(), column.dataType().simpleString(), column.comment(), null));
-
         columnMetadataList.add(
             GravitinoColumnMetadata.builder()
                 .name(column.name())
@@ -168,7 +156,6 @@ public class TableEventConverter extends BaseEventConverter {
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
     GravitinoDatasetFacet gravitinoFacet =
         buildGravitinoFacet(event, tableInfo, columnMetadataList);
-
     DatasetFacetsBuilder facetsBuilder =
         openLineage
             .newDatasetFacetsBuilder()
@@ -177,7 +164,6 @@ public class TableEventConverter extends BaseEventConverter {
                 openLineage.newLifecycleStateChangeDatasetFacet(
                     OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.CREATE,
                     null));
-
     if (gravitinoFacet != null) {
       facetsBuilder.put(GRAVITINO_FACET_KEY, gravitinoFacet);
     }
@@ -194,13 +180,11 @@ public class TableEventConverter extends BaseEventConverter {
       Event event, NameIdentifier identifier, TableInfo tableInfo) {
     List<SchemaDatasetFacetFields> fields = new ArrayList<>();
     List<GravitinoColumnMetadata> columnMetadataList = new ArrayList<>();
-
     if (tableInfo != null && tableInfo.columns() != null) {
       for (Column column : tableInfo.columns()) {
         fields.add(
             openLineage.newSchemaDatasetFacetFields(
                 column.name(), column.dataType().simpleString(), column.comment(), null));
-
         columnMetadataList.add(
             GravitinoColumnMetadata.builder()
                 .name(column.name())
@@ -214,9 +198,7 @@ public class TableEventConverter extends BaseEventConverter {
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
     GravitinoDatasetFacet gravitinoFacet =
         buildGravitinoFacet(event, tableInfo, columnMetadataList);
-
     DatasetFacetsBuilder facetsBuilder = openLineage.newDatasetFacetsBuilder().schema(schemaFacet);
-
     if (gravitinoFacet != null) {
       facetsBuilder.put(GRAVITINO_FACET_KEY, gravitinoFacet);
     }
@@ -233,13 +215,11 @@ public class TableEventConverter extends BaseEventConverter {
       Event event, NameIdentifier identifier, TableInfo tableInfo, List<TableChangeInfo> changes) {
     List<SchemaDatasetFacetFields> fields = new ArrayList<>();
     List<GravitinoColumnMetadata> columnMetadataList = new ArrayList<>();
-
     if (tableInfo != null && tableInfo.columns() != null) {
       for (Column column : tableInfo.columns()) {
         fields.add(
             openLineage.newSchemaDatasetFacetFields(
                 column.name(), column.dataType().simpleString(), column.comment(), null));
-
         columnMetadataList.add(
             GravitinoColumnMetadata.builder()
                 .name(column.name())
@@ -253,7 +233,6 @@ public class TableEventConverter extends BaseEventConverter {
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
     GravitinoDatasetFacet gravitinoFacet =
         buildAlterTableFacet(event, tableInfo, columnMetadataList, changes);
-
     DatasetFacetsBuilder facetsBuilder =
         openLineage
             .newDatasetFacetsBuilder()
@@ -261,7 +240,6 @@ public class TableEventConverter extends BaseEventConverter {
             .lifecycleStateChange(
                 openLineage.newLifecycleStateChangeDatasetFacet(
                     OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.ALTER, null));
-
     if (gravitinoFacet != null) {
       facetsBuilder.put(GRAVITINO_FACET_KEY, gravitinoFacet);
     }
@@ -285,12 +263,11 @@ public class TableEventConverter extends BaseEventConverter {
             .description(tableInfo.comment())
             .properties(tableInfo.properties())
             .columns(columnMetadataList);
-
     if (tableInfo.partitioning() != null && tableInfo.partitioning().length > 0) {
       builder.partitions(
           Arrays.stream(tableInfo.partitioning())
               .map(Object::toString)
-              .collect(Collectors.joining(", ")));
+              .collect(Collectors.joining(",")));
     }
 
     if (tableInfo.distribution() != null) {
@@ -301,12 +278,12 @@ public class TableEventConverter extends BaseEventConverter {
       builder.sortOrders(
           Arrays.stream(tableInfo.sortOrder())
               .map(Object::toString)
-              .collect(Collectors.joining(", ")));
+              .collect(Collectors.joining(",")));
     }
 
     if (tableInfo.index() != null && tableInfo.index().length > 0) {
       builder.indexes(
-          Arrays.stream(tableInfo.index()).map(Object::toString).collect(Collectors.joining(", ")));
+          Arrays.stream(tableInfo.index()).map(Object::toString).collect(Collectors.joining(",")));
     }
 
     Audit audit = tableInfo.auditInfo();
@@ -332,12 +309,11 @@ public class TableEventConverter extends BaseEventConverter {
             .properties(tableInfo.properties())
             .columns(columnMetadataList)
             .changes(changes);
-
     if (tableInfo.partitioning() != null && tableInfo.partitioning().length > 0) {
       builder.partitions(
           Arrays.stream(tableInfo.partitioning())
               .map(Object::toString)
-              .collect(Collectors.joining(", ")));
+              .collect(Collectors.joining(",")));
     }
 
     if (tableInfo.distribution() != null) {
@@ -348,12 +324,12 @@ public class TableEventConverter extends BaseEventConverter {
       builder.sortOrders(
           Arrays.stream(tableInfo.sortOrder())
               .map(Object::toString)
-              .collect(Collectors.joining(", ")));
+              .collect(Collectors.joining(",")));
     }
 
     if (tableInfo.index() != null && tableInfo.index().length > 0) {
       builder.indexes(
-          Arrays.stream(tableInfo.index()).map(Object::toString).collect(Collectors.joining(", ")));
+          Arrays.stream(tableInfo.index()).map(Object::toString).collect(Collectors.joining(",")));
     }
 
     Audit audit = tableInfo.auditInfo();
@@ -487,7 +463,7 @@ public class TableEventConverter extends BaseEventConverter {
           .build();
     }
 
-    log.debug("Unsupported TableChange type: {}", change.getClass().getSimpleName());
+    log.debug("Unsupported TableChange type:{}", change.getClass().getSimpleName());
     return null;
   }
 

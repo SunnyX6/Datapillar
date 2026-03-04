@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 /**
- * 监听页面可见性（标签页切换 / 窗口焦点）并返回当前可见状态
+ * Monitor page visibility（Tab switching / window focus）and returns the currently visible state
  */
 export function usePageVisibility() {
   const [isVisible, setIsVisible] = useState(() => {

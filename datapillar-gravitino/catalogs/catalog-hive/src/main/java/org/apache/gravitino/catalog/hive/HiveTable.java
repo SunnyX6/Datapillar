@@ -137,11 +137,13 @@ public class HiveTable extends BaseTable {
                     (k, v) ->
                         properties.put(HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX + k, v)));
 
-    // 统一统计字段名称，与 MySQL 保持一致: numRows, totalSize, rawDataSize, indexSize, numFiles
-    // ORC/Parquet 表在数据写入时会自动更新这些统计信息，无需手动执行 ANALYZE TABLE
+    // Unified statistical field names，with MySQL Be consistent: numRows, totalSize, rawDataSize,
+    // indexSize, numFiles
+    // ORC/Parquet The table automatically updates these statistics as data is written，No need to do
+    // it manually ANALYZE TABLE
     Map<String, String> params = table.getParameters();
     if (params != null) {
-      // numRows: 优先使用 Hive 原生字段，兼容 Spark 前缀字段
+      // numRows: priority use Hive native fields，Compatible Spark prefix field
       if (!properties.containsKey("numRows")
           && params.containsKey("spark.sql.statistics.numRows")) {
         properties.put("numRows", params.get("spark.sql.statistics.numRows"));
@@ -162,7 +164,8 @@ public class HiveTable extends BaseTable {
         properties.put("numFiles", params.get("spark.sql.statistics.numFiles"));
       }
     }
-    // indexSize: Hive 是文件系统型数据仓库，没有索引概念，设置为 0（与 MySQL 保持统一字段）
+    // indexSize: Hive It is a file system data warehouse，No concept of index，set to 0（with MySQL
+    // Keep fields consistent）
     if (!properties.containsKey("indexSize")) {
       properties.put("indexSize", "0");
     }

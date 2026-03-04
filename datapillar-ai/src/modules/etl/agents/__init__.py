@@ -1,31 +1,28 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-ETL 智能团队
+ETL smart team
 
-使用 @agent 装饰器定义 Agent，通过 Datapillar 组建团队。
+use @agent Decorator definition Agent,Pass Datapillar Build a team.team member:- AnalystAgent:Demand Analyst(entrance,Taking into account intelligent distribution)
+- CatalogAgent:Metadata Q&A Specialist
+- ArchitectAgent:data architect
+- DeveloperAgent:Data development engineer
+- ReviewerAgent:code reviewer
 
-团队成员：
-- AnalystAgent: 需求分析师（入口，兼顾智能分发）
-- CatalogAgent: 元数据问答专员
-- ArchitectAgent: 数据架构师
-- DeveloperAgent: 数据开发工程师
-- ReviewerAgent: 代码评审员
-
-协作模式：Process.DYNAMIC
-- AnalystAgent 作为入口，可分发到 CatalogAgent 或 ArchitectAgent
-- ArchitectAgent → DeveloperAgent → ReviewerAgent 形成开发流水线
+Collaboration mode:Process.DYNAMIC
+- AnalystAgent as an entrance,Can be distributed to CatalogAgent or ArchitectAgent
+- ArchitectAgent → DeveloperAgent → ReviewerAgent Form a development pipeline
 """
 
-# 显式导入工具模块，触发 @tool 装饰器注册
-from src.modules.etl import tools as _tools  # noqa: F401
+# Explicitly import tool modules,trigger @tool Decorator registration
 from datapillar_oneagentic import Datapillar, DatapillarConfig, Process
+
 from src.infrastructure.llm.config import get_datapillar_config
+from src.modules.etl import tools as _tools  # noqa: F401
 from src.shared.config.runtime import get_default_tenant_id
 
-# 显式导入所有 agent 模块，触发 @agent 装饰器注册
+# Explicitly import all agent module,trigger @agent Decorator registration
 from . import (
     analyst_agent,
     architect_agent,
@@ -34,24 +31,23 @@ from . import (
     reviewer_agent,
 )
 
+
 def create_etl_team(
     *,
     config: DatapillarConfig | None = None,
     namespace: str | None = None,
     tenant_id: int | None = None,
 ) -> Datapillar:
-    """创建 ETL 智能团队
+    """create ETL smart team
 
-    Returns:
-        Datapillar: 配置好的 ETL 团队实例
+    Returns:Datapillar:configured ETL Team instance
 
-    协作流程（DYNAMIC 模式）：
-    1. AnalystAgent 接收请求，判断意图
-       - 元数据查询 → 委派给 CatalogAgent
-       - ETL 需求 → 分析后委派给 ArchitectAgent
-    2. ArchitectAgent 设计 Job/Stage → 委派给 DeveloperAgent
-    3. DeveloperAgent 生成 SQL → 委派给 ReviewerAgent
-    4. ReviewerAgent 评审代码 → 返回结果
+    Collaboration process(DYNAMIC mode):1.AnalystAgent receive request,Determine intent
+    - Metadata query → delegate to CatalogAgent
+    - ETL demand → After analysis,delegate to ArchitectAgent
+    2.ArchitectAgent design Job/Stage → delegate to DeveloperAgent
+    3.DeveloperAgent generate SQL → delegate to ReviewerAgent
+    4.ReviewerAgent Review code → Return results
     """
     from .analyst_agent import AnalystAgent
     from .architect_agent import ArchitectAgent
@@ -68,13 +64,13 @@ def create_etl_team(
     return Datapillar(
         config=config,
         namespace=namespace,
-        name="ETL 智能团队",
+        name="ETL smart team",
         agents=[
-            AnalystAgent,  # 入口：需求分析 + 智能分发
-            CatalogAgent,  # 元数据查询
-            ArchitectAgent,  # 架构设计
-            DeveloperAgent,  # SQL 开发
-            ReviewerAgent,  # 代码评审
+            AnalystAgent,  # entrance:needs analysis + Intelligent distribution
+            CatalogAgent,  # Metadata query
+            ArchitectAgent,  # Architecture design
+            DeveloperAgent,  # SQL develop
+            ReviewerAgent,  # code review],process=Process.DYNAMIC,)
         ],
         process=Process.DYNAMIC,
     )

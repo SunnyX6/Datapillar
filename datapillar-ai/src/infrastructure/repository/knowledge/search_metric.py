@@ -1,13 +1,12 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-Neo4j 指标查询服务
+Neo4j Indicator query service
 
-职责：提供指标相关的查询功能
-- get_metric_context: 根据指标 code 列表查询指标详情
-- search_metrics: 混合检索指标（向量 + 全文）
+Responsibilities：Provide indicator-related query functions
+- get_metric_context: According to indicators code List query indicator details
+- search_metrics: Mixed search metrics（Vector + Full text）
 """
 
 from __future__ import annotations
@@ -25,11 +24,11 @@ logger = logging.getLogger(__name__)
 
 
 class Neo4jMetricSearch:
-    """Neo4j 指标查询服务"""
+    """Neo4j Indicator query service"""
 
     _SYSTEM_CREATORS = ["OPENLINEAGE", "GRAVITINO_SYNC", "system", "SYSTEM"]
 
-    # Metric 上下文查询 Cypher 模板
+    # Metric contextual query Cypher Template
     _METRIC_CYPHER = """
     UNWIND $element_ids AS eid
     MATCH (n:Knowledge)
@@ -58,13 +57,13 @@ class Neo4jMetricSearch:
         user_id: int | None = None,
     ) -> list[dict]:
         """
-        根据指标 code 列表查询指标详情
+        According to indicators code List query indicator details
 
-        参数：
-        - codes: 指标 code 列表
+        parameters：
+        - codes: indicator code list
 
-        返回：
-        - 指标上下文列表
+        Return：
+        - Metric context list
         """
         if not codes:
             return []
@@ -129,7 +128,7 @@ class Neo4jMetricSearch:
                 )
                 records = result.data()
 
-            logger.debug(f"从 Neo4j 获取 {len(records)} 个指标上下文")
+            logger.debug(f"from Neo4j Get {len(records)} indicator context")
 
             return [
                 {
@@ -144,7 +143,7 @@ class Neo4jMetricSearch:
                 for r in records
             ]
         except Exception as e:
-            logger.error(f"获取指标上下文失败: {e}")
+            logger.error(f"Failed to get indicator context: {e}")
             return []
 
     @classmethod
@@ -157,15 +156,15 @@ class Neo4jMetricSearch:
         user_id: int | None = None,
     ) -> list[dict[str, Any]]:
         """
-        混合搜索指标
+        Hybrid search metrics
 
-        参数：
-        - query: 搜索文本
-        - top_k: 每个索引返回的数量
-        - min_score: 最小相似度阈值
+        parameters：
+        - query: Search text
+        - top_k: The number returned by each index
+        - min_score: Minimum similarity threshold
 
-        返回：
-        - 推荐的指标列表，包含 type, code, name, description, score
+        Return：
+        - Recommended indicator list，contains type, code, name, description, score
         """
         from neo4j_graphrag.retrievers import HybridCypherRetriever
         from neo4j_graphrag.types import HybridSearchRanker, RetrieverResultItem
@@ -262,7 +261,7 @@ class Neo4jMetricSearch:
                         }
                     )
             except Exception as e:
-                logger.warning(f"混合搜索[{config['metric_type']}]失败: {e}")
+                logger.warning(f"hybrid search[{config['metric_type']}]failed: {e}")
 
             return results
 
@@ -278,5 +277,5 @@ class Neo4jMetricSearch:
         all_results.sort(key=lambda x: x.get("score", 0), reverse=True)
         all_results = all_results[:top_k]
 
-        logger.debug(f"[指标搜索] 总耗时: {time.time() - start:.3f}s")
+        logger.debug(f"[Indicator search] Total time spent: {time.time() - start:.3f}s")
         return all_results

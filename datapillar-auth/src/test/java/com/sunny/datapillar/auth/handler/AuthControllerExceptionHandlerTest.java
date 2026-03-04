@@ -1,5 +1,7 @@
 package com.sunny.datapillar.auth.handler;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import com.sunny.datapillar.common.constant.Code;
 import com.sunny.datapillar.common.constant.ErrorType;
 import com.sunny.datapillar.common.exception.InternalException;
@@ -7,37 +9,35 @@ import com.sunny.datapillar.common.response.ErrorResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 class AuthControllerExceptionHandlerTest {
 
-    private final AuthControllerExceptionHandler handler = new AuthControllerExceptionHandler();
+  private final AuthControllerExceptionHandler handler = new AuthControllerExceptionHandler();
 
-    @Test
-    void handleRuntimeException_shouldReturnMappedErrorResponse() {
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        InternalException exception = new com.sunny.datapillar.common.exception.InternalException(
-                new IllegalStateException("mysql_unreachable"),
-                "db_connect_failed");
+  @Test
+  void handleRuntimeException_shouldReturnMappedErrorResponse() {
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    InternalException exception =
+        new com.sunny.datapillar.common.exception.InternalException(
+            new IllegalStateException("mysql_unreachable"), "db_connect_failed");
 
-        ErrorResponse errorResponse = handler.handleDatapillarRuntimeException(exception, response);
+    ErrorResponse errorResponse = handler.handleDatapillarRuntimeException(exception, response);
 
-        assertEquals(500, response.getStatus());
-        assertEquals(Code.INTERNAL_ERROR, errorResponse.getCode());
-        assertEquals(ErrorType.INTERNAL_ERROR, errorResponse.getType());
-        assertEquals("db_connect_failed", errorResponse.getMessage());
-    }
+    assertEquals(500, response.getStatus());
+    assertEquals(Code.INTERNAL_ERROR, errorResponse.getCode());
+    assertEquals(ErrorType.INTERNAL_ERROR, errorResponse.getType());
+    assertEquals("db_connect_failed", errorResponse.getMessage());
+  }
 
-    @Test
-    void handleException_shouldPreserveOriginalExceptionMessage() {
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        Exception exception = new IllegalStateException("mysql_unreachable");
+  @Test
+  void handleException_shouldPreserveOriginalExceptionMessage() {
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    Exception exception = new IllegalStateException("mysql_unreachable");
 
-        ErrorResponse errorResponse = handler.handleException(exception, response);
+    ErrorResponse errorResponse = handler.handleException(exception, response);
 
-        assertEquals(500, response.getStatus());
-        assertEquals(Code.INTERNAL_ERROR, errorResponse.getCode());
-        assertEquals(ErrorType.INTERNAL_ERROR, errorResponse.getType());
-        assertEquals("mysql_unreachable", errorResponse.getMessage());
-    }
+    assertEquals(500, response.getStatus());
+    assertEquals(Code.INTERNAL_ERROR, errorResponse.getCode());
+    assertEquals(ErrorType.INTERNAL_ERROR, errorResponse.getType());
+    assertEquals("mysql_unreachable", errorResponse.getMessage());
+  }
 }

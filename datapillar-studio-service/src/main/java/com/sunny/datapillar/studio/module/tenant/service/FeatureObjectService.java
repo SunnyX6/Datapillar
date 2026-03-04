@@ -16,28 +16,20 @@ import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
-
 /**
- * 功能Object服务
- * 提供功能Object业务能力与领域服务
+ * FunctionObjectservice Provide functionalityObjectBusiness capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface FeatureObjectService {
 
-    /**
-     * 根据用户ID查询可访问的功能对象列表
-     */
-    List<FeatureTreeNodeItem> getFeatureObjectsByUserId(Long userId, String location);
+  /** According to userIDQuery the list of accessible functional objects */
+  List<FeatureTreeNodeItem> getFeatureObjectsByUserId(Long userId, String location);
 
-    /**
-     * 查询所有可见功能对象
-     */
-    List<FeatureTreeNodeItem> getAllVisibleFeatureObjects();
+  /** Query all visible functional objects */
+  List<FeatureTreeNodeItem> getAllVisibleFeatureObjects();
 
-    /**
-     * 构建功能对象树
-     */
-    List<FeatureTreeNodeItem> buildFeatureObjectTree(List<FeatureTreeNodeItem> featureObjects);
+  /** Build functional object tree */
+  List<FeatureTreeNodeItem> buildFeatureObjectTree(List<FeatureTreeNodeItem> featureObjects);
 }

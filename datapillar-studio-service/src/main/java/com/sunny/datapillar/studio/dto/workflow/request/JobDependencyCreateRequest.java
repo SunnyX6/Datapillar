@@ -8,9 +8,9 @@ import lombok.Data;
 @Schema(name = "JobDependencyCreate")
 public class JobDependencyCreateRequest {
 
-    @NotNull(message = "任务 ID 不能为空")
-    private Long jobId;
+  @NotNull(message = "Task ID cannot be empty")
+  private Long jobId;
 
-    @NotNull(message = "上游任务 ID 不能为空")
-    private Long parentJobId;
+  @NotNull(message = "upstream tasks ID cannot be empty")
+  private Long parentJobId;
 }

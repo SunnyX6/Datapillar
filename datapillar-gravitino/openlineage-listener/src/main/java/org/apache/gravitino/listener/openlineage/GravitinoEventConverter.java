@@ -1,21 +1,19 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * regarding copyright ownership.The ASF licenses this file
+ * to you under the Apache License,Version 2.0 (the
+ * "License");you may not use this file except in compliance
+ * with the License.You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * Unless required by applicable law or agreed to in writing,* software distributed under the License is distributed on an
+ * "AS IS" BASIS,WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND,either express or implied.See the License for the
  * specific language governing permissions and limitations
- * under the License.
- */
+ * under the License.*/
 
 package org.apache.gravitino.listener.openlineage;
 
@@ -64,20 +62,20 @@ import org.apache.gravitino.listener.openlineage.converters.ValueDomainEventConv
 import org.apache.gravitino.listener.openlineage.converters.WordRootEventConverter;
 
 /**
- * Gravitino 事件转换器（委托模式）。
+ * Gravitino event converter(Delegate mode).*
  *
- * <p>将不同类型的事件委托给对应的子转换器处理：
+ * <p>Delegate different types of events to corresponding sub-converters for processing:*
  *
  * <ul>
- *   <li>TableEventConverter: Table 相关事件
- *   <li>SchemaEventConverter: Schema 相关事件
- *   <li>CatalogEventConverter: Catalog 相关事件
- *   <li>MetricEventConverter: Metric 相关事件
- *   <li>TagEventConverter: Tag 相关事件
- *   <li>WordRootEventConverter: WordRoot 相关事件
- *   <li>ModifierEventConverter: Modifier 相关事件
- *   <li>UnitEventConverter: Unit 相关事件
- *   <li>ValueDomainEventConverter: ValueDomain 相关事件
+ *   <li>TableEventConverter:Table Related events
+ *   <li>SchemaEventConverter:Schema Related events
+ *   <li>CatalogEventConverter:Catalog Related events
+ *   <li>MetricEventConverter:Metric Related events
+ *   <li>TagEventConverter:Tag Related events
+ *   <li>WordRootEventConverter:WordRoot Related events
+ *   <li>ModifierEventConverter:Modifier Related events
+ *   <li>UnitEventConverter:Unit Related events
+ *   <li>ValueDomainEventConverter:ValueDomain Related events
  * </ul>
  */
 @Slf4j
@@ -106,13 +104,13 @@ public class GravitinoEventConverter {
   }
 
   /**
-   * 将 Gravitino 事件转换为 OpenLineage RunEvent。
+   * will Gravitino event converted to OpenLineage RunEvent.*
    *
-   * @param event Gravitino 事件
-   * @return OpenLineage RunEvent，如果事件类型不支持则返回 null
+   * @param event Gravitino event
+   * @return OpenLineage RunEvent,Returns if the event type is not supported null
    */
   public RunEvent convert(Event event) {
-    // Table 事件
+    // Table event
     if (event instanceof CreateTableEvent
         || event instanceof AlterTableEvent
         || event instanceof DropTableEvent
@@ -120,7 +118,7 @@ public class GravitinoEventConverter {
       return tableConverter.convert(event);
     }
 
-    // Schema 事件
+    // Schema event
     if (event instanceof CreateSchemaEvent
         || event instanceof AlterSchemaEvent
         || event instanceof DropSchemaEvent
@@ -128,21 +126,21 @@ public class GravitinoEventConverter {
       return schemaConverter.convert(event);
     }
 
-    // Catalog 事件
+    // Catalog event
     if (event instanceof CreateCatalogEvent
         || event instanceof AlterCatalogEvent
         || event instanceof DropCatalogEvent) {
       return catalogConverter.convert(event);
     }
 
-    // Metric 事件
+    // Metric event
     if (event instanceof RegisterMetricEvent
         || event instanceof AlterMetricEvent
         || event instanceof DropMetricEvent) {
       return metricConverter.convert(event);
     }
 
-    // Tag 事件
+    // Tag event
     if (event instanceof CreateTagEvent
         || event instanceof AlterTagEvent
         || event instanceof DeleteTagEvent
@@ -150,35 +148,35 @@ public class GravitinoEventConverter {
       return tagConverter.convert(event);
     }
 
-    // WordRoot 事件
+    // WordRoot event
     if (event instanceof CreateWordRootEvent
         || event instanceof AlterWordRootEvent
         || event instanceof DropWordRootEvent) {
       return wordRootConverter.convert(event);
     }
 
-    // Modifier 事件
+    // Modifier event
     if (event instanceof CreateModifierEvent
         || event instanceof AlterModifierEvent
         || event instanceof DropModifierEvent) {
       return modifierConverter.convert(event);
     }
 
-    // Unit 事件
+    // Unit event
     if (event instanceof CreateUnitEvent
         || event instanceof AlterUnitEvent
         || event instanceof DropUnitEvent) {
       return unitConverter.convert(event);
     }
 
-    // ValueDomain 事件
+    // ValueDomain event
     if (event instanceof CreateValueDomainEvent
         || event instanceof AlterValueDomainEvent
         || event instanceof DropValueDomainEvent) {
       return valueDomainConverter.convert(event);
     }
 
-    log.debug("Unsupported event type: {}", event.getClass().getSimpleName());
+    log.debug("Unsupported event type:{}", event.getClass().getSimpleName());
     return null;
   }
 }

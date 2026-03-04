@@ -1,94 +1,93 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-Catalog / 元数据问答相关 schema
+Catalog / Metadata Q&A related schema
 
-CatalogAgent 的职责是元数据问答：
-- 回答"有哪些 catalog/schema/表/字段"等问题
-- 回答表结构、血缘概览等问题
-- 不做 ETL 需求分析，不生成 SQL
+CatalogAgent Responsibility for Metadata Q&A:- answer"What are there catalog/schema/table/Field"and other questions
+- Answer table structure,Overview of ancestry and other issues
+- Dont do it ETL needs analysis,Not generated SQL
 """
 
 from pydantic import BaseModel, Field
 
 
 class OptionItem(BaseModel):
-    """结构化选项（统一表示各层级资产）"""
+    """Structured options(Unified representation of assets at all levels)"""
 
     type: str = Field(
         ...,
-        description="资产类型：catalog/schema/table/column/lineage/valuedomain",
+        description="Asset type:catalog/schema/table/column/lineage/valuedomain",
     )
-    name: str = Field(..., description="名称")
+    name: str = Field(..., description="Name")
     path: str = Field(
         ...,
-        description="完整路径：catalog / catalog.schema / catalog.schema.table / catalog.schema.table.column",
+        description="full path:catalog / catalog.schema / catalog.schema.table / catalog.schema.table.column",
     )
-    description: str | None = Field(default=None, description="描述")
+    description: str | None = Field(default=None, description="Description")
     tools: list[str] = Field(
         default_factory=list,
-        description="可用工具（展开下一层或查看详情）",
+        description="Available tools(Expand to the next level or view details)",
     )
     extra: dict | None = Field(
         default=None,
-        description="额外信息（如 column 的 data_type，lineage 的 upstream/downstream）",
+        description="Additional information(Such as column of data_type,lineage of upstream/downstream)",
     )
 
 
 class CatalogResultOutput(BaseModel):
     """
-    CatalogAgent 的 LLM 输出（用于 structured output）
+    CatalogAgent of LLM output(used for structured output)
 
-    设计原则：
-    - summary: 一句话概括
-    - answer: 详细文字回答
-    - options: 结构化选项（统一表示各层级资产）
-    - ambiguities: 需要澄清的问题
-    - confidence: 信息充分程度
+    design principles:- summary:One sentence summary
+    - answer:Detailed text answer
+    - options:Structured options(Unified representation of assets at all levels)
+    - ambiguities:Questions that need clarification
+    - confidence:information adequacy
     """
 
-    summary: str = Field(..., description="一句话概括回答")
-    answer: str = Field(..., description="详细文字回答（给用户看的中文回答）")
+    summary: str = Field(..., description="One sentence summary answer")
+    answer: str = Field(..., description="Detailed text answer(Chinese answers for users)")
     options: list[OptionItem] = Field(
         default_factory=list,
-        description="结构化选项（catalog/schema/table/column 等）",
+        description="Structured options(catalog/schema/table/column Wait)",
     )
     ambiguities: list[str] = Field(
         default_factory=list,
-        description="需要澄清的问题列表（当信息不足时）",
+        description="List of questions requiring clarification(When information is insufficient)",
     )
     recommendations: list[str] = Field(
         default_factory=list,
-        description="推荐引导（可选）",
+        description="Recommended guidance(Optional)",
     )
     confidence: float = Field(
         default=1.0,
         ge=0.0,
         le=1.0,
-        description="信息充分程度，需要澄清时 < 0.7",
+        description="information adequacy,When clarification is needed < 0.7",
     )
 
 
 class CatalogResult(BaseModel):
     """
-    CatalogAgent 的交付物（存入 Blackboard）
+    CatalogAgent deliverables(Deposit Blackboard)
 
-    包含用户原始输入 + LLM 输出
+    Contains original user input + LLM output
     """
 
-    user_query: str = Field(..., description="用户原始输入")
-    summary: str = Field(..., description="一句话概括")
-    answer: str = Field(..., description="详细文字回答")
-    options: list[OptionItem] = Field(default_factory=list, description="结构化选项")
-    ambiguities: list[str] = Field(default_factory=list, description="需要澄清的问题")
-    recommendations: list[str] = Field(default_factory=list, description="推荐引导")
+    user_query: str = Field(..., description="original user input")
+    summary: str = Field(..., description="One sentence summary")
+    answer: str = Field(..., description="Detailed text answer")
+    options: list[OptionItem] = Field(default_factory=list, description="Structured options")
+    ambiguities: list[str] = Field(
+        default_factory=list, description="Questions that need clarification"
+    )
+    recommendations: list[str] = Field(default_factory=list, description="Recommended guidance")
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
 
     @classmethod
     def from_output(cls, output: CatalogResultOutput, user_query: str) -> "CatalogResult":
-        """从 LLM 输出构建完整结果"""
+        """from LLM Output the complete results of the build"""
         return cls(
             user_query=user_query,
             summary=output.summary,
@@ -100,5 +99,5 @@ class CatalogResult(BaseModel):
         )
 
     def needs_clarification(self) -> bool:
-        """是否需要用户澄清"""
+        """Does the user need clarification?"""
         return self.confidence < 0.7 and len(self.ambiguities) > 0

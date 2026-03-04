@@ -30,7 +30,7 @@ function resolveErrorMessage(error: unknown): string {
     return error.message
   }
 
-  return '未知错误'
+  return 'unknown error'
 }
 
 function parseRoleId(roleId: string): number | null {
@@ -102,7 +102,7 @@ export function usePermissionFunctional(
         } catch (error) {
           const message = resolveErrorMessage(error)
           setPermissionsError(params.roleId, message)
-          toast.error(`加载角色功能权限失败：${message}`)
+          toast.error(`Failed to load role function permissions：${message}`)
         }
       })()
 

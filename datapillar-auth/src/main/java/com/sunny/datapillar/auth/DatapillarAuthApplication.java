@@ -6,8 +6,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * 认证启动类
- * 负责服务启动与基础组件装配
+ * Auth bootstrap class for service startup and base component wiring.
  *
  * @author Sunny
  * @date 2026-01-01
@@ -16,7 +15,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @EnableDubbo
 @MapperScan("com.sunny.datapillar.auth.mapper")
 public class DatapillarAuthApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(DatapillarAuthApplication.class, args);
-    }
+  public static void main(String[] args) {
+    SpringApplication.run(DatapillarAuthApplication.class, args);
+  }
 }

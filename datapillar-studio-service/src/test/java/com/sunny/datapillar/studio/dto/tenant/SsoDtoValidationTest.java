@@ -1,5 +1,8 @@
 package com.sunny.datapillar.studio.dto.tenant;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.sunny.datapillar.studio.dto.tenant.request.SsoConfigCreateRequest;
 import com.sunny.datapillar.studio.dto.tenant.request.SsoConfigUpdateRequest;
 import com.sunny.datapillar.studio.dto.tenant.request.SsoIdentityBindByCodeRequest;
@@ -11,77 +14,75 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 class SsoDtoValidationTest {
 
-    private Validator validator;
+  private Validator validator;
 
-    @BeforeEach
-    void setUp() {
-        validator = Validation.buildDefaultValidatorFactory().getValidator();
-    }
+  @BeforeEach
+  void setUp() {
+    validator = Validation.buildDefaultValidatorFactory().getValidator();
+  }
 
-    @Test
-    void createRequestShouldPassValidation() {
-        SsoConfigCreateRequest request = new SsoConfigCreateRequest();
-        request.setProvider("dingtalk");
-        request.setStatus(1);
-        request.setConfig(buildConfig("client", "secret", "https://redirect"));
+  @Test
+  void createRequestShouldPassValidation() {
+    SsoConfigCreateRequest request = new SsoConfigCreateRequest();
+    request.setProvider("dingtalk");
+    request.setStatus(1);
+    request.setConfig(buildConfig("client", "secret", "https://redirect"));
 
-        Set<ConstraintViolation<SsoConfigCreateRequest>> violations = validator.validate(request);
+    Set<ConstraintViolation<SsoConfigCreateRequest>> violations = validator.validate(request);
 
-        assertTrue(violations.isEmpty());
-    }
+    assertTrue(violations.isEmpty());
+  }
 
-    @Test
-    void createRequestShouldFailWhenConfigMissing() {
-        SsoConfigCreateRequest request = new SsoConfigCreateRequest();
-        request.setProvider("dingtalk");
+  @Test
+  void createRequestShouldFailWhenConfigMissing() {
+    SsoConfigCreateRequest request = new SsoConfigCreateRequest();
+    request.setProvider("dingtalk");
 
-        Set<ConstraintViolation<SsoConfigCreateRequest>> violations = validator.validate(request);
+    Set<ConstraintViolation<SsoConfigCreateRequest>> violations = validator.validate(request);
 
-        assertFalse(violations.isEmpty());
-    }
+    assertFalse(violations.isEmpty());
+  }
 
-    @Test
-    void updateRequestShouldFailWhenClientSecretIsBlank() {
-        SsoConfigUpdateRequest request = new SsoConfigUpdateRequest();
-        request.setConfig(buildConfig("client", " ", "https://redirect"));
+  @Test
+  void updateRequestShouldFailWhenClientSecretIsBlank() {
+    SsoConfigUpdateRequest request = new SsoConfigUpdateRequest();
+    request.setConfig(buildConfig("client", " ", "https://redirect"));
 
-        Set<ConstraintViolation<SsoConfigUpdateRequest>> violations = validator.validate(request);
+    Set<ConstraintViolation<SsoConfigUpdateRequest>> violations = validator.validate(request);
 
-        assertFalse(violations.isEmpty());
-    }
+    assertFalse(violations.isEmpty());
+  }
 
-    @Test
-    void updateRequestShouldFailWhenStatusOutOfRange() {
-        SsoConfigUpdateRequest request = new SsoConfigUpdateRequest();
-        request.setStatus(2);
+  @Test
+  void updateRequestShouldFailWhenStatusOutOfRange() {
+    SsoConfigUpdateRequest request = new SsoConfigUpdateRequest();
+    request.setStatus(2);
 
-        Set<ConstraintViolation<SsoConfigUpdateRequest>> violations = validator.validate(request);
+    Set<ConstraintViolation<SsoConfigUpdateRequest>> violations = validator.validate(request);
 
-        assertFalse(violations.isEmpty());
-    }
+    assertFalse(violations.isEmpty());
+  }
 
-    @Test
-    void bindByCodeRequestShouldRejectUnsupportedProvider() {
-        SsoIdentityBindByCodeRequest request = new SsoIdentityBindByCodeRequest();
-        request.setUserId(1L);
-        request.setProvider("wechat");
-        request.setAuthCode("code-1");
+  @Test
+  void bindByCodeRequestShouldRejectUnsupportedProvider() {
+    SsoIdentityBindByCodeRequest request = new SsoIdentityBindByCodeRequest();
+    request.setUserId(1L);
+    request.setProvider("wechat");
+    request.setAuthCode("code-1");
 
-        Set<ConstraintViolation<SsoIdentityBindByCodeRequest>> violations = validator.validate(request);
+    Set<ConstraintViolation<SsoIdentityBindByCodeRequest>> violations = validator.validate(request);
 
-        assertFalse(violations.isEmpty());
-    }
+    assertFalse(violations.isEmpty());
+  }
 
-    private SsoDingtalkConfigItem buildConfig(String clientId, String clientSecret, String redirectUri) {
-        SsoDingtalkConfigItem config = new SsoDingtalkConfigItem();
-        config.setClientId(clientId);
-        config.setClientSecret(clientSecret);
-        config.setRedirectUri(redirectUri);
-        return config;
-    }
+  private SsoDingtalkConfigItem buildConfig(
+      String clientId, String clientSecret, String redirectUri) {
+    SsoDingtalkConfigItem config = new SsoDingtalkConfigItem();
+    config.setClientId(clientId);
+    config.setClientSecret(clientSecret);
+    config.setRedirectUri(redirectUri);
+    return config;
+  }
 }

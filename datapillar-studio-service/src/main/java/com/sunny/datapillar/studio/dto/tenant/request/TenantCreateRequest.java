@@ -9,15 +9,15 @@ import lombok.Data;
 @Schema(name = "TenantCreate")
 public class TenantCreateRequest {
 
-    @NotBlank(message = "租户编码不能为空")
-    @Size(max = 64, message = "租户编码长度不能超过64个字符")
-    private String code;
+  @NotBlank(message = "Tenant code cannot be empty")
+  @Size(max = 64, message = "The tenant code length cannot exceed64characters")
+  private String code;
 
-    @NotBlank(message = "租户名称不能为空")
-    @Size(max = 128, message = "租户名称长度不能超过128个字符")
-    private String name;
+  @NotBlank(message = "Tenant name cannot be empty")
+  @Size(max = 128, message = "The tenant name cannot be longer than128characters")
+  private String name;
 
-    @NotBlank(message = "租户类型不能为空")
-    @Size(max = 32, message = "租户类型长度不能超过32个字符")
-    private String type;
+  @NotBlank(message = "Tenant type cannot be empty")
+  @Size(max = 32, message = "The length of the tenant type cannot exceed32characters")
+  private String type;
 }

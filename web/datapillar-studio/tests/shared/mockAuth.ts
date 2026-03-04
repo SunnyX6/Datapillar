@@ -7,11 +7,15 @@ type ApiResponse<T> = {
 
 type MockLoginResult = {
   userId: number
-  tenantId: number
   username: string
   email?: string
-  roles: Array<{ id: number; name: string; type: string }>
-  menus: Array<{ id: number; name: string; path: string }>
+  tenants: Array<{
+    tenantId: number
+    tenantCode: string
+    tenantName: string
+    status: number
+    isDefault: number
+  }>
 }
 
 const buildApiResponse = <T,>(data: T): ApiResponse<T> => ({
@@ -21,11 +25,17 @@ const buildApiResponse = <T,>(data: T): ApiResponse<T> => ({
 
 const buildLoginResult = (username: string): MockLoginResult => ({
   userId: 10001,
-  tenantId: 0,
   username,
   email: `${username}@datapillar.ai`,
-  roles: [{ id: 1, name: '管理员', type: 'ADMIN' }],
-  menus: []
+  tenants: [
+    {
+      tenantId: 0,
+      tenantCode: 'tenant-default',
+      tenantName: 'Default tenant',
+      status: 1,
+      isDefault: 1
+    }
+  ]
 })
 
 export const mockAuthRoutes = async (page: Page) => {
@@ -42,7 +52,7 @@ export const mockAuthRoutes = async (page: Page) => {
           lastUsername = payload.loginAlias
         }
       } catch {
-        // 忽略解析失败，使用默认用户名
+        // Ignore parsing failures，Use default username
       }
 
       const user = buildLoginResult(lastUsername)
@@ -86,6 +96,15 @@ export const mockAuthRoutes = async (page: Page) => {
       return
     }
 
+    if (pathname.endsWith('/users/me/menu')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(buildApiResponse([]))
+      })
+      return
+    }
+
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -96,4 +115,5 @@ export const mockAuthRoutes = async (page: Page) => {
   await page.route('**/api/auth/**', handler)
   await page.route('**/api/login', handler)
   await page.route('**/api/login/**', handler)
+  await page.route('**/api/studio/**', handler)
 }

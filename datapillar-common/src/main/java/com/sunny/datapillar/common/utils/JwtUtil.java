@@ -1,6 +1,5 @@
 package com.sunny.datapillar.common.utils;
 
-import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
 import com.sunny.datapillar.common.exception.BadRequestException;
 import com.sunny.datapillar.common.exception.UnauthorizedException;
 import com.sunny.datapillar.common.security.SessionTokenClaims;
@@ -15,191 +14,190 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * JWT工具类
- * 提供JWT通用工具能力
+ * JWTTools provideJWTCommon tool capabilities
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public class JwtUtil {
 
-    private final SecretKey key;
-    private final String issuer;
+  private final SecretKey key;
+  private final String issuer;
 
-    public JwtUtil(String secret, String issuer) {
-        if (secret == null || secret.length() < 32) {
-            throw new IllegalArgumentException("JWT 密钥长度至少 32 位");
-        }
-        this.key = new SecretKeySpec(secret.getBytes(), "HmacSHA256");
-        this.issuer = issuer;
+  public JwtUtil(String secret, String issuer) {
+    if (secret == null || secret.length() < 32) {
+      throw new IllegalArgumentException("JWT The key length must be at least 32 Bit");
     }
+    this.key = new SecretKeySpec(secret.getBytes(), "HmacSHA256");
+    this.issuer = issuer;
+  }
 
-    public String sign(Map<String, Object> claims, String subject, Date issuedAt, Date expiration) {
-        return sign(claims, subject, issuedAt, expiration, null);
+  public String sign(Map<String, Object> claims, String subject, Date issuedAt, Date expiration) {
+    return sign(claims, subject, issuedAt, expiration, null);
+  }
+
+  public String sign(
+      Map<String, Object> claims, String subject, Date issuedAt, Date expiration, String tokenId) {
+    if (claims == null || subject == null || issuedAt == null || expiration == null) {
+      throw new BadRequestException("Parameter error");
     }
-
-    public String sign(Map<String, Object> claims, String subject, Date issuedAt, Date expiration, String tokenId) {
-        if (claims == null || subject == null || issuedAt == null || expiration == null) {
-            throw new BadRequestException("参数错误");
-        }
-        var builder = Jwts.builder()
-                .claims(claims)
-                .subject(subject)
-                .issuer(issuer)
-                .issuedAt(issuedAt)
-                .expiration(expiration);
-        if (tokenId != null && !tokenId.isBlank()) {
-            builder.id(tokenId);
-        }
-        return builder
-                .signWith(key)
-                .compact();
+    var builder =
+        Jwts.builder()
+            .claims(claims)
+            .subject(subject)
+            .issuer(issuer)
+            .issuedAt(issuedAt)
+            .expiration(expiration);
+    if (tokenId != null && !tokenId.isBlank()) {
+      builder.id(tokenId);
     }
+    return builder.signWith(key).compact();
+  }
 
-    public Claims parseToken(String token) {
-        return parseToken(token, false);
+  public Claims parseToken(String token) {
+    return parseToken(token, false);
+  }
+
+  public Claims parseTokenWithIssuer(String token) {
+    return parseToken(token, true);
+  }
+
+  public boolean isValid(String token) {
+    return isValid(token, false);
+  }
+
+  public boolean isValidWithIssuer(String token) {
+    return isValid(token, true);
+  }
+
+  public Long getUserId(Claims claims) {
+    if (claims == null) {
+      return null;
     }
+    return parseLong(claims.getSubject());
+  }
 
-    public Claims parseTokenWithIssuer(String token) {
-        return parseToken(token, true);
+  public Long getTenantId(Claims claims) {
+    if (claims == null) {
+      return null;
     }
+    return parseLong(claims.get("tenantId"));
+  }
 
-    public boolean isValid(String token) {
-        return isValid(token, false);
+  public String getUsername(Claims claims) {
+    if (claims == null) {
+      return null;
     }
+    return claims.get("username", String.class);
+  }
 
-    public boolean isValidWithIssuer(String token) {
-        return isValid(token, true);
+  public String getEmail(Claims claims) {
+    if (claims == null) {
+      return null;
     }
+    return claims.get("email", String.class);
+  }
 
-    public Long getUserId(Claims claims) {
-        if (claims == null) {
-            return null;
-        }
-        return parseLong(claims.getSubject());
+  public String getTokenType(Claims claims) {
+    if (claims == null) {
+      return null;
     }
+    return claims.get("tokenType", String.class);
+  }
 
-    public Long getTenantId(Claims claims) {
-        if (claims == null) {
-            return null;
-        }
-        return parseLong(claims.get("tenantId"));
+  public Boolean getRememberMe(Claims claims) {
+    if (claims == null) {
+      return null;
     }
+    return claims.get("rememberMe", Boolean.class);
+  }
 
-    public String getUsername(Claims claims) {
-        if (claims == null) {
-            return null;
-        }
-        return claims.get("username", String.class);
+  public Long getActorUserId(Claims claims) {
+    if (claims == null) {
+      return null;
     }
+    return parseLong(claims.get("actorUserId"));
+  }
 
-    public String getEmail(Claims claims) {
-        if (claims == null) {
-            return null;
-        }
-        return claims.get("email", String.class);
+  public Long getActorTenantId(Claims claims) {
+    if (claims == null) {
+      return null;
     }
+    return parseLong(claims.get("actorTenantId"));
+  }
 
-    public String getTokenType(Claims claims) {
-        if (claims == null) {
-            return null;
-        }
-        return claims.get("tokenType", String.class);
+  public boolean isImpersonation(Claims claims) {
+    if (claims == null) {
+      return false;
     }
+    return Boolean.TRUE.equals(claims.get("impersonation", Boolean.class));
+  }
 
-    public Boolean getRememberMe(Claims claims) {
-        if (claims == null) {
-            return null;
-        }
-        return claims.get("rememberMe", Boolean.class);
+  public String getSessionId(Claims claims) {
+    if (claims == null) {
+      return null;
     }
+    return claims.get(SessionTokenClaims.SESSION_ID, String.class);
+  }
 
-    public Long getActorUserId(Claims claims) {
-        if (claims == null) {
-            return null;
-        }
-        return parseLong(claims.get("actorUserId"));
+  public String getTokenId(Claims claims) {
+    if (claims == null) {
+      return null;
     }
-
-    public Long getActorTenantId(Claims claims) {
-        if (claims == null) {
-            return null;
-        }
-        return parseLong(claims.get("actorTenantId"));
+    if (claims.getId() != null && !claims.getId().isBlank()) {
+      return claims.getId();
     }
+    return claims.get(SessionTokenClaims.TOKEN_ID, String.class);
+  }
 
-    public boolean isImpersonation(Claims claims) {
-        if (claims == null) {
-            return false;
-        }
-        return Boolean.TRUE.equals(claims.get("impersonation", Boolean.class));
+  public String extractTokenSignature(String token) {
+    if (token == null || token.isEmpty()) {
+      throw new UnauthorizedException("TokenInvalid", "JWT cannot be empty");
     }
-
-    public String getSessionId(Claims claims) {
-        if (claims == null) {
-            return null;
-        }
-        return claims.get(SessionTokenClaims.SESSION_ID, String.class);
+    String[] parts = token.split("\\.");
+    if (parts.length != 3) {
+      throw new UnauthorizedException("TokenInvalid", "JWT Illegal format");
     }
+    return parts[2];
+  }
 
-    public String getTokenId(Claims claims) {
-        if (claims == null) {
-            return null;
-        }
-        if (claims.getId() != null && !claims.getId().isBlank()) {
-            return claims.getId();
-        }
-        return claims.get(SessionTokenClaims.TOKEN_ID, String.class);
+  private Claims parseToken(String token, boolean requireIssuer) {
+    if (token == null || token.isBlank()) {
+      throw new UnauthorizedException("TokenInvalid");
     }
-
-    public String extractTokenSignature(String token) {
-        if (token == null || token.isEmpty()) {
-            throw new UnauthorizedException("Token无效", "JWT 不能为空");
-        }
-        String[] parts = token.split("\\.");
-        if (parts.length != 3) {
-            throw new UnauthorizedException("Token无效", "JWT 格式非法");
-        }
-        return parts[2];
+    try {
+      JwtParserBuilder parser = Jwts.parser().verifyWith(key);
+      if (requireIssuer && issuer != null && !issuer.isBlank()) {
+        parser = parser.requireIssuer(issuer);
+      }
+      return parser.build().parseSignedClaims(token).getPayload();
+    } catch (ExpiredJwtException e) {
+      throw new UnauthorizedException("TokenExpired");
+    } catch (JwtException | IllegalArgumentException e) {
+      throw new UnauthorizedException("TokenInvalid", e.getMessage());
     }
+  }
 
-    private Claims parseToken(String token, boolean requireIssuer) {
-        if (token == null || token.isBlank()) {
-            throw new UnauthorizedException("Token无效");
-        }
-        try {
-            JwtParserBuilder parser = Jwts.parser().verifyWith(key);
-            if (requireIssuer && issuer != null && !issuer.isBlank()) {
-                parser = parser.requireIssuer(issuer);
-            }
-            return parser.build().parseSignedClaims(token).getPayload();
-        } catch (ExpiredJwtException e) {
-            throw new UnauthorizedException("Token已过期");
-        } catch (JwtException | IllegalArgumentException e) {
-            throw new UnauthorizedException("Token无效", e.getMessage());
-        }
+  private boolean isValid(String token, boolean requireIssuer) {
+    try {
+      parseToken(token, requireIssuer);
+      return true;
+    } catch (Throwable e) {
+      return false;
     }
+  }
 
-    private boolean isValid(String token, boolean requireIssuer) {
-        try {
-            parseToken(token, requireIssuer);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+  private Long parseLong(Object value) {
+    if (value instanceof Number) {
+      return ((Number) value).longValue();
     }
-
-    private Long parseLong(Object value) {
-        if (value instanceof Number) {
-            return ((Number) value).longValue();
-        }
-        if (value instanceof String) {
-            try {
-                return Long.parseLong((String) value);
-            } catch (NumberFormatException ex) {
-                return null;
-            }
-        }
+    if (value instanceof String) {
+      try {
+        return Long.parseLong((String) value);
+      } catch (NumberFormatException ex) {
         return null;
+      }
     }
+    return null;
+  }
 }

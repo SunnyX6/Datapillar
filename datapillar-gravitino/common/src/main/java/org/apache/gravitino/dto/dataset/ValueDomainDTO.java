@@ -26,7 +26,7 @@ import lombok.ToString;
 import org.apache.gravitino.dataset.ValueDomain;
 import org.apache.gravitino.dto.AuditDTO;
 
-/** 值域 DTO */
+/** range DTO */
 @ToString
 @EqualsAndHashCode
 public class ValueDomainDTO implements ValueDomain {
@@ -85,7 +85,7 @@ public class ValueDomainDTO implements ValueDomain {
     return items.stream().map(item -> (Item) item).collect(Collectors.toList());
   }
 
-  /** 获取原始的 DTO items 列表 */
+  /** Get the original DTO items list */
   public List<ValueDomainItemDTO> itemDTOs() {
     return items;
   }

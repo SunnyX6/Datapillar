@@ -26,7 +26,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** 更新词根的请求 */
+/** Request to update stem */
 @Getter
 @ToString
 @EqualsAndHashCode
@@ -45,6 +45,6 @@ public class WordRootUpdateRequest implements RESTRequest {
 
   @Override
   public void validate() throws IllegalArgumentException {
-    // 所有字段均为可选，不做强制校验
+    // All fields are optional，No mandatory verification
   }
 }

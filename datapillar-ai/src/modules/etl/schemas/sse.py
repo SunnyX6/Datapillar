@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-ETL SSE 事件模型
+ETL SSE event model
 """
 
 from enum import Enum
@@ -13,7 +12,7 @@ from pydantic import BaseModel, Field
 
 
 class ActivityEvent(str, Enum):
-    """活动事件类型"""
+    """Active event type"""
 
     LLM = "llm"
     TOOL = "tool"
@@ -21,7 +20,7 @@ class ActivityEvent(str, Enum):
 
 
 class ActivityStatus(str, Enum):
-    """活动状态"""
+    """active status"""
 
     RUNNING = "running"
     DONE = "done"
@@ -31,7 +30,7 @@ class ActivityStatus(str, Enum):
 
 
 class RunStatus(str, Enum):
-    """运行总状态"""
+    """Overall running status"""
 
     RUNNING = "running"
     DONE = "done"
@@ -40,7 +39,7 @@ class RunStatus(str, Enum):
 
 
 class Activity(BaseModel):
-    """单个 Agent 的活动状态"""
+    """single Agent activity status"""
 
     agent_cn: str = ""
     agent_en: str = ""
@@ -53,7 +52,7 @@ class Activity(BaseModel):
 
 
 class EtlSseEvent(BaseModel):
-    """ETL SSE 事件"""
+    """ETL SSE event"""
 
     run_id: str
     ts: int

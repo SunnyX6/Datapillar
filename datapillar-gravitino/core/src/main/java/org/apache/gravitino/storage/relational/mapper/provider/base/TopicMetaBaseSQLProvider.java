@@ -22,17 +22,21 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.TopicMetaMapper.TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.ibatis.annotations.Param;
 
 public class TopicMetaBaseSQLProvider {
 
   public String insertTopicMeta(@Param("topicMeta") TopicPO topicPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TABLE_NAME
         + "(topic_id, topic_name, metalake_id, catalog_id, schema_id,"
         + " comment, properties, audit_info, current_version, last_version,"
-        + " deleted_at)"
+        + " deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{topicMeta.topicId},"
         + " #{topicMeta.topicName},"
@@ -44,16 +48,21 @@ public class TopicMetaBaseSQLProvider {
         + " #{topicMeta.auditInfo},"
         + " #{topicMeta.currentVersion},"
         + " #{topicMeta.lastVersion},"
-        + " #{topicMeta.deletedAt}"
+        + " #{topicMeta.deletedAt},"
+        + " "
+        + tenantId
         + " )";
   }
 
   public String insertTopicMetaOnDuplicateKeyUpdate(@Param("topicMeta") TopicPO topicPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TABLE_NAME
         + "(topic_id, topic_name, metalake_id, catalog_id, schema_id,"
         + " comment, properties, audit_info, current_version, last_version,"
-        + " deleted_at)"
+        + " deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{topicMeta.topicId},"
         + " #{topicMeta.topicName},"
@@ -65,7 +74,9 @@ public class TopicMetaBaseSQLProvider {
         + " #{topicMeta.auditInfo},"
         + " #{topicMeta.currentVersion},"
         + " #{topicMeta.lastVersion},"
-        + " #{topicMeta.deletedAt}"
+        + " #{topicMeta.deletedAt},"
+        + " "
+        + tenantId
         + " )"
         + " ON DUPLICATE KEY UPDATE"
         + " topic_name = #{topicMeta.topicName},"
@@ -81,6 +92,7 @@ public class TopicMetaBaseSQLProvider {
   }
 
   public String listTopicPOsBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT topic_id as topicId, topic_name as topicName, metalake_id as metalakeId,"
         + " catalog_id as catalogId, schema_id as schemaId,"
         + " comment as comment, properties as properties, audit_info as auditInfo,"
@@ -88,10 +100,13 @@ public class TopicMetaBaseSQLProvider {
         + " deleted_at as deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String listTopicPOsByTopicIds(@Param("topicIds") List<Long> topicIds) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + " SELECT topic_id as topicId, topic_name as topicName, metalake_id as metalakeId,"
         + " catalog_id as catalogId, schema_id as schemaId,"
@@ -106,11 +121,14 @@ public class TopicMetaBaseSQLProvider {
         + "#{topicId}"
         + "</foreach>"
         + ") "
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + "</script>";
   }
 
   public String selectTopicMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("topicName") String topicName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT topic_id as topicId, topic_name as topicName,"
         + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId,"
         + " comment as comment, properties as properties, audit_info as auditInfo,"
@@ -118,10 +136,13 @@ public class TopicMetaBaseSQLProvider {
         + " deleted_at as deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND topic_name = #{topicName} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND topic_name = #{topicName} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectTopicMetaById(@Param("topicId") Long topicId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT topic_id as topicId, topic_name as topicName,"
         + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId,"
         + " comment as comment, properties as properties, audit_info as auditInfo,"
@@ -129,11 +150,14 @@ public class TopicMetaBaseSQLProvider {
         + " deleted_at as deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE topic_id = #{topicId} AND deleted_at = 0";
+        + " WHERE topic_id = #{topicId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String updateTopicMeta(
       @Param("newTopicMeta") TopicPO newTopicPO, @Param("oldTopicMeta") TopicPO oldTopicPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET topic_name = #{newTopicMeta.topicName},"
@@ -156,53 +180,74 @@ public class TopicMetaBaseSQLProvider {
         + " AND audit_info = #{oldTopicMeta.auditInfo}"
         + " AND current_version = #{oldTopicMeta.currentVersion}"
         + " AND last_version = #{oldTopicMeta.lastVersion}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectTopicIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("topicName") String name) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT topic_id as topicId FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND topic_name = #{topicName}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteTopicMetasByTopicId(@Param("topicId") Long topicId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE topic_id = #{topicId} AND deleted_at = 0";
+        + " WHERE topic_id = #{topicId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteTopicMetasByCatalogId(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteTopicMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteTopicMetasBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteTopicMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeline}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 }

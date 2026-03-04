@@ -16,15 +16,14 @@ import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
 
 /**
- * 用户Profile业务服务
- * 提供用户Profile业务业务能力与领域服务
+ * UserProfilebusiness services Provide usersProfileBusiness capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface UserProfileBizService {
 
-    UserResponse getProfile(Long userId);
+  UserResponse getProfile(Long userId);
 
-    void updateProfile(Long userId, UserProfileUpdateRequest request);
+  void updateProfile(Long userId, UserProfileUpdateRequest request);
 }

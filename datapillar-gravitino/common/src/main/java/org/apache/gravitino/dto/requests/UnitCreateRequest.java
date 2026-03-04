@@ -28,7 +28,7 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** 创建单位的请求 */
+/** Create a request for an organization */
 @Getter
 @ToString
 @EqualsAndHashCode

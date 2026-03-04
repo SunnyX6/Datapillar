@@ -1,28 +1,24 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-知识图谱数据访问层（Knowledge Repository）
+Knowledge graph data access layer(Knowledge Repository)
 
-定位：
-- 这是 Neo4j 上"知识图谱/数仓资产"的统一数据访问层
-- 供 ETL、多智能体与治理能力共同复用
+Positioning:- This is Neo4j on"Knowledge graph/Digital warehouse assets"unified data access layer
+- supply ETL,Multi-agent and governance capabilities are reused together
 
-模块划分：
-- search_table: 表查询（含列、值域、血缘）
-- search_column: 列查询（预留）
-- search_metric: 指标查询
-- search_semantic: 语义资产查询（词根、修饰符、单位）
-- search_node: 节点搜索（混合检索）
-- search_sql: SQL 搜索
-- sync_metadata: 同步元数据写入
-- sync_lineage: 同步血缘关系写入
-- writeback: 写回操作
-- dto: 数据传输对象
+Module division:- search_table:Table query(Contains columns,range,Bloodline)
+- search_column:column query(reserved)
+- search_metric:Indicator query
+- search_semantic:Semantic asset query(root,modifier,unit)
+- search_node:Node search(Hybrid search)
+- search_sql:SQL Search
+- sync_metadata:Synchronous metadata writing
+- sync_lineage:Synchronous blood relationship writing
+- writeback:writeback operation
+- dto:data transfer object
 
-边界：
-- 这里只做数据访问（Cypher 查询/检索/写回），不承载业务编排
+border:- Only data access is done here(Cypher Query/Search/write back),Does not carry business orchestration
 """
 
 from src.infrastructure.repository.knowledge.dto import (
@@ -41,21 +37,17 @@ from src.infrastructure.repository.knowledge.sync_lineage import Lineage
 from src.infrastructure.repository.knowledge.sync_metadata import Metadata, TableUpsertPayload
 from src.infrastructure.repository.knowledge.writeback import Neo4jKGWritebackRepository
 
-__all__ = [
-    # 搜索服务
+__all__ = [  # Search service
     "Neo4jTableSearch",
     "Neo4jColumnSearch",
     "Neo4jMetricSearch",
     "Neo4jSemanticSearch",
     "Neo4jNodeSearch",
-    "Neo4jSQLSearch",
-    # 元数据/血缘
+    "Neo4jSQLSearch",  # metadata/Bloodline
     "Metadata",
     "TableUpsertPayload",
-    "Lineage",
-    # 写回服务
-    "Neo4jKGWritebackRepository",
-    # 数据传输对象
+    "Lineage",  # write back service
+    "Neo4jKGWritebackRepository",  # data transfer object
     "SearchHit",
     "SQLHit",
     "WordRootDTO",

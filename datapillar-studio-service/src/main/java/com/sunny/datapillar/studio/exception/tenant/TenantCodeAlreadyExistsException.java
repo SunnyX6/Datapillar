@@ -5,19 +5,18 @@ import com.sunny.datapillar.common.exception.AlreadyExistsException;
 import java.util.Map;
 
 /**
- * 租户编码已存在异常
- * 描述租户唯一编码约束冲突
+ * There is an exception in the tenant encoding Describe tenant unique encoding constraint violation
  *
  * @author Sunny
  * @date 2026-02-26
  */
 public class TenantCodeAlreadyExistsException extends AlreadyExistsException {
 
-    public TenantCodeAlreadyExistsException() {
-        super(ErrorType.TENANT_CODE_ALREADY_EXISTS, Map.of(), "租户编码已存在");
-    }
+  public TenantCodeAlreadyExistsException() {
+    super(ErrorType.TENANT_CODE_ALREADY_EXISTS, Map.of(), "Tenant code already exists");
+  }
 
-    public TenantCodeAlreadyExistsException(Throwable cause) {
-        super(cause, ErrorType.TENANT_CODE_ALREADY_EXISTS, Map.of(), "租户编码已存在");
-    }
+  public TenantCodeAlreadyExistsException(Throwable cause) {
+    super(cause, ErrorType.TENANT_CODE_ALREADY_EXISTS, Map.of(), "Tenant code already exists");
+  }
 }

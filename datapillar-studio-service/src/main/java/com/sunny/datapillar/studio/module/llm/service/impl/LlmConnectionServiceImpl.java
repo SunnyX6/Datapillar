@@ -20,8 +20,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 大模型Connection服务实现
- * 实现大模型Connection业务流程与规则校验
+ * large modelConnectionService implementation Implement large modelsConnectionBusiness process and
+ * rule verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -30,10 +30,11 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class LlmConnectionServiceImpl implements LlmConnectionService {
 
-    private final LlmManagerService llmManagerService;
+  private final LlmManagerService llmManagerService;
 
-    @Override
-    public LlmModelConnectResponse connectModel(Long userId, Long aiModelId, LlmModelConnectRequest request) {
-        return llmManagerService.connectModel(userId, aiModelId, request);
-    }
+  @Override
+  public LlmModelConnectResponse connectModel(
+      Long userId, Long aiModelId, LlmModelConnectRequest request) {
+    return llmManagerService.connectModel(userId, aiModelId, request);
+  }
 }

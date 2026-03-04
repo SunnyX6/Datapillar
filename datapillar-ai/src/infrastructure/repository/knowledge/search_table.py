@@ -1,17 +1,16 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-Neo4j 表查询服务
+Neo4j Table query service
 
-职责：提供表相关的查询功能（含列、值域、血缘）
-- get_table_info: 获取表基本信息
-- get_table_detail: 获取表详情（含列和值域）
-- get_table_lineage: 获取表血缘关系
-- get_column_lineage: 获取列级血缘
-- find_lineage_sql: 根据血缘查找 SQL
-- search_tables: 混合搜索表（向量 + 全文）
+Responsibilities:Provide table-related query functions(Contains columns,range,Bloodline)
+- get_table_info:Get basic table information
+- get_table_detail:Get table details(Contains columns and ranges)
+- get_table_lineage:Get table blood relationship
+- get_column_lineage:Get rank lineage
+- find_lineage_sql:Search based on ancestry SQL
+- search_tables:hybrid search table(Vector + Full text)
 """
 
 from __future__ import annotations
@@ -29,11 +28,11 @@ logger = logging.getLogger(__name__)
 
 
 class Neo4jTableSearch:
-    """Neo4j 表查询服务"""
+    """Neo4j Table query service"""
 
     _SYSTEM_CREATORS = ["OPENLINEAGE", "GRAVITINO_SYNC", "system", "SYSTEM"]
 
-    # Table 混合检索返回格式（HybridCypherRetriever）
+    # Table Mixed search return format(HybridCypherRetriever)
     _TABLE_RETRIEVAL_QUERY = """
     OPTIONAL MATCH (s:Schema)-[:HAS_TABLE]->(node)
     OPTIONAL MATCH (c:Catalog)-[:HAS_SCHEMA]->(s)
@@ -59,7 +58,7 @@ class Neo4jTableSearch:
     """
 
     # =========================================================================
-    # 精确查询
+    # Precise query
     # =========================================================================
 
     @classmethod
@@ -69,7 +68,7 @@ class Neo4jTableSearch:
         *,
         tenant_id: int | None = None,
     ) -> list[dict[str, Any]]:
-        """列出 Catalog 列表（导航用途）"""
+        """list Catalog list(Navigation purposes)"""
         safe_limit = min(max(int(limit), 1), 2000)
         cypher = """
         MATCH (c:Catalog)
@@ -92,7 +91,7 @@ class Neo4jTableSearch:
                 )
                 return [convert_neo4j_types(r) for r in (result.data() or [])]
         except Exception as e:
-            logger.error(f"列出 Catalog 失败: {e}")
+            logger.error(f"list Catalog failed:{e}")
             return []
 
     @classmethod
@@ -103,7 +102,7 @@ class Neo4jTableSearch:
         *,
         tenant_id: int | None = None,
     ) -> list[dict[str, Any]]:
-        """列出指定 Catalog 下的 Schema 列表（导航用途）"""
+        """list specified Catalog down Schema list(Navigation purposes)"""
         if not (isinstance(catalog, str) and catalog.strip()):
             return []
 
@@ -133,7 +132,7 @@ class Neo4jTableSearch:
                 )
                 return [convert_neo4j_types(r) for r in (result.data() or [])]
         except Exception as e:
-            logger.error(f"列出 Schema 失败: {e}")
+            logger.error(f"list Schema failed:{e}")
             return []
 
     @classmethod
@@ -147,7 +146,7 @@ class Neo4jTableSearch:
         *,
         tenant_id: int | None = None,
     ) -> list[dict[str, Any]]:
-        """列出指定 Catalog + Schema 下的 Table 列表（导航用途，支持 cursor 翻页）"""
+        """list specified Catalog + Schema down Table list(Navigation purposes,support cursor Turn page)"""
         if not (isinstance(catalog, str) and catalog.strip()):
             return []
         if not (isinstance(schema, str) and schema.strip()):
@@ -201,7 +200,7 @@ class Neo4jTableSearch:
                     for item in items
                 ]
         except Exception as e:
-            logger.error(f"列出 Table 失败: {e}")
+            logger.error(f"list Table failed:{e}")
             return []
 
     @classmethod
@@ -215,15 +214,13 @@ class Neo4jTableSearch:
         user_id: int | None = None,
     ) -> dict[str, Any] | None:
         """
-        获取表基本信息
+        Get basic table information
 
-        参数：
-        - catalog: Catalog 名称
-        - schema: Schema 名称
-        - table: 表名
+        parameters:- catalog:Catalog Name
+        - schema:Schema Name
+        - table:table name
 
-        返回：
-        - {catalog, schema, table, description, column_count}
+        Return:- {catalog,schema,table,description,column_count}
         """
         cypher = """
         MATCH (cat:Catalog {name: $catalog})-[:HAS_SCHEMA]->(sch:Schema {name: $schema})-[:HAS_TABLE]->(t:Table {name: $table})
@@ -260,7 +257,7 @@ class Neo4jTableSearch:
                 record = result.single()
 
                 if not record:
-                    logger.debug(f"未找到表: {catalog}.{schema}.{table}")
+                    logger.debug(f"table not found:{catalog}.{schema}.{table}")
                     return None
 
                 return {
@@ -271,7 +268,7 @@ class Neo4jTableSearch:
                     "column_count": record["column_count"],
                 }
         except Exception as e:
-            logger.error(f"获取表基本信息失败: {e}")
+            logger.error(f"Failed to obtain basic table information:{e}")
             return None
 
     @classmethod
@@ -285,15 +282,13 @@ class Neo4jTableSearch:
         user_id: int | None = None,
     ) -> dict[str, Any] | None:
         """
-        获取表详情（含列和值域）
+        Get table details(Contains columns and ranges)
 
-        参数：
-        - catalog: Catalog 名称
-        - schema: Schema 名称
-        - table: 表名
+        parameters:- catalog:Catalog Name
+        - schema:Schema Name
+        - table:table name
 
-        返回：
-        - {catalog, schema, table, description, columns: [{name, dataType, description, valueDomain}]}
+        Return:- {catalog,schema,table,description,columns:[{name,dataType,description,valueDomain}]}
         """
         cypher = """
         MATCH (cat:Catalog {name: $catalog})-[:HAS_SCHEMA]->(sch:Schema {name: $schema})-[:HAS_TABLE]->(t:Table {name: $table})
@@ -344,7 +339,7 @@ class Neo4jTableSearch:
                 record = result.single()
 
                 if not record:
-                    logger.debug(f"未找到表: {catalog}.{schema}.{table}")
+                    logger.debug(f"table not found:{catalog}.{schema}.{table}")
                     return None
 
                 return {
@@ -355,11 +350,11 @@ class Neo4jTableSearch:
                     "columns": record["columns"],
                 }
         except Exception as e:
-            logger.error(f"获取表详情失败: {e}")
+            logger.error(f"Failed to get table details:{e}")
             return None
 
     # =========================================================================
-    # 血缘查询
+    # Bloodline query
     # =========================================================================
 
     @classmethod
@@ -373,15 +368,13 @@ class Neo4jTableSearch:
         user_id: int | None = None,
     ) -> dict[str, Any]:
         """
-        获取表血缘关系
+        Get table blood relationship
 
-        参数：
-        - schema: Schema 名称
-        - table: 表名
-        - direction: 方向（upstream/downstream/both）
+        parameters:- schema:Schema Name
+        - table:table name
+        - direction:direction(upstream/downstream/both)
 
-        返回：
-        - {upstream: [], downstream: [], edges: []}
+        Return:- {upstream:[],downstream:[],edges:[]}
         """
         qualified_name = f"{schema}.{table}"
 
@@ -445,7 +438,7 @@ class Neo4jTableSearch:
                     "edges": edges,
                 }
         except Exception as e:
-            logger.error(f"获取表血缘失败: {e}")
+            logger.error(f"Failed to obtain table lineage:{e}")
             return {"upstream": [], "downstream": [], "edges": []}
 
     @classmethod
@@ -455,20 +448,20 @@ class Neo4jTableSearch:
         target_table: str,
     ) -> list[dict[str, Any]]:
         """
-        获取列级血缘
+        Get rank lineage
 
-        参数：
-        - source_table: 源表（schema.table 格式）
-        - target_table: 目标表（schema.table 格式）
+        parameters:- source_table:source table(schema.table Format)
+        - target_table:target table(schema.table Format)
 
-        返回：
-        - [{sql_id, sql_content, column_mappings}]
+        Return:- [{sql_id,sql_content,column_mappings}]
         """
         source_parts = source_table.split(".", 1)
         target_parts = target_table.split(".", 1)
 
         if len(source_parts) < 2 or len(target_parts) < 2:
-            logger.warning("列级血缘查询需要 schema.table 格式的表名")
+            logger.warning(
+                "Required for column-level ancestry query schema.table Format table name"
+            )
             return []
 
         source_schema, source_name = source_parts
@@ -505,7 +498,7 @@ class Neo4jTableSearch:
                 records = result.data()
                 return [convert_neo4j_types(r) for r in records]
         except Exception as e:
-            logger.error(f"获取列级血缘失败: {e}")
+            logger.error(f"Failed to obtain rank bloodline:{e}")
             return []
 
     @classmethod
@@ -518,14 +511,12 @@ class Neo4jTableSearch:
         user_id: int | None = None,
     ) -> dict[str, Any] | None:
         """
-        根据血缘关系精准查找 SQL
+        Accurate search based on blood relationship SQL
 
-        参数：
-        - source_tables: 源表列表
-        - target_table: 目标表
+        parameters:- source_tables:Source table list
+        - target_table:target table
 
-        返回：
-        - {sql_id, name, content, summary, engine, source_tables, target_table}
+        Return:- {sql_id,name,content,summary,engine,source_tables,target_table}
         """
         target_parts = target_table.split(".", 1)
         if len(target_parts) == 2:
@@ -582,11 +573,11 @@ class Neo4jTableSearch:
                 record = result.single()
                 return convert_neo4j_types(record.data()) if record else None
         except Exception as e:
-            logger.error(f"根据血缘查找 SQL 失败: {e}")
+            logger.error(f"Search based on ancestry SQL failed:{e}")
             return None
 
     # =========================================================================
-    # 混合搜索（表）
+    # hybrid search(table)
     # =========================================================================
 
     @classmethod
@@ -599,15 +590,13 @@ class Neo4jTableSearch:
         user_id: int | None = None,
     ) -> list[dict[str, Any]]:
         """
-        混合搜索表（向量 + 全文）
+        hybrid search table(Vector + Full text)
 
-        参数：
-        - query: 搜索文本
-        - top_k: 返回数量上限
-        - min_score: 最小相似度阈值
+        parameters:- query:Search text
+        - top_k:Return maximum quantity
+        - min_score:Minimum similarity threshold
 
-        返回：
-        - [{type, path, name, description, dataType, table, score}]
+        Return:- [{type,path,name,description,dataType,table,score}]
         """
         from neo4j_graphrag.retrievers import HybridCypherRetriever
         from neo4j_graphrag.types import HybridSearchRanker, RetrieverResultItem
@@ -672,8 +661,8 @@ class Neo4jTableSearch:
                     }
                 )
 
-            logger.debug(f"[表搜索] 总耗时: {time.time() - start:.3f}s")
+            logger.debug(f"[table search] Total time spent:{time.time() - start:.3f}s")
             return recommendations
         except Exception as e:
-            logger.error(f"混合搜索表失败: {e}")
+            logger.error(f"Mixed search table failed:{e}")
             return []

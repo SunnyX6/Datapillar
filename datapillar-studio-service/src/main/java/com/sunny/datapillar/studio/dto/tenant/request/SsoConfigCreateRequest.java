@@ -16,18 +16,17 @@ import lombok.Data;
 @Schema(name = "SsoConfigCreate")
 public class SsoConfigCreateRequest {
 
-    @NotBlank(message = "SSO提供方不能为空")
-    @Pattern(regexp = "(?i)^dingtalk$", message = "参数错误")
-    @Size(max = 32, message = "SSO提供方长度不能超过32个字符")
-    private String provider;
+  @NotBlank(message = "SSOProvider cannot be empty")
+  @Pattern(regexp = "(?i)^dingtalk$", message = "Parameter error")
+  @Size(max = 32, message = "SSOProvider length cannot exceed32characters")
+  private String provider;
 
-    @Size(max = 255, message = "基础URL长度不能超过255个字符")
-    private String baseUrl;
+  @Size(max = 255, message = "BasicsURLThe length cannot exceed255characters")
+  private String baseUrl;
 
-    @Valid
-    private SsoDingtalkConfigItem config;
+  @Valid private SsoDingtalkConfigItem config;
 
-    @Min(value = 0, message = "参数错误")
-    @Max(value = 1, message = "参数错误")
-    private Integer status;
+  @Min(value = 0, message = "Parameter error")
+  @Max(value = 1, message = "Parameter error")
+  private Integer status;
 }

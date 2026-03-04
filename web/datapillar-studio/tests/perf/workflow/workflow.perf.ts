@@ -4,8 +4,8 @@ import { getPerfBudgets } from '../../shared/env'
 import { mockAuthRoutes } from '../../shared/mockAuth'
 import { collectWebVitals, initWebVitals } from '../../shared/webVitals'
 
-test.describe('工作流构建性能', () => {
-  test('工作流画布 Web Vitals', async ({ page }) => {
+test.describe('Workflow build performance', () => {
+  test('workflow canvas Web Vitals', async ({ page }) => {
     const budgets = getPerfBudgets()
 
     await mockAuthRoutes(page)
@@ -13,17 +13,17 @@ test.describe('工作流构建性能', () => {
     await initWebVitals(page)
     await page.goto('/workflow')
 
-    await expect(page.getByRole('heading', { name: '等待任务', level: 3 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Waiting for tasks', level: 3 })).toBeVisible()
 
-    const historyButton = page.getByRole('button', { name: '历史会话' })
+    const historyButton = page.getByRole('button', { name: 'History session' })
     await historyButton.click()
-    await expect(page.getByText('实时数仓构建任务')).toBeVisible()
+    await expect(page.getByText('Real-time data warehouse construction tasks')).toBeVisible()
     await historyButton.click()
 
-    await page.getByRole('button', { name: '新会话' }).click()
+    await page.getByRole('button', { name: 'new session' }).click()
 
-    const input = page.getByPlaceholder('描述你的数据工作流需求...')
-    await input.fill('构建订单明细同步流程')
+    const input = page.getByPlaceholder('Describe your data workflow needs...')
+    await input.fill('Build order details synchronization process')
 
     await page.waitForTimeout(300)
 

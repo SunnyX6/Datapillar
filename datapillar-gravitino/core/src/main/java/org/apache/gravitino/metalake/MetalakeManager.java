@@ -48,6 +48,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.multitenancy.context.TenantContextHolder;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -82,6 +83,11 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
 
     // preload all metalakes and put them into cache, this is useful when user load schema/table
     // directly without list/get metalake first.
+    if (TenantContextHolder.get() == null) {
+      LOG.info("Skip metalake preload during startup because tenant context is not initialized");
+      return;
+    }
+
     BaseMetalake[] baseMetalakes = listMetalakes();
     for (BaseMetalake baseMetalake : baseMetalakes) {
       loadMetalake(baseMetalake.nameIdentifier());

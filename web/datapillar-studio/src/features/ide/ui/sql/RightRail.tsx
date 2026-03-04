@@ -1,6 +1,6 @@
 /**
- * SQL编辑器 - 右侧工具栏组件
- * 基于 BaseRightRail 骨架构建
+ * SQLEditor - Right toolbar component
+ * Based on BaseRightRail skeleton construction
  */
 
 import { useState, useEffect } from 'react'
@@ -37,17 +37,17 @@ import {
 } from '@/services/oneMetaService'
 
 interface RightRailProps {
-  /** 当前选中的 catalog */
+  /** currently selected catalog */
   selectedCatalog?: string
-  /** 当前选中的 schema */
+  /** currently selected schema */
   selectedSchema?: string
-  /** 请求打开 database 面板（用户主动选择时触发） */
+  /** Request to open database panel（Triggered when the user actively selects） */
   requestOpenDatabase?: boolean
-  /** 重置请求状态的回调 */
+  /** Callback to reset request status */
   onResetOpenRequest?: () => void
 }
 
-/** 获取 Catalog 图标 */
+/** Get Catalog icon */
 function getCatalogIcon(iconName?: string, size = 12) {
   const iconProps = { size, className: 'text-blue-600 shrink-0' }
   switch (iconName) {
@@ -84,7 +84,7 @@ function getCatalogIcon(iconName?: string, size = 12) {
   }
 }
 
-/** 右侧按钮配置 */
+/** Right button configuration */
 const RIGHT_RAIL_BUTTONS: RightRailButton[] = [
   {
     id: 'database',
@@ -106,7 +106,7 @@ export function RightRail({ selectedCatalog, selectedSchema, requestOpenDatabase
   const [activePanel, setActivePanel] = useState<string | null>(null)
   const [aiChatInput, setAiChatInput] = useState('')
 
-  // 只有当父组件请求打开 database 面板时才打开（用户主动选择 schema 时）
+  // Only opened when requested by the parent component database Open the panel（Users actively choose schema time）
   useEffect(() => {
     if (requestOpenDatabase) {
       const frameId = requestAnimationFrame(() => {
@@ -117,7 +117,7 @@ export function RightRail({ selectedCatalog, selectedSchema, requestOpenDatabase
     }
   }, [requestOpenDatabase, onResetOpenRequest])
 
-  // 根据当前激活面板渲染标题
+  // Renders the title based on the currently active panel
   const panelTitle = activePanel === 'database' ? (
     <><Database size={12} className="text-amber-500" /><span className="text-micro font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">Data Sources</span></>
   ) : activePanel === 'ai' ? (
@@ -146,7 +146,7 @@ export function RightRail({ selectedCatalog, selectedSchema, requestOpenDatabase
   )
 }
 
-/** 数据源面板 - 树形结构（与 tab 内 catalog/schema 下拉联动） */
+/** Data source panel - tree structure（with tab within catalog/schema Drop-down linkage） */
 function DatabasePanel({
   selectedCatalog,
   selectedSchema
@@ -164,7 +164,7 @@ function DatabasePanel({
   const [tableDetails, setTableDetails] = useState<Map<string, TableItem>>(new Map())
   const [loadingTableId, setLoadingTableId] = useState<string | null>(null)
 
-  // 当选中 catalog 变化时，加载 catalog 信息
+  // selected catalog When changing，Load catalog information
   useEffect(() => {
     if (!selectedCatalog) {
       setCatalog(null)
@@ -186,7 +186,7 @@ function DatabasePanel({
     loadCatalog()
   }, [selectedCatalog])
 
-  // 当选中的 schema 变化时，加载 tables
+  // selected schema When changing，Load tables
   useEffect(() => {
     if (!selectedCatalog || !selectedSchema) {
       setTables([])
@@ -210,7 +210,7 @@ function DatabasePanel({
     loadTables()
   }, [selectedCatalog, selectedSchema])
 
-  // 创建拖拽预览卡片
+  // Create a drag-and-drop preview card
   const createDragPreview = (tableName: string): HTMLElement => {
     const isDark = document.documentElement.classList.contains('dark')
 
@@ -230,7 +230,7 @@ function DatabasePanel({
       font-family: system-ui, -apple-system, sans-serif;
     `
 
-    // 表图标
+    // table icon
     const tableIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     tableIcon.setAttribute('width', '14')
     tableIcon.setAttribute('height', '14')
@@ -240,7 +240,7 @@ function DatabasePanel({
     tableIcon.setAttribute('stroke-width', '2')
     tableIcon.innerHTML = '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M12 3v18"/>'
 
-    // 表名
+    // table name
     const nameEl = document.createElement('span')
     nameEl.style.cssText = `
       font-size: 12px;
@@ -250,7 +250,7 @@ function DatabasePanel({
     `
     nameEl.textContent = tableName
 
-    // 拖拽指示图标 (GripVertical)
+    // drag indicator icon (GripVertical)
     const gripIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     gripIcon.setAttribute('width', '10')
     gripIcon.setAttribute('height', '10')
@@ -265,7 +265,7 @@ function DatabasePanel({
     return preview
   }
 
-  // 切换表的展开/折叠状态
+  // Expansion of switch table/folded state
   const toggleTable = async (table: TableItem) => {
     const isExpanded = expandedTables.has(table.id)
 
@@ -278,7 +278,7 @@ function DatabasePanel({
     } else {
       setExpandedTables(prev => new Set(prev).add(table.id))
 
-      // 如果还没有加载过列信息，则加载
+      // If the column information has not been loaded yet，then load
       if (!tableDetails.has(table.id) && selectedCatalog && selectedSchema) {
         setLoadingTableId(table.id)
         try {
@@ -293,13 +293,13 @@ function DatabasePanel({
     }
   }
 
-  // 未选择 catalog 时显示提示
+  // Not selected catalog Show prompt when
   if (!selectedCatalog || !catalog) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Database size={32} className="text-slate-200 dark:text-slate-700 mb-3" />
-        <p className="text-micro text-slate-400 dark:text-slate-500">请先在编辑器工具栏中</p>
-        <p className="text-micro text-slate-400 dark:text-slate-500">选择 Catalog 和 Schema</p>
+        <p className="text-micro text-slate-400 dark:text-slate-500">Please first click on the editor toolbar</p>
+        <p className="text-micro text-slate-400 dark:text-slate-500">Choose Catalog and Schema</p>
       </div>
     )
   }
@@ -314,7 +314,7 @@ function DatabasePanel({
         </div>
       ) : (
         <div>
-          {/* Catalog 节点 */}
+          {/* Catalog node */}
           <div
             onClick={() => setExpandedCatalog(!expandedCatalog)}
             className="flex items-center gap-1.5 px-2 py-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md cursor-pointer transition-colors"
@@ -327,7 +327,7 @@ function DatabasePanel({
             <span className="text-body-sm font-medium truncate">{catalog.name}</span>
           </div>
 
-          {/* Schema 节点 */}
+          {/* Schema node */}
           {expandedCatalog && selectedSchema && (
             <div className="ml-4 border-l border-slate-100 dark:border-slate-800 pl-2 mt-0.5">
               <div
@@ -351,10 +351,10 @@ function DatabasePanel({
                 {loadingTables ? (
                   <div className="flex items-center gap-2 px-2 py-1 text-caption text-slate-400 dark:text-slate-500">
                     <Loader2 size={12} className="animate-spin" />
-                    <span>加载中...</span>
+                    <span>Loading...</span>
                   </div>
                 ) : tables.length === 0 ? (
-                  <div className="px-2 py-1 text-caption text-slate-400 dark:text-slate-500">暂无表</div>
+                  <div className="px-2 py-1 text-caption text-slate-400 dark:text-slate-500">No table yet</div>
                 ) : (
                   tables.map(table => {
                     const isExpanded = expandedTables.has(table.id)
@@ -375,12 +375,12 @@ function DatabasePanel({
                             }))
                             e.dataTransfer.effectAllowed = 'copy'
 
-                            // 创建科技感拖拽预览卡片
+                            // Create a technological drag-and-drop preview card
                             const preview = createDragPreview(table.name)
                             document.body.appendChild(preview)
                             e.dataTransfer.setDragImage(preview, 20, 20)
 
-                            // 延迟移除预览元素
+                            // Delay removal of preview elements
                             requestAnimationFrame(() => {
                               setTimeout(() => {
                                 document.body.removeChild(preview)
@@ -406,7 +406,7 @@ function DatabasePanel({
                             {isLoadingThis ? (
                               <div className="flex items-center gap-2 px-2 py-0.5 text-legal text-slate-400 dark:text-slate-500">
                                 <Loader2 size={10} className="animate-spin" />
-                                <span>加载列...</span>
+                                <span>load column...</span>
                               </div>
                             ) : detail?.columns && detail.columns.length > 0 ? (
                               detail.columns.map(col => (
@@ -421,7 +421,7 @@ function DatabasePanel({
                                 </div>
                               ))
                             ) : (
-                              <div className="px-2 py-0.5 text-legal text-slate-400 dark:text-slate-500">暂无列信息</div>
+                              <div className="px-2 py-0.5 text-legal text-slate-400 dark:text-slate-500">No information listed yet</div>
                             )}
                           </div>
                         )}
@@ -439,7 +439,7 @@ function DatabasePanel({
   )
 }
 
-/** AI助手面板 */
+/** AIAssistant panel */
 function AIPanel({ aiChatInput, onInputChange }: { aiChatInput: string; onInputChange: (value: string) => void }) {
   const recentDecisions = [
     'Enable State TTL for analysis_01',
@@ -449,7 +449,7 @@ function AIPanel({ aiChatInput, onInputChange }: { aiChatInput: string; onInputC
 
   return (
     <div className="h-full flex flex-col">
-      {/* LIVE INSIGHT 卡片 */}
+      {/* LIVE INSIGHT card */}
       <div className="mb-4 p-3 rounded-xl bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-2 mb-2">
           <div className="p-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/50">
@@ -488,7 +488,7 @@ function AIPanel({ aiChatInput, onInputChange }: { aiChatInput: string; onInputC
         </div>
       </div>
 
-      {/* 快捷操作按钮 */}
+      {/* Quick action button */}
       <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
         <div className="flex flex-wrap gap-2 mb-3">
           <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-indigo-600 text-white text-tiny font-medium hover:bg-indigo-500 transition-colors">
@@ -509,7 +509,7 @@ function AIPanel({ aiChatInput, onInputChange }: { aiChatInput: string; onInputC
           </button>
         </div>
 
-        {/* 输入区域 */}
+        {/* input area */}
         <div className="relative">
           <input
             type="text"

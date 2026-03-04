@@ -1,5 +1,7 @@
 package com.sunny.datapillar.studio.dto.setup.response;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -7,7 +9,8 @@ import lombok.Data;
 @Schema(name = "SetupInitializeResponse")
 public class SetupInitializeResponse {
 
-    private Long tenantId;
+  @JsonSerialize(using = ToStringSerializer.class)
+  private Long tenantId;
 
-    private Long userId;
+  private Long userId;
 }

@@ -9,13 +9,13 @@ import lombok.Data;
 @Schema(name = "RoleCreate")
 public class RoleCreateRequest {
 
-    @NotBlank(message = "角色名称不能为空")
-    @Size(max = 64, message = "角色名称长度不能超过64个字符")
-    private String name;
+  @NotBlank(message = "Role name cannot be empty")
+  @Size(max = 64, message = "The character name cannot be longer than64characters")
+  private String name;
 
-    @Size(max = 255, message = "角色描述长度不能超过255个字符")
-    private String description;
+  @Size(max = 255, message = "Character descriptions cannot be longer than255characters")
+  private String description;
 
-    @Size(max = 16, message = "角色类型长度不能超过16个字符")
-    private String type;
+  @Size(max = 16, message = "The character type length cannot exceed16characters")
+  private String type;
 }

@@ -16,15 +16,15 @@ import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
 
 /**
- * 租户邀请业务服务
- * 提供租户邀请业务业务能力与领域服务
+ * Tenant invitation business service Provide tenant invitation business capabilities and domain
+ * services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface TenantInvitationBizService {
 
-    InvitationDetailResponse getInvitationByCode(String inviteCode);
+  InvitationDetailResponse getInvitationByCode(String inviteCode);
 
-    void registerInvitation(InvitationRegisterRequest request);
+  void registerInvitation(InvitationRegisterRequest request);
 }

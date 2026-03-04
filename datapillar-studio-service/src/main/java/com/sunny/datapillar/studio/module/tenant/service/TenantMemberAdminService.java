@@ -18,21 +18,21 @@ import com.sunny.datapillar.studio.module.user.entity.User;
 import java.util.List;
 
 /**
- * 租户Member管理服务
- * 提供租户Member管理业务能力与领域服务
+ * tenantMemberManagement services Provide tenantsMemberManagement business capabilities and domain
+ * services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface TenantMemberAdminService {
 
-    List<User> listUsers(Integer status);
+  List<User> listUsers(Integer status);
 
-    void updateMemberStatus(Long userId, Integer status);
+  void updateMemberStatus(Long userId, Integer status);
 
-    void updateUser(Long userId, UserUpdateRequest dto);
+  void updateUser(Long userId, UserUpdateRequest dto);
 
-    List<RoleResponse> getRolesByUserId(Long userId);
+  List<RoleResponse> getRolesByUserId(Long userId);
 
-    void assignRoles(Long userId, List<Long> roleIds);
+  void assignRoles(Long userId, List<Long> roleIds);
 }

@@ -1,24 +1,21 @@
 package com.sunny.datapillar.openlineage.security;
 
-/**
- * 租户上下文 ThreadLocal。
- */
+/** Tenant context ThreadLocal. */
 public final class TenantContextHolder {
 
-    private static final ThreadLocal<TenantContext> HOLDER = new ThreadLocal<>();
+  private static final ThreadLocal<TenantContext> HOLDER = new ThreadLocal<>();
 
-    private TenantContextHolder() {
-    }
+  private TenantContextHolder() {}
 
-    public static void set(TenantContext context) {
-        HOLDER.set(context);
-    }
+  public static void set(TenantContext context) {
+    HOLDER.set(context);
+  }
 
-    public static TenantContext get() {
-        return HOLDER.get();
-    }
+  public static TenantContext get() {
+    return HOLDER.get();
+  }
 
-    public static void clear() {
-        HOLDER.remove();
-    }
+  public static void clear() {
+    HOLDER.remove();
+  }
 }

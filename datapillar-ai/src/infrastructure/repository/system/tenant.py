@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-02-07
 
-"""租户数据访问。"""
+"""Tenant data access."""
 
 from __future__ import annotations
 
@@ -34,7 +33,7 @@ class Tenant:
                 value = str(row[0] or "").strip()
                 return value or None
         except Exception as exc:
-            logger.error("获取租户编码失败: %s", exc)
+            logger.error("Failed to obtain tenant code:%s", exc)
             return None
 
     @staticmethod
@@ -54,5 +53,5 @@ class Tenant:
                     return None
                 return row[0]
         except Exception as exc:
-            logger.error("获取租户公钥失败: %s", exc)
+            logger.error("Failed to obtain tenant public key:%s", exc)
             return None

@@ -1,33 +1,33 @@
 /**
- * 国际化状态管理 - Zustand
+ * International status management - Zustand
  *
- * 功能：
- * 1. 支持 zh-CN/en-US 两种语言
- * 2. localStorage 持久化用户选择
- * 3. 同步切换 i18next 语言
+ * Function：
+ * 1. support zh-CN/en-US two languages
+ * 2. localStorage Persisting user selections
+ * 3. Synchronous switching i18next language
  */
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import i18n from '@/app/i18n'
 
-// ==================== 类型定义 ====================
+// ==================== type definition ====================
 
 export type Language = 'zh-CN' | 'en-US'
 
 interface I18nState {
-  // 状态
-  language: Language // 当前语言
+  // Status
+  language: Language // Current language
 
   // Actions
   setLanguage: (language: Language) => void
   initialize: () => void
 }
 
-// ==================== 工具函数 ====================
+// ==================== Utility function ====================
 
 /**
- * 切换 i18next 语言
+ * switch i18next language
  */
 const changeI18nLanguage = (language: Language) => {
   i18n.changeLanguage(language)
@@ -38,11 +38,11 @@ const changeI18nLanguage = (language: Language) => {
 export const useI18nStore = create<I18nState>()(
   persist(
     (set, get) => ({
-      // 初始状态（默认中文）
+      // initial state（Default Chinese）
       language: 'zh-CN',
 
       /**
-       * 设置语言
+       * Set language
        */
       setLanguage: (language: Language) => {
         set({ language })
@@ -50,8 +50,8 @@ export const useI18nStore = create<I18nState>()(
       },
 
       /**
-       * 初始化语言
-       * 应用启动时调用，设置初始语言
+       * initialization language
+       * Called when the application starts，Set initial language
        */
       initialize: () => {
         const { language } = get()
@@ -60,8 +60,8 @@ export const useI18nStore = create<I18nState>()(
     }),
     {
       name: 'i18n-storage', // localStorage key
-      storage: createJSONStorage(() => localStorage), // 持久化到 localStorage
-      // 只持久化 language
+      storage: createJSONStorage(() => localStorage), // persist to localStorage
+      // Persistence only language
       partialize: (state) => ({
         language: state.language
       })
@@ -69,17 +69,17 @@ export const useI18nStore = create<I18nState>()(
   )
 )
 
-// ==================== 辅助 Hooks ====================
+// ==================== Auxiliary Hooks ====================
 
 /**
- * 获取当前语言
+ * Get current language
  */
 export const useLanguage = () => {
   return useI18nStore(state => state.language)
 }
 
 /**
- * 检查是否为中文
+ * Check if it is Chinese
  */
 export const useIsZhCN = () => {
   return useI18nStore(state => state.language === 'zh-CN')

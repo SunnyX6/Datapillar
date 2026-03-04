@@ -1,15 +1,13 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-需求分析数据结构
+Requirements analysis data structure
 
-AnalystAgent 的职责是业务分析：
-- 将用户需求拆分为多条 pipeline
-- 每条 pipeline 由多个 Job 组成，每个 Job 明确 source_tables/target_table
-- 只关心"做什么"，不关心"怎么做"
-- 不涉及 SQL、Stage 等技术细节
+AnalystAgent Responsibilities are Business Analysis:- Split user needs into multiple items pipeline
+- each pipeline by multiple Job composition,each Job clear source_tables/target_table
+- only care"what to do",dont care"how to do"
+- Not involved SQL,Stage and other technical details
 """
 
 import json
@@ -32,16 +30,15 @@ def _try_parse_json(value: object) -> object:
 
 class AmbiguityItem(BaseModel):
     """
-    结构化澄清项
+    structured clarifying items
 
-    说明：
-    - 表问题：candidates 中必须是 catalog.schema.table
-    - 调度周期问题：candidates 是可选 cron 列表（可为空）
+    Description:- table problem:candidates in must be catalog.schema.table
+    - Scheduling cycle problem:candidates is optional cron list(Can be null)
     """
 
-    type: Literal["table", "schedule"] = Field(..., description="问题类型：table/schedule")
-    question: str = Field(..., description="需要澄清的问题")
-    candidates: list[str] = Field(default_factory=list, description="候选项列表")
+    type: Literal["table", "schedule"] = Field(..., description="Question type:table/schedule")
+    question: str = Field(..., description="Questions that need clarification")
+    candidates: list[str] = Field(default_factory=list, description="Candidate list")
 
     @field_validator("candidates", mode="before")
     @classmethod
@@ -57,18 +54,21 @@ class AmbiguityItem(BaseModel):
 
 class PipelineJob(BaseModel):
     """
-    PipelineJob - 业务步骤
+    PipelineJob - business steps
 
-    业务层面的概念，表示 pipeline 内的一个逻辑步骤。
-    每个 Job 支持多个 source_tables，只有一个 target_table。
+    business level concepts,express pipeline a logical step within.each Job Support multiple source_tables,only one target_table.
     """
 
-    job_id: str = Field(..., description="Job 唯一标识（需带 pipeline 前缀）")
-    job_name: str = Field(..., description="Job 名称")
-    description: str = Field(..., description="这个 Job 做什么（业务描述）")
-    source_tables: list[str] = Field(default_factory=list, description="源表列表（catalog.schema.table）")
-    target_table: str | None = Field(None, description="目标表（单表，catalog.schema.table）")
-    depends_on: list[str] = Field(default_factory=list, description="依赖的上游 Job ID")
+    job_id: str = Field(..., description="Job unique identifier(Need to bring pipeline prefix)")
+    job_name: str = Field(..., description="Job Name")
+    description: str = Field(..., description="this Job what to do(Business description)")
+    source_tables: list[str] = Field(
+        default_factory=list, description="Source table list(catalog.schema.table)"
+    )
+    target_table: str | None = Field(
+        None, description="target table(Single table,catalog.schema.table)"
+    )
+    depends_on: list[str] = Field(default_factory=list, description="Dependent upstream Job ID")
 
     @field_validator("source_tables", "depends_on", mode="before")
     @classmethod
@@ -84,24 +84,26 @@ class PipelineJob(BaseModel):
 
 class Pipeline(BaseModel):
     """
-    Pipeline - 业务线/工作流路线
+    Pipeline - business line/workflow route
 
-    一条 pipeline 对应一条业务线，通过多个 Job 组织多源多目标路径。
+    one piece pipeline Corresponds to a business line,through multiple Job Organize multi-source and multi-destination paths.
     """
 
-    pipeline_id: str = Field(..., description="Pipeline 唯一标识")
-    pipeline_name: str = Field(..., description="Pipeline 名称（由 LLM 生成）")
-    schedule: str | None = Field(..., description="调度周期 cron 表达式，未明确则为 null")
-    jobs: list[PipelineJob] = Field(default_factory=list, description="Job 列表")
+    pipeline_id: str = Field(..., description="Pipeline unique identifier")
+    pipeline_name: str = Field(..., description="Pipeline Name(by LLM generate)")
+    schedule: str | None = Field(
+        ..., description="Scheduling cycle cron expression,If not specified,it is null"
+    )
+    jobs: list[PipelineJob] = Field(default_factory=list, description="Job list")
     depends_on_pipelines: list[str] = Field(
-        default_factory=list, description="依赖的上游 Pipeline ID 列表"
+        default_factory=list, description="Dependent upstream Pipeline ID list"
     )
     ambiguities: list[AmbiguityItem] = Field(
         default_factory=list,
-        description="该 Pipeline 需要澄清的结构化问题列表",
+        description="the Pipeline Structured list of questions requiring clarification",
     )
     confidence: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="该 Pipeline 的需求明确程度"
+        default=0.5, ge=0.0, le=1.0, description="the Pipeline degree of clarity of needs"
     )
 
     @field_validator("depends_on_pipelines", mode="before")
@@ -138,39 +140,39 @@ class Pipeline(BaseModel):
 
 class AnalysisResultOutput(BaseModel):
     """
-    LLM 输出的需求分析结果（用于 structured output）
+    LLM Output requirements analysis results(used for structured output)
 
-    不含 user_query，因为那是代码传入的。
-    """
+    Does not contain user_query,Because thats what the code passed in."""
 
-    summary: str = Field(..., description="一句话概括用户需求（必须具体，不能模糊）")
-    pipelines: list[Pipeline] = Field(default_factory=list, description="Pipeline 列表")
+    summary: str = Field(
+        ..., description="Summarize user needs in one sentence(Must be specific,Cant be blurry)"
+    )
+    pipelines: list[Pipeline] = Field(default_factory=list, description="Pipeline list")
 
     @field_validator("pipelines", mode="before")
     @classmethod
     def _parse_pipelines(cls, v: object) -> object:
         return _try_parse_json(v)
 
+
 class AnalysisResult(BaseModel):
     """
-    需求分析结果（AnalystAgent 输出）
+    Requirements analysis results(AnalystAgent output)
 
-    业务层面的分析：
-    - 将用户需求拆分为多条 pipeline
-    - 每条 pipeline 由多个 Job 组成，每个 Job 明确 source_tables/target_table
-    - 标注歧义点
+    Business level analysis:- Split user needs into multiple items pipeline
+    - each pipeline by multiple Job composition,each Job clear source_tables/target_table
+    - Mark ambiguous points
 
-    不涉及技术实现（Job、Stage、SQL），那是架构师的职责。
-    """
+    Does not involve technical implementation(Job,Stage,SQL),Thats the architects job."""
 
-    user_query: str = Field(..., description="用户原始输入")
-    summary: str = Field(..., description="一句话概括用户需求")
+    user_query: str = Field(..., description="original user input")
+    summary: str = Field(..., description="Summarize user needs in one sentence")
 
-    pipelines: list[Pipeline] = Field(default_factory=list, description="Pipeline 列表")
+    pipelines: list[Pipeline] = Field(default_factory=list, description="Pipeline list")
 
     @classmethod
     def from_output(cls, output: AnalysisResultOutput, user_query: str) -> "AnalysisResult":
-        """从 LLM 输出构建完整的分析结果"""
+        """from LLM Output builds complete analysis results"""
         return cls(
             user_query=user_query,
             summary=output.summary,
@@ -178,7 +180,7 @@ class AnalysisResult(BaseModel):
         )
 
     def needs_clarification(self) -> bool:
-        """是否需要用户澄清"""
+        """Does the user need clarification?"""
         for pipeline in self.pipelines:
             if pipeline.ambiguities:
                 return True
@@ -187,7 +189,7 @@ class AnalysisResult(BaseModel):
         return False
 
     def get_all_tables(self) -> list[str]:
-        """获取所有涉及的表"""
+        """Get all involved tables"""
         tables = set()
         for pipeline in self.pipelines:
             for job in pipeline.jobs:
@@ -199,7 +201,7 @@ class AnalysisResult(BaseModel):
         return list(tables)
 
     def job_by_id(self, job_id: str) -> PipelineJob | None:
-        """根据 ID 获取 Job"""
+        """According to ID Get Job"""
         for pipeline in self.pipelines:
             for job in pipeline.jobs:
                 if job.job_id == job_id:
@@ -207,19 +209,19 @@ class AnalysisResult(BaseModel):
         return None
 
     def plan_summary(self) -> str:
-        """获取执行计划摘要"""
+        """Get execution plan summary"""
         lines = []
         for pipeline in self.pipelines:
             deps = (
-                f" (依赖 pipeline: {', '.join(pipeline.depends_on_pipelines)})"
+                f" (Depend on pipeline:{','.join(pipeline.depends_on_pipelines)})"
                 if pipeline.depends_on_pipelines
                 else ""
             )
             lines.append(f"[Pipeline {pipeline.pipeline_id}] {pipeline.pipeline_name}{deps}")
             for job in pipeline.jobs:
-                job_deps = f" (依赖: {', '.join(job.depends_on)})" if job.depends_on else ""
-                source_label = ", ".join(job.source_tables) if job.source_tables else "未指定"
-                target_label = job.target_table or "未指定"
+                job_deps = f" (Depend on:{','.join(job.depends_on)})" if job.depends_on else ""
+                source_label = ", ".join(job.source_tables) if job.source_tables else "unspecified"
+                target_label = job.target_table or "unspecified"
                 lines.append(f"  [{job.job_name}] {source_label} → {target_label}{job_deps}")
                 lines.append(f"    {job.description}")
         return "\n".join(lines)

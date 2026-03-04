@@ -64,10 +64,10 @@ export function FeatureStepGrant({
     <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
-          <h3 className={sectionTitleClassName}>默认授权矩阵 (Inheritance)</h3>
+          <h3 className={sectionTitleClassName}>Default authorization matrix (Inheritance)</h3>
           <Button size="small" variant="ghost" className={cn(TYPOGRAPHY.micro, 'text-brand-600 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-200')}>
             <Plus size={12} />
-            添加角色
+            Add role
           </Button>
         </div>
         <Card variant="default" padding="none" className={cn(cardClassName, 'overflow-hidden shadow-none dark:shadow-none')}>
@@ -76,7 +76,7 @@ export function FeatureStepGrant({
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
               <input
                 type="text"
-                placeholder="搜索角色名或 ID..."
+                placeholder="Search for character name or ID..."
                 className={cn(
                   TYPOGRAPHY.legal,
                   'w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-full outline-none focus:border-brand-400 dark:focus:border-brand-400/70 focus:ring-2 focus:ring-brand-500/10 dark:focus:ring-brand-500/20 text-slate-600 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500'
@@ -86,11 +86,11 @@ export function FeatureStepGrant({
             <div className="flex items-center gap-5 flex-wrap justify-end">
               <div className={cn(TYPOGRAPHY.legal, 'flex items-center gap-2 text-slate-500 dark:text-slate-400')}>
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                系统角色
+                system role
               </div>
               <div className={cn(TYPOGRAPHY.legal, 'flex items-center gap-2 text-slate-400 dark:text-slate-500')}>
                 <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600" />
-                自定义角色
+                Custom role
               </div>
             </div>
           </div>
@@ -112,10 +112,10 @@ export function FeatureStepGrant({
                       {isAllSelected && <Check size={8} className="text-white" />}
                     </button>
                   </th>
-                  <th className="px-3 py-2 text-left">角色身份 (IDENTITY)</th>
-                  <th className="px-3 py-2 text-left w-40">覆盖成员 (REACH)</th>
-                  <th className="px-3 py-2 text-left w-40">权限溯源 (ORIGIN)</th>
-                  <th className="px-3 py-2 text-right">授权策略 (POLICY)</th>
+                  <th className="px-3 py-2 text-left">role identity (IDENTITY)</th>
+                  <th className="px-3 py-2 text-left w-40">Override members (REACH)</th>
+                  <th className="px-3 py-2 text-left w-40">Permission traceability (ORIGIN)</th>
+                  <th className="px-3 py-2 text-right">Authorization policy (POLICY)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -147,10 +147,10 @@ export function FeatureStepGrant({
                         <div className={cn(TYPOGRAPHY.legal, 'font-black text-slate-700 dark:text-slate-100')}>{role.name}</div>
                       </td>
                       <td className="px-3 py-2">
-                        <div className={cn(TYPOGRAPHY.legal, 'text-slate-400 dark:text-slate-500')}>{role.userCount} 成员受影响</div>
+                        <div className={cn(TYPOGRAPHY.legal, 'text-slate-400 dark:text-slate-500')}>{role.userCount} members affected</div>
                       </td>
                       <td className="px-3 py-2">
-                        <div className={cn(TYPOGRAPHY.legal, 'text-slate-400 dark:text-slate-500')}>{role.isSystem ? '平台角色' : '自定义角色'}</div>
+                        <div className={cn(TYPOGRAPHY.legal, 'text-slate-400 dark:text-slate-500')}>{role.isSystem ? 'platform role' : 'Custom role'}</div>
                       </td>
                       <td className="px-3 py-2 text-right">
                         <div className="flex justify-end">
@@ -169,7 +169,7 @@ export function FeatureStepGrant({
                                   }`
                                 )}
                               >
-                                {level === 'DISABLE' ? '禁止' : level === 'READ' ? '只读' : '管理'}
+                                {level === 'DISABLE' ? 'prohibited' : level === 'READ' ? 'read only' : 'management'}
                               </button>
                             ))}
                           </div>
@@ -184,10 +184,10 @@ export function FeatureStepGrant({
             {selectedCount > 0 && (
               <div className="absolute bottom-3 right-4 z-20">
                 <div className="bg-slate-900 dark:bg-slate-800 text-white dark:text-slate-100 px-3 py-1 rounded-full shadow-xl shadow-slate-900/20 flex items-center gap-2 border border-slate-800 dark:border-slate-700">
-                  <div className={cn(TYPOGRAPHY.caption, 'font-medium whitespace-nowrap')}>已选 {selectedCount} 项</div>
+                  <div className={cn(TYPOGRAPHY.caption, 'font-medium whitespace-nowrap')}>Selected {selectedCount} item</div>
                   {pendingLevel && (
                     <div className={cn(TYPOGRAPHY.caption, 'text-slate-300 dark:text-slate-400 whitespace-nowrap')}>
-                      策略：{pendingLevel === 'DISABLE' ? '禁止' : pendingLevel === 'READ' ? '只读' : '管理'}
+                      Strategy：{pendingLevel === 'DISABLE' ? 'prohibited' : pendingLevel === 'READ' ? 'read only' : 'management'}
                     </div>
                   )}
                   <button
@@ -198,7 +198,7 @@ export function FeatureStepGrant({
                     }}
                     className="text-xs text-slate-400 dark:text-slate-400 hover:text-white transition-colors"
                   >
-                    清空
+                    Clear
                   </button>
                   <Button
                     size="small"
@@ -207,7 +207,7 @@ export function FeatureStepGrant({
                     className="bg-brand-500 hover:bg-brand-400 dark:bg-brand-400 dark:hover:bg-brand-300 text-white border-0 shadow-lg shadow-brand-500/25 px-3 py-1 h-7"
                     onClick={handleBulkApply}
                   >
-                    确认授权
+                    Confirm authorization
                   </Button>
                 </div>
               </div>

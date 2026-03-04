@@ -7,17 +7,17 @@ import lombok.Data;
 @Schema(name = "SsoConfigDingtalkConfig")
 public class SsoDingtalkConfigItem {
 
-    private String clientId;
+  private String clientId;
 
-    private String clientSecret;
+  private String clientSecret;
 
-    private String redirectUri;
+  private String redirectUri;
 
-    private String scope;
+  private String scope;
 
-    private String responseType;
+  private String responseType;
 
-    private String prompt;
+  private String prompt;
 
-    private String corpId;
+  private String corpId;
 }

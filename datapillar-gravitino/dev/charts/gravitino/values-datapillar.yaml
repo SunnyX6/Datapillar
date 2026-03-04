@@ -1,0 +1,8 @@
+cache:
+  implementation: org.apache.gravitino.extensions.multitenancy.cache.TenantScopedEntityCache
+
+authorization:
+  impl: org.apache.gravitino.extensions.multitenancy.authorization.TenantAwareAuthorizer
+
+additionalConfigItems:
+  gravitino.extensions.multitenancy.sqlRewrite.enabled: "true"

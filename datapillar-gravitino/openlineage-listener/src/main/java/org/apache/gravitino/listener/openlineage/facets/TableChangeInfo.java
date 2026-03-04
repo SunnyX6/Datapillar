@@ -25,18 +25,18 @@ import lombok.Builder;
 import lombok.Getter;
 
 /**
- * 表变更信息
+ * Table change information
  *
- * <p>用于在 OpenLineage 事件中传递具体的表/列变更操作
+ * <p>used in OpenLineage Pass the specific table in the event/Column change operation
  */
 @Getter
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class TableChangeInfo {
 
-  /** 变更类型 */
+  /** Change type */
   public enum ChangeType {
-    // 表级别变更
+    // Table level changes
     RENAME_TABLE,
     UPDATE_COMMENT,
     SET_PROPERTY,
@@ -44,7 +44,7 @@ public class TableChangeInfo {
     ADD_INDEX,
     DELETE_INDEX,
 
-    // 列级别变更
+    // Column level changes
     ADD_COLUMN,
     DELETE_COLUMN,
     RENAME_COLUMN,
@@ -56,71 +56,73 @@ public class TableChangeInfo {
     UPDATE_COLUMN_AUTO_INCREMENT
   }
 
-  /** 变更类型 */
+  /** Change type */
   @JsonProperty("type")
   private final ChangeType type;
 
-  /** 新表名（RENAME_TABLE 时使用） */
+  /** New table name（RENAME_TABLE used when） */
   @JsonProperty("newName")
   private final String newName;
 
-  /** 新注释（UPDATE_COMMENT / UPDATE_COLUMN_COMMENT 时使用） */
+  /** new annotation（UPDATE_COMMENT / UPDATE_COLUMN_COMMENT used when） */
   @JsonProperty("newComment")
   private final String newComment;
 
-  /** 属性键（SET_PROPERTY / REMOVE_PROPERTY 时使用） */
+  /** property key（SET_PROPERTY / REMOVE_PROPERTY used when） */
   @JsonProperty("propertyKey")
   private final String propertyKey;
 
-  /** 属性值（SET_PROPERTY 时使用） */
+  /** attribute value（SET_PROPERTY used when） */
   @JsonProperty("propertyValue")
   private final String propertyValue;
 
-  /** 列名（列级别变更时使用） */
+  /** List（Used when column level changes） */
   @JsonProperty("columnName")
   private final String columnName;
 
-  /** 旧列名（RENAME_COLUMN 时使用） */
+  /** old column name（RENAME_COLUMN used when） */
   @JsonProperty("oldColumnName")
   private final String oldColumnName;
 
-  /** 新列名（RENAME_COLUMN 时使用） */
+  /** New listing（RENAME_COLUMN used when） */
   @JsonProperty("newColumnName")
   private final String newColumnName;
 
-  /** 列数据类型（ADD_COLUMN / UPDATE_COLUMN_TYPE 时使用） */
+  /** Column data type（ADD_COLUMN / UPDATE_COLUMN_TYPE used when） */
   @JsonProperty("dataType")
   private final String dataType;
 
-  /** 列注释（ADD_COLUMN 时使用） */
+  /** Column comments（ADD_COLUMN used when） */
   @JsonProperty("columnComment")
   private final String columnComment;
 
-  /** 列是否可空（ADD_COLUMN / UPDATE_COLUMN_NULLABILITY 时使用） */
+  /** Whether the column is nullable（ADD_COLUMN / UPDATE_COLUMN_NULLABILITY used when） */
   @JsonProperty("nullable")
   private final Boolean nullable;
 
-  /** 列是否自增（ADD_COLUMN / UPDATE_COLUMN_AUTO_INCREMENT 时使用） */
+  /** Whether the column is auto-incremented（ADD_COLUMN / UPDATE_COLUMN_AUTO_INCREMENT used when） */
   @JsonProperty("autoIncrement")
   private final Boolean autoIncrement;
 
-  /** 列默认值（ADD_COLUMN / UPDATE_COLUMN_DEFAULT_VALUE 时使用） */
+  /** Column default value（ADD_COLUMN / UPDATE_COLUMN_DEFAULT_VALUE used when） */
   @JsonProperty("defaultValue")
   private final String defaultValue;
 
-  /** 列位置（ADD_COLUMN / UPDATE_COLUMN_POSITION 时使用，如 "FIRST" 或 "AFTER xxx"） */
+  /**
+   * column position（ADD_COLUMN / UPDATE_COLUMN_POSITION used when，Such as "FIRST" or "AFTER xxx"）
+   */
   @JsonProperty("position")
   private final String position;
 
-  /** 索引名（ADD_INDEX / DELETE_INDEX 时使用） */
+  /** Index name（ADD_INDEX / DELETE_INDEX used when） */
   @JsonProperty("indexName")
   private final String indexName;
 
-  /** 索引类型（ADD_INDEX 时使用） */
+  /** Index type（ADD_INDEX used when） */
   @JsonProperty("indexType")
   private final String indexType;
 
-  /** 索引列（ADD_INDEX 时使用） */
+  /** Index column（ADD_INDEX used when） */
   @JsonProperty("indexColumns")
   private final String[] indexColumns;
 }

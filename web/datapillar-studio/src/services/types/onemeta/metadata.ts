@@ -1,6 +1,6 @@
 /**
- * One Meta (Gravitino) 服务的响应类型定义
- * 基于 Apache Gravitino REST API
+ * One Meta (Gravitino) Service response type definition
+ * Based on Apache Gravitino REST API
  */
 
 export interface GravitinoBaseResponse {

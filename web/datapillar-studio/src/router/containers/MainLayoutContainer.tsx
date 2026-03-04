@@ -70,9 +70,9 @@ export function MainLayoutContainer() {
         if (result.outcome === 'SUCCESS' || result.outcome === 'ALREADY_EXPIRED') {
           return
         }
-        toast.error(result.message ?? '退出登录失败，请稍后重试')
+        toast.error(result.message ?? 'Logout failed，Please try again later')
       } catch {
-        toast.error('退出登录失败，请稍后重试')
+        toast.error('Logout failed，Please try again later')
       }
     })()
   }

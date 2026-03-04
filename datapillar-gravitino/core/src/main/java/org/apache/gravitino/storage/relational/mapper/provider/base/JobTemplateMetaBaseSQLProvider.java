@@ -20,36 +20,47 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
 import org.apache.ibatis.annotations.Param;
 
 public class JobTemplateMetaBaseSQLProvider {
 
   public String insertJobTemplateMeta(@Param("jobTemplateMeta") JobTemplatePO jobTemplatePO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + JobTemplateMetaMapper.TABLE_NAME
         + " (job_template_id, job_template_name, metalake_id,"
         + " job_template_comment, job_template_content, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES (#{jobTemplateMeta.jobTemplateId}, #{jobTemplateMeta.jobTemplateName},"
         + " #{jobTemplateMeta.metalakeId}, #{jobTemplateMeta.jobTemplateComment},"
         + " #{jobTemplateMeta.jobTemplateContent}, #{jobTemplateMeta.auditInfo},"
         + " #{jobTemplateMeta.currentVersion}, #{jobTemplateMeta.lastVersion},"
-        + " #{jobTemplateMeta.deletedAt})";
+        + " #{jobTemplateMeta.deletedAt}, "
+        + tenantId
+        + ")";
   }
 
   public String insertJobTemplateMetaOnDuplicateKeyUpdate(
       @Param("jobTemplateMeta") JobTemplatePO jobTemplatePO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + JobTemplateMetaMapper.TABLE_NAME
         + " (job_template_id, job_template_name, metalake_id,"
         + " job_template_comment, job_template_content, audit_info, current_version,"
-        + " last_version, deleted_at)"
+        + " last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES (#{jobTemplateMeta.jobTemplateId}, #{jobTemplateMeta.jobTemplateName},"
         + " #{jobTemplateMeta.metalakeId}, #{jobTemplateMeta.jobTemplateComment},"
         + " #{jobTemplateMeta.jobTemplateContent}, #{jobTemplateMeta.auditInfo},"
         + " #{jobTemplateMeta.currentVersion}, #{jobTemplateMeta.lastVersion},"
-        + " #{jobTemplateMeta.deletedAt})"
+        + " #{jobTemplateMeta.deletedAt}, "
+        + tenantId
+        + ")"
         + " ON DUPLICATE KEY UPDATE"
         + " job_template_name = #{jobTemplateMeta.jobTemplateName},"
         + " metalake_id = #{jobTemplateMeta.metalakeId},"
@@ -62,6 +73,7 @@ public class JobTemplateMetaBaseSQLProvider {
   }
 
   public String listJobTemplatePOsByMetalake(@Param("metalakeName") String metalakeName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT jtm.job_template_id AS jobTemplateId, jtm.job_template_name AS jobTemplateName,"
         + " jtm.metalake_id AS metalakeId, jtm.job_template_comment AS jobTemplateComment,"
         + " jtm.job_template_content AS jobTemplateContent, jtm.audit_info AS auditInfo,"
@@ -72,12 +84,17 @@ public class JobTemplateMetaBaseSQLProvider {
         + " jtm JOIN "
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON jtm.metalake_id = mm.metalake_id"
-        + " WHERE mm.metalake_name = #{metalakeName} AND jtm.deleted_at = 0 AND mm.deleted_at = 0";
+        + " WHERE mm.metalake_name = #{metalakeName} AND jtm.deleted_at = 0 AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("jtm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId);
   }
 
   public String selectJobTemplatePOByMetalakeAndName(
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateName") String jobTemplateName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT jtm.job_template_id AS jobTemplateId, jtm.job_template_name AS jobTemplateName,"
         + " jtm.metalake_id AS metalakeId, jtm.job_template_comment AS jobTemplateComment,"
         + " jtm.job_template_content AS jobTemplateContent, jtm.audit_info AS auditInfo,"
@@ -89,12 +106,17 @@ public class JobTemplateMetaBaseSQLProvider {
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON jtm.metalake_id = mm.metalake_id"
         + " WHERE mm.metalake_name = #{metalakeName} AND jtm.job_template_name = #{jobTemplateName}"
-        + " AND jtm.deleted_at = 0 AND mm.deleted_at = 0";
+        + " AND jtm.deleted_at = 0 AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("jtm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId);
   }
 
   public String softDeleteJobTemplateMetaByMetalakeAndName(
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateName") String jobTemplateName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + JobTemplateMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -102,22 +124,30 @@ public class JobTemplateMetaBaseSQLProvider {
         + " WHERE job_template_name = #{jobTemplateName} AND metalake_id ="
         + " (SELECT metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
-        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0)"
-        + " AND deleted_at = 0";
+        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ")"
+        + " AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteJobTemplateMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + JobTemplateMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000.0"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteJobTemplateMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + JobTemplateMetaMapper.TABLE_NAME
-        + " WHERE deleted_at < #{legacyTimeline} AND deleted_at > 0 LIMIT #{limit}";
+        + " WHERE deleted_at < #{legacyTimeline} AND deleted_at > 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 }

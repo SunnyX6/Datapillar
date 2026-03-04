@@ -24,10 +24,10 @@ interface AdaptiveGridProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 /**
- * AdaptiveGrid：Tailwind 原子拼出的参数化栅格
+ * AdaptiveGrid：Tailwind A parametric grid made of atoms
  *
- * - variant 定义断点组合
- * - gap 可独立控制
+ * - variant Define breakpoint combinations
+ * - gap Can be controlled independently
  */
 export function AdaptiveGrid({
   variant = 'dashboard',

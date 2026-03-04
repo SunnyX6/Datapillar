@@ -31,7 +31,7 @@ interface MetricFormLeftProps {
 
 const PAGE_SIZE = 8
 
-/** 单位选择器 - 支持无限滚动 */
+/** Unit selector - Support infinite scroll */
 function UnitSelector({
   value,
   unitName,
@@ -57,7 +57,7 @@ function UnitSelector({
 
   const hasMore = units.length < total
 
-  // 加载首页数据
+  // Load homepage data
   const loadInitial = useCallback(async () => {
     if (initialized || loading) return
     setLoading(true)
@@ -73,7 +73,7 @@ function UnitSelector({
     }
   }, [initialized, loading])
 
-  // 加载更多
+  // load more
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
@@ -82,7 +82,7 @@ function UnitSelector({
       setUnits((prev) => [...prev, ...data.items.map((u) => ({ symbol: u.symbol || u.code[0], name: u.name, code: u.code }))])
       setTotal(data.total)
     } catch {
-      // 加载失败
+      // Loading failed
     } finally {
       setLoadingMore(false)
     }
@@ -127,7 +127,7 @@ function UnitSelector({
     }
   }, [open])
 
-  // 滚动加载更多
+  // Scroll to load more
   useEffect(() => {
     if (!open || !listRef.current) return
     const list = listRef.current
@@ -143,7 +143,7 @@ function UnitSelector({
   const selectedUnit = units.find((u) => u.code === value)
   const displayLabel = selectedUnit
     ? `${selectedUnit.symbol} ${selectedUnit.name}`
-    : (unitName ? `${unitSymbol || ''} ${unitName}`.trim() : (value || '请选择单位'))
+    : (unitName ? `${unitSymbol || ''} ${unitName}`.trim() : (value || 'Please select the unit'))
 
   return (
     <>
@@ -173,7 +173,7 @@ function UnitSelector({
                 <Loader2 size={16} className="animate-spin text-slate-400" />
               </div>
             ) : units.length === 0 ? (
-              <div className="py-4 text-center text-xs text-slate-400">暂无单位数据</div>
+              <div className="py-4 text-center text-xs text-slate-400">No unit data yet</div>
             ) : (
               <>
                 {units.map((unit) => (
@@ -206,7 +206,7 @@ function UnitSelector({
                   </div>
                 )}
                 {!hasMore && units.length > PAGE_SIZE && (
-                  <div className="py-1.5 text-center text-micro text-slate-300">已加载全部</div>
+                  <div className="py-1.5 text-center text-micro text-slate-300">All loaded</div>
                 )}
               </>
             )}
@@ -218,7 +218,7 @@ function UnitSelector({
   )
 }
 
-/** 将 form 中的 dataType/precision/scale 转为 DataTypeValue */
+/** will form in dataType/precision/scale convert to DataTypeValue */
 function toDataTypeValue(form: MetricFormData): DataTypeValue {
   if (form.dataType === 'DECIMAL') {
     return { type: 'DECIMAL', precision: form.precision || 10, scale: form.scale || 2 }
@@ -226,7 +226,7 @@ function toDataTypeValue(form: MetricFormData): DataTypeValue {
   return { type: form.dataType || '' }
 }
 
-/** 将 DataTypeValue 更新回 form */
+/** will DataTypeValue update back form */
 function fromDataTypeValue(value: DataTypeValue): Partial<MetricFormData> {
   if (value.type === 'DECIMAL') {
     return { dataType: 'DECIMAL', precision: value.precision ?? 10, scale: value.scale ?? 2 }
@@ -256,9 +256,9 @@ export function MetricFormLeft({
   updateAggregation,
   formulaRef
 }: MetricFormLeftProps) {
-  // 修饰符 fetchData 适配器
+  // modifier fetchData adapter
   const fetchModifierData = useCallback(async (offset: number, limit: number): Promise<{ items: InfiniteSelectItem[]; total: number }> => {
-    // 优先使用父级已缓存的数据，避免重复请求导致闪烁
+    // Prioritize the use of parent cached data，Avoid flickering caused by repeated requests
     if (offset === 0) {
       if (_modifiers.length === 0) {
         const loaded = await _loadModifiers().catch(() => [] as MetricModifierDTO[])
@@ -298,7 +298,7 @@ export function MetricFormLeft({
     }
   }, [_modifiers, _modifierTotal, _loadModifiers])
 
-  // 词根 fetchData 适配器
+  // root fetchData adapter
   const fetchWordRootData = useCallback(async (offset: number, limit: number): Promise<{ items: InfiniteSelectItem[]; total: number }> => {
     const data = await fetchWordRoots(offset, limit).catch(() => ({ items: [], total: 0 }))
     return {
@@ -312,9 +312,9 @@ export function MetricFormLeft({
     }
   }, [])
 
-  // 原子指标 fetchData 适配器
+  // Atomic indicators fetchData adapter
   const fetchAtomicMetricData = useCallback(async (offset: number, limit: number): Promise<{ items: InfiniteSelectItem[]; total: number }> => {
-    // 先用父级缓存，避免每次挂载时重新请求导致下拉闪烁
+    // Use parent cache first，Avoid re-requesting each time the mount causes the drop-down to flicker
     if (offset === 0) {
       if (_atomicMetrics.length === 0) {
         const loaded = await _loadAtomicMetrics().catch(() => [] as Array<{ code: string; name: string }>)
@@ -355,14 +355,14 @@ export function MetricFormLeft({
     }
   }, [_atomicMetrics, _atomicTotal, _loadAtomicMetrics])
 
-  // 聚合函数选项
+  // Aggregate function options
   const AGGREGATIONS = ['SUM', 'AVG', 'COUNT', 'MAX', 'MIN', 'DISTINCT_COUNT']
   const [aggOpen, setAggOpen] = useState(false)
   const aggInputRef = useRef<HTMLInputElement>(null)
   const aggDropdownRef = useRef<HTMLDivElement>(null)
   const [aggDropdownPos, setAggDropdownPos] = useState<{ top: number; left: number } | null>(null)
 
-  // 聚合函数下拉位置计算
+  // Aggregation function drop-down position calculation
   useLayoutEffect(() => {
     if (!aggOpen) return
     const updatePosition = () => {
@@ -381,7 +381,7 @@ export function MetricFormLeft({
     }
   }, [aggOpen])
 
-  // 聚合函数点击外部关闭
+  // Aggregate function click outside to close
   useEffect(() => {
     if (!aggOpen) return
     const handleClickOutside = (e: MouseEvent) => {
@@ -394,7 +394,7 @@ export function MetricFormLeft({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [aggOpen])
 
-  // 过滤匹配的聚合函数
+  // Aggregate function to filter matches
   const filteredAggregations = AGGREGATIONS.filter((agg) =>
     agg.toLowerCase().includes(form.aggregation.toLowerCase())
   )
@@ -403,20 +403,20 @@ export function MetricFormLeft({
     <div className="col-span-5 xl:col-span-4 flex flex-col gap-4 h-full">
       <div className="flex-1 min-h-0 flex flex-col gap-4">
         <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">指标名称 *</label>
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Indicator name *</label>
           <input
             type="text"
-            placeholder="例如：累计订单金额"
+            placeholder="For example：Cumulative order amount"
             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-all"
             value={form.name}
             onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
           />
         </div>
 
-        {/* 指标编码区域 */}
+        {/* Indicator coding area */}
         <div className="space-y-2">
           <div className="flex items-center justify-between h-5">
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">指标编码 *</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Indicator coding *</label>
             <span className={`font-mono text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded ${!isEditMode && form.code ? 'visible' : 'invisible'}`}>
               {form.code || '-'}
             </span>
@@ -432,7 +432,7 @@ export function MetricFormLeft({
                 <div className="flex items-center gap-1">
                   <div className={form.baseCode ? 'hidden' : 'flex'}>
                     <InfiniteSelect
-                      placeholder="选择原子指标"
+                      placeholder="Select Atomic Indicator"
                       variant="slate"
                       initialItems={_atomicMetrics.map((m) => ({
                         key: m.code,
@@ -462,7 +462,7 @@ export function MetricFormLeft({
                 <div className={form.modifiers.length < 2 ? 'flex items-center' : 'hidden'}>
                   <span className="text-slate-400 mx-1">_</span>
                   <InfiniteSelect
-                    placeholder="选择修饰符"
+                    placeholder="Select modifier"
                     variant="blue"
                     selectedKeys={form.modifiers}
                      initialItems={_modifiers.map((m) => ({
@@ -480,12 +480,12 @@ export function MetricFormLeft({
                     }}
                   />
                 </div>
-                {/* 自定义后缀 - 追加在最后 */}
+                {/* Custom suffix - Append at the end */}
                 <div className="flex items-center">
                   <span className="text-slate-400 mx-1">_</span>
                   <input
                     type="text"
-                    placeholder="自定义后缀"
+                    placeholder="Custom suffix"
                     className="w-20 shrink-0 bg-transparent border-b border-dashed border-slate-400 px-1 py-0.5 text-xs font-mono uppercase placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
                     value={form.customSuffix}
                     onChange={(e) => updateDerivedCustomSuffix(e.target.value.toUpperCase())}
@@ -519,7 +519,7 @@ export function MetricFormLeft({
                     addSeg(
                       (
                         <InfiniteSelect
-                          placeholder="选择词根"
+                          placeholder="Select root word"
                           variant="purple"
                           selectedKeys={form.wordRoots}
                           fetchData={fetchWordRootData}
@@ -536,7 +536,7 @@ export function MetricFormLeft({
                         <input
                           ref={aggInputRef}
                           type="text"
-                          placeholder="聚合函数"
+                          placeholder="aggregate function"
                           className="w-20 shrink-0 bg-transparent border-b border-dashed border-emerald-400 px-1 py-0.5 text-xs font-mono uppercase text-emerald-600 placeholder:text-emerald-400 dark:placeholder:text-emerald-600 focus:outline-none focus:border-emerald-500"
                           value={form.aggregation}
                           onChange={(e) => updateAggregation(e.target.value.toUpperCase())}
@@ -571,12 +571,12 @@ export function MetricFormLeft({
                     'agg'
                   )
 
-                  // 自定义后缀 - 追加在最后
+                  // Custom suffix - Append at the end
                   addSeg(
                     (
                       <input
                         type="text"
-                        placeholder="自定义后缀"
+                        placeholder="Custom suffix"
                         className="w-20 shrink-0 bg-transparent border-b border-dashed border-slate-400 px-1 py-0.5 text-xs font-mono uppercase placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
                         value={form.customSuffix}
                         onChange={(e) => updateCustomSuffix(e.target.value.toUpperCase())}
@@ -595,18 +595,18 @@ export function MetricFormLeft({
 
         <div className="grid grid-cols-[200px_1fr] gap-3">
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">数据类型</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">data type</label>
             <DataTypeSelector
               value={toDataTypeValue(form)}
               onChange={(value) => setForm((prev) => ({ ...prev, ...fromDataTypeValue(value) }))}
               filter="numeric"
               triggerClassName="w-full !border !border-slate-200 dark:!border-slate-700 !py-2.5 !px-4 !bg-white dark:!bg-slate-900"
-              placeholder="请选择数据类型"
+              placeholder="Please select data type"
               labelClassName="text-body-sm text-slate-800 dark:text-slate-200"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">单位</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">unit</label>
             <UnitSelector
               value={form.unit}
               unitName={form.unitName}
@@ -617,19 +617,19 @@ export function MetricFormLeft({
         </div>
 
         <div className="flex flex-col gap-1.5 flex-1 min-h-0">
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">业务描述</label>
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Business description</label>
           <textarea
-            placeholder="描述该指标的业务含义..."
+            placeholder="Describe the business meaning of the metric..."
             className="w-full flex-1 min-h-[60px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-all resize-none"
             value={form.comment}
             onChange={(e) => setForm((prev) => ({ ...prev, comment: e.target.value }))}
           />
         </div>
 
-        {/* 公式表达式 */}
+        {/* formula expression */}
         <div className="flex flex-col gap-1.5 flex-1 min-h-0">
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-            <Code size={14} className="text-emerald-500" /> 公式表达式 *
+            <Code size={14} className="text-emerald-500" /> formula expression *
           </label>
           <div className="relative flex-1 min-h-[60px]">
             <Code size={14} className="absolute top-3.5 left-4 text-emerald-500/50 pointer-events-none" />
@@ -639,7 +639,7 @@ export function MetricFormLeft({
                   form.type === 'ATOMIC'
                     ? "SUM(orders.amount) WHERE status = 'paid'"
                     : form.type === 'DERIVED'
-                      ? "{SALES_AMOUNT} WHERE region = '北京'"
+                      ? "{SALES_AMOUNT} WHERE region = 'Beijing'"
                       : '({SALES_AMOUNT} - {COST}) / {SALES_AMOUNT} * 100'
                 }
                 className="w-full h-full bg-slate-900 text-emerald-400 font-mono border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 text-body-sm focus:outline-none focus:border-emerald-500 shadow-lg resize-none"

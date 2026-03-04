@@ -51,24 +51,26 @@ def test_build_messages_includes_system_instruction() -> None:
     service = LlmPlaygroundService()
 
     messages = service._build_messages(
-        message="你好",
-        system_instruction="你是严谨助手",
+        message="hello",
+        system_instruction="You are a rigorous assistant",
     )
 
     assert len(messages) == 2
     assert messages[0].role == "system"
-    assert messages[0].content == "你是严谨助手"
+    assert messages[0].content == "You are a rigorous assistant"
     assert messages[1].role == "user"
-    assert messages[1].content == "你好"
+    assert messages[1].content == "hello"
 
 
 @pytest.mark.asyncio
 async def test_stream_chat_emits_text_chunks_with_top_p(monkeypatch: pytest.MonkeyPatch) -> None:
     class _FakeLlm:
         async def astream(self, _messages):
-            yield Message.assistant("你", metadata={"reasoning_content": "先"})
-            yield Message.assistant("好", metadata={"reasoning_content": "先想"})
-            yield Message.assistant("，世界", metadata={"reasoning_content": "先想后答"})
+            yield Message.assistant("you", metadata={"reasoning_content": "First"})
+            yield Message.assistant("good", metadata={"reasoning_content": "think first"})
+            yield Message.assistant(
+                "，world", metadata={"reasoning_content": "Think first and answer later"}
+            )
 
     class _FakeProvider:
         def __init__(self) -> None:
@@ -100,7 +102,7 @@ async def test_stream_chat_emits_text_chunks_with_top_p(monkeypatch: pytest.Monk
     payload = PlaygroundChatRequest.model_validate(
         {
             "aiModelId": 88,
-            "message": "你好",
+            "message": "hello",
             "modelConfig": {
                 "temperature": 0.7,
                 "topP": 0.9,
@@ -117,12 +119,12 @@ async def test_stream_chat_emits_text_chunks_with_top_p(monkeypatch: pytest.Monk
             deltas.append(("text", delta.text_delta))
 
     assert deltas == [
-        ("thinking", "先"),
-        ("text", "你"),
-        ("thinking", "想"),
-        ("text", "好"),
-        ("thinking", "后答"),
-        ("text", "，世界"),
+        ("thinking", "First"),
+        ("text", "you"),
+        ("thinking", "think"),
+        ("text", "good"),
+        ("thinking", "Answer later"),
+        ("text", "，world"),
     ]
     assert provider.kwargs == {
         "temperature": 0.7,

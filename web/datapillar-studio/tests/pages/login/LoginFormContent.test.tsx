@@ -30,7 +30,7 @@ vi.mock('@/state', () => ({
           {
             tenantId: 0,
             tenantCode: 'tenant-default',
-            tenantName: '默认租户',
+            tenantName: 'Default tenant',
             status: 1,
             isDefault: 1
           }
@@ -60,7 +60,7 @@ const unmount = (root: ReturnType<typeof createRoot>, container: HTMLDivElement)
 }
 
 describe('LoginFormContent', () => {
-  it('展示企业SSO快捷登录按钮与三方图标', () => {
+  it('Showcase businessSSOQuick login button and three-party icon', () => {
     const { container, root } = render(<LoginFormContent onSsoClick={vi.fn()} />)
 
     const buttons = Array.from(container.querySelectorAll('button'))

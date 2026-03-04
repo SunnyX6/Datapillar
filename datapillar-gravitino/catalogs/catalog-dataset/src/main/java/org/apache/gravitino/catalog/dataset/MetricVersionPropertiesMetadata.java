@@ -23,7 +23,7 @@ import java.util.Map;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
-/** MetricVersion 属性元数据 */
+/** MetricVersion Property metadata */
 public class MetricVersionPropertiesMetadata extends BasePropertiesMetadata {
 
   @Override

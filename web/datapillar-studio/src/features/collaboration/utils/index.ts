@@ -20,7 +20,7 @@ export function buildTicketTitle(typeLabel: string, target: string): string {
 }
 
 export function isTicketMentioned(ticket: Ticket, currentUser: UserProfile): boolean {
-  const needles = [`@${currentUser.name}`, `@${currentUser.avatar}`, '@me', '@我']
+  const needles = [`@${currentUser.name}`, `@${currentUser.avatar}`, '@me', '@me']
   return ticket.timeline.some((event) => {
     if (!event.comment) {
       return false

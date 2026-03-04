@@ -142,7 +142,7 @@ export function LLMManagementView() {
           return
         }
         const message = error instanceof Error ? error.message : String(error)
-        toast.error(`加载模型失败：${message}`)
+        toast.error(`Failed to load model：${message}`)
         setProviders([])
         setModels([])
         setConnectedModelIds([])
@@ -246,11 +246,11 @@ export function LLMManagementView() {
       if (createdRecord.hasApiKey) {
         setConnectedModelIds((prev) => connectModel(prev, createdRecord.aiModelId))
       }
-      toast.success(`已添加模型：${createdRecord.name}`)
+      toast.success(`Model added：${createdRecord.name}`)
       return true
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      toast.error(`添加模型失败：${message}`)
+      toast.error(`Failed to add model：${message}`)
       return false
     }
   }
@@ -274,13 +274,13 @@ export function LLMManagementView() {
     request: { apiKey: string; baseUrl?: string }
   ): Promise<boolean> => {
     if (!model.aiModelId) {
-      toast.error('模型主键缺失，无法连接')
+      toast.error('Model primary key is missing，Unable to connect')
       return false
     }
 
     const normalizedApiKey = request.apiKey.trim()
     if (!normalizedApiKey) {
-      toast.error('API Key 不能为空')
+      toast.error('API Key cannot be empty')
       return false
     }
 
@@ -295,11 +295,11 @@ export function LLMManagementView() {
       setModels(nextModels)
       setConnectedModelIds(collectConnectedModelIds(nextModels))
       setDrawerTab('playground')
-      toast.success(`模型连接成功：${model.name}`)
+      toast.success(`Model connection successful：${model.name}`)
       return true
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      toast.error(`模型连接失败：${message}`)
+      toast.error(`Model connection failed：${message}`)
       return false
     }
   }

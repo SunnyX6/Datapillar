@@ -1,16 +1,16 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-Architect 数据结构
+Architect data structure
 
-ArchitectAgent 的产物：ArchitectOutput
+ArchitectAgent product of：ArchitectOutput
 """
 
 import json
 
 from pydantic import BaseModel, Field, field_validator
+
 from src.modules.etl.schemas.workflow import StageOutput
 
 
@@ -27,15 +27,19 @@ def _try_parse_json(value: object) -> object:
 
 
 class ArchitectJob(BaseModel):
-    """Job 设计输出（与需求分析保持一致，只补充 stages）"""
+    """Job design output（Aligned with needs analysis，Only supplement stages）"""
 
-    job_id: str = Field(..., description="Job 唯一标识（需带 pipeline 前缀）")
-    job_name: str = Field(..., description="Job 名称，简洁描述该步骤")
-    description: str = Field(..., description="Job 详细描述")
-    source_tables: list[str] = Field(default_factory=list, description="输入表列表")
-    target_table: str = Field(..., description="输出目标表")
-    depends_on: list[str] = Field(default_factory=list, description="同 pipeline 内的上游 Job 依赖")
-    stages: list[StageOutput] = Field(default_factory=list, description="Job 内执行阶段列表")
+    job_id: str = Field(..., description="Job unique identifier（Need to bring pipeline prefix）")
+    job_name: str = Field(..., description="Job Name，Briefly describe the step")
+    description: str = Field(..., description="Job Detailed description")
+    source_tables: list[str] = Field(default_factory=list, description="Input table list")
+    target_table: str = Field(..., description="Output target table")
+    depends_on: list[str] = Field(
+        default_factory=list, description="Same pipeline within the upstream Job Depend on"
+    )
+    stages: list[StageOutput] = Field(
+        default_factory=list, description="Job internal execution phase list"
+    )
 
     @field_validator("source_tables", "depends_on", mode="before")
     @classmethod
@@ -55,17 +59,19 @@ class ArchitectJob(BaseModel):
 
 
 class ArchitectPipeline(BaseModel):
-    """Pipeline 设计输出（与需求分析一致）"""
+    """Pipeline design output（Consistent with needs analysis）"""
 
-    pipeline_id: str = Field(..., description="Pipeline 唯一标识")
-    pipeline_name: str = Field(..., description="Pipeline 名称（保持需求分析一致）")
-    schedule: str | None = Field(..., description="调度周期 cron 表达式（保持需求分析一致）")
-    jobs: list[ArchitectJob] = Field(default_factory=list, description="Job 列表")
+    pipeline_id: str = Field(..., description="Pipeline unique identifier")
+    pipeline_name: str = Field(..., description="Pipeline Name（Keep needs analysis consistent）")
+    schedule: str | None = Field(
+        ..., description="Scheduling cycle cron expression（Keep needs analysis consistent）"
+    )
+    jobs: list[ArchitectJob] = Field(default_factory=list, description="Job list")
     depends_on_pipelines: list[str] = Field(
-        default_factory=list, description="依赖的上游 Pipeline ID 列表"
+        default_factory=list, description="Dependent upstream Pipeline ID list"
     )
     confidence: float = Field(
-        default=0.8, ge=0.0, le=1.0, description="该 Pipeline 的置信度"
+        default=0.8, ge=0.0, le=1.0, description="the Pipeline confidence level"
     )
 
     @field_validator("jobs", mode="before")
@@ -86,10 +92,10 @@ class ArchitectPipeline(BaseModel):
 
 
 class ArchitectOutput(BaseModel):
-    """架构设计输出（pipeline 级别）"""
+    """Architecture design output（pipeline Level）"""
 
-    summary: str = Field(..., description="整体方案一句话概括")
-    pipelines: list[ArchitectPipeline] = Field(default_factory=list, description="Pipeline 列表")
+    summary: str = Field(..., description="One sentence summary of the overall plan")
+    pipelines: list[ArchitectPipeline] = Field(default_factory=list, description="Pipeline list")
 
     @field_validator("pipelines", mode="before")
     @classmethod

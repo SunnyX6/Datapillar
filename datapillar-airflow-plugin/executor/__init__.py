@@ -2,21 +2,16 @@
 """
 Datapillar Component Executor Framework
 
-可扩展的组件执行器框架。
+Extensible component executor framework.Usage:1.inheritance BaseExecutor
+2.realize execute() method
+3.use @register Decorator registration
 
-使用方式：
-1. 继承 BaseExecutor
-2. 实现 execute() 方法
-3. 使用 @register 装饰器注册
-
-示例：
-    from datapillar_airflow_plugin.executor import BaseExecutor, register
+Example:from datapillar_airflow_plugin.executor import BaseExecutor,register
 
     @register("MY_COMPONENT")
     class MyComponentExecutor(BaseExecutor):
-        def execute(self, params: dict) -> ExecutorResult:
-            # 实现执行逻辑
-            return ExecutorResult(success=True, output="done")
+        def execute(self,params:dict) -> ExecutorResult:# Implement execution logic
+    return ExecutorResult(success=True,output="done")
 """
 
 import logging
@@ -27,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class ExecutorResult:
-    """执行结果"""
+    """Execution result"""
 
     def __init__(self, success: bool, output: str = "", error: str = ""):
         self.success = success
@@ -47,53 +42,46 @@ class ExecutorResult:
 
 class BaseExecutor(ABC):
     """
-    执行器基类
+    Executor base class
 
-    所有组件执行器必须继承此类并实现 execute() 方法。
-    """
+    All component executors must inherit this class and implement execute() method."""
 
     @abstractmethod
     def execute(self, params: Dict[str, Any]) -> ExecutorResult:
         """
-        执行组件逻辑
+    Execute component logic
 
-        Args:
-            params: 组件参数（由用户在前端填写）
+    Args:params:Component parameters(Filled in by the user on the front end)
 
-        Returns:
-            ExecutorResult: 执行结果
-        """
+    Returns:ExecutorResult:Execution result
+    """
         pass
 
     def validate_params(self, params: Dict[str, Any]) -> None:
         """
-        验证参数（可选覆盖）
+    Validation parameters(Optional override)
 
-        Args:
-            params: 组件参数
+    Args:params:Component parameters
 
-        Raises:
-            ValueError: 参数无效时抛出
-        """
+    Raises:ValueError:Thrown when the parameter is invalid
+    """
         pass
 
 
-# ==================== 执行器注册表 ====================
+# Implement execution logic
 
 _EXECUTOR_REGISTRY: Dict[str, Type[BaseExecutor]] = {}
 
 
 def register(component_code: str):
     """
-    执行器注册装饰器
+    Executor registration decorator
 
-    使用方式：
-        @register("SHELL")
-        class ShellExecutor(BaseExecutor):
-            ...
+    Usage:@register("SHELL")
+    class ShellExecutor(BaseExecutor):
+        ...
 
-    Args:
-        component_code: 组件代码（与 job_component 表中的 component_code 对应）
+    Args:component_code:component code(with job_component in the table component_code Correspond)
     """
     def decorator(cls: Type[BaseExecutor]):
         code = component_code.upper()
@@ -107,16 +95,13 @@ def register(component_code: str):
 
 def get_executor(component_code: str) -> BaseExecutor:
     """
-    获取执行器实例
+    Get executor instance
 
-    Args:
-        component_code: 组件代码
+    Args:component_code:component code
 
-    Returns:
-        BaseExecutor: 执行器实例
+    Returns:BaseExecutor:Executor instance
 
-    Raises:
-        ValueError: 组件未注册时抛出
+    Raises:ValueError:Thrown when the component is not registered
     """
     code = component_code.upper()
     executor_cls = _EXECUTOR_REGISTRY.get(code)
@@ -130,43 +115,37 @@ def get_executor(component_code: str) -> BaseExecutor:
 
 def list_executors() -> Dict[str, str]:
     """
-    列出所有已注册的执行器
+    List all registered executors
 
-    Returns:
-        Dict[str, str]: {component_code: executor_class_name}
+    Returns:Dict[str,str]:{component_code:executor_class_name}
     """
     return {code: cls.__name__ for code, cls in _EXECUTOR_REGISTRY.items()}
 
 
-# ==================== 执行入口 ====================
+# ==================== Executor registry ====================
 
 def execute_component(component_code: str, params: Dict[str, Any], **context) -> Dict[str, Any]:
     """
-    通用组件执行入口
+    Common component execution entry
 
-    这个函数会被 Airflow PythonOperator 调用。
+    This function will be Airflow PythonOperator call.Args:component_code:component code(SHELL,PYTHON,HTTP,...)
+    params:Component parameters(The value filled in by the user on the front end)
+    context:Airflow context
 
-    Args:
-        component_code: 组件代码（SHELL, PYTHON, HTTP, ...）
-        params: 组件参数（用户在前端填写的值）
-        context: Airflow 上下文
+    Returns:Execution result dictionary
 
-    Returns:
-        执行结果字典
-
-    Raises:
-        ValueError: 组件未注册
-        RuntimeError: 执行失败
+    Raises:ValueError:Component not registered
+    RuntimeError:Execution failed
     """
     logger.info(f"Executing component: {component_code}")
     logger.debug(f"Params: {params}")
 
     executor = get_executor(component_code)
 
-    # 验证参数
+    # ==================== Execution entry ====================
     executor.validate_params(params)
 
-    # 执行
+    # Validation parameters
     result = executor.execute(params)
 
     if not result.success:
@@ -176,12 +155,12 @@ def execute_component(component_code: str, params: Dict[str, Any], **context) ->
     return result.to_dict()
 
 
-# ==================== 自动加载内置执行器 ====================
+# execute
 
 def _load_builtin_executors():
-    """加载内置执行器"""
+    """Load built-in executor"""
     from datapillar_airflow_plugin.executor import shell
 
 
-# 模块加载时自动注册内置执行器
+# ==================== Automatically load built-in executors ====================
 _load_builtin_executors()

@@ -1,5 +1,6 @@
 package com.sunny.datapillar.studio.module.user.controller;
 
+import com.sunny.datapillar.common.response.ApiResponse;
 import com.sunny.datapillar.studio.dto.llm.request.*;
 import com.sunny.datapillar.studio.dto.llm.response.*;
 import com.sunny.datapillar.studio.dto.project.request.*;
@@ -15,7 +16,6 @@ import com.sunny.datapillar.studio.dto.user.response.*;
 import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.user.service.UserProfileBizService;
-import com.sunny.datapillar.common.response.ApiResponse;
 import com.sunny.datapillar.studio.util.UserContextUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,32 +28,32 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 用户Profile业务控制器
- * 负责用户Profile业务接口编排与请求处理
+ * UserProfileBusiness controller Responsible userProfileBusiness interface orchestration and
+ * request processing
  *
  * @author Sunny
  * @date 2026-01-01
  */
-@Tag(name = "用户资料", description = "当前用户资料接口")
+@Tag(name = "User profile", description = "Current user profile interface")
 @RestController
 @RequestMapping("/biz/users/me/profile")
 @RequiredArgsConstructor
 public class UserProfileBizController {
 
-    private final UserProfileBizService userProfileBizService;
+  private final UserProfileBizService userProfileBizService;
 
-    @Operation(summary = "获取当前用户资料")
-    @GetMapping
-    public ApiResponse<UserResponse> profile() {
-        Long userId = UserContextUtil.getRequiredUserId();
-        return ApiResponse.ok(userProfileBizService.getProfile(userId));
-    }
+  @Operation(summary = "Get current user information")
+  @GetMapping
+  public ApiResponse<UserResponse> profile() {
+    Long userId = UserContextUtil.getRequiredUserId();
+    return ApiResponse.ok(userProfileBizService.getProfile(userId));
+  }
 
-    @Operation(summary = "更新当前用户资料")
-    @PatchMapping
-    public ApiResponse<Void> updateProfile(@Valid @RequestBody UserProfileUpdateRequest request) {
-        Long userId = UserContextUtil.getRequiredUserId();
-        userProfileBizService.updateProfile(userId, request);
-        return ApiResponse.ok(null);
-    }
+  @Operation(summary = "Update current user profile")
+  @PatchMapping
+  public ApiResponse<Void> updateProfile(@Valid @RequestBody UserProfileUpdateRequest request) {
+    Long userId = UserContextUtil.getRequiredUserId();
+    userProfileBizService.updateProfile(userId, request);
+    return ApiResponse.ok(null);
+  }
 }

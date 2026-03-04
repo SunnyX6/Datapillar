@@ -5,11 +5,11 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  // 加载环境变量
+  // Load environment variables
   const env = loadEnv(mode, process.cwd(), '')
   const gatewayUrl = env.VITE_GATEWAY_URL?.trim()
   if (!gatewayUrl) {
-    throw new Error('缺少环境变量 VITE_GATEWAY_URL')
+    throw new Error('Missing environment variables VITE_GATEWAY_URL')
   }
   return {
     plugins: [
@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3001,
       host: true,
-      // 统一代理到 Gateway，由 Gateway 负责路由
+      // Unified agent to Gateway，by Gateway Responsible for routing
       proxy: {
         '/api': {
           target: gatewayUrl,
@@ -38,46 +38,46 @@ export default defineConfig(({ mode }) => {
     },
 
     build: {
-      // 生产环境优化
+      // Production environment optimization
       target: 'es2015',
       outDir: 'dist',
       assetsDir: 'assets',
       sourcemap: false,
 
-      // 分包策略
+      // subcontracting strategy
       rollupOptions: {
         output: {
           manualChunks: {
-            // React 核心
+            // React core
             'react-vendor': ['react', 'react-dom'],
 
             // React Router
             'router': ['react-router-dom'],
 
-            // Ant Design (UI 库)
+            // Ant Design (UI Library)
             'antd': ['antd', '@ant-design/icons'],
 
-            // Monaco Editor (大文件)
+            // Monaco Editor (large files)
             'monaco': ['monaco-editor', '@monaco-editor/react'],
 
             // React Flow
             'reactflow': ['@xyflow/react'],
 
-            // 工具库
+            // Tool library
             'utils': ['axios', 'lodash-es', 'qs', 'zustand'],
 
-            // UI 库 (其他)
+            // UI Library (Others)
             'ui-libs': ['@dnd-kit/core', '@dnd-kit/sortable']
           },
 
-          // 资源文件命名
+          // Resource file naming
           assetFileNames: 'assets/[name]-[hash][extname]',
           chunkFileNames: 'assets/[name]-[hash].js',
           entryFileNames: 'assets/[name]-[hash].js'
         }
       },
 
-      // 分块大小警告限制
+      // Chunk size warning limit
       chunkSizeWarningLimit: 1000
     },
 
@@ -94,20 +94,20 @@ export default defineConfig(({ mode }) => {
         '@neo4j-nvl/base',
         '@neo4j-nvl/interaction-handlers',
         '@neo4j-nvl/react',
-        // Monaco 深度导入，减少 dev 请求爆炸
+        // Monaco Deep import，reduce dev request explosion
         '@monaco-editor/react',
         'monaco-editor/esm/vs/editor/editor.api',
         'monaco-editor/esm/vs/basic-languages/sql/sql',
-        // 视觉与交互重库，换取首屏响应
+        // Visual and interactive repository，In exchange for first screen response
         'framer-motion',
         'lucide-react',
         'react-icons',
         'react-icons/si',
         'sonner',
-        // 大型 UI 与图形依赖
+        // Large UI Dependent on graphics
         '@xyflow/react',
         'react-virtuoso',
-        // 文本/表单/格式化
+        // text/form/Format
         'react-markdown',
         'remark-gfm',
         'react-hook-form',
@@ -115,12 +115,12 @@ export default defineConfig(({ mode }) => {
         'zod',
         'yup',
         'sql-formatter',
-        // 其他重依赖
+        // Other heavy dependencies
         '@iconify/react',
         '@radix-ui/react-select',
         '@dnd-kit/utilities',
         'zustand',
-        // neo4j 依赖的 CommonJS 模块，需要预构建
+        // neo4j dependent CommonJS module，Requires pre-build
         '@neo4j-bloom/dagre',
         'graphlib'
       ]

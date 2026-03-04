@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-// 环境变量类型定义
+// Environment variable type definition
 interface ImportMetaEnv {
   readonly VITE_APP_NAME: string
   readonly VITE_APP_ENV: string

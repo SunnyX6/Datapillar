@@ -1,4 +1,4 @@
-# Datapillar API Gateway 生产环境配置
+# Datapillar API Gateway Production environment configuration
 
 server:
   port: ${SERVER_PORT:8080}
@@ -26,7 +26,7 @@ logging:
       max-history: 30
       total-size-cap: 5GB
 
-# 路由配置
+# Routing configuration
 gateway:
   routes:
     auth:

@@ -8,21 +8,21 @@ import lombok.Data;
 @Schema(name = "JobComponentResponse")
 public class JobComponentResponse {
 
-    private Long id;
+  private Long id;
 
-    private String componentCode;
+  private String componentCode;
 
-    private String componentName;
+  private String componentName;
 
-    private String componentType;
+  private String componentType;
 
-    private Map<String, Object> jobParams;
+  private Map<String, Object> jobParams;
 
-    private String description;
+  private String description;
 
-    private String icon;
+  private String icon;
 
-    private String color;
+  private String color;
 
-    private Integer sortOrder;
+  private Integer sortOrder;
 }

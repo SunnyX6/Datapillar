@@ -1,15 +1,10 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-知识图谱写回（Writeback / Command Repository）
+Knowledge graph write back(Writeback / Command Repository)
 
-边界（强约束）：
-- 这里只允许“写回/更新”知识图谱，不允许承载任何读查询逻辑。
-
-目的：
-- 避免把查询与写回混在一个 Repository 里
+border(Strong constraints):- Only allowed here"write back/update"Knowledge graph,Not allowed to host any read query logic.purpose:- Avoid mixing queries with writeback Repository inside
 """
 
 from __future__ import annotations
@@ -26,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class Neo4jKGWritebackRepository:
-    """知识图谱写回仓储（只写，不读）"""
+    """Knowledge graph writes back to warehousing(write only,Dont read)"""
 
     @classmethod
     async def persist_kg_updates(
@@ -36,10 +31,9 @@ class Neo4jKGWritebackRepository:
         session_id: str,
     ) -> int:
         """
-        将用户确认过的结构化事实写回 Neo4j（事务性写入）
+        Write back the structured facts confirmed by the user Neo4j(transactional write)
 
-        使用显式事务确保原子性：要么全部成功，要么全部回滚。
-        支持类型: table_role / lineage / col_map / join
+        Use explicit transactions to ensure atomicity:Either all succeed,Or roll it all back.Support type:table_role / lineage / col_map / join
         """
         if not updates:
             return 0
@@ -132,21 +126,24 @@ class Neo4jKGWritebackRepository:
                         )
                         saved += 1
                     else:
-                        logger.warning("[persist_kg_updates] 忽略未知类型: %s", upd_type)
+                        logger.warning("[persist_kg_updates] Ignore unknown types:%s", upd_type)
 
                 await tx.commit()
-                logger.info("[persist_kg_updates] 事务提交成功，写入 %s 条记录", saved)
+                logger.info(
+                    "[persist_kg_updates] Transaction submitted successfully,write %s records",
+                    saved,
+                )
 
             except Exception as exc:
                 await tx.rollback()
-                logger.error("[persist_kg_updates] 事务回滚: %s", exc)
+                logger.error("[persist_kg_updates] transaction rollback:%s", exc)
                 raise
 
         return saved
 
     @classmethod
     async def bump_sql_count(cls, sql_id: str) -> bool:
-        """增加 SQL 节点的使用次数"""
+        """increase SQL The number of times the node is used"""
         cypher = """
         MATCH (s:SQL {id: $sql_id})
         SET s.use_count = coalesce(s.use_count, 0) + 1,
@@ -159,9 +156,9 @@ class Neo4jKGWritebackRepository:
                 result = await arun_cypher(session, cypher, {"sql_id": sql_id})
                 record = await result.single()
                 if record:
-                    logger.info("SQL 使用次数更新: %s -> %s", sql_id, record["use_count"])
+                    logger.info("SQL Usage updates:%s -> %s", sql_id, record["use_count"])
                     return True
                 return False
         except Exception as e:
-            logger.error("更新 SQL 使用次数失败: %s", e)
+            logger.error("update SQL Use count failed:%s", e)
             return False

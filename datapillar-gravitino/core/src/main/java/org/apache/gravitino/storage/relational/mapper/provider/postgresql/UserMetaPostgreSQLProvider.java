@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE
 import static org.apache.gravitino.storage.relational.mapper.UserMetaMapper.USER_ROLE_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.UserMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.ibatis.annotations.Param;
@@ -29,29 +30,36 @@ import org.apache.ibatis.annotations.Param;
 public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   @Override
   public String softDeleteUserMetaByUserId(Long userId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + USER_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE user_id = #{userId} AND deleted_at = 0";
+        + " WHERE user_id = #{userId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteUserMetasByMetalakeId(Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + USER_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String insertUserMetaOnDuplicateKeyUpdate(UserPO userPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + USER_TABLE_NAME
         + "(user_id, user_name, external_user_id,"
         + "metalake_id, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{userMeta.userId},"
         + " #{userMeta.userName},"
@@ -60,7 +68,9 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
         + " #{userMeta.auditInfo},"
         + " #{userMeta.currentVersion},"
         + " #{userMeta.lastVersion},"
-        + " #{userMeta.deletedAt}"
+        + " #{userMeta.deletedAt},"
+        + " "
+        + tenantId
         + " )"
         + " ON CONFLICT(user_id) DO UPDATE SET"
         + " user_name = #{userMeta.userName},"
@@ -74,6 +84,7 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
 
   @Override
   public String listExtendedUserPOsByMetalakeId(Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
         + " ut.external_user_id as externalUserId, ut.metalake_id as metalakeId,"
         + " ut.audit_info as auditInfo,"
@@ -86,26 +97,35 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
         + " ut LEFT OUTER JOIN ("
         + " SELECT * FROM "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " WHERE deleted_at = 0)"
+        + " WHERE deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ")"
         + " AS rt ON rt.user_id = ut.user_id"
         + " LEFT OUTER JOIN ("
         + " SELECT * FROM "
         + ROLE_TABLE_NAME
-        + " WHERE deleted_at = 0)"
+        + " WHERE deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ")"
         + " AS rot ON rot.role_id = rt.role_id"
         + " WHERE "
         + " ut.deleted_at = 0 AND"
         + " ut.metalake_id = #{metalakeId}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ut", tenantId)
         + " GROUP BY ut.user_id";
   }
 
   @Override
   public String deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + USER_TABLE_NAME
         + " WHERE user_id IN (SELECT user_id FROM "
         + USER_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit})";
   }
 }

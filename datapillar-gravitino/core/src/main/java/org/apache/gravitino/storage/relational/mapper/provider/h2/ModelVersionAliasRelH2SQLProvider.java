@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper.provider.h2;
 
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ModelVersionAliasRelBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
@@ -27,6 +28,7 @@ public class ModelVersionAliasRelH2SQLProvider extends ModelVersionAliasRelBaseS
   @Override
   public String softDeleteModelVersionAliasRelsByModelIdAndAlias(
       @Param("modelId") Long modelId, @Param("alias") String alias) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -34,7 +36,12 @@ public class ModelVersionAliasRelH2SQLProvider extends ModelVersionAliasRelBaseS
         + " WHERE model_id = #{modelId} AND model_version = ("
         + " SELECT model_version FROM "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " WHERE model_id = #{modelId} AND model_version_alias = #{alias} AND deleted_at = 0)"
-        + " AND deleted_at = 0";
+        + " WHERE model_id = #{modelId} AND model_version_alias = #{alias} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ")"
+        + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 }

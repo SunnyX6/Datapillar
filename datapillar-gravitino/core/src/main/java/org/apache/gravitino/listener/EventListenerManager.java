@@ -165,8 +165,8 @@ public class EventListenerManager {
       EventListenerPlugin listenerPlugin =
           (EventListenerPlugin) Class.forName(className).getDeclaredConstructor().newInstance();
 
-      // 合并 gravitino.eventListener.{name}.* 和 gravitino.{name}.* 配置
-      // gravitino.{name}.* 配置优先级更高
+      // merge gravitino.eventListener.{name}.* and gravitino.{name}.* Configuration
+      // gravitino.{name}.* Configuration priority is higher
       Map<String, String> mergedConfig = new HashMap<>(config);
       String additionalPrefix = "gravitino." + listenerName + ".";
       Map<String, String> additionalConfig = MapUtils.getPrefixMap(allProperties, additionalPrefix);

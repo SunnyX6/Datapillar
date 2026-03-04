@@ -70,14 +70,14 @@ export function Sidebar({ menus, onNavigate, currentPath, collapsed, onToggleCol
 
   const getSidebarSectionLabel = useCallback((categoryName?: string) => {
     if (!categoryName) {
-      return t('side.sections.other', { ns: 'navigation', defaultValue: '其他' })
+      return t('side.sections.other', { ns: 'navigation', defaultValue: 'Others' })
     }
     switch (categoryName) {
-      case '构建与设计':
+      case 'Build and Design':
         return t('side.sections.build', { ns: 'navigation', defaultValue: categoryName })
-      case '计算与连接':
+      case 'Compute and connect':
         return t('side.sections.compute', { ns: 'navigation', defaultValue: categoryName })
-      case '观测':
+      case 'observation':
         return t('side.sections.observe', { ns: 'navigation', defaultValue: categoryName })
       default:
         return categoryName
@@ -133,7 +133,7 @@ export function Sidebar({ menus, onNavigate, currentPath, collapsed, onToggleCol
 
   return (
     <aside className={`${sidebarWidth} ${topOffset} flex-shrink-0 bg-[#F9FAFB] dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700/80 flex flex-col h-full z-30 overflow-visible relative transition-[width] duration-200 ease-out`}>
-      {/* 品牌 Logo 区域 */}
+      {/* brand Logo area */}
       <div className={`${sectionPadding} relative ${logoHeight} flex items-center ${logoSpacing}`}>
         <div
           className={`flex items-center ${collapsed ? 'w-14 h-14 justify-center mx-auto' : 'w-full h-full gap-2.5 -ml-1'} ${logoOffset}`}

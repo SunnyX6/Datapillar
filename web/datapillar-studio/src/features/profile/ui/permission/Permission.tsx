@@ -95,7 +95,7 @@ export function PermissionLayout() {
                         'font-semibold text-slate-600 dark:text-slate-300',
                       )}
                     >
-                      共 {selectedRole.userCount} 名成员
+                      total {selectedRole.userCount} members
                     </span>
                   </div>
                 </div>
@@ -108,7 +108,7 @@ export function PermissionLayout() {
                   className="shadow-lg shadow-slate-200/60 dark:shadow-none"
                 >
                   <Link2 size={14} />
-                  邀请成员
+                  Invite members
                 </Button>
               </div>
             </div>
@@ -127,7 +127,7 @@ export function PermissionLayout() {
                     )}
                   >
                     <Users size={16} />
-                    成员列表
+                    Member list
                   </button>
                   <button
                     type="button"
@@ -141,7 +141,7 @@ export function PermissionLayout() {
                     )}
                   >
                     <Shield size={16} />
-                    功能权限
+                    Function permissions
                   </button>
                 </div>
               </div>

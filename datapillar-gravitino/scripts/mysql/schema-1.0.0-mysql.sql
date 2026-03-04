@@ -457,7 +457,7 @@ CREATE TABLE IF NOT EXISTS `job_run_meta` (
 CREATE TABLE IF NOT EXISTS `metric_modifier_meta` (
     `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `modifier_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'modifier id',
-    `modifier_name` VARCHAR(128) NOT NULL COMMENT 'modifier name, e.g., 近7天, 北京地区',
+    `modifier_name` VARCHAR(128) NOT NULL COMMENT 'modifier name, e.g., last 7 days, Beijing area',
     `modifier_code` VARCHAR(128) NOT NULL COMMENT 'modifier code, e.g., 7d, beijing',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
@@ -470,13 +470,13 @@ CREATE TABLE IF NOT EXISTS `metric_modifier_meta` (
     UNIQUE KEY `uk_sid_mcode_del` (`tenant_id`, `schema_id`, `modifier_code`, `deleted_at`),
     KEY `idx_mid` (`tenant_id`, `metalake_id`),
     KEY `idx_cid` (`tenant_id`, `catalog_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '修饰符元数据表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Metric modifier metadata table';
 
 CREATE TABLE IF NOT EXISTS `wordroot_meta` (
     `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `root_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'root word id',
     `root_code` VARCHAR(64) NOT NULL COMMENT 'root code, e.g., amt, cnt, rate',
-    `root_name` VARCHAR(128) NOT NULL COMMENT 'root name, e.g., 金额, amount',
+    `root_name` VARCHAR(128) NOT NULL COMMENT 'root name, e.g., amount, amt',
     `data_type` VARCHAR(128) DEFAULT NULL COMMENT 'data type, e.g., STRING, INTEGER, DECIMAL(10,2)',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
@@ -488,14 +488,14 @@ CREATE TABLE IF NOT EXISTS `wordroot_meta` (
     UNIQUE KEY `uk_sid_rcode_del` (`tenant_id`, `schema_id`, `root_code`, `deleted_at`),
     KEY `idx_mid` (`tenant_id`, `metalake_id`),
     KEY `idx_cid` (`tenant_id`, `catalog_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '词根元数据表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Word root metadata table';
 
 CREATE TABLE IF NOT EXISTS `unit_meta` (
     `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `unit_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'unit id',
     `unit_code` VARCHAR(64) NOT NULL COMMENT 'unit code, e.g., CURRENCY, RATIO, COUNT',
-    `unit_name` VARCHAR(128) NOT NULL COMMENT 'unit name, e.g., 人民币, 百分比, 个数',
-    `unit_symbol` VARCHAR(16) NOT NULL COMMENT 'unit symbol, e.g., ¥, %, 个',
+    `unit_name` VARCHAR(128) NOT NULL COMMENT 'unit name, e.g., CNY, percent, count',
+    `unit_symbol` VARCHAR(16) NOT NULL COMMENT 'unit symbol, e.g., CNY, %, count',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
@@ -506,17 +506,17 @@ CREATE TABLE IF NOT EXISTS `unit_meta` (
     UNIQUE KEY `uk_sid_ucode_del` (`tenant_id`, `schema_id`, `unit_code`, `deleted_at`),
     KEY `idx_mid` (`tenant_id`, `metalake_id`),
     KEY `idx_cid` (`tenant_id`, `catalog_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '单位元数据表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Unit metadata table';
 
 CREATE TABLE IF NOT EXISTS `value_domain_meta` (
     `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
-    `domain_id` BIGINT(20) UNSIGNED NOT NULL COMMENT '值域唯一ID',
-    `domain_code` VARCHAR(64) NOT NULL COMMENT '值域编码, e.g., ORDER_STATUS',
-    `domain_name` VARCHAR(128) NOT NULL COMMENT '值域名称, e.g., 订单状态值域',
-    `domain_type` VARCHAR(16) NOT NULL COMMENT '值域类型: ENUM, RANGE, REGEX',
-    `domain_level` VARCHAR(16) NOT NULL DEFAULT 'BUSINESS' COMMENT '值域级别: BUILTIN, BUSINESS',
-    `items` MEDIUMTEXT DEFAULT NULL COMMENT '值域项JSON数组: [{"value":"1","label":"待支付"},...]',
-    `data_type` VARCHAR(32) DEFAULT NULL COMMENT '数据类型: STRING, INTEGER, DECIMAL 等',
+    `domain_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'value domain unique ID',
+    `domain_code` VARCHAR(64) NOT NULL COMMENT 'value domain code, e.g., ORDER_STATUS',
+    `domain_name` VARCHAR(128) NOT NULL COMMENT 'value domain name, e.g., order status domain',
+    `domain_type` VARCHAR(16) NOT NULL COMMENT 'value domain type: ENUM, RANGE, REGEX',
+    `domain_level` VARCHAR(16) NOT NULL DEFAULT 'BUSINESS' COMMENT 'value domain level: BUILTIN, BUSINESS',
+    `items` MEDIUMTEXT DEFAULT NULL COMMENT 'value domain items JSON array: [{"value":"1","label":"pending_payment"}, ...]',
+    `data_type` VARCHAR(32) DEFAULT NULL COMMENT 'data type: STRING, INTEGER, DECIMAL, etc',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
@@ -527,7 +527,7 @@ CREATE TABLE IF NOT EXISTS `value_domain_meta` (
     UNIQUE KEY `uk_sid_dcode_del` (`tenant_id`, `schema_id`, `domain_code`, `deleted_at`),
     KEY `idx_mid` (`tenant_id`, `metalake_id`),
     KEY `idx_cid` (`tenant_id`, `catalog_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '值域元数据表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Value domain metadata table';
 
 CREATE TABLE IF NOT EXISTS `metric_meta` (
     `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
@@ -550,7 +550,7 @@ CREATE TABLE IF NOT EXISTS `metric_meta` (
     KEY `idx_mid` (`tenant_id`, `metalake_id`),
     KEY `idx_cid` (`tenant_id`, `catalog_id`),
     KEY `idx_type` (`tenant_id`, `metric_type`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '指标元数据主表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Metric metadata main table';
 
 CREATE TABLE IF NOT EXISTS `metric_version_info` (
     `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
@@ -565,7 +565,7 @@ CREATE TABLE IF NOT EXISTS `metric_version_info` (
     `metric_type` VARCHAR(32) NOT NULL COMMENT 'metric type: ATOMIC, DERIVED, COMPOSITE',
     `data_type` VARCHAR(128) DEFAULT NULL COMMENT 'data type snapshot, e.g., STRING, INTEGER, DECIMAL(10,2)',
     `metric_comment` TEXT DEFAULT NULL COMMENT 'metric comment snapshot',
-    `metric_unit` VARCHAR(64) DEFAULT NULL COMMENT 'metric unit, e.g., 元, 个, %',
+    `metric_unit` VARCHAR(64) DEFAULT NULL COMMENT 'metric unit, e.g., CNY, count, %',
     `parent_metric_ids` TEXT DEFAULT NULL COMMENT 'parent metric ids in JSON array format, e.g., [123, 456]',
     `calculation_formula` TEXT DEFAULT NULL COMMENT 'calculation formula, e.g., metric1 / metric2 * 100',
     `ref_table_id` BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'referenced table id for ATOMIC metric',
@@ -581,4 +581,4 @@ CREATE TABLE IF NOT EXISTS `metric_version_info` (
     KEY `idx_catalog` (`tenant_id`, `catalog_id`),
     KEY `idx_schema` (`tenant_id`, `schema_id`),
     KEY `idx_ref_table` (`tenant_id`, `ref_table_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '指标版本快照表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Metric version snapshot table';

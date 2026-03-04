@@ -1,12 +1,11 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-Neo4j 语义资产查询服务
+Neo4j Semantic Asset Query Service
 
-职责：提供语义资产相关的查询功能
-- search_semantic_assets: 混合检索词根、修饰符、单位
+Responsibilities:Provide query functions related to semantic assets
+- search_semantic_assets:Mixed search root,modifier,unit
 """
 
 from __future__ import annotations
@@ -23,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class Neo4jSemanticSearch:
-    """Neo4j 语义资产查询服务（词根、修饰符、单位）"""
+    """Neo4j Semantic Asset Query Service(root,modifier,unit)"""
 
     _SYSTEM_CREATORS = ["OPENLINEAGE", "GRAVITINO_SYNC", "system", "SYSTEM"]
 
@@ -37,18 +36,14 @@ class Neo4jSemanticSearch:
         user_id: int | None = None,
     ) -> dict[str, list[Any]]:
         """
-        根据用户输入语义检索相关的词根、修饰符、单位（混合检索：向量+全文）
+        Retrieve related root words based on user input semantics,modifier,unit(Hybrid search:Vector+Full text)
 
-        参数：
-        - query: 用户输入文本
-        - top_k: 每种资产类型返回的数量
-        - min_score: 最小相似度阈值
+        parameters:- query:User input text
+        - top_k:Quantity returned for each asset type
+        - min_score:Minimum similarity threshold
 
-        返回：
-        {
-            "word_roots": [{"code": ..., "name": ..., "dataType": ..., "score": ...}],
-            "modifiers": [{"code": ..., "modifierType": ..., "score": ...}],
-            "units": [{"code": ..., "name": ..., "symbol": ..., "score": ...}]
+        Return:{
+        "word_roots":[{"code":...,"name":...,"dataType":...,"score":...}],"modifiers":[{"code":...,"modifierType":...,"score":...}],"units":[{"code":...,"name":...,"symbol":...,"score":...}]
         }
         """
         from neo4j_graphrag.retrievers import HybridCypherRetriever
@@ -127,7 +122,7 @@ class Neo4jSemanticSearch:
             )
 
         def hybrid_search_single(config: dict[str, str]) -> tuple[str, list]:
-            """单资产类型混合搜索"""
+            """Single asset type mixed search"""
             results: list[dict[str, Any]] = []
 
             try:
@@ -163,7 +158,7 @@ class Neo4jSemanticSearch:
                     results.append(metadata)
 
             except Exception as e:
-                logger.warning(f"语义资产搜索[{config['name']}]失败: {e}")
+                logger.warning(f"Semantic asset search[{config['name']}]failed:{e}")
 
             return (config["name"], results)
 
@@ -176,11 +171,11 @@ class Neo4jSemanticSearch:
                 result[name] = items
 
         logger.info(
-            f"[语义资产检索] query={query[:20]}..., "
-            f"词根={len(result['word_roots'])}, "
-            f"修饰符={len(result['modifiers'])}, "
-            f"单位={len(result['units'])}, "
-            f"耗时={time.time() - start:.3f}s"
+            f"[Semantic asset retrieval] query={query[:20]}..., "
+            f"root={len(result['word_roots'])},"
+            f"modifier={len(result['modifiers'])},"
+            f"unit={len(result['units'])},"
+            f"Time consuming={time.time() - start:.3f}s"
         )
 
         return result

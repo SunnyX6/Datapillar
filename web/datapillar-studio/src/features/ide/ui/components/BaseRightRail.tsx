@@ -1,6 +1,6 @@
 /**
- * 右侧工具栏骨架组件
- * 提供可展开/收起的侧边面板结构
+ * Right toolbar skeleton component
+ * Provides expandable/Tucked side panel structure
  */
 
 import { type ReactNode } from 'react'
@@ -11,28 +11,28 @@ export interface RightRailButton {
   id: string
   icon: ReactNode
   title: string
-  /** 激活时的颜色样式 */
+  /** Color style when activated */
   activeClassName?: string
-  /** 非激活时的颜色样式 */
+  /** Color style when inactive */
   inactiveClassName?: string
 }
 
 interface BaseRightRailProps {
-  /** 按钮列表 */
+  /** button list */
   buttons: RightRailButton[]
-  /** 当前激活的面板 ID，null 表示无面板展开 */
+  /** Currently active panel ID，null Indicates no panel expansion */
   activePanel: string | null
-  /** 面板切换回调 */
+  /** Panel switching callback */
   onPanelChange: (id: string | null) => void
-  /** 面板标题（根据 activePanel 动态渲染） */
+  /** Panel title（According to activePanel dynamic rendering） */
   panelTitle?: ReactNode
-  /** 面板内容 */
+  /** Panel content */
   children?: ReactNode
-  /** 面板宽度 */
+  /** Panel width */
   panelWidth?: number
-  /** 面板宽度样式类（优先于 panelWidth） */
+  /** Panel width style class（take precedence over panelWidth） */
   panelWidthClassName?: string
-  /** 底部固定按钮 */
+  /** Bottom fixed button */
   bottomButtons?: RightRailButton[]
 }
 
@@ -52,7 +52,7 @@ export function BaseRightRail({
 
   return (
     <div className="relative flex shrink-0 z-[60]">
-      {/* 展开的面板 */}
+      {/* expanded panel */}
       <AnimatePresence mode="wait">
         {activePanel && (
           <motion.div
@@ -64,7 +64,7 @@ export function BaseRightRail({
             className={`absolute right-10 top-0 bottom-0 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-[-8px_0_24px_rgba(0,0,0,0.06)] dark:shadow-[-8px_0_24px_rgba(0,0,0,0.3)] flex flex-col ${panelWidthClassName ?? 'w-[var(--panel-width)]'}`}
             style={{ '--panel-width': `${panelWidth}px` } as React.CSSProperties}
           >
-            {/* 面板头部 */}
+            {/* Panel header */}
             <div className="h-10 px-3 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
               <div className="flex items-center gap-2">
                 {panelTitle}
@@ -77,7 +77,7 @@ export function BaseRightRail({
               </button>
             </div>
 
-            {/* 面板内容 */}
+            {/* Panel content */}
             <div className="flex-1 overflow-y-auto p-3 scrollbar-hide">
               {children}
             </div>
@@ -85,9 +85,9 @@ export function BaseRightRail({
         )}
       </AnimatePresence>
 
-      {/* 右侧按钮栏 */}
+      {/* Right button bar */}
       <div className="w-10 flex flex-col items-center pt-1.5 pb-4 gap-1.5 bg-white dark:bg-slate-900 border-l border-slate-100 dark:border-slate-800 shrink-0 z-30 select-none">
-        {/* 主要按钮 */}
+        {/* main button */}
         {buttons.map((button) => {
           const isActive = activePanel === button.id
           return (
@@ -106,10 +106,10 @@ export function BaseRightRail({
           )
         })}
 
-        {/* 弹性空间 */}
+        {/* Flexible space */}
         <div className="flex-1" />
 
-        {/* 底部按钮 */}
+        {/* bottom button */}
         {bottomButtons?.map((button) => {
           const isActive = activePanel === button.id
           return (

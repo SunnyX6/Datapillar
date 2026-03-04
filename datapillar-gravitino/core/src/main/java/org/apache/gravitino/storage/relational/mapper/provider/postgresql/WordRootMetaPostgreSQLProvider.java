@@ -20,5 +20,5 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.WordRootMetaBaseSQLProvider;
 
-/** WordRoot 元数据 PostgreSQL Provider */
+/** WordRoot metadata PostgreSQL Provider */
 public class WordRootMetaPostgreSQLProvider extends WordRootMetaBaseSQLProvider {}

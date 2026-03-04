@@ -22,7 +22,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.dataset.MetricModifier;
 import org.apache.gravitino.meta.AuditInfo;
 
-/** Modifier 接口的实现类 */
+/** Modifier Implementation class of interface */
 public class ModifierImpl implements MetricModifier, Auditable {
 
   private String name;
@@ -58,7 +58,7 @@ public class ModifierImpl implements MetricModifier, Auditable {
     return auditInfo;
   }
 
-  /** Builder 类用于构建 ModifierImpl 实例 */
+  /** Builder classes used to build ModifierImpl Example */
   public static class Builder {
     private final ModifierImpl modifier;
 

@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 """
-ETL 知识导航工具真实数据库测试（node.py）
+ETL knowledge navigation tool real database test (node.py).
 
-要求：只做真实调用，打印输入/输出，不做断言。
+Requirement: run real calls only, print input/output, do not assert.
 """
 
 from __future__ import annotations
@@ -24,13 +23,13 @@ def _pretty(raw: str) -> str:
 
 def _print_tool(name: str, payload: dict, raw: str) -> None:
     print("\n" + "=" * 80)
-    print(f"工具: {name}")
-    print(f"输入: {payload}")
-    print("输出(raw):")
+    print(f"Tool: {name}")
+    print(f"Input: {payload}")
+    print("Output (raw):")
     print(raw)
     pretty = _pretty(raw)
     if pretty != raw:
-        print("输出(json):")
+        print("Output (json):")
         print(pretty)
 
 

@@ -1,5 +1,5 @@
 /**
- * 响应式组件库导出
+ * Responsive component library export
  */
 
 export { ResponsiveCard } from './ResponsiveCard'

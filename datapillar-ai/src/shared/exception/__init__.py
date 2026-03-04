@@ -1,7 +1,7 @@
 # @author Sunny
 # @date 2026-02-20
 
-"""AI 服务异常体系。"""
+"""AI Service exception system."""
 
 from src.shared.exception.already_exists import AlreadyExistsException
 from src.shared.exception.bad_request import BadRequestException

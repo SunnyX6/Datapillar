@@ -1,5 +1,5 @@
 """
-LLM 配置构建测试
+LLM Configure build tests
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ def test_get_datapillar_config_merges_settings(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config_module.Tenant, "get_code", lambda tenant_id: f"tenant-{tenant_id}")
     monkeypatch.setattr(
         config_module.auth_crypto_rpc_client,
-        "decrypt_llm_api_key_sync",
+        "decrypt_api_key_sync",
         lambda *, tenant_code, ciphertext: f"{tenant_code}:{ciphertext}",
     )
     _mock_models(monkeypatch)
@@ -89,7 +89,7 @@ def test_get_datapillar_config_merges_settings(monkeypatch: pytest.MonkeyPatch):
 
 def test_get_datapillar_config_requires_runtime_sections(monkeypatch: pytest.MonkeyPatch):
     def _raise_missing_llm():
-        raise ConfigurationError("缺少 llm")
+        raise ConfigurationError("missing llm")
 
     monkeypatch.setattr(config_module, "get_llm_config", _raise_missing_llm)
     monkeypatch.setattr(config_module, "get_agent_config", lambda: {"max_steps": 5})

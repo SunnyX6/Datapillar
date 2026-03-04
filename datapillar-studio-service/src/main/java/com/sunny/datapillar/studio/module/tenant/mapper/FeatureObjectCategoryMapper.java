@@ -7,8 +7,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 /**
- * 功能ObjectCategoryMapper
- * 负责功能ObjectCategory数据访问与持久化映射
+ * FunctionObjectCategoryMapper Responsible for functionObjectCategoryData access and persistence
+ * mapping
  *
  * @author Sunny
  * @date 2026-01-01
@@ -16,11 +16,11 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface FeatureObjectCategoryMapper extends BaseMapper<FeatureObjectCategory> {
 
-    FeatureObjectCategory selectByCode(@Param("code") String code);
+  FeatureObjectCategory selectByCode(@Param("code") String code);
 
-    FeatureObjectCategory selectByName(@Param("name") String name);
+  FeatureObjectCategory selectByName(@Param("name") String name);
 
-    FeatureObjectCategory selectByCategoryId(@Param("id") Long id);
+  FeatureObjectCategory selectByCategoryId(@Param("id") Long id);
 
-    List<FeatureObjectCategory> selectAll();
+  List<FeatureObjectCategory> selectAll();
 }

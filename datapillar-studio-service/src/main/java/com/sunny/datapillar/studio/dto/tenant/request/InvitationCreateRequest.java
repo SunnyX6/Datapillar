@@ -9,9 +9,9 @@ import lombok.Data;
 @Schema(name = "InvitationCreate")
 public class InvitationCreateRequest {
 
-    @NotNull(message = "角色不能为空")
-    private Long roleId;
+  @NotNull(message = "Role cannot be empty")
+  private Long roleId;
 
-    @NotNull(message = "过期时间不能为空")
-    private OffsetDateTime expiresAt;
+  @NotNull(message = "Expiration time cannot be empty")
+  private OffsetDateTime expiresAt;
 }

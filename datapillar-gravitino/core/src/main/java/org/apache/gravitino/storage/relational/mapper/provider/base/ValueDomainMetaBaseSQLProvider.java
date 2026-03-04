@@ -20,34 +20,45 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.ValueDomainMetaMapper.TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.ValueDomainPO;
 import org.apache.ibatis.annotations.Param;
 
-/** ValueDomain 元数据基础 SQL Provider */
+/** ValueDomain Metadata basics SQL Provider */
 public class ValueDomainMetaBaseSQLProvider {
 
   public String insertValueDomainMeta(@Param("domain") ValueDomainPO domainPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TABLE_NAME
         + " (domain_id, domain_code, domain_name, domain_type, domain_level,"
-        + " items, data_type, metalake_id, catalog_id, schema_id, domain_comment, audit_info, deleted_at)"
+        + " items, data_type, metalake_id, catalog_id, schema_id, domain_comment, audit_info, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES (#{domain.domainId}, #{domain.domainCode},"
         + " #{domain.domainName}, #{domain.domainType}, #{domain.domainLevel},"
         + " #{domain.items}, #{domain.dataType}, #{domain.metalakeId}, #{domain.catalogId},"
         + " #{domain.schemaId}, #{domain.domainComment},"
-        + " #{domain.auditInfo}, #{domain.deletedAt})";
+        + " #{domain.auditInfo}, #{domain.deletedAt}, "
+        + tenantId
+        + ")";
   }
 
   public String insertValueDomainMetaOnDuplicateKeyUpdate(@Param("domain") ValueDomainPO domainPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TABLE_NAME
         + " (domain_id, domain_code, domain_name, domain_type, domain_level,"
-        + " items, data_type, metalake_id, catalog_id, schema_id, domain_comment, audit_info, deleted_at)"
+        + " items, data_type, metalake_id, catalog_id, schema_id, domain_comment, audit_info, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES (#{domain.domainId}, #{domain.domainCode},"
         + " #{domain.domainName}, #{domain.domainType}, #{domain.domainLevel},"
         + " #{domain.items}, #{domain.dataType}, #{domain.metalakeId}, #{domain.catalogId},"
         + " #{domain.schemaId}, #{domain.domainComment},"
-        + " #{domain.auditInfo}, #{domain.deletedAt})"
+        + " #{domain.auditInfo}, #{domain.deletedAt}, "
+        + tenantId
+        + ")"
         + " ON DUPLICATE KEY UPDATE"
         + " domain_name = #{domain.domainName},"
         + " domain_type = #{domain.domainType},"
@@ -60,17 +71,7 @@ public class ValueDomainMetaBaseSQLProvider {
   }
 
   public String listValueDomainPOsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "SELECT domain_id AS domainId, domain_code AS domainCode, domain_name AS domainName,"
-        + " domain_type AS domainType, domain_level AS domainLevel, items, data_type AS dataType,"
-        + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId,"
-        + " domain_comment AS domainComment, audit_info AS auditInfo, deleted_at AS deletedAt"
-        + " FROM "
-        + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
-  }
-
-  public String listValueDomainPOsBySchemaIdWithPagination(
-      @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT domain_id AS domainId, domain_code AS domainCode, domain_name AS domainName,"
         + " domain_type AS domainType, domain_level AS domainLevel, items, data_type AS dataType,"
         + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId,"
@@ -78,38 +79,64 @@ public class ValueDomainMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
+  }
+
+  public String listValueDomainPOsBySchemaIdWithPagination(
+      @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
+    return "SELECT domain_id AS domainId, domain_code AS domainCode, domain_name AS domainName,"
+        + " domain_type AS domainType, domain_level AS domainLevel, items, data_type AS dataType,"
+        + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId,"
+        + " domain_comment AS domainComment, audit_info AS auditInfo, deleted_at AS deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + " ORDER BY domain_id"
         + " LIMIT #{limit} OFFSET #{offset}";
   }
 
   public String countValueDomainsBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT COUNT(*) FROM "
         + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectValueDomainMetaBySchemaIdAndDomainCode(
       @Param("schemaId") Long schemaId, @Param("domainCode") String domainCode) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT domain_id AS domainId, domain_code AS domainCode, domain_name AS domainName,"
         + " domain_type AS domainType, domain_level AS domainLevel, items, data_type AS dataType,"
         + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId,"
         + " domain_comment AS domainComment, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND domain_code = #{domainCode} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND domain_code = #{domainCode} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectValueDomainMetaByDomainId(@Param("domainId") Long domainId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT domain_id AS domainId, domain_code AS domainCode, domain_name AS domainName,"
         + " domain_type AS domainType, domain_level AS domainLevel, items, data_type AS dataType,"
         + " metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId,"
         + " domain_comment AS domainComment, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE domain_id = #{domainId} AND deleted_at = 0";
+        + " WHERE domain_id = #{domainId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String listValueDomainPOsByDomainIds(@Param("domainIds") java.util.List<Long> domainIds) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     StringBuilder sql = new StringBuilder();
     sql.append(
         "SELECT domain_id AS domainId, domain_code AS domainCode, domain_name AS domainName,"
@@ -126,12 +153,15 @@ public class ValueDomainMetaBaseSQLProvider {
       }
     }
     sql.append(") AND deleted_at = 0");
+    sql.append(" AND ");
+    sql.append(TenantSqlSupport.tenantPredicate(null, tenantId));
     return sql.toString();
   }
 
   public String updateValueDomainMeta(
       @Param("newDomain") ValueDomainPO newDomainPO,
       @Param("oldDomain") ValueDomainPO oldDomainPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET domain_name = #{newDomain.domainName},"
@@ -143,46 +173,64 @@ public class ValueDomainMetaBaseSQLProvider {
         + " audit_info = #{newDomain.auditInfo},"
         + " deleted_at = #{newDomain.deletedAt}"
         + " WHERE domain_id = #{oldDomain.domainId}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteValueDomainMetaBySchemaIdAndDomainCode(
       @Param("schemaId") Long schemaId, @Param("domainCode") String domainCode) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND domain_code = #{domainCode} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND domain_code = #{domainCode} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteValueDomainMetasBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteValueDomainMetasByCatalogId(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteValueDomainMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteValueDomainMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 }

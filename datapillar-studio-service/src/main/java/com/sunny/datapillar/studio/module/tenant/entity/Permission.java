@@ -8,8 +8,7 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
- * 权限组件
- * 负责权限核心逻辑实现
+ * Permission component Responsible for the implementation of core permission logic
  *
  * @author Sunny
  * @date 2026-01-01
@@ -17,24 +16,24 @@ import lombok.Data;
 @Data
 @TableName("permissions")
 public class Permission {
-    @TableId(type = IdType.AUTO)
-    private Long id;
+  @TableId(type = IdType.AUTO)
+  private Long id;
 
-    private String code;
+  private String code;
 
-    private String name;
+  private String name;
 
-    private String description;
+  private String description;
 
-    private Integer level;
+  private Integer level;
 
-    private Integer sort;
+  private Integer sort;
 
-    private Integer status;
+  private Integer status;
 
-    @TableField("created_at")
-    private LocalDateTime createdAt;
+  @TableField("created_at")
+  private LocalDateTime createdAt;
 
-    @TableField("updated_at")
-    private LocalDateTime updatedAt;
+  @TableField("updated_at")
+  private LocalDateTime updatedAt;
 }

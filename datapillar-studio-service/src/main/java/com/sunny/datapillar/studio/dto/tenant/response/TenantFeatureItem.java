@@ -7,29 +7,29 @@ import lombok.Data;
 @Schema(name = "FeatureEntitlementItem")
 public class TenantFeatureItem {
 
-    private Long objectId;
+  private Long objectId;
 
-    private String objectName;
+  private String objectName;
 
-    private String objectPath;
+  private String objectPath;
 
-    private String objectType;
+  private String objectType;
 
-    private String location;
+  private String location;
 
-    private Long categoryId;
+  private Long categoryId;
 
-    private String categoryName;
+  private String categoryName;
 
-    private Integer sort;
+  private Integer sort;
 
-    private Integer objectStatus;
+  private Integer objectStatus;
 
-    private Integer entitlementStatus;
+  private Integer entitlementStatus;
 
-    private Long permissionId;
+  private Long permissionId;
 
-    private String permissionCode;
+  private String permissionCode;
 
-    private Integer permissionLevel;
+  private Integer permissionLevel;
 }

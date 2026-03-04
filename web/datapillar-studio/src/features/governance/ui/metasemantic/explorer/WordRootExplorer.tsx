@@ -21,7 +21,7 @@ import {
 } from '@/components/ui'
 import { formatTime } from '@/utils'
 
-/** 每页加载数量 */
+/** Number of loads per page */
 const PAGE_SIZE = 20
 
 interface WordRootExplorerProps {
@@ -29,7 +29,7 @@ interface WordRootExplorerProps {
   onOpenDrawer: (root: WordRoot) => void
 }
 
-/** 新增行的表单状态 */
+/** Form status for new rows */
 interface NewRowForm {
   code: string
   name: string
@@ -44,7 +44,7 @@ const emptyForm: NewRowForm = {
   comment: ''
 }
 
-/** 词根行组件 */
+/** root line component */
 function WordRootRow({
   root,
   isEditing,
@@ -111,7 +111,7 @@ function WordRootRow({
       onUpdate(root.code, updated)
       onEndEdit()
     } catch {
-      // 保存失败
+      // Save failed
     } finally {
       setSaving(false)
     }
@@ -127,7 +127,7 @@ function WordRootRow({
               value={editForm.name}
               onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               onClick={(e) => e.stopPropagation()}
-              placeholder="词根名称"
+              placeholder="root name"
               className="w-full px-2 py-1 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="text-micro font-mono text-slate-400 uppercase px-1">{root.code}</div>
@@ -148,7 +148,7 @@ function WordRootRow({
             value={editForm.comment}
             onChange={(e) => setEditForm({ ...editForm, comment: e.target.value })}
             onClick={(e) => e.stopPropagation()}
-            placeholder="描述"
+            placeholder="Description"
             className="w-full px-2 py-1.5 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </td>
@@ -164,7 +164,7 @@ function WordRootRow({
               onClick={handleSave}
               disabled={saving || !editForm.name.trim()}
               className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors disabled:opacity-50"
-              title="保存"
+              title="save"
             >
               {saving ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Check size={iconSizeToken.small} />}
             </button>
@@ -172,7 +172,7 @@ function WordRootRow({
               onClick={handleCancel}
               disabled={saving}
               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors disabled:opacity-50"
-              title="取消"
+              title="Cancel"
             >
               <X size={iconSizeToken.small} />
             </button>
@@ -219,7 +219,7 @@ function WordRootRow({
           <button
             onClick={handleEdit}
             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-            title="编辑"
+            title="Edit"
           >
             <Pencil size={iconSizeToken.small} />
           </button>
@@ -227,7 +227,7 @@ function WordRootRow({
             onClick={handleDelete}
             disabled={deleting}
             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors disabled:opacity-50"
-            title="删除"
+            title="Delete"
           >
             {deleting ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Trash2 size={iconSizeToken.small} />}
           </button>
@@ -237,7 +237,7 @@ function WordRootRow({
   )
 }
 
-/** 新增行组件 */
+/** Add new row component */
 function NewWordRootRow({
   form,
   onChange,
@@ -261,14 +261,14 @@ function NewWordRootRow({
             type="text"
             value={form.name}
             onChange={(e) => onChange({ ...form, name: e.target.value })}
-            placeholder="词根名称"
+            placeholder="root name"
             className="w-full px-2 py-1 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <input
             type="text"
             value={form.code}
             onChange={(e) => onChange({ ...form, code: e.target.value.toUpperCase() })}
-            placeholder="编码 (CODE)"
+            placeholder="encoding (CODE)"
             className="w-full px-2 py-1 text-micro font-mono uppercase border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -287,7 +287,7 @@ function NewWordRootRow({
           type="text"
           value={form.comment}
           onChange={(e) => onChange({ ...form, comment: e.target.value })}
-          placeholder="描述（可选）"
+          placeholder="Description（Optional）"
           className="w-full px-2 py-1.5 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </td>
@@ -303,7 +303,7 @@ function NewWordRootRow({
             onClick={onSave}
             disabled={!isValid || saving}
             className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="保存"
+            title="save"
           >
             {saving ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Check size={iconSizeToken.small} />}
           </button>
@@ -311,7 +311,7 @@ function NewWordRootRow({
             onClick={onCancel}
             disabled={saving}
             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors disabled:opacity-50"
-            title="取消"
+            title="Cancel"
           >
             <X size={iconSizeToken.small} />
           </button>
@@ -325,24 +325,24 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
   const searchTerm = useSearchStore((state) => state.searchTerm)
   const setWordRootsTotal = useSemanticStatsStore((state) => state.setWordRootsTotal)
 
-  // 数据状态
+  // Data status
   const [wordRoots, setWordRoots] = useState<WordRoot[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  // 新增行状态
+  // New row status
   const [showNewRow, setShowNewRow] = useState(false)
   const [newRowForm, setNewRowForm] = useState<NewRowForm>(emptyForm)
   const [saving, setSaving] = useState(false)
 
-  // 当前编辑行的 code（同时只能编辑一行）
+  // of the current edit line code（Only one line can be edited at a time）
   const [editingCode, setEditingCode] = useState<string | null>(null)
 
-  // 是否还有更多数据
+  // Is there more data?
   const hasMore = wordRoots.length < total
 
-  // 加载首页数据
+  // Load homepage data
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
@@ -351,13 +351,13 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
       setTotal(result.total)
       setWordRootsTotal(result.total)
     } catch {
-      // 加载失败时保持空列表
+      // Keep empty list when loading fails
     } finally {
       setLoading(false)
     }
   }, [setWordRootsTotal])
 
-  // 加载更多数据
+  // load more data
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
@@ -366,13 +366,13 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
       setWordRoots((prev) => [...prev, ...result.items])
       setTotal(result.total)
     } catch {
-      // 加载失败
+      // Loading failed
     } finally {
       setLoadingMore(false)
     }
   }, [loadingMore, hasMore, wordRoots.length])
 
-  // 无限滚动
+  // infinite scroll
   const { sentinelRef } = useInfiniteScroll({
     hasMore,
     loading: loadingMore,
@@ -383,7 +383,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
     loadData()
   }, [loadData])
 
-  // 过滤词根
+  // Filter root words
   const filteredRoots = wordRoots.filter(
     (r) =>
       r.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -391,7 +391,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
       (r.comment && r.comment.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
-  // 保存新词根
+  // save new root
   const handleSaveNewRow = async () => {
     if (saving) return
     setSaving(true)
@@ -408,32 +408,32 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
       setShowNewRow(false)
       setNewRowForm(emptyForm)
     } catch {
-      // 保存失败
+      // Save failed
     } finally {
       setSaving(false)
     }
   }
 
-  // 取消新增
+  // Cancel new addition
   const handleCancelNewRow = () => {
     setShowNewRow(false)
     setNewRowForm(emptyForm)
   }
 
-  // 删除词根
+  // Remove root word
   const handleDelete = (code: string) => {
     setWordRoots((prev) => prev.filter((r) => r.code !== code))
     setTotal((prev) => prev - 1)
   }
 
-  // 更新词根
+  // Update root
   const handleUpdate = (code: string, updated: WordRoot) => {
     setWordRoots((prev) => prev.map((r) => (r.code === code ? updated : r)))
   }
 
-  // 显示新增行
+  // Show new rows
   const handleShowNewRow = () => {
-    setEditingCode(null) // 取消当前编辑行
+    setEditingCode(null) // Cancel current edit line
     setShowNewRow(true)
   }
 
@@ -445,7 +445,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
             <ArrowLeft size={iconSizeToken.large} />
           </button>
           <div className="flex items-center gap-2">
-            <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">规范词根</h2>
+            <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">canonical root</h2>
             <Badge variant="blue">
               {filteredRoots.length} / {total}
             </Badge>
@@ -456,7 +456,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
           disabled={showNewRow}
           className="bg-slate-900 dark:bg-blue-600 text-white px-3 @md:px-4 py-1 @md:py-1.5 rounded-lg text-caption @md:text-body-sm font-medium flex items-center gap-1 @md:gap-1.5 shadow-md hover:bg-blue-600 dark:hover:bg-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Plus size={iconSizeToken.medium} /> <span className="hidden @md:inline">新增词根</span>
+          <Plus size={iconSizeToken.medium} /> <span className="hidden @md:inline">Add new root</span>
         </button>
       </div>
 
@@ -464,7 +464,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
         <Table
           footer={
             <>
-              {/* 哨兵元素 + 加载更多 */}
+              {/* Sentinel element + load more */}
               <div ref={sentinelRef} className="h-1" />
               {loadingMore && (
                 <div className="flex justify-center py-4 border-t border-slate-100 dark:border-slate-800">
@@ -476,12 +476,12 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
         >
           <TableHeader>
             <TableRow>
-              <TableHead className={tableColumnWidthClassMap['5xl']}>词根名称 / 编码</TableHead>
-              <TableHead className={`${tableColumnWidthClassMap['4xl']} text-center`}>数据类型</TableHead>
-              <TableHead>描述</TableHead>
-              <TableHead className={tableColumnWidthClassMap.lg}>创建人</TableHead>
-              <TableHead className={tableColumnWidthClassMap['2xl']}>创建时间</TableHead>
-              <TableHead className={`${tableColumnWidthClassMap.lg} text-center`}>操作</TableHead>
+              <TableHead className={tableColumnWidthClassMap['5xl']}>root name / encoding</TableHead>
+              <TableHead className={`${tableColumnWidthClassMap['4xl']} text-center`}>data type</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead className={tableColumnWidthClassMap.lg}>Creator</TableHead>
+              <TableHead className={tableColumnWidthClassMap['2xl']}>creation time</TableHead>
+              <TableHead className={`${tableColumnWidthClassMap.lg} text-center`}>Operation</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -489,7 +489,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
               <TableRow>
                 <TableCell colSpan={6} className="py-12 text-center">
                   <Loader2 className="w-6 h-6 animate-spin text-blue-500 mx-auto" />
-                  <div className="text-slate-400 text-caption mt-2">加载中...</div>
+                  <div className="text-slate-400 text-caption mt-2">Loading...</div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -518,7 +518,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
                 {filteredRoots.length === 0 && !showNewRow && (
                   <TableRow>
                     <TableCell colSpan={6} className="py-12 @md:py-16 text-center text-slate-400 text-caption @md:text-body-sm">
-                      未找到匹配的词根
+                      No matching root found
                     </TableCell>
                   </TableRow>
                 )}

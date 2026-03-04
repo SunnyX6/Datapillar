@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.h2;
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ModelVersionMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.ibatis.annotations.Param;
@@ -30,13 +31,17 @@ public class ModelVersionMetaH2Provider extends ModelVersionMetaBaseSQLProvider 
   @Override
   public String insertModelVersionMetas(
       @Param("modelVersionMetas") List<ModelVersionPO> modelVersionPOs) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "INSERT INTO "
         + ModelVersionMetaMapper.TABLE_NAME
         + "(metalake_id, catalog_id, schema_id, model_id, version, model_version_comment,"
-        + " model_version_properties, model_version_uri_name, model_version_uri, audit_info, deleted_at)"
+        + " model_version_properties, model_version_uri_name, model_version_uri, audit_info, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " SELECT m.metalake_id, m.catalog_id, m.schema_id, m.model_id, m.model_latest_version, v.model_version_comment,"
-        + " v.model_version_properties, v.model_version_uri_name, v.model_version_uri, v.audit_info, v.deleted_at"
+        + " v.model_version_properties, v.model_version_uri_name, v.model_version_uri, v.audit_info, v.deleted_at, "
+        + tenantId
         + " FROM ("
         + "<foreach collection='modelVersionMetas' item='version' separator='UNION ALL'>"
         + " SELECT"
@@ -50,7 +55,10 @@ public class ModelVersionMetaH2Provider extends ModelVersionMetaBaseSQLProvider 
         + " (SELECT metalake_id, catalog_id, schema_id, model_id, model_latest_version"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " WHERE model_id = #{modelVersionMetas[0].modelId} AND deleted_at = 0) m"
+        + " WHERE model_id = #{modelVersionMetas[0].modelId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ") m"
         + " ON v.model_id = m.model_id"
         + "</script>";
   }
@@ -58,13 +66,17 @@ public class ModelVersionMetaH2Provider extends ModelVersionMetaBaseSQLProvider 
   @Override
   public String insertModelVersionMetasWithVersionNumber(
       @Param("modelVersionMetas") List<ModelVersionPO> modelVersionPOs) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "INSERT INTO "
         + ModelVersionMetaMapper.TABLE_NAME
         + "(metalake_id, catalog_id, schema_id, model_id, version, model_version_comment,"
-        + " model_version_properties, model_version_uri_name, model_version_uri, audit_info, deleted_at)"
+        + " model_version_properties, model_version_uri_name, model_version_uri, audit_info, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " SELECT m.metalake_id, m.catalog_id, m.schema_id, m.model_id, v.model_version_number, v.model_version_comment,"
-        + " v.model_version_properties, v.model_version_uri_name, v.model_version_uri, v.audit_info, v.deleted_at"
+        + " v.model_version_properties, v.model_version_uri_name, v.model_version_uri, v.audit_info, v.deleted_at, "
+        + tenantId
         + " FROM ("
         + "<foreach collection='modelVersionMetas' item='version' separator='UNION ALL'>"
         + " SELECT"
@@ -78,7 +90,10 @@ public class ModelVersionMetaH2Provider extends ModelVersionMetaBaseSQLProvider 
         + " (SELECT metalake_id, catalog_id, schema_id, model_id"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " WHERE model_id = #{modelVersionMetas[0].modelId} AND deleted_at = 0) m"
+        + " WHERE model_id = #{modelVersionMetas[0].modelId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ") m"
         + " ON v.model_id = m.model_id"
         + "</script>";
   }

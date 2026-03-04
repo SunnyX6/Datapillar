@@ -31,19 +31,23 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dataset.ValueDomain;
 
-/** 值域实体类 */
+/** Value domain entity class */
 @ToString
 public class ValueDomainEntity implements Entity, Auditable, HasIdentifier, ValueDomain {
 
-  public static final Field ID = Field.required("id", Long.class, "值域 ID");
-  public static final Field DOMAIN_CODE = Field.required("domainCode", String.class, "值域编码");
-  public static final Field DOMAIN_NAME = Field.required("domainName", String.class, "值域名称");
-  public static final Field DOMAIN_TYPE = Field.required("domainType", Type.class, "值域类型");
-  public static final Field DOMAIN_LEVEL = Field.required("domainLevel", Level.class, "值域级别");
-  public static final Field ITEMS = Field.optional("items", List.class, "值域项列表");
-  public static final Field COMMENT = Field.optional("comment", String.class, "注释");
-  public static final Field DATA_TYPE = Field.optional("dataType", String.class, "数据类型");
-  public static final Field AUDIT_INFO = Field.required("auditInfo", AuditInfo.class, "审计信息");
+  public static final Field ID = Field.required("id", Long.class, "range ID");
+  public static final Field DOMAIN_CODE =
+      Field.required("domainCode", String.class, "range encoding");
+  public static final Field DOMAIN_NAME =
+      Field.required("domainName", String.class, "Value field name");
+  public static final Field DOMAIN_TYPE = Field.required("domainType", Type.class, "Range type");
+  public static final Field DOMAIN_LEVEL =
+      Field.required("domainLevel", Level.class, "range level");
+  public static final Field ITEMS = Field.optional("items", List.class, "List of range items");
+  public static final Field COMMENT = Field.optional("comment", String.class, "Comment");
+  public static final Field DATA_TYPE = Field.optional("dataType", String.class, "data type");
+  public static final Field AUDIT_INFO =
+      Field.required("auditInfo", AuditInfo.class, "Audit information");
 
   private Long id;
   private String domainCode;

@@ -26,7 +26,7 @@ vi.mock('@/state', () => ({
   ) =>
     selector({
       user: {
-        tenantName: '平台租户'
+        tenantName: 'Platform tenant'
       }
     }),
   useI18nStore: (selector: (state: { language: string; setLanguage: () => void }) => unknown) =>

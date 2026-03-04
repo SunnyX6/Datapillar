@@ -1,7 +1,7 @@
 # @author Sunny
 # @date 2026-01-27
 
-"""FastAPI 认证依赖。"""
+"""FastAPI Authentication dependency."""
 
 from fastapi import Request
 
@@ -12,19 +12,20 @@ _ADMIN_ROLE = "ADMIN"
 
 
 def current_user_state(request: Request) -> CurrentUser:
-    """从 request.state 获取当前用户。"""
+    """Get current user from request state."""
     current_user = getattr(request.state, "current_user", None)
     if current_user is None:
-        raise UnauthorizedException("认证信息丢失")
+        raise UnauthorizedException("Authentication information lost")
     return current_user
 
 
 def require_admin_role(request: Request) -> None:
-    """校验当前请求是否具备管理员角色。"""
-    assertion = getattr(request.state, "gateway_assertion", None)
-    roles = getattr(assertion, "roles", []) if assertion is not None else []
+    """Verify whether the current request has the administrator role."""
+    current_user = current_user_state(request)
     normalized_roles = {
-        role.strip().upper() for role in roles if isinstance(role, str) and role.strip()
+        role.strip().upper()
+        for role in current_user.roles
+        if isinstance(role, str) and role.strip()
     }
     if _ADMIN_ROLE not in normalized_roles:
-        raise ForbiddenException("需要管理员权限")
+        raise ForbiddenException("Requires administrator rights")

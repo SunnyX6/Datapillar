@@ -17,17 +17,17 @@ import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
- * 单点登录Identity服务
- * 提供单点登录Identity业务能力与领域服务
+ * Single sign-onIdentityservice Provide single sign-onIdentityBusiness capabilities and domain
+ * services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface SsoIdentityService {
 
-    List<SsoIdentityItem> list(String provider, Long userId);
+  List<SsoIdentityItem> list(String provider, Long userId);
 
-    Long bindByCode(SsoIdentityBindByCodeRequest request);
+  Long bindByCode(SsoIdentityBindByCodeRequest request);
 
-    void unbind(Long identityId);
+  void unbind(Long identityId);
 }

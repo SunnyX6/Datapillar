@@ -8,12 +8,12 @@ from src.shared.web.code import Code
 
 
 def test_exception_mapper_maps_bad_request_exception() -> None:
-    detail = ExceptionMapper.resolve(BadRequestException("参数错误"))
+    detail = ExceptionMapper.resolve(BadRequestException("Parameter error"))
 
     assert detail.http_status == 400
     assert detail.error_code == Code.BAD_REQUEST
     assert detail.error_type == "BAD_REQUEST"
-    assert detail.message == "参数错误"
+    assert detail.message == "Parameter error"
     assert detail.server_error is False
 
 
@@ -37,12 +37,12 @@ def test_exception_mapper_maps_request_validation_error_to_bad_request() -> None
 
 
 def test_exception_mapper_maps_http_conflict() -> None:
-    detail = ExceptionMapper.resolve(HTTPException(status_code=409, detail="冲突"))
+    detail = ExceptionMapper.resolve(HTTPException(status_code=409, detail="conflict"))
 
     assert detail.http_status == 409
     assert detail.error_code == Code.CONFLICT
     assert detail.error_type == "CONFLICT"
-    assert detail.message == "冲突"
+    assert detail.message == "conflict"
 
 
 def test_exception_mapper_maps_duplicate_message_to_already_exists() -> None:

@@ -7,11 +7,11 @@ import lombok.Data;
 @Schema(name = "SetupStepStatusItem")
 public class SetupStepStatusItem {
 
-    private String code;
+  private String code;
 
-    private String name;
+  private String name;
 
-    private String description;
+  private String description;
 
-    private String status;
+  private String status;
 }

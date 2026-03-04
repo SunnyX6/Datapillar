@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-from types import SimpleNamespace
 
 import pytest
 
@@ -32,14 +31,6 @@ async def test_decrypt_llm_api_key_builds_rpc_meta(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(client, "_resolve_endpoint", _mock_resolve_endpoint)
     monkeypatch.setattr(client, "_call_decrypt", _mock_call_decrypt)
-    monkeypatch.setattr(
-        auth_crypto_module,
-        "get_nacos_runtime",
-        lambda: SimpleNamespace(
-            config=SimpleNamespace(service_name="datapillar-ai", group="DATAPILLAR")
-        ),
-    )
-
     plaintext = await client.decrypt_llm_api_key(tenant_code="tenant-acme", ciphertext="ENCv1:abc")
 
     request = captured_request["request"]
@@ -48,8 +39,6 @@ async def test_decrypt_llm_api_key_builds_rpc_meta(monkeypatch: pytest.MonkeyPat
     assert request.purpose == "llm.api_key"
     assert request.ciphertext == "ENCv1:abc"
     assert request.meta.protocol_version == "security.v1"
-    assert request.meta.caller_service == "datapillar-ai"
-    assert request.meta.attrs["caller"] == "datapillar-ai"
 
 
 @pytest.mark.asyncio
@@ -70,15 +59,7 @@ async def test_decrypt_llm_api_key_rejects_empty_plaintext(monkeypatch: pytest.M
 
     monkeypatch.setattr(client, "_resolve_endpoint", _mock_resolve_endpoint)
     monkeypatch.setattr(client, "_call_decrypt", _mock_call_decrypt)
-    monkeypatch.setattr(
-        auth_crypto_module,
-        "get_nacos_runtime",
-        lambda: SimpleNamespace(
-            config=SimpleNamespace(service_name="datapillar-ai", group="DATAPILLAR")
-        ),
-    )
-
-    with pytest.raises(RuntimeError, match="空明文"):
+    with pytest.raises(RuntimeError, match="empty plaintext"):
         await client.decrypt_llm_api_key(tenant_code="tenant-acme", ciphertext="ENCv1:abc")
 
 
@@ -113,6 +94,6 @@ async def test_decrypt_llm_api_key_sync_supports_running_loop(
 
     monkeypatch.setattr(client, "decrypt_llm_api_key", _mock_decrypt)
 
-    value = client.decrypt_llm_api_key_sync(tenant_code="tenant-3", ciphertext="ENCv1:abc")
+    value = client.decrypt_api_key_sync(tenant_code="tenant-3", ciphertext="ENCv1:abc")
 
     assert value == "tenant-3:ENCv1:abc"

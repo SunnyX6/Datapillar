@@ -16,13 +16,17 @@ import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
 import com.sunny.datapillar.studio.module.user.service.UserPermissionService;
 import com.sunny.datapillar.studio.module.user.service.UserService;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 用户权限服务实现
- * 实现用户权限业务流程与规则校验
+ * User permission service implementation Implement user permission business process and rule
+ * verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -31,10 +35,74 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class UserPermissionServiceImpl implements UserPermissionService {
 
-    private final UserService userService;
+  private static final String MENU_OBJECT_TYPE = "MENU";
+  private static final String DISABLE_PERMISSION = "DISABLE";
 
-    @Override
-    public List<FeatureObjectPermissionItem> listPermissions(Long userId) {
-        return userService.getUserPermissions(userId);
+  private final UserService userService;
+
+  @Override
+  public List<FeatureObjectPermissionItem> listPermissions(Long userId) {
+    return userService.getUserPermissions(userId);
+  }
+
+  @Override
+  public List<UserMenuItem> listMenus(Long userId) {
+    List<FeatureObjectPermissionItem> permissions = userService.getUserPermissions(userId);
+    return buildMenuTree(permissions);
+  }
+
+  private List<UserMenuItem> buildMenuTree(List<FeatureObjectPermissionItem> permissions) {
+    if (permissions == null || permissions.isEmpty()) {
+      return new ArrayList<>();
     }
+
+    Map<Long, UserMenuItem> menuNodeMap = new LinkedHashMap<>();
+    Map<Long, Long> parentMap = new LinkedHashMap<>();
+    for (FeatureObjectPermissionItem permission : permissions) {
+      if (permission == null || permission.getObjectId() == null) {
+        continue;
+      }
+      if (!MENU_OBJECT_TYPE.equalsIgnoreCase(permission.getObjectType())) {
+        continue;
+      }
+      if (isDisabledPermission(permission.getPermissionCode())) {
+        continue;
+      }
+      UserMenuItem menuItem = toMenuItem(permission);
+      menuItem.setChildren(new ArrayList<>());
+      menuNodeMap.put(permission.getObjectId(), menuItem);
+      parentMap.put(permission.getObjectId(), permission.getParentId());
+    }
+
+    List<UserMenuItem> roots = new ArrayList<>();
+    for (Map.Entry<Long, UserMenuItem> entry : menuNodeMap.entrySet()) {
+      Long parentId = parentMap.get(entry.getKey());
+      UserMenuItem parent = parentId == null ? null : menuNodeMap.get(parentId);
+      if (parent == null) {
+        roots.add(entry.getValue());
+        continue;
+      }
+      parent.getChildren().add(entry.getValue());
+    }
+    return roots;
+  }
+
+  private boolean isDisabledPermission(String permissionCode) {
+    if (permissionCode == null || permissionCode.isBlank()) {
+      return true;
+    }
+    return DISABLE_PERMISSION.equals(permissionCode.trim().toUpperCase(Locale.ROOT));
+  }
+
+  private UserMenuItem toMenuItem(FeatureObjectPermissionItem permission) {
+    UserMenuItem item = new UserMenuItem();
+    item.setId(permission.getObjectId());
+    item.setName(permission.getObjectName());
+    item.setPath(permission.getObjectPath());
+    item.setPermissionCode(permission.getPermissionCode());
+    item.setLocation(permission.getLocation());
+    item.setCategoryId(permission.getCategoryId());
+    item.setCategoryName(permission.getCategoryName());
+    return item;
+  }
 }

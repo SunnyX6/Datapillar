@@ -29,7 +29,7 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   return (
     <div className="h-14 border-b border-slate-200/60 dark:border-white/10 flex items-center gap-3 px-4 flex-shrink-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md relative z-40">
-      {/* 三段式布局：左右固定，中间自适应并截断标题 */}
+      {/* three-stage layout：Fixed left and right，Adapt in the middle and truncate the title */}
       <div className="relative flex items-center shrink-0">
         <button
           type="button"
@@ -43,7 +43,7 @@ export function ChatHeader({
           )}
         >
           <History size={14} className="text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300" />
-          <span>历史会话</span>
+          <span>History session</span>
           <ChevronDown
             size={10}
             className={cn('text-slate-400 transition-transform duration-200', showHistory && 'rotate-180')}
@@ -77,7 +77,7 @@ export function ChatHeader({
             <div className="border-t border-slate-100 dark:border-slate-800 mt-1 pt-2 px-1">
               <button className="w-full flex items-center justify-center px-3 py-2 text-micro font-normal text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors">
                 <Trash2 size={12} className="mr-1.5" />
-                清空历史记录
+                Clear history
               </button>
             </div>
           </div>
@@ -97,13 +97,13 @@ export function ChatHeader({
           type="button"
           onClick={onNewSession}
           className="group relative flex items-center justify-center size-8 rounded-lg text-indigo-700 dark:text-indigo-300 hover:text-indigo-800 dark:hover:text-indigo-200"
-          aria-label="新会话"
-          title="新会话"
+          aria-label="new session"
+          title="new session"
         >
           <SquarePen size={14} />
-          <span className="sr-only">新会话</span>
+          <span className="sr-only">new session</span>
           <span className="pointer-events-none absolute right-0 top-full mt-2 whitespace-nowrap rounded-md border border-slate-200 bg-white px-2 py-1 text-micro font-semibold text-slate-600 opacity-0 shadow-sm group-hover:opacity-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-            新会话
+            new session
           </span>
         </button>
       </div>

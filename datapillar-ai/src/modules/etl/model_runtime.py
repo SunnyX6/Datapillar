@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-02-26
 
-"""ETL 模型运行时配置构建（强制显式模型）。"""
+"""ETL Model runtime configuration build(Force explicit model)."""
 
 from __future__ import annotations
 
@@ -34,11 +33,11 @@ def build_etl_datapillar_config(
 ) -> DatapillarConfig:
     normalized_provider_model_id = provider_model_id.strip()
     if ai_model_id <= 0:
-        raise BadRequestException("model.aiModelId 无效")
+        raise BadRequestException("model.aiModelId Invalid")
     if user_id <= 0:
-        raise BadRequestException("userId 无效")
+        raise BadRequestException("userId Invalid")
     if not normalized_provider_model_id:
-        raise BadRequestException("model.providerModelId 不能为空")
+        raise BadRequestException("model.providerModelId cannot be empty")
 
     chat_model = ModelNew.get_active_chat_model_by_id(
         tenant_id=tenant_id,
@@ -46,19 +45,19 @@ def build_etl_datapillar_config(
         ai_model_id=ai_model_id,
     )
     if not chat_model:
-        raise ForbiddenException("指定模型未授权或不可用")
+        raise ForbiddenException("The specified model is not authorized or unavailable")
 
     db_provider_model_id = str(chat_model.get("provider_model_id") or "").strip()
     if db_provider_model_id != normalized_provider_model_id:
-        raise ConflictException("model.providerModelId 与 aiModelId 不匹配")
+        raise ConflictException("model.providerModelId with aiModelId no match")
 
     embedding_model = ModelNew.get_active_embedding_default(tenant_id=tenant_id)
     if not embedding_model:
-        raise BadRequestException("未找到启用的 Embedding 模型")
+        raise BadRequestException("Enabled not found Embedding model")
 
     dimension = embedding_model.get("embedding_dimension")
     if not dimension:
-        raise BadRequestException("Embedding 模型必须配置 embedding_dimension")
+        raise BadRequestException("Embedding Model must be configured embedding_dimension")
 
     chat_api_key = ModelNew.decrypt_api_key(
         tenant_code=tenant_code,

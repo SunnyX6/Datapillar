@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
-"""Embedding 处理基础能力（共享）。"""
+"""Embedding processing basic abilities(share)."""
 
 from src.shared.embedding.processor import EmbeddingProcessor
 

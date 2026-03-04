@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Shell 脚本执行器"""
+"""Shell script executor"""
 
 import subprocess
 import logging
@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 @register("SHELL")
 class ShellExecutor(BaseExecutor):
     """
-    Shell 脚本执行器
+    Shell script executor
 
-    参数：
-        script: Shell 脚本内容
-        timeout: 超时时间（秒），默认 60
+    parameters：
+        script: Shell Script content
+        timeout: timeout（seconds），Default 60
     """
 
     def validate_params(self, params: Dict[str, Any]) -> None:

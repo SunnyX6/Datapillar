@@ -7,9 +7,9 @@ import lombok.Data;
 @Schema(name = "FeatureObjectAssignment")
 public class RoleFeatureAssignmentItem {
 
-    private Long objectId;
+  private Long objectId;
 
-    private Long permissionId;
+  private Long permissionId;
 
-    private String permissionCode;
+  private String permissionCode;
 }

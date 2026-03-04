@@ -113,7 +113,7 @@ describe('SetupPage', () => {
     useSetupStore.getState().resetSetupStatus()
   })
 
-  it('初始化已完成时应同步 guard 状态并跳转登录页，避免 status 请求死循环', async () => {
+  it('Should be synchronized when initialization is complete guard Status and jump to the login page，avoid status Request infinite loop', async () => {
     mockedGetSetupStatus.mockResolvedValue({
       schemaReady: true,
       initialized: true,
@@ -131,7 +131,7 @@ describe('SetupPage', () => {
     cleanup(root, container)
   })
 
-  it('密码眼睛按钮应切换输入框明文/密文', async () => {
+  it('The password eye button should toggle the input box to plain text/cipher text', async () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root = createRoot(container)
@@ -139,10 +139,10 @@ describe('SetupPage', () => {
     await act(async () => {
       root.render(
         <InputGroup
-          label="密码"
+          label="Password"
           type="password"
           value="123456"
-          placeholder="请输入密码"
+          placeholder="Please enter password"
           onChange={vi.fn()}
           required
         />
@@ -151,14 +151,14 @@ describe('SetupPage', () => {
 
     expect(container.querySelector('input[type="password"]')).toBeTruthy()
 
-    const eyeButton = container.querySelector('button[aria-label="显示密码"]') as HTMLButtonElement | null
+    const eyeButton = container.querySelector('button[aria-label="show password"]') as HTMLButtonElement | null
     expect(eyeButton).toBeTruthy()
     await act(async () => {
       eyeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
     expect(container.querySelector('input[type="text"]')).toBeTruthy()
-    expect(container.querySelector('button[aria-label="隐藏密码"]')).toBeTruthy()
+    expect(container.querySelector('button[aria-label="Hide password"]')).toBeTruthy()
 
     cleanup(root, container)
   })

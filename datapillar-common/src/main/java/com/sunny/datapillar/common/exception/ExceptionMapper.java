@@ -5,116 +5,89 @@ import com.sunny.datapillar.common.constant.ErrorType;
 import org.slf4j.MDC;
 
 /**
- * 异常Mapper
- * 负责异常数据访问与持久化映射
+ * AbnormalMapper Responsible for exception data access and persistence mapping
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public final class ExceptionMapper {
 
-    private static final String DEFAULT_INTERNAL_MESSAGE = "服务器内部错误";
+  private static final String DEFAULT_INTERNAL_MESSAGE = "Server internal error";
 
-    private ExceptionMapper() {
+  private ExceptionMapper() {}
+
+  public static ExceptionDetail resolve(Throwable throwable) {
+    Throwable target =
+        throwable == null ? new InternalException(DEFAULT_INTERNAL_MESSAGE) : throwable;
+    String message = resolveMessage(target);
+    String type = target.getClass().getSimpleName();
+    String traceId = resolveTraceId();
+
+    if (target instanceof DatapillarRuntimeException runtimeException) {
+      return new ExceptionDetail(
+          runtimeException.getCode(),
+          runtimeException.getCode(),
+          runtimeException.getType(),
+          message,
+          traceId,
+          resolveServerError(runtimeException));
+    }
+    if (target instanceof IllegalArgumentException) {
+      return buildDetail(Code.BAD_REQUEST, ErrorType.BAD_REQUEST, message, traceId, false);
+    }
+    if (target instanceof UnsupportedOperationException) {
+      return buildDetail(
+          Code.METHOD_NOT_ALLOWED, ErrorType.METHOD_NOT_ALLOWED, message, traceId, false);
+    }
+    return buildDetail(Code.INTERNAL_ERROR, ErrorType.INTERNAL_ERROR, message, traceId, true);
+  }
+
+  private static ExceptionDetail buildDetail(
+      int code, String type, String message, String traceId, boolean serverError) {
+    return new ExceptionDetail(code, code, type, message, traceId, serverError);
+  }
+
+  private static String resolveMessage(Throwable throwable) {
+    String message = throwable.getMessage();
+    if (message != null && !message.isBlank()) {
+      return message;
     }
 
-    public static ExceptionDetail resolve(Throwable throwable) {
-        Throwable target = throwable == null
-                ? new InternalException(DEFAULT_INTERNAL_MESSAGE)
-                : throwable;
-        String message = resolveMessage(target);
-        String type = target.getClass().getSimpleName();
-        String traceId = resolveTraceId();
-
-        if (target instanceof DatapillarRuntimeException runtimeException) {
-            return new ExceptionDetail(
-                    runtimeException.getCode(),
-                    runtimeException.getCode(),
-                    runtimeException.getType(),
-                    message,
-                    traceId,
-                    resolveServerError(runtimeException));
-        }
-        if (target instanceof IllegalArgumentException) {
-            return buildDetail(
-                    Code.BAD_REQUEST,
-                    ErrorType.BAD_REQUEST,
-                    message,
-                    traceId,
-                    false);
-        }
-        if (target instanceof UnsupportedOperationException) {
-            return buildDetail(
-                    Code.METHOD_NOT_ALLOWED,
-                    ErrorType.METHOD_NOT_ALLOWED,
-                    message,
-                    traceId,
-                    false);
-        }
-        return buildDetail(
-                Code.INTERNAL_ERROR,
-                ErrorType.INTERNAL_ERROR,
-                message,
-                traceId,
-                true);
+    Throwable cause = throwable.getCause();
+    if (cause != null && cause.getMessage() != null && !cause.getMessage().isBlank()) {
+      return cause.getMessage();
     }
 
-    private static ExceptionDetail buildDetail(int code,
-                                               String type,
-                                               String message,
-                                               String traceId,
-                                               boolean serverError) {
-        return new ExceptionDetail(
-                code,
-                code,
-                type,
-                message,
-                traceId,
-                serverError);
+    return DEFAULT_INTERNAL_MESSAGE;
+  }
+
+  private static boolean resolveServerError(DatapillarRuntimeException exception) {
+    if (exception == null) {
+      return true;
     }
-
-    private static String resolveMessage(Throwable throwable) {
-        String message = throwable.getMessage();
-        if (message != null && !message.isBlank()) {
-            return message;
-        }
-
-        Throwable cause = throwable.getCause();
-        if (cause != null && cause.getMessage() != null && !cause.getMessage().isBlank()) {
-            return cause.getMessage();
-        }
-
-        return DEFAULT_INTERNAL_MESSAGE;
+    if (ErrorType.REQUIRED.equals(exception.getType())) {
+      return false;
     }
+    return exception.getCode() >= Code.INTERNAL_ERROR;
+  }
 
-    private static boolean resolveServerError(DatapillarRuntimeException exception) {
-        if (exception == null) {
-            return true;
-        }
-        if (ErrorType.REQUIRED.equals(exception.getType())) {
-            return false;
-        }
-        return exception.getCode() >= Code.INTERNAL_ERROR;
+  private static String resolveTraceId() {
+    String traceId = MDC.get("traceId");
+    if (traceId != null && !traceId.isBlank()) {
+      return traceId;
     }
+    String fallback = MDC.get("trace_id");
+    if (fallback != null && !fallback.isBlank()) {
+      return fallback;
+    }
+    return null;
+  }
 
-    private static String resolveTraceId() {
-        String traceId = MDC.get("traceId");
-        if (traceId != null && !traceId.isBlank()) {
-            return traceId;
-        }
-        String fallback = MDC.get("trace_id");
-        if (fallback != null && !fallback.isBlank()) {
-            return fallback;
-        }
-        return null;
-    }
-
-    public record ExceptionDetail(
-            int httpStatus,
-            int errorCode,
-            String type,
-            String message,
-            String traceId,
-            boolean serverError) {
-    }
+  public record ExceptionDetail(
+      int httpStatus,
+      int errorCode,
+      String type,
+      String message,
+      String traceId,
+      boolean serverError) {}
 }

@@ -1,5 +1,5 @@
-# Datapillar Studio Service 生产环境配置
-# 此配置会覆盖默认配置
+# Datapillar Studio Service Production environment configuration
+# This configuration overrides the default configuration
 
 server:
   port: ${SERVER_PORT:8081}
@@ -65,7 +65,7 @@ logging:
       max-history: 30
       total-size-cap: 5GB
 
-# Airflow 配置
+# Airflow Configuration
 airflow:
   base-url: ${AIRFLOW_BASE_URL:http://localhost:8080}
   plugin-path: /plugins/datapillar
@@ -74,12 +74,12 @@ airflow:
   connect-timeout: 5000
   read-timeout: 30000
 
-# Gravitino 配置
+# Gravitino Configuration
 gravitino:
   uri: ${GRAVITINO_URI:http://localhost:8090}
   metalake: ${GRAVITINO_METALAKE:datapillar}
 
-# Flink SQL 配置
+# Flink SQL Configuration
 flink:
   sql:
     enabled: true

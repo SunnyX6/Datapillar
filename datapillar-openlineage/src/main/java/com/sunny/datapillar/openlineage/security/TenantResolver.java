@@ -7,81 +7,64 @@ import com.sunny.datapillar.openlineage.model.TenantSourceType;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
 
-/**
- * 租户归属解析器。
- */
+/** Tenant ownership resolver. */
 @Component
 public class TenantResolver {
 
-    public TenantContext resolve(OpenLineageEventEnvelope envelope, HttpServletRequest request) {
-        GatewayAssertionContext auth = GatewayAssertionContext.current(request);
+  public TenantContext resolve(OpenLineageEventEnvelope envelope, HttpServletRequest request) {
+    TrustedIdentityContext auth = TrustedIdentityContext.current(request);
+    Long authTenantId = auth == null ? null : auth.tenantId();
+    String authTenantCode = auth == null ? null : trimToNull(auth.tenantCode());
+    Long resolvedTenantId = requirePositiveTenantId(authTenantId);
+    String resolvedTenantCode = requireTenantCode(authTenantCode);
+    String resolvedTenantName = resolvedTenantCode;
 
-        Long authTenantId = auth == null ? null : auth.tenantId();
-        String authTenantCode = auth == null ? null : trimToNull(auth.tenantCode());
-        String authTenantName = auth == null ? null : trimToNull(auth.tenantName());
+    Long facetTenantId = envelope.facetTenantId().orElse(null);
+    String facetTenantCode = envelope.facetTenantCode().orElse(null);
+    verifyFacetTenantConsistency(
+        resolvedTenantId, resolvedTenantCode, facetTenantId, facetTenantCode);
 
-        Long facetTenantId = envelope.facetTenantId().orElse(null);
-        String facetTenantCode = envelope.facetTenantCode().orElse(null);
-        String facetTenantName = envelope.facetTenantName().orElse(null);
+    TenantSourceType sourceType =
+        envelope.looksLikeGravitinoSource()
+            ? TenantSourceType.GRAVITINO
+            : TenantSourceType.COMPUTE_ENGINE;
+    return new TenantContext(resolvedTenantId, resolvedTenantCode, resolvedTenantName, sourceType);
+  }
 
-        if (envelope.looksLikeGravitinoSource()) {
-            if (facetTenantId == null || facetTenantId <= 0) {
-                throw new OpenLineageValidationException("gravitino 事件缺少 facet tenant_id");
-            }
-            if (authTenantId != null && !authTenantId.equals(facetTenantId)) {
-                throw new OpenLineageTenantMismatchException(
-                        "租户不一致: authTenantId=%s facetTenantId=%s", authTenantId, facetTenantId);
-            }
-            String resolvedTenantCode = firstNonBlank(facetTenantCode, authTenantCode);
-            String resolvedTenantName = firstNonBlank(facetTenantName, authTenantName);
-            ensureTenantDetail(resolvedTenantCode, "tenantCode");
-            ensureTenantDetail(resolvedTenantName, "tenantName");
-            return new TenantContext(
-                    facetTenantId,
-                    resolvedTenantCode,
-                    resolvedTenantName,
-                    TenantSourceType.GRAVITINO);
-        }
-
-        if (authTenantId == null || authTenantId <= 0) {
-            throw new OpenLineageValidationException("compute 事件缺少鉴权租户");
-        }
-        if (facetTenantId != null && !authTenantId.equals(facetTenantId)) {
-            throw new OpenLineageTenantMismatchException(
-                    "租户不一致: authTenantId=%s facetTenantId=%s", authTenantId, facetTenantId);
-        }
-
-        String resolvedTenantCode = firstNonBlank(authTenantCode, facetTenantCode);
-        String resolvedTenantName = firstNonBlank(authTenantName, facetTenantName);
-        ensureTenantDetail(resolvedTenantCode, "tenantCode");
-        ensureTenantDetail(resolvedTenantName, "tenantName");
-
-        return new TenantContext(
-                authTenantId,
-                resolvedTenantCode,
-                resolvedTenantName,
-                TenantSourceType.COMPUTE_ENGINE);
+  private Long requirePositiveTenantId(Long tenantId) {
+    if (tenantId == null || tenantId <= 0) {
+      throw new OpenLineageValidationException("authentication tenant_id missing");
     }
+    return tenantId;
+  }
 
-    private String firstNonBlank(String primary, String fallback) {
-        String normalizedPrimary = trimToNull(primary);
-        if (normalizedPrimary != null) {
-            return normalizedPrimary;
-        }
-        return trimToNull(fallback);
+  private String requireTenantCode(String tenantCode) {
+    String normalized = trimToNull(tenantCode);
+    if (normalized == null) {
+      throw new OpenLineageValidationException("authentication tenant_code missing");
     }
+    return normalized;
+  }
 
-    private String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String normalized = value.trim();
-        return normalized.isEmpty() ? null : normalized;
+  private void verifyFacetTenantConsistency(
+      Long authTenantId, String authTenantCode, Long facetTenantId, String facetTenantCode) {
+    if (facetTenantId != null && !authTenantId.equals(facetTenantId)) {
+      throw new OpenLineageTenantMismatchException(
+          "Tenants are inconsistent:authTenantId=%s facetTenantId=%s", authTenantId, facetTenantId);
     }
+    String normalizedFacetTenantCode = trimToNull(facetTenantCode);
+    if (normalizedFacetTenantCode != null && !authTenantCode.equals(normalizedFacetTenantCode)) {
+      throw new OpenLineageTenantMismatchException(
+          "Tenants are inconsistent:authTenantCode=%s facetTenantCode=%s",
+          authTenantCode, normalizedFacetTenantCode);
+    }
+  }
 
-    private void ensureTenantDetail(String value, String fieldName) {
-        if (value == null || value.isBlank()) {
-            throw new OpenLineageValidationException("缺少租户字段: %s", fieldName);
-        }
+  private String trimToNull(String value) {
+    if (value == null) {
+      return null;
     }
+    String normalized = value.trim();
+    return normalized.isEmpty() ? null : normalized;
+  }
 }

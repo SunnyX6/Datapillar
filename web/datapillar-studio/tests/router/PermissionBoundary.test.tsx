@@ -98,7 +98,7 @@ describe('PermissionBoundary', () => {
     })
   })
 
-  it('无权限时应跳转 /403 并携带受限路径', async () => {
+  it('Should jump when there is no permission /403 and carry restricted paths', async () => {
     const { container, root } = renderWithEntry('/projects')
 
     await act(async () => {
@@ -116,12 +116,12 @@ describe('PermissionBoundary', () => {
     cleanup(root, container)
   })
 
-  it('有权限时应继续渲染目标页面', async () => {
+  it('The target page should continue to be rendered when permission is granted', async () => {
     useAuthStore.setState({
       user: buildUser([
         {
           id: 2,
-          name: '项目',
+          name: 'Project',
           path: '/projects',
           location: 'TOP',
           permissionCode: 'READ',
@@ -141,12 +141,12 @@ describe('PermissionBoundary', () => {
     cleanup(root, container)
   })
 
-  it('目标页无权限但存在可访问入口时应自动回退到首个可访问页面', async () => {
+  it('When the target page does not have permission but there is an accessible entry, it should automatically fall back to the first accessible page.', async () => {
     useAuthStore.setState({
       user: buildUser([
         {
           id: 1,
-          name: '首页',
+          name: 'Home page',
           path: '/home',
           location: 'TOP',
           permissionCode: 'READ',

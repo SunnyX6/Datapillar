@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import static org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper.VERSION_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.FilesetVersionBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.ibatis.annotations.Param;
@@ -28,78 +29,98 @@ import org.apache.ibatis.annotations.Param;
 public class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseSQLProvider {
   @Override
   public String softDeleteFilesetVersionsByMetalakeId(Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + VERSION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteFilesetVersionsByCatalogId(Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + VERSION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteFilesetVersionsBySchemaId(Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + VERSION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteFilesetVersionsByFilesetId(Long filesetId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + VERSION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
+        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String deleteFilesetVersionsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + VERSION_TABLE_NAME
         + " WHERE id IN (SELECT id FROM "
         + VERSION_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit})";
   }
 
   @Override
   public String softDeleteFilesetVersionsByRetentionLine(
       Long filesetId, long versionRetentionLine, int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + VERSION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE id IN (SELECT id FROM "
         + VERSION_TABLE_NAME
-        + " WHERE fileset_id = #{filesetId} AND version <= #{versionRetentionLine} AND deleted_at = 0 LIMIT #{limit})";
+        + " WHERE fileset_id = #{filesetId} AND version <= #{versionRetentionLine} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit})";
   }
 
   @Override
   public String insertFilesetVersionsOnDuplicateKeyUpdate(
       List<FilesetVersionPO> filesetVersionPOs) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "INSERT INTO "
         + VERSION_TABLE_NAME
         + " (metalake_id, catalog_id, schema_id, fileset_id,"
         + " version, fileset_comment, properties, storage_location_name, storage_location,"
-        + " deleted_at)"
+        + " deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES "
         + "<foreach collection='filesetVersions' item='version' separator=','>"
         + " (#{version.metalakeId}, #{version.catalogId}, #{version.schemaId}, #{version.filesetId},"
         + " #{version.version}, #{version.filesetComment}, #{version.properties},"
-        + " #{version.locationName}, #{version.storageLocation}, #{version.deletedAt})"
+        + " #{version.locationName}, #{version.storageLocation}, #{version.deletedAt}, "
+        + tenantId
+        + ")"
         + "</foreach>"
-        + " ON CONFLICT(fileset_id, version, storage_location_name, deleted_at) DO UPDATE SET"
+        + " ON CONFLICT(tenant_id, fileset_id, version, storage_location_name, deleted_at) DO UPDATE SET"
         + " metalake_id = EXCLUDED.metalake_id,"
         + " catalog_id = EXCLUDED.catalog_id,"
         + " schema_id = EXCLUDED.schema_id,"

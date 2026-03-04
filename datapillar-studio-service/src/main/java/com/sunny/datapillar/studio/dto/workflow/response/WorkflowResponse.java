@@ -9,33 +9,33 @@ import lombok.Data;
 @Schema(name = "WorkflowResponse")
 public class WorkflowResponse {
 
-    private Long id;
+  private Long id;
 
-    private Long projectId;
+  private Long projectId;
 
-    private String projectName;
+  private String projectName;
 
-    private String workflowName;
+  private String workflowName;
 
-    private Integer triggerType;
+  private Integer triggerType;
 
-    private String triggerValue;
+  private String triggerValue;
 
-    private Integer timeoutSeconds;
+  private Integer timeoutSeconds;
 
-    private Integer maxRetryTimes;
+  private Integer maxRetryTimes;
 
-    private Integer priority;
+  private Integer priority;
 
-    private Integer status;
+  private Integer status;
 
-    private String description;
+  private String description;
 
-    private LocalDateTime createdAt;
+  private LocalDateTime createdAt;
 
-    private LocalDateTime updatedAt;
+  private LocalDateTime updatedAt;
 
-    private List<JobResponse> jobs;
+  private List<JobResponse> jobs;
 
-    private List<JobDependencyResponse> dependencies;
+  private List<JobDependencyResponse> dependencies;
 }

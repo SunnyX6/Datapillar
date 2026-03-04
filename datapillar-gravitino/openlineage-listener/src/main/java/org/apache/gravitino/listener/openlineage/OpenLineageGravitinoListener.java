@@ -69,7 +69,7 @@ public class OpenLineageGravitinoListener implements EventListenerPlugin {
   private OpenLineageClientBuilder clientBuilder;
   private String namespace;
 
-  // 异步执行和限流
+  // Asynchronous execution and current limiting
   private ExecutorService executorService;
   private Semaphore concurrencySemaphore;
   private int retryTotal;
@@ -87,7 +87,7 @@ public class OpenLineageGravitinoListener implements EventListenerPlugin {
     this.openLineage = new OpenLineage(OpenLineageListenerConfig.PRODUCER_URI);
     this.converter = new GravitinoEventConverter(openLineage, namespace);
 
-    // 获取异步执行器和限流配置
+    // Get asynchronous executor and current limiting configuration
     this.executorService = clientBuilder.getExecutorService();
     this.concurrencySemaphore = clientBuilder.getConcurrencySemaphore();
     this.retryTotal = clientBuilder.getRetryTotal();
@@ -133,7 +133,7 @@ public class OpenLineageGravitinoListener implements EventListenerPlugin {
     try {
       OpenLineage.RunEvent runEvent = converter.convert(postEvent);
       if (runEvent != null) {
-        // 异步发送事件（带限流和重试）
+        // Send events asynchronously（With current limit and retry）
         emitEventAsync(runEvent);
       }
     } catch (IllegalArgumentException e) {
@@ -151,12 +151,12 @@ public class OpenLineageGravitinoListener implements EventListenerPlugin {
     }
   }
 
-  /** 异步发送事件（带限流和重试） */
+  /** Send events asynchronously（With current limit and retry） */
   private void emitEventAsync(OpenLineage.RunEvent runEvent) {
     executorService.submit(
         () -> {
           try {
-            // 获取并发许可（限流）
+            // Get concurrent permission（Current limiting）
             concurrencySemaphore.acquire();
             try {
               emitWithRetry(runEvent);
@@ -170,7 +170,7 @@ public class OpenLineageGravitinoListener implements EventListenerPlugin {
         });
   }
 
-  /** 带重试的事件发送 */
+  /** Event sending with retries */
   private void emitWithRetry(OpenLineage.RunEvent runEvent) {
     int attempt = 0;
     Exception lastException = null;
@@ -182,12 +182,12 @@ public class OpenLineageGravitinoListener implements EventListenerPlugin {
             "Emitted OpenLineage event: type={}, job={}",
             runEvent.getEventType(),
             runEvent.getJob().getName());
-        return; // 成功，直接返回
+        return; // success，Return directly
       } catch (Exception e) {
         lastException = e;
         attempt++;
         if (attempt < retryTotal) {
-          // 计算退避时间：backoffFactor * 2^(attempt-1) 秒
+          // Calculate backoff time：backoffFactor * 2^(attempt-1) seconds
           long sleepMs = (long) (retryBackoffFactor * Math.pow(2, attempt - 1) * 1000);
           log.warn(
               "Failed to emit event (attempt {}/{}), retrying in {}ms: {}",

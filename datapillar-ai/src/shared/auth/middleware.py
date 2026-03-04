@@ -1,7 +1,7 @@
 # @author Sunny
 # @date 2026-01-27
 
-"""全局认证中间件。"""
+"""Global authentication middleware."""
 
 from __future__ import annotations
 
@@ -13,11 +13,6 @@ from typing import Any
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.shared.auth.gateway_assertion import (
-    GatewayAssertionConfig,
-    GatewayAssertionError,
-    GatewayAssertionVerifier,
-)
 from src.shared.auth.user import CurrentUser
 from src.shared.config.runtime import get_runtime_config
 from src.shared.context import reset_request_scope, set_request_scope
@@ -25,9 +20,20 @@ from src.shared.exception import ServiceUnavailableException, UnauthorizedExcept
 
 logger = logging.getLogger(__name__)
 
+HEADER_ISSUER = "X-Principal-Iss"
+HEADER_SUBJECT = "X-Principal-Sub"
+HEADER_TENANT_ID = "X-Tenant-Id"
+HEADER_TENANT_CODE = "X-Tenant-Code"
+HEADER_USER_ID = "X-User-Id"
+HEADER_USERNAME = "X-Username"
+HEADER_EMAIL = "X-User-Email"
+HEADER_ROLES = "X-User-Roles"
+HEADER_TRACE_ID = "X-Trace-Id"
+
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    """统一请求入口中间件：Gzip 解压 + 网关断言认证。"""
+    """Unified request entry middleware:
+    Gzip decode + trusted identity authentication."""
 
     WHITELIST_PATHS = {
         "/health",
@@ -37,10 +43,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
         "/api/ai/openapi.json",
     }
 
-    def __init__(self, app):
-        super().__init__(app)
-        self._gateway_assertion_verifier: GatewayAssertionVerifier | None = None
-
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         await self._maybe_decode_gzip_request(request)
 
@@ -48,28 +50,50 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if path in self.WHITELIST_PATHS or path.startswith("/docs") or path.startswith("/redoc"):
             return await call_next(request)
 
-        verifier = self._get_gateway_assertion_verifier()
-        assertion = request.headers.get(verifier.header_name)
-        if not assertion:
-            logger.warning("[Auth] 缺少网关断言: %s", path)
-            raise UnauthorizedException("缺少网关断言")
+        if not self._is_trusted_identity_enabled():
+            raise ServiceUnavailableException("Authentication configuration is not available")
 
-        try:
-            context = verifier.verify(assertion, request.method, path)
-        except GatewayAssertionError as exc:
-            logger.warning("[Auth] 网关断言校验失败: path=%s, reason=%s", path, exc)
-            raise UnauthorizedException("网关断言无效", cause=exc) from exc
+        issuer = self._normalize(request.headers.get(HEADER_ISSUER))
+        subject = self._normalize(request.headers.get(HEADER_SUBJECT))
+        tenant_code = self._normalize(request.headers.get(HEADER_TENANT_CODE))
+        username = self._normalize(request.headers.get(HEADER_USERNAME)) or subject
+        email = self._normalize(request.headers.get(HEADER_EMAIL))
+        trace_id = self._normalize(request.headers.get(HEADER_TRACE_ID))
+        user_id = self._parse_positive_int(request.headers.get(HEADER_USER_ID))
+        tenant_id = self._parse_positive_int(request.headers.get(HEADER_TENANT_ID))
+        roles = self._parse_roles(request.headers.get(HEADER_ROLES))
 
-        request.state.current_user = CurrentUser(
-            user_id=context.user_id,
-            tenant_id=context.tenant_id,
-            tenant_code=context.tenant_code,
-            username=context.username,
-            email=context.email,
+        if issuer is None or subject is None:
+            logger.warning("[Auth] Missing trusted principal headers:path=%s", path)
+            raise UnauthorizedException("Missing trusted principal headers")
+        if tenant_code is None:
+            logger.warning("[Auth] Missing tenant code header:path=%s", path)
+            raise UnauthorizedException("Missing tenant code header")
+        if user_id is None or tenant_id is None:
+            logger.warning("[Auth] Missing user/tenant id headers:path=%s", path)
+            raise UnauthorizedException("Missing trusted user context headers")
+
+        current_user = CurrentUser(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            tenant_code=tenant_code,
+            username=username or subject,
+            issuer=issuer,
+            subject=subject,
+            email=email,
+            roles=tuple(roles),
         )
-        request.state.gateway_assertion = context
-        logger.debug("[Auth] 网关断言注入成功: user=%s, path=%s", context.user_id, path)
-        token = set_request_scope(context.tenant_id, context.user_id, context.tenant_code)
+        request.state.current_user = current_user
+        logger.info(
+            "[Auth] trusted_identity_resolved iss=%s sub=%s preferred_username=%s tenant_code=%s trace_id=%s",
+            issuer,
+            subject,
+            current_user.username,
+            tenant_code,
+            trace_id or "",
+        )
+
+        token = set_request_scope(tenant_id, user_id, tenant_code)
         try:
             return await call_next(request)
         finally:
@@ -84,7 +108,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         try:
             decompressed_body = gzip.decompress(compressed_body)
         except Exception as exc:
-            logger.warning("Gzip 解压失败: %s", exc)
+            logger.warning("Gzip decompression failed:%s", exc)
             decompressed_body = compressed_body
 
         request.scope["headers"] = [
@@ -113,32 +137,38 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         return replay_receive
 
-    def _get_gateway_assertion_verifier(self) -> GatewayAssertionVerifier:
-        if self._gateway_assertion_verifier is not None:
-            return self._gateway_assertion_verifier
-
+    def _is_trusted_identity_enabled(self) -> bool:
         try:
-            runtime_config = get_runtime_config()
-            assertion = runtime_config.security.gateway_assertion
-            if not assertion.enabled:
-                raise ServiceUnavailableException("认证配置不可用")
-
-            self._gateway_assertion_verifier = GatewayAssertionVerifier(
-                GatewayAssertionConfig(
-                    enabled=assertion.enabled,
-                    header_name=assertion.header_name,
-                    issuer=assertion.issuer,
-                    audience=assertion.audience,
-                    key_id=assertion.key_id,
-                    public_key_path=assertion.public_key_path,
-                    previous_key_id=assertion.previous_key_id,
-                    previous_public_key_path=assertion.previous_public_key_path,
-                    max_clock_skew_seconds=assertion.max_clock_skew_seconds,
-                )
-            )
-            return self._gateway_assertion_verifier
-        except ServiceUnavailableException:
-            raise
+            return bool(get_runtime_config().security.trusted_identity.enabled)
         except Exception as exc:
-            logger.error("[Auth] 网关断言配置加载失败: %s", exc)
-            raise ServiceUnavailableException("认证配置不可用", cause=exc) from exc
+            logger.error("[Auth] Trusted identity configuration failed to load:%s", exc)
+            raise ServiceUnavailableException(
+                "Authentication configuration is not available", cause=exc
+            ) from exc
+
+    def _normalize(self, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    def _parse_positive_int(self, value: str | None) -> int | None:
+        normalized = self._normalize(value)
+        if normalized is None:
+            return None
+        try:
+            parsed = int(normalized)
+        except ValueError:
+            return None
+        return parsed if parsed > 0 else None
+
+    def _parse_roles(self, value: str | None) -> list[str]:
+        normalized = self._normalize(value)
+        if normalized is None:
+            return []
+        roles = []
+        for token in normalized.split(","):
+            role = self._normalize(token)
+            if role is not None:
+                roles.append(role.upper())
+        return roles

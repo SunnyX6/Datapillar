@@ -8,19 +8,19 @@ const StatusBadge = ({ status }: { status: Document['status'] }) => {
     case 'indexed':
       return (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full ${RESPONSIVE_TYPOGRAPHY.badge} font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200`}>
-          <CheckCircle size={12} className="mr-1" /> 已索引
+          <CheckCircle size={12} className="mr-1" /> Indexed
         </span>
       )
     case 'processing':
       return (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full ${RESPONSIVE_TYPOGRAPHY.badge} font-medium bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-200`}>
-          <Clock size={12} className="mr-1 animate-pulse" /> 处理中
+          <Clock size={12} className="mr-1 animate-pulse" /> Processing
         </span>
       )
     case 'error':
       return (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full ${RESPONSIVE_TYPOGRAPHY.badge} font-medium bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200`}>
-          <AlertCircle size={12} className="mr-1" /> 失败
+          <AlertCircle size={12} className="mr-1" /> failed
         </span>
       )
     default:
@@ -72,10 +72,10 @@ export default function DocList({ spaceId, documents }: DocListProps) {
         <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
           <thead className="bg-slate-50 dark:bg-slate-800/60">
             <tr>
-              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>文档名称</th>
-              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>状态</th>
-              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>切片数 / 长度</th>
-              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>上传时间</th>
+              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>Document name</th>
+              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>Status</th>
+              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>Number of slices / length</th>
+              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>Upload time</th>
               <th scope="col" className="relative px-4 py-2.5"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
@@ -113,7 +113,7 @@ export default function DocList({ spaceId, documents }: DocListProps) {
             ) : (
               <tr>
                 <td colSpan={5} className={`px-4 py-6 text-center ${TYPOGRAPHY.bodySm} text-slate-500 dark:text-slate-400`}>
-                  此空间暂无文档
+                  There are currently no documents in this space
                 </td>
               </tr>
             )}

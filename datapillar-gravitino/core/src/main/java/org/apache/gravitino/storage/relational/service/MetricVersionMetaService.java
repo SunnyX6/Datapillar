@@ -1,21 +1,19 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * regarding copyright ownership.The ASF licenses this file
+ * to you under the Apache License,Version 2.0 (the
+ * "License");you may not use this file except in compliance
+ * with the License.You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * Unless required by applicable law or agreed to in writing,* software distributed under the License is distributed on an
+ * "AS IS" BASIS,WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND,either express or implied.See the License for the
  * specific language governing permissions and limitations
- * under the License.
- */
+ * under the License.*/
 package org.apache.gravitino.storage.relational.service;
 
 import java.util.ArrayList;
@@ -36,7 +34,7 @@ import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 
-/** MetricVersion 元数据服务 */
+/** MetricVersion metadata service */
 public class MetricVersionMetaService {
 
   private static final MetricVersionMetaService INSTANCE = new MetricVersionMetaService();
@@ -48,55 +46,51 @@ public class MetricVersionMetaService {
   private MetricVersionMetaService() {}
 
   /**
-   * 根据 namespace 列出所有指标版本
+   * According to namespace List all indicator versions
    *
-   * @param ns namespace (格式: [metalake, catalog, schema, metric_code])
-   * @return 版本实体列表
+   * @param ns namespace (Format:[metalake,catalog,schema,metric_code])
+   * @return Version entity list
    */
   public List<MetricVersionEntity> listVersionsByNamespace(Namespace ns) {
-    NamespaceUtil.checkMetricVersion(ns);
-
-    // namespace 的所有 levels 构成 metric identifier
-    NameIdentifier metricIdent = NameIdentifier.of(ns.levels());
-
-    // 获取 metric entity，如果不存在会抛出 NoSuchEntityException
-    MetricEntity metricEntity = MetricMetaService.getInstance().getMetricByIdentifier(metricIdent);
-
-    // 查询该 metric 的所有版本
+    NamespaceUtil.checkMetricVersion(ns); // namespace of all levels constitute metric identifier
+    NameIdentifier metricIdent =
+        NameIdentifier.of(
+            ns.levels()); // Get metric entity,Will throw if it does not exist NoSuchEntityException
+    MetricEntity metricEntity =
+        MetricMetaService.getInstance()
+            .getMetricByIdentifier(metricIdent); // Query the metric All versions of
     List<MetricVersionPO> versionPOs =
         SessionUtils.getWithoutCommit(
             MetricVersionMetaMapper.class,
             mapper -> mapper.listMetricVersionMetasByMetricId(metricEntity.id()));
-
     if (versionPOs.isEmpty()) {
       return List.of();
     }
 
-    // 转换为 Entity
+    // Convert to Entity
     return POConverters.fromMetricVersionPOs(versionPOs, metricIdent);
   }
 
   /**
-   * 根据 metric_id 和 version 获取特定版本
+   * According to metric_id and version Get a specific version
    *
-   * @param metricIdent 指标标识符
-   * @param version 版本号
-   * @return 版本实体
-   * @throws NoSuchEntityException 如果版本不存在
+   * @param metricIdent indicator identifier
+   * @param version version number
+   * @return version entity
+   * @throws NoSuchEntityException if the version does not exist
    */
   public MetricVersionEntity getVersionByIdentifier(NameIdentifier metricIdent, int version)
       throws NoSuchEntityException {
 
-    // 获取 metric entity
-    MetricEntity metricEntity = MetricMetaService.getInstance().getMetricByIdentifier(metricIdent);
-
-    // 查询特定版本
+    // Get metric entity
+    MetricEntity metricEntity =
+        MetricMetaService.getInstance()
+            .getMetricByIdentifier(metricIdent); // Query a specific version
     MetricVersionPO versionPO =
         SessionUtils.getWithoutCommit(
             MetricVersionMetaMapper.class,
             mapper ->
                 mapper.selectMetricVersionMetaByMetricIdAndVersion(metricEntity.id(), version));
-
     if (versionPO == null) {
       throw new NoSuchEntityException(
           "MetricVersion %s (version %d) does not exist", metricIdent, version);
@@ -106,36 +100,35 @@ public class MetricVersionMetaService {
   }
 
   /**
-   * 根据 NameIdentifier 获取版本（兼容 JDBCBackend.get() 调用）
+   * According to NameIdentifier Get version(Compatible JDBCBackend.get() call)
    *
-   * @param ident 版本标识符（namespace = [metalake, catalog, schema, metric_code], name = version）
-   * @return 版本实体
-   * @throws NoSuchEntityException 如果版本不存在
+   * @param ident version identifier(namespace = [metalake,catalog,schema,metric_code],name =
+   *     version)
+   * @return version entity
+   * @throws NoSuchEntityException if the version does not exist
    */
   public MetricVersionEntity getMetricVersionByIdentifier(NameIdentifier ident)
       throws NoSuchEntityException {
-    NamespaceUtil.checkMetricVersion(ident.namespace());
-
-    // namespace 的所有 levels 构成 metric identifier
-    NameIdentifier metricIdent = NameIdentifier.of(ident.namespace().levels());
-
-    // ident.name() 是版本号
+    NamespaceUtil.checkMetricVersion(
+        ident.namespace()); // namespace of all levels constitute metric identifier
+    NameIdentifier metricIdent =
+        NameIdentifier.of(ident.namespace().levels()); // ident.name() is the version number
     int version;
     try {
       version = Integer.parseInt(ident.name());
     } catch (NumberFormatException e) {
-      throw new NoSuchEntityException(
-          "Invalid version number: %s, must be an integer", ident.name());
+      throw new NoSuchEntityException("Invalid version number:%s,must be an integer", ident.name());
     }
 
     return getVersionByIdentifier(metricIdent, version);
   }
 
   /**
-   * 根据引用表 ID 获取当前版本指标（仅返回 current_version 对应记录）。
+   * According to the reference table ID Get current version metrics(Return only current_version
+   * Corresponding record).*
    *
-   * @param refTableId 引用表 ID
-   * @return 指标版本实体列表
+   * @param refTableId Reference table ID
+   * @return Indicator version entity list
    */
   public List<MetricVersionEntity> listCurrentVersionsByRefTableId(Long refTableId) {
     if (refTableId == null) {
@@ -154,7 +147,6 @@ public class MetricVersionMetaService {
     Map<Long, CatalogPO> catalogCache = new HashMap<>();
     Map<Long, MetalakePO> metalakeCache = new HashMap<>();
     List<MetricVersionEntity> versions = new ArrayList<>(versionPOs.size());
-
     for (MetricVersionPO versionPO : versionPOs) {
       if (versionPO == null || versionPO.getMetricCode() == null) {
         continue;

@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-02-07
 
-"""对象存储私钥读取（S3/OSS/MinIO）。"""
+"""Object storage private key reading(S3/OSS/MinIO)."""
 
 from __future__ import annotations
 
@@ -15,7 +14,7 @@ class ObjectStoreKeyStorage(KeyStorage):
     def __init__(self, config: dict[str, object]) -> None:
         bucket = (config.get("bucket") or "").strip()
         if not bucket:
-            raise ValueError("key_storage.s3.bucket 不能为空")
+            raise ValueError("key_storage.s3.bucket cannot be empty")
         self._bucket = bucket
         self._prefix = (config.get("prefix") or "privkeys").strip() or "privkeys"
         self._client = boto3.client(
@@ -28,7 +27,7 @@ class ObjectStoreKeyStorage(KeyStorage):
 
     def load_private_key(self, tenant_id: int) -> bytes:
         if tenant_id <= 0:
-            raise ValueError("tenant_id 无效")
+            raise ValueError("tenant_id Invalid")
         key = f"{self._prefix}/{tenant_id}/private.pem"
         response = self._client.get_object(Bucket=self._bucket, Key=key)
         return response["Body"].read()

@@ -8,8 +8,8 @@ from dynaconf import Dynaconf
 from src.shared.config.exceptions import ConfigurationError
 from src.shared.config.nacos_client import (
     NacosBootstrapConfig,
-    _is_usable_service_ip,
     _build_client_config,
+    _is_usable_service_ip,
     apply_nacos_config,
     load_nacos_config,
     parse_nacos_config_content,
@@ -56,9 +56,6 @@ def _valid_runtime_config() -> dict[str, object]:
         "gravitino_db_username": "root",
         "gravitino_db_password": "Sunny.123456",
         "gravitino_sync_metalake": "datapillar",
-        "jwt_secret": "jwt-secret",
-        "jwt_issuer": "datapillar",
-        "auth_enabled": True,
         "llm": {"retry": {"max_retries": 2}},
         "agent": {"max_steps": 10},
         "sql_summary": {
@@ -80,16 +77,8 @@ def _valid_runtime_config() -> dict[str, object]:
         },
         "security": {
             "default_tenant_id": 1,
-            "gateway_assertion": {
+            "trusted_identity": {
                 "enabled": True,
-                "header_name": "X-Gateway-Assertion",
-                "issuer": "datapillar-auth",
-                "audience": "datapillar-ai",
-                "key_id": "auth-dev-2026-02",
-                "public_key_path": "classpath:shared/auth/security/gateway-assertion-dev-public.pem",
-                "previous_key_id": "",
-                "previous_public_key_path": "",
-                "max_clock_skew_seconds": 5,
             },
             "key_storage": {
                 "type": "local",
@@ -232,7 +221,7 @@ def test_resolve_service_ip_fails_fast_on_invalid_nacos_service_ip(
     monkeypatch.setenv("POD_IP", "192.168.0.100")
     monkeypatch.setenv("HOST_IP", "192.168.0.101")
 
-    with pytest.raises(ConfigurationError, match="服务注册 IP 非法"):
+    with pytest.raises(ConfigurationError, match="Service registration IP illegal"):
         resolve_service_ip()
 
 
@@ -241,5 +230,5 @@ def test_resolve_service_ip_requires_explicit_env(monkeypatch: pytest.MonkeyPatc
     monkeypatch.delenv("POD_IP", raising=False)
     monkeypatch.delenv("HOST_IP", raising=False)
 
-    with pytest.raises(ConfigurationError, match="缺少服务注册 IP"):
+    with pytest.raises(ConfigurationError, match="Missing service registration IP"):
         resolve_service_ip()

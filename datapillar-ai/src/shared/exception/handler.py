@@ -1,7 +1,7 @@
 # @author Sunny
 # @date 2026-02-20
 
-"""全局异常处理注册。"""
+"""Global exception handling registration."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    """注册全局异常处理器。"""
+    """Register global exception handler."""
 
     @app.exception_handler(DatapillarException)
     async def _handle_datapillar_exception(
@@ -55,7 +55,7 @@ def _build_error_response(*, request: Request, exc: Exception) -> JSONResponse:
 
     if detail.server_error:
         logger.error(
-            "请求失败: path=%s, type=%s, message=%s",
+            "Request failed:path=%s,type=%s,message=%s",
             request.url.path,
             detail.error_type,
             detail.message,
@@ -63,7 +63,7 @@ def _build_error_response(*, request: Request, exc: Exception) -> JSONResponse:
         )
     else:
         logger.warning(
-            "请求异常: path=%s, type=%s, message=%s",
+            "Request exception:path=%s,type=%s,message=%s",
             request.url.path,
             detail.error_type,
             detail.message,

@@ -11,15 +11,15 @@ import lombok.NoArgsConstructor;
 @Schema(name = "AuthTokenResponse")
 public class TokenResponse {
 
-    private boolean valid;
+  private boolean valid;
 
-    private Long userId;
+  private Long userId;
 
-    private Long tenantId;
+  private Long tenantId;
 
-    private String username;
+  private String username;
 
-    private String email;
+  private String email;
 
-    private String errorMessage;
+  private String errorMessage;
 }

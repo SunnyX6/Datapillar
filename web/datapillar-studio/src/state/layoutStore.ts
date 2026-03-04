@@ -1,10 +1,10 @@
 /**
- * 布局状态管理 - 负责侧边栏折叠偏好
+ * Layout state management - Responsible for sidebar collapse preferences
  *
- * 约束：
- * - 使用 Zustand 共享状态，避免路由切换重置
- * - 通过 globalThis 确保懒加载路由不会重复实例化 store
- * - 仅在浏览器端与 localStorage 同步，防止 SSR 报错
+ * constraint：
+ * - use Zustand Shared status，Avoid routing switch resets
+ * - Pass globalThis Ensure that lazy loading routes are not instantiated repeatedly store
+ * - Only on the browser side with localStorage sync，prevent SSR Report an error
  */
 
 import { create } from 'zustand'

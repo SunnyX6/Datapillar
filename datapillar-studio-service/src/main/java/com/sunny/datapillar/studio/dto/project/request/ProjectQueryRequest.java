@@ -8,21 +8,21 @@ import lombok.Data;
 @Schema(name = "ProjectQuery")
 public class ProjectQueryRequest {
 
-    private String keyword;
+  private String keyword;
 
-    private ProjectStatus status;
+  private ProjectStatus status;
 
-    private Boolean onlyFavorites;
+  private Boolean onlyFavorites;
 
-    private Boolean onlyVisible;
+  private Boolean onlyVisible;
 
-    private Integer limit = 20;
+  private Integer limit = 20;
 
-    private Integer offset = 0;
+  private Integer offset = 0;
 
-    private Integer maxLimit = 200;
+  private Integer maxLimit = 200;
 
-    private String sortBy = "updatedAt";
+  private String sortBy = "updatedAt";
 
-    private String sortOrder = "desc";
+  private String sortOrder = "desc";
 }

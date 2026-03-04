@@ -1,6 +1,6 @@
 /**
- * SQL编辑器 - 底部面板组件
- * 基于 BaseBottomPanel 骨架构建
+ * SQLEditor - Bottom panel components
+ * Based on BaseBottomPanel skeleton construction
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -34,17 +34,17 @@ interface BottomPanelProps {
   executeResult: ExecuteResult | null
   executionLogs: ExecutionLog[]
   isExecuting: boolean
-  /** 外部控制折叠状态 */
+  /** External control of folded state */
   collapsed?: boolean
-  /** 折叠状态变化回调 */
+  /** Collapse state change callback */
   onCollapsedChange?: (collapsed: boolean) => void
-  /** 外部控制激活的 Tab */
+  /** external control activated Tab */
   activeTab?: string
-  /** Tab 切换回调 */
+  /** Tab Switch callback */
   onActiveTabChange?: (tab: string) => void
 }
 
-/** 底部面板 Tab 配置 */
+/** bottom panel Tab Configuration */
 const BOTTOM_TABS: BottomPanelTab[] = [
   { id: 'results', label: 'Results', icon: <TableIcon size={10} /> },
   { id: 'messages', label: 'Messages', icon: <MessageSquare size={10} /> }
@@ -69,7 +69,7 @@ export function BottomPanel({
   const dialectButtonRef = useRef<HTMLButtonElement>(null)
   const dialectDropdownRef = useRef<HTMLDivElement>(null)
 
-  // 支持受控和非受控模式
+  // Supports controlled and uncontrolled modes
   const isCollapsed = controlledCollapsed ?? internalCollapsed
   const activeTab = controlledActiveTab ?? internalActiveTab
 
@@ -83,7 +83,7 @@ export function BottomPanel({
     onActiveTabChange?.(tab)
   }
 
-  // 点击外部关闭语言选择框
+  // Click outside to close the language selection box
   useEffect(() => {
     if (!showDialects) return
     const handleClickOutside = (e: MouseEvent) => {
@@ -96,14 +96,14 @@ export function BottomPanel({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showDialects])
 
-  // 状态栏左侧 - 光标位置
+  // Left side of status bar - cursor position
   const statusLeft = (
     <div className="flex items-center gap-1.5 text-tiny font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider border-r border-slate-200 dark:border-slate-700 pr-2 h-3 select-none">
       <Terminal size={9} /> {cursor.ln}:{cursor.col}
     </div>
   )
 
-  // 状态栏右侧 - 方言选择器 + 在线状态
+  // Right side of status bar - Dialect selector + online status
   const statusRight = (
     <>
       <div className="relative">
@@ -164,12 +164,12 @@ export function BottomPanel({
   )
 }
 
-/** 结果表格组件 */
+/** Result table component */
 function ResultsTable({ executeResult }: { executeResult: ExecuteResult | null }) {
   if (!executeResult || !executeResult.columns || executeResult.columns.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500 text-micro">
-        暂无数据
+        No data yet
       </div>
     )
   }
@@ -212,17 +212,17 @@ function ResultsTable({ executeResult }: { executeResult: ExecuteResult | null }
   )
 }
 
-/** 消息日志组件 */
+/** Message log component */
 function MessagesLog({ logs }: { logs: { time: string; msg: string; type: string }[] }) {
   if (logs.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500 text-micro">
-        暂无日志
+        No logs yet
       </div>
     )
   }
 
-  // 根据日志类型返回对应的样式类
+  // Return the corresponding style class according to the log type
   const getLogStyle = (type: string) => {
     switch (type) {
       case 'success':
@@ -237,7 +237,7 @@ function MessagesLog({ logs }: { logs: { time: string; msg: string; type: string
     }
   }
 
-  // 根据日志类型返回时间戳的样式
+  // Return timestamp style based on log type
   const getTimeStyle = (type: string) => {
     switch (type) {
       case 'success':

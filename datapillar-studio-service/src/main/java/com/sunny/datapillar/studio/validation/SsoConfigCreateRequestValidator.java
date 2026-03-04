@@ -6,19 +6,20 @@ import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import org.springframework.util.StringUtils;
 
-public class SsoConfigCreateRequestValidator implements ConstraintValidator<ValidSsoConfigCreateRequest, SsoConfigCreateRequest> {
+public class SsoConfigCreateRequestValidator
+    implements ConstraintValidator<ValidSsoConfigCreateRequest, SsoConfigCreateRequest> {
 
-    @Override
-    public boolean isValid(SsoConfigCreateRequest request, ConstraintValidatorContext context) {
-        if (request == null) {
-            return false;
-        }
-        SsoDingtalkConfigItem config = request.getConfig();
-        if (config == null) {
-            return false;
-        }
-        return StringUtils.hasText(config.getClientId())
-                && StringUtils.hasText(config.getClientSecret())
-                && StringUtils.hasText(config.getRedirectUri());
+  @Override
+  public boolean isValid(SsoConfigCreateRequest request, ConstraintValidatorContext context) {
+    if (request == null) {
+      return false;
     }
+    SsoDingtalkConfigItem config = request.getConfig();
+    if (config == null) {
+      return false;
+    }
+    return StringUtils.hasText(config.getClientId())
+        && StringUtils.hasText(config.getClientSecret())
+        && StringUtils.hasText(config.getRedirectUri());
+  }
 }

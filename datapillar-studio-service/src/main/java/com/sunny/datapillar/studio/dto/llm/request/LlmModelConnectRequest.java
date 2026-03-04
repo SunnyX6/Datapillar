@@ -9,9 +9,9 @@ import lombok.Data;
 @Schema(name = "LlmModelConnectRequest")
 public class LlmModelConnectRequest {
 
-    @NotBlank(message = "api_key 不能为空")
-    private String apiKey;
+  @NotBlank(message = "api_key cannot be empty")
+  private String apiKey;
 
-    @Size(max = 255, message = "base_url 长度不能超过 255")
-    private String baseUrl;
+  @Size(max = 255, message = "base_url The length cannot exceed 255")
+  private String baseUrl;
 }

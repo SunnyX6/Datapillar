@@ -78,14 +78,14 @@ export function ToastCopyAction(props: { text: string }) {
     })
   }
 
-  const label = status === 'copied' ? '已复制' : status === 'failed' ? '失败' : null
+  const label = status === 'copied' ? 'Copied' : status === 'failed' ? 'failed' : null
 
   return (
     <button
       type="button"
       onClick={handleClick}
-      aria-label={status === 'idle' ? '复制消息' : label ?? '复制消息'}
-      title={status === 'idle' ? '复制消息' : label ?? '复制消息'}
+      aria-label={status === 'idle' ? 'Copy message' : label ?? 'Copy message'}
+      title={status === 'idle' ? 'Copy message' : label ?? 'Copy message'}
       style={{
         ...COPY_ACTION_BUTTON_STYLE,
         ...COPY_ACTION_STATUS_STYLE[status]

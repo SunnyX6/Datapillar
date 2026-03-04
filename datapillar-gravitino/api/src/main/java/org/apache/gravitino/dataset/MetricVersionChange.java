@@ -21,42 +21,42 @@ package org.apache.gravitino.dataset;
 import java.util.Objects;
 import org.apache.gravitino.annotation.Evolving;
 
-/** 指标版本变更接口 */
+/** Indicator version change interface */
 @Evolving
 public interface MetricVersionChange {
 
   /**
-   * 创建更新注释的变更
+   * Create changes that update comments
    *
-   * @param newComment 新的注释
-   * @return 变更对象
+   * @param newComment new annotation
+   * @return Change object
    */
   static MetricVersionChange updateComment(String newComment) {
     return new UpdateComment(newComment);
   }
 
   /**
-   * 创建设置属性的变更
+   * Create changes to settings properties
    *
-   * @param property 属性名
-   * @param value 属性值
-   * @return 变更对象
+   * @param property attribute name
+   * @param value attribute value
+   * @return Change object
    */
   static MetricVersionChange setProperty(String property, String value) {
     return new SetProperty(property, value);
   }
 
   /**
-   * 创建删除属性的变更
+   * Create changes that delete attributes
    *
-   * @param property 属性名
-   * @return 变更对象
+   * @param property attribute name
+   * @return Change object
    */
   static MetricVersionChange removeProperty(String property) {
     return new RemoveProperty(property);
   }
 
-  /** 更新注释变更 */
+  /** Update note changes */
   final class UpdateComment implements MetricVersionChange {
     private final String newComment;
 
@@ -87,7 +87,7 @@ public interface MetricVersionChange {
     }
   }
 
-  /** 设置属性变更 */
+  /** Set property changes */
   final class SetProperty implements MetricVersionChange {
     private final String property;
     private final String value;
@@ -124,7 +124,7 @@ public interface MetricVersionChange {
     }
   }
 
-  /** 删除属性变更 */
+  /** Delete attribute changes */
   final class RemoveProperty implements MetricVersionChange {
     private final String property;
 

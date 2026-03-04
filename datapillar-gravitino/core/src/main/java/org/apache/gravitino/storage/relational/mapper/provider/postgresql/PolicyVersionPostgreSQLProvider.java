@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper.PO
 import static org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper.POLICY_VERSION_TABLE_NAME;
 
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyVersionBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 
@@ -29,31 +30,47 @@ public class PolicyVersionPostgreSQLProvider extends PolicyVersionBaseSQLProvide
   @Override
   public String softDeletePolicyVersionByMetalakeAndPolicyName(
       String metalakeName, String policyName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE metalake_id = (SELECT metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
+        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId)
+        + ")"
         + " AND policy_id = (SELECT policy_id FROM "
         + POLICY_META_TABLE_NAME
-        + " pm WHERE pm.policy_name = #{policyName} AND pm.deleted_at = 0)"
-        + " AND deleted_at = 0";
+        + " pm WHERE pm.policy_name = #{policyName} AND pm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pm", tenantId)
+        + ")"
+        + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String deletePolicyVersionsByLegacyTimeline(Long legacyTimeline, int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + POLICY_VERSION_TABLE_NAME
         + " WHERE id IN (SELECT id FROM "
         + POLICY_VERSION_TABLE_NAME
-        + " WHERE deleted_at = 0 AND legacy_timeline < #{legacyTimeline} LIMIT #{limit})";
+        + " WHERE deleted_at = 0 AND legacy_timeline < #{legacyTimeline}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit})"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeletePolicyVersionsByRetentionLine(
       Long policyId, long versionRetentionLine, int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
@@ -61,24 +78,35 @@ public class PolicyVersionPostgreSQLProvider extends PolicyVersionBaseSQLProvide
         + " WHERE id IN (SELECT id FROM "
         + POLICY_VERSION_TABLE_NAME
         + " WHERE policy_id = #{policyId} AND version < #{versionRetentionLine}"
-        + " AND deleted_at = 0 LIMIT #{limit})";
+        + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit})"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeletePolicyVersionsByMetalakeId(Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + POLICY_VERSION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String insertPolicyVersionOnDuplicateKeyUpdate(PolicyVersionPO policyVersion) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + POLICY_VERSION_TABLE_NAME
         + " (metalake_id, policy_id, version, policy_comment, enabled,"
-        + " content, deleted_at)"
+        + " content, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES ("
         + " #{policyVersion.metalakeId},"
         + " #{policyVersion.policyId},"
@@ -86,7 +114,10 @@ public class PolicyVersionPostgreSQLProvider extends PolicyVersionBaseSQLProvide
         + " #{policyVersion.policyComment},"
         + " #{policyVersion.enabled},"
         + " #{policyVersion.content},"
-        + " #{policyVersion.deletedAt})"
+        + " #{policyVersion.deletedAt},"
+        + " "
+        + tenantId
+        + ")"
         + " ON CONFLICT (policy_id, version, deleted_at) DO UPDATE SET"
         + " policy_comment = #{policyVersion.policyComment},"
         + " enabled = #{policyVersion.enabled},"

@@ -29,6 +29,7 @@ import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMap
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -37,6 +38,7 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
   public String listPolicyPOsByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
         + " pm.audit_info, pm.current_version, pm.last_version,"
         + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
@@ -51,13 +53,20 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + " pvi ON pm.policy_id = pvi.policy_id AND pm.current_version = pvi.version"
         + " WHERE pe.metadata_object_id = #{metadataObjectId}"
         + " AND pe.metadata_object_type = #{metadataObjectType} AND pe.deleted_at = 0"
-        + " AND pm.deleted_at = 0 AND pvi.deleted_at = 0";
+        + " AND pm.deleted_at = 0 AND pvi.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pe", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pvi", tenantId);
   }
 
   public String getPolicyPOsByMetadataObjectAndPolicyName(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType,
       @Param("policyName") String policyName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
         + " pm.audit_info, pm.current_version, pm.last_version,"
         + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
@@ -72,11 +81,18 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + " pvi ON pm.policy_id = pvi.policy_id AND pm.current_version = pvi.version"
         + " WHERE pe.metadata_object_id = #{metadataObjectId}"
         + " AND pe.metadata_object_type = #{metadataObjectType} AND pm.policy_name = #{policyName}"
-        + " AND pe.deleted_at = 0 AND pm.deleted_at = 0 AND pvi.deleted_at = 0";
+        + " AND pe.deleted_at = 0 AND pm.deleted_at = 0 AND pvi.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pe", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pvi", tenantId);
   }
 
   public String listPolicyMetadataObjectRelsByMetalakeAndPolicyName(
       @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT pe.policy_id as policyId, pe.metadata_object_id as metadataObjectId,"
         + " pe.metadata_object_type as metadataObjectType, pe.audit_info as auditInfo,"
         + " pe.current_version as currentVersion, pe.last_version as lastVersion,"
@@ -90,16 +106,25 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON pm.metalake_id = mm.metalake_id"
         + " WHERE mm.metalake_name = #{metalakeName} AND pm.policy_name = #{policyName}"
-        + " AND pe.deleted_at = 0 AND pm.deleted_at = 0 AND mm.deleted_at = 0";
+        + " AND pe.deleted_at = 0 AND pm.deleted_at = 0 AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pe", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId);
   }
 
   public String batchInsertPolicyMetadataObjectRels(
       @Param("policyRels") List<PolicyMetadataObjectRelPO> policyRelPOs) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "INSERT INTO "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
         + "(policy_id, metadata_object_id, metadata_object_type, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES "
         + "<foreach collection='policyRels' item='item' separator=','>"
         + "(#{item.policyId},"
@@ -108,7 +133,10 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + " #{item.auditInfo},"
         + " #{item.currentVersion},"
         + " #{item.lastVersion},"
-        + " #{item.deletedAt})"
+        + " #{item.deletedAt},"
+        + " "
+        + tenantId
+        + ")"
         + "</foreach>"
         + "</script>";
   }
@@ -117,6 +145,7 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType,
       @Param("policyIds") List<Long> policyIds) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
@@ -128,11 +157,14 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + "</foreach>"
         + " AND metadata_object_id = #{metadataObjectId}"
         + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + "</script>";
   }
 
   public String softDeletePolicyMetadataObjectRelsByMetalakeAndPolicyName(
       @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
         + " pe JOIN "
@@ -143,11 +175,18 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + " SET pe.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE mm.metalake_name = #{metalakeName} AND pm.policy_name = #{policyName}"
-        + " AND pe.deleted_at = 0 AND pm.deleted_at = 0 AND mm.deleted_at = 0";
+        + " AND pe.deleted_at = 0 AND pm.deleted_at = 0 AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pe", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId);
   }
 
   public String softDeletePolicyMetadataObjectRelsByMetalakeId(
       @Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
         + " pe JOIN "
@@ -156,79 +195,114 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + " SET pe.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE pm.metalake_id = #{metalakeId}"
-        + " AND pe.deleted_at = 0 AND pm.deleted_at = 0";
+        + " AND pe.deleted_at = 0 AND pm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pe", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("pm", tenantId);
   }
 
   public String softDeletePolicyMetadataObjectRelsByMetadataObject(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return " UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0"
-        + " AND metadata_object_type = #{metadataObjectType}";
+        + " AND metadata_object_type = #{metadataObjectType} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeletePolicyMetadataObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE deleted_at = 0 AND ("
+        + " WHERE deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " AND ("
         + "   (metadata_object_type = 'CATALOG' AND metadata_object_id = #{catalogId})"
         + "   OR (metadata_object_type = 'SCHEMA' AND metadata_object_id IN (SELECT schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
-        + " WHERE catalog_id = #{catalogId}))"
+        + " WHERE catalog_id = #{catalogId} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + "))"
         + "   OR (metadata_object_type = 'TOPIC' AND metadata_object_id IN (SELECT topic_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " WHERE catalog_id = #{catalogId}))"
+        + " WHERE catalog_id = #{catalogId} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + "))"
         + "   OR (metadata_object_type = 'TABLE' AND metadata_object_id IN (SELECT table_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " WHERE catalog_id = #{catalogId}))"
+        + " WHERE catalog_id = #{catalogId} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + "))"
         + "   OR (metadata_object_type = 'FILESET' AND metadata_object_id IN (SELECT fileset_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
-        + " WHERE catalog_id = #{catalogId}))"
+        + " WHERE catalog_id = #{catalogId} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + "))"
         + "   OR (metadata_object_type = 'MODEL' AND metadata_object_id IN (SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " WHERE catalog_id = #{catalogId}))"
+        + " WHERE catalog_id = #{catalogId} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + "))"
         + " )";
   }
 
   public String softDeletePolicyMetadataObjectRelsBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE deleted_at = 0 AND ("
+        + " WHERE deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " AND ("
         + "   (metadata_object_type = 'SCHEMA' AND metadata_object_id = #{schemaId})"
         + "   OR (metadata_object_type = 'TOPIC' AND metadata_object_id IN (SELECT topic_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId}))"
+        + " WHERE schema_id = #{schemaId} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + "))"
         + "   OR (metadata_object_type = 'TABLE' AND metadata_object_id IN (SELECT table_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId}))"
+        + " WHERE schema_id = #{schemaId} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + "))"
         + "   OR (metadata_object_type = 'FILESET' AND metadata_object_id IN (SELECT fileset_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
-        + " WHERE schema_id = #{schemaId}))"
+        + " WHERE schema_id = #{schemaId} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + "))"
         + "   OR (metadata_object_type = 'MODEL' AND metadata_object_id IN (SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId}))"
+        + " WHERE schema_id = #{schemaId} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + "))"
         + " )";
   }
 
   public String softDeletePolicyMetadataObjectRelsByTableId(@Param("tableId") Long tableId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE metadata_object_id = #{tableId}"
         + " AND metadata_object_type = 'TABLE'"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deletePolicyEntityRelsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 }

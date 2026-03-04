@@ -42,10 +42,10 @@ import { FeatureStepGrant } from './FeatureStepGrant'
 import { FeatureStepNavigation } from './FeatureStepNavigation'
 
 const STEPS = [
-  { id: 'design', label: '基础定义', desc: '身份与原子动作' },
-  { id: 'visibility', label: '导航挂载', desc: '菜单拓扑与权重' },
-  { id: 'grant', label: '初始授权', desc: '角色访问矩阵' },
-  { id: 'audit', label: '发布审计', desc: '变更差分确认' }
+  { id: 'design', label: 'basic definition', desc: 'Identity and atomic actions' },
+  { id: 'visibility', label: 'Navigation mount', desc: 'Menu topology and weights' },
+  { id: 'grant', label: 'initial authorization', desc: 'role access matrix' },
+  { id: 'audit', label: 'Post an audit', desc: 'Change difference confirmation' }
 ]
 
 const PRESET_ICONS = [
@@ -444,7 +444,7 @@ export function FeatureStep({ selectedId, roles, currentStepIndex, onStepChange 
             className="px-5 dark:border-slate-700 dark:text-slate-200"
           >
             <ArrowLeft size={14} className="mr-2" />
-            上一步
+            Previous step
           </Button>
           <Button
             size="small"
@@ -452,7 +452,7 @@ export function FeatureStep({ selectedId, roles, currentStepIndex, onStepChange 
             onClick={nextStep}
             className={`px-6 shadow-sm ${isLastStep ? 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400' : ''}`}
           >
-            {isLastStep ? '确认发布' : '继续配置'}
+            {isLastStep ? 'Confirm release' : 'Continue configuration'}
             {!isLastStep && <ArrowRight size={14} className="ml-2" />}
             {isLastStep && <CheckCircle2 size={14} className="ml-2" />}
           </Button>

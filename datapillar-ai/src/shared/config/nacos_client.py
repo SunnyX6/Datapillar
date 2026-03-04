@@ -2,20 +2,19 @@
 # @date 2026-02-04
 
 """
-Nacos 配置加载与服务注册
+Nacos Configuration loading and service registration
 
-约束：
-- Nacos 为唯一配置源，不做本地兜底
-- 仅在启动阶段拉取配置（默认不做热更新）
+constraint:- Nacos As the only configuration source,Don't be a local cover-up
+- Only pull configuration during startup phase(Hot update is not performed by default)
 """
 
 from __future__ import annotations
 
 import logging
 import os
-from ipaddress import ip_address, ip_network
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from ipaddress import ip_address, ip_network
 from typing import Any
 
 import yaml
@@ -58,7 +57,8 @@ class NacosBootstrapConfig:
 
 
 class NacosRuntime:
-    """Nacos 运行期对象：持有客户端与注册信息"""
+    """Nacos runtime object:
+    Hold client and registration information"""
 
     def __init__(
         self,
@@ -92,7 +92,7 @@ class NacosRuntime:
         self._service_port = port
 
         logger.info(
-            "注册 Nacos 服务实例: service=%s, ip=%s, port=%s, group=%s, cluster=%s",
+            "Register Nacos Service instance:service=%s,ip=%s,port=%s,group=%s,cluster=%s",
             self._config.service_name,
             service_ip,
             port,
@@ -116,7 +116,7 @@ class NacosRuntime:
         )
         if not registered:
             raise ConfigurationError(
-                f"Nacos 服务注册失败: service={self._config.service_name}, ip={service_ip}, port={port}"
+                f"Nacos Service registration failed:service={self._config.service_name},ip={service_ip},port={port}"
             )
         self._registered = True
 
@@ -124,7 +124,7 @@ class NacosRuntime:
         if not self._registered or not self._service_ip or not self._service_port:
             return
         logger.info(
-            "注销 Nacos 服务实例: service=%s, ip=%s, port=%s",
+            "Log out Nacos Service instance:service=%s,ip=%s,port=%s",
             self._config.service_name,
             self._service_ip,
             self._service_port,
@@ -142,7 +142,7 @@ class NacosRuntime:
             )
             if not removed:
                 logger.warning(
-                    "Nacos 服务注销返回 false: service=%s, ip=%s, port=%s",
+                    "Nacos Service logout returns false:service=%s,ip=%s,port=%s",
                     self._config.service_name,
                     self._service_ip,
                     self._service_port,
@@ -162,7 +162,7 @@ class NacosRuntime:
                     self._config_listener,
                 )
             except Exception as exc:
-                logger.warning("移除 Nacos 配置监听失败: %s", exc, exc_info=True)
+                logger.warning("Remove Nacos Failed to configure listening:%s", exc, exc_info=True)
             self._config_listener = None
 
         await self._naming_client.shutdown()
@@ -173,7 +173,7 @@ class NacosRuntime:
 
 
 async def bootstrap_nacos(settings: Dynaconf) -> NacosRuntime:
-    """启动期加载 Nacos 配置并初始化运行期对象"""
+    """Loading during startup Nacos Configure and initialize runtime objects"""
     config = _load_bootstrap_config()
     client_config = _build_client_config(config)
     config_client = await NacosConfigService.create_config_service(client_config)
@@ -214,16 +214,18 @@ def set_nacos_runtime(runtime: NacosRuntime | None) -> None:
 
 def get_nacos_runtime() -> NacosRuntime:
     if _nacos_runtime_cache is None:
-        raise ConfigurationError("Nacos 运行时未初始化")
+        raise ConfigurationError("Nacos Not initialized at runtime")
     return _nacos_runtime_cache
 
 
 async def load_nacos_config(client: Any, data_id: str, group: str) -> dict[str, Any]:
-    """从 Nacos 拉取并解析配置"""
+    """from Nacos Pull and parse configuration"""
     try:
         content = await client.get_config(ConfigParam(data_id=data_id, group=group))
     except Exception as exc:
-        raise ConfigurationError(f"Nacos 配置拉取失败: dataId={data_id}, group={group}") from exc
+        raise ConfigurationError(
+            f"Nacos Configuration pull failed:dataId={data_id},group={group}"
+        ) from exc
     return parse_nacos_config_content(content, data_id, group)
 
 
@@ -233,31 +235,37 @@ def parse_nacos_config_content(
     group: str = "",
 ) -> dict[str, Any]:
     if content is None:
-        raise ConfigurationError(f"Nacos 配置为空: dataId={data_id}, group={group}")
+        raise ConfigurationError(
+            f"Nacos Configuration is empty:\n    dataId={data_id},group={group}"
+        )
     if isinstance(content, bytes):
         content = content.decode("utf-8")
     if not str(content).strip():
-        raise ConfigurationError(f"Nacos 配置为空: dataId={data_id}, group={group}")
+        raise ConfigurationError(f"Nacos Configuration is empty:dataId={data_id},group={group}")
     try:
         data = yaml.safe_load(content)
     except Exception as exc:
-        raise ConfigurationError(f"Nacos 配置解析失败: dataId={data_id}, group={group}") from exc
+        raise ConfigurationError(
+            f"Nacos Configuration parsing failed:dataId={data_id},group={group}"
+        ) from exc
     if data is None:
-        raise ConfigurationError(f"Nacos 配置为空: dataId={data_id}, group={group}")
+        raise ConfigurationError(f"Nacos Configuration is empty:dataId={data_id},group={group}")
     if not isinstance(data, dict):
-        raise ConfigurationError(f"Nacos 配置必须是 YAML 对象: dataId={data_id}, group={group}")
+        raise ConfigurationError(
+            f"Nacos The configuration must be YAML object:dataId={data_id},group={group}"
+        )
     return data
 
 
 def apply_nacos_config(settings: Dynaconf, config: dict[str, Any]) -> None:
-    # 严格校验：先校验完整配置，再更新 settings，避免无效配置污染运行态。
+    # Strict verification:
     current = settings_to_dict(settings)
     merged = {**current, **config}
     runtime_config = build_runtime_config(merged)
 
     settings.update(config)
     set_runtime_config(runtime_config)
-    logger.info("Nacos 配置已加载: keys=%s", sorted(config.keys()))
+    logger.info("Nacos Configuration loaded:keys=%s", sorted(config.keys()))
 
 
 async def start_config_watch(
@@ -277,16 +285,16 @@ async def start_config_watch(
             data = parse_nacos_config_content(content, changed_data_id, changed_group)
             apply_nacos_config(settings, data)
             logger.info(
-                "Nacos 配置监听生效: dataId=%s, group=%s, tenant=%s",
+                "Nacos Configure monitoring to take effect:dataId=%s,group=%s,tenant=%s",
                 changed_data_id,
                 changed_group,
                 tenant,
             )
         except Exception as exc:
-            logger.error("Nacos 配置监听失败: %s", exc, exc_info=True)
+            logger.error("Nacos Failed to configure listening:%s", exc, exc_info=True)
 
     await client.add_listener(data_id, group, _listener)
-    logger.info("Nacos 配置监听已开启: dataId=%s, group=%s", data_id, group)
+    logger.info("Nacos Configuration monitoring is enabled:dataId=%s,group=%s", data_id, group)
     return _listener
 
 
@@ -308,14 +316,16 @@ def _resolve_change_pair(
 
 
 def resolve_service_ip() -> str:
-    """使用显式环境变量解析服务 IP（禁止自动探测）"""
+    """Use explicit environment variable resolution services IP(Disable automatic detection)"""
     for key in ("NACOS_SERVICE_IP", "POD_IP", "HOST_IP"):
         value = os.getenv(key)
         if value and _is_usable_service_ip(value):
             return value.strip()
         if value:
-            raise ConfigurationError(f"服务注册 IP 非法: {key}={value}")
-    raise ConfigurationError("缺少服务注册 IP，请显式配置 NACOS_SERVICE_IP")
+            raise ConfigurationError(f"Service registration IP illegal:{key}={value}")
+    raise ConfigurationError(
+        "Missing service registration IP,Please configure explicitly NACOS_SERVICE_IP"
+    )
 
 
 def _is_usable_service_ip(value: str) -> bool:
@@ -328,10 +338,8 @@ def _is_usable_service_ip(value: str) -> bool:
         return False
     if parsed.is_loopback or parsed.is_unspecified or parsed.is_multicast or parsed.is_link_local:
         return False
-    # RFC 2544 基准测试保留网段，不应作为服务注册地址。
-    if parsed.version == 4 and parsed in ip_network("198.18.0.0/15"):
-        return False
-    return True
+    # RFC 2544 benchmark network segment must not be used for service registration.
+    return not (parsed.version == 4 and parsed in ip_network("198.18.0.0/15"))
 
 
 def _build_client_config(config: NacosBootstrapConfig):
@@ -382,7 +390,7 @@ def _load_bootstrap_config() -> NacosBootstrapConfig:
 def _required_env(name: str) -> str:
     value = os.getenv(name)
     if value is None or not value.strip():
-        raise ConfigurationError(f"缺少 Nacos 环境变量: {name}")
+        raise ConfigurationError(f"missing Nacos environment variables:{name}")
     return value
 
 
@@ -392,7 +400,7 @@ def _required_bool_env(name: str) -> bool:
         return True
     if value in {"0", "false", "no", "n"}:
         return False
-    raise ConfigurationError(f"Nacos 环境变量格式错误: {name}={value}")
+    raise ConfigurationError(f"Nacos Environment variable format error:{name}={value}")
 
 
 def _required_int_env(name: str) -> int:
@@ -400,4 +408,4 @@ def _required_int_env(name: str) -> int:
     try:
         return int(value)
     except ValueError as exc:
-        raise ConfigurationError(f"Nacos 环境变量格式错误: {name}={value}") from exc
+        raise ConfigurationError(f"Nacos Environment variable format error:{name}={value}") from exc

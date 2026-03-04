@@ -1,7 +1,7 @@
 # @author Sunny
 # @date 2026-01-27
 
-"""FastAPI 应用启动入口。"""
+"""FastAPI Application startup entrance."""
 
 from __future__ import annotations
 
@@ -19,12 +19,12 @@ from src.shared.exception import register_exception_handlers
 
 
 def create_app() -> FastAPI:
-    """创建 FastAPI 应用。"""
+    """create FastAPI Application."""
     setup_logging()
 
     app = FastAPI(
         title="Datapillar AI",
-        description="AI 工作流生成服务",
+        description="AI Workflow generation service",
         version="3.0.0",
         lifespan=create_lifespan(settings=settings),
     )
@@ -57,7 +57,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "src.app:app",
-        host="0.0.0.0",  # noqa: S104
+        host="0.0.0.0",  # noqa:S104
         port=7003,
         reload=False,
     )

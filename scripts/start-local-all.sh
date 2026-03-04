@@ -1,27 +1,27 @@
 #!/bin/bash
 
-# Datapillar 本地调试一键启动脚本
-# 作者: Sunny
-# 版本: 1.4.0
+# Datapillar Local debugging one-click startup script
+# Author: Sunny
+# version: 1.4.0
 
 set -o pipefail
 export NO_PROXY=127.0.0.1,localhost
 export no_proxy=127.0.0.1,localhost
-# 颜色定义
+# color definition
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# 获取脚本所在目录的父目录（项目根目录）
+# Get the parent directory of the directory where the script is located（Project root directory）
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# 设置日志目录环境变量
+# Set the log directory environment variable
 export LOG_HOME="/tmp/datapillar-logs"
 mkdir -p "$LOG_HOME"
 
-# Nacos 统一环境变量（本地）
+# Nacos Unify environment variables（local）
 export NACOS_SERVER_ADDR="127.0.0.1:8848"
 export NACOS_NAMESPACE="dev"
 export NACOS_USERNAME="datapillar-svc"
@@ -29,13 +29,13 @@ export NACOS_PASSWORD="123456asd"
 export NACOS_GROUP="DATAPILLAR"
 export NACOS_FORCE_SYNC="${NACOS_FORCE_SYNC:-true}"
 
-# 校验 Dubbo 注册 IP，避免 loopback 导致 Dubbo 启动失败
+# Verify Dubbo Register IP，avoid loopback cause Dubbo Startup failed
 is_invalid_dubbo_ip() {
     local ip="${1:-}"
     [ -z "$ip" ] || [ "$ip" = "127.0.0.1" ] || [ "$ip" = "0.0.0.0" ] || [ "$ip" = "localhost" ]
 }
 
-# 使用默认路由网卡 IP 作为 Dubbo 注册地址，避免被 VPN/utun 网卡误选
+# Use default routing network card IP as Dubbo Registered address，avoid being VPN/utun Wrong selection of network card
 if is_invalid_dubbo_ip "${DUBBO_IP_TO_REGISTRY:-}"; then
     DEFAULT_IF="$(route -n get default 2>/dev/null | awk '/interface:/{print $2; exit}')"
     [ -z "$DEFAULT_IF" ] && DEFAULT_IF="en0"
@@ -45,7 +45,7 @@ if is_invalid_dubbo_ip "${DUBBO_IP_TO_REGISTRY:-}"; then
     fi
 fi
 if is_invalid_dubbo_ip "${DUBBO_IP_TO_REGISTRY}"; then
-    echo -e "${RED}❌ 未找到可用的 DUBBO_IP_TO_REGISTRY，请手动设置后重试${NC}"
+    echo -e "${RED}❌ Not found available DUBBO_IP_TO_REGISTRY，Please set it manually and try again${NC}"
     exit 1
 fi
 export DUBBO_IP_TO_REGISTRY
@@ -54,40 +54,41 @@ if is_invalid_dubbo_ip "${TRI_DUBBO_IP_TO_REGISTRY:-}"; then
 else
     export TRI_DUBBO_IP_TO_REGISTRY
 fi
-# 统一服务注册 IP，强制显式配置，禁止自动探测网卡导致注册漂移
+# Unified service registration IP，Force explicit configuration，Disable automatic detection of network cards causing registration drift
 export NACOS_SERVICE_IP="$DUBBO_IP_TO_REGISTRY"
-# 服务监听 IP（Java/Python），可按环境覆盖；默认全网卡监听
+# Service monitoring IP（Java/Python），Can be covered by environment；Default full network card monitoring
 export SERVER_ADDRESS="${SERVER_ADDRESS:-0.0.0.0}"
 
-# 本地构建/运行目录（避免写入用户目录权限问题）
+# local build/Run directory（Avoid writing user directory permission issues）
 export MAVEN_REPO_LOCAL="${MAVEN_REPO_LOCAL:-/tmp/m2}"
 export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/datapillar-uv-cache}"
+export GRADLE_USER_HOME="${GRADLE_USER_HOME:-/tmp/datapillar-gradle}"
 mkdir -p "$MAVEN_REPO_LOCAL" "$UV_CACHE_DIR"
+mkdir -p "$GRADLE_USER_HOME"
 
-# Java 本地用户目录（避免 Dubbo 默认写 ~/.dubbo）
+# Java local user directory（avoid Dubbo Default write ~/.dubbo）
 export JAVA_LOCAL_HOME="${JAVA_LOCAL_HOME:-/tmp/datapillar-java-home}"
 mkdir -p "$JAVA_LOCAL_HOME"
 
-# Nacos 客户端日志目录（避免默认写到 ~/logs/nacos）
+# Nacos Client log directory（Avoid writing by default ~/logs/nacos）
 export NACOS_LOG_DIR="${NACOS_LOG_DIR:-$LOG_HOME/nacos}"
 export NACOS_CACHE_DIR="${NACOS_CACHE_DIR:-$LOG_HOME/nacos/cache}"
 mkdir -p "$NACOS_LOG_DIR" "$NACOS_CACHE_DIR"
 
-# AI 本地 Home（避免第三方 SDK 写入用户目录）
+# AI local Home（Avoid third parties SDK Write to user directory）
 export AI_LOCAL_HOME="${AI_LOCAL_HOME:-/tmp/datapillar-ai-home}"
 mkdir -p "$AI_LOCAL_HOME"
 
-# Nacos HTTP 地址（用于校验/同步配置）
+# Nacos HTTP address（for verification/Sync configuration）
 export NACOS_HTTP_ADDR="${NACOS_HTTP_ADDR:-http://${NACOS_SERVER_ADDR}}"
 
-# AI 服务 Nacos 启动参数
+# AI service Nacos Startup parameters
 export NACOS_DATA_ID="${NACOS_DATA_ID:-datapillar-ai.yaml}"
 export NACOS_SERVICE_NAME="${NACOS_SERVICE_NAME:-datapillar-ai}"
 export NACOS_CLUSTER_NAME="${NACOS_CLUSTER_NAME:-DEFAULT}"
 export NACOS_EPHEMERAL="${NACOS_EPHEMERAL:-true}"
 export NACOS_HEARTBEAT_INTERVAL="${NACOS_HEARTBEAT_INTERVAL:-5}"
 export NACOS_CONFIG_WATCH="${NACOS_CONFIG_WATCH:-true}"
-
 echo "=========================================="
 echo "   ____        _              _ _ _            "
 echo "  |  _ \  __ _| |_ __ _ _ __ (_) | | __ _ _ __ "
@@ -97,20 +98,20 @@ echo "  |____/ \__,_|\__\__,_| .__/|_|_|_|\__,_|_|   "
 echo "                       |_|    [LOCAL DEBUG]    "
 echo "=========================================="
 echo ""
-echo "🚀 Datapillar 本地调试启动中..."
-echo "📁 项目目录: $PROJECT_ROOT"
-echo "📝 日志目录: $LOG_HOME"
-echo "🌐 Dubbo 注册IP: $DUBBO_IP_TO_REGISTRY"
-echo "🌐 服务监听IP: $SERVER_ADDRESS"
+echo "🚀 Datapillar Local debugging is starting..."
+echo "📁 Project directory: $PROJECT_ROOT"
+echo "📝 Log directory: $LOG_HOME"
+echo "🌐 Dubbo RegisterIP: $DUBBO_IP_TO_REGISTRY"
+echo "🌐 Service monitoringIP: $SERVER_ADDRESS"
 echo ""
 
-# 检查端口是否被占用
+# Check whether the port is occupied
 check_port() {
     local port=$1
     local service=$2
 
     if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo -e "${YELLOW}⚠️  端口 $port ($service) 已被占用${NC}"
+        echo -e "${YELLOW}⚠️  port $port ($service) Already occupied${NC}"
         return 1
     fi
     return 0
@@ -135,7 +136,7 @@ sync_nacos_config() {
     local local_file="$PROJECT_ROOT/config/nacos/${NACOS_NAMESPACE}/DATAPILLAR/${data_id}"
 
     if [ ! -f "$local_file" ]; then
-        echo -e "${RED}❌ 缺少本地 Nacos 配置模板: $local_file${NC}"
+        echo -e "${RED}❌ Missing local Nacos Configuration template: $local_file${NC}"
         return 1
     fi
 
@@ -144,15 +145,15 @@ sync_nacos_config() {
         query_resp=$(curl -sS "${NACOS_HTTP_ADDR}/nacos/v1/cs/configs?dataId=${data_id}&group=${NACOS_GROUP}&tenant=${NACOS_NAMESPACE}&username=${NACOS_USERNAME}&password=${NACOS_PASSWORD}")
 
         if [ -n "$query_resp" ] && [ "$query_resp" != "config data not exist" ] && [[ "$query_resp" != *'"status":403'* ]]; then
-            echo -e "   ${GREEN}✅ 已存在: ${data_id}${NC}"
+            echo -e "   ${GREEN}✅ Already exists: ${data_id}${NC}"
             return 0
         fi
     fi
 
     if [ "${NACOS_FORCE_SYNC}" = "true" ]; then
-        echo -e "   ${YELLOW}强制覆盖 Nacos 配置: ${data_id}${NC}"
+        echo -e "   ${YELLOW}Force coverage Nacos Configuration: ${data_id}${NC}"
     else
-        echo -e "   ${YELLOW}同步配置到 Nacos: ${data_id}${NC}"
+        echo -e "   ${YELLOW}Synchronize configuration to Nacos: ${data_id}${NC}"
     fi
     local publish_resp
     publish_resp=$(curl -sS -X POST "${NACOS_HTTP_ADDR}/nacos/v1/cs/configs" \
@@ -165,20 +166,20 @@ sync_nacos_config() {
         --data-urlencode "content@${local_file}")
 
     if [ "$publish_resp" != "true" ]; then
-        echo -e "${RED}❌ 同步 Nacos 配置失败: ${data_id}${NC}"
-        echo "   响应: ${publish_resp}"
+        echo -e "${RED}❌ sync Nacos Configuration failed: ${data_id}${NC}"
+        echo "   response: ${publish_resp}"
         return 1
     fi
 
-    echo -e "   ${GREEN}✅ 同步成功: ${data_id}${NC}"
+    echo -e "   ${GREEN}✅ Synchronization successful: ${data_id}${NC}"
     return 0
 }
 
 prepare_nacos_configs() {
     if [ "${NACOS_FORCE_SYNC}" = "true" ]; then
-        echo "🔧 强制覆盖 Nacos 配置..."
+        echo "🔧 Force coverage Nacos Configuration..."
     else
-        echo "🔧 校验 Nacos 配置..."
+        echo "🔧 Verify Nacos Configuration..."
     fi
     local items=(
         "datapillar-auth.yaml"
@@ -191,77 +192,108 @@ prepare_nacos_configs() {
     for item in "${items[@]}"; do
         sync_nacos_config "$item" || return 1
     done
-    echo -e "${GREEN}✅ Nacos 配置就绪${NC}"
+    echo -e "${GREEN}✅ Nacos Configuration ready${NC}"
     echo ""
     return 0
 }
 
 prepare_nacos_configs || exit 1
 
-# 第一步：编译整个项目
-# 本地启动不应被 testCompile 阻塞，这里显式跳过测试编译与执行
-echo "📦 编译项目中..."
+# first step：Compile the entire project
+# Local boot should not be testCompile blocking，Test compilation and execution are explicitly skipped here
+echo "📦 Compiling project..."
 cd "$PROJECT_ROOT"
 mvn clean package -Dmaven.test.skip=true -Dmaven.repo.local="$MAVEN_REPO_LOCAL"
 if [ $? -ne 0 ]; then
-    echo -e "${RED}❌ 编译失败${NC}"
+    echo -e "${RED}❌ Compilation failed${NC}"
     exit 1
 fi
-echo -e "${GREEN}✅ 编译完成${NC}"
+echo -e "${GREEN}✅ Compilation completed${NC}"
 echo ""
 
-# 启动 Java 服务
+build_gravitino_distribution() {
+    local build_log="$LOG_HOME/datapillar-gravitino.build.log"
+    local gravitino_home="$PROJECT_ROOT/datapillar-gravitino"
+    local package_dir="$gravitino_home/distribution/package"
+
+    echo "📦 Pack Datapillar-Gravitino in distribution package..."
+    echo "   ${YELLOW}Build logs are output to both the terminal and file.: $build_log${NC}"
+    cd "$gravitino_home"
+    if ! ./build.sh 2>&1 | tee "$build_log"; then
+        echo -e "${RED}❌ Datapillar-Gravitino Packaging failed${NC}"
+        echo -e "   ${YELLOW}View log: $build_log${NC}"
+        tail -n 60 "$build_log" 2>/dev/null || true
+        cd "$PROJECT_ROOT"
+        return 1
+    fi
+
+    if [ ! -x "$package_dir/bin/gravitino.sh" ]; then
+        echo -e "${RED}❌ Gravitino Startup script does not exist: $package_dir/bin/gravitino.sh${NC}"
+        cd "$PROJECT_ROOT"
+        return 1
+    fi
+
+    echo -e "${GREEN}✅ Datapillar-Gravitino Packaging completed${NC}"
+    echo -e "   ${YELLOW}Pack log: $build_log${NC}"
+    echo ""
+    cd "$PROJECT_ROOT"
+    return 0
+}
+
+build_gravitino_distribution || exit 1
+
+# start Java service
 start_java_service() {
     local service_name=$1
     local jar_path=$2
     local port=$3
     local startup_log="$LOG_HOME/${service_name}.startup.log"
 
-    echo "▶️  启动 $service_name (端口: $port)"
+    echo "▶️  start $service_name (port: $port)"
 
-    # 检查端口
+    # Check port
     if ! check_port $port $service_name; then
-        echo -e "   ${YELLOW}跳过启动，端口已占用${NC}"
+        echo -e "   ${YELLOW}Skip startup，Port is occupied${NC}"
         return 0
     fi
 
-    # 检查 jar 文件
+    # Check jar File
     if [ ! -f "$jar_path" ]; then
-        echo -e "   ${RED}❌ JAR 文件不存在: $jar_path${NC}"
+        echo -e "   ${RED}❌ JAR File does not exist: $jar_path${NC}"
         return 1
     fi
 
-    # 启动服务（保留启动日志，便于排障）
+    # Start service（Keep startup log，Easy to troubleshoot）
     nohup java -Duser.home="$JAVA_LOCAL_HOME" -Dfile.encoding=UTF-8 -DLOG_HOME="$LOG_HOME" -DJM.LOG.PATH="$NACOS_LOG_DIR" -DJM.SNAPSHOT.PATH="$NACOS_LOG_DIR/snapshot" -Ddubbo.application.register-mode=interface -Ddubbo.registry.register-mode=interface -jar "$jar_path" --server.address="$SERVER_ADDRESS" >"$startup_log" 2>&1 &
     local pid=$!
     echo "$pid" > /tmp/${service_name}.pid
 
-    # 快速校验进程与端口
+    # Quickly verify processes and ports
     sleep 2
     if ! kill -0 $pid 2>/dev/null; then
-        echo -e "   ${RED}❌ $service_name 启动失败，进程已退出${NC}"
-        echo -e "   ${YELLOW}查看日志: $startup_log${NC}"
+        echo -e "   ${RED}❌ $service_name Startup failed，Process has exited${NC}"
+        echo -e "   ${YELLOW}View log: $startup_log${NC}"
         tail -n 60 "$startup_log" 2>/dev/null || true
         return 1
     fi
 
     if ! wait_for_port $port 20; then
-        echo -e "   ${RED}❌ $service_name 启动超时，端口 $port 未监听${NC}"
-        echo -e "   ${YELLOW}查看日志: $startup_log${NC}"
+        echo -e "   ${RED}❌ $service_name Start timeout，port $port Not listening${NC}"
+        echo -e "   ${YELLOW}View log: $startup_log${NC}"
         tail -n 60 "$startup_log" 2>/dev/null || true
         return 1
     fi
 
-    echo -e "   ${GREEN}✅ $service_name 启动成功 (PID: $pid)${NC}"
-    echo -e "   ${YELLOW}启动日志: $startup_log${NC}"
+    echo -e "   ${GREEN}✅ $service_name Started successfully (PID: $pid)${NC}"
+    echo -e "   ${YELLOW}Startup log: $startup_log${NC}"
     return 0
 }
 
-# 启动 Python AI 服务
+# start Python AI service
 start_ai_service() {
     local startup_log="$LOG_HOME/datapillar-ai.startup.log"
 
-    # 从 .env 读取端口配置，默认 7003
+    # from .env Read port configuration，Default 7003
     cd "$PROJECT_ROOT/datapillar-ai"
     if [ -f ".env" ]; then
         AI_PORT=$(grep "^APP_PORT=" .env | cut -d'=' -f2)
@@ -270,15 +302,15 @@ start_ai_service() {
         AI_PORT=7003
     fi
 
-    echo "▶️  启动 datapillar-ai (端口: $AI_PORT)"
+    echo "▶️  start datapillar-ai (port: $AI_PORT)"
 
     if ! check_port $AI_PORT "datapillar-ai"; then
-        echo -e "   ${YELLOW}跳过启动，端口已占用${NC}"
+        echo -e "   ${YELLOW}Skip startup，Port is occupied${NC}"
         cd "$PROJECT_ROOT"
         return 0
     fi
 
-    # 使用 uv run 启动服务
+    # use uv run Start service
     LOG_HOME="$LOG_HOME" \
     UV_CACHE_DIR="$UV_CACHE_DIR" \
     XDG_CACHE_HOME="$UV_CACHE_DIR" \
@@ -291,75 +323,141 @@ start_ai_service() {
 
     sleep 2
     if ! kill -0 $pid 2>/dev/null; then
-        echo -e "   ${RED}❌ datapillar-ai 启动失败，进程已退出${NC}"
-        echo -e "   ${YELLOW}查看日志: $startup_log${NC}"
+        echo -e "   ${RED}❌ datapillar-ai Startup failed，Process has exited${NC}"
+        echo -e "   ${YELLOW}View log: $startup_log${NC}"
         tail -n 60 "$startup_log" 2>/dev/null || true
         cd "$PROJECT_ROOT"
         return 1
     fi
 
     if ! wait_for_port $AI_PORT 20; then
-        echo -e "   ${RED}❌ datapillar-ai 启动超时，端口 $AI_PORT 未监听${NC}"
-        echo -e "   ${YELLOW}查看日志: $startup_log${NC}"
+        echo -e "   ${RED}❌ datapillar-ai Start timeout，port $AI_PORT Not listening${NC}"
+        echo -e "   ${YELLOW}View log: $startup_log${NC}"
         tail -n 60 "$startup_log" 2>/dev/null || true
         cd "$PROJECT_ROOT"
         return 1
     fi
 
-    echo -e "   ${GREEN}✅ datapillar-ai 启动成功 (PID: $pid)${NC}"
-    echo -e "   ${YELLOW}启动日志: $startup_log${NC}"
+    echo -e "   ${GREEN}✅ datapillar-ai Started successfully (PID: $pid)${NC}"
+    echo -e "   ${YELLOW}Startup log: $startup_log${NC}"
 
     cd "$PROJECT_ROOT"
     return 0
 }
 
-echo "🚀 启动服务..."
+start_gravitino_service() {
+    local service_name="datapillar-gravitino"
+    local service_display_name="Datapillar-Gravitino"
+    local port=8090
+    local startup_log="$LOG_HOME/${service_name}.startup.log"
+    local gravitino_home="$PROJECT_ROOT/datapillar-gravitino/distribution/package"
+    local gravitino_bin="$gravitino_home/bin/gravitino.sh"
+    local gravitino_conf="$gravitino_home/conf"
+    local default_gravitino_log_dir="$gravitino_home/logs"
+
+    echo "▶️  start $service_display_name (port: $port)"
+
+    if ! check_port $port $service_name; then
+        echo -e "   ${YELLOW}Skip startup，Port is occupied${NC}"
+        return 0
+    fi
+
+    if [ ! -x "$gravitino_bin" ]; then
+        echo -e "   ${RED}❌ Startup script does not exist: $gravitino_bin${NC}"
+        return 1
+    fi
+
+    if [ ! -f "$gravitino_conf/gravitino.conf" ]; then
+        echo -e "   ${RED}❌ Configuration file does not exist: $gravitino_conf/gravitino.conf${NC}"
+        return 1
+    fi
+
+    if [ ! -f "$gravitino_conf/gravitino-env.sh" ]; then
+        echo -e "   ${RED}❌ Environment file does not exist: $gravitino_conf/gravitino-env.sh${NC}"
+        return 1
+    fi
+
+    echo "   Use native Gravitino Configuration directory: $gravitino_conf"
+    export GRAVITINO_HOME="$gravitino_home"
+    export GRAVITINO_LOG_DIR="${GRAVITINO_LOG_DIR:-$default_gravitino_log_dir}"
+    mkdir -p "$GRAVITINO_LOG_DIR"
+    echo "   Gravitino Run log directory: $GRAVITINO_LOG_DIR"
+
+    cd "$gravitino_home"
+    if ! "$gravitino_bin" --config "$gravitino_conf" start >"$startup_log" 2>&1; then
+        echo -e "   ${RED}❌ $service_display_name Startup failed${NC}"
+        echo -e "   ${YELLOW}View log: $startup_log${NC}"
+        tail -n 60 "$startup_log" 2>/dev/null || true
+        cd "$PROJECT_ROOT"
+        return 1
+    fi
+    cd "$PROJECT_ROOT"
+
+    if ! wait_for_port $port 30; then
+        echo -e "   ${RED}❌ $service_display_name Start timeout，port $port Not listening${NC}"
+        echo -e "   ${YELLOW}View log: $startup_log${NC}"
+        tail -n 60 "$startup_log" 2>/dev/null || true
+        return 1
+    fi
+
+    local pid
+    pid=$(lsof -ti :$port -sTCP:LISTEN 2>/dev/null | head -1)
+    if [ -n "$pid" ]; then
+        echo "$pid" > /tmp/${service_name}.pid
+    fi
+
+    echo -e "   ${GREEN}✅ $service_display_name Started successfully${NC}"
+    echo -e "   ${YELLOW}Startup log: $startup_log${NC}"
+    return 0
+}
+
+abort_startup() {
+    echo ""
+    echo -e "${RED}❌ Service startup failed，abort remaining startup tasks${NC}"
+    exit 1
+}
+
+echo "🚀 Start service..."
 echo ""
 
-FAILED=0
-
-# 1. 启动认证服务
+# 1. Start authentication service
 start_java_service "datapillar-auth" \
-    "$PROJECT_ROOT/datapillar-auth/target/datapillar-auth-1.0.0.jar" 7001 || FAILED=1
+    "$PROJECT_ROOT/datapillar-auth/target/datapillar-auth-1.0.0.jar" 7001 || abort_startup
 
-# 2. 启动核心业务服务
+# 2. Start core business services
 start_java_service "datapillar-studio-service" \
-    "$PROJECT_ROOT/datapillar-studio-service/target/datapillar-studio-service-1.0.0.jar" 7002 || FAILED=1
+    "$PROJECT_ROOT/datapillar-studio-service/target/datapillar-studio-service-1.0.0.jar" 7002 || abort_startup
 
-# 3. 启动 API 网关
+# 3. start API gateway
 start_java_service "datapillar-api-gateway" \
-    "$PROJECT_ROOT/datapillar-api-gateway/target/datapillar-api-gateway-1.0.0.jar" 7000 || FAILED=1
+    "$PROJECT_ROOT/datapillar-api-gateway/target/datapillar-api-gateway-1.0.0.jar" 7000 || abort_startup
 
-# 4. 启动 AI 服务
-start_ai_service || FAILED=1
+# 4. start AI service
+start_ai_service || abort_startup
 
-# 5. 启动 OpenLineage 服务
+# 5. start OpenLineage service
 start_java_service "datapillar-openlineage" \
-    "$PROJECT_ROOT/datapillar-openlineage/target/datapillar-openlineage-1.0.0.jar" 7004 || FAILED=1
+    "$PROJECT_ROOT/datapillar-openlineage/target/datapillar-openlineage-1.0.0.jar" 7004 || abort_startup
+
+# 6. start Gravitino service
+start_gravitino_service || abort_startup
 
 
 echo ""
 echo "=========================================="
-if [ $FAILED -eq 0 ]; then
-    echo -e "${GREEN}✅ 所有服务启动成功${NC}"
-else
-    echo -e "${RED}❌ 存在服务启动失败，请检查 $LOG_HOME/*.startup.log${NC}"
-fi
+echo -e "${GREEN}✅ All services started successfully${NC}"
 echo "=========================================="
 echo ""
-echo "📋 服务列表："
-echo "   • API 网关:           http://localhost:7000"
-echo "   • 认证服务:           http://localhost:7001"
-echo "   • 核心业务:           http://localhost:7002"
-echo "   • AI 服务:            http://localhost:7003"
-echo "   • OpenLineage 服务:   http://localhost:7004"
+echo "📋 Service list："
+echo "   • API gateway:           http://localhost:7000"
+echo "   • Authentication services:           http://localhost:7001"
+echo "   • core business:           http://localhost:7002"
+echo "   • AI service:            http://localhost:7003"
+echo "   • OpenLineage service:   http://localhost:7004"
+echo "   • Datapillar-Gravitino: http://localhost:8090"
 echo ""
-echo "📝 日志目录: $LOG_HOME"
+echo "📝 Log directory: $LOG_HOME"
 echo "   tail -f $LOG_HOME/*.startup.log"
 echo ""
-echo "🛑 停止服务: ./scripts/stop-local-all.sh"
+echo "🛑 Stop service: ./scripts/stop-local-all.sh"
 echo ""
-
-if [ $FAILED -ne 0 ]; then
-    exit 1
-fi

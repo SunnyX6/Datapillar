@@ -8,21 +8,21 @@ import lombok.Data;
 @Schema(name = "RoleMemberItem")
 public class RoleMemberItem {
 
-    private Long userId;
+  private Long userId;
 
-    private String username;
+  private String username;
 
-    private String nickname;
+  private String nickname;
 
-    private String email;
+  private String email;
 
-    private String phone;
+  private String phone;
 
-    private Integer userLevel;
+  private Integer userLevel;
 
-    private Integer memberStatus;
+  private Integer memberStatus;
 
-    private LocalDateTime joinedAt;
+  private LocalDateTime joinedAt;
 
-    private LocalDateTime assignedAt;
+  private LocalDateTime assignedAt;
 }

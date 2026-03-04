@@ -20,7 +20,8 @@ message CheckAuthenticationResponse {
   DenyCode deny_code = 2;
   string message = 3;
   Principal principal = 4;
-  string gateway_assertion = 5;
+  reserved 5;
+  reserved "gateway_assertion";
 }
 
 service AuthenticationService {

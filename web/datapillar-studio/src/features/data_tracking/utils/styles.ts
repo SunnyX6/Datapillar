@@ -2,17 +2,17 @@ import type { TrackingStatus } from './types'
 
 export const STATUS_STYLES: Record<TrackingStatus, { label: string; className: string }> = {
   implemented: {
-    label: '已上线',
+    label: 'Already online',
     className:
       'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-200 dark:border-emerald-500/20'
   },
   tested: {
-    label: '已测试',
+    label: 'Tested',
     className:
       'bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-500/10 dark:text-blue-200 dark:border-blue-500/20'
   },
   planned: {
-    label: '规划中',
+    label: 'Under planning',
     className:
       'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
   }

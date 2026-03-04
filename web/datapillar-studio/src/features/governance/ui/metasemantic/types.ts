@@ -1,19 +1,19 @@
 /**
- * 语义层组件专用类型
+ * Semantic layer component-specific types
  */
 
-// 从统一类型文件重新导出
+// Re-export from uniform type file
 export type { MetricType, Metric, WordRootDTO } from '@/services/types/onemeta/semantic'
 export type { AIRecommendation, AITableRecommendation, AIMetricRecommendation } from '@/services/types/ai/metric'
 
-// 兼容别名
+// Compatible with aliases
 export type { WordRootDTO as WordRoot } from '@/services/types/onemeta/semantic'
 
 export type SemanticCategory = 'HOME' | 'METRICS' | 'GLOSSARY' | 'STANDARDS' | 'MODELS' | 'APIS'
 
 export type ViewMode = 'CARD' | 'LIST'
 
-/** 子入口配置 */
+/** Subentry configuration */
 export interface SubEntry {
   id: string
   label: string

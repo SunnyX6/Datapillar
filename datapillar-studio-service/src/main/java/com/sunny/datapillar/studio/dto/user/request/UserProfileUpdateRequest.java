@@ -10,13 +10,13 @@ import lombok.Data;
 @Schema(name = "UserUpdateProfile")
 public class UserProfileUpdateRequest {
 
-    @Size(max = 50, message = "昵称长度不能超过50个字符")
-    private String nickname;
+  @Size(max = 50, message = "Nickname length cannot exceed50characters")
+  private String nickname;
 
-    @Email(message = "邮箱格式不正确")
-    @Size(max = 100, message = "邮箱长度不能超过100个字符")
-    private String email;
+  @Email(message = "Email format is incorrect")
+  @Size(max = 100, message = "The length of the email cannot exceed100characters")
+  private String email;
 
-    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
-    private String phone;
+  @Pattern(regexp = "^1[3-9]\\d{9}$", message = "Mobile phone number format is incorrect")
+  private String phone;
 }

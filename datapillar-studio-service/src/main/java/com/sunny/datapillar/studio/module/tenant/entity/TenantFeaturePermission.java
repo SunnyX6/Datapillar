@@ -8,8 +8,8 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
- * 租户功能权限组件
- * 负责租户功能权限核心逻辑实现
+ * Tenant Function Permission Component Responsible for the core logic implementation of tenant
+ * functional permissions
  *
  * @author Sunny
  * @date 2026-01-01
@@ -17,32 +17,32 @@ import lombok.Data;
 @Data
 @TableName("tenant_feature_permissions")
 public class TenantFeaturePermission {
-    @TableId(type = IdType.AUTO)
-    private Long id;
+  @TableId(type = IdType.AUTO)
+  private Long id;
 
-    @TableField("tenant_id")
-    private Long tenantId;
+  @TableField("tenant_id")
+  private Long tenantId;
 
-    @TableField("object_id")
-    private Long objectId;
+  @TableField("object_id")
+  private Long objectId;
 
-    @TableField("permission_id")
-    private Long permissionId;
+  @TableField("permission_id")
+  private Long permissionId;
 
-    private Integer status;
+  private Integer status;
 
-    @TableField("grant_source")
-    private String grantSource;
+  @TableField("grant_source")
+  private String grantSource;
 
-    @TableField("granted_by")
-    private Long grantedBy;
+  @TableField("granted_by")
+  private Long grantedBy;
 
-    @TableField("granted_at")
-    private LocalDateTime grantedAt;
+  @TableField("granted_at")
+  private LocalDateTime grantedAt;
 
-    @TableField("updated_by")
-    private Long updatedBy;
+  @TableField("updated_by")
+  private Long updatedBy;
 
-    @TableField("updated_at")
-    private LocalDateTime updatedAt;
+  @TableField("updated_at")
+  private LocalDateTime updatedAt;
 }

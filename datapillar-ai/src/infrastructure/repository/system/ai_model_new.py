@@ -1,13 +1,11 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-02-26
 
 """
-AI 模型数据访问（新实现）
+AI Model data access(new implementation)
 
-用途：
-- ETL 等新链路的模型读取与 API Key 解密
-- 禁止默认兜底，必须显式指定 chat 模型
+Purpose:- ETL Waiting for model reading of new links and API Key Decrypt
+- Disable default by default,Must be specified explicitly chat model
 """
 
 from __future__ import annotations
@@ -47,7 +45,7 @@ _MODEL_FIELDS = (
 
 
 class ModelNew:
-    """AI 模型查询（新实现）。"""
+    """AI model query (new implementation)."""
 
     @staticmethod
     def get_active_chat_model_by_id(
@@ -93,7 +91,7 @@ class ModelNew:
                 return dict(row) if row else None
         except Exception as exc:
             logger.error(
-                "查询激活 Chat 模型失败: tenant=%s user=%s aiModelId=%s err=%s",
+                "Failed to query active Chat model: tenant=%s user=%s aiModelId=%s err=%s",
                 tenant_id,
                 user_id,
                 ai_model_id,
@@ -120,15 +118,15 @@ class ModelNew:
                 row = conn.execute(query, {"tenant_id": tenant_id}).mappings().fetchone()
                 return dict(row) if row else None
         except Exception as exc:
-            logger.error("查询激活 Embedding 模型失败: tenant=%s err=%s", tenant_id, exc)
+            logger.error("Failed to query active Embedding model: tenant=%s err=%s", tenant_id, exc)
             return None
 
     @staticmethod
     def decrypt_api_key(*, tenant_code: str, encrypted_value: str | None) -> str:
         if not encrypted_value or not encrypted_value.strip():
-            raise ValueError("api_key 为空")
+            raise ValueError("api_key is empty")
         if not is_encrypted_ciphertext(encrypted_value):
-            raise ValueError("api_key 未加密")
+            raise ValueError("api_key is not encrypted")
         return auth_crypto_rpc_client.decrypt_llm_api_key_sync(
             tenant_code=tenant_code,
             ciphertext=encrypted_value,

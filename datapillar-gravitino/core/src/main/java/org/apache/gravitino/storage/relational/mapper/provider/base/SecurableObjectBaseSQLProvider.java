@@ -28,6 +28,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -35,11 +36,14 @@ public class SecurableObjectBaseSQLProvider {
 
   public String batchInsertSecurableObjects(
       @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "INSERT INTO "
         + SECURABLE_OBJECT_TABLE_NAME
         + "(role_id, metadata_object_id, type, privilege_names, privilege_conditions, "
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES "
         + "<foreach collection='securableObjects' item='item' separator=','>"
         + "(#{item.roleId},"
@@ -49,13 +53,17 @@ public class SecurableObjectBaseSQLProvider {
         + " #{item.privilegeConditions},"
         + " #{item.currentVersion},"
         + " #{item.lastVersion},"
-        + " #{item.deletedAt})"
+        + " #{item.deletedAt},"
+        + " "
+        + tenantId
+        + ")"
         + "</foreach>"
         + "</script>";
   }
 
   public String batchSoftDeleteSecurableObjects(
       @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
@@ -64,20 +72,25 @@ public class SecurableObjectBaseSQLProvider {
         + " WHERE FALSE "
         + "<foreach collection='securableObjects' item='item' separator=' '>"
         + " OR (metadata_object_id = #{item.metadataObjectId} AND"
-        + " role_id = #{item.roleId} AND deleted_at = 0 )"
+        + " role_id = #{item.roleId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " )"
         + "</foreach>"
         + "</script>";
   }
 
   public String softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+        + " WHERE role_id = #{roleId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteSecurableObjectsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
         + " ob SET ob.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -85,105 +98,143 @@ public class SecurableObjectBaseSQLProvider {
         + " WHERE exists (SELECT * from "
         + ROLE_TABLE_NAME
         + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"
-        + " AND ro.deleted_at = 0) AND ob.deleted_at = 0";
+        + " AND ro.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("ro", tenantId)
+        + ") AND ob.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("ob", tenantId);
   }
 
   public String softDeleteObjectRelsByMetadataObject(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0"
-        + " AND type = #{metadataObjectType}";
+        + " AND type = #{metadataObjectType} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
         + " sect SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE sect.deleted_at = 0 AND EXISTS ("
+        + " WHERE sect.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("sect", tenantId)
+        + " AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
         + " ct WHERE ct.catalog_id = #{catalogId}  AND "
         + " ct.catalog_id = sect.metadata_object_id AND sect.type = 'CATALOG'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ct", tenantId)
         + " UNION "
         + " SELECT st.catalog_id FROM "
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.catalog_id = #{catalogId} AND "
         + " st.schema_id = sect.metadata_object_id AND sect.type = 'SCHEMA'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("st", tenantId)
         + " UNION "
         + " SELECT tt.catalog_id FROM "
         + TopicMetaMapper.TABLE_NAME
         + " tt WHERE tt.catalog_id = #{catalogId} AND "
         + " tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tt", tenantId)
         + " UNION "
         + " SELECT tat.catalog_id FROM "
         + TableMetaMapper.TABLE_NAME
         + " tat WHERE tat.catalog_id = #{catalogId} AND "
         + " tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tat", tenantId)
         + " UNION "
         + " SELECT ft.catalog_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.catalog_id = #{catalogId} AND"
         + " ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ft", tenantId)
         + " UNION "
         + " SELECT mt.catalog_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
         + " mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mt", tenantId)
         + ")";
   }
 
   public String softDeleteObjectRelsBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
         + " sect SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE sect.deleted_at = 0 AND EXISTS ("
+        + " WHERE sect.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("sect", tenantId)
+        + " AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.schema_id = #{schemaId} "
         + " AND st.schema_id = sect.metadata_object_id AND sect.type = 'SCHEMA'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("st", tenantId)
         + " UNION "
         + " SELECT tt.schema_id FROM "
         + TopicMetaMapper.TABLE_NAME
         + " tt WHERE tt.schema_id = #{schemaId} AND "
         + " tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tt", tenantId)
         + " UNION "
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
         + " tat WHERE tat.schema_id = #{schemaId} AND "
         + " tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tat", tenantId)
         + " UNION "
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.schema_id = #{schemaId} AND "
         + " ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ft", tenantId)
         + " UNION "
         + " SELECT mt.schema_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.schema_id = #{schemaId} AND "
         + " mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mt", tenantId)
         + ")";
   }
 
   public String listSecurableObjectsByRoleId(@Param("roleId") Long roleId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT role_id as roleId, metadata_object_id as metadataObjectId,"
         + " type as type, privilege_names as privilegeNames,"
         + " privilege_conditions as privilegeConditions, current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+        + " WHERE role_id = #{roleId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteSecurableObjectsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 }

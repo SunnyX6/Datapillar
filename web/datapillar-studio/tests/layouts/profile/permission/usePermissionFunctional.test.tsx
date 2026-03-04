@@ -70,7 +70,7 @@ describe('usePermissionFunctional', () => {
         objectType: 'MENU',
         location: 'sidebar',
         categoryId: 1,
-        categoryName: '数据资产',
+        categoryName: 'data assets',
         sort: 1,
         permissionCode: 'READ',
         tenantPermissionCode: 'ADMIN',
@@ -79,7 +79,7 @@ describe('usePermissionFunctional', () => {
     ])
   })
 
-  it('仅在功能权限 tab 激活时请求权限接口', async () => {
+  it('Only in functional permissions tab Request permission interface during activation', async () => {
     const harness = createHarness()
 
     harness.render({ tenantId: 1, roleId: '1', activeTab: 'members' })
@@ -99,7 +99,7 @@ describe('usePermissionFunctional', () => {
     harness.unmount()
   })
 
-  it('同角色命中权限缓存时不重复请求，切新角色才请求', async () => {
+  it('No repeated requests when the same role hits the permission cache，Request only when cutting new roles', async () => {
     const harness = createHarness()
 
     harness.render({ tenantId: 1, roleId: '1', activeTab: 'functional' })

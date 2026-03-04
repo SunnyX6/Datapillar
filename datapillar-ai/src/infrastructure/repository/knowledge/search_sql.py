@@ -1,19 +1,16 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-SQL 检索服务
+SQL Search service
 
-职责：搜索参考 SQL，供智能体参考历史 SQL 写法
-设计原则：
-- SQL 节点不参与指针检索（hybrid_search 排除 SQL）
-- 用户可输入自然语言或 SQL 片段进行搜索
-- 基于 SQL 的 summary（LLM 生成的语义摘要）进行向量匹配
+Responsibilities:Search Reference SQL,History for the agent to refer to SQL Writing method
+design principles:- SQL Node does not participate in pointer retrieval(hybrid_search exclude SQL)
+- Users can enter natural language or SQL Fragment to search
+- Based on SQL of summary(LLM Generated semantic summary)Perform vector matching
 
-使用场景：
-- 用户贴一段 SQL，查找相似的历史 SQL
-- 用户描述需求，查找相关的参考 SQL
+Usage scenarios:- User posts a paragraph SQL,Find similar history SQL
+- User description requirements,Find relevant references SQL
 """
 
 from __future__ import annotations
@@ -29,19 +26,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SQLHit:
-    """SQL 搜索命中项（参考 SQL）"""
+    """SQL Search hits(Reference SQL)"""
 
-    node_id: str  # SQL 节点 ID
-    score: float  # 相关性得分
-    content: str | None  # SQL 内容
-    summary: str | None  # SQL 摘要
-    tags: str | None  # 标签
-    dialect: str | None  # SQL 方言
-    engine: str | None  # 执行引擎
+    node_id: str  # SQL node ID
+    score: float  # relevance score
+    content: str | None  # SQL content
+    summary: str | None  # SQL Summary
+    tags: str | None  # label
+    dialect: str | None  # SQL dialect
+    engine: str | None  # execution engine
 
 
 class Neo4jSQLSearch:
-    """Neo4j SQL 搜索服务"""
+    """Neo4j SQL Search service"""
 
     @classmethod
     def search_reference_sql(
@@ -54,30 +51,25 @@ class Neo4jSQLSearch:
         tenant_id: int | None = None,
     ) -> list[SQLHit]:
         """
-        搜索参考 SQL
+        Search Reference SQL
 
-        用于查找与用户输入相似的历史 SQL。用户可以输入：
-        - 自然语言描述：如 "按用户汇总交易金额"
-        - SQL 片段：如 "SELECT user_id, SUM(amount) FROM orders"
+        Used to find history similar to user input SQL.User can enter:- natural language description:Such as "Summarize transaction amount by user"
+        - SQL fragment:Such as "SELECT user_id,SUM(amount) FROM orders"
 
-        搜索基于 SQL 的 summary（LLM 生成的语义摘要）进行向量匹配。
+        Search based on SQL of summary(LLM Generated semantic summary)Perform vector matching.Args:query:Search text(natural language or SQL)
+        top_k:Return quantity
+        min_score:Minimum similarity threshold
+        dialect:SQL Dialect filtering(Such as spark,flink)
+        engine:Perform engine filtering
 
-        Args:
-            query: 搜索文本（自然语言或 SQL）
-            top_k: 返回数量
-            min_score: 最小相似度阈值
-            dialect: SQL 方言过滤（如 spark, flink）
-            engine: 执行引擎过滤
-
-        Returns:
-            SQLHit 列表
+        Returns:SQLHit list
         """
         try:
             from neo4j_graphrag.retrievers import VectorCypherRetriever
 
             from src.infrastructure.llm.embeddings import UnifiedEmbedder
 
-            # SQL 专用的 retrieval_query
+            # SQL dedicated retrieval_query
             sql_retrieval_query = """
             RETURN node.id AS node_id,
                    node.content AS content,
@@ -88,7 +80,7 @@ class Neo4jSQLSearch:
                    score
             """
 
-            # SQL 专用的 result_formatter
+            # SQL dedicated result_formatter
             def sql_result_formatter(record: Any) -> Any:
                 from neo4j_graphrag.types import RetrieverResultItem
 
@@ -107,7 +99,7 @@ class Neo4jSQLSearch:
 
             retriever = VectorCypherRetriever(
                 driver=Neo4jClient.get_driver(),
-                index_name="sql_embedding",  # SQL 专用向量索引
+                index_name="sql_embedding",  # SQL Private vector index
                 retrieval_query=sql_retrieval_query,
                 result_formatter=sql_result_formatter,
                 embedder=UnifiedEmbedder(tenant_id),
@@ -128,11 +120,11 @@ class Neo4jSQLSearch:
                 if not node_id:
                     continue
 
-                # 方言过滤
+                # Dialect filtering
                 if dialect and metadata.get("dialect") != dialect:
                     continue
 
-                # 引擎过滤
+                # engine filter
                 if engine and metadata.get("engine") != engine:
                     continue
 
@@ -151,5 +143,5 @@ class Neo4jSQLSearch:
             return hits
 
         except Exception as e:
-            logger.error(f"参考 SQL 搜索失败: {e}")
+            logger.error(f"Reference SQL Search failed:{e}")
             return []

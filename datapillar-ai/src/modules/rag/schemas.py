@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-28
 
-"""RAG 知识 Wiki 接口模型."""
+"""RAG knowledge Wiki interface model."""
 
 from __future__ import annotations
 

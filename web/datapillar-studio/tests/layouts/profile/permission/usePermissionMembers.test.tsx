@@ -83,7 +83,7 @@ describe('usePermissionMembers', () => {
     }))
   })
 
-  it('仅在成员 tab 激活时请求成员接口', async () => {
+  it('only in members tab Request member interface on activation', async () => {
     const harness = createHarness()
 
     harness.render({ tenantId: 1, roleId: '1', activeTab: 'functional' })
@@ -103,7 +103,7 @@ describe('usePermissionMembers', () => {
     harness.unmount()
   })
 
-  it('同角色命中缓存时不重复请求，切换新角色才请求', async () => {
+  it('No repeated requests when the same role hits the cache，Request only after switching to new role', async () => {
     const harness = createHarness()
 
     harness.render({ tenantId: 1, roleId: '1', activeTab: 'members' })

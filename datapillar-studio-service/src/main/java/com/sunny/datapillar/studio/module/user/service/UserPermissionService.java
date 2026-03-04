@@ -17,13 +17,14 @@ import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
- * 用户权限服务
- * 提供用户权限业务能力与领域服务
+ * User rights service Provide user authority business capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface UserPermissionService {
 
-    List<FeatureObjectPermissionItem> listPermissions(Long userId);
+  List<FeatureObjectPermissionItem> listPermissions(Long userId);
+
+  List<UserMenuItem> listMenus(Long userId);
 }

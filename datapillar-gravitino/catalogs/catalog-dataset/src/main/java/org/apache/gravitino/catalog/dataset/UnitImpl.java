@@ -22,7 +22,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.dataset.Unit;
 import org.apache.gravitino.meta.AuditInfo;
 
-/** Unit 接口的实现类 */
+/** Unit Implementation class of interface */
 public class UnitImpl implements Unit, Auditable {
 
   private String code;
@@ -58,7 +58,7 @@ public class UnitImpl implements Unit, Auditable {
     return auditInfo;
   }
 
-  /** Builder 类用于构建 UnitImpl 实例 */
+  /** Builder classes used to build UnitImpl Example */
   public static class Builder {
     private final UnitImpl unit;
 

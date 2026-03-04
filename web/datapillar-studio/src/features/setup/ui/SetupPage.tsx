@@ -49,7 +49,7 @@ function toSetupLogType(status: SetupStepStatus): SetupLogType {
 
 function buildLogsFromSteps(steps?: SetupStatusStep[]): SetupLog[] {
   if (!steps || steps.length === 0) {
-    return [{ text: '等待初始化步骤返回...', type: 'info' }]
+    return [{ text: 'Wait for the initialization step to return...', type: 'info' }]
   }
   return steps.map((step) => ({
     text: `${step.name}${step.description ? ` - ${step.description}` : ''}`,
@@ -70,7 +70,7 @@ function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message
   }
-  return '初始化失败，请重试'
+  return 'Initialization failed，Please try again'
 }
 
 const SETUP_FORM_BASE_WIDTH = 400
@@ -112,7 +112,7 @@ export function InputGroup({ label, type = 'text', value, onChange, placeholder,
             type="button"
             onClick={() => setShowPassword((previous) => !previous)}
             className="absolute top-1/2 right-3 -translate-y-1/2 text-slate-400 hover:text-indigo-500 transition-colors"
-            aria-label={showPassword ? '隐藏密码' : '显示密码'}
+            aria-label={showPassword ? 'Hide password' : 'show password'}
           >
             {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
           </button>

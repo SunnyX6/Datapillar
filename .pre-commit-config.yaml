@@ -1,10 +1,49 @@
 repos:
-  # 说明：
-  # - 本仓库是 monorepo，Git 根目录在 `Datapillar/`。
-  # - datapillar-ai 的 Python 质量门禁只对 `datapillar-ai/` 生效，避免影响其它子项目。
-  # - 使用 datapillar-ai 的 `.venv`，保证 Ruff/Black 版本与项目一致（uv 管理）。
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-yaml
+        exclude: ^datapillar-gravitino/
+      - id: check-json
+        exclude: ^(datapillar-gravitino/|web/datapillar-studio/tsconfig.*\.json$|web/datapillar-web-site/tsconfig.*\.json$)
+      - id: check-toml
+        exclude: ^datapillar-gravitino/
+      - id: end-of-file-fixer
+        exclude: ^(datapillar-gravitino/|datapillar-oneagentic/data/|web/datapillar-studio/\.vite/|web/datapillar-studio/dist/|web/datapillar-web-site/\.next/|web/datapillar-web-site/dist/)
+      - id: trailing-whitespace
+        exclude: ^(datapillar-gravitino/|datapillar-oneagentic/data/|web/datapillar-studio/\.vite/|web/datapillar-studio/dist/|web/datapillar-web-site/\.next/|web/datapillar-web-site/dist/)
+      - id: check-merge-conflict
+        exclude: ^datapillar-gravitino/
+
   - repo: local
     hooks:
+      - id: python-syntax-self-modules
+        name: python syntax / self modules
+        language: python
+        entry: python3
+        types: [python]
+        files: ^(datapillar-ai|datapillar-oneagentic|datapillar-airflow-plugin)/
+        args:
+          - -c
+          - |
+            import py_compile
+            import sys
+
+            errors: list[str] = []
+            for path in sys.argv[1:]:
+                if "/tests/" in path or "/test/" in path or "/.venv/" in path or "/.uv-cache/" in path:
+                    continue
+                try:
+                    py_compile.compile(path, doraise=True)
+                except Exception as exc:
+                    errors.append(f"{path}:1:Python syntax error: {exc}")
+
+            if errors:
+                print("Python syntax gate failed:")
+                for item in errors:
+                    print(item)
+                raise SystemExit(1)
+
       - id: datapillar-ai-ruff
         name: datapillar-ai / ruff check
         entry: datapillar-ai/.venv/bin/ruff
@@ -14,21 +53,334 @@ repos:
         args: [check, --config, datapillar-ai/pyproject.toml]
 
       - id: datapillar-ai-black
-        name: datapillar-ai / black
+        name: datapillar-ai / black --check
         entry: datapillar-ai/.venv/bin/black
         language: system
         types: [python]
         files: ^datapillar-ai/
-        args: [--config, datapillar-ai/pyproject.toml]
+        args: [--check, --config, datapillar-ai/pyproject.toml]
 
-      - id: datapillar-ai-function-name-max-segments
-        name: datapillar-ai / function name segments (<= 3)
-        entry: datapillar-ai/.venv/bin/python
+      - id: datapillar-oneagentic-ruff
+        name: datapillar-oneagentic / ruff check
+        entry: datapillar-oneagentic/.venv/bin/ruff
         language: system
         types: [python]
-        files: ^datapillar-ai/src/.*\.py$
+        files: ^datapillar-oneagentic/
+        args: [check, --config, datapillar-oneagentic/pyproject.toml]
+
+      - id: datapillar-oneagentic-black
+        name: datapillar-oneagentic / black --check
+        entry: datapillar-oneagentic/.venv/bin/black
+        language: system
+        types: [python]
+        files: ^datapillar-oneagentic/
+        args: [--check, --config, datapillar-oneagentic/pyproject.toml]
+
+      - id: python-function-name-max-segments
+        name: python function segments (<=4)
+        language: python
+        entry: python3
+        types: [python]
+        files: ^(datapillar-ai|datapillar-oneagentic|datapillar-airflow-plugin)/.*\.py$
         args:
-          [
-            -c,
-            "import ast\nimport sys\n\nMAX_SEGMENTS = 3\n\n\ndef _segments(name: str) -> int:\n    core = name.strip(\"_\")\n    if not core:\n        return 0\n    return len([p for p in core.split(\"_\") if p])\n\n\nerrors: list[str] = []\nfor path in sys.argv[1:]:\n    try:\n        src = open(path, \"r\", encoding=\"utf-8\").read()\n        tree = ast.parse(src, filename=path)\n    except Exception as e:\n        errors.append(f\"{path}:1: 无法解析文件({e})\")\n        continue\n\n    for node in ast.walk(tree):\n        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):\n            continue\n        lineno = getattr(node, \"lineno\", 1)\n        if _segments(node.name) > MAX_SEGMENTS:\n            errors.append(f\"{path}:{lineno}: 方法/函数名过长(>{MAX_SEGMENTS}段): {node.name}\")\n\nif errors:\n    print(\"命名门禁失败：方法/函数名必须言简意赅，最多三段式(最多2个下划线)。\")\n    for e in errors:\n        print(e)\n    sys.exit(1)\n",
-          ]
+          - -c
+          - |
+            import ast
+            import re
+            import subprocess
+            import sys
+
+            MAX_SEGMENTS = 4
+            errors: list[str] = []
+
+            def segments(name: str) -> int:
+                core = name.strip("_")
+                if not core:
+                    return 0
+                return len([part for part in core.split("_") if part])
+
+            for path in sys.argv[1:]:
+                if "/tests/" in path or "/test/" in path or "/.venv/" in path or "/.uv-cache/" in path:
+                    continue
+
+                diff_lines = subprocess.run(
+                    ["git", "diff", "--cached", "-U0", "--", path],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                ).stdout.splitlines()
+
+                added_lines: set[int] = set()
+                for row in diff_lines:
+                    if not row.startswith("@@"):
+                        continue
+                    match = re.search(r"\+(\d+)(?:,(\d+))?", row)
+                    if not match:
+                        continue
+                    start = int(match.group(1))
+                    count = int(match.group(2) or "1")
+                    for line_no in range(start, start + count):
+                        added_lines.add(line_no)
+
+                try:
+                    source = open(path, "r", encoding="utf-8").read()
+                    tree = ast.parse(source, filename=path)
+                except Exception as exc:
+                    errors.append(f"{path}:1:Unable to parse file ({exc})")
+                    continue
+
+                for node in ast.walk(tree):
+                    if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        continue
+                    line = getattr(node, "lineno", 1)
+                    if added_lines and line not in added_lines:
+                        continue
+                    if segments(node.name) > MAX_SEGMENTS:
+                        errors.append(
+                            f"{path}:{line}:Function name segments exceed {MAX_SEGMENTS}: {node.name}"
+                        )
+
+            if errors:
+                print("Naming gate failed: Python function names may use at most 4 segments.")
+                for item in errors:
+                    print(item)
+                raise SystemExit(1)
+
+      - id: naming-redline
+        name: naming redline (>32) / self modules
+        language: python
+        entry: python3
+        pass_filenames: true
+        files: ^(datapillar-ai|datapillar-oneagentic|datapillar-airflow-plugin|datapillar-common|datapillar-auth|datapillar-studio-service|datapillar-api-gateway|datapillar-openlineage|datapillar-distribution)/
+        types_or: [python, java]
+        args:
+          - -c
+          - |
+            import ast
+            import re
+            import sys
+            from pathlib import Path
+
+            REDLINE = 32
+            review_hits: list[str] = []
+            redline_hits: list[str] = []
+
+            java_pattern = re.compile(
+                r"^(?:\s*@.*\n)*\s*(?:public|protected|private|default)\s+(?:static\s+)?(?:final\s+)?(?:synchronized\s+)?(?:<[^>]+>\s+)?[A-Za-z0-9_<>,\[\].?]+\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(",
+                re.M,
+            )
+
+            for path in sys.argv[1:]:
+                normalized = path.replace("\\", "/")
+                if normalized.startswith("datapillar-gravitino/"):
+                    continue
+                if "/tests/" in normalized or "/test/" in normalized or "/src/test/" in normalized:
+                    continue
+                if "/.venv/" in normalized or "/.uv-cache/" in normalized:
+                    continue
+
+                file_path = Path(path)
+                if not file_path.exists():
+                    continue
+
+                suffix = Path(normalized).suffix
+                source = file_path.read_text(encoding="utf-8", errors="ignore")
+
+                if suffix == ".py":
+                    try:
+                        tree = ast.parse(source, filename=path)
+                    except Exception:
+                        continue
+                    for node in ast.walk(tree):
+                        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            continue
+                        name = node.name
+                        length = len(name)
+                        line = getattr(node, "lineno", 1)
+                        if 25 <= length <= REDLINE:
+                            review_hits.append(f"{path}:{line}:{name} ({length})")
+                        elif length > REDLINE:
+                            redline_hits.append(f"{path}:{line}:{name} ({length})")
+
+                elif suffix == ".java":
+                    for match in java_pattern.finditer(source):
+                        name = match.group(1)
+                        length = len(name)
+                        line = source.count("\n", 0, match.start()) + 1
+                        if 25 <= length <= REDLINE:
+                            review_hits.append(f"{path}:{line}:{name} ({length})")
+                        elif length > REDLINE:
+                            redline_hits.append(f"{path}:{line}:{name} ({length})")
+
+            if review_hits:
+                print("Naming review tips (25-32):")
+                for item in sorted(set(review_hits)):
+                    print(item)
+
+            if redline_hits:
+                print("Naming gate failed: function/method name length must not exceed 32.")
+                for item in sorted(set(redline_hits)):
+                    print(item)
+                raise SystemExit(1)
+
+      - id: weak-exception-incremental
+        name: weak exception incremental gate
+        language: python
+        entry: python3
+        pass_filenames: true
+        files: ^(datapillar-ai|datapillar-oneagentic|datapillar-airflow-plugin|datapillar-common|datapillar-auth|datapillar-studio-service|datapillar-api-gateway|datapillar-openlineage|datapillar-distribution)/
+        types_or: [python, java]
+        args:
+          - -c
+          - |
+            import re
+            import subprocess
+            import sys
+
+            py_except = re.compile(r"\bexcept\s+Exception(?:\s+as\s+\w+)?\s*:")
+            java_catch = re.compile(r"\bcatch\s*\(\s*Exception\s+\w+\s*\)")
+            violations: list[str] = []
+
+            for path in sys.argv[1:]:
+                if "/tests/" in path or "/test/" in path or "/src/test/" in path:
+                    continue
+                diff = subprocess.run(
+                    ["git", "diff", "--cached", "-U0", "--", path],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                ).stdout.splitlines()
+
+                for line in diff:
+                    if not line.startswith("+") or line.startswith("+++"):
+                        continue
+                    payload = line[1:]
+                    if py_except.search(payload):
+                        violations.append(
+                            f"{path}:New except Exception found; use specific exception handling."
+                        )
+                    if java_catch.search(payload):
+                        violations.append(
+                            f"{path}:New catch(Exception) found; use specific exception handling."
+                        )
+
+            if violations:
+                print("Exception handling gate failed: weak exception patterns are forbidden.")
+                for item in sorted(set(violations)):
+                    print(item)
+                raise SystemExit(1)
+
+      - id: java-module-test-compile
+        name: java module test-compile (changed modules)
+        stages: [manual]
+        language: system
+        entry: bash
+        types: [java]
+        files: ^(datapillar-common|datapillar-auth|datapillar-studio-service|datapillar-api-gateway|datapillar-openlineage|datapillar-distribution)/
+        pass_filenames: true
+        args:
+          - -c
+          - |
+            set -euo pipefail
+            modules=()
+            for f in "$@"; do
+              case "$f" in
+                datapillar-common/*) modules+=("datapillar-common") ;;
+                datapillar-auth/*) modules+=("datapillar-auth") ;;
+                datapillar-studio-service/*) modules+=("datapillar-studio-service") ;;
+                datapillar-api-gateway/*) modules+=("datapillar-api-gateway") ;;
+                datapillar-openlineage/*) modules+=("datapillar-openlineage") ;;
+                datapillar-distribution/*) modules+=("datapillar-distribution") ;;
+              esac
+            done
+
+            if [ ${#modules[@]} -eq 0 ]; then
+              exit 0
+            fi
+
+            uniq_modules=$(printf "%s\n" "${modules[@]}" | sort -u)
+            while IFS= read -r module; do
+              if [ -z "$module" ]; then
+                continue
+              fi
+              if ! mvn -q -pl "$module" -am -DskipTests test-compile; then
+                mvn -q -pl "$module" -am -DskipTests test-compile
+              fi
+            done <<EOF2
+            $uniq_modules
+            EOF2
+          - --
+
+      - id: frontend-artifact-and-lockfile
+        name: frontend artifact and lockfile gate
+        language: python
+        entry: python3
+        pass_filenames: true
+        files: ^web/(datapillar-studio|datapillar-web-site)/
+        args:
+          - -c
+          - |
+            from pathlib import Path
+            import subprocess
+            import sys
+
+            violations: list[str] = []
+            touched = set()
+
+            for path in sys.argv[1:]:
+                normalized = path.replace("\\", "/")
+                file_path = Path(path)
+                staged = subprocess.run(
+                    ["git", "diff", "--cached", "--name-status", "--", path],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                ).stdout
+                is_staged_delete = any(
+                    line.startswith("D\t") or line.startswith("D ")
+                    for line in staged.splitlines()
+                )
+                if is_staged_delete:
+                    continue
+                if not file_path.exists():
+                    continue
+                if "/node_modules/" in normalized:
+                    violations.append(f"{path}:node_modules submission is forbidden")
+                if normalized.endswith(".tsbuildinfo"):
+                    violations.append(f"{path}:submission of .tsbuildinfo is forbidden")
+                if normalized.startswith("web/datapillar-studio/"):
+                    touched.add("web/datapillar-studio")
+                if normalized.startswith("web/datapillar-web-site/"):
+                    touched.add("web/datapillar-web-site")
+
+            for module in sorted(touched):
+                lock_candidates = [
+                    Path(module) / "package-lock.json",
+                    Path(module) / "pnpm-lock.yaml",
+                    Path(module) / "yarn.lock",
+                ]
+                existing = [str(p) for p in lock_candidates if p.exists()]
+                if len(existing) != 1:
+                    violations.append(
+                        f"{module}:there must be exactly one lock file (package-lock/pnpm-lock/yarn.lock), current={existing}"
+                    )
+
+            if violations:
+                print("Frontend gate failed:")
+                for item in sorted(set(violations)):
+                    print(item)
+                raise SystemExit(1)
+
+      - id: web-datapillar-studio-lint
+        name: web/datapillar-studio lint + type-check
+        language: system
+        entry: bash -lc 'cd web/datapillar-studio && npm run lint && npm run type-check'
+        pass_filenames: false
+        files: ^web/datapillar-studio/
+
+      - id: web-datapillar-web-site-lint
+        name: web/datapillar-web-site lint + type-check
+        language: system
+        entry: bash -lc 'cd web/datapillar-web-site && npm run lint && npm run type-check'
+        pass_filenames: false
+        files: ^web/datapillar-web-site/

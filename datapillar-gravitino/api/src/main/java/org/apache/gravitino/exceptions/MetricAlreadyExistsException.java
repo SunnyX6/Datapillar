@@ -21,14 +21,14 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** 当指定名称的指标已存在时抛出的异常 */
+/** Exception thrown when an indicator with the specified name already exists */
 public class MetricAlreadyExistsException extends AlreadyExistsException {
 
   /**
-   * 使用指定的详细消息构造新异常
+   * Constructs a new exception with the specified detailed message
    *
-   * @param message 详细消息
-   * @param args 消息的参数
+   * @param message Detailed message
+   * @param args Message parameters
    */
   @FormatMethod
   public MetricAlreadyExistsException(@FormatString String message, Object... args) {
@@ -36,11 +36,11 @@ public class MetricAlreadyExistsException extends AlreadyExistsException {
   }
 
   /**
-   * 使用指定的详细消息和原因构造新异常
+   * Constructs a new exception with the specified detailed message and reason
    *
-   * @param cause 原因
-   * @param message 详细消息
-   * @param args 消息的参数
+   * @param cause Reason
+   * @param message Detailed message
+   * @param args Message parameters
    */
   @FormatMethod
   public MetricAlreadyExistsException(

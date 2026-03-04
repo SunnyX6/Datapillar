@@ -1,7 +1,7 @@
 /**
- * 知识 Wiki API 服务
+ * knowledge Wiki API service
  *
- * 对接 /api/ai/biz/knowledge/wiki
+ * docking /api/ai/biz/knowledge/wiki
  */
 
 import {

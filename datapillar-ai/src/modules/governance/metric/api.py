@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-指标 AI 治理 API
+indicator AI governance API
 """
 
 from typing import Any
@@ -19,7 +18,7 @@ router = APIRouter()
 
 @router.post("/fill", response_model=ApiSuccessResponseSchema)
 async def ai_fill(request: Request, payload: AIFillRequest) -> dict[str, Any]:
-    """AI 填写指标表单"""
+    """AI Fill out the indicator form"""
     current_user = request.state.current_user
     result: AIFillResponse = await metric_ai_service.fill(
         payload,

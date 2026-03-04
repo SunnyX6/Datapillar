@@ -2,6 +2,7 @@ import { API_BASE, API_PATH, requestData, requestEnvelope } from '@/api'
 import type {
   LoginResult,
   LoginTenantRequest,
+  Menu,
   PasswordLoginRequest,
   SsoLoginRequest
 } from '@/services/types/auth'
@@ -67,5 +68,12 @@ export async function logout() {
     baseURL: API_BASE.login,
     url: API_PATH.login.logout,
     method: 'POST'
+  })
+}
+
+export async function getMyMenus(): Promise<Menu[]> {
+  return requestData<Menu[]>({
+    baseURL: API_BASE.studioBiz,
+    url: API_PATH.userMenu.me
   })
 }

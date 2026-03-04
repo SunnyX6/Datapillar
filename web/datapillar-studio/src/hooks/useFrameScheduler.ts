@@ -16,8 +16,8 @@ export interface FrameScheduler {
 }
 
 /**
- * 使用单个 requestAnimationFrame 驱动的调度器
- * - pause = false 时自动暂停计时，resume 后继续
+ * Use a single requestAnimationFrame driver scheduler
+ * - pause = false Automatically pause timing when，resume continue after
  */
 export function useFrameScheduler(active: boolean): FrameScheduler {
   const tasksRef = useRef<Map<number, FrameTask>>(new Map())

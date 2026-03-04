@@ -7,7 +7,7 @@ import lombok.Data;
 @Schema(name = "LlmModelConnectResponse")
 public class LlmModelConnectResponse {
 
-    private boolean connected;
+  private boolean connected;
 
-    private boolean hasApiKey;
+  private boolean hasApiKey;
 }

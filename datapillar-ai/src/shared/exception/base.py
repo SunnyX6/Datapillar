@@ -41,7 +41,7 @@ class DatapillarException(Exception):
         super().__init__(resolved)
 
 
-def _resolve_message(message:str,cause:Exception | None) -> str:
+def _resolve_message(message: str, cause: Exception | None) -> str:
     normalized = message.strip() if isinstance(message, str) else ""
     if normalized:
         return normalized

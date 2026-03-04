@@ -5,8 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 /**
- * 登录Command组件
- * 负责登录Command核心逻辑实现
+ * Login command model.
  *
  * @author Sunny
  * @date 2026-01-01
@@ -14,23 +13,26 @@ import lombok.Data;
 @Data
 public class LoginCommand {
 
-    @NotBlank(message = "method 不能为空")
-    private String method;
+  @NotBlank(message = "method must not be blank")
+  private String method;
 
-    private Boolean rememberMe;
+  private Boolean rememberMe;
 
-    private String loginAlias;
+  private String loginAlias;
 
-    private String password;
+  private String password;
 
-    private String tenantCode;
+  private String tenantCode;
 
-    private String provider;
+  private String provider;
 
-    private String code;
+  private String code;
 
-    private String state;
+  private String state;
 
-    @JsonIgnore
-    private String clientIp;
+  private String nonce;
+
+  private String codeVerifier;
+
+  @JsonIgnore private String clientIp;
 }

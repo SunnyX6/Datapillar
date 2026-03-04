@@ -26,12 +26,12 @@ export function TrackingPlanTable() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={iconSizeToken.small} />
           <input
             type="text"
-            placeholder="搜索埋点方案..."
+            placeholder="Search for buried plans..."
             className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-body-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-brand-500 dark:focus:border-brand-400 outline-none transition-colors"
           />
         </div>
         <Button variant="outline" size="small" className="self-start @md:self-auto">
-          按页面筛选
+          Filter by page
         </Button>
       </div>
 
@@ -40,19 +40,19 @@ export function TrackingPlanTable() {
           <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
             <tr>
               <th className={`px-6 py-4 ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-semibold text-slate-500 uppercase tracking-wider w-[30%]`}>
-                事件 (Schema)
+                event (Schema)
               </th>
               <th className={`px-6 py-4 ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-semibold text-slate-500 uppercase tracking-wider w-[26%]`}>
-                上下文 (Where)
+                context (Where)
               </th>
               <th className={`px-6 py-4 ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-semibold text-slate-500 uppercase tracking-wider w-[24%]`}>
-                触发描述
+                trigger description
               </th>
               <th className={`px-6 py-4 ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-semibold text-slate-500 uppercase tracking-wider text-center w-[10%]`}>
-                状态
+                Status
               </th>
               <th className={`px-6 py-4 ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-semibold text-slate-500 uppercase tracking-wider text-right`}>
-                操作
+                Operation
               </th>
             </tr>
           </thead>

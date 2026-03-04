@@ -10,17 +10,22 @@ import lombok.Data;
 @Schema(name = "LlmProviderUpdateRequest")
 public class LlmProviderUpdateRequest {
 
-    @Size(min = 1, max = 64, message = "name 长度范围必须在 1-64")
-    private String name;
+  @Size(min = 1, max = 64, message = "name The length range must be within 1-64")
+  private String name;
 
-    @Size(max = 255, message = "base_url 长度不能超过 255")
-    private String baseUrl;
+  @Size(max = 255, message = "base_url The length cannot exceed 255")
+  private String baseUrl;
 
-    @Size(max = 200, message = "add_model_ids 数量不能超过 200")
-    private List<@NotBlank(message = "add_model_ids 存在空值")
-            @Size(max = 128, message = "add_model_ids 元素长度不能超过 128") String> addModelIds;
+  @Size(max = 200, message = "add_model_ids The quantity cannot exceed 200")
+  private List<
+          @NotBlank(message = "add_model_ids Null value exists")
+          @Size(max = 128, message = "add_model_ids The element length cannot exceed 128") String>
+      addModelIds;
 
-    @Size(max = 200, message = "remove_model_ids 数量不能超过 200")
-    private List<@NotBlank(message = "remove_model_ids 存在空值")
-            @Size(max = 128, message = "remove_model_ids 元素长度不能超过 128") String> removeModelIds;
+  @Size(max = 200, message = "remove_model_ids The quantity cannot exceed 200")
+  private List<
+          @NotBlank(message = "remove_model_ids Null value exists")
+          @Size(max = 128, message = "remove_model_ids The element length cannot exceed 128")
+          String>
+      removeModelIds;
 }

@@ -8,8 +8,7 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
- * AI提供器组件
- * 负责AI提供器核心逻辑实现
+ * AIprovider component responsibleAIProvider core logic implementation
  *
  * @author Sunny
  * @date 2026-01-01
@@ -18,24 +17,24 @@ import lombok.Data;
 @TableName("ai_provider")
 public class AiProvider {
 
-    @TableId(value = "id", type = IdType.AUTO)
-    private Long id;
+  @TableId(value = "id", type = IdType.AUTO)
+  private Long id;
 
-    @TableField("code")
-    private String code;
+  @TableField("code")
+  private String code;
 
-    @TableField("name")
-    private String name;
+  @TableField("name")
+  private String name;
 
-    @TableField("base_url")
-    private String baseUrl;
+  @TableField("base_url")
+  private String baseUrl;
 
-    @TableField("model_ids")
-    private String modelIds;
+  @TableField("model_ids")
+  private String modelIds;
 
-    @TableField("created_at")
-    private LocalDateTime createdAt;
+  @TableField("created_at")
+  private LocalDateTime createdAt;
 
-    @TableField("updated_at")
-    private LocalDateTime updatedAt;
+  @TableField("updated_at")
+  private LocalDateTime updatedAt;
 }

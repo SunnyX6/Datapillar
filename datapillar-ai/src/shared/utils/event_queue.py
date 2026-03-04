@@ -1,15 +1,14 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-异步事件队列
+Asynchronous event queue
 
-提供：
-- 事件缓冲
-- 批量处理
-- 背压控制
-- 暂停/恢复
+provide：
+- event buffer
+- Batch processing
+- Back pressure control
+- pause/restore
 """
 
 import asyncio
@@ -25,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class QueueStats:
-    """队列统计信息"""
+    """Queue statistics"""
 
     total_received: int = 0
     total_processed: int = 0
@@ -36,7 +35,7 @@ class QueueStats:
 
 @dataclass
 class QueueConfig:
-    """队列配置"""
+    """Queue configuration"""
 
     max_size: int = 10000
     batch_size: int = 100
@@ -45,13 +44,13 @@ class QueueConfig:
 
 class AsyncEventQueue:
     """
-    异步事件队列
+    Asynchronous event queue
 
-    提供：
-    - 事件缓冲：当写入速度跟不上接收速度时缓冲事件
-    - 批量处理：积累一定数量后批量写入，提高效率
-    - 背压控制：队列满时拒绝新事件，防止内存溢出
-    - 暂停/恢复：支持在同步期间暂停消费
+    provide：
+    - event buffer：Buffering events when write speed cannot keep up with receive speed
+    - Batch processing：Write in batches after accumulating a certain amount，Improve efficiency
+    - Back pressure control：Reject new events when queue is full，Prevent memory overflow
+    - pause/restore：Supports pausing consumption during synchronization
     """
 
     def __init__(self, config: QueueConfig | None = None):
@@ -61,64 +60,64 @@ class AsyncEventQueue:
         self._running = False
         self._paused = False
         self._pause_event = asyncio.Event()
-        self._pause_event.set()  # 初始状态为非暂停
+        self._pause_event.set()  # The initial state is non-paused
         self._processor_task: asyncio.Task | None = None
         self._processor: Callable[[list[Any]], Any] | None = None
 
     @property
     def stats(self) -> QueueStats:
-        """获取队列统计"""
+        """Get queue statistics"""
         self._stats.current_size = self._queue.qsize()
         return self._stats
 
     async def put(self, event: Any) -> bool:
         """
-        添加事件到队列
+        Add event to queue
 
         Returns:
-            True 如果成功添加，False 如果队列已满
+            True If added successfully，False If the queue is full
         """
         try:
             self._queue.put_nowait(event)
             self._stats.total_received += 1
             return True
         except asyncio.QueueFull:
-            logger.warning("事件队列已满，丢弃事件")
+            logger.warning("Event queue is full，discard event")
             return False
 
     async def put_wait(self, event: Any, timeout: float = 5.0) -> bool:
         """
-        添加事件到队列（等待模式）
+        Add event to queue（wait mode）
 
         Args:
-            event: 事件
-            timeout: 超时时间（秒）
+            event: event
+            timeout: timeout（seconds）
 
         Returns:
-            True 如果成功添加，False 如果超时
+            True If added successfully，False if timeout
         """
         try:
             await asyncio.wait_for(self._queue.put(event), timeout=timeout)
             self._stats.total_received += 1
             return True
         except TimeoutError:
-            logger.warning("事件队列添加超时")
+            logger.warning("Add timeout to event queue")
             return False
 
     async def get_batch(self, max_size: int | None = None) -> list[Any]:
         """
-        获取一批事件
+        Get a batch of events
 
         Args:
-            max_size: 最大批量大小，默认使用配置值
+            max_size: Maximum batch size，Use configuration values by default
 
         Returns:
-            事件列表
+            event list
         """
         batch_size = max_size or self.config.batch_size
         batch: list[Any] = []
 
-        # 至少等待一个事件
+        # Wait for at least one event
         try:
             event = await asyncio.wait_for(
                 self._queue.get(), timeout=self.config.flush_interval_seconds
@@ -127,7 +126,7 @@ class AsyncEventQueue:
         except TimeoutError:
             return batch
 
-        # 非阻塞获取更多事件
+        # Get more events non-blockingly
         while len(batch) < batch_size:
             try:
                 event = self._queue.get_nowait()
@@ -138,60 +137,62 @@ class AsyncEventQueue:
         return batch
 
     def set_processor(self, processor: Callable[[list[Any]], Any]) -> None:
-        """设置批量处理器"""
+        """Set up batch processor"""
         self._processor = processor
 
     @property
     def is_paused(self) -> bool:
-        """是否处于暂停状态"""
+        """Is it in paused state?"""
         return self._paused
 
     def pause(self) -> None:
-        """暂停队列消费（事件仍可入队，但不会被处理）"""
+        """Pause queue consumption（Events can still be queued，but will not be processed）"""
         if not self._paused:
             self._paused = True
             self._pause_event.clear()
-            logger.info("事件队列消费已暂停")
+            logger.info("Event queue consumption has been paused")
 
     def resume(self) -> None:
-        """恢复队列消费"""
+        """Resume queue consumption"""
         if self._paused:
             self._paused = False
             self._pause_event.set()
-            logger.info("事件队列消费已恢复")
+            logger.info("Event queue consumption has resumed")
 
     async def start(self) -> None:
-        """启动队列处理"""
+        """Start queue processing"""
         if self._running:
             return
 
         self._running = True
         if self._processor:
             self._processor_task = asyncio.create_task(self._process_loop())
-            logger.info("事件队列处理器已启动")
+            logger.info("Event queue handler started")
 
     async def stop(self, timeout: float = 30.0) -> None:
-        """停止队列处理"""
+        """Stop queue processing"""
         self._running = False
 
         if self._processor_task:
-            # 等待处理完剩余事件
+            # Wait for remaining events to be processed
             try:
                 await asyncio.wait_for(self._drain(), timeout=timeout)
             except TimeoutError:
-                logger.warning(f"队列排空超时，剩余 {self._queue.qsize()} 个事件未处理")
+                logger.warning(
+                    f"Queue emptying timeout，Remaining {self._queue.qsize()} events unhandled"
+                )
 
             self._processor_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._processor_task
 
-        logger.info("事件队列处理器已停止")
+        logger.info("The event queue handler has stopped")
 
     async def _process_loop(self) -> None:
-        """处理循环"""
+        """processing loop"""
         while self._running:
             try:
-                # 等待非暂停状态
+                # Wait for non-paused state
                 await self._pause_event.wait()
 
                 batch = await self.get_batch()
@@ -202,14 +203,14 @@ class AsyncEventQueue:
                         self._stats.last_flush_time = datetime.now()
                     except Exception as e:
                         self._stats.total_failed += len(batch)
-                        logger.error(f"批量处理失败: {e}")
+                        logger.error(f"Batch processing failed: {e}")
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"处理循环异常: {e}")
+                logger.error(f"Handling loop exceptions: {e}")
 
     async def _drain(self) -> None:
-        """排空队列"""
+        """empty queue"""
         while not self._queue.empty() and self._processor:
             batch = await self.get_batch()
             if batch:
@@ -218,4 +219,4 @@ class AsyncEventQueue:
                     self._stats.total_processed += len(batch)
                 except Exception as e:
                     self._stats.total_failed += len(batch)
-                    logger.error(f"排空时处理失败: {e}")
+                    logger.error(f"Processing failed while draining: {e}")

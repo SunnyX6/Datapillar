@@ -21,7 +21,7 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** 当请求的值域不存在时抛出此异常 */
+/** This exception is thrown when the requested value domain does not exist */
 public class NoSuchValueDomainException extends NotFoundException {
 
   @FormatMethod

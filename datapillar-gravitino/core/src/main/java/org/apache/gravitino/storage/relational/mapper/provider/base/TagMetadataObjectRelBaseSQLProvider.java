@@ -29,6 +29,7 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -37,6 +38,7 @@ public class TagMetadataObjectRelBaseSQLProvider {
   public String listTagPOsByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
         + " tm.metalake_id as metalakeId, tm.tag_comment as comment, tm.properties as properties,"
         + " tm.audit_info as auditInfo,"
@@ -50,13 +52,17 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + " te ON tm.tag_id = te.tag_id"
         + " WHERE te.metadata_object_id = #{metadataObjectId}"
         + " AND te.metadata_object_type = #{metadataObjectType} AND te.deleted_at = 0"
-        + " AND tm.deleted_at = 0";
+        + " AND tm.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("te", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tm", tenantId);
   }
 
   public String getTagPOsByMetadataObjectAndTagName(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType,
       @Param("tagName") String tagName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
         + " tm.metalake_id as metalakeId, tm.tag_comment as comment, tm.properties as properties,"
         + " tm.audit_info as auditInfo,"
@@ -70,11 +76,16 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + " te ON tm.tag_id = te.tag_id"
         + " WHERE te.metadata_object_id = #{metadataObjectId}"
         + " AND te.metadata_object_type = #{metadataObjectType} AND tm.tag_name = #{tagName}"
-        + " AND te.deleted_at = 0 AND tm.deleted_at = 0";
+        + " AND te.deleted_at = 0 AND tm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("te", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tm", tenantId);
   }
 
   public String listTagMetadataObjectRelsByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT te.tag_id as tagId, te.metadata_object_id as metadataObjectId,"
         + " te.metadata_object_type as metadataObjectType, te.audit_info as auditInfo,"
         + " te.current_version as currentVersion, te.last_version as lastVersion,"
@@ -87,16 +98,25 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON te.tag_id = tm.tag_id AND tm.metalake_id = mm.metalake_id"
         + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name = #{tagName}"
-        + " AND te.deleted_at = 0 AND tm.deleted_at = 0 AND mm.deleted_at = 0";
+        + " AND te.deleted_at = 0 AND tm.deleted_at = 0 AND mm.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("te", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tm", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId);
   }
 
   public String batchInsertTagMetadataObjectRels(
       @Param("tagRels") List<TagMetadataObjectRelPO> tagRelPOs) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "INSERT INTO "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + "(tag_id, metadata_object_id, metadata_object_type, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES "
         + "<foreach collection='tagRels' item='item' separator=','>"
         + "(#{item.tagId},"
@@ -105,7 +125,10 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + " #{item.auditInfo},"
         + " #{item.currentVersion},"
         + " #{item.lastVersion},"
-        + " #{item.deletedAt})"
+        + " #{item.deletedAt},"
+        + " "
+        + tenantId
+        + ")"
         + "</foreach>"
         + "</script>";
   }
@@ -114,6 +137,7 @@ public class TagMetadataObjectRelBaseSQLProvider {
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType,
       @Param("tagIds") List<Long> tagIds) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
@@ -124,12 +148,14 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + "#{tagId}"
         + "</foreach>"
         + " And metadata_object_id = #{metadataObjectId}"
-        + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0"
+        + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + "</script>";
   }
 
   public String softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " te SET te.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -138,11 +164,17 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + TagMetaMapper.TAG_TABLE_NAME
         + " tm WHERE tm.metalake_id IN (SELECT mm.metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0) AND te.deleted_at = 0";
+        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("mm", tenantId)
+        + ")"
+        + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("tm", tenantId)
+        + ") AND te.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("te", tenantId);
   }
 
   public String softDeleteTagMetadataObjectRelsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " te SET te.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -150,123 +182,170 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + " WHERE EXISTS (SELECT * FROM "
         + TagMetaMapper.TAG_TABLE_NAME
         + " tm WHERE tm.metalake_id = #{metalakeId} AND tm.tag_id = te.tag_id"
-        + " AND tm.deleted_at = 0) AND te.deleted_at = 0";
+        + " AND tm.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("tm", tenantId)
+        + ") AND te.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("te", tenantId);
   }
 
   public String softDeleteTagMetadataObjectRelsByMetadataObject(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0"
-        + " AND metadata_object_type = #{metadataObjectType}";
+        + " AND metadata_object_type = #{metadataObjectType} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteTagMetadataObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " tmt SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE tmt.deleted_at = 0 AND EXISTS ("
+        + " WHERE tmt.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("tmt", tenantId)
+        + " AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
         + " ct WHERE ct.catalog_id = #{catalogId}  AND "
         + "ct.catalog_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'CATALOG'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ct", tenantId)
         + " UNION "
         + " SELECT st.catalog_id FROM "
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.catalog_id = #{catalogId} AND "
         + "st.schema_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'SCHEMA'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("st", tenantId)
         + " UNION "
         + " SELECT tt.catalog_id FROM "
         + TopicMetaMapper.TABLE_NAME
         + " tt WHERE tt.catalog_id = #{catalogId} AND "
         + "tt.topic_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TOPIC'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tt", tenantId)
         + " UNION "
         + " SELECT tat.catalog_id FROM "
         + TableMetaMapper.TABLE_NAME
         + " tat WHERE tat.catalog_id = #{catalogId} AND "
         + "tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tat", tenantId)
         + " UNION "
         + " SELECT ft.catalog_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.catalog_id = #{catalogId}  AND"
         + " ft.fileset_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FILESET'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ft", tenantId)
         + " UNION "
         + " SELECT cot.catalog_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " cot WHERE cot.catalog_id = #{catalogId} AND"
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("cot", tenantId)
         + " UNION "
         + " SELECT mt.catalog_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
         + " mt.model_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'MODEL'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mt", tenantId)
         + ")";
   }
 
   public String softDeleteTagMetadataObjectRelsBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " tmt SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE tmt.deleted_at = 0 AND EXISTS ("
+        + " WHERE tmt.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("tmt", tenantId)
+        + " AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.schema_id = #{schemaId} AND "
         + " st.schema_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'SCHEMA'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("st", tenantId)
         + " UNION "
         + " SELECT tt.schema_id FROM "
         + TopicMetaMapper.TABLE_NAME
         + " tt WHERE tt.schema_id = #{schemaId} AND "
         + "tt.topic_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TOPIC'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tt", tenantId)
         + " UNION "
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
         + " tat WHERE tat.schema_id = #{schemaId} AND "
         + "tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tat", tenantId)
         + " UNION "
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.schema_id = #{schemaId} AND "
         + " ft.fileset_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FILESET'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ft", tenantId)
         + " UNION "
         + " SELECT cot.schema_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " cot WHERE cot.schema_id = #{schemaId} AND "
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("cot", tenantId)
         + " UNION "
         + " SELECT mt.schema_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.schema_id = #{schemaId} AND "
         + " mt.model_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'MODEL'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mt", tenantId)
         + ")";
   }
 
   public String softDeleteTagMetadataObjectRelsByTableId(@Param("tableId") Long tableId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " tmt SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE tmt.deleted_at = 0 AND EXISTS ("
+        + " WHERE tmt.deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate("tmt", tenantId)
+        + " AND EXISTS ("
         + " SELECT tat.table_id FROM "
         + TableMetaMapper.TABLE_NAME
         + " tat WHERE tat.table_id = #{tableId} AND "
         + " tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("tat", tenantId)
         + " UNION "
         + " SELECT cot.table_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " cot WHERE cot.table_id = #{tableId} AND"
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("cot", tenantId)
         + ")";
   }
 
   public String deleteTagEntityRelsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 }

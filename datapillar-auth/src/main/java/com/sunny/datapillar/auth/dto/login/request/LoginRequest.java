@@ -8,22 +8,22 @@ import lombok.Data;
 @Schema(name = "AuthLoginRequest")
 public class LoginRequest {
 
-    @NotBlank(message = "stage 不能为空")
-    private String stage;
+  @NotBlank(message = "stage must not be blank")
+  private String stage;
 
-    private Boolean rememberMe;
+  private Boolean rememberMe;
 
-    private String loginAlias;
+  private String loginAlias;
 
-    private String password;
+  private String password;
 
-    private String tenantCode;
+  private String tenantCode;
 
-    private String provider;
+  private String provider;
 
-    private String code;
+  private String code;
 
-    private String state;
+  private String state;
 
-    private Long tenantId;
+  private Long tenantId;
 }

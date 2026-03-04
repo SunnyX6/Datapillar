@@ -1,9 +1,9 @@
 /**
- * 响应式断点检测 Hook
+ * Responsive breakpoint detection Hook
  *
- * 基于 @theme 中的断点变量（src/index.css）
+ * Based on @theme breakpoint variable in（src/index.css）
  *
- * 使用方式：
+ * Usage：
  * ```tsx
  * const { isSmallScreen, isDesktop, breakpoint } = useResponsive()
  *
@@ -11,7 +11,7 @@
  *   <div>
  *     {isMobile && <MobileView />}
  *     {isDesktop && <DesktopView />}
- *     <p>当前断点：{breakpoint}</p>
+ *     <p>current breakpoint：{breakpoint}</p>
  *   </div>
  * )
  * ```
@@ -23,10 +23,10 @@ import { BREAKPOINT_ORDER, getBreakpoints, getBreakpointValue, type BreakpointKe
 export type Breakpoint = BreakpointKey
 
 /**
- * 获取当前断点
+ * Get the current breakpoint
  */
 function getCurrentBreakpoint(): Breakpoint {
-  if (typeof window === 'undefined') return 'lg' // SSR 默认值：lg 断点
+  if (typeof window === 'undefined') return 'lg' // SSR Default value：lg breakpoint
 
   const width = window.innerWidth
   const breakpoints = getBreakpoints()
@@ -40,7 +40,7 @@ function getCurrentBreakpoint(): Breakpoint {
 }
 
 /**
- * 响应式断点检测 Hook
+ * Responsive breakpoint detection Hook
  */
 export function useResponsive() {
   const [breakpoint, setBreakpoint] = useState<Breakpoint>(getCurrentBreakpoint)
@@ -50,43 +50,43 @@ export function useResponsive() {
       setBreakpoint(getCurrentBreakpoint())
     }
 
-    // 使用 ResizeObserver 监听窗口变化（性能更好）
+    // use ResizeObserver Listen for window changes（Better performance）
     if (typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver(handleResize)
       observer.observe(document.body)
       return () => observer.disconnect()
     }
 
-    // 降级方案：使用 resize 事件
+    // Downgrade plan：use resize event
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   return {
-    /** 当前断点 */
+    /** current breakpoint */
     breakpoint,
 
-    /** 是否为最小屏（< 1440px，对应 md） */
+    /** Whether it is the smallest screen（< 1440px，Correspond md） */
     isSmallScreen: breakpoint === 'md',
 
-    /** 是否为桌面端（>= 1440px）*/
+    /** Is it a desktop version?（>= 1440px）*/
     isDesktop: breakpoint === 'lg' || breakpoint === 'xl' || breakpoint === '2xl' || breakpoint === '3xl',
 
-    /** 是否为大屏幕（>= 1920px）*/
+    /** Is it a large screen?（>= 1920px）*/
     isLargeScreen: breakpoint === 'xl' || breakpoint === '2xl' || breakpoint === '3xl',
 
-    /** 当前屏幕宽度 */
+    /** Current screen width */
     width: typeof window !== 'undefined' ? window.innerWidth : 1024
   }
 }
 
 /**
- * 监听特定断点的 Hook
+ * Listen to specific breakpoints Hook
  *
- * 使用方式：
+ * Usage：
  * ```tsx
- * const isDesktop = useBreakpoint('lg') // >= lg 断点时为 true
- * const isSmall = useBreakpoint('md', 'max') // < md 断点时为 true
+ * const isDesktop = useBreakpoint('lg') // >= lg The breakpoint is true
+ * const isSmall = useBreakpoint('md', 'max') // < md The breakpoint is true
  * ```
  */
 export function useBreakpoint(
@@ -107,7 +107,7 @@ export function useBreakpoint(
     const mediaQuery = window.matchMedia(query)
     const handleChange = (e: MediaQueryListEvent) => setMatches(e.matches)
 
-    // 兼容旧版浏览器
+    // Compatible with older browsers
     if (mediaQuery.addEventListener) {
       mediaQuery.addEventListener('change', handleChange)
       return () => mediaQuery.removeEventListener('change', handleChange)
@@ -121,8 +121,8 @@ export function useBreakpoint(
 }
 
 /**
- * 使用 useSyncExternalStore 的断点检测（React 18+）
- * 性能更好，支持 SSR
+ * use useSyncExternalStore breakpoint detection（React 18+）
+ * Better performance，support SSR
  */
 const listeners: Set<() => void> = new Set()
 let currentBreakpoint: Breakpoint = 'lg'
@@ -142,8 +142,8 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * 使用 useSyncExternalStore 的响应式 Hook（推荐）
- * 相比 useResponsive，性能更好，支持 SSR
+ * use useSyncExternalStore responsive Hook（Recommended）
+ * compared to useResponsive，Better performance，support SSR
  */
 export function useBreakpointSync() {
   return useSyncExternalStore(
@@ -152,14 +152,14 @@ export function useBreakpointSync() {
       return () => listeners.delete(callback)
     },
     () => currentBreakpoint,
-    () => 'lg' // SSR 默认值
+    () => 'lg' // SSR Default value
   )
 }
 
 /**
- * 动态尺寸计算工具
+ * Dynamic size calculation tool
  *
- * 使用方式：
+ * Usage：
  * ```tsx
  * const { getDimension } = useResponsiveDimension()
  *
@@ -171,10 +171,10 @@ export function useResponsiveDimension() {
 
   return {
     /**
-     * 根据断点返回对应的尺寸值
+     * Return the corresponding size value based on the breakpoint
      */
     getDimension: (dimensions: Partial<Record<Breakpoint, string | number>>) => {
-      // 从当前断点向下查找最近的定义值
+      // Find the most recently defined value from the current breakpoint downwards
       const currentIndex = BREAKPOINT_ORDER.indexOf(breakpoint)
 
       for (let i = currentIndex; i < BREAKPOINT_ORDER.length; i++) {
@@ -184,7 +184,7 @@ export function useResponsiveDimension() {
         }
       }
 
-      // 如果没有找到，返回最小断点的值
+      // if not found，Returns the value of the minimum breakpoint
       return dimensions.md || '100%'
     }
   }

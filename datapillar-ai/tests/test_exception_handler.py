@@ -13,11 +13,11 @@ def _build_app() -> FastAPI:
 
     @app.get("/bad")
     async def bad() -> dict[str, str]:
-        raise BadRequestException("参数错误")
+        raise BadRequestException("Parameter error")
 
     @app.get("/http")
     async def http_error() -> dict[str, str]:
-        raise HTTPException(status_code=403, detail="禁止访问")
+        raise HTTPException(status_code=403, detail="Forbidden access")
 
     @app.get("/boom")
     async def boom() -> dict[str, str]:
@@ -39,7 +39,7 @@ def test_handler_maps_custom_exception() -> None:
     assert response.json() == {
         "code": Code.BAD_REQUEST,
         "type": "BAD_REQUEST",
-        "message": "参数错误",
+        "message": "Parameter error",
         "retryable": False,
     }
 
@@ -53,7 +53,7 @@ def test_handler_maps_http_exception() -> None:
     assert response.json() == {
         "code": Code.FORBIDDEN,
         "type": "FORBIDDEN",
-        "message": "禁止访问",
+        "message": "Forbidden access",
         "retryable": False,
     }
 
@@ -81,6 +81,6 @@ def test_handler_maps_validation_exception_to_bad_request() -> None:
     assert response.json() == {
         "code": Code.BAD_REQUEST,
         "type": "BAD_REQUEST",
-        "message": "请求参数校验失败",
+        "message": "Request parameter verification failed",
         "retryable": False,
     }

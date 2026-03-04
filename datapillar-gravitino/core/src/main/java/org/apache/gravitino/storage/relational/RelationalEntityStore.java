@@ -40,7 +40,6 @@ import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
-import org.apache.gravitino.datapillar.storage.relational.DatapillarJDBCBackend;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.SupportsTagOperations;
@@ -59,9 +58,9 @@ public class RelationalEntityStore
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
           Configs.DEFAULT_ENTITY_RELATIONAL_STORE,
-          DatapillarJDBCBackend.class.getCanonicalName(),
-          DatapillarJDBCBackend.class.getSimpleName(),
-          DatapillarJDBCBackend.class.getCanonicalName());
+          JDBCBackend.class.getCanonicalName(),
+          JDBCBackend.class.getCanonicalName(),
+          JDBCBackend.class.getCanonicalName());
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
   private EntityCache cache;
@@ -79,14 +78,31 @@ public class RelationalEntityStore
 
   private static RelationalBackend createRelationalEntityBackend(Config config) {
     String backendName = config.get(ENTITY_RELATIONAL_STORE);
-    String className =
-        RELATIONAL_BACKENDS.getOrDefault(backendName, Configs.DEFAULT_ENTITY_RELATIONAL_STORE);
+    String className = RELATIONAL_BACKENDS.getOrDefault(backendName, backendName);
 
     try {
+      Class<?> backendClass = Class.forName(className);
+      if (!RelationalBackend.class.isAssignableFrom(backendClass)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Configured relational backend %s (resolved class %s) does not implement %s",
+                backendName, className, RelationalBackend.class.getName()));
+      }
       RelationalBackend relationalBackend =
-          (RelationalBackend) Class.forName(className).getDeclaredConstructor().newInstance();
+          (RelationalBackend) backendClass.getDeclaredConstructor().newInstance();
       relationalBackend.initialize(config);
       return relationalBackend;
+    } catch (ClassNotFoundException e) {
+      LOGGER.error(
+          "Failed to resolve relational backend class for '{}', resolved class '{}'.",
+          backendName,
+          className,
+          e);
+      throw new RuntimeException(
+          String.format(
+              "Failed to resolve relational backend by name: %s, resolved class: %s",
+              backendName, className),
+          e);
     } catch (Exception e) {
       LOGGER.error(
           "Failed to create and initialize RelationalBackend by name '{}'.", backendName, e);

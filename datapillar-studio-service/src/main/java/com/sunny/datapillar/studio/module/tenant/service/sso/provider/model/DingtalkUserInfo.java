@@ -4,8 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 
 /**
- * Dingtalk用户Info组件
- * 负责Dingtalk用户Info核心逻辑实现
+ * DingtalkUserInfocomponents responsibleDingtalkUserInfoCore logic implementation
  *
  * @author Sunny
  * @date 2026-01-01
@@ -14,6 +13,6 @@ import lombok.Data;
 @AllArgsConstructor
 public class DingtalkUserInfo {
 
-    private String unionId;
-    private String rawJson;
+  private String unionId;
+  private String rawJson;
 }

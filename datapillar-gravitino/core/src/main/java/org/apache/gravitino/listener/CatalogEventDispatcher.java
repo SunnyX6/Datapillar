@@ -214,7 +214,7 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
       MetricLineageEventEmitter.emitForCatalog(
           eventBus, PrincipalUtils.getCurrentUserName(), catalogIdent);
     } catch (Exception e) {
-      LOG.warn("Catalog变更触发指标级联失败: catalog={}", ident, e);
+      LOG.warn("CatalogChange trigger indicator cascade failed: catalog={}", ident, e);
     }
   }
 }

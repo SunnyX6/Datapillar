@@ -5,19 +5,18 @@ import com.sunny.datapillar.common.exception.ForbiddenException;
 import java.util.Map;
 
 /**
- * SSO 配置已禁用异常
- * 描述租户 SSO 配置不可用语义
+ * SSO Configuration disabled exception Describe the tenant SSO Configure unavailable semantics
  *
  * @author Sunny
  * @date 2026-02-26
  */
 public class SsoConfigDisabledException extends ForbiddenException {
 
-    public SsoConfigDisabledException() {
-        super(ErrorType.SSO_CONFIG_DISABLED, Map.of(), "SSO配置已禁用");
-    }
+  public SsoConfigDisabledException() {
+    super(ErrorType.SSO_CONFIG_DISABLED, Map.of(), "SSOConfiguration is disabled");
+  }
 
-    public SsoConfigDisabledException(Throwable cause) {
-        super(cause, ErrorType.SSO_CONFIG_DISABLED, Map.of(), "SSO配置已禁用");
-    }
+  public SsoConfigDisabledException(Throwable cause) {
+    super(cause, ErrorType.SSO_CONFIG_DISABLED, Map.of(), "SSOConfiguration is disabled");
+  }
 }

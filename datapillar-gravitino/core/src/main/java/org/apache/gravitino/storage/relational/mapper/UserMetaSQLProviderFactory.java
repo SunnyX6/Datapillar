@@ -55,9 +55,19 @@ public class UserMetaSQLProviderFactory {
     return getProvider().selectUserIdByMetalakeIdAndName(metalakeId, userName);
   }
 
+  public static String selectUserIdByMetalakeIdAndExternalUserId(
+      @Param("metalakeId") Long metalakeId, @Param("externalUserId") String externalUserId) {
+    return getProvider().selectUserIdByMetalakeIdAndExternalUserId(metalakeId, externalUserId);
+  }
+
   public static String selectUserMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String name) {
     return getProvider().selectUserMetaByMetalakeIdAndName(metalakeId, name);
+  }
+
+  public static String selectUserMetaByMetalakeIdAndExternalUserId(
+      @Param("metalakeId") Long metalakeId, @Param("externalUserId") String externalUserId) {
+    return getProvider().selectUserMetaByMetalakeIdAndExternalUserId(metalakeId, externalUserId);
   }
 
   public static String insertUserMeta(@Param("userMeta") UserPO userPO) {

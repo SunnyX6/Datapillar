@@ -2,13 +2,10 @@
 # @date 2026-01-27
 
 """
-OneAgentic 配置构建器
+OneAgentic Configuration builder
 
-从 ai_model 读取启用的 Chat/Embedding 模型，并合并业务侧 llm/agent 配置。
-
-DEPRECATED:
-- 该文件仅保留给历史链路兼容
-- ETL `/chat` 新链路不再依赖本文件
+from ai_model Read enabled Chat/Embedding model,and merge the business side llm/agent Configuration.DEPRECATED:- This file is only reserved for historical link compatibility
+- ETL `/chat` New links no longer rely on this file
 """
 
 from __future__ import annotations
@@ -43,16 +40,16 @@ def get_datapillar_config(
 
     chat_model = Model.get_chat_default(resolved_tenant_id)
     if not chat_model:
-        raise ValueError("未找到启用的 Chat 模型，请检查 ai_model 配置")
+        raise ValueError("Enabled not found Chat model,please check ai_model Configuration")
 
-    return _build_datapillar_config_from_models(
+    return _build_config_from_models(
         tenant_id=resolved_tenant_id,
         tenant_code=resolved_tenant_code,
         chat_model=chat_model,
     )
 
 
-def get_datapillar_config_by_chat_model(
+def get_config_by_model(
     *,
     tenant_id: int,
     tenant_code: str | None,
@@ -60,10 +57,10 @@ def get_datapillar_config_by_chat_model(
     provider_model_id: str,
 ) -> DatapillarConfig:
     if ai_model_id <= 0:
-        raise ValueError("model.aiModelId 无效")
+        raise ValueError("model.aiModelId Invalid")
     normalized_provider_model_id = provider_model_id.strip()
     if not normalized_provider_model_id:
-        raise ValueError("model.providerModelId 不能为空")
+        raise ValueError("model.providerModelId cannot be empty")
 
     resolved_tenant_code = _resolve_tenant_code(tenant_id, tenant_code)
     chat_model = Model.get_active_chat_model(
@@ -71,19 +68,19 @@ def get_datapillar_config_by_chat_model(
         ai_model_id=ai_model_id,
     )
     if not chat_model:
-        raise ValueError("指定模型不存在或未激活")
+        raise ValueError("The specified model does not exist or is not active")
     model_provider_model_id = str(chat_model.get("provider_model_id") or "").strip()
     if model_provider_model_id != normalized_provider_model_id:
-        raise ValueError("model.providerModelId 与 aiModelId 不匹配")
+        raise ValueError("model.providerModelId with aiModelId no match")
 
-    return _build_datapillar_config_from_models(
+    return _build_config_from_models(
         tenant_id=tenant_id,
         tenant_code=resolved_tenant_code,
         chat_model=chat_model,
     )
 
 
-def _build_datapillar_config_from_models(
+def _build_config_from_models(
     *,
     tenant_id: int,
     tenant_code: str,
@@ -91,11 +88,11 @@ def _build_datapillar_config_from_models(
 ) -> DatapillarConfig:
     embedding_model = Model.get_embedding_default(tenant_id)
     if not embedding_model:
-        raise ValueError("未找到启用的 Embedding 模型")
+        raise ValueError("Enabled not found Embedding model")
 
     dimension = embedding_model.get("embedding_dimension")
     if not dimension:
-        raise ValueError("Embedding 模型必须配置 embedding_dimension")
+        raise ValueError("Embedding Model must be configured embedding_dimension")
 
     llm_config = _coerce_dict(get_llm_config())
     chat_api_key = _decrypt_api_key(tenant_code, chat_model.get("api_key"))
@@ -125,9 +122,9 @@ def _build_datapillar_config_from_models(
 
 def _decrypt_api_key(tenant_code: str, encrypted_value: str | None) -> str:
     if not encrypted_value or not encrypted_value.strip():
-        raise ValueError("api_key 为空")
+        raise ValueError("api_key is empty")
     if not is_encrypted_ciphertext(encrypted_value):
-        raise ValueError("api_key 未加密")
+        raise ValueError("api_key Not encrypted")
     return auth_crypto_rpc_client.decrypt_llm_api_key_sync(
         tenant_code=tenant_code,
         ciphertext=encrypted_value,
@@ -147,4 +144,4 @@ def _resolve_tenant_code(tenant_id: int, tenant_code: str | None) -> str:
     resolved = Tenant.get_code(tenant_id)
     if resolved:
         return resolved
-    raise ValueError("tenant_code 不存在")
+    raise ValueError("tenant_code does not exist")

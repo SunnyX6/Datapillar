@@ -1704,14 +1704,14 @@ public class POConverters {
         .build();
   }
 
-  // ==================== Metric 相关转换方法 ====================
+  // ==================== Metric Related conversion methods ====================
 
   /**
-   * 将 MetricPO 转换为 MetricEntity
+   * will MetricPO Convert to MetricEntity
    *
-   * @param metricPO MetricPO 对象
-   * @param namespace namespace 对象
-   * @return MetricEntity 对象
+   * @param metricPO MetricPO object
+   * @param namespace namespace object
+   * @return MetricEntity object
    */
   public static MetricEntity fromMetricPO(MetricPO metricPO, Namespace namespace) {
     try {
@@ -1744,11 +1744,11 @@ public class POConverters {
   }
 
   /**
-   * 初始化 MetricPO（带版本信息）
+   * initialization MetricPO（With version information）
    *
-   * @param metricEntity MetricEntity 对象
-   * @param builder MetricPO.Builder 对象
-   * @return MetricPO 对象
+   * @param metricEntity MetricEntity object
+   * @param builder MetricPO.Builder object
+   * @return MetricPO object
    */
   public static MetricPO initializeMetricPOWithVersion(
       MetricEntity metricEntity, MetricPO.Builder builder, String unit) {
@@ -1772,12 +1772,12 @@ public class POConverters {
   }
 
   /**
-   * 更新 MetricPO
+   * update MetricPO
    *
-   * @param oldMetricPO 旧的 MetricPO 对象
-   * @param newMetric 新的 MetricEntity 对象
-   * @param newVersion 新版本号（如果为 null，保持原有版本号）
-   * @return 更新后的 MetricPO 对象
+   * @param oldMetricPO old MetricPO object
+   * @param newMetric new MetricEntity object
+   * @param newVersion new version number（if for null，Keep the original version number）
+   * @return updated MetricPO object
    */
   public static MetricPO updateMetricPOWithVersion(
       MetricPO oldMetricPO, MetricEntity newMetric, Integer newVersion) {
@@ -1803,36 +1803,36 @@ public class POConverters {
   }
 
   /**
-   * 检查是否需要创建新版本
+   * Check if a new version needs to be created
    *
-   * @param oldMetric 旧的 MetricEntity 对象
-   * @param newMetric 新的 MetricEntity 对象
-   * @return 是否需要更新版本
+   * @param oldMetric old MetricEntity object
+   * @param newMetric new MetricEntity object
+   * @return Do you need an updated version?
    */
   public static boolean checkMetricVersionNeedUpdate(
       MetricEntity oldMetric, MetricEntity newMetric) {
-    // 如果 comment, name, type 任一发生变化，需要创建新版本
+    // if comment, name, type any changes，Need to create new version
     if (!StringUtils.equals(oldMetric.comment(), newMetric.comment())
         || !StringUtils.equals(oldMetric.name(), newMetric.name())
         || oldMetric.metricType() != newMetric.metricType()) {
       return true;
     }
 
-    // 如果 properties 发生变化，需要创建新版本
+    // if properties change，Need to create new version
     return !Objects.equals(oldMetric.properties(), newMetric.properties());
   }
 
   /**
-   * 将 MetricVersionPO 转换为 MetricVersionEntity
+   * will MetricVersionPO Convert to MetricVersionEntity
    *
-   * @param metricVersionPO MetricVersionPO 对象
-   * @param metricIdent Metric 的 NameIdentifier
-   * @return MetricVersionEntity 对象
+   * @param metricVersionPO MetricVersionPO object
+   * @param metricIdent Metric of NameIdentifier
+   * @return MetricVersionEntity object
    */
   public static MetricVersionEntity fromMetricVersionPO(
       MetricVersionPO metricVersionPO, NameIdentifier metricIdent) {
     try {
-      // 解析 parentMetricCodes JSON 字符串为 String 数组
+      // parse parentMetricCodes JSON The string is String array
       String[] parentMetricCodes = null;
       if (StringUtils.isNotBlank(metricVersionPO.getParentMetricCodes())) {
         parentMetricCodes =
@@ -1840,7 +1840,7 @@ public class POConverters {
                 .readValue(metricVersionPO.getParentMetricCodes(), String[].class);
       }
 
-      // 解析 versionProperties JSON 字符串为 Map
+      // parse versionProperties JSON The string is Map
       Map<String, String> properties = Collections.emptyMap();
       if (StringUtils.isNotBlank(metricVersionPO.getVersionProperties())) {
         properties =
@@ -1877,14 +1877,14 @@ public class POConverters {
   }
 
   /**
-   * 初始化 MetricVersionPO
+   * initialization MetricVersionPO
    *
-   * @param versionEntity MetricVersionEntity 对象
+   * @param versionEntity MetricVersionEntity object
    * @param metricId Metric ID
    * @param metalakeId Metalake ID
    * @param catalogId Catalog ID
    * @param schemaId Schema ID
-   * @return MetricVersionPO 对象
+   * @return MetricVersionPO object
    */
   public static MetricVersionPO initializeMetricVersionPO(
       MetricVersionEntity versionEntity,
@@ -1894,7 +1894,7 @@ public class POConverters {
       Long schemaId,
       Integer version) {
     try {
-      // 将 parentMetricCodes 转换为 JSON 字符串
+      // will parentMetricCodes Convert to JSON string
       String parentMetricCodesJson = null;
       if (versionEntity.parentMetricCodes() != null
           && versionEntity.parentMetricCodes().length > 0) {
@@ -1902,7 +1902,7 @@ public class POConverters {
             JsonUtils.anyFieldMapper().writeValueAsString(versionEntity.parentMetricCodes());
       }
 
-      // 将 properties 转换为 JSON 字符串
+      // will properties Convert to JSON string
       String propertiesJson = null;
       if (versionEntity.properties() != null && !versionEntity.properties().isEmpty()) {
         propertiesJson = JsonUtils.anyFieldMapper().writeValueAsString(versionEntity.properties());
@@ -1935,23 +1935,23 @@ public class POConverters {
   }
 
   /**
-   * 更新 MetricVersionPO
+   * update MetricVersionPO
    *
-   * @param oldVersionPO 旧的 MetricVersionPO 对象
-   * @param newVersion 新的 MetricVersionEntity 对象
-   * @return 更新后的 MetricVersionPO 对象
+   * @param oldVersionPO old MetricVersionPO object
+   * @param newVersion new MetricVersionEntity object
+   * @return updated MetricVersionPO object
    */
   public static MetricVersionPO updateMetricVersionPO(
       MetricVersionPO oldVersionPO, MetricVersionEntity newVersion) {
     try {
-      // 将 parentMetricCodes 转换为 JSON 字符串
+      // will parentMetricCodes Convert to JSON string
       String parentMetricCodesJson = null;
       if (newVersion.parentMetricCodes() != null && newVersion.parentMetricCodes().length > 0) {
         parentMetricCodesJson =
             JsonUtils.anyFieldMapper().writeValueAsString(newVersion.parentMetricCodes());
       }
 
-      // 将 properties 转换为 JSON 字符串
+      // will properties Convert to JSON string
       String propertiesJson = null;
       if (newVersion.properties() != null && !newVersion.properties().isEmpty()) {
         propertiesJson = JsonUtils.anyFieldMapper().writeValueAsString(newVersion.properties());
@@ -1984,10 +1984,10 @@ public class POConverters {
   }
 
   /**
-   * 从 MetricEntity 创建初始版本
+   * from MetricEntity Create initial version
    *
-   * @param metricEntity MetricEntity 对象
-   * @return MetricVersionEntity 对象
+   * @param metricEntity MetricEntity object
+   * @return MetricVersionEntity object
    */
   public static MetricVersionEntity createInitialMetricVersion(MetricEntity metricEntity) {
     return createInitialMetricVersion(metricEntity, null, null, null, null, null, null);
@@ -2021,10 +2021,10 @@ public class POConverters {
   }
 
   /**
-   * 从 MetricEntity 创建新版本
+   * from MetricEntity Create new version
    *
-   * @param metricEntity MetricEntity 对象
-   * @return MetricVersionEntity 对象
+   * @param metricEntity MetricEntity object
+   * @return MetricVersionEntity object
    */
   public static MetricVersionEntity createMetricVersionFromEntity(MetricEntity metricEntity) {
     return MetricVersionEntity.builder()
@@ -2043,11 +2043,11 @@ public class POConverters {
   }
 
   /**
-   * 批量转换 MetricVersionPO 列表
+   * Batch conversion MetricVersionPO list
    *
-   * @param versionPOs MetricVersionPO 列表
-   * @param metricIdent 指标标识符
-   * @return MetricVersionEntity 列表
+   * @param versionPOs MetricVersionPO list
+   * @param metricIdent indicator identifier
+   * @return MetricVersionEntity list
    */
   public static List<MetricVersionEntity> fromMetricVersionPOs(
       List<MetricVersionPO> versionPOs, NameIdentifier metricIdent) {
@@ -2057,7 +2057,7 @@ public class POConverters {
         .collect(Collectors.toList());
   }
 
-  /** 将 MetricModifierPO 转换为 MetricModifierEntity */
+  /** will MetricModifierPO Convert to MetricModifierEntity */
   public static MetricModifierEntity fromMetricModifierPO(
       MetricModifierPO metricModifierPO, Namespace namespace) {
     try {
@@ -2085,7 +2085,7 @@ public class POConverters {
         .collect(Collectors.toList());
   }
 
-  /** 初始化 MetricModifierPO */
+  /** initialization MetricModifierPO */
   public static MetricModifierPO initializeMetricModifierPO(
       MetricModifierEntity metricModifierEntity, MetricModifierPO.Builder builder) {
     try {
@@ -2104,7 +2104,7 @@ public class POConverters {
     }
   }
 
-  /** 更新 MetricModifierPO */
+  /** update MetricModifierPO */
   public static MetricModifierPO updateMetricModifierPO(
       MetricModifierPO oldMetricModifierPO, MetricModifierEntity newMetricModifierEntity) {
     try {
@@ -2127,7 +2127,7 @@ public class POConverters {
     }
   }
 
-  /** 将 WordRootPO 转换为 WordRootEntity */
+  /** will WordRootPO Convert to WordRootEntity */
   public static WordRootEntity fromWordRootPO(WordRootPO wordRootPO, Namespace namespace) {
     try {
       return WordRootEntity.builder()
@@ -2153,7 +2153,7 @@ public class POConverters {
         .collect(Collectors.toList());
   }
 
-  /** 初始化 WordRootPO */
+  /** initialization WordRootPO */
   public static WordRootPO initializeWordRootPO(
       WordRootEntity wordRootEntity, WordRootPO.Builder builder) {
     try {
@@ -2171,7 +2171,7 @@ public class POConverters {
     }
   }
 
-  /** 更新 WordRootPO */
+  /** update WordRootPO */
   public static WordRootPO updateWordRootPO(
       WordRootPO oldWordRootPO, WordRootEntity newWordRootEntity) {
     try {
@@ -2194,9 +2194,9 @@ public class POConverters {
     }
   }
 
-  // ==================== Unit 相关转换方法 ====================
+  // ==================== Unit Related conversion methods ====================
 
-  /** 将 UnitPO 转换为 UnitEntity */
+  /** will UnitPO Convert to UnitEntity */
   public static UnitEntity fromUnitPO(UnitPO unitPO, Namespace namespace) {
     try {
       return UnitEntity.builder()
@@ -2221,7 +2221,7 @@ public class POConverters {
         .collect(Collectors.toList());
   }
 
-  /** 初始化 UnitPO */
+  /** initialization UnitPO */
   public static UnitPO initializeUnitPO(UnitEntity unitEntity, UnitPO.Builder builder) {
     try {
       return builder
@@ -2238,7 +2238,7 @@ public class POConverters {
     }
   }
 
-  /** 更新 UnitPO */
+  /** update UnitPO */
   public static UnitPO updateUnitPO(UnitPO oldUnitPO, UnitEntity newUnitEntity) {
     try {
       UnitPO.Builder builder = UnitPO.builder();
@@ -2259,18 +2259,18 @@ public class POConverters {
     }
   }
 
-  // ==================== ValueDomain 相关转换方法 ====================
+  // ==================== ValueDomain Related conversion methods ====================
 
-  /** 将 ValueDomainPO 转换为 ValueDomainEntity */
+  /** will ValueDomainPO Convert to ValueDomainEntity */
   public static ValueDomainEntity fromValueDomainPO(ValueDomainPO domainPO, Namespace namespace) {
     try {
-      // 处理 domainLevel，兼容旧数据（默认 BUSINESS）
+      // Process domainLevel，Compatible with old data（Default BUSINESS）
       org.apache.gravitino.dataset.ValueDomain.Level domainLevel =
           domainPO.getDomainLevel() != null
               ? org.apache.gravitino.dataset.ValueDomain.Level.valueOf(domainPO.getDomainLevel())
               : org.apache.gravitino.dataset.ValueDomain.Level.BUSINESS;
 
-      // 解析 items JSON 数组
+      // parse items JSON array
       List<org.apache.gravitino.dataset.ValueDomain.Item> items = null;
       if (domainPO.getItems() != null && !domainPO.getItems().isEmpty()) {
         List<org.apache.gravitino.dto.dataset.ValueDomainItemDTO> itemDTOs =
@@ -2312,17 +2312,17 @@ public class POConverters {
         .collect(Collectors.toList());
   }
 
-  /** 初始化 ValueDomainPO */
+  /** initialization ValueDomainPO */
   public static ValueDomainPO initializeValueDomainPO(
       ValueDomainEntity entity, ValueDomainPO.Builder builder) {
     try {
-      // 默认级别为 BUSINESS
+      // The default level is BUSINESS
       String domainLevel =
           entity.domainLevel() != null
               ? entity.domainLevel().name()
               : org.apache.gravitino.dataset.ValueDomain.Level.BUSINESS.name();
 
-      // 序列化 items 为 JSON 数组
+      // serialization items for JSON array
       String itemsJson = null;
       if (entity.items() != null && !entity.items().isEmpty()) {
         itemsJson = JsonUtils.anyFieldMapper().writeValueAsString(entity.items());
@@ -2345,17 +2345,17 @@ public class POConverters {
     }
   }
 
-  /** 更新 ValueDomainPO */
+  /** update ValueDomainPO */
   public static ValueDomainPO updateValueDomainPO(
       ValueDomainPO oldPO, ValueDomainEntity newEntity) {
     try {
-      // 默认级别为 BUSINESS
+      // The default level is BUSINESS
       String domainLevel =
           newEntity.domainLevel() != null
               ? newEntity.domainLevel().name()
               : org.apache.gravitino.dataset.ValueDomain.Level.BUSINESS.name();
 
-      // 序列化 items 为 JSON 数组
+      // serialization items for JSON array
       String itemsJson = null;
       if (newEntity.items() != null && !newEntity.items().isEmpty()) {
         itemsJson = JsonUtils.anyFieldMapper().writeValueAsString(newEntity.items());

@@ -1,4 +1,4 @@
-# Python虚拟环境
+# Pythonvirtual environment
 venv/
 *.pyc
 __pycache__/
@@ -6,7 +6,7 @@ __pycache__/
 dist/
 build/
 
-# Dynaconf 敏感配置（不提交）
+# Dynaconf Sensitive configuration（Do not submit）
 config/.secrets.toml
 config/settings.local.toml
 .secrets.*
@@ -16,24 +16,24 @@ config/settings.local.toml
 .idea/
 *.swp
 
-# 日志
+# Log
 *.log
 logs/
 
-# 数据库文件
+# database file
 *.db
 sessions.db
 
-# GraphRAG缓存
+# GraphRAGcache
 graphrag_cache/
 *.parquet
 *.index
 
-# 测试
+# test
 .pytest_cache/
 .coverage
 
-# pre-commit（本项目内自定义缓存目录）
+# pre-commit（Custom cache directory within this project）
 .pre-commit-cache/
 
 # macOS

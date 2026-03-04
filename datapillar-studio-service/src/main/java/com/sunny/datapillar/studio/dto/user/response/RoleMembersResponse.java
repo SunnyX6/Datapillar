@@ -8,17 +8,17 @@ import lombok.Data;
 @Schema(name = "RoleMembersResponse")
 public class RoleMembersResponse {
 
-    private Long roleId;
+  private Long roleId;
 
-    private String roleName;
+  private String roleName;
 
-    private String roleType;
+  private String roleType;
 
-    private Integer roleLevel;
+  private Integer roleLevel;
 
-    private Integer roleStatus;
+  private Integer roleStatus;
 
-    private Long memberCount;
+  private Long memberCount;
 
-    private List<RoleMemberItem> members;
+  private List<RoleMemberItem> members;
 }

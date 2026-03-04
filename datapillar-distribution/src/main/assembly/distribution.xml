@@ -9,7 +9,7 @@
     <includeBaseDirectory>true</includeBaseDirectory>
 
     <fileSets>
-        <!-- bin 目录 - 启动脚本 -->
+        <!-- bin Directory - startup script -->
         <fileSet>
             <directory>${project.basedir}/bin</directory>
             <outputDirectory>bin</outputDirectory>
@@ -19,7 +19,7 @@
             </includes>
         </fileSet>
 
-        <!-- conf 目录 - 配置文件 -->
+        <!-- conf Directory - Configuration file -->
         <fileSet>
             <directory>${project.basedir}/conf</directory>
             <outputDirectory>conf</outputDirectory>
@@ -29,7 +29,7 @@
             </includes>
         </fileSet>
 
-        <!-- libs 目录 - 依赖 jar -->
+        <!-- libs Directory - Depend on jar -->
         <fileSet>
             <directory>${project.build.directory}/datapillar-${project.version}/libs</directory>
             <outputDirectory>libs</outputDirectory>
@@ -39,7 +39,7 @@
             </includes>
         </fileSet>
 
-        <!-- data 目录 - 空目录 -->
+        <!-- data Directory - Empty directory -->
         <fileSet>
             <directory>${project.build.directory}/datapillar-${project.version}/data</directory>
             <outputDirectory>data</outputDirectory>
@@ -48,7 +48,7 @@
             </excludes>
         </fileSet>
 
-        <!-- logs 目录 - 空目录 -->
+        <!-- logs Directory - Empty directory -->
         <fileSet>
             <directory>${project.build.directory}/datapillar-${project.version}/logs</directory>
             <outputDirectory>logs</outputDirectory>

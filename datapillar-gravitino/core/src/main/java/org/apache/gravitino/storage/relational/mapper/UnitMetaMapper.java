@@ -26,7 +26,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
-/** Unit 元数据 Mapper */
+/** Unit metadata Mapper */
 public interface UnitMetaMapper {
 
   String TABLE_NAME = "unit_meta";

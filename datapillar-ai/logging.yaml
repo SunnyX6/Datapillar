@@ -28,7 +28,7 @@ handlers:
     filters: [context]
 
 filters:
-  # 过滤第三方库的噪音日志
+  # Filter noise logs from third-party libraries
   exclude_noisy:
     (): src.shared.config.logging.ExcludeNoisyFilter
   context:
@@ -39,7 +39,7 @@ root:
   handlers: [console, file]
 
 loggers:
-  # 应用日志
+  # Application log
   src:
     level: DEBUG
     handlers: [console, file]
@@ -55,7 +55,7 @@ loggers:
     handlers: [console, file]
     propagate: false
 
-  # 第三方库日志级别
+  # Third-party library log level
   uvicorn:
     level: INFO
     propagate: false

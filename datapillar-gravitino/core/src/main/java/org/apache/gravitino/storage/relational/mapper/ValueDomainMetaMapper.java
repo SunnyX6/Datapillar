@@ -26,7 +26,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
-/** ValueDomain 元数据 Mapper */
+/** ValueDomain metadata Mapper */
 public interface ValueDomainMetaMapper {
 
   String TABLE_NAME = "value_domain_meta";

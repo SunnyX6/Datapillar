@@ -1,10 +1,10 @@
 /**
- * 认证相关的 TypeScript 接口定义
+ * Certification related TypeScript Interface definition
  */
 import type { ApiResponse } from '@/api/types/api'
 
 /**
- * 菜单项接口
+ * menu item interface
  */
 export interface Menu {
   id: number
@@ -24,7 +24,7 @@ export interface RoleInfo {
 }
 
 /**
- * 用户信息接口
+ * User information interface
  */
 export interface User {
   userId: number
@@ -40,7 +40,7 @@ export interface User {
 }
 
 /**
- * 密码登录请求接口
+ * Password login request interface
  */
 export interface PasswordLoginRequest {
   tenantCode?: string
@@ -50,17 +50,15 @@ export interface PasswordLoginRequest {
 }
 
 /**
- * 登录成功响应接口
+ * Login successful response interface
  */
 export interface LoginSuccess {
-  /** 成功登录场景通常不回传 loginStage */
+  /** Successful login scenarios usually do not return loginStage */
   loginStage?: string
   userId: number
   username: string
   email?: string
   tenants: TenantOption[]
-  roles: RoleInfo[]
-  menus: Menu[]
 }
 
 export interface TenantOption {
@@ -97,7 +95,7 @@ export interface SsoLoginRequest {
 export type LoginRequest = PasswordLoginRequest | SsoLoginRequest
 
 /**
- * Token 信息接口
+ * Token Information interface
  */
 export interface TokenInfo {
   remainingSeconds: number
@@ -109,7 +107,7 @@ export interface TokenInfo {
 }
 
 /**
- * 注册请求接口
+ * Registration request interface
  */
 export interface RegisterRequest {
   username: string
@@ -119,7 +117,7 @@ export interface RegisterRequest {
 }
 
 /**
- * 修改密码请求接口
+ * Password change request interface
  */
 export interface ChangePasswordRequest {
   currentPassword: string
@@ -128,14 +126,14 @@ export interface ChangePasswordRequest {
 }
 
 /**
- * 重置密码请求接口
+ * Reset password request interface
  */
 export interface ResetPasswordRequest {
   email: string
 }
 
 /**
- * 认证状态接口
+ * Authentication status interface
  */
 export interface AuthState {
   isAuthenticated: boolean
@@ -145,7 +143,7 @@ export interface AuthState {
 }
 
 /**
- * 认证错误类型
+ * Authentication error type
  */
 export type AuthErrorType =
   | 'INVALID_CREDENTIALS'
@@ -158,7 +156,7 @@ export type AuthErrorType =
   | 'UNKNOWN_ERROR'
 
 /**
- * 认证错误接口
+ * Authentication error interface
  */
 export interface AuthError {
   type: AuthErrorType
@@ -167,7 +165,7 @@ export interface AuthError {
 }
 
 /**
- * 统一的认证响应类型
+ * Unified authentication response type
  */
 export type LoginApiResponse = ApiResponse<LoginResult>
 export type TokenInfoApiResponse = ApiResponse<TokenInfo>

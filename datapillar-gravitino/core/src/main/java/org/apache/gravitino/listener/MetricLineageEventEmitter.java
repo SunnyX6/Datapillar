@@ -1,21 +1,19 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * regarding copyright ownership.The ASF licenses this file
+ * to you under the Apache License,Version 2.0 (the
+ * "License");you may not use this file except in compliance
+ * with the License.You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * Unless required by applicable law or agreed to in writing,* software distributed under the License is distributed on an
+ * "AS IS" BASIS,WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND,either express or implied.See the License for the
  * specific language governing permissions and limitations
- * under the License.
- */
+ * under the License.*/
 
 package org.apache.gravitino.listener;
 
@@ -43,9 +41,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 指标血缘级联事件发射器
+ * indicator lineage cascade event emitter
  *
- * <p>当表/Schema/Catalog 发生变更时，主动发送指标变更事件，确保指标引用表/列为最新。
+ * <p>watch/Schema/Catalog When changes occur,Proactively send indicator change events,Make sure the
+ * indicator references the table/listed as latest.
  */
 public final class MetricLineageEventEmitter {
 
@@ -79,7 +78,6 @@ public final class MetricLineageEventEmitter {
     }
 
     Map<Long, Map<Long, String>> columnNameCache = new HashMap<>();
-
     for (MetricEntity metric : metrics) {
       Integer currentVersion = metric.currentVersion();
       if (currentVersion == null) {
@@ -92,7 +90,10 @@ public final class MetricLineageEventEmitter {
             MetricVersionMetaService.getInstance()
                 .getVersionByIdentifier(metric.nameIdentifier(), currentVersion);
       } catch (Exception e) {
-        LOG.warn("指标版本读取失败，跳过级联事件: metric={} version={}", metric.code(), currentVersion);
+        LOG.warn(
+            "Failed to read indicator version,Skip cascading events:metric={} version={}",
+            metric.code(),
+            currentVersion);
         continue;
       }
 
@@ -160,7 +161,6 @@ public final class MetricLineageEventEmitter {
     String filterColumns =
         buildColumnNamesJson(
             version.filterColumnIds(), columnNameMap, version.metricCode(), "filter");
-
     return new MetricInfo(
         version.metricName(),
         version.metricCode(),
@@ -200,7 +200,10 @@ public final class MetricLineageEventEmitter {
     try {
       return JsonUtils.anyFieldMapper().writeValueAsString(columns);
     } catch (JsonProcessingException e) {
-      LOG.warn("指标列序列化失败，使用空列表: metric={} field={}", metricCode, fieldType);
+      LOG.warn(
+          "Indicator column serialization failed,Use empty list:metric={} field={}",
+          metricCode,
+          fieldType);
       return "[]";
     }
   }
@@ -226,14 +229,19 @@ public final class MetricLineageEventEmitter {
             try {
               ids.add(Long.parseLong(str));
             } catch (NumberFormatException e) {
-              LOG.warn("指标列 ID 解析失败，跳过: metric={} field={} value={}", metricCode, fieldType, str);
+              LOG.warn(
+                  "indicator column ID Parsing failed,skip:metric={} field={} value={}",
+                  metricCode,
+                  fieldType,
+                  str);
             }
           }
         }
       }
       return List.copyOf(ids);
     } catch (Exception e) {
-      LOG.warn("指标列 ID JSON 解析失败，跳过: metric={} field={}", metricCode, fieldType);
+      LOG.warn(
+          "indicator column ID JSON Parsing failed,skip:metric={} field={}", metricCode, fieldType);
       return List.of();
     }
   }

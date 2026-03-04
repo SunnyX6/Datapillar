@@ -65,7 +65,7 @@ const createRect = ({
 } as DOMRect)
 
 describe('ChatInput', () => {
-  it('模型下拉卡片支持将模型设为默认', () => {
+  it('The model drop-down card supports setting the model as default', () => {
     const onDefaultModelChange = vi.fn()
     const { container, root } = render(
       <ChatInput
@@ -89,14 +89,14 @@ describe('ChatInput', () => {
       />
     )
 
-    const modelTrigger = container.querySelector('button[title="选择模型"]')
+    const modelTrigger = container.querySelector('button[title="Select model"]')
     expect(modelTrigger).toBeTruthy()
 
     act(() => {
       modelTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    const starButtons = Array.from(document.body.querySelectorAll('[aria-label="设为默认模型"]'))
+    const starButtons = Array.from(document.body.querySelectorAll('[aria-label="Set as default model"]'))
     expect(starButtons.length).toBe(2)
 
     act(() => {
@@ -109,7 +109,7 @@ describe('ChatInput', () => {
     unmount(root, container)
   })
 
-  it('模型下拉卡片根据真实高度计算向上展开位置', () => {
+  it('The model drop-down card calculates its upward expansion position based on the real height.', () => {
     const modelOptions: ChatModelOption[] = [{ aiModelId: 88, providerModelId: 'glm-test', label: 'glm-test', badge: 'G', tone: 'blue', providerLabel: 'GLM' }]
     const innerHeightDescriptor = Object.getOwnPropertyDescriptor(window, 'innerHeight')
     Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 760 })
@@ -134,7 +134,7 @@ describe('ChatInput', () => {
       />
     )
 
-    const modelTrigger = container.querySelector('button[title="选择模型"]') as HTMLButtonElement | null
+    const modelTrigger = container.querySelector('button[title="Select model"]') as HTMLButtonElement | null
     expect(modelTrigger).toBeTruthy()
 
     const triggerRectSpy = vi
@@ -159,7 +159,7 @@ describe('ChatInput', () => {
     unmount(root, container)
   })
 
-  it('无模型权限时显示明确提示文案', () => {
+  it('Display clear prompt copy when there is no model permission', () => {
     const { container, root } = render(
       <ChatInput
         input=""
@@ -180,10 +180,10 @@ describe('ChatInput', () => {
       />
     )
 
-    const modelTrigger = container.querySelector('button[title="请联系管理员授权LLM模型"]') as HTMLButtonElement | null
+    const modelTrigger = container.querySelector('button[title="Please contact the administrator for authorizationLLMmodel"]') as HTMLButtonElement | null
     expect(modelTrigger).toBeTruthy()
     expect(modelTrigger?.disabled).toBe(true)
-    expect(modelTrigger?.textContent).toContain('请联系管理员授权LLM模型')
+    expect(modelTrigger?.textContent).toContain('Please contact the administrator for authorizationLLMmodel')
 
     act(() => {
       modelTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }))

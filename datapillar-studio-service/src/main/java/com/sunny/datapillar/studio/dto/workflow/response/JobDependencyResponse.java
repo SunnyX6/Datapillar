@@ -7,11 +7,11 @@ import lombok.Data;
 @Schema(name = "JobDependencyResponse")
 public class JobDependencyResponse {
 
-    private Long id;
+  private Long id;
 
-    private Long workflowId;
+  private Long workflowId;
 
-    private Long jobId;
+  private Long jobId;
 
-    private Long parentJobId;
+  private Long parentJobId;
 }

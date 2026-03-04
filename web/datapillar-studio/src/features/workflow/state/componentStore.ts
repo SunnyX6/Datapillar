@@ -1,7 +1,7 @@
 /**
- * 组件缓存 Store
+ * Component caching Store
  *
- * 缓存从后端获取的组件列表，避免重复请求
+ * Cache the list of components obtained from the backend，Avoid duplicate requests
  */
 
 import { create } from 'zustand'

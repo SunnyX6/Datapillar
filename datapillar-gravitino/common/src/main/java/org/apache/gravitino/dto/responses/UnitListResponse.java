@@ -27,7 +27,7 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.dataset.UnitDTO;
 
-/** 单位分页列表响应，返回完整的单位数据 */
+/** Unit paginated list response，Return complete unit data */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -46,12 +46,12 @@ public class UnitListResponse extends BaseResponse {
   private final int limit;
 
   /**
-   * 创建单位列表响应
+   * Create unit list response
    *
-   * @param units 单位数组
-   * @param total 总数
-   * @param offset 偏移量
-   * @param limit 每页大小
+   * @param units unit array
+   * @param total total
+   * @param offset offset
+   * @param limit page size
    */
   public UnitListResponse(UnitDTO[] units, long total, int offset, int limit) {
     super(0);
@@ -61,7 +61,7 @@ public class UnitListResponse extends BaseResponse {
     this.limit = limit;
   }
 
-  /** Jackson 反序列化用的默认构造函数 */
+  /** Jackson Default constructor for deserialization */
   public UnitListResponse() {
     super();
     this.units = null;

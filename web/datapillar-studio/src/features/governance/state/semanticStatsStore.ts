@@ -1,6 +1,6 @@
 /**
- * 语义资产统计 Store
- * 缓存各类语义资产的统计数据，避免重复请求
+ * Semantic Asset Statistics Store
+ * Cache statistical data for various semantic assets，Avoid duplicate requests
  */
 
 import { create } from 'zustand'

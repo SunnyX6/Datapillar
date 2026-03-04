@@ -30,7 +30,7 @@ type StudioNodeData = {
 }
 
 /**
- * 根据颜色生成样式类
+ * Generate style classes based on colors
  */
 function generateColorStyles(color: string) {
   return {
@@ -215,7 +215,7 @@ export default function WorkflowCanvasRenderer({
   const hasWorkflow = formattedLayout.nodes.length > 0
   const loadComponents = useComponentStore((state) => state.loadComponents)
 
-  // 加载组件列表
+  // Load component list
   useEffect(() => {
     loadComponents()
   }, [loadComponents])

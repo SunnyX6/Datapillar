@@ -1,15 +1,13 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-02-05
 
 """
-AI 模型数据访问
+AI Model data access
 
-表：ai_model, ai_llm_usage
+table:ai_model,ai_llm_usage
 
-DEPRECATED:
-- 该文件保留给历史链路兼容使用
-- 新链路请使用 `ai_model_new.py`（显式模型输入，不允许默认兜底）
+DEPRECATED:- This file is reserved for compatible use of historical links
+- Please use the new link `ai_model_new.py`(Explicit model input,Dont allow defaulting to the truth)
 """
 
 from __future__ import annotations
@@ -48,7 +46,7 @@ _MODEL_FIELDS = (
 
 
 class Model:
-    """AI 模型查询（ai_model）。"""
+    """AI Model query(ai_model)."""
 
     @staticmethod
     def get_chat_default(tenant_id: int) -> dict[str, Any] | None:
@@ -69,7 +67,7 @@ class Model:
                 row = conn.execute(query, {"tenant_id": tenant_id}).mappings().fetchone()
                 return dict(row) if row else None
         except Exception as e:
-            logger.error(f"获取启用 Chat 模型失败: {e}")
+            logger.error(f"Get enabled Chat Model failed:{e}")
             return None
 
     @staticmethod
@@ -91,7 +89,7 @@ class Model:
                 row = conn.execute(query, {"tenant_id": tenant_id}).mappings().fetchone()
                 return dict(row) if row else None
         except Exception as e:
-            logger.error(f"获取启用 Embedding 模型失败: {e}")
+            logger.error(f"Get enabled Embedding Model failed:{e}")
             return None
 
     @staticmethod
@@ -113,7 +111,7 @@ class Model:
                 )
                 return dict(row) if row else None
         except Exception as e:
-            logger.error(f"获取模型 #{ai_model_id} 失败: {e}")
+            logger.error(f"Get model #{ai_model_id} failed:{e}")
             return None
 
     @staticmethod
@@ -150,7 +148,7 @@ class Model:
                 return dict(row) if row else None
         except Exception as e:
             logger.error(
-                "查询模型失败: tenant=%s aiModelId=%s err=%s",
+                "Query model failed:tenant=%s aiModelId=%s err=%s",
                 tenant_id,
                 ai_model_id,
                 e,
@@ -160,11 +158,10 @@ class Model:
 
 class LlmUsage:
     """
-    LLM Token 使用量（ai_llm_usage）
+    LLM Token Usage(ai_llm_usage)
 
-    约束：
-    - 使用 run_id 唯一去重，支持断线重连/事件重放导致的重复写入
-    - DB 异常不应影响主链路：上层应捕获异常仅做告警
+    constraint:- use run_id The only way to remove duplicates,Support disconnection and reconnection/Duplicate writes caused by event replay
+    - DB Exceptions should not affect the main link:The upper layer should catch exceptions and only provide warnings
     """
 
     @staticmethod

@@ -1,10 +1,10 @@
 /**
- * 外部知识导入菜单
+ * External knowledge import menu
  *
- * 功能：
- * 1. 导入词汇表（Excel / CSV）
- * 2. 创建实体（手动录入）
- * 3. 上传文档（PDF / Markdown）
+ * Function：
+ * 1. Import glossary（Excel / CSV）
+ * 2. Create entity（Manual entry）
+ * 3. Upload documents（PDF / Markdown）
  */
 
 import type { LucideIcon } from 'lucide-react'

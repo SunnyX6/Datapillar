@@ -12,15 +12,15 @@ import lombok.NoArgsConstructor;
 @Schema(name = "AuthLoginResponse")
 public class LoginResponse {
 
-    private Long userId;
+  private Long userId;
 
-    private Long tenantId;
+  private Long tenantId;
 
-    private String username;
+  private String username;
 
-    private String email;
+  private String email;
 
-    private List<RoleItem> roles;
+  private List<RoleItem> roles;
 
-    private List<MenuItem> menus;
+  private List<MenuItem> menus;
 }

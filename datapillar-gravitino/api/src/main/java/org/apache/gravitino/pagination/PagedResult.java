@@ -21,13 +21,13 @@ package org.apache.gravitino.pagination;
 import java.util.List;
 
 /**
- * 分页结果封装类
+ * Pagination result encapsulation class
  *
- * @param <T> 数据类型
+ * @param <T> data type
  */
 public class PagedResult<T> {
 
-  /** 默认每页大小 */
+  /** Default page size */
   public static final int DEFAULT_LIMIT = 20;
 
   private final List<T> items;

@@ -20,36 +20,47 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.UnitMetaMapper.TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.UnitPO;
 import org.apache.ibatis.annotations.Param;
 
-/** Unit 元数据基础 SQL Provider */
+/** Unit Metadata basics SQL Provider */
 public class UnitMetaBaseSQLProvider {
 
   public String insertUnitMeta(@Param("unit") UnitPO unitPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TABLE_NAME
         + " (unit_id, unit_code, unit_name, unit_symbol,"
         + " metalake_id, catalog_id, schema_id, unit_comment,"
-        + " audit_info, deleted_at)"
+        + " audit_info, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES (#{unit.unitId}, #{unit.unitCode},"
         + " #{unit.unitName}, #{unit.unitSymbol},"
         + " #{unit.metalakeId}, #{unit.catalogId},"
         + " #{unit.schemaId}, #{unit.unitComment},"
-        + " #{unit.auditInfo}, #{unit.deletedAt})";
+        + " #{unit.auditInfo}, #{unit.deletedAt}, "
+        + tenantId
+        + ")";
   }
 
   public String insertUnitMetaOnDuplicateKeyUpdate(@Param("unit") UnitPO unitPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + TABLE_NAME
         + " (unit_id, unit_code, unit_name, unit_symbol,"
         + " metalake_id, catalog_id, schema_id, unit_comment,"
-        + " audit_info, deleted_at)"
+        + " audit_info, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES (#{unit.unitId}, #{unit.unitCode},"
         + " #{unit.unitName}, #{unit.unitSymbol},"
         + " #{unit.metalakeId}, #{unit.catalogId},"
         + " #{unit.schemaId}, #{unit.unitComment},"
-        + " #{unit.auditInfo}, #{unit.deletedAt})"
+        + " #{unit.auditInfo}, #{unit.deletedAt}, "
+        + tenantId
+        + ")"
         + " ON DUPLICATE KEY UPDATE"
         + " unit_code = #{unit.unitCode},"
         + " unit_name = #{unit.unitName},"
@@ -63,17 +74,7 @@ public class UnitMetaBaseSQLProvider {
   }
 
   public String listUnitPOsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "SELECT unit_id AS unitId, unit_code AS unitCode, unit_name AS unitName,"
-        + " unit_symbol AS unitSymbol, metalake_id AS metalakeId, catalog_id AS catalogId,"
-        + " schema_id AS schemaId, unit_comment AS unitComment,"
-        + " audit_info AS auditInfo, deleted_at AS deletedAt"
-        + " FROM "
-        + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
-  }
-
-  public String listUnitPOsBySchemaIdWithPagination(
-      @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT unit_id AS unitId, unit_code AS unitCode, unit_name AS unitName,"
         + " unit_symbol AS unitSymbol, metalake_id AS metalakeId, catalog_id AS catalogId,"
         + " schema_id AS schemaId, unit_comment AS unitComment,"
@@ -81,36 +82,62 @@ public class UnitMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
-        + " ORDER BY unit_id"
-        + " LIMIT #{limit} OFFSET #{offset}";
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
-  public String countUnitsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "SELECT COUNT(*) FROM "
-        + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
-  }
-
-  public String selectUnitMetaBySchemaIdAndUnitCode(
-      @Param("schemaId") Long schemaId, @Param("unitCode") String unitCode) {
+  public String listUnitPOsBySchemaIdWithPagination(
+      @Param("schemaId") Long schemaId, @Param("offset") int offset, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT unit_id AS unitId, unit_code AS unitCode, unit_name AS unitName,"
         + " unit_symbol AS unitSymbol, metalake_id AS metalakeId, catalog_id AS catalogId,"
         + " schema_id AS schemaId, unit_comment AS unitComment,"
         + " audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND unit_code = #{unitCode} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " ORDER BY unit_id"
+        + " LIMIT #{limit} OFFSET #{offset}";
+  }
+
+  public String countUnitsBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
+    return "SELECT COUNT(*) FROM "
+        + TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
+  }
+
+  public String selectUnitMetaBySchemaIdAndUnitCode(
+      @Param("schemaId") Long schemaId, @Param("unitCode") String unitCode) {
+    long tenantId = TenantSqlSupport.requireTenantId();
+    return "SELECT unit_id AS unitId, unit_code AS unitCode, unit_name AS unitName,"
+        + " unit_symbol AS unitSymbol, metalake_id AS metalakeId, catalog_id AS catalogId,"
+        + " schema_id AS schemaId, unit_comment AS unitComment,"
+        + " audit_info AS auditInfo, deleted_at AS deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND unit_code = #{unitCode} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectUnitIdBySchemaIdAndUnitCode(
       @Param("schemaId") Long schemaId, @Param("unitCode") String unitCode) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT unit_id FROM "
         + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND unit_code = #{unitCode} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND unit_code = #{unitCode} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String updateUnitMeta(
       @Param("newUnit") UnitPO newUnitPO, @Param("oldUnit") UnitPO oldUnitPO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET unit_code = #{newUnit.unitCode},"
@@ -131,46 +158,64 @@ public class UnitMetaBaseSQLProvider {
         + " AND ((unit_comment = #{oldUnit.unitComment}) OR "
         + " (unit_comment IS NULL AND #{oldUnit.unitComment} IS NULL))"
         + " AND audit_info = #{oldUnit.auditInfo}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteUnitMetaBySchemaIdAndUnitCode(
       @Param("schemaId") Long schemaId, @Param("unitCode") String unitCode) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND unit_code = #{unitCode} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND unit_code = #{unitCode} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteUnitMetasBySchemaId(@Param("schemaId") Long schemaId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteUnitMetasByCatalogId(@Param("catalogId") Long catalogId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteUnitMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteUnitMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 }

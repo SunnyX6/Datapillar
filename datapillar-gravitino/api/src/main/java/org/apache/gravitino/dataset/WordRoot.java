@@ -22,46 +22,47 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * WordRoot 接口表示词根（数仓命名规范中的基础词汇）
+ * WordRoot interface representation root（Basic vocabulary in data warehouse naming conventions）
  *
- * <p>词根是企业数仓中的通用基础设施，用于统一命名规范，例如：
+ * <p>Stem is the common infrastructure in enterprise data warehouses，Used to unify naming
+ * conventions，For example：
  *
  * <ul>
- *   <li>amt - 金额
- *   <li>cnt - 数量
- *   <li>rate - 比率
+ *   <li>amt - Amount
+ *   <li>cnt - Quantity
+ *   <li>rate - Ratio
  * </ul>
  */
 @Evolving
 public interface WordRoot extends Auditable {
 
   /**
-   * 获取词根编码
+   * Get root code
    *
-   * @return 词根编码，如 amt, cnt, rate
+   * @return Root encoding，Such as amt, cnt, rate
    */
   String code();
 
   /**
-   * 获取词根名称
+   * Get root name
    *
-   * @return 词根名称，如 金额, 数量, 比率（用户输入什么就是什么）
+   * @return root name，Such as Amount, Quantity, Ratio（What the user inputs is what it is）
    */
   String name();
 
   /**
-   * 获取词根数据类型
+   * Get the root data type
    *
-   * @return 数据类型，如 STRING, INTEGER, DECIMAL(10,2)，如果未设置则返回 null
+   * @return data type，Such as STRING, INTEGER, DECIMAL(10,2)，Returns if not set null
    */
   default String dataType() {
     return null;
   }
 
   /**
-   * 获取词根注释
+   * Get root annotation
    *
-   * @return 词根注释
+   * @return Root annotation
    */
   String comment();
 }

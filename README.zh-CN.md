@@ -64,7 +64,7 @@
 
 ## 技术架构
 
-![Datapillar 技术架构图](docs/assets4/architecture.png)
+![Datapillar 技术架构图](docs/assets/architecture.png)
 
 ## 本地开发快速开始（调试）
 
@@ -97,7 +97,7 @@
 ./scripts/start-local-all.sh
 ```
 
-> 仅用于本地开发调试，不用于生产环境。
+> 脚本会自动同步 Nacos 配置并启动全部后端服务，适用于本地调试场景。
 
 该脚本会自动编译并启动：
 
@@ -106,6 +106,7 @@
 - `datapillar-api-gateway`（7000）
 - `datapillar-ai`（7003）
 - `datapillar-openlineage`（7004）
+- `datapillar-gravitino`（8090）
 
 日志目录：
 
@@ -149,8 +150,8 @@ npm run dev
 
 ## 模块职责
 
-- `datapillar-api-gateway`：统一入口、路由转发、断言透传与流量控制。
-- `datapillar-auth`：认证鉴权、租户身份管理与安全断言签发。
+- `datapillar-api-gateway`：统一入口、路由转发、JWT 校验与流量控制。
+- `datapillar-auth`：身份引导、租户成员治理与密钥管理。
 - `datapillar-studio-service`：核心业务域（租户/工作流/邀请等）。
 - `datapillar-ai`：AI 编排、模型配置访问与 RAG/Agent 运行时。
 - `datapillar-openlineage`：OpenLineage 事件接入、异步分发与存储写入。
@@ -158,7 +159,7 @@ npm run dev
 
 ## 常见问题（本地调试）
 
-- 端口冲突（`7000`~`7004`）：先执行 `./scripts/stop-local-all.sh` 再重启。
+- 端口冲突（`7000`~`7004`、`8090`）：先执行 `./scripts/stop-local-all.sh` 再重启。
 - Nacos 同步/鉴权失败：检查 `scripts/start-local-all.sh` 中 Nacos 相关环境变量。
 - 编译或启动失败：查看 `/tmp/datapillar-logs/*.startup.log`。
 - 前端异常：确认网关 `http://localhost:7000` 与前端 `http://localhost:3001` 可访问。

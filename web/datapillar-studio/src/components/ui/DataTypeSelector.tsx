@@ -1,10 +1,10 @@
 /**
- * 通用数据类型选择器组件
+ * Generic data type selector component
  *
- * 支持 Gravitino 全部数据类型，可按场景过滤：
- * - filter="all": 全部类型（创建表）
- * - filter="numeric": 数值类型（创建指标）
- * - filter={['STRING', 'INTEGER']}: 自定义类型列表
+ * support Gravitino All data types，Filter by scene：
+ * - filter="all": All types（Create table）
+ * - filter="numeric": Numeric type（Create indicator）
+ * - filter={['STRING', 'INTEGER']}: Custom type list
  */
 
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
@@ -29,7 +29,7 @@ import {
 import { DEFAULT_LENGTH, getMaxLengthForType, type DataTypeValue } from '@/utils/dataType'
 import { Button } from './Button'
 
-/** 数据类型配置 */
+/** Data type configuration */
 interface DataTypeConfig {
   type: string
   label: string
@@ -38,7 +38,7 @@ interface DataTypeConfig {
   hasParams?: 'decimal' | 'length'
 }
 
-/** Gravitino 完整数据类型配置 */
+/** Gravitino Complete data type configuration */
 const DATA_TYPE_CONFIGS: DataTypeConfig[] = [
   { type: 'STRING', label: 'STRING', icon: Type, category: 'string' },
   { type: 'VARCHAR', label: 'VARCHAR', icon: Type, category: 'string', hasParams: 'length' },
@@ -63,34 +63,34 @@ const DATA_TYPE_CONFIGS: DataTypeConfig[] = [
   { type: 'UNION', label: 'UNION', icon: GitBranch, category: 'complex' }
 ]
 
-/** 数值类型列表 */
+/** list of numeric types */
 const NUMERIC_TYPES = ['BYTE', 'SHORT', 'INTEGER', 'BIGINT', 'FLOAT', 'DOUBLE', 'DECIMAL']
 
 export interface DataTypeSelectorProps {
   value: DataTypeValue
   onChange: (value: DataTypeValue) => void
   disabled?: boolean
-  /** 类型过滤：'all' | 'numeric' | 自定义类型数组 */
+  /** Type filtering：'all' | 'numeric' | Custom type array */
   filter?: 'all' | 'numeric' | string[]
-  /** 尺寸：'default' | 'small' */
+  /** Size：'default' | 'small' */
   size?: 'default' | 'small'
-  /** 空值占位文案 */
+  /** Null value placeholder copy */
   placeholder?: string
-  /** 触发按钮额外样式（用于容器内不溢出/对齐高度） */
+  /** Trigger button extra style（Used in containers without spillage/Align height） */
   triggerClassName?: string
-  /** 触发按钮文案额外样式（用于统一字号/截断） */
+  /** Additional styles for trigger button copy（Used to unify font size/Truncate） */
   labelClassName?: string
-  /** 下拉宽度：'trigger' 跟随触发按钮 | 'auto' 自适应 | number 指定像素 */
+  /** Drop down width：'trigger' follow trigger button | 'auto' Adaptive | number Specify pixels */
   dropdownWidth?: 'trigger' | 'auto' | number
-  /** 下拉容器额外样式 */
+  /** Drop-down container additional styles */
   dropdownClassName?: string
-  /** 下拉列表额外样式 */
+  /** Dropdown list extra styles */
   dropdownListClassName?: string
-  /** 选项按钮额外样式 */
+  /** Option button extra styles */
   optionClassName?: string
 }
 
-/** 精度选择卡片 */
+/** Accuracy selection card */
 function DecimalPrecisionCard({
   precision,
   scale,
@@ -103,12 +103,12 @@ function DecimalPrecisionCard({
   return (
     <div className="w-52 bg-white dark:bg-slate-800 rounded-xl p-2.5 shadow-2xl border border-slate-200 dark:border-slate-700">
       <div className="text-micro text-slate-500 dark:text-slate-400 mb-2">
-        设置精度 (P) 和小数位 (S)
+        Set precision (P) and decimal places (S)
       </div>
       <div className="space-y-2">
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-micro font-medium text-blue-600 dark:text-blue-400">精度 P</span>
+            <span className="text-micro font-medium text-blue-600 dark:text-blue-400">Accuracy P</span>
             <span className="text-body-sm font-bold text-slate-800 dark:text-slate-200">{precision}</span>
           </div>
           <input
@@ -126,7 +126,7 @@ function DecimalPrecisionCard({
         </div>
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-micro font-medium text-amber-600 dark:text-amber-400">小数位 S</span>
+            <span className="text-micro font-medium text-amber-600 dark:text-amber-400">Decimal places S</span>
             <span className="text-body-sm font-bold text-slate-800 dark:text-slate-200">{scale}</span>
           </div>
           <input
@@ -140,13 +140,13 @@ function DecimalPrecisionCard({
         </div>
       </div>
       <div className="mt-1.5 text-micro text-slate-400 dark:text-slate-500">
-        示例: DECIMAL({precision},{scale})
+        Example: DECIMAL({precision},{scale})
       </div>
     </div>
   )
 }
 
-/** 长度选择卡片 */
+/** Length selection card */
 function LengthCard({
   length,
   min,
@@ -161,10 +161,10 @@ function LengthCard({
   return (
     <div className="w-48 bg-white dark:bg-slate-800 rounded-xl p-2.5 shadow-2xl border border-slate-200 dark:border-slate-700">
       <div className="text-micro text-slate-500 dark:text-slate-400 mb-2">
-        设置字符长度
+        Set character length
       </div>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-micro font-medium text-blue-600 dark:text-blue-400">长度</span>
+        <span className="text-micro font-medium text-blue-600 dark:text-blue-400">length</span>
         <span className="text-body-sm font-bold text-slate-800 dark:text-slate-200">{length}</span>
       </div>
       <input
@@ -176,7 +176,7 @@ function LengthCard({
         className="w-full h-1.5 bg-slate-200 dark:bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white"
       />
       <div className="mt-1.5 text-micro text-slate-400 dark:text-slate-500">
-        范围: {min} - {max}
+        scope: {min} - {max}
       </div>
     </div>
   )
@@ -267,7 +267,7 @@ export function DataTypeSelector({
           ? dropdownWidth
           : Math.max(rect.width, dropdownMinWidth)
 
-      // 如果下方空间不够且上方空间更大，则向上展开
+      // If there is not enough space below and there is more space above，expand upward
       if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
         const top = rect.top - Math.min(dropdownHeight, spaceAbove) - 4
         const left = typeof resolvedWidth === 'number'

@@ -22,7 +22,7 @@ import java.util.Objects;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
-/** Dataset Catalog 能力定义 */
+/** Dataset Catalog Capability definition */
 public class DatasetCatalogCapability implements Capability {
   @Override
   public CapabilityResult managedStorage(Scope scope) {

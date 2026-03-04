@@ -129,10 +129,10 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
             properties.forEach(
                 (key, value) -> {
                   if (mysqlConfigToGravitino.containsKey(key)) {
-                    // 转换 MySQL 原生 key 为 Gravitino key (如 ENGINE -> engine)
+                    // Convert MySQL Native key for Gravitino key (Such as ENGINE -> engine)
                     put(mysqlConfigToGravitino.get(key), value);
                   } else if (isMysqlStatisticsKey(key)) {
-                    // 保留 MySQL 统计字段: numRows, totalSize, rawDataSize, indexSize
+                    // Reserve MySQL Statistical fields: numRows, totalSize, rawDataSize, indexSize
                     put(key, value);
                   }
                 });

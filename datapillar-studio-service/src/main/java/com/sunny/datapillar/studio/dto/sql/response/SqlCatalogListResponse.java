@@ -8,7 +8,7 @@ import lombok.Data;
 @Schema(name = "SqlCatalogListResponse")
 public class SqlCatalogListResponse {
 
-    private List<String> catalogs;
+  private List<String> catalogs;
 
-    private String currentCatalog;
+  private String currentCatalog;
 }

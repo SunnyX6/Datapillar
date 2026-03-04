@@ -2,10 +2,7 @@
 # @date 2026-02-19
 
 """
-LLM Playground API。
-
-DEPRECATED:
-- 该模块保留给历史链路兼容
+LLM Playground API.DEPRECATED:- This module is reserved for historical link compatibility
 """
 
 from __future__ import annotations
@@ -30,18 +27,18 @@ router = APIRouter()
     response_class=EventSourceResponse,
     responses={
         200: {
-            "description": "Playground SSE 输出（思考流 + 正文流）",
+            "description": "Playground SSE output(flow of thought + text flow)",
             "content": {
                 "text/event-stream": {
                     "schema": {
                         "type": "string",
                         "example": (
                             "event: reasoning_delta\\n"
-                            "data: {\"delta\":\"思考片段\"}\\n\\n"
+                            "data:{\\\"delta\\\":\\\"Thought piece\\\"}\\\\n\\\\n"
                             "event: delta\\n"
-                            "data: {\"delta\":\"回答片段\"}\\n\\n"
+                            "data:{\\\"delta\\\":\\\"answer snippet\\\"}\\\\n\\\\n"
                             "event: done\\n"
-                            "data: {\"content\":\"最终回答\",\"reasoning\":\"完整思考\"}\\n\\n"
+                            "data:{\\\"content\\\":\\\"final answer\\\",\\\"reasoning\\\":\\\"Think completely\\\"}\\\\n\\\\n"
                         ),
                     }
                 }
@@ -50,7 +47,7 @@ router = APIRouter()
     },
 )
 async def playground_chat(request: Request, payload: PlaygroundChatRequest) -> EventSourceResponse:
-    """Playground 聊天（SSE）。"""
+    """Playground Chat(SSE)."""
     current_user = request.state.current_user
 
     async def event_stream():
@@ -85,12 +82,12 @@ async def playground_chat(request: Request, payload: PlaygroundChatRequest) -> E
                     ensure_ascii=False,
                 ),
             }
-        except Exception as exc:  # pragma: no cover - SSE 防御分支
+        except BaseException as exc:  # pragma:no cover - SSE defense branch
             detail = ExceptionMapper.resolve(exc)
             if detail.server_error:
-                logger.error("Playground 模型调用失败: %s", exc, exc_info=True)
+                logger.error("Playground Model call failed:%s", exc, exc_info=True)
             else:
-                logger.warning("Playground 请求异常: %s", detail.message)
+                logger.warning("Playground Request exception:%s", detail.message)
             yield {
                 "event": "error",
                 "data": json.dumps(

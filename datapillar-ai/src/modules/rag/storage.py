@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-28
 
-"""RAG 知识 Wiki 文件存储."""
+"""RAG knowledge Wiki File storage."""
 
 from __future__ import annotations
 
@@ -27,7 +26,7 @@ class StorageManager:
         self._config = config
         storage_type = config.get("type")
         if not isinstance(storage_type, str) or not storage_type.strip():
-            raise ValueError("knowledge_wiki.storage.type 缺失")
+            raise ValueError("knowledge_wiki.storage.type Missing")
 
         self._storage_type = storage_type.strip().lower()
         self._local_dir = config.get("local_dir")
@@ -36,19 +35,19 @@ class StorageManager:
 
         if self._storage_type == "local":
             if not isinstance(self._local_dir, str) or not self._local_dir.strip():
-                raise ValueError("knowledge_wiki.storage.local_dir 缺失")
+                raise ValueError("knowledge_wiki.storage.local_dir Missing")
             return
 
         if self._storage_type == "s3":
             if not isinstance(self._s3_cfg, dict):
-                raise ValueError("knowledge_wiki.storage.s3 缺失")
+                raise ValueError("knowledge_wiki.storage.s3 Missing")
             bucket = self._s3_cfg.get("bucket")
             if not isinstance(bucket, str) or not bucket.strip():
-                raise ValueError("knowledge_wiki.storage.s3.bucket 缺失")
+                raise ValueError("knowledge_wiki.storage.s3.bucket Missing")
             self._init_s3_client()
             return
 
-        raise ValueError(f"不支持的知识库存储类型: {self._storage_type}")
+        raise ValueError(f"Unsupported knowledge base storage type: {self._storage_type}")
 
     async def save(self, *, namespace_id: int, filename: str, content: bytes) -> StorageResult:
         if self._storage_type == "s3":
@@ -133,4 +132,7 @@ class StorageManager:
 def _sanitize_filename(name: str) -> str:
     if not name:
         return "document"
-    return "".join(ch for ch in name if ch.isalnum() or ch in {"-", "_", ".", " "}).strip() or "document"
+    return (
+        "".join(ch for ch in name if ch.isalnum() or ch in {"-", "_", ".", " "}).strip()
+        or "document"
+    )

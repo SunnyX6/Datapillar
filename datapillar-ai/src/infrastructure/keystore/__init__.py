@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-02-07
 
-"""私钥存储入口。"""
+"""Private key storage entrance."""
 
 from __future__ import annotations
 
@@ -22,4 +21,4 @@ def get_key_storage() -> KeyStorage:
         return LocalKeyStorage(config.get("local_path") or "")
     if storage_type == "s3":
         return ObjectStoreKeyStorage(config.get("s3") or {})
-    raise ValueError(f"不支持的 key_storage 类型: {storage_type}")
+    raise ValueError(f"Not supported key_storage Type:{storage_type}")

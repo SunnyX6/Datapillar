@@ -15,41 +15,41 @@ import lombok.Data;
 @Schema(name = "LlmModelCreateRequest")
 public class LlmModelCreateRequest {
 
-    @NotBlank(message = "provider_model_id 不能为空")
-    @Size(max = 128, message = "provider_model_id 长度不能超过 128")
-    private String providerModelId;
+  @NotBlank(message = "provider_model_id cannot be empty")
+  @Size(max = 128, message = "provider_model_id The length cannot exceed 128")
+  private String providerModelId;
 
-    @NotBlank(message = "name 不能为空")
-    @Size(max = 128, message = "name 长度不能超过 128")
-    private String name;
+  @NotBlank(message = "name cannot be empty")
+  @Size(max = 128, message = "name The length cannot exceed 128")
+  private String name;
 
-    @NotBlank(message = "provider_code 不能为空")
-    @Size(max = 32, message = "provider_code 长度不能超过 32")
-    private String providerCode;
+  @NotBlank(message = "provider_code cannot be empty")
+  @Size(max = 32, message = "provider_code The length cannot exceed 32")
+  private String providerCode;
 
-    @NotNull(message = "model_type 不能为空")
-    private AiModelType modelType;
+  @NotNull(message = "model_type cannot be empty")
+  private AiModelType modelType;
 
-    @Size(max = 512, message = "description 长度不能超过 512")
-    private String description;
+  @Size(max = 512, message = "description The length cannot exceed 512")
+  private String description;
 
-    private List<String> tags;
+  private List<String> tags;
 
-    @Min(value = 1, message = "context_tokens 必须大于 0")
-    private Integer contextTokens;
+  @Min(value = 1, message = "context_tokens must be greater than 0")
+  private Integer contextTokens;
 
-    @DecimalMin(value = "0", message = "input_price_usd 不能小于 0")
-    private BigDecimal inputPriceUsd;
+  @DecimalMin(value = "0", message = "input_price_usd cannot be less than 0")
+  private BigDecimal inputPriceUsd;
 
-    @DecimalMin(value = "0", message = "output_price_usd 不能小于 0")
-    private BigDecimal outputPriceUsd;
+  @DecimalMin(value = "0", message = "output_price_usd cannot be less than 0")
+  private BigDecimal outputPriceUsd;
 
-    @Min(value = 1, message = "embedding_dimension 必须大于 0")
-    private Integer embeddingDimension;
+  @Min(value = 1, message = "embedding_dimension must be greater than 0")
+  private Integer embeddingDimension;
 
-    @Size(max = 255, message = "base_url 长度不能超过 255")
-    private String baseUrl;
+  @Size(max = 255, message = "base_url The length cannot exceed 255")
+  private String baseUrl;
 
-    @Size(max = 2048, message = "api_key 长度不能超过 2048")
-    private String apiKey;
+  @Size(max = 2048, message = "api_key The length cannot exceed 2048")
+  private String apiKey;
 }

@@ -27,7 +27,7 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 
-/** Dataset Catalog 实现类 */
+/** Dataset Catalog Implementation class */
 public class DatasetCatalogImpl extends BaseCatalog<DatasetCatalogImpl> {
 
   private static final DatasetCatalogPropertiesMetadata CATALOG_PROPERTIES_META =

@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-28
 
-"""RAG 知识 Wiki 任务仓储."""
+"""RAG knowledge Wiki Task warehousing."""
 
 from __future__ import annotations
 

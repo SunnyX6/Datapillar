@@ -1,14 +1,14 @@
 # @author Sunny
 # @date 2026-02-20
 
-"""NotFound 异常。"""
+"""NotFound Abnormal."""
 
 from src.shared.exception.base import DatapillarException
 from src.shared.web.code import Code
 
 
 class NotFoundException(DatapillarException):
-    """资源不存在异常。"""
+    """There is no exception in the resource."""
 
     default_code = Code.NOT_FOUND
     default_type = "NOT_FOUND"

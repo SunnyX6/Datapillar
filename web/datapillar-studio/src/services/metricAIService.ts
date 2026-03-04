@@ -1,7 +1,7 @@
 /**
- * 指标 AI 治理服务
+ * indicator AI Governance services
  *
- * 通过 Gateway 调用 AI 服务
+ * Pass Gateway call AI service
  */
 
 import { API_BASE, API_PATH, requestData } from '@/api'
@@ -10,7 +10,7 @@ import type { AIFillRequest, AIFillResponse } from '@/services/types/ai/metric'
 export type { AIFillRequest, AIFillResponse }
 
 /**
- * AI 填写指标表单
+ * AI Fill out the indicator form
  */
 export async function aiFillMetric(request: AIFillRequest): Promise<AIFillResponse> {
   return requestData<AIFillResponse, AIFillRequest>({

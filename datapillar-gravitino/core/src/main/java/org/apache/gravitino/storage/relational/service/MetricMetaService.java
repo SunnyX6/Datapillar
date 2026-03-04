@@ -1,21 +1,19 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * regarding copyright ownership.The ASF licenses this file
+ * to you under the Apache License,Version 2.0 (the
+ * "License");you may not use this file except in compliance
+ * with the License.You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * Unless required by applicable law or agreed to in writing,* software distributed under the License is distributed on an
+ * "AS IS" BASIS,WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND,either express or implied.See the License for the
  * specific language governing permissions and limitations
- * under the License.
- */
+ * under the License.*/
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Preconditions;
@@ -48,7 +46,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Service 类处理 Metric 和 MetricVersion 的数据库操作 */
+/** Service class processing Metric and MetricVersion database operations */
 public class MetricMetaService {
 
   private static final Logger LOG = LoggerFactory.getLogger(MetricMetaService.class);
@@ -61,65 +59,57 @@ public class MetricMetaService {
   private MetricMetaService() {}
 
   /**
-   * 根据 namespace 列出所有指标
+   * According to namespace List all indicators
    *
-   * @param ns namespace (应该是 schema 级别)
-   * @return 指标实体列表
+   * @param ns namespace (should be schema Level)
+   * @return Indicator entity list
    */
   public List<MetricEntity> listMetricsByNamespace(Namespace ns) {
     NamespaceUtil.checkMetric(ns);
-
     Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ns);
-
     List<MetricPO> metricPOs =
         SessionUtils.getWithoutCommit(
             MetricMetaMapper.class, mapper -> mapper.listMetricPOsBySchemaId(schemaId));
-
     return POConverters.fromMetricPOs(metricPOs, ns);
   }
 
   /**
-   * 分页列出指标
+   * List metrics in pages
    *
-   * @param ns namespace (应该是 schema 级别)
-   * @param offset 偏移量
-   * @param limit 每页大小
-   * @return 指标实体列表
+   * @param ns namespace (should be schema Level)
+   * @param offset offset
+   * @param limit page size
+   * @return Indicator entity list
    */
   public List<MetricEntity> listMetricsByNamespaceWithPagination(
       Namespace ns, int offset, int limit) {
     NamespaceUtil.checkMetric(ns);
-
     Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ns);
-
     List<MetricPO> metricPOs =
         SessionUtils.getWithoutCommit(
             MetricMetaMapper.class,
             mapper -> mapper.listMetricPOsBySchemaIdWithPagination(schemaId, offset, limit));
-
     return POConverters.fromMetricPOs(metricPOs, ns);
   }
 
   /**
-   * 统计指标总数
+   * Total number of statistical indicators
    *
-   * @param ns namespace (应该是 schema 级别)
-   * @return 指标总数
+   * @param ns namespace (should be schema Level)
+   * @return Total number of indicators
    */
   public long countMetricsByNamespace(Namespace ns) {
     NamespaceUtil.checkMetric(ns);
-
     Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ns);
-
     return SessionUtils.getWithoutCommit(
         MetricMetaMapper.class, mapper -> mapper.countMetricsBySchemaId(schemaId));
   }
 
   /**
-   * 根据标识符获取指标
+   * Get metrics based on identifier
    *
-   * @param ident 指标的 NameIdentifier
-   * @return 指标实体
+   * @param ident indicator NameIdentifier
+   * @return indicator entity
    */
   public MetricEntity getMetricByIdentifier(NameIdentifier ident) {
     MetricPO metricPO = getMetricPOByIdentifier(ident);
@@ -127,27 +117,27 @@ public class MetricMetaService {
   }
 
   /**
-   * 插入新指标
+   * Insert new indicator
    *
-   * @param metricEntity 指标实体
-   * @param overwrite 是否覆盖已存在的指标
-   * @throws IOException 如果插入失败
+   * @param metricEntity indicator entity
+   * @param overwrite Whether to overwrite existing indicators
+   * @throws IOException If insert fails
    */
   public void insertMetric(MetricEntity metricEntity, boolean overwrite) throws IOException {
     insertMetricWithVersion(metricEntity, overwrite, null, null, null, null, null, null);
   }
 
   /**
-   * 插入新指标并设置初始版本的属性
+   * Insert new indicator and set properties of initial version
    *
-   * @param metricEntity 指标实体
-   * @param unit 单位
-   * @param parentMetricCodes 父指标编码数组
-   * @param calculationFormula 计算公式
-   * @param refTableId 引用的Table ID
-   * @param measureColumnIds 度量列ID JSON数组
-   * @param filterColumnIds 过滤列ID JSON数组
-   * @throws IOException 如果插入失败
+   * @param metricEntity indicator entity
+   * @param unit unit
+   * @param parentMetricCodes Parent indicator encoding array
+   * @param calculationFormula Calculation formula
+   * @param refTableId quotedTable ID
+   * @param measureColumnIds measure columnID JSONarray
+   * @param filterColumnIds Filter columnsID JSONarray
+   * @throws IOException If insert fails
    */
   public void insertMetricWithVersion(
       MetricEntity metricEntity,
@@ -170,17 +160,17 @@ public class MetricMetaService {
   }
 
   /**
-   * 插入新指标并设置初始版本的属性（内部方法）
+   * Insert new indicator and set properties of initial version(internal method)
    *
-   * @param metricEntity 指标实体
-   * @param overwrite 是否覆盖
-   * @param unit 单位
-   * @param parentMetricCodes 父指标编码数组
-   * @param calculationFormula 计算公式
-   * @param refTableId 引用的Table ID
-   * @param measureColumnIds 度量列ID JSON数组
-   * @param filterColumnIds 过滤列ID JSON数组
-   * @throws IOException 如果插入失败
+   * @param metricEntity indicator entity
+   * @param overwrite Whether to cover
+   * @param unit unit
+   * @param parentMetricCodes Parent indicator encoding array
+   * @param calculationFormula Calculation formula
+   * @param refTableId quotedTable ID
+   * @param measureColumnIds measure columnID JSONarray
+   * @param filterColumnIds Filter columnsID JSONarray
+   * @throws IOException If insert fails
    */
   private void insertMetricWithVersion(
       MetricEntity metricEntity,
@@ -193,11 +183,9 @@ public class MetricMetaService {
       String filterColumnIds)
       throws IOException {
     NameIdentifierUtil.checkMetric(metricEntity.nameIdentifier());
-
     try {
       MetricPO.Builder builder = MetricPO.builder();
       fillMetricPOBuilderParentEntityId(builder, metricEntity.namespace());
-
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
@@ -212,7 +200,8 @@ public class MetricMetaService {
                     }
                   }),
           () -> {
-            // 同时插入第一个版本到 metric_version_info 表，并设置版本相关属性
+            // Also insert the first version into metric_version_info table,And set version related
+            // properties
             MetricVersionEntity initialVersion =
                 POConverters.createInitialMetricVersion(
                     metricEntity,
@@ -230,7 +219,7 @@ public class MetricMetaService {
                     metricPO.getMetalakeId(),
                     metricPO.getCatalogId(),
                     metricPO.getSchemaId(),
-                    1); // 初始版本号为 1
+                    1); // The initial version number is 1
             SessionUtils.doWithoutCommit(
                 MetricVersionMetaMapper.class, mapper -> mapper.insertMetricVersionMeta(versionPO));
           });
@@ -242,33 +231,30 @@ public class MetricMetaService {
   }
 
   /**
-   * 更新指标（只更新描述性字段：name、comment，不创建版本）
+   * Update indicator(Update only descriptive fields:name,comment,Do not create version)
    *
-   * <p>版本创建应通过 updateMetricVersion 显式调用
+   * <p>Version creation should be done via updateMetricVersion explicit call
    *
-   * @param identifier 指标标识符
-   * @param updater 更新函数
-   * @param <E> 实体类型
-   * @return 更新后的指标实体
-   * @throws IOException 如果更新失败
+   * @param identifier indicator identifier
+   * @param updater update function
+   * @param <E> Entity type
+   * @return Updated indicator entity
+   * @throws IOException If the update fails
    */
   public <E extends Entity & HasIdentifier> MetricEntity updateMetric(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkMetric(identifier);
-
     MetricPO oldMetricPO = getMetricPOByIdentifier(identifier);
     MetricEntity oldMetricEntity = POConverters.fromMetricPO(oldMetricPO, identifier.namespace());
     MetricEntity newEntity = (MetricEntity) updater.apply((E) oldMetricEntity);
-
     Preconditions.checkArgument(
         Objects.equals(oldMetricEntity.id(), newEntity.id()),
-        "The updated metric entity id: %s should be same with the metric entity id before: %s",
+        "The updated metric entity id:%s should be same with the metric entity id before:%s",
         newEntity.id(),
         oldMetricEntity.id());
-
     Integer updateResult;
     try {
-      // 只更新 metric_meta 表的描述性字段，不创建版本
+      // Update only metric_meta table descriptive fields,Do not create version
       updateResult =
           SessionUtils.doWithCommitAndFetchResult(
               MetricMetaMapper.class,
@@ -285,33 +271,30 @@ public class MetricMetaService {
     if (updateResult > 0) {
       return newEntity;
     } else {
-      throw new IOException("Failed to update the entity: " + identifier);
+      throw new IOException("Failed to update the entity:" + identifier);
     }
   }
 
   /**
-   * 删除指标
+   * Delete indicator
    *
-   * @param ident 指标标识符
-   * @return 是否删除成功
+   * @param ident indicator identifier
+   * @return Is deletion successful?
    */
   public boolean deleteMetric(NameIdentifier ident) {
     NameIdentifierUtil.checkMetric(ident);
-
     Long schemaId;
     String metricCode = ident.name();
-
     try {
       schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
     } catch (NoSuchEntityException e) {
-      LOG.warn("Failed to delete metric: {}", ident, e);
+      LOG.warn("Failed to delete metric:{}", ident, e);
       return false;
     }
 
     int[] metricDeletedCount = new int[] {0};
-    int[] metricVersionDeletedCount = new int[] {0};
-
-    // 同时删除 metric_meta 和 metric_version_info 表的记录
+    int[] metricVersionDeletedCount =
+        new int[] {0}; // Delete simultaneously metric_meta and metric_version_info table records
     SessionUtils.doMultipleWithCommit(
         () ->
             metricVersionDeletedCount[0] =
@@ -326,31 +309,28 @@ public class MetricMetaService {
                     MetricMetaMapper.class,
                     mapper ->
                         mapper.softDeleteMetricMetaBySchemaIdAndMetricCode(schemaId, metricCode)));
-
     return metricDeletedCount[0] + metricVersionDeletedCount[0] > 0;
   }
 
   /**
-   * 切换指标的当前版本（直接更新数据库，不触发版本创建逻辑）
+   * Switch the current version of the indicator(Update database directly,Does not trigger version
+   * creation logic)
    *
-   * @param ident 指标标识符
-   * @param targetVersion 目标版本号
-   * @return 更新后的指标实体
-   * @throws IOException 如果更新失败
+   * @param ident indicator identifier
+   * @param targetVersion Target version number
+   * @return Updated indicator entity
+   * @throws IOException If the update fails
    */
   public MetricVersionEntity switchMetricCurrentVersion(NameIdentifier ident, Integer targetVersion)
       throws IOException {
     NameIdentifierUtil.checkMetric(ident);
-
-    MetricPO oldMetricPO = getMetricPOByIdentifier(ident);
-
-    // 获取目标版本的详情
+    MetricPO oldMetricPO = getMetricPOByIdentifier(ident); // Get target version details
     NameIdentifier versionIdent =
         NameIdentifier.of(NamespaceUtil.toMetricVersionNs(ident), String.valueOf(targetVersion));
     MetricVersionEntity targetVersionEntity =
-        MetricVersionMetaService.getInstance().getMetricVersionByIdentifier(versionIdent);
-
-    // 用目标版本的数据更新主表
+        MetricVersionMetaService.getInstance()
+            .getMetricVersionByIdentifier(
+                versionIdent); // Update the main table with the target version of data
     MetricPO updatedPO =
         MetricPO.builder()
             .withMetricId(oldMetricPO.getMetricId())
@@ -368,7 +348,6 @@ public class MetricMetaService {
             .withAuditInfo(oldMetricPO.getAuditInfo())
             .withDeletedAt(oldMetricPO.getDeletedAt())
             .build();
-
     Integer updateResult;
     try {
       updateResult =
@@ -382,47 +361,42 @@ public class MetricMetaService {
     if (updateResult > 0) {
       return targetVersionEntity;
     } else {
-      throw new IOException("Failed to switch metric version: " + ident);
+      throw new IOException("Failed to switch metric version:" + ident);
     }
   }
 
   /**
-   * 根据遗留时间线删除指标元数据
+   * Remove metric metadata based on legacy timeline
    *
-   * @param legacyTimeline 遗留时间线
-   * @param limit 删除数量限制
-   * @return 删除的记录数
+   * @param legacyTimeline legacy timeline
+   * @param limit Remove quantity limit
+   * @return Number of records deleted
    */
   public int deleteMetricMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     int metricDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
             MetricMetaMapper.class,
             mapper -> mapper.deleteMetricMetasByLegacyTimeline(legacyTimeline, limit));
-
     int metricVersionDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
             MetricVersionMetaMapper.class,
             mapper -> mapper.deleteMetricVersionMetasByLegacyTimeline(legacyTimeline, limit));
-
     return metricDeletedCount + metricVersionDeletedCount;
   }
 
   /**
-   * 列出指标的所有版本
+   * List all versions of the indicator
    *
-   * @param metricIdent 指标标识符
-   * @return 版本实体列表
+   * @param metricIdent indicator identifier
+   * @return Version entity list
    */
   public List<MetricVersionEntity> listMetricVersions(NameIdentifier metricIdent) {
     NameIdentifierUtil.checkMetric(metricIdent);
-
     MetricEntity metricEntity = getMetricByIdentifier(metricIdent);
-
     List<MetricVersionPO> versionPOs =
         SessionUtils.getWithoutCommit(
             MetricVersionMetaMapper.class,
             mapper -> mapper.listMetricVersionMetasByMetricId(metricEntity.id()));
-
     return versionPOs.stream()
         .filter(po -> po != null)
         .map(po -> POConverters.fromMetricVersionPO(po, metricIdent))
@@ -430,19 +404,17 @@ public class MetricMetaService {
   }
 
   /**
-   * 获取指定版本的指标版本
+   * Get the indicator version of the specified version
    *
-   * @param metricIdent 指标标识符
-   * @param versionId 版本ID
-   * @return 版本实体
+   * @param metricIdent indicator identifier
+   * @param versionId versionID
+   * @return version entity
    */
   public MetricVersionEntity getMetricVersion(NameIdentifier metricIdent, Long versionId) {
     NameIdentifierUtil.checkMetric(metricIdent);
-
     MetricVersionPO versionPO =
         SessionUtils.getWithoutCommit(
             MetricVersionMetaMapper.class, mapper -> mapper.selectMetricVersionMetaById(versionId));
-
     if (versionPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -454,43 +426,42 @@ public class MetricMetaService {
   }
 
   /**
-   * 删除指定版本
+   * Delete specified version
    *
-   * @param metricIdent 指标标识符
-   * @param versionId 版本ID
-   * @return 是否删除成功
+   * @param metricIdent indicator identifier
+   * @param versionId versionID
+   * @return Is deletion successful?
    */
   public boolean deleteMetricVersion(NameIdentifier metricIdent, Long versionId) {
     NameIdentifierUtil.checkMetric(metricIdent);
-
     Integer deletedCount =
         SessionUtils.doWithCommitAndFetchResult(
             MetricVersionMetaMapper.class,
             mapper -> mapper.softDeleteMetricVersionMetaById(versionId));
-
     return deletedCount != null && deletedCount > 0;
   }
 
   /**
-   * 更新指标版本（创建新版本）
+   * Update indicator version(Create new version)
    *
-   * <p>该方法会创建一个新版本，版本号为 lastVersion + 1
+   * <p>This method will create a new version,The version number is lastVersion + 1
    *
-   * @param metricIdent 指标标识符
-   * @param currentVersion 当前版本号（用于验证，实际会创建新版本）
-   * @param metricName 指标名称
-   * @param metricCode 指标编码
-   * @param metricType 指标类型
-   * @param dataType 数据类型
-   * @param comment 注释
-   * @param unit 单位
-   * @param parentMetricCodes 父指标编码数组
-   * @param calculationFormula 计算公式
-   * @param refTableId 引用的Table ID
-   * @param measureColumnIds 度量列ID JSON数组
-   * @param filterColumnIds 过滤列ID JSON数组
-   * @return 新创建的版本实体
-   * @throws IOException 如果创建失败
+   * @param metricIdent indicator identifier
+   * @param currentVersion Current version number(for verification,A new version will actually be
+   *     created)
+   * @param metricName Indicator name
+   * @param metricCode Indicator coding
+   * @param metricType Indicator type
+   * @param dataType data type
+   * @param comment Comment
+   * @param unit unit
+   * @param parentMetricCodes Parent indicator encoding array
+   * @param calculationFormula Calculation formula
+   * @param refTableId quotedTable ID
+   * @param measureColumnIds measure columnID JSONarray
+   * @param filterColumnIds Filter columnsID JSONarray
+   * @return Newly created version entity
+   * @throws IOException If creation fails
    */
   public MetricVersionEntity updateMetricVersion(
       NameIdentifier metricIdent,
@@ -508,7 +479,7 @@ public class MetricMetaService {
       String measureColumnIds,
       String filterColumnIds)
       throws IOException {
-    // 调用 createMetricVersion 创建新版本
+    // call createMetricVersion Create new version
     return createMetricVersion(
         metricIdent,
         metricName,
@@ -526,23 +497,21 @@ public class MetricMetaService {
   }
 
   /**
-   * 更新指标版本
+   * Update indicator version
    *
-   * @param metricIdent 指标标识符
-   * @param versionId 版本ID
-   * @param updater 更新函数
-   * @param <E> 实体类型
-   * @return 更新后的版本实体
-   * @throws IOException 如果更新失败
+   * @param metricIdent indicator identifier
+   * @param versionId versionID
+   * @param updater update function
+   * @param <E> Entity type
+   * @return Updated version entity
+   * @throws IOException If the update fails
    */
   public <E extends Entity & HasIdentifier> MetricVersionEntity updateMetricVersion(
       NameIdentifier metricIdent, Long versionId, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkMetric(metricIdent);
-
     MetricVersionPO oldVersionPO =
         SessionUtils.getWithoutCommit(
             MetricVersionMetaMapper.class, mapper -> mapper.selectMetricVersionMetaById(versionId));
-
     if (oldVersionPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -554,7 +523,6 @@ public class MetricMetaService {
         POConverters.fromMetricVersionPO(oldVersionPO, metricIdent);
     MetricVersionEntity newVersionEntity =
         (MetricVersionEntity) updater.apply((E) oldVersionEntity);
-
     Integer updateResult;
     try {
       updateResult =
@@ -574,23 +542,22 @@ public class MetricMetaService {
       return newVersionEntity;
     } else {
       throw new IOException(
-          "Failed to update the metric version: " + metricIdent + " id " + versionId);
+          "Failed to update the metric version:" + metricIdent + " id " + versionId);
     }
   }
 
   /**
-   * 根据 schema ID 和指标编码获取指标 ID
+   * According to schema ID and indicator encoding to obtain indicators ID
    *
    * @param schemaId schema ID
-   * @param metricCode 指标编码
-   * @return 指标 ID
+   * @param metricCode Indicator coding
+   * @return indicator ID
    */
   Long getMetricIdBySchemaIdAndMetricCode(Long schemaId, String metricCode) {
     Long metricId =
         SessionUtils.getWithoutCommit(
             MetricMetaMapper.class,
             mapper -> mapper.selectMetricIdBySchemaIdAndMetricCode(schemaId, metricCode));
-
     if (metricId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -602,21 +569,18 @@ public class MetricMetaService {
   }
 
   /**
-   * 根据标识符获取指标 PO
+   * Get metrics based on identifier PO
    *
-   * @param ident 指标标识符
-   * @return 指标 PO
+   * @param ident indicator identifier
+   * @return indicator PO
    */
   MetricPO getMetricPOByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkMetric(ident);
-
     Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
-
     MetricPO metricPO =
         SessionUtils.getWithoutCommit(
             MetricMetaMapper.class,
             mapper -> mapper.selectMetricMetaBySchemaIdAndMetricCode(schemaId, ident.name()));
-
     if (metricPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -628,7 +592,7 @@ public class MetricMetaService {
   }
 
   /**
-   * 填充指标 PO Builder 的父实体 ID
+   * fill indicator PO Builder parent entity of ID
    *
    * @param builder PO Builder
    * @param ns namespace
@@ -642,22 +606,22 @@ public class MetricMetaService {
   }
 
   /**
-   * 创建新版本并更新主表
+   * Create new version and update main table
    *
-   * @param metricIdent 指标标识符
-   * @param metricName 指标名称
-   * @param metricCode 指标编码
-   * @param metricType 指标类型
-   * @param dataType 数据类型
-   * @param comment 版本注释
-   * @param unit 单位
-   * @param parentMetricCodes 父指标编码数组
-   * @param calculationFormula 计算公式
-   * @param refTableId 引用的Table ID
-   * @param measureColumnIds 度量列ID JSON数组
-   * @param filterColumnIds 过滤列ID JSON数组
-   * @return 新创建的版本实体
-   * @throws IOException 如果创建失败
+   * @param metricIdent indicator identifier
+   * @param metricName Indicator name
+   * @param metricCode Indicator coding
+   * @param metricType Indicator type
+   * @param dataType data type
+   * @param comment Release Notes
+   * @param unit unit
+   * @param parentMetricCodes Parent indicator encoding array
+   * @param calculationFormula Calculation formula
+   * @param refTableId quotedTable ID
+   * @param measureColumnIds measure columnID JSONarray
+   * @param filterColumnIds Filter columnsID JSONarray
+   * @return Newly created version entity
+   * @throws IOException If creation fails
    */
   public MetricVersionEntity createMetricVersion(
       NameIdentifier metricIdent,
@@ -675,14 +639,14 @@ public class MetricMetaService {
       String filterColumnIds)
       throws IOException {
     NameIdentifierUtil.checkMetric(metricIdent);
-
     MetricPO metricPO = getMetricPOByIdentifier(metricIdent);
-    MetricEntity metricEntity = POConverters.fromMetricPO(metricPO, metricIdent.namespace());
-
-    // 计算新版本号（需要在创建 entity 之前，因为 version 是必填字段）
-    Integer newVersion = metricPO.getLastVersion() + 1;
-
-    // 创建新版本实体
+    MetricEntity metricEntity =
+        POConverters.fromMetricPO(
+            metricPO,
+            metricIdent
+                .namespace()); // Calculate new version number(Need to create entity before,because
+    // version is a required field)
+    Integer newVersion = metricPO.getLastVersion() + 1; // Create new version entity
     MetricVersionEntity newVersionEntity =
         MetricVersionEntity.builder()
             .withMetricIdentifier(metricIdent)
@@ -706,7 +670,6 @@ public class MetricMetaService {
                     .withCreateTime(Instant.now())
                     .build())
             .build();
-
     MetricVersionPO newVersionPO =
         POConverters.initializeMetricVersionPO(
             newVersionEntity,
@@ -714,9 +677,7 @@ public class MetricMetaService {
             metricPO.getMetalakeId(),
             metricPO.getCatalogId(),
             metricPO.getSchemaId(),
-            newVersion);
-
-    // 构建更新后的主表 PO
+            newVersion); // Build the updated main table PO
     MetricPO updatedMetricPO =
         MetricPO.builder()
             .withMetricId(metricPO.getMetricId())
@@ -734,16 +695,15 @@ public class MetricMetaService {
             .withAuditInfo(metricPO.getAuditInfo())
             .withDeletedAt(metricPO.getDeletedAt())
             .build();
-
     try {
-      // 先插入新版本记录
+      // Insert new version record first
       SessionUtils.doWithCommit(
-          MetricVersionMetaMapper.class, mapper -> mapper.insertMetricVersionMeta(newVersionPO));
-
-      // 更新主表的current_version和last_version
+          MetricVersionMetaMapper.class,
+          mapper ->
+              mapper.insertMetricVersionMeta(
+                  newVersionPO)); // Update the main tablecurrent_versionandlast_version
       SessionUtils.doWithCommit(
           MetricMetaMapper.class, mapper -> mapper.updateMetricMeta(updatedMetricPO, metricPO));
-
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.METRIC_VERSION, metricIdent.toString());

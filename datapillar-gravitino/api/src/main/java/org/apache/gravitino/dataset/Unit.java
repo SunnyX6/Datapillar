@@ -22,44 +22,45 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * Unit 接口表示单位（指标的度量单位）
+ * Unit Interface representation unit（The unit of measurement for the indicator）
  *
- * <p>单位是企业数仓中的通用基础设施，用于统一指标的度量单位，例如：
+ * <p>Units are common infrastructure in enterprise data warehouses，The unit of measurement used to
+ * unify the metric，For example：
  *
  * <ul>
- *   <li>CURRENCY - 人民币 (¥)
- *   <li>RATIO - 百分比 (%)
- *   <li>COUNT - 个数 (个)
+ *   <li>CURRENCY - RMB (¥)
+ *   <li>RATIO - Percentage (%)
+ *   <li>COUNT - number (a)
  * </ul>
  */
 @Evolving
 public interface Unit extends Auditable {
 
   /**
-   * 获取单位编码
+   * Get unit code
    *
-   * @return 单位编码，如 CURRENCY, RATIO, COUNT
+   * @return unit code，Such as CURRENCY, RATIO, COUNT
    */
   String code();
 
   /**
-   * 获取单位名称
+   * Get unit name
    *
-   * @return 单位名称，如 人民币, 百分比, 个数
+   * @return Unit name，Such as RMB, Percentage, number
    */
   String name();
 
   /**
-   * 获取单位符号
+   * Get unit symbol
    *
-   * @return 单位符号，如 ¥, %, 个
+   * @return unit symbol，Such as ¥, %, a
    */
   String symbol();
 
   /**
-   * 获取单位注释
+   * Get unit notes
    *
-   * @return 单位注释
+   * @return Unit Notes
    */
   String comment();
 }

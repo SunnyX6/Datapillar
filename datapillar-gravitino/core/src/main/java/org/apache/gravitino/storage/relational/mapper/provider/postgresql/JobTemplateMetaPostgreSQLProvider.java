@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.JobTemplateMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
 import org.apache.ibatis.annotations.Param;
@@ -30,6 +31,7 @@ public class JobTemplateMetaPostgreSQLProvider extends JobTemplateMetaBaseSQLPro
   public String softDeleteJobTemplateMetaByMetalakeAndName(
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateName") String jobTemplateName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + JobTemplateMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
@@ -37,31 +39,42 @@ public class JobTemplateMetaPostgreSQLProvider extends JobTemplateMetaBaseSQLPro
         + " WHERE metalake_id IN ("
         + " SELECT metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
-        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0)"
-        + " AND job_template_name = #{jobTemplateName} AND deleted_at = 0";
+        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ")"
+        + " AND job_template_name = #{jobTemplateName} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteJobTemplateMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + JobTemplateMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String insertJobTemplateMetaOnDuplicateKeyUpdate(
       @Param("jobTemplateMeta") JobTemplatePO jobTemplatePO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + JobTemplateMetaMapper.TABLE_NAME
         + " (job_template_id, job_template_name, metalake_id, job_template_comment, "
-        + " job_template_content, audit_info, current_version, last_version, deleted_at)"
+        + " job_template_content, audit_info, current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES (#{jobTemplateMeta.jobTemplateId}, #{jobTemplateMeta.jobTemplateName},"
         + " #{jobTemplateMeta.metalakeId}, #{jobTemplateMeta.jobTemplateComment},"
         + " #{jobTemplateMeta.jobTemplateContent}, #{jobTemplateMeta.auditInfo},"
         + " #{jobTemplateMeta.currentVersion}, #{jobTemplateMeta.lastVersion},"
-        + " #{jobTemplateMeta.deletedAt})"
+        + " #{jobTemplateMeta.deletedAt}, "
+        + tenantId
+        + ")"
         + " ON CONFLICT(job_template_id) DO UPDATE SET"
         + " job_template_name = #{jobTemplateMeta.jobTemplateName},"
         + " metalake_id = #{jobTemplateMeta.metalakeId},"
@@ -75,10 +88,13 @@ public class JobTemplateMetaPostgreSQLProvider extends JobTemplateMetaBaseSQLPro
 
   @Override
   public String deleteJobTemplateMetasByLegacyTimeline(Long legacyTimeline, int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + JobTemplateMetaMapper.TABLE_NAME
         + " WHERE job_template_id IN (SELECT job_template_id FROM "
         + JobTemplateMetaMapper.TABLE_NAME
-        + " WHERE deleted_at < #{legacyTimeline} AND deleted_at > 0 LIMIT #{limit})";
+        + " WHERE deleted_at < #{legacyTimeline} AND deleted_at > 0 AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit})";
   }
 }

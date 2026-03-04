@@ -8,17 +8,17 @@ import lombok.Data;
 @Schema(name = "InvitationDetailResponse")
 public class InvitationDetailResponse {
 
-    private String inviteCode;
+  private String inviteCode;
 
-    private String tenantName;
+  private String tenantName;
 
-    private Long roleId;
+  private Long roleId;
 
-    private String roleName;
+  private String roleName;
 
-    private String inviterName;
+  private String inviterName;
 
-    private OffsetDateTime expiresAt;
+  private OffsetDateTime expiresAt;
 
-    private Integer status;
+  private Integer status;
 }

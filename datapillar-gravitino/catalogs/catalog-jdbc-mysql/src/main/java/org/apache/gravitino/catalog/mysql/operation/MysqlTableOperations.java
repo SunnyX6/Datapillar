@@ -183,8 +183,8 @@ public class MysqlTableOperations extends JdbcTableOperations {
                       put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, autoIncrement);
                     }
 
-                    // MySQL 统计字段: numRows, totalSize, rawDataSize, indexSize
-                    // 注意: MySQL 没有 type, format, numFiles 等 Hive 特有字段
+                    // MySQL Statistical fields: numRows, totalSize, rawDataSize, indexSize
+                    // Note: MySQL No type, format, numFiles Wait Hive Unique fields
                     long rows = resultSet.getLong("Rows");
                     long dataLength = resultSet.getLong("Data_length");
                     long indexLength = resultSet.getLong("Index_length");

@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-02-07
 
-"""私钥存储接口。"""
+"""Private key storage interface."""
 
 from __future__ import annotations
 

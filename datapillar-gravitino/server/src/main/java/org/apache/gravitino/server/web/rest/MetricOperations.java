@@ -70,7 +70,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 
-@Tag(name = "Metric Management", description = "指标管理相关API")
+@Tag(name = "Metric Management", description = "Indicator management relatedAPI")
 @Path("metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/metrics")
 public class MetricOperations {
 
@@ -90,27 +90,29 @@ public class MetricOperations {
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.SCHEMA)
-  @Operation(summary = "列出所有指标", description = "列出指定schema下的所有指标")
+  @Operation(
+      summary = "List all indicators",
+      description = "list specifiedschemaAll indicators under")
   @ApiResponses(
       value = {
-        @ApiResponse(responseCode = "200", description = "成功返回指标列表"),
-        @ApiResponse(responseCode = "404", description = "Schema不存在")
+        @ApiResponse(responseCode = "200", description = "Successfully returns the indicator list"),
+        @ApiResponse(responseCode = "404", description = "Schemadoes not exist")
       })
   public Response listMetrics(
-      @Parameter(description = "Metalake名称", required = true)
+      @Parameter(description = "MetalakeName", required = true)
           @PathParam("metalake")
           @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @Parameter(description = "Catalog名称", required = true)
+      @Parameter(description = "CatalogName", required = true)
           @PathParam("catalog")
           @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
           String catalog,
-      @Parameter(description = "Schema名称", required = true)
+      @Parameter(description = "SchemaName", required = true)
           @PathParam("schema")
           @AuthorizationMetadata(type = Entity.EntityType.SCHEMA)
           String schema,
-      @Parameter(description = "偏移量") @QueryParam("offset") @DefaultValue("0") int offset,
-      @Parameter(description = "每页大小") @QueryParam("limit") @DefaultValue("20") int limit) {
+      @Parameter(description = "offset") @QueryParam("offset") @DefaultValue("0") int offset,
+      @Parameter(description = "page size") @QueryParam("limit") @DefaultValue("20") int limit) {
     Namespace metricNs = Namespace.of(metalake, catalog, schema);
 
     try {
@@ -173,7 +175,7 @@ public class MetricOperations {
 
     try {
       request.validate();
-      // 使用 code 作为 identifier，因为数据库层用 code 查询
+      // use code as identifier，Because the database layer uses code Query
       NameIdentifier metricId = NameIdentifier.of(metalake, catalog, schema, request.getCode());
 
       return Utils.doAs(
@@ -370,11 +372,14 @@ public class MetricOperations {
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.SCHEMA)
-  @Operation(summary = "更新指标版本", description = "更新指定指标版本的信息（会自动创建新版本）")
+  @Operation(
+      summary = "Update indicator version",
+      description =
+          "Update information about the specified indicator version（A new version will be automatically created）")
   @ApiResponses(
       value = {
-        @ApiResponse(responseCode = "200", description = "成功更新版本"),
-        @ApiResponse(responseCode = "404", description = "指标版本不存在")
+        @ApiResponse(responseCode = "200", description = "Successfully updated version"),
+        @ApiResponse(responseCode = "404", description = "Indicator version does not exist")
       })
   public Response alterMetricVersion(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -585,11 +590,13 @@ public class MetricOperations {
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.SCHEMA)
-  @Operation(summary = "更新修饰符", description = "更新指定修饰符的信息")
+  @Operation(
+      summary = "update modifier",
+      description = "Update information for a specified modifier")
   @ApiResponses(
       value = {
-        @ApiResponse(responseCode = "200", description = "成功更新修饰符"),
-        @ApiResponse(responseCode = "404", description = "修饰符不存在")
+        @ApiResponse(responseCode = "200", description = "Successfully updated modifiers"),
+        @ApiResponse(responseCode = "404", description = "Modifier does not exist")
       })
   public Response alterModifier(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)

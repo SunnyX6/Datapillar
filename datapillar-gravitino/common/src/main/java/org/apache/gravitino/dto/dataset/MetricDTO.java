@@ -29,7 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dataset.Metric;
 import org.apache.gravitino.dto.AuditDTO;
 
-/** 表示指标的 DTO (Data Transfer Object) */
+/** indicating an indicator DTO (Data Transfer Object) */
 @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @EqualsAndHashCode

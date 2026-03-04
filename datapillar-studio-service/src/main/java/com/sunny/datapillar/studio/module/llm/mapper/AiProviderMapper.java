@@ -5,12 +5,10 @@ import com.sunny.datapillar.studio.module.llm.entity.AiProvider;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * AI提供器Mapper
- * 负责AI提供器数据访问与持久化映射
+ * AIproviderMapper responsibleAIProvider data access and persistence mapping
  *
  * @author Sunny
  * @date 2026-01-01
  */
 @Mapper
-public interface AiProviderMapper extends BaseMapper<AiProvider> {
-}
+public interface AiProviderMapper extends BaseMapper<AiProvider> {}

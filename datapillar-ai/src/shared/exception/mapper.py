@@ -1,7 +1,7 @@
 # @author Sunny
 # @date 2026-02-20
 
-"""异常映射器。"""
+"""exception mapper."""
 
 from __future__ import annotations
 
@@ -18,21 +18,11 @@ from src.shared.config.exceptions import (
     ConfigurationError,
     DatabaseError,
 )
-from src.shared.exception.already_exists import AlreadyExistsException
-from src.shared.exception.bad_request import BadRequestException
 from src.shared.exception.base import DatapillarException
-from src.shared.exception.conflict import ConflictException
-from src.shared.exception.connection_failed import ConnectionFailedException
-from src.shared.exception.forbidden import ForbiddenException
 from src.shared.exception.internal import InternalException
-from src.shared.exception.not_found import NotFoundException
-from src.shared.exception.service_unavailable import ServiceUnavailableException
-from src.shared.exception.too_many_requests import TooManyRequestsException
-from src.shared.exception.unauthorized import UnauthorizedException
-from src.shared.exception.unsupported_operation import UnsupportedOperationException
 from src.shared.web.code import Code
 
-_DEFAULT_INTERNAL_MESSAGE = "服务器内部错误"
+_DEFAULT_INTERNAL_MESSAGE = "Server internal error"
 _DUPLICATE_KEY_HINTS = (
     "duplicate entry",
     "duplicate key",
@@ -66,7 +56,7 @@ class ExceptionDetail:
 
 
 class ExceptionMapper:
-    """统一异常语义映射。"""
+    """Unified exception semantic mapping."""
 
     @classmethod
     def resolve(cls, exc: Exception | None) -> ExceptionDetail:
@@ -112,7 +102,7 @@ class ExceptionMapper:
                 http_status=Code.BAD_REQUEST,
                 error_code=Code.BAD_REQUEST,
                 error_type="BAD_REQUEST",
-                message="请求参数校验失败",
+                message="Request parameter verification failed",
                 server_error=False,
                 context={},
                 retryable=False,
@@ -152,7 +142,7 @@ class ExceptionMapper:
                 http_status=Code.CONFLICT,
                 error_code=Code.CONFLICT,
                 error_type="ALREADY_EXISTS",
-                message="数据已存在",
+                message="Data already exists",
                 server_error=False,
                 context={},
                 retryable=False,
@@ -163,7 +153,7 @@ class ExceptionMapper:
                 http_status=Code.SERVICE_UNAVAILABLE,
                 error_code=Code.SERVICE_UNAVAILABLE,
                 error_type="SERVICE_UNAVAILABLE",
-                message="服务调用超时",
+                message="Service call timeout",
                 server_error=True,
                 context={},
                 retryable=True,
@@ -238,12 +228,12 @@ def _resolve_message(exc: Exception) -> str:
 def _resolve_http_detail(detail: Any) -> str:
     if isinstance(detail, str):
         text = detail.strip()
-        return text if text else "请求失败"
+        return text if text else "Request failed"
     if isinstance(detail, dict):
         message = detail.get("message")
         if isinstance(message, str) and message.strip():
             return message.strip()
-    return "请求失败"
+    return "Request failed"
 
 
 def _unwrap_exception_group(exc: Exception | None) -> Exception | None:

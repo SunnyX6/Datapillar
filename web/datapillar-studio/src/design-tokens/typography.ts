@@ -1,225 +1,108 @@
 /**
- * 字体规范系统
+ * Font specification system
  *
- * 基于 src/index.css 中定义的字体 CSS 变量
- * 提供 TypeScript 类型支持和自动补全
+ * Based on src/index.css Fonts defined in CSS variable
+ * provide TypeScript Type support and autocompletion
  *
- * 使用方式：
- * ```tsx
+ * Usage:* ```tsx
  * import { TYPOGRAPHY } from '@/design-tokens/typography'
  *
- * // 使用预定义的类名
- * <h1 className={TYPOGRAPHY.title}>标题</h1>
- * <p className={TYPOGRAPHY.body}>正文</p>
- * <span className={TYPOGRAPHY.caption}>说明文字</span>
+ * // Use predefined class names
+ * <h1 className={TYPOGRAPHY.title}>Title</h1>
+ * <p className={TYPOGRAPHY.body}>Text</p>
+ * <span className={TYPOGRAPHY.caption}>Description text</span>
  * ```
  *
- * CSS 变量定义（src/index.css）：
- * ```css
- * :root {
- *   --font-display: 700 28px/34px var(--font-family-sans);
- *   --font-title: 700 22px/28px var(--font-family-sans);
- *   --font-heading: 600 18px/24px var(--font-family-sans);
- *   --font-subtitle: 600 16px/22px var(--font-family-sans);
- *   --font-body: 500 14px/20px var(--font-family-sans);
- *   --font-body-sm: 500 13px/18px var(--font-family-sans);
- *   --font-caption: 500 12px/16px var(--font-family-sans);
- *   --font-micro: 600 10px/14px var(--font-family-sans);
- * }
+ * CSS variable definition(src/index.css):* ```css
+ *:root {
+ * --font-display:700 28px/34px var(--font-family-sans);* --font-title:700 22px/28px var(--font-family-sans);* --font-heading:600 18px/24px var(--font-family-sans);* --font-subtitle:600 16px/22px var(--font-family-sans);* --font-body:500 14px/20px var(--font-family-sans);* --font-body-sm:500 13px/18px var(--font-family-sans);* --font-caption:500 12px/16px var(--font-family-sans);* --font-micro:600 10px/14px var(--font-family-sans);* }
  * ```
  */
 
 /**
- * 字体类名映射
- * 所有类名都已在 src/index.css 中定义
+ * Font class name mapping
+ * All class names are present src/index.css in definition
  */
 export const TYPOGRAPHY = {
-  /** 最大标题：28px / 700 粗体 / 行高 34px */
-  display: 'text-display',
-
-  /** 大标题：26px / 700 粗体 / 行高 32px */
-  displaySm: 'text-display-sm',
-
-  /** 标题：22px / 700 粗体 / 行高 28px */
-  title: 'text-title',
-
-  /** 小标题：18px / 600 半粗 / 行高 24px */
-  heading: 'text-heading',
-
-  /** 副标题：16px / 600 半粗 / 行高 22px */
-  subtitle: 'text-subtitle',
-
-  /** 正文（最常用）：14px / 500 中等 / 行高 20px */
-  body: 'text-body',
-
-  /** 小正文：13px / 500 中等 / 行高 18px */
-  bodySm: 'text-body-sm',
-
-  /** 超小正文：12.5px / 500 中等 / 行高 17px（介于 bodySm 与 caption 之间） */
-  bodyXs: 'text-body-xs',
-
-  /** 说明文字：12px / 500 中等 / 行高 16px */
-  caption: 'text-caption',
-
-  /** 极小文字：10px / 600 半粗 / 行高 14px */
-  micro: 'text-micro',
-
-  /** 法律/徽标：11px / 600 / 行高 14px */
-  legal: 'text-legal',
-
-  /** 超小徽标：9px / 600 / 行高 12px */
-  nano: 'text-nano',
-
-  /** 右键菜单标题：8px / 600 / 行高 10px（>=1920：9px / 11px） */
-  contextMenuTitle: 'context-menu-title',
-
-  /** 极微徽标：8px / 600 / 行高 10px */
-  tiny: 'text-tiny',
-
-  /** 最小徽标：7px / 600 / 行高 9px */
-  mini: 'text-mini'
+ /** Maximum title:28px / 700 Bold / row height 34px */
+ display:'text-display',/** headline:26px / 700 Bold / row height 32px */
+ displaySm:'text-display-sm',/** Title:22px / 700 Bold / row height 28px */
+ title:'text-title',/** Subtitle:18px / 600 semi-thick / row height 24px */
+ heading:'text-heading',/** subtitle:16px / 600 semi-thick / row height 22px */
+ subtitle:'text-subtitle',/** Text(Most commonly used):14px / 500 medium / row height 20px */
+ body:'text-body',/** small text:13px / 500 medium / row height 18px */
+ bodySm:'text-body-sm',/** Super small text:12.5px / 500 medium / row height 17px(between bodySm with caption between) */
+ bodyXs:'text-body-xs',/** Description text:12px / 500 medium / row height 16px */
+ caption:'text-caption',/** Very small text:10px / 600 semi-thick / row height 14px */
+ micro:'text-micro',/** law/logo:11px / 600 / row height 14px */
+ legal:'text-legal',/** Extra small logo:9px / 600 / row height 12px */
+ nano:'text-nano',/** Right-click menu title:8px / 600 / row height 10px(>=1920:9px / 11px) */
+ contextMenuTitle:'context-menu-title',/** minimal logo:8px / 600 / row height 10px */
+ tiny:'text-tiny',/** minimal logo:7px / 600 / row height 9px */
+ mini:'text-mini'
 } as const
 
 /**
- * 字体尺寸（数值，用于动态计算或 style 属性）
+ * Font size(numerical value,for dynamic calculations or style Properties)
  */
 export const FONT_SIZE = {
-  display: 28,
-  displaySm: 26,
-  title: 22,
-  heading: 18,
-  subtitle: 16,
-  body: 14,
-  bodySm: 13,
-  bodyXs: 12.5,
-  caption: 12,
-  micro: 10,
-  legal: 11,
-  nano: 9,
-  contextMenuTitle: 8,
-  tiny: 8,
-  mini: 7
+ display:28,displaySm:26,title:22,heading:18,subtitle:16,body:14,bodySm:13,bodyXs:12.5,caption:12,micro:10,legal:11,nano:9,contextMenuTitle:8,tiny:8,mini:7
 } as const
 
 /**
- * 字体行高（数值）
+ * Font line height(numerical value)
  */
 export const LINE_HEIGHT = {
-  display: 34,
-  title: 28,
-  heading: 24,
-  subtitle: 22,
-  body: 20,
-  bodySm: 18,
-  bodyXs: 17,
-  caption: 16,
-  micro: 14,
-  legal: 14,
-  nano: 12,
-  contextMenuTitle: 10,
-  tiny: 10,
-  mini: 9
+ display:34,title:28,heading:24,subtitle:22,body:20,bodySm:18,bodyXs:17,caption:16,micro:14,legal:14,nano:12,contextMenuTitle:10,tiny:10,mini:9
 } as const
 
 /**
- * 字体粗细
+ * Font weight
  */
 export const FONT_WEIGHT = {
-  display: 700,
-  title: 700,
-  heading: 600,
-  subtitle: 600,
-  body: 500,
-  bodySm: 500,
-  bodyXs: 500,
-  caption: 500,
-  micro: 600,
-  legal: 600,
-  nano: 600,
-  contextMenuTitle: 600,
-  tiny: 600,
-  mini: 600
+ display:700,title:700,heading:600,subtitle:600,body:500,bodySm:500,bodyXs:500,caption:500,micro:600,legal:600,nano:600,contextMenuTitle:600,tiny:600,mini:600
 } as const
 
 /**
- * 字体使用场景推荐
+ * Recommended font usage scenarios
  */
 export const TYPOGRAPHY_USE_CASES = {
-  /** 页面主标题 */
-  pageTitle: TYPOGRAPHY.display,
-
-  /** 卡片标题、模态框标题 */
-  cardTitle: TYPOGRAPHY.title,
-
-  /** 分区标题、小标题 */
-  sectionTitle: TYPOGRAPHY.heading,
-
-  /** 副标题、说明性标题 */
-  subtitle: TYPOGRAPHY.subtitle,
-
-  /** 正文、表单标签 */
-  body: TYPOGRAPHY.body,
-
-  /** 次要正文、辅助文字 */
-  bodySecondary: TYPOGRAPHY.bodySm,
-
-  /** 提示文字、说明文字 */
-  hint: TYPOGRAPHY.caption,
-
-  /** 标签、徽章、角标 */
-  badge: TYPOGRAPHY.micro,
-
-  /** 右键菜单标题 */
-  contextMenuTitle: TYPOGRAPHY.contextMenuTitle
+ /** Page main title */
+ pageTitle:TYPOGRAPHY.display,/** card title,Modal box title */
+ cardTitle:TYPOGRAPHY.title,/** Section title,Subtitle */
+ sectionTitle:TYPOGRAPHY.heading,/** subtitle,descriptive title */
+ subtitle:TYPOGRAPHY.subtitle,/** Text,form tag */
+ body:TYPOGRAPHY.body,/** secondary text,Auxiliary text */
+ bodySecondary:TYPOGRAPHY.bodySm,/** Prompt text,Description text */
+ hint:TYPOGRAPHY.caption,/** label,badge,corner mark */
+ badge:TYPOGRAPHY.micro,/** Right-click menu title */
+ contextMenuTitle:TYPOGRAPHY.contextMenuTitle
 } as const
 
 /**
- * 响应式字体组合（适用于需要在不同屏幕尺寸下使用不同字体的场景）
+ * Responsive font combination(Suitable for scenarios where different fonts need to be used on different screen sizes)
  *
- * 命名规范：
- * - 使用语义化命名，描述使用场景而非具体尺寸
- * - 格式：{场景}{可选修饰符}
+ * Naming convention:* - Use semantic naming,Describe usage scenarios rather than specific dimensions
+ * - Format:{scene}{Optional modifiers}
  */
 export const RESPONSIVE_TYPOGRAPHY = {
-  /** 响应式页面标题：窄屏 22px，桌面 28px */
-  pageTitle: 'text-title @md:text-display',
-
-  /** 响应式大标题：窄屏 24px，桌面 30px（Dashboard 主标题） */
-  displayTitle: 'text-2xl @md:text-3xl',
-
-  /** 响应式卡片标题：窄屏 18px，桌面 22px */
-  cardTitle: 'text-heading @md:text-title',
-
-  /** 响应式分区标题：窄屏 14px，桌面 16px */
-  sectionTitle: 'text-sm @md:text-base',
-
-  /** 响应式小标题：窄屏 12px，桌面 14px */
-  subtitle: 'text-xs @md:text-sm',
-
-  /** 响应式正文：窄屏 13px，桌面 14px */
-  body: 'text-body-sm @md:text-body',
-
-  /** 响应式指标数值：窄屏 24px，桌面 26px */
-  metricValue: 'text-2xl @md:text-display-sm',
-
-  /** 响应式标签文字：窄屏 13px，桌面 14px */
-  label: 'text-body-sm @md:text-sm',
-
-  /** 响应式徽章/标签：窄屏 11px，桌面 12px */
-  badge: 'text-legal @md:text-xs',
-
-  /** 响应式表头/时间戳：窄屏 10px，桌面 11px */
-  tableHeader: 'text-micro @md:text-legal',
-
-  /** 响应式图例：窄屏 10px，桌面 12px */
-  legend: 'text-micro @md:text-xs',
-
-  /** 响应式极小标签：窄屏 9px，桌面 10px */
-  tag: 'text-nano @md:text-micro'
+ /** Responsive page title:narrow screen 22px,Desktop 28px */
+ pageTitle:'text-title @md:text-display',/** Responsive headline:narrow screen 24px,Desktop 30px(Dashboard main title) */
+ displayTitle:'text-2xl @md:text-3xl',/** Responsive card title:narrow screen 18px,Desktop 22px */
+ cardTitle:'text-heading @md:text-title',/** Responsive section title:narrow screen 14px,Desktop 16px */
+ sectionTitle:'text-sm @md:text-base',/** Responsive subtitle:narrow screen 12px,Desktop 14px */
+ subtitle:'text-xs @md:text-sm',/** Responsive body:narrow screen 13px,Desktop 14px */
+ body:'text-body-sm @md:text-body',/** Responsive indicator value:narrow screen 24px,Desktop 26px */
+ metricValue:'text-2xl @md:text-display-sm',/** Responsive label text:narrow screen 13px,Desktop 14px */
+ label:'text-body-sm @md:text-sm',/** Responsive badge/label:narrow screen 11px,Desktop 12px */
+ badge:'text-legal @md:text-xs',/** Responsive header/Timestamp:narrow screen 10px,Desktop 11px */
+ tableHeader:'text-micro @md:text-legal',/** Responsive legend:narrow screen 10px,Desktop 12px */
+ legend:'text-micro @md:text-xs',/** Responsive minimal label:narrow screen 9px,Desktop 10px */
+ tag:'text-nano @md:text-micro'
 } as const
 
 /**
- * 类型导出（用于 TypeScript 类型推导）
+ * Type export(used for TypeScript type inference)
  */
 export type TypographyClass = typeof TYPOGRAPHY[keyof typeof TYPOGRAPHY]
 export type TypographyUseCase = keyof typeof TYPOGRAPHY_USE_CASES

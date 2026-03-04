@@ -39,34 +39,42 @@ import org.apache.gravitino.dataset.MetricVersion;
 public class MetricVersionEntity implements Entity, Auditable, HasIdentifier, MetricVersion {
 
   public static final Field METRIC_IDENT =
-      Field.required("metric_ident", NameIdentifier.class, "指标的名称标识符");
-  public static final Field ID = Field.optional("id", Long.class, "指标版本ID（自增主键）");
-  public static final Field VERSION = Field.required("version", Integer.class, "版本号，从1开始");
-  public static final Field METRIC_NAME = Field.required("metric_name", String.class, "指标名称快照");
-  public static final Field METRIC_CODE = Field.required("metric_code", String.class, "指标编码快照");
+      Field.required("metric_ident", NameIdentifier.class, "Name identifier of the indicator");
+  public static final Field ID =
+      Field.optional("id", Long.class, "Indicator versionID（auto-increment primary key）");
+  public static final Field VERSION =
+      Field.required("version", Integer.class, "version number，from1start");
+  public static final Field METRIC_NAME =
+      Field.required("metric_name", String.class, "Indicator name snapshot");
+  public static final Field METRIC_CODE =
+      Field.required("metric_code", String.class, "Indicator encoding snapshot");
   public static final Field METRIC_TYPE =
-      Field.required("metric_type", Metric.Type.class, "指标类型快照");
-  public static final Field DATA_TYPE = Field.optional("data_type", String.class, "数据类型快照");
-  public static final Field COMMENT = Field.optional("comment", String.class, "指标版本注释");
-  public static final Field UNIT = Field.optional("unit", String.class, "指标单位");
+      Field.required("metric_type", Metric.Type.class, "Indicator type snapshot");
+  public static final Field DATA_TYPE =
+      Field.optional("data_type", String.class, "Data type snapshot");
+  public static final Field COMMENT =
+      Field.optional("comment", String.class, "Indicator version notes");
+  public static final Field UNIT = Field.optional("unit", String.class, "Index unit");
   public static final Field PARENT_METRIC_CODES =
-      Field.optional("parent_metric_codes", String[].class, "父指标编码数组");
+      Field.optional("parent_metric_codes", String[].class, "Parent indicator encoding array");
   public static final Field CALCULATION_FORMULA =
-      Field.optional("calculation_formula", String.class, "计算公式");
+      Field.optional("calculation_formula", String.class, "Calculation formula");
   public static final Field REF_TABLE_ID =
-      Field.optional("ref_table_id", Long.class, "引用的Table ID（原子指标）");
+      Field.optional("ref_table_id", Long.class, "quotedTable ID（Atomic indicators）");
   public static final Field REF_CATALOG_NAME =
-      Field.optional("ref_catalog_name", String.class, "引用的Catalog名称（只读，JOIN查询）");
+      Field.optional("ref_catalog_name", String.class, "quotedCatalogName（read only，JOINQuery）");
   public static final Field REF_SCHEMA_NAME =
-      Field.optional("ref_schema_name", String.class, "引用的Schema名称（只读，JOIN查询）");
+      Field.optional("ref_schema_name", String.class, "quotedSchemaName（read only，JOINQuery）");
   public static final Field REF_TABLE_NAME =
-      Field.optional("ref_table_name", String.class, "引用的Table名称（只读，JOIN查询）");
+      Field.optional("ref_table_name", String.class, "quotedTableName（read only，JOINQuery）");
   public static final Field MEASURE_COLUMN_IDS =
-      Field.optional("measure_column_ids", String.class, "度量列ID JSON数组");
+      Field.optional("measure_column_ids", String.class, "measure columnID JSONarray");
   public static final Field FILTER_COLUMN_IDS =
-      Field.optional("filter_column_ids", String.class, "过滤列ID JSON数组");
-  public static final Field PROPERTIES = Field.optional("properties", Map.class, "版本属性");
-  public static final Field AUDIT_INFO = Field.required("audit_info", AuditInfo.class, "审计信息");
+      Field.optional("filter_column_ids", String.class, "Filter columnsID JSONarray");
+  public static final Field PROPERTIES =
+      Field.optional("properties", Map.class, "version attribute");
+  public static final Field AUDIT_INFO =
+      Field.required("audit_info", AuditInfo.class, "Audit information");
 
   private NameIdentifier metricIdent;
   private Long id;

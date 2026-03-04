@@ -1,7 +1,7 @@
 # @author Sunny
 # @date 2026-02-20
 
-"""FastAPI 生命周期管理。"""
+"""FastAPI life cycle management."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ class RuntimeResources:
 
 
 def create_lifespan(*, settings: Any):
-    """创建应用 lifespan。"""
+    """Create app lifespan."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -53,8 +53,8 @@ async def _startup(
     app.state.nacos_runtime = resources.nacos_runtime
 
     logger.info("=" * 60)
-    logger.info("Datapillar AI - 启动中...")
-    logger.info("环境: %s", resources.nacos_runtime.config.namespace)
+    logger.info("Datapillar AI - Starting...")
+    logger.info("environment:%s", resources.nacos_runtime.config.namespace)
     logger.info("Neo4j URI: %s", settings.neo4j_uri)
     logger.info(
         "MySQL: %s:%s/%s",
@@ -68,33 +68,33 @@ async def _startup(
 
     await resources.nacos_runtime.register_service(port=settings.app_port)
 
-    logger.info("初始化 MySQL 连接池...")
+    logger.info("initialization MySQL connection pool...")
     MySQLClient.get_engine()
 
-    logger.info("初始化 Neo4j 连接池...")
+    logger.info("initialization Neo4j connection pool...")
     Neo4jClient.get_driver()
 
-    logger.info("初始化 Redis 连接池...")
+    logger.info("initialization Redis connection pool...")
     await RedisClient.get_instance()
     if not await RedisClient.ping():
-        raise RuntimeError("Redis 连接验证失败")
-    logger.info("Redis 连接验证通过")
+        raise RuntimeError("Redis Connection verification failed")
+    logger.info("Redis Connection verification passed")
 
-    logger.info("初始化 Gravitino 数据库连接...")
+    logger.info("initialization Gravitino Database connection...")
     GravitinoDBClient.get_engine()
 
-    logger.info("FastAPI 应用启动完成")
+    logger.info("FastAPI Application startup completed")
 
 
 async def _shutdown(resources: RuntimeResources) -> None:
-    logger.info("Datapillar AI - 关闭中...")
+    logger.info("Datapillar AI - Closed...")
 
     await RedisClient.close()
     await AsyncNeo4jClient.close()
     Neo4jClient.close()
     MySQLClient.close()
     GravitinoDBClient.close()
-    logger.info("所有连接池已关闭")
+    logger.info("All connection pools are closed")
 
     if resources.nacos_runtime is not None:
         await resources.nacos_runtime.deregister_service()

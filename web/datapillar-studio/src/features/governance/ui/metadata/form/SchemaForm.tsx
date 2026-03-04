@@ -1,5 +1,5 @@
 /**
- * Schema 表单组件
+ * Schema form component
  */
 
 import { forwardRef, useImperativeHandle, useState } from 'react'
@@ -30,7 +30,7 @@ export const CreateSchemaForm = forwardRef<SchemaFormHandle, CreateSchemaFormPro
       getData: () => formData,
       validate: () => {
         if (!formData.name.trim()) {
-          toast.error('请输入 Schema 名称')
+          toast.error('Please enter Schema Name')
           return false
         }
         return true
@@ -41,20 +41,20 @@ export const CreateSchemaForm = forwardRef<SchemaFormHandle, CreateSchemaFormPro
       <div className="space-y-2.5">
         <div>
           <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Schema 名称 <span className="text-red-500">*</span>
+            Schema Name <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
-            placeholder="例如: analytics_mart"
+            placeholder="For example: analytics_mart"
             value={formData.name}
             onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
             className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">描述 (可选)</label>
+          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Description (Optional)</label>
           <textarea
-            placeholder="Schema 用途说明"
+            placeholder="Schema Instructions for use"
             value={formData.comment}
             onChange={(e) => setFormData((prev) => ({ ...prev, comment: e.target.value }))}
             rows={2}

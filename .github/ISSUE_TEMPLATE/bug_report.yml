@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        请尽量提供可复现信息，避免“无法定位”的描述。
+        Please provide reproducible details and avoid non-actionable descriptions.
   - type: input
     id: module
     attributes:

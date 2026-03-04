@@ -1,8 +1,8 @@
 /**
- * 通用模态框组件
+ * Universal modal component
  *
- * 支持尺寸：迷你(mini) | 小(sm) | 中(md) | 大(lg) | 特大(xl)
- * 参考 examples/MetricRegistrationModal.tsx 设计风格
+ * Support size：mini(mini) | small(sm) | in(md) | Big(lg) | extra large(xl)
+ * Reference examples/MetricRegistrationModal.tsx design style
  */
 
 import { useEffect, useRef, type ReactNode } from 'react'
@@ -16,16 +16,16 @@ interface ModalProps {
   isOpen: boolean
   onClose: () => void
   title?: ReactNode
-  /** 副标题，显示在标题下方 */
+  /** subtitle，Shown below title */
   subtitle?: ReactNode
   children: ReactNode
-  /** 统一 footer（与 footerLeft/footerRight 二选一） */
+  /** unify footer（with footerLeft/footerRight Choose one） */
   footer?: ReactNode
-  /** 左侧 footer 按钮区域 */
+  /** left side footer button area */
   footerLeft?: ReactNode
-  /** 右侧 footer 按钮区域 */
+  /** right side footer button area */
   footerRight?: ReactNode
-  /** 迷你(mini): 简单表单 | 小(sm): 窄表单 | 中(md): 标准表单 | 大(lg): 宽表单 | 特大(xl): 超宽复杂表单 */
+  /** mini(mini): simple form | small(sm): narrow form | in(md): standard form | Big(lg): wide form | extra large(xl): Extra wide complex forms */
   size?: 'mini' | 'sm' | 'md' | 'lg' | 'xl'
 }
 
@@ -71,7 +71,7 @@ export function Modal({
 
   const hasFooter = footer || footerLeft || footerRight
 
-  // 使用 design-tokens 中定义的模态框宽度
+  // use design-tokens The width of the modal box defined in
   const widthClass =
     size === 'mini'
       ? modalWidthClassMap.mini
@@ -85,31 +85,31 @@ export function Modal({
 
   const modalContent = (
     <div className="fixed inset-0 z-[999999] flex items-center justify-center p-6">
-      {/* 背景遮罩 */}
+      {/* background mask */}
       <div
         className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-300"
         onClick={onClose}
       />
 
-      {/* 模态框内容 */}
+      {/* Modal box content */}
       <div
         ref={modalRef}
         tabIndex={-1}
         className={`relative w-full ${widthClass} bg-white dark:bg-slate-900 shadow-[0_32px_128px_-16px_rgba(0,0,0,0.3)] rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden outline-none flex flex-col max-h-[90vh] animate-in zoom-in-95 fade-in duration-300`}
       >
-        {/* 关闭按钮 */}
+        {/* close button */}
         <Button
           type="button"
           onClick={onClose}
           variant="ghost"
           size="icon"
           className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 z-10 transition-all group"
-          aria-label="关闭"
+          aria-label="close"
         >
           <X size={20} className="group-hover:rotate-90 transition-transform" />
         </Button>
 
-        {/* 标题 */}
+        {/* Title */}
         {title && (
           <div className="px-8 pt-8 pb-2">
             <h2 className={`${TYPOGRAPHY.subtitle} font-bold text-slate-900 dark:text-white tracking-tight`}>
@@ -119,10 +119,10 @@ export function Modal({
           </div>
         )}
 
-        {/* 内容区域 */}
+        {/* content area */}
         <div className="flex-1 min-h-0 overflow-y-auto px-8 py-4 custom-scrollbar">{children}</div>
 
-        {/* 底部按钮区域 */}
+        {/* Bottom button area */}
         {hasFooter && (
           <div className="flex items-center justify-between gap-3 px-8 py-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
             <div className="flex items-center gap-2">{footerLeft}</div>
@@ -136,11 +136,11 @@ export function Modal({
   return createPortal(modalContent, document.body)
 }
 
-/** 模态框取消按钮 */
+/** Modal box cancel button */
 export function ModalCancelButton({
   onClick,
   disabled,
-  children = '取消'
+  children = 'Cancel'
 }: {
   onClick: () => void
   disabled?: boolean
@@ -159,13 +159,13 @@ export function ModalCancelButton({
   )
 }
 
-/** 模态框确认按钮 */
+/** Modal box confirmation button */
 export function ModalPrimaryButton({
   onClick,
   disabled,
   loading,
   variant = 'blue',
-  children = '确认'
+  children = 'Confirm'
 }: {
   onClick: () => void
   disabled?: boolean

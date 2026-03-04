@@ -10,17 +10,17 @@ import lombok.Data;
 @Schema(name = "ProjectUpdate")
 public class ProjectUpdateRequest {
 
-    @Size(max = 100, message = "项目名称长度不能超过100个字符")
-    private String name;
+  @Size(max = 100, message = "The project name cannot be longer than100characters")
+  private String name;
 
-    @Size(max = 500, message = "项目描述长度不能超过500个字符")
-    private String description;
+  @Size(max = 500, message = "Item description length cannot exceed500characters")
+  private String description;
 
-    private ProjectStatus status;
+  private ProjectStatus status;
 
-    private List<String> tags;
+  private List<String> tags;
 
-    private Boolean isFavorite;
+  private Boolean isFavorite;
 
-    private Boolean isVisible;
+  private Boolean isVisible;
 }

@@ -1,5 +1,10 @@
 package com.sunny.datapillar.openlineage.service;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sunny.datapillar.openlineage.async.AsyncTaskDispatcher;
@@ -23,65 +28,63 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 class OpenLineageServiceTest {
 
-    @Mock
-    private OpenLineageDao openLineageDao;
+  @Mock private OpenLineageDao openLineageDao;
 
-    @Mock
-    private OpenLineageEventDao openLineageEventDao;
+  @Mock private OpenLineageEventDao openLineageEventDao;
 
-    @Mock
-    private AsyncTaskDispatcher asyncTaskDispatcher;
+  @Mock private AsyncTaskDispatcher asyncTaskDispatcher;
 
-    private final ObjectMapper mapper = OpenLineageClientUtils.newObjectMapper();
+  private final ObjectMapper mapper = OpenLineageClientUtils.newObjectMapper();
 
-    @Test
-    void shouldWriteEventAndDispatchTask() throws Exception {
-        Executor directExecutor = Runnable::run;
-        OpenLineageServiceImpl service = new OpenLineageServiceImpl(
-                openLineageDao,
-                openLineageEventDao,
-                asyncTaskDispatcher,
-                directExecutor);
+  @Test
+  void shouldWriteEventAndDispatchTask() throws Exception {
+    Executor directExecutor = Runnable::run;
+    OpenLineageServiceImpl service =
+        new OpenLineageServiceImpl(
+            openLineageDao, openLineageEventDao, asyncTaskDispatcher, directExecutor);
 
-        OpenLineageEventEnvelope envelope = parseRunEvent();
-        TenantContext tenantContext = new TenantContext(1001L, "t-1001", "Tenant1001", TenantSourceType.GRAVITINO);
+    OpenLineageEventEnvelope envelope = parseRunEvent();
+    TenantContext tenantContext =
+        new TenantContext(1001L, "t-1001", "Tenant1001", TenantSourceType.GRAVITINO);
 
-        AsyncTaskCandidate candidate = AsyncTaskCandidate.builder()
-                .taskType(AsyncTaskType.EMBEDDING)
-                .resourceType("TABLE")
-                .resourceId("table-1")
-                .contentHash("hash-1")
-                .modelFingerprint("builtin:embedding:v1")
-                .payload("sales.orders")
-                .build();
+    AsyncTaskCandidate candidate =
+        AsyncTaskCandidate.builder()
+            .taskType(AsyncTaskType.EMBEDDING)
+            .resourceType("TABLE")
+            .resourceId("table-1")
+            .contentHash("hash-1")
+            .modelFingerprint("builtin:embedding:v1")
+            .payload("sales.orders")
+            .build();
 
-        OpenLineageUpdateResult updateResult = OpenLineageUpdateResult.builder().addCandidate(candidate).build();
+    OpenLineageUpdateResult updateResult =
+        OpenLineageUpdateResult.builder().addCandidate(candidate).build();
 
-        when(openLineageDao.updateDatapillarModel(any(OpenLineage.RunEvent.class), eq(envelope), eq(tenantContext)))
-                .thenReturn(updateResult);
-        when(openLineageEventDao.upsertAsyncTask(eq(tenantContext), eq(candidate))).thenReturn(10L);
-        when(openLineageEventDao.claimTimeout()).thenReturn(Duration.ofSeconds(120));
-        when(openLineageEventDao.claimTaskForPush(eq(10L), any(String.class), any(LocalDateTime.class))).thenReturn(true);
+    when(openLineageDao.updateDatapillarModel(
+            any(OpenLineage.RunEvent.class), eq(envelope), eq(tenantContext)))
+        .thenReturn(updateResult);
+    when(openLineageEventDao.upsertAsyncTask(eq(tenantContext), eq(candidate))).thenReturn(10L);
+    when(openLineageEventDao.claimTimeout()).thenReturn(Duration.ofSeconds(120));
+    when(openLineageEventDao.claimTaskForPush(eq(10L), any(String.class), any(LocalDateTime.class)))
+        .thenReturn(true);
 
-        OpenLineage.RunEvent runEvent = (OpenLineage.RunEvent) envelope.getEvent();
-        Assertions.assertDoesNotThrow(() -> service.createAsync(runEvent, envelope, tenantContext).join());
+    OpenLineage.RunEvent runEvent = (OpenLineage.RunEvent) envelope.getEvent();
+    Assertions.assertDoesNotThrow(
+        () -> service.createAsync(runEvent, envelope, tenantContext).join());
 
-        verify(openLineageDao).createLineageEvent(runEvent, envelope, tenantContext);
-        verify(openLineageDao).updateDatapillarModel(runEvent, envelope, tenantContext);
-        verify(openLineageEventDao).upsertAsyncTask(tenantContext, candidate);
-        verify(asyncTaskDispatcher).dispatch(eq(AsyncTaskType.EMBEDDING), eq(10L), any(String.class));
-    }
+    verify(openLineageDao).createLineageEvent(runEvent, envelope, tenantContext);
+    verify(openLineageDao).updateDatapillarModel(runEvent, envelope, tenantContext);
+    verify(openLineageEventDao).upsertAsyncTask(tenantContext, candidate);
+    verify(asyncTaskDispatcher).dispatch(eq(AsyncTaskType.EMBEDDING), eq(10L), any(String.class));
+  }
 
-    private OpenLineageEventEnvelope parseRunEvent() throws Exception {
-        JsonNode node = mapper.readTree("""
+  private OpenLineageEventEnvelope parseRunEvent() throws Exception {
+    JsonNode node =
+        mapper.readTree(
+            """
                 {
                   "eventTime": "2026-02-28T00:00:00Z",
                   "eventType": "START",
@@ -96,7 +99,7 @@ class OpenLineageServiceTest {
                   "outputs": []
                 }
                 """);
-        OpenLineage.RunEvent event = mapper.treeToValue(node, OpenLineage.RunEvent.class);
-        return OpenLineageEventEnvelope.fromRunEvent(event, node);
-    }
+    OpenLineage.RunEvent event = mapper.treeToValue(node, OpenLineage.RunEvent.class);
+    return OpenLineageEventEnvelope.fromRunEvent(event, node);
+  }
 }

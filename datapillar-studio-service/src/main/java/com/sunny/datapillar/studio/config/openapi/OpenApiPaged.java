@@ -7,8 +7,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * 分页接口标记注解
- * 用于标记需要在文档中保留分页字段的接口
+ * Paging interface markup annotation Interface for marking pagination fields that need to be
+ * preserved in the document
  *
  * @author Sunny
  * @date 2026-01-01
@@ -16,5 +16,4 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-public @interface OpenApiPaged {
-}
+public @interface OpenApiPaged {}

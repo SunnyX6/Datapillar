@@ -1,7 +1,7 @@
 /**
- * 动态图标组件
+ * Dynamic icon component
  *
- * 根据图标名称动态渲染 react-icons/si 或 lucide-react 图标
+ * Dynamically render based on icon name react-icons/si or lucide-react icon
  */
 
 import { memo } from 'react'
@@ -35,7 +35,7 @@ interface DynamicIconProps extends IconProps {
 }
 
 /**
- * 图标注册表
+ * Icon registry
  */
 const ICON_REGISTRY: Record<string, IconType | LucideIcon> = {
   // react-icons/si
@@ -55,7 +55,7 @@ const ICON_REGISTRY: Record<string, IconType | LucideIcon> = {
 }
 
 /**
- * 动态图标组件
+ * Dynamic icon component
  *
  * @example
  * <DynamicIcon name="SiApachehive" size={16} color="#FDEE21" />

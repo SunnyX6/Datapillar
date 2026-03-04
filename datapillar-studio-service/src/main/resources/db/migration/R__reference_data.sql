@@ -2,9 +2,9 @@
 
 INSERT INTO permissions (code, name, description, level, sort, status)
 VALUES
-  ('DISABLE', '禁止', '禁用权限', 0, 1, 1),
-  ('READ', '查看', '查看权限', 1, 2, 1),
-  ('ADMIN', '管理', '管理权限', 2, 3, 1)
+  ('DISABLE', 'Disable', 'Disable permission', 0, 1, 1),
+  ('READ', 'Read', 'Read permission', 1, 2, 1),
+  ('ADMIN', 'Admin', 'Admin permission', 2, 3, 1)
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   description = VALUES(description),
@@ -14,10 +14,10 @@ ON DUPLICATE KEY UPDATE
 
 INSERT INTO feature_object_categories (code, name, description, sort, status)
 VALUES
-  ('MANAGE_DEFINE', '管理与定义', '管理与定义入口', 1, 1),
-  ('BUILD', '构建与设计', NULL, 2, 1),
-  ('COMPUTE', '计算与连接', NULL, 3, 1),
-  ('OBSERVE', '观测', NULL, 4, 1)
+  ('MANAGE_DEFINE', 'Manage & Define', 'Manage & Define entry', 1, 1),
+  ('BUILD', 'Build & Design', NULL, 2, 1),
+  ('COMPUTE', 'Compute & Connect', NULL, 3, 1),
+  ('OBSERVE', 'Observe', NULL, 4, 1)
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   description = VALUES(description),
@@ -26,10 +26,10 @@ ON DUPLICATE KEY UPDATE
 
 INSERT INTO feature_objects (parent_id, type, name, category_id, path, location, description, sort, status)
 VALUES
-  (NULL, 'MENU', '数据驾驶舱', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/home', 'TOP', NULL, 1, 1),
-  (NULL, 'MENU', '数据治理', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/governance', 'TOP', NULL, 2, 1),
-  (NULL, 'MENU', '项目', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/projects', 'TOP', NULL, 3, 1),
-  (NULL, 'MENU', '团队协作', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/collaboration', 'TOP', NULL, 4, 1)
+  (NULL, 'MENU', 'Data Cockpit', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/home', 'TOP', NULL, 1, 1),
+  (NULL, 'MENU', 'Data Governance', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/governance', 'TOP', NULL, 2, 1),
+  (NULL, 'MENU', 'Projects', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/projects', 'TOP', NULL, 3, 1),
+  (NULL, 'MENU', 'Collaboration', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/collaboration', 'TOP', NULL, 4, 1)
 ON DUPLICATE KEY UPDATE
   parent_id = VALUES(parent_id),
   type = VALUES(type),
@@ -42,9 +42,9 @@ ON DUPLICATE KEY UPDATE
 
 INSERT INTO feature_objects (parent_id, type, name, category_id, path, location, description, sort, status)
 VALUES
-  (NULL, 'MENU', '元数据', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/governance/metadata', 'TOP', NULL, 1, 1),
-  (NULL, 'MENU', '元语义', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/governance/semantic', 'TOP', NULL, 2, 1),
-  (NULL, 'MENU', '知识图谱', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/governance/knowledge', 'TOP', NULL, 3, 1)
+  (NULL, 'MENU', 'Metadata', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/governance/metadata', 'TOP', NULL, 1, 1),
+  (NULL, 'MENU', 'Meta Semantic', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/governance/semantic', 'TOP', NULL, 2, 1),
+  (NULL, 'MENU', 'Knowledge Graph', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/governance/knowledge', 'TOP', NULL, 3, 1)
 ON DUPLICATE KEY UPDATE
   parent_id = VALUES(parent_id),
   type = VALUES(type),
@@ -62,15 +62,15 @@ WHERE child.path IN ('/governance/metadata', '/governance/semantic', '/governanc
 
 INSERT INTO feature_objects (parent_id, type, name, category_id, path, location, description, sort, status)
 VALUES
-  (NULL, 'MENU', '知识 Wiki', (SELECT id FROM feature_object_categories WHERE code = 'BUILD'), '/wiki', 'SIDEBAR', NULL, 1, 1),
-  (NULL, 'MENU', '工作流构建', (SELECT id FROM feature_object_categories WHERE code = 'BUILD'), '/workflow', 'SIDEBAR', NULL, 2, 1),
-  (NULL, 'MENU', '统一开发 IDE', (SELECT id FROM feature_object_categories WHERE code = 'BUILD'), '/ide', 'SIDEBAR', NULL, 3, 1),
-  (NULL, 'MENU', '数据埋点', (SELECT id FROM feature_object_categories WHERE code = 'COMPUTE'), '/data-tracking', 'SIDEBAR', NULL, 4, 1),
-  (NULL, 'MENU', '计算仓', (SELECT id FROM feature_object_categories WHERE code = 'COMPUTE'), '/compute-warehouse', 'SIDEBAR', NULL, 5, 1),
-  (NULL, 'MENU', '发布', (SELECT id FROM feature_object_categories WHERE code = 'COMPUTE'), '/deployments', 'SIDEBAR', NULL, 6, 1),
-  (NULL, 'MENU', '日志', (SELECT id FROM feature_object_categories WHERE code = 'OBSERVE'), '/logs', 'SIDEBAR', NULL, 7, 1),
-  (NULL, 'MENU', '版本历史', (SELECT id FROM feature_object_categories WHERE code = 'OBSERVE'), '/version', 'SIDEBAR', NULL, 8, 1),
-  (NULL, 'MENU', 'Git 运维', (SELECT id FROM feature_object_categories WHERE code = 'OBSERVE'), '/git', 'SIDEBAR', NULL, 9, 1)
+  (NULL, 'MENU', 'Knowledge Wiki', (SELECT id FROM feature_object_categories WHERE code = 'BUILD'), '/wiki', 'SIDEBAR', NULL, 1, 1),
+  (NULL, 'MENU', 'Workflow Builder', (SELECT id FROM feature_object_categories WHERE code = 'BUILD'), '/workflow', 'SIDEBAR', NULL, 2, 1),
+  (NULL, 'MENU', 'Unified IDE', (SELECT id FROM feature_object_categories WHERE code = 'BUILD'), '/ide', 'SIDEBAR', NULL, 3, 1),
+  (NULL, 'MENU', 'Data Tracking', (SELECT id FROM feature_object_categories WHERE code = 'COMPUTE'), '/data-tracking', 'SIDEBAR', NULL, 4, 1),
+  (NULL, 'MENU', 'Compute Warehouse', (SELECT id FROM feature_object_categories WHERE code = 'COMPUTE'), '/compute-warehouse', 'SIDEBAR', NULL, 5, 1),
+  (NULL, 'MENU', 'Deployments', (SELECT id FROM feature_object_categories WHERE code = 'COMPUTE'), '/deployments', 'SIDEBAR', NULL, 6, 1),
+  (NULL, 'MENU', 'Logs', (SELECT id FROM feature_object_categories WHERE code = 'OBSERVE'), '/logs', 'SIDEBAR', NULL, 7, 1),
+  (NULL, 'MENU', 'Version History', (SELECT id FROM feature_object_categories WHERE code = 'OBSERVE'), '/version', 'SIDEBAR', NULL, 8, 1),
+  (NULL, 'MENU', 'Git Ops', (SELECT id FROM feature_object_categories WHERE code = 'OBSERVE'), '/git', 'SIDEBAR', NULL, 9, 1)
 ON DUPLICATE KEY UPDATE
   parent_id = VALUES(parent_id),
   type = VALUES(type),
@@ -83,9 +83,9 @@ ON DUPLICATE KEY UPDATE
 
 INSERT INTO feature_objects (parent_id, type, name, category_id, path, location, description, sort, status)
 VALUES
-  (NULL, 'MENU', '个人中心', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/profile', 'PROFILE', NULL, 1, 1),
-  (NULL, 'MENU', '权限配置', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/profile/permission', 'PROFILE', NULL, 2, 1),
-  (NULL, 'MENU', 'AI 配置', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/profile/llm/models', 'PROFILE', NULL, 3, 1)
+  (NULL, 'MENU', 'Profile', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/profile', 'PROFILE', NULL, 1, 1),
+  (NULL, 'MENU', 'Permission Settings', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/profile/permission', 'PROFILE', NULL, 2, 1),
+  (NULL, 'MENU', 'AI Settings', (SELECT id FROM feature_object_categories WHERE code = 'MANAGE_DEFINE'), '/profile/llm/models', 'PROFILE', NULL, 3, 1)
 ON DUPLICATE KEY UPDATE
   parent_id = VALUES(parent_id),
   type = VALUES(type),
@@ -103,7 +103,7 @@ WHERE child.path IN ('/profile/permission', '/profile/llm/models');
 
 INSERT INTO feature_objects (parent_id, type, name, category_id, path, location, description, sort, status)
 VALUES
-  (NULL, 'PAGE', 'SQL 编辑器', NULL, '/ide/sql', 'PAGE', NULL, 1, 1)
+  (NULL, 'PAGE', 'SQL Editor', NULL, '/ide/sql', 'PAGE', NULL, 1, 1)
 ON DUPLICATE KEY UPDATE
   parent_id = VALUES(parent_id),
   type = VALUES(type),

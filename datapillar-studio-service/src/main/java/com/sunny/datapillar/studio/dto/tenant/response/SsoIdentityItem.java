@@ -8,15 +8,15 @@ import lombok.Data;
 @Schema(name = "SsoIdentityItem")
 public class SsoIdentityItem {
 
-    private Long id;
+  private Long id;
 
-    private Long userId;
+  private Long userId;
 
-    private String provider;
+  private String provider;
 
-    private String externalUserId;
+  private String externalUserId;
 
-    private LocalDateTime createdAt;
+  private LocalDateTime createdAt;
 
-    private LocalDateTime updatedAt;
+  private LocalDateTime updatedAt;
 }

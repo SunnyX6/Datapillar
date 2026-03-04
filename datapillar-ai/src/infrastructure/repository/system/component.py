@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-ETL 组件数据访问
+ETL Component data access
 
-表：job_component
+table：job_component
 """
 
 import logging
@@ -19,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class Component:
-    """ETL 组件查询（job_component）"""
+    """ETL Component query（job_component）"""
 
     @staticmethod
     def list_active(tenant_id: int) -> list[dict[str, Any]]:
@@ -43,7 +42,7 @@ class Component:
                 result = conn.execute(query, {"tenant_id": tenant_id})
                 return [dict(row) for row in result.mappings()]
         except Exception as e:
-            logger.error(f"获取组件列表失败: {e}")
+            logger.error(f"Failed to get component list: {e}")
             return []
 
     @staticmethod
@@ -77,7 +76,7 @@ class Component:
                 row = result.mappings().fetchone()
                 return dict(row) if row else None
         except Exception as e:
-            logger.error(f"获取组件 {component_code} 失败: {e}")
+            logger.error(f"Get component {component_code} failed: {e}")
             return None
 
     @staticmethod
@@ -111,5 +110,5 @@ class Component:
                 )
                 return [dict(row) for row in result.mappings()]
         except Exception as e:
-            logger.error(f"获取 {component_type} 类型组件失败: {e}")
+            logger.error(f"Get {component_type} Type component failed: {e}")
             return []

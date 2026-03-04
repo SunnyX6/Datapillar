@@ -7,11 +7,11 @@ import lombok.Data;
 @Schema(name = "FeatureObjectRoleSource")
 public class FeatureRoleSourceItem {
 
-    private Long objectId;
+  private Long objectId;
 
-    private Long roleId;
+  private Long roleId;
 
-    private String roleName;
+  private String roleName;
 
-    private String permissionCode;
+  private String permissionCode;
 }

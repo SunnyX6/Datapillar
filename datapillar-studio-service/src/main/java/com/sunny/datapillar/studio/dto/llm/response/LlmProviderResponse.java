@@ -8,13 +8,13 @@ import lombok.Data;
 @Schema(name = "LlmProviderResponse")
 public class LlmProviderResponse {
 
-    private Long id;
+  private Long id;
 
-    private String code;
+  private String code;
 
-    private String name;
+  private String name;
 
-    private String baseUrl;
+  private String baseUrl;
 
-    private List<String> modelIds;
+  private List<String> modelIds;
 }

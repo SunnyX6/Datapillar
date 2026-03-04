@@ -1,15 +1,10 @@
 /**
- * SQL DDL 解析服务
- * 基于 dt-sql-parser 实现，支持 Hive、Spark、Flink、MySQL 等多种 SQL 方言
+ * SQL DDL parsing service
+ * Based on dt-sql-parser realize,support Hive,Spark,Flink,MySQL etc.SQL dialect
  */
 
 import {
-  MySQL,
-  FlinkSQL,
-  SparkSQL,
-  HiveSQL,
-  PostgreSQL,
-  TrinoSQL
+ MySQL,FlinkSQL,SparkSQL,HiveSQL,PostgreSQL,TrinoSQL
 } from 'dt-sql-parser'
 import { EntityContextType } from 'dt-sql-parser'
 import type { ParseError } from 'dt-sql-parser'
@@ -17,218 +12,175 @@ import type { ParseError } from 'dt-sql-parser'
 export type SqlDialect = 'MySQL' | 'HiveSQL' | 'SparkSQL' | 'FlinkSQL' | 'PostgreSQL' | 'TrinoSQL'
 
 export interface ParsedColumn {
-  id: string
-  name: string
-  dataType: string
-  comment: string
-  nullable: boolean
-  isPartition?: boolean
+ id:string
+ name:string
+ dataType:string
+ comment:string
+ nullable:boolean
+ isPartition?: boolean
 }
 
 export interface ParsedProperty {
-  id: string
-  key: string
-  value: string
+ id:string
+ key:string
+ value:string
 }
 
 export interface ParsedDDL {
-  tableName: string
-  columns: ParsedColumn[]
-  properties: ParsedProperty[]
-  tableComment: string
+ tableName:string
+ columns:ParsedColumn[]
+ properties:ParsedProperty[]
+ tableComment:string
 }
 
-// Provider 到 SQL 方言的映射
-const PROVIDER_DIALECT_MAP: Record<string, SqlDialect> = {
-  hive: 'HiveSQL',
-  'lakehouse-iceberg': 'HiveSQL',
-  'lakehouse-hudi': 'HiveSQL',
-  'lakehouse-paimon': 'HiveSQL',
-  'jdbc-mysql': 'MySQL',
-  'jdbc-doris': 'MySQL',
-  'jdbc-oceanbase': 'MySQL',
-  'jdbc-starrocks': 'MySQL',
-  'jdbc-postgresql': 'PostgreSQL',
-  spark: 'SparkSQL',
-  databricks: 'SparkSQL',
-  trino: 'TrinoSQL',
-  flink: 'FlinkSQL'
+// Provider Arrive SQL Dialect mapping
+const PROVIDER_DIALECT_MAP:Record<string,SqlDialect> = {
+ hive:'HiveSQL','lakehouse-iceberg':'HiveSQL','lakehouse-hudi':'HiveSQL','lakehouse-paimon':'HiveSQL','jdbc-mysql':'MySQL','jdbc-doris':'MySQL','jdbc-oceanbase':'MySQL','jdbc-starrocks':'MySQL','jdbc-postgresql':'PostgreSQL',spark:'SparkSQL',databricks:'SparkSQL',trino:'TrinoSQL',flink:'FlinkSQL'
 }
 
-export const DIALECT_LABELS: Record<SqlDialect, string> = {
-  HiveSQL: 'Hive SQL',
-  MySQL: 'MySQL',
-  PostgreSQL: 'PostgreSQL',
-  SparkSQL: 'Spark SQL',
-  TrinoSQL: 'Trino SQL',
-  FlinkSQL: 'Flink SQL'
+export const DIALECT_LABELS:Record<SqlDialect,string> = {
+ HiveSQL:'Hive SQL',MySQL:'MySQL',PostgreSQL:'PostgreSQL',SparkSQL:'Spark SQL',TrinoSQL:'Trino SQL',FlinkSQL:'Flink SQL'
 }
 
 /**
- * 根据 provider 解析对应的 SQL 方言
+ * According to provider Analyze the corresponding SQL dialect
  */
-export function resolveDialect(provider?: string): SqlDialect {
-  if (!provider) return 'MySQL'
-  if (PROVIDER_DIALECT_MAP[provider]) return PROVIDER_DIALECT_MAP[provider]
-  const matched = Object.keys(PROVIDER_DIALECT_MAP).find((key) => provider.startsWith(key))
-  return matched ? PROVIDER_DIALECT_MAP[matched] : 'MySQL'
+export function resolveDialect(provider?: string):SqlDialect {
+ if (!provider) return 'MySQL'
+ if (PROVIDER_DIALECT_MAP[provider]) return PROVIDER_DIALECT_MAP[provider]
+ const matched = Object.keys(PROVIDER_DIALECT_MAP).find((key) => provider.startsWith(key))
+ return matched?PROVIDER_DIALECT_MAP[matched]:'MySQL'
 }
 
 /**
- * 获取对应方言的解析器实例
+ * Get the parser instance of the corresponding dialect
  */
-function getParser(dialect: SqlDialect) {
-  switch (dialect) {
-    case 'HiveSQL':
-      return new HiveSQL()
-    case 'SparkSQL':
-      return new SparkSQL()
-    case 'FlinkSQL':
-      return new FlinkSQL()
-    case 'PostgreSQL':
-      return new PostgreSQL()
-    case 'TrinoSQL':
-      return new TrinoSQL()
-    case 'MySQL':
-    default:
-      return new MySQL()
-  }
+function getParser(dialect:SqlDialect) {
+ switch (dialect) {
+ case 'HiveSQL':return new HiveSQL()
+ case 'SparkSQL':return new SparkSQL()
+ case 'FlinkSQL':return new FlinkSQL()
+ case 'PostgreSQL':return new PostgreSQL()
+ case 'TrinoSQL':return new TrinoSQL()
+ case 'MySQL':default:return new MySQL()
+ }
 }
 
 /**
- * 生成唯一 ID
+ * generate unique ID
  */
-function generateId(prefix: string, index: number): string {
-  return `${prefix}_${Date.now()}_${index}`
+function generateId(prefix:string,index:number):string {
+ return `${prefix}_${Date.now()}_${index}`
 }
 
 /**
- * 从 WordRange 提取文本
+ * from WordRange Extract text
  */
-function extractText(ddl: string, range: { startIndex: number; endIndex: number } | null): string {
-  if (!range) return ''
-  return ddl.substring(range.startIndex, range.endIndex + 1).replace(/^['"`]|['"`]$/g, '')
+function extractText(ddl:string,range:{ startIndex:number;endIndex:number } | null):string {
+ if (!range) return ''
+ return ddl.substring(range.startIndex,range.endIndex + 1).replace(/^['"`]|['"`]$/g,'')
 }
 
 /**
- * 主解析函数 - 使用 dt-sql-parser 的 getAllEntities API
+ * Main analytical function - use dt-sql-parser of getAllEntities API
  */
-export function parseDDL(ddl: string, provider?: string): ParsedDDL {
-  const dialect = resolveDialect(provider)
-  const parser = getParser(dialect)
+export function parseDDL(ddl:string,provider?: string):ParsedDDL {
+ const dialect = resolveDialect(provider)
+ const parser = getParser(dialect)
 
-  // 先验证语法，有错误直接抛出
-  const errors = parser.validate(ddl)
-  if (errors.length > 0) {
-    const firstError = errors[0]
-    throw new Error(
-      `DDL 语法错误 (行 ${firstError.startLine}, 列 ${firstError.startColumn}): ${firstError.message}`
-    )
-  }
+ // Verify the syntax first,Throw an error directly
+ const errors = parser.validate(ddl)
+ if (errors.length > 0) {
+ const firstError = errors[0]
+ throw new Error(`DDL syntax error (OK ${firstError.startLine},Column ${firstError.startColumn}):${firstError.message}`)
+ }
 
-  const result: ParsedDDL = {
-    tableName: '',
-    columns: [],
-    properties: [],
-    tableComment: ''
-  }
+ const result:ParsedDDL = {
+ tableName:'',columns:[],properties:[],tableComment:''
+ }
 
-  // 使用 getAllEntities 提取所有实体
-  const entities = parser.getAllEntities(ddl)
+ // use getAllEntities Extract all entities
+ const entities = parser.getAllEntities(ddl)
 
-  if (!entities || entities.length === 0) {
-    throw new Error('无法解析 DDL，请检查语句格式。')
-  }
+ if (!entities || entities.length === 0) {
+ throw new Error('Unable to parse DDL,Please check the statement format.')
+ }
 
-  // 检测 PARTITIONED BY 的位置（不区分大小写）
-  const partitionMatch = ddl.match(/PARTITIONED\s+BY\s*\(/i)
-  const partitionStartIndex = partitionMatch ? partitionMatch.index! : -1
+ // Detection PARTITIONED BY location(Not case sensitive)
+ const partitionMatch = ddl.match(/PARTITIONED\s+BY\s*\(/i)
+ const partitionStartIndex = partitionMatch?partitionMatch.index!: -1
 
-  let colIndex = 0
-  let propIndex = 0
-  let currentPropKey = ''
+ let colIndex = 0
+ let propIndex = 0
+ let currentPropKey = ''
 
-  for (const entity of entities) {
-    switch (entity.entityContextType) {
-      // 表名
-      case EntityContextType.TABLE_CREATE: {
-        result.tableName = entity.text
-        // 提取表注释
-        if (entity['_comment']) {
-          result.tableComment = extractText(ddl, entity['_comment'] as { startIndex: number; endIndex: number })
-        }
-        // 提取列（如果 columns 存在）
-        const tableEntity = entity as { columns?: Array<{
-          text: string
-          position?: { startIndex: number }
-          _colType?: { text?: string; startIndex: number; endIndex: number }
-          _comment?: { text?: string; startIndex: number; endIndex: number }
-        }> }
-        if (tableEntity.columns) {
-          tableEntity.columns.forEach((col) => {
-            const colStartIndex = col.position?.startIndex ?? 0
-            const isPartition = partitionStartIndex > 0 && colStartIndex > partitionStartIndex
-            result.columns.push({
-              id: generateId('col', colIndex++),
-              name: col.text,
-              dataType: col._colType?.text?.toUpperCase() || 'STRING',
-              comment: col._comment?.text?.replace(/^['"`]|['"`]$/g, '') || '',
-              nullable: true,
-              isPartition
-            })
-          })
-        }
-        break
-      }
+ for (const entity of entities) {
+ switch (entity.entityContextType) {
+ // table name
+ case EntityContextType.TABLE_CREATE:{
+ result.tableName = entity.text
+ // Extract table comments
+ if (entity['_comment']) {
+ result.tableComment = extractText(ddl,entity['_comment'] as { startIndex:number;endIndex:number })
+ }
+ // Extract columns(if columns exist)
+ const tableEntity = entity as { columns?: Array<{
+ text:string
+ position?: { startIndex:number }
+ _colType?: { text?: string;startIndex:number;endIndex:number }
+ _comment?: { text?: string;startIndex:number;endIndex:number }
+ }> }
+ if (tableEntity.columns) {
+ tableEntity.columns.forEach((col) => {
+ const colStartIndex = col.position?.startIndex?? 0
+ const isPartition = partitionStartIndex > 0 && colStartIndex > partitionStartIndex
+ result.columns.push({
+ id:generateId('col',colIndex++),name:col.text,dataType:col._colType?.text?.toUpperCase() || 'STRING',comment:col._comment?.text?.replace(/^['"`]|['"`]$/g,'') || '',nullable:true,isPartition
+ })
+ })
+ }
+ break
+ }
 
-      // 列名（独立的列实体）
-      case EntityContextType.COLUMN_CREATE: {
-        const colEntity = entity as {
-          text: string
-          position?: { startIndex: number }
-          _colType?: { text?: string; startIndex: number; endIndex: number }
-          _comment?: { text?: string; startIndex: number; endIndex: number }
-        }
-        const colStartIndex = colEntity.position?.startIndex ?? 0
-        const isPartition = partitionStartIndex > 0 && colStartIndex > partitionStartIndex
-        result.columns.push({
-          id: generateId('col', colIndex++),
-          name: colEntity.text,
-          dataType: colEntity._colType?.text?.toUpperCase() || 'STRING',
-          comment: colEntity._comment?.text?.replace(/^['"`]|['"`]$/g, '') || '',
-          nullable: true,
-          isPartition
-        })
-        break
-      }
+ // List(independent column entity)
+ case EntityContextType.COLUMN_CREATE:{
+ const colEntity = entity as {
+ text:string
+ position?: { startIndex:number }
+ _colType?: { text?: string;startIndex:number;endIndex:number }
+ _comment?: { text?: string;startIndex:number;endIndex:number }
+ }
+ const colStartIndex = colEntity.position?.startIndex?? 0
+ const isPartition = partitionStartIndex > 0 && colStartIndex > partitionStartIndex
+ result.columns.push({
+ id:generateId('col',colIndex++),name:colEntity.text,dataType:colEntity._colType?.text?.toUpperCase() || 'STRING',comment:colEntity._comment?.text?.replace(/^['"`]|['"`]$/g,'') || '',nullable:true,isPartition
+ })
+ break
+ }
 
-      // 表属性 key
-      case EntityContextType.TABLE_PROPERTY_KEY:
-        currentPropKey = entity.text
-        break
+ // table properties key
+ case EntityContextType.TABLE_PROPERTY_KEY:currentPropKey = entity.text
+ break
 
-      // 表属性 value
-      case EntityContextType.TABLE_PROPERTY_VALUE:
-        if (currentPropKey) {
-          result.properties.push({
-            id: generateId('prop', propIndex++),
-            key: currentPropKey,
-            value: entity.text
-          })
-          currentPropKey = ''
-        }
-        break
-    }
-  }
+ // table properties value
+ case EntityContextType.TABLE_PROPERTY_VALUE:if (currentPropKey) {
+ result.properties.push({
+ id:generateId('prop',propIndex++),key:currentPropKey,value:entity.text
+ })
+ currentPropKey = ''
+ }
+ break
+ }
+ }
 
-  return result
+ return result
 }
 
 /**
- * 验证 DDL 语法
+ * Verify DDL Grammar
  */
-export function validateDDL(ddl: string, provider?: string): ParseError[] {
-  const dialect = resolveDialect(provider)
-  const parser = getParser(dialect)
-  return parser.validate(ddl)
+export function validateDDL(ddl:string,provider?: string):ParseError[] {
+ const dialect = resolveDialect(provider)
+ const parser = getParser(dialect)
+ return parser.validate(ddl)
 }

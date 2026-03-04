@@ -1,6 +1,6 @@
 # Contributing to Datapillar
 
-English | [简体中文](./CONTRIBUTING.zh-CN.md)
+English | [Simplified Chinese](./CONTRIBUTING.zh-CN.md)
 
 Thanks for contributing to Datapillar.
 

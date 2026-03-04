@@ -2,40 +2,37 @@
 """
 Datapillar Airflow Plugin - Unified REST API for Airflow 3.x
 
-封装 Airflow 官方 API，提供统一的接口给 studio-service 调用。
-
-API 设计：
-├── DAG 管理
-│   ├── POST   /dags              - 创建/部署 DAG
-│   ├── DELETE /dags/{id}         - 删除 DAG 文件
-│   ├── GET    /dags              - 列出 DAG
-│   ├── GET    /dags/{id}         - DAG 详情
-│   └── PATCH  /dags/{id}         - 暂停/恢复 DAG
+encapsulation Airflow official API,Provide a unified interface to studio-service call.API design:├── DAG management
+│ ├── POST /dags - create/deploy DAG
+│ ├── DELETE /dags/{id} - Delete DAG File
+│ ├── GET /dags - list DAG
+│ ├── GET /dags/{id} - DAG Details
+│ └── PATCH /dags/{id} - pause/restore DAG
 │
-├── DAG 版本管理
-│   ├── GET    /dags/{id}/versions           - 列出 DAG 版本历史
-│   └── GET    /dags/{id}/versions/{num}     - 获取特定版本详情
+├── DAG Version management
+│ ├── GET /dags/{id}/versions - list DAG Version history
+│ └── GET /dags/{id}/versions/{num} - Get specific version details
 │
-├── DAG Run 管理
-│   ├── POST   /dags/{id}/runs           - 触发 DAG
-│   ├── GET    /dags/{id}/runs           - 列出 Runs
-│   └── GET    /dags/{id}/runs/{run_id}  - Run 状态
+├── DAG Run management
+│ ├── POST /dags/{id}/runs - trigger DAG
+│ ├── GET /dags/{id}/runs - list Runs
+│ └── GET /dags/{id}/runs/{run_id} - Run Status
 │
-├── Task 管理
-│   ├── GET    /dags/{id}/runs/{run_id}/tasks         - 任务列表
-│   ├── GET    /dags/{id}/runs/{run_id}/tasks/{tid}   - 任务状态
-│   ├── PATCH  /dags/{id}/runs/{run_id}/tasks/{tid}/state  - 设置任务状态 (success/failed/skipped)
-│   ├── POST   /dags/{id}/runs/{run_id}/tasks/{tid}/rerun  - 重跑单个任务
-│   ├── POST   /dags/{id}/runs/{run_id}/clear              - 批量清除任务
-│   └── GET    /dags/{id}/runs/{run_id}/tasks/{tid}/logs   - 任务日志
+├── Task management
+│ ├── GET /dags/{id}/runs/{run_id}/tasks - task list
+│ ├── GET /dags/{id}/runs/{run_id}/tasks/{tid} - Task status
+│ ├── PATCH /dags/{id}/runs/{run_id}/tasks/{tid}/state - Set task status (success/failed/skipped)
+│ ├── POST /dags/{id}/runs/{run_id}/tasks/{tid}/rerun - Rerun a single task
+│ ├── POST /dags/{id}/runs/{run_id}/clear - Batch cleaning tasks
+│ └── GET /dags/{id}/runs/{run_id}/tasks/{tid}/logs - Mission log
 │
-└── 其他
-    ├── GET    /health              - 健康检查
-    └── POST   /dags/reserialize    - 强制刷新 DAG
+└── Others
+    ├── GET /health - health check
+    └── POST /dags/reserialize - Force refresh DAG
 """
 
-from fastapi import FastAPI, HTTPException, Query, Depends
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Query, Depends, Header
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 import logging
@@ -43,14 +40,14 @@ import logging
 from airflow.api_fastapi.core_api.security import GetUserDep
 
 from .dag_generator import DagGenerator
-from .config import get_config
 
 logger = logging.getLogger(__name__)
+DAG_GENERATOR = DagGenerator()
 
 # FastAPI App
 app = FastAPI(
     title="Datapillar Airflow API",
-    description="统一 API 封装 Airflow，屏蔽版本差异",
+    description="unify API encapsulation Airflow,Block version differences",
     version="2.0.0"
 )
 
@@ -58,7 +55,7 @@ app = FastAPI(
 # ==================== Authentication ====================
 
 def require_auth(user: GetUserDep):
-    """验证用户已登录"""
+    """Verify user is logged in"""
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
     return user
@@ -67,7 +64,7 @@ def require_auth(user: GetUserDep):
 # ==================== Request/Response Models ====================
 
 class JobInfo(BaseModel):
-    """任务定义 - 对应 job_info 表"""
+    """task definition - Correspond job_info table"""
     id: int
     job_name: str
     job_type: str  # component_code: SHELL, PYTHON, SQL, HTTP, SPARK
@@ -77,17 +74,17 @@ class JobInfo(BaseModel):
 
 
 class JobDependency(BaseModel):
-    """依赖关系 - 对应 job_dependency 表"""
+    """Dependencies - Correspond job_dependency table"""
     job_id: int
     parent_job_id: int
 
 
 class Workflow(BaseModel):
-    """工作流配置 - 对应 job_workflow 表"""
+    """Workflow configuration - Correspond job_workflow table"""
     workflow_name: str
     description: Optional[str] = None
     trigger_type: Optional[int] = 1  # 1: cron, 2: manual, etc.
-    trigger_value: Optional[str] = None  # cron 表达式
+    trigger_value: Optional[str] = None  # ISO Format,If left blank,the current time will be used
     timeout_seconds: Optional[int] = 0
     max_retry_times: Optional[int] = 0
     jobs: List[JobInfo]
@@ -95,37 +92,38 @@ class Workflow(BaseModel):
 
 
 class DeployDagRequest(BaseModel):
-    """部署 DAG 请求"""
-    namespace: Optional[str] = None
+    """Deploy DAG request."""
+    workflow_id: int = Field(..., ge=1)
+    dag_id: Optional[str] = None
     workflow: Workflow
 
 
 class TriggerDagRequest(BaseModel):
-    """触发 DAG 请求"""
-    logical_date: Optional[str] = None  # ISO 格式，不填则使用当前时间
+    """trigger DAG Request"""
+    logical_date: Optional[str] = None  # success,failed,skipped
     conf: Optional[Dict[str, Any]] = None
 
 
 class PatchDagRequest(BaseModel):
-    """更新 DAG 请求"""
+    """update DAG Request"""
     is_paused: Optional[bool] = None
 
 
 class RerunTaskRequest(BaseModel):
-    """重跑任务请求"""
+    """Request to rerun task"""
     downstream: bool = False
     upstream: bool = False
 
 
 class SetTaskStateRequest(BaseModel):
-    """设置任务状态请求"""
+    """Set task status request"""
     new_state: str  # success, failed, skipped
     include_upstream: bool = False
     include_downstream: bool = False
 
 
 class ClearTasksRequest(BaseModel):
-    """清除任务请求"""
+    """Clear task request"""
     task_ids: List[str]
     only_failed: bool = True
     reset_dag_runs: bool = True
@@ -134,22 +132,43 @@ class ClearTasksRequest(BaseModel):
 
 
 class ApiResponse(BaseModel):
-    """统一 API 响应"""
+    """unify API response"""
     success: bool
     message: Optional[str] = None
     data: Optional[Any] = None
 
 
+def require_tenant_code(x_tenant_code: Optional[str] = Header(default=None, alias="X-Tenant-Code")) -> str:
+    """Validate and normalize tenant header."""
+    try:
+        return DAG_GENERATOR.normalize_tenant_code(x_tenant_code)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def require_tenant_dag_match(
+        dag_id: str,
+        tenant_code: str = Depends(require_tenant_code)) -> str:
+    """Ensure dag_id belongs to current tenant."""
+    try:
+        dag_tenant, _ = DAG_GENERATOR.parse_dag_id(dag_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if dag_tenant != tenant_code:
+        raise HTTPException(status_code=403, detail="Tenant is not allowed to access this DAG")
+    return tenant_code
+
+
 # ==================== Helper Functions ====================
 
 def get_airflow_session():
-    """获取 Airflow 数据库 session"""
+    """Get Airflow database session"""
     from airflow.utils.session import create_session
     return create_session()
 
 
 def serialize_dag(dag_model) -> Dict[str, Any]:
-    """序列化 DAG 模型"""
+    """serialization DAG model"""
     return {
         "dag_id": dag_model.dag_id,
         "description": dag_model.description,
@@ -164,7 +183,7 @@ def serialize_dag(dag_model) -> Dict[str, Any]:
 
 
 def serialize_dagrun(dagrun) -> Dict[str, Any]:
-    """序列化 DAG Run"""
+    """serialization DAG Run"""
     return {
         "run_id": dagrun.run_id,
         "dag_id": dagrun.dag_id,
@@ -178,7 +197,7 @@ def serialize_dagrun(dagrun) -> Dict[str, Any]:
 
 
 def serialize_task_instance(ti) -> Dict[str, Any]:
-    """序列化 Task Instance"""
+    """serialization Task Instance"""
     return {
         "task_id": ti.task_id,
         "dag_id": ti.dag_id,
@@ -196,7 +215,7 @@ def serialize_task_instance(ti) -> Dict[str, Any]:
 
 
 def serialize_dag_version(version) -> Dict[str, Any]:
-    """序列化 DAG Version"""
+    """serialization DAG Version"""
     return {
         "id": str(version.id),
         "version_number": version.version_number,
@@ -212,21 +231,22 @@ def serialize_dag_version(version) -> Dict[str, Any]:
 
 @app.get("/health")
 async def health_check():
-    """健康检查"""
+    """health check"""
     return {"status": "ok", "service": "datapillar-airflow-plugin", "api_version": "v2"}
 
 
 # ==================== DAG Management ====================
 
 @app.post("/dags", response_model=ApiResponse, dependencies=[Depends(require_auth)])
-async def deploy_dag(request: DeployDagRequest):
+async def deploy_dag(request: DeployDagRequest, tenant_code: str = Depends(require_tenant_code)):
     """
-    部署 DAG - 创建 DAG 文件到 Airflow dags 目录
+    deploy DAG - create DAG file to Airflow dags Directory
     """
     try:
-        generator = DagGenerator()
-        dag_id = request.workflow.workflow_name
-        dag_path = generator.generate(dag_id, request.workflow.model_dump())
+        dag_id = DAG_GENERATOR.build_dag_id(tenant_code, request.workflow_id)
+        if request.dag_id is not None and request.dag_id.strip().lower() != dag_id:
+            raise HTTPException(status_code=400, detail=f"dag_id mismatch: expected {dag_id}")
+        dag_path = DAG_GENERATOR.generate(tenant_code, request.workflow_id, dag_id, request.workflow.model_dump())
 
         logger.info(f"DAG deployed: {dag_id} at {dag_path}")
 
@@ -241,13 +261,13 @@ async def deploy_dag(request: DeployDagRequest):
 
 
 @app.delete("/dags/{dag_id}", response_model=ApiResponse, dependencies=[Depends(require_auth)])
-async def delete_dag(dag_id: str):
+async def delete_dag(dag_id: str, tenant_code: str = Depends(require_tenant_dag_match)):
     """
-    删除 DAG - 删除 DAG 文件
+    Delete DAG - Delete DAG File
     """
     try:
-        generator = DagGenerator()
-        generator.delete(dag_id)
+        _, workflow_id = DAG_GENERATOR.parse_dag_id(dag_id)
+        DAG_GENERATOR.delete(tenant_code, workflow_id)
 
         logger.info(f"DAG file deleted: {dag_id}")
 
@@ -266,20 +286,21 @@ async def delete_dag(dag_id: str):
 async def list_dags(
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
-    only_active: bool = Query(default=True, description="只显示活跃的 DAG（非 stale）"),
-    tags: Optional[str] = Query(default=None, description="逗号分隔的标签过滤")
+    only_active: bool = Query(default=True, description="Show only active DAG(Not stale)"),
+    tags: Optional[str] = Query(default=None, description="Comma separated tag filtering"),
+    tenant_code: str = Depends(require_tenant_code),
 ):
     """
-    列出 DAG
+    list DAG
     """
     try:
         from airflow.models import DagModel
 
         with get_airflow_session() as session:
-            query = session.query(DagModel)
+            query = session.query(DagModel).filter(DagModel.dag_id.like(f"dp_{tenant_code}_w%"))
 
             if only_active:
-                # Airflow 3.x: is_stale=False 表示活跃
+                # ==================== DAG Version Management ====================
                 query = query.filter(DagModel.is_stale == False)
 
             if tags:
@@ -302,9 +323,9 @@ async def list_dags(
 
 
 @app.get("/dags/{dag_id}", response_model=ApiResponse, dependencies=[Depends(require_auth)])
-async def get_dag(dag_id: str):
+async def get_dag(dag_id: str, tenant_code: str = Depends(require_tenant_dag_match)):
     """
-    获取 DAG 详情
+    Get DAG Details
     """
     try:
         from airflow.models import DagModel
@@ -327,9 +348,9 @@ async def get_dag(dag_id: str):
 
 
 @app.patch("/dags/{dag_id}", response_model=ApiResponse, dependencies=[Depends(require_auth)])
-async def patch_dag(dag_id: str, request: PatchDagRequest):
+async def patch_dag(dag_id: str, request: PatchDagRequest, tenant_code: str = Depends(require_tenant_dag_match)):
     """
-    更新 DAG - 暂停/恢复
+    update DAG - pause/restore
     """
     try:
         from airflow.models import DagModel
@@ -363,10 +384,11 @@ async def patch_dag(dag_id: str, request: PatchDagRequest):
 async def list_dag_versions(
     dag_id: str,
     limit: int = Query(default=25, ge=1, le=100),
-    offset: int = Query(default=0, ge=0)
+    offset: int = Query(default=0, ge=0),
+    tenant_code: str = Depends(require_tenant_dag_match),
 ):
     """
-    列出 DAG 版本历史
+    list DAG Version history
     """
     try:
         from airflow.models.dag_version import DagVersion
@@ -390,11 +412,11 @@ async def list_dag_versions(
 
 
 @app.get("/dags/{dag_id}/versions/{version_number}", response_model=ApiResponse, dependencies=[Depends(require_auth)])
-async def get_dag_version(dag_id: str, version_number: int):
+async def get_dag_version(dag_id: str, version_number: int, tenant_code: str = Depends(require_tenant_dag_match)):
     """
-    获取 DAG 特定版本详情
+    Get DAG Specific version details
 
-    返回版本基本信息以及该版本的 DAG 结构（tasks 和 dependencies）
+    Returns basic version information and the DAG structure(tasks and dependencies)
     """
     try:
         from airflow.models.dag_version import DagVersion
@@ -414,19 +436,19 @@ async def get_dag_version(dag_id: str, version_number: int):
                     detail=f"DAG version not found: {dag_id} v{version_number}"
                 )
 
-            # 基本版本信息
+            # add DAG structural information(If there is serialization DAG)
             result = serialize_dag_version(version)
 
-            # 添加 DAG 结构信息（如果有序列化的 DAG）
+            # Extract task and dependency information
             if version.serialized_dag:
                 try:
                     dag_data = version.serialized_dag.data
                     if dag_data:
-                        # 提取任务和依赖信息
+                        # Airflow 3.x:data in __var within
                         tasks = []
                         raw_tasks = dag_data.get("dag", {}).get("tasks", [])
                         for task in raw_tasks:
-                            # Airflow 3.x: 数据在 __var 内
+                            # ==================== DAG Run Management ====================
                             task_var = task.get("__var", task)
                             tasks.append({
                                 "task_id": task_var.get("task_id"),
@@ -454,9 +476,13 @@ async def get_dag_version(dag_id: str, version_number: int):
 # ==================== DAG Run Management ====================
 
 @app.post("/dags/{dag_id}/runs", response_model=ApiResponse, dependencies=[Depends(require_auth)])
-async def trigger_dag(dag_id: str, request: Optional[TriggerDagRequest] = None):
+async def trigger_dag(
+    dag_id: str,
+    request: Optional[TriggerDagRequest] = None,
+    tenant_code: str = Depends(require_tenant_dag_match),
+):
     """
-    触发 DAG Run
+    trigger DAG Run
     """
     try:
         from airflow.models import DagModel, DagRun
@@ -469,17 +495,17 @@ async def trigger_dag(dag_id: str, request: Optional[TriggerDagRequest] = None):
             if not dag:
                 raise HTTPException(status_code=404, detail=f"DAG not found: {dag_id}")
 
-            # 解析 logical_date
+            # generate run_id
             if request and request.logical_date:
                 logical_date = datetime.fromisoformat(request.logical_date.replace('Z', '+00:00'))
             else:
                 from datetime import timezone
                 logical_date = datetime.now(timezone.utc)
 
-            # 生成 run_id
+            # Check if it already exists
             run_id = f"manual__{logical_date.isoformat()}"
 
-            # 检查是否已存在
+            # create DAG Run
             existing = session.query(DagRun).filter(
                 DagRun.dag_id == dag_id,
                 DagRun.run_id == run_id
@@ -491,7 +517,7 @@ async def trigger_dag(dag_id: str, request: Optional[TriggerDagRequest] = None):
                     detail=f"DAG Run already exists: {run_id}"
                 )
 
-            # 创建 DAG Run
+            # ==================== Task Management ====================
             dag_run = DagRun(
                 dag_id=dag_id,
                 run_id=run_id,
@@ -524,10 +550,11 @@ async def list_dag_runs(
     dag_id: str,
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    state: Optional[str] = Query(default=None, description="过滤状态: queued, running, success, failed")
+    state: Optional[str] = Query(default=None, description="filter status:queued,running,success,failed"),
+    tenant_code: str = Depends(require_tenant_dag_match),
 ):
     """
-    列出 DAG Runs
+    list DAG Runs
     """
     try:
         from airflow.models import DagRun
@@ -554,9 +581,9 @@ async def list_dag_runs(
 
 
 @app.get("/dags/{dag_id}/runs/{run_id}", response_model=ApiResponse, dependencies=[Depends(require_auth)])
-async def get_dag_run(dag_id: str, run_id: str):
+async def get_dag_run(dag_id: str, run_id: str, tenant_code: str = Depends(require_tenant_dag_match)):
     """
-    获取 DAG Run 详情
+    Get DAG Run Details
     """
     try:
         from airflow.models import DagRun
@@ -584,9 +611,9 @@ async def get_dag_run(dag_id: str, run_id: str):
 # ==================== Task Management ====================
 
 @app.get("/dags/{dag_id}/runs/{run_id}/tasks", response_model=ApiResponse, dependencies=[Depends(require_auth)])
-async def list_tasks(dag_id: str, run_id: str):
+async def list_tasks(dag_id: str, run_id: str, tenant_code: str = Depends(require_tenant_dag_match)):
     """
-    列出任务实例
+    List task instances
     """
     try:
         from airflow.models import TaskInstance
@@ -610,9 +637,9 @@ async def list_tasks(dag_id: str, run_id: str):
 
 
 @app.get("/dags/{dag_id}/runs/{run_id}/tasks/{task_id}", response_model=ApiResponse, dependencies=[Depends(require_auth)])
-async def get_task(dag_id: str, run_id: str, task_id: str):
+async def get_task(dag_id: str, run_id: str, task_id: str, tenant_code: str = Depends(require_tenant_dag_match)):
     """
-    获取任务详情
+    Get task details
     """
     try:
         from airflow.models import TaskInstance
@@ -639,16 +666,22 @@ async def get_task(dag_id: str, run_id: str, task_id: str):
 
 
 @app.post("/dags/{dag_id}/runs/{run_id}/tasks/{task_id}/rerun", response_model=ApiResponse, dependencies=[Depends(require_auth)])
-async def rerun_task(dag_id: str, run_id: str, task_id: str, request: Optional[RerunTaskRequest] = None):
+async def rerun_task(
+    dag_id: str,
+    run_id: str,
+    task_id: str,
+    request: Optional[RerunTaskRequest] = None,
+    tenant_code: str = Depends(require_tenant_dag_match),
+):
     """
-    重跑任务 - 清除任务状态让 scheduler 重新调度
+    rerun mission - Clear task status scheduler Rescheduling
     """
     try:
         from airflow.models import TaskInstance, DagRun
         from airflow.utils.state import DagRunState
 
         with get_airflow_session() as session:
-            # 查找任务
+            # Clear task status
             task = session.query(TaskInstance).filter(
                 TaskInstance.dag_id == dag_id,
                 TaskInstance.run_id == run_id,
@@ -658,7 +691,7 @@ async def rerun_task(dag_id: str, run_id: str, task_id: str, request: Optional[R
             if not task:
                 raise HTTPException(status_code=404, detail=f"Task not found: {dag_id}/{run_id}/{task_id}")
 
-            # 清除任务状态
+            # update DAG Run The status is queued,let scheduler Rescheduling
             task.state = None
             task.start_date = None
             task.end_date = None
@@ -666,7 +699,7 @@ async def rerun_task(dag_id: str, run_id: str, task_id: str, request: Optional[R
 
             cleared_tasks = [task_id]
 
-            # 更新 DAG Run 状态为 queued，让 scheduler 重新调度
+            # use DBDagBag Get SerializedDAG
             dag_run = session.query(DagRun).filter(
                 DagRun.dag_id == dag_id,
                 DagRun.run_id == run_id
@@ -697,12 +730,17 @@ async def rerun_task(dag_id: str, run_id: str, task_id: str, request: Optional[R
 
 
 @app.patch("/dags/{dag_id}/runs/{run_id}/tasks/{task_id}/state", response_model=ApiResponse, dependencies=[Depends(require_auth)])
-async def set_task_state(dag_id: str, run_id: str, task_id: str, request: SetTaskStateRequest):
+async def set_task_state(
+    dag_id: str,
+    run_id: str,
+    task_id: str,
+    request: SetTaskStateRequest,
+    tenant_code: str = Depends(require_tenant_dag_match),
+):
     """
-    设置任务状态 - 直接将任务标记为 success/failed/skipped
+    Set task status - Mark the task directly as success/failed/skipped
 
-    Airflow 3.x 通过 PATCH API 设置任务状态，而不是执行任务。
-    """
+    Airflow 3.x Pass PATCH API Set task status,rather than performing tasks."""
     try:
         from airflow.models.dagbag import DBDagBag
         from airflow.utils.state import TaskInstanceState
@@ -722,14 +760,14 @@ async def set_task_state(dag_id: str, run_id: str, task_id: str, request: SetTas
         }
 
         with get_airflow_session() as session:
-            # 使用 DBDagBag 获取 SerializedDAG
+            # use SerializedDAG of set_task_instance_state method
             dag_bag = DBDagBag()
             dag = dag_bag.get_latest_version_of_dag(dag_id, session=session)
 
             if not dag:
                 raise HTTPException(status_code=404, detail=f"DAG not found: {dag_id}")
 
-            # 使用 SerializedDAG 的 set_task_instance_state 方法
+            # use DBDagBag Get SerializedDAG
             affected_tis = dag.set_task_instance_state(
                 task_id=task_id,
                 run_id=run_id,
@@ -762,26 +800,30 @@ async def set_task_state(dag_id: str, run_id: str, task_id: str, request: SetTas
 
 
 @app.post("/dags/{dag_id}/runs/{run_id}/clear", response_model=ApiResponse, dependencies=[Depends(require_auth)])
-async def clear_tasks(dag_id: str, run_id: str, request: ClearTasksRequest):
+async def clear_tasks(
+    dag_id: str,
+    run_id: str,
+    request: ClearTasksRequest,
+    tenant_code: str = Depends(require_tenant_dag_match),
+):
     """
-    批量清除任务 - 让 scheduler 重新调度
+    Batch cleaning tasks - let scheduler Rescheduling
 
-    相当于 Airflow UI 的 "Clear" 操作。
-    """
+    Equivalent to Airflow UI of "Clear" Operation."""
     try:
         from airflow.models.dagbag import DBDagBag
         from airflow.models.taskinstance import clear_task_instances
         from airflow.utils.state import DagRunState
 
         with get_airflow_session() as session:
-            # 使用 DBDagBag 获取 SerializedDAG
+            # use DAG of clear method(dry_run=True Get task list)
             dag_bag = DBDagBag()
             dag = dag_bag.get_latest_version_of_dag(dag_id, session=session)
 
             if not dag:
                 raise HTTPException(status_code=404, detail=f"DAG not found: {dag_id}")
 
-            # 使用 DAG 的 clear 方法（dry_run=True 获取任务列表）
+            # actual clearing
             task_instances = dag.clear(
                 run_id=run_id,
                 task_ids=request.task_ids,
@@ -797,7 +839,7 @@ async def clear_tasks(dag_id: str, run_id: str, request: ClearTasksRequest):
                     data={"cleared_count": 0}
                 )
 
-            # 实际清除
+            # ==================== DAG Reserialize ====================
             clear_task_instances(
                 task_instances,
                 session,
@@ -831,10 +873,11 @@ async def get_task_logs(
     dag_id: str,
     run_id: str,
     task_id: str,
-    try_number: int = Query(default=-1, description="尝试次数，-1 表示最新")
+    try_number: int = Query(default=-1, description="number of attempts,-1 Indicates the latest"),
+    tenant_code: str = Depends(require_tenant_dag_match),
 ):
     """
-    获取任务日志
+    Get task log
     """
     try:
         from airflow.models import TaskInstance
@@ -895,9 +938,9 @@ async def get_task_logs(
 # ==================== DAG Reserialize ====================
 
 @app.post("/dags/{dag_id}/reserialize", response_model=ApiResponse, dependencies=[Depends(require_auth)])
-async def reserialize_dag(dag_id: str):
+async def reserialize_dag(dag_id: str, tenant_code: str = Depends(require_tenant_dag_match)):
     """
-    强制刷新指定 DAG - 通过 DagPriorityParsingRequest 通知 DAG processor 立即重新解析
+    Force refresh specified DAG - Pass DagPriorityParsingRequest Notification DAG processor Reparse now
     """
     try:
         from airflow.models import DagModel
@@ -909,16 +952,16 @@ async def reserialize_dag(dag_id: str):
             if not dag:
                 raise HTTPException(status_code=404, detail=f"DAG not found: {dag_id}")
 
-            # 计算 id（与 Airflow 逻辑一致）
+            # Delete existing requests first,Insert new one
             import hashlib
             request_id = hashlib.md5(f"{dag.bundle_name}:{dag.relative_fileloc}".encode()).hexdigest()
 
-            # 先删除已存在的请求，再插入新的
+            # Create a priority resolution request,DAG processor will be processed immediately
             session.query(DagPriorityParsingRequest).filter(
                 DagPriorityParsingRequest.id == request_id
             ).delete()
 
-            # 创建优先解析请求，DAG processor 会立即处理
+            # Create a priority parsing request; DAG processor will handle it immediately
             parsing_request = DagPriorityParsingRequest(
                 bundle_name=dag.bundle_name,
                 relative_fileloc=dag.relative_fileloc

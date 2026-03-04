@@ -9,5 +9,5 @@ import lombok.Data;
 @Schema(name = "UserFeatureResponse")
 public class UserFeatureResponse {
 
-    private List<FeatureTreeNodeItem> features;
+  private List<FeatureTreeNodeItem> features;
 }

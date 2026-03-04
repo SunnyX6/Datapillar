@@ -7,7 +7,7 @@ interface WorkflowGraphLike {
 }
 
 /**
- * 判断是否需要展示双栏布局：出现用户消息或已有工作流节点就切换
+ * Determine whether a two-column layout needs to be displayed：Switch when a user message appears or there is an existing workflow node.
  */
 export const hasWorkflowInteraction = (messages: ChatMessage[], workflow: WorkflowGraphLike) => {
   const hasUserMessage = messages.some((message) => message.role === 'user')

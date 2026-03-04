@@ -17,23 +17,23 @@ import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
- * 租户单点登录管理服务
- * 提供租户单点登录管理业务能力与领域服务
+ * Tenant single sign-on management service Provide tenant single sign-on management business
+ * capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface TenantSsoAdminService {
 
-    List<SsoConfigResponse> listConfigs();
+  List<SsoConfigResponse> listConfigs();
 
-    Long createConfig(SsoConfigCreateRequest dto);
+  Long createConfig(SsoConfigCreateRequest dto);
 
-    void updateConfig(Long configId, SsoConfigUpdateRequest dto);
+  void updateConfig(Long configId, SsoConfigUpdateRequest dto);
 
-    List<SsoIdentityItem> listIdentities(String provider, Long userId);
+  List<SsoIdentityItem> listIdentities(String provider, Long userId);
 
-    Long bindByCode(SsoIdentityBindByCodeRequest request);
+  Long bindByCode(SsoIdentityBindByCodeRequest request);
 
-    void unbind(Long identityId);
+  void unbind(Long identityId);
 }

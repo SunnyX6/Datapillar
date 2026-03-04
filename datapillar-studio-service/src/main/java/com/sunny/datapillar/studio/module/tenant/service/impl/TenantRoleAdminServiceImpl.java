@@ -21,8 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 租户角色管理服务实现
- * 实现租户角色管理业务流程与规则校验
+ * Tenant role management service implementation Implement tenant role management business processes
+ * and rule verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -31,45 +31,55 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class TenantRoleAdminServiceImpl implements TenantRoleAdminService {
 
-    private final RoleService roleService;
+  private final RoleService roleService;
 
-    @Override
-    public List<RoleResponse> getRoleList() {
-        return roleService.getRoleList();
-    }
+  @Override
+  public List<RoleResponse> getRoleList() {
+    return roleService.getRoleList();
+  }
 
-    @Override
-    public Long createRole(RoleCreateRequest dto) {
-        return roleService.createRole(dto);
-    }
+  @Override
+  public Long createRole(RoleCreateRequest dto) {
+    return roleService.createRole(dto);
+  }
 
-    @Override
-    public void updateRole(Long roleId, RoleUpdateRequest dto) {
-        roleService.updateRole(roleId, dto);
-    }
+  @Override
+  public void updateRole(Long roleId, RoleUpdateRequest dto) {
+    roleService.updateRole(roleId, dto);
+  }
 
-    @Override
-    public void deleteRole(Long roleId) {
-        roleService.deleteRole(roleId);
-    }
+  @Override
+  public void deleteRole(Long roleId) {
+    roleService.deleteRole(roleId);
+  }
 
-    @Override
-    public List<FeatureObjectPermissionItem> getRolePermissions(Long roleId, String scope) {
-        return roleService.getRolePermissions(roleId, scope);
-    }
+  @Override
+  public List<FeatureObjectPermissionItem> getRolePermissions(Long roleId, String scope) {
+    return roleService.getRolePermissions(roleId, scope);
+  }
 
-    @Override
-    public void updateRolePermissions(Long roleId, List<RoleFeatureAssignmentItem> permissions) {
-        roleService.updateRolePermissions(roleId, permissions);
-    }
+  @Override
+  public void updateRolePermissions(Long roleId, List<RoleFeatureAssignmentItem> permissions) {
+    roleService.updateRolePermissions(roleId, permissions);
+  }
 
-    @Override
-    public RoleMembersResponse getRoleMembers(Long roleId, Integer status) {
-        return roleService.getRoleMembers(roleId, status);
-    }
+  @Override
+  public RoleMembersResponse getRoleMembers(Long roleId, Integer status) {
+    return roleService.getRoleMembers(roleId, status);
+  }
 
-    @Override
-    public void removeRoleMembers(Long roleId, List<Long> userIds) {
-        roleService.removeRoleMembers(roleId, userIds);
-    }
+  @Override
+  public void removeRoleMembers(Long roleId, List<Long> userIds) {
+    roleService.removeRoleMembers(roleId, userIds);
+  }
+
+  @Override
+  public List<RoleDataPrivilegeItem> getRoleDataPrivileges(Long roleId, String domain) {
+    return roleService.getRoleDataPrivileges(roleId, domain);
+  }
+
+  @Override
+  public void updateRoleDataPrivileges(Long roleId, RoleDataPrivilegeSyncRequest request) {
+    roleService.updateRoleDataPrivileges(roleId, request);
+  }
 }

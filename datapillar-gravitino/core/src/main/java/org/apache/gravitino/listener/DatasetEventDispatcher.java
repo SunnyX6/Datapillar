@@ -173,7 +173,7 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
     try {
       Metric metric = dispatcher.alterMetric(ident, changes);
 
-      // 查询当前版本的详细信息，确保发送完整的数据到 Neo4j
+      // Query the details of the current version，Make sure to send complete data to Neo4j
       MetricVersion currentVersionInfo =
           dispatcher.getMetricVersion(ident, metric.currentVersion());
 
@@ -226,7 +226,7 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
     try {
       MetricVersion metricVersion = dispatcher.switchMetricVersion(ident, targetVersion);
 
-      // 获取主表信息用于事件
+      // Get main table information for events
       Metric metric = dispatcher.getMetric(ident);
 
       MetricInfo updatedMetricInfo =
@@ -286,7 +286,7 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
               measureColumnIds,
               filterColumnIds);
 
-      // 获取最新的 Metric 信息
+      // Get the latest Metric information
       Metric metric = dispatcher.getMetric(ident);
 
       MetricInfo updatedMetricInfo =
@@ -472,7 +472,7 @@ public class DatasetEventDispatcher implements DatasetDispatcher {
     }
   }
 
-  // ==================== ValueDomain 值域相关方法 ====================
+  // ==================== ValueDomain Range related methods ====================
 
   @Override
   public PagedResult<ValueDomain> listValueDomains(Namespace namespace, int offset, int limit)

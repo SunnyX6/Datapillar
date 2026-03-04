@@ -1,33 +1,25 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-ETL 模块 - 智能 ETL 工作流生成
+ETL module - Smart ETL Workflow generation
 
-导入此模块时，Agent 和工具自动注册到框架。
-
-使用示例：
-```python
-# 导入 ETL 模块（触发 Agent 和工具注册）
+When importing this module,Agent and tools are automatically registered to the framework.Usage example:```python
+# import ETL module(trigger Agent and tool registration)
 from src.modules.etl.agents import create_etl_team
 
-# 创建团队
+# Create a team
 team = create_etl_team()
 
-# 流式执行
-async for event in team.stream(
-    query="创建用户宽表",
-    session_id="session_001",
-):
-    print(event)
+# Streaming execution
+async for event in team.stream(query="Create user wide table",session_id="session_001",):print(event)
 ```
 """
 
-# 导入 agents 模块触发 Agent 注册
-from src.modules.etl import agents as _agents  # noqa: F401
+# import agents module trigger Agent Register
+from src.modules.etl import agents as _agents  # noqa:F401
 
-# 导出 router 供路由自动注册
+# Export router For automatic registration of routes
 from src.modules.etl.api import router
 
 MODULE_SCOPE = "biz"

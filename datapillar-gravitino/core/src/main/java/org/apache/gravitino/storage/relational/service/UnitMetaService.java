@@ -39,7 +39,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Unit 元数据服务类 */
+/** Unit Metadata service class */
 public class UnitMetaService {
   private static final Logger LOG = LoggerFactory.getLogger(UnitMetaService.class);
   private static final UnitMetaService INSTANCE = new UnitMetaService();
@@ -50,7 +50,7 @@ public class UnitMetaService {
 
   private UnitMetaService() {}
 
-  /** 插入 Unit */
+  /** Insert Unit */
   public void insertUnit(UnitEntity unitEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkUnit(unitEntity.nameIdentifier());
@@ -75,7 +75,7 @@ public class UnitMetaService {
     }
   }
 
-  /** 根据 namespace 列出所有 Unit */
+  /** According to namespace list all Unit */
   public List<UnitEntity> listUnitsByNamespace(Namespace namespace) {
     NamespaceUtil.checkUnit(namespace);
 
@@ -85,14 +85,14 @@ public class UnitMetaService {
     List<UnitPO> unitPOs =
         SessionUtils.getWithoutCommit(
             UnitMetaMapper.class, mapper -> mapper.listUnitPOsBySchemaId(schemaId));
-    LOG.debug("listUnitsByNamespace - 查询到 {} 个 UnitPO", unitPOs.size());
+    LOG.debug("listUnitsByNamespace - Found {} a UnitPO", unitPOs.size());
 
     List<UnitEntity> result = POConverters.fromUnitPOs(unitPOs, namespace);
-    LOG.debug("listUnitsByNamespace - 转换后返回 {} 个 Entity", result.size());
+    LOG.debug("listUnitsByNamespace - Return after conversion {} a Entity", result.size());
     return result;
   }
 
-  /** 分页列出 Unit */
+  /** List in pages Unit */
   public List<UnitEntity> listUnitsByNamespaceWithPagination(
       Namespace namespace, int offset, int limit) {
     NamespaceUtil.checkUnit(namespace);
@@ -107,7 +107,7 @@ public class UnitMetaService {
     return POConverters.fromUnitPOs(unitPOs, namespace);
   }
 
-  /** 统计 Unit 总数 */
+  /** statistics Unit total */
   public long countUnitsByNamespace(Namespace namespace) {
     NamespaceUtil.checkUnit(namespace);
 
@@ -117,7 +117,7 @@ public class UnitMetaService {
         UnitMetaMapper.class, mapper -> mapper.countUnitsBySchemaId(schemaId));
   }
 
-  /** 获取 Unit */
+  /** Get Unit */
   public UnitEntity getUnitByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkUnit(ident);
 
@@ -127,7 +127,7 @@ public class UnitMetaService {
     return POConverters.fromUnitPO(unitPO, ident.namespace());
   }
 
-  /** 更新 Unit */
+  /** update Unit */
   public <E extends Entity & HasIdentifier> UnitEntity updateUnit(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkUnit(ident);
@@ -165,7 +165,7 @@ public class UnitMetaService {
     }
   }
 
-  /** 删除 Unit */
+  /** Delete Unit */
   public boolean deleteUnit(NameIdentifier ident) {
     NameIdentifierUtil.checkUnit(ident);
 
@@ -222,7 +222,7 @@ public class UnitMetaService {
     }
   }
 
-  /** 根据遗留时间线删除单位元数据 */
+  /** Remove unit metadata based on legacy timeline */
   public int deleteUnitMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         UnitMetaMapper.class,

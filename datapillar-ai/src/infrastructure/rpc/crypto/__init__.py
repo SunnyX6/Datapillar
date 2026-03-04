@@ -1,7 +1,7 @@
 # @author Sunny
 # @date 2026-02-19
 
-"""Auth Crypto RPC 客户端导出。"""
+"""Auth Crypto RPC Client export."""
 
 from src.infrastructure.rpc.crypto.crypto_client import (
     AuthCryptoRpcClient,

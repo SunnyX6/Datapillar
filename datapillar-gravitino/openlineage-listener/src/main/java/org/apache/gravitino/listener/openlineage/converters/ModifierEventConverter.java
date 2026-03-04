@@ -1,21 +1,19 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.See the NOTICE file
  * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * regarding copyright ownership.The ASF licenses this file
+ * to you under the Apache License,Version 2.0 (the
+ * "License");you may not use this file except in compliance
+ * with the License.You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
+ * Unless required by applicable law or agreed to in writing,* software distributed under the License is distributed on an
+ * "AS IS" BASIS,WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND,either express or implied.See the License for the
  * specific language governing permissions and limitations
- * under the License.
- */
+ * under the License.*/
 
 package org.apache.gravitino.listener.openlineage.converters;
 
@@ -36,9 +34,9 @@ import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.info.ModifierInfo;
 
 /**
- * Modifier 事件转换器。
+ * Modifier event converter.*
  *
- * <p>处理: CreateModifierEvent, AlterModifierEvent, DropModifierEvent
+ * <p>Process:CreateModifierEvent,AlterModifierEvent,DropModifierEvent
  */
 public class ModifierEventConverter extends BaseEventConverter {
 
@@ -60,10 +58,8 @@ public class ModifierEventConverter extends BaseEventConverter {
   private RunEvent convertCreateModifier(CreateModifierEvent event) {
     NameIdentifier identifier = event.identifier();
     ModifierInfo modifierInfo = event.createdModifierInfo();
-
     List<SchemaDatasetFacetFields> fields = buildModifierFields(modifierInfo);
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
-
     DatasetFacets facets =
         openLineage
             .newDatasetFacetsBuilder()
@@ -72,7 +68,6 @@ public class ModifierEventConverter extends BaseEventConverter {
                 openLineage.newLifecycleStateChangeDatasetFacet(
                     OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.CREATE, null))
             .build();
-
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
@@ -80,7 +75,6 @@ public class ModifierEventConverter extends BaseEventConverter {
             .name(formatDatasetName(identifier))
             .facets(facets)
             .build();
-
     return createRunEvent(
         event,
         "gravitino.create_modifier",
@@ -92,10 +86,8 @@ public class ModifierEventConverter extends BaseEventConverter {
   private RunEvent convertAlterModifier(AlterModifierEvent event) {
     NameIdentifier identifier = event.identifier();
     ModifierInfo modifierInfo = event.updatedModifierInfo();
-
     List<SchemaDatasetFacetFields> fields = buildModifierFields(modifierInfo);
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
-
     DatasetFacets facets =
         openLineage
             .newDatasetFacetsBuilder()
@@ -104,7 +96,6 @@ public class ModifierEventConverter extends BaseEventConverter {
                 openLineage.newLifecycleStateChangeDatasetFacet(
                     OpenLineage.LifecycleStateChangeDatasetFacet.LifecycleStateChange.ALTER, null))
             .build();
-
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
@@ -112,7 +103,6 @@ public class ModifierEventConverter extends BaseEventConverter {
             .name(formatDatasetName(identifier))
             .facets(facets)
             .build();
-
     return createRunEvent(
         event,
         "gravitino.alter_modifier",
@@ -123,12 +113,10 @@ public class ModifierEventConverter extends BaseEventConverter {
 
   private RunEvent convertDropModifier(DropModifierEvent event) {
     NameIdentifier identifier = event.identifier();
-
     String code = identifier.name();
     List<SchemaDatasetFacetFields> fields = new ArrayList<>();
     fields.add(openLineage.newSchemaDatasetFacetFields("code", "STRING", code, null));
     SchemaDatasetFacet schemaFacet = openLineage.newSchemaDatasetFacet(fields);
-
     OutputDataset outputDataset =
         openLineage
             .newOutputDatasetBuilder()
@@ -144,7 +132,6 @@ public class ModifierEventConverter extends BaseEventConverter {
                             null))
                     .build())
             .build();
-
     return createRunEvent(
         event,
         "gravitino.drop_modifier",

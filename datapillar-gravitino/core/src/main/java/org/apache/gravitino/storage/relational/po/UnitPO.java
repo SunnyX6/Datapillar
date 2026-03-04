@@ -20,7 +20,7 @@ package org.apache.gravitino.storage.relational.po;
 
 import lombok.Getter;
 
-/** Unit PO，对应 unit_meta 表 */
+/** Unit PO，Correspond unit_meta table */
 @Getter
 public class UnitPO {
   private Long unitId;

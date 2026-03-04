@@ -2,10 +2,10 @@ import type { AgentActivity } from '@/features/workflow/state'
 import type { StreamStatus } from '@/services/aiWorkflowService'
 
 const STREAM_STATUS_LABEL: Record<StreamStatus, string> = {
-  running: '进行中',
-  done: '已完成',
-  error: '失败',
-  aborted: '已停止'
+  running: 'In progress',
+  done: 'Completed',
+  error: 'failed',
+  aborted: 'Stopped'
 }
 
 export const getProcessRowTitle = (row: AgentActivity): string => {

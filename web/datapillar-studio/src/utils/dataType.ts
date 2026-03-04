@@ -1,9 +1,9 @@
 /**
- * 数据类型工具函数
- * 用于解析和构建 Gravitino 数据类型字符串
+ * Data type utility functions
+ * for parsing and building Gravitino data type string
  */
 
-/** 数据类型值 */
+/** data type value */
 export interface DataTypeValue {
   type: string
   precision?: number
@@ -25,8 +25,8 @@ export function getMaxLengthForType(type: string): number {
 }
 
 /**
- * 解析 dataType 字符串为 DataTypeValue 对象
- * 例如: "DECIMAL(18,4)" -> { type: "DECIMAL", precision: 18, scale: 4 }
+ * parse dataType The string is DataTypeValue object
+ * For example: "DECIMAL(18,4)" -> { type: "DECIMAL", precision: 18, scale: 4 }
  */
 export function parseDataTypeString(dataType: string | undefined): DataTypeValue {
   if (!dataType) return { type: '' }
@@ -46,8 +46,8 @@ export function parseDataTypeString(dataType: string | undefined): DataTypeValue
 }
 
 /**
- * 将 DataTypeValue 对象构建为 dataType 字符串
- * 例如: { type: "DECIMAL", precision: 18, scale: 4 } -> "DECIMAL(18,4)"
+ * will DataTypeValue The object is constructed as dataType string
+ * For example: { type: "DECIMAL", precision: 18, scale: 4 } -> "DECIMAL(18,4)"
  */
 export function buildDataTypeString(value: DataTypeValue): string {
   if (value.type === 'DECIMAL' && value.precision !== undefined) {

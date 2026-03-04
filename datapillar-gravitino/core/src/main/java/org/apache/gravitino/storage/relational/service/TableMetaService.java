@@ -215,7 +215,7 @@ public class TableMetaService {
 
     Long tableId = getTableIdBySchemaIdAndName(schemaId, tableName);
 
-    // 检查是否有指标版本引用该表
+    // Check if there is an indicator version referencing the table
     Integer metricRefCount =
         SessionUtils.getWithoutCommit(
             MetricVersionMetaMapper.class,

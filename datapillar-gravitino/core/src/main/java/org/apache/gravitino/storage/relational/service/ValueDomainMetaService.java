@@ -37,7 +37,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
-/** ValueDomain 元数据服务类 */
+/** ValueDomain Metadata service class */
 public class ValueDomainMetaService {
   private static final ValueDomainMetaService INSTANCE = new ValueDomainMetaService();
 
@@ -47,7 +47,7 @@ public class ValueDomainMetaService {
 
   private ValueDomainMetaService() {}
 
-  /** 根据 schemaId 和 domainCode 获取值域的 domainId */
+  /** According to schemaId and domainCode Get the value range domainId */
   public Long getValueDomainIdBySchemaIdAndDomainCode(Long schemaId, String domainCode) {
     ValueDomainPO domainPO =
         SessionUtils.getWithoutCommit(
@@ -63,7 +63,7 @@ public class ValueDomainMetaService {
     return domainPO.getDomainId();
   }
 
-  /** 插入 ValueDomain */
+  /** Insert ValueDomain */
   public void insertValueDomain(ValueDomainEntity entity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkValueDomain(entity.nameIdentifier());
@@ -88,7 +88,7 @@ public class ValueDomainMetaService {
     }
   }
 
-  /** 根据 namespace 列出所有 ValueDomain */
+  /** According to namespace list all ValueDomain */
   public List<ValueDomainEntity> listValueDomainsByNamespace(Namespace namespace) {
     NamespaceUtil.checkValueDomain(namespace);
 
@@ -101,7 +101,7 @@ public class ValueDomainMetaService {
     return POConverters.fromValueDomainPOs(domainPOs, namespace);
   }
 
-  /** 分页列出 ValueDomain */
+  /** List in pages ValueDomain */
   public List<ValueDomainEntity> listValueDomainsByNamespaceWithPagination(
       Namespace namespace, int offset, int limit) {
     NamespaceUtil.checkValueDomain(namespace);
@@ -116,7 +116,7 @@ public class ValueDomainMetaService {
     return POConverters.fromValueDomainPOs(domainPOs, namespace);
   }
 
-  /** 统计 ValueDomain 总数 */
+  /** statistics ValueDomain total */
   public long countValueDomainsByNamespace(Namespace namespace) {
     NamespaceUtil.checkValueDomain(namespace);
 
@@ -126,7 +126,7 @@ public class ValueDomainMetaService {
         ValueDomainMetaMapper.class, mapper -> mapper.countValueDomainsBySchemaId(schemaId));
   }
 
-  /** 获取 ValueDomain */
+  /** Get ValueDomain */
   public ValueDomainEntity getValueDomainByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkValueDomain(ident);
 
@@ -137,7 +137,7 @@ public class ValueDomainMetaService {
     return POConverters.fromValueDomainPO(domainPO, ident.namespace());
   }
 
-  /** 更新 ValueDomain */
+  /** update ValueDomain */
   public <E extends Entity & HasIdentifier> ValueDomainEntity updateValueDomain(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkValueDomain(ident);
@@ -175,7 +175,7 @@ public class ValueDomainMetaService {
     }
   }
 
-  /** 删除 ValueDomain */
+  /** Delete ValueDomain */
   public boolean deleteValueDomain(NameIdentifier ident) {
     NameIdentifierUtil.checkValueDomain(ident);
 
@@ -234,7 +234,7 @@ public class ValueDomainMetaService {
     }
   }
 
-  /** 根据遗留时间线删除值域元数据 */
+  /** Remove range metadata based on legacy timeline */
   public int deleteValueDomainMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         ValueDomainMetaMapper.class,

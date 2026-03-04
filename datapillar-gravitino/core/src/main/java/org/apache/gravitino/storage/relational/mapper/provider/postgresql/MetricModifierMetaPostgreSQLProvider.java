@@ -20,5 +20,5 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.MetricModifierMetaBaseSQLProvider;
 
-/** MetricModifier 元数据 PostgreSQL Provider */
+/** MetricModifier metadata PostgreSQL Provider */
 public class MetricModifierMetaPostgreSQLProvider extends MetricModifierMetaBaseSQLProvider {}

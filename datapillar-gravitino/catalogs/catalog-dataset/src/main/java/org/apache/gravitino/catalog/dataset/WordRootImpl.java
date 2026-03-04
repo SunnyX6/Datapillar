@@ -22,7 +22,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.dataset.WordRoot;
 import org.apache.gravitino.meta.AuditInfo;
 
-/** WordRoot 接口的实现类 */
+/** WordRoot Implementation class of interface */
 public class WordRootImpl implements WordRoot, Auditable {
 
   private String code;
@@ -58,7 +58,7 @@ public class WordRootImpl implements WordRoot, Auditable {
     return auditInfo;
   }
 
-  /** Builder 类用于构建 WordRootImpl 实例 */
+  /** Builder classes used to build WordRootImpl Example */
   public static class Builder {
     private final WordRootImpl wordRoot;
 

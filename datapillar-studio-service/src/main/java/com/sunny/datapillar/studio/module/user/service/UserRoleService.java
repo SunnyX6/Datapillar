@@ -17,15 +17,14 @@ import com.sunny.datapillar.studio.dto.workflow.response.*;
 import java.util.List;
 
 /**
- * 用户角色服务
- * 提供用户角色业务能力与领域服务
+ * User role service Provide user role business capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface UserRoleService {
 
-    List<RoleResponse> listRolesByUser(Long userId);
+  List<RoleResponse> listRolesByUser(Long userId);
 
-    void assignRoles(Long userId, List<Long> roleIds);
+  void assignRoles(Long userId, List<Long> roleIds);
 }

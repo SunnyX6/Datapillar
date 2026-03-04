@@ -9,8 +9,7 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 /**
- * AIUsage组件
- * 负责AIUsage核心逻辑实现
+ * AIUsagecomponents responsibleAIUsageCore logic implementation
  *
  * @author Sunny
  * @date 2026-01-01
@@ -19,39 +18,39 @@ import lombok.Data;
 @TableName("ai_usage")
 public class AiUsage {
 
-    @TableId(value = "id", type = IdType.AUTO)
-    private Long id;
+  @TableId(value = "id", type = IdType.AUTO)
+  private Long id;
 
-    @TableField("tenant_id")
-    private Long tenantId;
+  @TableField("tenant_id")
+  private Long tenantId;
 
-    @TableField("user_id")
-    private Long userId;
+  @TableField("user_id")
+  private Long userId;
 
-    @TableField("model_id")
-    private Long modelId;
+  @TableField("model_id")
+  private Long modelId;
 
-    @TableField("call_count")
-    private Long callCount;
+  @TableField("call_count")
+  private Long callCount;
 
-    @TableField("prompt_tokens")
-    private Long promptTokens;
+  @TableField("prompt_tokens")
+  private Long promptTokens;
 
-    @TableField("completion_tokens")
-    private Long completionTokens;
+  @TableField("completion_tokens")
+  private Long completionTokens;
 
-    @TableField("total_tokens")
-    private Long totalTokens;
+  @TableField("total_tokens")
+  private Long totalTokens;
 
-    @TableField("total_cost_usd")
-    private BigDecimal totalCostUsd;
+  @TableField("total_cost_usd")
+  private BigDecimal totalCostUsd;
 
-    @TableField("last_used_at")
-    private LocalDateTime lastUsedAt;
+  @TableField("last_used_at")
+  private LocalDateTime lastUsedAt;
 
-    @TableField("created_at")
-    private LocalDateTime createdAt;
+  @TableField("created_at")
+  private LocalDateTime createdAt;
 
-    @TableField("updated_at")
-    private LocalDateTime updatedAt;
+  @TableField("updated_at")
+  private LocalDateTime updatedAt;
 }

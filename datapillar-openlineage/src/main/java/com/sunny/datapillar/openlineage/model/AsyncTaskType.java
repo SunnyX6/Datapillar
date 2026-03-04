@@ -1,9 +1,7 @@
 package com.sunny.datapillar.openlineage.model;
 
-/**
- * 异步任务类型。
- */
+/** Asynchronous task type. */
 public enum AsyncTaskType {
-    EMBEDDING,
-    SQL_SUMMARY
+  EMBEDDING,
+  SQL_SUMMARY
 }

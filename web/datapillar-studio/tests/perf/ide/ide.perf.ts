@@ -6,8 +6,8 @@ import { mockAuthRoutes } from '../../shared/mockAuth'
 import { MOCK_CATALOG_NAME, MOCK_SCHEMA_NAME, mockOneMetaRoutes } from '../../shared/mockOneMeta'
 import { collectWebVitals, initWebVitals } from '../../shared/webVitals'
 
-test.describe('IDE 模块性能', () => {
-  test('SQL 编辑器 Web Vitals', async ({ page }, testInfo) => {
+test.describe('IDE Module performance', () => {
+  test('SQL Editor Web Vitals', async ({ page }, testInfo) => {
     const budgets = getPerfBudgets()
 
     await mockAuthRoutes(page)
@@ -16,7 +16,7 @@ test.describe('IDE 模块性能', () => {
     await initWebVitals(page)
     await page.goto('/ide/sql')
 
-    const pickerButton = page.getByRole('button', { name: '选择 Catalog' })
+    const pickerButton = page.getByRole('button', { name: 'Choose Catalog' })
     await expect(pickerButton).toBeVisible()
 
     await pickerButton.click()
@@ -40,8 +40,8 @@ test.describe('IDE 模块性能', () => {
     await page.locator('.monaco-editor').click()
     await page.keyboard.type('select 1;')
 
-    const expandBottomPanel = page.getByRole('button', { name: '展开底部面板' })
-    const collapseBottomPanel = page.getByRole('button', { name: '收起底部面板' })
+    const expandBottomPanel = page.getByRole('button', { name: 'Expand bottom panel' })
+    const collapseBottomPanel = page.getByRole('button', { name: 'Collapse bottom panel' })
     await expect(expandBottomPanel.or(collapseBottomPanel)).toBeVisible()
     if (await expandBottomPanel.isVisible()) {
       await expandBottomPanel.click()
@@ -64,7 +64,7 @@ test.describe('IDE 模块性能', () => {
       }
       const reportPath = testInfo.outputPath('cls-report.json')
       await writeFile(reportPath, JSON.stringify(report, null, 2), 'utf-8')
-      await testInfo.attach('CLS诊断', {
+      await testInfo.attach('CLSDiagnosis', {
         contentType: 'application/json',
         path: reportPath
       })

@@ -81,8 +81,6 @@ import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.datapillar.cache.TenantCacheKeyBuilder;
-import org.apache.gravitino.datapillar.cache.TenantCatalogCacheKey;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
@@ -101,6 +99,8 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.model.ModelCatalog;
+import org.apache.gravitino.multitenancy.cache.TenantCacheKeyBuilder;
+import org.apache.gravitino.multitenancy.cache.TenantCatalogCacheKey;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -471,7 +471,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         () -> {
           checkMetalake(metalakeIdent, store);
 
-          // 先验证属性，避免写入脏数据（验证失败直接抛异常，不会写入数据库）
+          // Verify attributes first，Avoid writing dirty data（If verification fails, an exception
+          // will be thrown directly.，Will not write to database）
           CatalogWrapper wrapper = createCatalogWrapper(e, mergedConfig);
 
           try {
@@ -994,7 +995,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     IsolatedClassLoader classLoader = createClassLoader(provider, conf);
     BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
 
-    // 校验 catalog type 与 provider 是否匹配
+    // Verify catalog type with provider Does it match
     Catalog.Type providerCatalogType = catalog.catalogType();
     if (providerCatalogType != null && !providerCatalogType.equals(entity.getType())) {
       classLoader.close();

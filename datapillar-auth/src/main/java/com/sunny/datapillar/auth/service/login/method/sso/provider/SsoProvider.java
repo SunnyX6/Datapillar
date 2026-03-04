@@ -6,37 +6,26 @@ import com.sunny.datapillar.auth.service.login.method.sso.model.SsoToken;
 import com.sunny.datapillar.auth.service.login.method.sso.model.SsoUserInfo;
 
 /**
- * 单点登录提供器接口
- * 定义单点登录提供器能力契约与行为边界
+ * Contract for SSO providers.
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface SsoProvider {
-    /**
-     * 返回 provider 标识（dingtalk/wecom/feishu/lark）
-     */
-    String provider();
+  /** Return provider identifier (dingtalk/wecom/feishu/lark). */
+  String provider();
 
-    /**
-     * 构建扫码/授权配置
-     */
-    SsoQrResponse buildQr(SsoProviderConfig config, String state);
+  /** Build QR/authorization config. */
+  SsoQrResponse buildQr(SsoProviderConfig config, String state);
 
-    /**
-     * 授权码换取 token
-     */
-    SsoToken exchangeCode(SsoProviderConfig config, String authCode);
+  /** Exchange authorization code for token. */
+  SsoToken exchangeCode(SsoProviderConfig config, String authCode);
 
-    /**
-     * 获取用户信息
-     */
-    SsoUserInfo fetchUserInfo(SsoProviderConfig config, SsoToken token);
+  /** Fetch user info from provider. */
+  SsoUserInfo fetchUserInfo(SsoProviderConfig config, SsoToken token);
 
-    /**
-     * 提取稳定外部用户 ID
-     */
-    default String extractExternalUserId(SsoUserInfo userInfo) {
-        return userInfo == null ? null : userInfo.getExternalUserId();
-    }
+  /** Extract stable external user ID. */
+  default String extractExternalUserId(SsoUserInfo userInfo) {
+    return userInfo == null ? null : userInfo.getExternalUserId();
+  }
 }

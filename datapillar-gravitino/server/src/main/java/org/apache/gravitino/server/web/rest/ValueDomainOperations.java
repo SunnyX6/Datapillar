@@ -90,7 +90,7 @@ public class ValueDomainOperations {
             PagedResult<ValueDomain> result =
                 datasetDispatcher.listValueDomains(valueDomainNs, offset, limit);
 
-            // 转换为 DTO 数组
+            // Convert to DTO array
             ValueDomainDTO[] domains =
                 result.items().stream().map(DTOConverters::toDTO).toArray(ValueDomainDTO[]::new);
 
@@ -155,7 +155,7 @@ public class ValueDomainOperations {
             NameIdentifier valueDomainId =
                 NameIdentifier.of(metalake, catalog, schema, request.getDomainCode());
 
-            // 转换 items 为 ValueDomain.Item 列表
+            // Convert items for ValueDomain.Item list
             List<ValueDomain.Item> items =
                 request.getItems().stream()
                     .map(item -> (ValueDomain.Item) item)
@@ -234,7 +234,7 @@ public class ValueDomainOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            // 转换 items 为 ValueDomain.Item 列表（如果提供）
+            // Convert items for ValueDomain.Item list（If provided）
             List<ValueDomain.Item> items = null;
             if (request.getItems() != null) {
               items =

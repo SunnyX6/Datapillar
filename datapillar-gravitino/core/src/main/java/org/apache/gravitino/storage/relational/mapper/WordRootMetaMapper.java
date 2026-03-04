@@ -28,7 +28,7 @@ import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.Update;
 import org.apache.ibatis.annotations.UpdateProvider;
 
-/** WordRoot 元数据映射器 */
+/** WordRoot metadata mapper */
 public interface WordRootMetaMapper {
   String TABLE_NAME = "wordroot_meta";
 

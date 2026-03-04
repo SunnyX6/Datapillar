@@ -14,17 +14,17 @@ import lombok.NoArgsConstructor;
 @Schema(name = "AuthLoginResult")
 public class LoginResultResponse {
 
-    private String loginStage;
+  private String loginStage;
 
-    private List<TenantOptionItem> tenants;
+  private List<TenantOptionItem> tenants;
 
-    private Long userId;
+  private Long userId;
 
-    private String username;
+  private String username;
 
-    private String email;
+  private String email;
 
-    private List<RoleItem> roles;
+  private List<RoleItem> roles;
 
-    private List<MenuItem> menus;
+  private List<MenuItem> menus;
 }

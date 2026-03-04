@@ -15,41 +15,43 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
-/**
- * 安全异常处理器。
- */
+/** Safe exception handler. */
 @Slf4j
 @Component
 public class SecurityExceptionHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
 
-    private final ObjectMapper objectMapper;
+  private final ObjectMapper objectMapper;
 
-    public SecurityExceptionHandler(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
+  public SecurityExceptionHandler(ObjectMapper objectMapper) {
+    this.objectMapper = objectMapper;
+  }
 
-    @Override
-    public void commence(HttpServletRequest request,
-                         HttpServletResponse response,
-                         org.springframework.security.core.AuthenticationException authException)
-            throws IOException, ServletException {
-        writeError(response, new UnauthorizedException(authException, "未授权访问"));
-    }
+  @Override
+  public void commence(
+      HttpServletRequest request,
+      HttpServletResponse response,
+      org.springframework.security.core.AuthenticationException authException)
+      throws IOException, ServletException {
+    writeError(response, new UnauthorizedException(authException, "Unauthorized access"));
+  }
 
-    @Override
-    public void handle(HttpServletRequest request,
-                       HttpServletResponse response,
-                       AccessDeniedException accessDeniedException)
-            throws IOException, ServletException {
-        writeError(response, new ForbiddenException(accessDeniedException, "无权限访问"));
-    }
+  @Override
+  public void handle(
+      HttpServletRequest request,
+      HttpServletResponse response,
+      AccessDeniedException accessDeniedException)
+      throws IOException, ServletException {
+    writeError(response, new ForbiddenException(accessDeniedException, "No access"));
+  }
 
-    public void writeError(HttpServletResponse response, RuntimeException exception) throws IOException {
-        ExceptionMapper.ExceptionDetail detail = ExceptionMapper.resolve(exception);
-        response.setStatus(detail.httpStatus());
-        response.setCharacterEncoding("UTF-8");
-        response.setContentType("application/json;charset=UTF-8");
-        ErrorResponse body = ErrorResponse.of(detail.errorCode(), detail.type(), detail.message(), detail.traceId());
-        response.getWriter().write(objectMapper.writeValueAsString(body));
-    }
+  public void writeError(HttpServletResponse response, RuntimeException exception)
+      throws IOException {
+    ExceptionMapper.ExceptionDetail detail = ExceptionMapper.resolve(exception);
+    response.setStatus(detail.httpStatus());
+    response.setCharacterEncoding("UTF-8");
+    response.setContentType("application/json;charset=UTF-8");
+    ErrorResponse body =
+        ErrorResponse.of(detail.errorCode(), detail.type(), detail.message(), detail.traceId());
+    response.getWriter().write(objectMapper.writeValueAsString(body));
+  }
 }

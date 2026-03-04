@@ -25,7 +25,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.gravitino.dto.dataset.MetricVersionDTO;
 
-/** 指标版本响应 */
+/** Indicator version response */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -39,7 +39,7 @@ public class MetricVersionResponse extends BaseResponse {
     this.version = version;
   }
 
-  /** Jackson 反序列化使用的默认构造函数 */
+  /** Jackson Default constructor used for deserialization */
   public MetricVersionResponse() {
     super();
     this.version = null;

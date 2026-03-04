@@ -56,7 +56,7 @@ export function CollaborationTicketList({
             type="text"
             value={listQuery}
             onChange={(event) => onListQueryChange(event.target.value)}
-            placeholder="搜索工单..."
+            placeholder="Search tickets..."
             className={cn(
               'w-full pl-8 pr-4 py-1.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:bg-white dark:focus:bg-slate-900 transition-all',
               TYPOGRAPHY.bodySm
@@ -106,7 +106,7 @@ export function CollaborationTicketList({
             <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800/60 rounded-full flex items-center justify-center mx-auto mb-3">
               <Inbox size={20} className="text-slate-300 dark:text-slate-600" />
             </div>
-            <p className={cn(TYPOGRAPHY.caption, 'text-slate-500 dark:text-slate-400')}>没有找到相关请求</p>
+            <p className={cn(TYPOGRAPHY.caption, 'text-slate-500 dark:text-slate-400')}>No relevant request found</p>
           </div>
         ) : (
           tickets.map((ticket) => {
@@ -115,8 +115,8 @@ export function CollaborationTicketList({
               ticketView === 'INBOX'
                 ? ticket.requester.name
                 : ticketView === 'SENT'
-                  ? `等待 ${ticket.assignee.name}`
-                  : `发起人 ${ticket.requester.name}`
+                  ? `wait ${ticket.assignee.name}`
+                  : `initiator ${ticket.requester.name}`
 
             const avatarLabel = ticketView === 'INBOX' ? ticket.requester.avatar : ticket.assignee.avatar
 

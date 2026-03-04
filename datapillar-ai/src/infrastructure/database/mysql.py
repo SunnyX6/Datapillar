@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-MySQL 数据库连接管理
+MySQL Database connection management
 
-提供 MySQL 连接池（基于 SQLAlchemy）
+provide MySQL connection pool（Based on SQLAlchemy）
 """
 
 import logging
@@ -20,13 +19,13 @@ logger = logging.getLogger(__name__)
 
 
 class MySQLClient:
-    """MySQL 连接池管理器（使用 SQLAlchemy）"""
+    """MySQL connection pool manager（use SQLAlchemy）"""
 
     _engine = None
 
     @classmethod
     def get_engine(cls):
-        """获取 SQLAlchemy Engine（全局单例连接池）"""
+        """Get SQLAlchemy Engine（Global singleton connection pool）"""
         if cls._engine is None:
             db_url = (
                 f"mysql+pymysql://{settings.mysql_username}:{settings.mysql_password}"
@@ -45,17 +44,17 @@ class MySQLClient:
                     echo=False,
                 )
                 logger.info(
-                    f"MySQL 连接池已初始化: {settings.mysql_host}:{settings.mysql_port}/{settings.mysql_database}"
+                    f"MySQL The connection pool has been initialized: {settings.mysql_host}:{settings.mysql_port}/{settings.mysql_database}"
                 )
             except Exception as e:
-                logger.error(f"MySQL 连接池初始化失败: {e}")
-                raise MySQLError(f"MySQL 连接池初始化失败: {e}") from e
+                logger.error(f"MySQL Connection pool initialization failed: {e}")
+                raise MySQLError(f"MySQL Connection pool initialization failed: {e}") from e
         return cls._engine
 
     @classmethod
     def close(cls):
-        """关闭连接池"""
+        """Close connection pool"""
         if cls._engine:
             cls._engine.dispose()
             cls._engine = None
-            logger.info("MySQL 连接池已关闭")
+            logger.info("MySQL Connection pool is closed")

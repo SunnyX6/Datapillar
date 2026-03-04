@@ -7,7 +7,7 @@ import lombok.Data;
 @Schema(name = "WorkflowRerunJobRequest")
 public class WorkflowRerunJobRequest {
 
-    private boolean downstream = false;
+  private boolean downstream = false;
 
-    private boolean upstream = false;
+  private boolean upstream = false;
 }

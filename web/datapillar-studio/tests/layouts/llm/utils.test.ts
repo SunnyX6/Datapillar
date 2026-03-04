@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { MAX_COMPARE_MODELS, collectConnectedModelIds, connectModel, filterModels, toggleModelSelection } from '@/features/llm/utils'
 import type { ModelFilters, ModelRecord } from '@/features/llm/utils/types'
 
-describe('LLM 筛选工具函数', () => {
-  it('按条件筛选模型列表', () => {
+describe('LLM Filter tool function', () => {
+  it('Filter model list by criteria', () => {
     const models: ModelRecord[] = [
       {
         aiModelId: 1,
@@ -53,7 +53,7 @@ describe('LLM 筛选工具函数', () => {
     expect(filterModels(models, 'embedding', queryFilters)[0].type).toBe('embeddings')
   })
 
-  it('连接模型时避免重复写入', () => {
+  it('Avoid duplicate writes when connecting models', () => {
     const connected = [1]
     expect(connectModel(connected, 1)).toEqual([1])
     expect(connectModel(connected, 3)).toEqual([
@@ -62,7 +62,7 @@ describe('LLM 筛选工具函数', () => {
     ])
   })
 
-  it('提取已连接模型 ID 时忽略未连接模型', () => {
+  it('Extract connected model ID Ignore unconnected models when', () => {
     const connectedIds = collectConnectedModelIds([
       { aiModelId: 11, hasApiKey: true },
       { aiModelId: 12, hasApiKey: false },
@@ -71,7 +71,7 @@ describe('LLM 筛选工具函数', () => {
     expect(connectedIds).toEqual([11])
   })
 
-  it('限制对比选择数量并允许取消', () => {
+  it('Limit the number of comparison selections and allow cancellation', () => {
     const initial = [1, 3, 4]
     expect(initial).toHaveLength(MAX_COMPARE_MODELS)
 

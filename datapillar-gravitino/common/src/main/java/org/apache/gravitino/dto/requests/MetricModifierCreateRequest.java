@@ -28,7 +28,7 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** 创建指标修饰符的请求 */
+/** Request to create indicator modifier */
 @Getter
 @ToString
 @EqualsAndHashCode

@@ -10,25 +10,25 @@ import lombok.Data;
 @Schema(name = "JobCreate")
 public class JobCreateRequest {
 
-    @NotBlank(message = "任务名称不能为空")
-    private String jobName;
+  @NotBlank(message = "Task name cannot be empty")
+  private String jobName;
 
-    @NotNull(message = "任务类型不能为空")
-    private Long jobType;
+  @NotNull(message = "Task type cannot be empty")
+  private Long jobType;
 
-    private Map<String, Object> jobParams;
+  private Map<String, Object> jobParams;
 
-    private Integer timeoutSeconds = 0;
+  private Integer timeoutSeconds = 0;
 
-    private Integer maxRetryTimes = 0;
+  private Integer maxRetryTimes = 0;
 
-    private Integer retryInterval = 0;
+  private Integer retryInterval = 0;
 
-    private Integer priority = 0;
+  private Integer priority = 0;
 
-    private Double positionX;
+  private Double positionX;
 
-    private Double positionY;
+  private Double positionY;
 
-    private String description;
+  private String description;
 }

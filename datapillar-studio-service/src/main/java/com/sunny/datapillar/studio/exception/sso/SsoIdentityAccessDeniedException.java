@@ -5,19 +5,19 @@ import com.sunny.datapillar.common.exception.ForbiddenException;
 import java.util.Map;
 
 /**
- * SSO 身份访问拒绝异常
- * 描述当前用户不具备身份绑定权限语义
+ * SSO Identity access denied exception Description: The current user does not have identity binding
+ * permission semantics
  *
  * @author Sunny
  * @date 2026-02-26
  */
 public class SsoIdentityAccessDeniedException extends ForbiddenException {
 
-    public SsoIdentityAccessDeniedException() {
-        super(ErrorType.SSO_IDENTITY_ACCESS_DENIED, Map.of(), "无SSO绑定权限");
-    }
+  public SsoIdentityAccessDeniedException() {
+    super(ErrorType.SSO_IDENTITY_ACCESS_DENIED, Map.of(), "NoneSSOBind permissions");
+  }
 
-    public SsoIdentityAccessDeniedException(Throwable cause) {
-        super(cause, ErrorType.SSO_IDENTITY_ACCESS_DENIED, Map.of(), "无SSO绑定权限");
-    }
+  public SsoIdentityAccessDeniedException(Throwable cause) {
+    super(cause, ErrorType.SSO_IDENTITY_ACCESS_DENIED, Map.of(), "NoneSSOBind permissions");
+  }
 }

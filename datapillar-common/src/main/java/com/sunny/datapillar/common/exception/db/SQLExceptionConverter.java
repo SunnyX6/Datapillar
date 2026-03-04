@@ -3,14 +3,14 @@ package com.sunny.datapillar.common.exception.db;
 import java.sql.SQLException;
 
 /**
- * SQL 异常转换器
+ * SQL exception converter
  *
  * @author Sunny
  * @date 2026-02-26
  */
 public interface SQLExceptionConverter {
 
-    boolean supports(String jdbcUrl, String driverClassName);
+  boolean supports(String jdbcUrl, String driverClassName);
 
-    DbStorageException convert(SQLException sqlException);
+  DbStorageException convert(SQLException sqlException);
 }

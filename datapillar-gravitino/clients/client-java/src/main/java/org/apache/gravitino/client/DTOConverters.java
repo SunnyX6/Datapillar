@@ -100,10 +100,10 @@ class DTOConverters {
   }
 
   /**
-   * 检查 catalog 类型是否被客户端支持
+   * Check catalog Whether the type is supported by the client
    *
-   * @param type catalog 类型
-   * @return 是否支持
+   * @param type catalog Type
+   * @return Whether to support
    */
   static boolean isSupportedCatalogType(Catalog.Type type) {
     return type == Catalog.Type.RELATIONAL

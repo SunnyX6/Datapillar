@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 # @author Sunny
 # @date 2026-01-27
 
 """
-Neo4j 数据库连接管理
+Neo4j Database connection management
 
-提供 Neo4j 同步和异步连接池
+provide Neo4j Synchronous and asynchronous connection pools
 """
 
 import logging
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def convert_neo4j_types(value: Any) -> Any:
     """
-    递归转换 Neo4j 特殊类型为 Python 原生类型
+    recursive conversion Neo4j The special type is Python primitive type
     """
     if isinstance(value, Neo4jDateTime):
         return value.iso_format()
@@ -34,16 +33,16 @@ def convert_neo4j_types(value: Any) -> Any:
 
 
 class Neo4jClient:
-    """Neo4j 连接池管理器（Neo4j Driver 自带连接池）"""
+    """Neo4j connection pool manager（Neo4j Driver Comes with connection pool）"""
 
     _driver: Driver | None = None
 
     @classmethod
     def get_driver(cls) -> Driver:
-        """获取 Neo4j Driver（全局单例，自带连接池）"""
+        """Get Neo4j Driver（Global singleton，Comes with connection pool）"""
         if cls._driver is None:
             try:
-                logger.info(f"初始化 Neo4j Driver: {settings.neo4j_uri}")
+                logger.info(f"initialization Neo4j Driver: {settings.neo4j_uri}")
                 cls._driver = GraphDatabase.driver(
                     settings.neo4j_uri,
                     auth=(settings.neo4j_username, settings.neo4j_password),
@@ -52,32 +51,32 @@ class Neo4jClient:
                     max_connection_lifetime=3600,
                 )
                 cls._driver.verify_connectivity()
-                logger.info("Neo4j Driver 初始化成功")
+                logger.info("Neo4j Driver Initialization successful")
             except Exception as e:
-                logger.error(f"Neo4j Driver 初始化失败: {e}")
-                raise Neo4jError(f"Neo4j 连接失败: {e}") from e
+                logger.error(f"Neo4j Driver Initialization failed: {e}")
+                raise Neo4jError(f"Neo4j Connection failed: {e}") from e
         return cls._driver
 
     @classmethod
     def close(cls):
-        """关闭 Neo4j Driver"""
+        """close Neo4j Driver"""
         if cls._driver:
             cls._driver.close()
             cls._driver = None
-            logger.info("Neo4j Driver 已关闭")
+            logger.info("Neo4j Driver Closed")
 
 
 class AsyncNeo4jClient:
-    """Neo4j 异步连接池管理器"""
+    """Neo4j Asynchronous connection pool manager"""
 
     _driver: AsyncDriver | None = None
 
     @classmethod
     async def get_driver(cls) -> AsyncDriver:
-        """获取 Neo4j AsyncDriver（全局单例，自带连接池）"""
+        """Get Neo4j AsyncDriver（Global singleton，Comes with connection pool）"""
         if cls._driver is None:
             try:
-                logger.info(f"初始化 Neo4j AsyncDriver: {settings.neo4j_uri}")
+                logger.info(f"initialization Neo4j AsyncDriver: {settings.neo4j_uri}")
                 cls._driver = AsyncGraphDatabase.driver(
                     settings.neo4j_uri,
                     auth=(settings.neo4j_username, settings.neo4j_password),
@@ -85,16 +84,16 @@ class AsyncNeo4jClient:
                     connection_acquisition_timeout=60,
                 )
                 await cls._driver.verify_connectivity()
-                logger.info("Neo4j AsyncDriver 初始化成功")
+                logger.info("Neo4j AsyncDriver Initialization successful")
             except Exception as e:
-                logger.error(f"Neo4j AsyncDriver 初始化失败: {e}")
-                raise Neo4jError(f"Neo4j 异步连接失败: {e}") from e
+                logger.error(f"Neo4j AsyncDriver Initialization failed: {e}")
+                raise Neo4jError(f"Neo4j Asynchronous connection failed: {e}") from e
         return cls._driver
 
     @classmethod
     async def close(cls):
-        """关闭 Neo4j AsyncDriver"""
+        """close Neo4j AsyncDriver"""
         if cls._driver:
             await cls._driver.close()
             cls._driver = None
-            logger.info("Neo4j AsyncDriver 已关闭")
+            logger.info("Neo4j AsyncDriver Closed")

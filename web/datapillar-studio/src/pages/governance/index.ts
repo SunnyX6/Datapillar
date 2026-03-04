@@ -1,7 +1,7 @@
-// 元数据相关页面
+// Metadata related pages
 export { GovernanceMetadataPage } from './metadata'
 
-// 元语义相关页面
+// Metasemantic related pages
 export {
   GovernanceSemanticPage,
   GovernanceMetricPage,
@@ -11,5 +11,5 @@ export {
   GovernanceClassificationPage
 } from './metasemantic'
 
-// 其他页面
+// Other pages
 export { GovernanceKnowledgePage } from './KnowledgeGraphPage'

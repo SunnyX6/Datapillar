@@ -7,8 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 工作流DAG业务服务实现
- * 实现工作流DAG业务业务流程与规则校验
+ * WorkflowDAGBusiness service implementation Implement workflowDAGBusiness business process and
+ * rule verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -17,35 +17,35 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class WorkflowDagBizServiceImpl implements WorkflowDagBizService {
 
-    private final WorkflowService workflowService;
+  private final WorkflowService workflowService;
 
-    @Override
-    public void publishWorkflow(Long id) {
-        workflowService.publishWorkflow(id);
-    }
+  @Override
+  public void publishWorkflow(Long id) {
+    workflowService.publishWorkflow(id);
+  }
 
-    @Override
-    public void pauseWorkflow(Long id) {
-        workflowService.pauseWorkflow(id);
-    }
+  @Override
+  public void pauseWorkflow(Long id) {
+    workflowService.pauseWorkflow(id);
+  }
 
-    @Override
-    public void resumeWorkflow(Long id) {
-        workflowService.resumeWorkflow(id);
-    }
+  @Override
+  public void resumeWorkflow(Long id) {
+    workflowService.resumeWorkflow(id);
+  }
 
-    @Override
-    public JsonNode getDagDetail(Long id) {
-        return workflowService.getDagDetail(id);
-    }
+  @Override
+  public JsonNode getDagDetail(Long id) {
+    return workflowService.getDagDetail(id);
+  }
 
-    @Override
-    public JsonNode getDagVersions(Long id, int limit, int offset) {
-        return workflowService.getDagVersions(id, limit, offset);
-    }
+  @Override
+  public JsonNode getDagVersions(Long id, int limit, int offset) {
+    return workflowService.getDagVersions(id, limit, offset);
+  }
 
-    @Override
-    public JsonNode getDagVersion(Long id, int versionNumber) {
-        return workflowService.getDagVersion(id, versionNumber);
-    }
+  @Override
+  public JsonNode getDagVersion(Long id, int versionNumber) {
+    return workflowService.getDagVersion(id, versionNumber);
+  }
 }

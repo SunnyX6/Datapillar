@@ -5,8 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * 网关启动类
- * 负责服务启动与基础组件装配
+ * Gateway startup class Responsible for service startup and basic component assembly
  *
  * @author Sunny
  * @date 2026-01-01
@@ -15,7 +14,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @EnableDubbo
 public class DatapillarGatewayApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(DatapillarGatewayApplication.class, args);
-    }
+  public static void main(String[] args) {
+    SpringApplication.run(DatapillarGatewayApplication.class, args);
+  }
 }

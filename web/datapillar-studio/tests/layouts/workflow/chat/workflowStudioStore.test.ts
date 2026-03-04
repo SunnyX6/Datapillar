@@ -11,13 +11,13 @@ afterEach(() => {
   resetStore()
 })
 
-describe('workflowStudioStore 模型选择', () => {
-  it('默认使用预设模型', () => {
+describe('workflowStudioStore Model selection', () => {
+  it('Use preset model by default', () => {
     const state = useWorkflowStudioStore.getState()
     expect(state.selectedAiModelId).toBe(DEFAULT_WORKFLOW_AI_MODEL_ID)
   })
 
-  it('hydrateFromCache 可恢复已选模型', () => {
+  it('hydrateFromCache Selected models can be restored', () => {
     const nextAiModelId = 2001
     useWorkflowStudioStore.getState().hydrateFromCache({
       messages: [],

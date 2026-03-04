@@ -24,7 +24,7 @@ import org.apache.gravitino.dataset.Metric;
 import org.apache.gravitino.dataset.MetricVersion;
 import org.apache.gravitino.meta.AuditInfo;
 
-/** MetricVersion 接口的实现类 */
+/** MetricVersion Implementation class of interface */
 public class MetricVersionImpl implements MetricVersion, Auditable {
 
   private Long id;
@@ -144,7 +144,7 @@ public class MetricVersionImpl implements MetricVersion, Auditable {
     return auditInfo;
   }
 
-  /** Builder 类用于构建 MetricVersionImpl 实例 */
+  /** Builder classes used to build MetricVersionImpl Example */
   public static class Builder {
     private final MetricVersionImpl metricVersion;
 

@@ -26,7 +26,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** 更新指标修饰符的请求 */
+/** Request to update indicator modifiers */
 @Getter
 @ToString
 @EqualsAndHashCode
@@ -42,6 +42,6 @@ public class MetricModifierUpdateRequest implements RESTRequest {
 
   @Override
   public void validate() throws IllegalArgumentException {
-    // 所有字段可选，无需校验
+    // All fields optional，No verification required
   }
 }

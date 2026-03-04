@@ -1,5 +1,8 @@
 package com.sunny.datapillar.openlineage.api;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sunny.datapillar.openlineage.exception.OpenLineageValidationException;
@@ -17,25 +20,22 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 class OpenLineageApiTest {
 
-    @Mock
-    private OpenLineageService openLineageService;
+  @Mock private OpenLineageService openLineageService;
 
-    @Mock
-    private TenantResolver tenantResolver;
+  @Mock private TenantResolver tenantResolver;
 
-    private final ObjectMapper mapper = OpenLineageClientUtils.newObjectMapper();
+  private final ObjectMapper mapper = OpenLineageClientUtils.newObjectMapper();
 
-    @Test
-    void shouldReturnCreatedWhenServiceSucceeds() throws Exception {
-        OpenLineageApi api = new OpenLineageApi(mapper, openLineageService, tenantResolver);
+  @Test
+  void shouldReturnCreatedWhenServiceSucceeds() throws Exception {
+    OpenLineageApi api = new OpenLineageApi(mapper, openLineageService, tenantResolver);
 
-        JsonNode payload = mapper.readTree("""
+    JsonNode payload =
+        mapper.readTree(
+            """
                 {
                   "eventTime": "2026-02-28T00:00:00Z",
                   "eventType": "START",
@@ -47,25 +47,32 @@ class OpenLineageApiTest {
                 }
                 """);
 
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/openlineage");
-        TenantContext tenantContext = new TenantContext(2002L, "t-2002", "Tenant2002", com.sunny.datapillar.openlineage.model.TenantSourceType.COMPUTE_ENGINE);
-        when(tenantResolver.resolve(any(), any())).thenReturn(tenantContext);
-        when(openLineageService.createAsync(any(OpenLineage.RunEvent.class), any(), any()))
-                .thenReturn(CompletableFuture.completedFuture(null));
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/openlineage");
+    TenantContext tenantContext =
+        new TenantContext(
+            2002L,
+            "t-2002",
+            "Tenant2002",
+            com.sunny.datapillar.openlineage.model.TenantSourceType.COMPUTE_ENGINE);
+    when(tenantResolver.resolve(any(), any())).thenReturn(tenantContext);
+    when(openLineageService.createAsync(any(OpenLineage.RunEvent.class), any(), any()))
+        .thenReturn(CompletableFuture.completedFuture(null));
 
-        ResponseEntity<com.sunny.datapillar.openlineage.api.dto.IngestAckResponse> response =
-                api.ingest(payload, request).join();
+    ResponseEntity<com.sunny.datapillar.openlineage.api.dto.IngestAckResponse> response =
+        api.ingest(payload, request).join();
 
-        Assertions.assertEquals(201, response.getStatusCode().value());
-        Assertions.assertNotNull(response.getBody());
-        Assertions.assertEquals("accepted", response.getBody().status());
-    }
+    Assertions.assertEquals(201, response.getStatusCode().value());
+    Assertions.assertNotNull(response.getBody());
+    Assertions.assertEquals("accepted", response.getBody().status());
+  }
 
-    @Test
-    void shouldReturnBadRequestWhenServiceFailsWithValidationError() throws Exception {
-        OpenLineageApi api = new OpenLineageApi(mapper, openLineageService, tenantResolver);
+  @Test
+  void shouldReturnBadRequestWhenServiceFailsWithValidationError() throws Exception {
+    OpenLineageApi api = new OpenLineageApi(mapper, openLineageService, tenantResolver);
 
-        JsonNode payload = mapper.readTree("""
+    JsonNode payload =
+        mapper.readTree(
+            """
                 {
                   "eventTime": "2026-02-28T00:00:00Z",
                   "eventType": "START",
@@ -77,17 +84,23 @@ class OpenLineageApiTest {
                 }
                 """);
 
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/openlineage");
-        TenantContext tenantContext = new TenantContext(2002L, "t-2002", "Tenant2002", com.sunny.datapillar.openlineage.model.TenantSourceType.COMPUTE_ENGINE);
-        when(tenantResolver.resolve(any(), any())).thenReturn(tenantContext);
-        when(openLineageService.createAsync(any(OpenLineage.RunEvent.class), any(), any()))
-                .thenReturn(CompletableFuture.failedFuture(new OpenLineageValidationException("bad request")));
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/openlineage");
+    TenantContext tenantContext =
+        new TenantContext(
+            2002L,
+            "t-2002",
+            "Tenant2002",
+            com.sunny.datapillar.openlineage.model.TenantSourceType.COMPUTE_ENGINE);
+    when(tenantResolver.resolve(any(), any())).thenReturn(tenantContext);
+    when(openLineageService.createAsync(any(OpenLineage.RunEvent.class), any(), any()))
+        .thenReturn(
+            CompletableFuture.failedFuture(new OpenLineageValidationException("bad request")));
 
-        ResponseEntity<com.sunny.datapillar.openlineage.api.dto.IngestAckResponse> response =
-                api.ingest(payload, request).join();
+    ResponseEntity<com.sunny.datapillar.openlineage.api.dto.IngestAckResponse> response =
+        api.ingest(payload, request).join();
 
-        Assertions.assertEquals(400, response.getStatusCode().value());
-        Assertions.assertNotNull(response.getBody());
-        Assertions.assertEquals("bad_request", response.getBody().status());
-    }
+    Assertions.assertEquals(400, response.getStatusCode().value());
+    Assertions.assertNotNull(response.getBody());
+    Assertions.assertEquals("bad_request", response.getBody().status());
+  }
 }

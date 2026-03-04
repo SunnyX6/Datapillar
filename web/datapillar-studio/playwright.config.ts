@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test'
 const baseURL = process.env.PLAYWRIGHT_BASE_URL
 
 if (!baseURL) {
-  throw new Error('请设置 PLAYWRIGHT_BASE_URL，例如 http://localhost:5173')
+  throw new Error('Please set PLAYWRIGHT_BASE_URL，For example http://localhost:5173')
 }
 
 export default defineConfig({

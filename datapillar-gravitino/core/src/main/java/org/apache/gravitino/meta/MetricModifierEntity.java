@@ -28,19 +28,23 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 
-/** MetricModifier 实体，表示指标修饰符 */
+/** MetricModifier Entity，Indicates indicator modifiers */
 @ToString
 public class MetricModifierEntity implements Entity, Auditable, HasIdentifier {
 
-  public static final Field ID = Field.required("id", Long.class, "指标修饰符的唯一 ID");
-  public static final Field NAME = Field.required("name", String.class, "指标修饰符的名称");
-  public static final Field NAMESPACE = Field.required("namespace", Namespace.class, "指标修饰符的命名空间");
-  public static final Field CODE = Field.required("code", String.class, "指标修饰符的编码");
-  public static final Field COMMENT = Field.optional("comment", String.class, "指标修饰符的注释");
+  public static final Field ID = Field.required("id", Long.class, "Indicator modifier unique ID");
+  public static final Field NAME =
+      Field.required("name", String.class, "The name of the indicator modifier");
+  public static final Field NAMESPACE =
+      Field.required("namespace", Namespace.class, "Namespace of indicator modifiers");
+  public static final Field CODE =
+      Field.required("code", String.class, "Encoding of indicator modifiers");
+  public static final Field COMMENT =
+      Field.optional("comment", String.class, "Comments on indicator modifiers");
   public static final Field MODIFIER_TYPE =
-      Field.optional("modifier_type", String.class, "指标修饰符的类型，来自值域");
+      Field.optional("modifier_type", String.class, "Type of indicator modifier，from value range");
   public static final Field AUDIT_INFO =
-      Field.required("audit_info", AuditInfo.class, "指标修饰符的审计信息");
+      Field.required("audit_info", AuditInfo.class, "Audit information for indicator modifiers");
 
   private Long id;
   private String name;

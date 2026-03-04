@@ -5,8 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * Studio启动类
- * 负责服务启动与基础组件装配
+ * StudioStartup class Responsible for service startup and basic component assembly
  *
  * @author Sunny
  * @date 2026-01-01
@@ -14,7 +13,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 @EnableDubbo
 public class DatapillarStudioApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(DatapillarStudioApplication.class, args);
-    }
+  public static void main(String[] args) {
+    SpringApplication.run(DatapillarStudioApplication.class, args);
+  }
 }

@@ -22,8 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 用户角色服务实现
- * 实现用户角色业务流程与规则校验
+ * User role service implementation Implement user role business process and rule verification
  *
  * @author Sunny
  * @date 2026-01-01
@@ -32,16 +31,16 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class UserRoleServiceImpl implements UserRoleService {
 
-    private final RoleService roleService;
-    private final UserService userService;
+  private final RoleService roleService;
+  private final UserService userService;
 
-    @Override
-    public List<RoleResponse> listRolesByUser(Long userId) {
-        return roleService.getRolesByUserId(userId);
-    }
+  @Override
+  public List<RoleResponse> listRolesByUser(Long userId) {
+    return roleService.getRolesByUserId(userId);
+  }
 
-    @Override
-    public void assignRoles(Long userId, List<Long> roleIds) {
-        userService.assignRoles(userId, roleIds);
-    }
+  @Override
+  public void assignRoles(Long userId, List<Long> roleIds) {
+    userService.assignRoles(userId, roleIds);
+  }
 }

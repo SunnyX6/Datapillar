@@ -25,7 +25,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.gravitino.dto.dataset.MetricDTO;
 
-/** 指标响应 */
+/** indicator response */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -39,7 +39,7 @@ public class MetricResponse extends BaseResponse {
     this.metric = metric;
   }
 
-  /** Jackson 反序列化使用的默认构造函数 */
+  /** Jackson Default constructor used for deserialization */
   public MetricResponse() {
     super();
     this.metric = null;

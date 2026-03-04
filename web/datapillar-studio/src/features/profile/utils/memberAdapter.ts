@@ -14,12 +14,12 @@ interface RoleMemberSource {
 
 function mapMemberStatusToUserStatus(status?: number): UserStatus {
   if (status === 1) {
-    return '已激活'
+    return 'Activated'
   }
   if (status === 0) {
-    return '已禁用'
+    return 'Disabled'
   }
-  return '已邀请'
+  return 'Invited'
 }
 
 function resolveMemberName(member: RoleMemberSource): string {
@@ -31,7 +31,7 @@ function resolveMemberName(member: RoleMemberSource): string {
   if (username) {
     return username
   }
-  return `用户${member.userId}`
+  return `User${member.userId}`
 }
 
 function resolveMemberEmail(member: RoleMemberSource): string {

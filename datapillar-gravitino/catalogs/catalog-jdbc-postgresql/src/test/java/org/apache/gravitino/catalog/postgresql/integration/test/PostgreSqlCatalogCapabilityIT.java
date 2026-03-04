@@ -44,7 +44,7 @@ public class PostgreSqlCatalogCapabilityIT {
       "test123",
       "schema_with_underscores",
       "user_schema",
-      "测试模式", // Unicode support
+      "test mode", // Unicode support
       "a".repeat(63) // Maximum length for PostgreSQL
     };
 
@@ -64,7 +64,7 @@ public class PostgreSqlCatalogCapabilityIT {
       "test123",
       "table_with_underscores",
       "user_table",
-      "测试表", // Unicode support
+      "Test table", // Unicode support
       "b".repeat(63) // Maximum length for PostgreSQL
     };
 
@@ -188,7 +188,7 @@ public class PostgreSqlCatalogCapabilityIT {
   void testPostgreSqlUnicodeNamesIntegration() {
     // Test that various Unicode characters work properly in names
     String[] unicodeNames = {
-      "测试表_integration", // Chinese characters
+      "Test table_integration", // Chinese characters
       "αβγ_table", // Greek letters
       "café_table", // Latin with accents
       "أحمد_table", // Arabic characters

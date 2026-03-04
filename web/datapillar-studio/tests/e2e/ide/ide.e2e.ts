@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { login } from '../../shared/auth'
 
-test.describe('IDE 模块', () => {
-  test('进入 SQL 编辑器并选择 Catalog/Schema', async ({ page }) => {
+test.describe('IDE module', () => {
+  test('enter SQL editor and select Catalog/Schema', async ({ page }) => {
     await login(page)
     await page.goto('/ide')
 
@@ -11,7 +11,7 @@ test.describe('IDE 模块', () => {
     await page.getByText('SQL Query', { exact: true }).click()
     await page.waitForURL('**/ide/sql')
 
-    const pickerButton = page.getByRole('button', { name: '选择 Catalog' })
+    const pickerButton = page.getByRole('button', { name: 'Choose Catalog' })
     await pickerButton.click()
 
     const catalogColumn = page.getByText('Catalog', { exact: true }).locator('..').locator('..')

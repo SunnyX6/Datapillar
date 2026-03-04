@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.U
 import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.mapper.provider.base.UserRoleRelBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
 import org.apache.ibatis.annotations.Param;
@@ -30,15 +31,19 @@ import org.apache.ibatis.annotations.Param;
 public class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
   @Override
   public String softDeleteUserRoleRelByUserId(Long userId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE user_id = #{userId} AND deleted_at = 0";
+        + " WHERE user_id = #{userId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteUserRoleRelByUserAndRoles(Long userId, List<Long> roleIds) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
@@ -50,38 +55,52 @@ public class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
         + "</foreach>"
         + ") "
         + "AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
         + "</script>";
   }
 
   @Override
   public String softDeleteUserRoleRelByMetalakeId(Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE user_id IN (SELECT user_id FROM "
         + USER_TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
-        + " AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + ")"
+        + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String softDeleteUserRoleRelByRoleId(Long roleId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+        + " WHERE role_id = #{roleId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   @Override
   public String batchInsertUserRoleRelOnDuplicateKeyUpdate(List<UserRoleRelPO> userRoleRelPOs) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "<script>"
         + "INSERT INTO "
         + USER_ROLE_RELATION_TABLE_NAME
         + "(user_id, role_id,"
         + " audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES "
         + "<foreach collection='userRoleRels' item='item' separator=','>"
         + "(#{item.userId},"
@@ -89,7 +108,10 @@ public class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
         + " #{item.auditInfo},"
         + " #{item.currentVersion},"
         + " #{item.lastVersion},"
-        + " #{item.deletedAt})"
+        + " #{item.deletedAt},"
+        + " "
+        + tenantId
+        + ")"
         + "</foreach>"
         + " ON CONFLICT (user_id, role_id, deleted_at) DO UPDATE SET"
         + " user_id = EXCLUDED.user_id,"
@@ -104,10 +126,16 @@ public class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
   @Override
   public String deleteUserRoleRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + USER_ROLE_RELATION_TABLE_NAME
         + " WHERE id IN (SELECT id FROM "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit})"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 }

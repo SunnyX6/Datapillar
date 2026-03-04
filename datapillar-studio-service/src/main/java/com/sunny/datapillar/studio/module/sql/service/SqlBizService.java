@@ -16,21 +16,20 @@ import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
 
 /**
- * SQL业务服务
- * 提供SQL业务业务能力与领域服务
+ * SQLbusiness services provideSQLBusiness capabilities and domain services
  *
  * @author Sunny
  * @date 2026-01-01
  */
 public interface SqlBizService {
 
-    SqlExecuteResponse executeSql(SqlExecuteRequest request);
+  SqlExecuteResponse executeSql(SqlExecuteRequest request);
 
-    SqlCatalogListResponse listCatalogs();
+  SqlCatalogListResponse listCatalogs();
 
-    SqlDatabaseListResponse listDatabases(String catalog);
+  SqlDatabaseListResponse listDatabases(String catalog);
 
-    SqlTableListResponse listTables(String catalog, String database);
+  SqlTableListResponse listTables(String catalog, String database);
 
-    boolean isAvailable();
+  boolean isAvailable();
 }

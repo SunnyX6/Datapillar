@@ -24,6 +24,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.USER
 
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.TenantSqlSupport;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -31,6 +32,7 @@ public class RoleMetaBaseSQLProvider {
 
   public String selectRoleMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT role_id as roleId, role_name as roleName,"
         + " metalake_id as metalakeId, properties as properties,"
         + " audit_info as auditInfo, current_version as currentVersion,"
@@ -38,18 +40,24 @@ public class RoleMetaBaseSQLProvider {
         + " FROM "
         + ROLE_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND role_name = #{roleName}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String selectRoleIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("roleName") String name) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT role_id as roleId FROM "
         + ROLE_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND role_name = #{roleName}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String listRolesByUserId(@Param("userId") Long userId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT ro.role_id as roleId, ro.role_name as roleName,"
         + " ro.metalake_id as metalakeId, ro.properties as properties,"
         + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
@@ -60,10 +68,15 @@ public class RoleMetaBaseSQLProvider {
         + USER_ROLE_RELATION_TABLE_NAME
         + " re ON ro.role_id = re.role_id"
         + " WHERE re.user_id = #{userId}"
-        + " AND ro.deleted_at = 0 AND re.deleted_at = 0";
+        + " AND ro.deleted_at = 0 AND re.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ro", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("re", tenantId);
   }
 
   public String listRolesByGroupId(Long groupId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT ro.role_id as roleId, ro.role_name as roleName,"
         + " ro.metalake_id as metalakeId, ro.properties as properties,"
         + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
@@ -74,12 +87,17 @@ public class RoleMetaBaseSQLProvider {
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " ge ON ro.role_id = ge.role_id"
         + " WHERE ge.group_id = #{groupId}"
-        + " AND ro.deleted_at = 0 AND ge.deleted_at = 0";
+        + " AND ro.deleted_at = 0 AND ge.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ro", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ge", tenantId);
   }
 
   public String listRolesByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT DISTINCT ro.role_id as roleId, ro.role_name as roleName,"
         + " ro.metalake_id as metalakeId, ro.properties as properties,"
         + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
@@ -91,10 +109,15 @@ public class RoleMetaBaseSQLProvider {
         + " se ON ro.role_id = se.role_id"
         + " WHERE se.metadata_object_id = #{metadataObjectId}"
         + " AND se.type = #{metadataObjectType}"
-        + " AND ro.deleted_at = 0 AND se.deleted_at = 0";
+        + " AND ro.deleted_at = 0 AND se.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("ro", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("se", tenantId);
   }
 
   public String listRolePOsByMetalake(@Param("metalakeName") String metalakeName) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "SELECT rt.role_id as roleId, rt.role_name as roleName,"
         + " rt.metalake_id as metalakeId, rt.properties as properties,"
         + " rt.audit_info as auditInfo, rt.current_version as currentVersion,"
@@ -105,15 +128,22 @@ public class RoleMetaBaseSQLProvider {
         + MetalakeMetaMapper.TABLE_NAME
         + " mt ON rt.metalake_id = mt.metalake_id"
         + " WHERE mt.metalake_name = #{metalakeName}"
-        + " AND rt.deleted_at = 0 AND mt.deleted_at = 0";
+        + " AND rt.deleted_at = 0 AND mt.deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("rt", tenantId)
+        + " AND "
+        + TenantSqlSupport.tenantPredicate("mt", tenantId);
   }
 
   public String insertRoleMeta(@Param("roleMeta") RolePO rolePO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + ROLE_TABLE_NAME
         + "(role_id, role_name,"
         + " metalake_id, properties,"
-        + " audit_info, current_version, last_version, deleted_at)"
+        + " audit_info, current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{roleMeta.roleId},"
         + " #{roleMeta.roleName},"
@@ -122,16 +152,21 @@ public class RoleMetaBaseSQLProvider {
         + " #{roleMeta.auditInfo},"
         + " #{roleMeta.currentVersion},"
         + " #{roleMeta.lastVersion},"
-        + " #{roleMeta.deletedAt}"
+        + " #{roleMeta.deletedAt},"
+        + " "
+        + tenantId
         + " )";
   }
 
   public String insertRoleMetaOnDuplicateKeyUpdate(@Param("roleMeta") RolePO rolePO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "INSERT INTO "
         + ROLE_TABLE_NAME
         + "(role_id, role_name,"
         + " metalake_id, properties,"
-        + " audit_info, current_version, last_version, deleted_at)"
+        + " audit_info, current_version, last_version, deleted_at, "
+        + TenantSqlSupport.tenantColumn()
+        + ")"
         + " VALUES("
         + " #{roleMeta.roleId},"
         + " #{roleMeta.roleName},"
@@ -140,7 +175,9 @@ public class RoleMetaBaseSQLProvider {
         + " #{roleMeta.auditInfo},"
         + " #{roleMeta.currentVersion},"
         + " #{roleMeta.lastVersion},"
-        + " #{roleMeta.deletedAt}"
+        + " #{roleMeta.deletedAt},"
+        + " "
+        + tenantId
         + " ) ON DUPLICATE KEY UPDATE"
         + " role_name = #{roleMeta.roleName},"
         + " metalake_id = #{roleMeta.metalakeId},"
@@ -153,6 +190,7 @@ public class RoleMetaBaseSQLProvider {
 
   public String updateRoleMeta(
       @Param("newRoleMeta") RolePO newRolePO, @Param("oldRoleMeta") RolePO oldRolePO) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ROLE_TABLE_NAME
         + " SET role_name = #{newRoleMeta.roleName},"
@@ -167,29 +205,41 @@ public class RoleMetaBaseSQLProvider {
         + " AND metalake_id = #{oldRoleMeta.metalakeId}"
         + " AND current_version = #{oldRoleMeta.currentVersion}"
         + " AND last_version = #{oldRoleMeta.lastVersion}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteRoleMetaByRoleId(Long roleId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ROLE_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+        + " WHERE role_id = #{roleId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "UPDATE "
         + ROLE_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId);
   }
 
   public String deleteRoleMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    long tenantId = TenantSqlSupport.requireTenantId();
     return "DELETE FROM "
         + ROLE_TABLE_NAME
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+        + " AND "
+        + TenantSqlSupport.tenantPredicate(null, tenantId)
+        + " LIMIT #{limit}";
   }
 }
