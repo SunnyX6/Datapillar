@@ -99,8 +99,7 @@ public class OwnerMetaService {
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        entityId,
-                        NameIdentifierUtil.toMetadataObject(entity, entityType).type().name())),
+                        entityId, entityType.name())),
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class, mapper -> mapper.insertOwnerRel(ownerRelPO)));

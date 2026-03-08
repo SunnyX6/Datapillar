@@ -312,7 +312,7 @@ export function MetricFormLeft({
     }
   }, [])
 
-  // Atomic indicators fetchData adapter
+  // Atomic Metric fetchData adapter
   const fetchAtomicMetricData = useCallback(async (offset: number, limit: number): Promise<{ items: InfiniteSelectItem[]; total: number }> => {
     // Use parent cache first，Avoid re-requesting each time the mount causes the drop-down to flicker
     if (offset === 0) {
@@ -403,20 +403,20 @@ export function MetricFormLeft({
     <div className="col-span-5 xl:col-span-4 flex flex-col gap-4 h-full">
       <div className="flex-1 min-h-0 flex flex-col gap-4">
         <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Indicator name *</label>
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Metric name *</label>
           <input
             type="text"
-            placeholder="For example：Cumulative order amount"
+            placeholder="Example: Cumulative order amount"
             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-all"
             value={form.name}
             onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
           />
         </div>
 
-        {/* Indicator coding area */}
+        {/* Metric code section */}
         <div className="space-y-2">
           <div className="flex items-center justify-between h-5">
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Indicator coding *</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Metric code *</label>
             <span className={`font-mono text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded ${!isEditMode && form.code ? 'visible' : 'invisible'}`}>
               {form.code || '-'}
             </span>
@@ -432,7 +432,7 @@ export function MetricFormLeft({
                 <div className="flex items-center gap-1">
                   <div className={form.baseCode ? 'hidden' : 'flex'}>
                     <InfiniteSelect
-                      placeholder="Select Atomic Indicator"
+                      placeholder="Select Atomic Metric"
                       variant="slate"
                       initialItems={_atomicMetrics.map((m) => ({
                         key: m.code,
@@ -519,7 +519,7 @@ export function MetricFormLeft({
                     addSeg(
                       (
                         <InfiniteSelect
-                          placeholder="Select root word"
+                          placeholder="Select WordRoot"
                           variant="purple"
                           selectedKeys={form.wordRoots}
                           fetchData={fetchWordRootData}

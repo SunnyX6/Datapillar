@@ -1201,7 +1201,7 @@ export function ComponentLibrarySidebar() {
 
  {/* bottom area */}
  <div className="px-3 py-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/60 flex items-center justify-between gap-2">
- <p className="text-micro text-slate-400 leading-relaxed flex-1">Before assembling derived indicators,Please make sure you already have the required caliber fragment in the component library.</p>
+ <p className="text-micro text-slate-400 leading-relaxed flex-1">Before assembling Derived Metrics, make sure required semantic fragments already exist in the component library.</p>
  <button
  onClick={() => setCollapsed(true)}
  className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"

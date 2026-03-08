@@ -342,6 +342,22 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   /**
+   * Replace all roles bound to a user.
+   *
+   * @param user The name of the User.
+   * @param roles The target role names of the user. An empty list clears all roles.
+   * @return The User after roles are replaced.
+   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws IllegalRoleException If the Role with the given name is invalid.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If replacing roles for a user encounters storage issues.
+   */
+  public User replaceRolesForUser(List<String> roles, String user)
+      throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
+    return getMetalake().replaceRolesForUser(roles, user);
+  }
+
+  /**
    * Grant roles to a group.
    *
    * @param group The name of the Group.

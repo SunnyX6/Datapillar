@@ -39,7 +39,7 @@ export AIRFLOW_PASSWORD="${AIRFLOW_PASSWORD:-123456asd}"
 
 # Gravitino Configuration（used for Flink SQL execute）
 export GRAVITINO_URI="${GRAVITINO_URI:-http://localhost:8090}"
-export GRAVITINO_METALAKE="${GRAVITINO_METALAKE:-datapillar}"
+export GRAVITINO_METALAKE="${GRAVITINO_METALAKE:-oneMeta}"
 
 # debug mode（Optional）
 # export DATAPILLAR_DEBUG_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"

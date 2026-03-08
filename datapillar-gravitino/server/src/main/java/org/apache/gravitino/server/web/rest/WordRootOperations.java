@@ -47,10 +47,12 @@ import org.apache.gravitino.dto.responses.WordRootResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.pagination.PagedResult;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 @Path("metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/wordroots")
 public class WordRootOperations {
@@ -88,7 +90,15 @@ public class WordRootOperations {
                 datasetDispatcher.listWordRoots(rootNs, offset, limit);
             WordRootDTO[] rootDTOs =
                 result.items().stream().map(DTOConverters::toDTO).toArray(WordRootDTO[]::new);
-            return Utils.ok(new WordRootListResponse(rootDTOs, result.total(), offset, limit));
+            rootDTOs =
+                MetadataFilterHelper.filterByExpression(
+                    metalake,
+                    AuthorizationExpressionConstants.filterWordRootAuthorizationExpression,
+                    Entity.EntityType.WORDROOT,
+                    rootDTOs,
+                    rootDto ->
+                        NameIdentifierUtil.ofWordRoot(metalake, catalog, schema, rootDto.code()));
+            return Utils.ok(new WordRootListResponse(rootDTOs, rootDTOs.length, offset, limit));
           });
 
     } catch (Exception e) {
@@ -102,14 +112,14 @@ public class WordRootOperations {
   @Timed(name = "get-wordroot." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-wordroot", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.loadWordRootAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.WORDROOT)
   public Response getWordRoot(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("code") String code) {
+      @PathParam("code") @AuthorizationMetadata(type = Entity.EntityType.WORDROOT) String code) {
     NameIdentifier rootId = NameIdentifier.of(metalake, catalog, schema, code);
 
     try {
@@ -130,7 +140,7 @@ public class WordRootOperations {
   @Timed(name = "create-wordroot." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-wordroot", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.createWordRootAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createWordRoot(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -168,14 +178,14 @@ public class WordRootOperations {
   @Timed(name = "delete-wordroot." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-wordroot", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.manageWordRootAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.WORDROOT)
   public Response deleteWordRoot(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("code") String code) {
+      @PathParam("code") @AuthorizationMetadata(type = Entity.EntityType.WORDROOT) String code) {
     NameIdentifier rootId = NameIdentifier.of(metalake, catalog, schema, code);
 
     try {
@@ -197,14 +207,14 @@ public class WordRootOperations {
   @Timed(name = "alter-wordroot." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-wordroot", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.manageWordRootAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.WORDROOT)
   public Response alterWordRoot(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("code") String code,
+      @PathParam("code") @AuthorizationMetadata(type = Entity.EntityType.WORDROOT) String code,
       WordRootUpdateRequest request) {
     NameIdentifier rootId = NameIdentifier.of(metalake, catalog, schema, code);
 

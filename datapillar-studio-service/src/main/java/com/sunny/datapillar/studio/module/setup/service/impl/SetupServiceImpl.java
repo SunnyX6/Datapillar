@@ -2,12 +2,6 @@ package com.sunny.datapillar.studio.module.setup.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sunny.datapillar.connector.gravitino.GravitinoConnector;
-import com.sunny.datapillar.connector.runtime.ConnectorKernel;
-import com.sunny.datapillar.connector.spi.ConnectorContext;
-import com.sunny.datapillar.connector.spi.ConnectorInvocation;
-import com.sunny.datapillar.connector.spi.IdempotencyDescriptor;
 import com.sunny.datapillar.studio.context.TenantContext;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
 import com.sunny.datapillar.studio.dto.llm.request.*;
@@ -24,7 +18,9 @@ import com.sunny.datapillar.studio.dto.user.request.*;
 import com.sunny.datapillar.studio.dto.user.response.*;
 import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoSetupService;
 import com.sunny.datapillar.studio.module.setup.entity.SystemBootstrap;
+import com.sunny.datapillar.studio.module.setup.enums.SetupBootstrapStatus;
 import com.sunny.datapillar.studio.module.setup.mapper.SystemBootstrapMapper;
 import com.sunny.datapillar.studio.module.setup.service.SetupService;
 import com.sunny.datapillar.studio.module.tenant.entity.FeatureObject;
@@ -45,12 +41,12 @@ import com.sunny.datapillar.studio.module.user.mapper.RolePermissionMapper;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserRoleMapper;
+import com.sunny.datapillar.studio.module.user.service.UserService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -78,28 +74,18 @@ public class SetupServiceImpl implements SetupService {
   private static final int MAX_TENANT_CODE_LENGTH = 64;
   private static final String DEFAULT_TENANT_CODE_PREFIX = "tenant";
   private static final int SYSTEM_BOOTSTRAP_ID = 1;
-  private static final int SETUP_COMPLETED = 1;
   private static final String STEP_SCHEMA_MIGRATION = "SCHEMA_MIGRATION";
   private static final String STEP_SYSTEM_INITIALIZATION = "SYSTEM_INITIALIZATION";
   private static final String STEP_COMPLETED = "COMPLETED";
   private static final String STEP_STATUS_PENDING = "PENDING";
   private static final String STEP_STATUS_IN_PROGRESS = "IN_PROGRESS";
+  private static final String STEP_STATUS_FAILED = "FAILED";
   private static final String STEP_STATUS_COMPLETED = "COMPLETED";
-  private static final String METALAKE_ONE_META = "oneMeta";
-  private static final String METALAKE_ONE_SEMANTICS = "oneSemantics";
-  private static final String SETUP_STEP_SYNC_USER = "SETUP_SYNC_USER";
-  private static final String SETUP_STEP_CREATE_METALAKE_METADATA =
-      "SETUP_CREATE_METALAKE_METADATA";
-  private static final String SETUP_STEP_CREATE_METALAKE_SEMANTIC =
-      "SETUP_CREATE_METALAKE_SEMANTIC";
-  private static final String SETUP_STEP_SYNC_ROLE_DATA_PRIVILEGES =
-      "SETUP_SYNC_ROLE_DATA_PRIVILEGES";
-  private static final Argon2PasswordEncoder ARGON2_PASSWORD_ENCODER =
-      new Argon2PasswordEncoder(16, 32, 1, 64 * 1024, 3);
   private final TenantMapper tenantMapper;
   private final SystemBootstrapMapper systemBootstrapMapper;
   private final TenantService tenantService;
   private final UserMapper userMapper;
+  private final UserService userService;
   private final TenantUserMapper tenantUserMapper;
   private final UserRoleMapper userRoleMapper;
   private final RoleMapper roleMapper;
@@ -107,8 +93,7 @@ public class SetupServiceImpl implements SetupService {
   private final PermissionMapper permissionMapper;
   private final FeatureObjectMapper featureObjectMapper;
   private final TenantFeaturePermissionMapper tenantFeaturePermissionMapper;
-  private final ConnectorKernel connectorKernel;
-  private final ObjectMapper objectMapper;
+  private final GravitinoSetupService gravitinoSetupService;
   private final TransactionTemplate transactionTemplate;
 
   @Override
@@ -117,18 +102,12 @@ public class SetupServiceImpl implements SetupService {
     SetupStatusResponse response = new SetupStatusResponse();
     SystemBootstrap bootstrap = systemBootstrapMapper.selectById(SYSTEM_BOOTSTRAP_ID);
     boolean schemaReady = bootstrap != null;
-    boolean initialized = isSetupCompleted(bootstrap);
+    SetupBootstrapStatus bootstrapStatus = resolveBootstrapStatus(bootstrap);
+    boolean initialized = schemaReady && bootstrapStatus == SetupBootstrapStatus.COMPLETED;
     response.setSchemaReady(schemaReady);
     response.setInitialized(initialized);
-    if (!schemaReady) {
-      response.setCurrentStep(STEP_SCHEMA_MIGRATION);
-    } else if (!initialized) {
-      response.setCurrentStep(STEP_SYSTEM_INITIALIZATION);
-    } else {
-      response.setCurrentStep(STEP_COMPLETED);
-    }
-
-    response.setSteps(buildStepStatuses(schemaReady, initialized));
+    response.setCurrentStep(resolveCurrentStep(schemaReady, bootstrapStatus));
+    response.setSteps(buildStepStatuses(schemaReady, bootstrapStatus));
     return response;
   }
 
@@ -139,8 +118,22 @@ public class SetupServiceImpl implements SetupService {
     }
 
     SetupProvisionContext context = prepareSetupProvisioning(request);
-    synchronizeSetupResources(context);
-    completeSetupProvisioning(context);
+    try {
+      gravitinoSetupService.initializeResources(
+          context.tenantId(),
+          context.tenantCode(),
+          context.adminUserId(),
+          context.adminUsername(),
+          context.adminRoleName());
+      completeSetupProvisioning(context);
+    } catch (RuntimeException exception) {
+      try {
+        markSetupProvisioningFailed(context);
+      } catch (RuntimeException markFailedException) {
+        exception.addSuppressed(markFailedException);
+      }
+      throw exception;
+    }
 
     SetupInitializeResponse response = new SetupInitializeResponse();
     response.setTenantId(context.tenantId());
@@ -148,13 +141,25 @@ public class SetupServiceImpl implements SetupService {
     return response;
   }
 
-  private boolean isSetupCompleted(SystemBootstrap bootstrap) {
-    return bootstrap != null
-        && bootstrap.getSetupCompleted() != null
-        && bootstrap.getSetupCompleted() == SETUP_COMPLETED;
+  private SetupBootstrapStatus resolveBootstrapStatus(SystemBootstrap bootstrap) {
+    if (bootstrap == null) {
+      return SetupBootstrapStatus.PENDING;
+    }
+    return SetupBootstrapStatus.fromCode(bootstrap.getStatus());
   }
 
-  private List<SetupStepStatusItem> buildStepStatuses(boolean schemaReady, boolean initialized) {
+  private String resolveCurrentStep(boolean schemaReady, SetupBootstrapStatus bootstrapStatus) {
+    if (!schemaReady) {
+      return STEP_SCHEMA_MIGRATION;
+    }
+    if (bootstrapStatus == SetupBootstrapStatus.COMPLETED) {
+      return STEP_COMPLETED;
+    }
+    return STEP_SYSTEM_INITIALIZATION;
+  }
+
+  private List<SetupStepStatusItem> buildStepStatuses(
+      boolean schemaReady, SetupBootstrapStatus bootstrapStatus) {
     return List.of(
         createStepStatus(
             STEP_SCHEMA_MIGRATION,
@@ -165,23 +170,28 @@ public class SetupServiceImpl implements SetupService {
             STEP_SYSTEM_INITIALIZATION,
             "Administrator initialization",
             "Create first tenant,Administrator and permission binding",
-            resolveInitStatus(schemaReady, initialized)),
+            resolveInitStatus(schemaReady, bootstrapStatus)),
         createStepStatus(
             STEP_COMPLETED,
             "Initialization completed",
             "The system enters the login state",
-            initialized ? STEP_STATUS_COMPLETED : STEP_STATUS_PENDING));
+            bootstrapStatus == SetupBootstrapStatus.COMPLETED
+                ? STEP_STATUS_COMPLETED
+                : STEP_STATUS_PENDING));
   }
 
   private String resolveSchemaMigrationStatus(boolean schemaReady) {
     return schemaReady ? STEP_STATUS_COMPLETED : STEP_STATUS_IN_PROGRESS;
   }
 
-  private String resolveInitStatus(boolean schemaReady, boolean initialized) {
+  private String resolveInitStatus(boolean schemaReady, SetupBootstrapStatus bootstrapStatus) {
     if (!schemaReady) {
       return STEP_STATUS_PENDING;
     }
-    if (initialized) {
+    if (bootstrapStatus == SetupBootstrapStatus.FAILED) {
+      return STEP_STATUS_FAILED;
+    }
+    if (bootstrapStatus == SetupBootstrapStatus.COMPLETED) {
       return STEP_STATUS_COMPLETED;
     }
     return STEP_STATUS_IN_PROGRESS;
@@ -198,138 +208,29 @@ public class SetupServiceImpl implements SetupService {
   }
 
   private SetupProvisionContext prepareSetupProvisioning(SetupInitializeRequest request) {
-    return runInTransaction(
-        () -> {
-          SystemBootstrap bootstrap =
-              systemBootstrapMapper.selectByIdForUpdate(SYSTEM_BOOTSTRAP_ID);
-          if (bootstrap == null) {
-            throw new com.sunny.datapillar.common.exception.ServiceUnavailableException(
-                "Service unavailable", "Database migration not completed");
-          }
-          if (isSetupCompleted(bootstrap)) {
-            throw new com.sunny.datapillar.common.exception.AlreadyExistsException(
-                "Resource already exists", "System has been initialized");
-          }
+    SystemBootstrap bootstrap = loadBootstrapForSetup();
+    validateAdminIdentityReady(bootstrap, request);
 
-          Long tenantId = bootstrap.getSetupTenantId();
-          if (tenantId == null || tenantId <= 0) {
-            tenantId = createTenant(request);
-            bootstrap.setSetupTenantId(tenantId);
-          }
+    SetupTenantContext tenantContext = resolveOrCreateSetupTenant(bootstrap, request);
+    Long tenantId = tenantContext.tenantId();
+    String tenantCode = tenantContext.tenantCode();
+    persistSetupTenantId(tenantId);
 
-          String tenantCode = requireTenantCode(tenantId);
-          Long adminUserId = bootstrap.getSetupAdminUserId();
-          User adminUser;
-          if (adminUserId == null || adminUserId <= 0) {
-            adminUser = createAdminUser(tenantId, request);
-            bootstrap.setSetupAdminUserId(adminUser.getId());
-          } else {
-            adminUser = userMapper.selectById(adminUserId);
-            if (adminUser == null) {
-              throw new com.sunny.datapillar.common.exception.InternalException(
-                  "Server internal error");
-            }
-          }
+    SetupAdminUserContext adminUserContext =
+        resolveOrCreateSetupAdminUser(bootstrap, tenantId, tenantCode, request);
+    User adminUser = adminUserContext.user();
+    persistSetupAdminUserId(adminUser.getId());
 
-          TenantContext previousContext = TenantContextHolder.get();
-          TenantContext setupContext =
-              new TenantContext(tenantId, tenantCode, adminUser.getId(), tenantId, false);
-          TenantContextHolder.set(setupContext);
-          Role adminRole;
-          try {
-            bindTenantUser(tenantId, adminUser.getId());
-            adminRole = upsertAdminRole(tenantId);
-            bindUserRole(tenantId, adminUser.getId(), adminRole.getId());
-            grantTenantAndRolePermissions(tenantId, adminUser.getId(), adminRole.getId());
-          } finally {
-            restoreTenantContext(previousContext);
-          }
+    SetupRoleContext adminRoleContext =
+        prepareSetupAuthorities(tenantId, tenantCode, adminUser.getId());
+    markSetupProvisioning(tenantId, adminUser.getId());
 
-          bootstrap.setSetupCompleted(0);
-          bootstrap.setSetupTokenHash(null);
-          bootstrap.setSetupTokenGeneratedAt(null);
-          int updated = systemBootstrapMapper.updateById(bootstrap);
-          if (updated == 0) {
-            throw new com.sunny.datapillar.common.exception.InternalException(
-                "Server internal error");
-          }
-
-          return new SetupProvisionContext(
-              tenantId,
-              tenantCode,
-              adminUser.getId(),
-              adminUser.getUsername(),
-              adminRole.getName());
-        });
-  }
-
-  private void synchronizeSetupResources(SetupProvisionContext context) {
-    ConnectorContext connectorContext =
-        new ConnectorContext(
-            context.tenantId(),
-            context.tenantCode(),
-            context.adminUserId(),
-            context.adminUsername(),
-            null,
-            context.adminUserId(),
-            context.tenantId(),
-            false,
-            null,
-            "setup:" + context.tenantId() + ":" + context.adminUserId());
-
-    invokeGravitinoWrite(
-        GravitinoConnector.OP_SECURITY_SYNC_USER,
-        objectMapper.createObjectNode().put("username", context.adminUsername()),
-        context,
-        SETUP_STEP_SYNC_USER,
-        connectorContext);
-
-    invokeGravitinoWrite(
-        GravitinoConnector.OP_METALAKE_CREATE,
-        objectMapper
-            .createObjectNode()
-            .put("metalakeName", METALAKE_ONE_META)
-            .put("comment", "Datapillar metadata metalake"),
-        context,
-        SETUP_STEP_CREATE_METALAKE_METADATA,
-        connectorContext);
-
-    invokeGravitinoWrite(
-        GravitinoConnector.OP_METALAKE_CREATE,
-        objectMapper
-            .createObjectNode()
-            .put("metalakeName", METALAKE_ONE_SEMANTICS)
-            .put("comment", "Datapillar semantic metalake"),
-        context,
-        SETUP_STEP_CREATE_METALAKE_SEMANTIC,
-        connectorContext);
-
-    invokeGravitinoWrite(
-        GravitinoConnector.OP_SECURITY_SYNC_ROLE_DATA_PRIVILEGES,
-        objectMapper
-            .createObjectNode()
-            .put("roleName", context.adminRoleName())
-            .put("domain", "METADATA")
-            .set("commands", objectMapper.createArrayNode()),
-        context,
-        SETUP_STEP_SYNC_ROLE_DATA_PRIVILEGES,
-        connectorContext);
-  }
-
-  private void invokeGravitinoWrite(
-      String operationId,
-      com.fasterxml.jackson.databind.node.ObjectNode payload,
-      SetupProvisionContext context,
-      String step,
-      ConnectorContext connectorContext) {
-    String key = "setup:%d:%d:%s".formatted(context.tenantId(), context.adminUserId(), step);
-    ConnectorInvocation invocation =
-        ConnectorInvocation.builder(GravitinoConnector.CONNECTOR_ID, operationId)
-            .payload(payload)
-            .context(connectorContext)
-            .idempotency(IdempotencyDescriptor.of(key, step))
-            .build();
-    connectorKernel.invoke(invocation);
+    return new SetupProvisionContext(
+        tenantId,
+        tenantCode,
+        adminUser.getId(),
+        adminUser.getUsername(),
+        adminRoleContext.role().getName());
   }
 
   private void completeSetupProvisioning(SetupProvisionContext context) {
@@ -341,7 +242,7 @@ public class SetupServiceImpl implements SetupService {
             throw new com.sunny.datapillar.common.exception.InternalException(
                 "Server internal error");
           }
-          bootstrap.setSetupCompleted(SETUP_COMPLETED);
+          bootstrap.setStatus(SetupBootstrapStatus.COMPLETED.code());
           bootstrap.setSetupTenantId(context.tenantId());
           bootstrap.setSetupAdminUserId(context.adminUserId());
           bootstrap.setSetupTokenHash(null);
@@ -355,27 +256,191 @@ public class SetupServiceImpl implements SetupService {
         });
   }
 
-  private Long createTenant(SetupInitializeRequest request) {
+  private void markSetupProvisioningFailed(SetupProvisionContext context) {
+    runInTransactionWithoutResult(
+        () -> {
+          SystemBootstrap bootstrap =
+              systemBootstrapMapper.selectByIdForUpdate(SYSTEM_BOOTSTRAP_ID);
+          if (bootstrap == null) {
+            throw new com.sunny.datapillar.common.exception.InternalException(
+                "Server internal error");
+          }
+          bootstrap.setStatus(SetupBootstrapStatus.FAILED.code());
+          bootstrap.setSetupCompletedAt(null);
+          bootstrap.setSetupTokenHash(null);
+          bootstrap.setSetupTokenGeneratedAt(null);
+          bootstrap.setSetupTenantId(context.tenantId());
+          bootstrap.setSetupAdminUserId(context.adminUserId());
+          int updated = systemBootstrapMapper.updateById(bootstrap);
+          if (updated == 0) {
+            throw new com.sunny.datapillar.common.exception.InternalException(
+                "Server internal error");
+          }
+        });
+  }
+
+  private SystemBootstrap loadBootstrapForSetup() {
+    return runInTransaction(
+        () -> {
+          SystemBootstrap bootstrap =
+              systemBootstrapMapper.selectByIdForUpdate(SYSTEM_BOOTSTRAP_ID);
+          if (bootstrap == null) {
+            throw new com.sunny.datapillar.common.exception.ServiceUnavailableException(
+                "Service unavailable", "Database migration not completed");
+          }
+
+          SetupBootstrapStatus bootstrapStatus = resolveBootstrapStatus(bootstrap);
+          if (bootstrapStatus == SetupBootstrapStatus.COMPLETED) {
+            throw new com.sunny.datapillar.common.exception.AlreadyExistsException(
+                "Resource already exists", "System has been initialized");
+          }
+          if (bootstrapStatus == SetupBootstrapStatus.PROVISIONING) {
+            throw new com.sunny.datapillar.common.exception.ConflictException(
+                "System setup is already in progress");
+          }
+          return bootstrap;
+        });
+  }
+
+  private void validateAdminIdentityReady(
+      SystemBootstrap bootstrap, SetupInitializeRequest request) {
+    Long bootstrapAdminUserId = bootstrap.getSetupAdminUserId();
+    if (bootstrapAdminUserId != null && bootstrapAdminUserId > 0) {
+      User existingAdmin = userMapper.selectById(bootstrapAdminUserId);
+      if (existingAdmin != null) {
+        return;
+      }
+    }
+
+    String username =
+        normalizeRequiredText(request.getUsername(), "Administrator username cannot be empty");
+    if (userMapper.selectByUsernameGlobal(username) != null) {
+      throw new com.sunny.datapillar.common.exception.AlreadyExistsException(
+          "Resource already exists", username);
+    }
+
+    String email = normalizeEmail(request.getEmail());
+    LambdaQueryWrapper<User> emailQuery = new LambdaQueryWrapper<>();
+    emailQuery.eq(User::getEmail, email).eq(User::getDeleted, USER_NOT_DELETED);
+    if (userMapper.selectOne(emailQuery) != null) {
+      throw new com.sunny.datapillar.common.exception.AlreadyExistsException(
+          "Resource already exists", email);
+    }
+  }
+
+  private void persistSetupTenantId(Long tenantId) {
+    runInTransactionWithoutResult(() -> updateBootstrapIdentifiers(tenantId, null, null));
+  }
+
+  private void persistSetupAdminUserId(Long adminUserId) {
+    runInTransactionWithoutResult(() -> updateBootstrapIdentifiers(null, adminUserId, null));
+  }
+
+  private void markSetupProvisioning(Long tenantId, Long adminUserId) {
+    runInTransactionWithoutResult(
+        () -> updateBootstrapIdentifiers(tenantId, adminUserId, SetupBootstrapStatus.PROVISIONING));
+  }
+
+  private void updateBootstrapIdentifiers(
+      Long tenantId, Long adminUserId, SetupBootstrapStatus bootstrapStatus) {
+    SystemBootstrap bootstrap = systemBootstrapMapper.selectByIdForUpdate(SYSTEM_BOOTSTRAP_ID);
+    if (bootstrap == null) {
+      throw new com.sunny.datapillar.common.exception.InternalException("Server internal error");
+    }
+
+    SetupBootstrapStatus currentStatus = resolveBootstrapStatus(bootstrap);
+    if (currentStatus == SetupBootstrapStatus.COMPLETED) {
+      throw new com.sunny.datapillar.common.exception.AlreadyExistsException(
+          "Resource already exists", "System has been initialized");
+    }
+    if (bootstrapStatus != null && currentStatus == SetupBootstrapStatus.PROVISIONING) {
+      throw new com.sunny.datapillar.common.exception.ConflictException(
+          "System setup is already in progress");
+    }
+
+    if (tenantId != null) {
+      bootstrap.setSetupTenantId(tenantId);
+    }
+    if (adminUserId != null) {
+      bootstrap.setSetupAdminUserId(adminUserId);
+    }
+    if (bootstrapStatus != null) {
+      bootstrap.setStatus(bootstrapStatus.code());
+      bootstrap.setSetupCompletedAt(null);
+      bootstrap.setSetupTokenHash(null);
+      bootstrap.setSetupTokenGeneratedAt(null);
+    }
+
+    int updated = systemBootstrapMapper.updateById(bootstrap);
+    if (updated == 0) {
+      throw new com.sunny.datapillar.common.exception.InternalException("Server internal error");
+    }
+  }
+
+  private SetupRoleContext prepareSetupAuthorities(
+      Long tenantId, String tenantCode, Long adminUserId) {
+    return runInTransaction(
+        () -> {
+          TenantContext previousContext = TenantContextHolder.get();
+          TenantContext setupContext =
+              new TenantContext(tenantId, tenantCode, adminUserId, tenantId, false);
+          TenantContextHolder.set(setupContext);
+          try {
+            bindTenantUser(tenantId, adminUserId);
+            SetupRoleContext adminRoleContext = upsertAdminRole(tenantId);
+            bindUserRole(tenantId, adminUserId, adminRoleContext.role().getId());
+            grantTenantAndRolePermissions(tenantId, adminUserId, adminRoleContext.role().getId());
+            return adminRoleContext;
+          } finally {
+            restoreTenantContext(previousContext);
+          }
+        });
+  }
+
+  private SetupTenantContext createTenant(SetupInitializeRequest request) {
     TenantCreateRequest tenant = new TenantCreateRequest();
     tenant.setCode(resolveTenantCode(request));
     tenant.setName(resolveTenantName(request));
     tenant.setType(DEFAULT_TENANT_TYPE);
-    return tenantService.createTenant(tenant);
-  }
-
-  private String requireTenantCode(Long tenantId) {
-    if (tenantId == null || tenantId <= 0) {
+    Long tenantId = tenantService.createTenant(tenant, false);
+    if (tenantId == null || tenantId <= 0 || !StringUtils.hasText(tenant.getCode())) {
       throw new com.sunny.datapillar.common.exception.InternalException("Server internal error");
     }
-    com.sunny.datapillar.studio.module.tenant.entity.Tenant tenant =
-        tenantMapper.selectById(tenantId);
-    if (tenant == null || !StringUtils.hasText(tenant.getCode())) {
-      throw new com.sunny.datapillar.common.exception.InternalException("Server internal error");
-    }
-    return tenant.getCode().trim();
+    return new SetupTenantContext(tenantId, tenant.getCode().trim(), true);
   }
 
-  private User createAdminUser(Long tenantId, SetupInitializeRequest request) {
+  private SetupTenantContext resolveOrCreateSetupTenant(
+      SystemBootstrap bootstrap, SetupInitializeRequest request) {
+    Long tenantId = bootstrap.getSetupTenantId();
+    if (tenantId != null && tenantId > 0) {
+      com.sunny.datapillar.studio.module.tenant.entity.Tenant tenant =
+          tenantMapper.selectById(tenantId);
+      if (tenant != null && StringUtils.hasText(tenant.getCode())) {
+        return new SetupTenantContext(tenantId, tenant.getCode().trim(), false);
+      }
+    }
+
+    SetupTenantContext createdTenant = createTenant(request);
+    bootstrap.setSetupTenantId(createdTenant.tenantId());
+    return createdTenant;
+  }
+
+  private SetupAdminUserContext resolveOrCreateSetupAdminUser(
+      SystemBootstrap bootstrap, Long tenantId, String tenantCode, SetupInitializeRequest request) {
+    Long adminUserId = bootstrap.getSetupAdminUserId();
+    if (adminUserId != null && adminUserId > 0) {
+      User adminUser = userMapper.selectById(adminUserId);
+      if (adminUser != null) {
+        return new SetupAdminUserContext(adminUser, false);
+      }
+    }
+
+    User adminUser = createAdminUser(tenantId, tenantCode, request);
+    bootstrap.setSetupAdminUserId(adminUser.getId());
+    return new SetupAdminUserContext(adminUser, true);
+  }
+
+  private User createAdminUser(Long tenantId, String tenantCode, SetupInitializeRequest request) {
     String email = resolveAdminEmail(request);
     String username = resolveAdminUsername(request);
     LambdaQueryWrapper<User> emailQuery = new LambdaQueryWrapper<>();
@@ -385,17 +450,32 @@ public class SetupServiceImpl implements SetupService {
           "Resource already exists", email);
     }
 
-    User user = new User();
-    user.setTenantId(tenantId);
-    user.setUsername(username);
-    user.setPassword(ARGON2_PASSWORD_ENCODER.encode(resolveAdminPassword(request)));
-    user.setNickname(resolveAdminDisplayName(request));
-    user.setEmail(email);
+    UserCreateRequest createRequest = new UserCreateRequest();
+    createRequest.setUsername(username);
+    createRequest.setPassword(resolveAdminPassword(request));
+    createRequest.setNickname(resolveAdminDisplayName(request));
+    createRequest.setEmail(email);
+    createRequest.setStatus(STATUS_ENABLED);
+
+    TenantContext previousContext = TenantContextHolder.get();
+    TenantContext createUserContext = new TenantContext(tenantId, tenantCode, null, null, false);
+    TenantContextHolder.set(createUserContext);
+    Long userId;
+    try {
+      userId = userService.createUser(createRequest, false);
+    } finally {
+      restoreTenantContext(previousContext);
+    }
+
+    User user = userMapper.selectById(userId);
+    if (user == null) {
+      throw new com.sunny.datapillar.common.exception.InternalException("Server internal error");
+    }
     user.setLevel(PLATFORM_SUPER_ADMIN_LEVEL);
     user.setStatus(STATUS_ENABLED);
     user.setDeleted(USER_NOT_DELETED);
-    int inserted = userMapper.insert(user);
-    if (inserted == 0 || user.getId() == null) {
+    int updated = userMapper.updateById(user);
+    if (updated == 0) {
       throw new com.sunny.datapillar.common.exception.InternalException("Server internal error");
     }
     return user;
@@ -422,7 +502,7 @@ public class SetupServiceImpl implements SetupService {
     tenantUserMapper.insert(tenantUser);
   }
 
-  private Role upsertAdminRole(Long tenantId) {
+  private SetupRoleContext upsertAdminRole(Long tenantId) {
     Role existing = roleMapper.findByName(tenantId, ADMIN_ROLE_NAME);
     if (existing != null) {
       existing.setType(ADMIN_ROLE_TYPE);
@@ -430,7 +510,7 @@ public class SetupServiceImpl implements SetupService {
       existing.setSort(ADMIN_ROLE_SORT);
       existing.setLevel(PLATFORM_SUPER_ADMIN_LEVEL);
       roleMapper.updateById(existing);
-      return existing;
+      return new SetupRoleContext(existing, false);
     }
 
     Role role = new Role();
@@ -445,7 +525,7 @@ public class SetupServiceImpl implements SetupService {
     if (inserted == 0 || role.getId() == null) {
       throw new com.sunny.datapillar.common.exception.InternalException("Server internal error");
     }
-    return role;
+    return new SetupRoleContext(role, true);
   }
 
   private void bindUserRole(Long tenantId, Long userId, Long roleId) {
@@ -689,4 +769,10 @@ public class SetupServiceImpl implements SetupService {
       Long adminUserId,
       String adminUsername,
       String adminRoleName) {}
+
+  private record SetupTenantContext(Long tenantId, String tenantCode, boolean created) {}
+
+  private record SetupAdminUserContext(User user, boolean created) {}
+
+  private record SetupRoleContext(Role role, boolean created) {}
 }

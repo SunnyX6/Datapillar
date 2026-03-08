@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom'
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import {
   connectAdminModel,
@@ -20,12 +21,7 @@ import { mapAdminModelToRecord, resolveProviderLabel } from '../utils/modelAdapt
 import type { LlmProvider, ModelCategory, ModelFilters, ModelRecord } from '../utils/types'
 import { collectConnectedModelIds, connectModel } from '../utils'
 
-const MODEL_TYPE_OPTIONS: Array<{ label: string; value: ModelCategory }> = [
-  { label: 'Chat', value: 'chat' },
-  { label: 'Embeddings', value: 'embeddings' },
-  { label: 'Reranking', value: 'reranking' },
-  { label: 'Code', value: 'code' }
-]
+const MODEL_TYPES: ModelCategory[] = ['chat', 'embeddings', 'reranking', 'code']
 
 const CONTEXT_LENGTH_OPTIONS: Array<{ label: string; value: string }> = [
   { label: '32K', value: '32768' },
@@ -60,6 +56,7 @@ function normalizeProviderBaseUrl(baseUrl?: string | null): string {
 }
 
 export function LLMManagementView() {
+  const { t } = useTranslation('llm')
   const [models, setModels] = useState<ModelRecord[]>([])
   const [providers, setProviders] = useState<StudioLlmProvider[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(true)
@@ -115,7 +112,13 @@ export function LLMManagementView() {
     return map
   }, [providers])
 
-  const filterTypeOptions = MODEL_TYPE_OPTIONS
+  const filterTypeOptions = useMemo<Array<{ label: string; value: ModelCategory }>>(
+    () => MODEL_TYPES.map((value) => ({
+      value,
+      label: t(`modelTypes.${value}`)
+    })),
+    [t]
+  )
   const contextOptions = CONTEXT_LENGTH_OPTIONS
 
   useEffect(() => {
@@ -142,7 +145,7 @@ export function LLMManagementView() {
           return
         }
         const message = error instanceof Error ? error.message : String(error)
-        toast.error(`Failed to load model：${message}`)
+        toast.error(t('toast.loadModelsFailed', { message }))
         setProviders([])
         setModels([])
         setConnectedModelIds([])
@@ -158,7 +161,7 @@ export function LLMManagementView() {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     if (!activeAiModelId) {
@@ -246,11 +249,11 @@ export function LLMManagementView() {
       if (createdRecord.hasApiKey) {
         setConnectedModelIds((prev) => connectModel(prev, createdRecord.aiModelId))
       }
-      toast.success(`Model added：${createdRecord.name}`)
+      toast.success(t('toast.modelAdded', { name: createdRecord.name }))
       return true
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      toast.error(`Failed to add model：${message}`)
+      toast.error(t('toast.modelAddFailed', { message }))
       return false
     }
   }
@@ -274,13 +277,13 @@ export function LLMManagementView() {
     request: { apiKey: string; baseUrl?: string }
   ): Promise<boolean> => {
     if (!model.aiModelId) {
-      toast.error('Model primary key is missing，Unable to connect')
+      toast.error(t('toast.modelPkMissing'))
       return false
     }
 
     const normalizedApiKey = request.apiKey.trim()
     if (!normalizedApiKey) {
-      toast.error('API Key cannot be empty')
+      toast.error(t('toast.apiKeyRequired'))
       return false
     }
 
@@ -295,11 +298,11 @@ export function LLMManagementView() {
       setModels(nextModels)
       setConnectedModelIds(collectConnectedModelIds(nextModels))
       setDrawerTab('playground')
-      toast.success(`Model connection successful：${model.name}`)
+      toast.success(t('toast.modelConnectSuccess', { name: model.name }))
       return true
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      toast.error(`Model connection failed：${message}`)
+      toast.error(t('toast.modelConnectFailed', { message }))
       return false
     }
   }

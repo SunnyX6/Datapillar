@@ -53,16 +53,22 @@ public class MetadataIdConverter {
 
   // Maps metadata type to entity type
   private static final Map<MetadataObject.Type, Entity.EntityType> METADATA_TO_ENTITY_TYPE_MAPPING =
-      ImmutableMap.of(
-          MetadataObject.Type.METALAKE, Entity.EntityType.METALAKE,
-          MetadataObject.Type.CATALOG, Entity.EntityType.CATALOG,
-          MetadataObject.Type.SCHEMA, Entity.EntityType.SCHEMA,
-          MetadataObject.Type.TABLE, Entity.EntityType.TABLE,
-          MetadataObject.Type.MODEL, Entity.EntityType.MODEL,
-          MetadataObject.Type.FILESET, Entity.EntityType.FILESET,
-          MetadataObject.Type.TOPIC, Entity.EntityType.TOPIC,
-          MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN,
-          MetadataObject.Type.ROLE, Entity.EntityType.ROLE);
+      ImmutableMap.<MetadataObject.Type, Entity.EntityType>builder()
+          .put(MetadataObject.Type.METALAKE, Entity.EntityType.METALAKE)
+          .put(MetadataObject.Type.CATALOG, Entity.EntityType.CATALOG)
+          .put(MetadataObject.Type.SCHEMA, Entity.EntityType.SCHEMA)
+          .put(MetadataObject.Type.TABLE, Entity.EntityType.TABLE)
+          .put(MetadataObject.Type.MODEL, Entity.EntityType.MODEL)
+          .put(MetadataObject.Type.METRIC, Entity.EntityType.METRIC)
+          .put(MetadataObject.Type.WORDROOT, Entity.EntityType.WORDROOT)
+          .put(MetadataObject.Type.UNIT, Entity.EntityType.UNIT)
+          .put(MetadataObject.Type.MODIFIER, Entity.EntityType.MODIFIER)
+          .put(MetadataObject.Type.VALUE_DOMAIN, Entity.EntityType.VALUE_DOMAIN)
+          .put(MetadataObject.Type.FILESET, Entity.EntityType.FILESET)
+          .put(MetadataObject.Type.TOPIC, Entity.EntityType.TOPIC)
+          .put(MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN)
+          .put(MetadataObject.Type.ROLE, Entity.EntityType.ROLE)
+          .build();
   // Maps metadata type to capability scope
   private static final Map<MetadataObject.Type, Capability.Scope> METADATA_SCOPE_MAPPING =
       ImmutableMap.of(
@@ -81,6 +87,11 @@ public class MetadataIdConverter {
           .put(Entity.EntityType.TABLE, TableEntity.class)
           .put(Entity.EntityType.FILESET, FilesetEntity.class)
           .put(Entity.EntityType.MODEL, ModelEntity.class)
+          .put(Entity.EntityType.METRIC, org.apache.gravitino.meta.MetricEntity.class)
+          .put(Entity.EntityType.MODIFIER, org.apache.gravitino.meta.ModifierEntity.class)
+          .put(Entity.EntityType.WORDROOT, org.apache.gravitino.meta.WordRootEntity.class)
+          .put(Entity.EntityType.UNIT, org.apache.gravitino.meta.UnitEntity.class)
+          .put(Entity.EntityType.VALUE_DOMAIN, org.apache.gravitino.meta.ValueDomainEntity.class)
           .put(Entity.EntityType.TOPIC, TopicEntity.class)
           .put(Entity.EntityType.TAG, TagEntity.class)
           .put(Entity.EntityType.MODEL_VERSION, ModelVersionEntity.class)

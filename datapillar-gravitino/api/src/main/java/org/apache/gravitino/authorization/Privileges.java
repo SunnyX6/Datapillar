@@ -59,6 +59,41 @@ public class Privileges {
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.FILESET);
 
+  private static final Set<MetadataObject.Type> METRIC_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.METRIC);
+
+  private static final Set<MetadataObject.Type> MODIFIER_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.MODIFIER);
+
+  private static final Set<MetadataObject.Type> WORDROOT_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.WORDROOT);
+
+  private static final Set<MetadataObject.Type> UNIT_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.UNIT);
+
+  private static final Set<MetadataObject.Type> VALUE_DOMAIN_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.VALUE_DOMAIN);
+
   /**
    * Returns the Privilege with allow condition from the string representation.
    *
@@ -139,6 +174,28 @@ public class Privileges {
         return CreateModelVersion.allow();
       case USE_MODEL:
         return UseModel.allow();
+
+        // Semantic
+      case CREATE_METRIC:
+        return CreateMetric.allow();
+      case USE_METRIC:
+        return UseMetric.allow();
+      case CREATE_MODIFIER:
+        return CreateModifier.allow();
+      case USE_MODIFIER:
+        return UseModifier.allow();
+      case CREATE_WORDROOT:
+        return CreateWordRoot.allow();
+      case USE_WORDROOT:
+        return UseWordRoot.allow();
+      case CREATE_UNIT:
+        return CreateUnit.allow();
+      case USE_UNIT:
+        return UseUnit.allow();
+      case CREATE_VALUE_DOMAIN:
+        return CreateValueDomain.allow();
+      case USE_VALUE_DOMAIN:
+        return UseValueDomain.allow();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -225,6 +282,28 @@ public class Privileges {
         return CreateModelVersion.deny();
       case USE_MODEL:
         return UseModel.deny();
+
+        // Semantic
+      case CREATE_METRIC:
+        return CreateMetric.deny();
+      case USE_METRIC:
+        return UseMetric.deny();
+      case CREATE_MODIFIER:
+        return CreateModifier.deny();
+      case USE_MODIFIER:
+        return UseModifier.deny();
+      case CREATE_WORDROOT:
+        return CreateWordRoot.deny();
+      case USE_WORDROOT:
+        return UseWordRoot.deny();
+      case CREATE_UNIT:
+        return CreateUnit.deny();
+      case USE_UNIT:
+        return UseUnit.deny();
+      case CREATE_VALUE_DOMAIN:
+        return CreateValueDomain.deny();
+      case USE_VALUE_DOMAIN:
+        return UseValueDomain.deny();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -956,6 +1035,252 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return MODEL_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to create a metric. */
+  public static class CreateMetric extends GenericPrivilege<CreateMetric> {
+    private static final CreateMetric ALLOW_INSTANCE =
+        new CreateMetric(Condition.ALLOW, Name.CREATE_METRIC);
+    private static final CreateMetric DENY_INSTANCE =
+        new CreateMetric(Condition.DENY, Name.CREATE_METRIC);
+
+    private CreateMetric(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    public static CreateMetric allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    public static CreateMetric deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to use a metric. */
+  public static class UseMetric extends GenericPrivilege<UseMetric> {
+    private static final UseMetric ALLOW_INSTANCE = new UseMetric(Condition.ALLOW, Name.USE_METRIC);
+    private static final UseMetric DENY_INSTANCE = new UseMetric(Condition.DENY, Name.USE_METRIC);
+
+    private UseMetric(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    public static UseMetric allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    public static UseMetric deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return METRIC_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to create a metric modifier. */
+  public static class CreateModifier extends GenericPrivilege<CreateModifier> {
+    private static final CreateModifier ALLOW_INSTANCE =
+        new CreateModifier(Condition.ALLOW, Name.CREATE_MODIFIER);
+    private static final CreateModifier DENY_INSTANCE =
+        new CreateModifier(Condition.DENY, Name.CREATE_MODIFIER);
+
+    private CreateModifier(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    public static CreateModifier allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    public static CreateModifier deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to use a metric modifier. */
+  public static class UseModifier extends GenericPrivilege<UseModifier> {
+    private static final UseModifier ALLOW_INSTANCE =
+        new UseModifier(Condition.ALLOW, Name.USE_MODIFIER);
+    private static final UseModifier DENY_INSTANCE =
+        new UseModifier(Condition.DENY, Name.USE_MODIFIER);
+
+    private UseModifier(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    public static UseModifier allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    public static UseModifier deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return MODIFIER_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to create a word root. */
+  public static class CreateWordRoot extends GenericPrivilege<CreateWordRoot> {
+    private static final CreateWordRoot ALLOW_INSTANCE =
+        new CreateWordRoot(Condition.ALLOW, Name.CREATE_WORDROOT);
+    private static final CreateWordRoot DENY_INSTANCE =
+        new CreateWordRoot(Condition.DENY, Name.CREATE_WORDROOT);
+
+    private CreateWordRoot(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    public static CreateWordRoot allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    public static CreateWordRoot deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to use a word root. */
+  public static class UseWordRoot extends GenericPrivilege<UseWordRoot> {
+    private static final UseWordRoot ALLOW_INSTANCE =
+        new UseWordRoot(Condition.ALLOW, Name.USE_WORDROOT);
+    private static final UseWordRoot DENY_INSTANCE =
+        new UseWordRoot(Condition.DENY, Name.USE_WORDROOT);
+
+    private UseWordRoot(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    public static UseWordRoot allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    public static UseWordRoot deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return WORDROOT_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to create a unit. */
+  public static class CreateUnit extends GenericPrivilege<CreateUnit> {
+    private static final CreateUnit ALLOW_INSTANCE =
+        new CreateUnit(Condition.ALLOW, Name.CREATE_UNIT);
+    private static final CreateUnit DENY_INSTANCE =
+        new CreateUnit(Condition.DENY, Name.CREATE_UNIT);
+
+    private CreateUnit(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    public static CreateUnit allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    public static CreateUnit deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to use a unit. */
+  public static class UseUnit extends GenericPrivilege<UseUnit> {
+    private static final UseUnit ALLOW_INSTANCE = new UseUnit(Condition.ALLOW, Name.USE_UNIT);
+    private static final UseUnit DENY_INSTANCE = new UseUnit(Condition.DENY, Name.USE_UNIT);
+
+    private UseUnit(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    public static UseUnit allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    public static UseUnit deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return UNIT_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to create a value domain. */
+  public static class CreateValueDomain extends GenericPrivilege<CreateValueDomain> {
+    private static final CreateValueDomain ALLOW_INSTANCE =
+        new CreateValueDomain(Condition.ALLOW, Name.CREATE_VALUE_DOMAIN);
+    private static final CreateValueDomain DENY_INSTANCE =
+        new CreateValueDomain(Condition.DENY, Name.CREATE_VALUE_DOMAIN);
+
+    private CreateValueDomain(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    public static CreateValueDomain allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    public static CreateValueDomain deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to use a value domain. */
+  public static class UseValueDomain extends GenericPrivilege<UseValueDomain> {
+    private static final UseValueDomain ALLOW_INSTANCE =
+        new UseValueDomain(Condition.ALLOW, Name.USE_VALUE_DOMAIN);
+    private static final UseValueDomain DENY_INSTANCE =
+        new UseValueDomain(Condition.DENY, Name.USE_VALUE_DOMAIN);
+
+    private UseValueDomain(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    public static UseValueDomain allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    public static UseValueDomain deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return VALUE_DOMAIN_SUPPORTED_TYPES.contains(type);
     }
   }
 }

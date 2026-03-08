@@ -46,7 +46,7 @@ import com.sunny.datapillar.studio.module.tenant.mapper.PermissionMapper;
 import com.sunny.datapillar.studio.module.tenant.service.TenantCodeResolver;
 import com.sunny.datapillar.studio.module.user.entity.User;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
+import com.sunny.datapillar.studio.security.crypto.LocalCryptoService;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -108,7 +108,7 @@ public class LlmManagerServiceImpl implements LlmManagerService {
   private final AiUsageMapper aiUsageMapper;
   private final PermissionMapper permissionMapper;
   private final UserMapper userMapper;
-  private final AuthCryptoRpcClient authCryptoClient;
+  private final LocalCryptoService localCryptoService;
   private final TenantCodeResolver tenantCodeResolver;
   private final ObjectMapper objectMapper;
   private final StudioDbExceptionTranslator studioDbExceptionTranslator;
@@ -328,7 +328,7 @@ public class LlmManagerServiceImpl implements LlmManagerService {
           model.getModelType(),
           normalizedApiKey,
           resolvedBaseUrl);
-      model.setApiKey(authCryptoClient.encryptLlmApiKey(tenantCode, normalizedApiKey));
+      model.setApiKey(localCryptoService.encryptLlmApiKey(tenantCode, normalizedApiKey));
       model.setStatus(AiModelStatus.ACTIVE);
     } else {
       model.setApiKey(null);
@@ -474,7 +474,7 @@ public class LlmManagerServiceImpl implements LlmManagerService {
         resolvedBaseUrl);
 
     String tenantCode = tenantCodeResolver.requireTenantCode(tenantId);
-    String encryptedApiKey = authCryptoClient.encryptLlmApiKey(tenantCode, apiKey);
+    String encryptedApiKey = localCryptoService.encryptLlmApiKey(tenantCode, apiKey);
 
     model.setApiKey(encryptedApiKey);
     model.setBaseUrl(resolvedBaseUrl);
@@ -1018,7 +1018,7 @@ public class LlmManagerServiceImpl implements LlmManagerService {
       return null;
     }
     try {
-      String plaintextApiKey = authCryptoClient.decryptLlmApiKey(tenantCode, encryptedApiKey);
+      String plaintextApiKey = localCryptoService.decryptLlmApiKey(tenantCode, encryptedApiKey);
       return maskSensitiveValue(plaintextApiKey);
     } catch (RuntimeException ex) {
       return MASK_FALLBACK;

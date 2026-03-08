@@ -29,6 +29,10 @@ public interface TenantService {
 
   Long createTenant(TenantCreateRequest dto);
 
+  default Long createTenant(TenantCreateRequest dto, boolean initializeMetalakes) {
+    return createTenant(dto);
+  }
+
   TenantResponse getTenant(Long tenantId);
 
   void updateTenant(Long tenantId, TenantUpdateRequest dto);

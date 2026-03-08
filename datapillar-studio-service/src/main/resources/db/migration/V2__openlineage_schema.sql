@@ -1,6 +1,6 @@
 -- Flyway schema migration for Datapillar OpenLineage tables
 
-CREATE TABLE IF NOT EXISTS lineage_events (
+CREATE TABLE IF NOT EXISTS ol_lineage_events (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT 'physical primary key',
   tenant_id BIGINT NOT NULL COMMENT 'Tenant ID',
   tenant_code VARCHAR(64) NOT NULL COMMENT 'Tenant Code',

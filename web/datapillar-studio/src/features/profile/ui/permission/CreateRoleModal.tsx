@@ -1,5 +1,6 @@
 import { useEffect,useMemo,useState } from 'react'
 import { Shield,User } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Modal,ModalCancelButton,ModalPrimaryButton } from '@/components/ui'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { cn } from '@/utils'
@@ -26,23 +27,25 @@ interface CreateRoleModalProps {
 
 const ROLE_TYPE_OPTIONS:Array<{
  type:RoleType
- label:string
- description:string
  icon:typeof Shield
 }> = [{
- type:'ADMIN',label:'ADMIN',description:'Suitable for administrators,Person in charge and other high-authority roles',icon:Shield,},{
- type:'USER',label:'USER',description:'Granted by default READ(exclude"Management and definition",Reserve"Personal Center")',icon:User,},]
+ type:'ADMIN',icon:Shield,},{
+ type:'USER',icon:User,},]
 
 const ROLE_NAME_MAX_LENGTH = 64
 const ROLE_DESC_MAX_LENGTH = 255
 
 export function CreateRoleModal({
- isOpen,onClose,existingNames,initialValues,title = 'Add new role',submitLabel = 'Create a role',submittingLabel = 'Submitting...',onCreate,}:CreateRoleModalProps) {
+ isOpen,onClose,existingNames,initialValues,title,submitLabel,submittingLabel,onCreate,}:CreateRoleModalProps) {
+ const { t } = useTranslation('permission')
  const [name,setName] = useState(initialValues?.name?? '')
  const [description,setDescription] = useState(initialValues?.description?? '')
  const [roleType,setRoleType] = useState<RoleType>(initialValues?.type?? 'USER')
  const [error,setError] = useState<string | null>(null)
  const [submitting,setSubmitting] = useState(false)
+ const resolvedTitle = title ?? t('createRole.title')
+ const resolvedSubmitLabel = submitLabel ?? t('createRole.submit')
+ const resolvedSubmittingLabel = submittingLabel ?? t('createRole.submitting')
 
  useEffect(() => {
  if (!isOpen) {
@@ -81,22 +84,22 @@ export function CreateRoleModal({
  const normalizedDesc = description.trim()
 
  if (!normalizedName) {
- setError('Role name cannot be empty')
+ setError(t('createRole.errors.nameRequired'))
  return
  }
 
  if (normalizedName.length > ROLE_NAME_MAX_LENGTH) {
- setError(`The character name cannot be longer than ${ROLE_NAME_MAX_LENGTH} characters`)
+ setError(t('createRole.errors.nameTooLong', { max: ROLE_NAME_MAX_LENGTH }))
  return
  }
 
  if (normalizedDesc.length > ROLE_DESC_MAX_LENGTH) {
- setError(`Character descriptions cannot be longer than ${ROLE_DESC_MAX_LENGTH} characters`)
+ setError(t('createRole.errors.descriptionTooLong', { max: ROLE_DESC_MAX_LENGTH }))
  return
  }
 
  if (normalizedNames.has(normalizedName.toLowerCase())) {
- setError('Role name already exists,Please change the name')
+ setError(t('createRole.errors.nameDuplicate'))
  return
  }
 
@@ -117,24 +120,24 @@ export function CreateRoleModal({
  isOpen={isOpen}
  onClose={handleClose}
  size="sm"
- title={title}
+ title={resolvedTitle}
  subtitle={
  <p
  className={cn(TYPOGRAPHY.caption,'text-slate-500 dark:text-slate-400',)}
  >
- Role types only support <span className="font-semibold">ADMIN</span> with{' '}
+ {t('createRole.roleTypeHintPrefix')} <span className="font-semibold">ADMIN</span> {t('createRole.roleTypeHintAnd')}{' '}
  <span className="font-semibold">USER</span>
  </p>
  }
  footerLeft={
- <ModalCancelButton onClick={handleClose}>Cancel</ModalCancelButton>
+ <ModalCancelButton onClick={handleClose}>{t('common.button.cancel', { ns: 'common', defaultValue: 'Cancel' })}</ModalCancelButton>
  }
  footerRight={
  <ModalPrimaryButton
  disabled={submitting}
  onClick={() => void handleSubmit()}
  >
- {submitting?submittingLabel:submitLabel}
+ {submitting?resolvedSubmittingLabel:resolvedSubmitLabel}
  </ModalPrimaryButton>
  }
  >
@@ -143,7 +146,7 @@ export function CreateRoleModal({
  <label
  className={cn(TYPOGRAPHY.caption,'font-semibold text-slate-700 dark:text-slate-300',)}
  >
- Character name
+ {t('createRole.nameLabel')}
  </label>
  <input
  type="text"
@@ -155,7 +158,7 @@ export function CreateRoleModal({
  setError(null)
  }
  }}
- placeholder="Please enter a role name"
+ placeholder={t('createRole.namePlaceholder')}
  className={cn(TYPOGRAPHY.bodySm,'w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all',)}
  />
  <div
@@ -169,7 +172,7 @@ export function CreateRoleModal({
  <label
  className={cn(TYPOGRAPHY.caption,'font-semibold text-slate-700 dark:text-slate-300',)}
  >
- role type
+ {t('createRole.typeLabel')}
  </label>
  <div className="grid grid-cols-1 gap-2">
  {ROLE_TYPE_OPTIONS.map((item) => {
@@ -190,12 +193,12 @@ export function CreateRoleModal({
  <p
  className={cn(TYPOGRAPHY.bodySm,'font-semibold',active?'text-brand-700 dark:text-brand-200':'text-slate-800 dark:text-slate-200',)}
  >
- {item.label}
+ {item.type}
  </p>
  <p
  className={cn(TYPOGRAPHY.caption,active?'text-brand-600/80 dark:text-brand-200/80':'text-slate-500 dark:text-slate-400',)}
  >
- {item.description}
+ {item.type === 'ADMIN' ? t('createRole.typeAdminDescription') : t('createRole.typeUserDescription')}
  </p>
  </div>
  </div>
@@ -208,7 +211,7 @@ export function CreateRoleModal({
  <label
  className={cn(TYPOGRAPHY.caption,'font-semibold text-slate-700 dark:text-slate-300',)}
  >
- role description(Optional)
+ {t('createRole.descriptionLabel')}
  </label>
  <textarea
  value={description}
@@ -219,7 +222,7 @@ export function CreateRoleModal({
  setError(null)
  }
  }}
- placeholder="Please enter a role description"
+ placeholder={t('createRole.descriptionPlaceholder')}
  rows={3}
  className={cn(TYPOGRAPHY.bodySm,'w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all resize-none',)}
  />

@@ -120,4 +120,24 @@ public class TestAuthorizationExpressionConverter {
         AuthorizationExpressionConverter.replaceAnyExpressions(
             "(ANY(OWNER, METALAKE, CATALOG)) && CATALOG::USE_CATALOG"));
   }
+
+  @Test
+  public void testReplaceSemanticAnyPrivilegeExpression() {
+    Assertions.assertEquals(
+        "((ANY(USE_METRIC, METALAKE, CATALOG, SCHEMA, METRIC)) && "
+            + "!(ANY(DENY_USE_METRIC, METALAKE, CATALOG, SCHEMA, METRIC)))",
+        AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_USE_METRIC"));
+    Assertions.assertEquals(
+        "((ANY(CREATE_VALUE_DOMAIN, METALAKE, CATALOG, SCHEMA, VALUE_DOMAIN)) "
+            + "&& !(ANY(DENY_CREATE_VALUE_DOMAIN, METALAKE, CATALOG, SCHEMA, VALUE_DOMAIN)))",
+        AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_CREATE_VALUE_DOMAIN"));
+  }
+
+  @Test
+  public void testReplaceTenantBootstrapRequestExpression() {
+    Assertions.assertEquals(
+        "@org.apache.gravitino.extensions.multitenancy.authorization.TenantBootstrapGuard"
+            + "@canCreateMetalake(principal)",
+        AuthorizationExpressionConverter.replaceAnyPrivilege("TENANT_BOOTSTRAP_REQUEST"));
+  }
 }

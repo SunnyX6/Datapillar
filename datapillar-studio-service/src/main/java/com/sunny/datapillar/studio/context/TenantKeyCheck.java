@@ -3,7 +3,7 @@ package com.sunny.datapillar.studio.context;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantMapper;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
+import com.sunny.datapillar.studio.security.crypto.LocalCryptoService;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,7 @@ public class TenantKeyCheck implements ApplicationRunner {
   private static final String LEGACY_PENDING_PUBLIC_KEY_PLACEHOLDER = "PENDING_PUBLIC_KEY";
 
   private final TenantMapper tenantMapper;
-  private final AuthCryptoRpcClient authCryptoClient;
+  private final LocalCryptoService localCryptoService;
 
   @Override
   public void run(ApplicationArguments args) {
@@ -59,8 +59,8 @@ public class TenantKeyCheck implements ApplicationRunner {
       }
 
       try {
-        AuthCryptoRpcClient.TenantKeyStatus keyStatus =
-            authCryptoClient.getTenantKeyStatus(tenantCode.trim());
+        LocalCryptoService.TenantKeyStatus keyStatus =
+            localCryptoService.getTenantKeyStatus(tenantCode.trim());
         if (!keyStatus.exists() || !"READY".equalsIgnoreCase(keyStatus.status())) {
           missingOrInvalidKeyTenantIds.add(tenantId);
         }

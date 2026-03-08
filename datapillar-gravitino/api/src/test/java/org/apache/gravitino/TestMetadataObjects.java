@@ -99,4 +99,36 @@ public class TestMetadataObjects {
     MetadataObject roleObject3 = MetadataObjects.parse("role", MetadataObject.Type.ROLE);
     Assertions.assertEquals("role", roleObject3.fullName());
   }
+
+  @Test
+  public void testSemanticMetadataObjects() {
+    MetadataObject metricObject =
+        MetadataObjects.of(
+            Lists.newArrayList("catalog", "schema", "metric"), MetadataObject.Type.METRIC);
+    Assertions.assertEquals("catalog.schema", metricObject.parent());
+    Assertions.assertEquals("metric", metricObject.name());
+    Assertions.assertEquals(MetadataObject.Type.METRIC, metricObject.type());
+
+    MetadataObject wordRootObject =
+        MetadataObjects.parse("catalog.schema.root", MetadataObject.Type.WORDROOT);
+    Assertions.assertEquals("catalog.schema", wordRootObject.parent());
+    Assertions.assertEquals("root", wordRootObject.name());
+    Assertions.assertEquals(MetadataObject.Type.WORDROOT, wordRootObject.type());
+
+    MetadataObject unitObject =
+        MetadataObjects.parse("catalog.schema.unit", MetadataObject.Type.UNIT);
+    Assertions.assertEquals("catalog.schema", unitObject.parent());
+    Assertions.assertEquals("unit", unitObject.name());
+    Assertions.assertEquals(MetadataObject.Type.UNIT, unitObject.type());
+
+    MetadataObject modifierObject =
+        MetadataObjects.parse("catalog.schema.modifier", MetadataObject.Type.MODIFIER);
+    Assertions.assertEquals("catalog.schema", modifierObject.parent());
+    Assertions.assertEquals("modifier", modifierObject.name());
+    Assertions.assertEquals(MetadataObject.Type.MODIFIER, modifierObject.type());
+
+    MetadataObject parent = MetadataObjects.parent(metricObject);
+    Assertions.assertEquals("catalog.schema", parent.fullName());
+    Assertions.assertEquals(MetadataObject.Type.SCHEMA, parent.type());
+  }
 }

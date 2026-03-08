@@ -13,6 +13,7 @@ public final class HeaderConstants {
   public static final String HEADER_TENANT_ID = "X-Tenant-Id";
   public static final String HEADER_TENANT_CODE = "X-Tenant-Code";
   public static final String HEADER_USER_ID = "X-User-Id";
+  public static final String HEADER_EXTERNAL_USER_ID = "X-External-User-Id";
   public static final String HEADER_USERNAME = "X-Username";
   public static final String HEADER_EMAIL = "X-User-Email";
   public static final String HEADER_USER_ROLES = "X-User-Roles";

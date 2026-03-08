@@ -267,6 +267,48 @@ public class TestAccessControlManagerForPermissions {
   }
 
   @Test
+  public void testReplaceRolesForUser() {
+    String notExist = "not-exist";
+
+    accessControlManager.replaceRolesForUser(METALAKE, Lists.newArrayList(), USER);
+    reset(authorizationPlugin);
+
+    User user =
+        accessControlManager.replaceRolesForUser(METALAKE, Lists.newArrayList("grantedRole"), USER);
+    Assertions.assertEquals(Lists.newArrayList("grantedRole"), user.roles());
+    verify(authorizationPlugin).onGrantedRolesToUser(any(), any());
+
+    reset(authorizationPlugin);
+    user =
+        accessControlManager.replaceRolesForUser(METALAKE, Lists.newArrayList("revokedRole"), USER);
+    Assertions.assertEquals(Lists.newArrayList("revokedRole"), user.roles());
+    verify(authorizationPlugin).onGrantedRolesToUser(any(), any());
+    verify(authorizationPlugin).onRevokedRolesFromUser(any(), any());
+
+    reset(authorizationPlugin);
+    user =
+        accessControlManager.replaceRolesForUser(METALAKE, Lists.newArrayList("revokedRole"), USER);
+    Assertions.assertEquals(Lists.newArrayList("revokedRole"), user.roles());
+    Mockito.verifyNoInteractions(authorizationPlugin);
+
+    reset(authorizationPlugin);
+    user = accessControlManager.replaceRolesForUser(METALAKE, Lists.newArrayList(), USER);
+    Assertions.assertTrue(user.roles().isEmpty());
+    verify(authorizationPlugin).onRevokedRolesFromUser(any(), any());
+
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.replaceRolesForUser(notExist, Lists.newArrayList(), USER));
+    Assertions.assertThrows(
+        IllegalRoleException.class,
+        () ->
+            accessControlManager.replaceRolesForUser(METALAKE, Lists.newArrayList(notExist), USER));
+    Assertions.assertThrows(
+        NoSuchUserException.class,
+        () -> accessControlManager.replaceRolesForUser(METALAKE, Lists.newArrayList(), notExist));
+  }
+
+  @Test
   public void testGrantRoleToGroup() {
     String notExist = "not-exist";
 

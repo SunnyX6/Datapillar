@@ -101,8 +101,8 @@ public class SqlServiceImpl implements SqlService {
   private TableEnvironment createTableEnvironment() {
     Configuration config = new Configuration();
 
-    // priority use Gravitino Catalog Store；Downgrade to memory when connector is not loaded at
-    // runtime catalog store
+    // Priority uses Gravitino Catalog Store; downgrades to in-memory when runtime catalog store
+    // is unavailable.
     if (hasGravitinoCatalogStoreFactory()) {
       config.setString("table.catalog-store.kind", "gravitino");
       config.setString(

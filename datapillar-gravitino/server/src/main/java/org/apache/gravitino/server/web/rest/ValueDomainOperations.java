@@ -50,10 +50,12 @@ import org.apache.gravitino.dto.responses.ValueDomainResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.pagination.PagedResult;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 @Path("metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/valuedomains")
 public class ValueDomainOperations {
@@ -89,13 +91,19 @@ public class ValueDomainOperations {
           () -> {
             PagedResult<ValueDomain> result =
                 datasetDispatcher.listValueDomains(valueDomainNs, offset, limit);
-
-            // Convert to DTO array
             ValueDomainDTO[] domains =
                 result.items().stream().map(DTOConverters::toDTO).toArray(ValueDomainDTO[]::new);
+            domains =
+                MetadataFilterHelper.filterByExpression(
+                    metalake,
+                    AuthorizationExpressionConstants.filterValueDomainAuthorizationExpression,
+                    Entity.EntityType.VALUE_DOMAIN,
+                    domains,
+                    domainDto ->
+                        NameIdentifierUtil.ofValueDomain(
+                            metalake, catalog, schema, domainDto.domainCode()));
 
-            return Utils.ok(
-                new ValueDomainListResponse(domains, (int) result.total(), offset, limit));
+            return Utils.ok(new ValueDomainListResponse(domains, domains.length, offset, limit));
           });
 
     } catch (Exception e) {
@@ -109,14 +117,15 @@ public class ValueDomainOperations {
   @Timed(name = "get-valuedomain." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-valuedomain", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.loadValueDomainAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.VALUE_DOMAIN)
   public Response getValueDomain(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("domainCode") String domainCode) {
+      @PathParam("domainCode") @AuthorizationMetadata(type = Entity.EntityType.VALUE_DOMAIN)
+          String domainCode) {
     NameIdentifier valueDomainId = NameIdentifier.of(metalake, catalog, schema, domainCode);
 
     try {
@@ -137,7 +146,7 @@ public class ValueDomainOperations {
   @Timed(name = "create-valuedomain." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-valuedomain", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.createValueDomainAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createValueDomain(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -187,14 +196,15 @@ public class ValueDomainOperations {
   @Timed(name = "delete-valuedomain." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-valuedomain", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.manageValueDomainAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.VALUE_DOMAIN)
   public Response deleteValueDomain(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("domainCode") String domainCode) {
+      @PathParam("domainCode") @AuthorizationMetadata(type = Entity.EntityType.VALUE_DOMAIN)
+          String domainCode) {
     NameIdentifier valueDomainId = NameIdentifier.of(metalake, catalog, schema, domainCode);
 
     try {
@@ -217,14 +227,15 @@ public class ValueDomainOperations {
   @Timed(name = "alter-valuedomain." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-valuedomain", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.manageValueDomainAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.VALUE_DOMAIN)
   public Response alterValueDomain(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("domainCode") String domainCode,
+      @PathParam("domainCode") @AuthorizationMetadata(type = Entity.EntityType.VALUE_DOMAIN)
+          String domainCode,
       ValueDomainUpdateRequest request) {
     NameIdentifier valueDomainId = NameIdentifier.of(metalake, catalog, schema, domainCode);
 

@@ -33,7 +33,7 @@ CREATE TABLE users (
 
 CREATE TABLE system_bootstrap (
   id TINYINT NOT NULL COMMENT 'Fixed single-row ID, value = 1',
-  setup_completed TINYINT NOT NULL DEFAULT 0 COMMENT 'Bootstrap completed: 1 completed, 0 not completed',
+  status TINYINT NOT NULL DEFAULT 0 COMMENT 'Bootstrap status: 0 pending, 1 provisioning, 2 failed, 3 completed',
   setup_tenant_id BIGINT NULL COMMENT 'Initial created first tenant ID',
   setup_admin_user_id BIGINT NULL COMMENT 'Initial created admin user ID',
   setup_token_hash VARCHAR(64) NULL COMMENT 'Setup wizard token hash (SHA-256)',
@@ -44,7 +44,7 @@ CREATE TABLE system_bootstrap (
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='System bootstrap status';
 
-INSERT INTO system_bootstrap (id, setup_completed)
+INSERT INTO system_bootstrap (id, status)
 VALUES (1, 0);
 
 CREATE TABLE tenant_users (

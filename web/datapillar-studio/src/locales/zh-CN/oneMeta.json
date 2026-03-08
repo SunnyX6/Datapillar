@@ -1,0 +1,206 @@
+{
+  "metadataView": {
+    "toast": {
+      "catalogCreated": "数据目录 {{name}} 创建成功",
+      "schemaCreated": "数据库 {{name}} 创建成功",
+      "tableUpdated": "表 {{name}} 更新成功",
+      "tableCreated": "表 {{name}} 创建成功"
+    },
+    "sidebar": {
+      "expandAria": "展开元数据侧边栏",
+      "collapseAria": "收起元数据侧边栏",
+      "centerTitle": "元数据中心"
+    },
+    "modal": {
+      "title": {
+        "editTableInfo": "编辑表信息",
+        "createCatalog": "创建数据目录",
+        "createSchema": "创建数据库",
+        "editColumns": "编辑字段",
+        "createTable": "创建数据表",
+        "manageTable": "管理数据表"
+      },
+      "subtitle": {
+        "editTableBasicPrefix": "编辑表 ",
+        "editTableBasicSuffix": " 的基础信息",
+        "editInSchemaPrefix": "在数据库 ",
+        "createInSchemaPrefix": "将在数据库 ",
+        "schemaSuffix": " 下操作"
+      },
+      "action": {
+        "saveChanges": "保存修改",
+        "createAsset": "创建物理资产"
+      }
+    }
+  },
+  "metadataOverview": {
+    "title": "元数据概览",
+    "subtitle": "数据资产全局健康与统计概览。"
+  },
+  "metadataForm": {
+    "catalog": {
+      "toast": {
+        "enterNameFirst": "请先填写数据目录名称。",
+        "testSuccess": "连接测试成功。",
+        "enterName": "请填写数据目录名称。"
+      },
+      "button": {
+        "testing": "测试中...",
+        "testConnection": "测试连接"
+      },
+      "field": {
+        "name": "数据目录名称",
+        "type": "数据目录类型",
+        "provider": "数据源类型",
+        "connection": "连接配置",
+        "description": "描述"
+      },
+      "placeholder": {
+        "name": "例如：prod_mysql_catalog",
+        "description": "请输入数据目录用途说明"
+      },
+      "option": {
+        "type": {
+          "relational": "数据库",
+          "fileset": "文件集",
+          "messaging": "消息队列"
+        }
+      },
+      "dropdown": {
+        "catalogType": "选择数据目录类型",
+        "provider": "选择数据源类型",
+        "chooseField": "选择{{field}}"
+      },
+      "customField": {
+        "keyPlaceholder": "配置项名称",
+        "valuePlaceholder": "配置项值",
+        "deleteAria": "删除配置项",
+        "addButton": "添加自定义配置"
+      },
+      "provider": {
+        "metastoreUri": "元数据地址",
+        "poolSize": "连接池大小",
+        "jdbcUrl": "JDBC 地址",
+        "jdbcDriver": "JDBC 驱动",
+        "username": "用户名",
+        "password": "密码",
+        "minConnections": "最小连接数",
+        "maxConnections": "最大连接数",
+        "catalogBackend": "目录后端类型",
+        "backendUri": "后端地址",
+        "warehousePath": "仓库路径",
+        "bootstrapServers": "引导服务地址",
+        "storagePath": "存储路径",
+        "filesystemProviders": "文件系统提供方"
+      }
+    },
+    "schema": {
+      "toast": {
+        "enterName": "请填写数据库名称。"
+      },
+      "field": {
+        "name": "数据库名称",
+        "description": "描述（可选）"
+      },
+      "placeholder": {
+        "name": "例如：analytics_mart",
+        "description": "请输入数据库用途说明"
+      }
+    },
+    "tableBasic": {
+      "toast": {
+        "enterName": "请填写数据表名称。"
+      },
+      "tip": {
+        "title": "提示",
+        "content": "修改表名可能影响 SQL 与 ETL 任务。表参数用于配置存储引擎、分区等高级属性。"
+      },
+      "field": {
+        "name": "物理表名",
+        "description": "描述信息",
+        "properties": "表参数"
+      },
+      "placeholder": {
+        "name": "例如：fact_order_sales",
+        "description": "清晰的业务描述有助于理解数据含义。",
+        "propertyName": "参数名",
+        "propertyValue": "参数值"
+      },
+      "warning": {
+        "renameImpact": "修改表名可能影响 SQL 与 ETL 任务。"
+      },
+      "action": {
+        "add": "新增"
+      },
+      "empty": {
+        "noProperties": "暂无表参数。"
+      }
+    },
+    "table": {
+      "toast": {
+        "enterName": "请填写物理表名。",
+        "addColumn": "请至少添加一个字段。",
+        "emptyColumnName": "存在未填写字段名的字段。"
+      },
+      "tip": {
+        "title": "提示",
+        "contentEdit": "输入字段名后，系统会自动匹配语义标准并推荐合适的物理类型。可拖拽字段调整顺序。",
+        "content": "输入字段名后，系统会自动匹配语义标准并推荐合适的物理类型。"
+      },
+      "panel": {
+        "expand": "展开配置面板",
+        "collapse": "收起配置面板"
+      },
+      "field": {
+        "name": "物理表名",
+        "description": "描述信息",
+        "properties": "表参数"
+      },
+      "placeholder": {
+        "name": "例如：fact_order_sales",
+        "description": "请描述该表的数据来源和核心业务用途...",
+        "propertyName": "参数名",
+        "propertyValue": "参数值"
+      },
+      "action": {
+        "add": "新增"
+      },
+      "empty": {
+        "noProperties": "暂无表参数。"
+      },
+      "ddl": {
+        "button": "DDL 快速导入",
+        "title": "DDL 快速导入",
+        "placeholder": "粘贴 CREATE TABLE 语句，自动解析表名、描述和字段定义。",
+        "parseFailed": "DDL 解析失败。"
+      },
+      "column": {
+        "header": "字段定义",
+        "add": "添加物理字段",
+        "empty": "暂无字段定义。",
+        "emptyHint": "点击“添加物理字段”或使用 DDL 快速导入。",
+        "namePlaceholder": "字段名",
+        "commentPlaceholder": "字段说明",
+        "primaryKey": "主键",
+        "required": "必填",
+        "valueDomain": "关联值域",
+        "selectValueDomain": "选择值域",
+        "delete": "删除",
+        "domainType": {
+          "enum": "枚举",
+          "range": "区间",
+          "regex": "正则",
+          "unknown": "未知"
+        },
+        "domainLevel": {
+          "builtin": "内置",
+          "business": "业务"
+        },
+        "enumValues": "枚举值（{{count}}）",
+        "moreItems": "... 另有 {{count}} 项",
+        "errorNoDataType": "值域 {{name}} 未配置数据类型，无法关联。",
+        "errorTypeMismatch": "数据类型不匹配：字段类型为 {{columnType}}，值域类型为 {{domainType}}。"
+      }
+    }
+  }
+}

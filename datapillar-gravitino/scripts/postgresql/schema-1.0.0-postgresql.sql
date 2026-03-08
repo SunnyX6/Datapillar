@@ -304,7 +304,7 @@ CREATE TABLE IF NOT EXISTS user_meta (
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id),
     UNIQUE (tenant_id, metalake_id, user_name, deleted_at),
-    UNIQUE (tenant_id, external_user_id, deleted_at)
+    UNIQUE (tenant_id, metalake_id, external_user_id, deleted_at)
     );
 COMMENT ON TABLE user_meta IS 'user metadata';
 
@@ -783,7 +783,7 @@ COMMENT ON COLUMN job_run_meta.deleted_at IS 'job run deleted at';
 -- Metric Management Tables
 -- ============================================
 
-CREATE TABLE IF NOT EXISTS metric_modifier_meta (
+CREATE TABLE IF NOT EXISTS modifier_meta (
     tenant_id BIGINT NOT NULL,
     modifier_id BIGINT NOT NULL,
     modifier_name VARCHAR(128) NOT NULL,
@@ -799,19 +799,19 @@ CREATE TABLE IF NOT EXISTS metric_modifier_meta (
     UNIQUE (tenant_id, schema_id, modifier_code, deleted_at)
 );
 
-CREATE INDEX IF NOT EXISTS metric_modifier_meta_idx_mid ON metric_modifier_meta (tenant_id, metalake_id);
-CREATE INDEX IF NOT EXISTS metric_modifier_meta_idx_cid ON metric_modifier_meta (tenant_id, catalog_id);
-COMMENT ON TABLE metric_modifier_meta IS 'Metric modifier metadata table';
-COMMENT ON COLUMN metric_modifier_meta.modifier_id IS 'modifier id';
-COMMENT ON COLUMN metric_modifier_meta.modifier_name IS 'modifier name, e.g., last 7 days, Beijing area';
-COMMENT ON COLUMN metric_modifier_meta.modifier_code IS 'modifier code, e.g., 7d, beijing';
-COMMENT ON COLUMN metric_modifier_meta.metalake_id IS 'metalake id';
-COMMENT ON COLUMN metric_modifier_meta.catalog_id IS 'catalog id';
-COMMENT ON COLUMN metric_modifier_meta.schema_id IS 'schema id';
-COMMENT ON COLUMN metric_modifier_meta.modifier_comment IS 'modifier comment';
-COMMENT ON COLUMN metric_modifier_meta.modifier_type IS 'modifier type, from value domain';
-COMMENT ON COLUMN metric_modifier_meta.audit_info IS 'modifier audit info';
-COMMENT ON COLUMN metric_modifier_meta.deleted_at IS 'modifier deleted at';
+CREATE INDEX IF NOT EXISTS modifier_meta_idx_mid ON modifier_meta (tenant_id, metalake_id);
+CREATE INDEX IF NOT EXISTS modifier_meta_idx_cid ON modifier_meta (tenant_id, catalog_id);
+COMMENT ON TABLE modifier_meta IS 'Modifier metadata table';
+COMMENT ON COLUMN modifier_meta.modifier_id IS 'modifier id';
+COMMENT ON COLUMN modifier_meta.modifier_name IS 'modifier name, e.g., last 7 days, Beijing area';
+COMMENT ON COLUMN modifier_meta.modifier_code IS 'modifier code, e.g., 7d, beijing';
+COMMENT ON COLUMN modifier_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN modifier_meta.catalog_id IS 'catalog id';
+COMMENT ON COLUMN modifier_meta.schema_id IS 'schema id';
+COMMENT ON COLUMN modifier_meta.modifier_comment IS 'modifier comment';
+COMMENT ON COLUMN modifier_meta.modifier_type IS 'modifier type, from value domain';
+COMMENT ON COLUMN modifier_meta.audit_info IS 'modifier audit info';
+COMMENT ON COLUMN modifier_meta.deleted_at IS 'modifier deleted at';
 
 CREATE TABLE IF NOT EXISTS wordroot_meta (
     tenant_id BIGINT NOT NULL,

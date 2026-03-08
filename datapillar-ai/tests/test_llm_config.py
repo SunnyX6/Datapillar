@@ -66,8 +66,8 @@ def test_get_datapillar_config_merges_settings(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(config_module, "get_default_tenant_id", lambda: 1)
     monkeypatch.setattr(config_module.Tenant, "get_code", lambda tenant_id: f"tenant-{tenant_id}")
     monkeypatch.setattr(
-        config_module.auth_crypto_rpc_client,
-        "decrypt_api_key_sync",
+        config_module.local_crypto_service,
+        "decrypt_key",
         lambda *, tenant_code, ciphertext: f"{tenant_code}:{ciphertext}",
     )
     _mock_models(monkeypatch)

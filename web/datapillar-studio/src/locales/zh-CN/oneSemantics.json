@@ -1,0 +1,187 @@
+{
+  "semanticHub": {
+    "title": {
+      "prefix": "元语义",
+      "highlight": ""
+    },
+    "subtitle": "企业级语义资产湖，将业务定义与物理数据打通。",
+    "categories": {
+      "metrics": {
+        "label": "指标中心",
+        "description": "统一业务口径，沉淀 Atomic / Derived Metric 体系。",
+        "trend": "NEW"
+      },
+      "wordRoot": {
+        "label": "词根中心",
+        "description": "以 WordRoot 统一语义命名与物理字段命名规范。"
+      },
+      "standards": {
+        "label": "语义标准",
+        "description": "数据类型标准、ValueDomain 约束和分级分类安全规范。",
+        "sub": {
+          "dataType": "数据类型",
+          "valueDomain": "值域",
+          "classification": "分级分类"
+        }
+      },
+      "models": {
+        "label": "AI 特征",
+        "description": "特征库与特征血缘，提升 AI 场景数据供给效率。"
+      },
+      "apis": {
+        "label": "数据服务",
+        "description": "Data-as-a-Service，统一管理 API 元数据。"
+      }
+    },
+    "hero": {
+      "title": "希望 AI 更准确理解你的数据？",
+      "description": "通过 OneMeta 的 Metadata + Semantic 资产，可显著提升企业 AI Agent 自动报表的准确率。",
+      "cta": "立即开启语义增强"
+    }
+  },
+  "metricForm": {
+    "type": {
+      "atomic": {
+        "label": "Atomic Metric",
+        "desc": "直接来源于物理表的真实 Metric，是所有计算的基础。"
+      },
+      "derived": {
+        "label": "Derived Metric",
+        "desc": "在基础 Metric 上叠加维度或时间范围得到的 Derived Metric。"
+      },
+      "composite": {
+        "label": "Composite Metric",
+        "desc": "由多个 Metric 通过运算组合得到的 Composite Metric。"
+      }
+    },
+    "modal": {
+      "step1": {
+        "title": "Metric 注册向导",
+        "subtitle": "请选择要创建的 Metric 类型"
+      },
+      "step2": {
+        "titleEdit": "编辑 Metric",
+        "titleCreate": "配置 Metric 详情",
+        "saveChanges": "保存修改",
+        "confirmPublish": "确认发布"
+      }
+    },
+    "ai": {
+      "title": "AI 智能填充",
+      "placeholder": {
+        "atomic": "先选择度量列，再描述 Metric。示例：单价乘数量得到累计订单金额。",
+        "derived": "先选择 Atomic Metric 与过滤维度，再描述 Derived Metric 逻辑。",
+        "composite": "先选择至少两个 Metric，再描述组合规则。"
+      },
+      "generating": "生成中...",
+      "smartFill": "智能填充",
+      "error": {
+        "selectMeasureFirst": "请先选择至少一个度量列。",
+        "selectBaseMetricFirst": "请先选择一个基础 Atomic Metric。",
+        "selectCompositeMetricsFirst": "请先选择至少两个用于组合的 Metric。",
+        "fillFailed": "AI 填充失败，请重试。"
+      },
+      "recommendation": {
+        "metricsAndTables": "推荐的 Metrics 与 Tables：",
+        "metricsOnly": "推荐的 Metrics：",
+        "tablesAndColumns": "推荐的 Tables 与 Columns：",
+        "column": "Column",
+        "metric": "Metric"
+      }
+    },
+    "loadingVersion": "正在加载 Metric 详情..."
+  },
+  "valueDomainExplorer": {
+    "title": "ValueDomain 约束",
+    "titleSuffix": "Value Domains",
+    "createButton": "创建 ValueDomain",
+    "loading": "加载中...",
+    "empty": "未找到匹配的 ValueDomain",
+    "card": {
+      "level": {
+        "builtin": "内置",
+        "business": "业务"
+      },
+      "action": {
+        "edit": "编辑",
+        "delete": "删除"
+      },
+      "enum": {
+        "empty": "暂无枚举值",
+        "more": "更多",
+        "moreTitle": "查看更多",
+        "noMoreTitle": "没有更多枚举值",
+        "moreAria": "查看更多枚举值",
+        "noMoreAria": "没有更多枚举值",
+        "pageAria": "切换到第 {{index}} 页",
+        "pageTitle": "第 {{index}} 页"
+      },
+      "count": "{{count}} 个枚举值"
+    }
+  },
+  "valueDomainForm": {
+    "type": {
+      "enum": {
+        "label": "枚举（ENUM）",
+        "desc": "定义离散可选值集合。"
+      },
+      "range": {
+        "label": "区间（RANGE）",
+        "desc": "定义数值区间，如 [0, 100]。"
+      },
+      "regex": {
+        "label": "正则（REGEX）",
+        "desc": "定义正则表达式约束。"
+      }
+    },
+    "level": {
+      "business": "业务级（BUSINESS）",
+      "builtin": "内置级（BUILTIN）"
+    },
+    "create": {
+      "title": "创建 ValueDomain",
+      "confirm": "确认创建"
+    },
+    "edit": {
+      "title": "编辑 ValueDomain",
+      "save": "保存"
+    },
+    "field": {
+      "domainName": "ValueDomain 名称",
+      "domainCode": "ValueDomain 编码",
+      "domainType": "ValueDomain 类型",
+      "domainLevel": "ValueDomain 级别",
+      "dataType": "数据类型",
+      "enumValue": "值（Key）",
+      "enumLabel": "标签（Value）",
+      "itemType": {
+        "enum": "枚举值列表",
+        "range": "区间表达式",
+        "regex": "正则表达式"
+      },
+      "comment": "备注"
+    },
+    "placeholder": {
+      "domainName": "订单状态",
+      "domainCode": "ORDER_STATUS",
+      "enumValue": "PAID",
+      "enumLabel": "已支付",
+      "rangeValue": "[0, 100]",
+      "regexValue": "^[1-9]\\d{5}(18|19|20)\\d{2}...",
+      "comment": "ValueDomain 描述（可选）"
+    },
+    "dropdown": {
+      "selectDomainType": "选择 ValueDomain 类型",
+      "selectDomainLevel": "选择 ValueDomain 级别"
+    },
+    "action": {
+      "addEnumValue": "添加枚举值"
+    },
+    "hint": {
+      "range": "请输入数值区间，例如：[0, 100] 或 (0, 1]。",
+      "regex": "请输入正则表达式。",
+      "rangeReadonly": "区间表达式不可修改。",
+      "regexReadonly": "正则表达式不可修改。"
+    }
+  }
+}

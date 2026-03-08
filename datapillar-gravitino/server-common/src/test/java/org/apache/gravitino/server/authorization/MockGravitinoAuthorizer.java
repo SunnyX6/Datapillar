@@ -54,6 +54,11 @@ public class MockGravitinoAuthorizer implements GravitinoAuthorizer {
         && privilege == Privilege.Name.USE_SCHEMA) {
       return true;
     }
+    if (type == MetadataObject.Type.METRIC
+        && "testMetric".equals(name)
+        && privilege == Privilege.Name.USE_METRIC) {
+      return true;
+    }
     return type == MetadataObject.Type.TABLE
         && "testTable".equals(name)
         && privilege == Privilege.Name.SELECT_TABLE;

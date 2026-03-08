@@ -46,6 +46,7 @@ import com.sunny.datapillar.studio.module.user.mapper.RoleMapper;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserRoleMapper;
+import com.sunny.datapillar.studio.module.user.service.UserService;
 import com.sunny.datapillar.studio.util.UserContextUtil;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -57,7 +58,6 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -82,8 +82,6 @@ public class InvitationServiceImpl implements InvitationService {
   private static final int STATUS_FAILED = 5;
 
   private static final int STATUS_ENABLED = 1;
-  private static final int DELETED_NO = 0;
-  private static final int USER_LEVEL_DEFAULT = 100;
 
   private static final String CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   private static final int CODE_LENGTH = 12;
@@ -100,7 +98,7 @@ public class InvitationServiceImpl implements InvitationService {
   private final TenantUserMapper tenantUserMapper;
   private final UserRoleMapper userRoleMapper;
   private final TenantMapper tenantMapper;
-  private final PasswordEncoder passwordEncoder;
+  private final UserService userService;
   private final StudioDbExceptionTranslator studioDbExceptionTranslator;
   private final TransactionTemplate transactionTemplate;
 
@@ -299,7 +297,12 @@ public class InvitationServiceImpl implements InvitationService {
     Integer status = invitation.getStatus();
     if (status == STATUS_PENDING) {
       validatePendingInvitationStatus(invitation, now);
-      Long userId = createInvitedUser(tenantId, username, email, password, now);
+      Long userId =
+          createInvitedUser(
+              username,
+              email,
+              password,
+              requireInvitationCreatorUsername(invitation.getInviterUserId()));
       return new RegisterPrincipal(userId, username);
     }
     if (status == STATUS_FAILED || status == STATUS_PROVISIONING) {
@@ -450,28 +453,25 @@ public class InvitationServiceImpl implements InvitationService {
   }
 
   private Long createInvitedUser(
-      Long tenantId, String username, String email, String password, LocalDateTime now) {
-    User user = new User();
-    user.setTenantId(tenantId);
-    user.setUsername(username);
-    user.setNickname(username);
-    user.setEmail(email);
-    user.setPassword(passwordEncoder.encode(password));
-    user.setLevel(USER_LEVEL_DEFAULT);
-    user.setStatus(STATUS_ENABLED);
-    user.setDeleted(DELETED_NO);
-    user.setCreatedAt(now);
-    user.setUpdatedAt(now);
-    try {
-      userMapper.insert(user);
-    } catch (RuntimeException re) {
-      throw translateDbException(re, StudioDbScene.STUDIO_INVITATION_REGISTER);
-    }
+      String username, String email, String password, String gravitinoCreatorUsername) {
+    UserCreateRequest request = new UserCreateRequest();
+    request.setUsername(username);
+    request.setPassword(password);
+    request.setNickname(username);
+    request.setEmail(email);
+    request.setStatus(STATUS_ENABLED);
+    return userService.createUser(request, true, gravitinoCreatorUsername);
+  }
 
-    if (user.getId() == null) {
-      throw new InvitationInternalException();
+  private String requireInvitationCreatorUsername(Long inviterUserId) {
+    if (inviterUserId == null || inviterUserId <= 0) {
+      throw new InvitationInviterNotFoundException("User does not exist: %s", inviterUserId);
     }
-    return user.getId();
+    User inviter = userMapper.selectById(inviterUserId);
+    if (inviter == null || !StringUtils.hasText(inviter.getUsername())) {
+      throw new InvitationInviterNotFoundException("User does not exist: %s", inviterUserId);
+    }
+    return inviter.getUsername().trim();
   }
 
   private void markInvitationExpired(Long invitationId, LocalDateTime now) {

@@ -98,7 +98,27 @@ public interface Privilege {
     /** The privilege to create a model version */
     CREATE_MODEL_VERSION(0L, 1L << 19),
     /** The privilege to view the metadata of the model and download all the model versions */
-    USE_MODEL(0L, 1L << 20);
+    USE_MODEL(0L, 1L << 20),
+    /** The privilege to create a metric. */
+    CREATE_METRIC(0L, 1L << 23),
+    /** The privilege to use a metric. */
+    USE_METRIC(0L, 1L << 24),
+    /** The privilege to create a metric modifier. */
+    CREATE_MODIFIER(0L, 1L << 25),
+    /** The privilege to use a metric modifier. */
+    USE_MODIFIER(0L, 1L << 26),
+    /** The privilege to create a word root. */
+    CREATE_WORDROOT(0L, 1L << 27),
+    /** The privilege to use a word root. */
+    USE_WORDROOT(0L, 1L << 28),
+    /** The privilege to create a unit. */
+    CREATE_UNIT(0L, 1L << 29),
+    /** The privilege to use a unit. */
+    USE_UNIT(0L, 1L << 30),
+    /** The privilege to create a value domain. */
+    CREATE_VALUE_DOMAIN(0L, 1L << 31),
+    /** The privilege to use a value domain. */
+    USE_VALUE_DOMAIN(0L, 1L << 32);
 
     private final long highBits;
     private final long lowBits;

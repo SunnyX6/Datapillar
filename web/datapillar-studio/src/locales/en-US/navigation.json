@@ -1,10 +1,5 @@
 {
   "top": {
-    "org": "Acme Corp",
-    "language": {
-      "zh": "Simplified Chinese",
-      "en": "English"
-    },
     "tabs": {
       "dashboard": "Dashboard",
       "governance": "Governance",
@@ -12,13 +7,13 @@
       "team": "Collaboration"
     },
     "dropdown": {
-      "governanceHeader": "Governance & OneMeta",
-      "metadata": "OneMeta",
+      "governanceHeader": "Governance & WarehouseRAG",
+      "metadata": "Metadata",
       "metadataDesc": "Unified physical asset metadata",
-      "semantic": "Metasemantic",
-      "semanticDesc": "Semantic asset space for metrics, word roots, APIs, and more",
-      "knowledge": "Knowledge Graphrag",
-      "knowledgeDesc": "Knowledge graph visualization and relationship exploration"
+      "semantic": "Semantic",
+      "semanticDesc": "Semantic asset space for Metrics, WordRoots, APIs, and more",
+      "knowledge": "Warehouse Graph RAG",
+      "knowledgeDesc": "Warehouse graph visualization and relationship exploration"
     },
     "actions": {
       "search": "Search..."

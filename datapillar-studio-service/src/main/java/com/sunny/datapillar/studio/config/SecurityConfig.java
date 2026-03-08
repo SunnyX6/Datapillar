@@ -1,9 +1,10 @@
 package com.sunny.datapillar.studio.config;
 
+import com.sunny.datapillar.studio.filter.IdentityStateValidationFilter;
 import com.sunny.datapillar.studio.filter.SetupStateFilter;
 import com.sunny.datapillar.studio.filter.TenantContextFilter;
 import com.sunny.datapillar.studio.filter.TraceIdFilter;
-import com.sunny.datapillar.studio.filter.TrustedIdentityFilter;
+import com.sunny.datapillar.studio.filter.TrustedIdentityAuthenticationFilter;
 import com.sunny.datapillar.studio.handler.SecurityExceptionHandler;
 import com.sunny.datapillar.studio.security.TrustedIdentityProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -28,22 +29,25 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableConfigurationProperties(TrustedIdentityProperties.class)
 public class SecurityConfig {
 
-  private final TrustedIdentityFilter trustedIdentityFilter;
+  private final TrustedIdentityAuthenticationFilter trustedIdentityAuthenticationFilter;
   private final SetupStateFilter setupStateFilter;
   private final TraceIdFilter traceIdFilter;
   private final TenantContextFilter tenantContextFilter;
+  private final IdentityStateValidationFilter identityStateValidationFilter;
   private final SecurityExceptionHandler securityExceptionHandler;
 
   public SecurityConfig(
-      TrustedIdentityFilter trustedIdentityFilter,
+      TrustedIdentityAuthenticationFilter trustedIdentityAuthenticationFilter,
       SetupStateFilter setupStateFilter,
       TraceIdFilter traceIdFilter,
       TenantContextFilter tenantContextFilter,
+      IdentityStateValidationFilter identityStateValidationFilter,
       SecurityExceptionHandler securityExceptionHandler) {
-    this.trustedIdentityFilter = trustedIdentityFilter;
+    this.trustedIdentityAuthenticationFilter = trustedIdentityAuthenticationFilter;
     this.setupStateFilter = setupStateFilter;
     this.traceIdFilter = traceIdFilter;
     this.tenantContextFilter = tenantContextFilter;
+    this.identityStateValidationFilter = identityStateValidationFilter;
     this.securityExceptionHandler = securityExceptionHandler;
   }
 
@@ -73,8 +77,9 @@ public class SecurityConfig {
                     .authenticated())
         .addFilterBefore(traceIdFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterAfter(setupStateFilter, TraceIdFilter.class)
-        .addFilterAfter(trustedIdentityFilter, SetupStateFilter.class)
-        .addFilterAfter(tenantContextFilter, TrustedIdentityFilter.class);
+        .addFilterAfter(trustedIdentityAuthenticationFilter, SetupStateFilter.class)
+        .addFilterAfter(tenantContextFilter, TrustedIdentityAuthenticationFilter.class)
+        .addFilterAfter(identityStateValidationFilter, TenantContextFilter.class);
 
     return http.build();
   }

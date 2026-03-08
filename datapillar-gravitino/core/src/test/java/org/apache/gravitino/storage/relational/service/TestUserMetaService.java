@@ -42,6 +42,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.multitenancy.context.ExternalUserIdContextHolder;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
@@ -368,6 +369,45 @@ class TestUserMetaService extends TestJDBCBackend {
         userMetaService.getUserByIdentifier(user4Overwrite.nameIdentifier());
     Assertions.assertEquals("user4Overwrite", actualOverwriteUser4.name());
     Assertions.assertNull(actualOverwriteUser4.roleNames());
+  }
+
+  @Test
+  void insertUserShouldUseUserNameAsExternalUserId() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    UserMetaService userMetaService = UserMetaService.getInstance();
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "sunny",
+            auditInfo);
+
+    ExternalUserIdContextHolder.set("700");
+    try {
+      userMetaService.insertUser(user, false);
+    } finally {
+      ExternalUserIdContextHolder.remove();
+    }
+
+    Assertions.assertEquals(
+        "sunny",
+        userMetaService
+            .getUserByExternalUserId(AuthorizationUtils.ofUserNamespace(metalakeName), "700")
+            .name());
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            userMetaService.getUserByExternalUserId(
+                AuthorizationUtils.ofUserNamespace(metalakeName), "creator"));
   }
 
   @Test

@@ -52,6 +52,6 @@ public class CreateModifierEvent extends ModifierEvent {
 
   @Override
   public OperationType operationType() {
-    return OperationType.CREATE_METRIC_MODIFIER;
+    return OperationType.CREATE_MODIFIER;
   }
 }

@@ -85,6 +85,48 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
+  public void testMetricMetadataAuthorizationMethodInterceptor() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+      MethodInvocation methodInvocation = mock(MethodInvocation.class);
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
+
+      GravitinoInterceptionService gravitinoInterceptionService =
+          new GravitinoInterceptionService();
+      Method testMethod =
+          TestOperations.class.getMethod(
+              "testMetricMethod", String.class, String.class, String.class, String.class);
+      List<MethodInterceptor> methodInterceptors =
+          gravitinoInterceptionService.getMethodInterceptors(testMethod);
+      MethodInterceptor methodInterceptor = methodInterceptors.get(0);
+
+      when(methodInvocation.proceed())
+          .thenReturn(
+              new TestOperations()
+                  .testMetricMethod("testMetalake", "testCatalog", "testSchema", "testMetric"));
+      when(methodInvocation.getMethod()).thenReturn(testMethod);
+      when(methodInvocation.getArguments())
+          .thenReturn(new Object[] {"testMetalake", "testCatalog", "testSchema", "testMetric"});
+      Response response = (Response) methodInterceptor.invoke(methodInvocation);
+      assertEquals("ok", response.getEntity());
+
+      when(methodInvocation.getArguments())
+          .thenReturn(new Object[] {"testMetalake", "testCatalog", "testSchema", "otherMetric"});
+      Response response2 = (Response) methodInterceptor.invoke(methodInvocation);
+      assertEquals(
+          "User 'tester' is not authorized to perform operation 'testMetricMethod' on metadata 'otherMetric'",
+          ((ErrorResponse) response2.getEntity()).getMessage());
+    }
+  }
+
+  @Test
   public void testSystemInternalErrorHandling() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
@@ -136,6 +178,17 @@ public class TestGravitinoInterceptionService {
         @AuthorizationMetadata(type = Entity.EntityType.METALAKE) String metalake) {
       return Utils.ok("ok");
     }
+
+    @AuthorizationExpression(
+        expression = "CATALOG::USE_CATALOG && SCHEMA::USE_SCHEMA && METRIC::USE_METRIC",
+        accessMetadataType = MetadataObject.Type.METRIC)
+    public Response testMetricMethod(
+        @AuthorizationMetadata(type = Entity.EntityType.METALAKE) String metalake,
+        @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+        @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+        @AuthorizationMetadata(type = Entity.EntityType.METRIC) String metric) {
+      return Utils.ok("ok");
+    }
   }
 
   private static class MockGravitinoAuthorizer implements GravitinoAuthorizer {
@@ -150,10 +203,31 @@ public class TestGravitinoInterceptionService {
         MetadataObject metadataObject,
         Privilege.Name privilege,
         AuthorizationRequestContext requestContext) {
-      return "tester".equals(principal.getName())
+      if ("tester".equals(principal.getName())
           && "testMetalake".equals(metalake)
           && metadataObject.type() == MetadataObject.Type.METALAKE
-          && privilege == Privilege.Name.USE_CATALOG;
+          && privilege == Privilege.Name.USE_CATALOG) {
+        return true;
+      }
+      if ("tester".equals(principal.getName())
+          && "testMetalake".equals(metalake)
+          && metadataObject.type() == MetadataObject.Type.CATALOG
+          && "testCatalog".equals(metadataObject.name())
+          && privilege == Privilege.Name.USE_CATALOG) {
+        return true;
+      }
+      if ("tester".equals(principal.getName())
+          && "testMetalake".equals(metalake)
+          && metadataObject.type() == MetadataObject.Type.SCHEMA
+          && "testSchema".equals(metadataObject.name())
+          && privilege == Privilege.Name.USE_SCHEMA) {
+        return true;
+      }
+      return "tester".equals(principal.getName())
+          && "testMetalake".equals(metalake)
+          && metadataObject.type() == MetadataObject.Type.METRIC
+          && "testMetric".equals(metadataObject.name())
+          && privilege == Privilege.Name.USE_METRIC;
     }
 
     @Override

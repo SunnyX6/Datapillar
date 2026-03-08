@@ -1,7 +1,8 @@
-import { useMemo,useState,type MouseEvent } from 'react'
+import { useState,type MouseEvent } from 'react'
 import {
  AlertCircle,ChevronDown,ChevronRight,Database,Folder,Layers,Lock,Server,Shield,Table,Unlock
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui'
 import { panelWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
@@ -49,19 +50,20 @@ const MOCK_GRAVITINO_ASSETS:GravitinoAsset[] = [{
  }]
 
 const Switch = ({
- checked,onChange,color = 'bg-brand-600',disabled
+ checked,onChange,color = 'bg-brand-600',disabled,srLabel
 }:{
  checked:boolean
  onChange:() => void
  color?: string
  disabled?: boolean
+ srLabel:string
 }) => (<button
  type="button"
  onClick={onChange}
  disabled={disabled}
  className={cn('relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',checked?color:'bg-slate-200 dark:bg-slate-700',disabled?'opacity-50 cursor-not-allowed':'')}
  >
- <span className="sr-only">Use setting</span>
+ <span className="sr-only">{srLabel}</span>
  <span
  aria-hidden="true"
  className={cn('pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',checked?'translate-x-4':'translate-x-0')}
@@ -77,6 +79,7 @@ interface DataPermissionProps {
 }
 
 export function DataPermission({ subject,onPrivilegesChange }:DataPermissionProps) {
+ const { t } = useTranslation('permission')
  const [selectedAssetId,setSelectedAssetId] = useState<string>('metalake_prod')
  const [expandedNodes,setExpandedNodes] = useState<Set<string>>(new Set(['metalake_prod','cat_pg_payment']))
  const [localPrivileges,setLocalPrivileges] = useState<Record<string,string[]>>(() => {
@@ -102,28 +105,25 @@ export function DataPermission({ subject,onPrivilegesChange }:DataPermissionProp
 
  const getPrivilegeGroups = (assetType:AssetType) => {
  const typeLabel =
- assetType === 'metalake'?'Metalake':assetType === 'catalog'?'Catalog':assetType === 'schema'?'Schema':'Table'
+ assetType === 'metalake'?t('dataPermission.assetType.metalake'):assetType === 'catalog'?t('dataPermission.assetType.catalog'):assetType === 'schema'?t('dataPermission.assetType.schema'):t('dataPermission.assetType.table')
 
  const childTypeLabel =
- assetType === 'metalake'?'Catalog':assetType === 'catalog'?'Schema':assetType === 'schema'?'Table':'Column'
+ assetType === 'metalake'?t('dataPermission.assetType.catalog'):assetType === 'catalog'?t('dataPermission.assetType.schema'):assetType === 'schema'?t('dataPermission.assetType.table'):t('dataPermission.assetType.column')
 
  return [{
- name:'Metadata access (Metadata Access)',color:'bg-blue-600',items:[{ key:'USAGE',label:'USAGE',desc:`Allow viewing ${typeLabel} properties,Configuration and metadata information` },{
- key:'SELECT',label:'SELECT',desc:assetType === 'table'?'Allows querying rows of data in a table':`Allow reading this ${typeLabel} Metadata for all resources under`
+ name:t('dataPermission.group.metadata.title'),color:'bg-blue-600',items:[{ key:'USAGE',label:'USAGE',desc:t('dataPermission.group.metadata.usageDesc', { typeLabel }) },{
+ key:'SELECT',label:'SELECT',desc:assetType === 'table'?t('dataPermission.group.metadata.selectTableDesc'):t('dataPermission.group.metadata.selectDesc', { typeLabel })
  }]
  },{
- name:'Resource and data management (Data Management)',color:'bg-emerald-600',items:[{
- key:'CREATE',label:'CREATE',desc:assetType === 'table'?'Allow creation of subpartitions or indexes':`allowed here ${typeLabel} Create new under ${childTypeLabel}`
- },{ key:'MODIFY',label:'MODIFY',desc:'allow execution UPDATE / INSERT Waiting for data change operation' },{ key:'ALTER',label:'ALTER',desc:`Allow modification ${typeLabel} structure(If adding a column,Modify properties)` }]
+ name:t('dataPermission.group.dataManage.title'),color:'bg-emerald-600',items:[{
+ key:'CREATE',label:'CREATE',desc:assetType === 'table'?t('dataPermission.group.dataManage.createTableDesc'):t('dataPermission.group.dataManage.createDesc', { typeLabel,childTypeLabel })
+ },{ key:'MODIFY',label:'MODIFY',desc:t('dataPermission.group.dataManage.modifyDesc') },{ key:'ALTER',label:'ALTER',desc:t('dataPermission.group.dataManage.alterDesc', { typeLabel }) }]
  },{
- name:'High-risk operations (Danger Zone)',color:'bg-rose-600',danger:true,items:[{ key:'DROP',label:'DROP',desc:`high risk:Allow permanent deletion of this ${typeLabel} and all its contained objects` }]
+ name:t('dataPermission.group.danger.title'),color:'bg-rose-600',danger:true,items:[{ key:'DROP',label:'DROP',desc:t('dataPermission.group.danger.dropDesc', { typeLabel }) }]
  }]
  }
 
- const privilegeGroups = useMemo(() => {
- if (!selectedAsset) return []
- return getPrivilegeGroups(selectedAsset.type)
- },[selectedAsset])
+ const privilegeGroups = selectedAsset?getPrivilegeGroups(selectedAsset.type):[]
 
  const hasPrivilege = (privilege:string) => {
  return localPrivileges[selectedAssetId]?.includes(privilege) || false
@@ -191,7 +191,7 @@ export function DataPermission({ subject,onPrivilegesChange }:DataPermissionProp
  <div className={cn(panelWidthClassMap.medium,'bg-slate-50/50 dark:bg-slate-900/70 border-r border-slate-200 dark:border-slate-800 flex flex-col')}>
  <div className="p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 font-bold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
  <Layers size={14} />
- Resource topology
+ {t('dataPermission.resourceTopology')}
  </div>
  <div className="flex-1 overflow-y-auto py-2 custom-scrollbar">{renderTree(MOCK_GRAVITINO_ASSETS)}</div>
  </div>
@@ -208,11 +208,11 @@ export function DataPermission({ subject,onPrivilegesChange }:DataPermissionProp
  </div>
  <div>
  <h4 className="font-bold text-slate-900 dark:text-slate-100 text-base tracking-tight">{selectedAsset.name}</h4>
- <p className="text-legal text-slate-500 dark:text-slate-400 font-mono mt-0.5">{selectedAsset.description || 'No description'}</p>
+ <p className="text-legal text-slate-500 dark:text-slate-400 font-mono mt-0.5">{selectedAsset.description || t('dataPermission.noDescription')}</p>
  </div>
  </div>
  <div className="text-right">
- <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">ACL Context</span>
+ <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">{t('dataPermission.aclContext')}</span>
  </div>
  </div>
  </div>
@@ -228,7 +228,7 @@ export function DataPermission({ subject,onPrivilegesChange }:DataPermissionProp
  {group.name}
  </h5>
  <span className={`${TYPOGRAPHY.micro} font-medium text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700`}>
- {group.items.filter((item) => hasPrivilege(item.key)).length} / {group.items.length} Authorize
+ {t('dataPermission.authorizeCount', { selected: group.items.filter((item) => hasPrivilege(item.key)).length,total: group.items.length })}
  </span>
  </div>
 
@@ -253,7 +253,7 @@ export function DataPermission({ subject,onPrivilegesChange }:DataPermissionProp
  {item.label}
  </span>
  {group.danger && (<span className={`${TYPOGRAPHY.micro} text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/30 px-1.5 rounded font-medium`}>
- High Risk
+ {t('dataPermission.highRisk')}
  </span>)}
  </div>
  <p className={cn('text-micro text-slate-500 dark:text-slate-400 mt-1')}>{item.desc}</p>
@@ -264,9 +264,14 @@ export function DataPermission({ subject,onPrivilegesChange }:DataPermissionProp
  <span
  className={cn('text-xs font-medium transition-colors',isActive?'text-brand-600 dark:text-brand-300':'text-slate-300 dark:text-slate-600')}
  >
- {isActive?'Allow':'Deny'}
+ {isActive?t('dataPermission.switch.allow'):t('dataPermission.switch.deny')}
  </span>
- <Switch checked={isActive} onChange={() => togglePrivilege(item.key)} color={group.color} />
+ <Switch
+ checked={isActive}
+ onChange={() => togglePrivilege(item.key)}
+ color={group.color}
+ srLabel={t('dataPermission.switch.sr')}
+ />
  </div>
  </div>)
  })}
@@ -276,7 +281,7 @@ export function DataPermission({ subject,onPrivilegesChange }:DataPermissionProp
  </div>
  </div>):(<div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500 flex-col gap-3">
  <Database size={48} className="opacity-20" />
- <p className="font-medium">Please select data assets from the left to configure</p>
+ <p className="font-medium">{t('dataPermission.emptySelectPrompt')}</p>
  </div>)}
  </div>
  </Card>)

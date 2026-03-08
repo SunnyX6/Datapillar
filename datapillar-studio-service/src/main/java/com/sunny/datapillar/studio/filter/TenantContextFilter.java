@@ -4,12 +4,12 @@ import com.sunny.datapillar.studio.context.TenantContext;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
 import com.sunny.datapillar.studio.handler.SecurityExceptionHandler;
 import com.sunny.datapillar.studio.security.TrustedIdentityContext;
+import com.sunny.datapillar.studio.security.TrustedIdentityProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Set;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -30,34 +30,18 @@ public class TenantContextFilter extends OncePerRequestFilter {
   private static final String ACTOR_TENANT_ID_KEY = "actorTenantId";
   private static final String IMPERSONATION_KEY = "impersonation";
 
-  private static final Set<String> WHITELIST_PREFIX =
-      Set.of("/actuator/health", "/actuator/info", "/v3/api-docs", "/setup", "/biz/invitations");
-
+  private final TrustedIdentityProperties properties;
   private final SecurityExceptionHandler securityExceptionHandler;
 
-  public TenantContextFilter(SecurityExceptionHandler securityExceptionHandler) {
+  public TenantContextFilter(
+      TrustedIdentityProperties properties, SecurityExceptionHandler securityExceptionHandler) {
+    this.properties = properties;
     this.securityExceptionHandler = securityExceptionHandler;
   }
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
-    String path = request.getRequestURI();
-    if (path == null) {
-      return false;
-    }
-    String contextPath = request.getContextPath();
-    if (contextPath != null && !contextPath.isBlank() && path.startsWith(contextPath)) {
-      path = path.substring(contextPath.length());
-      if (path.isEmpty()) {
-        path = "/";
-      }
-    }
-    for (String prefix : WHITELIST_PREFIX) {
-      if (path.startsWith(prefix)) {
-        return true;
-      }
-    }
-    return false;
+    return TrustedIdentityRequestSupport.shouldSkip(request, properties.isEnabled());
   }
 
   @Override

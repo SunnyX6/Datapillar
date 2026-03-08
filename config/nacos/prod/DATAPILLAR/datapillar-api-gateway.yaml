@@ -117,7 +117,7 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD}
-      database: ${REDIS_DATABASE}
+      database: ${REDIS_DATABASE:0}
 
 scalar:
   enabled: true
@@ -129,6 +129,8 @@ scalar:
       default: true
     - title: Studio API
       url: /api/studio/v3/api-docs
+    - title: Studio Governance API
+      url: /api/studio/v3/api-docs/governance
     - title: AI API
       url: /api/ai/openapi.json
     - title: OpenLineage API
@@ -142,7 +144,7 @@ security:
   authentication:
     enabled: true
     auth-token-cookie-name: auth-token
-    issuer-uri: ${AUTH_ISSUER_URI}
+    issuer: ${AUTH_TOKEN_ISSUER:https://auth.datapillar.local}
     audience: ${AUTH_AUDIENCE:datapillar-api}
     username-claim: preferred_username
     email-claim: email

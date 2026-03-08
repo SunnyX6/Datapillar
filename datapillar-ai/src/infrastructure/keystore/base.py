@@ -10,5 +10,5 @@ from abc import ABC, abstractmethod
 
 class KeyStorage(ABC):
     @abstractmethod
-    def load_private_key(self, tenant_id: int) -> bytes:
+    def load_private_key(self, tenant_code: str) -> bytes:
         raise NotImplementedError

@@ -18,12 +18,15 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import static org.apache.gravitino.authorization.Privilege.Name.USE_CATALOG;
+import static org.apache.gravitino.authorization.Privilege.Name.USE_SCHEMA;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -246,6 +249,60 @@ public class TestJcasbinAuthorizer {
     jcasbinAuthorizer.handleMetadataOwnerChange(
         METALAKE, USER_ID, catalogIdent, Entity.EntityType.CATALOG);
     assertFalse(doAuthorizeOwner(currentPrincipal));
+  }
+
+  @Test
+  public void testHasSetOwnerPermissionForSemanticObjectsRequiresSchemaAccess() {
+    MetadataObject metalakeObject =
+        MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE);
+    MetadataObject schemaObject =
+        MetadataObjects.of(ImmutableList.of("catalog", "schema"), MetadataObject.Type.SCHEMA);
+    MetadataObject catalogObject = MetadataObjects.parent(schemaObject);
+
+    for (MetadataObject.Type metadataType :
+        ImmutableList.of(
+            MetadataObject.Type.METRIC,
+            MetadataObject.Type.WORDROOT,
+            MetadataObject.Type.UNIT,
+            MetadataObject.Type.MODIFIER,
+            MetadataObject.Type.VALUE_DOMAIN)) {
+      String objectName = metadataType.name().toLowerCase();
+      MetadataObject metadataObject =
+          MetadataObjects.of(ImmutableList.of("catalog", "schema", objectName), metadataType);
+
+      JcasbinAuthorizer authorizerSpy = spy(jcasbinAuthorizer);
+      doReturn(false).when(authorizerSpy).isOwner(any(), eq(METALAKE), eq(metalakeObject));
+      doReturn(true).when(authorizerSpy).isOwner(any(), eq(METALAKE), eq(metadataObject));
+      doReturn(false).when(authorizerSpy).isOwner(any(), eq(METALAKE), eq(schemaObject));
+      doReturn(false).when(authorizerSpy).isOwner(any(), eq(METALAKE), eq(catalogObject));
+      doReturn(false)
+          .when(authorizerSpy)
+          .authorize(any(), eq(METALAKE), eq(metalakeObject), eq(USE_SCHEMA), any());
+      doReturn(false)
+          .when(authorizerSpy)
+          .authorize(any(), eq(METALAKE), eq(catalogObject), eq(USE_SCHEMA), any());
+      doReturn(false)
+          .when(authorizerSpy)
+          .authorize(any(), eq(METALAKE), eq(schemaObject), eq(USE_SCHEMA), any());
+
+      assertFalse(
+          authorizerSpy.hasSetOwnerPermission(
+              METALAKE,
+              metadataType.name(),
+              String.format("catalog.schema.%s", objectName),
+              new AuthorizationRequestContext()));
+
+      doReturn(true)
+          .when(authorizerSpy)
+          .authorize(any(), eq(METALAKE), eq(schemaObject), eq(USE_SCHEMA), any());
+
+      assertTrue(
+          authorizerSpy.hasSetOwnerPermission(
+              METALAKE,
+              metadataType.name(),
+              String.format("catalog.schema.%s", objectName),
+              new AuthorizationRequestContext()));
+    }
   }
 
   private Boolean doAuthorize(Principal currentPrincipal) {

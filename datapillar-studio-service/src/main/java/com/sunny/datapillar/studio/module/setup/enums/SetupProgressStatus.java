@@ -10,5 +10,6 @@ package com.sunny.datapillar.studio.module.setup.enums;
 public enum SetupProgressStatus {
   PENDING,
   IN_PROGRESS,
+  FAILED,
   COMPLETED
 }

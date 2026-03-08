@@ -9,14 +9,19 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.sunny.datapillar.common.constant.ErrorType;
 import com.sunny.datapillar.common.exception.AlreadyExistsException;
 import com.sunny.datapillar.studio.dto.tenant.request.TenantCreateRequest;
 import com.sunny.datapillar.studio.dto.tenant.request.TenantUpdateRequest;
 import com.sunny.datapillar.studio.exception.translator.StudioDbExceptionTranslator;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoCatalogService;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoMetalakeService;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoSchemaService;
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantMapper;
 import com.sunny.datapillar.studio.module.tenant.util.TenantIdGenerator;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
+import com.sunny.datapillar.studio.security.crypto.LocalCryptoService;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,7 +34,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 class TenantServiceImplTest {
 
   @Mock private TenantMapper tenantMapper;
-  @Mock private AuthCryptoRpcClient authCryptoClient;
+  @Mock private LocalCryptoService localCryptoService;
+  @Mock private GravitinoMetalakeService gravitinoMetalakeService;
+  @Mock private GravitinoCatalogService gravitinoCatalogService;
+  @Mock private GravitinoSchemaService gravitinoSchemaService;
   @Mock private StudioDbExceptionTranslator studioDbExceptionTranslator;
   @Mock private TenantIdGenerator tenantIdGenerator;
   @Mock private TransactionTemplate transactionTemplate;
@@ -38,6 +46,7 @@ class TenantServiceImplTest {
 
   @BeforeEach
   void setUp() {
+    lenient().when(transactionTemplate.getTransactionManager()).thenReturn(null);
     lenient()
         .when(transactionTemplate.execute(any()))
         .thenAnswer(
@@ -48,110 +57,17 @@ class TenantServiceImplTest {
     tenantService =
         new TenantServiceImpl(
             tenantMapper,
-            authCryptoClient,
+            localCryptoService,
+            gravitinoMetalakeService,
+            gravitinoCatalogService,
+            gravitinoSchemaService,
             studioDbExceptionTranslator,
             tenantIdGenerator,
             transactionTemplate);
   }
 
   @Test
-  void createTenant_shouldInsertProvisioningThenFinalizeActive() {
-    Tenant persisted = new Tenant();
-    when(tenantMapper.selectByCode("tenant-acme")).thenReturn(null);
-    when(tenantIdGenerator.nextId()).thenReturn(101L);
-    when(tenantMapper.insert(any(Tenant.class)))
-        .thenAnswer(
-            invocation -> {
-              Tenant tenant = invocation.getArgument(0);
-              copyTenant(tenant, persisted);
-              return 1;
-            });
-    when(tenantMapper.selectById(101L)).thenReturn(persisted);
-    when(tenantMapper.updateById(any(Tenant.class)))
-        .thenAnswer(
-            invocation -> {
-              Tenant tenant = invocation.getArgument(0);
-              copyTenant(tenant, persisted);
-              return 1;
-            });
-    when(authCryptoClient.ensureTenantKey("tenant-acme"))
-        .thenReturn(
-            new AuthCryptoRpcClient.TenantKeySnapshot(
-                "tenant-acme",
-                "-----BEGIN PUBLIC KEY-----mock-----END PUBLIC KEY-----",
-                "v1",
-                "fp-1"));
-
-    TenantCreateRequest dto = new TenantCreateRequest();
-    dto.setCode("tenant-acme");
-    dto.setName("ACME");
-    dto.setType("ENTERPRISE");
-
-    Long tenantId = tenantService.createTenant(dto);
-
-    assertEquals(101L, tenantId);
-    verify(authCryptoClient).ensureTenantKey(eq("tenant-acme"));
-    assertEquals("tenant-acme", persisted.getCode());
-    assertEquals("ACME", persisted.getName());
-    assertEquals("ENTERPRISE", persisted.getType());
-    assertEquals(
-        "-----BEGIN PUBLIC KEY-----mock-----END PUBLIC KEY-----", persisted.getEncryptPublicKey());
-    assertEquals(1, persisted.getStatus());
-  }
-
-  @Test
-  void createTenant_shouldResumeFailedProvisionRecord() {
-    Tenant existing = new Tenant();
-    existing.setId(201L);
-    existing.setCode("tenant-acme");
-    existing.setName("ACME");
-    existing.setType("ENTERPRISE");
-    existing.setStatus(1);
-    existing.setEncryptPublicKey(null);
-    when(tenantMapper.selectByCode("tenant-acme")).thenReturn(existing);
-    when(tenantMapper.updateById(any(Tenant.class))).thenReturn(1);
-    when(tenantMapper.selectById(201L)).thenReturn(existing);
-    when(authCryptoClient.ensureTenantKey("tenant-acme"))
-        .thenReturn(
-            new AuthCryptoRpcClient.TenantKeySnapshot(
-                "tenant-acme",
-                "-----BEGIN PUBLIC KEY-----mock-----END PUBLIC KEY-----",
-                "v1",
-                "fp-1"));
-
-    TenantCreateRequest dto = new TenantCreateRequest();
-    dto.setCode("tenant-acme");
-    dto.setName("ACME");
-    dto.setType("ENTERPRISE");
-
-    Long tenantId = tenantService.createTenant(dto);
-
-    assertEquals(201L, tenantId);
-    verify(tenantMapper, never()).insert(any(Tenant.class));
-  }
-
-  @Test
-  void createTenant_shouldRejectWhenCodeAlreadyActive() {
-    Tenant existing = new Tenant();
-    existing.setId(301L);
-    existing.setCode("tenant-acme");
-    existing.setEncryptPublicKey("-----BEGIN PUBLIC KEY-----mock-----END PUBLIC KEY-----");
-    when(tenantMapper.selectByCode("tenant-acme")).thenReturn(existing);
-
-    TenantCreateRequest dto = new TenantCreateRequest();
-    dto.setCode("tenant-acme");
-    dto.setName("ACME");
-    dto.setType("ENTERPRISE");
-
-    AlreadyExistsException ex =
-        assertThrows(AlreadyExistsException.class, () -> tenantService.createTenant(dto));
-
-    assertEquals("Tenant code already exists", ex.getMessage());
-    verify(authCryptoClient, never()).ensureTenantKey(any());
-  }
-
-  @Test
-  void createTenant_shouldMarkFailedWhenAuthRpcFails() {
+  void createTenant_shouldInitializeResourcesAndPersistPublicKey() {
     Tenant persisted = new Tenant();
     when(tenantMapper.selectByCode("tenant-acme")).thenReturn(null);
     when(tenantIdGenerator.nextId()).thenReturn(401L);
@@ -162,18 +78,125 @@ class TenantServiceImplTest {
               copyTenant(tenant, persisted);
               return 1;
             });
-    RuntimeException rpcException = new RuntimeException("rpc unavailable");
-    when(authCryptoClient.ensureTenantKey("tenant-acme")).thenThrow(rpcException);
+    when(tenantMapper.selectById(401L)).thenReturn(persisted);
+    when(tenantMapper.updateById(any(Tenant.class)))
+        .thenAnswer(
+            invocation -> {
+              Tenant tenant = invocation.getArgument(0);
+              copyTenant(tenant, persisted);
+              return 1;
+            });
+    when(gravitinoMetalakeService.createMetalake(any(), any(), any(), eq(null))).thenReturn(true);
+    when(gravitinoCatalogService.createCatalogIfAbsent(eq("oneMeta"), any(), eq(null)))
+        .thenReturn(true);
+    when(gravitinoSchemaService.createSchemaIfAbsent(eq("oneMeta"), eq("OneDS"), any(), eq(null)))
+        .thenReturn(true);
+    when(localCryptoService.generateTenantKey("tenant-acme"))
+        .thenReturn(
+            new LocalCryptoService.TenantKeySnapshot(
+                "tenant-acme",
+                "-----BEGIN PUBLIC KEY-----generated-----END PUBLIC KEY-----",
+                "v1",
+                "fp-1"));
 
-    TenantCreateRequest dto = new TenantCreateRequest();
-    dto.setCode("tenant-acme");
-    dto.setName("ACME");
-    dto.setType("ENTERPRISE");
+    TenantCreateRequest request = new TenantCreateRequest();
+    request.setCode("tenant-acme");
+    request.setName("ACME");
+    request.setType("ENTERPRISE");
 
-    RuntimeException ex =
-        assertThrows(RuntimeException.class, () -> tenantService.createTenant(dto));
+    Long tenantId = tenantService.createTenant(request);
 
-    assertEquals("rpc unavailable", ex.getMessage());
+    assertEquals(401L, tenantId);
+    verify(gravitinoMetalakeService)
+        .createMetalake(eq("oneMeta"), eq("Datapillar tenant metalake"), any(), eq(null));
+    verify(gravitinoCatalogService).createCatalogIfAbsent(eq("oneMeta"), any(), eq(null));
+    verify(gravitinoSchemaService)
+        .createSchemaIfAbsent(eq("oneMeta"), eq("OneDS"), any(), eq(null));
+    assertEquals(
+        "-----BEGIN PUBLIC KEY-----generated-----END PUBLIC KEY-----",
+        persisted.getEncryptPublicKey());
+  }
+
+  @Test
+  void createTenant_shouldRollbackTenantWhenMetalakeInitializationFails() {
+    Tenant persisted = new Tenant();
+    when(tenantMapper.selectByCode("tenant-acme")).thenReturn(null);
+    when(tenantIdGenerator.nextId()).thenReturn(451L);
+    when(tenantMapper.insert(any(Tenant.class)))
+        .thenAnswer(
+            invocation -> {
+              Tenant tenant = invocation.getArgument(0);
+              copyTenant(tenant, persisted);
+              return 1;
+            });
+    when(gravitinoMetalakeService.createMetalake(
+            eq("oneMeta"), eq("Datapillar tenant metalake"), any(), eq(null)))
+        .thenThrow(new RuntimeException("metalake init failed"));
+
+    TenantCreateRequest request = new TenantCreateRequest();
+    request.setCode("tenant-acme");
+    request.setName("ACME");
+    request.setType("ENTERPRISE");
+
+    RuntimeException exception =
+        assertThrows(RuntimeException.class, () -> tenantService.createTenant(request));
+
+    assertEquals("metalake init failed", exception.getMessage());
+    verify(localCryptoService, never()).generateTenantKey("tenant-acme");
+    verify(tenantMapper).deleteById(451L);
+  }
+
+  @Test
+  void createTenant_shouldLoadExistingKeyWhenPrivateKeyAlreadyExists() {
+    Tenant persisted = new Tenant();
+    when(tenantMapper.selectByCode("tenant-acme")).thenReturn(null);
+    when(tenantIdGenerator.nextId()).thenReturn(501L);
+    when(tenantMapper.insert(any(Tenant.class)))
+        .thenAnswer(
+            invocation -> {
+              Tenant tenant = invocation.getArgument(0);
+              copyTenant(tenant, persisted);
+              return 1;
+            });
+    when(tenantMapper.selectById(501L)).thenReturn(persisted);
+    when(tenantMapper.updateById(any(Tenant.class)))
+        .thenAnswer(
+            invocation -> {
+              Tenant tenant = invocation.getArgument(0);
+              copyTenant(tenant, persisted);
+              return 1;
+            });
+    when(gravitinoMetalakeService.createMetalake(any(), any(), any(), eq(null))).thenReturn(true);
+    when(gravitinoCatalogService.createCatalogIfAbsent(eq("oneMeta"), any(), eq(null)))
+        .thenReturn(true);
+    when(gravitinoSchemaService.createSchemaIfAbsent(eq("oneMeta"), eq("OneDS"), any(), eq(null)))
+        .thenReturn(true);
+    when(localCryptoService.generateTenantKey("tenant-acme"))
+        .thenThrow(
+            new AlreadyExistsException(
+                ErrorType.TENANT_PRIVATE_KEY_ALREADY_EXISTS,
+                Map.of("tenantCode", "tenant-acme"),
+                "Tenant private key already exists"));
+    when(localCryptoService.loadTenantKey("tenant-acme"))
+        .thenReturn(
+            new LocalCryptoService.TenantKeySnapshot(
+                "tenant-acme",
+                "-----BEGIN PUBLIC KEY-----existing-----END PUBLIC KEY-----",
+                "v1",
+                "fp-1"));
+
+    TenantCreateRequest request = new TenantCreateRequest();
+    request.setCode("tenant-acme");
+    request.setName("ACME");
+    request.setType("ENTERPRISE");
+
+    Long tenantId = tenantService.createTenant(request);
+
+    assertEquals(501L, tenantId);
+    verify(localCryptoService).loadTenantKey("tenant-acme");
+    assertEquals(
+        "-----BEGIN PUBLIC KEY-----existing-----END PUBLIC KEY-----",
+        persisted.getEncryptPublicKey());
   }
 
   @Test

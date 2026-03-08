@@ -127,7 +127,7 @@ function WordRootRow({
               value={editForm.name}
               onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               onClick={(e) => e.stopPropagation()}
-              placeholder="root name"
+              placeholder="WordRoot name"
               className="w-full px-2 py-1 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="text-micro font-mono text-slate-400 uppercase px-1">{root.code}</div>
@@ -261,7 +261,7 @@ function NewWordRootRow({
             type="text"
             value={form.name}
             onChange={(e) => onChange({ ...form, name: e.target.value })}
-            placeholder="root name"
+            placeholder="WordRoot name"
             className="w-full px-2 py-1 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <input
@@ -383,7 +383,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
     loadData()
   }, [loadData])
 
-  // Filter root words
+  // Filter WordRoots
   const filteredRoots = wordRoots.filter(
     (r) =>
       r.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -420,7 +420,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
     setNewRowForm(emptyForm)
   }
 
-  // Remove root word
+  // Remove WordRoot
   const handleDelete = (code: string) => {
     setWordRoots((prev) => prev.filter((r) => r.code !== code))
     setTotal((prev) => prev - 1)
@@ -445,7 +445,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
             <ArrowLeft size={iconSizeToken.large} />
           </button>
           <div className="flex items-center gap-2">
-            <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">canonical root</h2>
+            <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">WordRoot Center</h2>
             <Badge variant="blue">
               {filteredRoots.length} / {total}
             </Badge>
@@ -456,7 +456,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
           disabled={showNewRow}
           className="bg-slate-900 dark:bg-blue-600 text-white px-3 @md:px-4 py-1 @md:py-1.5 rounded-lg text-caption @md:text-body-sm font-medium flex items-center gap-1 @md:gap-1.5 shadow-md hover:bg-blue-600 dark:hover:bg-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Plus size={iconSizeToken.medium} /> <span className="hidden @md:inline">Add new root</span>
+          <Plus size={iconSizeToken.medium} /> <span className="hidden @md:inline">Add WordRoot</span>
         </button>
       </div>
 
@@ -476,7 +476,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
         >
           <TableHeader>
             <TableRow>
-              <TableHead className={tableColumnWidthClassMap['5xl']}>root name / encoding</TableHead>
+              <TableHead className={tableColumnWidthClassMap['5xl']}>WordRoot name / code</TableHead>
               <TableHead className={`${tableColumnWidthClassMap['4xl']} text-center`}>data type</TableHead>
               <TableHead>Description</TableHead>
               <TableHead className={tableColumnWidthClassMap.lg}>Creator</TableHead>
@@ -518,7 +518,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
                 {filteredRoots.length === 0 && !showNewRow && (
                   <TableRow>
                     <TableCell colSpan={6} className="py-12 @md:py-16 text-center text-slate-400 text-caption @md:text-body-sm">
-                      No matching root found
+                      No matching WordRoot found
                     </TableCell>
                   </TableRow>
                 )}

@@ -9,7 +9,6 @@ import type {
 
 export async function login(request: PasswordLoginRequest): Promise<LoginResult> {
   return requestData<LoginResult, {
-    stage: 'AUTH'
     loginAlias: string
     password: string
     rememberMe?: boolean
@@ -19,7 +18,6 @@ export async function login(request: PasswordLoginRequest): Promise<LoginResult>
     url: API_PATH.login.root,
     method: 'POST',
     data: {
-      stage: 'AUTH',
       loginAlias: request.loginAlias,
       password: request.password,
       rememberMe: request.rememberMe,
@@ -30,7 +28,6 @@ export async function login(request: PasswordLoginRequest): Promise<LoginResult>
 
 export async function loginSso(request: SsoLoginRequest): Promise<LoginResult> {
   return requestData<LoginResult, {
-    stage: 'AUTH'
     provider: string
     code: string
     state: string
@@ -41,7 +38,6 @@ export async function loginSso(request: SsoLoginRequest): Promise<LoginResult> {
     url: API_PATH.login.sso,
     method: 'POST',
     data: {
-      stage: 'AUTH',
       provider: request.provider,
       code: request.code,
       state: request.state,

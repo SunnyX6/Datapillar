@@ -33,8 +33,10 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.dataset.Metric;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.SchemaDTO;
+import org.apache.gravitino.dto.dataset.MetricDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
@@ -76,6 +78,7 @@ public class TestSupportPolicies extends TestBase {
   private static Fileset genericFileset;
 
   private static Topic genericTopic;
+  private static GenericMetric genericMetric;
 
   private final Set<MetadataObject.Type> supportedObjectTypes =
       Collections.singleton(MetadataObject.Type.FILESET);
@@ -171,6 +174,19 @@ public class TestSupportPolicies extends TestBase {
                 .withName("topic1")
                 .withComment("comment1")
                 .withProperties(Collections.emptyMap())
+                .withAudit(AuditDTO.builder().withCreator("test").build())
+                .build(),
+            client.restClient(),
+            Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
+
+    genericMetric =
+        new GenericMetric(
+            MetricDTO.builder()
+                .withName("metricName")
+                .withCode("metric_code")
+                .withType(Metric.Type.ATOMIC)
+                .withCurrentVersion(1)
+                .withLastVersion(1)
                 .withAudit(AuditDTO.builder().withCreator("test").build())
                 .build(),
             client.restClient(),
@@ -347,6 +363,16 @@ public class TestSupportPolicies extends TestBase {
     testAssociatePolicies(
         genericTopic.supportsPolicies(),
         MetadataObjects.of("catalog1.schema1", genericTopic.name(), MetadataObject.Type.TOPIC));
+  }
+
+  @Test
+  public void testPolicyOperationsForMetric() throws JsonProcessingException {
+    MetadataObject metricObject =
+        MetadataObjects.of("catalog1.schema1", genericMetric.code(), MetadataObject.Type.METRIC);
+    testListPolicies(genericMetric.supportsPolicies(), metricObject);
+    testListPoliciesInfo(genericMetric.supportsPolicies(), metricObject);
+    testGetPolicy(genericMetric.supportsPolicies(), metricObject);
+    testAssociatePolicies(genericMetric.supportsPolicies(), metricObject);
   }
 
   private void testListPolicies(SupportsPolicies supportsPolicies, MetadataObject metadataObject)

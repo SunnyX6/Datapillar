@@ -1,0 +1,187 @@
+{
+  "semanticHub": {
+    "title": {
+      "prefix": "OneMeta",
+      "highlight": "Semantic"
+    },
+    "subtitle": "Enterprise semantic asset lake that bridges business definitions to physical data.",
+    "categories": {
+      "metrics": {
+        "label": "Metric Center",
+        "description": "Unify business semantics and build atomic/derived Metric systems.",
+        "trend": "NEW"
+      },
+      "wordRoot": {
+        "label": "WordRoot Glossary",
+        "description": "Standardize semantic naming and physical field naming with WordRoots."
+      },
+      "standards": {
+        "label": "Semantic Standards",
+        "description": "Data type standards, ValueDomain constraints, and classification/security standards.",
+        "sub": {
+          "dataType": "Data Type",
+          "valueDomain": "ValueDomain",
+          "classification": "Classification"
+        }
+      },
+      "models": {
+        "label": "AI Features",
+        "description": "Model feature repository and feature lineage to accelerate AI data delivery."
+      },
+      "apis": {
+        "label": "Data Services",
+        "description": "Data-as-a-Service with unified API metadata management."
+      }
+    },
+    "hero": {
+      "title": "Want AI to understand your data better?",
+      "description": "With OneMeta semantic assets (Metadata + Semantic), enterprise AI agents can deliver more accurate auto-generated reports.",
+      "cta": "Enable semantic enhancement"
+    }
+  },
+  "metricForm": {
+    "type": {
+      "atomic": {
+        "label": "Atomic Metric",
+        "desc": "Ground-truth Metric derived directly from physical tables."
+      },
+      "derived": {
+        "label": "Derived Metric",
+        "desc": "Derived Metric based on base Metric + dimensions/time scopes."
+      },
+      "composite": {
+        "label": "Composite Metric",
+        "desc": "Composite Metric calculated from multiple Metrics (ratio, efficiency, etc.)."
+      }
+    },
+    "modal": {
+      "step1": {
+        "title": "Metric Registration Wizard",
+        "subtitle": "Select the Metric type to create"
+      },
+      "step2": {
+        "titleEdit": "Edit Metric",
+        "titleCreate": "Configure Metric details",
+        "saveChanges": "Save changes",
+        "confirmPublish": "Confirm publish"
+      }
+    },
+    "ai": {
+      "title": "AI Smart Fill",
+      "placeholder": {
+        "atomic": "Select measure columns first, then describe the Metric. Example: multiply unit price by quantity to get cumulative order amount.",
+        "derived": "Select base Atomic Metric and filter dimensions first, then describe the Derived Metric logic.",
+        "composite": "Select at least two Metrics first, then describe composition rules."
+      },
+      "generating": "Generating...",
+      "smartFill": "Smart Fill",
+      "error": {
+        "selectMeasureFirst": "Please select at least one measure column first.",
+        "selectBaseMetricFirst": "Please select a base Atomic Metric first.",
+        "selectCompositeMetricsFirst": "Please select at least two Metrics for composition.",
+        "fillFailed": "AI fill failed, please try again."
+      },
+      "recommendation": {
+        "metricsAndTables": "Recommended Metrics and Tables:",
+        "metricsOnly": "Recommended Metrics:",
+        "tablesAndColumns": "Recommended Tables and Columns:",
+        "column": "Column",
+        "metric": "Metric"
+      }
+    },
+    "loadingVersion": "Loading Metric details..."
+  },
+  "valueDomainExplorer": {
+    "title": "ValueDomain Constraints",
+    "titleSuffix": "Value Domains",
+    "createButton": "Create ValueDomain",
+    "loading": "Loading...",
+    "empty": "No matching ValueDomain found",
+    "card": {
+      "level": {
+        "builtin": "Built-in",
+        "business": "Business"
+      },
+      "action": {
+        "edit": "Edit",
+        "delete": "Delete"
+      },
+      "enum": {
+        "empty": "No enumeration values",
+        "more": "More",
+        "moreTitle": "More",
+        "noMoreTitle": "No more enumeration values",
+        "moreAria": "More enumeration values",
+        "noMoreAria": "No more enumeration values",
+        "pageAria": "Switch to page {{index}}",
+        "pageTitle": "Page {{index}}"
+      },
+      "count": "{{count}} enumeration values"
+    }
+  },
+  "valueDomainForm": {
+    "type": {
+      "enum": {
+        "label": "Enumeration (ENUM)",
+        "desc": "Define a discrete set of optional values."
+      },
+      "range": {
+        "label": "Range (RANGE)",
+        "desc": "Define a numeric interval, such as [0, 100]."
+      },
+      "regex": {
+        "label": "Pattern (REGEX)",
+        "desc": "Define a regular-expression constraint."
+      }
+    },
+    "level": {
+      "business": "Business Level (BUSINESS)",
+      "builtin": "Built-in Level (BUILTIN)"
+    },
+    "create": {
+      "title": "Create ValueDomain",
+      "confirm": "Confirm Create"
+    },
+    "edit": {
+      "title": "Edit ValueDomain",
+      "save": "Save"
+    },
+    "field": {
+      "domainName": "ValueDomain Name",
+      "domainCode": "ValueDomain Code",
+      "domainType": "ValueDomain Type",
+      "domainLevel": "ValueDomain Level",
+      "dataType": "Data Type",
+      "enumValue": "Value (Key)",
+      "enumLabel": "Label (Value)",
+      "itemType": {
+        "enum": "Enumeration Values",
+        "range": "Range Expression",
+        "regex": "Regular Expression"
+      },
+      "comment": "Comment"
+    },
+    "placeholder": {
+      "domainName": "Order status",
+      "domainCode": "ORDER_STATUS",
+      "enumValue": "PAID",
+      "enumLabel": "Paid",
+      "rangeValue": "[0, 100]",
+      "regexValue": "^[1-9]\\d{5}(18|19|20)\\d{2}...",
+      "comment": "ValueDomain description (optional)"
+    },
+    "dropdown": {
+      "selectDomainType": "Select ValueDomain type",
+      "selectDomainLevel": "Select ValueDomain level"
+    },
+    "action": {
+      "addEnumValue": "Add enumeration value"
+    },
+    "hint": {
+      "range": "Enter a numeric interval, such as [0, 100] or (0, 1].",
+      "regex": "Enter a regular expression.",
+      "rangeReadonly": "Range expressions are read-only.",
+      "regexReadonly": "Regular expressions are read-only."
+    }
+  }
+}

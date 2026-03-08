@@ -1,15 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button, Modal, ModalCancelButton, ModalPrimaryButton, Select } from '@/components/ui'
 import type { CreateAdminLlmModelRequest } from '@/services/studioLlmService'
 import type { LlmProvider, ModelCategory } from '../utils/types'
 
-const MODEL_TYPE_OPTIONS: Array<{ label: string; value: ModelCategory }> = [
-  { label: 'Chat', value: 'chat' },
-  { label: 'Embeddings', value: 'embeddings' },
-  { label: 'Reranking', value: 'reranking' },
-  { label: 'Code', value: 'code' }
-]
+const MODEL_TYPES: ModelCategory[] = ['chat', 'embeddings', 'reranking', 'code']
 
 type CreateFormState = {
   providerModelId: string
@@ -52,9 +48,14 @@ export function CreateLLMModal({
   onClose: () => void
   onSubmit: (request: CreateAdminLlmModelRequest) => Promise<boolean>
 }) {
+  const { t } = useTranslation('llm')
   const defaultProvider = useMemo<LlmProvider>(
     () => providerOptions[0]?.value ?? 'openai',
     [providerOptions]
+  )
+  const modelTypeOptions = useMemo(
+    () => MODEL_TYPES.map((value) => ({ value, label: t(`modelTypes.${value}`) })),
+    [t]
   )
 
   const [form, setForm] = useState<CreateFormState>(() => (
@@ -127,12 +128,12 @@ export function CreateLLMModal({
       isOpen={isOpen}
       onClose={handleClose}
       size="sm"
-      title="Add model"
+      title={t('createModal.title')}
       footerRight={
         <>
           <ModalCancelButton onClick={handleClose} disabled={isSubmitting} />
           <ModalPrimaryButton onClick={handleSubmit} disabled={!isValid || isSubmitting} loading={isSubmitting}>
-            Confirm to add
+            {t('createModal.confirm')}
           </ModalPrimaryButton>
         </>
       }
@@ -140,40 +141,40 @@ export function CreateLLMModal({
       <div className="space-y-4">
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            Model name <span className="text-rose-500">*</span>
+            {t('createModal.modelName')} <span className="text-rose-500">*</span>
           </label>
           <input
             type="text"
             value={form.name}
             onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-            placeholder="Such as：GPT-4o"
+            placeholder={t('createModal.modelNamePlaceholder')}
             className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
 
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            Base URL
+            {t('createModal.baseUrl')}
           </label>
           <input
             type="text"
             value={form.baseUrl}
             onChange={(event) => setForm((prev) => ({ ...prev, baseUrl: event.target.value }))}
-            placeholder="https://api.example.com/v1"
+            placeholder={t('createModal.baseUrlPlaceholder')}
             className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>
 
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            API Key（Optional）
+            {t('createModal.apiKeyOptional')}
           </label>
           <div className="relative">
             <input
               type={isApiKeyVisible ? 'text' : 'password'}
               value={form.apiKey}
               onChange={(event) => setForm((prev) => ({ ...prev, apiKey: event.target.value }))}
-              placeholder="sk-..."
+              placeholder={t('createModal.apiKeyPlaceholder')}
               className="w-full pl-3 pr-10 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
             />
             <Button
@@ -182,7 +183,7 @@ export function CreateLLMModal({
               variant="ghost"
               size="tiny"
               className="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 dark:text-slate-500 hover:text-indigo-500 transition-colors"
-              aria-label={isApiKeyVisible ? 'hide API Key' : 'show API Key'}
+              aria-label={isApiKeyVisible ? t('createModal.hideApiKeyAria') : t('createModal.showApiKeyAria')}
             >
               {isApiKeyVisible ? <EyeOff size={14} /> : <Eye size={14} />}
             </Button>
@@ -191,52 +192,52 @@ export function CreateLLMModal({
 
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            Provider <span className="text-rose-500">*</span>
+            {t('createModal.provider')} <span className="text-rose-500">*</span>
           </label>
           <Select
             value={form.provider}
             onChange={(value) => handleProviderChange(value as LlmProvider)}
             options={providerOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
-            dropdownHeader="Select supplier"
+            dropdownHeader={t('createModal.selectProvider')}
             size="sm"
           />
         </div>
 
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            model ID <span className="text-rose-500">*</span>
+            {t('createModal.modelId')} <span className="text-rose-500">*</span>
           </label>
           <Select
             value={form.providerModelId}
             onChange={(value) => setForm((prev) => ({ ...prev, providerModelId: value }))}
             options={modelIdOptions}
-            placeholder={modelIdOptions.length > 0 ? 'Please select a model ID' : 'the Provider No options available yet modelIds'}
-            dropdownHeader="Select model ID"
+            placeholder={modelIdOptions.length > 0 ? t('createModal.selectModelId') : t('createModal.noModelIdOptions')}
+            dropdownHeader={t('createModal.selectModelId')}
             size="sm"
           />
         </div>
 
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            Model type <span className="text-rose-500">*</span>
+            {t('createModal.modelType')} <span className="text-rose-500">*</span>
           </label>
           <Select
             value={form.modelType}
             onChange={(value) => setForm((prev) => ({ ...prev, modelType: value as ModelCategory }))}
-            options={MODEL_TYPE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
-            dropdownHeader="Select model type"
+            options={modelTypeOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
+            dropdownHeader={t('createModal.selectModelType')}
             size="sm"
           />
         </div>
 
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            Description
+            {t('createModal.description')}
           </label>
           <textarea
             value={form.description}
             onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-            placeholder="Model description（Optional）"
+            placeholder={t('createModal.descriptionPlaceholder')}
             className="w-full min-h-[88px] px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 resize-none"
           />
         </div>

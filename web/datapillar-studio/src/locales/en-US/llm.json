@@ -1,0 +1,189 @@
+{
+  "modelTypes": {
+    "chat": "Chat",
+    "embeddings": "Embeddings",
+    "reranking": "Reranking",
+    "code": "Code"
+  },
+  "toast": {
+    "loadModelsFailed": "Failed to load models: {{message}}",
+    "modelAdded": "Model added: {{name}}",
+    "modelAddFailed": "Failed to add model: {{message}}",
+    "modelPkMissing": "Model primary key is missing and cannot be connected",
+    "apiKeyRequired": "API Key cannot be empty",
+    "modelConnectSuccess": "Model connected: {{name}}",
+    "modelConnectFailed": "Model connection failed: {{message}}"
+  },
+  "filter": {
+    "sections": {
+      "provider": "Providers",
+      "modelType": "Model type",
+      "context": "Context length"
+    },
+    "section": {
+      "addProvider": "Add provider",
+      "close": "Close",
+      "expand": "Expand",
+      "editOption": "Edit {{optionLabel}}",
+      "deleteOption": "Delete {{optionLabel}}"
+    },
+    "createModal": {
+      "title": "Add provider",
+      "confirm": "Confirm",
+      "providerCode": "Provider code",
+      "providerCodePlaceholder": "e.g. openai",
+      "providerName": "Provider name",
+      "providerNamePlaceholder": "e.g. OpenAI",
+      "baseUrl": "Base URL",
+      "baseUrlPlaceholder": "https://api.example.com/v1",
+      "modelIds": "Supported model IDs",
+      "addModelId": "+ Add",
+      "noModelId": "No model IDs",
+      "modelIdPlaceholder": "e.g. gpt-4o-mini"
+    },
+    "editModal": {
+      "title": "Edit provider: {{providerCode}}",
+      "confirm": "Save",
+      "providerCode": "Provider code",
+      "providerName": "Provider name",
+      "providerNamePlaceholder": "e.g. OpenAI",
+      "baseUrl": "Base URL",
+      "baseUrlPlaceholder": "https://api.example.com/v1",
+      "modelIds": "Supported model IDs",
+      "addModelId": "+ Add",
+      "noModelId": "No model IDs",
+      "modelIdPlaceholder": "e.g. gpt-4o-mini",
+      "modelIdHint": "Added and removed model IDs are calculated automatically when saving"
+    },
+    "deleteModelIdTitle": "Delete model ID",
+    "toast": {
+      "providerInvalid": "Invalid provider",
+      "providerNotFound": "Provider not found: {{providerCode}}",
+      "providerDeleted": "Provider deleted: {{providerCode}}",
+      "providerDeleteFailed": "Failed to delete provider: {{message}}",
+      "providerCodeRequired": "Provider code cannot be empty",
+      "providerAdded": "Provider added: {{providerCode}}",
+      "providerCreateFailed": "Failed to create provider: {{message}}",
+      "providerNameRequired": "Provider name cannot be empty",
+      "noChanges": "No changes detected",
+      "providerUpdated": "Provider updated: {{providerCode}}",
+      "providerUpdateFailed": "Failed to update provider: {{message}}"
+    }
+  },
+  "models": {
+    "title": "Model management",
+    "addModel": "Add model",
+    "badgeNew": "NEW",
+    "providerBy": "by",
+    "searchPlaceholder": "Search models...",
+    "loadingCount": "Loading models...",
+    "totalCount": "{{count}} models",
+    "latestRelease": "Latest release",
+    "loadingCard": "Loading models...",
+    "emptyCard": "No models available",
+    "loadMore": "Load more models",
+    "selected": "Selected",
+    "clearSelection": "Clear",
+    "startCompare": "Start comparison",
+    "status": {
+      "active": "ACTIVE",
+      "connect": "CONNECT"
+    },
+    "copyModelId": "Copy model ID",
+    "playground": "Playground",
+    "configure": "Configure",
+    "input": "input",
+    "output": "output",
+    "stat": {
+      "context": "Context",
+      "inputPrice": "Input price",
+      "outputPrice": "Output price"
+    }
+  },
+  "compare": {
+    "title": "Model comparison",
+    "subtitle": "Comparing {{count}} models",
+    "columns": {
+      "properties": "Model attributes"
+    },
+    "rows": {
+      "context": "Context window",
+      "pricing": "Pricing",
+      "params": "Parameter size",
+      "tags": "Capabilities",
+      "description": "Description"
+    },
+    "input": "Input",
+    "output": "Output",
+    "proprietaryUnknown": "Proprietary / Unknown"
+  },
+  "createModal": {
+    "title": "Add model",
+    "confirm": "Confirm",
+    "modelName": "Model name",
+    "modelNamePlaceholder": "e.g. GPT-4o",
+    "baseUrl": "Base URL",
+    "baseUrlPlaceholder": "https://api.example.com/v1",
+    "apiKeyOptional": "API Key (optional)",
+    "apiKeyPlaceholder": "sk-...",
+    "hideApiKeyAria": "Hide API key",
+    "showApiKeyAria": "Show API key",
+    "provider": "Provider",
+    "selectProvider": "Select provider",
+    "modelId": "Model ID",
+    "selectModelId": "Select model ID",
+    "noModelIdOptions": "No model IDs for this provider",
+    "modelType": "Model type",
+    "selectModelType": "Select model type",
+    "description": "Description",
+    "descriptionPlaceholder": "Model description (optional)"
+  },
+  "test": {
+    "welcome": "Hello! I am {{modelName}}. You can test my capabilities here.",
+    "assistantFallback": "The model is temporarily unresponsive. Please try again later.",
+    "toast": {
+      "playgroundFailed": "Playground request failed: {{message}}"
+    },
+    "status": {
+      "ready": "READY",
+      "setupRequired": "SETUP REQUIRED"
+    },
+    "tabs": {
+      "connect": "Connect",
+      "playground": "Playground"
+    },
+    "closeDialogAria": "Close model dialog",
+    "connectedTitle": "{{provider}} connected",
+    "connectTitle": "Connect {{provider}}",
+    "connectedSubtitle": "API key connected. You can test the model directly in Playground.",
+    "connectSubtitle": "Enter API key to connect {{provider}} and enable {{modelName}}.",
+    "effectiveTitle": "Connection is active",
+    "effectiveSubtitle": "Credentials are stored securely and ready for Playground.",
+    "modifyConfigAria": "Modify configuration",
+    "apiKey": "API Key",
+    "apiKeyMaskedPlaceholder": "{{maskedApiKey}} (enter a new key to replace)",
+    "apiKeyPlaceholder": "sk-... ({{provider}} key)",
+    "baseUrl": "Base URL",
+    "optional": "optional",
+    "baseUrlPlaceholder": "https://api.example.com/v1",
+    "connecting": "Connecting...",
+    "saveAndConnect": "Save & Connect",
+    "encryptedHint": "Keys are encrypted at rest",
+    "thoughtProcess": "Thought process",
+    "thinking": "Thinking...",
+    "processing": "Processing...",
+    "generatingAria": "AI is generating a response",
+    "messagePlaceholder": "Message {{modelName}}...",
+    "sendMessageAria": "Send message",
+    "outputWarning": "AI output may be inaccurate. Please review carefully.",
+    "modelConfig": "Model config",
+    "systemInstruction": "System instruction",
+    "systemInstructionPlaceholder": "Optional: provide system-level instructions",
+    "temperature": "Temperature",
+    "topP": "Top P",
+    "startThinking": "Enable thinking",
+    "startThinkingHint": "Only works for models that support thinking",
+    "switchThinkingAria": "Switch thinking mode",
+    "resetConversation": "Reset conversation"
+  }
+}

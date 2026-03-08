@@ -48,15 +48,16 @@ public interface RoleService {
   /** Update role permissions（Full coverage） */
   void updateRolePermissions(Long roleId, List<RoleFeatureAssignmentItem> permissions);
 
+  /** Get role data privileges */
+  List<RoleDataPrivilegeItem> getRoleDataPrivileges(Long roleId, String domain);
+
+  /** Replace role data privileges */
+  void replaceRoleDataPrivileges(
+      Long roleId, String domain, List<RoleDataPrivilegeCommandItem> commands);
+
   /** Get role members */
   RoleMembersResponse getRoleMembers(Long roleId, Integer status);
 
   /** Remove role members in batches */
   void removeRoleMembers(Long roleId, List<Long> userIds);
-
-  /** Get role data privileges from Gravitino */
-  List<RoleDataPrivilegeItem> getRoleDataPrivileges(Long roleId, String domain);
-
-  /** Sync role data privileges to Gravitino */
-  void updateRoleDataPrivileges(Long roleId, RoleDataPrivilegeSyncRequest request);
 }

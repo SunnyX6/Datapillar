@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.hook;
 
+import com.google.common.collect.Lists;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -121,6 +123,15 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     User grantedUser = dispatcher.grantRolesToUser(metalake, roles, user);
     notifyRoleUserRelChange(metalake, roles);
     return grantedUser;
+  }
+
+  @Override
+  public User replaceRolesForUser(String metalake, List<String> roles, String user)
+      throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
+    User existingUser = dispatcher.getUser(metalake, user);
+    User replacedUser = dispatcher.replaceRolesForUser(metalake, roles, user);
+    notifyRoleUserRelChange(metalake, mergeRoleNames(existingUser, replacedUser));
+    return replacedUser;
   }
 
   @Override
@@ -234,6 +245,17 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
         gravitinoAuthorizer.handleRolePrivilegeChange(metalake, role);
       }
     }
+  }
+
+  private static List<String> mergeRoleNames(User... users) {
+    LinkedHashSet<String> roleNames = new LinkedHashSet<>();
+    for (User user : users) {
+      if (user != null && user.roles() != null) {
+        roleNames.addAll(user.roles());
+      }
+    }
+
+    return Lists.newArrayList(roleNames);
   }
 
   private static void notifyRoleUserRelChange(String metalake, String role) {

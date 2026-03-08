@@ -2,8 +2,8 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sunny.datapillar.openlineage.dao.mapper.OpenLineageEventMapper">
 
-    <insert id="insertLineageEvent" parameterType="com.sunny.datapillar.openlineage.model.LineageEventRecord">
-        INSERT INTO lineage_events (
+    <insert id="insertLineageEvent" parameterType="com.sunny.datapillar.openlineage.model.OpenLineageEventRecord">
+        INSERT INTO ol_lineage_events (
             tenant_id,
             tenant_code,
             tenant_name,

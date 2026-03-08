@@ -47,11 +47,37 @@ class ClaimAssemblerTest {
     assertEquals(101L, assembled.get("user_id"));
     assertEquals(1001L, assembled.get("tenant_id"));
     assertEquals("tenant-a", assembled.get("tenant_code"));
+    assertEquals("jti-1", assembled.get("jti"));
     assertTrue(assembled.containsKey("sid"));
     assertTrue(assembled.containsKey("aud"));
 
     assertFalse(assembled.containsKey("userId"));
     assertFalse(assembled.containsKey("tenantId"));
+  }
+
+  @Test
+  void assembleBusinessClaims_shouldKeepSessionIdentifiers() {
+    TokenClaims claims =
+        TokenClaims.builder()
+            .issuer("https://auth.datapillar.local")
+            .subject("101")
+            .audience(List.of("datapillar-api"))
+            .issuedAt(Instant.now())
+            .expiration(Instant.now().plusSeconds(3600))
+            .tokenId("jti-1")
+            .sessionId("sid-1")
+            .userId(101L)
+            .tenantId(1001L)
+            .tenantCode("tenant-a")
+            .tokenType("access")
+            .build();
+
+    Map<String, Object> assembled = claimAssembler.assembleBusinessClaims(claims);
+
+    assertEquals("sid-1", assembled.get("sid"));
+    assertEquals("jti-1", assembled.get("jti"));
+    assertFalse(assembled.containsKey("iss"));
+    assertFalse(assembled.containsKey("aud"));
   }
 
   @Test

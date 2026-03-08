@@ -15,9 +15,12 @@ from functools import lru_cache
 
 from datapillar_oneagentic import DatapillarConfig
 
+from src.infrastructure.keystore.crypto_service import (
+    is_encrypted_ciphertext,
+    local_crypto_service,
+)
 from src.infrastructure.repository.system.ai_model import Model
 from src.infrastructure.repository.system.tenant import Tenant
-from src.infrastructure.rpc.crypto import auth_crypto_rpc_client, is_encrypted_ciphertext
 from src.shared.config.runtime import get_agent_config, get_default_tenant_id, get_llm_config
 from src.shared.context import get_current_tenant_code, get_current_tenant_id
 
@@ -95,8 +98,8 @@ def _build_config_from_models(
         raise ValueError("Embedding Model must be configured embedding_dimension")
 
     llm_config = _coerce_dict(get_llm_config())
-    chat_api_key = _decrypt_api_key(tenant_code, chat_model.get("api_key"))
-    embedding_api_key = _decrypt_api_key(tenant_code, embedding_model.get("api_key"))
+    chat_api_key = _decrypt_key(tenant_code, chat_model.get("api_key"))
+    embedding_api_key = _decrypt_key(tenant_code, embedding_model.get("api_key"))
     llm_config.update(
         {
             "provider": chat_model.get("provider_code"),
@@ -120,12 +123,12 @@ def _build_config_from_models(
     )
 
 
-def _decrypt_api_key(tenant_code: str, encrypted_value: str | None) -> str:
+def _decrypt_key(tenant_code: str, encrypted_value: str | None) -> str:
     if not encrypted_value or not encrypted_value.strip():
         raise ValueError("api_key is empty")
     if not is_encrypted_ciphertext(encrypted_value):
         raise ValueError("api_key Not encrypted")
-    return auth_crypto_rpc_client.decrypt_llm_api_key_sync(
+    return local_crypto_service.decrypt_key(
         tenant_code=tenant_code,
         ciphertext=encrypted_value,
     )

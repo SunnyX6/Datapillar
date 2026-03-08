@@ -105,12 +105,15 @@ public class TenantRoleAdminController {
     return ApiResponse.ok(tenantRoleAdminService.getRoleDataPrivileges(roleId, domain));
   }
 
-  @Operation(summary = "Sync role data privileges")
+  @Operation(summary = "Replace role data privileges")
   @PutMapping("/{roleId}/data-privileges")
   @PreAuthorize("hasAuthority('ADMIN')")
-  public ApiResponse<Void> updateDataPrivileges(
+  public ApiResponse<Void> replaceDataPrivileges(
       @PathVariable Long roleId, @Valid @RequestBody RoleDataPrivilegeSyncRequest request) {
-    tenantRoleAdminService.updateRoleDataPrivileges(roleId, request);
+    tenantRoleAdminService.replaceRoleDataPrivileges(
+        roleId,
+        request == null ? null : request.getDomain(),
+        request == null ? null : request.getCommands());
     return ApiResponse.ok();
   }
 

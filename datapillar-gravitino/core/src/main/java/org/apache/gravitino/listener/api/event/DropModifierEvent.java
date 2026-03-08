@@ -50,6 +50,6 @@ public class DropModifierEvent extends ModifierEvent {
 
   @Override
   public OperationType operationType() {
-    return OperationType.DROP_METRIC_MODIFIER;
+    return OperationType.DROP_MODIFIER;
   }
 }

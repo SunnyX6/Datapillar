@@ -260,6 +260,25 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public User replaceRolesForUser(String metalake, List<String> roles, String user)
+      throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new ReplaceUserRolesPreEvent(initiator, metalake, user, roles));
+    try {
+      User userObject = dispatcher.replaceRolesForUser(metalake, roles, user);
+      eventBus.dispatchEvent(
+          new ReplaceUserRolesEvent(initiator, metalake, new UserInfo(userObject), roles));
+
+      return userObject;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new ReplaceUserRolesFailureEvent(initiator, metalake, e, user, roles));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public Group grantRolesToGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();

@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Collection;
 import java.util.Map;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 /** OAuth2 token endpoint controller. */
 @RestController
 @RequestMapping("/oauth2")
+@ConditionalOnProperty(prefix = "auth", name = "authenticator", havingValue = "oauth2")
 public class OAuth2TokenController {
 
   private final SessionAppService sessionAppService;

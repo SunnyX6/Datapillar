@@ -196,6 +196,46 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the metric {@link NameIdentifier} with the given metalake, catalog, schema and metric
+   * name.
+   */
+  public static NameIdentifier ofMetric(
+      String metalake, String catalog, String schema, String metric) {
+    return NameIdentifier.of(metalake, catalog, schema, metric);
+  }
+
+  /**
+   * Create the modifier {@link NameIdentifier} with the given metalake, catalog, schema and
+   * modifier code.
+   */
+  public static NameIdentifier ofModifier(
+      String metalake, String catalog, String schema, String modifier) {
+    return NameIdentifier.of(metalake, catalog, schema, modifier);
+  }
+
+  /**
+   * Create the word root {@link NameIdentifier} with the given metalake, catalog, schema and code.
+   */
+  public static NameIdentifier ofWordRoot(
+      String metalake, String catalog, String schema, String wordRoot) {
+    return NameIdentifier.of(metalake, catalog, schema, wordRoot);
+  }
+
+  /** Create the unit {@link NameIdentifier} with the given metalake, catalog, schema and code. */
+  public static NameIdentifier ofUnit(String metalake, String catalog, String schema, String unit) {
+    return NameIdentifier.of(metalake, catalog, schema, unit);
+  }
+
+  /**
+   * Create the value domain {@link NameIdentifier} with the given metalake, catalog, schema and
+   * domain code.
+   */
+  public static NameIdentifier ofValueDomain(
+      String metalake, String catalog, String schema, String valueDomain) {
+    return NameIdentifier.of(metalake, catalog, schema, valueDomain);
+  }
+
+  /**
    * Create the model {@link NameIdentifier} from the give model version's namespace.
    *
    * @param modelVersionNs The model version's namespace
@@ -578,6 +618,26 @@ public class NameIdentifierUtil {
         checkModel(ident);
         String modelParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(modelParent, ident.name(), MetadataObject.Type.MODEL);
+
+      case METRIC:
+        checkMetric(ident);
+        String metricParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(metricParent, ident.name(), MetadataObject.Type.METRIC);
+
+      case MODIFIER:
+        checkModifier(ident);
+        String modifierParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(modifierParent, ident.name(), MetadataObject.Type.MODIFIER);
+
+      case WORDROOT:
+        checkRoot(ident);
+        String wordRootParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(wordRootParent, ident.name(), MetadataObject.Type.WORDROOT);
+
+      case UNIT:
+        checkUnit(ident);
+        String unitParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(unitParent, ident.name(), MetadataObject.Type.UNIT);
 
       case VALUE_DOMAIN:
         checkValueDomain(ident);

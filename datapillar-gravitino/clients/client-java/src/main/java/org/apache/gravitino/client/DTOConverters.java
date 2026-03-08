@@ -31,6 +31,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.dataset.MetricChange;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
@@ -42,6 +43,7 @@ import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
+import org.apache.gravitino.dto.requests.MetricUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelVersionUpdateRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
@@ -109,7 +111,8 @@ class DTOConverters {
     return type == Catalog.Type.RELATIONAL
         || type == Catalog.Type.FILESET
         || type == Catalog.Type.MESSAGING
-        || type == Catalog.Type.MODEL;
+        || type == Catalog.Type.MODEL
+        || type == Catalog.Type.DATASET;
   }
 
   @SuppressWarnings("unchecked")
@@ -162,6 +165,17 @@ class DTOConverters {
             .withAudit((AuditDTO) catalog.auditInfo())
             .withRestClient(client)
             .build();
+      case DATASET:
+        return GenericDatasetCatalog.builder()
+            .withNamespace(namespace)
+            .withName(catalog.name())
+            .withType(catalog.type())
+            .withProvider(catalog.provider())
+            .withComment(catalog.comment())
+            .withProperties(catalog.properties())
+            .withAudit((AuditDTO) catalog.auditInfo())
+            .withRestClient(client)
+            .build();
 
       default:
         throw new UnsupportedOperationException("Unsupported catalog type: " + catalog.type());
@@ -201,6 +215,34 @@ class DTOConverters {
     } else if (change instanceof SchemaChange.RemoveProperty) {
       return new SchemaUpdateRequest.RemoveSchemaPropertyRequest(
           ((SchemaChange.RemoveProperty) change).getProperty());
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static MetricUpdateRequest toMetricUpdateRequest(MetricChange change) {
+    if (change instanceof MetricChange.RenameMetric) {
+      return new MetricUpdateRequest.RenameMetricRequest(
+          ((MetricChange.RenameMetric) change).newName());
+
+    } else if (change instanceof MetricChange.UpdateComment) {
+      return new MetricUpdateRequest.UpdateMetricCommentRequest(
+          ((MetricChange.UpdateComment) change).newComment());
+
+    } else if (change instanceof MetricChange.UpdateDataType) {
+      return new MetricUpdateRequest.UpdateMetricDataTypeRequest(
+          ((MetricChange.UpdateDataType) change).newDataType());
+
+    } else if (change instanceof MetricChange.SetProperty) {
+      return new MetricUpdateRequest.SetMetricPropertyRequest(
+          ((MetricChange.SetProperty) change).property(),
+          ((MetricChange.SetProperty) change).value());
+
+    } else if (change instanceof MetricChange.RemoveProperty) {
+      return new MetricUpdateRequest.RemoveMetricPropertyRequest(
+          ((MetricChange.RemoveProperty) change).property());
 
     } else {
       throw new IllegalArgumentException(

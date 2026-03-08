@@ -1,5 +1,6 @@
 import { useEffect,useMemo,useState } from 'react'
 import { Copy,Shield } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button,Modal } from '@/components/ui'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
@@ -65,6 +66,7 @@ function buildAbsoluteInviteLink(inviteUri:string):string {
 }
 
 export function InviteMemberModal({ isOpen,onClose,role,roleId }:InviteMemberModalProps) {
+ const { t } = useTranslation('permission')
  const tenantId = useAuthStore((state) => state.user?.tenantId)
  const [copied,setCopied] = useState(false)
  const [inviteLink,setInviteLink] = useState('')
@@ -100,7 +102,7 @@ export function InviteMemberModal({ isOpen,onClose,role,roleId }:InviteMemberMod
  }
  setInviteLink('')
  const message = error instanceof Error?error.message:String(error)
- toast.error(`Failed to generate invitation link:${message}`)
+ toast.error(t('inviteMember.toast.generateFailed', { message }))
  } finally {
  if (!cancelled) {
  setIsGenerating(false)
@@ -113,7 +115,7 @@ export function InviteMemberModal({ isOpen,onClose,role,roleId }:InviteMemberMod
  return () => {
  cancelled = true
  }
- },[isOpen,resolvedRoleNumericId,tenantId])
+ },[isOpen,resolvedRoleNumericId,t,tenantId])
 
  const handleCopy = async () => {
  if (!inviteLink) {
@@ -127,17 +129,19 @@ export function InviteMemberModal({ isOpen,onClose,role,roleId }:InviteMemberMod
  }
  }
 
- const inviteText = isGenerating?'Generating invitation link...':inviteLink || 'Invitation link generation failed,Please close and try again'
+ const inviteText = isGenerating
+ ? t('inviteMember.generating')
+ : inviteLink || t('inviteMember.generateEmpty')
 
  return (<Modal
  isOpen={isOpen}
  onClose={onClose}
  size="sm"
- title="Invite members to join"
+ title={t('inviteMember.title')}
  >
  <div className="space-y-5">
  <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/70 p-5">
- <div className={cn(TYPOGRAPHY.bodySm,'font-semibold text-slate-500 dark:text-slate-400 mb-4')}>Exclusive invitation link</div>
+ <div className={cn(TYPOGRAPHY.bodySm,'font-semibold text-slate-500 dark:text-slate-400 mb-4')}>{t('inviteMember.linkTitle')}</div>
  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-4">
  <div className={cn(TYPOGRAPHY.body,'flex-1 min-w-0 truncate font-mono text-slate-800 dark:text-slate-200')}>
  {inviteText}
@@ -147,7 +151,7 @@ export function InviteMemberModal({ isOpen,onClose,role,roleId }:InviteMemberMod
  onClick={handleCopy}
  disabled={!inviteLink || isGenerating}
  className="inline-flex size-11 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
- aria-label="Copy invitation link"
+ aria-label={t('inviteMember.copyAria')}
  >
  <Copy size={18} />
  </button>
@@ -155,7 +159,7 @@ export function InviteMemberModal({ isOpen,onClose,role,roleId }:InviteMemberMod
  <p
  className={cn(TYPOGRAPHY.caption,'mt-2',copied?'text-emerald-600 dark:text-emerald-400':'text-slate-400 dark:text-slate-500')}
  >
- {copied?'Invitation link copied':'Copy and send to members to join'}
+ {copied?t('inviteMember.copied'):t('inviteMember.copyHint')}
  </p>
  </div>
 
@@ -163,7 +167,7 @@ export function InviteMemberModal({ isOpen,onClose,role,roleId }:InviteMemberMod
  <div className="flex items-start gap-3">
  <Shield size={18} className="mt-0.5 text-amber-600 dark:text-amber-300 shrink-0" />
  <p className={cn(TYPOGRAPHY.bodySm,'font-semibold text-amber-700 dark:text-amber-200 leading-relaxed')}>
- Members holding this link will automatically receive <span className="font-black">{role.name}</span> All permissions of the role.Please keep it properly.</p>
+ {t('inviteMember.securityTipPrefix')} <span className="font-black">{role.name}</span> {t('inviteMember.securityTipSuffix')}</p>
  </div>
  </div>
 
@@ -173,7 +177,7 @@ export function InviteMemberModal({ isOpen,onClose,role,roleId }:InviteMemberMod
  onClick={onClose}
  className="w-full bg-slate-950 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 text-white py-3.5"
  >
- Confirm and close
+ {t('inviteMember.confirmClose')}
  </Button>
  </div>
  </div>

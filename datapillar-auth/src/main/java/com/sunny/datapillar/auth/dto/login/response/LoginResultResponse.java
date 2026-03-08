@@ -23,8 +23,4 @@ public class LoginResultResponse {
   private String username;
 
   private String email;
-
-  private List<RoleItem> roles;
-
-  private List<MenuItem> menus;
 }

@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
@@ -37,7 +37,7 @@ import com.sunny.datapillar.studio.module.user.mapper.RoleMapper;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserRoleMapper;
-import java.sql.SQLException;
+import com.sunny.datapillar.studio.module.user.service.UserService;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -47,7 +47,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -61,7 +60,7 @@ class InvitationServiceImplTest {
   @Mock private TenantUserMapper tenantUserMapper;
   @Mock private UserRoleMapper userRoleMapper;
   @Mock private TenantMapper tenantMapper;
-  @Mock private PasswordEncoder passwordEncoder;
+  @Mock private UserService userService;
   @Mock private TransactionTemplate transactionTemplate;
 
   private InvitationServiceImpl invitationService;
@@ -81,6 +80,10 @@ class InvitationServiceImplTest {
         new MapperBuilderAssistant(new MybatisConfiguration(), ""), UserInvitationRole.class);
     TableInfoHelper.initTableInfo(
         new MapperBuilderAssistant(new MybatisConfiguration(), ""), UserRole.class);
+    User inviter = new User();
+    inviter.setId(200L);
+    inviter.setUsername("inviter_user");
+    lenient().when(userMapper.selectById(200L)).thenReturn(inviter);
     invitationService =
         new InvitationServiceImpl(
             userInvitationMapper,
@@ -90,7 +93,7 @@ class InvitationServiceImplTest {
             tenantUserMapper,
             userRoleMapper,
             tenantMapper,
-            passwordEncoder,
+            userService,
             new StudioDbExceptionTranslator(),
             transactionTemplate);
   }
@@ -105,6 +108,7 @@ class InvitationServiceImplTest {
     UserInvitation invitation = new UserInvitation();
     invitation.setId(1L);
     invitation.setTenantId(100L);
+    invitation.setInviterUserId(200L);
     invitation.setInviterUserId(200L);
     invitation.setInviteCode("INV-001");
     invitation.setStatus(0);
@@ -160,25 +164,21 @@ class InvitationServiceImplTest {
   }
 
   @Test
-  void registerInvitation_shouldReturnEmailExistsWhenInsertDuplicateEmail() {
+  void registerInvitation_shouldPropagateCreateUserConflict() {
     InvitationRegisterRequest request = buildRegisterRequest();
     UserInvitation invitation = buildPendingInvitation();
 
     when(userInvitationMapper.selectByInviteCodeForUpdate("INV-EMAIL")).thenReturn(invitation);
     when(tenantMapper.selectById(100L)).thenReturn(tenant());
-    when(passwordEncoder.encode("123456")).thenReturn("encoded-password");
-    RuntimeException sqlWrapped =
-        new RuntimeException(
-            new SQLException(
-                "Duplicate entry x@datapillar.ai for key uq_user_email", "23000", 1062));
-    when(userMapper.insert(any(User.class))).thenThrow(sqlWrapped);
+    when(userService.createUser(any(), eq(true), eq("inviter_user")))
+        .thenThrow(new AlreadyExistsException("Resource already exists", "x@datapillar.ai"));
 
     AlreadyExistsException exception =
         assertThrows(
             AlreadyExistsException.class, () -> invitationService.registerInvitation(request));
 
-    assertEquals("Email already exists", exception.getMessage());
-    verify(userMapper).insert(any(User.class));
+    assertEquals("Resource already exists", exception.getMessage());
+    verify(userService).createUser(any(), eq(true), eq("inviter_user"));
   }
 
   @Test
@@ -188,16 +188,7 @@ class InvitationServiceImplTest {
     invitation.setInviteCode("INV-EMAIL");
     when(userInvitationMapper.selectByInviteCodeForUpdate("INV-EMAIL")).thenReturn(invitation);
     when(tenantMapper.selectById(100L)).thenReturn(tenant());
-    when(passwordEncoder.encode("123456")).thenReturn("encoded-password");
-
-    doAnswer(
-            invocation -> {
-              User user = invocation.getArgument(0);
-              user.setId(501L);
-              return 1;
-            })
-        .when(userMapper)
-        .insert(any(User.class));
+    when(userService.createUser(any(), eq(true), eq("inviter_user"))).thenReturn(501L);
 
     when(tenantUserMapper.selectByTenantIdAndUserId(100L, 501L)).thenReturn(null);
     when(tenantUserMapper.countByUserId(501L)).thenReturn(0);
@@ -230,16 +221,7 @@ class InvitationServiceImplTest {
     invitation.setInviteCode("INV-EMAIL");
     when(userInvitationMapper.selectByInviteCodeForUpdate("INV-EMAIL")).thenReturn(invitation);
     when(tenantMapper.selectById(100L)).thenReturn(tenant());
-    when(passwordEncoder.encode("123456")).thenReturn("encoded-password");
-
-    doAnswer(
-            invocation -> {
-              User user = invocation.getArgument(0);
-              user.setId(502L);
-              return 1;
-            })
-        .when(userMapper)
-        .insert(any(User.class));
+    when(userService.createUser(any(), eq(true), eq("inviter_user"))).thenReturn(502L);
 
     TenantUser tenantUser = new TenantUser();
     tenantUser.setTenantId(100L);
@@ -269,7 +251,7 @@ class InvitationServiceImplTest {
         assertThrows(
             InvitationInternalException.class, () -> invitationService.registerInvitation(request));
 
-    assertEquals("Server internal error", exception.getMessage());
+    assertEquals("Invitation processing failed", exception.getMessage());
     verify(tenantUserMapper).updateById(any(TenantUser.class));
   }
 
@@ -286,6 +268,7 @@ class InvitationServiceImplTest {
     UserInvitation invitation = new UserInvitation();
     invitation.setId(1L);
     invitation.setTenantId(100L);
+    invitation.setInviterUserId(200L);
     invitation.setStatus(0);
     invitation.setExpiresAt(LocalDateTime.now().plusDays(1));
     return invitation;

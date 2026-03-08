@@ -1,4 +1,5 @@
 import { BarChart3, Database, Layers, Server, ShieldCheck } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui'
 import { contentMaxWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
@@ -19,15 +20,17 @@ const INGESTION_BARS = [
 ] as const
 
 export function Overview() {
+  const { t } = useTranslation('oneMeta')
+
   return (
     <div className="flex-1 overflow-auto custom-scrollbar">
       <div className={`p-4 @md:p-6 @xl:p-8 space-y-6 @md:space-y-8 ${contentMaxWidthClassMap.full} mx-auto`}>
         <div>
           <h2 className="text-heading @md:text-title @xl:text-display font-black text-slate-900 dark:text-slate-100 tracking-tight">
-            Platform Overview
+            {t('metadataOverview.title')}
           </h2>
           <p className="text-slate-500 dark:text-slate-400 mt-2 text-body-sm @md:text-body">
-            Global health and statistics for your data estate.
+            {t('metadataOverview.subtitle')}
           </p>
         </div>
 

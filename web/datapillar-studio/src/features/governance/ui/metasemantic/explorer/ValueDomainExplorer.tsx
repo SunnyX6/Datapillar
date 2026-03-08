@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Plus, Users, Trash2, Loader2, Pencil, Clock, ChevronsRight } from 'lucide-react'
 import { iconSizeToken } from '@/design-tokens/dimensions'
 import { Badge } from '../components'
@@ -32,17 +33,17 @@ const PAGE_SIZE = 20
 /** Enumeration value card preview display number per page（Keep card size stable） */
 const ENUM_PREVIEW_PAGE_SIZE = 6
 
-/** Type label configuration */
-const TYPE_CONFIG: Record<ValueDomainType, { label: string; color: string }> = {
-  ENUM: { label: 'ENUM', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800' },
-  RANGE: { label: 'RANGE', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' },
-  REGEX: { label: 'REGEX', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800' }
+/** Type color configuration */
+const TYPE_CONFIG: Record<ValueDomainType, { color: string }> = {
+  ENUM: { color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800' },
+  RANGE: { color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' },
+  REGEX: { color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800' }
 }
 
-/** Level label configuration */
-const LEVEL_CONFIG: Record<string, { label: string; color: string }> = {
-  BUILTIN: { label: 'Built-in', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800' },
-  BUSINESS: { label: 'Business', color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700' }
+/** Level color configuration */
+const LEVEL_CONFIG: Record<string, { color: string }> = {
+  BUILTIN: { color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800' },
+  BUSINESS: { color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700' }
 }
 
 interface ValueDomainExplorerProps {
@@ -59,10 +60,14 @@ function ValueDomainCard({
   onDelete: (domainCode: string) => void
   onEdit: (domain: ValueDomainDTO) => void
 }) {
+  const { t } = useTranslation('oneSemantics')
   const normalizedType = (domain.domainType?.toUpperCase() || 'ENUM') as ValueDomainType
   const normalizedLevel = domain.domainLevel?.toUpperCase() || 'BUSINESS'
   const typeConfig = TYPE_CONFIG[normalizedType] || TYPE_CONFIG.ENUM
   const levelConfig = LEVEL_CONFIG[normalizedLevel] || LEVEL_CONFIG.BUSINESS
+  const levelLabel = normalizedLevel === 'BUILTIN'
+    ? t('valueDomainExplorer.card.level.builtin')
+    : t('valueDomainExplorer.card.level.business')
   const isBuiltin = normalizedLevel === 'BUILTIN'
   const [deleting, setDeleting] = useState(false)
   const [previewPageIndex, setPreviewPageIndex] = useState(0)
@@ -124,14 +129,14 @@ function ValueDomainCard({
             </span>
           )}
           <span className={`px-2 py-0.5 text-micro font-medium rounded-md border ${levelConfig.color}`}>
-            {levelConfig.label}
+            {levelLabel}
           </span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={handleEdit}
             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-            title="Edit"
+            title={t('valueDomainExplorer.card.action.edit')}
           >
             <Pencil size={iconSizeToken.small} />
           </button>
@@ -140,7 +145,7 @@ function ValueDomainCard({
               onClick={handleDelete}
               disabled={deleting}
               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
-              title="Delete"
+              title={t('valueDomainExplorer.card.action.delete')}
             >
               {deleting ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Trash2 size={iconSizeToken.small} />}
             </button>
@@ -177,7 +182,7 @@ function ValueDomainCard({
                     </div>
                   ) : (
                     <div className="h-full flex items-center">
-                      <span className="text-slate-500 text-micro">No enumeration value</span>
+                      <span className="text-slate-500 text-micro">{t('valueDomainExplorer.card.enum.empty')}</span>
                     </div>
                   )}
                 </div>
@@ -197,11 +202,11 @@ function ValueDomainCard({
                 ? 'hover:border-emerald-400/80 text-slate-300 hover:text-emerald-300'
                 : 'text-slate-300 cursor-default opacity-50'
             )}
-            title={hasMultiplePreviewPages ? 'More' : 'No more enumeration values'}
-            aria-label={hasMultiplePreviewPages ? 'More enumeration values' : 'No more enumeration values'}
+            title={hasMultiplePreviewPages ? t('valueDomainExplorer.card.enum.moreTitle') : t('valueDomainExplorer.card.enum.noMoreTitle')}
+            aria-label={hasMultiplePreviewPages ? t('valueDomainExplorer.card.enum.moreAria') : t('valueDomainExplorer.card.enum.noMoreAria')}
           >
             <ChevronsRight size={iconSizeToken.extraLarge} className="mb-1" />
-            <span className="text-micro font-semibold tracking-wide">More</span>
+            <span className="text-micro font-semibold tracking-wide">{t('valueDomainExplorer.card.enum.more')}</span>
           </button>
         )}
       </div>
@@ -218,8 +223,8 @@ function ValueDomainCard({
                   ? 'w-2 h-2 bg-emerald-500 dark:bg-emerald-400'
                   : 'w-1.5 h-1.5 bg-slate-200 dark:bg-slate-700'
               )}
-              aria-label={`Switch to page ${index + 1} page`}
-              title={`No. ${index + 1} page`}
+              aria-label={t('valueDomainExplorer.card.enum.pageAria', { index: index + 1 })}
+              title={t('valueDomainExplorer.card.enum.pageTitle', { index: index + 1 })}
             />
           ))}
         </div>
@@ -238,13 +243,16 @@ function ValueDomainCard({
             <span>{formatTime(domain.audit?.createTime)}</span>
           </div>
         </div>
-        <span className="text-micro text-slate-400">{domain.items?.length || 0} enumeration values</span>
+        <span className="text-micro text-slate-400">
+          {t('valueDomainExplorer.card.count', { count: domain.items?.length || 0 })}
+        </span>
       </div>
     </Card>
   )
 }
 
 export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
+  const { t } = useTranslation('oneSemantics')
   const searchTerm = useSearchStore((state) => state.searchTerm)
 
   // Data status
@@ -384,7 +392,8 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
           </button>
           <div className="flex items-center gap-2">
             <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">
-              range constraints <span className="font-normal text-slate-400">(Value Domains)</span>
+              {t('valueDomainExplorer.title')}{' '}
+              <span className="font-normal text-slate-400">({t('valueDomainExplorer.titleSuffix')})</span>
             </h2>
             <Badge variant="blue">
               {filteredDomains.length} / {total}
@@ -395,7 +404,7 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
           onClick={() => setShowCreateModal(true)}
           className="bg-slate-900 dark:bg-blue-600 text-white px-3 @md:px-4 py-1 @md:py-1.5 rounded-lg text-caption @md:text-body-sm font-medium flex items-center gap-1 @md:gap-1.5 shadow-md hover:bg-blue-600 dark:hover:bg-blue-500 transition-all"
         >
-          <Plus size={iconSizeToken.medium} /> <span className="hidden @md:inline">Create a value range</span>
+          <Plus size={iconSizeToken.medium} /> <span className="hidden @md:inline">{t('valueDomainExplorer.createButton')}</span>
         </button>
       </div>
 
@@ -404,11 +413,11 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-            <div className="text-slate-400 text-caption mt-3">Loading...</div>
+            <div className="text-slate-400 text-caption mt-3">{t('valueDomainExplorer.loading')}</div>
           </div>
         ) : filteredDomains.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-slate-400 text-caption">
-            No matching range found
+            {t('valueDomainExplorer.empty')}
           </div>
         ) : (
           <>
@@ -470,6 +479,7 @@ function EditValueDomainModal({
   onClose: () => void
   onUpdated: () => void
 }) {
+  const { t } = useTranslation('oneSemantics')
   const [domainName, setDomainName] = useState('')
   const [domainLevel, setDomainLevel] = useState<'BUSINESS' | 'BUILTIN'>('BUSINESS')
   const [dataType, setDataType] = useState<DataTypeValue>({ type: 'STRING' })
@@ -567,13 +577,17 @@ function EditValueDomainModal({
   if (!domain) return null
 
   const normalizedType = (domain.domainType?.toUpperCase() || 'ENUM') as ValueDomainType
-  const typeLabel = normalizedType === 'ENUM' ? 'enumeration type (ENUM)' : normalizedType === 'RANGE' ? 'Interval (RANGE)' : 'pattern (REGEX)'
+  const typeLabel = normalizedType === 'ENUM'
+    ? t('valueDomainForm.type.enum.label')
+    : normalizedType === 'RANGE'
+      ? t('valueDomainForm.type.range.label')
+      : t('valueDomainForm.type.regex.label')
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Edit range"
+      title={t('valueDomainForm.edit.title')}
       size="sm"
       footerRight={
         <>
@@ -583,7 +597,7 @@ function EditValueDomainModal({
             disabled={!isValid}
             loading={saving}
           >
-            save
+            {t('valueDomainForm.edit.save')}
           </ModalPrimaryButton>
         </>
       }
@@ -593,19 +607,19 @@ function EditValueDomainModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              Value field name <span className="text-rose-500">*</span>
+              {t('valueDomainForm.field.domainName')} <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
               value={domainName}
               onChange={(e) => setDomainName(e.target.value)}
-              placeholder="Order status"
+              placeholder={t('valueDomainForm.placeholder.domainName')}
               className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
             />
           </div>
           <div>
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              range encoding
+              {t('valueDomainForm.field.domainCode')}
             </label>
             <div className="px-3 py-2 text-body-sm font-mono uppercase bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400">
               {domain.domainCode}
@@ -617,7 +631,7 @@ function EditValueDomainModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              Range type
+              {t('valueDomainForm.field.domainType')}
             </label>
             <div className="px-3 py-2 text-body-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400">
               {typeLabel}
@@ -625,16 +639,16 @@ function EditValueDomainModal({
           </div>
           <div>
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              range level
+              {t('valueDomainForm.field.domainLevel')}
             </label>
             <Select
               value={domainLevel}
               onChange={(value) => setDomainLevel(value as 'BUSINESS' | 'BUILTIN')}
               options={[
-                { value: 'BUSINESS', label: 'business level (BUSINESS)' },
-                { value: 'BUILTIN', label: 'Built-in level (BUILTIN)' }
+                { value: 'BUSINESS', label: t('valueDomainForm.level.business') },
+                { value: 'BUILTIN', label: t('valueDomainForm.level.builtin') }
               ]}
-              dropdownHeader="Select range level"
+              dropdownHeader={t('valueDomainForm.dropdown.selectDomainLevel')}
               size="sm"
             />
           </div>
@@ -643,7 +657,7 @@ function EditValueDomainModal({
         {/* data type - Narrow and wide */}
         <div className="w-1/3">
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            data type <span className="text-rose-500">*</span>
+            {t('valueDomainForm.field.dataType')} <span className="text-rose-500">*</span>
           </label>
           <DataTypeSelector
             value={dataType}
@@ -656,7 +670,12 @@ function EditValueDomainModal({
         {/* value item - Display different inputs based on type */}
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            {normalizedType === 'ENUM' ? 'List of enumeration values' : normalizedType === 'RANGE' ? 'interval expression' : 'regular expression'} <span className="text-rose-500">*</span>
+            {normalizedType === 'ENUM'
+              ? t('valueDomainForm.field.itemType.enum')
+              : normalizedType === 'RANGE'
+                ? t('valueDomainForm.field.itemType.range')
+                : t('valueDomainForm.field.itemType.regex')}
+            <span className="text-rose-500"> *</span>
           </label>
 
           {normalizedType === 'ENUM' ? (
@@ -664,8 +683,8 @@ function EditValueDomainModal({
             <div className="space-y-2">
               {/* Header */}
               <div className="grid grid-cols-[1fr_1fr_32px] gap-2 text-micro text-slate-400 px-1">
-                <span>value (Key)</span>
-                <span>label (Value)</span>
+                <span>{t('valueDomainForm.field.enumValue')}</span>
+                <span>{t('valueDomainForm.field.enumLabel')}</span>
                 <span></span>
               </div>
               {/* list item */}
@@ -675,14 +694,14 @@ function EditValueDomainModal({
                     type="text"
                     value={item.key}
                     onChange={(e) => updateEnumItem(index, 'key', e.target.value)}
-                    placeholder="PAID"
+                    placeholder={t('valueDomainForm.placeholder.enumValue')}
                     className="w-full px-3 py-1.5 text-body-sm text-slate-800 dark:text-slate-200 font-mono border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
                   />
                   <input
                     type="text"
                     value={item.value}
                     onChange={(e) => updateEnumItem(index, 'value', e.target.value)}
-                    placeholder="paid"
+                    placeholder={t('valueDomainForm.placeholder.enumLabel')}
                     className="w-full px-3 py-1.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
                   />
                   <button
@@ -701,7 +720,7 @@ function EditValueDomainModal({
                 onClick={addEnumItem}
                 className="w-full py-2 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg text-caption text-slate-500 hover:text-blue-600 hover:border-blue-400 dark:hover:border-blue-500 transition-all flex items-center justify-center gap-1"
               >
-                <Plus size={14} /> Add enumeration value
+                <Plus size={14} /> {t('valueDomainForm.action.addEnumValue')}
               </button>
             </div>
           ) : (
@@ -711,7 +730,9 @@ function EditValueDomainModal({
                 {itemValue || '-'}
               </div>
               <p className="text-micro text-slate-400 mt-1">
-                {normalizedType === 'RANGE' ? 'Interval expressions cannot be modified' : 'Regular expressions cannot be modified'}
+                {normalizedType === 'RANGE'
+                  ? t('valueDomainForm.hint.rangeReadonly')
+                  : t('valueDomainForm.hint.regexReadonly')}
               </p>
             </div>
           )}
@@ -720,13 +741,13 @@ function EditValueDomainModal({
         {/* Remarks */}
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            Remarks
+            {t('valueDomainForm.field.comment')}
           </label>
           <input
             type="text"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="Value range description（Optional）"
+            placeholder={t('valueDomainForm.placeholder.comment')}
             className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>

@@ -131,6 +131,49 @@ public class ReverseIndexRules {
                                 nsFileset.level(0),
                                 nsFileset.level(1));
                         break;
+                      case METRIC:
+                        entityType = Entity.EntityType.METRIC;
+                        Namespace nsMetric = Namespace.fromString(securableObject.parent());
+                        namespace =
+                            Namespace.of(
+                                roleEntity.namespace().level(0),
+                                nsMetric.level(0),
+                                nsMetric.level(1));
+                        break;
+                      case WORDROOT:
+                        entityType = Entity.EntityType.WORDROOT;
+                        Namespace nsWordRoot = Namespace.fromString(securableObject.parent());
+                        namespace =
+                            Namespace.of(
+                                roleEntity.namespace().level(0),
+                                nsWordRoot.level(0),
+                                nsWordRoot.level(1));
+                        break;
+                      case UNIT:
+                        entityType = Entity.EntityType.UNIT;
+                        Namespace nsUnit = Namespace.fromString(securableObject.parent());
+                        namespace =
+                            Namespace.of(
+                                roleEntity.namespace().level(0), nsUnit.level(0), nsUnit.level(1));
+                        break;
+                      case MODIFIER:
+                        entityType = Entity.EntityType.MODIFIER;
+                        Namespace nsModifier = Namespace.fromString(securableObject.parent());
+                        namespace =
+                            Namespace.of(
+                                roleEntity.namespace().level(0),
+                                nsModifier.level(0),
+                                nsModifier.level(1));
+                        break;
+                      case VALUE_DOMAIN:
+                        entityType = Entity.EntityType.VALUE_DOMAIN;
+                        Namespace nsValueDomain = Namespace.fromString(securableObject.parent());
+                        namespace =
+                            Namespace.of(
+                                roleEntity.namespace().level(0),
+                                nsValueDomain.level(0),
+                                nsValueDomain.level(1));
+                        break;
                       default:
                         throw new UnsupportedOperationException(
                             "Don't support securable object type: " + securableObject.type());

@@ -52,6 +52,10 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN)
           .put(MetadataObject.Type.ROLE, Entity.EntityType.ROLE)
           .put(MetadataObject.Type.MODEL, Entity.EntityType.MODEL)
+          .put(MetadataObject.Type.METRIC, Entity.EntityType.METRIC)
+          .put(MetadataObject.Type.WORDROOT, Entity.EntityType.WORDROOT)
+          .put(MetadataObject.Type.UNIT, Entity.EntityType.UNIT)
+          .put(MetadataObject.Type.MODIFIER, Entity.EntityType.MODIFIER)
           .put(MetadataObject.Type.VALUE_DOMAIN, Entity.EntityType.VALUE_DOMAIN)
           .build();
 
@@ -113,6 +117,10 @@ public class MetadataObjectUtil {
       case FILESET:
       case COLUMN:
       case MODEL:
+      case METRIC:
+      case WORDROOT:
+      case UNIT:
+      case MODIFIER:
       case VALUE_DOMAIN:
         String fullName = DOT.join(metalakeName, metadataObject.fullName());
         return NameIdentifier.parse(fullName);
@@ -192,6 +200,42 @@ public class MetadataObjectUtil {
       case MODEL:
         NameIdentifierUtil.checkModel(identifier);
         check(env.modelDispatcher().modelExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case METRIC:
+        NameIdentifierUtil.checkMetric(identifier);
+        try {
+          env.datasetDispatcher().getMetric(identifier);
+        } catch (Exception e) {
+          throw checkNotNull(exceptionToThrowSupplier).get();
+        }
+        break;
+
+      case WORDROOT:
+        NameIdentifierUtil.checkRoot(identifier);
+        try {
+          env.datasetDispatcher().getWordRoot(identifier);
+        } catch (Exception e) {
+          throw checkNotNull(exceptionToThrowSupplier).get();
+        }
+        break;
+
+      case UNIT:
+        NameIdentifierUtil.checkUnit(identifier);
+        try {
+          env.datasetDispatcher().getUnit(identifier);
+        } catch (Exception e) {
+          throw checkNotNull(exceptionToThrowSupplier).get();
+        }
+        break;
+
+      case MODIFIER:
+        NameIdentifierUtil.checkModifier(identifier);
+        try {
+          env.datasetDispatcher().getMetricModifier(identifier);
+        } catch (Exception e) {
+          throw checkNotNull(exceptionToThrowSupplier).get();
+        }
         break;
 
       case VALUE_DOMAIN:

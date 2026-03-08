@@ -47,11 +47,16 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.MetricEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.ModifierEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.UnitEntity;
+import org.apache.gravitino.meta.ValueDomainEntity;
+import org.apache.gravitino.meta.WordRootEntity;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -70,6 +75,11 @@ public class TestMetadataIdConverter {
   private NameIdentifier ident6;
   private NameIdentifier ident7;
   private NameIdentifier ident8;
+  private NameIdentifier ident9;
+  private NameIdentifier ident10;
+  private NameIdentifier ident11;
+  private NameIdentifier ident12;
+  private NameIdentifier ident13;
 
   // Test Entities
   private BaseMetalake entity1;
@@ -80,6 +90,11 @@ public class TestMetadataIdConverter {
   private FilesetEntity entity6;
   private TopicEntity entity7;
   private GroupEntity entity8;
+  private MetricEntity entity9;
+  private WordRootEntity entity10;
+  private UnitEntity entity11;
+  private ModifierEntity entity12;
+  private ValueDomainEntity entity13;
 
   @BeforeAll
   void initTest() throws IOException {
@@ -150,6 +165,36 @@ public class TestMetadataIdConverter {
                   MetadataIdConverter.normalizeCaseSensitive(
                       eq(ident8), eq(null), eq(mockCatalogManager)))
           .thenReturn(ident8);
+      mockedStatic
+          .when(
+              () ->
+                  MetadataIdConverter.normalizeCaseSensitive(
+                      eq(ident9), eq(null), eq(mockCatalogManager)))
+          .thenReturn(ident9);
+      mockedStatic
+          .when(
+              () ->
+                  MetadataIdConverter.normalizeCaseSensitive(
+                      eq(ident10), eq(null), eq(mockCatalogManager)))
+          .thenReturn(ident10);
+      mockedStatic
+          .when(
+              () ->
+                  MetadataIdConverter.normalizeCaseSensitive(
+                      eq(ident11), eq(null), eq(mockCatalogManager)))
+          .thenReturn(ident11);
+      mockedStatic
+          .when(
+              () ->
+                  MetadataIdConverter.normalizeCaseSensitive(
+                      eq(ident12), eq(null), eq(mockCatalogManager)))
+          .thenReturn(ident12);
+      mockedStatic
+          .when(
+              () ->
+                  MetadataIdConverter.normalizeCaseSensitive(
+                      eq(ident13), eq(null), eq(mockCatalogManager)))
+          .thenReturn(ident13);
 
       Long metalakeConvertedId =
           MetadataIdConverter.getID(
@@ -183,6 +228,32 @@ public class TestMetadataIdConverter {
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "topic"), MetadataObject.Type.TOPIC),
               "metalake");
+      Long metricConvertedId =
+          MetadataIdConverter.getID(
+              MetadataObjects.of(
+                  ImmutableList.of("catalog", "schema", "metric"), MetadataObject.Type.METRIC),
+              "metalake");
+      Long wordRootConvertedId =
+          MetadataIdConverter.getID(
+              MetadataObjects.of(
+                  ImmutableList.of("catalog", "schema", "root"), MetadataObject.Type.WORDROOT),
+              "metalake");
+      Long unitConvertedId =
+          MetadataIdConverter.getID(
+              MetadataObjects.of(
+                  ImmutableList.of("catalog", "schema", "unit"), MetadataObject.Type.UNIT),
+              "metalake");
+      Long modifierConvertedId =
+          MetadataIdConverter.getID(
+              MetadataObjects.of(
+                  ImmutableList.of("catalog", "schema", "modifier"), MetadataObject.Type.MODIFIER),
+              "metalake");
+      Long valueDomainConvertedId =
+          MetadataIdConverter.getID(
+              MetadataObjects.of(
+                  ImmutableList.of("catalog", "schema", "domain"),
+                  MetadataObject.Type.VALUE_DOMAIN),
+              "metalake");
 
       Assertions.assertEquals(1L, metalakeConvertedId);
       Assertions.assertEquals(2L, catalogConvertedId);
@@ -191,6 +262,11 @@ public class TestMetadataIdConverter {
       Assertions.assertEquals(5L, modelConvertedId);
       Assertions.assertEquals(6L, filesetConvertedId);
       Assertions.assertEquals(7L, topicConvertedId);
+      Assertions.assertEquals(9L, metricConvertedId);
+      Assertions.assertEquals(10L, wordRootConvertedId);
+      Assertions.assertEquals(11L, unitConvertedId);
+      Assertions.assertEquals(12L, modifierConvertedId);
+      Assertions.assertEquals(13L, valueDomainConvertedId);
     } finally {
       FieldUtils.writeDeclaredField(
           GravitinoEnv.getInstance(), "catalogManager", originalCatalogManager, true);
@@ -208,6 +284,11 @@ public class TestMetadataIdConverter {
     ident6 = NameIdentifier.of("metalake", "catalog", "schema", "fileset");
     ident7 = NameIdentifier.of("metalake", "catalog", "schema", "topic");
     ident8 = NameIdentifier.of("metalake", "group");
+    ident9 = NameIdentifier.of("metalake", "catalog", "schema", "metric");
+    ident10 = NameIdentifier.of("metalake", "catalog", "schema", "root");
+    ident11 = NameIdentifier.of("metalake", "catalog", "schema", "unit");
+    ident12 = NameIdentifier.of("metalake", "catalog", "schema", "modifier");
+    ident13 = NameIdentifier.of("metalake", "catalog", "schema", "domain");
   }
 
   private void initTestEntities() {
@@ -228,6 +309,13 @@ public class TestMetadataIdConverter {
         getTestTopicEntity(
             7L, "topic", Namespace.of("metalake", "catalog", "schema"), "test_topic");
     entity8 = getTestGroupEntity(8L, "group", Namespace.of("metalake"));
+    entity9 = getTestMetricEntity(9L, "metric", Namespace.of("metalake", "catalog", "schema"));
+    entity10 = getTestWordRootEntity(10L, "root", Namespace.of("metalake", "catalog", "schema"));
+    entity11 = getTestUnitEntity(11L, "unit", Namespace.of("metalake", "catalog", "schema"));
+    entity12 =
+        getTestModifierEntity(12L, "modifier", Namespace.of("metalake", "catalog", "schema"));
+    entity13 =
+        getTestValueDomainEntity(13L, "domain", Namespace.of("metalake", "catalog", "schema"));
   }
 
   private void initMockCache() throws IOException {
@@ -241,6 +329,14 @@ public class TestMetadataIdConverter {
     when(mockStore.get(ident6, Entity.EntityType.FILESET, FilesetEntity.class)).thenReturn(entity6);
     when(mockStore.get(ident7, Entity.EntityType.TOPIC, TopicEntity.class)).thenReturn(entity7);
     when(mockStore.get(ident8, Entity.EntityType.GROUP, GroupEntity.class)).thenReturn(entity8);
+    when(mockStore.get(ident9, Entity.EntityType.METRIC, MetricEntity.class)).thenReturn(entity9);
+    when(mockStore.get(ident10, Entity.EntityType.WORDROOT, WordRootEntity.class))
+        .thenReturn(entity10);
+    when(mockStore.get(ident11, Entity.EntityType.UNIT, UnitEntity.class)).thenReturn(entity11);
+    when(mockStore.get(ident12, Entity.EntityType.MODIFIER, ModifierEntity.class))
+        .thenReturn(entity12);
+    when(mockStore.get(ident13, Entity.EntityType.VALUE_DOMAIN, ValueDomainEntity.class))
+        .thenReturn(entity13);
   }
 
   private BaseMetalake getTestMetalake(long id, String name, String comment) {
@@ -356,6 +452,62 @@ public class TestMetadataIdConverter {
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
+        .withAuditInfo(getTestAuditInfo())
+        .build();
+  }
+
+  private MetricEntity getTestMetricEntity(long id, String code, Namespace namespace) {
+    return MetricEntity.builder()
+        .withId(id)
+        .withCode(code)
+        .withName(code)
+        .withNamespace(namespace)
+        .withType(org.apache.gravitino.dataset.Metric.Type.ATOMIC)
+        .withAuditInfo(getTestAuditInfo())
+        .build();
+  }
+
+  private WordRootEntity getTestWordRootEntity(long id, String code, Namespace namespace) {
+    return WordRootEntity.builder()
+        .withId(id)
+        .withCode(code)
+        .withRootName(code)
+        .withNamespace(namespace)
+        .withDataType("STRING")
+        .withAuditInfo(getTestAuditInfo())
+        .build();
+  }
+
+  private UnitEntity getTestUnitEntity(long id, String code, Namespace namespace) {
+    return UnitEntity.builder()
+        .withId(id)
+        .withCode(code)
+        .withUnitName(code)
+        .withNamespace(namespace)
+        .withSymbol(code)
+        .withAuditInfo(getTestAuditInfo())
+        .build();
+  }
+
+  private ModifierEntity getTestModifierEntity(long id, String code, Namespace namespace) {
+    return ModifierEntity.builder()
+        .withId(id)
+        .withCode(code)
+        .withName(code)
+        .withNamespace(namespace)
+        .withAuditInfo(getTestAuditInfo())
+        .build();
+  }
+
+  private ValueDomainEntity getTestValueDomainEntity(long id, String code, Namespace namespace) {
+    return ValueDomainEntity.builder()
+        .withId(id)
+        .withDomainCode(code)
+        .withDomainName(code)
+        .withNamespace(namespace)
+        .withDomainType(org.apache.gravitino.dataset.ValueDomain.Type.ENUM)
+        .withDomainLevel(org.apache.gravitino.dataset.ValueDomain.Level.BUSINESS)
+        .withItems(ImmutableList.of())
         .withAuditInfo(getTestAuditInfo())
         .build();
   }

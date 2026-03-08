@@ -50,14 +50,14 @@ import org.apache.gravitino.exceptions.NoSuchMetricVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.MetricEntity;
-import org.apache.gravitino.meta.MetricModifierEntity;
 import org.apache.gravitino.meta.MetricVersionEntity;
+import org.apache.gravitino.meta.ModifierEntity;
 import org.apache.gravitino.meta.UnitEntity;
 import org.apache.gravitino.meta.ValueDomainEntity;
 import org.apache.gravitino.meta.WordRootEntity;
 import org.apache.gravitino.pagination.PagedResult;
 import org.apache.gravitino.storage.relational.service.MetricMetaService;
-import org.apache.gravitino.storage.relational.service.MetricModifierMetaService;
+import org.apache.gravitino.storage.relational.service.ModifierMetaService;
 import org.apache.gravitino.storage.relational.service.UnitMetaService;
 import org.apache.gravitino.storage.relational.service.ValueDomainMetaService;
 import org.apache.gravitino.storage.relational.service.WordRootMetaService;
@@ -491,10 +491,10 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       throws NoSuchSchemaException {
     NamespaceUtil.checkModifier(namespace);
     try {
-      List<MetricModifierEntity> modifiers =
-          MetricModifierMetaService.getInstance()
+      List<ModifierEntity> modifiers =
+          ModifierMetaService.getInstance()
               .listModifiersByNamespaceWithPagination(namespace, offset, limit);
-      long total = MetricModifierMetaService.getInstance().countModifiersByNamespace(namespace);
+      long total = ModifierMetaService.getInstance().countModifiersByNamespace(namespace);
       List<MetricModifier> modifierList =
           modifiers.stream().map(this::toModifierImpl).collect(Collectors.toList());
       return new PagedResult<>(modifierList, total, offset, limit);
@@ -507,16 +507,14 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   public org.apache.gravitino.dataset.MetricModifier getMetricModifier(NameIdentifier ident) {
     NameIdentifierUtil.checkModifier(ident);
     try {
-      org.apache.gravitino.meta.MetricModifierEntity entity =
+      org.apache.gravitino.meta.ModifierEntity entity =
           store.get(
-              ident,
-              Entity.EntityType.METRIC_MODIFIER,
-              org.apache.gravitino.meta.MetricModifierEntity.class);
+              ident, Entity.EntityType.MODIFIER, org.apache.gravitino.meta.ModifierEntity.class);
       return toModifierImpl(entity);
     } catch (NoSuchEntityException e) {
-      throw new RuntimeException("Metric modifier " + ident + " does not exist", e);
+      throw new RuntimeException("Modifier " + ident + " does not exist", e);
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to get metric modifier " + ident, ioe);
+      throw new RuntimeException("Failed to get modifier " + ident, ioe);
     }
   }
 
@@ -526,8 +524,8 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       throws NoSuchSchemaException {
     NameIdentifierUtil.checkModifier(ident);
     long uid = GravitinoEnv.getInstance().idGenerator().nextId();
-    org.apache.gravitino.meta.MetricModifierEntity entity =
-        org.apache.gravitino.meta.MetricModifierEntity.builder()
+    org.apache.gravitino.meta.ModifierEntity entity =
+        org.apache.gravitino.meta.ModifierEntity.builder()
             .withId(uid)
             .withName(ident.name())
             .withNamespace(ident.namespace())
@@ -543,9 +541,9 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
     try {
       store.put(entity, false /* overwrite */);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to create metric modifier " + ident, e);
+      throw new RuntimeException("Failed to create modifier " + ident, e);
     } catch (EntityAlreadyExistsException e) {
-      throw new EntityAlreadyExistsException("Metric modifier %s already exists", ident);
+      throw new EntityAlreadyExistsException("Modifier %s already exists", ident);
     } catch (NoSuchEntityException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", ident.namespace());
     }
@@ -557,9 +555,9 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
   public boolean deleteMetricModifier(NameIdentifier ident) {
     NameIdentifierUtil.checkModifier(ident);
     try {
-      return store.delete(ident, Entity.EntityType.METRIC_MODIFIER);
+      return store.delete(ident, Entity.EntityType.MODIFIER);
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to delete metric modifier " + ident, ioe);
+      throw new RuntimeException("Failed to delete modifier " + ident, ioe);
     }
   }
 
@@ -568,13 +566,13 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
       NameIdentifier ident, String name, String comment) {
     NameIdentifierUtil.checkModifier(ident);
     try {
-      MetricModifierEntity updatedEntity =
+      ModifierEntity updatedEntity =
           store.update(
               ident,
-              MetricModifierEntity.class,
-              Entity.EntityType.METRIC_MODIFIER,
+              ModifierEntity.class,
+              Entity.EntityType.MODIFIER,
               entity ->
-                  MetricModifierEntity.builder()
+                  ModifierEntity.builder()
                       .withId(entity.id())
                       .withName(name != null ? name : entity.name())
                       .withNamespace(entity.namespace())
@@ -591,11 +589,11 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
                       .build());
       return toModifierImpl(updatedEntity);
     } catch (NoSuchEntityException e) {
-      throw new RuntimeException("Metric modifier " + ident + " does not exist", e);
+      throw new RuntimeException("Modifier " + ident + " does not exist", e);
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to alter metric modifier " + ident, ioe);
+      throw new RuntimeException("Failed to alter modifier " + ident, ioe);
     } catch (EntityAlreadyExistsException e) {
-      throw new EntityAlreadyExistsException("Metric modifier %s already exists", ident);
+      throw new EntityAlreadyExistsException("Modifier %s already exists", ident);
     }
   }
 
@@ -709,9 +707,9 @@ public class DatasetCatalogOperations extends ManagedSchemaOperations
     }
   }
 
-  /** will MetricModifierEntity Convert to ModifierImpl */
+  /** will ModifierEntity Convert to ModifierImpl */
   private org.apache.gravitino.dataset.MetricModifier toModifierImpl(
-      org.apache.gravitino.meta.MetricModifierEntity entity) {
+      org.apache.gravitino.meta.ModifierEntity entity) {
     return ModifierImpl.builder()
         .withName(entity.name())
         .withCode(entity.code())

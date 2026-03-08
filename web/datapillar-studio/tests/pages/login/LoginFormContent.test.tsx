@@ -34,9 +34,7 @@ vi.mock('@/state', () => ({
             status: 1,
             isDefault: 1
           }
-        ],
-        roles: [],
-        menus: []
+        ]
       }),
       loading: false
     })

@@ -20,7 +20,6 @@
     <modules>
         <module>datapillar-common</module>
         <module>datapillar-auth</module>
-        <module>datapillar-connector</module>
         <module>datapillar-studio-service</module>
         <module>datapillar-api-gateway</module>
         <module>datapillar-openlineage</module>
@@ -277,26 +276,6 @@
             <dependency>
                 <groupId>com.sunny</groupId>
                 <artifactId>datapillar-auth</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.sunny</groupId>
-                <artifactId>datapillar-connector-spi</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.sunny</groupId>
-                <artifactId>datapillar-connector-runtime</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.sunny</groupId>
-                <artifactId>datapillar-connector-airflow</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.sunny</groupId>
-                <artifactId>datapillar-connector-gravitino</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

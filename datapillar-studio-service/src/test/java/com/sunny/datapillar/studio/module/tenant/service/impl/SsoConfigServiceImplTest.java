@@ -33,7 +33,7 @@ import com.sunny.datapillar.studio.exception.translator.StudioDbExceptionTransla
 import com.sunny.datapillar.studio.module.tenant.entity.TenantSsoConfig;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantSsoConfigMapper;
 import com.sunny.datapillar.studio.module.tenant.service.TenantCodeResolver;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
+import com.sunny.datapillar.studio.security.crypto.LocalCryptoService;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -48,7 +48,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class SsoConfigServiceImplTest {
 
   @Mock private TenantSsoConfigMapper tenantSsoConfigMapper;
-  @Mock private AuthCryptoRpcClient authCryptoClient;
+  @Mock private LocalCryptoService localCryptoService;
   @Mock private TenantCodeResolver tenantCodeResolver;
 
   private SsoConfigServiceImpl service;
@@ -61,7 +61,7 @@ class SsoConfigServiceImplTest {
     service =
         new SsoConfigServiceImpl(
             tenantSsoConfigMapper,
-            authCryptoClient,
+            localCryptoService,
             tenantCodeResolver,
             new ObjectMapper(),
             new StudioDbExceptionTranslator());

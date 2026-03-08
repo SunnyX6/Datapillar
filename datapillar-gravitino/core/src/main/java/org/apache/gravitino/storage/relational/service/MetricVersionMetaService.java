@@ -123,6 +123,15 @@ public class MetricVersionMetaService {
     return getVersionByIdentifier(metricIdent, version);
   }
 
+  public boolean deleteMetricVersionByIdentifier(NameIdentifier ident) {
+    MetricVersionEntity versionEntity = getMetricVersionByIdentifier(ident);
+    Integer deleteResult =
+        SessionUtils.doWithCommitAndFetchResult(
+            MetricVersionMetaMapper.class,
+            mapper -> mapper.softDeleteMetricVersionMetaById(versionEntity.id()));
+    return deleteResult != null && deleteResult > 0;
+  }
+
   /**
    * According to the reference table ID Get current version metrics(Return only current_version
    * Corresponding record).*

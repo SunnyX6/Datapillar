@@ -179,7 +179,7 @@ CREATE TABLE IF NOT EXISTS `user_meta` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'user deleted at',
     PRIMARY KEY (`user_id`),
     UNIQUE KEY `uk_mid_us_del` (`tenant_id`, `metalake_id`, `user_name`, `deleted_at`),
-    UNIQUE KEY `uk_tid_euid_del` (`tenant_id`, `external_user_id`, `deleted_at`)
+    UNIQUE KEY `uk_mid_euid_del` (`tenant_id`, `metalake_id`, `external_user_id`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'user metadata';
 
 CREATE TABLE IF NOT EXISTS `role_meta` (
@@ -454,7 +454,7 @@ CREATE TABLE IF NOT EXISTS `job_run_meta` (
 -- Metric Management Tables
 -- ============================================
 
-CREATE TABLE IF NOT EXISTS `metric_modifier_meta` (
+CREATE TABLE IF NOT EXISTS `modifier_meta` (
     `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',
     `modifier_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'modifier id',
     `modifier_name` VARCHAR(128) NOT NULL COMMENT 'modifier name, e.g., last 7 days, Beijing area',
@@ -470,7 +470,7 @@ CREATE TABLE IF NOT EXISTS `metric_modifier_meta` (
     UNIQUE KEY `uk_sid_mcode_del` (`tenant_id`, `schema_id`, `modifier_code`, `deleted_at`),
     KEY `idx_mid` (`tenant_id`, `metalake_id`),
     KEY `idx_cid` (`tenant_id`, `catalog_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Metric modifier metadata table';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Modifier metadata table';
 
 CREATE TABLE IF NOT EXISTS `wordroot_meta` (
     `tenant_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tenant id',

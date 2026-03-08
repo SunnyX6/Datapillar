@@ -6,12 +6,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sunny.datapillar.common.exception.BadRequestException;
 import com.sunny.datapillar.common.exception.NotFoundException;
-import com.sunny.datapillar.common.exception.UnauthorizedException;
-import com.sunny.datapillar.connector.airflow.AirflowConnector;
-import com.sunny.datapillar.connector.runtime.ConnectorKernel;
-import com.sunny.datapillar.connector.spi.ConnectorInvocation;
-import com.sunny.datapillar.connector.spi.IdempotencyDescriptor;
-import com.sunny.datapillar.studio.context.TenantContextHolder;
 import com.sunny.datapillar.studio.dto.llm.request.*;
 import com.sunny.datapillar.studio.dto.llm.response.*;
 import com.sunny.datapillar.studio.dto.project.request.*;
@@ -26,6 +20,7 @@ import com.sunny.datapillar.studio.dto.user.request.*;
 import com.sunny.datapillar.studio.dto.user.response.*;
 import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
+import com.sunny.datapillar.studio.integration.airflow.AirflowWorkflowClient;
 import com.sunny.datapillar.studio.module.workflow.entity.JobWorkflow;
 import com.sunny.datapillar.studio.module.workflow.mapper.JobDependencyMapper;
 import com.sunny.datapillar.studio.module.workflow.mapper.JobInfoMapper;
@@ -34,7 +29,6 @@ import com.sunny.datapillar.studio.module.workflow.service.WorkflowService;
 import com.sunny.datapillar.studio.module.workflow.service.dag.DagBuilder;
 import com.sunny.datapillar.studio.module.workflow.service.dag.DagValidationException;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -50,19 +44,10 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class WorkflowServiceImpl implements WorkflowService {
 
-  private static final String IDEMPOTENCY_STEP_DEPLOY = "AIRFLOW_DEPLOY";
-  private static final String IDEMPOTENCY_STEP_DELETE = "AIRFLOW_DELETE";
-  private static final String IDEMPOTENCY_STEP_PAUSE = "AIRFLOW_PAUSE";
-  private static final String IDEMPOTENCY_STEP_RESUME = "AIRFLOW_RESUME";
-  private static final String IDEMPOTENCY_STEP_TRIGGER = "AIRFLOW_TRIGGER";
-  private static final String IDEMPOTENCY_STEP_RERUN = "AIRFLOW_RERUN_TASK";
-  private static final String IDEMPOTENCY_STEP_SET_STATE = "AIRFLOW_SET_TASK_STATE";
-  private static final String IDEMPOTENCY_STEP_CLEAR = "AIRFLOW_CLEAR_TASKS";
-
   private final JobWorkflowMapper workflowMapper;
   private final JobInfoMapper jobInfoMapper;
   private final JobDependencyMapper dependencyMapper;
-  private final ConnectorKernel connectorKernel;
+  private final AirflowWorkflowClient airflowWorkflowClient;
   private final ObjectMapper objectMapper;
 
   @Override
@@ -146,10 +131,7 @@ public class WorkflowServiceImpl implements WorkflowService {
 
     if (workflow.getStatus() == 1 || workflow.getStatus() == 2) {
       JsonNode payload = objectMapper.createObjectNode().put("workflowId", id);
-      invokeAirflow(
-          AirflowConnector.OP_DELETE,
-          payload,
-          buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_DELETE));
+      airflowWorkflowClient.delete(payload);
       log.info("Deleted airflow workflow: id={}", id);
     }
 
@@ -173,11 +155,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     validateDag(jobs, dependencies);
 
     JsonNode payload = buildAirflowDeployPayload(workflow, jobs, dependencies);
-    JsonNode response =
-        invokeAirflow(
-            AirflowConnector.OP_DEPLOY,
-            payload,
-            buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_DEPLOY));
+    JsonNode response = airflowWorkflowClient.deploy(payload);
     log.info("Published workflow to airflow: id={}, response={}", id, response);
 
     workflow.setStatus(1);
@@ -197,8 +175,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     }
 
     JsonNode payload = objectMapper.createObjectNode().put("workflowId", id);
-    invokeAirflow(
-        AirflowConnector.OP_PAUSE, payload, buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_PAUSE));
+    airflowWorkflowClient.pause(payload);
 
     workflow.setStatus(2);
     workflowMapper.updateById(workflow);
@@ -218,8 +195,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     }
 
     JsonNode payload = objectMapper.createObjectNode().put("workflowId", id);
-    invokeAirflow(
-        AirflowConnector.OP_RESUME, payload, buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_RESUME));
+    airflowWorkflowClient.resume(payload);
 
     workflow.setStatus(1);
     workflowMapper.updateById(workflow);
@@ -230,7 +206,7 @@ public class WorkflowServiceImpl implements WorkflowService {
   public JsonNode getDagDetail(Long id) {
     getWorkflowById(id);
     JsonNode payload = objectMapper.createObjectNode().put("workflowId", id);
-    return invokeAirflow(AirflowConnector.OP_GET_DAG, payload, null);
+    return airflowWorkflowClient.getDag(payload);
   }
 
   @Override
@@ -242,7 +218,7 @@ public class WorkflowServiceImpl implements WorkflowService {
             .put("workflowId", id)
             .put("limit", limit)
             .put("offset", offset);
-    return invokeAirflow(AirflowConnector.OP_LIST_DAG_VERSIONS, payload, null);
+    return airflowWorkflowClient.listDagVersions(payload);
   }
 
   @Override
@@ -250,7 +226,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     getWorkflowById(id);
     JsonNode payload =
         objectMapper.createObjectNode().put("workflowId", id).put("versionNumber", versionNumber);
-    return invokeAirflow(AirflowConnector.OP_GET_DAG_VERSION, payload, null);
+    return airflowWorkflowClient.getDagVersion(payload);
   }
 
   @Override
@@ -268,10 +244,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     }
 
     JsonNode payload = objectMapper.createObjectNode().put("workflowId", id).set("body", body);
-    return invokeAirflow(
-        AirflowConnector.OP_TRIGGER_RUN,
-        payload,
-        buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_TRIGGER));
+    return airflowWorkflowClient.triggerRun(payload);
   }
 
   @Override
@@ -286,21 +259,21 @@ public class WorkflowServiceImpl implements WorkflowService {
     if (StringUtils.hasText(state)) {
       payload.put("state", state);
     }
-    return invokeAirflow(AirflowConnector.OP_LIST_RUNS, payload, null);
+    return airflowWorkflowClient.listRuns(payload);
   }
 
   @Override
   public JsonNode getWorkflowRun(Long id, String runId) {
     getWorkflowById(id);
     JsonNode payload = objectMapper.createObjectNode().put("workflowId", id).put("runId", runId);
-    return invokeAirflow(AirflowConnector.OP_GET_RUN, payload, null);
+    return airflowWorkflowClient.getRun(payload);
   }
 
   @Override
   public JsonNode getRunJobs(Long id, String runId) {
     getWorkflowById(id);
     JsonNode payload = objectMapper.createObjectNode().put("workflowId", id).put("runId", runId);
-    return invokeAirflow(AirflowConnector.OP_LIST_TASKS, payload, null);
+    return airflowWorkflowClient.listTasks(payload);
   }
 
   @Override
@@ -312,7 +285,7 @@ public class WorkflowServiceImpl implements WorkflowService {
             .put("workflowId", id)
             .put("runId", runId)
             .put("taskId", jobId);
-    return invokeAirflow(AirflowConnector.OP_GET_TASK, payload, null);
+    return airflowWorkflowClient.getTask(payload);
   }
 
   @Override
@@ -325,7 +298,7 @@ public class WorkflowServiceImpl implements WorkflowService {
             .put("runId", runId)
             .put("taskId", jobId)
             .put("tryNumber", tryNumber);
-    return invokeAirflow(AirflowConnector.OP_GET_TASK_LOGS, payload, null);
+    return airflowWorkflowClient.getTaskLogs(payload);
   }
 
   @Override
@@ -345,10 +318,7 @@ public class WorkflowServiceImpl implements WorkflowService {
             .put("runId", runId)
             .put("taskId", jobId)
             .set("body", body);
-    return invokeAirflow(
-        AirflowConnector.OP_RERUN_TASK,
-        payload,
-        buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_RERUN + ":" + runId + ":" + jobId));
+    return airflowWorkflowClient.rerunTask(payload);
   }
 
   @Override
@@ -368,10 +338,7 @@ public class WorkflowServiceImpl implements WorkflowService {
             .put("runId", runId)
             .put("taskId", jobId)
             .set("body", body);
-    return invokeAirflow(
-        AirflowConnector.OP_SET_TASK_STATE,
-        payload,
-        buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_SET_STATE + ":" + runId + ":" + jobId));
+    return airflowWorkflowClient.setTaskState(payload);
   }
 
   @Override
@@ -387,10 +354,7 @@ public class WorkflowServiceImpl implements WorkflowService {
 
     JsonNode payload =
         objectMapper.createObjectNode().put("workflowId", id).put("runId", runId).set("body", body);
-    return invokeAirflow(
-        AirflowConnector.OP_CLEAR_TASKS,
-        payload,
-        buildWorkflowIdempotency(id, IDEMPOTENCY_STEP_CLEAR + ":" + runId));
+    return airflowWorkflowClient.clearTasks(payload);
   }
 
   private JobWorkflow getWorkflowById(Long id) {
@@ -471,30 +435,5 @@ public class WorkflowServiceImpl implements WorkflowService {
         .createObjectNode()
         .put("workflowId", workflow.getId())
         .set("workflow", objectMapper.valueToTree(workflowMap));
-  }
-
-  private JsonNode invokeAirflow(
-      String operationId, JsonNode payload, IdempotencyDescriptor idempotencyDescriptor) {
-    ConnectorInvocation.Builder builder =
-        ConnectorInvocation.builder(AirflowConnector.CONNECTOR_ID, operationId).payload(payload);
-    if (idempotencyDescriptor != null) {
-      builder.idempotency(idempotencyDescriptor);
-    }
-    return connectorKernel.invoke(builder.build()).payload();
-  }
-
-  private IdempotencyDescriptor buildWorkflowIdempotency(Long workflowId, String action) {
-    String tenantCode = requiredTenantCode();
-    String normalizedAction = action == null ? "UNKNOWN" : action.trim().toUpperCase(Locale.ROOT);
-    String key = "airflow:%s:%d:%s".formatted(tenantCode, workflowId, normalizedAction);
-    return IdempotencyDescriptor.of(key, normalizedAction);
-  }
-
-  private String requiredTenantCode() {
-    String tenantCode = TenantContextHolder.getTenantCode();
-    if (!StringUtils.hasText(tenantCode)) {
-      throw new UnauthorizedException("Unauthorized access");
-    }
-    return tenantCode.trim().toLowerCase(Locale.ROOT);
   }
 }

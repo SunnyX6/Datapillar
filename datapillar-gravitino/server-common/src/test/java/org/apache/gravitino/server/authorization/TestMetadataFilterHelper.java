@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -32,6 +33,9 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.multitenancy.context.ExternalUserIdContextHolder;
+import org.apache.gravitino.multitenancy.context.TenantContext;
+import org.apache.gravitino.multitenancy.context.TenantContextHolder;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -131,13 +135,112 @@ public class TestMetadataFilterHelper {
     }
   }
 
+  @Test
+  public void testFilterMetricByExpression() {
+    makeCompletableFutureUseCurrentThread();
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
+
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
+      NameIdentifier[] nameIdentifiers = new NameIdentifier[2];
+      nameIdentifiers[0] =
+          NameIdentifierUtil.ofMetric("testMetalake", "testCatalog", "testSchema", "testMetric");
+      nameIdentifiers[1] =
+          NameIdentifierUtil.ofMetric("testMetalake", "testCatalog", "testSchema", "otherMetric");
+      NameIdentifier[] filtered =
+          MetadataFilterHelper.filterByExpression(
+              "testMetalake",
+              "CATALOG::USE_CATALOG && SCHEMA::USE_SCHEMA && METRIC::USE_METRIC",
+              Entity.EntityType.METRIC,
+              nameIdentifiers);
+      Assertions.assertEquals(1, filtered.length);
+      Assertions.assertEquals(
+          "testMetalake.testCatalog.testSchema.testMetric", filtered[0].toString());
+    }
+  }
+
+  @Test
+  public void testFilterByExpressionPropagatesTenantAndExternalUserContext() {
+    setExecutor(
+        runnable -> {
+          // Simulate context lost after thread switch.
+          TenantContextHolder.remove();
+          ExternalUserIdContextHolder.remove();
+          runnable.run();
+        });
+    AtomicReference<TenantContext> observedTenantContext = new AtomicReference<>();
+    AtomicReference<String> observedExternalUserId = new AtomicReference<>();
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
+
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer())
+          .thenReturn(
+              new MockGravitinoAuthorizer() {
+                @Override
+                public boolean authorize(
+                    java.security.Principal principal,
+                    String metalake,
+                    org.apache.gravitino.MetadataObject metadataObject,
+                    Privilege.Name privilege,
+                    org.apache.gravitino.authorization.AuthorizationRequestContext requestContext) {
+                  observedTenantContext.set(TenantContextHolder.get());
+                  observedExternalUserId.set(ExternalUserIdContextHolder.get());
+                  return super.authorize(
+                      principal, metalake, metadataObject, privilege, requestContext);
+                }
+              });
+
+      TenantContextHolder.set(
+          TenantContext.builder()
+              .withTenantId(1001L)
+              .withTenantCode("tenant-test")
+              .withTenantName("tenant-test")
+              .build());
+      ExternalUserIdContextHolder.set("1001");
+      NameIdentifier[] nameIdentifiers = {
+        NameIdentifierUtil.ofCatalog("testMetalake", "testCatalog")
+      };
+
+      NameIdentifier[] filtered =
+          MetadataFilterHelper.filterByExpression(
+              "testMetalake", "CATALOG::USE_CATALOG", Entity.EntityType.CATALOG, nameIdentifiers);
+      Assertions.assertEquals(1, filtered.length);
+      Assertions.assertEquals("testMetalake.testCatalog", filtered[0].toString());
+      Assertions.assertNotNull(observedTenantContext.get());
+      Assertions.assertEquals(1001L, observedTenantContext.get().tenantId());
+      Assertions.assertEquals("tenant-test", observedTenantContext.get().tenantCode());
+      Assertions.assertEquals("1001", observedExternalUserId.get());
+    } finally {
+      TenantContextHolder.remove();
+      ExternalUserIdContextHolder.remove();
+      makeCompletableFutureUseCurrentThread();
+    }
+  }
+
   private static void makeCompletableFutureUseCurrentThread() {
+    setExecutor(Runnable::run);
+  }
+
+  private static void setExecutor(Executor executor) {
     try {
-      Executor currentThread = Runnable::run;
       Class<MetadataFilterHelper> jcasbinAuthorizerClass = MetadataFilterHelper.class;
       Field field = jcasbinAuthorizerClass.getDeclaredField("executor");
       field.setAccessible(true);
-      field.set(null, currentThread);
+      field.set(null, executor);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

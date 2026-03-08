@@ -49,9 +49,11 @@ import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /** The service class for user metadata. It provides the basic database operations for user. */
 public class UserMetaService {
+  private static final String INTERNAL_SERVICE_USER = "datapillar";
   private static final UserMetaService INSTANCE = new UserMetaService();
 
   public static UserMetaService getInstance() {
@@ -154,9 +156,7 @@ public class UserMetaService {
       Long metalakeId =
           MetalakeMetaService.getInstance().getMetalakeIdByName(userEntity.namespace().level(0));
       UserPO.Builder builder =
-          UserPO.builder()
-              .withMetalakeId(metalakeId)
-              .withExternalUserId(resolveExternalUserId(userEntity));
+          UserPO.builder().withMetalakeId(metalakeId).withExternalUserId(resolveExternalUserId());
       UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
 
       List<Long> roleIds = Optional.ofNullable(userEntity.roleIds()).orElse(Lists.newArrayList());
@@ -342,14 +342,16 @@ public class UserMetaService {
     return POConverters.fromUserPO(userPO, rolePOs, namespace);
   }
 
-  private String resolveExternalUserId(UserEntity userEntity) {
-    String scopedExternalUserId = ExternalUserIdContextHolder.get();
-    if (StringUtils.isNotBlank(scopedExternalUserId)) {
-      return scopedExternalUserId.trim();
+  private String resolveExternalUserId() {
+    String explicitExternalUserId = StringUtils.trimToNull(ExternalUserIdContextHolder.get());
+    if (explicitExternalUserId != null) {
+      return explicitExternalUserId;
     }
-    if (StringUtils.isNotBlank(userEntity.name())) {
-      return userEntity.name().trim();
+
+    if (INTERNAL_SERVICE_USER.equalsIgnoreCase(PrincipalUtils.getCurrentUserName())) {
+      return "-1";
     }
-    return String.valueOf(userEntity.id());
+
+    throw new IllegalStateException("Missing external user id context for Gravitino user sync");
   }
 }

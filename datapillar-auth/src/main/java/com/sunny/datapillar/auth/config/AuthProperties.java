@@ -19,7 +19,6 @@ public class AuthProperties {
 
   private AuthenticatorType authenticator = AuthenticatorType.SIMPLE;
   private Token token = new Token();
-  private Jwks jwks = new Jwks();
   private OAuth2 oauth2 = new OAuth2();
 
   @PostConstruct
@@ -28,8 +27,13 @@ public class AuthProperties {
       throw new IllegalStateException("auth.authenticator must be configured");
     }
     token.validate();
-    jwks.validate();
-    oauth2.validate();
+    if (AuthenticatorType.OAUTH2 == authenticator) {
+      if (oauth2 == null) {
+        throw new IllegalStateException(
+            "auth.oauth2 must be configured when auth.authenticator=oauth2");
+      }
+      oauth2.validate();
+    }
   }
 
   public enum AuthenticatorType {
@@ -58,11 +62,7 @@ public class AuthProperties {
 
     @NotBlank private String audience = "datapillar-api";
 
-    @NotBlank private String algorithm = "EdDSA";
-
-    @NotBlank private String privateKeyPath = "classpath:security/auth-token-dev-private.pem";
-
-    @NotBlank private String publicKeyPath = "classpath:security/auth-token-dev-public.pem";
+    @NotBlank private String keysetPath = "classpath:security/auth-token-dev-keyset.json";
 
     private long accessTtlSeconds = 3600;
     private long refreshTtlSeconds = 604800;
@@ -84,8 +84,8 @@ public class AuthProperties {
     }
 
     private void validate() {
-      if (!"EdDSA".equalsIgnoreCase(algorithm)) {
-        throw new IllegalStateException("auth.token.algorithm must be EdDSA");
+      if (keysetPath == null || keysetPath.isBlank()) {
+        throw new IllegalStateException("auth.token.keyset_path cannot be empty");
       }
       if (audiences().isEmpty()) {
         throw new IllegalStateException("auth.token.audience cannot be empty");
@@ -95,20 +95,6 @@ public class AuthProperties {
       }
       if (loginTtlSeconds <= 0) {
         throw new IllegalStateException("auth.token.login_ttl_seconds must be > 0");
-      }
-    }
-  }
-
-  @Data
-  public static class Jwks {
-
-    private boolean enabled = true;
-
-    @NotBlank private String activeKid = "auth-dev-2026-01";
-
-    private void validate() {
-      if (enabled && (activeKid == null || activeKid.trim().isEmpty())) {
-        throw new IllegalStateException("auth.jwks.active_kid cannot be empty");
       }
     }
   }

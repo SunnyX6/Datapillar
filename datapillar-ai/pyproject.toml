@@ -10,7 +10,7 @@ dependencies = [# FastAPIframe
  "pymysql>=1.1.0",# Redis(Checkpoint & Memory)
  "redis>=5.2.1","datapillar-oneagentic[glm,openai,redis,sse,milvus,knowledge]>=0.1.0","boto3>=1.34.0",# binary serialization
  "msgpack>=1.0.8",# Tool library
- "dynaconf>=3.2.0","httpx>=0.28.1,<0.29.0","apache-dubbo>=0.4.0","grpcio>=1.76.0","pyyaml>=6.0.1",# SQL parse(bloodline analysis)
+ "dynaconf>=3.2.0","httpx>=0.28.1,<0.29.0","pyyaml>=6.0.1",# SQL parse(bloodline analysis)
  "sqlglot>=26.0.0",# JWTCertification
  "pyjwt[crypto]>=2.8.0","sqlalchemy>=2.0.0",# JSON Repair(Process LLM Output malformation JSON)
  "json-repair>=0.30.0",# High performance hashing(Content deduplication)
@@ -50,9 +50,6 @@ ignore = ["S311","S608"]
 "datapillar-ai/tests/**" = ["S"]
 "**/scripts/**" = ["S"]
 "datapillar-ai/scripts/**" = ["S"]
-# Generated protobuf modules are managed by code generation.
-"src/infrastructure/rpc/proto/**" = ["E712"]
-"datapillar-ai/src/infrastructure/rpc/proto/**" = ["E712"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]

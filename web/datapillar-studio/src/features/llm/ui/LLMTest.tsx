@@ -2,6 +2,7 @@ import { useEffect,useRef,useState } from 'react'
 import {
  ArrowRight,Bot,ChevronDown,ChevronRight,Globe,Key,Play,Send,Settings2,ShieldCheck,SlidersHorizontal,User,X
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { cardWidthClassMap,drawerWidthClassMap,menuWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
@@ -21,9 +22,9 @@ type ChatMessage = {
 
 type PendingIndicatorPhase = 'hidden' | 'entering' | 'visible' | 'leaving'
 
-function buildWelcomeMessage(model:ModelRecord):ChatMessage {
+function buildWelcomeMessage(content:string):ChatMessage {
  return {
- id:'welcome',role:'assistant',content:`hello!i am ${model.name},You can test my abilities here.`
+ id:'welcome',role:'assistant',content
  }
 }
 
@@ -36,12 +37,15 @@ export function LLMTest({
  onClose:() => void
  onConnect:(model:ModelRecord,request:{ apiKey:string;baseUrl?: string }) => Promise<boolean>
 }) {
+ const { t } = useTranslation('llm')
  const [activeTab,setActiveTab] = useState<'config' | 'playground'>(isConnected?defaultTab:'config')
  const [isEditing,setIsEditing] = useState(false)
  const [apiKey,setApiKey] = useState('')
  const [baseUrl,setBaseUrl] = useState(model.baseUrl?? '')
  const [isConnecting,setIsConnecting] = useState(false)
- const [messages,setMessages] = useState<ChatMessage[]>([buildWelcomeMessage(model)])
+ const [messages,setMessages] = useState<ChatMessage[]>([
+ buildWelcomeMessage(t('test.welcome', { modelName: model.name }))
+ ])
  const [collapsedReasoningMessageIds,setCollapsedReasoningMessageIds] = useState<string[]>([])
  const [draft,setDraft] = useState('')
  const [temperature,setTemperature] = useState(0.7)
@@ -239,8 +243,8 @@ export function LLMTest({
  hidePendingIndicator(assistantMessageId,true)
  setMessages((prev) =>
  prev.map((item) =>
- item.id === assistantMessageId &&!item.content.trim()?{...item,content:'The model is temporarily unresponsive,Please try again later.' }:item))
- toast.error(`Playground call failed:${message}`)
+ item.id === assistantMessageId &&!item.content.trim()?{...item,content:t('test.assistantFallback') }:item))
+ toast.error(t('test.toast.playgroundFailed', { message }))
  streamCancelRef.current = null
  setIsStreaming(false)
  setStreamingAssistantMessageId(null)
@@ -250,7 +254,7 @@ export function LLMTest({
 
  const handleReset = () => {
  cancelStreaming()
- setMessages([buildWelcomeMessage(model)])
+ setMessages([buildWelcomeMessage(t('test.welcome', { modelName: model.name }))])
  setCollapsedReasoningMessageIds([])
  setDraft('')
  }
@@ -288,7 +292,7 @@ export function LLMTest({
  isConnected?'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-200 dark:border-emerald-500/20':'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/20'
  }`}
  >
- {isConnected?'READY':'SETUP REQUIRED'}
+ {isConnected?t('test.status.ready'):t('test.status.setupRequired')}
  </span>
  </div>
  <div className="text-micro text-slate-400 font-mono truncate">{model.providerModelId}</div>
@@ -304,7 +308,7 @@ export function LLMTest({
  }`}
  >
  <Key size={12} className="mr-1.5" />
- Connect
+ {t('test.tabs.connect')}
  </button>
  <button
  type="button"
@@ -315,14 +319,14 @@ export function LLMTest({
  } ${!isConnected?'cursor-not-allowed':'hover:text-slate-700 dark:hover:text-slate-200'}`}
  >
  <Play size={12} className="mr-1.5 fill-current" />
- Playground
+ {t('test.tabs.playground')}
  </button>
  </div>
  <button
  type="button"
  onClick={onClose}
  className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
- aria-label="Close model dialog"
+ aria-label={t('test.closeDialogAria')}
  >
  <X size={18} />
  </button>
@@ -336,10 +340,14 @@ export function LLMTest({
  <Key size={22} className="text-slate-400" />
  </div>
  <h2 className="text-subtitle @md:text-title font-black text-slate-900 dark:text-white">
- {isConnected?`${getProviderLabel(model)} Connected`:`Connect to ${getProviderLabel(model)}`}
+ {isConnected
+ ? t('test.connectedTitle', { provider: getProviderLabel(model) })
+ : t('test.connectTitle', { provider: getProviderLabel(model) })}
  </h2>
  <p className="text-caption @md:text-body-sm text-slate-500 dark:text-slate-400 mt-2.5 max-w-sm mx-auto">
- {isConnected?'API Key Connected,Direct access Playground test model.':`input API Key to connect ${getProviderLabel(model)} and enable ${model.name}.`}
+ {isConnected
+ ? t('test.connectedSubtitle')
+ : t('test.connectSubtitle', { provider: getProviderLabel(model), modelName: model.name })}
  </p>
  </div>
 
@@ -348,9 +356,9 @@ export function LLMTest({
  <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 rounded-xl flex items-start">
  <ShieldCheck size={18} className="text-emerald-600 dark:text-emerald-300 mt-0.5 mr-3 flex-shrink-0" />
  <div>
- <h4 className="text-body-sm font-semibold text-emerald-800 dark:text-emerald-200">The connection has taken effect</h4>
+ <h4 className="text-body-sm font-semibold text-emerald-800 dark:text-emerald-200">{t('test.effectiveTitle')}</h4>
  <p className="text-caption text-emerald-600/90 dark:text-emerald-200/80 mt-1">
- Credentials saved safely,Direct access Playground.</p>
+ {t('test.effectiveSubtitle')}</p>
  </div>
  </div>
  <div className="flex items-center gap-3">
@@ -360,7 +368,7 @@ export function LLMTest({
  className="flex-1 h-9 bg-slate-900 hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white text-caption font-semibold rounded-xl transition-all shadow-md flex items-center justify-center"
  >
  <Play size={14} className="mr-2 fill-current" />
- Playground
+ {t('test.tabs.playground')}
  </button>
  <button
  type="button"
@@ -370,7 +378,7 @@ export function LLMTest({
  setIsEditing(true)
  }}
  className="h-9 w-9 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:border-indigo-300 transition-colors flex items-center justify-center"
- aria-label="Modify configuration"
+ aria-label={t('test.modifyConfigAria')}
  >
  <Settings2 size={16} />
  </button>
@@ -378,7 +386,7 @@ export function LLMTest({
  </div>):(<div className="space-y-2.5">
  <div>
  <label className={`block ${TYPOGRAPHY.micro} font-bold text-slate-500 uppercase tracking-wide mb-1`}>
- API Key <span className="text-rose-500">*</span>
+ {t('test.apiKey')} <span className="text-rose-500">*</span>
  </label>
  <div className="relative group">
  <Key size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
@@ -386,7 +394,9 @@ export function LLMTest({
  type="password"
  value={apiKey}
  onChange={(event) => setApiKey(event.target.value)}
- placeholder={model.maskedApiKey?`${model.maskedApiKey}(Enter new Key Cover)`:`sk-...(${getProviderLabel(model)} Key)`}
+ placeholder={model.maskedApiKey
+ ? t('test.apiKeyMaskedPlaceholder', { maskedApiKey: model.maskedApiKey })
+ : t('test.apiKeyPlaceholder', { provider: getProviderLabel(model) })}
  className="w-full h-9 pl-8 pr-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-caption text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all font-mono"
  autoFocus
  />
@@ -395,7 +405,7 @@ export function LLMTest({
 
  <div>
  <label className={`block ${TYPOGRAPHY.micro} font-bold text-slate-500 uppercase tracking-wide mb-1`}>
- Base URL <span className="text-slate-400 font-normal normal-case ml-1">(optional)</span>
+ {t('test.baseUrl')} <span className="text-slate-400 font-normal normal-case ml-1">({t('test.optional')})</span>
  </label>
  <div className="relative group">
  <Globe size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
@@ -403,7 +413,7 @@ export function LLMTest({
  type="text"
  value={baseUrl}
  onChange={(event) => setBaseUrl(event.target.value)}
- placeholder="https://api.example.com/v1"
+ placeholder={t('test.baseUrlPlaceholder')}
  className="w-full h-9 pl-8 pr-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-caption text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all font-mono"
  />
  </div>
@@ -418,11 +428,11 @@ export function LLMTest({
  disabled={!apiKey.trim() || isConnecting}
  className="w-full h-9 bg-indigo-400 hover:bg-indigo-500 text-white text-caption font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
  >
- {isConnecting?'Connecting...':'Save & Connect'}
+ {isConnecting?t('test.connecting'):t('test.saveAndConnect')}
  <ArrowRight size={16} className="ml-2" />
  </button>
  <p className={`${TYPOGRAPHY.nano} text-center text-slate-400 mt-2 flex items-center justify-center`}>
- <ShieldCheck size={10} className="mr-1" /> Keys are encrypted at rest.</p>
+ <ShieldCheck size={10} className="mr-1" /> {t('test.encryptedHint')}</p>
  </div>
  </div>)}
  </div>
@@ -459,13 +469,13 @@ export function LLMTest({
  onClick={() => toggleReasoningCollapse(message.id)}
  className="w-full flex items-center justify-between gap-2 text-left text-micro font-semibold text-slate-500 dark:text-slate-300"
  >
- <span className="uppercase tracking-wide">thought process</span>
+ <span className="uppercase tracking-wide">{t('test.thoughtProcess')}</span>
  {isReasoningCollapsed?<ChevronRight size={12} />:<ChevronDown size={12} />}
- </button>):(<div className="text-micro font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wide">thought process</div>)}
+ </button>):(<div className="text-micro font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wide">{t('test.thoughtProcess')}</div>)}
  {hasReasoning?(!isReasoningCollapsed && (<div className="mt-2 pt-2 border-t border-slate-200/70 dark:border-slate-700 whitespace-pre-wrap text-caption text-slate-600 dark:text-slate-300 leading-relaxed">
  {reasoningContent}
  </div>)):(<div className="mt-2 pt-2 border-t border-slate-200/70 dark:border-slate-700 text-caption text-slate-500 dark:text-slate-400">
- Thinking...</div>)}
+ {t('test.thinking')}</div>)}
  </div>)}
  {shouldShowContent && (<div className={`rounded-2xl px-4 py-3 text-body-sm shadow-sm bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200 ${
  shouldShowReasoningBlock?'rounded-t-none border-t-0':''
@@ -492,8 +502,8 @@ export function LLMTest({
  style={{ animationDelay:'300ms' }}
  />
  </div>
- <span className="text-micro font-semibold text-indigo-500 tracking-tight">Processing...</span>
- <span className="sr-only">AI Generating response</span>
+ <span className="text-micro font-semibold text-indigo-500 tracking-tight">{t('test.processing')}</span>
+ <span className="sr-only">{t('test.generatingAria')}</span>
  </div>
  </div>)}
  </div>
@@ -527,7 +537,7 @@ export function LLMTest({
  handleSend()
  }
  }}
- placeholder={`Message ${model.name}...`}
+ placeholder={t('test.messagePlaceholder', { modelName: model.name })}
  className="flex-1 bg-transparent outline-none text-body-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 group-focus-within:placeholder:text-slate-500 transition-colors"
  disabled={isStreaming}
  />
@@ -538,12 +548,12 @@ export function LLMTest({
  draft.trim() &&!isStreaming?'bg-indigo-600 text-white hover:bg-indigo-500 shadow-md shadow-indigo-500/20':'bg-slate-200 text-slate-400 cursor-not-allowed dark:bg-slate-700'
  }`}
  disabled={!draft.trim() || isStreaming}
- aria-label="Send message"
+ aria-label={t('test.sendMessageAria')}
  >
  <Send size={14} />
  </button>
  </div>
- <p className={`${TYPOGRAPHY.micro} text-slate-400 text-center mt-2`}>AI Output may be inaccurate,Please use caution.</p>
+ <p className={`${TYPOGRAPHY.micro} text-slate-400 text-center mt-2`}>{t('test.outputWarning')}</p>
  </div>
  </div>
 
@@ -552,21 +562,21 @@ export function LLMTest({
  <span className="size-6 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-indigo-500">
  <SlidersHorizontal size={12} />
  </span>
- MODEL CONFIG
+ {t('test.modelConfig')}
  </div>
 
  <div className="mt-5 space-y-5">
  <div>
  <div className="flex items-center justify-between mb-2">
  <label className="text-caption font-semibold text-slate-600 dark:text-slate-300">
- System Instruction
+ {t('test.systemInstruction')}
  </label>
  <span className="text-micro font-mono text-slate-500">{systemInstruction.length}/2000</span>
  </div>
  <textarea
  value={systemInstruction}
  onChange={(event) => setSystemInstruction(event.target.value.slice(0,2000))}
- placeholder="Optional:Enter system-level instructions(For example,reply style,constraint)"
+ placeholder={t('test.systemInstructionPlaceholder')}
  rows={4}
  className="w-full resize-y min-h-[84px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-caption text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all"
  />
@@ -574,7 +584,7 @@ export function LLMTest({
 
  <div>
  <div className="flex items-center justify-between mb-2">
- <label className="text-caption font-semibold text-slate-600 dark:text-slate-300">Temperature</label>
+ <label className="text-caption font-semibold text-slate-600 dark:text-slate-300">{t('test.temperature')}</label>
  <span className="text-micro font-mono text-slate-500">{temperature.toFixed(1)}</span>
  </div>
  <input
@@ -590,7 +600,7 @@ export function LLMTest({
 
  <div>
  <div className="flex items-center justify-between mb-2">
- <label className="text-caption font-semibold text-slate-600 dark:text-slate-300">Top P</label>
+ <label className="text-caption font-semibold text-slate-600 dark:text-slate-300">{t('test.topP')}</label>
  <span className="text-micro font-mono text-slate-500">{topP.toFixed(2)}</span>
  </div>
  <input
@@ -606,8 +616,8 @@ export function LLMTest({
 
  <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2">
  <div>
- <p className="text-caption font-semibold text-slate-600 dark:text-slate-300">Start thinking</p>
- <p className="text-micro text-slate-400">Only takes effect if the model supports it</p>
+ <p className="text-caption font-semibold text-slate-600 dark:text-slate-300">{t('test.startThinking')}</p>
+ <p className="text-micro text-slate-400">{t('test.startThinkingHint')}</p>
  </div>
  <button
  type="button"
@@ -615,7 +625,7 @@ export function LLMTest({
  className={`h-6 w-11 rounded-full border transition-colors ${
  thinkingEnabled?'border-indigo-500 bg-indigo-500':'border-slate-300 bg-slate-200 dark:border-slate-600 dark:bg-slate-700'
  }`}
- aria-label="Switch thinking mode"
+ aria-label={t('test.switchThinkingAria')}
  >
  <span
  className={`block h-5 w-5 rounded-full bg-white transition-transform ${
@@ -630,7 +640,7 @@ export function LLMTest({
  onClick={handleReset}
  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-body-sm font-semibold text-slate-600 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
  >
- Reset conversation
+ {t('test.resetConversation')}
  </button>
  </div>
  </div>

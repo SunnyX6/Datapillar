@@ -41,7 +41,7 @@ import com.sunny.datapillar.studio.module.tenant.service.sso.provider.DingtalkBi
 import com.sunny.datapillar.studio.module.tenant.service.sso.provider.model.DingtalkUserInfo;
 import com.sunny.datapillar.studio.module.user.entity.TenantUser;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
+import com.sunny.datapillar.studio.security.crypto.LocalCryptoService;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -68,7 +68,7 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
   private final TenantSsoConfigMapper tenantSsoConfigMapper;
   private final TenantUserMapper tenantUserMapper;
   private final DingtalkBindingClient dingtalkBindingClient;
-  private final AuthCryptoRpcClient authCryptoClient;
+  private final LocalCryptoService localCryptoService;
   private final TenantCodeResolver tenantCodeResolver;
   private final ObjectMapper objectMapper;
   private final StudioDbExceptionTranslator studioDbExceptionTranslator;
@@ -238,7 +238,7 @@ public class SsoIdentityServiceImpl implements SsoIdentityService {
 
   private String decryptClientSecret(String tenantCode, String encoded) {
     try {
-      return authCryptoClient.decryptSsoClientSecret(tenantCode, encoded);
+      return localCryptoService.decryptSsoClientSecret(tenantCode, encoded);
     } catch (IllegalArgumentException ex) {
       throw new SsoConfigInvalidException(ex);
     }

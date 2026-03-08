@@ -16,16 +16,20 @@
             <artifactId>datapillar-common</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.sunny</groupId>
-            <artifactId>datapillar-connector-runtime</artifactId>
+            <groupId>org.apache.gravitino</groupId>
+            <artifactId>gravitino-client-java</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.sunny</groupId>
-            <artifactId>datapillar-connector-airflow</artifactId>
+            <groupId>org.apache.gravitino</groupId>
+            <artifactId>gravitino-api</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.sunny</groupId>
-            <artifactId>datapillar-connector-gravitino</artifactId>
+            <groupId>org.apache.gravitino</groupId>
+            <artifactId>gravitino-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp-jvm</artifactId>
         </dependency>
         <!-- Spring Boot Web -->
         <dependency>
@@ -46,18 +50,10 @@
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
         </dependency>
-        <!-- Dubbo RPC -->
+        <!-- AWS SDK v2 (S3) -->
         <dependency>
-            <groupId>org.apache.dubbo</groupId>
-            <artifactId>dubbo-spring-boot-starter</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.dubbo</groupId>
-            <artifactId>dubbo-nacos-spring-boot-starter</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
         </dependency>
         <!-- Spring Boot Validation -->
         <dependency>
@@ -133,7 +129,7 @@
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
         </dependency>
-        <!-- Flink SQL(runtime by gravitino-flink-connector-runtime provide) -->
+        <!-- Flink SQL (runtime support provided by Gravitino extension jars) -->
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-table-api-java</artifactId>

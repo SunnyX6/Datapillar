@@ -42,6 +42,7 @@ import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
 import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
 import org.apache.gravitino.dto.requests.RoleGrantRequest;
+import org.apache.gravitino.dto.requests.RoleReplaceRequest;
 import org.apache.gravitino.dto.requests.RoleRevokeRequest;
 import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
@@ -94,6 +95,34 @@ public class PermissionOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
           OperationType.GRANT, StringUtils.join(request.getRoleNames(), ","), user, e);
+    }
+  }
+
+  @PUT
+  @Path("users/{user}/replace/")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "replace-roles-for-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "replace-roles-for-user", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::MANAGE_GRANTS")
+  public Response replaceRolesForUser(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("user") String user,
+      RoleReplaceRequest request) {
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            return Utils.ok(
+                new UserResponse(
+                    DTOConverters.toDTO(
+                        accessControlManager.replaceRolesForUser(
+                            metalake, request.getRoleNames(), user))));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleUserPermissionOperationException(
+          OperationType.REPLACE, StringUtils.join(request.getRoleNames(), ","), user, e);
     }
   }
 

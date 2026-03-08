@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,21 @@ class Ed25519JwkSupportTest {
     assertEquals("kid-1", jwk.get("kid"));
     assertEquals("OKP", jwk.get("kty"));
     assertEquals("Ed25519", jwk.get("crv"));
+  }
+
+  @Test
+  void shouldBuildAndParseEd25519PrivateJwk() throws Exception {
+    KeyPair keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+    Map<String, Object> jwk =
+        Ed25519JwkSupport.toPrivateJwk("kid-1", keyPair.getPublic(), keyPair.getPrivate());
+
+    PublicKey parsedPublic = Ed25519JwkSupport.parseEd25519PublicKeyFromJwk(jwk);
+    PrivateKey parsedPrivate = Ed25519JwkSupport.parseEd25519PrivateKeyFromJwk(jwk);
+
+    assertEquals(keyPair.getPublic(), parsedPublic);
+    assertEquals(keyPair.getPrivate(), parsedPrivate);
+    assertEquals("kid-1", jwk.get("kid"));
+    assertEquals("EdDSA", jwk.get("alg"));
   }
 
   @Test

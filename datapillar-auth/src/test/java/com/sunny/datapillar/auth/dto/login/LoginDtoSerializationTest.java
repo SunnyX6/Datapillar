@@ -1,6 +1,7 @@
 package com.sunny.datapillar.auth.dto.login;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -57,6 +58,8 @@ class LoginDtoSerializationTest {
     assertTrue(jsonNode.has("userId"));
     assertTrue(jsonNode.has("username"));
     assertTrue(jsonNode.has("email"));
+    assertFalse(jsonNode.has("roles"));
+    assertFalse(jsonNode.has("menus"));
     assertEquals(10L, jsonNode.get("tenants").get(0).get("tenantId").asLong());
   }
 }

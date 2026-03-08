@@ -65,10 +65,12 @@ import org.apache.gravitino.dto.responses.MetricVersionResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.pagination.PagedResult;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 @Tag(name = "Metric Management", description = "Indicator management relatedAPI")
 @Path("metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/metrics")
@@ -122,7 +124,15 @@ public class MetricOperations {
             PagedResult<Metric> result = datasetDispatcher.listMetrics(metricNs, offset, limit);
             MetricDTO[] metricDTOs =
                 result.items().stream().map(DTOConverters::toDTO).toArray(MetricDTO[]::new);
-            return Utils.ok(new MetricListResponse(metricDTOs, result.total(), offset, limit));
+            metricDTOs =
+                MetadataFilterHelper.filterByExpression(
+                    metalake,
+                    AuthorizationExpressionConstants.filterMetricAuthorizationExpression,
+                    Entity.EntityType.METRIC,
+                    metricDTOs,
+                    metricDto ->
+                        NameIdentifierUtil.ofMetric(metalake, catalog, schema, metricDto.code()));
+            return Utils.ok(new MetricListResponse(metricDTOs, metricDTOs.length, offset, limit));
           });
 
     } catch (Exception e) {
@@ -136,8 +146,8 @@ public class MetricOperations {
   @Timed(name = "get-metric." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-metric", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.loadMetricAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.METRIC)
   public Response getMetric(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -164,7 +174,7 @@ public class MetricOperations {
   @Timed(name = "register-metric." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "register-metric", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.createMetricAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response registerMetric(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -214,8 +224,8 @@ public class MetricOperations {
   @Timed(name = "delete-metric." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-metric", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.manageMetricAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.METRIC)
   public Response deleteMetric(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -243,8 +253,8 @@ public class MetricOperations {
   @Timed(name = "alter-metric." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-metric", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.manageMetricAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.METRIC)
   public Response alterMetric(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -277,8 +287,8 @@ public class MetricOperations {
   @Timed(name = "list-metric-versions." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-metric-versions", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.loadMetricAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.METRIC)
   public Response listMetricVersions(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -308,8 +318,8 @@ public class MetricOperations {
   @Timed(name = "get-metric-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-metric-version", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.loadMetricAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.METRIC)
   public Response getMetricVersion(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -339,8 +349,8 @@ public class MetricOperations {
   @Timed(name = "delete-metric-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-metric-version", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.manageMetricAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.METRIC)
   public Response deleteMetricVersion(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -370,8 +380,8 @@ public class MetricOperations {
   @Timed(name = "alter-metric-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-metric-version", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.manageMetricAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.METRIC)
   @Operation(
       summary = "Update indicator version",
       description =
@@ -428,8 +438,8 @@ public class MetricOperations {
   @Timed(name = "switch-metric-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "switch-metric-version", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.manageMetricAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.METRIC)
   public Response switchMetricVersion(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -478,8 +488,17 @@ public class MetricOperations {
                 datasetDispatcher.listMetricModifiers(modifierNs, offset, limit);
             MetricModifierDTO[] modifierDTOs =
                 result.items().stream().map(DTOConverters::toDTO).toArray(MetricModifierDTO[]::new);
+            modifierDTOs =
+                MetadataFilterHelper.filterByExpression(
+                    metalake,
+                    AuthorizationExpressionConstants.filterModifierAuthorizationExpression,
+                    Entity.EntityType.MODIFIER,
+                    modifierDTOs,
+                    modifierDto ->
+                        NameIdentifierUtil.ofModifier(
+                            metalake, catalog, schema, modifierDto.code()));
             return Utils.ok(
-                new MetricModifierListResponse(modifierDTOs, result.total(), offset, limit));
+                new MetricModifierListResponse(modifierDTOs, modifierDTOs.length, offset, limit));
           });
 
     } catch (Exception e) {
@@ -493,14 +512,14 @@ public class MetricOperations {
   @Timed(name = "get-modifier." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-modifier", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.loadModifierAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.MODIFIER)
   public Response getModifier(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("code") String code) {
+      @PathParam("code") @AuthorizationMetadata(type = Entity.EntityType.MODIFIER) String code) {
     NameIdentifier modifierId = NameIdentifier.of(metalake, catalog, schema, code);
 
     try {
@@ -523,7 +542,7 @@ public class MetricOperations {
   @Timed(name = "create-modifier." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-modifier", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.createModifierAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createModifier(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -559,14 +578,14 @@ public class MetricOperations {
   @Timed(name = "delete-modifier." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-modifier", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.manageModifierAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.MODIFIER)
   public Response deleteModifier(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("code") String code) {
+      @PathParam("code") @AuthorizationMetadata(type = Entity.EntityType.MODIFIER) String code) {
     NameIdentifier modifierId = NameIdentifier.of(metalake, catalog, schema, code);
 
     try {
@@ -588,8 +607,8 @@ public class MetricOperations {
   @Timed(name = "alter-modifier." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-modifier", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.manageModifierAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.MODIFIER)
   @Operation(
       summary = "update modifier",
       description = "Update information for a specified modifier")
@@ -603,7 +622,7 @@ public class MetricOperations {
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("code") String code,
+      @PathParam("code") @AuthorizationMetadata(type = Entity.EntityType.MODIFIER) String code,
       MetricModifierUpdateRequest request) {
     NameIdentifier modifierId = NameIdentifier.of(metalake, catalog, schema, code);
 

@@ -29,11 +29,6 @@ import { Button } from '@/components/ui'
 import type { Menu } from '@/services/types/auth'
 import { isMenuVisible } from '@/services/menuPermissionService'
 
-const LANGUAGE_OPTIONS: { id: Language; label: string }[] = [
-  { id: 'zh-CN', label: 'Simplified Chinese' },
-  { id: 'en-US', label: 'English' }
-]
-
 interface UserInfo {
   name: string
   email?: string
@@ -75,7 +70,14 @@ export function TopNav({
   }, [user.email])
   const language = useI18nStore((state) => state.language)
   const setLanguage = useI18nStore((state) => state.setLanguage)
-  const { t, i18n } = useTranslation('navigation')
+  const { t, i18n } = useTranslation(['navigation', 'common'])
+  const languageOptions = useMemo<{ id: Language; label: string }[]>(
+    () => [
+      { id: 'zh-CN', label: t('language.zh-CN', { ns: 'common' }) },
+      { id: 'en-US', label: t('language.en-US', { ns: 'common' }) }
+    ],
+    [t]
+  )
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isGovernanceOpen, setIsGovernanceOpen] = useState(false)
   const [isLanguageOpen, setIsLanguageOpen] = useState(false)
@@ -680,7 +682,7 @@ export function TopNav({
                 style={languageDropdownStyle}
                 className={`fixed z-[1000000] ${menuWidthClassMap.compact} bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150 origin-top-right top-[var(--dropdown-top)] right-[calc(100vw-var(--dropdown-right))]`}
               >
-                {LANGUAGE_OPTIONS.map((option) => (
+                {languageOptions.map((option) => (
                   <Button
                     key={option.id}
                     type="button"

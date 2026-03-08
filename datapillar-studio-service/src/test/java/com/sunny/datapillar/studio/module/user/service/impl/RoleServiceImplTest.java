@@ -2,44 +2,33 @@ package com.sunny.datapillar.studio.module.user.service.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.sunny.datapillar.common.exception.ForbiddenException;
-import com.sunny.datapillar.common.exception.NotFoundException;
-import com.sunny.datapillar.connector.runtime.ConnectorKernel;
-import com.sunny.datapillar.connector.spi.ConnectorResponse;
 import com.sunny.datapillar.studio.context.TenantContext;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
-import com.sunny.datapillar.studio.dto.tenant.request.RoleDataPrivilegeSyncRequest;
-import com.sunny.datapillar.studio.dto.tenant.response.TenantFeaturePermissionLimitItem;
+import com.sunny.datapillar.studio.dto.tenant.request.RoleDataPrivilegeCommandItem;
+import com.sunny.datapillar.studio.dto.tenant.response.RoleDataPrivilegeItem;
 import com.sunny.datapillar.studio.dto.user.request.RoleCreateRequest;
-import com.sunny.datapillar.studio.dto.user.response.RoleMemberItem;
-import com.sunny.datapillar.studio.dto.user.response.RoleMembersResponse;
-import com.sunny.datapillar.studio.module.tenant.entity.FeatureObject;
-import com.sunny.datapillar.studio.module.tenant.entity.FeatureObjectCategory;
-import com.sunny.datapillar.studio.module.tenant.entity.Permission;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoRolePrivilegeService;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoRoleService;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoUserRoleService;
 import com.sunny.datapillar.studio.module.tenant.mapper.FeatureObjectCategoryMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.FeatureObjectMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.PermissionMapper;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantFeaturePermissionMapper;
 import com.sunny.datapillar.studio.module.user.entity.Role;
-import com.sunny.datapillar.studio.module.user.entity.RolePermission;
+import com.sunny.datapillar.studio.module.user.entity.User;
 import com.sunny.datapillar.studio.module.user.mapper.RoleMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
-import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -52,7 +41,9 @@ class RoleServiceImplTest {
   @Mock private FeatureObjectCategoryMapper featureObjectCategoryMapper;
   @Mock private TenantFeaturePermissionMapper tenantFeaturePermissionMapper;
   @Mock private UserMapper userMapper;
-  @Mock private ConnectorKernel connectorKernel;
+  @Mock private GravitinoRoleService gravitinoRoleService;
+  @Mock private GravitinoRolePrivilegeService gravitinoRolePrivilegeService;
+  @Mock private GravitinoUserRoleService gravitinoUserRoleService;
 
   private RoleServiceImpl roleService;
 
@@ -67,8 +58,9 @@ class RoleServiceImplTest {
             featureObjectCategoryMapper,
             tenantFeaturePermissionMapper,
             userMapper,
-            connectorKernel,
-            new ObjectMapper());
+            gravitinoRoleService,
+            gravitinoRolePrivilegeService,
+            gravitinoUserRoleService);
   }
 
   @AfterEach
@@ -77,166 +69,121 @@ class RoleServiceImplTest {
   }
 
   @Test
-  void getRoleMembers_shouldReturnRoleScopedResponse() {
-    Role role = new Role();
-    role.setId(3L);
-    role.setTenantId(10L);
-    role.setName("Developer");
-    role.setType("USER");
-    role.setLevel(100);
-    role.setStatus(1);
-    when(roleMapper.selectOne(any())).thenReturn(role);
-
-    RoleMemberItem member = new RoleMemberItem();
-    member.setUserId(101L);
-    member.setUsername("sunny");
-    member.setMemberStatus(1);
-    member.setJoinedAt(LocalDateTime.parse("2026-02-01T10:00:00"));
-    member.setAssignedAt(LocalDateTime.parse("2026-02-02T12:00:00"));
-    when(roleMapper.selectRoleMembers(10L, 3L, 1)).thenReturn(List.of(member));
-
-    RoleMembersResponse response = roleService.getRoleMembers(3L, 1);
-
-    assertEquals(3L, response.getRoleId());
-    assertEquals("Developer", response.getRoleName());
-    assertEquals("USER", response.getRoleType());
-    assertEquals(100, response.getRoleLevel());
-    assertEquals(1, response.getRoleStatus());
-    assertEquals(1L, response.getMemberCount());
-    assertEquals(1, response.getMembers().size());
-  }
-
-  @Test
-  void removeRoleMembers_shouldRejectWhenContainsPlatformSuperAdminUser() {
-    Role role = new Role();
-    role.setId(7L);
-    role.setTenantId(10L);
-    when(roleMapper.selectOne(any())).thenReturn(role);
-    when(userMapper.selectUserIdsByMaxLevel(10L, List.of(101L, 102L), 0)).thenReturn(List.of(101L));
-
-    ForbiddenException exception =
-        assertThrows(
-            ForbiddenException.class, () -> roleService.removeRoleMembers(7L, List.of(101L, 102L)));
-
-    assertTrue(
-        exception.getMessage().contains("Platform super users are not allowed to remove roles"));
-    verify(roleMapper, never()).deleteRoleMembersByUserIds(any(), any(), any());
-  }
-
-  @Test
-  void getRoleMembers_shouldRejectWhenRoleNotFound() {
-    when(roleMapper.selectOne(any())).thenReturn(null);
-
-    NotFoundException exception =
-        assertThrows(NotFoundException.class, () -> roleService.getRoleMembers(99L, null));
-
-    assertTrue(exception.getMessage().contains("role does not exist"));
-    verify(roleMapper, never()).selectRoleMembers(any(), any(), any());
-  }
-
-  @Test
-  void createRole_shouldAssignDefaultReadPermissionsForUserRole() {
+  void createRole_shouldPersistAndCreateRemoteRole() {
     RoleCreateRequest request = new RoleCreateRequest();
-    request.setName("ordinary member");
-    request.setDescription("Default permission verification");
-    request.setType("USER");
+    request.setName("Developer");
+    request.setDescription("Developer role");
+    request.setType("group");
 
-    when(roleMapper.findByName(10L, "ordinary member")).thenReturn(null);
-    when(roleMapper.selectMaxSortByTenant(10L)).thenReturn(3);
+    when(roleMapper.findByName(10L, "Developer")).thenReturn(null);
+    when(roleMapper.selectMaxSortByTenant(10L)).thenReturn(4);
     when(roleMapper.insert(any(Role.class)))
         .thenAnswer(
             invocation -> {
               Role role = invocation.getArgument(0);
-              role.setId(9L);
+              role.setId(301L);
               return 1;
             });
 
-    when(permissionMapper.selectSystemByCode("READ")).thenReturn(permission(2L, "READ", 1));
-
-    FeatureObjectCategory category = new FeatureObjectCategory();
-    category.setId(100L);
-    category.setCode("MANAGE_DEFINE");
-    when(featureObjectCategoryMapper.selectByCode("MANAGE_DEFINE")).thenReturn(category);
-
-    FeatureObject workflow = featureObject(1000L, "/workflow", 200L);
-    FeatureObject profile = featureObject(1001L, "/profile", 100L);
-    FeatureObject profilePermission = featureObject(1002L, "/profile/permission", 100L);
-    FeatureObject profileAi = featureObject(1003L, "/profile/llm/models", 100L);
-    FeatureObject home = featureObject(1004L, "/home", 100L);
-    when(featureObjectMapper.selectList(any()))
-        .thenReturn(List.of(workflow, profile, profilePermission, profileAi, home));
-
-    when(tenantFeaturePermissionMapper.selectPermissionLimits(10L))
-        .thenReturn(
-            List.of(
-                permissionLimit(1000L, 1, 1),
-                permissionLimit(1001L, 1, 1),
-                permissionLimit(1002L, 1, 1),
-                permissionLimit(1003L, 1, 1),
-                permissionLimit(1004L, 1, 1)));
-
     Long roleId = roleService.createRole(request);
 
-    assertEquals(9L, roleId);
-    ArgumentCaptor<RolePermission> captor = ArgumentCaptor.forClass(RolePermission.class);
-    verify(roleMapper, times(2)).insertRolePermission(captor.capture());
-    List<RolePermission> insertedPermissions = captor.getAllValues();
-    assertEquals(2, insertedPermissions.size());
-    assertTrue(
-        insertedPermissions.stream()
-            .anyMatch(
-                item ->
-                    item.getRoleId().equals(9L)
-                        && item.getObjectId().equals(1000L)
-                        && item.getPermissionId().equals(2L)));
-    assertTrue(
-        insertedPermissions.stream()
-            .anyMatch(
-                item ->
-                    item.getRoleId().equals(9L)
-                        && item.getObjectId().equals(1001L)
-                        && item.getPermissionId().equals(2L)));
+    assertEquals(301L, roleId);
+    verify(gravitinoRoleService).createRole("Developer", null);
   }
 
   @Test
-  void roleDataPrivilegeApi_shouldCallConnectorKernel() {
+  void deleteRole_shouldDeleteRemoteRoleAndLocalBindings() {
+    Role role = new Role();
+    role.setId(301L);
+    role.setTenantId(10L);
+    role.setName("Developer");
+    role.setLevel(100);
+
+    when(roleMapper.selectOne(any())).thenReturn(role);
+    when(roleMapper.countUsersByRoleId(10L, 301L)).thenReturn(0L);
+
+    roleService.deleteRole(301L);
+
+    verify(gravitinoRoleService).deleteRole("Developer", null);
+    verify(roleMapper).deleteRolePermissions(10L, 301L);
+    verify(roleMapper).deleteUserRolesByRoleId(10L, 301L);
+    verify(roleMapper).deleteById(301L);
+  }
+
+  @Test
+  void removeRoleMembers_shouldSyncRemainingRemoteRoles() {
     Role role = new Role();
     role.setId(7L);
     role.setTenantId(10L);
+    when(roleMapper.selectOne(any())).thenReturn(role);
+    when(userMapper.selectUserIdsByMaxLevel(10L, List.of(101L), 0)).thenReturn(List.of());
+
+    User user = new User();
+    user.setId(101L);
+    user.setTenantId(10L);
+    user.setUsername("sunny");
+    when(userMapper.selectByIdAndTenantId(10L, 101L)).thenReturn(user);
+
+    Role remainingRole = new Role();
+    remainingRole.setName("Analyst");
+    when(roleMapper.findByUserId(10L, 101L)).thenReturn(List.of(remainingRole));
+
+    roleService.removeRoleMembers(7L, List.of(101L));
+
+    verify(roleMapper).deleteRoleMembersByUserIds(10L, 7L, List.of(101L));
+    verify(gravitinoUserRoleService).replaceUserRoles("sunny", List.of("Analyst"), null);
+  }
+
+  @Test
+  void removeRoleMembers_shouldRejectPlatformSuperAdmin() {
+    Role role = new Role();
+    role.setId(7L);
+    role.setTenantId(10L);
+    when(roleMapper.selectOne(any())).thenReturn(role);
+    when(userMapper.selectUserIdsByMaxLevel(10L, List.of(101L), 0)).thenReturn(List.of(101L));
+
+    assertThrows(ForbiddenException.class, () -> roleService.removeRoleMembers(7L, List.of(101L)));
+  }
+
+  @Test
+  void replaceRoleDataPrivileges_shouldDelegateToGravitinoRolePrivilegeService() {
+    Role role = new Role();
+    role.setId(301L);
+    role.setTenantId(10L);
+    role.setName("Developer");
     role.setLevel(100);
+    when(roleMapper.selectOne(any())).thenReturn(role);
+
+    RoleDataPrivilegeCommandItem command = new RoleDataPrivilegeCommandItem();
+    command.setObjectType("TABLE");
+    command.setObjectName("ods.orders");
+    command.setPrivilegeCodes(List.of("SELECT"));
+
+    roleService.replaceRoleDataPrivileges(301L, "metadata", List.of(command));
+
+    verify(gravitinoRolePrivilegeService)
+        .replaceRoleDataPrivileges(eq("Developer"), eq("metadata"), eq(List.of(command)), eq(null));
+  }
+
+  @Test
+  void getRoleDataPrivileges_shouldDelegateToGravitinoRolePrivilegeService() {
+    Role role = new Role();
+    role.setId(301L);
+    role.setTenantId(10L);
     role.setName("Developer");
     when(roleMapper.selectOne(any())).thenReturn(role);
-    when(connectorKernel.invoke(any()))
-        .thenReturn(ConnectorResponse.of(JsonNodeFactory.instance.objectNode().putArray("items")));
 
-    assertEquals(0, roleService.getRoleDataPrivileges(7L, "SEMANTICS").size());
-    roleService.updateRoleDataPrivileges(7L, new RoleDataPrivilegeSyncRequest());
-    verify(connectorKernel, times(2)).invoke(any());
-  }
+    RoleDataPrivilegeItem item = new RoleDataPrivilegeItem();
+    item.setDomain("metadata");
+    item.setObjectType("TABLE");
+    item.setObjectName("ods.orders");
+    item.setPrivilegeCode("SELECT");
+    when(gravitinoRolePrivilegeService.getRoleDataPrivileges("Developer", "metadata", null))
+        .thenReturn(List.of(item));
 
-  private FeatureObject featureObject(Long id, String path, Long categoryId) {
-    FeatureObject object = new FeatureObject();
-    object.setId(id);
-    object.setPath(path);
-    object.setCategoryId(categoryId);
-    object.setStatus(1);
-    return object;
-  }
+    List<RoleDataPrivilegeItem> result = roleService.getRoleDataPrivileges(301L, "metadata");
 
-  private TenantFeaturePermissionLimitItem permissionLimit(
-      Long objectId, Integer status, Integer permissionLevel) {
-    TenantFeaturePermissionLimitItem limit = new TenantFeaturePermissionLimitItem();
-    limit.setObjectId(objectId);
-    limit.setStatus(status);
-    limit.setPermissionLevel(permissionLevel);
-    return limit;
-  }
-
-  private Permission permission(Long id, String code, Integer level) {
-    Permission permission = new Permission();
-    permission.setId(id);
-    permission.setCode(code);
-    permission.setLevel(level);
-    return permission;
+    assertEquals(1, result.size());
+    assertEquals("ods.orders", result.getFirst().getObjectName());
   }
 }

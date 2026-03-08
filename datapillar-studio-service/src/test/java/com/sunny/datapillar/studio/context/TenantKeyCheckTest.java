@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantMapper;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
+import com.sunny.datapillar.studio.security.crypto.LocalCryptoService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,7 +20,7 @@ class TenantKeyCheckTest {
 
   @Mock private TenantMapper tenantMapper;
 
-  @Mock private AuthCryptoRpcClient authCryptoClient;
+  @Mock private LocalCryptoService localCryptoService;
 
   @Test
   void run_shouldPassWhenAllTenantKeysAreReady() {
@@ -31,11 +31,11 @@ class TenantKeyCheckTest {
     tenant.setStatus(1);
 
     when(tenantMapper.selectList(any())).thenReturn(List.of(tenant));
-    when(authCryptoClient.getTenantKeyStatus("tenant-1"))
+    when(localCryptoService.getTenantKeyStatus("tenant-1"))
         .thenReturn(
-            new AuthCryptoRpcClient.TenantKeyStatus(true, "tenant-1", "READY", "v1", "fp-1"));
+            new LocalCryptoService.TenantKeyStatus(true, "tenant-1", "READY", "v1", "fp-1"));
 
-    TenantKeyCheck check = new TenantKeyCheck(tenantMapper, authCryptoClient);
+    TenantKeyCheck check = new TenantKeyCheck(tenantMapper, localCryptoService);
 
     assertDoesNotThrow(() -> check.run(null));
   }
@@ -54,10 +54,10 @@ class TenantKeyCheckTest {
     tenant2.setStatus(1);
 
     when(tenantMapper.selectList(any())).thenReturn(List.of(tenant1, tenant2));
-    when(authCryptoClient.getTenantKeyStatus("tenant-2"))
-        .thenReturn(new AuthCryptoRpcClient.TenantKeyStatus(false, "tenant-2", "MISSING", "", ""));
+    when(localCryptoService.getTenantKeyStatus("tenant-2"))
+        .thenReturn(new LocalCryptoService.TenantKeyStatus(false, "tenant-2", "MISSING", "", ""));
 
-    TenantKeyCheck check = new TenantKeyCheck(tenantMapper, authCryptoClient);
+    TenantKeyCheck check = new TenantKeyCheck(tenantMapper, localCryptoService);
 
     IllegalStateException exception =
         assertThrows(IllegalStateException.class, () -> check.run(null));
@@ -76,7 +76,7 @@ class TenantKeyCheckTest {
 
     when(tenantMapper.selectList(any())).thenReturn(List.of(tenant));
 
-    TenantKeyCheck check = new TenantKeyCheck(tenantMapper, authCryptoClient);
+    TenantKeyCheck check = new TenantKeyCheck(tenantMapper, localCryptoService);
 
     assertDoesNotThrow(() -> check.run(null));
   }

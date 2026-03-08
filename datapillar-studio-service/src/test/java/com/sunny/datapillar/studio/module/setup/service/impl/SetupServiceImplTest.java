@@ -9,16 +9,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.sunny.datapillar.common.exception.AlreadyExistsException;
 import com.sunny.datapillar.common.exception.ServiceUnavailableException;
-import com.sunny.datapillar.connector.runtime.ConnectorKernel;
-import com.sunny.datapillar.connector.spi.ConnectorResponse;
 import com.sunny.datapillar.studio.context.TenantContext;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
 import com.sunny.datapillar.studio.dto.llm.request.*;
@@ -35,6 +34,7 @@ import com.sunny.datapillar.studio.dto.user.request.*;
 import com.sunny.datapillar.studio.dto.user.response.*;
 import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoSetupService;
 import com.sunny.datapillar.studio.module.setup.entity.SystemBootstrap;
 import com.sunny.datapillar.studio.module.setup.mapper.SystemBootstrapMapper;
 import com.sunny.datapillar.studio.module.tenant.entity.FeatureObject;
@@ -51,6 +51,7 @@ import com.sunny.datapillar.studio.module.user.mapper.RolePermissionMapper;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserRoleMapper;
+import com.sunny.datapillar.studio.module.user.service.UserService;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,6 +70,7 @@ class SetupServiceImplTest {
   @Mock private SystemBootstrapMapper systemBootstrapMapper;
   @Mock private TenantService tenantService;
   @Mock private UserMapper userMapper;
+  @Mock private UserService userService;
   @Mock private TenantUserMapper tenantUserMapper;
   @Mock private UserRoleMapper userRoleMapper;
   @Mock private RoleMapper roleMapper;
@@ -76,7 +78,7 @@ class SetupServiceImplTest {
   @Mock private PermissionMapper permissionMapper;
   @Mock private FeatureObjectMapper featureObjectMapper;
   @Mock private TenantFeaturePermissionMapper tenantFeaturePermissionMapper;
-  @Mock private ConnectorKernel connectorKernel;
+  @Mock private GravitinoSetupService gravitinoSetupService;
   @Mock private TransactionTemplate transactionTemplate;
 
   private SetupServiceImpl setupService;
@@ -90,15 +92,13 @@ class SetupServiceImplTest {
               TransactionCallback<?> callback = invocation.getArgument(0);
               return callback.doInTransaction(null);
             });
-    lenient()
-        .when(connectorKernel.invoke(any()))
-        .thenReturn(ConnectorResponse.of(JsonNodeFactory.instance.objectNode()));
     setupService =
         new SetupServiceImpl(
             tenantMapper,
             systemBootstrapMapper,
             tenantService,
             userMapper,
+            userService,
             tenantUserMapper,
             userRoleMapper,
             roleMapper,
@@ -106,8 +106,7 @@ class SetupServiceImplTest {
             permissionMapper,
             featureObjectMapper,
             tenantFeaturePermissionMapper,
-            connectorKernel,
-            new ObjectMapper(),
+            gravitinoSetupService,
             transactionTemplate);
   }
 
@@ -148,7 +147,7 @@ class SetupServiceImplTest {
 
   @Test
   void getStatus_shouldReturnCompletedStepWhenAlreadyInitialized() {
-    when(systemBootstrapMapper.selectById(1)).thenReturn(bootstrap(1));
+    when(systemBootstrapMapper.selectById(1)).thenReturn(bootstrap(3));
 
     SetupStatusResponse response = setupService.getStatus();
 
@@ -159,6 +158,20 @@ class SetupServiceImplTest {
     assertEquals("COMPLETED", response.getSteps().get(0).getStatus());
     assertEquals("COMPLETED", response.getSteps().get(1).getStatus());
     assertEquals("COMPLETED", response.getSteps().get(2).getStatus());
+  }
+
+  @Test
+  void getStatus_shouldReturnFailedInitializationStepWhenProvisioningFailed() {
+    when(systemBootstrapMapper.selectById(1)).thenReturn(bootstrap(2));
+
+    SetupStatusResponse response = setupService.getStatus();
+
+    assertTrue(response.isSchemaReady());
+    assertFalse(response.isInitialized());
+    assertEquals("SYSTEM_INITIALIZATION", response.getCurrentStep());
+    assertEquals("COMPLETED", response.getSteps().get(0).getStatus());
+    assertEquals("FAILED", response.getSteps().get(1).getStatus());
+    assertEquals("PENDING", response.getSteps().get(2).getStatus());
   }
 
   @Test
@@ -175,7 +188,7 @@ class SetupServiceImplTest {
 
   @Test
   void initialize_shouldRejectWhenSystemAlreadyInitialized() {
-    SystemBootstrap bootstrap = bootstrap(1);
+    SystemBootstrap bootstrap = bootstrap(3);
     when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap);
 
     AlreadyExistsException exception =
@@ -189,10 +202,12 @@ class SetupServiceImplTest {
   void initialize_shouldCreateAdminTenantAndGrantPermissions() {
     when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap(0));
     when(tenantMapper.selectByCode(any())).thenReturn(null);
-    when(tenantService.createTenant(any())).thenReturn(100L);
-    when(tenantMapper.selectById(100L)).thenReturn(tenant(100L, "tenant-acme-data"));
+    when(tenantService.createTenant(any(), eq(false))).thenReturn(100L);
     when(userMapper.selectByUsernameGlobal(any())).thenReturn(null);
     when(userMapper.selectOne(any())).thenReturn(null);
+    when(userService.createUser(any(), eq(false))).thenReturn(200L);
+    when(userMapper.selectById(200L)).thenReturn(adminUser(200L, "sunny"));
+    when(userMapper.updateById(any(User.class))).thenReturn(1);
     when(tenantUserMapper.selectByTenantIdAndUserId(100L, 200L))
         .thenAnswer(
             invocation -> {
@@ -200,13 +215,6 @@ class SetupServiceImplTest {
               assertEquals(200L, TenantContextHolder.getActorUserId());
               assertEquals(100L, TenantContextHolder.getActorTenantId());
               return null;
-            });
-    when(userMapper.insert(any(User.class)))
-        .thenAnswer(
-            invocation -> {
-              User user = invocation.getArgument(0);
-              user.setId(200L);
-              return 1;
             });
     when(roleMapper.findByName(anyLong(), any())).thenReturn(null);
     when(roleMapper.insert(any(Role.class)))
@@ -237,31 +245,188 @@ class SetupServiceImplTest {
 
     ArgumentCaptor<TenantCreateRequest> tenantCaptor =
         ArgumentCaptor.forClass(TenantCreateRequest.class);
-    verify(tenantService).createTenant(tenantCaptor.capture());
+    verify(tenantService).createTenant(tenantCaptor.capture(), eq(false));
     assertEquals("tenant-acme-data", tenantCaptor.getValue().getCode());
     assertEquals("ACME Data", tenantCaptor.getValue().getName());
 
     ArgumentCaptor<SystemBootstrap> bootstrapCaptor =
         ArgumentCaptor.forClass(SystemBootstrap.class);
-    verify(systemBootstrapMapper, org.mockito.Mockito.times(2))
+    verify(systemBootstrapMapper, org.mockito.Mockito.times(4))
         .updateById(bootstrapCaptor.capture());
     List<SystemBootstrap> bootstrapUpdates = bootstrapCaptor.getAllValues();
     SystemBootstrap finalBootstrap = bootstrapUpdates.get(bootstrapUpdates.size() - 1);
-    assertEquals(1, finalBootstrap.getSetupCompleted());
+    assertEquals(3, finalBootstrap.getStatus());
     assertEquals(100L, finalBootstrap.getSetupTenantId());
     assertEquals(200L, finalBootstrap.getSetupAdminUserId());
     assertNull(finalBootstrap.getSetupTokenHash());
     assertNull(finalBootstrap.getSetupTokenGeneratedAt());
     assertTrue(finalBootstrap.getSetupCompletedAt() != null);
     assertNull(TenantContextHolder.get());
+
+    verify(gravitinoSetupService)
+        .initializeResources(100L, "tenant-acme-data", 200L, "sunny", "Platform over management");
+  }
+
+  @Test
+  void initialize_shouldMarkSetupFailedWhenGravitinoSetupFails() {
+    SystemBootstrap bootstrap = bootstrap(0);
+    when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap);
+    when(tenantMapper.selectByCode(any())).thenReturn(null);
+    when(tenantService.createTenant(any(), eq(false))).thenReturn(100L);
+    when(userMapper.selectByUsernameGlobal(any())).thenReturn(null);
+    when(userMapper.selectOne(any())).thenReturn(null);
+    when(userService.createUser(any(), eq(false))).thenReturn(200L);
+    when(userMapper.selectById(200L)).thenReturn(adminUser(200L, "sunny"));
+    when(userMapper.updateById(any(User.class))).thenReturn(1);
+    when(tenantUserMapper.selectByTenantIdAndUserId(100L, 200L)).thenReturn(null);
+    when(roleMapper.findByName(anyLong(), any())).thenReturn(null);
+    when(roleMapper.insert(any(Role.class)))
+        .thenAnswer(
+            invocation -> {
+              Role role = invocation.getArgument(0);
+              role.setId(300L);
+              return 1;
+            });
+    when(userRoleMapper.selectCount(any())).thenReturn(0L);
+
+    Permission adminPermission = new Permission();
+    adminPermission.setId(3L);
+    when(permissionMapper.selectSystemByCode("ADMIN")).thenReturn(adminPermission);
+
+    FeatureObject activeObject = new FeatureObject();
+    activeObject.setId(1L);
+    activeObject.setStatus(1);
+    when(featureObjectMapper.selectList(any())).thenReturn(List.of(activeObject));
+    when(tenantFeaturePermissionMapper.selectByTenantIdAndObjectId(anyLong(), anyLong()))
+        .thenReturn(null);
+    when(systemBootstrapMapper.updateById(any(SystemBootstrap.class))).thenReturn(1);
+    doThrow(new RuntimeException("remote failed"))
+        .when(gravitinoSetupService)
+        .initializeResources(100L, "tenant-acme-data", 200L, "sunny", "Platform over management");
+
+    assertThrows(RuntimeException.class, () -> setupService.initialize(buildInitializeRequest()));
+
+    verify(userMapper, never()).deleteById(200L);
+    verify(tenantMapper, never()).deleteById(100L);
+    verify(roleMapper, never()).delete(any());
+
+    ArgumentCaptor<SystemBootstrap> bootstrapCaptor =
+        ArgumentCaptor.forClass(SystemBootstrap.class);
+    verify(systemBootstrapMapper, org.mockito.Mockito.times(4))
+        .updateById(bootstrapCaptor.capture());
+    List<SystemBootstrap> bootstrapUpdates = bootstrapCaptor.getAllValues();
+    SystemBootstrap finalBootstrap = bootstrapUpdates.get(bootstrapUpdates.size() - 1);
+    assertEquals(2, finalBootstrap.getStatus());
+    assertEquals(100L, finalBootstrap.getSetupTenantId());
+    assertEquals(200L, finalBootstrap.getSetupAdminUserId());
+  }
+
+  @Test
+  void initialize_shouldRecoverWhenBootstrapTenantMissing() {
+    SystemBootstrap bootstrap = bootstrap(0);
+    bootstrap.setSetupTenantId(999L);
+    bootstrap.setSetupAdminUserId(200L);
+    when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap);
+    when(tenantMapper.selectByCode(any())).thenReturn(null);
+    when(tenantMapper.selectById(999L)).thenReturn(null);
+    when(tenantService.createTenant(any(), eq(false))).thenReturn(100L);
+    when(userMapper.selectById(200L)).thenReturn(adminUser(200L, "sunny"));
+    when(tenantUserMapper.selectByTenantIdAndUserId(100L, 200L)).thenReturn(null);
+    when(roleMapper.findByName(anyLong(), any())).thenReturn(null);
+    when(roleMapper.insert(any(Role.class)))
+        .thenAnswer(
+            invocation -> {
+              Role role = invocation.getArgument(0);
+              role.setId(300L);
+              return 1;
+            });
+    when(userRoleMapper.selectCount(any())).thenReturn(0L);
+
+    Permission adminPermission = new Permission();
+    adminPermission.setId(3L);
+    when(permissionMapper.selectSystemByCode("ADMIN")).thenReturn(adminPermission);
+
+    FeatureObject activeObject = new FeatureObject();
+    activeObject.setId(1L);
+    activeObject.setStatus(1);
+    when(featureObjectMapper.selectList(any())).thenReturn(List.of(activeObject));
+    when(tenantFeaturePermissionMapper.selectByTenantIdAndObjectId(anyLong(), anyLong()))
+        .thenReturn(null);
+    when(systemBootstrapMapper.updateById(any(SystemBootstrap.class))).thenReturn(1);
+
+    SetupInitializeResponse response = setupService.initialize(buildInitializeRequest());
+
+    assertEquals(100L, response.getTenantId());
+    assertEquals(200L, response.getUserId());
+    verify(tenantService).createTenant(any(), eq(false));
+    verify(userService, never()).createUser(any(), eq(false));
+
+    ArgumentCaptor<SystemBootstrap> bootstrapCaptor =
+        ArgumentCaptor.forClass(SystemBootstrap.class);
+    verify(systemBootstrapMapper, org.mockito.Mockito.times(4))
+        .updateById(bootstrapCaptor.capture());
+    List<SystemBootstrap> bootstrapUpdates = bootstrapCaptor.getAllValues();
+    SystemBootstrap finalBootstrap = bootstrapUpdates.get(bootstrapUpdates.size() - 1);
+    assertEquals(100L, finalBootstrap.getSetupTenantId());
+    assertEquals(200L, finalBootstrap.getSetupAdminUserId());
+  }
+
+  @Test
+  void initialize_shouldRecoverWhenBootstrapAdminUserMissing() {
+    SystemBootstrap bootstrap = bootstrap(0);
+    bootstrap.setSetupTenantId(100L);
+    bootstrap.setSetupAdminUserId(999L);
+    when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap);
+    when(tenantMapper.selectById(100L)).thenReturn(tenant(100L, "tenant-acme-data"));
+    when(userMapper.selectById(999L)).thenReturn(null);
+    when(userMapper.selectByUsernameGlobal(any())).thenReturn(null);
+    when(userMapper.selectOne(any())).thenReturn(null);
+    when(userService.createUser(any(), eq(false))).thenReturn(200L);
+    when(userMapper.selectById(200L)).thenReturn(adminUser(200L, "sunny"));
+    when(userMapper.updateById(any(User.class))).thenReturn(1);
+    when(tenantUserMapper.selectByTenantIdAndUserId(100L, 200L)).thenReturn(null);
+    when(roleMapper.findByName(anyLong(), any())).thenReturn(null);
+    when(roleMapper.insert(any(Role.class)))
+        .thenAnswer(
+            invocation -> {
+              Role role = invocation.getArgument(0);
+              role.setId(300L);
+              return 1;
+            });
+    when(userRoleMapper.selectCount(any())).thenReturn(0L);
+
+    Permission adminPermission = new Permission();
+    adminPermission.setId(3L);
+    when(permissionMapper.selectSystemByCode("ADMIN")).thenReturn(adminPermission);
+
+    FeatureObject activeObject = new FeatureObject();
+    activeObject.setId(1L);
+    activeObject.setStatus(1);
+    when(featureObjectMapper.selectList(any())).thenReturn(List.of(activeObject));
+    when(tenantFeaturePermissionMapper.selectByTenantIdAndObjectId(anyLong(), anyLong()))
+        .thenReturn(null);
+    when(systemBootstrapMapper.updateById(any(SystemBootstrap.class))).thenReturn(1);
+
+    SetupInitializeResponse response = setupService.initialize(buildInitializeRequest());
+
+    assertEquals(100L, response.getTenantId());
+    assertEquals(200L, response.getUserId());
+    verify(tenantService, never()).createTenant(any(), eq(false));
+    verify(userService).createUser(any(), eq(false));
+
+    ArgumentCaptor<SystemBootstrap> bootstrapCaptor =
+        ArgumentCaptor.forClass(SystemBootstrap.class);
+    verify(systemBootstrapMapper, org.mockito.Mockito.times(4))
+        .updateById(bootstrapCaptor.capture());
+    List<SystemBootstrap> bootstrapUpdates = bootstrapCaptor.getAllValues();
+    SystemBootstrap finalBootstrap = bootstrapUpdates.get(bootstrapUpdates.size() - 1);
+    assertEquals(100L, finalBootstrap.getSetupTenantId());
+    assertEquals(200L, finalBootstrap.getSetupAdminUserId());
   }
 
   @Test
   void initialize_shouldRejectWhenUsernameAlreadyExists() {
     when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap(0));
-    when(tenantMapper.selectByCode(any())).thenReturn(null);
-    when(tenantService.createTenant(any())).thenReturn(100L);
-    when(tenantMapper.selectById(100L)).thenReturn(tenant(100L, "tenant-acme-data"));
 
     User existingUser = new User();
     existingUser.setId(999L);
@@ -272,6 +437,7 @@ class SetupServiceImplTest {
             AlreadyExistsException.class, () -> setupService.initialize(buildInitializeRequest()));
 
     assertEquals("Resource already exists", exception.getMessage());
+    verify(tenantService, never()).createTenant(any(), eq(false));
   }
 
   @Test
@@ -281,17 +447,12 @@ class SetupServiceImplTest {
 
     when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap(0));
     when(tenantMapper.selectByCode(any())).thenReturn(null);
-    when(tenantService.createTenant(any())).thenReturn(100L);
-    when(tenantMapper.selectById(100L)).thenReturn(tenant(100L, "tenant-acme-data"));
+    when(tenantService.createTenant(any(), eq(false))).thenReturn(100L);
     when(userMapper.selectByUsernameGlobal(any())).thenReturn(null);
     when(userMapper.selectOne(any())).thenReturn(null);
-    when(userMapper.insert(any(User.class)))
-        .thenAnswer(
-            invocation -> {
-              User user = invocation.getArgument(0);
-              user.setId(200L);
-              return 1;
-            });
+    when(userService.createUser(any(), eq(false))).thenReturn(200L);
+    when(userMapper.selectById(200L)).thenReturn(adminUser(200L, "sunny"));
+    when(userMapper.updateById(any(User.class))).thenReturn(1);
     when(roleMapper.findByName(anyLong(), any())).thenReturn(null);
     when(roleMapper.insert(any(Role.class)))
         .thenAnswer(
@@ -325,7 +486,7 @@ class SetupServiceImplTest {
   private SystemBootstrap bootstrap(int setupCompleted) {
     SystemBootstrap bootstrap = new SystemBootstrap();
     bootstrap.setId(1);
-    bootstrap.setSetupCompleted(setupCompleted);
+    bootstrap.setStatus(setupCompleted);
     return bootstrap;
   }
 
@@ -335,5 +496,12 @@ class SetupServiceImplTest {
     tenant.setId(id);
     tenant.setCode(code);
     return tenant;
+  }
+
+  private User adminUser(Long id, String username) {
+    User user = new User();
+    user.setId(id);
+    user.setUsername(username);
+    return user;
   }
 }

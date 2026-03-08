@@ -1,11 +1,6 @@
 package com.sunny.datapillar.studio.module.user.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sunny.datapillar.connector.gravitino.GravitinoConnector;
-import com.sunny.datapillar.connector.runtime.ConnectorKernel;
-import com.sunny.datapillar.connector.spi.ConnectorInvocation;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
 import com.sunny.datapillar.studio.dto.llm.request.*;
 import com.sunny.datapillar.studio.dto.llm.response.*;
@@ -21,6 +16,9 @@ import com.sunny.datapillar.studio.dto.user.request.*;
 import com.sunny.datapillar.studio.dto.user.response.*;
 import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoRolePrivilegeService;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoRoleService;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoUserRoleService;
 import com.sunny.datapillar.studio.module.tenant.entity.FeatureObject;
 import com.sunny.datapillar.studio.module.tenant.entity.FeatureObjectCategory;
 import com.sunny.datapillar.studio.module.tenant.entity.Permission;
@@ -47,7 +45,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 /** Role service implementation Implement role business process and rule verification. */
 @Slf4j
@@ -71,8 +68,9 @@ public class RoleServiceImpl implements RoleService {
   private final FeatureObjectCategoryMapper featureObjectCategoryMapper;
   private final TenantFeaturePermissionMapper tenantFeaturePermissionMapper;
   private final UserMapper userMapper;
-  private final ConnectorKernel connectorKernel;
-  private final ObjectMapper objectMapper;
+  private final GravitinoRoleService gravitinoRoleService;
+  private final GravitinoRolePrivilegeService gravitinoRolePrivilegeService;
+  private final GravitinoUserRoleService gravitinoUserRoleService;
 
   @Override
   public RoleResponse getRoleById(Long id) {
@@ -112,6 +110,8 @@ public class RoleServiceImpl implements RoleService {
       throw new com.sunny.datapillar.common.exception.InternalException("Server internal error");
     }
 
+    gravitinoRoleService.createRole(role.getName(), null);
+
     log.info("Created role: id={}", role.getId());
     return role.getId();
   }
@@ -124,12 +124,9 @@ public class RoleServiceImpl implements RoleService {
     ensureRoleMutable(existingRole);
 
     if (dto.getName() != null && !dto.getName().isBlank()) {
-      Role roleWithSameName = roleMapper.findByName(tenantId, dto.getName());
-      if (roleWithSameName != null && !roleWithSameName.getId().equals(id)) {
-        throw new com.sunny.datapillar.common.exception.AlreadyExistsException(
-            "Role code already exists: %s", dto.getName());
+      if (!dto.getName().trim().equals(existingRole.getName())) {
+        throw new com.sunny.datapillar.common.exception.BadRequestException("Parameter error");
       }
-      existingRole.setName(dto.getName());
     }
     if (dto.getDescription() != null) {
       existingRole.setDescription(dto.getDescription());
@@ -154,6 +151,7 @@ public class RoleServiceImpl implements RoleService {
           "There are members under the role，cannot be deleted");
     }
 
+    gravitinoRoleService.deleteRole(role.getName(), null);
     roleMapper.deleteRolePermissions(tenantId, id);
     roleMapper.deleteUserRolesByRoleId(tenantId, id);
     roleMapper.deleteById(id);
@@ -206,6 +204,16 @@ public class RoleServiceImpl implements RoleService {
     }
 
     roleMapper.deleteRoleMembersByUserIds(tenantId, roleId, uniqueUserIds);
+    for (Long userId : uniqueUserIds) {
+      com.sunny.datapillar.studio.module.user.entity.User user =
+          userMapper.selectByIdAndTenantId(tenantId, userId);
+      if (user != null) {
+        gravitinoUserRoleService.replaceUserRoles(
+            user.getUsername(),
+            roleMapper.findByUserId(tenantId, userId).stream().map(Role::getName).toList(),
+            null);
+      }
+    }
   }
 
   @Override
@@ -291,70 +299,16 @@ public class RoleServiceImpl implements RoleService {
   public List<RoleDataPrivilegeItem> getRoleDataPrivileges(Long roleId, String domain) {
     Long tenantId = getRequiredTenantId();
     Role role = requireRoleInTenant(roleId, tenantId);
-    JsonNode payload =
-        objectMapper
-            .createObjectNode()
-            .put("roleName", role.getName())
-            .put("domain", normalizeDomain(domain));
-    JsonNode response =
-        connectorKernel
-            .invoke(
-                ConnectorInvocation.builder(
-                        GravitinoConnector.CONNECTOR_ID,
-                        GravitinoConnector.OP_SECURITY_LIST_ROLE_DATA_PRIVILEGES)
-                    .payload(payload)
-                    .build())
-            .payload();
-    return mapRoleDataPrivileges(response);
+    return gravitinoRolePrivilegeService.getRoleDataPrivileges(role.getName(), domain, null);
   }
 
   @Override
-  public void updateRoleDataPrivileges(Long roleId, RoleDataPrivilegeSyncRequest request) {
+  public void replaceRoleDataPrivileges(
+      Long roleId, String domain, List<RoleDataPrivilegeCommandItem> commands) {
     Long tenantId = getRequiredTenantId();
     Role role = requireRoleInTenant(roleId, tenantId);
     ensureRoleMutable(role);
-
-    var payload = objectMapper.createObjectNode();
-    payload.put("roleName", role.getName());
-    payload.put("domain", normalizeDomain(request == null ? null : request.getDomain()));
-    payload.set(
-        "commands", objectMapper.valueToTree(request == null ? List.of() : request.getCommands()));
-
-    connectorKernel.invoke(
-        ConnectorInvocation.builder(
-                GravitinoConnector.CONNECTOR_ID,
-                GravitinoConnector.OP_SECURITY_SYNC_ROLE_DATA_PRIVILEGES)
-            .payload(payload)
-            .build());
-  }
-
-  private List<RoleDataPrivilegeItem> mapRoleDataPrivileges(JsonNode response) {
-    JsonNode items = response == null ? null : response.path("items");
-    if (items == null || !items.isArray()) {
-      return List.of();
-    }
-
-    List<RoleDataPrivilegeItem> result = new ArrayList<>();
-    for (JsonNode item : items) {
-      if (item == null || !item.isObject()) {
-        continue;
-      }
-      RoleDataPrivilegeItem dto = new RoleDataPrivilegeItem();
-      dto.setDomain(item.path("domain").asText(null));
-      dto.setObjectType(item.path("objectType").asText(null));
-      dto.setObjectName(item.path("objectName").asText(null));
-      dto.setColumnName(item.path("columnName").asText(null));
-      dto.setPrivilegeCode(item.path("privilegeCode").asText(null));
-      result.add(dto);
-    }
-    return result;
-  }
-
-  private String normalizeDomain(String domain) {
-    if (!StringUtils.hasText(domain)) {
-      return "METADATA";
-    }
-    return domain.trim().toUpperCase(Locale.ROOT);
+    gravitinoRolePrivilegeService.replaceRoleDataPrivileges(role.getName(), domain, commands, null);
   }
 
   private Map<String, Permission> getPermissionMap() {

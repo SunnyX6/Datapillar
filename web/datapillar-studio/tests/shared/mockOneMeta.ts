@@ -153,10 +153,10 @@ const buildWordRootList = (offset: number, limit: number) =>
   })
 
 export const mockOneMetaRoutes = async (page: Page) => {
-  await page.route('**/api/studio/biz/governance/**', async (route) => {
+  await page.route(/\/api\/studio\/(?:biz|admin)\/(metadata|semantic)(?:\/.*)?(?:\?.*)?$/, async (route) => {
     const request = route.request()
     const url = new URL(request.url())
-    const path = url.pathname.replace(/^\/api\/studio\/biz\/governance\/(metadata|semantic)/, '')
+    const path = url.pathname.replace(/^\/api\/studio\/(?:biz|admin)\/(metadata|semantic)/, '')
 
     if (request.method() !== 'GET') {
       await route.fulfill({
@@ -251,7 +251,7 @@ export const mockOneMetaRoutes = async (page: Page) => {
       return
     }
 
-    if (path === '/valuedomains') {
+    if (path === '/value-domains') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

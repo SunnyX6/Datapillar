@@ -64,4 +64,94 @@ public class AuthorizationExpressionConstants {
       "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) || "
           + "ANY_READ_FILESET || "
           + "ANY_WRITE_FILESET";
+
+  public static final String createMetricAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_METRIC";
+
+  public static final String loadMetricAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (METRIC::OWNER || ANY_USE_METRIC)";
+
+  public static final String manageMetricAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && METRIC::OWNER";
+
+  public static final String filterMetricAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG, SCHEMA, METRIC) || ANY_USE_METRIC";
+
+  public static final String createWordRootAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_WORDROOT";
+
+  public static final String loadWordRootAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (WORDROOT::OWNER || ANY_USE_WORDROOT)";
+
+  public static final String manageWordRootAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && WORDROOT::OWNER";
+
+  public static final String filterWordRootAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG, SCHEMA, WORDROOT) || ANY_USE_WORDROOT";
+
+  public static final String createUnitAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_UNIT";
+
+  public static final String loadUnitAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (UNIT::OWNER || ANY_USE_UNIT)";
+
+  public static final String manageUnitAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && UNIT::OWNER";
+
+  public static final String filterUnitAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG, SCHEMA, UNIT) || ANY_USE_UNIT";
+
+  public static final String createModifierAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_MODIFIER";
+
+  public static final String loadModifierAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (MODIFIER::OWNER || ANY_USE_MODIFIER)";
+
+  public static final String manageModifierAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && MODIFIER::OWNER";
+
+  public static final String filterModifierAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG, SCHEMA, MODIFIER) || ANY_USE_MODIFIER";
+
+  public static final String createValueDomainAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_VALUE_DOMAIN";
+
+  public static final String loadValueDomainAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (VALUE_DOMAIN::OWNER || ANY_USE_VALUE_DOMAIN)";
+
+  public static final String manageValueDomainAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && VALUE_DOMAIN::OWNER";
+
+  public static final String filterValueDomainAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG, SCHEMA, VALUE_DOMAIN) || ANY_USE_VALUE_DOMAIN";
 }

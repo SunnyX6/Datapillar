@@ -585,11 +585,18 @@ public class GravitinoEnv {
         new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
     this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
 
-    // initialization DatasetDispatcher（With event distribution）
+    // Create and initialize Dataset related modules, the operation chain is:
+    // DatasetEventDispatcher -> DatasetNormalizeDispatcher -> DatasetHookDispatcher ->
+    // DatasetOperationDispatcher
     org.apache.gravitino.catalog.DatasetOperationDispatcher datasetOperationDispatcher =
         new org.apache.gravitino.catalog.DatasetOperationDispatcher(
             catalogManager, entityStore, idGenerator);
-    this.datasetDispatcher = new DatasetEventDispatcher(eventBus, datasetOperationDispatcher);
+    org.apache.gravitino.hook.DatasetHookDispatcher datasetHookDispatcher =
+        new org.apache.gravitino.hook.DatasetHookDispatcher(datasetOperationDispatcher);
+    org.apache.gravitino.catalog.DatasetNormalizeDispatcher datasetNormalizeDispatcher =
+        new org.apache.gravitino.catalog.DatasetNormalizeDispatcher(
+            datasetHookDispatcher, catalogManager);
+    this.datasetDispatcher = new DatasetEventDispatcher(eventBus, datasetNormalizeDispatcher);
 
     this.statisticManager = new StatisticManager(entityStore, idGenerator, config);
 

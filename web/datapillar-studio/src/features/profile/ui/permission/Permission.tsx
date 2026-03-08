@@ -1,4 +1,5 @@
 import { Link2, Shield, Users } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { cn } from '@/utils'
@@ -20,6 +21,7 @@ export type {
 } from '../../utils/permissionTypes'
 
 export function PermissionLayout() {
+  const { t } = useTranslation('permission')
   const {
     roles,
     selectedRole,
@@ -95,7 +97,7 @@ export function PermissionLayout() {
                         'font-semibold text-slate-600 dark:text-slate-300',
                       )}
                     >
-                      total {selectedRole.userCount} members
+                      {t('layout.membersTotal', { count: selectedRole.userCount })}
                     </span>
                   </div>
                 </div>
@@ -108,7 +110,7 @@ export function PermissionLayout() {
                   className="shadow-lg shadow-slate-200/60 dark:shadow-none"
                 >
                   <Link2 size={14} />
-                  Invite members
+                  {t('layout.inviteMembers')}
                 </Button>
               </div>
             </div>
@@ -127,7 +129,7 @@ export function PermissionLayout() {
                     )}
                   >
                     <Users size={16} />
-                    Member list
+                    {t('tabs.members')}
                   </button>
                   <button
                     type="button"
@@ -141,7 +143,7 @@ export function PermissionLayout() {
                     )}
                   >
                     <Shield size={16} />
-                    Function permissions
+                    {t('tabs.functional')}
                   </button>
                 </div>
               </div>

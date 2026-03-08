@@ -182,6 +182,16 @@ public class TestSecurableObjects {
     Privilege createModel = Privileges.CreateModel.allow();
     Privilege createModelVersion = Privileges.CreateModelVersion.allow();
     Privilege useModel = Privileges.UseModel.allow();
+    Privilege createMetric = Privileges.CreateMetric.allow();
+    Privilege useMetric = Privileges.UseMetric.allow();
+    Privilege createModifier = Privileges.CreateModifier.allow();
+    Privilege useModifier = Privileges.UseModifier.allow();
+    Privilege createWordRoot = Privileges.CreateWordRoot.allow();
+    Privilege useWordRoot = Privileges.UseWordRoot.allow();
+    Privilege createUnit = Privileges.CreateUnit.allow();
+    Privilege useUnit = Privileges.UseUnit.allow();
+    Privilege createValueDomain = Privileges.CreateValueDomain.allow();
+    Privilege useValueDomain = Privileges.UseValueDomain.allow();
 
     // Test create catalog
     Assertions.assertTrue(createCatalog.canBindTo(MetadataObject.Type.METALAKE));
@@ -404,5 +414,50 @@ public class TestSecurableObjects {
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.COLUMN));
     Assertions.assertTrue(useModel.canBindTo(MetadataObject.Type.MODEL));
+
+    Assertions.assertTrue(createMetric.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(createMetric.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(createMetric.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createMetric.canBindTo(MetadataObject.Type.METRIC));
+    Assertions.assertTrue(useMetric.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(useMetric.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(useMetric.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(useMetric.canBindTo(MetadataObject.Type.METRIC));
+
+    Assertions.assertTrue(createModifier.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(createModifier.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(createModifier.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createModifier.canBindTo(MetadataObject.Type.MODIFIER));
+    Assertions.assertTrue(useModifier.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(useModifier.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(useModifier.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(useModifier.canBindTo(MetadataObject.Type.MODIFIER));
+
+    Assertions.assertTrue(createWordRoot.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(createWordRoot.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(createWordRoot.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createWordRoot.canBindTo(MetadataObject.Type.WORDROOT));
+    Assertions.assertTrue(useWordRoot.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(useWordRoot.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(useWordRoot.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(useWordRoot.canBindTo(MetadataObject.Type.WORDROOT));
+
+    Assertions.assertTrue(createUnit.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(createUnit.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(createUnit.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createUnit.canBindTo(MetadataObject.Type.UNIT));
+    Assertions.assertTrue(useUnit.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(useUnit.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(useUnit.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(useUnit.canBindTo(MetadataObject.Type.UNIT));
+
+    Assertions.assertTrue(createValueDomain.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(createValueDomain.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(createValueDomain.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createValueDomain.canBindTo(MetadataObject.Type.VALUE_DOMAIN));
+    Assertions.assertTrue(useValueDomain.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(useValueDomain.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(useValueDomain.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(useValueDomain.canBindTo(MetadataObject.Type.VALUE_DOMAIN));
   }
 }

@@ -68,10 +68,10 @@ import org.apache.gravitino.storage.relational.service.JobMetaService;
 import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.MetricMetaService;
-import org.apache.gravitino.storage.relational.service.MetricModifierMetaService;
 import org.apache.gravitino.storage.relational.service.MetricVersionMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
+import org.apache.gravitino.storage.relational.service.ModifierMetaService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
@@ -148,9 +148,8 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>) MetricMetaService.getInstance().listMetricsByNamespace(namespace);
       case METRIC_VERSION:
         return (List<E>) MetricVersionMetaService.getInstance().listVersionsByNamespace(namespace);
-      case METRIC_MODIFIER:
-        return (List<E>)
-            MetricModifierMetaService.getInstance().listModifiersByNamespace(namespace);
+      case MODIFIER:
+        return (List<E>) ModifierMetaService.getInstance().listModifiersByNamespace(namespace);
       case WORDROOT:
         return (List<E>) WordRootMetaService.getInstance().listWordRootsByNamespace(namespace);
       case UNIT:
@@ -224,9 +223,9 @@ public class JDBCBackend implements RelationalBackend {
     } else if (e instanceof org.apache.gravitino.meta.MetricVersionEntity) {
       throw new UnsupportedOperationException(
           "MetricVersion should not be inserted directly. It is automatically created when inserting a Metric.");
-    } else if (e instanceof org.apache.gravitino.meta.MetricModifierEntity) {
-      MetricModifierMetaService.getInstance()
-          .insertModifier((org.apache.gravitino.meta.MetricModifierEntity) e, overwritten);
+    } else if (e instanceof org.apache.gravitino.meta.ModifierEntity) {
+      ModifierMetaService.getInstance()
+          .insertModifier((org.apache.gravitino.meta.ModifierEntity) e, overwritten);
     } else if (e instanceof org.apache.gravitino.meta.WordRootEntity) {
       WordRootMetaService.getInstance()
           .insertWordRoot((org.apache.gravitino.meta.WordRootEntity) e, overwritten);
@@ -283,8 +282,8 @@ public class JDBCBackend implements RelationalBackend {
         // MetricVersion update needs special handling with version number
         throw new UnsupportedEntityTypeException(
             "Updating metric version through entity store is not supported");
-      case METRIC_MODIFIER:
-        return (E) MetricModifierMetaService.getInstance().updateModifier(ident, updater);
+      case MODIFIER:
+        return (E) ModifierMetaService.getInstance().updateModifier(ident, updater);
       case WORDROOT:
         return (E) WordRootMetaService.getInstance().updateWordRoot(ident, updater);
       case UNIT:
@@ -332,8 +331,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) MetricMetaService.getInstance().getMetricByIdentifier(ident);
       case METRIC_VERSION:
         return (E) MetricVersionMetaService.getInstance().getMetricVersionByIdentifier(ident);
-      case METRIC_MODIFIER:
-        return (E) MetricModifierMetaService.getInstance().getModifierByIdentifier(ident);
+      case MODIFIER:
+        return (E) ModifierMetaService.getInstance().getModifierByIdentifier(ident);
       case WORDROOT:
         return (E) WordRootMetaService.getInstance().getWordRootByIdentifier(ident);
       case UNIT:
@@ -383,11 +382,9 @@ public class JDBCBackend implements RelationalBackend {
       case METRIC:
         return MetricMetaService.getInstance().deleteMetric(ident);
       case METRIC_VERSION:
-        // MetricVersion delete needs special handling with version number
-        throw new UnsupportedEntityTypeException(
-            "Deleting metric version through entity store is not supported");
-      case METRIC_MODIFIER:
-        return MetricModifierMetaService.getInstance().deleteModifier(ident);
+        return MetricVersionMetaService.getInstance().deleteMetricVersionByIdentifier(ident);
+      case MODIFIER:
+        return ModifierMetaService.getInstance().deleteModifier(ident);
       case WORDROOT:
         return WordRootMetaService.getInstance().deleteWordRoot(ident);
       case UNIT:
@@ -483,9 +480,9 @@ public class JDBCBackend implements RelationalBackend {
       case METRIC_VERSION:
         // MetricVersion by MetricMetaService.deleteMetricMetasByLegacyTimeline Delete together
         return 0;
-      case METRIC_MODIFIER:
-        return MetricModifierMetaService.getInstance()
-            .deleteMetricModifierMetasByLegacyTimeline(
+      case MODIFIER:
+        return ModifierMetaService.getInstance()
+            .deleteModifierMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case WORDROOT:
         return WordRootMetaService.getInstance()
@@ -528,7 +525,7 @@ public class JDBCBackend implements RelationalBackend {
       case MODEL_VERSION:
       case METRIC:
       case METRIC_VERSION:
-      case METRIC_MODIFIER:
+      case MODIFIER:
       case WORDROOT:
       case UNIT:
       case VALUE_DOMAIN:

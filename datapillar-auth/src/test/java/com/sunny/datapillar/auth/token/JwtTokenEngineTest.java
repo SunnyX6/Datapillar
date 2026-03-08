@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sunny.datapillar.auth.config.AuthProperties;
+import com.sunny.datapillar.auth.key.KeySetKeyManager;
 import com.sunny.datapillar.auth.security.JwtToken;
 import io.jsonwebtoken.Claims;
 import java.util.List;
@@ -16,16 +18,15 @@ class JwtTokenEngineTest {
     AuthProperties properties = new AuthProperties();
     properties.getToken().setIssuer("https://auth.datapillar.local");
     properties.getToken().setAudience("datapillar-api");
-    properties.getToken().setPrivateKeyPath("classpath:security/auth-token-dev-private.pem");
-    properties.getToken().setPublicKeyPath("classpath:security/auth-token-dev-public.pem");
+    properties.getToken().setKeysetPath("classpath:security/auth-token-dev-keyset.json");
     properties.getToken().setAccessTtlSeconds(accessTtlSeconds);
     properties.getToken().setRefreshTtlSeconds(120);
     properties.getToken().setRefreshRememberTtlSeconds(240);
     properties.getToken().setLoginTtlSeconds(60);
-    properties.getJwks().setActiveKid("auth-dev-2026-01");
     properties.validate();
 
-    JwtToken jwtToken = new JwtToken(properties);
+    JwtToken jwtToken =
+        new JwtToken(properties, new KeySetKeyManager(new ObjectMapper(), properties));
     return new JwtTokenEngine(jwtToken, new ClaimAssembler());
   }
 
@@ -52,6 +53,8 @@ class JwtTokenEngineTest {
     assertEquals("access", parsed.get("token_type", String.class));
     assertEquals(101L, ((Number) parsed.get("user_id")).longValue());
     assertEquals(1001L, ((Number) parsed.get("tenant_id")).longValue());
+    assertEquals("sid-1", parsed.get("sid", String.class));
+    assertEquals("jti-1", parsed.getId());
   }
 
   @Test
@@ -91,7 +94,10 @@ class JwtTokenEngineTest {
             .build();
 
     String token = engine.issueAccessToken(claims);
-    String forgedToken = token.substring(0, token.length() - 1) + "a";
+    String[] tokenParts = token.split("\\.");
+    String forgedSignature =
+        (tokenParts[2].startsWith("a") ? "b" : "a") + tokenParts[2].substring(1);
+    String forgedToken = tokenParts[0] + "." + tokenParts[1] + "." + forgedSignature;
 
     com.sunny.datapillar.common.exception.UnauthorizedException exception =
         assertThrows(

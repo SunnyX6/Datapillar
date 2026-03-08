@@ -35,4 +35,11 @@ public interface TenantMemberAdminService {
   List<RoleResponse> getRolesByUserId(Long userId);
 
   void assignRoles(Long userId, List<Long> roleIds);
+
+  List<RoleDataPrivilegeItem> getMemberDataPrivileges(Long userId, String domain);
+
+  void replaceMemberDataPrivileges(
+      Long userId, String domain, List<RoleDataPrivilegeCommandItem> commands);
+
+  void clearMemberDataPrivileges(Long userId, String domain);
 }

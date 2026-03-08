@@ -54,7 +54,7 @@ import com.sunny.datapillar.studio.module.tenant.mapper.PermissionMapper;
 import com.sunny.datapillar.studio.module.tenant.service.TenantCodeResolver;
 import com.sunny.datapillar.studio.module.user.entity.User;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
+import com.sunny.datapillar.studio.security.crypto.LocalCryptoService;
 import java.sql.SQLException;
 import java.util.List;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -76,7 +76,7 @@ class LlmManagerServiceImplTest {
   @Mock private AiUsageMapper aiUsageMapper;
   @Mock private PermissionMapper permissionMapper;
   @Mock private UserMapper userMapper;
-  @Mock private AuthCryptoRpcClient authCryptoClient;
+  @Mock private LocalCryptoService localCryptoService;
   @Mock private TenantCodeResolver tenantCodeResolver;
 
   private LlmManagerServiceImpl service;
@@ -101,7 +101,7 @@ class LlmManagerServiceImplTest {
                 aiUsageMapper,
                 permissionMapper,
                 userMapper,
-                authCryptoClient,
+                localCryptoService,
                 tenantCodeResolver,
                 new ObjectMapper(),
                 new StudioDbExceptionTranslator()));
@@ -186,7 +186,7 @@ class LlmManagerServiceImplTest {
               inserting.setId(10L);
               return 1;
             });
-    when(authCryptoClient.encryptLlmApiKey("tenant-1", "sk-test")).thenReturn("ENCv1:encrypted");
+    when(localCryptoService.encryptLlmApiKey("tenant-1", "sk-test")).thenReturn("ENCv1:encrypted");
     doNothing().when(service).verifyModelConnection(any(), any(), any(), any(), any());
 
     LlmModelCreateRequest request = new LlmModelCreateRequest();
@@ -428,7 +428,7 @@ class LlmManagerServiceImplTest {
     provider.setCode("openai");
     provider.setName("OpenAI");
     when(aiProviderMapper.selectByIds(any())).thenReturn(List.of(provider));
-    when(authCryptoClient.decryptLlmApiKey("tenant-1", "ENCv1:encrypted"))
+    when(localCryptoService.decryptLlmApiKey("tenant-1", "ENCv1:encrypted"))
         .thenReturn("sk-1234567890");
 
     List<LlmModelResponse> rows = service.listModels(null, null, null, 101L);
@@ -455,7 +455,7 @@ class LlmManagerServiceImplTest {
     provider.setCode("openai");
     provider.setName("OpenAI");
     when(aiProviderMapper.selectByIds(any())).thenReturn(List.of(provider));
-    when(authCryptoClient.decryptLlmApiKey("tenant-1", "ENCv1:encrypted"))
+    when(localCryptoService.decryptLlmApiKey("tenant-1", "ENCv1:encrypted"))
         .thenThrow(new com.sunny.datapillar.common.exception.InternalException("decrypt_failed"));
 
     List<LlmModelResponse> rows = service.listModels(null, null, null, 101L);
@@ -572,7 +572,7 @@ class LlmManagerServiceImplTest {
     provider.setCode("openai");
     when(aiProviderMapper.selectById(1L)).thenReturn(provider);
 
-    when(authCryptoClient.encryptLlmApiKey("tenant-1", "sk-test")).thenReturn("ENCv1:encrypted");
+    when(localCryptoService.encryptLlmApiKey("tenant-1", "sk-test")).thenReturn("ENCv1:encrypted");
     doNothing().when(service).verifyModelConnection(any(), any(), any(), any(), any());
 
     LlmModelConnectRequest request = new LlmModelConnectRequest();
@@ -611,7 +611,7 @@ class LlmManagerServiceImplTest {
     provider.setCode("openai");
     when(aiProviderMapper.selectById(1L)).thenReturn(provider);
 
-    when(authCryptoClient.encryptLlmApiKey("tenant-1", "sk-test"))
+    when(localCryptoService.encryptLlmApiKey("tenant-1", "sk-test"))
         .thenThrow(
             new com.sunny.datapillar.common.exception.InternalException(
                 "tenant_public_key_missing"));

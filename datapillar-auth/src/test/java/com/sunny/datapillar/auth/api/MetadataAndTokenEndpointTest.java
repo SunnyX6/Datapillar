@@ -8,6 +8,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
 import com.sunny.datapillar.auth.api.session.OAuth2TokenController;
+import com.sunny.datapillar.auth.api.wellknown.OpenIdConfigurationController;
 import com.sunny.datapillar.auth.api.wellknown.WellKnownController;
 import com.sunny.datapillar.auth.config.AuthProperties;
 import com.sunny.datapillar.auth.dto.oauth.response.OAuth2TokenResponse;
@@ -55,14 +56,16 @@ class MetadataAndTokenEndpointTest {
     when(tokenAppService.jwks()).thenReturn(jwks);
     when(tokenAppService.openidConfiguration()).thenReturn(discovery);
 
-    WellKnownController controller = new WellKnownController(tokenAppService);
+    WellKnownController jwksController = new WellKnownController(tokenAppService);
+    OpenIdConfigurationController openIdController =
+        new OpenIdConfigurationController(tokenAppService);
 
     assertEquals(
         "auth-dev-2026-01",
-        ((Map<?, ?>) ((List<?>) controller.jwks().get("keys")).get(0)).get("kid"));
+        ((Map<?, ?>) ((List<?>) jwksController.jwks().get("keys")).get(0)).get("kid"));
     assertEquals(
         "https://auth.datapillar.local/oauth2/token",
-        controller.openidConfiguration().get("token_endpoint"));
+        openIdController.openidConfiguration().get("token_endpoint"));
   }
 
   @Test

@@ -59,11 +59,11 @@ def build_etl_datapillar_config(
     if not dimension:
         raise BadRequestException("Embedding Model must be configured embedding_dimension")
 
-    chat_api_key = ModelNew.decrypt_api_key(
+    chat_api_key = ModelNew.decrypt_key(
         tenant_code=tenant_code,
         encrypted_value=chat_model.get("api_key"),
     )
-    embedding_api_key = ModelNew.decrypt_api_key(
+    embedding_api_key = ModelNew.decrypt_key(
         tenant_code=tenant_code,
         encrypted_value=embedding_model.get("api_key"),
     )

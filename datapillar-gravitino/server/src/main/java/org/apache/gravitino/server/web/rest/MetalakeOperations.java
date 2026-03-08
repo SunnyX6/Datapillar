@@ -123,7 +123,7 @@ public class MetalakeOperations {
   @Timed(name = "create-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-metalake", absolute = true)
   @AuthorizationExpression(
-      expression = "SERVICE_ADMIN",
+      expression = "SERVICE_ADMIN || TENANT_BOOTSTRAP_REQUEST",
       errorMessage =
           "Only service admins can create metalakes, current user can't create the metalake,"
               + "  you should configure it in the server configuration first")

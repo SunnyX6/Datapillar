@@ -1,0 +1,206 @@
+{
+  "metadataView": {
+    "toast": {
+      "catalogCreated": "Catalog {{name}} created successfully",
+      "schemaCreated": "Schema {{name}} created successfully",
+      "tableUpdated": "Table {{name}} updated successfully",
+      "tableCreated": "Table {{name}} created successfully"
+    },
+    "sidebar": {
+      "expandAria": "Expand metadata sidebar",
+      "collapseAria": "Collapse metadata sidebar",
+      "centerTitle": "Metadata Center"
+    },
+    "modal": {
+      "title": {
+        "editTableInfo": "Edit table information",
+        "createCatalog": "Create Catalog",
+        "createSchema": "Create Schema",
+        "editColumns": "Edit columns",
+        "createTable": "Create Table",
+        "manageTable": "Manage Table"
+      },
+      "subtitle": {
+        "editTableBasicPrefix": "Edit basic information for table ",
+        "editTableBasicSuffix": "",
+        "editInSchemaPrefix": "Edit in Schema ",
+        "createInSchemaPrefix": "Create in Schema ",
+        "schemaSuffix": ""
+      },
+      "action": {
+        "saveChanges": "Save changes",
+        "createAsset": "Create physical asset"
+      }
+    }
+  },
+  "metadataOverview": {
+    "title": "OneMeta Overview",
+    "subtitle": "Global health and statistics for your data estate."
+  },
+  "metadataForm": {
+    "catalog": {
+      "toast": {
+        "enterNameFirst": "Please enter Catalog name first.",
+        "testSuccess": "Connection test succeeded.",
+        "enterName": "Please enter Catalog name."
+      },
+      "button": {
+        "testing": "Testing...",
+        "testConnection": "Test Connection"
+      },
+      "field": {
+        "name": "Catalog Name",
+        "type": "Catalog Type",
+        "provider": "Provider",
+        "connection": "Connection Settings",
+        "description": "Description"
+      },
+      "placeholder": {
+        "name": "Example: prod_mysql_catalog",
+        "description": "Catalog usage description"
+      },
+      "option": {
+        "type": {
+          "relational": "Database",
+          "fileset": "Fileset",
+          "messaging": "Message Queue"
+        }
+      },
+      "dropdown": {
+        "catalogType": "Select Catalog type",
+        "provider": "Select provider",
+        "chooseField": "Select {{field}}"
+      },
+      "customField": {
+        "keyPlaceholder": "Configuration key",
+        "valuePlaceholder": "Configuration value",
+        "deleteAria": "Delete configuration item",
+        "addButton": "Add custom configuration"
+      },
+      "provider": {
+        "metastoreUri": "Metastore URI",
+        "poolSize": "Connection Pool Size",
+        "jdbcUrl": "JDBC URL",
+        "jdbcDriver": "JDBC Driver",
+        "username": "Username",
+        "password": "Password",
+        "minConnections": "Min Connections",
+        "maxConnections": "Max Connections",
+        "catalogBackend": "Catalog Backend",
+        "backendUri": "Backend URI",
+        "warehousePath": "Warehouse Path",
+        "bootstrapServers": "Bootstrap Servers",
+        "storagePath": "Storage Path",
+        "filesystemProviders": "Filesystem Providers"
+      }
+    },
+    "schema": {
+      "toast": {
+        "enterName": "Please enter Schema name."
+      },
+      "field": {
+        "name": "Schema Name",
+        "description": "Description (Optional)"
+      },
+      "placeholder": {
+        "name": "Example: analytics_mart",
+        "description": "Schema usage description"
+      }
+    },
+    "tableBasic": {
+      "toast": {
+        "enterName": "Please enter table name."
+      },
+      "tip": {
+        "title": "Reminder",
+        "content": "Renaming a table may impact SQL and ETL tasks. Table properties are used for storage engine and partition settings."
+      },
+      "field": {
+        "name": "Physical Table Name",
+        "description": "Description",
+        "properties": "Table Properties"
+      },
+      "placeholder": {
+        "name": "Example: fact_order_sales",
+        "description": "A clear business description improves understanding.",
+        "propertyName": "Property key",
+        "propertyValue": "Property value"
+      },
+      "warning": {
+        "renameImpact": "Renaming the table may impact SQL and ETL tasks."
+      },
+      "action": {
+        "add": "Add"
+      },
+      "empty": {
+        "noProperties": "No table properties yet."
+      }
+    },
+    "table": {
+      "toast": {
+        "enterName": "Please enter physical table name.",
+        "addColumn": "Please add at least one column.",
+        "emptyColumnName": "There are columns with empty names."
+      },
+      "tip": {
+        "title": "Reminder",
+        "contentEdit": "The system can match semantic standards for columns and suggest physical data types. Drag columns to adjust order.",
+        "content": "The system can match semantic standards for columns and suggest physical data types."
+      },
+      "panel": {
+        "expand": "Expand configuration panel",
+        "collapse": "Collapse configuration panel"
+      },
+      "field": {
+        "name": "Physical Table Name",
+        "description": "Description",
+        "properties": "Table Properties"
+      },
+      "placeholder": {
+        "name": "Example: fact_order_sales",
+        "description": "Describe the data source and business purpose of this table...",
+        "propertyName": "Property key",
+        "propertyValue": "Property value"
+      },
+      "action": {
+        "add": "Add"
+      },
+      "empty": {
+        "noProperties": "No table properties yet."
+      },
+      "ddl": {
+        "button": "DDL Quick Import",
+        "title": "DDL Quick Import",
+        "placeholder": "Paste a CREATE TABLE statement to parse table name, description, and columns automatically.",
+        "parseFailed": "DDL parse failed."
+      },
+      "column": {
+        "header": "Column Definitions",
+        "add": "Add Physical Column",
+        "empty": "No column definitions yet.",
+        "emptyHint": "Click \"Add Physical Column\" or use DDL Quick Import.",
+        "namePlaceholder": "Column name",
+        "commentPlaceholder": "Comment",
+        "primaryKey": "Primary Key",
+        "required": "Required",
+        "valueDomain": "Associated ValueDomain",
+        "selectValueDomain": "Select ValueDomain",
+        "delete": "Delete",
+        "domainType": {
+          "enum": "Enumeration",
+          "range": "Range",
+          "regex": "Regex",
+          "unknown": "Unknown"
+        },
+        "domainLevel": {
+          "builtin": "Built-in",
+          "business": "Business"
+        },
+        "enumValues": "Enumeration Values ({{count}})",
+        "moreItems": "... {{count}} more items",
+        "errorNoDataType": "ValueDomain {{name}} has no data type and cannot be associated.",
+        "errorTypeMismatch": "Type mismatch: column type is {{columnType}}, ValueDomain type is {{domainType}}."
+      }
+    }
+  }
+}

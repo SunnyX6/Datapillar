@@ -65,6 +65,7 @@ import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
 import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.requests.RoleGrantRequest;
+import org.apache.gravitino.dto.requests.RoleReplaceRequest;
 import org.apache.gravitino.dto.requests.RoleRevokeRequest;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
@@ -1112,6 +1113,37 @@ public class GravitinoMetalake extends MetalakeDTO
                 API_PERMISSION_PATH,
                 RESTUtils.encodeString(this.name()),
                 String.format("users/%s/grant", RESTUtils.encodeString(user))),
+            request,
+            UserResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.permissionOperationErrorHandler());
+    resp.validate();
+
+    return resp.getUser();
+  }
+
+  /**
+   * Replace all roles bound to a user.
+   *
+   * @param user The name of the User.
+   * @param roles The target role names of the user. An empty list clears all roles.
+   * @return The User after roles are replaced.
+   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws IllegalRoleException If the Role with the given name is invalid.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If replacing roles for a user encounters storage issues.
+   */
+  public User replaceRolesForUser(List<String> roles, String user)
+      throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
+    RoleReplaceRequest request = new RoleReplaceRequest(roles);
+    request.validate();
+
+    UserResponse resp =
+        restClient.put(
+            String.format(
+                API_PERMISSION_PATH,
+                RESTUtils.encodeString(this.name()),
+                String.format("users/%s/replace", RESTUtils.encodeString(user))),
             request,
             UserResponse.class,
             Collections.emptyMap(),

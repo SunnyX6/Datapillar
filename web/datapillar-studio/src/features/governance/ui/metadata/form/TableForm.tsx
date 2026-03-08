@@ -5,6 +5,7 @@
  */
 
 import { useEffect,useState,useRef,useCallback,forwardRef,useImperativeHandle,useLayoutEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import { GripVertical,Plus,Trash2,Key,Sparkles,Layers,List,Hash,Type,ChevronLeft,ChevronRight,Pin } from 'lucide-react'
 import { toast } from 'sonner'
@@ -94,6 +95,7 @@ function ColumnRow({
  isDragging:boolean
  isLeftCollapsed:boolean
 }) {
+ const { t } = useTranslation('oneMeta')
  const [hoveredDomain,setHoveredDomain] = useState<string | null>(null)
  const [cardPos,setCardPos] = useState<{ top:number;left:number } | null>(null)
  const hoverItemRef = useRef<HTMLDivElement>(null)
@@ -144,10 +146,10 @@ function ColumnRow({
  /** Get the value field type label */
  const getDomainTypeLabel = (domainType?: string) => {
  switch (domainType?.toUpperCase()) {
- case 'ENUM':return 'enumeration'
- case 'RANGE':return 'scope'
- case 'REGEX':return 'regular'
- default:return 'unknown'
+ case 'ENUM':return t('metadataForm.table.column.domainType.enum')
+ case 'RANGE':return t('metadataForm.table.column.domainType.range')
+ case 'REGEX':return t('metadataForm.table.column.domainType.regex')
+ default:return t('metadataForm.table.column.domainType.unknown')
  }
  }
 
@@ -166,7 +168,7 @@ function ColumnRow({
  {column.valueDomainCode && (<div className="absolute -top-1.5 left-6 z-10">
  <span
  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-micro font-medium bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-full border border-indigo-200 dark:border-indigo-800 cursor-pointer hover:bg-indigo-200 dark:hover:bg-indigo-900/60"
- title={`range:${valueDomains.find((d) => d.domainCode === column.valueDomainCode)?.domainName || column.valueDomainCode}`}
+ title={valueDomains.find((d) => d.domainCode === column.valueDomainCode)?.domainName || column.valueDomainCode}
  onClick={() => onUpdate('valueDomainCode','')}
  >
  {getDomainIcon(valueDomains.find((d) => d.domainCode === column.valueDomainCode)?.domainType)}
@@ -190,7 +192,7 @@ function ColumnRow({
  type="text"
  value={column.name}
  onChange={(e) => onUpdate('name',e.target.value)}
- placeholder="List"
+ placeholder={t('metadataForm.table.column.namePlaceholder')}
  title={column.name}
  className="h-7 w-full min-w-0 px-2 text-xs text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
  />
@@ -214,8 +216,8 @@ function ColumnRow({
  className={`h-7 w-7 inline-flex items-center justify-center rounded-md transition-colors ${
  column.isPrimaryKey?'text-amber-600 bg-amber-50 dark:bg-amber-900/30':'text-slate-400 dark:text-slate-500 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700'
  }`}
- title="primary key"
- aria-label="primary key"
+ title={t('metadataForm.table.column.primaryKey')}
+ aria-label={t('metadataForm.table.column.primaryKey')}
  >
  <Key size={12} />
  </button>
@@ -228,7 +230,7 @@ function ColumnRow({
  onChange={(e) => onUpdate('nullable',!e.target.checked)}
  className="w-3.5 h-3.5 text-blue-600 rounded border-slate-300 dark:border-slate-600 focus:ring-blue-500"
  />
- <span>Required</span>
+ <span>{t('metadataForm.table.column.required')}</span>
  </label>
  </div>
 
@@ -237,7 +239,7 @@ function ColumnRow({
  type="text"
  value={column.comment || ''}
  onChange={(e) => onUpdate('comment',e.target.value)}
- placeholder="Comment"
+ placeholder={t('metadataForm.table.column.commentPlaceholder')}
  title={column.comment || ''}
  className="h-7 w-full min-w-0 px-2 text-xs text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
  />
@@ -256,8 +258,8 @@ function ColumnRow({
  className={`h-7 w-7 inline-flex items-center justify-center rounded-md transition-colors ${
  column.valueDomainCode?'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30':'text-slate-400 dark:text-slate-500 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-700'
  }`}
- title="associated range"
- aria-label="associated range"
+ title={t('metadataForm.table.column.valueDomain')}
+ aria-label={t('metadataForm.table.column.valueDomain')}
  >
  <Pin size={12} />
  </button>
@@ -270,7 +272,7 @@ function ColumnRow({
  >
  {/* head */}
  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
- <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Select range</span>
+ <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{t('metadataForm.table.column.selectValueDomain')}</span>
  </div>
  {/* list */}
  <div className="max-h-40 overflow-y-auto py-1">
@@ -285,11 +287,14 @@ function ColumnRow({
  onClick={(e) => {
  // Verify that data types match
  if (!domain.dataType) {
- toast.error(`range ${domain.domainName} No data type specified,Unable to associate`)
+ toast.error(t('metadataForm.table.column.errorNoDataType', { name: domain.domainName }))
  return
  }
  if (!isDataTypeCompatible(column.dataType,domain.dataType)) {
- toast.error(`Data type mismatch:The column type is ${column.dataType.toUpperCase()},The value range type is ${domain.dataType.toUpperCase()}`)
+ toast.error(t('metadataForm.table.column.errorTypeMismatch', {
+ columnType: column.dataType.toUpperCase(),
+ domainType: domain.dataType.toUpperCase()
+ }))
  return
  }
  onUpdate('valueDomainCode',domain.domainCode);(e.currentTarget.parentElement?.parentElement as HTMLDivElement).classList.add('hidden')
@@ -308,8 +313,8 @@ function ColumnRow({
  type="button"
  onClick={onDelete}
  className="h-7 w-7 inline-flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors opacity-0 group-hover:opacity-100"
- title="Delete"
- aria-label="Delete"
+ title={t('metadataForm.table.column.delete')}
+ aria-label={t('metadataForm.table.column.delete')}
  >
  <Trash2 size={12} />
  </button>
@@ -338,19 +343,21 @@ function ColumnRow({
  {activeHoveredDomain.dataType}
  </span>)}
  {activeHoveredDomain.domainLevel && (<span className={`text-micro px-1.5 py-0.5 rounded ${activeHoveredDomain.domainLevel === 'BUILTIN'?'bg-amber-100 text-amber-600':'bg-blue-100 text-blue-600'}`}>
- {activeHoveredDomain.domainLevel === 'BUILTIN'?'Built-in':'Business'}
+ {activeHoveredDomain.domainLevel === 'BUILTIN'
+  ? t('metadataForm.table.column.domainLevel.builtin')
+  : t('metadataForm.table.column.domainLevel.business')}
  </span>)}
  </div>
  </div>
  {/* List of enumeration items */}
  {activeHoveredDomain.items.length > 0 && (<div className="px-3 py-2">
- <p className="text-micro font-medium text-slate-400 dark:text-slate-500 mb-1.5">enumeration value ({activeHoveredDomain.items.length})</p>
+ <p className="text-micro font-medium text-slate-400 dark:text-slate-500 mb-1.5">{t('metadataForm.table.column.enumValues', { count: activeHoveredDomain.items.length })}</p>
  <div className="max-h-32 overflow-y-auto space-y-1">
  {activeHoveredDomain.items.slice(0,10).map((item) => (<div key={item.value} className="flex items-center gap-2 text-micro">
  <span className="font-mono text-slate-600 dark:text-slate-300">{item.value}</span>
  {item.label && <span className="text-slate-400 truncate">({item.label})</span>}
  </div>))}
- {activeHoveredDomain.items.length > 10 && (<p className="text-micro text-slate-400">...Also {activeHoveredDomain.items.length - 10} item</p>)}
+ {activeHoveredDomain.items.length > 10 && (<p className="text-micro text-slate-400">{t('metadataForm.table.column.moreItems', { count: activeHoveredDomain.items.length - 10 })}</p>)}
  </div>
  </div>)}
  </div>,document.body)}
@@ -358,6 +365,7 @@ function ColumnRow({
 }
 
 export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(({ parentName:_parentName,provider,onDDLButtonRender,onOverlayRender,initialData },ref) => {
+ const { t } = useTranslation('oneMeta')
  const [tableName,setTableName] = useState(initialData?.name || '')
  const [tableComment,setTableComment] = useState(initialData?.comment || '')
  const [userDdlInput,setUserDdlInput] = useState('')
@@ -395,21 +403,21 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  },{} as Record<string,string>)
  }),validate:() => {
  if (!tableName.trim()) {
- toast.error('Please enter the physical table name')
+ toast.error(t('metadataForm.table.toast.enterName'))
  return false
  }
  if (columns.length === 0) {
- toast.error('Please add at least one column')
+ toast.error(t('metadataForm.table.toast.addColumn'))
  return false
  }
  const emptyColumns = columns.filter((col) =>!col.name.trim())
  if (emptyColumns.length > 0) {
- toast.error('There are columns with unfilled names')
+ toast.error(t('metadataForm.table.toast.emptyColumnName'))
  return false
  }
  return true
  }
- }))
+ }), [tableName, tableComment, columns, properties, t])
 
  // Load range list
  useEffect(() => {
@@ -433,12 +441,12 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  setProperties(parsed.properties)
  setParseError(null)
  } catch (error:unknown) {
- const message = error instanceof Error?error.message:'parse DDL failed'
+ const message = error instanceof Error?error.message:t('metadataForm.table.ddl.parseFailed')
  setParseError(message)
  }
  },400)
  return () => clearTimeout(handler)
- },[userDdlInput,provider])
+ },[userDdlInput,provider,t])
 
  // rendering DDL button
  useEffect(() => {
@@ -451,10 +459,10 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
  </svg>
- DDL Quick import
+ {t('metadataForm.table.ddl.button')}
  </button>)
  }
- },[ddlExpanded,onDDLButtonRender])
+ },[ddlExpanded,onDDLButtonRender,t])
 
  // rendering DDL drawer
  useEffect(() => {
@@ -466,7 +474,7 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  >
  <div className="flex-shrink-0 p-4 border-b border-slate-200 dark:border-slate-700">
  <div className="flex items-center gap-2">
- <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">DDL Quick import</span>
+ <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{t('metadataForm.table.ddl.title')}</span>
  <span className="text-legal text-indigo-600 dark:text-indigo-400">{dialectLabel}</span>
  </div>
  </div>
@@ -474,7 +482,7 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  <textarea
  defaultValue={ddlInputRef.current}
  onChange={handleDdlChange}
- placeholder="Paste CREATE TABLE statement,Automatically parse table names,Table description,Column definition"
+ placeholder={t('metadataForm.table.ddl.placeholder')}
  className="w-full h-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono resize-none"
  autoFocus={ddlExpanded}
  />
@@ -484,7 +492,7 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  </div>)}
  </div>)
  }
- },[ddlExpanded,parseError,dialectLabel,onOverlayRender,handleDdlChange])
+ },[ddlExpanded,parseError,dialectLabel,onOverlayRender,handleDdlChange,t])
 
  const handleAddColumn = () => {
  setColumns((prev) => [...prev,{ id:`col_${Date.now()}`,name:'',dataType:'STRING',comment:'',nullable:true }])
@@ -544,10 +552,10 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  {isEditMode && (<div className="p-3 mb-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">
  <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 mb-1.5">
  <Sparkles size={14} />
- <span className="text-xs font-semibold">Smart reminder</span>
+ <span className="text-xs font-semibold">{t('metadataForm.table.tip.title')}</span>
  </div>
  <p className="text-xs text-blue-600/80 dark:text-blue-400/80 leading-relaxed">
- When entering column names,The system will automatically match One Meta Semantic standards and recommends the most appropriate physical type.Drag columns to adjust order.</p>
+ {t('metadataForm.table.tip.contentEdit')}</p>
  </div>)}
 
  <div className="flex flex-1 min-h-0">
@@ -557,8 +565,8 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  type="button"
  onClick={() => setIsLeftCollapsed(false)}
  className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
- title="Expand configuration"
- aria-label="Expand configuration"
+ title={t('metadataForm.table.panel.expand')}
+ aria-label={t('metadataForm.table.panel.expand')}
  >
  <ChevronRight size={16} />
  </button>
@@ -567,8 +575,8 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  type="button"
  onClick={() => setIsLeftCollapsed(true)}
  className="absolute top-2 -right-2 w-5 h-8 flex items-center justify-center bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg shadow-sm transition-colors z-20"
- title="Collapse configuration"
- aria-label="Collapse configuration"
+ title={t('metadataForm.table.panel.collapse')}
+ aria-label={t('metadataForm.table.panel.collapse')}
  >
  <ChevronLeft size={14} className="text-slate-400" />
  </button>
@@ -577,24 +585,24 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  {/* Physical table name */}
  <div className="space-y-1.5">
  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
- Physical table name <span className="text-red-500">*</span>
+ {t('metadataForm.table.field.name')} <span className="text-red-500">*</span>
  </label>
  <input
  type="text"
  value={tableName}
  onChange={(e) => setTableName(e.target.value)}
- placeholder="For example:fact_order_sales"
+ placeholder={t('metadataForm.table.placeholder.name')}
  className="w-full px-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
 
  {/* Description information */}
  <div className="space-y-1.5">
- <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Description information</label>
+ <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">{t('metadataForm.table.field.description')}</label>
  <textarea
  value={tableComment}
  onChange={(e) => setTableComment(e.target.value)}
- placeholder="Describe the data source and core business purpose of the table..."
+ placeholder={t('metadataForm.table.placeholder.description')}
  rows={3}
  className="w-full px-3 py-2 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
@@ -603,22 +611,22 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  {/* Table parameters */}
  <div className="space-y-1.5">
  <div className="flex items-center justify-between">
- <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Table parameters</label>
+ <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">{t('metadataForm.table.field.properties')}</label>
  <button
  type="button"
  onClick={handleAddProperty}
  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
  >
- + add
+ + {t('metadataForm.table.action.add')}
  </button>
  </div>
  {properties.length === 0?(<div className="py-3 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
- No table parameters yet
+ {t('metadataForm.table.empty.noProperties')}
  </div>):(<div className="space-y-1.5 max-h-32 overflow-y-auto custom-scrollbar">
  {properties.map((prop) => (<div key={prop.id} className="flex items-center gap-1">
  <input
  type="text"
- placeholder="Parameter name"
+ placeholder={t('metadataForm.table.placeholder.propertyName')}
  value={prop.key}
  onChange={(e) => handlePropertyChange(prop.id,'key',e.target.value)}
  className="w-[45%] min-w-0 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 truncate"
@@ -626,7 +634,7 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  <span className="text-slate-300 flex-shrink-0">=</span>
  <input
  type="text"
- placeholder="Parameter value"
+ placeholder={t('metadataForm.table.placeholder.propertyValue')}
  value={prop.value}
  onChange={(e) => handlePropertyChange(prop.id,'value',e.target.value)}
  className="w-[45%] min-w-0 px-2 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500 truncate"
@@ -646,10 +654,10 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">
  <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 mb-1.5">
  <Sparkles size={14} />
- <span className="text-xs font-semibold">Smart reminder</span>
+ <span className="text-xs font-semibold">{t('metadataForm.table.tip.title')}</span>
  </div>
  <p className="text-xs text-blue-600/80 dark:text-blue-400/80 leading-relaxed">
- When entering column names,The system will automatically match One Meta Semantic standards and recommends the most appropriate physical type.</p>
+ {t('metadataForm.table.tip.content')}</p>
  </div>
  </div>
  </div>)}
@@ -661,7 +669,7 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  <div className="flex items-center justify-between mb-2">
  <div className="flex items-center gap-1.5">
  <Layers size={14} className="text-blue-600" />
- <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Column definition</span>
+ <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{t('metadataForm.table.column.header')}</span>
  <span className="text-xs text-slate-400">({columns.length})</span>
  </div>
  <button
@@ -670,7 +678,7 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
  >
  <Plus size={12} />
- Add physical column
+ {t('metadataForm.table.column.add')}
  </button>
  </div>
 
@@ -692,8 +700,8 @@ export const CreateTableForm = forwardRef<TableFormHandle,CreateTableFormProps>(
 
  {columns.length === 0 && (<div className="flex flex-col items-center justify-center py-10 text-slate-400">
  <Layers size={28} className="mb-2 opacity-50" />
- <p className="text-xs">No column definition yet</p>
- <p className="text-xs mt-1">Click"Add physical column"or use DDL Quick import</p>
+ <p className="text-xs">{t('metadataForm.table.column.empty')}</p>
+ <p className="text-xs mt-1">{t('metadataForm.table.column.emptyHint')}</p>
  </div>)}
  </div>
  </div>

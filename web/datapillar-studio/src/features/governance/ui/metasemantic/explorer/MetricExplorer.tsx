@@ -15,7 +15,7 @@ import { formatTime } from '@/utils'
 /** Number of loads per page */
 const PAGE_SIZE = 20
 
-/** Indicator type color mapping */
+/** Metric type color mapping */
 const TYPE_VARIANTS: Record<string, 'blue' | 'purple' | 'warning'> = {
   ATOMIC: 'blue',
   DERIVED: 'purple',
@@ -284,7 +284,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
     loadData()
   }, [loadData])
 
-  // When updated indicators are passed in externally，Update the corresponding item in the list
+  // When updated Metrics are passed in externally, update the corresponding item in the list
   useEffect(() => {
     if (updatedMetric) {
       setMetrics((prev) =>
@@ -301,13 +301,13 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
       (m.comment && m.comment.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
-  // Delete indicator
+  // Delete Metric
   const handleDelete = (code: string) => {
     setMetrics((prev) => prev.filter((m) => m.code !== code))
     setTotal((prev) => prev - 1)
   }
 
-  // Save new indicator
+  // Save new Metric
   const handleSaveNewMetric = async (form: MetricFormData) => {
     if (saving) return
     setSaving(true)
@@ -318,7 +318,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
         precision: form.precision,
         scale: form.scale
       }
-      // Build parentMetricCodes：Derived index takes baseCode，Take the composite indicator compositeMetrics
+      // Build parentMetricCodes: Derived Metric takes baseCode, Composite Metric takes compositeMetrics
       let parentMetricCodes: string[] | undefined
       if (form.type === 'DERIVED' && form.baseCode) {
         parentMetricCodes = [form.baseCode]
@@ -343,7 +343,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
           ? JSON.stringify(form.filterColumns.map(c => c.id).filter(Boolean))
           : undefined
       })
-      // Construct a new indicator object，Add directly to list
+      // Construct a new Metric object and add it directly to the list
       const newMetric: Metric = {
         name: form.name.trim(),
         code: form.code.trim().toUpperCase(),
@@ -369,7 +369,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
     }
   }
 
-  // Save edited indicator
+  // Save edited Metric
   const handleSaveEditMetric = async (form: MetricFormData) => {
     if (saving || !editingMetric) return
     setSaving(true)
@@ -382,7 +382,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
       }
       const fullDataType = form.dataType ? buildDataTypeString(dataTypeValue) : undefined
 
-      // Build parentMetricCodes：Derived index takes baseCode，Take the composite indicator compositeMetrics
+      // Build parentMetricCodes: Derived Metric takes baseCode, Composite Metric takes compositeMetrics
       let parentMetricCodes: string[] | undefined
       if (form.type === 'DERIVED' && form.baseCode) {
         parentMetricCodes = [form.baseCode]
@@ -445,7 +445,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
 	              <ArrowLeft size={iconSizeToken.large} />
 	            </Button>
 	            <div className="flex items-center gap-2">
-	              <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">indicator center</h2>
+	              <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">Metric Center</h2>
 	              <Badge variant="blue">
                 {filteredMetrics.length} / {total}
               </Badge>
@@ -476,7 +476,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
 
             <Button onClick={() => setShowNewModal(true)} size="header">
               <Plus size={iconSizeToken.medium} />
-              <span className="hidden @md:inline">New indicator</span>
+              <span className="hidden @md:inline">New Metric</span>
             </Button>
           </div>
         </div>
@@ -525,7 +525,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
             >
               <TableHeader>
                 <TableRow>
-                  <TableHead className={tableColumnWidthClassMap['4xl']}>Indicator name / encoding</TableHead>
+                  <TableHead className={tableColumnWidthClassMap['4xl']}>Metric name / code</TableHead>
                   <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>Type</TableHead>
                   <TableHead className={`px-3 ${tableColumnWidthClassMap.xl} text-center`}>data type</TableHead>
                   <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>unit</TableHead>
@@ -556,7 +556,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
       {/* Right semantic component library */}
       <ComponentLibrarySidebar />
 
-      {/* New indicator pop-up window */}
+      {/* New metric modal */}
       <MetricFormModal
         isOpen={showNewModal}
         onClose={() => setShowNewModal(false)}
@@ -564,7 +564,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
         saving={saving}
       />
 
-      {/* Edit indicator pop-up window */}
+      {/* Edit metric modal */}
       <MetricFormModal
         isOpen={!!editingMetric}
         onClose={() => setEditingMetric(null)}

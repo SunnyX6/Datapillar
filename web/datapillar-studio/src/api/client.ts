@@ -34,7 +34,8 @@ const CSRF_HEADER_NAME = 'X-CSRF-Token'
 const REFRESH_CSRF_COOKIE_NAME = 'refresh-csrf-token'
 const REFRESH_CSRF_HEADER_NAME = 'X-Refresh-CSRF-Token'
 const AUTH_ENDPOINTS = {
-  loginBase: LOGIN_BASE_URL,
+  login: `${LOGIN_BASE_URL}${API_PATH.login.root}`,
+  loginSso: `${LOGIN_BASE_URL}${API_PATH.login.sso}`,
   logout: `${LOGIN_BASE_URL}${API_PATH.login.logout}`,
   refresh: `${AUTH_BASE_URL}${API_PATH.auth.refresh}`
 }
@@ -88,9 +89,10 @@ function getRequestUrl(config: InternalAxiosRequestConfig): string {
 
 function shouldSkipAuthHandling(config: InternalAxiosRequestConfig): boolean {
   const requestUrl = getRequestUrl(config)
-  return requestUrl.startsWith(AUTH_ENDPOINTS.loginBase) ||
-    requestUrl.startsWith(AUTH_ENDPOINTS.logout) ||
-    requestUrl.startsWith(AUTH_ENDPOINTS.refresh)
+  return requestUrl === AUTH_ENDPOINTS.login ||
+    requestUrl === AUTH_ENDPOINTS.loginSso ||
+    requestUrl === AUTH_ENDPOINTS.logout ||
+    requestUrl === AUTH_ENDPOINTS.refresh
 }
 
 function normalizePath(url: string): string {

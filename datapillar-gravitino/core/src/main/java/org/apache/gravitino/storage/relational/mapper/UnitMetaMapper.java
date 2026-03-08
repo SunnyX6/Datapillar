@@ -23,6 +23,7 @@ import org.apache.gravitino.storage.relational.po.UnitPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -62,6 +63,16 @@ public interface UnitMetaMapper {
       method = "selectUnitIdBySchemaIdAndUnitCode")
   Long selectUnitIdBySchemaIdAndUnitCode(
       @Param("schemaId") Long schemaId, @Param("unitCode") String unitCode);
+
+  @Select(
+      "SELECT unit_id AS unitId, unit_code AS unitCode, unit_name AS unitName,"
+          + " unit_symbol AS unitSymbol, metalake_id AS metalakeId, catalog_id AS catalogId,"
+          + " schema_id AS schemaId, unit_comment AS unitComment,"
+          + " audit_info AS auditInfo, deleted_at AS deletedAt"
+          + " FROM "
+          + TABLE_NAME
+          + " WHERE unit_id = #{unitId} AND deleted_at = 0")
+  UnitPO selectUnitMetaByUnitId(@Param("unitId") Long unitId);
 
   @UpdateProvider(type = UnitMetaSQLProviderFactory.class, method = "updateUnitMeta")
   Integer updateUnitMeta(@Param("newUnit") UnitPO newUnitPO, @Param("oldUnit") UnitPO oldUnitPO);

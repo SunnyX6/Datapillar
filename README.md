@@ -4,7 +4,7 @@
 </h1>
 
 <p align="center">
-  <a href="./README.md">English</a> | <a href="./README.zh-CN.md">Simplified Chinese</a>
+  <a href="./README.md">English</a> | <a href="./README.zh-CN.md">简体中文</a>
 </p>
 
 <p align="center">
@@ -24,10 +24,9 @@
 </p>
 
 ## What Datapillar Solves
-
-- Build data development workflows with governance and AI in one platform.
+- Zero-ETL
+- Data governance and AI .
 - Keep metadata, lineage graph, and semantic assets synchronized across services.
-- Provide a local-debug-first workflow for rapid iteration on multi-service changes.
 
 ## Core Capabilities
 

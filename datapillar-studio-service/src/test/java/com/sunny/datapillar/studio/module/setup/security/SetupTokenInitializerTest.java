@@ -30,7 +30,7 @@ class SetupTokenInitializerTest {
   void run_shouldOnlyLogWhenNotInitialized() throws Exception {
     SystemBootstrap bootstrap = new SystemBootstrap();
     bootstrap.setId(1);
-    bootstrap.setSetupCompleted(0);
+    bootstrap.setStatus(0);
     when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap);
 
     setupTokenInitializer.run(new DefaultApplicationArguments(new String[0]));
@@ -42,7 +42,7 @@ class SetupTokenInitializerTest {
   void run_shouldSkipWhenAlreadyInitialized() throws Exception {
     SystemBootstrap bootstrap = new SystemBootstrap();
     bootstrap.setId(1);
-    bootstrap.setSetupCompleted(1);
+    bootstrap.setStatus(3);
     when(systemBootstrapMapper.selectByIdForUpdate(1)).thenReturn(bootstrap);
 
     setupTokenInitializer.run(new DefaultApplicationArguments(new String[0]));

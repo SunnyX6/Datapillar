@@ -1,5 +1,6 @@
 import { useMemo,useState } from 'react'
 import { ChevronRight,Fingerprint,Pencil,Plus,Search,Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Modal,ModalCancelButton,ModalPrimaryButton,Tooltip } from '@/components/ui'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { cn } from '@/utils'
@@ -25,6 +26,7 @@ interface RoleListProps {
 
 export function RoleList({
  roles,selectedRoleId,onSelectRole,onCreateRole,onUpdateRole,onDeleteRole,}:RoleListProps) {
+ const { t } = useTranslation('permission')
  const [keyword,setKeyword] = useState('')
  const [isCreateRoleOpen,setIsCreateRoleOpen] = useState(false)
  const [editingRole,setEditingRole] = useState<RoleItem | null>(null)
@@ -67,13 +69,13 @@ export function RoleList({
  className={cn(TYPOGRAPHY.micro,'font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-widest flex items-center gap-2',)}
  >
  <Fingerprint size={12} />
- Identity role
+ {t('roleList.title')}
  </h2>
  <button
  type="button"
  onClick={() => setIsCreateRoleOpen(true)}
  className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-md transition-all"
- aria-label="Add new role"
+ aria-label={t('roleList.addRoleAria')}
  >
  <Plus size={16} />
  </button>
@@ -87,7 +89,7 @@ export function RoleList({
  type="text"
  value={keyword}
  onChange={(event) => setKeyword(event.target.value)}
- placeholder="Search role name..."
+ placeholder={t('roleList.searchPlaceholder')}
  className={cn(TYPOGRAPHY.caption,'w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500',)}
  />
  </div>
@@ -98,8 +100,8 @@ export function RoleList({
  const isSelected = selectedRoleId === role.id
  const canEditRole =!role.isSystem
  const canDeleteRole =!role.isSystem && role.userCount === 0
- const editDisabledReason = role.isSystem?'Platform super management roles are not allowed to be edited.':'Edit role'
- const deleteDisabledReason = role.isSystem?'Platform super management roles are not allowed to be deleted':role.userCount > 0?'There are members under the role,cannot be deleted':'Delete role'
+ const editDisabledReason = role.isSystem?t('roleList.systemNoEdit'):t('roleList.editRole')
+ const deleteDisabledReason = role.isSystem?t('roleList.systemNoDelete'):role.userCount > 0?t('roleList.hasMembersCannotDelete'):t('roleList.deleteRole')
 
  return (<div
  key={role.id}
@@ -124,7 +126,7 @@ export function RoleList({
  <span
  className={cn(TYPOGRAPHY.nano,isSelected?'text-slate-500 dark:text-slate-300 font-semibold':'text-slate-400 dark:text-slate-500',)}
  >
- {role.userCount} members
+ {t('roleList.membersCount', { count: role.userCount })}
  </span>
  <span
  className={cn(TYPOGRAPHY.micro,'px-1.5 py-0.5 rounded border',role.type === 'ADMIN'?'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300':'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-700/70 dark:text-slate-300',)}
@@ -142,7 +144,7 @@ export function RoleList({
  <Tooltip content={editDisabledReason} side="top">
  <button
  type="button"
- aria-label={`Edit role-${role.name}`}
+ aria-label={t('roleList.editRoleAria', { roleName: role.name })}
  disabled={!canEditRole}
  onClick={() => {
  if (!canEditRole) {
@@ -158,7 +160,7 @@ export function RoleList({
  <Tooltip content={deleteDisabledReason} side="top">
  <button
  type="button"
- aria-label={`Delete role-${role.name}`}
+ aria-label={t('roleList.deleteRoleAria', { roleName: role.name })}
  disabled={!canDeleteRole}
  onClick={() => {
  if (!canDeleteRole) {
@@ -195,9 +197,9 @@ export function RoleList({
  editingRole?{
  name:editingRole.name,description:editingRole.description,type:editingRole.type,}:undefined
  }
- title="Edit role"
- submitLabel="Save changes"
- submittingLabel="Saving..."
+ title={t('roleList.editRole')}
+ submitLabel={t('roleList.saveChanges')}
+ submittingLabel={t('roleList.saving')}
  onCreate={async (payload) => {
  if (!editingRole ||!onUpdateRole) {
  return false
@@ -214,17 +216,17 @@ export function RoleList({
  setDeletingRole(null)
  }}
  size="mini"
- title="Delete role"
+ title={t('roleList.deleteRole')}
  subtitle={
  deletingRole?(<p className={cn(TYPOGRAPHY.caption,'text-slate-500 dark:text-slate-400')}>
- Confirm role deletion"{deletingRole.name}"?This operation is irreversible.</p>):null
+ {t('roleList.confirmDeleteMessage', { roleName: deletingRole.name })}</p>):null
  }
  footerLeft={
  <ModalCancelButton
  disabled={deletingRoleSubmitting}
  onClick={() => setDeletingRole(null)}
  >
- Cancel
+ {t('common.button.cancel', { ns: 'common', defaultValue: 'Cancel' })}
  </ModalCancelButton>
  }
  footerRight={
@@ -234,12 +236,12 @@ export function RoleList({
  variant="amber"
  onClick={() => void handleDeleteRole()}
  >
- Confirm deletion
+ {t('roleList.confirmDelete')}
  </ModalPrimaryButton>
  }
  >
  <p className={cn(TYPOGRAPHY.bodySm,'text-slate-600 dark:text-slate-300')}>
- After deletion,The permission configuration corresponding to this role will not be restored.</p>
+ {t('roleList.deleteTip')}</p>
  </Modal>
  </div>)
 }

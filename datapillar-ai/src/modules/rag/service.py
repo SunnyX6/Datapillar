@@ -26,10 +26,13 @@ from datapillar_oneagentic.knowledge import (
 from datapillar_oneagentic.providers.llm.config import EmbeddingConfig
 from datapillar_oneagentic.storage.config import VectorStoreConfig
 
+from src.infrastructure.keystore.crypto_service import (
+    is_encrypted_ciphertext,
+    local_crypto_service,
+)
 from src.infrastructure.repository.rag import DocumentRepository, JobRepository, NamespaceRepository
 from src.infrastructure.repository.system.ai_model import Model as AiModelRepository
 from src.infrastructure.repository.system.tenant import Tenant as TenantRepository
-from src.infrastructure.rpc.crypto import auth_crypto_rpc_client, is_encrypted_ciphertext
 from src.modules.rag.sse import job_event_hub
 from src.modules.rag.storage import StorageManager
 from src.shared.config.runtime import get_knowledge_wiki_config
@@ -643,7 +646,7 @@ class KnowledgeWikiService:
             raise BadRequestException("embedding_dimension Not configured")
         resolved_tenant_code = self._resolve_tenant_code(tenant_id, tenant_code)
         try:
-            decrypted_key = auth_crypto_rpc_client.decrypt_api_key_sync(
+            decrypted_key = local_crypto_service.decrypt_key(
                 tenant_code=resolved_tenant_code,
                 ciphertext=encrypted_key,
             )

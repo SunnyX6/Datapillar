@@ -1,9 +1,9 @@
 package com.sunny.datapillar.auth.security;
 
 import com.sunny.datapillar.auth.config.AuthProperties;
+import com.sunny.datapillar.auth.key.KeyManager;
 import com.sunny.datapillar.common.exception.BadRequestException;
 import com.sunny.datapillar.common.exception.UnauthorizedException;
-import com.sunny.datapillar.common.security.EdDsaJwtSupport;
 import com.sunny.datapillar.common.security.SessionTokenClaims;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -34,30 +34,24 @@ public class JwtToken {
   private final PublicKey publicKey;
   private final String issuer;
   private final List<String> audiences;
-  private final String algorithm;
   private final String activeKid;
   private final long accessTokenExpiration;
   private final long refreshTokenExpiration;
   private final long refreshTokenRememberExpiration;
   private final long loginTokenExpiration;
 
-  public JwtToken(AuthProperties authProperties) {
+  public JwtToken(AuthProperties authProperties, KeyManager keyManager) {
     AuthProperties.Token token = authProperties.getToken();
-    AuthProperties.Jwks jwks = authProperties.getJwks();
-    this.privateKey = EdDsaJwtSupport.loadPrivateKey(token.getPrivateKeyPath());
-    this.publicKey = EdDsaJwtSupport.loadPublicKey(token.getPublicKeyPath());
+    this.privateKey = keyManager.privateKey();
+    this.publicKey = keyManager.publicKey();
     this.issuer = token.getIssuer();
     this.audiences = normalizeAudiences(token.getAudience());
-    this.algorithm = token.getAlgorithm();
-    this.activeKid = jwks.getActiveKid();
+    this.activeKid = keyManager.activeKid();
     this.accessTokenExpiration = token.getAccessTtlSeconds() * 1000;
     this.refreshTokenExpiration = token.getRefreshTtlSeconds() * 1000;
     this.refreshTokenRememberExpiration = token.getRefreshRememberTtlSeconds() * 1000;
     this.loginTokenExpiration = token.getLoginTtlSeconds() * 1000;
 
-    if (!"EdDSA".equalsIgnoreCase(algorithm)) {
-      throw new IllegalStateException("auth.token.algorithm must be EdDSA");
-    }
     if (!StringUtils.hasText(issuer)) {
       throw new IllegalStateException("auth.token.issuer cannot be empty");
     }

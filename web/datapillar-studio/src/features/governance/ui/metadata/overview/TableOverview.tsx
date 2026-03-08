@@ -8,7 +8,6 @@ import {
   Clock,
   Fingerprint,
   Key,
-  Lock,
   Medal,
   Table as TableIcon,
   User,
@@ -280,29 +279,6 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
           // updatecolumns
           if (detail.columns) {
             setColumns(detail.columns)
-
-            // Get each columns tag，Extract value range association
-            const loadColumnTags = async () => {
-              const domainMap = new Map<string, string>()
-              await Promise.all(
-                detail.columns.map(async (col) => {
-                  try {
-                    const columnFullName = `${catalogName}.${schemaName}.${tableName}.${col.name}`
-                    const tags = await getObjectTags('COLUMN', columnFullName)
-                    // Find the range tag（to vd: Beginning）
-                    const valueDomainTag = tags.find((tag) => tag.startsWith(VALUE_DOMAIN_TAG_PREFIX))
-                    if (valueDomainTag) {
-                      const domainCode = valueDomainTag.slice(VALUE_DOMAIN_TAG_PREFIX.length)
-                      domainMap.set(col.name, domainCode)
-                    }
-                  } catch {
-                    // Ignore individual columns tag Failed to obtain
-                  }
-                })
-              )
-              setColumnValueDomainMap(domainMap)
-            }
-            loadColumnTags()
           }
 
           // updateindexes（only for JDBC type valid）
@@ -310,11 +286,11 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
             setIndexes(detail.indexes)
           }
 
-          // fromauditextracted fromownerandupdatedAt
+          // Owner must come from Gravitino owner relation, never from audit.creator.
+          setOwner(detail.owner || '')
+
+          // Update audit timestamp display.
           if (detail.audit) {
-            if (detail.audit.creator) {
-              setOwner(detail.audit.creator)
-            }
             // Prioritize update time，If not, use creation time
             const timeValue = detail.audit.lastModifiedTime || detail.audit.createTime
             if (timeValue) {
@@ -724,13 +700,12 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
             <>
               <Table layout="auto" minWidth="none">
                 <TableHeader className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
-                  <TableRow>
-                    <TableHead className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Column Name</TableHead>
-                    <TableHead className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Data Type</TableHead>
-                    <TableHead className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Comment</TableHead>
-                    <TableHead className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Tags</TableHead>
-                  </TableRow>
-                </TableHeader>
+	                  <TableRow>
+	                    <TableHead className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Column Name</TableHead>
+	                    <TableHead className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Data Type</TableHead>
+	                    <TableHead className={`px-6 py-3 text-left ${TYPOGRAPHY.legal} uppercase tracking-widest`}>Comment</TableHead>
+	                  </TableRow>
+	                </TableHeader>
                 <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {columns.map((col) => {
                     const indexTypes = columnIndexMap.get(col.name)
@@ -740,7 +715,10 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                     const currentDomain = valueDomains.find((d) => d.domainCode === currentDomainCode)
 
                     return (
-                      <TableRow key={col.name} className="group hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                      <TableRow
+                        key={col.name}
+                        className="group hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+                      >
                         <TableCell className="px-6 py-3 font-mono text-caption text-slate-800 dark:text-slate-100">
                           <div className="flex items-center gap-2">
                             {/* List + value range tag container */}
@@ -790,20 +768,12 @@ export function TableOverview({ table, provider, breadcrumb, activeTab, onTabCha
                               </span>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell className="px-6 py-3 font-mono text-caption text-slate-500 dark:text-slate-300">{col.dataType}</TableCell>
-                        <TableCell className="px-6 py-3 text-caption text-slate-600 dark:text-slate-300">{col.comment ?? '-'}</TableCell>
-                        <TableCell className="px-6 py-3 text-caption">
-                          {col.piiTag && (
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded ${TYPOGRAPHY.micro} font-bold bg-rose-50 text-rose-600 border border-rose-100`}>
-                              <Lock size={10} />
-                              {col.piiTag}
-                            </span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
+	                        </TableCell>
+	                        <TableCell className="px-6 py-3 font-mono text-caption text-slate-500 dark:text-slate-300">{col.dataType}</TableCell>
+	                        <TableCell className="px-6 py-3 text-caption text-slate-600 dark:text-slate-300">{col.comment ?? '-'}</TableCell>
+	                      </TableRow>
+	                    )
+	                  })}
                 </TableBody>
               </Table>
               {/* Value range selection drop-down - Portal Arrive body */}

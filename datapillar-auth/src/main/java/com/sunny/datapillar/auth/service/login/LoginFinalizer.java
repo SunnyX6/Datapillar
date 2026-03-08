@@ -1,11 +1,7 @@
 package com.sunny.datapillar.auth.service.login;
 
-import com.sunny.datapillar.auth.dto.auth.request.*;
-import com.sunny.datapillar.auth.dto.auth.response.*;
-import com.sunny.datapillar.auth.dto.login.request.*;
-import com.sunny.datapillar.auth.dto.login.response.*;
-import com.sunny.datapillar.auth.dto.oauth.request.*;
-import com.sunny.datapillar.auth.dto.oauth.response.*;
+import com.sunny.datapillar.auth.dto.login.response.LoginResultResponse;
+import com.sunny.datapillar.auth.dto.login.response.TenantOptionItem;
 import com.sunny.datapillar.auth.entity.Tenant;
 import com.sunny.datapillar.auth.entity.TenantUser;
 import com.sunny.datapillar.auth.entity.User;
@@ -111,8 +107,7 @@ public class LoginFinalizer {
     authCookieManager.issueSessionCsrfCookies(
         tenant.getId(), user.getId(), refreshTtlSeconds, response);
 
-    LoginResponse loginResponse = userAccessReader.buildLoginResponse(tenant.getId(), user);
-    return buildLoginResult(loginResponse, tenantOptions);
+    return buildLoginResult(user, tenantOptions);
   }
 
   private LoginResultResponse buildTenantSelectResult(
@@ -135,15 +130,12 @@ public class LoginFinalizer {
     return result;
   }
 
-  private LoginResultResponse buildLoginResult(
-      LoginResponse loginResponse, List<TenantOptionItem> tenantOptions) {
+  private LoginResultResponse buildLoginResult(User user, List<TenantOptionItem> tenantOptions) {
     LoginResultResponse result = new LoginResultResponse();
     result.setTenants(tenantOptions);
-    result.setUserId(loginResponse.getUserId());
-    result.setUsername(loginResponse.getUsername());
-    result.setEmail(loginResponse.getEmail());
-    result.setRoles(loginResponse.getRoles());
-    result.setMenus(loginResponse.getMenus());
+    result.setUserId(user.getId());
+    result.setUsername(user.getUsername());
+    result.setEmail(user.getEmail());
     return result;
   }
 

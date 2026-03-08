@@ -3,7 +3,7 @@ package com.sunny.datapillar.openlineage.dao.mapper;
 import com.sunny.datapillar.openlineage.model.AsyncBatchRecord;
 import com.sunny.datapillar.openlineage.model.AsyncTaskAttemptRecord;
 import com.sunny.datapillar.openlineage.model.AsyncTaskRecord;
-import com.sunny.datapillar.openlineage.model.LineageEventRecord;
+import com.sunny.datapillar.openlineage.model.OpenLineageEventRecord;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
@@ -13,7 +13,7 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface OpenLineageEventMapper {
 
-  int insertLineageEvent(LineageEventRecord record);
+  int insertLineageEvent(OpenLineageEventRecord record);
 
   int upsertAsyncTask(AsyncTaskRecord record);
 

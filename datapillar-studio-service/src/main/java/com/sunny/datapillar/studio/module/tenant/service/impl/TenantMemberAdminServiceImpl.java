@@ -60,4 +60,20 @@ public class TenantMemberAdminServiceImpl implements TenantMemberAdminService {
   public void assignRoles(Long userId, List<Long> roleIds) {
     userService.assignRoles(userId, roleIds);
   }
+
+  @Override
+  public List<RoleDataPrivilegeItem> getMemberDataPrivileges(Long userId, String domain) {
+    return userService.getUserDataPrivileges(userId, domain);
+  }
+
+  @Override
+  public void replaceMemberDataPrivileges(
+      Long userId, String domain, List<RoleDataPrivilegeCommandItem> commands) {
+    userService.replaceUserDataPrivileges(userId, domain, commands);
+  }
+
+  @Override
+  public void clearMemberDataPrivileges(Long userId, String domain) {
+    userService.clearUserDataPrivileges(userId, domain);
+  }
 }

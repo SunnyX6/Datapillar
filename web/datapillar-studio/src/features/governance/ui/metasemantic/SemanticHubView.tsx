@@ -1,4 +1,5 @@
 import { useMemo,useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Target,Book,Shield,Cpu,Globe,Workflow,Zap,Braces,ListChecks,ShieldCheck } from 'lucide-react'
 import { HubAssetCard } from './components'
@@ -13,6 +14,7 @@ const CATEGORY_ROUTES:Record<SemanticCategory,string> = {
 }
 
 export function SemanticHubView() {
+ const { t } = useTranslation('oneSemantics')
  const navigate = useNavigate()
  const metricsTotal = useSemanticStatsStore((state) => state.metricsTotal)
  const wordRootsTotal = useSemanticStatsStore((state) => state.wordRootsTotal)
@@ -30,16 +32,16 @@ export function SemanticHubView() {
  },[metricsTotal,wordRootsTotal,setMetricsTotal,setWordRootsTotal])
 
  const categories:CategoryConfig[] = useMemo(() => [{
- id:'METRICS',label:'indicator center',icon:Target,color:'bg-purple-600',description:'Unified business caliber,Precipitated enterprise atomic index and derived index system.',count:metricsTotal?? 0,trend:'NEW'
+ id:'METRICS',label:t('semanticHub.categories.metrics.label'),icon:Target,color:'bg-purple-600',description:t('semanticHub.categories.metrics.description'),count:metricsTotal?? 0,trend:t('semanticHub.categories.metrics.trend')
  },{
- id:'GLOSSARY',label:'canonical root',icon:Book,color:'bg-blue-600',description:'The cornerstone of data standardized naming,Standardize field semantics and physical naming.',count:wordRootsTotal?? 0
+ id:'GLOSSARY',label:t('semanticHub.categories.wordRoot.label'),icon:Book,color:'bg-blue-600',description:t('semanticHub.categories.wordRoot.description'),count:wordRootsTotal?? 0
  },{
- id:'STANDARDS',label:'Standard specifications',icon:Shield,color:'bg-emerald-600',description:'data type standards,Value range constraints and hierarchical classification safety specifications.',count:12,subEntries:[{ id:'datatype',label:'data type',icon:Braces,route:'/governance/semantic/standards/datatypes' },{ id:'valuedomain',label:'range',icon:ListChecks,route:'/governance/semantic/standards/valuedomains' },{ id:'security',label:'Classification',icon:ShieldCheck,route:'/governance/semantic/standards/security' }]
+ id:'STANDARDS',label:t('semanticHub.categories.standards.label'),icon:Shield,color:'bg-emerald-600',description:t('semanticHub.categories.standards.description'),count:12,subEntries:[{ id:'datatype',label:t('semanticHub.categories.standards.sub.dataType'),icon:Braces,route:'/governance/semantic/standards/datatypes' },{ id:'valuedomain',label:t('semanticHub.categories.standards.sub.valueDomain'),icon:ListChecks,route:'/governance/semantic/standards/valuedomains' },{ id:'security',label:t('semanticHub.categories.standards.sub.classification'),icon:ShieldCheck,route:'/governance/semantic/standards/security' }]
  },{
- id:'MODELS',label:'AI Features',icon:Cpu,color:'bg-orange-500',description:'Model feature database and feature lineage,speed up AI Scene data supply.',count:8
+ id:'MODELS',label:t('semanticHub.categories.models.label'),icon:Cpu,color:'bg-orange-500',description:t('semanticHub.categories.models.description'),count:8
  },{
- id:'APIS',label:'Data services',icon:Globe,color:'bg-cyan-500',description:'Data-as-a-Service,Unified management API Service metadata.',count:24
- }],[metricsTotal,wordRootsTotal])
+ id:'APIS',label:t('semanticHub.categories.apis.label'),icon:Globe,color:'bg-cyan-500',description:t('semanticHub.categories.apis.description'),count:24
+ }],[metricsTotal,wordRootsTotal,t])
 
  const handleCategoryClick = (categoryId:SemanticCategory) => {
  const route = CATEGORY_ROUTES[categoryId]
@@ -57,20 +59,20 @@ export function SemanticHubView() {
  <div className="animate-in fade-in duration-500">
  <div className="mb-6 @md:mb-8">
  <h1 className="text-heading @md:text-title @xl:text-display font-black text-slate-900 dark:text-slate-100 tracking-tight">
- One Meta <span className="text-blue-600">Semantic</span>
+ {t('semanticHub.title.prefix')} <span className="text-blue-600">{t('semanticHub.title.highlight')}</span>
  </h1>
- <p className="text-slate-500 dark:text-slate-400 mt-2 text-body-sm @md:text-body">Enterprise-level semantic asset lake,Connect business definitions to physical data.</p>
+ <p className="text-slate-500 dark:text-slate-400 mt-2 text-body-sm @md:text-body">{t('semanticHub.subtitle')}</p>
  </div>
 
  <div className="grid grid-cols-1 @md:grid-cols-2 @xl:grid-cols-3 gap-4 @md:gap-6">
  {categories.map((cat) => (<HubAssetCard key={cat.id} config={cat} onClick={() => handleCategoryClick(cat.id)} onSubEntryClick={handleSubEntryClick} />))}
  <div className="@md:col-span-2 @xl:col-span-3 bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700 rounded-xl @md:rounded-2xl p-6 @md:p-8 flex items-center justify-between text-white shadow-lg overflow-hidden relative group">
  <div className="relative z-10 max-w-lg">
- <h3 className="text-body @md:text-subtitle @xl:text-title font-bold mb-2 @md:mb-3">want to AI Understand your data better?</h3>
+ <h3 className="text-body @md:text-subtitle @xl:text-title font-bold mb-2 @md:mb-3">{t('semanticHub.hero.title')}</h3>
  <p className="text-blue-100 mb-4 @md:mb-6 text-caption @md:text-body-sm opacity-90">
- Pass One Meta Improve physical assets,Metadata such as semantics,Can significantly improve enterprise-level AI Agent The accuracy and quality of automatic report generation.</p>
+ {t('semanticHub.hero.description')}</p>
  <button className="bg-white text-blue-600 font-semibold px-4 @md:px-6 py-2 @md:py-2.5 rounded-lg @md:rounded-xl shadow-md hover:scale-105 transition-all flex items-center gap-2 text-caption @md:text-body-sm">
- <Zap size={iconSizeToken.medium} /> Turn on semantic enhancement now
+ <Zap size={iconSizeToken.medium} /> {t('semanticHub.hero.cta')}
  </button>
  </div>
  <div className="opacity-10 absolute right-0 top-0 bottom-0 pointer-events-none group-hover:scale-110 transition-transform duration-1000 hidden @md:block">

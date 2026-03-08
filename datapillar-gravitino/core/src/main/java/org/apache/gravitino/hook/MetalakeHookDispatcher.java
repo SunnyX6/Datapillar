@@ -24,6 +24,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
@@ -31,6 +32,7 @@ import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -62,6 +64,18 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws MetalakeAlreadyExistsException {
     Metalake metalake = dispatcher.createMetalake(ident, comment, properties);
+    String currentUser = PrincipalUtils.getCurrentUserName();
+
+    // Ensure the creator can immediately access the metalake as a user principal.
+    AccessControlDispatcher accessControlDispatcher =
+        GravitinoEnv.getInstance().accessControlDispatcher();
+    if (accessControlDispatcher != null) {
+      try {
+        accessControlDispatcher.addUser(ident.name(), currentUser);
+      } catch (UserAlreadyExistsException ignored) {
+        // idempotent by design
+      }
+    }
 
     // Set the creator as owner of the metalake.
     OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
@@ -69,7 +83,7 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
       ownerDispatcher.setOwner(
           ident.name(),
           NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.METALAKE),
-          PrincipalUtils.getCurrentUserName(),
+          currentUser,
           Owner.Type.USER);
     }
     return metalake;

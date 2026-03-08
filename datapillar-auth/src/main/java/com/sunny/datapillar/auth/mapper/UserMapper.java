@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.sunny.datapillar.auth.dto.login.response.RoleItem;
 import com.sunny.datapillar.auth.entity.User;
 import java.util.List;
-import java.util.Map;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -25,9 +24,5 @@ public interface UserMapper extends BaseMapper<User> {
 
   /** Query role list of the user. */
   List<RoleItem> selectRolesByUserId(
-      @Param("tenantId") Long tenantId, @Param("userId") Long userId);
-
-  /** Query accessible menu list for the user. */
-  List<Map<String, Object>> selectMenusByUserId(
       @Param("tenantId") Long tenantId, @Param("userId") Long userId);
 }

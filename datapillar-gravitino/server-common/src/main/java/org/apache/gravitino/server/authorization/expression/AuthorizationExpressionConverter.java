@@ -159,6 +159,10 @@ public class AuthorizationExpressionConverter {
     expression = expression.replaceAll("METALAKE_USER", "authorizer.isMetalakeUser(METALAKE_NAME)");
     expression =
         expression.replaceAll(
+            "TENANT_BOOTSTRAP_REQUEST",
+            "@org.apache.gravitino.extensions.multitenancy.authorization.TenantBootstrapGuard@canCreateMetalake(principal)");
+    expression =
+        expression.replaceAll(
             "ANY_USE_CATALOG",
             "((ANY(USE_CATALOG, METALAKE, CATALOG)) && "
                 + "!(ANY(DENY_USE_CATALOG, METALAKE, CATALOG)))");
@@ -213,6 +217,56 @@ public class AuthorizationExpressionConverter {
             "ANY_CREATE_MODEL",
             "((ANY(CREATE_MODEL, METALAKE, CATALOG, SCHEMA)) "
                 + "&& !(ANY(DENY_CREATE_MODEL, METALAKE, CATALOG, SCHEMA)))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_METRIC",
+            "((ANY(CREATE_METRIC, METALAKE, CATALOG, SCHEMA, METRIC)) "
+                + "&& !(ANY(DENY_CREATE_METRIC, METALAKE, CATALOG, SCHEMA, METRIC)))");
+    expression =
+        expression.replaceAll(
+            "ANY_USE_METRIC",
+            "((ANY(USE_METRIC, METALAKE, CATALOG, SCHEMA, METRIC)) "
+                + "&& !(ANY(DENY_USE_METRIC, METALAKE, CATALOG, SCHEMA, METRIC)))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_MODIFIER",
+            "((ANY(CREATE_MODIFIER, METALAKE, CATALOG, SCHEMA, MODIFIER)) "
+                + "&& !(ANY(DENY_CREATE_MODIFIER, METALAKE, CATALOG, SCHEMA, MODIFIER)))");
+    expression =
+        expression.replaceAll(
+            "ANY_USE_MODIFIER",
+            "((ANY(USE_MODIFIER, METALAKE, CATALOG, SCHEMA, MODIFIER)) "
+                + "&& !(ANY(DENY_USE_MODIFIER, METALAKE, CATALOG, SCHEMA, MODIFIER)))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_WORDROOT",
+            "((ANY(CREATE_WORDROOT, METALAKE, CATALOG, SCHEMA, WORDROOT)) "
+                + "&& !(ANY(DENY_CREATE_WORDROOT, METALAKE, CATALOG, SCHEMA, WORDROOT)))");
+    expression =
+        expression.replaceAll(
+            "ANY_USE_WORDROOT",
+            "((ANY(USE_WORDROOT, METALAKE, CATALOG, SCHEMA, WORDROOT)) "
+                + "&& !(ANY(DENY_USE_WORDROOT, METALAKE, CATALOG, SCHEMA, WORDROOT)))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_UNIT",
+            "((ANY(CREATE_UNIT, METALAKE, CATALOG, SCHEMA, UNIT)) "
+                + "&& !(ANY(DENY_CREATE_UNIT, METALAKE, CATALOG, SCHEMA, UNIT)))");
+    expression =
+        expression.replaceAll(
+            "ANY_USE_UNIT",
+            "((ANY(USE_UNIT, METALAKE, CATALOG, SCHEMA, UNIT)) "
+                + "&& !(ANY(DENY_USE_UNIT, METALAKE, CATALOG, SCHEMA, UNIT)))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_VALUE_DOMAIN",
+            "((ANY(CREATE_VALUE_DOMAIN, METALAKE, CATALOG, SCHEMA, VALUE_DOMAIN)) "
+                + "&& !(ANY(DENY_CREATE_VALUE_DOMAIN, METALAKE, CATALOG, SCHEMA, VALUE_DOMAIN)))");
+    expression =
+        expression.replaceAll(
+            "ANY_USE_VALUE_DOMAIN",
+            "((ANY(USE_VALUE_DOMAIN, METALAKE, CATALOG, SCHEMA, VALUE_DOMAIN)) "
+                + "&& !(ANY(DENY_USE_VALUE_DOMAIN, METALAKE, CATALOG, SCHEMA, VALUE_DOMAIN)))");
     expression =
         expression.replaceAll(
             "ANY_CREATE_TOPIC",

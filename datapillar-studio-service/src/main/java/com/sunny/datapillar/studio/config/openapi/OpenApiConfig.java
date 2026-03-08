@@ -288,6 +288,7 @@ public class OpenApiConfig {
             "Tenant functions",
             "tenantSSO"));
     groups.put("user", List.of("User", "User profile", "User permissions"));
+    groups.put("governance", List.of("Metadata", "Metadata admin", "Semantic", "Semantic admin"));
     groups.put("project", List.of("Project"));
     groups.put(
         "workflow",

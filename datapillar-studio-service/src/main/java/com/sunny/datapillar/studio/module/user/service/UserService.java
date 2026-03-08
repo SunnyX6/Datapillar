@@ -34,6 +34,15 @@ public interface UserService {
   /** Create user */
   Long createUser(UserCreateRequest dto);
 
+  default Long createUser(UserCreateRequest dto, boolean provisionGravitino) {
+    return createUser(dto);
+  }
+
+  default Long createUser(
+      UserCreateRequest dto, boolean provisionGravitino, String gravitinoCreatorUsername) {
+    return createUser(dto, provisionGravitino);
+  }
+
   /** Update user */
   void updateUser(Long id, UserUpdateRequest dto);
 
@@ -60,6 +69,16 @@ public interface UserService {
 
   /** Get user permissions */
   List<FeatureObjectPermissionItem> getUserPermissions(Long userId);
+
+  /** Get user data privileges */
+  List<RoleDataPrivilegeItem> getUserDataPrivileges(Long userId, String domain);
+
+  /** Replace user data privileges */
+  void replaceUserDataPrivileges(
+      Long userId, String domain, List<RoleDataPrivilegeCommandItem> commands);
+
+  /** Clear user data privileges */
+  void clearUserDataPrivileges(Long userId, String domain);
 
   /** Update current user personal information */
   void updateProfile(Long userId, UserProfileUpdateRequest dto);

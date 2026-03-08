@@ -1,0 +1,14 @@
+{
+  "activeKid": "auth-dev-2026-01",
+  "keys": [
+    {
+      "kid": "auth-dev-2026-01",
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "alg": "EdDSA",
+      "use": "sig",
+      "x": "dZtzwS1gtdOLOtnnGEZ_4Q0gqRw6oT8kLbV4eQy2Wdg",
+      "d": "QhkSi794yaYeuuP5Qb-lEE8JZcQzEcaq4P1JAWy0IdM"
+    }
+  ]
+}

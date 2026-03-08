@@ -3,23 +3,11 @@
  */
 
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Trash2 } from 'lucide-react'
 import { Modal, ModalCancelButton, ModalPrimaryButton, Select } from '@/components/ui'
 import { DataTypeSelector, type DataTypeValue } from '@/components/ui'
 import type { ValueDomainType, ValueDomainLevel } from '@/services/oneMetaSemanticService'
-
-/** Range type options */
-const DOMAIN_TYPE_OPTIONS: { value: ValueDomainType; label: string; desc: string }[] = [
-  { value: 'ENUM', label: 'enumeration type (ENUM)', desc: 'Define a discrete set of optional values' },
-  { value: 'RANGE', label: 'Interval (RANGE)', desc: 'Define numerical range，Such as [0, 100]' },
-  { value: 'REGEX', label: 'pattern (REGEX)', desc: 'Define regular expression constraints' }
-]
-
-/** Range level options */
-const DOMAIN_LEVEL_OPTIONS: { value: ValueDomainLevel; label: string }[] = [
-  { value: 'BUSINESS', label: 'business level (BUSINESS)' },
-  { value: 'BUILTIN', label: 'Built-in level (BUILTIN)' }
-]
 
 /** enum value items */
 export interface EnumItem {
@@ -61,7 +49,29 @@ interface ValueDomainFormModalProps {
 }
 
 export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueDomainFormModalProps) {
+  const { t } = useTranslation('oneSemantics')
   const [form, setForm] = useState<ValueDomainFormData>(emptyForm)
+  const domainTypeOptions: { value: ValueDomainType; label: string; desc: string }[] = [
+    {
+      value: 'ENUM',
+      label: t('valueDomainForm.type.enum.label'),
+      desc: t('valueDomainForm.type.enum.desc')
+    },
+    {
+      value: 'RANGE',
+      label: t('valueDomainForm.type.range.label'),
+      desc: t('valueDomainForm.type.range.desc')
+    },
+    {
+      value: 'REGEX',
+      label: t('valueDomainForm.type.regex.label'),
+      desc: t('valueDomainForm.type.regex.desc')
+    }
+  ]
+  const domainLevelOptions: { value: ValueDomainLevel; label: string }[] = [
+    { value: 'BUSINESS', label: t('valueDomainForm.level.business') },
+    { value: 'BUILTIN', label: t('valueDomainForm.level.builtin') }
+  ]
 
   const handleClose = () => {
     setForm(emptyForm)
@@ -105,12 +115,12 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
       isOpen={isOpen}
       onClose={handleClose}
       size="sm"
-      title="Create a value range"
+      title={t('valueDomainForm.create.title')}
       footerRight={
         <>
           <ModalCancelButton onClick={handleClose} disabled={saving} />
           <ModalPrimaryButton onClick={handleSave} disabled={!isValid} loading={saving}>
-            Confirm creation
+            {t('valueDomainForm.create.confirm')}
           </ModalPrimaryButton>
         </>
       }
@@ -120,25 +130,25 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              Value field name <span className="text-rose-500">*</span>
+              {t('valueDomainForm.field.domainName')} <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
               value={form.domainName}
               onChange={(e) => setForm({ ...form, domainName: e.target.value })}
-              placeholder="Order status"
+              placeholder={t('valueDomainForm.placeholder.domainName')}
               className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
             />
           </div>
           <div>
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              range encoding <span className="text-rose-500">*</span>
+              {t('valueDomainForm.field.domainCode')} <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
               value={form.domainCode}
               onChange={(e) => setForm({ ...form, domainCode: e.target.value.toUpperCase() })}
-              placeholder="ORDER_STATUS"
+              placeholder={t('valueDomainForm.placeholder.domainCode')}
               className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 font-mono uppercase border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
             />
           </div>
@@ -148,37 +158,37 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              Range type <span className="text-rose-500">*</span>
+              {t('valueDomainForm.field.domainType')} <span className="text-rose-500">*</span>
             </label>
             <Select
               value={form.domainType}
               onChange={(value) => setForm({ ...form, domainType: value as ValueDomainType })}
-              options={DOMAIN_TYPE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
-              dropdownHeader="Select a range type"
+              options={domainTypeOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
+              dropdownHeader={t('valueDomainForm.dropdown.selectDomainType')}
               size="sm"
             />
           </div>
           <div>
             <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-              range level <span className="text-rose-500">*</span>
+              {t('valueDomainForm.field.domainLevel')} <span className="text-rose-500">*</span>
             </label>
             <Select
               value={form.domainLevel}
               onChange={(value) => setForm({ ...form, domainLevel: value as ValueDomainLevel })}
-              options={DOMAIN_LEVEL_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
-              dropdownHeader="Select range level"
+              options={domainLevelOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
+              dropdownHeader={t('valueDomainForm.dropdown.selectDomainLevel')}
               size="sm"
             />
           </div>
         </div>
         <p className="text-micro text-slate-400 -mt-2">
-          {DOMAIN_TYPE_OPTIONS.find((opt) => opt.value === form.domainType)?.desc}
+          {domainTypeOptions.find((opt) => opt.value === form.domainType)?.desc}
         </p>
 
         {/* data type - Narrow and wide */}
         <div className="w-1/3">
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            data type <span className="text-rose-500">*</span>
+            {t('valueDomainForm.field.dataType')} <span className="text-rose-500">*</span>
           </label>
           <DataTypeSelector
             value={form.dataType}
@@ -191,7 +201,12 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
         {/* value item - Display different inputs based on type */}
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            {form.domainType === 'ENUM' ? 'List of enumeration values' : form.domainType === 'RANGE' ? 'interval expression' : 'regular expression'} <span className="text-rose-500">*</span>
+            {form.domainType === 'ENUM'
+              ? t('valueDomainForm.field.itemType.enum')
+              : form.domainType === 'RANGE'
+                ? t('valueDomainForm.field.itemType.range')
+                : t('valueDomainForm.field.itemType.regex')}
+            <span className="text-rose-500"> *</span>
           </label>
 
           {form.domainType === 'ENUM' ? (
@@ -199,8 +214,8 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
             <div className="space-y-2">
               {/* Header */}
               <div className="grid grid-cols-[1fr_1fr_32px] gap-2 text-micro text-slate-400 px-1">
-                <span>value (Key)</span>
-                <span>label (Value)</span>
+                <span>{t('valueDomainForm.field.enumValue')}</span>
+                <span>{t('valueDomainForm.field.enumLabel')}</span>
                 <span></span>
               </div>
               {/* list item */}
@@ -210,14 +225,14 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
                     type="text"
                     value={item.key}
                     onChange={(e) => updateEnumItem(index, 'key', e.target.value)}
-                    placeholder="PAID"
+                    placeholder={t('valueDomainForm.placeholder.enumValue')}
                     className="w-full px-3 py-1.5 text-body-sm text-slate-800 dark:text-slate-200 font-mono border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
                   />
                   <input
                     type="text"
                     value={item.value}
                     onChange={(e) => updateEnumItem(index, 'value', e.target.value)}
-                    placeholder="paid"
+                    placeholder={t('valueDomainForm.placeholder.enumLabel')}
                     className="w-full px-3 py-1.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
                   />
                   <button
@@ -236,7 +251,7 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
                 onClick={addEnumItem}
                 className="w-full py-2 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg text-caption text-slate-500 hover:text-blue-600 hover:border-blue-400 dark:hover:border-blue-500 transition-all flex items-center justify-center gap-1"
               >
-                <Plus size={14} /> Add enumeration value
+                <Plus size={14} /> {t('valueDomainForm.action.addEnumValue')}
               </button>
             </div>
           ) : (
@@ -246,11 +261,17 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
                 type="text"
                 value={form.itemValue}
                 onChange={(e) => setForm({ ...form, itemValue: e.target.value })}
-                placeholder={form.domainType === 'RANGE' ? '[0, 100]' : '^[1-9]\\d{5}(18|19|20)\\d{2}...'}
+                placeholder={
+                  form.domainType === 'RANGE'
+                    ? t('valueDomainForm.placeholder.rangeValue')
+                    : t('valueDomainForm.placeholder.regexValue')
+                }
                 className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 font-mono border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
               />
               <p className="text-micro text-slate-400 mt-1">
-                {form.domainType === 'RANGE' ? 'Enter a numerical range，Such as: [0, 100] or (0, 1]' : 'Enter regular expression'}
+                {form.domainType === 'RANGE'
+                  ? t('valueDomainForm.hint.range')
+                  : t('valueDomainForm.hint.regex')}
               </p>
             </div>
           )}
@@ -259,13 +280,13 @@ export function ValueDomainFormModal({ isOpen, onClose, onSave, saving }: ValueD
         {/* Remarks */}
         <div>
           <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-            Remarks
+            {t('valueDomainForm.field.comment')}
           </label>
           <input
             type="text"
             value={form.comment}
             onChange={(e) => setForm({ ...form, comment: e.target.value })}
-            placeholder="Value range description（Optional）"
+            placeholder={t('valueDomainForm.placeholder.comment')}
             className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
           />
         </div>

@@ -77,6 +77,7 @@ tasks.test {
     dependsOn(":catalogs:catalog-model:jar", ":catalogs:catalog-model:runtimeJars")
     dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
     dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
+    dependsOn(":catalogs:catalog-dataset:jar", ":catalogs:catalog-dataset:copyLibAndConfig")
   }
 }
 

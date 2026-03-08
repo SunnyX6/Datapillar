@@ -48,10 +48,10 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.MetricEntity;
-import org.apache.gravitino.meta.MetricModifierEntity;
 import org.apache.gravitino.meta.MetricVersionEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.meta.ModifierEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -77,12 +77,12 @@ import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
-import org.apache.gravitino.storage.relational.po.MetricModifierPO;
 import org.apache.gravitino.storage.relational.po.MetricPO;
 import org.apache.gravitino.storage.relational.po.MetricVersionPO;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
+import org.apache.gravitino.storage.relational.po.ModifierPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
@@ -2057,11 +2057,10 @@ public class POConverters {
         .collect(Collectors.toList());
   }
 
-  /** will MetricModifierPO Convert to MetricModifierEntity */
-  public static MetricModifierEntity fromMetricModifierPO(
-      MetricModifierPO metricModifierPO, Namespace namespace) {
+  /** will ModifierPO Convert to ModifierEntity */
+  public static ModifierEntity fromModifierPO(ModifierPO metricModifierPO, Namespace namespace) {
     try {
-      return MetricModifierEntity.builder()
+      return ModifierEntity.builder()
           .withId(metricModifierPO.getModifierId())
           .withName(metricModifierPO.getModifierName())
           .withNamespace(namespace)
@@ -2077,17 +2076,17 @@ public class POConverters {
     }
   }
 
-  public static List<MetricModifierEntity> fromMetricModifierPOs(
-      List<MetricModifierPO> metricModifierPOs, Namespace namespace) {
+  public static List<ModifierEntity> fromModifierPOs(
+      List<ModifierPO> metricModifierPOs, Namespace namespace) {
     return metricModifierPOs.stream()
         .filter(metricModifierPO -> metricModifierPO != null)
-        .map(metricModifierPO -> POConverters.fromMetricModifierPO(metricModifierPO, namespace))
+        .map(metricModifierPO -> POConverters.fromModifierPO(metricModifierPO, namespace))
         .collect(Collectors.toList());
   }
 
-  /** initialization MetricModifierPO */
-  public static MetricModifierPO initializeMetricModifierPO(
-      MetricModifierEntity metricModifierEntity, MetricModifierPO.Builder builder) {
+  /** initialization ModifierPO */
+  public static ModifierPO initializeModifierPO(
+      ModifierEntity metricModifierEntity, ModifierPO.Builder builder) {
     try {
       return builder
           .withModifierId(metricModifierEntity.id())
@@ -2104,23 +2103,23 @@ public class POConverters {
     }
   }
 
-  /** update MetricModifierPO */
-  public static MetricModifierPO updateMetricModifierPO(
-      MetricModifierPO oldMetricModifierPO, MetricModifierEntity newMetricModifierEntity) {
+  /** update ModifierPO */
+  public static ModifierPO updateModifierPO(
+      ModifierPO oldModifierPO, ModifierEntity newModifierEntity) {
     try {
-      MetricModifierPO.Builder builder = MetricModifierPO.builder();
+      ModifierPO.Builder builder = ModifierPO.builder();
       return builder
-          .withModifierId(oldMetricModifierPO.getModifierId())
-          .withModifierName(newMetricModifierEntity.name())
-          .withModifierCode(newMetricModifierEntity.code())
-          .withMetalakeId(oldMetricModifierPO.getMetalakeId())
-          .withCatalogId(oldMetricModifierPO.getCatalogId())
-          .withSchemaId(oldMetricModifierPO.getSchemaId())
-          .withModifierComment(newMetricModifierEntity.comment())
-          .withModifierType(newMetricModifierEntity.modifierType())
+          .withModifierId(oldModifierPO.getModifierId())
+          .withModifierName(newModifierEntity.name())
+          .withModifierCode(newModifierEntity.code())
+          .withMetalakeId(oldModifierPO.getMetalakeId())
+          .withCatalogId(oldModifierPO.getCatalogId())
+          .withSchemaId(oldModifierPO.getSchemaId())
+          .withModifierComment(newModifierEntity.comment())
+          .withModifierType(newModifierEntity.modifierType())
           .withAuditInfo(
-              JsonUtils.anyFieldMapper().writeValueAsString(newMetricModifierEntity.auditInfo()))
-          .withDeletedAt(oldMetricModifierPO.getDeletedAt())
+              JsonUtils.anyFieldMapper().writeValueAsString(newModifierEntity.auditInfo()))
+          .withDeletedAt(oldModifierPO.getDeletedAt())
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);

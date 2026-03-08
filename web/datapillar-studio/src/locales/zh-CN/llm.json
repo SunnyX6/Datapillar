@@ -1,0 +1,189 @@
+{
+  "modelTypes": {
+    "chat": "聊天",
+    "embeddings": "向量",
+    "reranking": "重排",
+    "code": "代码"
+  },
+  "toast": {
+    "loadModelsFailed": "加载模型失败：{{message}}",
+    "modelAdded": "模型已添加：{{name}}",
+    "modelAddFailed": "添加模型失败：{{message}}",
+    "modelPkMissing": "模型主键缺失，无法建立连接",
+    "apiKeyRequired": "API Key 不能为空",
+    "modelConnectSuccess": "模型已连接：{{name}}",
+    "modelConnectFailed": "模型连接失败：{{message}}"
+  },
+  "filter": {
+    "sections": {
+      "provider": "服务商",
+      "modelType": "模型类型",
+      "context": "上下文长度"
+    },
+    "section": {
+      "addProvider": "新增服务商",
+      "close": "收起",
+      "expand": "展开",
+      "editOption": "编辑 {{optionLabel}}",
+      "deleteOption": "删除 {{optionLabel}}"
+    },
+    "createModal": {
+      "title": "新增服务商",
+      "confirm": "确认",
+      "providerCode": "服务商编码",
+      "providerCodePlaceholder": "例如：openai",
+      "providerName": "服务商名称",
+      "providerNamePlaceholder": "例如：OpenAI",
+      "baseUrl": "Base URL",
+      "baseUrlPlaceholder": "https://api.example.com/v1",
+      "modelIds": "支持的模型 ID",
+      "addModelId": "+ 添加",
+      "noModelId": "暂无模型 ID",
+      "modelIdPlaceholder": "例如：gpt-4o-mini"
+    },
+    "editModal": {
+      "title": "编辑服务商：{{providerCode}}",
+      "confirm": "保存",
+      "providerCode": "服务商编码",
+      "providerName": "服务商名称",
+      "providerNamePlaceholder": "例如：OpenAI",
+      "baseUrl": "Base URL",
+      "baseUrlPlaceholder": "https://api.example.com/v1",
+      "modelIds": "支持的模型 ID",
+      "addModelId": "+ 添加",
+      "noModelId": "暂无模型 ID",
+      "modelIdPlaceholder": "例如：gpt-4o-mini",
+      "modelIdHint": "保存时会自动计算新增与移除的模型 ID"
+    },
+    "deleteModelIdTitle": "删除模型 ID",
+    "toast": {
+      "providerInvalid": "服务商无效",
+      "providerNotFound": "未找到服务商：{{providerCode}}",
+      "providerDeleted": "服务商已删除：{{providerCode}}",
+      "providerDeleteFailed": "删除服务商失败：{{message}}",
+      "providerCodeRequired": "服务商编码不能为空",
+      "providerAdded": "服务商已添加：{{providerCode}}",
+      "providerCreateFailed": "创建服务商失败：{{message}}",
+      "providerNameRequired": "服务商名称不能为空",
+      "noChanges": "未检测到变更",
+      "providerUpdated": "服务商已更新：{{providerCode}}",
+      "providerUpdateFailed": "更新服务商失败：{{message}}"
+    }
+  },
+  "models": {
+    "title": "模型管理",
+    "addModel": "新增模型",
+    "badgeNew": "NEW",
+    "providerBy": "by",
+    "searchPlaceholder": "搜索模型...",
+    "loadingCount": "模型加载中...",
+    "totalCount": "共 {{count}} 个模型",
+    "latestRelease": "最新发布",
+    "loadingCard": "模型加载中...",
+    "emptyCard": "暂无可用模型",
+    "loadMore": "加载更多模型",
+    "selected": "已选择",
+    "clearSelection": "清空",
+    "startCompare": "开始对比",
+    "status": {
+      "active": "已连接",
+      "connect": "去连接"
+    },
+    "copyModelId": "复制模型 ID",
+    "playground": "调试",
+    "configure": "配置",
+    "input": "输入",
+    "output": "输出",
+    "stat": {
+      "context": "上下文",
+      "inputPrice": "输入价格",
+      "outputPrice": "输出价格"
+    }
+  },
+  "compare": {
+    "title": "模型对比",
+    "subtitle": "正在对比 {{count}} 个模型",
+    "columns": {
+      "properties": "模型属性"
+    },
+    "rows": {
+      "context": "上下文窗口",
+      "pricing": "定价",
+      "params": "参数规模",
+      "tags": "能力标签",
+      "description": "描述"
+    },
+    "input": "输入",
+    "output": "输出",
+    "proprietaryUnknown": "闭源 / 未知"
+  },
+  "createModal": {
+    "title": "新增模型",
+    "confirm": "确认",
+    "modelName": "模型名称",
+    "modelNamePlaceholder": "例如：GPT-4o",
+    "baseUrl": "Base URL",
+    "baseUrlPlaceholder": "https://api.example.com/v1",
+    "apiKeyOptional": "API Key（可选）",
+    "apiKeyPlaceholder": "sk-...",
+    "hideApiKeyAria": "隐藏 API Key",
+    "showApiKeyAria": "显示 API Key",
+    "provider": "服务商",
+    "selectProvider": "选择服务商",
+    "modelId": "模型 ID",
+    "selectModelId": "选择模型 ID",
+    "noModelIdOptions": "该服务商暂无模型 ID",
+    "modelType": "模型类型",
+    "selectModelType": "选择模型类型",
+    "description": "描述",
+    "descriptionPlaceholder": "模型描述（可选）"
+  },
+  "test": {
+    "welcome": "你好！我是 {{modelName}}，你可以在这里测试我的能力。",
+    "assistantFallback": "模型暂时无响应，请稍后重试。",
+    "toast": {
+      "playgroundFailed": "调试请求失败：{{message}}"
+    },
+    "status": {
+      "ready": "已就绪",
+      "setupRequired": "需先配置"
+    },
+    "tabs": {
+      "connect": "连接",
+      "playground": "调试"
+    },
+    "closeDialogAria": "关闭模型弹窗",
+    "connectedTitle": "{{provider}} 已连接",
+    "connectTitle": "连接 {{provider}}",
+    "connectedSubtitle": "API Key 已连接，可直接在 Playground 测试模型。",
+    "connectSubtitle": "请输入 API Key 连接 {{provider}}，启用 {{modelName}}。",
+    "effectiveTitle": "连接已生效",
+    "effectiveSubtitle": "凭据已安全保存，可用于 Playground。",
+    "modifyConfigAria": "修改配置",
+    "apiKey": "API Key",
+    "apiKeyMaskedPlaceholder": "{{maskedApiKey}}（输入新 Key 可替换）",
+    "apiKeyPlaceholder": "sk-...（{{provider}} 的 Key）",
+    "baseUrl": "Base URL",
+    "optional": "可选",
+    "baseUrlPlaceholder": "https://api.example.com/v1",
+    "connecting": "连接中...",
+    "saveAndConnect": "保存并连接",
+    "encryptedHint": "Key 会加密存储",
+    "thoughtProcess": "思考过程",
+    "thinking": "思考中...",
+    "processing": "处理中...",
+    "generatingAria": "AI 正在生成回复",
+    "messagePlaceholder": "给 {{modelName}} 发送消息...",
+    "sendMessageAria": "发送消息",
+    "outputWarning": "AI 输出可能不准确，请谨慎核对。",
+    "modelConfig": "模型配置",
+    "systemInstruction": "系统指令",
+    "systemInstructionPlaceholder": "可选：填写系统级提示词",
+    "temperature": "Temperature",
+    "topP": "Top P",
+    "startThinking": "启用思考",
+    "startThinkingHint": "仅对支持思考能力的模型生效",
+    "switchThinkingAria": "切换思考模式",
+    "resetConversation": "重置会话"
+  }
+}

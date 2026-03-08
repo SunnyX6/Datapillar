@@ -1,5 +1,6 @@
 import { useMemo,useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
  ArrowUpDown,Check,Copy,Key,LayoutGrid,List,Maximize2,Play,Plus,Search,SlidersHorizontal
 } from 'lucide-react'
@@ -29,6 +30,7 @@ export function LLMModels({
  onOpenTest:(aiModelId:number,tab:'config' | 'playground') => void
  onCreateModel:(request:CreateAdminLlmModelRequest) => Promise<boolean>
 }) {
+ const { t } = useTranslation('llm')
  const [searchQuery,setSearchQuery] = useState('')
  const [viewMode,setViewMode] = useState<'list' | 'grid'>('list')
  const [selectedModelIds,setSelectedModelIds] = useState<number[]>([])
@@ -53,7 +55,7 @@ export function LLMModels({
  <div className={`mx-auto ${contentMaxWidthClassMap.extraWide} px-6 @md:px-8 py-8`}>
  <div className="flex flex-col @md:flex-row @md:items-center justify-between gap-4 mb-6">
  <h1 className="text-heading @md:text-title @xl:text-display font-black text-slate-900 dark:text-white tracking-tight">
- Model management
+ {t('models.title')}
  </h1>
  <div className="flex items-center gap-3">
  <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-lg flex items-center gap-1">
@@ -82,7 +84,7 @@ export function LLMModels({
  onClick={() => setIsCreateOpen(true)}
  >
  <Plus size={iconSizeToken.small} />
- Add model
+ {t('models.addModel')}
  </Button>
  </div>
  </div>
@@ -97,7 +99,7 @@ export function LLMModels({
  type="text"
  value={searchQuery}
  onChange={(event) => setSearchQuery(event.target.value)}
- placeholder="Search model (Search models)..."
+ placeholder={t('models.searchPlaceholder')}
  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 pl-11 pr-10 text-body-sm text-slate-900 dark:text-slate-100 placeholder:text-caption placeholder:text-slate-500 focus:outline-none focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/20 transition-colors shadow-sm"
  />
  <div className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 text-micro text-slate-400 font-medium">
@@ -107,16 +109,16 @@ export function LLMModels({
  </div>
 
  <div className="flex justify-between items-center text-body-sm text-slate-500 dark:text-slate-400 mb-4">
- <span>{isLoadingModels?'Model loading...':`${filteredModels.length} models`}</span>
+ <span>{isLoadingModels?t('models.loadingCount'):t('models.totalCount', { count: filteredModels.length })}</span>
  <button type="button" className="flex items-center hover:text-slate-900 dark:hover:text-slate-200 transition-colors">
- Latest releases (Newest)
+ {t('models.latestRelease')}
  <ArrowUpDown size={14} className="ml-1.5" />
  </button>
  </div>
 
  {isLoadingModels?(<Card className="h-28 flex items-center justify-center text-slate-500 dark:text-slate-400">
- Loading model...</Card>):filteredModels.length === 0?(<Card className="h-28 flex items-center justify-center text-slate-500 dark:text-slate-400">
- No models available yet
+ {t('models.loadingCard')}</Card>):filteredModels.length === 0?(<Card className="h-28 flex items-center justify-center text-slate-500 dark:text-slate-400">
+ {t('models.emptyCard')}
  </Card>):viewMode === 'list'?(<div className="space-y-2">
  {filteredModels.map((model) => {
  const isConnected = connectedModelIds.includes(model.aiModelId) || Boolean(model.hasApiKey)
@@ -158,7 +160,7 @@ export function LLMModels({
  type="button"
  className="px-6 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-full text-body-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 transition-all shadow-sm"
  >
- Load more models
+ {t('models.loadMore')}
  </button>
  </div>
  </div>
@@ -170,7 +172,7 @@ export function LLMModels({
  <span className="bg-slate-800 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold mr-2">
  {selectedModelIds.length}
  </span>
- Selected
+ {t('models.selected')}
  </div>
  <div className="h-4 w-px bg-slate-700 mx-1" />
  <button
@@ -178,7 +180,7 @@ export function LLMModels({
  onClick={() => setSelectedModelIds([])}
  className="px-2 py-0.5 text-caption text-slate-400 hover:text-white transition-colors font-medium"
  >
- Clear
+ {t('models.clearSelection')}
  </button>
  <button
  type="button"
@@ -186,7 +188,7 @@ export function LLMModels({
  className="ml-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-caption font-semibold rounded-full transition-all shadow-lg shadow-indigo-900/40 flex items-center"
  >
  <SlidersHorizontal size={12} className="mr-2" />
- Start comparing
+ {t('models.startCompare')}
  </button>
  </div>
  </div>)}
@@ -210,11 +212,12 @@ function CompareModal({
  onClose:() => void
  models:ModelRecord[]
 }) {
+ const { t } = useTranslation('llm')
  return (<Modal
  isOpen={isOpen}
  onClose={onClose}
- title="Model comparison (Compare Models)"
- subtitle={<span className="text-body-sm text-slate-500">Comparing {models.length} models</span>}
+ title={t('compare.title')}
+ subtitle={<span className="text-body-sm text-slate-500">{t('compare.subtitle', { count: models.length })}</span>}
  size="xl"
  >
  <Card padding="none" variant="default" className="overflow-hidden shadow-sm">
@@ -222,7 +225,7 @@ function CompareModal({
  <thead>
  <tr>
  <th className="p-4 w-48 bg-slate-50 dark:bg-slate-800/60 border-b border-r border-slate-100 dark:border-slate-800 sticky left-0 z-20 text-micro font-semibold text-slate-400 uppercase tracking-wider">
- Model properties (Attributes)
+ {t('compare.columns.properties')}
  </th>
  {models.map((model) => (<th
  key={model.aiModelId}
@@ -231,7 +234,7 @@ function CompareModal({
  <div className="flex items-center justify-between mb-2">
  <div className="font-semibold text-body text-slate-900 dark:text-slate-100">{model.name}</div>
  {model.isNew && (<span className={`${TYPOGRAPHY.nano} bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-semibold uppercase`}>
- NEW
+ {t('models.badgeNew')}
  </span>)}
  </div>
  <div className="text-caption text-slate-500 font-medium bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded w-fit mb-3">
@@ -244,7 +247,7 @@ function CompareModal({
  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
  <tr>
  <td className="p-4 bg-slate-50 dark:bg-slate-800/60 border-r border-slate-100 dark:border-slate-800 font-medium text-body-sm text-slate-600 sticky left-0">
- context window (Context)
+ {t('compare.rows.context')}
  </td>
  {models.map((model) => (<td key={model.aiModelId} className="p-4 text-body-sm font-mono text-slate-800 dark:text-slate-200">
  <div className="flex items-center">
@@ -255,16 +258,16 @@ function CompareModal({
  </tr>
  <tr>
  <td className="p-4 bg-slate-50 dark:bg-slate-800/60 border-r border-slate-100 dark:border-slate-800 font-medium text-body-sm text-slate-600 sticky left-0">
- Pricing (Pricing)
+ {t('compare.rows.pricing')}
  </td>
  {models.map((model) => (<td key={model.aiModelId} className="p-4 text-body-sm font-mono text-slate-800 dark:text-slate-200">
  <div className="flex flex-col space-y-1">
  <div className="flex items-center text-slate-900 dark:text-slate-100 font-semibold">
- <span className="w-16 text-caption text-slate-400 font-normal">Input</span>
+ <span className="w-16 text-caption text-slate-400 font-normal">{t('compare.input')}</span>
  {model.stats.inputPrice}
  </div>
  <div className="flex items-center text-slate-900 dark:text-slate-100 font-semibold">
- <span className="w-16 text-caption text-slate-400 font-normal">Output</span>
+ <span className="w-16 text-caption text-slate-400 font-normal">{t('compare.output')}</span>
  {model.stats.outputPrice}
  </div>
  </div>
@@ -272,17 +275,17 @@ function CompareModal({
  </tr>
  <tr>
  <td className="p-4 bg-slate-50 dark:bg-slate-800/60 border-r border-slate-100 dark:border-slate-800 font-medium text-body-sm text-slate-600 sticky left-0">
- Parameter quantity (Params)
+ {t('compare.rows.params')}
  </td>
  {models.map((model) => (<td key={model.aiModelId} className="p-4 text-body-sm text-slate-800 dark:text-slate-200">
  {model.stats.params?(<span className="bg-purple-50 text-purple-700 px-2 py-1 rounded text-caption font-semibold border border-purple-100">
  {model.stats.params}
- </span>):(<span className="text-slate-400 italic text-caption">Proprietary / Unknown</span>)}
+ </span>):(<span className="text-slate-400 italic text-caption">{t('compare.proprietaryUnknown')}</span>)}
  </td>))}
  </tr>
  <tr>
  <td className="p-4 bg-slate-50 dark:bg-slate-800/60 border-r border-slate-100 dark:border-slate-800 font-medium text-body-sm text-slate-600 sticky left-0">
- Capability label (Tags)
+ {t('compare.rows.tags')}
  </td>
  {models.map((model) => (<td key={model.aiModelId} className="p-4">
  <div className="flex flex-wrap gap-2">
@@ -297,7 +300,7 @@ function CompareModal({
  </tr>
  <tr>
  <td className="p-4 bg-slate-50 dark:bg-slate-800/60 border-r border-slate-100 dark:border-slate-800 font-medium text-body-sm text-slate-600 sticky left-0 align-top">
- Description (Description)
+ {t('compare.rows.description')}
  </td>
  {models.map((model) => (<td key={model.aiModelId} className="p-4 text-caption text-slate-500 dark:text-slate-400 leading-relaxed align-top">
  {model.description}
@@ -321,6 +324,7 @@ function ModelRow({
  onSelect:() => void
  onManage:() => void
 }) {
+ const { t } = useTranslation('llm')
  return (<div
  className={`group py-6 border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/60 transition-all -mx-4 px-4 rounded-xl cursor-pointer ${
  isSelected?'bg-indigo-50/40 dark:bg-indigo-500/10':''
@@ -355,11 +359,11 @@ function ModelRow({
  isConnected?'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-200 dark:border-emerald-500/20':'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
  }`}
  >
- {isConnected?'ACTIVE':'CONNECT'}
+ {isConnected?t('models.status.active'):t('models.status.connect')}
  </span>
  <button
  className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 transition-all p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
- title="Copy Model ID"
+ title={t('models.copyModelId')}
  onClick={(event) => {
  event.stopPropagation()
  void navigator.clipboard.writeText(model.providerModelId)
@@ -368,7 +372,7 @@ function ModelRow({
  <Copy size={12} />
  </button>
  {model.isNew && (<span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-micro font-semibold uppercase rounded-full tracking-wide ml-1">
- NEW
+ {t('models.badgeNew')}
  </span>)}
  </div>
  <div className="flex items-center gap-3">
@@ -385,10 +389,10 @@ function ModelRow({
  >
  {isConnected?(<>
  <Play size={12} className="mr-1.5 fill-current" />
- Playground
+ {t('models.playground')}
  </>):(<>
  <Key size={12} className="mr-1.5" />
- Configure
+ {t('models.configure')}
  </>)}
  </button>
  </div>
@@ -400,14 +404,14 @@ function ModelRow({
 
  <div className="flex flex-wrap items-center text-caption text-slate-500 dark:text-slate-400 space-x-4 font-mono">
  <span className="flex min-w-0 max-w-full items-center">
- <span className="mr-1 shrink-0 text-slate-400">by</span>
+ <span className="mr-1 shrink-0 text-slate-400">{t('models.providerBy')}</span>
  <span className="shrink-0 text-slate-600 dark:text-slate-300 underline decoration-slate-300">{getProviderLabel(model)}</span>
  <span className="mx-1 shrink-0 text-slate-400">.</span>
  <span className="break-all text-slate-500 dark:text-slate-300">{model.providerModelId}</span>
  </span>
  <span>{model.stats.context}</span>
- <span className="text-slate-400">{model.stats.inputPrice} input</span>
- <span className="text-slate-400">{model.stats.outputPrice} output</span>
+ <span className="text-slate-400">{model.stats.inputPrice} {t('models.input')}</span>
+ <span className="text-slate-400">{model.stats.outputPrice} {t('models.output')}</span>
  </div>
  </div>
  </div>
@@ -426,6 +430,7 @@ function ModelCard({
  onSelect:() => void
  onManage:() => void
 }) {
+ const { t } = useTranslation('llm')
  return (<Card
  padding="none"
  variant="default"
@@ -463,11 +468,11 @@ function ModelCard({
  isConnected?'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-200 dark:border-emerald-500/20':'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
  }`}
  >
- {isConnected?'ACTIVE':'CONNECT'}
+ {isConnected?t('models.status.active'):t('models.status.connect')}
  </span>
  </div>
  <div className="text-caption text-slate-500 mt-1.5 flex items-center">
- <span className="shrink-0 text-slate-400 mr-1">by</span>
+ <span className="shrink-0 text-slate-400 mr-1">{t('models.providerBy')}</span>
  <span className="shrink-0 underline decoration-slate-300">{getProviderLabel(model)}</span>
  <span className="shrink-0 text-slate-400 mx-1">.</span>
  <span className="truncate font-mono text-slate-500 dark:text-slate-300" title={model.providerModelId}>
@@ -478,7 +483,7 @@ function ModelCard({
  </div>
  <div className="flex items-center gap-2 shrink-0">
  {model.isNew && (<span className="flex-shrink-0 px-2 py-0.5 bg-blue-50 text-blue-600 text-micro font-semibold uppercase rounded-full">
- NEW
+ {t('models.badgeNew')}
  </span>)}
  <button
  type="button"
@@ -490,10 +495,10 @@ function ModelCard({
  >
  {isConnected?(<>
  <Play size={12} className="mr-1.5 fill-current" />
- Playground
+ {t('models.playground')}
  </>):(<>
  <Key size={12} className="mr-1.5" />
- Configure
+ {t('models.configure')}
  </>)}
  </button>
  </div>
@@ -504,9 +509,9 @@ function ModelCard({
  </p>
 
  <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-slate-800 mt-auto">
- <StatLine label="Context" value={model.stats.context} />
- <StatLine label="Input Price" value={model.stats.inputPrice} />
- <StatLine label="Output Price" value={model.stats.outputPrice} />
+ <StatLine label={t('models.stat.context')} value={model.stats.context} />
+ <StatLine label={t('models.stat.inputPrice')} value={model.stats.inputPrice} />
+ <StatLine label={t('models.stat.outputPrice')} value={model.stats.outputPrice} />
  </div>
  </Card>)
 }

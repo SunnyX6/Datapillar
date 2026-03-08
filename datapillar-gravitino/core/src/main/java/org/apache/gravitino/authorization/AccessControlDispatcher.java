@@ -165,6 +165,20 @@ public interface AccessControlDispatcher {
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException;
 
   /**
+   * Replaces all roles bound to a user.
+   *
+   * @param metalake The metalake of the user.
+   * @param roles The target role names for the user.
+   * @param user The name of the user.
+   * @return The updated user instance.
+   * @throws NoSuchUserException If the user with the given name does not exist.
+   * @throws IllegalRoleException If any role with the given name is invalid.
+   * @throws NoSuchMetalakeException If the metalake with the given name does not exist.
+   */
+  User replaceRolesForUser(String metalake, List<String> roles, String user)
+      throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException;
+
+  /**
    * Grant roles to a group.
    *
    * @param metalake The metalake of the Group.

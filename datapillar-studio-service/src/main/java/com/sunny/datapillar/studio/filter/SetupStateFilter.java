@@ -3,6 +3,7 @@ package com.sunny.datapillar.studio.filter;
 import com.sunny.datapillar.common.constant.ErrorType;
 import com.sunny.datapillar.studio.handler.SecurityExceptionHandler;
 import com.sunny.datapillar.studio.module.setup.entity.SystemBootstrap;
+import com.sunny.datapillar.studio.module.setup.enums.SetupBootstrapStatus;
 import com.sunny.datapillar.studio.module.setup.mapper.SystemBootstrapMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -27,7 +28,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class SetupStateFilter extends OncePerRequestFilter {
 
   private static final int SYSTEM_BOOTSTRAP_ID = 1;
-  private static final int SETUP_COMPLETED = 1;
   private static final long CACHE_TTL_MILLIS = 3000L;
 
   private static final Set<String> WHITELIST_PREFIX =
@@ -123,9 +123,7 @@ public class SetupStateFilter extends OncePerRequestFilter {
 
       boolean schemaReady = bootstrap != null;
       boolean completed =
-          schemaReady
-              && bootstrap.getSetupCompleted() != null
-              && bootstrap.getSetupCompleted() == SETUP_COMPLETED;
+          schemaReady && SetupBootstrapStatus.COMPLETED.matches(bootstrap.getStatus());
       CachedState refreshed = new CachedState(schemaReady, completed, now + CACHE_TTL_MILLIS);
       cachedState = refreshed;
       return refreshed;

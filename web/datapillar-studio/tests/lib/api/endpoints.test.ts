@@ -23,8 +23,10 @@ describe('API endpoints', () => {
   })
 
   it('Governance interface should route through studio domain APIs', () => {
-    expect(API_BASE.governanceMetadata).toBe('/api/studio/biz/governance/metadata')
-    expect(API_BASE.governanceSemantic).toBe('/api/studio/biz/governance/semantic')
+    expect(API_BASE.governanceMetadata).toBe('/api/studio/biz/metadata')
+    expect(API_BASE.governanceMetadataAdmin).toBe('/api/studio/admin/metadata')
+    expect(API_BASE.governanceSemantic).toBe('/api/studio/biz/semantic')
+    expect(API_BASE.governanceSemanticAdmin).toBe('/api/studio/admin/semantic')
     expect((API_BASE as Record<string, string>).oneMeta).toBeUndefined()
   })
 

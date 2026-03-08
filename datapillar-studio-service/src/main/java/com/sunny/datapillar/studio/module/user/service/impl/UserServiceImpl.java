@@ -15,6 +15,10 @@ import com.sunny.datapillar.studio.dto.user.request.*;
 import com.sunny.datapillar.studio.dto.user.response.*;
 import com.sunny.datapillar.studio.dto.workflow.request.*;
 import com.sunny.datapillar.studio.dto.workflow.response.*;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoDomainRoutingService;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoUserDataPrivilegeService;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoUserRoleService;
+import com.sunny.datapillar.studio.integration.gravitino.service.GravitinoUserService;
 import com.sunny.datapillar.studio.module.tenant.entity.Permission;
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.mapper.FeatureObjectMapper;
@@ -29,6 +33,8 @@ import com.sunny.datapillar.studio.module.user.mapper.RoleMapper;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
 import com.sunny.datapillar.studio.module.user.mapper.UserMapper;
 import com.sunny.datapillar.studio.module.user.service.UserService;
+import com.sunny.datapillar.studio.util.UserContextUtil;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -62,6 +68,9 @@ public class UserServiceImpl implements UserService {
   private final FeatureObjectMapper featureObjectMapper;
   private final RoleMapper roleMapper;
   private final TenantMapper tenantMapper;
+  private final GravitinoUserService gravitinoUserService;
+  private final GravitinoUserRoleService gravitinoUserRoleService;
+  private final GravitinoUserDataPrivilegeService gravitinoUserDataPrivilegeService;
 
   @Override
   public User findByUsername(String username) {
@@ -86,8 +95,29 @@ public class UserServiceImpl implements UserService {
   @Override
   @Transactional
   public Long createUser(UserCreateRequest dto) {
+    return createUser(dto, true);
+  }
+
+  @Override
+  @Transactional
+  public Long createUser(UserCreateRequest dto, boolean provisionGravitino) {
+    return createUser(dto, provisionGravitino, null);
+  }
+
+  @Override
+  @Transactional
+  public Long createUser(
+      UserCreateRequest dto, boolean provisionGravitino, String gravitinoCreatorUsername) {
+    if (dto == null || !StringUtils.hasText(dto.getUsername())) {
+      throw new com.sunny.datapillar.common.exception.BadRequestException("Parameter error");
+    }
+
     Long tenantId = getRequiredTenantId();
-    User existing = userMapper.selectByUsernameGlobal(dto.getUsername());
+    String normalizedUsername = dto.getUsername().trim();
+
+    User existing = userMapper.selectByUsernameGlobal(normalizedUsername);
+    Long createdUserId;
+    String usernameForCreate;
     if (existing != null) {
       TenantUser tenantUser =
           tenantUserMapper.selectByTenantIdAndUserId(tenantId, existing.getId());
@@ -103,7 +133,7 @@ public class UserServiceImpl implements UserService {
         tenantUser.setUserId(existing.getId());
         tenantUser.setStatus(MEMBER_STATUS_ENABLED);
         tenantUser.setIsDefault(0);
-        tenantUser.setJoinedAt(java.time.LocalDateTime.now());
+        tenantUser.setJoinedAt(LocalDateTime.now());
         tenantUserMapper.insert(tenantUser);
       } else {
         tenantUser.setStatus(MEMBER_STATUS_ENABLED);
@@ -111,42 +141,50 @@ public class UserServiceImpl implements UserService {
       }
 
       if (dto.getRoleIds() != null && !dto.getRoleIds().isEmpty()) {
-        assignRoles(existing.getId(), dto.getRoleIds());
+        replaceLocalUserRoles(tenantId, existing.getId(), dto.getRoleIds());
       }
-      log.info("Added tenant member: tenantId={}, userId={}", tenantId, existing.getId());
-      return existing.getId();
+      createdUserId = existing.getId();
+      usernameForCreate = existing.getUsername();
+      log.info("Added tenant member: tenantId={}, userId={}", tenantId, createdUserId);
+    } else {
+      User user = new User();
+      BeanUtils.copyProperties(dto, user);
+      user.setTenantId(tenantId);
+      user.setUsername(normalizedUsername);
+
+      if (dto.getPassword() != null) {
+        user.setPassword(passwordEncoder.encode(dto.getPassword()));
+      }
+      user.setLevel(USER_LEVEL_DEFAULT);
+      user.setDeleted(0);
+
+      userMapper.insert(user);
+
+      TenantUser tenantUser = new TenantUser();
+      tenantUser.setTenantId(tenantId);
+      tenantUser.setUserId(user.getId());
+      tenantUser.setStatus(MEMBER_STATUS_ENABLED);
+      tenantUser.setIsDefault(tenantUserMapper.countByUserId(user.getId()) == 0 ? 1 : 0);
+      tenantUser.setJoinedAt(LocalDateTime.now());
+      tenantUserMapper.insert(tenantUser);
+
+      if (dto.getRoleIds() != null && !dto.getRoleIds().isEmpty()) {
+        replaceLocalUserRoles(tenantId, user.getId(), dto.getRoleIds());
+      }
+
+      createdUserId = user.getId();
+      usernameForCreate = user.getUsername();
+      log.info(
+          "Created user: tenantId={}, id={}, username={}",
+          tenantId,
+          createdUserId,
+          usernameForCreate);
     }
 
-    User user = new User();
-    BeanUtils.copyProperties(dto, user);
-    user.setTenantId(tenantId);
-
-    if (dto.getPassword() != null) {
-      user.setPassword(passwordEncoder.encode(dto.getPassword()));
+    if (provisionGravitino) {
+      createGravitinoUser(createdUserId, usernameForCreate, gravitinoCreatorUsername);
     }
-    user.setLevel(USER_LEVEL_DEFAULT);
-    user.setDeleted(0);
-
-    userMapper.insert(user);
-
-    TenantUser tenantUser = new TenantUser();
-    tenantUser.setTenantId(tenantId);
-    tenantUser.setUserId(user.getId());
-    tenantUser.setStatus(MEMBER_STATUS_ENABLED);
-    tenantUser.setIsDefault(tenantUserMapper.countByUserId(user.getId()) == 0 ? 1 : 0);
-    tenantUser.setJoinedAt(java.time.LocalDateTime.now());
-    tenantUserMapper.insert(tenantUser);
-
-    if (dto.getRoleIds() != null && !dto.getRoleIds().isEmpty()) {
-      assignRoles(user.getId(), dto.getRoleIds());
-    }
-
-    log.info(
-        "Created user: tenantId={}, id={}, username={}",
-        tenantId,
-        user.getId(),
-        user.getUsername());
-    return user.getId();
+    return createdUserId;
   }
 
   @Override
@@ -207,8 +245,11 @@ public class UserServiceImpl implements UserService {
           "Platform super-managed users are not allowed to delete");
     }
 
+    String principalUsername = requiredGravitinoPrincipal(null);
     tenantUserMapper.deleteByTenantIdAndUserId(tenantId, id);
     userMapper.deleteUserRoles(tenantId, id);
+    clearGravitinoUserAccess(id, user.getUsername(), principalUsername);
+    deleteGravitinoUser(user.getUsername(), principalUsername);
     log.info("Removed tenant member: tenantId={}, id={}", tenantId, id);
   }
 
@@ -246,8 +287,21 @@ public class UserServiceImpl implements UserService {
       throw new com.sunny.datapillar.common.exception.NotFoundException(
           "User does not exist: %s", userId);
     }
+    User user = userMapper.selectByIdAndTenantId(tenantId, userId);
+    if (user == null) {
+      throw new com.sunny.datapillar.common.exception.NotFoundException(
+          "User does not exist: %s", userId);
+    }
+
     tenantUser.setStatus(status);
     tenantUserMapper.updateById(tenantUser);
+
+    String principalUsername = requiredGravitinoPrincipal(null);
+    if (status == MEMBER_STATUS_DISABLED) {
+      clearGravitinoUserAccess(userId, user.getUsername(), principalUsername);
+      return;
+    }
+    synchronizeGravitinoUserRoles(tenantId, userId, user.getUsername(), principalUsername);
   }
 
   @Override
@@ -260,6 +314,19 @@ public class UserServiceImpl implements UserService {
           "User does not exist: %s", userId);
     }
 
+    List<String> previousRoleNames = currentUserRoleNames(tenantId, userId);
+    String principalUsername = requiredGravitinoPrincipal(null);
+    replaceLocalUserRoles(tenantId, userId, roleIds);
+    try {
+      synchronizeGravitinoUserRoles(tenantId, userId, user.getUsername(), principalUsername);
+    } catch (RuntimeException exception) {
+      compensateRemoteRoleBindings(
+          user.getUsername(), previousRoleNames, principalUsername, List.of());
+      throw exception;
+    }
+  }
+
+  private void replaceLocalUserRoles(Long tenantId, Long userId, List<Long> roleIds) {
     List<Long> normalizedRoleIds = normalizeRoleIds(roleIds);
     userMapper.deleteUserRoles(tenantId, userId);
     for (Long roleId : normalizedRoleIds) {
@@ -273,6 +340,21 @@ public class UserServiceImpl implements UserService {
       userRole.setRoleId(roleId);
       userMapper.insertUserRole(userRole);
     }
+  }
+
+  private void synchronizeGravitinoUserRoles(
+      Long tenantId, Long userId, String username, String principalUsername) {
+    gravitinoUserRoleService.replaceUserRoles(
+        username.trim(), currentUserRoleNames(tenantId, userId), principalUsername.trim());
+  }
+
+  private void clearGravitinoUserAccess(Long userId, String username, String principalUsername) {
+    gravitinoUserRoleService.revokeAllUserRoles(username.trim(), principalUsername.trim());
+    gravitinoUserDataPrivilegeService.clearUserDataPrivileges(
+        userId,
+        username.trim(),
+        GravitinoDomainRoutingService.DOMAIN_ALL,
+        principalUsername.trim());
   }
 
   private List<Long> normalizeRoleIds(List<Long> roleIds) {
@@ -335,6 +417,43 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
+  public List<RoleDataPrivilegeItem> getUserDataPrivileges(Long userId, String domain) {
+    Long tenantId = getRequiredTenantId();
+    User user = userMapper.selectByIdAndTenantId(tenantId, userId);
+    if (user == null) {
+      throw new com.sunny.datapillar.common.exception.NotFoundException(
+          "User does not exist: %s", userId);
+    }
+    return gravitinoUserDataPrivilegeService.getUserDataPrivileges(
+        userId, user.getUsername(), domain, null);
+  }
+
+  @Override
+  public void replaceUserDataPrivileges(
+      Long userId, String domain, List<RoleDataPrivilegeCommandItem> commands) {
+    Long tenantId = getRequiredTenantId();
+    User user = userMapper.selectByIdAndTenantId(tenantId, userId);
+    if (user == null) {
+      throw new com.sunny.datapillar.common.exception.NotFoundException(
+          "User does not exist: %s", userId);
+    }
+    gravitinoUserDataPrivilegeService.replaceUserDataPrivileges(
+        userId, user.getUsername(), domain, commands, null);
+  }
+
+  @Override
+  public void clearUserDataPrivileges(Long userId, String domain) {
+    Long tenantId = getRequiredTenantId();
+    User user = userMapper.selectByIdAndTenantId(tenantId, userId);
+    if (user == null) {
+      throw new com.sunny.datapillar.common.exception.NotFoundException(
+          "User does not exist: %s", userId);
+    }
+    gravitinoUserDataPrivilegeService.clearUserDataPrivileges(
+        userId, user.getUsername(), domain, null);
+  }
+
+  @Override
   @Transactional
   public void updateProfile(Long userId, UserProfileUpdateRequest dto) {
     Long tenantId = getRequiredTenantId();
@@ -392,6 +511,42 @@ public class UserServiceImpl implements UserService {
     return map;
   }
 
+  private List<String> currentUserRoleNames(Long tenantId, Long userId) {
+    return roleMapper.findByUserId(tenantId, userId).stream().map(Role::getName).toList();
+  }
+
+  private void compensateRemoteRoleBindings(
+      String username,
+      List<String> previousRoleNames,
+      String principalUsername,
+      List<String> createdMetalakes) {
+    try {
+      gravitinoUserRoleService.replaceUserRoles(
+          username.trim(),
+          previousRoleNames == null ? List.of() : previousRoleNames,
+          principalUsername.trim());
+    } catch (RuntimeException cleanupException) {
+      log.warn(
+          "Failed to restore Gravitino role bindings after user role sync error, username={}",
+          username,
+          cleanupException);
+    }
+    if (createdMetalakes == null || createdMetalakes.isEmpty()) {
+      return;
+    }
+    for (String metalake : createdMetalakes) {
+      try {
+        gravitinoUserService.deleteUser(metalake, username.trim(), principalUsername.trim());
+      } catch (RuntimeException cleanupException) {
+        log.warn(
+            "Failed to delete compensated Gravitino user, metalake={}, username={}",
+            metalake,
+            username,
+            cleanupException);
+      }
+    }
+  }
+
   private String calculateRoleMaxPermission(
       List<FeatureRoleSourceItem> sources, Map<String, Permission> permissionMap) {
     if (sources == null || sources.isEmpty()) {
@@ -400,5 +555,38 @@ public class UserServiceImpl implements UserService {
     List<String> codes =
         sources.stream().map(FeatureRoleSourceItem::getPermissionCode).collect(Collectors.toList());
     return PermissionLevelUtil.maxCode(permissionMap, codes);
+  }
+
+  private void createGravitinoUser(Long userId, String username, String explicitCreatorUsername) {
+    if (userId == null || userId <= 0 || !StringUtils.hasText(username)) {
+      throw new com.sunny.datapillar.common.exception.InternalException("Server internal error");
+    }
+    String principalUsername = requiredGravitinoPrincipal(explicitCreatorUsername);
+    List<String> createdMetalakes =
+        gravitinoUserService.createUser(username.trim(), userId, principalUsername.trim());
+    try {
+      synchronizeGravitinoUserRoles(getRequiredTenantId(), userId, username, principalUsername);
+    } catch (RuntimeException exception) {
+      compensateRemoteRoleBindings(username, List.of(), principalUsername, createdMetalakes);
+      throw exception;
+    }
+  }
+
+  private void deleteGravitinoUser(String username, String principalUsername) {
+    if (!StringUtils.hasText(username)) {
+      throw new com.sunny.datapillar.common.exception.InternalException("Server internal error");
+    }
+    gravitinoUserService.deleteUser(username.trim(), principalUsername.trim());
+  }
+
+  private String requiredGravitinoPrincipal(String explicitCreatorUsername) {
+    String principalUsername =
+        StringUtils.hasText(explicitCreatorUsername)
+            ? explicitCreatorUsername.trim()
+            : UserContextUtil.getUsername();
+    if (!StringUtils.hasText(principalUsername)) {
+      throw new com.sunny.datapillar.common.exception.UnauthorizedException("Unauthorized access");
+    }
+    return principalUsername.trim();
   }
 }

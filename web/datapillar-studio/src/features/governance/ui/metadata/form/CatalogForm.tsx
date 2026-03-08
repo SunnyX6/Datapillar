@@ -3,6 +3,7 @@
  */
 
 import { forwardRef, useImperativeHandle, useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { testCatalogConnection } from '@/services/oneMetaService'
 import { Select } from '@/components/ui'
@@ -51,6 +52,7 @@ export interface CatalogFormHandle {
 
 export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogFormProps>(
   ({ parentName: _parentName, onFooterLeftRender }, ref) => {
+    const { t } = useTranslation('oneMeta')
     const [catalogType, setCatalogType] = useState<CatalogType>('RELATIONAL')
     const [provider, setProvider] = useState<string>('hive')
     const [formData, setFormData] = useState({
@@ -63,7 +65,7 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
     // test connection
     const handleTestConnection = useCallback(async () => {
       if (!formData.name.trim()) {
-        toast.error('Please enter first Catalog Name')
+        toast.error(t('metadataForm.catalog.toast.enterNameFirst'))
         return
       }
       setIsTesting(true)
@@ -75,13 +77,13 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
           comment: formData.comment,
           properties: formData.properties
         })
-        toast.success('Connection test successful')
+        toast.success(t('metadataForm.catalog.toast.testSuccess'))
       } catch {
         // The error was passed by the unity client toast show
       } finally {
         setIsTesting(false)
       }
-    }, [formData, catalogType, provider])
+    }, [formData, catalogType, provider, t])
 
     // Render test connection button to footer
     useEffect(() => {
@@ -99,11 +101,11 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
             )}
-            {isTesting ? 'Under test...' : 'test connection'}
+            {isTesting ? t('metadataForm.catalog.button.testing') : t('metadataForm.catalog.button.testConnection')}
           </button>
         )
       }
-    }, [onFooterLeftRender, handleTestConnection, isTesting])
+    }, [onFooterLeftRender, handleTestConnection, isTesting, t])
 
     useImperativeHandle(ref, () => ({
       getData: () => ({
@@ -115,12 +117,12 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
       }),
       validate: () => {
         if (!formData.name.trim()) {
-          toast.error('Please enter Catalog Name')
+          toast.error(t('metadataForm.catalog.toast.enterName'))
           return false
         }
         return true
       }
-    }))
+    }), [formData, catalogType, provider, t])
 
   const handleTypeChange = (newType: CatalogType) => {
     setCatalogType(newType)
@@ -146,11 +148,11 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
       {/* Basic information */}
       <div>
         <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Catalog Name <span className="text-red-500">*</span>
+          {t('metadataForm.catalog.field.name')} <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
-          placeholder="For example: prod_mysql_catalog"
+          placeholder={t('metadataForm.catalog.placeholder.name')}
           value={formData.name}
           onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
           className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
@@ -159,46 +161,46 @@ export const CreateCatalogForm = forwardRef<CatalogFormHandle, CreateCatalogForm
 
       <div>
         <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Catalog Type <span className="text-red-500">*</span>
+          {t('metadataForm.catalog.field.type')} <span className="text-red-500">*</span>
         </label>
         <Select
           value={catalogType}
           onChange={(value) => handleTypeChange(value as CatalogType)}
           options={[
-            { value: 'RELATIONAL', label: 'database' },
-            { value: 'FILESET', label: 'File set' },
-            { value: 'MESSAGING', label: 'message queue' }
+            { value: 'RELATIONAL', label: t('metadataForm.catalog.option.type.relational') },
+            { value: 'FILESET', label: t('metadataForm.catalog.option.type.fileset') },
+            { value: 'MESSAGING', label: t('metadataForm.catalog.option.type.messaging') }
           ]}
-          dropdownHeader="Choose Catalog Type"
+          dropdownHeader={t('metadataForm.catalog.dropdown.catalogType')}
           className="dark:bg-slate-900 dark:border-slate-700"
         />
       </div>
 
       <div>
         <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Provider <span className="text-red-500">*</span>
+          {t('metadataForm.catalog.field.provider')} <span className="text-red-500">*</span>
         </label>
         <Select
           value={provider}
           onChange={handleProviderChange}
           options={PROVIDER_BY_TYPE[catalogType]}
-          dropdownHeader="Select data source type"
+          dropdownHeader={t('metadataForm.catalog.dropdown.provider')}
           className="dark:bg-slate-900 dark:border-slate-700"
         />
       </div>
 
       {/* Dynamic configuration items */}
       <div className="space-y-2">
-        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Connection configuration</label>
+        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">{t('metadataForm.catalog.field.connection')}</label>
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 space-y-2.5">
           <ProviderConfigFields provider={provider} onChange={handlePropertyChange} values={formData.properties} />
         </div>
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Description</label>
+        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">{t('metadataForm.catalog.field.description')}</label>
         <textarea
-          placeholder="Catalog Instructions for use"
+          placeholder={t('metadataForm.catalog.placeholder.description')}
           value={formData.comment}
           onChange={(e) => setFormData((prev) => ({ ...prev, comment: e.target.value }))}
           rows={2}
@@ -221,6 +223,7 @@ function ProviderConfigFields({
   onChange: (key: string, value: string) => void
   values: Record<string, string>
 }) {
+  const { t } = useTranslation('oneMeta')
   const [customKeys, setCustomKeys] = useState<string[]>([])
 
   // Add custom configuration items
@@ -257,9 +260,11 @@ function ProviderConfigFields({
         <div className="w-1/3 flex-shrink-0">
           <input
             type="text"
-            value={label}
+            value={key}
             disabled
-            className="w-full px-3 py-1.5 text-xs font-medium bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-md cursor-not-allowed"
+            title={label}
+            aria-label={label}
+            className="w-full px-3 py-1.5 text-xs font-mono bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-md cursor-not-allowed"
           />
         </div>
         <div className="flex-1">
@@ -268,7 +273,7 @@ function ProviderConfigFields({
               value={values[key] ?? options[0]?.value ?? ''}
               onChange={(value) => onChange(key, value)}
               options={options}
-              dropdownHeader={`Choose${label}`}
+              dropdownHeader={t('metadataForm.catalog.dropdown.chooseField', { field: label })}
             />
           ) : (
             <input
@@ -300,7 +305,7 @@ function ProviderConfigFields({
         <div className="w-1/3 flex-shrink-0">
           <input
             type="text"
-            placeholder="Configuration item name"
+            placeholder={t('metadataForm.catalog.customField.keyPlaceholder')}
             value={displayKey}
             onChange={(e) => handleKeyChange(tempKey, e.target.value)}
             className="w-full px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
@@ -309,7 +314,7 @@ function ProviderConfigFields({
         <div className="flex-1">
           <input
             type="text"
-            placeholder="Configuration item value"
+            placeholder={t('metadataForm.catalog.customField.valuePlaceholder')}
             value={values[actualKey] || ''}
             onChange={(e) => onChange(actualKey, e.target.value)}
             className="w-full px-3 py-1.5 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
@@ -319,7 +324,7 @@ function ProviderConfigFields({
           type="button"
           onClick={() => handleDeleteField(tempKey)}
           className="w-4 flex-shrink-0 text-red-500 hover:text-red-600 transition-colors"
-          aria-label="Delete configuration item"
+          aria-label={t('metadataForm.catalog.customField.deleteAria')}
         >
           <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -335,8 +340,8 @@ function ProviderConfigFields({
     if (provider === 'hive') {
       return (
         <>
-          {renderField('metastore.uris', 'Metastore URI', 'thrift://127.0.0.1:9083')}
-          {renderField('client.pool-size', 'Connection pool size', '1', false, 'number')}
+          {renderField('metastore.uris', t('metadataForm.catalog.provider.metastoreUri'), 'thrift://127.0.0.1:9083')}
+          {renderField('client.pool-size', t('metadataForm.catalog.provider.poolSize'), '1', false, 'number')}
         </>
       )
     }
@@ -361,12 +366,12 @@ function ProviderConfigFields({
 
       return (
         <>
-          {renderField('jdbc-url', 'JDBC URL', urlMap[dbType] || 'jdbc://localhost:3306/db')}
-          {renderField('jdbc-driver', 'JDBC Driver', driverMap[dbType] || 'com.mysql.cj.jdbc.Driver')}
-          {renderField('jdbc-user', 'Username', 'root')}
-          {renderField('jdbc-password', 'Password', '', true, 'password')}
-          {renderField('jdbc.pool.min-size', 'Minimum number of connections', '2', false, 'number')}
-          {renderField('jdbc.pool.max-size', 'Maximum number of connections', '10', false, 'number')}
+          {renderField('jdbc-url', t('metadataForm.catalog.provider.jdbcUrl'), urlMap[dbType] || 'jdbc://localhost:3306/db')}
+          {renderField('jdbc-driver', t('metadataForm.catalog.provider.jdbcDriver'), driverMap[dbType] || 'com.mysql.cj.jdbc.Driver')}
+          {renderField('jdbc-user', t('metadataForm.catalog.provider.username'), 'root')}
+          {renderField('jdbc-password', t('metadataForm.catalog.provider.password'), '', true, 'password')}
+          {renderField('jdbc.pool.min-size', t('metadataForm.catalog.provider.minConnections'), '2', false, 'number')}
+          {renderField('jdbc.pool.max-size', t('metadataForm.catalog.provider.maxConnections'), '10', false, 'number')}
         </>
       )
     }
@@ -384,24 +389,24 @@ function ProviderConfigFields({
 
       return (
         <>
-          {renderField('catalog-backend', 'Catalog Backend', '', true, 'select', backendOptions)}
-          {renderField('uri', 'Backend URI', 'thrift://127.0.0.1:9083')}
-          {renderField('warehouse', 'Warehouse path', 'hdfs://namespace/path or s3://bucket/path')}
+          {renderField('catalog-backend', t('metadataForm.catalog.provider.catalogBackend'), '', true, 'select', backendOptions)}
+          {renderField('uri', t('metadataForm.catalog.provider.backendUri'), 'thrift://127.0.0.1:9083')}
+          {renderField('warehouse', t('metadataForm.catalog.provider.warehousePath'), 'hdfs://namespace/path or s3://bucket/path')}
         </>
       )
     }
 
     // Kafka Configuration
     if (provider === 'kafka') {
-      return <>{renderField('bootstrap.servers', 'Bootstrap Servers', 'localhost:9092')}</>
+      return <>{renderField('bootstrap.servers', t('metadataForm.catalog.provider.bootstrapServers'), 'localhost:9092')}</>
     }
 
     // Fileset Configuration
     if (provider === 'fileset') {
       return (
         <>
-          {renderField('location', 'storage path', 'hdfs://path or s3://bucket/path', false)}
-          {renderField('filesystem-providers', 'Filesystem Providers', 'builtin-hdfs,s3', false)}
+          {renderField('location', t('metadataForm.catalog.provider.storagePath'), 'hdfs://path or s3://bucket/path', false)}
+          {renderField('filesystem-providers', t('metadataForm.catalog.provider.filesystemProviders'), 'builtin-hdfs,s3', false)}
         </>
       )
     }
@@ -423,7 +428,7 @@ function ProviderConfigFields({
         onClick={handleAddCustomField}
         className="w-full mt-2 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
       >
-        + Add custom configuration
+        + {t('metadataForm.catalog.customField.addButton')}
       </button>
     </>
   )

@@ -29,11 +29,11 @@ import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetricMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.MetricModifierMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetricVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModifierMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
@@ -68,7 +68,7 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         JobTemplateMetaMapper.class,
         MetalakeMetaMapper.class,
         MetricMetaMapper.class,
-        MetricModifierMetaMapper.class,
+        ModifierMetaMapper.class,
         WordRootMetaMapper.class,
         MetricVersionMetaMapper.class,
         ModelMetaMapper.class,

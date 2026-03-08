@@ -43,6 +43,41 @@ public class TestGravitinoClientBuilder {
   }
 
   @Test
+  public void testGravitinoClientTenantContextHeaders() {
+    try (MockGravitinoClient client =
+        MockGravitinoClient.builder("http://127.0.0.1")
+            .withTenantContext(1001L, "tenant-1001")
+            .build()) {
+      Assertions.assertEquals("1001", client.getHeaders().get("X-Tenant-Id"));
+      Assertions.assertEquals("tenant-1001", client.getHeaders().get("X-Tenant-Code"));
+      Assertions.assertFalse(client.getHeaders().containsKey("X-Tenant-Name"));
+    }
+
+    try (MockGravitinoClient client =
+        MockGravitinoClient.builder("http://127.0.0.1")
+            .withTenantContext(1002L, "tenant-1002", "Tenant 1002")
+            .build()) {
+      Assertions.assertEquals("1002", client.getHeaders().get("X-Tenant-Id"));
+      Assertions.assertEquals("tenant-1002", client.getHeaders().get("X-Tenant-Code"));
+      Assertions.assertEquals("Tenant 1002", client.getHeaders().get("X-Tenant-Name"));
+    }
+  }
+
+  @Test
+  public void testTenantContextMergesHeaders() {
+    Map<String, String> headers = ImmutableMap.of("X-Trace-Id", "trace-1");
+    try (MockGravitinoClient client =
+        MockGravitinoClient.builder("http://127.0.0.1")
+            .withHeaders(headers)
+            .withTenantContext(2001L, "tenant-2001")
+            .build()) {
+      Assertions.assertEquals("trace-1", client.getHeaders().get("X-Trace-Id"));
+      Assertions.assertEquals("2001", client.getHeaders().get("X-Tenant-Id"));
+      Assertions.assertEquals("tenant-2001", client.getHeaders().get("X-Tenant-Code"));
+    }
+  }
+
+  @Test
   public void testGravitinoClientSimpleAuthWithUserName() {
     String userName = "test_user";
     try (MockGravitinoClient client =

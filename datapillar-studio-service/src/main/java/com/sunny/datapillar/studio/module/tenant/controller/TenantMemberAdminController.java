@@ -24,6 +24,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -88,6 +89,37 @@ public class TenantMemberAdminController {
   public ApiResponse<Void> updateRoles(
       @PathVariable Long memberId, @Valid @RequestBody List<Long> roleIds) {
     tenantMemberAdminService.assignRoles(memberId, roleIds);
+    return ApiResponse.ok();
+  }
+
+  @Operation(summary = "Get member data privileges")
+  @GetMapping("/{memberId}/data-privileges")
+  @PreAuthorize("hasAuthority('ADMIN')")
+  public ApiResponse<List<RoleDataPrivilegeItem>> dataPrivileges(
+      @PathVariable Long memberId,
+      @RequestParam(value = "domain", required = false) String domain) {
+    return ApiResponse.ok(tenantMemberAdminService.getMemberDataPrivileges(memberId, domain));
+  }
+
+  @Operation(summary = "Replace member data privileges")
+  @PutMapping("/{memberId}/data-privileges")
+  @PreAuthorize("hasAuthority('ADMIN')")
+  public ApiResponse<Void> replaceDataPrivileges(
+      @PathVariable Long memberId, @Valid @RequestBody RoleDataPrivilegeSyncRequest request) {
+    tenantMemberAdminService.replaceMemberDataPrivileges(
+        memberId,
+        request == null ? null : request.getDomain(),
+        request == null ? null : request.getCommands());
+    return ApiResponse.ok();
+  }
+
+  @Operation(summary = "Clear member data privileges")
+  @DeleteMapping("/{memberId}/data-privileges")
+  @PreAuthorize("hasAuthority('ADMIN')")
+  public ApiResponse<Void> clearDataPrivileges(
+      @PathVariable Long memberId,
+      @RequestParam(value = "domain", required = false) String domain) {
+    tenantMemberAdminService.clearMemberDataPrivileges(memberId, domain);
     return ApiResponse.ok();
   }
 }

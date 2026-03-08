@@ -36,48 +36,5 @@
         ORDER BY r.sort ASC, r.id ASC
     </select>
 
-    <select id="selectMenusByUserId" resultType="map">
-        SELECT
-            o.id,
-            o.name,
-            o.path,
-            o.parent_id,
-            o.location,
-            o.category_id AS category_id,
-            c.name AS category_name,
-            o.sort,
-            CASE
-                WHEN LEAST(
-                    MAX(CASE p.code WHEN 'ADMIN' THEN 2 WHEN 'READ' THEN 1 WHEN 'DISABLE' THEN 0 ELSE 0 END),
-                    MAX(CASE tp.code WHEN 'ADMIN' THEN 2 WHEN 'READ' THEN 1 WHEN 'DISABLE' THEN 0 ELSE 0 END)
-                ) >= 2 THEN 'ADMIN'
-                WHEN LEAST(
-                    MAX(CASE p.code WHEN 'ADMIN' THEN 2 WHEN 'READ' THEN 1 WHEN 'DISABLE' THEN 0 ELSE 0 END),
-                    MAX(CASE tp.code WHEN 'ADMIN' THEN 2 WHEN 'READ' THEN 1 WHEN 'DISABLE' THEN 0 ELSE 0 END)
-                ) >= 1 THEN 'READ'
-                ELSE 'DISABLE'
-            END AS permission_code
-        FROM feature_objects o
-        LEFT JOIN feature_object_categories c ON o.category_id = c.id
-        INNER JOIN tenant_feature_permissions tfe
-                ON tfe.object_id = o.id
-               AND tfe.tenant_id = #{tenantId}
-               AND tfe.status = 1
-        INNER JOIN permissions tp ON tp.id = tfe.permission_id
-        INNER JOIN (
-            SELECT rp.object_id, rp.permission_id
-            FROM role_permissions rp
-            INNER JOIN user_roles ur ON ur.role_id = rp.role_id
-            WHERE ur.tenant_id = #{tenantId}
-              AND rp.tenant_id = #{tenantId}
-              AND ur.user_id = #{userId}
-        ) rel ON rel.object_id = o.id
-        INNER JOIN permissions p ON p.id = rel.permission_id
-        WHERE o.type = 'MENU'
-          AND o.status = 1
-        GROUP BY o.id, o.name, o.path, o.parent_id, o.location, o.category_id, c.name, o.sort
-        ORDER BY o.sort ASC, o.id ASC
-    </select>
-
 
 </mapper>

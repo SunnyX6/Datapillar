@@ -148,7 +148,7 @@ public class OwnerManager implements OwnerDispatcher {
               metalake,
               userEntity.id(),
               MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
-              Entity.EntityType.valueOf(metadataObject.type().name()));
+              org.apache.gravitino.utils.MetadataObjectUtil.toEntityType(metadataObject));
         } catch (IOException e) {
           LOG.warn(e.getMessage(), e);
         }

@@ -1,4 +1,5 @@
 import { Activity,AlertCircle,ShieldCheck,Zap } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button,Card } from '@/components/ui'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { cn } from '@/utils'
@@ -46,12 +47,6 @@ type AiPermissionProps = RoleModeProps | UserModeProps
 
 const ACCESS_LEVELS:AiAccessLevel[] = ['DISABLE','READ','ADMIN']
 
-const ACCESS_LABELS:Record<AiAccessLevel,string> = {
- DISABLE:'prohibited',READ:'View',ADMIN:'management',}
-
-const MODEL_STATUS_LABELS:Record<string,string> = {
- ACTIVE:'Connected',INACTIVE:'Not connected',}
-
 const getAccessActiveClass = (level:AiAccessLevel) => {
  if (level === 'ADMIN') {
  return 'bg-white dark:bg-slate-900 text-brand-600 dark:text-brand-300 shadow-sm ring-1 ring-black/5 dark:ring-white/10'
@@ -62,12 +57,18 @@ const getAccessActiveClass = (level:AiAccessLevel) => {
  return 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 shadow-sm ring-1 ring-black/5 dark:ring-white/10'
 }
 
-function normalizeModelStatus(status?: string | null):string {
+function normalizeModelStatus(status: string | null | undefined,getText:(key:string,options?: Record<string, unknown>) => string):string {
  const normalized = status?.trim().toUpperCase()
  if (!normalized) {
- return 'unknown status'
+ return getText('aiPermission.modelStatus.unknown')
  }
- return MODEL_STATUS_LABELS[normalized]?? normalized
+ if (normalized === 'ACTIVE') {
+ return getText('aiPermission.modelStatus.active')
+ }
+ if (normalized === 'INACTIVE') {
+ return getText('aiPermission.modelStatus.inactive')
+ }
+ return normalized
 }
 
 function isModelActive(status?: string | null):boolean {
@@ -122,12 +123,20 @@ function getUsageWidthClass(usagePercent:number):string {
 }
 
 export function AiPermission(props:AiPermissionProps) {
+ const { t } = useTranslation('permission')
  const { className } = props
  const mode = props.mode
- const subjectLabel = mode === 'user'?'The user':'this role'
+ const subjectLabel = mode === 'user'
+ ? t('aiPermission.subject.user')
+ : t('aiPermission.subject.role')
  const models = props.models
  const isLoading = Boolean(props.loading)
  const errorMessage = props.error
+ const accessLabels:Record<AiAccessLevel,string> = {
+ DISABLE:t('aiPermission.level.disable'),
+ READ:t('aiPermission.level.read'),
+ ADMIN:t('aiPermission.level.admin')
+ }
 
  const handleModelAccessUpdate = (aiModelId:number,access:AiAccessLevel) => {
  if (props.mode === 'user') {
@@ -146,9 +155,9 @@ export function AiPermission(props:AiPermissionProps) {
  <div
  className={cn(TYPOGRAPHY.bodySm,'text-indigo-900 dark:text-indigo-200')}
  >
- <p className="font-medium">Independent permission configuration mode</p>
+ <p className="font-medium">{t('aiPermission.userMode.title')}</p>
  <p className={cn(TYPOGRAPHY.caption,'opacity-80 mt-0.5')}>
- You are configuring this user individually AI Model permissions
+ {t('aiPermission.userMode.subtitle')}
  </p>
  </div>
  </div>)}
@@ -159,7 +168,7 @@ export function AiPermission(props:AiPermissionProps) {
  >
  <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
  <Zap size={14} className="animate-pulse" />
- <span className={cn(TYPOGRAPHY.caption)}>Loading model permissions...</span>
+ <span className={cn(TYPOGRAPHY.caption)}>{t('aiPermission.loading')}</span>
  </div>
  </Card>)}
 
@@ -169,10 +178,10 @@ export function AiPermission(props:AiPermissionProps) {
  >
  <div className="flex items-center justify-between gap-4">
  <div className={cn(TYPOGRAPHY.caption,'text-rose-700 dark:text-rose-300')}>
- Failed to load model permissions:{errorMessage}
+ {t('aiPermission.errorPrefix', { message: errorMessage })}
  </div>
  {props.onRetry && (<Button size="small" variant="outline" onClick={props.onRetry}>
- Try again
+ {t('aiPermission.retry')}
  </Button>)}
  </div>
  </Card>)}
@@ -183,7 +192,7 @@ export function AiPermission(props:AiPermissionProps) {
  className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
  >
  <p className={cn(TYPOGRAPHY.caption,'text-slate-500 dark:text-slate-400')}>
- Not configurable yet AI model
+ {t('aiPermission.empty')}
  </p>
  </Card>)}
 
@@ -226,16 +235,16 @@ export function AiPermission(props:AiPermissionProps) {
  <span
  className={cn(TYPOGRAPHY.nano,'px-2 py-0.5 rounded-full border uppercase tracking-wider font-semibold',active?'border-emerald-200 text-emerald-700 bg-emerald-50 dark:border-emerald-500/40 dark:text-emerald-300 dark:bg-emerald-500/10':'border-amber-200 text-amber-700 bg-amber-50 dark:border-amber-500/40 dark:text-amber-300 dark:bg-amber-500/10',)}
  >
- {normalizeModelStatus(model.modelStatus)}
+ {normalizeModelStatus(model.modelStatus,t)}
  </span>
  </div>
  <div
  className={cn(TYPOGRAPHY.nano,'mt-1 flex items-center gap-4 text-slate-400 dark:text-slate-500 uppercase tracking-wider',)}
  >
- <span>{model.modelType?.toUpperCase()?? 'UNKNOWN'}</span>
- <span>call {model.callCount?? '0'} times</span>
- <span>Token {model.totalTokens?? '0'}</span>
- <span>cost ${model.totalCostUsd?? '0'}</span>
+ <span>{model.modelType?.toUpperCase()?? t('aiPermission.modelTypeUnknown')}</span>
+ <span>{t('aiPermission.metric.callTimes', { value: model.callCount?? '0' })}</span>
+ <span>{t('aiPermission.metric.tokenTotal', { value: model.totalTokens?? '0' })}</span>
+ <span>{t('aiPermission.metric.costUsd', { value: model.totalCostUsd?? '0' })}</span>
  </div>
  </div>
  </div>
@@ -255,7 +264,7 @@ export function AiPermission(props:AiPermissionProps) {
  data-testid={`ai-access-${model.aiModelId}-${level}`}
  className={cn(TYPOGRAPHY.micro,'px-2.5 py-1 rounded-md font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60',selected?getAccessActiveClass(level):'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200',)}
  >
- {ACCESS_LABELS[level]}
+ {accessLabels[level]}
  </button>)
  })}
  </div>
@@ -272,13 +281,13 @@ export function AiPermission(props:AiPermissionProps) {
  <span
  className={cn(TYPOGRAPHY.nano,'font-semibold text-slate-400 dark:text-slate-500',)}
  >
- Token total amount
+ {t('aiPermission.metric.tokenTotalLabel')}
  </span>
  </div>
  <span
  className={cn(TYPOGRAPHY.nano,'px-2 py-1 rounded-md font-semibold uppercase tracking-wider',hasUsageData?'text-slate-600 bg-slate-100 dark:text-slate-300 dark:bg-slate-800':'text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-500/10',)}
  >
- call {model.callCount?? '-'} times
+ {t('aiPermission.metric.callTimes', { value: model.callCount?? '-' })}
  </span>
  </div>
  <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
@@ -289,8 +298,8 @@ export function AiPermission(props:AiPermissionProps) {
  <div
  className={cn(TYPOGRAPHY.nano,'flex items-center justify-between text-slate-500 dark:text-slate-400',)}
  >
- <span>cost ${model.totalCostUsd?? '-'}</span>
- <span>{hasUsageData?'Statistics have been accessed(Basic version)':'Statistics interface to be accessed'}</span>
+ <span>{t('aiPermission.metric.costUsd', { value: model.totalCostUsd?? '-' })}</span>
+ <span>{hasUsageData?t('aiPermission.statistics.ready'):t('aiPermission.statistics.pending')}</span>
  </div>
  </div>
  </Card>)
@@ -308,15 +317,14 @@ export function AiPermission(props:AiPermissionProps) {
  <h4
  className={cn(TYPOGRAPHY.micro,'font-black uppercase tracking-widest text-slate-300',)}
  >
- Governance Gateway (Governance Gateway)
+ {t('aiPermission.governance.title')}
  </h4>
  </div>
  <p
  className={cn(TYPOGRAPHY.caption,'text-slate-300 leading-relaxed max-w-2xl',)}
  >
- {subjectLabel}of AI
- Traffic will be intercepted by the unified policy gateway in real time,Automatically perform desensitization of sensitive information,Prompt
- Injection interception and policy audit traces.</p>
+ {t('aiPermission.governance.description', { subject: subjectLabel })}
+ </p>
  </div>
  <ShieldCheck
  size={110}

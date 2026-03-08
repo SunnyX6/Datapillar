@@ -19,9 +19,4 @@ public class WellKnownController {
   public Map<String, Object> jwks() {
     return tokenAppService.jwks();
   }
-
-  @GetMapping("/.well-known/openid-configuration")
-  public Map<String, Object> openidConfiguration() {
-    return tokenAppService.openidConfiguration();
-  }
 }

@@ -1,6 +1,7 @@
 package com.sunny.datapillar.studio.module.setup.security;
 
 import com.sunny.datapillar.studio.module.setup.entity.SystemBootstrap;
+import com.sunny.datapillar.studio.module.setup.enums.SetupBootstrapStatus;
 import com.sunny.datapillar.studio.module.setup.mapper.SystemBootstrapMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,8 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class SetupTokenInitializer implements ApplicationRunner {
 
   private static final int SYSTEM_BOOTSTRAP_ID = 1;
-  private static final int SETUP_COMPLETED = 1;
-
   private final SystemBootstrapMapper systemBootstrapMapper;
 
   @Override
@@ -42,7 +41,7 @@ public class SetupTokenInitializer implements ApplicationRunner {
       return;
     }
 
-    if (bootstrap.getSetupCompleted() != null && bootstrap.getSetupCompleted() == SETUP_COMPLETED) {
+    if (SetupBootstrapStatus.COMPLETED.matches(bootstrap.getStatus())) {
       return;
     }
 

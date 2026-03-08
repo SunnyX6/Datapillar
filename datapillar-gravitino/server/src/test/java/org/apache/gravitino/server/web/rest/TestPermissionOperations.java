@@ -52,6 +52,7 @@ import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
 import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
 import org.apache.gravitino.dto.requests.RoleGrantRequest;
+import org.apache.gravitino.dto.requests.RoleReplaceRequest;
 import org.apache.gravitino.dto.requests.RoleRevokeRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
@@ -230,6 +231,89 @@ public class TestPermissionOperations extends BaseOperationsTest {
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
+  @Test
+  public void testReplaceRolesForUser() {
+    Mockito.reset(manager);
+    UserEntity userEntity =
+        UserEntity.builder()
+            .withId(1L)
+            .withName("user")
+            .withRoleNames(Lists.newArrayList())
+            .withRoleIds(Lists.newArrayList())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    when(manager.replaceRolesForUser(any(), any(), any())).thenReturn(userEntity);
+
+    RoleReplaceRequest illegalReq = new RoleReplaceRequest(null);
+    Response illegalResp =
+        target("/metalakes/metalake1/permissions/users/user/replace")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(illegalReq, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
+
+    RoleReplaceRequest request = new RoleReplaceRequest(Lists.newArrayList());
+    Response resp =
+        target("/metalakes/metalake1/permissions/users/user/replace")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    UserResponse userResponse = resp.readEntity(UserResponse.class);
+    Assertions.assertEquals(0, userResponse.getCode());
+    User user = userResponse.getUser();
+    Assertions.assertEquals(userEntity.roles(), user.roles());
+    Assertions.assertEquals(userEntity.name(), user.name());
+
+    doThrow(new NoSuchUserException("mock error"))
+        .when(manager)
+        .replaceRolesForUser(any(), any(), any());
+    Response notFoundResp =
+        target("/metalakes/metalake1/permissions/users/user/replace")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), notFoundResp.getStatus());
+
+    ErrorResponse errorResponse = notFoundResp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchUserException.class.getSimpleName(), errorResponse.getType());
+
+    doThrow(new IllegalRoleException("mock error"))
+        .when(manager)
+        .replaceRolesForUser(any(), any(), any());
+    Response badRequestResp =
+        target("/metalakes/metalake1/permissions/users/user/replace")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), badRequestResp.getStatus());
+
+    errorResponse = badRequestResp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(IllegalRoleException.class.getSimpleName(), errorResponse.getType());
+
+    doThrow(new RuntimeException("mock error"))
+        .when(manager)
+        .replaceRolesForUser(any(), any(), any());
+    Response internalResp =
+        target("/metalakes/metalake1/permissions/users/user/replace")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), internalResp.getStatus());
+
+    errorResponse = internalResp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
   }
 
   @Test

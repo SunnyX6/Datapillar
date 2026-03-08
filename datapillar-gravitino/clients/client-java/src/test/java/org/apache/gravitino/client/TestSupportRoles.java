@@ -34,8 +34,16 @@ import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.dataset.Metric;
+import org.apache.gravitino.dataset.ValueDomain;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.SchemaDTO;
+import org.apache.gravitino.dto.dataset.MetricDTO;
+import org.apache.gravitino.dto.dataset.MetricModifierDTO;
+import org.apache.gravitino.dto.dataset.UnitDTO;
+import org.apache.gravitino.dto.dataset.ValueDomainDTO;
+import org.apache.gravitino.dto.dataset.ValueDomainItemDTO;
+import org.apache.gravitino.dto.dataset.WordRootDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
@@ -68,6 +76,11 @@ public class TestSupportRoles extends TestBase {
   private static Fileset genericFileset;
 
   private static Topic genericTopic;
+  private static GenericMetric genericMetric;
+  private static GenericMetricModifier genericMetricModifier;
+  private static GenericWordRoot genericWordRoot;
+  private static GenericUnit genericUnit;
+  private static GenericValueDomain genericValueDomain;
   private static Metalake metalake;
 
   @BeforeAll
@@ -161,6 +174,70 @@ public class TestSupportRoles extends TestBase {
                 .build(),
             client.restClient(),
             Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
+
+    genericMetric =
+        new GenericMetric(
+            MetricDTO.builder()
+                .withName("metricName")
+                .withCode("metric_code")
+                .withType(Metric.Type.ATOMIC)
+                .withCurrentVersion(1)
+                .withLastVersion(1)
+                .withAudit(AuditDTO.builder().withCreator("test").build())
+                .build(),
+            client.restClient(),
+            Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
+
+    genericMetricModifier =
+        new GenericMetricModifier(
+            MetricModifierDTO.builder()
+                .withName("Region")
+                .withCode("region")
+                .withComment("comment")
+                .withModifierType("ENUM")
+                .withAudit(AuditDTO.builder().withCreator("test").build())
+                .build(),
+            client.restClient(),
+            Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
+
+    genericWordRoot =
+        new GenericWordRoot(
+            WordRootDTO.builder()
+                .withCode("country")
+                .withName("Country")
+                .withDataType("STRING")
+                .withComment("comment")
+                .withAudit(AuditDTO.builder().withCreator("test").build())
+                .build(),
+            client.restClient(),
+            Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
+
+    genericUnit =
+        new GenericUnit(
+            UnitDTO.builder()
+                .withCode("yuan")
+                .withName("Yuan")
+                .withSymbol("CNY")
+                .withComment("comment")
+                .withAudit(AuditDTO.builder().withCreator("test").build())
+                .build(),
+            client.restClient(),
+            Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
+
+    genericValueDomain =
+        new GenericValueDomain(
+            ValueDomainDTO.builder()
+                .withDomainCode("country_domain")
+                .withDomainName("Country Domain")
+                .withDomainType(ValueDomain.Type.ENUM)
+                .withDomainLevel(ValueDomain.Level.BUSINESS)
+                .withItems(Collections.singletonList(new ValueDomainItemDTO("CN", "China")))
+                .withComment("comment")
+                .withDataType("STRING")
+                .withAudit(AuditDTO.builder().withCreator("test").build())
+                .build(),
+            client.restClient(),
+            Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
   }
 
   @Test
@@ -211,6 +288,28 @@ public class TestSupportRoles extends TestBase {
     testListRoles(
         genericTopic.supportsRoles(),
         MetadataObjects.of("catalog1.schema1", genericTopic.name(), MetadataObject.Type.TOPIC));
+  }
+
+  @Test
+  public void testListRolesForSemanticObjects() throws JsonProcessingException {
+    testListRoles(
+        genericMetric.supportsRoles(),
+        MetadataObjects.of("catalog1.schema1", genericMetric.code(), MetadataObject.Type.METRIC));
+    testListRoles(
+        genericMetricModifier,
+        MetadataObjects.of(
+            "catalog1.schema1", genericMetricModifier.code(), MetadataObject.Type.MODIFIER));
+    testListRoles(
+        genericWordRoot,
+        MetadataObjects.of(
+            "catalog1.schema1", genericWordRoot.code(), MetadataObject.Type.WORDROOT));
+    testListRoles(
+        genericUnit,
+        MetadataObjects.of("catalog1.schema1", genericUnit.code(), MetadataObject.Type.UNIT));
+    testListRoles(
+        genericValueDomain,
+        MetadataObjects.of(
+            "catalog1.schema1", genericValueDomain.domainCode(), MetadataObject.Type.VALUE_DOMAIN));
   }
 
   private void testListRoles(SupportsRoles supportsRoles, MetadataObject metadataObject)

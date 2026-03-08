@@ -17,8 +17,11 @@ from datapillar_oneagentic.providers.llm import LLMProvider
 from datapillar_oneagentic.providers.llm.config import LLMConfig
 from datapillar_oneagentic.providers.llm.llm import extract_thinking
 
+from src.infrastructure.keystore.crypto_service import (
+    is_encrypted_ciphertext,
+    local_crypto_service,
+)
 from src.infrastructure.repository.system.ai_model import Model
-from src.infrastructure.rpc.crypto import auth_crypto_rpc_client, is_encrypted_ciphertext
 from src.modules.llm.schemas import PlaygroundChatRequest
 from src.shared.config.runtime import get_llm_config
 from src.shared.exception import BadRequestException, ServiceUnavailableException
@@ -56,7 +59,7 @@ class LlmPlaygroundService:
         if not model:
             raise BadRequestException("Model does not exist,Not enabled or not connected")
 
-        decrypted_api_key = await self._decrypt_api_key(
+        decrypted_api_key = await self._decrypt_key(
             tenant_code=tenant_code,
             encrypted_value=model.get("api_key"),
         )
@@ -119,14 +122,14 @@ class LlmPlaygroundService:
         llm_config = LLMConfig.model_validate(llm_payload)
         return LLMProvider(llm_config)
 
-    async def _decrypt_api_key(self, *, tenant_code: str, encrypted_value: str | None) -> str:
+    async def _decrypt_key(self, *, tenant_code: str, encrypted_value: str | None) -> str:
         if not encrypted_value or not encrypted_value.strip():
             raise BadRequestException("Model not configured API Key")
         if not is_encrypted_ciphertext(encrypted_value):
             raise BadRequestException("model API Key Invalid encryption format")
 
         try:
-            return await auth_crypto_rpc_client.decrypt_llm_api_key(
+            return await local_crypto_service.decrypt_key_async(
                 tenant_code=tenant_code,
                 ciphertext=encrypted_value,
             )

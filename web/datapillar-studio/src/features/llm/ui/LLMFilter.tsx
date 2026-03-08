@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Check,ChevronDown,ChevronRight,Pencil,Plus,Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Modal,ModalCancelButton,ModalPrimaryButton,Tooltip } from '@/components/ui'
 import { panelWidthClassMap } from '@/design-tokens/dimensions'
@@ -64,6 +65,7 @@ export function LLMFilter({
  onUpdateProvider:(providerCode:string,request:UpdateAdminLlmProviderRequest) => Promise<void>
  onDeleteProvider:(providerCode:string) => Promise<void>
 }) {
+ const { t } = useTranslation('llm')
  const [isCreateProviderOpen,setIsCreateProviderOpen] = useState(false)
  const [isEditProviderOpen,setIsEditProviderOpen] = useState(false)
  const [providerCreateForm,setProviderCreateForm] = useState<ProviderCreateForm>(emptyProviderCreateForm)
@@ -118,12 +120,12 @@ export function LLMFilter({
  const handleOpenEditProviderModal = (providerValue:string) => {
  const providerCode = normalizeProviderCode(providerValue)
  if (!providerCode) {
- toast.error('Provider Invalid')
+ toast.error(t('filter.toast.providerInvalid'))
  return
  }
  const provider = providers.find((item) => normalizeProviderCode(item.code) === providerCode)
  if (!provider) {
- toast.error(`not found Provider:${providerCode}`)
+ toast.error(t('filter.toast.providerNotFound', { providerCode }))
  return
  }
  setProviderEditForm({
@@ -138,12 +140,12 @@ export function LLMFilter({
  }
  const providerCode = normalizeProviderCode(providerValue)
  if (!providerCode) {
- toast.error('Provider Invalid')
+ toast.error(t('filter.toast.providerInvalid'))
  return
  }
  const provider = providers.find((item) => normalizeProviderCode(item.code) === providerCode)
  if (!provider) {
- toast.error(`not found Provider:${providerCode}`)
+ toast.error(t('filter.toast.providerNotFound', { providerCode }))
  return
  }
 
@@ -154,10 +156,10 @@ export function LLMFilter({
  setIsEditProviderOpen(false)
  setProviderEditForm(emptyProviderEditForm)
  }
- toast.success(`Deleted Provider:${providerCode}`)
+ toast.success(t('filter.toast.providerDeleted', { providerCode }))
  } catch (error) {
  const message = error instanceof Error?error.message:String(error)
- toast.error(`Delete Provider failed:${message}`)
+ toast.error(t('filter.toast.providerDeleteFailed', { message }))
  } finally {
  setIsDeletingProvider(false)
  }
@@ -177,7 +179,7 @@ export function LLMFilter({
  }
  const providerCode = normalizeProviderCode(providerCreateForm.code)
  if (!providerCode) {
- toast.error('Provider code cannot be empty')
+ toast.error(t('filter.toast.providerCodeRequired'))
  return
  }
  const providerName = providerCreateForm.name.trim()
@@ -191,10 +193,10 @@ export function LLMFilter({
  })
  setIsCreateProviderOpen(false)
  setProviderCreateForm(emptyProviderCreateForm)
- toast.success(`Added Provider:${providerCode}`)
+ toast.success(t('filter.toast.providerAdded', { providerCode }))
  } catch (error) {
  const message = error instanceof Error?error.message:String(error)
- toast.error(`New Provider failed:${message}`)
+ toast.error(t('filter.toast.providerCreateFailed', { message }))
  } finally {
  setIsCreatingProvider(false)
  }
@@ -206,12 +208,12 @@ export function LLMFilter({
  }
  const providerCode = normalizeProviderCode(providerEditForm.code)
  if (!providerCode) {
- toast.error('Provider Invalid')
+ toast.error(t('filter.toast.providerInvalid'))
  return
  }
  const currentProvider = providers.find((item) => normalizeProviderCode(item.code) === providerCode)
  if (!currentProvider) {
- toast.error(`not found Provider:${providerCode}`)
+ toast.error(t('filter.toast.providerNotFound', { providerCode }))
  return
  }
 
@@ -224,7 +226,7 @@ export function LLMFilter({
  const nextModelIds = normalizeProviderModelIds(providerEditForm.modelIds)
 
  if (!nextName && currentName) {
- toast.error('Provider Name cannot be empty')
+ toast.error(t('filter.toast.providerNameRequired'))
  return
  }
 
@@ -246,7 +248,7 @@ export function LLMFilter({
  }
 
  if (Object.keys(request).length === 0) {
- toast.message('No changes detected')
+ toast.message(t('filter.toast.noChanges'))
  return
  }
 
@@ -256,10 +258,10 @@ export function LLMFilter({
  setProviderEditForm((prev) => ({...prev,name:nextName,baseUrl:nextBaseUrl,modelIds:nextModelIds
  }))
  setIsEditProviderOpen(false)
- toast.success(`updated Provider:${providerCode}`)
+ toast.success(t('filter.toast.providerUpdated', { providerCode }))
  } catch (error) {
  const message = error instanceof Error?error.message:String(error)
- toast.error(`update Provider failed:${message}`)
+ toast.error(t('filter.toast.providerUpdateFailed', { message }))
  } finally {
  setIsUpdatingProvider(false)
  }
@@ -268,7 +270,7 @@ export function LLMFilter({
  return (<>
  <aside className={`hidden @md:block ${panelWidthClassMap.mediumResponsive} flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 @xl:pl-8 @xl:pr-6 pb-6 pt-8 overflow-y-auto custom-scrollbar`}>
  <FilterSection
- title="supplier (Providers)"
+ title={t('filter.sections.provider')}
  options={providerOptions}
  selected={filters.providers}
  onToggle={(value) => onToggleProvider(value as LlmProvider)}
@@ -280,14 +282,14 @@ export function LLMFilter({
  defaultOpen
  />
  <FilterSection
- title="Model type (Type)"
+ title={t('filter.sections.modelType')}
  options={filterTypeOptions}
  selected={filters.types}
  onToggle={(value) => onToggleType(value as ModelCategory)}
  defaultOpen
  />
  <FilterSection
- title="context length (Context)"
+ title={t('filter.sections.context')}
  options={contextOptions}
  selected={filters.contexts}
  onToggle={(value) => onToggleContext(value)}
@@ -299,7 +301,7 @@ export function LLMFilter({
  isOpen={isCreateProviderOpen}
  onClose={handleCloseCreateProviderModal}
  size="sm"
- title="Add new supplier (Provider)"
+ title={t('filter.createModal.title')}
  footerRight={
  <>
  <ModalCancelButton onClick={handleCloseCreateProviderModal} disabled={isCreatingProvider} />
@@ -308,7 +310,7 @@ export function LLMFilter({
  disabled={!normalizeProviderCode(providerCreateForm.code)}
  loading={isCreatingProvider}
  >
- Confirm new addition
+ {t('filter.createModal.confirm')}
  </ModalPrimaryButton>
  </>
  }
@@ -316,68 +318,68 @@ export function LLMFilter({
  <div className="space-y-4">
  <div>
  <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
- Provider Code <span className="text-rose-500">*</span>
+ {t('filter.createModal.providerCode')} <span className="text-rose-500">*</span>
  </label>
  <input
  type="text"
  value={providerCreateForm.code}
  onChange={(event) => setProviderCreateForm((prev) => ({...prev,code:event.target.value }))}
- placeholder="Such as:openai"
+ placeholder={t('filter.createModal.providerCodePlaceholder')}
  className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
  <div>
  <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
- Provider Name
+ {t('filter.createModal.providerName')}
  </label>
  <input
  type="text"
  value={providerCreateForm.name}
  onChange={(event) => setProviderCreateForm((prev) => ({...prev,name:event.target.value }))}
- placeholder="Such as:OpenAI"
+ placeholder={t('filter.createModal.providerNamePlaceholder')}
  className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
  <div>
  <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
- Base URL
+ {t('filter.createModal.baseUrl')}
  </label>
  <input
  type="text"
  value={providerCreateForm.baseUrl}
  onChange={(event) => setProviderCreateForm((prev) => ({...prev,baseUrl:event.target.value }))}
- placeholder="https://api.example.com/v1"
+ placeholder={t('filter.createModal.baseUrlPlaceholder')}
  className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
 
  <div className="space-y-1.5">
  <div className="flex items-center justify-between">
- <label className="block text-caption font-medium text-slate-700 dark:text-slate-300">Supported modelsID</label>
+ <label className="block text-caption font-medium text-slate-700 dark:text-slate-300">{t('filter.createModal.modelIds')}</label>
  <button
  type="button"
  onClick={handleAddCreateProviderModelId}
  className="text-caption text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
  >
- + add
+ {t('filter.createModal.addModelId')}
  </button>
  </div>
  {providerCreateForm.modelIds.length === 0?(<div className="py-3 text-center text-caption text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
- No model yet ID
+ {t('filter.createModal.noModelId')}
  </div>):(<div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar">
  {providerCreateForm.modelIds.map((modelId,index) => (<div key={`create-provider-model-${index}`} className="flex items-center gap-1.5">
  <input
  type="text"
  value={modelId}
  onChange={(event) => handleChangeCreateProviderModelId(index,event.target.value)}
- placeholder="Such as:gpt-4o-mini"
+ placeholder={t('filter.createModal.modelIdPlaceholder')}
  className="flex-1 min-w-0 px-2.5 py-2 text-body-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500"
  />
  <button
  type="button"
  onClick={() => handleRemoveCreateProviderModelId(index)}
  className="p-1.5 text-slate-300 hover:text-rose-500 rounded transition-colors flex-shrink-0"
- title="Delete model ID"
+ title={t('filter.deleteModelIdTitle')}
  >
  <Trash2 size={12} />
  </button>
@@ -391,7 +393,7 @@ export function LLMFilter({
  isOpen={isEditProviderOpen}
  onClose={handleCloseEditProviderModal}
  size="sm"
- title={`Edit supplier:${providerEditForm.code || '-'}`}
+ title={t('filter.editModal.title', { providerCode: providerEditForm.code || '-' })}
  footerRight={
  <>
  <ModalCancelButton onClick={handleCloseEditProviderModal} disabled={isUpdatingProvider || isDeletingProvider} />
@@ -400,7 +402,7 @@ export function LLMFilter({
  disabled={!normalizeProviderCode(providerEditForm.code) || isDeletingProvider}
  loading={isUpdatingProvider}
  >
- Save updates
+ {t('filter.editModal.confirm')}
  </ModalPrimaryButton>
  </>
  }
@@ -408,7 +410,7 @@ export function LLMFilter({
  <div className="space-y-4">
  <div>
  <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
- Provider Code
+ {t('filter.editModal.providerCode')}
  </label>
  <input
  type="text"
@@ -419,61 +421,61 @@ export function LLMFilter({
  </div>
  <div>
  <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
- Provider Name
+ {t('filter.editModal.providerName')}
  </label>
  <input
  type="text"
  value={providerEditForm.name}
  onChange={(event) => setProviderEditForm((prev) => ({...prev,name:event.target.value }))}
- placeholder="Such as:OpenAI"
+ placeholder={t('filter.editModal.providerNamePlaceholder')}
  className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
  <div>
  <label className="block text-caption font-medium text-slate-700 dark:text-slate-300 mb-1.5">
- Base URL
+ {t('filter.editModal.baseUrl')}
  </label>
  <input
  type="text"
  value={providerEditForm.baseUrl}
  onChange={(event) => setProviderEditForm((prev) => ({...prev,baseUrl:event.target.value }))}
- placeholder="https://api.example.com/v1"
+ placeholder={t('filter.editModal.baseUrlPlaceholder')}
  className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
  <div className="space-y-1.5">
  <div className="flex items-center justify-between">
- <label className="block text-caption font-medium text-slate-700 dark:text-slate-300">Supported modelsID</label>
+ <label className="block text-caption font-medium text-slate-700 dark:text-slate-300">{t('filter.editModal.modelIds')}</label>
  <button
  type="button"
  onClick={handleAddEditProviderModelId}
  className="text-caption text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
  >
- + add
+ {t('filter.editModal.addModelId')}
  </button>
  </div>
  {providerEditForm.modelIds.length === 0?(<div className="py-3 text-center text-caption text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
- No model yet ID
+ {t('filter.editModal.noModelId')}
  </div>):(<div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar">
  {providerEditForm.modelIds.map((modelId,index) => (<div key={`edit-provider-model-${index}`} className="flex items-center gap-1.5">
  <input
  type="text"
  value={modelId}
  onChange={(event) => handleChangeEditProviderModelId(index,event.target.value)}
- placeholder="Such as:gpt-4o-mini"
+ placeholder={t('filter.editModal.modelIdPlaceholder')}
  className="flex-1 min-w-0 px-2.5 py-2 text-body-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-500"
  />
  <button
  type="button"
  onClick={() => handleRemoveEditProviderModelId(index)}
  className="p-1.5 text-slate-300 hover:text-rose-500 rounded transition-colors flex-shrink-0"
- title="Delete model ID"
+ title={t('filter.deleteModelIdTitle')}
  >
  <Trash2 size={12} />
  </button>
  </div>))}
  </div>)}
- <p className="mt-1 text-micro text-slate-400">New and removed items will be automatically calculated when saving.modelIds.</p>
+ <p className="mt-1 text-micro text-slate-400">{t('filter.editModal.modelIdHint')}</p>
  </div>
  </div>
  </Modal>
@@ -492,6 +494,7 @@ function FilterSection({
  onDeleteOption?: (value:string) => void
  defaultOpen?: boolean
 }) {
+ const { t } = useTranslation('llm')
  const [isOpen,setIsOpen] = useState(defaultOpen)
 
  return (<div className="mb-6">
@@ -504,7 +507,7 @@ function FilterSection({
  {title}
  </button>
  <div className="flex items-center gap-1">
- {onAddOption && isOpen && (<Tooltip content="Add new supplier" side="top">
+ {onAddOption && isOpen && (<Tooltip content={t('filter.section.addProvider')} side="top">
  <button
  type="button"
  onClick={onAddOption}
@@ -517,7 +520,7 @@ function FilterSection({
  type="button"
  onClick={() => setIsOpen((prev) =>!prev)}
  className="p-1 rounded text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-all"
- title={isOpen?'close':'Expand'}
+ title={isOpen?t('filter.section.close'):t('filter.section.expand')}
  >
  {isOpen?<ChevronDown size={16} />:<ChevronRight size={16} />}
  </button>
@@ -543,7 +546,7 @@ function FilterSection({
  </span>
  </label>
  {(onEditOption || onDeleteOption) && (<div className="flex items-center gap-0.5">
- {onEditOption && (<Tooltip content={`Edit ${option.label}`} side="top">
+ {onEditOption && (<Tooltip content={t('filter.section.editOption', { optionLabel: option.label })} side="top">
  <button
  type="button"
  onClick={(event) => {
@@ -556,7 +559,7 @@ function FilterSection({
  <Pencil size={12} />
  </button>
  </Tooltip>)}
- {onDeleteOption && (<Tooltip content={`Delete ${option.label}`} side="top">
+ {onDeleteOption && (<Tooltip content={t('filter.section.deleteOption', { optionLabel: option.label })} side="top">
  <button
  type="button"
  onClick={(event) => {

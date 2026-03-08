@@ -65,19 +65,31 @@ logging:
       max-history: 30
       total-size-cap: 5GB
 
-# Airflow Configuration
 airflow:
-  base-url: ${AIRFLOW_BASE_URL:http://localhost:8080}
+  endpoint: ${AIRFLOW_BASE_URL:http://localhost:8080}
   plugin-path: /plugins/datapillar
   username: ${AIRFLOW_USERNAME:datapillar}
   password: ${AIRFLOW_PASSWORD:123456asd}
-  connect-timeout: 5000
-  read-timeout: 30000
+  connect-timeout-ms: 5000
+  read-timeout-ms: 30000
 
-# Gravitino Configuration
 gravitino:
   uri: ${GRAVITINO_URI:http://localhost:8090}
-  metalake: ${GRAVITINO_METALAKE:datapillar}
+  metalake: ${GRAVITINO_METALAKE:oneMeta}
+  auth:
+    type: ${GRAVITINO_AUTH_TYPE:simple}
+    simple:
+      user: ${GRAVITINO_SIMPLE_AUTH_USER:datapillar}
+    oauth:
+      server-uri: ${GRAVITINO_OAUTH_SERVER_URI:}
+      token-path: ${GRAVITINO_OAUTH_TOKEN_PATH:}
+      credential: ${GRAVITINO_OAUTH_CREDENTIAL:}
+      scope: ${GRAVITINO_OAUTH_SCOPE:}
+    kerberos:
+      client-principal: ${GRAVITINO_KERBEROS_CLIENT_PRINCIPAL:}
+      keytab-path: ${GRAVITINO_KERBEROS_KEYTAB_PATH:}
+  connect-timeout-ms: 2000
+  read-timeout-ms: 5000
 
 # Flink SQL Configuration
 flink:

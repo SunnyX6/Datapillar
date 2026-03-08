@@ -43,6 +43,7 @@ import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
+import org.apache.gravitino.exceptions.MetricAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -53,6 +54,8 @@ import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchMetricException;
+import org.apache.gravitino.exceptions.NoSuchMetricVersionException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
@@ -63,7 +66,10 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
+import org.apache.gravitino.exceptions.NoSuchUnitException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.NoSuchValueDomainException;
+import org.apache.gravitino.exceptions.NoSuchWordRootException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -80,8 +86,11 @@ import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.exceptions.UnitAlreadyExistsException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.exceptions.ValueDomainAlreadyExistsException;
+import org.apache.gravitino.exceptions.WordRootAlreadyExistsException;
 
 /**
  * Utility class providing error handling for REST requests and specific to Metalake errors.
@@ -250,6 +259,42 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> modelErrorHandler() {
     return ModelErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Metric and MetricModifier operations.
+   *
+   * @return A Consumer representing the metric error handler.
+   */
+  public static Consumer<ErrorResponse> metricErrorHandler() {
+    return MetricErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to WordRoot operations.
+   *
+   * @return A Consumer representing the word root error handler.
+   */
+  public static Consumer<ErrorResponse> wordRootErrorHandler() {
+    return WordRootErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Unit operations.
+   *
+   * @return A Consumer representing the unit error handler.
+   */
+  public static Consumer<ErrorResponse> unitErrorHandler() {
+    return UnitErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to ValueDomain operations.
+   *
+   * @return A Consumer representing the value domain error handler.
+   */
+  public static Consumer<ErrorResponse> valueDomainErrorHandler() {
+    return ValueDomainErrorHandler.INSTANCE;
   }
 
   /**
@@ -1125,6 +1170,238 @@ public class ErrorHandlers {
               .getType()
               .equals(ModelVersionAliasesAlreadyExistException.class.getSimpleName())) {
             throw new ModelVersionAliasesAlreadyExistException(errorMsg);
+          } else {
+            throw new AlreadyExistsException(errorMsg);
+          }
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMsg);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMsg);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMsg);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMsg);
+
+          } else {
+            throw new NotInUseException(errorMsg);
+          }
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Metric and MetricModifier operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class MetricErrorHandler extends RestErrorHandler {
+
+    private static final MetricErrorHandler INSTANCE = new MetricErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMsg = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMsg);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(errorMsg);
+          } else if (errorResponse.getType().equals(NoSuchMetricException.class.getSimpleName())) {
+            throw new NoSuchMetricException(errorMsg);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchMetricVersionException.class.getSimpleName())) {
+            throw new NoSuchMetricVersionException(errorMsg);
+          } else {
+            throw new NotFoundException(errorMsg);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          if (errorResponse.getType().equals(MetricAlreadyExistsException.class.getSimpleName())) {
+            throw new MetricAlreadyExistsException(errorMsg);
+          } else {
+            throw new AlreadyExistsException(errorMsg);
+          }
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMsg);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMsg);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMsg);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMsg);
+
+          } else {
+            throw new NotInUseException(errorMsg);
+          }
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to WordRoot operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class WordRootErrorHandler extends RestErrorHandler {
+
+    private static final WordRootErrorHandler INSTANCE = new WordRootErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMsg = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMsg);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(errorMsg);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchWordRootException.class.getSimpleName())) {
+            throw new NoSuchWordRootException(errorMsg);
+          } else {
+            throw new NotFoundException(errorMsg);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          if (errorResponse
+              .getType()
+              .equals(WordRootAlreadyExistsException.class.getSimpleName())) {
+            throw new WordRootAlreadyExistsException(errorMsg);
+          } else {
+            throw new AlreadyExistsException(errorMsg);
+          }
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMsg);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMsg);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMsg);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMsg);
+
+          } else {
+            throw new NotInUseException(errorMsg);
+          }
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Unit operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class UnitErrorHandler extends RestErrorHandler {
+
+    private static final UnitErrorHandler INSTANCE = new UnitErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMsg = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMsg);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(errorMsg);
+          } else if (errorResponse.getType().equals(NoSuchUnitException.class.getSimpleName())) {
+            throw new NoSuchUnitException(errorMsg);
+          } else {
+            throw new NotFoundException(errorMsg);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          if (errorResponse.getType().equals(UnitAlreadyExistsException.class.getSimpleName())) {
+            throw new UnitAlreadyExistsException(errorMsg);
+          } else {
+            throw new AlreadyExistsException(errorMsg);
+          }
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMsg);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMsg);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMsg);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMsg);
+
+          } else {
+            throw new NotInUseException(errorMsg);
+          }
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to ValueDomain operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class ValueDomainErrorHandler extends RestErrorHandler {
+
+    private static final ValueDomainErrorHandler INSTANCE = new ValueDomainErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMsg = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMsg);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(errorMsg);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchValueDomainException.class.getSimpleName())) {
+            throw new NoSuchValueDomainException(errorMsg);
+          } else {
+            throw new NotFoundException(errorMsg);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          if (errorResponse
+              .getType()
+              .equals(ValueDomainAlreadyExistsException.class.getSimpleName())) {
+            throw new ValueDomainAlreadyExistsException(errorMsg);
           } else {
             throw new AlreadyExistsException(errorMsg);
           }

@@ -2,9 +2,11 @@ package com.sunny.datapillar.gateway.handler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sunny.datapillar.common.constant.HeaderConstants;
 import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
 import com.sunny.datapillar.common.exception.ExceptionMapper;
 import com.sunny.datapillar.common.response.ErrorResponse;
+import com.sunny.datapillar.gateway.filter.TraceIdFilter;
 import java.net.ConnectException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeoutException;
@@ -15,12 +17,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 /**
- * Gateway exception handler Responsible for gateway exception handling process and result output
+ * Gateway exception handler responsible for unified error output.
  *
  * @author Sunny
  * @date 2026-01-01
@@ -45,6 +48,7 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
 
     DatapillarRuntimeException mappedException = mapException(ex);
     ExceptionMapper.ExceptionDetail detail = ExceptionMapper.resolve(mappedException);
+    String traceId = resolveTraceId(exchange, detail.traceId());
 
     if (detail.serverError()) {
       log.error("Gateway exception: type={}, message={}", detail.type(), detail.message(), ex);
@@ -54,8 +58,8 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
     }
 
     ErrorResponse body =
-        ErrorResponse.of(detail.errorCode(), detail.type(), detail.message(), detail.traceId());
-    return writeResponse(response, HttpStatus.valueOf(detail.httpStatus()), body);
+        ErrorResponse.of(detail.errorCode(), detail.type(), detail.message(), traceId);
+    return writeResponse(exchange, response, HttpStatus.valueOf(detail.httpStatus()), body);
   }
 
   private DatapillarRuntimeException mapException(Throwable ex) {
@@ -102,7 +106,10 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
   }
 
   private Mono<Void> writeResponse(
-      ServerHttpResponse response, HttpStatus status, ErrorResponse body) {
+      ServerWebExchange exchange,
+      ServerHttpResponse response,
+      HttpStatus status,
+      ErrorResponse body) {
     response.setStatusCode(status);
     response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
@@ -111,7 +118,7 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
       return response.writeWith(Mono.just(response.bufferFactory().wrap(bytes)));
     } catch (JsonProcessingException e) {
       log.error("Gateway response serialization failed", e);
-      String traceId = ExceptionMapper.resolve(e).traceId();
+      String traceId = resolveTraceId(exchange, ExceptionMapper.resolve(e).traceId());
       String fallback =
           String.format(
               "{\"code\":500,\"message\":\"Response serialization failed\",\"type\":\"INTERNAL_ERROR\",\"traceId\":\"%s\"}",
@@ -119,6 +126,34 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
       return response.writeWith(
           Mono.just(response.bufferFactory().wrap(fallback.getBytes(StandardCharsets.UTF_8))));
     }
+  }
+
+  private String resolveTraceId(ServerWebExchange exchange, String fallbackTraceId) {
+    if (exchange == null) {
+      return trimToNull(fallbackTraceId);
+    }
+    String responseTraceId =
+        trimToNull(exchange.getResponse().getHeaders().getFirst(HeaderConstants.HEADER_TRACE_ID));
+    if (responseTraceId != null) {
+      return responseTraceId;
+    }
+    String requestTraceId =
+        trimToNull(exchange.getRequest().getHeaders().getFirst(HeaderConstants.HEADER_TRACE_ID));
+    if (requestTraceId != null) {
+      return requestTraceId;
+    }
+    Object attributeTraceId = exchange.getAttribute(TraceIdFilter.TRACE_ID_ATTRIBUTE);
+    if (attributeTraceId instanceof String traceId && StringUtils.hasText(traceId)) {
+      return traceId.trim();
+    }
+    return trimToNull(fallbackTraceId);
+  }
+
+  private String trimToNull(String value) {
+    if (!StringUtils.hasText(value)) {
+      return null;
+    }
+    return value.trim();
   }
 
   private String escapeJson(String value) {

@@ -1,11 +1,12 @@
 /**
- * Indicator registration form - Guided design
+ * Metric registration form - Guided design
  *
- * Step 1:Select indicator type (small modal box)
- * Step 2:Configuration indicator details (Large modal box)
+ * Step 1: Select Metric type (small modal)
+ * Step 2: Configure Metric details (large modal)
  */
 
 import { useState,useEffect,useCallback,useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Target,Zap,Layers,ArrowRight,ChevronLeft,CheckCircle2,Loader2,Sparkles,AlertTriangle } from 'lucide-react'
 import { Modal,ModalCancelButton,ModalPrimaryButton } from '@/components/ui'
 import { parseDataTypeString } from '@/components/ui'
@@ -16,17 +17,6 @@ import { MetricFormLeft } from './MetricFormLeft'
 import { MetricFormRight } from './MetricFormRight'
 import type { MetricFormData,MeasureColumn,FilterColumn } from './types'
 export type { MetricFormData } from './types'
-
-/** Indicator type configuration */
-const METRIC_TYPE_CONFIG:Record<MetricType,{ label:string;desc:string;icon:typeof Target;color:string;bg:string }> = {
- ATOMIC:{
- label:'Atomic indicators',desc:'Ground truth derived directly from physical tables,is the cornerstone of all calculations.',icon:Target,color:'text-purple-600',bg:'bg-purple-50'
- },DERIVED:{
- label:'Derived indicators',desc:'Overlay dimensional filtering or time periods on top of atomic indicators.',icon:Zap,color:'text-blue-600',bg:'bg-blue-50'
- },COMPOSITE:{
- label:'Composite indicator',desc:'Obtained by arithmetic operations between multiple indicators,such as ratio,Efficiency etc..',icon:Layers,color:'text-emerald-600',bg:'bg-emerald-50'
- }
-}
 
 const DATA_TYPES = ['INTEGER','LONG','DOUBLE','DECIMAL']
 
@@ -39,11 +29,12 @@ interface MetricFormProps {
  onClose:() => void
  onSave:(form:MetricFormData) => void
  saving:boolean
- /** edit mode:Pass in the indicator to be edited */
+ /** edit mode: Pass in the Metric to be edited */
  editMetric?: Metric | null
 }
-/** Indicator registration form pop-up window */
+/** Metric registration modal */
 export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:MetricFormProps) {
+ const { t } = useTranslation('oneSemantics')
  const isEditMode =!!editMetric
  const [step,setStep] = useState(isEditMode?2:1)
  const [form,setForm] = useState<MetricFormData>(emptyForm)
@@ -65,6 +56,21 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  const [atomicMetrics,setAtomicMetrics] = useState<Array<{ code:string;name:string;comment?: string }>>([])
  const [modifierTotal,setModifierTotal] = useState(0)
  const [atomicTotal,setAtomicTotal] = useState(0)
+ const metricTypeConfig = useCallback(():Record<MetricType,{ label:string;desc:string;icon:typeof Target;color:string;bg:string }> => ({
+ ATOMIC:{
+ label:t('metricForm.type.atomic.label'),
+ desc:t('metricForm.type.atomic.desc'),
+ icon:Target,color:'text-purple-600',bg:'bg-purple-50'
+ },DERIVED:{
+ label:t('metricForm.type.derived.label'),
+ desc:t('metricForm.type.derived.desc'),
+ icon:Zap,color:'text-blue-600',bg:'bg-blue-50'
+ },COMPOSITE:{
+ label:t('metricForm.type.composite.label'),
+ desc:t('metricForm.type.composite.desc'),
+ icon:Layers,color:'text-emerald-600',bg:'bg-emerald-50'
+ }
+ }),[t])
 
  // Loading units(Lazy loading when clicking the dropdown)
  const loadUnits = useCallback(async () => {
@@ -91,7 +97,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  return data.items
  },[wordRoots])
 
- // Load a list of atomic indicators(For derived indicators)
+ // Load a list of Atomic Metrics (for Derived Metrics)
  const loadAtomicMetrics = useCallback(async () => {
  if (atomicMetrics.length > 0) return atomicMetrics
  const data = await fetchMetrics(0,500).catch(() => ({ items:[],total:0 }))
@@ -104,7 +110,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  // Used to prevent repeated requests after the edit is saved successfully.
  const loadedMetricCodeRef = useRef<string | null>(null)
 
- // edit mode:Load indicator version details(Only loaded when first opened)
+ // edit mode: load Metric version details (only loaded when first opened)
  useEffect(() => {
  if (!isOpen) {
  // Reset when pop-up window is closed
@@ -113,7 +119,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  }
 
  if (isEditMode && editMetric) {
- // If data for this indicator has already been loaded,No more repeated requests
+ // If data for this Metric has already been loaded, skip repeated requests
  if (loadedMetricCodeRef.current === editMetric.code) {
  return
  }
@@ -144,7 +150,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
 
  const parsedDataType = parseDataTypeString(editMetric.dataType)
 
- // Process parentMetricCodes:The derived indicator takes the first one as baseCode,The composite indicator is converted to compositeMetrics
+ // Process parentMetricCodes: Derived Metric uses first parent as baseCode, Composite Metric uses compositeMetrics
  const parentCodes = versionData.parentMetricCodes || []
  let baseCode = ''
  let compositeMetrics:Array<{ code:string;name:string }> = []
@@ -211,17 +217,17 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  setAiError('')
  setAiMessage(null)
 
- // Verify:For different types of indicators,you need to select the necessary data first
+ // Verify: different Metric types require different prerequisite selections
  if (form.type === 'ATOMIC' && form.measureColumns.length === 0) {
- setAiError('Please select at least one measure column on the right first')
+ setAiError(t('metricForm.ai.error.selectMeasureFirst'))
  return
  }
  if (form.type === 'DERIVED' &&!form.baseCode) {
- setAiError('Please select an atomic indicator in the indicator coding area first')
+ setAiError(t('metricForm.ai.error.selectBaseMetricFirst'))
  return
  }
  if (form.type === 'COMPOSITE' && (!form.compositeMetrics || form.compositeMetrics.length < 2)) {
- setAiError('Please first select at least two indicators to participate in the operation on the right')
+ setAiError(t('metricForm.ai.error.selectCompositeMetricsFirst'))
  return
  }
 
@@ -241,7 +247,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  payload.refSchema = form.refSchema
  payload.refTable = form.refTable
  } else if (form.type === 'DERIVED') {
- // Basic indicators:code + name + description
+ // Base Metric: code + name + description
  const baseMetricInfo = atomicMetrics.find((m) => m.code === form.baseCode)
  payload.baseMetric = {
  code:form.baseCode,name:baseMetricInfo?.name || form.baseCode,description:baseMetricInfo?.comment
@@ -257,7 +263,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  payload.refSchema = form.refSchema
  payload.refTable = form.refTable
  } else {
- // Composite indicator:User-selected list of indicators(code + name + description)
+ // Composite Metric: user-selected list of Metrics (code + name + description)
  payload.metrics = (form.compositeMetrics || []).map((m) => ({
  code:m.code,name:m.name,description:m.comment
  }))
@@ -314,13 +320,13 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  }
  })
  } catch {
- setAiError('AI Failed to fill in,Please try again')
+ setAiError(t('metricForm.ai.error.fillFailed'))
  } finally {
  setAiLoading(false)
  }
  }
 
- // Atomic indicators:Toggle measurement column selection state
+ // Atomic Metric: toggle measure-column selection state
  const handleMeasureColumnToggle = (col:MeasureColumn,selected:boolean) => {
  if (selected) {
  setForm({...form,measureColumns:[...form.measureColumns,col]
@@ -331,7 +337,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  }
  }
 
- // Atomic indicators:Toggle filter column selection status
+ // Atomic Metric: toggle filter-column selection state
  const handleFilterColumnToggle = (col:MeasureColumn,selected:boolean,filterCol?: FilterColumn) => {
  if (selected && filterCol) {
  // Add or update filter columns
@@ -352,7 +358,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  }
  }
 
- // Automatic splicing code:atom/Composite indicator = wordRoots + aggregation + customSuffix
+ // Auto-generate code: Atomic/Composite Metric = WordRoots + aggregation + customSuffix
  const updateCode = useCallback((customSuffix:string,selectedWordRoots:string[],aggregation:string) => {
  const parts = [...selectedWordRoots,aggregation,customSuffix].filter(Boolean)
  const code = parts.join('_').toUpperCase()
@@ -360,7 +366,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  }))
  },[])
 
- // Add root word
+ // Add WordRoot
  const addWordRoot = (rootCode:string) => {
  if (form.wordRoots.includes(rootCode)) return
  const newWordRoots = [...form.wordRoots,rootCode]
@@ -383,9 +389,9 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  updateCode(customSuffix,form.wordRoots,form.aggregation)
  }
 
- // Derived indicators:Update basic indicators code and modifiers
+ // Derived Metric: update base code and modifiers
  const updateDerivedCode = (baseCode:string,selectedModifiers:string[],customSuffix?: string) => {
- // Derived indicator code = baseCode + modifiers + customSuffix
+ // Derived Metric code = baseCode + modifiers + customSuffix
  setForm((prev) => {
  const suffix = customSuffix?? prev.customSuffix
  const parts = [baseCode,...selectedModifiers,suffix].filter(Boolean)
@@ -395,13 +401,14 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  })
  }
 
- // Derived indicators:Update custom suffix
+ // Derived Metric: update custom suffix
  const updateDerivedCustomSuffix = (customSuffix:string) => {
  updateDerivedCode(form.baseCode,form.modifiers,customSuffix)
  }
 
  const isValid = form.name.trim() && form.code.trim() && form.formula.trim()
- const typeConfig = METRIC_TYPE_CONFIG[form.type] || METRIC_TYPE_CONFIG.ATOMIC
+ const metricTypeConfigMap = metricTypeConfig()
+ const typeConfig = metricTypeConfigMap[form.type] || metricTypeConfigMap.ATOMIC
 
  // Derived scenarios prefetch pull data in advance,Avoid flickering on first opening
  useEffect(() => {
@@ -414,20 +421,20 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  }
  },[isOpen,step,form.type,atomicMetrics.length,modifiers.length,loadAtomicMetrics,loadModifiers])
 
- // Step 1:Select indicator type
+ // Step 1: select Metric type
  if (step === 1) {
  return (<Modal
  isOpen={isOpen}
  onClose={handleClose}
  size="sm"
- title="Indicator Registration Wizard"
- subtitle={<span className="text-xs text-slate-400">Please select the type of indicator you want to create</span>}
+ title={t('metricForm.modal.step1.title')}
+ subtitle={<span className="text-xs text-slate-400">{t('metricForm.modal.step1.subtitle')}</span>}
  >
  <div className="flex flex-col min-h-0">
  <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
  <div className="space-y-3">
  {(['ATOMIC','DERIVED','COMPOSITE'] as MetricType[]).map((type) => {
- const config = METRIC_TYPE_CONFIG[type]
+ const config = metricTypeConfigMap[type]
  return (<button
  key={type}
  onClick={() => handleSelectType(type)}
@@ -453,7 +460,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  </Modal>)
  }
 
- // Step 2:Configuration indicator details
+ // Step 2: configure Metric details
  return (<Modal
  isOpen={isOpen}
  onClose={handleClose}
@@ -467,7 +474,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  >
  <ChevronLeft size={18} />
  </button>)}
- <span>{isEditMode?'Edit indicator':'Configuration indicator details'}</span>
+ <span>{isEditMode?t('metricForm.modal.step2.titleEdit'):t('metricForm.modal.step2.titleCreate')}</span>
  <span className={`text-xs font-medium px-2 py-0.5 rounded ${typeConfig.bg} ${typeConfig.color}`}>
  {typeConfig.label}
  </span>
@@ -477,7 +484,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  <>
  <ModalCancelButton onClick={handleClose} disabled={saving || loadingVersion} />
  <ModalPrimaryButton onClick={handleSave} disabled={!isValid || loadingVersion} loading={saving}>
- <CheckCircle2 size={16} /> {isEditMode?'Save changes':'Confirm release'}
+ <CheckCircle2 size={16} /> {isEditMode?t('metricForm.modal.step2.saveChanges'):t('metricForm.modal.step2.confirmPublish')}
  </ModalPrimaryButton>
  </>
  }
@@ -487,13 +494,13 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-2xl border border-purple-100 dark:border-purple-800/50 shrink-0">
  <div className="flex items-center gap-2 mb-2">
  <Sparkles size={16} className="text-purple-500" />
- <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">AI Help write</span>
+ <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">{t('metricForm.ai.title')}</span>
  </div>
  <div className="flex gap-2">
  <input
  type="text"
  placeholder={
- form.type === 'ATOMIC'?'First select the measure column on the right,Then describe the indicator,For example:Multiply unit price and quantity,Total order amount accumulated':form.type === 'DERIVED'?'First select the atomic indicator in the coding area on the left,Select the dimension filter column on the right,For example:Statistics of monthly cumulative values in Beijing area':'First select at least two indicators on the right,Then describe the operation rules,For example:Sales minus costs divided by sales'
+ form.type === 'ATOMIC'?t('metricForm.ai.placeholder.atomic'):form.type === 'DERIVED'?t('metricForm.ai.placeholder.derived'):t('metricForm.ai.placeholder.composite')
  }
  className="flex-1 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-purple-500 transition-all"
  value={aiInput}
@@ -510,7 +517,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl text-body-sm font-medium flex items-center gap-2 transition-all"
  >
  {aiLoading?<Loader2 size={16} className="animate-spin" />:<Sparkles size={16} />}
- {aiLoading?'Generating...':'Smart fill'}
+ {aiLoading?t('metricForm.ai.generating'):t('metricForm.ai.smartFill')}
  </button>
  </div>
  {aiError && (<div className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
@@ -532,9 +539,9 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  {(() => {
  const hasMetric = aiMessage.recommendations.some((r) => r.msgType === 'metric')
  const hasTable = aiMessage.recommendations.some((r) => r.msgType === 'table')
- if (hasMetric && hasTable) return 'Recommended indicators and tables:'
- if (hasMetric) return 'Recommended indicators:'
- return 'Recommended tables and columns:'
+ if (hasMetric && hasTable) return t('metricForm.ai.recommendation.metricsAndTables')
+ if (hasMetric) return t('metricForm.ai.recommendation.metricsOnly')
+ return t('metricForm.ai.recommendation.tablesAndColumns')
  })()}
  </div>
  <div className="space-y-2">
@@ -546,14 +553,14 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  </div>
  {rec.columns && rec.columns.length > 0 && (<div className="ml-6 space-y-0.5">
  {rec.columns.map((col,colIdx) => (<div key={colIdx} className="flex items-center gap-2 text-xs">
- <span className="px-1.5 py-0.5 rounded text-micro font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">Column</span>
+ <span className="px-1.5 py-0.5 rounded text-micro font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">{t('metricForm.ai.recommendation.column')}</span>
  <code className="text-slate-600 dark:text-slate-400 font-mono text-legal">{col.name}</code>
  {col.dataType && (<span className="text-slate-400 dark:text-slate-500 text-micro">({col.dataType})</span>)}
  {col.description && (<span className="text-slate-500 dark:text-slate-400">- {col.description}</span>)}
  </div>))}
  </div>)}
  </div>):(<div key={idx} className="flex items-center gap-2 text-xs">
- <span className="px-1.5 py-0.5 rounded text-micro font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">indicator</span>
+ <span className="px-1.5 py-0.5 rounded text-micro font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">{t('metricForm.ai.recommendation.metric')}</span>
  <code className="text-slate-700 dark:text-slate-300 font-mono">{rec.code}</code>
  <span className="text-slate-600 dark:text-slate-400">{rec.name}</span>
  {rec.description && (<span className="text-slate-500 dark:text-slate-400">- {rec.description}</span>)}
@@ -566,7 +573,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  {/* Loading status */}
  {loadingVersion?(<div className="flex flex-col items-center justify-center py-16">
  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
- <div className="text-slate-400 text-xs mt-3">Load indicator details...</div>
+ <div className="text-slate-400 text-xs mt-3">{t('metricForm.loadingVersion')}</div>
  </div>):(<div className="flex-1 min-h-0">
  {/* form content - two column layout */}
  <div className="grid grid-cols-12 gap-6 min-h-[520px] items-stretch">

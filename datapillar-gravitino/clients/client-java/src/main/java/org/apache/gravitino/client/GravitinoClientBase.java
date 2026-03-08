@@ -28,6 +28,7 @@ import java.io.Closeable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
@@ -55,6 +56,15 @@ public abstract class GravitinoClientBase implements Closeable {
 
   /** The REST API path prefix for load a specific metalake */
   protected static final String API_METALAKES_IDENTIFIER_PATH = API_METALAKES_LIST_PATH + "/";
+
+  /** Tenant context header name for multi-tenant requests. */
+  protected static final String HEADER_TENANT_ID = "X-Tenant-Id";
+
+  /** Tenant context header name for multi-tenant requests. */
+  protected static final String HEADER_TENANT_CODE = "X-Tenant-Code";
+
+  /** Tenant context header name for multi-tenant requests. */
+  protected static final String HEADER_TENANT_NAME = "X-Tenant-Name";
 
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
@@ -317,6 +327,40 @@ public abstract class GravitinoClientBase implements Closeable {
     }
 
     /**
+     * Sets tenant context headers for the request.
+     *
+     * @param tenantId Tenant id, must be a positive number.
+     * @param tenantCode Tenant code, must not be blank.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withTenantContext(Long tenantId, String tenantCode) {
+      return withTenantContext(tenantId, tenantCode, null);
+    }
+
+    /**
+     * Sets tenant context headers for the request.
+     *
+     * @param tenantId Tenant id, must be a positive number.
+     * @param tenantCode Tenant code, must not be blank.
+     * @param tenantName Optional tenant name.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withTenantContext(Long tenantId, String tenantCode, String tenantName) {
+      Preconditions.checkArgument(
+          tenantId != null && tenantId > 0, "tenantId must be a positive number");
+      Preconditions.checkArgument(StringUtils.isNotBlank(tenantCode), "tenantCode can't be blank");
+
+      Map<String, String> tenantHeaders = new LinkedHashMap<>();
+      tenantHeaders.put(HEADER_TENANT_ID, String.valueOf(tenantId));
+      tenantHeaders.put(HEADER_TENANT_CODE, tenantCode.trim());
+      if (StringUtils.isNotBlank(tenantName)) {
+        tenantHeaders.put(HEADER_TENANT_NAME, tenantName.trim());
+      }
+      this.headers = mergeHeaders(this.headers, tenantHeaders);
+      return this;
+    }
+
+    /**
      * Set base client config for Gravitino Client.
      *
      * @param properties A map of properties (key-value pairs) used to configure the Gravitino
@@ -328,6 +372,18 @@ public abstract class GravitinoClientBase implements Closeable {
         this.properties = ImmutableMap.copyOf(properties);
       }
       return this;
+    }
+
+    private Map<String, String> mergeHeaders(
+        Map<String, String> baseHeaders, Map<String, String> deltaHeaders) {
+      Map<String, String> merged = new LinkedHashMap<>();
+      if (baseHeaders != null) {
+        merged.putAll(baseHeaders);
+      }
+      if (deltaHeaders != null) {
+        merged.putAll(deltaHeaders);
+      }
+      return ImmutableMap.copyOf(merged);
     }
 
     /**

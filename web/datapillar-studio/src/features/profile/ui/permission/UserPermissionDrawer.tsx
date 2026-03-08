@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Database, Save, Shield, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui'
@@ -113,6 +114,7 @@ export function UserPermissionDrawer({
   role,
   onUpdateModelAccess,
 }: UserPermissionDrawerProps) {
+  const { t } = useTranslation('permission')
   const [activeTab, setActiveTab] = useState<'data' | 'ai'>('data')
   const [aiModels, setAiModels] = useState<AiPermissionModelItem[]>([])
   const [aiLoading, setAiLoading] = useState(false)
@@ -128,7 +130,7 @@ export function UserPermissionDrawer({
   const loadAiPermissionModels = useCallback(async () => {
     if (parsedUserId === null) {
       setAiModels([])
-      setAiError('UserIDInvalid')
+      setAiError(t('userDrawer.error.userIdInvalid'))
       return
     }
 
@@ -146,18 +148,18 @@ export function UserPermissionDrawer({
     } finally {
       setAiLoading(false)
     }
-  }, [parsedUserId])
+  }, [parsedUserId, t])
 
   const handleAiPermissionUpdate = useCallback(
     async (userId: string, aiModelId: number, access: AiAccessLevel) => {
       if (parsedUserId === null) {
-        toast.error('UserIDInvalid，Unable to configure model permissions')
+        toast.error(t('userDrawer.toast.userIdInvalid'))
         return
       }
 
       const targetModel = aiModels.find((model) => model.aiModelId === aiModelId)
       if (!targetModel) {
-        toast.error('Model does not exist，Unable to configure permissions')
+        toast.error(t('userDrawer.toast.modelNotFound'))
         return
       }
 
@@ -182,12 +184,12 @@ export function UserPermissionDrawer({
         )
         onUpdateModelAccess(userId, aiModelId, access)
       } catch (error) {
-        toast.error(`Update user AI Model permission failed：${resolveErrorMessage(error)}`)
+        toast.error(t('userDrawer.toast.updateFailed', { message: resolveErrorMessage(error) }))
       } finally {
         setUpdatingModelId(null)
       }
     },
-    [aiModels, onUpdateModelAccess, parsedUserId],
+    [aiModels, onUpdateModelAccess, parsedUserId, t],
   )
 
   useEffect(() => {
@@ -220,7 +222,7 @@ export function UserPermissionDrawer({
                   'font-bold text-slate-900 dark:text-white',
                 )}
               >
-                {user.name} Permission configuration
+                {t('userDrawer.title', { userName: user.name })}
               </h2>
               <div
                 className={cn(
@@ -228,7 +230,7 @@ export function UserPermissionDrawer({
                   'flex items-center gap-2 mt-1 text-slate-500 dark:text-slate-400',
                 )}
               >
-                <span>Role:</span>
+                <span>{t('userDrawer.roleLabel')}</span>
                 <span
                   className={cn(
                     TYPOGRAPHY.caption,
@@ -240,7 +242,7 @@ export function UserPermissionDrawer({
                 {user.department && (
                   <>
                     <span className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full mx-1" />
-                    <span>Department: {user.department}</span>
+                    <span>{t('userDrawer.departmentLabel', { department: user.department })}</span>
                   </>
                 )}
               </div>
@@ -250,7 +252,7 @@ export function UserPermissionDrawer({
             type="button"
             onClick={onClose}
             className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-400 dark:text-slate-500 transition-colors"
-            aria-label="close"
+            aria-label={t('userDrawer.closeAria')}
           >
             <X size={20} />
           </button>
@@ -271,7 +273,7 @@ export function UserPermissionDrawer({
             )}
           >
             <Database size={16} />
-            Data permissions (Gravitino)
+            {t('userDrawer.tabs.data')}
             {user.dataPrivileges && user.dataPrivileges.length > 0 && (
               <span className="w-2 h-2 rounded-full bg-brand-500" />
             )}
@@ -289,7 +291,7 @@ export function UserPermissionDrawer({
             )}
           >
             <Sparkles size={16} />
-            AI Model permissions
+            {t('userDrawer.tabs.ai')}
             {hasEnabledAiPermission && (
               <span className="w-2 h-2 rounded-full bg-brand-500" />
             )}
@@ -332,7 +334,7 @@ export function UserPermissionDrawer({
             'text-slate-400 dark:text-slate-500',
           )}
         >
-          Modifications take effect immediately
+          {t('userDrawer.footer.immediateEffect')}
         </div>
         <div className="flex gap-3">
           <Button
@@ -341,7 +343,7 @@ export function UserPermissionDrawer({
             className="bg-brand-600 text-white hover:bg-brand-700"
           >
             <Save size={16} />
-            Complete configuration
+            {t('userDrawer.footer.complete')}
           </Button>
         </div>
       </div>

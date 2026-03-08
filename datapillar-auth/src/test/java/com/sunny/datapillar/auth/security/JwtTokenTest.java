@@ -3,7 +3,9 @@ package com.sunny.datapillar.auth.security;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sunny.datapillar.auth.config.AuthProperties;
+import com.sunny.datapillar.auth.key.KeySetKeyManager;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.Test;
 
@@ -13,15 +15,13 @@ class JwtTokenTest {
     AuthProperties properties = new AuthProperties();
     properties.getToken().setIssuer("https://auth.datapillar.local");
     properties.getToken().setAudience("datapillar-api");
-    properties.getToken().setPrivateKeyPath("classpath:security/auth-token-dev-private.pem");
-    properties.getToken().setPublicKeyPath("classpath:security/auth-token-dev-public.pem");
+    properties.getToken().setKeysetPath("classpath:security/auth-token-dev-keyset.json");
     properties.getToken().setAccessTtlSeconds(60);
     properties.getToken().setRefreshTtlSeconds(604800);
     properties.getToken().setRefreshRememberTtlSeconds(2592000);
     properties.getToken().setLoginTtlSeconds(300);
-    properties.getJwks().setActiveKid("auth-dev-2026-01");
     properties.validate();
-    return new JwtToken(properties);
+    return new JwtToken(properties, new KeySetKeyManager(new ObjectMapper(), properties));
   }
 
   @Test

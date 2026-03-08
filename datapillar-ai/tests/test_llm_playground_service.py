@@ -92,11 +92,11 @@ async def test_stream_chat_emits_text_chunks_with_top_p(monkeypatch: pytest.Monk
 
     service = LlmPlaygroundService()
 
-    async def _mock_decrypt_api_key(**_kwargs):
+    async def _mock_decrypt_key(**_kwargs):
         return "plain-key"
 
     monkeypatch.setattr(playground_service_module.Model, "get_active_chat_model", _mock_get_model)
-    monkeypatch.setattr(service, "_decrypt_api_key", _mock_decrypt_api_key)
+    monkeypatch.setattr(service, "_decrypt_key", _mock_decrypt_key)
     monkeypatch.setattr(service, "_build_llm_provider", lambda **_kwargs: provider)
 
     payload = PlaygroundChatRequest.model_validate(
@@ -121,9 +121,9 @@ async def test_stream_chat_emits_text_chunks_with_top_p(monkeypatch: pytest.Monk
     assert deltas == [
         ("thinking", "First"),
         ("text", "you"),
-        ("thinking", "think"),
+        ("thinking", "think first"),
         ("text", "good"),
-        ("thinking", "Answer later"),
+        ("thinking", "Think first and answer later"),
         ("text", "，world"),
     ]
     assert provider.kwargs == {
@@ -134,23 +134,23 @@ async def test_stream_chat_emits_text_chunks_with_top_p(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
-async def test_decrypt_api_key_calls_auth_crypto_rpc(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_decrypt_key_calls_local_crypto_service(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
 
-    class _FakeAuthCryptoRpcClient:
-        async def decrypt_llm_api_key(self, *, tenant_code: str, ciphertext: str) -> str:
+    class _FakeLocalCryptoService:
+        async def decrypt_key_async(self, *, tenant_code: str, ciphertext: str) -> str:
             captured["tenant_code"] = tenant_code
             captured["ciphertext"] = ciphertext
             return "plain-key"
 
     monkeypatch.setattr(
         playground_service_module,
-        "auth_crypto_rpc_client",
-        _FakeAuthCryptoRpcClient(),
+        "local_crypto_service",
+        _FakeLocalCryptoService(),
     )
 
     service = LlmPlaygroundService()
-    decrypted = await service._decrypt_api_key(tenant_code="tenant-11", encrypted_value="ENCv1:abc")
+    decrypted = await service._decrypt_key(tenant_code="tenant-11", encrypted_value="ENCv1:abc")
 
     assert decrypted == "plain-key"
     assert captured == {

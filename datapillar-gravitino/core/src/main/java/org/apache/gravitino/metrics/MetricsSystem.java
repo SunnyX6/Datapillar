@@ -119,8 +119,15 @@ public class MetricsSystem implements Closeable {
     LOG.info("Unregistered {} from metrics system {}", metricsSource.getMetricsSourceName(), name);
   }
 
+  private static final String JMX_REPORTER_ENABLED = "gravitino.metrics.jmx.enabled";
+
   // We support JMX reporter for now, todo: support more reporters
   private void initAndStartMetricsReporter() {
+    if (!Boolean.parseBoolean(System.getProperty(JMX_REPORTER_ENABLED, "true"))) {
+      LOG.info(
+          "Skip JMX metrics reporter because system property {} is disabled", JMX_REPORTER_ENABLED);
+      return;
+    }
     JmxReporter jmxReporter = JmxReporter.forRegistry(metricRegistry).build();
     jmxReporter.start();
     metricsReporters.add(jmxReporter);

@@ -1,5 +1,6 @@
 import { useEffect,useMemo,useState } from 'react'
 import { Building2,Check,Search,Settings2,Trash2,UserPlus,X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
  Button,Table,TableBody,TableCell,TableHead,TableHeader,TableRow,} from '@/components/ui'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
@@ -32,6 +33,7 @@ interface MembersListProps {
 
 export function MembersList({
  role,selectedRoleId,users,onUpdateUserModelAccess,onDeleteUsers,showToolbar = true,isAddModalOpen = false,onOpenAddModal,onCloseAddModal,}:MembersListProps) {
+ const { t } = useTranslation('permission')
  const [selectedUserId,setSelectedUserId] = useState<string | null>(null)
  const [selectedUserIds,setSelectedUserIds] = useState<string[]>([])
  const [isBatchDeleting,setIsBatchDeleting] = useState(false)
@@ -108,12 +110,12 @@ export function MembersList({
  <h3
  className={cn(TYPOGRAPHY.subtitle,'font-bold text-slate-900 dark:text-white',)}
  >
- Member list
+ {t('membersList.title')}
  </h3>
  <p
  className={cn(TYPOGRAPHY.caption,'text-slate-500 dark:text-slate-400 mt-1',)}
  >
- management <span className="font-semibold text-brand-600">{role.name}</span> members under.</p>
+ {t('membersList.descriptionPrefix')} <span className="font-semibold text-brand-600">{role.name}</span> {t('membersList.descriptionSuffix')}</p>
  </div>
  <div className="flex items-center gap-3">
  <div className="relative group w-64">
@@ -123,13 +125,13 @@ export function MembersList({
  />
  <input
  type="text"
- placeholder="Search members..."
+ placeholder={t('membersList.searchPlaceholder')}
  className={cn(TYPOGRAPHY.bodySm,'w-full pl-9 pr-4 py-1.5 bg-white dark:bg-slate-900 border border-brand-300/70 dark:border-brand-400/40 rounded-lg hover:border-brand-400/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all text-slate-900 dark:text-slate-100 placeholder:text-slate-400',)}
  />
  </div>
  <Button size="small" variant="primary" onClick={onOpenAddModal}>
  <UserPlus size={14} />
- Add member
+ {t('membersList.addMember')}
  </Button>
  </div>
  </div>)}
@@ -144,11 +146,11 @@ export function MembersList({
  className={cn(TYPOGRAPHY.caption,'bg-slate-50/50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 font-medium',)}
  >
  <TableRow>
- <TableHead className="px-6 py-3.5 w-1/3">User</TableHead>
- <TableHead className="px-6 py-3.5">Department</TableHead>
- <TableHead className="px-6 py-3.5">permission status</TableHead>
- <TableHead className="px-6 py-3.5">active time</TableHead>
- <TableHead className="px-6 py-3.5 text-center">Operation</TableHead>
+ <TableHead className="px-6 py-3.5 w-1/3">{t('membersList.columns.user')}</TableHead>
+ <TableHead className="px-6 py-3.5">{t('membersList.columns.department')}</TableHead>
+ <TableHead className="px-6 py-3.5">{t('membersList.columns.status')}</TableHead>
+ <TableHead className="px-6 py-3.5">{t('membersList.columns.activeTime')}</TableHead>
+ <TableHead className="px-6 py-3.5 text-center">{t('membersList.columns.operation')}</TableHead>
  </TableRow>
  </TableHeader>
  <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -161,7 +163,7 @@ export function MembersList({
  <p
  className={cn(TYPOGRAPHY.bodySm,'text-slate-600 dark:text-slate-300 font-medium',)}
  >
- No members yet
+ {t('membersList.emptyTitle')}
  </p>
  <Button
  variant="outline"
@@ -169,7 +171,7 @@ export function MembersList({
  className="mt-4"
  onClick={onOpenAddModal}
  >
- Invite now
+ {t('membersList.inviteNow')}
  </Button>
  </div>
  </TableCell>
@@ -221,7 +223,7 @@ export function MembersList({
  <div className="flex flex-col items-start gap-1">
  <StatusBadge status={user.status} />
  {isProtectedUser && (<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-violet-50 text-violet-700 border-violet-100 dark:bg-violet-500/10 dark:text-violet-300 dark:border-violet-500/30">
- Platform over management
+ {t('membersList.platformSuperAdmin')}
  </span>)}
  </div>
  </TableCell>
@@ -241,7 +243,7 @@ export function MembersList({
  className="border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
  >
  <Settings2 size={14} />
- Configure permissions
+ {t('membersList.configurePermission')}
  </Button>)}
  </TableCell>
  </TableRow>)
@@ -256,7 +258,7 @@ export function MembersList({
  {selectedCount}
  </span>
  <span className={cn(TYPOGRAPHY.caption,'font-medium whitespace-nowrap')}>
- Selected
+ {t('membersList.selected')}
  </span>
  </div>
 
@@ -264,18 +266,18 @@ export function MembersList({
 
  <button
  type="button"
- aria-label="Select all members"
+ aria-label={t('membersList.selectAllAria')}
  onClick={toggleSelectAll}
  className={cn(TYPOGRAPHY.caption,'px-2 py-1 text-slate-300 transition-colors hover:text-white',)}
  >
- {isAllSelected?'Deselect all':'Select all'}
+ {isAllSelected?t('membersList.deselectAll'):t('membersList.selectAll')}
  </button>
 
  <div className="mx-1 h-4 w-px bg-slate-700" />
 
  <button
  type="button"
- aria-label="Delete members in batches"
+ aria-label={t('membersList.batchDeleteAria')}
  onClick={() => {
  void removeUsers(selectedUserIds)
  }}
@@ -283,12 +285,12 @@ export function MembersList({
  className={cn(TYPOGRAPHY.caption,'inline-flex items-center gap-1.5 px-2 py-1 text-rose-400 transition-colors hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-50',)}
  >
  <Trash2 size={12} />
- Batch delete
+ {t('membersList.batchDelete')}
  </button>
 
  <button
  type="button"
- aria-label="Close bulk operations"
+ aria-label={t('membersList.closeBulkActionsAria')}
  onClick={clearSelection}
  className="ml-1 inline-flex size-6 items-center justify-center rounded-lg text-slate-400 transition-colors hover:text-white"
  >
@@ -320,9 +322,17 @@ interface StatusBadgeProps {
 }
 
 function StatusBadge({ status }:StatusBadgeProps) {
+ const { t } = useTranslation('permission')
+ const label = status === 'Activated'
+ ? t('membersList.status.activated')
+ : status === 'Invited'
+ ? t('membersList.status.invited')
+ : status === 'Disabled'
+ ? t('membersList.status.disabled')
+ : status
  return (<span
  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${STATUS_STYLES[status]}`}
  >
- {status}
+ {label}
  </span>)
 }

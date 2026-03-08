@@ -33,3 +33,12 @@ gateway:
       url: http://${AUTH_HOST:localhost}:${AUTH_PORT:8082}
     studio:
       url: http://${STUDIO_HOST:localhost}:${STUDIO_PORT:8081}
+
+security:
+  authentication:
+    enabled: true
+    auth-token-cookie-name: ${AUTH_TOKEN_COOKIE_NAME:auth-token}
+    issuer: ${AUTH_TOKEN_ISSUER:http://localhost:7001}
+    audience: ${AUTH_AUDIENCE:datapillar-api}
+    username-claim: preferred_username
+    email-claim: email

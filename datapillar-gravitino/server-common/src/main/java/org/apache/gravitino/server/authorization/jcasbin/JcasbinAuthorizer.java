@@ -304,8 +304,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         if (tempType == MetadataObject.Type.TABLE
             || tempType == MetadataObject.Type.TOPIC
             || tempType == MetadataObject.Type.FILESET
-            || tempType == MetadataObject.Type.MODEL) {
-          // table owner need use_catalog and use_schema privileges
+            || tempType == MetadataObject.Type.MODEL
+            || tempType == MetadataObject.Type.METRIC
+            || tempType == MetadataObject.Type.WORDROOT
+            || tempType == MetadataObject.Type.UNIT
+            || tempType == MetadataObject.Type.MODIFIER
+            || tempType == MetadataObject.Type.VALUE_DOMAIN) {
+          // Schema child object owner needs schema access privileges.
           boolean hasMetalakeUseSchema =
               authorize(
                   currentPrincipal,
@@ -504,7 +509,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               .listEntitiesByRelation(
                   SupportsRelationOperations.Type.OWNER_REL,
                   entityIdent,
-                  Entity.EntityType.valueOf(metadataObject.type().name()));
+                  org.apache.gravitino.utils.MetadataObjectUtil.toEntityType(metadataObject));
       for (Entity ownerEntity : owners) {
         if (ownerEntity instanceof UserEntity) {
           UserEntity user = (UserEntity) ownerEntity;

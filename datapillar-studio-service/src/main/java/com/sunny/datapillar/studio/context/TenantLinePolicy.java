@@ -38,6 +38,7 @@ public class TenantLinePolicy implements TenantLineHandler {
     String normalized = tableName.toLowerCase(Locale.ROOT);
     return "tenants".equals(normalized)
         || "system_bootstrap".equals(normalized)
+        || "user_identities".equals(normalized)
         || "ai_provider".equals(normalized)
         || "user_invitation_orgs".equals(normalized)
         || "user_invitation_roles".equals(normalized)

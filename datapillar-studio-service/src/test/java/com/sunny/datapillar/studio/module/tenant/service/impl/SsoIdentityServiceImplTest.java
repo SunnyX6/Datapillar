@@ -37,7 +37,7 @@ import com.sunny.datapillar.studio.module.tenant.service.sso.provider.DingtalkBi
 import com.sunny.datapillar.studio.module.tenant.service.sso.provider.model.DingtalkUserInfo;
 import com.sunny.datapillar.studio.module.user.entity.TenantUser;
 import com.sunny.datapillar.studio.module.user.mapper.TenantUserMapper;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
+import com.sunny.datapillar.studio.security.crypto.LocalCryptoService;
 import java.sql.SQLException;
 import java.util.Map;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -55,7 +55,7 @@ class SsoIdentityServiceImplTest {
   @Mock private TenantSsoConfigMapper tenantSsoConfigMapper;
   @Mock private TenantUserMapper tenantUserMapper;
   @Mock private DingtalkBindingClient dingtalkBindingClient;
-  @Mock private AuthCryptoRpcClient authCryptoClient;
+  @Mock private LocalCryptoService localCryptoService;
   @Mock private TenantCodeResolver tenantCodeResolver;
 
   private SsoIdentityServiceImpl service;
@@ -73,7 +73,7 @@ class SsoIdentityServiceImplTest {
             tenantSsoConfigMapper,
             tenantUserMapper,
             dingtalkBindingClient,
-            authCryptoClient,
+            localCryptoService,
             tenantCodeResolver,
             new ObjectMapper(),
             new StudioDbExceptionTranslator());
@@ -110,7 +110,8 @@ class SsoIdentityServiceImplTest {
                     "clientSecret", "ENCv1:secret",
                     "redirectUri", "https://redirect")));
     when(tenantSsoConfigMapper.selectOne(any())).thenReturn(config);
-    when(authCryptoClient.decryptSsoClientSecret("tenant-1", "ENCv1:secret")).thenReturn("secret");
+    when(localCryptoService.decryptSsoClientSecret("tenant-1", "ENCv1:secret"))
+        .thenReturn("secret");
 
     DingtalkUserInfo userInfo = new DingtalkUserInfo("union-001", "{\"unionId\":\"union-001\"}");
     when(dingtalkBindingClient.fetchUserInfo("client", "secret", "code-001")).thenReturn(userInfo);
@@ -166,7 +167,8 @@ class SsoIdentityServiceImplTest {
                     "clientSecret", "ENCv1:secret",
                     "redirectUri", "https://redirect")));
     when(tenantSsoConfigMapper.selectOne(any())).thenReturn(config);
-    when(authCryptoClient.decryptSsoClientSecret("tenant-1", "ENCv1:secret")).thenReturn("secret");
+    when(localCryptoService.decryptSsoClientSecret("tenant-1", "ENCv1:secret"))
+        .thenReturn("secret");
 
     DingtalkUserInfo userInfo = new DingtalkUserInfo("union-001", "{\"unionId\":\"union-001\"}");
     when(dingtalkBindingClient.fetchUserInfo("client", "secret", "code-001")).thenReturn(userInfo);

@@ -7,9 +7,9 @@ import { drawerWidthClassMap,iconSizeToken } from '@/design-tokens/dimensions'
 import { fetchMetricVersion,fetchMetricVersionNumbers,switchMetricVersion as apiSwitchMetricVersion } from '@/services/oneMetaSemanticService'
 import { formatTime } from '@/utils'
 
-/** Indicator type label mapping */
+/** Metric type label mapping */
 const TYPE_LABELS:Record<string,{ label:string;variant:'blue' | 'purple' | 'warning' }> = {
- ATOMIC:{ label:'Atomic indicators',variant:'blue' },DERIVED:{ label:'Derived indicators',variant:'purple' },COMPOSITE:{ label:'Composite indicator',variant:'warning' }
+ ATOMIC:{ label:'Atomic Metric',variant:'blue' },DERIVED:{ label:'Derived Metric',variant:'purple' },COMPOSITE:{ label:'Composite Metric',variant:'warning' }
 }
 
 const skeletonBaseClassName = 'inline-block animate-pulse rounded bg-slate-200/70 dark:bg-slate-700/40'
@@ -130,19 +130,19 @@ export function MetricOverview({ metric,onClose,onVersionSwitch }:MetricOverview
  const typeInfo = TYPE_LABELS[typeKey] || { label:typeKey || '-',variant:'blue' as const }
 
  return createPortal(<aside className={`fixed right-0 top-14 bottom-0 z-30 ${drawerWidthClassMap.responsive} bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col animate-in slide-in-from-right duration-500`}>
- {/* head:height and"indicator center"List page header alignment */}
+ {/* header height aligns with Metric Center list page */}
  <div className="h-12 md:h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 md:px-6 flex items-center justify-between flex-shrink-0 shadow-sm">
  <div className="flex items-center gap-2">
  <div className="p-1.5 bg-purple-600 text-white rounded-lg shadow-sm">
  <Target size={iconSizeToken.medium} />
  </div>
- <h2 className="text-body-sm font-semibold text-slate-800 dark:text-slate-100">Indicator details</h2>
+ <h2 className="text-body-sm font-semibold text-slate-800 dark:text-slate-100">Metric details</h2>
  </div>
  <button
  type="button"
  onClick={onClose}
  className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
- aria-label="Close indicator details"
+ aria-label="Close metric details"
  >
  <X size={iconSizeToken.large} className="text-slate-400" />
  </button>
@@ -150,7 +150,7 @@ export function MetricOverview({ metric,onClose,onVersionSwitch }:MetricOverview
 
  {/* content area */}
  <div className="flex-1 min-h-0 overflow-auto p-6 custom-scrollbar">
- {/* Indicator name and type */}
+ {/* Metric name and type */}
  <div className="mb-6">
  <div className="flex items-center gap-2 mb-2">
  <h1 className="text-heading font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
@@ -188,7 +188,7 @@ export function MetricOverview({ metric,onClose,onVersionSwitch }:MetricOverview
  </div>
  <div className="grid grid-cols-2 gap-3">
  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
- <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">Indicator type</div>
+ <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">Metric type</div>
  <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">
  {loading?<SkeletonBlock className="h-5 w-16" />:typeKey || '-'}
  </div>

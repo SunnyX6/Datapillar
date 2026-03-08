@@ -32,7 +32,7 @@ import com.sunny.datapillar.studio.module.tenant.entity.TenantSsoConfig;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantSsoConfigMapper;
 import com.sunny.datapillar.studio.module.tenant.service.TenantCodeResolver;
 import com.sunny.datapillar.studio.module.tenant.service.sso.SsoConfigService;
-import com.sunny.datapillar.studio.rpc.crypto.AuthCryptoRpcClient;
+import com.sunny.datapillar.studio.security.crypto.LocalCryptoService;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -58,7 +58,7 @@ public class SsoConfigServiceImpl implements SsoConfigService {
   private static final int STATUS_DISABLED = 0;
 
   private final TenantSsoConfigMapper tenantSsoConfigMapper;
-  private final AuthCryptoRpcClient authCryptoClient;
+  private final LocalCryptoService localCryptoService;
   private final TenantCodeResolver tenantCodeResolver;
   private final ObjectMapper objectMapper;
   private final StudioDbExceptionTranslator studioDbExceptionTranslator;
@@ -272,7 +272,7 @@ public class SsoConfigServiceImpl implements SsoConfigService {
 
   private String encryptClientSecret(String tenantCode, String secret) {
     try {
-      return authCryptoClient.encryptSsoClientSecret(tenantCode, secret);
+      return localCryptoService.encryptSsoClientSecret(tenantCode, secret);
     } catch (IllegalArgumentException ex) {
       throw new SsoConfigInvalidException(ex);
     }

@@ -20,8 +20,8 @@ public class SystemBootstrap {
   @TableId(type = IdType.INPUT)
   private Integer id;
 
-  @TableField("setup_completed")
-  private Integer setupCompleted;
+  @TableField("status")
+  private Integer status;
 
   @TableField("setup_tenant_id")
   private Long setupTenantId;

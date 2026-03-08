@@ -1,6 +1,6 @@
 export const API_BASE = {
-  login: '/api/login',
-  auth: '/api/auth',
+  login: '/api/auth/session',
+  auth: '/api/auth/session',
   studioSetup: '/api/studio/setup',
   studioBiz: '/api/studio/biz',
   studioAdmin: '/api/studio/admin',
@@ -10,20 +10,22 @@ export const API_BASE = {
   aiWorkflow: '/api/ai/biz/etl',
   aiMetric: '/api/ai/biz/governance/metric',
   aiLlmPlayground: '/api/ai/admin/llms',
-  governanceMetadata: '/api/studio/biz/governance/metadata',
-  governanceSemantic: '/api/studio/biz/governance/semantic',
+  governanceMetadata: '/api/studio/biz/metadata',
+  governanceMetadataAdmin: '/api/studio/admin/metadata',
+  governanceSemantic: '/api/studio/biz/semantic',
+  governanceSemanticAdmin: '/api/studio/admin/semantic',
   studioActuator: '/api/studio/actuator'
 } as const
 
 export const API_PATH = {
   login: {
-    root: '',
+    root: '/login',
     logout: '/logout',
-    sso: '/sso'
+    sso: '/oauth2/login'
   },
   auth: {
     refresh: '/refresh',
-    validate: '/validate'
+    validate: '/context'
   },
   setup: {
     root: '',

@@ -62,6 +62,14 @@ public interface MetadataObject {
     ROLE,
     /** A model is mapped to the model artifact in ML. */
     MODEL,
+    /** A metric is mapped to a semantic metric asset. */
+    METRIC,
+    /** A word root is mapped to a semantic word root asset. */
+    WORDROOT,
+    /** A unit is mapped to a semantic unit asset. */
+    UNIT,
+    /** A modifier is mapped to a semantic metric modifier asset. */
+    MODIFIER,
     /** A value domain defines a set of valid values for columns or fields. */
     VALUE_DOMAIN
   }

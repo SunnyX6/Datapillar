@@ -16,7 +16,10 @@ from typing import Any
 from sqlalchemy import text
 
 from src.infrastructure.database.mysql import MySQLClient
-from src.infrastructure.rpc.crypto import auth_crypto_rpc_client, is_encrypted_ciphertext
+from src.infrastructure.keystore.crypto_service import (
+    is_encrypted_ciphertext,
+    local_crypto_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -122,12 +125,12 @@ class ModelNew:
             return None
 
     @staticmethod
-    def decrypt_api_key(*, tenant_code: str, encrypted_value: str | None) -> str:
+    def decrypt_key(*, tenant_code: str, encrypted_value: str | None) -> str:
         if not encrypted_value or not encrypted_value.strip():
             raise ValueError("api_key is empty")
         if not is_encrypted_ciphertext(encrypted_value):
             raise ValueError("api_key is not encrypted")
-        return auth_crypto_rpc_client.decrypt_llm_api_key_sync(
+        return local_crypto_service.decrypt_key(
             tenant_code=tenant_code,
             ciphertext=encrypted_value,
         )

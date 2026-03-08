@@ -19,13 +19,13 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 import com.google.common.collect.ImmutableList;
+import java.lang.reflect.Proxy;
 import java.util.Collections;
 import java.util.List;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -55,6 +55,7 @@ public class TestUserEvent {
   private NameIdentifier otherIdentifier;
   private NameIdentifier inExistIdentifier;
   private List<String> grantedRoles;
+  private List<String> replacedRoles;
   private List<String> revokedRoles;
 
   @BeforeAll
@@ -68,6 +69,7 @@ public class TestUserEvent {
     this.otherIdentifier = NameIdentifierUtil.ofUser(METALAKE, otherUserName);
     this.inExistIdentifier = NameIdentifierUtil.ofUser(METALAKE, inExistUserName);
     this.grantedRoles = ImmutableList.of("test", "engineer");
+    this.replacedRoles = ImmutableList.of("engineer");
     this.revokedRoles = ImmutableList.of("admin", "scientist");
 
     this.dummyEventListener = new DummyEventListener();
@@ -75,8 +77,6 @@ public class TestUserEvent {
     this.dispatcher = new AccessControlEventDispatcher(eventBus, mockUserDispatcher());
     this.failureDispatcher =
         new AccessControlEventDispatcher(eventBus, mockExceptionUserDispatcher());
-
-    System.out.println(failureDispatcher);
   }
 
   @Test
@@ -418,6 +418,56 @@ public class TestUserEvent {
   }
 
   @Test
+  void testReplaceRolesUserPreEvent() {
+    dispatcher.replaceRolesForUser(METALAKE, replacedRoles, userName);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(ReplaceUserRolesPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+    Assertions.assertEquals(OperationType.REPLACE_USER_ROLES, preEvent.operationType());
+
+    ReplaceUserRolesPreEvent replaceUserRolesEvent = (ReplaceUserRolesPreEvent) preEvent;
+    Assertions.assertEquals(identifier, replaceUserRolesEvent.identifier());
+    Assertions.assertEquals(userName, replaceUserRolesEvent.userName());
+    Assertions.assertEquals(replacedRoles, replaceUserRolesEvent.roles());
+  }
+
+  @Test
+  void testReplaceRolesUserEvent() {
+    dispatcher.replaceRolesForUser(METALAKE, replacedRoles, userName);
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ReplaceUserRolesEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.REPLACE_USER_ROLES, event.operationType());
+
+    ReplaceUserRolesEvent replaceUserRolesEvent = (ReplaceUserRolesEvent) event;
+    Assertions.assertEquals(identifier, replaceUserRolesEvent.identifier());
+    validateUserInfo(replaceUserRolesEvent.replacedUserInfo(), user);
+    Assertions.assertEquals(replacedRoles, replaceUserRolesEvent.roles());
+  }
+
+  @Test
+  void testReplaceRolesUserFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.replaceRolesForUser(METALAKE, replacedRoles, inExistUserName));
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ReplaceUserRolesFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.REPLACE_USER_ROLES, event.operationType());
+
+    ReplaceUserRolesFailureEvent replaceUserRolesFailureEvent =
+        (ReplaceUserRolesFailureEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofUser(METALAKE, inExistUserName),
+        replaceUserRolesFailureEvent.identifier());
+    Assertions.assertEquals(inExistUserName, replaceUserRolesFailureEvent.userName());
+    Assertions.assertEquals(replacedRoles, replaceUserRolesFailureEvent.roles());
+  }
+
+  @Test
   void testRevokeRolesUserPreEvent() {
     dispatcher.revokeRolesFromUser(METALAKE, revokedRoles, otherUserName);
 
@@ -471,43 +521,75 @@ public class TestUserEvent {
     Assertions.assertEquals(revokedRoles, revokeUserRolesFailureEvent.roles());
   }
 
-  private AccessControlEventDispatcher mockUserDispatcher() {
-    AccessControlEventDispatcher dispatcher = mock(AccessControlEventDispatcher.class);
-    when(dispatcher.addUser(METALAKE, userName)).thenReturn(user);
-    when(dispatcher.addUser(METALAKE, otherUserName)).thenReturn(otherUser);
-
-    when(dispatcher.removeUser(METALAKE, userName)).thenReturn(true);
-    when(dispatcher.removeUser(METALAKE, inExistUserName)).thenReturn(false);
-
-    when(dispatcher.listUsers(METALAKE)).thenReturn(new User[] {user, otherUser});
-    when(dispatcher.listUserNames(METALAKE)).thenReturn(new String[] {userName, otherUserName});
-
-    when(dispatcher.getUser(METALAKE, userName)).thenReturn(user);
-    when(dispatcher.getUser(METALAKE, inExistUserName))
-        .thenThrow(new NoSuchUserException("user not found"));
-    when(dispatcher.getUser(INEXIST_METALAKE, userName))
-        .thenThrow(new NoSuchMetalakeException("user not found"));
-    when(dispatcher.grantRolesToUser(METALAKE, grantedRoles, userName)).thenReturn(user);
-    when(dispatcher.revokeRolesFromUser(METALAKE, revokedRoles, otherUserName))
-        .thenReturn(otherUser);
-
-    return dispatcher;
+  private AccessControlDispatcher mockUserDispatcher() {
+    return (AccessControlDispatcher)
+        Proxy.newProxyInstance(
+            AccessControlDispatcher.class.getClassLoader(),
+            new Class[] {AccessControlDispatcher.class},
+            (proxy, method, args) -> {
+              String methodName = method.getName();
+              switch (methodName) {
+                case "addUser":
+                  return userName.equals(args[1]) ? user : otherUser;
+                case "removeUser":
+                  return !inExistUserName.equals(args[1]);
+                case "listUsers":
+                  return new User[] {user, otherUser};
+                case "listUserNames":
+                  return new String[] {userName, otherUserName};
+                case "getUser":
+                  if (INEXIST_METALAKE.equals(args[0])) {
+                    throw new NoSuchMetalakeException("user not found");
+                  }
+                  if (inExistUserName.equals(args[1])) {
+                    throw new NoSuchUserException("user not found");
+                  }
+                  return user;
+                case "grantRolesToUser":
+                  return user;
+                case "replaceRolesForUser":
+                  return user;
+                case "revokeRolesFromUser":
+                  return otherUser;
+                case "hashCode":
+                  return System.identityHashCode(proxy);
+                case "equals":
+                  return proxy == args[0];
+                case "toString":
+                  return "TestUserEventAccessControlDispatcher";
+                default:
+                  throw new UnsupportedOperationException(methodName);
+              }
+            });
   }
 
-  private AccessControlEventDispatcher mockExceptionUserDispatcher() {
-    return mock(
-        AccessControlEventDispatcher.class,
-        invocation -> {
-          throw new GravitinoRuntimeException("Exception for all methods");
-        });
+  private AccessControlDispatcher mockExceptionUserDispatcher() {
+    return (AccessControlDispatcher)
+        Proxy.newProxyInstance(
+            AccessControlDispatcher.class.getClassLoader(),
+            new Class[] {AccessControlDispatcher.class},
+            (proxy, method, args) -> {
+              throw new GravitinoRuntimeException("Exception for all methods");
+            });
   }
 
   private User getMockUser(String name, List<String> roles) {
-    User user = mock(User.class);
-    when(user.name()).thenReturn(name);
-    when(user.roles()).thenReturn(roles);
+    return new User() {
+      @Override
+      public String name() {
+        return name;
+      }
 
-    return user;
+      @Override
+      public List<String> roles() {
+        return roles;
+      }
+
+      @Override
+      public Audit auditInfo() {
+        return null;
+      }
+    };
   }
 
   private void validateUserInfo(UserInfo userInfo, User expectedUser) {

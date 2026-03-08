@@ -26,7 +26,9 @@ import static org.apache.gravitino.authorization.AuthorizationUtils.filterSecura
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -146,6 +148,71 @@ class PermissionManager {
     } catch (IOException ioe) {
       LOG.error(
           "Failed to grant role {} to user {} in the metalake {} due to storage issues",
+          StringUtils.join(roles, ","),
+          user,
+          metalake,
+          ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  User replaceRolesForUser(String metalake, List<String> roles, String user) {
+    try {
+      List<RoleEntity> targetRoleEntities = resolveRoleEntities(metalake, roles);
+      UserRoleReplaceContext roleReplaceContext = new UserRoleReplaceContext();
+
+      User updatedUser =
+          store.update(
+              AuthorizationUtils.ofUser(metalake, user),
+              UserEntity.class,
+              Entity.EntityType.USER,
+              userEntity -> {
+                List<RoleEntity> currentRoleEntities = getUserRoleEntities(metalake, userEntity);
+                Map<String, RoleEntity> currentRolesByName = toRoleEntityMap(currentRoleEntities);
+                Map<String, RoleEntity> targetRolesByName = toRoleEntityMap(targetRoleEntities);
+
+                roleReplaceContext.rolesToGrant =
+                    targetRoleEntities.stream()
+                        .filter(roleEntity -> !currentRolesByName.containsKey(roleEntity.name()))
+                        .collect(Collectors.toList());
+                roleReplaceContext.rolesToRevoke =
+                    currentRoleEntities.stream()
+                        .filter(roleEntity -> !targetRolesByName.containsKey(roleEntity.name()))
+                        .collect(Collectors.toList());
+
+                AuditInfo auditInfo =
+                    AuditInfo.builder()
+                        .withCreator(userEntity.auditInfo().creator())
+                        .withCreateTime(userEntity.auditInfo().createTime())
+                        .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                        .withLastModifiedTime(Instant.now())
+                        .build();
+
+                return UserEntity.builder()
+                    .withNamespace(userEntity.namespace())
+                    .withId(userEntity.id())
+                    .withName(userEntity.name())
+                    .withRoleNames(toRoleNames(targetRoleEntities))
+                    .withRoleIds(toRoleIds(targetRoleEntities))
+                    .withAuditInfo(auditInfo)
+                    .build();
+              });
+
+      notifyGrantedRolesToUser(metalake, roleReplaceContext.rolesToGrant, updatedUser);
+      notifyRevokedRolesFromUser(metalake, roleReplaceContext.rolesToRevoke, updatedUser);
+      return updatedUser;
+    } catch (NoSuchEntityException nse) {
+      LOG.warn(
+          "Failed to replace roles, user {} does not exist in the metalake {}",
+          user,
+          metalake,
+          nse);
+      throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
+    } catch (NoSuchRoleException nsr) {
+      throw new IllegalRoleException(nsr);
+    } catch (IOException ioe) {
+      LOG.error(
+          "Failed to replace roles {} for user {} in the metalake {} due to storage issues",
           StringUtils.join(roles, ","),
           user,
           metalake,
@@ -700,6 +767,84 @@ class PermissionManager {
     return updateSecurableObjects;
   }
 
+  private List<RoleEntity> resolveRoleEntities(String metalake, List<String> roles)
+      throws NoSuchRoleException {
+    List<RoleEntity> roleEntities = Lists.newArrayList();
+    for (String role : roles) {
+      TreeLockUtils.doWithTreeLock(
+          AuthorizationUtils.ofRole(metalake, role),
+          LockType.READ,
+          () -> roleEntities.add(roleManager.getRole(metalake, role)));
+    }
+    return deduplicateRoleEntities(roleEntities);
+  }
+
+  private List<RoleEntity> getUserRoleEntities(String metalake, UserEntity userEntity)
+      throws NoSuchRoleException {
+    List<RoleEntity> roleEntities = Lists.newArrayList();
+    if (userEntity.roleNames() != null) {
+      for (String role : userEntity.roleNames()) {
+        roleEntities.add(roleManager.getRole(metalake, role));
+      }
+    }
+    return deduplicateRoleEntities(roleEntities);
+  }
+
+  private List<RoleEntity> deduplicateRoleEntities(List<RoleEntity> roleEntities) {
+    return Lists.newArrayList(toRoleEntityMap(roleEntities).values());
+  }
+
+  private Map<String, RoleEntity> toRoleEntityMap(List<RoleEntity> roleEntities) {
+    Map<String, RoleEntity> roleEntitiesByName = new LinkedHashMap<>();
+    for (RoleEntity roleEntity : roleEntities) {
+      roleEntitiesByName.putIfAbsent(roleEntity.name(), roleEntity);
+    }
+    return roleEntitiesByName;
+  }
+
+  private void notifyGrantedRolesToUser(String metalake, List<RoleEntity> roleEntities, User user) {
+    if (roleEntities.isEmpty()) {
+      return;
+    }
+
+    List<SecurableObject> securableObjects = Lists.newArrayList();
+    for (Role roleEntity : roleEntities) {
+      securableObjects.addAll(roleEntity.securableObjects());
+    }
+
+    AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
+        metalake,
+        securableObjects,
+        (authorizationPlugin, catalogName) ->
+            authorizationPlugin.onGrantedRolesToUser(
+                roleEntities.stream()
+                    .map(roleEntity -> filterSecurableObjects(roleEntity, metalake, catalogName))
+                    .collect(Collectors.toList()),
+                user));
+  }
+
+  private void notifyRevokedRolesFromUser(
+      String metalake, List<RoleEntity> roleEntities, User user) {
+    if (roleEntities.isEmpty()) {
+      return;
+    }
+
+    List<SecurableObject> securableObjects = Lists.newArrayList();
+    for (Role roleEntity : roleEntities) {
+      securableObjects.addAll(roleEntity.securableObjects());
+    }
+
+    AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
+        metalake,
+        securableObjects,
+        (authorizationPlugin, catalogName) ->
+            authorizationPlugin.onRevokedRolesFromUser(
+                roleEntities.stream()
+                    .map(roleEntity -> filterSecurableObjects(roleEntity, metalake, catalogName))
+                    .collect(Collectors.toList()),
+                user));
+  }
+
   private static class AuthorizationPluginCallbackWrapper {
     private Runnable callback;
 
@@ -720,5 +865,10 @@ class PermissionManager {
 
   private List<String> toRoleNames(List<RoleEntity> roleEntities) {
     return roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList());
+  }
+
+  private static class UserRoleReplaceContext {
+    private List<RoleEntity> rolesToGrant = Lists.newArrayList();
+    private List<RoleEntity> rolesToRevoke = Lists.newArrayList();
   }
 }

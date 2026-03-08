@@ -37,11 +37,12 @@ public interface TenantRoleAdminService {
 
   void updateRolePermissions(Long roleId, List<RoleFeatureAssignmentItem> permissions);
 
+  List<RoleDataPrivilegeItem> getRoleDataPrivileges(Long roleId, String domain);
+
+  void replaceRoleDataPrivileges(
+      Long roleId, String domain, List<RoleDataPrivilegeCommandItem> commands);
+
   RoleMembersResponse getRoleMembers(Long roleId, Integer status);
 
   void removeRoleMembers(Long roleId, List<Long> userIds);
-
-  List<RoleDataPrivilegeItem> getRoleDataPrivileges(Long roleId, String domain);
-
-  void updateRoleDataPrivileges(Long roleId, RoleDataPrivilegeSyncRequest request);
 }

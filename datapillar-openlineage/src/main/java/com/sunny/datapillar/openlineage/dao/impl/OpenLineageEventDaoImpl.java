@@ -8,7 +8,7 @@ import com.sunny.datapillar.openlineage.model.AsyncTaskAttemptRecord;
 import com.sunny.datapillar.openlineage.model.AsyncTaskCandidate;
 import com.sunny.datapillar.openlineage.model.AsyncTaskRecord;
 import com.sunny.datapillar.openlineage.model.AsyncTaskType;
-import com.sunny.datapillar.openlineage.model.LineageEventRecord;
+import com.sunny.datapillar.openlineage.model.OpenLineageEventRecord;
 import com.sunny.datapillar.openlineage.model.OpenLineageEventEnvelope;
 import com.sunny.datapillar.openlineage.security.TenantContext;
 import io.openlineage.client.OpenLineage;
@@ -254,8 +254,8 @@ public class OpenLineageEventDaoImpl implements OpenLineageEventDao {
       throw new OpenLineageWriteException("lineage Event storage parameters are missing");
     }
 
-    LineageEventRecord record =
-        LineageEventRecord.builder()
+    OpenLineageEventRecord record =
+        OpenLineageEventRecord.builder()
             .tenantId(tenantContext.tenantId())
             .tenantCode(requireText(tenantContext.tenantCode(), "tenantCode"))
             .tenantName(requireText(tenantContext.tenantName(), "tenantName"))

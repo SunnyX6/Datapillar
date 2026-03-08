@@ -1,0 +1,283 @@
+{
+  "layout": {
+    "membersTotal": "Total {{count}} members",
+    "inviteMembers": "Invite members"
+  },
+  "tabs": {
+    "members": "Member list",
+    "functional": "Function permissions"
+  },
+  "roleList": {
+    "title": "Identity role",
+    "addRoleAria": "Add new role",
+    "searchPlaceholder": "Search role name...",
+    "systemNoEdit": "Platform super management roles cannot be edited.",
+    "systemNoDelete": "Platform super management roles cannot be deleted.",
+    "hasMembersCannotDelete": "There are members under this role and it cannot be deleted.",
+    "editRole": "Edit role",
+    "deleteRole": "Delete role",
+    "membersCount": "{{count}} members",
+    "saveChanges": "Save changes",
+    "saving": "Saving...",
+    "confirmDeleteMessage": "Confirm deleting role \"{{roleName}}\"? This action cannot be undone.",
+    "confirmDelete": "Confirm deletion",
+    "deleteTip": "After deletion, the permission configuration of this role cannot be restored.",
+    "editRoleAria": "Edit role {{roleName}}",
+    "deleteRoleAria": "Delete role {{roleName}}"
+  },
+  "createRole": {
+    "title": "Add new role",
+    "submit": "Create role",
+    "submitting": "Submitting...",
+    "roleTypeHintPrefix": "Role types only support",
+    "roleTypeHintAnd": "and",
+    "nameLabel": "Role name",
+    "namePlaceholder": "Please enter a role name",
+    "typeLabel": "Role type",
+    "typeAdminDescription": "Suitable for administrators, owners, and other high-privilege roles",
+    "typeUserDescription": "Default READ privileges (except management/definition), preserving Personal Center",
+    "descriptionLabel": "Role description (optional)",
+    "descriptionPlaceholder": "Please enter a role description",
+    "errors": {
+      "nameRequired": "Role name cannot be empty",
+      "nameTooLong": "Role name cannot exceed {{max}} characters",
+      "descriptionTooLong": "Role description cannot exceed {{max}} characters",
+      "nameDuplicate": "Role name already exists, please change it"
+    }
+  },
+  "membersList": {
+    "title": "Member list",
+    "descriptionPrefix": "Manage members under",
+    "descriptionSuffix": "",
+    "searchPlaceholder": "Search members...",
+    "addMember": "Add member",
+    "columns": {
+      "user": "User",
+      "department": "Department",
+      "status": "Permission status",
+      "activeTime": "Active time",
+      "operation": "Operation"
+    },
+    "emptyTitle": "No members yet",
+    "inviteNow": "Invite now",
+    "platformSuperAdmin": "Platform super admin",
+    "configurePermission": "Configure permissions",
+    "selected": "Selected",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "batchDelete": "Batch delete",
+    "selectAllAria": "Select all members",
+    "batchDeleteAria": "Delete selected members in batch",
+    "closeBulkActionsAria": "Close bulk operations",
+    "status": {
+      "activated": "Activated",
+      "invited": "Invited",
+      "disabled": "Disabled"
+    }
+  },
+  "inviteMember": {
+    "title": "Invite members",
+    "linkTitle": "Exclusive invitation link",
+    "generating": "Generating invitation link...",
+    "generateEmpty": "Invitation link generation failed. Please close and retry",
+    "copyAria": "Copy invitation link",
+    "copied": "Invitation link copied",
+    "copyHint": "Copy and send to members",
+    "securityTipPrefix": "Members with this link will automatically receive all permissions of role",
+    "securityTipSuffix": ". Keep it secure.",
+    "confirmClose": "Confirm and close",
+    "toast": {
+      "generateFailed": "Failed to generate invitation link: {{message}}"
+    }
+  },
+  "addMember": {
+    "title": "Add member",
+    "addTo": "Add to",
+    "tabs": {
+      "orgStructure": "Organization structure",
+      "thirdPartySync": "Third-party sync",
+      "auto": "Auto"
+    },
+    "provider": {
+      "dingtalk": "DingTalk",
+      "feishu": "Feishu"
+    },
+    "orgUnits": {
+      "all": "All members",
+      "product": "Product Design Center",
+      "risk": "Compliance and Risk Control Department",
+      "biz": "Commercialization Team",
+      "rd": "Platform R&D Department",
+      "sre": "Operation and Maintenance Department"
+    },
+    "config": {
+      "returnToSourceList": "Return to source list",
+      "title": "Configure {{provider}} connection",
+      "subtitle": "Please enter your {{provider}} application credentials to complete authorization.",
+      "agentId": "Agent ID",
+      "appId": "App ID",
+      "agentIdPlaceholder": "For example: 23456789",
+      "appIdPlaceholder": "For example: cli_a1b2c3d4e5",
+      "appKey": "App Key",
+      "appKeyPlaceholder": "Enter App Key",
+      "appSecret": "App Secret",
+      "appSecretPlaceholder": "Enter App Secret",
+      "saveAndConnect": "Save and connect",
+      "howToGetInfo": "How to get this information?"
+    },
+    "departmentFilter": "Department filter",
+    "searchPlaceholder": "Search name or email...",
+    "columns": {
+      "nameDepartment": "Name / Department",
+      "email": "Email"
+    },
+    "noMatchingMember": "No matching member found",
+    "selectedCount": "Selected {{count}} members",
+    "actions": {
+      "clear": "Clear",
+      "confirmAdd": "Confirm add"
+    },
+    "import": {
+      "title": "Synchronize organization structure",
+      "subtitle": "Connect your OA platform to sync departments and members in real time.",
+      "wecom": {
+        "name": "Enterprise WeChat",
+        "syncTime": "Today 09:30",
+        "memberCount": "128 members"
+      },
+      "status": {
+        "connected": "Connected",
+        "notConfigured": "Not configured"
+      },
+      "actions": {
+        "syncing": "Synchronizing",
+        "sync": "Sync",
+        "goToConfig": "Go to configuration"
+      },
+      "dingtalkDesc": "Supports syncing departments, staff, and role groups.",
+      "feishuDesc": "Supports syncing organization structure and document permissions."
+    },
+    "assistance": {
+      "prefix": "Need assistance? View",
+      "guide": "Configuration Guide",
+      "or": "or",
+      "support": "Contact technical support"
+    }
+  },
+  "userDrawer": {
+    "title": "{{userName}} Permission configuration",
+    "roleLabel": "Role:",
+    "departmentLabel": "Department: {{department}}",
+    "closeAria": "Close",
+    "tabs": {
+      "data": "Data permissions (Gravitino)",
+      "ai": "AI model permissions"
+    },
+    "footer": {
+      "immediateEffect": "Modifications take effect immediately",
+      "complete": "Complete configuration"
+    },
+    "error": {
+      "userIdInvalid": "User ID is invalid"
+    },
+    "toast": {
+      "userIdInvalid": "User ID is invalid, unable to configure model permissions",
+      "modelNotFound": "Model not found, unable to configure permissions",
+      "updateFailed": "Failed to update user AI model permissions: {{message}}"
+    }
+  },
+  "aiPermission": {
+    "subject": {
+      "user": "This user",
+      "role": "This role"
+    },
+    "level": {
+      "disable": "Disable",
+      "read": "Read",
+      "admin": "Admin"
+    },
+    "userMode": {
+      "title": "Independent permission mode",
+      "subtitle": "You are configuring AI model permissions for this user individually."
+    },
+    "loading": "Loading model permissions...",
+    "errorPrefix": "Failed to load model permissions: {{message}}",
+    "retry": "Try again",
+    "empty": "No configurable AI models",
+    "modelStatus": {
+      "active": "Connected",
+      "inactive": "Not connected",
+      "unknown": "Unknown status"
+    },
+    "modelTypeUnknown": "UNKNOWN",
+    "metric": {
+      "callTimes": "{{value}} calls",
+      "tokenTotal": "Tokens {{value}}",
+      "costUsd": "Cost ${{value}}",
+      "tokenTotalLabel": "Total tokens"
+    },
+    "statistics": {
+      "ready": "Statistics connected (Basic version)",
+      "pending": "Statistics interface pending"
+    },
+    "switch": {
+      "allow": "Allow",
+      "deny": "Deny"
+    },
+    "governance": {
+      "title": "Governance Gateway",
+      "description": "{{subject}} AI traffic is intercepted in real time by the unified policy gateway, with automatic desensitization, prompt-injection interception, and policy audit tracing."
+    }
+  },
+  "dataPermission": {
+    "resourceTopology": "Resource topology",
+    "noDescription": "No description",
+    "aclContext": "ACL context",
+    "authorizeCount": "{{selected}} / {{total}} authorized",
+    "highRisk": "High risk",
+    "switch": {
+      "allow": "Allow",
+      "deny": "Deny",
+      "sr": "Use setting"
+    },
+    "emptySelectPrompt": "Please select data assets on the left to configure.",
+    "assetType": {
+      "metalake": "Metalake",
+      "catalog": "Catalog",
+      "schema": "Schema",
+      "table": "Table",
+      "column": "Column"
+    },
+    "group": {
+      "metadata": {
+        "title": "Metadata access",
+        "usageDesc": "Allow viewing {{typeLabel}} properties, configuration, and metadata.",
+        "selectDesc": "Allow reading {{typeLabel}} metadata and all resources under it.",
+        "selectTableDesc": "Allow querying table rows."
+      },
+      "dataManage": {
+        "title": "Resource and data management",
+        "createDesc": "Allow creating new {{childTypeLabel}} resources under {{typeLabel}}.",
+        "createTableDesc": "Allow creating subpartitions or indexes.",
+        "modifyDesc": "Allow UPDATE / INSERT data modification operations.",
+        "alterDesc": "Allow altering {{typeLabel}} structure (such as adding columns or editing properties)."
+      },
+      "danger": {
+        "title": "High-risk operations",
+        "dropDesc": "High risk: allow permanently deleting this {{typeLabel}} and all contained objects."
+      }
+    }
+  },
+  "functionalPermission": {
+    "level": {
+      "disable": "Disable",
+      "read": "Read",
+      "admin": "Admin"
+    },
+    "actions": {
+      "expandChildren": "Expand child nodes",
+      "collapseChildren": "Collapse child nodes"
+    },
+    "objectMetaFallback": "Object information not configured"
+  }
+}

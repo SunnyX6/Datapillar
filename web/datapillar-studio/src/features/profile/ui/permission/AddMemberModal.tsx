@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
  ArrowRight,Building2,Check,CheckCircle2,ChevronLeft,Globe,Key,LayoutGrid,Loader2,Lock,RefreshCw,Search,UserPlus,X
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ThirdPartyIcons } from '@/components'
 import { Button,Modal } from '@/components/ui'
 import { tableColumnWidthClassMap } from '@/design-tokens/dimensions'
@@ -30,6 +31,7 @@ const ROLE_DEPARTMENT_MAP:Record<string,string> = {
 }
 
 export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMemberModalProps) {
+ const { t } = useTranslation('permission')
  const [activeTab,setActiveTab] = useState<'platform' | 'import'>('platform')
  const [configProvider,setConfigProvider] = useState<ConfigProvider | null>(null)
  const [isSyncing,setIsSyncing] = useState(false)
@@ -45,7 +47,7 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  return acc
  },{})
  },[availableUsers])
- const orgUnits = useMemo<Array<{ id:string;name:string;count:number;icon:LucideIcon }>>(() => [{ id:'all',name:'all members',count:availableUsers.length,icon:LayoutGrid },{ id:'product',name:'Product Design Center',count:departmentCounts['Product Design Center']?? 0,icon:Building2 },{ id:'risk',name:'Compliance and Risk Control Department',count:departmentCounts['Compliance and Risk Control Department']?? 0,icon:Building2 },{ id:'biz',name:'Commercialization team',count:departmentCounts['Commercialization team']?? 0,icon:Building2 },{ id:'rd',name:'Platform R&D Department',count:departmentCounts['Platform R&D Department']?? 0,icon:Building2 },{ id:'sre',name:'Operation and Maintenance Department',count:departmentCounts['Operation and Maintenance Department']?? 0,icon:Building2 }],[availableUsers.length,departmentCounts])
+ const orgUnits = useMemo<Array<{ id:string;name:string;count:number;icon:LucideIcon }>>(() => [{ id:'all',name:t('addMember.orgUnits.all'),count:availableUsers.length,icon:LayoutGrid },{ id:'product',name:t('addMember.orgUnits.product'),count:departmentCounts['Product Design Center']?? 0,icon:Building2 },{ id:'risk',name:t('addMember.orgUnits.risk'),count:departmentCounts['Compliance and Risk Control Department']?? 0,icon:Building2 },{ id:'biz',name:t('addMember.orgUnits.biz'),count:departmentCounts['Commercialization team']?? 0,icon:Building2 },{ id:'rd',name:t('addMember.orgUnits.rd'),count:departmentCounts['Platform R&D Department']?? 0,icon:Building2 },{ id:'sre',name:t('addMember.orgUnits.sre'),count:departmentCounts['Operation and Maintenance Department']?? 0,icon:Building2 }],[availableUsers.length,departmentCounts,t])
  const [allUnit,...departmentUnits] = orgUnits
  const filteredUsers = useMemo(() => {
  const scopedUsers =
@@ -96,7 +98,7 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  onClick={() => setConfigProvider(null)}
  >
  <ChevronLeft size={16} />
- <span className={cn(TYPOGRAPHY.bodySm,'font-medium')}>Return to source list</span>
+ <span className={cn(TYPOGRAPHY.bodySm,'font-medium')}>{t('addMember.config.returnToSourceList')}</span>
  </button>
 
  <div className="flex items-center gap-4 mb-6">
@@ -105,65 +107,65 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  </div>
  <div>
  <h3 className={cn(TYPOGRAPHY.subtitle,'font-bold text-slate-900 dark:text-white')}>
- Configuration {configProvider === 'DingTalk'?'DingTalk':'Feishu'} connect
+ {t('addMember.config.title', { provider: configProvider === 'DingTalk' ? t('addMember.provider.dingtalk') : t('addMember.provider.feishu') })}
  </h3>
  <p className={cn(TYPOGRAPHY.caption,'text-slate-500 dark:text-slate-400 mt-1')}>
- Please enter your business {configProvider === 'DingTalk'?'DingTalk':'Feishu'} Apply credentials to complete authorization.</p>
+ {t('addMember.config.subtitle', { provider: configProvider === 'DingTalk' ? t('addMember.provider.dingtalk') : t('addMember.provider.feishu') })}</p>
  </div>
  </div>
 
  <div className="space-y-4">
  <div>
  <label className={cn(TYPOGRAPHY.caption,'block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5')}>
- {configProvider === 'DingTalk'?'Agent ID':'App ID'} <span className="text-red-500">*</span>
+ {configProvider === 'DingTalk'?t('addMember.config.agentId'):t('addMember.config.appId')} <span className="text-red-500">*</span>
  </label>
  <div className="relative">
  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={16} />
  <input
  type="text"
  className={cn(TYPOGRAPHY.bodySm,'w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:focus:border-brand-400 outline-none transition-all text-slate-900 dark:text-slate-100')}
- placeholder={configProvider === 'DingTalk'?'For example:23456789':'For example:cli_a1b2c3d4e5'}
+ placeholder={configProvider === 'DingTalk'?t('addMember.config.agentIdPlaceholder'):t('addMember.config.appIdPlaceholder')}
  />
  </div>
  </div>
 
  <div>
  <label className={cn(TYPOGRAPHY.caption,'block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5')}>
- App Key <span className="text-red-500">*</span>
+ {t('addMember.config.appKey')} <span className="text-red-500">*</span>
  </label>
  <div className="relative">
  <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={16} />
  <input
  type="text"
  className={cn(TYPOGRAPHY.bodySm,'w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:focus:border-brand-400 outline-none transition-all text-slate-900 dark:text-slate-100')}
- placeholder="Enter the applied App Key"
+ placeholder={t('addMember.config.appKeyPlaceholder')}
  />
  </div>
  </div>
 
  <div>
  <label className={cn(TYPOGRAPHY.caption,'block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5')}>
- App Secret <span className="text-red-500">*</span>
+ {t('addMember.config.appSecret')} <span className="text-red-500">*</span>
  </label>
  <div className="relative">
  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={16} />
  <input
  type="password"
  className={cn(TYPOGRAPHY.bodySm,'w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:focus:border-brand-400 outline-none transition-all text-slate-900 dark:text-slate-100')}
- placeholder="Enter the applied App Secret"
+ placeholder={t('addMember.config.appSecretPlaceholder')}
  />
  </div>
  </div>
 
  <div className="pt-3 flex gap-3">
  <Button className="w-full" size="normal" onClick={() => setConfigProvider(null)}>
- Save and connect
+ {t('addMember.config.saveAndConnect')}
  </Button>
  </div>
 
  <div className="flex justify-center mt-4">
  <a href="#" className={cn(TYPOGRAPHY.caption,'text-brand-600 dark:text-brand-300 hover:underline')}>
- How to get this information?</a>
+ {t('addMember.config.howToGetInfo')}</a>
  </div>
  </div>
  </div>)
@@ -172,9 +174,9 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  isOpen={isOpen}
  onClose={onClose}
  size={configProvider?'sm':'lg'}
- title="Add member"
+ title={t('addMember.title')}
  subtitle={(<span className={cn(TYPOGRAPHY.caption,'text-slate-500 dark:text-slate-400 flex items-center gap-2')}>
- add to
+ {t('addMember.addTo')}
  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
  <UserPlus size={12} />
  {role.name}
@@ -193,7 +195,7 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  activeTab === 'platform'?'border-brand-600 text-brand-600':'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
  }`)}
  >
- Organizational Structure Choice
+ {t('addMember.tabs.orgStructure')}
  </button>
  <button
  type="button"
@@ -202,9 +204,9 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  activeTab === 'import'?'border-brand-600 text-brand-600':'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
  }`)}
  >
- Third party synchronization
+ {t('addMember.tabs.thirdPartySync')}
  <span className={cn(TYPOGRAPHY.micro,'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-300 px-1.5 py-0.5 rounded-full font-bold')}>
- Auto
+ {t('addMember.tabs.auto')}
  </span>
  </button>
  </div>
@@ -215,7 +217,7 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  {activeTab === 'platform' && (<div className="flex w-full h-full min-h-0 bg-white dark:bg-slate-900/90">
  <div className="w-60 bg-slate-50/50 dark:bg-slate-900/70 border-r border-slate-100 dark:border-slate-800 flex flex-col shrink-0 min-h-0">
  <div className="px-4 pt-6 pb-3 border-b border-slate-200/60 dark:border-slate-800/80">
- <h4 className={cn(TYPOGRAPHY.bodyXs,'font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-2 mb-2')}>Department filter</h4>
+ <h4 className={cn(TYPOGRAPHY.bodyXs,'font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-2 mb-2')}>{t('addMember.departmentFilter')}</h4>
  </div>
  <div className="flex-1 overflow-y-auto px-3 pt-2 pb-3 space-y-0.5 custom-scrollbar min-h-0">
  <button
@@ -293,7 +295,7 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  type="text"
  value={searchQuery}
  onChange={(event) => setSearchQuery(event.target.value)}
- placeholder="Search name or email..."
+ placeholder={t('addMember.searchPlaceholder')}
  className={cn(TYPOGRAPHY.bodyXs,'w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:focus:border-brand-400 outline-none transition-all text-slate-900 dark:text-slate-100')}
  />
  </div>
@@ -311,8 +313,8 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  {isAllSelected && <Check size={8} className="text-white" />}
  </div>)}
  </div>
- <div className="flex-1 pl-1.5">name / Department</div>
- <div className="w-1/3 text-center px-1.5">Email</div>
+ <div className="flex-1 pl-1.5">{t('addMember.columns.nameDepartment')}</div>
+ <div className="w-1/3 text-center px-1.5">{t('addMember.columns.email')}</div>
  </div>
  </div>
 
@@ -321,10 +323,10 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
  <Search size={24} className="opacity-40" />
  </div>
- <p className={cn(TYPOGRAPHY.bodyXs,'font-medium text-slate-500 dark:text-slate-400')}>No matching member found</p>
+ <p className={cn(TYPOGRAPHY.bodyXs,'font-medium text-slate-500 dark:text-slate-400')}>{t('addMember.noMatchingMember')}</p>
  </div>):(<div className="divide-y divide-slate-50 dark:divide-slate-800">
  {filteredUsers.map((user) => {
- const department = ROLE_DEPARTMENT_MAP[user.roleId]?? 'Platform R&D Department'
+ const department = ROLE_DEPARTMENT_MAP[user.roleId]?? t('addMember.orgUnits.rd')
  const isSelected = selectedUserIds.includes(user.id)
  return (<div
  key={user.id}
@@ -415,7 +417,7 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  </div>)}
  </div>
  <div className="h-8 w-px bg-slate-700/50 mx-1 hidden @md:block"></div>
- <div className={cn(TYPOGRAPHY.caption,'font-medium whitespace-nowrap')}>Selected {selectedCount} members</div>
+ <div className={cn(TYPOGRAPHY.caption,'font-medium whitespace-nowrap')}>{t('addMember.selectedCount', { count: selectedCount })}</div>
  </div>
 
  <div className="flex items-center gap-3 pl-4">
@@ -424,7 +426,7 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  onClick={() => setSelectedUserIds([])}
  className="text-xs text-slate-400 dark:text-slate-300 hover:text-white transition-colors"
  >
- Clear
+ {t('addMember.actions.clear')}
  </button>
  <Button
  size="small"
@@ -432,7 +434,7 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  className="bg-brand-500 hover:bg-brand-400 text-white border-0 shadow-lg shadow-brand-500/25 px-5"
  onClick={handleConfirmAdd}
  >
- Confirm to add
+ {t('addMember.actions.confirmAdd')}
  </Button>
  </div>
  </div>
@@ -447,9 +449,9 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-300 mb-4 ring-1 ring-brand-100 dark:ring-brand-500/30 shadow-sm">
  <RefreshCw size={22} />
  </div>
- <h3 className={cn(TYPOGRAPHY.subtitle,'font-bold text-slate-900 dark:text-white tracking-tight')}>Synchronize organizational structure</h3>
+ <h3 className={cn(TYPOGRAPHY.subtitle,'font-bold text-slate-900 dark:text-white tracking-tight')}>{t('addMember.import.title')}</h3>
  <p className={cn(TYPOGRAPHY.caption,'text-slate-500 dark:text-slate-400 mt-2 max-w-sm mx-auto leading-relaxed')}>
- Connect your business OA platform,Automatically pull the latest department structure and personnel list,Keep permission assignments updated in real time.</p>
+ {t('addMember.import.subtitle')}</p>
  </div>
 
  <div className="space-y-2">
@@ -459,18 +461,18 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  </div>
  <div className="flex-1 min-w-0 py-0.5">
  <div className="flex items-center gap-2 mb-1">
- <h4 className={cn(TYPOGRAPHY.bodyXs,'font-bold text-slate-900 dark:text-slate-100')}>Enterprise WeChat</h4>
+ <h4 className={cn(TYPOGRAPHY.bodyXs,'font-bold text-slate-900 dark:text-slate-100')}>{t('addMember.import.wecom.name')}</h4>
  <div
  className={cn(TYPOGRAPHY.micro,'flex items-center gap-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-bold border border-emerald-100/50 dark:border-emerald-500/30')}
  >
  <CheckCircle2 size={10} className="fill-emerald-100 stroke-emerald-600 dark:fill-emerald-500/20 dark:stroke-emerald-300" />
- <span>Connected</span>
+ <span>{t('addMember.import.status.connected')}</span>
  </div>
  </div>
  <div className={cn(TYPOGRAPHY.micro,'flex items-center gap-2 text-slate-500 dark:text-slate-400')}>
- <span className="truncate">today 09:30</span>
+ <span className="truncate">{t('addMember.import.wecom.syncTime')}</span>
  <span className="w-0.5 h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full" />
- <span>128 people</span>
+ <span>{t('addMember.import.wecom.memberCount')}</span>
  </div>
  </div>
  <div className="pr-2">
@@ -481,7 +483,7 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  onClick={handleSync}
  >
  {isSyncing?<Loader2 size={12} className="animate-spin" />:<RefreshCw size={12} />}
- {isSyncing?'Synchronizing':'sync'}
+ {isSyncing?t('addMember.import.actions.syncing'):t('addMember.import.actions.sync')}
  </Button>
  </div>
  </div>
@@ -493,14 +495,14 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  <div className="flex-1 min-w-0 py-0.5">
  <div className="flex items-center gap-2 mb-1">
  <h4 className={cn(TYPOGRAPHY.bodyXs,'font-bold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors')}>
- DingTalk
+ {t('addMember.provider.dingtalk')}
  </h4>
  <span className={cn(TYPOGRAPHY.micro,'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold px-1.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700')}>
- Not configured
+ {t('addMember.import.status.notConfigured')}
  </span>
  </div>
  <p className={cn(TYPOGRAPHY.micro,'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-colors truncate')}>
- Support sync department,Staff and role groups
+ {t('addMember.import.dingtalkDesc')}
  </p>
  </div>
  <div className="pr-2">
@@ -510,7 +512,7 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  className={cn(TYPOGRAPHY.bodyXs,'h-8 px-3 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800')}
  onClick={() => setConfigProvider('DingTalk')}
  >
- Go to configuration
+ {t('addMember.import.actions.goToConfig')}
  <ArrowRight size={12} />
  </Button>
  </div>
@@ -523,14 +525,14 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  <div className="flex-1 min-w-0 py-0.5">
  <div className="flex items-center gap-2 mb-1">
  <h4 className={cn(TYPOGRAPHY.bodyXs,'font-bold text-slate-900 dark:text-slate-100 group-hover:text-teal-600 dark:group-hover:text-teal-300 transition-colors')}>
- Feishu
+ {t('addMember.provider.feishu')}
  </h4>
  <span className={cn(TYPOGRAPHY.micro,'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold px-1.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700')}>
- Not configured
+ {t('addMember.import.status.notConfigured')}
  </span>
  </div>
  <p className={cn(TYPOGRAPHY.micro,'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-colors truncate')}>
- Supports synchronization of organizational structure and document permissions
+ {t('addMember.import.feishuDesc')}
  </p>
  </div>
  <div className="pr-2">
@@ -540,7 +542,7 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
  className={cn(TYPOGRAPHY.bodyXs,'h-8 px-3 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800')}
  onClick={() => setConfigProvider('Lark')}
  >
- Go to configuration
+ {t('addMember.import.actions.goToConfig')}
  <ArrowRight size={12} />
  </Button>
  </div>
@@ -551,8 +553,8 @@ export function AddMemberModal({ isOpen,onClose,role,users,onAddUser }:AddMember
 
  <div className="bg-slate-50 dark:bg-slate-900/70 p-4 border-t border-slate-100 dark:border-slate-800/80 text-center">
  <p className={cn(TYPOGRAPHY.micro,'text-slate-400 dark:text-slate-500')}>
- need assistance?View <a href="#" className="text-brand-600 dark:text-brand-300 hover:underline">Configuration Guide</a> or{' '}
- <a href="#" className="text-brand-600 dark:text-brand-300 hover:underline">Contact technical support</a>
+ {t('addMember.assistance.prefix')} <a href="#" className="text-brand-600 dark:text-brand-300 hover:underline">{t('addMember.assistance.guide')}</a> {t('addMember.assistance.or')}{' '}
+ <a href="#" className="text-brand-600 dark:text-brand-300 hover:underline">{t('addMember.assistance.support')}</a>
  </p>
  </div>
  </div>)}

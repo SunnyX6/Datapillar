@@ -1,4 +1,5 @@
 import { useEffect,useMemo,useRef,useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate,useParams } from 'react-router-dom'
 import { Database,Menu,MoreVertical,Server,Table as TableIcon,Folder,Activity,Box,Layers } from 'lucide-react'
 import {
@@ -25,6 +26,7 @@ const INDENT_PX = 18
 const VALUE_DOMAIN_TAG_PREFIX = 'vd:'
 
 export function MetadataView() {
+ const { t } = useTranslation('oneMeta')
  const navigate = useNavigate()
  const { catalogName,schemaName,tableName } = useParams<{
  catalogName?: string
@@ -149,7 +151,7 @@ export function MetadataView() {
  navigate(`/governance/metadata/catalogs/${encodeURIComponent(catalogName)}/schemas/${encodeURIComponent(schemaName)}/tables/${encodeURIComponent(formData.name)}`)
  }
 
- toast.success(`table ${formData.name} Update successful`)
+ toast.success(t('metadataView.toast.tableUpdated', { name: formData.name }))
  return
  }
 
@@ -161,23 +163,32 @@ export function MetadataView() {
  name:formData.name,type:formData.type,provider:formData.provider,comment:formData.comment,properties:formData.properties
  })
 
- await refreshCatalogs()
-
  const newCatalogId = formData.name
- setExpandedNodes((prev) => new Set(prev).add(newCatalogId))
- await loadSchemas(newCatalogId)
-
  closeModal()
+ toast.success(t('metadataView.toast.catalogCreated', { name: formData.name }))
+ setExpandedNodes((prev) => new Set(prev).add(newCatalogId))
+ try {
+ await refreshCatalogs()
+ await loadSchemas(newCatalogId)
+ } catch {
+ // The error was passed by the unity client toast show
+ }
  } else if (modalState.nodeType === 'CATALOG') {
  if (!schemaFormRef.current?.validate()) return
 
+ const catalogId = modalState.nodeId
  const formData = schemaFormRef.current.getData()
- await createSchema(modalState.nodeId,{
+ await createSchema(catalogId,{
  name:formData.name,comment:formData.comment
  })
 
- await refreshSchemas(modalState.nodeId)
  closeModal()
+ toast.success(t('metadataView.toast.schemaCreated', { name: formData.name }))
+ try {
+ await refreshSchemas(catalogId)
+ } catch {
+ // The error was passed by the unity client toast show
+ }
  } else if (modalState.nodeType === 'SCHEMA') {
  if (!tableFormRef.current?.validate()) return
 
@@ -265,12 +276,15 @@ export function MetadataView() {
 
  closeModal()
  setRefreshKey((k) => k + 1)
- toast.success(`table ${modalState.editingTable.name} Update successful`)
+ toast.success(t('metadataView.toast.tableUpdated', { name: modalState.editingTable.name }))
  } else {
  // create pattern
  await createTable(catalogName,schemaName,{
  name:formData.name,comment:formData.comment,columns:formData.columns.map(({ valueDomainCode:_,...col }) => col),properties:formData.properties
  })
+
+ closeModal()
+ toast.success(t('metadataView.toast.tableCreated', { name: formData.name }))
 
  // Type the column associated with the range tag(for lineage tracing)
  const columnsWithValueDomain = formData.columns.filter((col) => col.valueDomainCode)
@@ -284,9 +298,11 @@ export function MetadataView() {
  }
 
  // Refresh table list
+ try {
  await refreshTables(catalogName,schemaName)
- closeModal()
- toast.success(`table ${formData.name} Created successfully`)
+ } catch {
+ // The error was passed by the unity client toast show
+ }
  }
  }
  } catch {
@@ -540,7 +556,7 @@ export function MetadataView() {
 
  {isSideCollapsed && (<button
  type="button"
- aria-label="Expand the metadata sidebar"
+ aria-label={t('metadataView.sidebar.expandAria')}
  className="absolute right-4 top-4 z-40 p-2 text-slate-600 hover:text-indigo-600 transition-colors"
  onClick={() => setIsSideCollapsed(false)}
  >
@@ -555,7 +571,7 @@ export function MetadataView() {
  <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center bg-slate-50 dark:bg-slate-900">
  <button
  type="button"
- aria-label="Collapse metadata sidebar"
+ aria-label={t('metadataView.sidebar.collapseAria')}
  className="p-2 rounded-md text-slate-600 hover:text-indigo-600 hover:bg-white/70 dark:hover:bg-slate-800 transition-colors"
  onClick={() => setIsSideCollapsed(true)}
  >
@@ -563,7 +579,7 @@ export function MetadataView() {
  </button>
  <div className="flex-1 flex items-center justify-center gap-1.5 pr-10">
  <Layers size={16} className="text-indigo-500" />
- <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">metadata center</span>
+ <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{t('metadataView.sidebar.centerTitle')}</span>
  </div>
  </div>
  <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar py-2">
@@ -584,23 +600,37 @@ export function MetadataView() {
  onClose={closeModal}
  size={modalState.editMode === 'basic'?'md':modalState.nodeType === 'SCHEMA'?'lg':'md'}
  title={
- modalState.editMode === 'basic'?'Edit table information':modalState.nodeType === 'ROOT'?'create Catalog':modalState.nodeType === 'CATALOG'?'create Schema':modalState.nodeType === 'SCHEMA'?modalState.editingTable?'Edit column':'create Table':'Management table'
+ modalState.editMode === 'basic'
+ ? t('metadataView.modal.title.editTableInfo')
+ : modalState.nodeType === 'ROOT'
+ ? t('metadataView.modal.title.createCatalog')
+ : modalState.nodeType === 'CATALOG'
+ ? t('metadataView.modal.title.createSchema')
+ : modalState.nodeType === 'SCHEMA'
+ ? modalState.editingTable
+ ? t('metadataView.modal.title.editColumns')
+ : t('metadataView.modal.title.createTable')
+ : t('metadataView.modal.title.manageTable')
  }
  subtitle={
  modalState.editMode === 'basic'?(<span className="text-xs text-slate-400 dark:text-slate-500">
- edit table"<span className="font-medium text-blue-600 dark:text-blue-400">{modalState.nodeName}</span>"basic information
+ {t('metadataView.modal.subtitle.editTableBasicPrefix')}
+ <span className="font-medium text-blue-600 dark:text-blue-400">{modalState.nodeName}</span>
+ {t('metadataView.modal.subtitle.editTableBasicSuffix')}
  </span>):modalState.nodeType === 'SCHEMA'?(<span className="text-xs text-slate-400 dark:text-slate-500">
- {modalState.editingTable?'Edit':'will be created in'} Schema"<span className="font-medium text-blue-600 dark:text-blue-400">{modalState.nodeName}</span>"
+ {modalState.editingTable?t('metadataView.modal.subtitle.editInSchemaPrefix'):t('metadataView.modal.subtitle.createInSchemaPrefix')}
+ <span className="font-medium text-blue-600 dark:text-blue-400">{modalState.nodeName}</span>
+ {t('metadataView.modal.subtitle.schemaSuffix')}
  </span>):undefined
  }
  footerLeft={footerLeft}
  footerRight={
  modalState.nodeType!== 'TABLE'?(<>
  <ModalCancelButton onClick={closeModal} disabled={isSubmitting}>
- Cancel
+ {t('common.button.cancel', { ns: 'common', defaultValue: 'Cancel' })}
  </ModalCancelButton>
  <ModalPrimaryButton onClick={handleSubmit} disabled={isSubmitting} loading={isSubmitting}>
- {modalState.editMode === 'basic' || modalState.editingTable?'Save changes':'Create physical assets'}
+ {modalState.editMode === 'basic' || modalState.editingTable?t('metadataView.modal.action.saveChanges'):t('metadataView.modal.action.createAsset')}
  </ModalPrimaryButton>
  </>):undefined
  }
@@ -678,13 +708,13 @@ function Tree({
  onMoreClick={() => onCreateChild(schema.id,'SCHEMA',schema.name)}
  />
  {expandedNodes.has(schema.id) &&
- schema.tables.map((table) => (<TreeNode
- key={table.id}
- id={table.id}
- label={table.name}
- type="TABLE"
- level={3}
- isActive={selectedNodeId === table.id}
+	 schema.tables.map((table) => (<TreeNode
+	 key={table.id}
+	 id={table.id}
+	 label={table.name}
+	 type="TABLE"
+	 level={3}
+	 isActive={selectedNodeId === table.id}
  isOpen={false}
  hasChildren={false}
  onClick={() => onSelect(table.id,'TABLE')}
@@ -698,13 +728,13 @@ function Tree({
 }
 
 function TreeNode({
- id:_id,label,type,catalogIcon,level,isOpen,isActive,hasChildren,onClick,onToggle,onMoreClick,showMore = true
+	 id:_id,label,type,catalogIcon,level,isOpen,isActive,hasChildren,onClick,onToggle,onMoreClick,showMore = true
 }:{
- id:string
- label:string
- type:NodeType
- catalogIcon?: string
- level:number
+	 id:string
+	 label:string
+	 type:NodeType
+	 catalogIcon?: string
+	 level:number
  isOpen:boolean
  isActive:boolean
  hasChildren:boolean
@@ -769,11 +799,11 @@ function TreeNode({
  e.stopPropagation()
  onToggle()
  }}
- >
- <ChevronRightIcon open={isOpen} />
- </div>
- {icon}
- <span className="truncate flex-1">{label}</span>
+	 >
+	 <ChevronRightIcon open={isOpen} />
+	 </div>
+	 {icon}
+	 <span className="truncate flex-1">{label}</span>
 
  {showMore && (<button
  type="button"

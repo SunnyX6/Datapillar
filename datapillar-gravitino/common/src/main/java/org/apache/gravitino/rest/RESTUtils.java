@@ -103,7 +103,9 @@ public class RESTUtils {
   public static String encodeString(String toEncode) {
     Preconditions.checkArgument(toEncode != null, "Invalid string to encode: null");
     try {
-      return URLEncoder.encode(toEncode, StandardCharsets.UTF_8.name());
+      // Use path-safe encoding: URLEncoder encodes spaces as '+', but URL path segments require
+      // '%20'. Keep other escaping semantics unchanged.
+      return URLEncoder.encode(toEncode, StandardCharsets.UTF_8.name()).replace("+", "%20");
     } catch (UnsupportedEncodingException e) {
       throw new GravitinoRuntimeException("Failed to encode string: %s", toEncode);
     }

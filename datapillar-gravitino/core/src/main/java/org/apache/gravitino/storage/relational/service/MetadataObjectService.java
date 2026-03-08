@@ -34,21 +34,29 @@ import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetricMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModifierMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.UnitMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ValueDomainMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.WordRootMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.MetricPO;
 import org.apache.gravitino.storage.relational.po.ModelPO;
+import org.apache.gravitino.storage.relational.po.ModifierPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.storage.relational.po.UnitPO;
 import org.apache.gravitino.storage.relational.po.ValueDomainPO;
+import org.apache.gravitino.storage.relational.po.WordRootPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,8 +81,12 @@ public class MetadataObjectService {
               .put(MetadataObject.Type.SCHEMA, MetadataObjectService::getSchemaObjectsFullName)
               .put(MetadataObject.Type.TABLE, MetadataObjectService::getTableObjectsFullName)
               .put(MetadataObject.Type.FILESET, MetadataObjectService::getFilesetObjectsFullName)
+              .put(MetadataObject.Type.METRIC, MetadataObjectService::getMetricObjectsFullName)
               .put(MetadataObject.Type.MODEL, MetadataObjectService::getModelObjectsFullName)
+              .put(MetadataObject.Type.MODIFIER, MetadataObjectService::getModifierObjectsFullName)
               .put(MetadataObject.Type.TOPIC, MetadataObjectService::getTopicObjectsFullName)
+              .put(MetadataObject.Type.WORDROOT, MetadataObjectService::getWordRootObjectsFullName)
+              .put(MetadataObject.Type.UNIT, MetadataObjectService::getUnitObjectsFullName)
               .put(MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName)
               .put(
                   MetadataObject.Type.VALUE_DOMAIN,
@@ -97,7 +109,7 @@ public class MetadataObjectService {
 
     List<MetadataObject> metadataObjects = Lists.newArrayList();
     for (Map.Entry<Entity.EntityType, List<Long>> entry : groupIdsByType.entrySet()) {
-      MetadataObject.Type objectType = MetadataObject.Type.valueOf(entry.getKey().name());
+      MetadataObject.Type objectType = toMetadataObjectType(entry.getKey());
       Map<Long, String> metadataObjectNames =
           TYPE_TO_FULLNAME_FUNCTION_MAP.get(objectType).apply(entry.getValue());
 
@@ -145,6 +157,20 @@ public class MetadataObjectService {
     } else if (type == MetadataObject.Type.MODEL) {
       return ModelMetaService.getInstance()
           .getModelIdBySchemaIdAndModelName(schemaId, names.get(2));
+    } else if (type == MetadataObject.Type.METRIC) {
+      return MetricMetaService.getInstance()
+          .getMetricIdBySchemaIdAndMetricCode(schemaId, names.get(2));
+    } else if (type == MetadataObject.Type.MODIFIER) {
+      return ModifierMetaService.getInstance()
+          .getModifierIdBySchemaIdAndCode(schemaId, names.get(2));
+    } else if (type == MetadataObject.Type.WORDROOT) {
+      return SessionUtils.getWithoutCommit(
+          WordRootMetaMapper.class,
+          mapper -> mapper.selectRootIdBySchemaIdAndRootCode(schemaId, names.get(2)));
+    } else if (type == MetadataObject.Type.UNIT) {
+      return SessionUtils.getWithoutCommit(
+          UnitMetaMapper.class,
+          mapper -> mapper.selectUnitIdBySchemaIdAndUnitCode(schemaId, names.get(2)));
     } else if (type == MetadataObject.Type.VALUE_DOMAIN) {
       // names.get(2) That’s it domainCode
       return ValueDomainMetaService.getInstance()
@@ -473,6 +499,158 @@ public class MetadataObjectService {
         });
 
     return schemaIdAndNameMap;
+  }
+
+  private static MetadataObject.Type toMetadataObjectType(Entity.EntityType entityType) {
+    if (entityType == Entity.EntityType.MODIFIER) {
+      return MetadataObject.Type.MODIFIER;
+    }
+    return MetadataObject.Type.valueOf(entityType.name());
+  }
+
+  public static Map<Long, String> getMetricObjectsFullName(List<Long> metricIds) {
+    if (metricIds == null || metricIds.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<MetricPO> metricPOs =
+        metricIds.stream()
+            .map(
+                metricId ->
+                    SessionUtils.getWithoutCommit(
+                        MetricMetaMapper.class,
+                        mapper -> mapper.selectMetricMetaByMetricId(metricId)))
+            .filter(po -> po != null)
+            .collect(Collectors.toList());
+
+    if (metricPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> schemaIds =
+        metricPOs.stream().map(MetricPO::getSchemaId).collect(Collectors.toList());
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
+    HashMap<Long, String> metricIdAndNameMap = new HashMap<>();
+
+    metricPOs.forEach(
+        metricPO -> {
+          String schemaName = schemaIdAndNameMap.getOrDefault(metricPO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of metric {} may be deleted", metricPO.getMetricId());
+            metricIdAndNameMap.put(metricPO.getMetricId(), null);
+            return;
+          }
+          metricIdAndNameMap.put(
+              metricPO.getMetricId(), DOT_JOINER.join(schemaName, metricPO.getMetricCode()));
+        });
+
+    return metricIdAndNameMap;
+  }
+
+  public static Map<Long, String> getModifierObjectsFullName(List<Long> modifierIds) {
+    List<ModifierPO> modifierPOs =
+        SessionUtils.getWithoutCommit(
+            ModifierMetaMapper.class, mapper -> mapper.listModifierPOsByModifierIds(modifierIds));
+
+    if (modifierPOs == null || modifierPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> schemaIds =
+        modifierPOs.stream().map(ModifierPO::getSchemaId).collect(Collectors.toList());
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
+    HashMap<Long, String> modifierIdAndNameMap = new HashMap<>();
+
+    modifierPOs.forEach(
+        modifierPO -> {
+          String schemaName = schemaIdAndNameMap.getOrDefault(modifierPO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of modifier {} may be deleted", modifierPO.getModifierId());
+            modifierIdAndNameMap.put(modifierPO.getModifierId(), null);
+            return;
+          }
+          modifierIdAndNameMap.put(
+              modifierPO.getModifierId(),
+              DOT_JOINER.join(schemaName, modifierPO.getModifierCode()));
+        });
+
+    return modifierIdAndNameMap;
+  }
+
+  public static Map<Long, String> getWordRootObjectsFullName(List<Long> rootIds) {
+    if (rootIds == null || rootIds.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<WordRootPO> rootPOs =
+        rootIds.stream()
+            .map(
+                rootId ->
+                    SessionUtils.getWithoutCommit(
+                        WordRootMetaMapper.class,
+                        mapper -> mapper.selectWordRootMetaByRootId(rootId)))
+            .filter(po -> po != null)
+            .collect(Collectors.toList());
+
+    if (rootPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> schemaIds =
+        rootPOs.stream().map(WordRootPO::getSchemaId).collect(Collectors.toList());
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
+    HashMap<Long, String> rootIdAndNameMap = new HashMap<>();
+
+    rootPOs.forEach(
+        rootPO -> {
+          String schemaName = schemaIdAndNameMap.getOrDefault(rootPO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of word root {} may be deleted", rootPO.getRootId());
+            rootIdAndNameMap.put(rootPO.getRootId(), null);
+            return;
+          }
+          rootIdAndNameMap.put(
+              rootPO.getRootId(), DOT_JOINER.join(schemaName, rootPO.getRootCode()));
+        });
+
+    return rootIdAndNameMap;
+  }
+
+  public static Map<Long, String> getUnitObjectsFullName(List<Long> unitIds) {
+    if (unitIds == null || unitIds.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<UnitPO> unitPOs =
+        unitIds.stream()
+            .map(
+                unitId ->
+                    SessionUtils.getWithoutCommit(
+                        UnitMetaMapper.class, mapper -> mapper.selectUnitMetaByUnitId(unitId)))
+            .filter(po -> po != null)
+            .collect(Collectors.toList());
+
+    if (unitPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> schemaIds = unitPOs.stream().map(UnitPO::getSchemaId).collect(Collectors.toList());
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
+    HashMap<Long, String> unitIdAndNameMap = new HashMap<>();
+
+    unitPOs.forEach(
+        unitPO -> {
+          String schemaName = schemaIdAndNameMap.getOrDefault(unitPO.getSchemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of unit {} may be deleted", unitPO.getUnitId());
+            unitIdAndNameMap.put(unitPO.getUnitId(), null);
+            return;
+          }
+          unitIdAndNameMap.put(
+              unitPO.getUnitId(), DOT_JOINER.join(schemaName, unitPO.getUnitCode()));
+        });
+
+    return unitIdAndNameMap;
   }
 
   /**

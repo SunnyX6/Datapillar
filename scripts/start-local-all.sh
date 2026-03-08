@@ -59,10 +59,10 @@ export NACOS_SERVICE_IP="$DUBBO_IP_TO_REGISTRY"
 # Service monitoring IP（Java/Python），Can be covered by environment；Default full network card monitoring
 export SERVER_ADDRESS="${SERVER_ADDRESS:-0.0.0.0}"
 
-# local build/Run directory（Avoid writing user directory permission issues）
-export MAVEN_REPO_LOCAL="${MAVEN_REPO_LOCAL:-/tmp/m2}"
-export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/datapillar-uv-cache}"
-export GRADLE_USER_HOME="${GRADLE_USER_HOME:-/tmp/datapillar-gradle}"
+# local build/run cache directory（prefer persistent user cache, can override via env）
+export MAVEN_REPO_LOCAL="${MAVEN_REPO_LOCAL:-$HOME/.m2/repository}"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-$HOME/.cache/uv}"
+export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
 mkdir -p "$MAVEN_REPO_LOCAL" "$UV_CACHE_DIR"
 mkdir -p "$GRADLE_USER_HOME"
 
@@ -197,9 +197,50 @@ prepare_nacos_configs() {
     return 0
 }
 
+publish_gravitino_java_client() {
+    local publish_log="$LOG_HOME/datapillar-gravitino.java-client.publish.log"
+    local gravitino_home="$PROJECT_ROOT/datapillar-gravitino"
+    local gradle_runner="$gravitino_home/gradlew"
+
+    echo "📦 Publish Datapillar-Gravitino Java client to local Maven repository..."
+    echo -e "   ${YELLOW}Publish logs are output to both the terminal and file.: $publish_log${NC}"
+
+    if [ ! -x "$gradle_runner" ]; then
+        echo -e "${RED}❌ Gravitino Gradle wrapper does not exist: $gradle_runner${NC}"
+        return 1
+    fi
+
+    cd "$gravitino_home"
+    if ! (
+        "$gradle_runner" \
+            -Dmaven.repo.local="$MAVEN_REPO_LOCAL" \
+            :api:publishToMavenLocal \
+            :common:publishToMavenLocal \
+            :clients:client-java-runtime:publishToMavenLocal \
+            :clients:client-java:publishToMavenLocal \
+            -x test \
+            -x javadoc
+    ) 2>&1 | tee "$publish_log"; then
+        echo -e "${RED}❌ Datapillar-Gravitino Java client publish failed${NC}"
+        echo -e "   ${YELLOW}View log: $publish_log${NC}"
+        tail -n 60 "$publish_log" 2>/dev/null || true
+        cd "$PROJECT_ROOT"
+        return 1
+    fi
+
+    echo -e "${GREEN}✅ Datapillar-Gravitino Java client published to local Maven repository${NC}"
+    echo -e "   ${YELLOW}Publish log: $publish_log${NC}"
+    echo ""
+    cd "$PROJECT_ROOT"
+    return 0
+}
+
 prepare_nacos_configs || exit 1
 
-# first step：Compile the entire project
+# first step：Publish Gravitino Java client to local Maven repository
+publish_gravitino_java_client || exit 1
+
+# second step：Compile the entire project
 # Local boot should not be testCompile blocking，Test compilation and execution are explicitly skipped here
 echo "📦 Compiling project..."
 cd "$PROJECT_ROOT"
@@ -450,11 +491,11 @@ echo "=========================================="
 echo ""
 echo "📋 Service list："
 echo "   • API gateway:           http://localhost:7000"
-echo "   • Authentication services:           http://localhost:7001"
-echo "   • core business:           http://localhost:7002"
+echo "   • Auth service:          http://localhost:7001"
+echo "   • Studio service:        http://localhost:7002"
 echo "   • AI service:            http://localhost:7003"
 echo "   • OpenLineage service:   http://localhost:7004"
-echo "   • Datapillar-Gravitino: http://localhost:8090"
+echo "   • Datapillar-Gravitino:  http://localhost:8090"
 echo ""
 echo "📝 Log directory: $LOG_HOME"
 echo "   tail -f $LOG_HOME/*.startup.log"

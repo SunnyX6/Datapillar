@@ -64,6 +64,17 @@ public class TenantRoleAdminServiceImpl implements TenantRoleAdminService {
   }
 
   @Override
+  public List<RoleDataPrivilegeItem> getRoleDataPrivileges(Long roleId, String domain) {
+    return roleService.getRoleDataPrivileges(roleId, domain);
+  }
+
+  @Override
+  public void replaceRoleDataPrivileges(
+      Long roleId, String domain, List<RoleDataPrivilegeCommandItem> commands) {
+    roleService.replaceRoleDataPrivileges(roleId, domain, commands);
+  }
+
+  @Override
   public RoleMembersResponse getRoleMembers(Long roleId, Integer status) {
     return roleService.getRoleMembers(roleId, status);
   }
@@ -71,15 +82,5 @@ public class TenantRoleAdminServiceImpl implements TenantRoleAdminService {
   @Override
   public void removeRoleMembers(Long roleId, List<Long> userIds) {
     roleService.removeRoleMembers(roleId, userIds);
-  }
-
-  @Override
-  public List<RoleDataPrivilegeItem> getRoleDataPrivileges(Long roleId, String domain) {
-    return roleService.getRoleDataPrivileges(roleId, domain);
-  }
-
-  @Override
-  public void updateRoleDataPrivileges(Long roleId, RoleDataPrivilegeSyncRequest request) {
-    roleService.updateRoleDataPrivileges(roleId, request);
   }
 }

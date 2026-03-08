@@ -151,6 +151,15 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+  public User replaceRolesForUser(String metalake, List<String> roles, String user)
+      throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofUser(metalake, user),
+        LockType.WRITE,
+        () -> permissionManager.replaceRolesForUser(metalake, roles, user));
+  }
+
+  @Override
   public Group grantRolesToGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(

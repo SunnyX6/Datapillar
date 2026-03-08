@@ -37,6 +37,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.multitenancy.context.ExternalUserIdContextHolder;
+import org.apache.gravitino.multitenancy.context.TenantContext;
+import org.apache.gravitino.multitenancy.context.TenantContextHolder;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -107,6 +110,8 @@ public class MetadataFilterHelper {
     }
     checkExecutor();
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
+    TenantContext tenantContextSnapshot = TenantContextHolder.get();
+    String externalUserIdSnapshot = ExternalUserIdContextHolder.get();
     List<CompletableFuture<NameIdentifier>> futures = new ArrayList<>();
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
       Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
@@ -114,18 +119,23 @@ public class MetadataFilterHelper {
           CompletableFuture.supplyAsync(
               () -> {
                 try {
-                  return PrincipalUtils.doAs(
-                      currentPrincipal,
-                      () -> {
-                        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-                            spiltMetadataNames(metalake, entityType, nameIdentifier);
-                        AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-                            new AuthorizationExpressionEvaluator(expression);
-                        return authorizationExpressionEvaluator.evaluate(
-                                nameIdentifierMap, authorizationRequestContext)
-                            ? nameIdentifier
-                            : null;
-                      });
+                  bindRequestContexts(tenantContextSnapshot, externalUserIdSnapshot);
+                  try {
+                    return PrincipalUtils.doAs(
+                        currentPrincipal,
+                        () -> {
+                          Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+                              spiltMetadataNames(metalake, entityType, nameIdentifier);
+                          AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+                              new AuthorizationExpressionEvaluator(expression);
+                          return authorizationExpressionEvaluator.evaluate(
+                                  nameIdentifierMap, authorizationRequestContext)
+                              ? nameIdentifier
+                              : null;
+                        });
+                  } finally {
+                    clearRequestContexts();
+                  }
                 } catch (Exception e) {
                   LOG.error("GravitinoAuthorize error:{}", e.getMessage(), e);
                   return null;
@@ -161,6 +171,8 @@ public class MetadataFilterHelper {
     }
     checkExecutor();
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
+    TenantContext tenantContextSnapshot = TenantContextHolder.get();
+    String externalUserIdSnapshot = ExternalUserIdContextHolder.get();
     List<CompletableFuture<E>> futures = new ArrayList<>();
     for (E entity : entities) {
       Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
@@ -168,19 +180,24 @@ public class MetadataFilterHelper {
           CompletableFuture.supplyAsync(
               () -> {
                 try {
-                  return PrincipalUtils.doAs(
-                      currentPrincipal,
-                      () -> {
-                        AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-                            new AuthorizationExpressionEvaluator(expression);
-                        NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
-                        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-                            spiltMetadataNames(metalake, entityType, nameIdentifier);
-                        return authorizationExpressionEvaluator.evaluate(
-                                nameIdentifierMap, authorizationRequestContext)
-                            ? entity
-                            : null;
-                      });
+                  bindRequestContexts(tenantContextSnapshot, externalUserIdSnapshot);
+                  try {
+                    return PrincipalUtils.doAs(
+                        currentPrincipal,
+                        () -> {
+                          AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+                              new AuthorizationExpressionEvaluator(expression);
+                          NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
+                          Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+                              spiltMetadataNames(metalake, entityType, nameIdentifier);
+                          return authorizationExpressionEvaluator.evaluate(
+                                  nameIdentifierMap, authorizationRequestContext)
+                              ? entity
+                              : null;
+                        });
+                  } finally {
+                    clearRequestContexts();
+                  }
                 } catch (Exception e) {
                   LOG.error("GravitinoAuthorize error:{}", e.getMessage(), e);
                   return null;
@@ -254,6 +271,41 @@ public class MetadataFilterHelper {
         nameIdentifierMap.put(
             Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
         break;
+      case METRIC:
+        nameIdentifierMap.put(Entity.EntityType.METRIC, nameIdentifier);
+        nameIdentifierMap.put(
+            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
+        nameIdentifierMap.put(
+            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
+        break;
+      case MODIFIER:
+        nameIdentifierMap.put(Entity.EntityType.MODIFIER, nameIdentifier);
+        nameIdentifierMap.put(
+            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
+        nameIdentifierMap.put(
+            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
+        break;
+      case WORDROOT:
+        nameIdentifierMap.put(Entity.EntityType.WORDROOT, nameIdentifier);
+        nameIdentifierMap.put(
+            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
+        nameIdentifierMap.put(
+            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
+        break;
+      case UNIT:
+        nameIdentifierMap.put(Entity.EntityType.UNIT, nameIdentifier);
+        nameIdentifierMap.put(
+            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
+        nameIdentifierMap.put(
+            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
+        break;
+      case VALUE_DOMAIN:
+        nameIdentifierMap.put(Entity.EntityType.VALUE_DOMAIN, nameIdentifier);
+        nameIdentifierMap.put(
+            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
+        nameIdentifierMap.put(
+            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
+        break;
       case METALAKE:
         nameIdentifierMap.put(entityType, nameIdentifier);
         break;
@@ -272,6 +324,24 @@ public class MetadataFilterHelper {
   private static boolean enableAuthorization() {
     Config config = GravitinoEnv.getInstance().config();
     return config != null && config.get(Configs.ENABLE_AUTHORIZATION);
+  }
+
+  private static void bindRequestContexts(TenantContext tenantContext, String externalUserId) {
+    if (tenantContext != null) {
+      TenantContextHolder.set(tenantContext);
+    } else {
+      TenantContextHolder.remove();
+    }
+    if (externalUserId != null) {
+      ExternalUserIdContextHolder.set(externalUserId);
+    } else {
+      ExternalUserIdContextHolder.remove();
+    }
+  }
+
+  private static void clearRequestContexts() {
+    TenantContextHolder.remove();
+    ExternalUserIdContextHolder.remove();
   }
 
   private static void checkExecutor() {

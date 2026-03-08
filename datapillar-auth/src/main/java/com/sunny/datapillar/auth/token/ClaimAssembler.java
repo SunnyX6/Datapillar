@@ -59,7 +59,6 @@ public class ClaimAssembler {
     assembled.remove("exp");
     assembled.remove("iat");
     assembled.remove("nbf");
-    assembled.remove("jti");
     return assembled;
   }
 

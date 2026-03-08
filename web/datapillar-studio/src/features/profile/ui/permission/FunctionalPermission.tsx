@@ -1,14 +1,11 @@
 import { useMemo,useState,type ReactElement } from 'react'
 import { ChevronDown,ChevronRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { cn } from '@/utils'
 import type { RoleDefinition } from '../../utils/permissionTypes'
 import type { PermissionLevel } from '../../utils/permissionConstants'
 import { PERMISSION_LEVELS } from '../../utils/permissionConstants'
-
-const PERMISSION_LABELS:Record<PermissionLevel,string> = {
- DISABLE:'prohibited',READ:'View',ADMIN:'management'
-}
 
 interface FunctionalPermissionProps {
  role:RoleDefinition
@@ -22,14 +19,20 @@ type PermissionItem = RoleDefinition['permissions'][number]
 function buildPermissionMeta(permission:PermissionItem):string {
  const fields = [permission.objectPath,permission.objectType,permission.location,].filter((item):item is string => Boolean(item && item.trim()))
  if (fields.length === 0) {
- return 'Object information not configured'
+ return ''
  }
  return fields.join('.')
 }
 
 export function FunctionalPermission(props:FunctionalPermissionProps) {
+ const { t } = useTranslation('permission')
  const permissions = props.role.permissions
  const [collapsedObjectIds,setCollapsedObjectIds] = useState<Set<number>>(new Set(),)
+ const permissionLabels:Record<PermissionLevel,string> = {
+ DISABLE:t('functionalPermission.level.disable'),
+ READ:t('functionalPermission.level.read'),
+ ADMIN:t('functionalPermission.level.admin')
+ }
 
  const groupedPermissions = useMemo(() => {
  return permissions.reduce<Record<string,PermissionItem[]>>((acc,permission) => {
@@ -74,7 +77,7 @@ export function FunctionalPermission(props:FunctionalPermissionProps) {
  type="button"
  onClick={() => handleToggleNode(permission.objectId)}
  className="shrink-0 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-200 transition-colors"
- aria-label={isCollapsed?'Expand child nodes':'Collapse child nodes'}
+ aria-label={isCollapsed?t('functionalPermission.actions.expandChildren'):t('functionalPermission.actions.collapseChildren')}
  aria-expanded={!isCollapsed}
  >
  {isCollapsed?(<ChevronRight size={14} />):(<ChevronDown size={14} />)}
@@ -89,7 +92,7 @@ export function FunctionalPermission(props:FunctionalPermissionProps) {
  <div
  className={cn(TYPOGRAPHY.caption,'text-slate-500 dark:text-slate-400 truncate',)}
  >
- {buildPermissionMeta(permission)}
+ {buildPermissionMeta(permission) || t('functionalPermission.objectMetaFallback')}
  </div>
  </div>
  </div>
@@ -120,7 +123,7 @@ export function FunctionalPermission(props:FunctionalPermissionProps) {
  props.readonly || permission.tenantLevel === 'DISABLE'?'cursor-not-allowed opacity-50':''
  } ${activeClass}`}
  >
- {PERMISSION_LABELS[level]}
+ {permissionLabels[level]}
  </button>)
  })}
  </div>

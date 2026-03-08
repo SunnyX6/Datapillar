@@ -5,6 +5,7 @@ import com.sunny.datapillar.auth.authentication.AuthenticationResult;
 import com.sunny.datapillar.auth.authentication.Authenticator;
 import com.sunny.datapillar.auth.config.AuthProperties;
 import com.sunny.datapillar.auth.config.AuthSecurityProperties;
+import com.sunny.datapillar.auth.dto.auth.response.AuthenticationContextResponse;
 import com.sunny.datapillar.auth.dto.auth.response.TokenInfoResponse;
 import com.sunny.datapillar.auth.dto.login.response.LoginResultResponse;
 import com.sunny.datapillar.auth.dto.login.response.SsoQrResponse;
@@ -14,10 +15,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 /** Session application service. */
 @Service
 public class SessionAppService {
+
+  private static final String BEARER_PREFIX = "Bearer ";
 
   private final Authenticator authenticator;
   private final AuthProperties authProperties;
@@ -101,6 +105,10 @@ public class SessionAppService {
     return authService.getTokenInfo(accessToken);
   }
 
+  public AuthenticationContextResponse context(String accessToken) {
+    return authService.resolveAuthenticationContext(accessToken);
+  }
+
   public SsoQrResponse oauth2Authorize(
       String provider,
       String tenantCode,
@@ -120,15 +128,45 @@ public class SessionAppService {
   }
 
   public String extractAccessToken(String authorization, String cookieToken) {
-    if (authorization != null && authorization.startsWith("Bearer ")) {
-      return authorization.substring(7);
+    String bearerToken = extractBearerToken(authorization);
+    String normalizedCookieToken = trimToNull(cookieToken);
+    if (bearerToken != null && normalizedCookieToken != null) {
+      throw new com.sunny.datapillar.common.exception.UnauthorizedException(
+          "Multiple authentication credentials are not allowed");
     }
-    return cookieToken;
+    if (bearerToken != null) {
+      return bearerToken;
+    }
+    return normalizedCookieToken;
   }
 
   public String extractAuthorizationToken(HttpServletRequest request, String cookieToken) {
     String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
     return extractAccessToken(authorization, cookieToken);
+  }
+
+  private String extractBearerToken(String authorization) {
+    String normalizedAuthorization = trimToNull(authorization);
+    if (normalizedAuthorization == null) {
+      return null;
+    }
+    if (!normalizedAuthorization.startsWith(BEARER_PREFIX)) {
+      throw new com.sunny.datapillar.common.exception.UnauthorizedException(
+          "Invalid Authorization header");
+    }
+    String token = normalizedAuthorization.substring(BEARER_PREFIX.length()).trim();
+    if (!StringUtils.hasText(token)) {
+      throw new com.sunny.datapillar.common.exception.UnauthorizedException(
+          "Invalid Authorization header");
+    }
+    return token;
+  }
+
+  private String trimToNull(String value) {
+    if (!StringUtils.hasText(value)) {
+      return null;
+    }
+    return value.trim();
   }
 
   private void ensureAuthenticator(String expected) {

@@ -75,12 +75,14 @@ gravitino.cache.enableWeigher = true
 gravitino.cache.implementation = org.apache.gravitino.extensions.multitenancy.cache.TenantScopedEntityCache
 
 # THE CONFIGURATION FOR authorization
+# Enabled authenticators for Gravitino server.
+gravitino.authenticators = simple
 # Whether Gravitino enable authorization or not
 gravitino.authorization.enable = true
 # The metadata authorization implementation
 gravitino.authorization.impl = org.apache.gravitino.extensions.multitenancy.authorization.TenantAwareAuthorizer
 # The admins of Gravitino service, multiple admins are spitted by comma.
-gravitino.authorization.serviceAdmins = anonymous
+gravitino.authorization.serviceAdmins = datapillar
 
 # HTTP Sink Configuration (optional, for forwarding to external systems like Marquez)
 # gravitino.lineage.http.sinkClass = org.apache.gravitino.lineage.sink.LineageHttpSink

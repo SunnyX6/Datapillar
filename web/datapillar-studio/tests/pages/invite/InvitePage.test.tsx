@@ -108,13 +108,14 @@ describe('InvitePage', () => {
     logoutMock.mockResolvedValue(undefined)
     loginMock.mockResolvedValue({
       userId: 1001,
-      menus: [
+      username: 'sunny',
+      tenants: [
         {
-          id: 1,
-          name: 'Home page',
-          path: '/home',
-          location: 'TOP',
-          permissionCode: 'READ'
+          tenantId: 1001,
+          tenantCode: 'tenant-default',
+          tenantName: 'Default tenant',
+          status: 1,
+          isDefault: 1
         }
       ]
     })

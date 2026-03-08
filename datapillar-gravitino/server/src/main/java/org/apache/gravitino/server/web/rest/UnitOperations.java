@@ -48,10 +48,12 @@ import org.apache.gravitino.dto.responses.UnitResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.pagination.PagedResult;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 @Path("metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/units")
 public class UnitOperations {
@@ -88,7 +90,15 @@ public class UnitOperations {
             PagedResult<Unit> result = datasetDispatcher.listUnits(unitNs, offset, limit);
             UnitDTO[] unitDTOs =
                 result.items().stream().map(DTOConverters::toDTO).toArray(UnitDTO[]::new);
-            return Utils.ok(new UnitListResponse(unitDTOs, result.total(), offset, limit));
+            unitDTOs =
+                MetadataFilterHelper.filterByExpression(
+                    metalake,
+                    AuthorizationExpressionConstants.filterUnitAuthorizationExpression,
+                    Entity.EntityType.UNIT,
+                    unitDTOs,
+                    unitDto ->
+                        NameIdentifierUtil.ofUnit(metalake, catalog, schema, unitDto.code()));
+            return Utils.ok(new UnitListResponse(unitDTOs, unitDTOs.length, offset, limit));
           });
 
     } catch (Exception e) {
@@ -102,14 +112,14 @@ public class UnitOperations {
   @Timed(name = "get-unit." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-unit", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.loadUnitAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.UNIT)
   public Response getUnit(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("code") String code) {
+      @PathParam("code") @AuthorizationMetadata(type = Entity.EntityType.UNIT) String code) {
     NameIdentifier unitId = NameIdentifier.of(metalake, catalog, schema, code);
 
     try {
@@ -130,7 +140,7 @@ public class UnitOperations {
   @Timed(name = "create-unit." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-unit", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.createUnitAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createUnit(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -168,14 +178,14 @@ public class UnitOperations {
   @Timed(name = "delete-unit." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-unit", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.manageUnitAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.UNIT)
   public Response deleteUnit(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("code") String code) {
+      @PathParam("code") @AuthorizationMetadata(type = Entity.EntityType.UNIT) String code) {
     NameIdentifier unitId = NameIdentifier.of(metalake, catalog, schema, code);
 
     try {
@@ -197,14 +207,14 @@ public class UnitOperations {
   @Timed(name = "alter-unit." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-unit", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.manageUnitAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.UNIT)
   public Response alterUnit(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("code") String code,
+      @PathParam("code") @AuthorizationMetadata(type = Entity.EntityType.UNIT) String code,
       UnitUpdateRequest request) {
     NameIdentifier unitId = NameIdentifier.of(metalake, catalog, schema, code);
 

@@ -133,8 +133,7 @@ public class GravitinoInterceptionService implements InterceptionService {
                   metadataContext, pathParams, new AuthorizationRequestContext());
           if (!authorizeResult) {
             MetadataObject.Type type = expressionAnnotation.accessMetadataType();
-            NameIdentifier accessMetadataName =
-                metadataContext.get(Entity.EntityType.valueOf(type.name()));
+            NameIdentifier accessMetadataName = metadataContext.get(toEntityType(type));
             String errorMessage = expressionAnnotation.errorMessage();
             String currentUser = PrincipalUtils.getCurrentUserName();
             String methodName = method.getName();
@@ -208,6 +207,12 @@ public class GravitinoInterceptionService implements InterceptionService {
       String table = entities.get(Entity.EntityType.TABLE);
       String topic = entities.get(Entity.EntityType.TOPIC);
       String fileset = entities.get(Entity.EntityType.FILESET);
+      String model = entities.get(Entity.EntityType.MODEL);
+      String metric = entities.get(Entity.EntityType.METRIC);
+      String modifier = entities.get(Entity.EntityType.MODIFIER);
+      String wordRoot = entities.get(Entity.EntityType.WORDROOT);
+      String unit = entities.get(Entity.EntityType.UNIT);
+      String valueDomain = entities.get(Entity.EntityType.VALUE_DOMAIN);
       entities.forEach(
           (type, metadata) -> {
             switch (type) {
@@ -236,10 +241,34 @@ public class GravitinoInterceptionService implements InterceptionService {
                     NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset));
                 break;
               case MODEL:
-                String model = entities.get(Entity.EntityType.MODEL);
                 nameIdentifierMap.put(
                     Entity.EntityType.MODEL,
                     NameIdentifierUtil.ofModel(metalake, catalog, schema, model));
+                break;
+              case METRIC:
+                nameIdentifierMap.put(
+                    Entity.EntityType.METRIC,
+                    NameIdentifierUtil.ofMetric(metalake, catalog, schema, metric));
+                break;
+              case MODIFIER:
+                nameIdentifierMap.put(
+                    Entity.EntityType.MODIFIER,
+                    NameIdentifierUtil.ofModifier(metalake, catalog, schema, modifier));
+                break;
+              case WORDROOT:
+                nameIdentifierMap.put(
+                    Entity.EntityType.WORDROOT,
+                    NameIdentifierUtil.ofWordRoot(metalake, catalog, schema, wordRoot));
+                break;
+              case UNIT:
+                nameIdentifierMap.put(
+                    Entity.EntityType.UNIT,
+                    NameIdentifierUtil.ofUnit(metalake, catalog, schema, unit));
+                break;
+              case VALUE_DOMAIN:
+                nameIdentifierMap.put(
+                    Entity.EntityType.VALUE_DOMAIN,
+                    NameIdentifierUtil.ofValueDomain(metalake, catalog, schema, valueDomain));
                 break;
               case METALAKE:
                 nameIdentifierMap.put(
@@ -265,6 +294,15 @@ public class GravitinoInterceptionService implements InterceptionService {
             }
           });
       return nameIdentifierMap;
+    }
+
+    private Entity.EntityType toEntityType(MetadataObject.Type type) {
+      switch (type) {
+        case MODIFIER:
+          return Entity.EntityType.MODIFIER;
+        default:
+          return Entity.EntityType.valueOf(type.name());
+      }
     }
 
     private Map<String, Object> extractPathParamsFromParameters(

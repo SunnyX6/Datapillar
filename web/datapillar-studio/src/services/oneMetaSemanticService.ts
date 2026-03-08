@@ -39,21 +39,21 @@ async function oneMetaGet<T extends GravitinoBaseResponse>(url:string):Promise<T
 
 async function oneMetaPost<T extends GravitinoBaseResponse>(url:string,data?: unknown):Promise<T> {
  const response = await requestRaw<T,unknown>({
- baseURL:API_BASE.governanceSemantic,url,method:'POST',data
+ baseURL:API_BASE.governanceSemanticAdmin,url,method:'POST',data
  })
  return ensureOneMetaSuccess(response)
 }
 
 async function oneMetaPut<T extends GravitinoBaseResponse>(url:string,data?: unknown):Promise<T> {
  const response = await requestRaw<T,unknown>({
- baseURL:API_BASE.governanceSemantic,url,method:'PUT',data
+ baseURL:API_BASE.governanceSemanticAdmin,url,method:'PUT',data
  })
  return ensureOneMetaSuccess(response)
 }
 
 async function oneMetaDelete<T extends GravitinoBaseResponse>(url:string):Promise<T> {
  const response = await requestRaw<T>({
- baseURL:API_BASE.governanceSemantic,url,method:'DELETE'
+ baseURL:API_BASE.governanceSemanticAdmin,url,method:'DELETE'
  })
  return ensureOneMetaSuccess(response)
 }
@@ -559,7 +559,7 @@ export async function fetchValueDomains(offset = 0,limit = 20):Promise<{
  offset:number
  limit:number
 }> {
- const response = await oneMetaGet<ValueDomainListResponse>(`/valuedomains?offset=${offset}&limit=${limit}`)
+  const response = await oneMetaGet<ValueDomainListResponse>(`/value-domains?offset=${offset}&limit=${limit}`)
 
  return {
  items:response.valueDomains || [],total:response.total,offset:response.offset,limit:response.limit
@@ -571,7 +571,7 @@ export async function fetchValueDomains(offset = 0,limit = 20):Promise<{
  * @param domainCode range encoding,Such as ORDER_STATUS
  */
 export async function fetchValueDomainsByCode(domainCode:string):Promise<ValueDomainItemDTO[]> {
- const response = await oneMetaGet<ValueDomainListResponse>(`/valuedomains?offset=0&limit=100`)
+  const response = await oneMetaGet<ValueDomainListResponse>(`/value-domains?offset=0&limit=100`)
  const domain = (response.valueDomains || []).find((d) => d.domainCode === domainCode)
  return domain?.items || []
 }
@@ -585,7 +585,7 @@ interface ValueDomainResponse extends GravitinoBaseResponse {
  * Create a value range
  */
 export async function createValueDomain(data:CreateValueDomainRequest):Promise<ValueDomainDTO> {
- const response = await oneMetaPost<ValueDomainResponse>(`/valuedomains`,data)
+  const response = await oneMetaPost<ValueDomainResponse>(`/value-domains`,data)
  return response.valueDomain
 }
 
@@ -594,7 +594,7 @@ export async function createValueDomain(data:CreateValueDomainRequest):Promise<V
  * @param domainCode range encoding
  */
 export async function deleteValueDomain(domainCode:string):Promise<void> {
- await oneMetaDelete<GravitinoBaseResponse>(`/valuedomains/${encodeURIComponent(domainCode)}`)
+  await oneMetaDelete<GravitinoBaseResponse>(`/value-domains/${encodeURIComponent(domainCode)}`)
 }
 
 /** Update range request */
@@ -611,7 +611,7 @@ export interface UpdateValueDomainRequest {
  * @param domainCode range encoding
  */
 export async function updateValueDomain(domainCode:string,data:UpdateValueDomainRequest):Promise<ValueDomainDTO> {
- const response = await oneMetaPut<ValueDomainResponse>(`/valuedomains/${encodeURIComponent(domainCode)}`,data)
+  const response = await oneMetaPut<ValueDomainResponse>(`/value-domains/${encodeURIComponent(domainCode)}`,data)
  return response.valueDomain
 }
 

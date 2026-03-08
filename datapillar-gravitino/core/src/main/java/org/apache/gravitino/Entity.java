@@ -78,7 +78,7 @@ public interface Entity extends Serializable {
     MODEL_VERSION,
     METRIC,
     METRIC_VERSION,
-    METRIC_MODIFIER,
+    MODIFIER,
     WORDROOT,
     UNIT,
     VALUE_DOMAIN,
