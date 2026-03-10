@@ -16,7 +16,16 @@
       "knowledgeDesc": "Warehouse graph visualization and relationship exploration"
     },
     "actions": {
-      "search": "Search..."
+      "search": "Search...",
+      "searchContext": {
+        "dashboard": "Search items, workflows...",
+        "metadata": "Search catalog, schema, table...",
+        "semantic": "Search metrics, word roots, data services...",
+        "semantic-metrics": "Search metric name or code...",
+        "semantic-glossary": "Search word roots or meaning...",
+        "knowledge": "Search knowledge graph nodes...",
+        "default": "Global search..."
+      }
     },
     "profile": {
       "profile": "Profile",

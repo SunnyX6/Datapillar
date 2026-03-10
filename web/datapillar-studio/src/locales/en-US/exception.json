@@ -1,0 +1,59 @@
+{
+  "serverError": {
+    "referenceFallback": "N/A",
+    "serviceStatus": {
+      "checking": "Checking service...",
+      "healthy": "Service healthy",
+      "unhealthy": "Service unavailable",
+      "idle": "Check service status"
+    },
+    "titlePrefix": "Server ",
+    "titleHighlight": "Something went wrong",
+    "description": "Sorry, the server encountered an unexpected condition. Our technical team has already received an alert and is working on it.",
+    "actions": {
+      "refresh": "Refresh page"
+    },
+    "requestId": "Request ID",
+    "copyHintHasId": "Click to copy Request ID and share it with support.",
+    "copyHintNoId": "No traceable request ID returned for this error.",
+    "meta": {
+      "module": "Module",
+      "statusCode": "Status code",
+      "occurredAt": "Occurred at"
+    },
+    "footer": {
+      "home": "Home page",
+      "help": "Help center",
+      "contact": "Contact support"
+    }
+  },
+  "forbidden": {
+    "title": "Restricted access",
+    "description": "Sorry, you do not have permission to access this page. Contact an administrator to grant menu permissions.",
+    "restrictedPathLabel": "Restricted path",
+    "actions": {
+      "back": "Return to previous page",
+      "home": "Return to home page"
+    },
+    "securityProtocolActive": "Security Protocol Active",
+    "securityNote": "If you believe this is a bug, contact the system administrator to request the required permissions."
+  },
+  "notFound": {
+    "systemAlert": "System alert",
+    "title": "Data Void",
+    "description": "The target node may have drifted or been recycled. The graph cannot resolve this legacy link.",
+    "nodeIdUndefined": "Node ID: undefined",
+    "actions": {
+      "home": "Return Home",
+      "retry": "Try again"
+    },
+    "log": {
+      "title": "ERR_LOG_DUMP",
+      "live": "LIVE",
+      "tracingRoute": "> tracing route...FAILED",
+      "pingGateway": "> ping gateway...TIMEOUT",
+      "checksum": "> checksum...CORRUPTED",
+      "reroutePrefix": "> initiating reroute..."
+    }
+  }
+}

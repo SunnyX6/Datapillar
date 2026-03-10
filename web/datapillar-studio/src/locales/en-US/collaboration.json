@@ -1,0 +1,191 @@
+{
+  "sidebar": {
+    "title": "Collaborative space",
+    "sections": {
+      "smartViews": "Smart views",
+      "quickFilters": "Quick filters"
+    },
+    "folders": {
+      "inbox": "Inbox (Pending)",
+      "sent": "I initiated",
+      "archive": "Archive history"
+    },
+    "smartViews": {
+      "mentioned": "Mentioned",
+      "urgent": "Urgent"
+    },
+    "quickFilters": {
+      "dataAccess": "Data access",
+      "codeReview": "Code reviews",
+      "infraOps": "Infra ops"
+    },
+    "createButton": "Initiate a collaboration request"
+  },
+  "status": {
+    "PENDING": "Pending",
+    "APPROVED": "Approved",
+    "REJECTED": "Rejected",
+    "CHANGES_REQUESTED": "Changes requested"
+  },
+  "statusFilter": {
+    "all": "All status"
+  },
+  "priority": {
+    "HIGH": "High",
+    "MEDIUM": "Medium",
+    "LOW": "Low"
+  },
+  "duration": {
+    "days7": "7 days",
+    "days30": "30 days",
+    "days90": "90 days",
+    "longTerm": "Long term"
+  },
+  "requestType": {
+    "DATA_ACCESS": {
+      "title": "Data permissions",
+      "desc": "Apply for table-level or field-level read permissions with sensitive-field detection."
+    },
+    "CODE_REVIEW": {
+      "title": "Code review",
+      "desc": "Submit ETL tasks or dataflow changes and trigger downstream impact analysis."
+    },
+    "RESOURCE_OPS": {
+      "title": "Resource operations",
+      "desc": "Apply for cluster scaling or queue quota priority adjustments."
+    },
+    "API_PUBLISH": {
+      "title": "Service release",
+      "desc": "Publish data tables as high-concurrency APIs with rate limiting and auth."
+    },
+    "SCHEMA_CHANGE": {
+      "title": "Schema changes",
+      "desc": "Apply DDL updates (column/index) and execute online schema changes."
+    },
+    "DQ_REPORT": {
+      "title": "Quality reporting",
+      "desc": "Report data anomalies or SLA delays and trigger quality workflows."
+    }
+  },
+  "ticketList": {
+    "searchPlaceholder": "Search tickets...",
+    "empty": "No relevant request found",
+    "userLabel": {
+      "inbox": "{{name}}",
+      "sent": "Waiting for {{name}}",
+      "archive": "Initiator {{name}}"
+    }
+  },
+  "detail": {
+    "empty": {
+      "title": "No ticket selected",
+      "description": "Please select a ticket from the list to view details."
+    },
+    "header": {
+      "currentHandler": "Current handler"
+    },
+    "actions": {
+      "reject": "Reject",
+      "approve": "Approve request",
+      "withdraw": "Withdraw request"
+    },
+    "prioritySuffix": " priority",
+    "sections": {
+      "dataAccess": {
+        "permissions": "Permissions",
+        "term": "Term",
+        "selectedFields": "Requested fields",
+        "reason": "Business reason"
+      },
+      "codeReview": {
+        "collapseDiff": "Collapse difference overview",
+        "viewDiff": "View code differences",
+        "addedCount": "Added {{count}} lines",
+        "removedCount": "Removed {{count}} lines",
+        "diffHint": "Detailed differences have been synchronized to the review system."
+      },
+      "resourceOps": {
+        "current": "Current",
+        "requested": "Requested"
+      },
+      "generic": {
+        "target": "Target",
+        "expectedDate": "Expected completion",
+        "tags": "Tags",
+        "description": "Requirement description"
+      }
+    },
+    "timeline": {
+      "title": "Circulation records",
+      "commentPlaceholder": "Add a comment or note...",
+      "commentButton": "Comment"
+    }
+  },
+  "view": {
+    "modal": {
+      "selectTypeTitle": "Initiate a new collaboration request",
+      "fillFormTitle": "Application details: {{typeLabel}}",
+      "selectTypeHint": "Please select a type to continue",
+      "cancel": "Cancel",
+      "submit": "Submit request"
+    },
+    "typeCarousel": {
+      "more": "More",
+      "back": "Back"
+    },
+    "defaults": {
+      "collaborationRequestTag": "Collaboration request",
+      "notFilledIn": "Not filled in",
+      "noTableSelected": "No table selected",
+      "desensitization": "Desensitization",
+      "originalData": "Original"
+    },
+    "dataAccess": {
+      "step1Title": "1. Search and select data table",
+      "searchPlaceholder": "Enter table keywords (e.g. order, user)...",
+      "noMatch": "No matching data table found",
+      "recommended": "Recommended tables",
+      "tableRows": "{{rows}} rows",
+      "ownerLabel": "Owner",
+      "step2Title": "2. Select fields",
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "tableHeader": {
+        "fieldName": "Field name",
+        "type": "Type"
+      },
+      "sensitiveField": "Sensitive field",
+      "selectedColumnsPrefix": "Selected",
+      "containsSensitive": "Contains sensitive fields",
+      "permissionType": "Permission type",
+      "permissionOptions": {
+        "select": "SELECT (Query)",
+        "export": "EXPORT (Export)"
+      },
+      "duration": "Term",
+      "step3Title": "3. Business rationale",
+      "reasonPlaceholder": "Please explain the reason and usage scenario",
+      "selectTableFirst": "Please select a data table on the left first"
+    },
+    "generic": {
+      "target": "Target",
+      "targetPlaceholder": "Please enter the asset requiring collaboration/service",
+      "expectedDate": "Expected completion date",
+      "priority": "Priority",
+      "tags": "Tags",
+      "tagsPlaceholder": "e.g. publish,change",
+      "description": "Requirement description",
+      "descriptionPlaceholder": "Please describe change/publish/problem details"
+    }
+  },
+  "time": {
+    "justNow": "Just now"
+  },
+  "timelineActions": {
+    "createRequest": "Create request",
+    "approveRequest": "Approve request",
+    "denyRequest": "Deny request",
+    "withdrawRequest": "Withdraw request",
+    "additionalInfo": "Additional information"
+  }
+}

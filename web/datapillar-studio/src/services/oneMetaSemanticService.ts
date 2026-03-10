@@ -460,7 +460,7 @@ export async function fetchModifiers(offset = 0,limit = 50):Promise<{
  offset:number
  limit:number
 }> {
- const response = await oneMetaGet<ModifierListResponse>(`/metrics/modifiers?offset=${offset}&limit=${limit}`)
+ const response = await oneMetaGet<ModifierListResponse>(`/modifiers?offset=${offset}&limit=${limit}`)
 
  return {
  items:response.modifiers || [],total:response.total,offset:response.offset,limit:response.limit
@@ -471,7 +471,7 @@ export async function fetchModifiers(offset = 0,limit = 50):Promise<{
  * Get modifier details
  */
 export async function getModifier(code:string):Promise<MetricModifierDTO> {
- const response = await oneMetaGet<ModifierResponse>(`/metrics/modifiers/${encodeURIComponent(code)}`)
+ const response = await oneMetaGet<ModifierResponse>(`/modifiers/${encodeURIComponent(code)}`)
  return response.modifier
 }
 
@@ -479,7 +479,7 @@ export async function getModifier(code:string):Promise<MetricModifierDTO> {
  * Create modifier
  */
 export async function createModifier(data:CreateModifierRequest):Promise<MetricModifierDTO> {
- const response = await oneMetaPost<ModifierResponse>(`/metrics/modifiers`,data)
+ const response = await oneMetaPost<ModifierResponse>(`/modifiers`,data)
  return response.modifier
 }
 
@@ -487,14 +487,14 @@ export async function createModifier(data:CreateModifierRequest):Promise<MetricM
  * Remove modifier
  */
 export async function deleteModifier(code:string):Promise<void> {
- await oneMetaDelete<GravitinoBaseResponse>(`/metrics/modifiers/${encodeURIComponent(code)}`)
+ await oneMetaDelete<GravitinoBaseResponse>(`/modifiers/${encodeURIComponent(code)}`)
 }
 
 /**
  * update modifier
  */
 export async function updateModifier(code:string,data:UpdateModifierRequest):Promise<MetricModifierDTO> {
- const response = await oneMetaPut<ModifierResponse>(`/metrics/modifiers/${encodeURIComponent(code)}`,data)
+ const response = await oneMetaPut<ModifierResponse>(`/modifiers/${encodeURIComponent(code)}`,data)
  return response.modifier
 }
 

@@ -1,4 +1,5 @@
 import { Filter, Inbox, Search } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui'
 import { menuWidthClassMap, panelWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
@@ -26,11 +27,12 @@ function TypeIcon({ type }: { type: Ticket['type'] }) {
 }
 
 function StatusBadge({ status }: { status: Ticket['status'] }) {
+  const { t } = useTranslation('collaboration')
   const config = statusConfigMap[status]
 
   return (
     <span className={cn('flex items-center px-2 py-0.5 rounded text-micro font-bold border uppercase tracking-wide', config.color)}>
-      {config.label}
+      {t(`status.${status}`, { defaultValue: config.label })}
     </span>
   )
 }
@@ -47,6 +49,8 @@ export function CollaborationTicketList({
   onSelectStatus,
   onSelectTicket
 }: CollaborationTicketListProps) {
+  const { t } = useTranslation('collaboration')
+
   return (
     <div className={cn(panelWidthClassMap.collaborationList, 'border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col flex-shrink-0')}>
       <div className="h-14 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 flex-shrink-0 sticky top-0 bg-white dark:bg-slate-900 z-10">
@@ -56,7 +60,7 @@ export function CollaborationTicketList({
             type="text"
             value={listQuery}
             onChange={(event) => onListQueryChange(event.target.value)}
-            placeholder="Search tickets..."
+            placeholder={t('ticketList.searchPlaceholder')}
             className={cn(
               'w-full pl-8 pr-4 py-1.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:bg-white dark:focus:bg-slate-900 transition-all',
               TYPOGRAPHY.bodySm
@@ -93,7 +97,7 @@ export function CollaborationTicketList({
                   statusFilter === option.value && 'text-brand-600 dark:text-brand-300 font-semibold'
                 )}
               >
-                {option.label}
+                {option.value === 'ALL' ? t('statusFilter.all') : t(`status.${option.value}`, { defaultValue: option.label })}
               </Button>
             ))}
           </div>
@@ -106,17 +110,17 @@ export function CollaborationTicketList({
             <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800/60 rounded-full flex items-center justify-center mx-auto mb-3">
               <Inbox size={20} className="text-slate-300 dark:text-slate-600" />
             </div>
-            <p className={cn(TYPOGRAPHY.caption, 'text-slate-500 dark:text-slate-400')}>No relevant request found</p>
+            <p className={cn(TYPOGRAPHY.caption, 'text-slate-500 dark:text-slate-400')}>{t('ticketList.empty')}</p>
           </div>
         ) : (
           tickets.map((ticket) => {
             const ticketView = getTicketView(ticket.id)
             const userLabel =
               ticketView === 'INBOX'
-                ? ticket.requester.name
+                ? t('ticketList.userLabel.inbox', { name: ticket.requester.name })
                 : ticketView === 'SENT'
-                  ? `wait ${ticket.assignee.name}`
-                  : `initiator ${ticket.requester.name}`
+                  ? t('ticketList.userLabel.sent', { name: ticket.assignee.name })
+                  : t('ticketList.userLabel.archive', { name: ticket.requester.name })
 
             const avatarLabel = ticketView === 'INBOX' ? ticket.requester.avatar : ticket.assignee.avatar
 

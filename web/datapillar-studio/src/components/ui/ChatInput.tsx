@@ -8,6 +8,7 @@ import { TYPOGRAPHY } from '@/design-tokens/typography'
 export type ChatModelOption = {
  id?: string | number
  aiModelId?: number
+ modelType?: string | null
  label?: string
  badge?: string
  tone?: 'emerald' | 'violet' | 'blue' | string
@@ -45,8 +46,25 @@ export type ChatInputProps = {
  onDefaultModelChange?: (value:number) => void
  /** Model drop-down card header copy */
  modelDropdownHeader?: string
+ text?: Partial<ChatInputText>
  commandOptions:ChatCommandOption[]
  onCommand:(commandId:string) => void
+}
+
+export type ChatInputText = {
+ placeholder:string
+ placeholderResume:string
+ sendLabel:string
+ stopLabel:string
+ continueLabel:string
+ noModelPermissionHint:string
+ modelButtonTitle:string
+ commandLibrary:string
+ intelligenceEnhancement:string
+ safetyHintDefault:string
+ safetyHintResume:string
+ defaultModel:string
+ setAsDefaultModel:string
 }
 
 type ResolvedChatModelOption = {
@@ -64,6 +82,22 @@ const MODEL_DROPDOWN_HEADER_HEIGHT = 42
 const MODEL_DROPDOWN_LIST_PADDING = 12
 const MODEL_DROPDOWN_ITEM_HEIGHT = 44
 const COMMAND_DROPDOWN_MIN_HEIGHT = 156
+
+const DEFAULT_CHAT_INPUT_TEXT:ChatInputText = {
+ placeholder:'Describe your data workflow needs...',
+ placeholderResume:'Please add key information to continue...',
+ sendLabel:'send',
+ stopLabel:'stop',
+ continueLabel:'continue',
+ noModelPermissionHint:'Please contact the administrator for model authorization',
+ modelButtonTitle:'Select model',
+ commandLibrary:'command library',
+ intelligenceEnhancement:'Intelligence enhancement',
+ safetyHintDefault:'AI may be wrong, please verify the output.',
+ safetyHintResume:'Wait for additional information to continue.',
+ defaultModel:'Default model',
+ setAsDefaultModel:'Set as default model'
+}
 
 function resolveDropdownTop(rect:DOMRect,dropdownHeight:number):number {
  const spaceBelow = window.innerHeight - rect.bottom - DROPDOWN_VIEWPORT_MARGIN
@@ -102,6 +136,11 @@ function resolveModelProviderLabel(providerModelId:string,providerLabel:string):
 }
 
 function resolveModelOption(option:ChatModelOption):ResolvedChatModelOption | null {
+ const normalizedModelType = option.modelType?.trim().toLowerCase()
+ if (normalizedModelType && normalizedModelType!== 'chat') {
+ return null
+ }
+
  const rawId = typeof option.id === 'string' || typeof option.id === 'number'?option.id:null
  const resolvedAiModelId =
  option.aiModelId?? (typeof rawId === 'number' && Number.isInteger(rawId) && rawId > 0?rawId:null)
@@ -126,10 +165,11 @@ function resolveModelOption(option:ChatModelOption):ResolvedChatModelOption | nu
 }
 
 export function ChatInput({
- input,onInputChange,onSend,onAbort,canSend,isGenerating,isWaitingForResume,onCompositionStart,onCompositionEnd,onKeyDown,onFocus,selectedModelId,defaultModelId,modelOptions,onModelChange,onDefaultModelChange,modelDropdownHeader = 'Select model',commandOptions,onCommand
+ input,onInputChange,onSend,onAbort,canSend,isGenerating,isWaitingForResume,onCompositionStart,onCompositionEnd,onKeyDown,onFocus,selectedModelId,defaultModelId,modelOptions,onModelChange,onDefaultModelChange,modelDropdownHeader = 'Select model',text,commandOptions,onCommand
 }:ChatInputProps) {
- const placeholder = isWaitingForResume?'Please add key information to continue...':'Describe your data workflow needs...'
- const sendLabel = isGenerating?'stop':isWaitingForResume?'continue':'send'
+ const uiText = { ...DEFAULT_CHAT_INPUT_TEXT,...text }
+ const placeholder = isWaitingForResume?uiText.placeholderResume:uiText.placeholder
+ const sendLabel = isGenerating?uiText.stopLabel:isWaitingForResume?uiText.continueLabel:uiText.sendLabel
  const [modelOpen,setModelOpen] = useState(false)
  const [commandOpen,setCommandOpen] = useState(false)
  const modelTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -144,9 +184,9 @@ export function ChatInput({
  const resolvedDefaultModelId = defaultModelId?? null
  const selectedModel = useMemo(() => normalizedModelOptions.find((model) => model.aiModelId === resolvedModelId)?? normalizedModelOptions[0],[normalizedModelOptions,resolvedModelId])
  const hasModels = normalizedModelOptions.length > 0
- const noModelPermissionHint = 'Please contact the administrator for authorizationLLMmodel'
- const modelButtonLabel = hasModels?(selectedModel?.label?? 'Select model'):noModelPermissionHint
- const modelButtonTitle = hasModels?'Select model':noModelPermissionHint
+ const noModelPermissionHint = uiText.noModelPermissionHint
+ const modelButtonLabel = hasModels?(selectedModel?.label?? uiText.modelButtonTitle):noModelPermissionHint
+ const modelButtonTitle = hasModels?uiText.modelButtonTitle:noModelPermissionHint
  const hasCommands = commandOptions.length > 0
 
  const modelToneClassMap:Record<string,string> = {
@@ -289,11 +329,11 @@ export function ChatInput({
  <ChevronDown size={12} className={cn('text-gray-400 transition-transform',modelOpen && 'rotate-180')} />
  </button>
  <span className="mx-1 h-4 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
- {hasCommands && (<Tooltip content="command library" side="top">
+ {hasCommands && (<Tooltip content={uiText.commandLibrary} side="top">
  <button
  ref={commandTriggerRef}
  type="button"
- aria-label="command library"
+ aria-label={uiText.commandLibrary}
  aria-haspopup="listbox"
  aria-expanded={commandOpen}
  onClick={() => {
@@ -312,10 +352,10 @@ export function ChatInput({
  <Command size={12} />
  </button>
  </Tooltip>)}
- <Tooltip content="Intelligence enhancement" side="top">
+ <Tooltip content={uiText.intelligenceEnhancement} side="top">
  <button
  type="button"
- aria-label="Intelligence enhancement"
+ aria-label={uiText.intelligenceEnhancement}
  className="p-0.5 text-gray-400 dark:text-slate-400 hover:text-gray-600 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800/70 rounded-lg transition-colors"
  >
  <Zap size={12} />
@@ -324,7 +364,7 @@ export function ChatInput({
  </div>
  <div className="flex items-center space-x-2.5">
  <span className="text-nano text-gray-300 dark:text-slate-500 font-medium hidden group-focus-within:inline-block animate-fade-in">
- {isWaitingForResume?'Wait for additional information to continue.':'AI something could go wrong,Please verify.'}
+ {isWaitingForResume?uiText.safetyHintResume:uiText.safetyHintDefault}
  </span>
  <button
  type="button"
@@ -389,8 +429,8 @@ export function ChatInput({
  if (isDefault) return
  onDefaultModelChange(model.aiModelId)
  }}
- title={isDefault?'Default model':'Set as default model'}
- aria-label={isDefault?'Default model':'Set as default model'}
+ title={isDefault?uiText.defaultModel:uiText.setAsDefaultModel}
+ aria-label={isDefault?uiText.defaultModel:uiText.setAsDefaultModel}
  className={cn('flex size-5 items-center justify-center rounded-md transition-colors',isDefault?'text-amber-400 dark:text-amber-300':'text-slate-400 hover:text-amber-400 dark:text-slate-500 dark:hover:text-amber-300')}
  >
  <Star size={13} className={cn('transition-colors',isDefault && 'fill-current')} />
@@ -409,7 +449,7 @@ export function ChatInput({
  className="fixed z-[1000000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 top-[var(--dropdown-top)] left-[var(--dropdown-left)] w-[var(--dropdown-width)]"
  >
  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700/70">
- <span className="text-micro font-semibold text-slate-400 uppercase tracking-wider">command library</span>
+ <span className="text-micro font-semibold text-slate-400 uppercase tracking-wider">{uiText.commandLibrary}</span>
  </div>
  <div className="p-1.5 space-y-1" role="listbox">
  {commandOptions.map((command) => (<button

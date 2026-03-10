@@ -1,5 +1,6 @@
 import { useEffect,useRef,useState,type ChangeEvent,type DragEvent } from 'react'
 import { Globe,Key,Loader2,Server,Shield,UploadCloud } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Modal } from '@/components/ui'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
@@ -22,6 +23,7 @@ type AuthType = 'Bearer' | 'Header' | 'Basic'
 export default function UploadDocumentModal({
  isOpen,onClose,spaceId,spaceName,onUploaded
 }:UploadDocumentModalProps) {
+ const { t } = useTranslation('wiki')
  const [uploadMode,setUploadMode] = useState<UploadMode>('local')
  const [dragActive,setDragActive] = useState(false)
  const [importUrl,setImportUrl] = useState('')
@@ -60,12 +62,12 @@ export default function UploadDocumentModal({
 
  const startLocalUpload = async (file:File) => {
  if (!spaceId) {
- toast.error('Please select a knowledge space first')
+ toast.error(t('uploadModal.toast.selectSpaceFirst'))
  return
  }
  const namespaceId = Number(spaceId)
  if (!Number.isFinite(namespaceId)) {
- toast.error('knowledge space ID Invalid')
+ toast.error(t('uploadModal.toast.invalidSpaceId'))
  return
  }
  try {
@@ -73,12 +75,12 @@ export default function UploadDocumentModal({
  const uploadResult = await uploadDocument(namespaceId,file,file.name)
  const document = await getDocument(uploadResult.document_id)
  onUploaded(mapDocumentToUi(document))
- toast.success('Document uploaded successfully')
+ toast.success(t('uploadModal.toast.uploadSuccess'))
  resetState()
  onClose()
  } catch (error) {
  const message = error instanceof Error?error.message:String(error)
- toast.error(`Upload failed:${message}`)
+ toast.error(t('uploadModal.toast.uploadFailed', { message }))
  } finally {
  setIsUploading(false)
  }
@@ -113,7 +115,7 @@ export default function UploadDocumentModal({
 
  const handleUrlImport = () => {
  if (!importUrl.trim()) return
- toast.warning('URL Import is not open yet')
+ toast.warning(t('uploadModal.toast.urlDisabled'))
  }
 
  const isUrlValid = importUrl.trim().length > 0
@@ -121,9 +123,9 @@ export default function UploadDocumentModal({
  return (<Modal
  isOpen={isOpen}
  onClose={handleClose}
- title="Upload documents"
+ title={t('uploadModal.title')}
  subtitle={(<span className="text-xs text-slate-400">
- upload to:<span className="font-semibold text-indigo-500">{spaceName}</span>
+ {t('uploadModal.subtitle.uploadTo')}<span className="font-semibold text-indigo-500">{spaceName}</span>
  </span>)}
  size="sm"
  >
@@ -136,7 +138,7 @@ export default function UploadDocumentModal({
  uploadMode === 'local'?'border-indigo-500 text-indigo-500':'border-transparent text-slate-400 hover:text-slate-600'
  }`}
  >
- local file
+ {t('uploadModal.tab.local')}
  </button>
  <button
  type="button"
@@ -148,7 +150,7 @@ export default function UploadDocumentModal({
  uploadMode === 'url'?'border-indigo-500 text-indigo-500':'border-transparent text-slate-400 hover:text-slate-600'
  } ${isUrlDisabled?'cursor-not-allowed opacity-50':''}`}
  >
- URL link
+ {t('uploadModal.tab.url')}
  </button>
  </div>)}
  </div>
@@ -156,8 +158,8 @@ export default function UploadDocumentModal({
  <div className="pt-6">
  {isUploading?(<div className="flex flex-col items-center justify-center py-12 text-center">
  <Loader2 size={42} className="text-indigo-500 animate-spin mb-4" />
- <p className={`${TYPOGRAPHY.bodySm} font-semibold text-slate-800`}>Uploading document...</p>
- <p className="text-xs text-slate-400 mt-1">After the upload is completed,you can"Segmentation management"Configure segmentation strategy in</p>
+ <p className={`${TYPOGRAPHY.bodySm} font-semibold text-slate-800`}>{t('uploadModal.uploading.title')}</p>
+ <p className="text-xs text-slate-400 mt-1">{t('uploadModal.uploading.description')}</p>
  </div>):uploadMode === 'local'?(<div
  className={`border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center transition-all ${
  dragActive?'border-indigo-500 bg-indigo-50/60':'border-slate-200 bg-slate-50/70 hover:bg-slate-100/70 hover:border-slate-300'
@@ -170,14 +172,14 @@ export default function UploadDocumentModal({
  <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mb-4 text-indigo-500">
  <UploadCloud size={30} />
  </div>
- <p className="text-sm font-semibold text-slate-700 mb-1">Click or drag files here</p>
- <p className="text-xs text-slate-400">support PDF,DOCX,MD,TXT (Max 20MB)</p>
+ <p className="text-sm font-semibold text-slate-700 mb-1">{t('uploadModal.local.dropTitle')}</p>
+ <p className="text-xs text-slate-400">{t('uploadModal.local.dropHint')}</p>
  <button
  type="button"
  onClick={() => fileInputRef.current?.click()}
  className="mt-6 px-6 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-semibold rounded-xl shadow-sm hover:border-indigo-300 hover:text-indigo-600 transition-all"
  >
- Select file
+ {t('uploadModal.local.selectFile')}
  </button>
  <input
  ref={fileInputRef}
@@ -188,7 +190,7 @@ export default function UploadDocumentModal({
  />
  </div>):(<div className="space-y-6">
  <div>
- <label className="block text-body-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Document address (URL)</label>
+ <label className="block text-body-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">{t('uploadModal.url.addressLabel')}</label>
  <div className="relative">
  <Globe size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
  <input
@@ -200,7 +202,7 @@ export default function UploadDocumentModal({
  autoFocus
  />
  </div>
- <p className={`${TYPOGRAPHY.legal} text-slate-400 mt-2`}>support PDF,Notion Page,Online documents or ordinary web pages.</p>
+ <p className={`${TYPOGRAPHY.legal} text-slate-400 mt-2`}>{t('uploadModal.url.addressHint')}</p>
  </div>
 
  <div className="space-y-3">
@@ -214,7 +216,7 @@ export default function UploadDocumentModal({
  />
  <span className="flex items-center">
  <Key size={14} className="mr-1.5 text-slate-400" />
- Authentication configuration (Authentication)
+ {t('uploadModal.url.authConfig')}
  </span>
  </label>
 
@@ -227,7 +229,7 @@ export default function UploadDocumentModal({
  />
  <span className="flex items-center">
  <Server size={14} className="mr-1.5 text-slate-400" />
- network proxy (Network)
+ {t('uploadModal.url.networkProxy')}
  </span>
  </label>
  </div>
@@ -248,7 +250,7 @@ export default function UploadDocumentModal({
 
  <div className="space-y-3">
  {urlAuthType === 'Header' && (<div>
- <label className={`block ${TYPOGRAPHY.legal} font-semibold text-slate-500 uppercase mb-1`}>Header Key</label>
+ <label className={`block ${TYPOGRAPHY.legal} font-semibold text-slate-500 uppercase mb-1`}>{t('uploadModal.url.headerKey')}</label>
  <input
  type="text"
  value={urlAuthKey}
@@ -259,7 +261,7 @@ export default function UploadDocumentModal({
  </div>)}
  <div>
  <label className={`block ${TYPOGRAPHY.legal} font-semibold text-slate-500 uppercase mb-1`}>
- {urlAuthType === 'Basic'?'Credentials (user:pass)':'Token / Value'}
+ {urlAuthType === 'Basic'?t('uploadModal.url.credentials'):t('uploadModal.url.tokenValue')}
  </label>
  <input
  type={urlAuthType === 'Basic'?'password':'text'}
@@ -274,26 +276,26 @@ export default function UploadDocumentModal({
 
  {useProxy && (<div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100 space-y-3 animate-in fade-in slide-in-from-top-2">
  <div>
- <label className={`block ${TYPOGRAPHY.legal} font-semibold text-slate-500 uppercase mb-1`}>Tunnel Agent</label>
+ <label className={`block ${TYPOGRAPHY.legal} font-semibold text-slate-500 uppercase mb-1`}>{t('uploadModal.url.tunnelAgent')}</label>
  <select
  value={proxyAgent}
  onChange={(event) => setProxyAgent(event.target.value)}
  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-300"
  >
- <option value="Default proxy">Default proxy(share)</option>
- <option value="Intranet proxy">Intranet proxy</option>
- <option value="VPN channel">VPN channel</option>
+ <option value="Default proxy">{t('uploadModal.url.proxy.default')}</option>
+ <option value="Intranet proxy">{t('uploadModal.url.proxy.intranet')}</option>
+ <option value="VPN channel">{t('uploadModal.url.proxy.vpn')}</option>
  </select>
  </div>
  <div className={`flex items-center ${TYPOGRAPHY.legal} text-blue-600 bg-white px-2 py-1.5 rounded border border-blue-100`}>
- <span className="mr-1.5">Tips</span>
- Traffic will pass through the selected Agent Make secure forwarding,No public network access required.</div>
+ <span className="mr-1.5">{t('uploadModal.url.tipsLabel')}</span>
+ {t('uploadModal.url.tipsContent')}</div>
  </div>)}
  </div>
 
  <div className="flex items-start text-xs text-slate-400">
  <Shield size={12} className="mt-0.5 mr-1.5 flex-shrink-0" />
- <p>The system will automatically access and parse the content.For intranet Wiki (Such as Confluence),Please enable authentication configuration.</p>
+ <p>{t('uploadModal.url.securityNotice')}</p>
  </div>
 
  <button
@@ -302,7 +304,7 @@ export default function UploadDocumentModal({
  disabled={!isUrlValid}
  className="w-full py-2.5 bg-indigo-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-200/50 hover:bg-indigo-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
  >
- {urlAuthEnabled?'Import with credentials (Import with Auth)':'Start importing'}
+ {urlAuthEnabled?t('uploadModal.url.importWithAuth'):t('uploadModal.url.startImport')}
  </button>
  </div>)}
  </div>

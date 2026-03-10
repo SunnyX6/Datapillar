@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search, Database, ChevronRight, FileText, Sliders, Zap, Layers, Command, Globe } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Card } from '@/components/ui'
 import { Select, type SelectOption } from '@/components/ui/Select'
@@ -19,11 +20,12 @@ interface Props {
 type RetrievalMode = 'semantic' | 'hybrid'
 
 const RETRIEVAL_MODE_OPTIONS: SelectOption[] = [
-  { value: 'semantic', label: 'Semantics' },
-  { value: 'hybrid', label: 'mix' }
+  { value: 'semantic', label: 'Semantic' },
+  { value: 'hybrid', label: 'Hybrid' }
 ]
 
 export default function RetrievalPlayground({ spaceId, spaceName, documents, isNamespaceCollapsed }: Props) {
+  const { t } = useTranslation('wiki')
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[] | null>(null)
   const [isSearching, setIsSearching] = useState(false)
@@ -41,10 +43,10 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
 
   const searchScopeOptions = useMemo<SelectOption[]>(() => {
     return [
-      { value: 'all', label: 'Full database search (All Documents)' },
+      { value: 'all', label: t('retrieval.scope.allDocuments') },
       ...documents.map((doc) => ({ value: doc.id, label: doc.title }))
     ]
-  }, [documents])
+  }, [documents, t])
 
   useEffect(() => {
     if (searchScope !== 'all' && !documents.some((doc) => doc.id === searchScope)) {
@@ -55,12 +57,12 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
   const handleSearch = async () => {
     if (!query.trim()) return
     if (!spaceId) {
-      toast.warning('Please select a knowledge space first')
+      toast.warning(t('retrieval.toast.selectSpaceFirst'))
       return
     }
     const namespaceId = Number(spaceId)
     if (!Number.isFinite(namespaceId)) {
-      toast.error('knowledge space ID Invalid')
+      toast.error(t('retrieval.toast.invalidSpaceId'))
       return
     }
     setIsSearching(true)
@@ -79,7 +81,7 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
       setLatencyMs(response.latency_ms)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      toast.error(`Retrieval failed：${message}`)
+      toast.error(t('retrieval.toast.failed', { message }))
       setResults([])
       setLatencyMs(null)
     } finally {
@@ -97,10 +99,10 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
           <div className="text-center space-y-2">
             <h3 className={`${TYPOGRAPHY.subtitle} font-bold text-slate-900 dark:text-slate-100 tracking-tight flex items-center justify-center`}>
               <Zap className="mr-2 text-indigo-500" size={20} />
-              Retrieval recall test
+              {t('retrieval.title')}
             </h3>
-            <p className={`${TYPOGRAPHY.bodySm} text-slate-500 dark:text-slate-400`}>Simulation Agent runtime environment，Debugging mixed retrieval and reordering effects</p>
-            <p className={`${TYPOGRAPHY.caption} text-slate-400`}>current space：{spaceName}</p>
+            <p className={`${TYPOGRAPHY.bodySm} text-slate-500 dark:text-slate-400`}>{t('retrieval.subtitle')}</p>
+            <p className={`${TYPOGRAPHY.caption} text-slate-400`}>{t('retrieval.currentSpace', { spaceName })}</p>
           </div>
 
           <div className="w-full relative z-20">
@@ -121,14 +123,14 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                     className={`w-full h-full px-4 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none bg-transparent ${TYPOGRAPHY.caption}`}
-                    placeholder="Enter test question，Press the Enter key to initiate a search..."
+                    placeholder={t('retrieval.searchPlaceholder')}
                   />
 
                   <div className="pr-3 flex items-center">
                     <button
                       onClick={() => setShowConfig(!showConfig)}
                       className={`p-2 rounded-lg transition-all duration-200 ${showConfig ? 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-200' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600'}`}
-                      title="Parameter configuration"
+                      title={t('retrieval.config.title')}
                     >
                       <Sliders size={16} />
                     </button>
@@ -145,14 +147,14 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
                 <div className="bg-slate-50/50 dark:bg-slate-800/60 rounded-xl p-4 space-y-5">
                   <div className="flex items-center justify-between">
                     <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase tracking-wider flex items-center shrink-0`}>
-                      <Globe size={12} className="mr-1.5" /> Search scope
+                      <Globe size={12} className="mr-1.5" /> {t('retrieval.config.scopeLabel')}
                     </label>
                     <div className="w-44">
                       <Select
                         value={searchScope}
                         onChange={(value) => setSearchScope(value)}
                         options={searchScopeOptions}
-                        dropdownHeader="Search scope"
+                        dropdownHeader={t('retrieval.config.scopeHeader')}
                         size="xs"
                       />
                     </div>
@@ -163,14 +165,17 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="flex items-center justify-between">
                       <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase tracking-wider flex items-center shrink-0`}>
-                        <Database size={12} className="mr-1.5" /> Search mode
+                        <Database size={12} className="mr-1.5" /> {t('retrieval.config.modeLabel')}
                       </label>
                       <div className="w-32">
                         <Select
                           value={retrievalMode}
                           onChange={(value) => setRetrievalMode(value as RetrievalMode)}
-                          options={RETRIEVAL_MODE_OPTIONS}
-                          dropdownHeader="Search mode"
+                          options={RETRIEVAL_MODE_OPTIONS.map((item) => ({
+                            ...item,
+                            label: item.value === 'semantic' ? t('retrieval.mode.semantic') : t('retrieval.mode.hybrid')
+                          }))}
+                          dropdownHeader={t('retrieval.config.modeHeader')}
                           size="xs"
                         />
                       </div>
@@ -178,7 +183,7 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
 
                     <div className="flex items-center justify-between">
                       <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase tracking-wider flex items-center shrink-0`}>
-                        <Layers size={12} className="mr-1.5" /> Reorder
+                        <Layers size={12} className="mr-1.5" /> {t('retrieval.config.rerankLabel')}
                       </label>
                       <div className="flex items-center space-x-3">
                         {enableRerank && (
@@ -201,7 +206,7 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
                       <div className="flex justify-between items-center mb-3">
-                        <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Top K</label>
+                          <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>{t('retrieval.config.topK')}</label>
                         <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded shadow-sm`}>{topK}</span>
                       </div>
                       <input
@@ -216,7 +221,7 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
                     </div>
                     <div>
                       <div className="flex justify-between items-center mb-3">
-                        <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Score Threshold</label>
+                        <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>{t('retrieval.config.scoreThreshold')}</label>
                         <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded shadow-sm`}>{threshold}</span>
                       </div>
                       <input
@@ -242,14 +247,14 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-4 shadow-sm">
                 <Command className="text-slate-300" size={24} />
               </div>
-              <p className={`${TYPOGRAPHY.bodySm} text-slate-400`}>ready，Enter the question and press Enter</p>
+              <p className={`${TYPOGRAPHY.bodySm} text-slate-400`}>{t('retrieval.emptyHint')}</p>
             </div>
           ) : (
             <div className="space-y-4">
               <div className={`${resultsWidthClass} flex items-center justify-between ${TYPOGRAPHY.bodySm} px-1`}>
                 <div className="flex items-center space-x-2">
                   <span className="font-semibold text-slate-700 dark:text-slate-200 flex items-center">
-                    Recall results ({results ? results.length : 0})
+                    {t('retrieval.resultTitle', { count: results ? results.length : 0 })}
                   </span>
                   {searchScope !== 'all' && (
                     <span className={`px-1.5 py-0.5 bg-blue-50 text-blue-600 ${TYPOGRAPHY.micro} rounded border border-blue-100 flex items-center max-w-40 truncate dark:bg-blue-500/10 dark:text-blue-200 dark:border-blue-500/20`}>
@@ -258,10 +263,10 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
                     </span>
                   )}
                   <span className={`px-1.5 py-0.5 bg-indigo-50 text-indigo-600 ${TYPOGRAPHY.micro} rounded border border-indigo-100 capitalize dark:bg-indigo-500/10 dark:text-indigo-200 dark:border-indigo-500/20`}>
-                    {retrievalMode} {enableRerank ? '+ Rerank' : ''}
+                    {t(`retrieval.mode.${retrievalMode}`)} {enableRerank ? `+ ${t('retrieval.config.rerankShort')}` : ''}
                   </span>
                 </div>
-                <span className={`${TYPOGRAPHY.caption} text-slate-400`}>Time consuming {latencyMs ?? '-'}ms</span>
+                <span className={`${TYPOGRAPHY.caption} text-slate-400`}>{t('retrieval.latency', { latency: latencyMs ?? '-' })}</span>
               </div>
 
               {results?.map((result) => (
@@ -283,7 +288,7 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
                     </div>
                     <div className="flex items-center space-x-3">
                       <div className="text-right">
-                        <div className={`${TYPOGRAPHY.micro} text-slate-400 uppercase font-bold`}>Similarity</div>
+                        <div className={`${TYPOGRAPHY.micro} text-slate-400 uppercase font-bold`}>{t('retrieval.similarity')}</div>
                         <div className={`${TYPOGRAPHY.bodySm} font-bold font-mono ${result.similarity > 0.8 ? 'text-emerald-600' : 'text-amber-600'}`}>
                           {result.similarity.toFixed(4)}
                         </div>
@@ -297,10 +302,10 @@ export default function RetrievalPlayground({ spaceId, spaceName, documents, isN
 
                   <div className="mt-3 flex justify-between items-center opacity-60 group-hover:opacity-100 transition-opacity">
                     <div className="flex space-x-2">
-                      <span className={`${TYPOGRAPHY.micro} bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-300`}>Token ID: 89-124</span>
+                      <span className={`${TYPOGRAPHY.micro} bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-300`}>{t('retrieval.tokenRange')}</span>
                     </div>
                     <button className={`${TYPOGRAPHY.caption} text-indigo-600 dark:text-indigo-200 font-medium flex items-center hover:underline`}>
-                      Contextual preview <ChevronRight size={12} />
+                      {t('retrieval.preview')} <ChevronRight size={12} />
                     </button>
                   </div>
                 </Card>

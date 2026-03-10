@@ -179,7 +179,9 @@ export function ChatPanel() {
  if (!active) {
  return
  }
- const options = rows.filter((model) => resolveModelOptionAiModelId(model)!== null)
+ const options = rows
+ .filter((model) => model.modelType?.toLowerCase() === 'chat')
+ .filter((model) => resolveModelOptionAiModelId(model)!== null)
  setModelOptions(options)
 
  const current = useWorkflowStudioStore.getState()

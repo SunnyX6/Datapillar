@@ -68,17 +68,19 @@ export interface TableProps extends Omit<HTMLAttributes<HTMLDivElement>,'childre
  footer?: ReactNode
  /** Infinite scroll down pagination:Table Responsible for rendering sentinel + loading,Data requests are handled by business components */
  infiniteScroll?: TableInfiniteScrollProps
+ /** Whether to allow horizontal scrolling. Defaults to true. */
+ horizontalScroll?: boolean
 }
 
 export function Table({
- children,className,tableClassName,layout = 'fixed',minWidth = 'wide',footer,infiniteScroll,...props
+ children,className,tableClassName,layout = 'fixed',minWidth = 'wide',footer,infiniteScroll,horizontalScroll = true,...props
 }:TableProps) {
  return (<div
  className={cn('bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm',className)}
  {...props}
  >
  <div className="overflow-hidden rounded-xl">
- <div className="overflow-x-auto">
+ <div className={horizontalScroll?'overflow-x-auto':'overflow-x-hidden'}>
  <table
  className={cn('w-full text-left border-collapse',tableLayoutClassMap[layout],tableMinWidthClassMap[minWidth],tableClassName)}
  >

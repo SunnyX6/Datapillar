@@ -1,0 +1,258 @@
+{
+  "namespaceForm": {
+    "field": {
+      "name": "Name",
+      "descriptionOptional": "Description (Optional)"
+    },
+    "placeholder": {
+      "name": "e.g. Marketing knowledge base",
+      "description": "Briefly describe what the space is about..."
+    },
+    "validation": {
+      "duplicateName": "Name already exists. Please use another one."
+    }
+  },
+  "hero": {
+    "title": "Build Datapillar Enterprise Knowledge Brain",
+    "description": "Datapillar Wiki is a next-generation RAG knowledge engine. By creating independent knowledge spaces (Namespaces), you can isolate documents across domains and use AI for deep semantic retrieval.",
+    "createFirstSpace": "Create first knowledge space",
+    "features": {
+      "isolation": {
+        "title": "Business Isolation",
+        "description": "Create separate spaces by department or project to isolate permissions and data security."
+      },
+      "chunking": {
+        "title": "Flexible Chunking Strategies",
+        "description": "Upload PDF/Word and choose chunking strategy by document type for vectorization."
+      },
+      "retrieval": {
+        "title": "Multi-Mode Retrieval",
+        "description": "Support semantic search, hybrid retrieval, and reranking across all docs or a single document scope."
+      }
+    }
+  },
+  "wikiView": {
+    "toast": {
+      "loadDocumentsFailed": "Failed to load documents: {{message}}",
+      "loadSpacesFailed": "Failed to load knowledge spaces: {{message}}",
+      "createSpaceSuccess": "Knowledge space created successfully",
+      "createSpaceFailed": "Creation failed: {{message}}"
+    },
+    "stats": {
+      "totalDocs": {
+        "label": "Total documents",
+        "unit": "docs"
+      },
+      "activeChunks": {
+        "label": "Active chunks",
+        "unit": "chunks"
+      },
+      "recallAccuracy": {
+        "label": "Average recall accuracy",
+        "unit": "%"
+      }
+    },
+    "createSpaceModal": {
+      "title": "Create knowledge space",
+      "subtitle": "Namespaces isolate knowledge documents for different business domains.",
+      "cancel": "Cancel",
+      "confirm": "Create space"
+    },
+    "fallbackSpace": {
+      "name": "No knowledge space selected",
+      "description": "Please create a knowledge space first before uploading documents."
+    },
+    "sidebar": {
+      "title": "Knowledge Spaces (Namespaces)",
+      "createAria": "Create knowledge space",
+      "docsCount": "{{count}} docs",
+      "closeAria": "Collapse knowledge spaces",
+      "closeTitle": "Collapse knowledge spaces",
+      "expandAria": "Expand knowledge spaces",
+      "expandTitle": "Expand knowledge spaces"
+    },
+    "header": {
+      "breadcrumbWiki": "Knowledge Wiki",
+      "uploadButton": "Upload documents to space"
+    },
+    "tabs": {
+      "documents": "Document list",
+      "chunks": "Chunk editor",
+      "retrieval": "Retrieval playground"
+    }
+  },
+  "uploadModal": {
+    "title": "Upload documents",
+    "subtitle": {
+      "uploadTo": "Upload to: "
+    },
+    "tab": {
+      "local": "Local file",
+      "url": "URL link"
+    },
+    "toast": {
+      "selectSpaceFirst": "Please select a knowledge space first",
+      "invalidSpaceId": "Invalid knowledge space ID",
+      "uploadSuccess": "Document uploaded successfully",
+      "uploadFailed": "Upload failed: {{message}}",
+      "urlDisabled": "URL import is not available yet"
+    },
+    "uploading": {
+      "title": "Uploading document...",
+      "description": "After upload completes, you can configure chunk strategy in Chunk Management."
+    },
+    "local": {
+      "dropTitle": "Click or drag files here",
+      "dropHint": "Supports PDF, DOCX, MD, TXT (max 20MB)",
+      "selectFile": "Select file"
+    },
+    "url": {
+      "addressLabel": "Document URL",
+      "addressHint": "Supports PDF, Notion pages, online docs, or normal web pages.",
+      "authConfig": "Authentication settings",
+      "networkProxy": "Network proxy",
+      "headerKey": "Header Key",
+      "credentials": "Credentials (user:pass)",
+      "tokenValue": "Token / Value",
+      "tunnelAgent": "Tunnel Agent",
+      "proxy": {
+        "default": "Default proxy (shared)",
+        "intranet": "Intranet proxy",
+        "vpn": "VPN channel"
+      },
+      "tipsLabel": "Tips",
+      "tipsContent": "Traffic will be securely forwarded through the selected agent without public network access.",
+      "securityNotice": "The system will automatically fetch and parse the content. For intranet Wiki (such as Confluence), enable authentication settings.",
+      "importWithAuth": "Import with credentials",
+      "startImport": "Start import"
+    }
+  },
+  "retrieval": {
+    "title": "Retrieval Recall Test",
+    "subtitle": "Simulate agent runtime to debug hybrid retrieval and rerank effects.",
+    "currentSpace": "Current space: {{spaceName}}",
+    "searchPlaceholder": "Enter a test question and press Enter to search...",
+    "scope": {
+      "allDocuments": "Search all documents"
+    },
+    "mode": {
+      "semantic": "Semantic",
+      "hybrid": "Hybrid"
+    },
+    "config": {
+      "title": "Parameter configuration",
+      "scopeLabel": "Search scope",
+      "scopeHeader": "Search scope",
+      "modeLabel": "Search mode",
+      "modeHeader": "Search mode",
+      "rerankLabel": "Rerank",
+      "rerankShort": "Rerank",
+      "topK": "Top K",
+      "scoreThreshold": "Score threshold"
+    },
+    "emptyHint": "Ready. Enter a question and press Enter.",
+    "resultTitle": "Recall results ({{count}})",
+    "latency": "Latency {{latency}}ms",
+    "similarity": "Similarity",
+    "tokenRange": "Token range: 89-124",
+    "preview": "Context preview",
+    "toast": {
+      "selectSpaceFirst": "Please select a knowledge space first",
+      "invalidSpaceId": "Invalid knowledge space ID",
+      "failed": "Retrieval failed: {{message}}"
+    }
+  },
+  "docList": {
+    "status": {
+      "indexed": "Indexed",
+      "processing": "Processing",
+      "failed": "Failed"
+    },
+    "columns": {
+      "documentName": "Document name",
+      "status": "Status",
+      "chunkLength": "Chunks / Tokens",
+      "uploadTime": "Upload time",
+      "actions": "Actions"
+    },
+    "empty": "No documents in this space yet"
+  },
+  "chunkManager": {
+    "mode": {
+      "general": "General",
+      "parentChild": "Parent/Child",
+      "qa": "Q&A"
+    },
+    "toast": {
+      "loadChunksFailed": "Failed to load chunks: {{message}}",
+      "selectDocumentFirst": "Please select a document first",
+      "invalidDocumentId": "Invalid document ID",
+      "chunkJobSubmitted": "Chunking task submitted",
+      "chunkJobFailed": "Chunking failed: {{message}}",
+      "emptyChunkContent": "Chunk content cannot be empty",
+      "chunkUpdated": "Chunk updated",
+      "updateFailed": "Update failed: {{message}}",
+      "chunkRemoved": "Chunk removed",
+      "removeFailed": "Removal failed: {{message}}"
+    },
+    "header": {
+      "noDocument": "No document",
+      "switchDocuments": "Switch documents",
+      "noDocumentsInSpace": "No documents in current space",
+      "totalChunks": "Total chunks",
+      "currentSpace": "Current space",
+      "chunkStrategy": "Chunk strategy"
+    },
+    "config": {
+      "title": "Chunk parameter configuration",
+      "chunkMode": "Chunk mode",
+      "general": {
+        "chunkLength": "Chunk length (chars)",
+        "overlap": "Overlap",
+        "delimiter": "Delimiter"
+      },
+      "parentChild": {
+        "parentChunk": "Parent chunk",
+        "parentLength": "Parent length (chars)",
+        "parentOverlap": "Parent overlap",
+        "parentDelimiter": "Parent delimiter",
+        "childChunk": "Child chunk",
+        "childLength": "Child length (chars)",
+        "childOverlap": "Child overlap",
+        "childDelimiter": "Child delimiter"
+      },
+      "qaPattern": "Q&A pattern",
+      "expectedChunks": "Estimated output: ~{{count}} chunks",
+      "applyAndReshard": "Apply configuration and re-shard"
+    },
+    "list": {
+      "searchPlaceholder": "Search chunks...",
+      "loading": "Loading chunks...",
+      "empty": "No chunks yet",
+      "length": "{{count}} len"
+    },
+    "detail": {
+      "title": "Chunk content details",
+      "remove": "Remove",
+      "reset": "Reset",
+      "editor": "Editor",
+      "charCount": "{{count}} chars",
+      "sourceMetadata": "Source metadata",
+      "sourcePage": "Source page",
+      "pageNumber": "Page {{page}}",
+      "lengthUsage": "Length usage",
+      "embeddingStatus": "Embedding status",
+      "model": "Model",
+      "notConfigured": "Not configured",
+      "vectorId": "Vector ID",
+      "vectorSynced": "Vector synced",
+      "vectorPending": "Vector pending",
+      "manualEditHint": "Manual content edits will trigger vector recalculation",
+      "saveAndUpdate": "Save and update index"
+    },
+    "empty": {
+      "selectChunk": "Please select a chunk from the left list",
+      "hint": "You can view details or manually optimize content"
+    }
+  }
+}

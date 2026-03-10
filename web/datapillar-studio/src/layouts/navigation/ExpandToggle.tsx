@@ -19,7 +19,6 @@ export function ExpandToggle({ variant, onToggle, className }: ExpandToggleProps
       type="button"
       onClick={onToggle}
       aria-label={label}
-      title={label}
       className={cn(
         'relative flex-shrink-0 overflow-hidden flex items-center justify-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-lg text-slate-500 hover:text-indigo-500 transition-colors h-14 w-6',
         isSidebarVariant ? 'rounded-l-full' : 'rounded-r-full',

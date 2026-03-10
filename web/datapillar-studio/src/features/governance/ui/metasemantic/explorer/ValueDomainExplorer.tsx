@@ -65,6 +65,11 @@ function ValueDomainCard({
   const normalizedLevel = domain.domainLevel?.toUpperCase() || 'BUSINESS'
   const typeConfig = TYPE_CONFIG[normalizedType] || TYPE_CONFIG.ENUM
   const levelConfig = LEVEL_CONFIG[normalizedLevel] || LEVEL_CONFIG.BUSINESS
+  const typeLabel = normalizedType === 'RANGE'
+    ? t('valueDomainExplorer.card.type.range')
+    : normalizedType === 'REGEX'
+      ? t('valueDomainExplorer.card.type.regex')
+      : t('valueDomainExplorer.card.type.enum')
   const levelLabel = normalizedLevel === 'BUILTIN'
     ? t('valueDomainExplorer.card.level.builtin')
     : t('valueDomainExplorer.card.level.business')
@@ -121,7 +126,7 @@ function ValueDomainCard({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
           <span className={`px-2 py-0.5 text-micro font-semibold uppercase tracking-wider rounded-md border ${typeConfig.color}`}>
-            {normalizedType}
+            {typeLabel}
           </span>
           {domain.dataType && (
             <span className="px-2 py-0.5 text-micro font-mono text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/30 rounded-md border border-cyan-200 dark:border-cyan-800">
@@ -392,8 +397,7 @@ export function ValueDomainExplorer({ onBack }: ValueDomainExplorerProps) {
           </button>
           <div className="flex items-center gap-2">
             <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">
-              {t('valueDomainExplorer.title')}{' '}
-              <span className="font-normal text-slate-400">({t('valueDomainExplorer.titleSuffix')})</span>
+              {t('valueDomainExplorer.title')}
             </h2>
             <Badge variant="blue">
               {filteredDomains.length} / {total}

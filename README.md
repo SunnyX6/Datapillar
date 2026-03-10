@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <strong>An <code>Agentic</code> <code>ETL</code> data development platform powered by data governance and RAG</strong>
+  <strong>An <code>Agentic</code> <code>ETL</code> data development platform powered by data governance and GraphRAG</strong>
 </p>
 
 <p align="center">

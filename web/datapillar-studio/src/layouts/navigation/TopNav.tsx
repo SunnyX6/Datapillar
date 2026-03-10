@@ -618,7 +618,7 @@ export function TopNav({
               onBlur={() => {
                 if (!searchTerm) setIsSearchOpen(false)
               }}
-              placeholder={getContextConfig().placeholder}
+              placeholder={t(getContextConfig().placeholder, { ns: 'navigation' })}
               className="flex-1 min-w-0 py-1.5 bg-transparent text-body-sm text-slate-700 dark:text-slate-200 placeholder:text-caption placeholder:text-slate-400 placeholder:truncate focus:outline-none truncate"
             />
             {searchTerm ? (

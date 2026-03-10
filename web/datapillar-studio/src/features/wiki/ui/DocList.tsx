@@ -1,26 +1,29 @@
 import { FileText, CheckCircle, Clock, AlertCircle, File, FileCode, MoreVertical } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui'
 import { RESPONSIVE_TYPOGRAPHY, TYPOGRAPHY } from '@/design-tokens/typography'
 import type { Document } from '../utils/types'
 
 const StatusBadge = ({ status }: { status: Document['status'] }) => {
+  const { t } = useTranslation('wiki')
+
   switch (status) {
     case 'indexed':
       return (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full ${RESPONSIVE_TYPOGRAPHY.badge} font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200`}>
-          <CheckCircle size={12} className="mr-1" /> Indexed
+          <CheckCircle size={12} className="mr-1" /> {t('docList.status.indexed')}
         </span>
       )
     case 'processing':
       return (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full ${RESPONSIVE_TYPOGRAPHY.badge} font-medium bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-200`}>
-          <Clock size={12} className="mr-1 animate-pulse" /> Processing
+          <Clock size={12} className="mr-1 animate-pulse" /> {t('docList.status.processing')}
         </span>
       )
     case 'error':
       return (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full ${RESPONSIVE_TYPOGRAPHY.badge} font-medium bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200`}>
-          <AlertCircle size={12} className="mr-1" /> failed
+          <AlertCircle size={12} className="mr-1" /> {t('docList.status.failed')}
         </span>
       )
     default:
@@ -64,6 +67,7 @@ interface DocListProps {
 }
 
 export default function DocList({ spaceId, documents }: DocListProps) {
+  const { t } = useTranslation('wiki')
   const filteredDocs = documents.filter((doc) => doc.spaceId === spaceId)
 
   return (
@@ -72,11 +76,11 @@ export default function DocList({ spaceId, documents }: DocListProps) {
         <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
           <thead className="bg-slate-50 dark:bg-slate-800/60">
             <tr>
-              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>Document name</th>
-              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>Status</th>
-              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>Number of slices / length</th>
-              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>Upload time</th>
-              <th scope="col" className="relative px-4 py-2.5"><span className="sr-only">Actions</span></th>
+              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>{t('docList.columns.documentName')}</th>
+              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>{t('docList.columns.status')}</th>
+              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>{t('docList.columns.chunkLength')}</th>
+              <th scope="col" className={`px-4 py-2.5 text-left ${RESPONSIVE_TYPOGRAPHY.tableHeader} font-medium text-slate-500 uppercase tracking-wider`}>{t('docList.columns.uploadTime')}</th>
+              <th scope="col" className="relative px-4 py-2.5"><span className="sr-only">{t('docList.columns.actions')}</span></th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-800">
@@ -112,10 +116,10 @@ export default function DocList({ spaceId, documents }: DocListProps) {
               ))
             ) : (
               <tr>
-                <td colSpan={5} className={`px-4 py-6 text-center ${TYPOGRAPHY.bodySm} text-slate-500 dark:text-slate-400`}>
-                  There are currently no documents in this space
-                </td>
-              </tr>
+                  <td colSpan={5} className={`px-4 py-6 text-center ${TYPOGRAPHY.bodySm} text-slate-500 dark:text-slate-400`}>
+                  {t('docList.empty')}
+                  </td>
+                </tr>
             )}
           </tbody>
         </table>

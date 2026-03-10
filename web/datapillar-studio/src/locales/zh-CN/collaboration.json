@@ -1,0 +1,191 @@
+{
+  "sidebar": {
+    "title": "协作空间",
+    "sections": {
+      "smartViews": "智能视图",
+      "quickFilters": "快捷筛选"
+    },
+    "folders": {
+      "inbox": "收件箱（待处理）",
+      "sent": "我发起的",
+      "archive": "归档历史"
+    },
+    "smartViews": {
+      "mentioned": "提及我的",
+      "urgent": "紧急"
+    },
+    "quickFilters": {
+      "dataAccess": "数据权限",
+      "codeReview": "代码评审",
+      "infraOps": "资源运维"
+    },
+    "createButton": "发起协作请求"
+  },
+  "status": {
+    "PENDING": "待处理",
+    "APPROVED": "已通过",
+    "REJECTED": "已拒绝",
+    "CHANGES_REQUESTED": "需修改"
+  },
+  "statusFilter": {
+    "all": "全部状态"
+  },
+  "priority": {
+    "HIGH": "高",
+    "MEDIUM": "中",
+    "LOW": "低"
+  },
+  "duration": {
+    "days7": "7天",
+    "days30": "30天",
+    "days90": "90天",
+    "longTerm": "长期"
+  },
+  "requestType": {
+    "DATA_ACCESS": {
+      "title": "数据权限",
+      "desc": "申请表级或字段级读取权限，支持敏感字段自动识别。"
+    },
+    "CODE_REVIEW": {
+      "title": "代码评审",
+      "desc": "提交 ETL 任务或数据流改动，触发下游影响分析。"
+    },
+    "RESOURCE_OPS": {
+      "title": "资源运维",
+      "desc": "申请集群扩容或调整队列配额优先级。"
+    },
+    "API_PUBLISH": {
+      "title": "服务发布",
+      "desc": "将数据表发布为高并发 API，配置限流与鉴权。"
+    },
+    "SCHEMA_CHANGE": {
+      "title": "模型变更",
+      "desc": "申请 DDL 变更（加列/索引），执行在线 Schema Change。"
+    },
+    "DQ_REPORT": {
+      "title": "质量报障",
+      "desc": "上报数据异常或 SLA 延迟，触发质量工单流转。"
+    }
+  },
+  "ticketList": {
+    "searchPlaceholder": "搜索工单...",
+    "empty": "暂无匹配请求",
+    "userLabel": {
+      "inbox": "{{name}}",
+      "sent": "等待 {{name}}",
+      "archive": "发起人 {{name}}"
+    }
+  },
+  "detail": {
+    "empty": {
+      "title": "未选择工单",
+      "description": "请先从左侧列表中选择一个工单查看详情。"
+    },
+    "header": {
+      "currentHandler": "当前处理人"
+    },
+    "actions": {
+      "reject": "拒绝",
+      "approve": "通过申请",
+      "withdraw": "撤回申请"
+    },
+    "prioritySuffix": "优先级",
+    "sections": {
+      "dataAccess": {
+        "permissions": "权限类型",
+        "term": "期限",
+        "selectedFields": "申请字段",
+        "reason": "申请理由"
+      },
+      "codeReview": {
+        "collapseDiff": "收起差异概览",
+        "viewDiff": "查看代码差异",
+        "addedCount": "新增 {{count}} 行",
+        "removedCount": "删除 {{count}} 行",
+        "diffHint": "详细差异已同步到评审系统。"
+      },
+      "resourceOps": {
+        "current": "当前",
+        "requested": "申请"
+      },
+      "generic": {
+        "target": "目标对象",
+        "expectedDate": "期望完成时间",
+        "tags": "标签",
+        "description": "需求描述"
+      }
+    },
+    "timeline": {
+      "title": "流转记录",
+      "commentPlaceholder": "添加评论或备注...",
+      "commentButton": "评论"
+    }
+  },
+  "view": {
+    "modal": {
+      "selectTypeTitle": "发起新的协作请求",
+      "fillFormTitle": "申请详情：{{typeLabel}}",
+      "selectTypeHint": "请选择一种类型后继续",
+      "cancel": "取消",
+      "submit": "提交申请"
+    },
+    "typeCarousel": {
+      "more": "更多",
+      "back": "返回"
+    },
+    "defaults": {
+      "collaborationRequestTag": "协作请求",
+      "notFilledIn": "未填写",
+      "noTableSelected": "未选择数据表",
+      "desensitization": "脱敏",
+      "originalData": "原始"
+    },
+    "dataAccess": {
+      "step1Title": "1. 搜索并选择数据表",
+      "searchPlaceholder": "请输入表名关键词（例如 order、user）...",
+      "noMatch": "未找到匹配的数据表",
+      "recommended": "推荐数据表",
+      "tableRows": "{{rows}} 行",
+      "ownerLabel": "负责人",
+      "step2Title": "2. 选择字段",
+      "selectAll": "全选",
+      "deselectAll": "取消全选",
+      "tableHeader": {
+        "fieldName": "字段名",
+        "type": "类型"
+      },
+      "sensitiveField": "敏感字段",
+      "selectedColumnsPrefix": "已选",
+      "containsSensitive": "包含敏感字段",
+      "permissionType": "权限类型",
+      "permissionOptions": {
+        "select": "SELECT（查询）",
+        "export": "EXPORT（导出）"
+      },
+      "duration": "期限",
+      "step3Title": "3. 业务理由",
+      "reasonPlaceholder": "请说明申请原因和使用场景",
+      "selectTableFirst": "请先在左侧选择数据表"
+    },
+    "generic": {
+      "target": "目标对象",
+      "targetPlaceholder": "请输入需要协作/服务的资产",
+      "expectedDate": "期望完成日期",
+      "priority": "优先级",
+      "tags": "标签",
+      "tagsPlaceholder": "例如：发布，变更",
+      "description": "需求描述",
+      "descriptionPlaceholder": "请描述变更/发布/问题详情"
+    }
+  },
+  "time": {
+    "justNow": "刚刚"
+  },
+  "timelineActions": {
+    "createRequest": "创建申请",
+    "approveRequest": "通过申请",
+    "denyRequest": "拒绝申请",
+    "withdrawRequest": "撤回申请",
+    "additionalInfo": "补充说明"
+  }
+}

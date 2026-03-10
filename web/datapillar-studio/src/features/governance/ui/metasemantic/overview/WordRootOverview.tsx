@@ -1,4 +1,5 @@
 import { Book, X, Info, GitBranch, Layers, Share2, ExternalLink } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { WordRoot } from '../types'
 import { drawerWidthClassMap, iconSizeToken } from '@/design-tokens/dimensions'
 import { formatTime } from '@/utils'
@@ -9,6 +10,8 @@ interface WordRootOverviewProps {
 }
 
 export function WordRootOverview({ wordRoot, onClose }: WordRootOverviewProps) {
+  const { t } = useTranslation('oneSemantics')
+
   return (
     <aside className={`fixed right-0 top-14 bottom-0 z-30 ${drawerWidthClassMap.responsive} bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col animate-in slide-in-from-right duration-500`}>
       <div className="h-12 md:h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 md:px-6 flex items-center justify-between flex-shrink-0 shadow-sm">
@@ -16,13 +19,13 @@ export function WordRootOverview({ wordRoot, onClose }: WordRootOverviewProps) {
           <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-sm">
             <Book size={iconSizeToken.medium} />
           </div>
-          <h2 className="text-body-sm font-semibold text-slate-800 dark:text-slate-100">Root details</h2>
+          <h2 className="text-body-sm font-semibold text-slate-800 dark:text-slate-100">{t('wordRootOverview.title')}</h2>
         </div>
         <button
           type="button"
           onClick={onClose}
           className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-          aria-label="Close root details"
+          aria-label={t('wordRootOverview.closeAria')}
         >
           <X size={iconSizeToken.large} className="text-slate-400" />
         </button>
@@ -36,32 +39,32 @@ export function WordRootOverview({ wordRoot, onClose }: WordRootOverviewProps) {
               {wordRoot.code}
             </span>
           </div>
-          <p className="text-slate-500 dark:text-slate-400 text-body-sm leading-relaxed">{wordRoot.comment || 'No detailed description yet...'}</p>
+          <p className="text-slate-500 dark:text-slate-400 text-body-sm leading-relaxed">{wordRoot.comment || t('wordRootOverview.descriptionEmpty')}</p>
         </div>
 
         <div className="space-y-6">
           <section>
             <div className="text-micro font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Info size={iconSizeToken.small} className="text-blue-500" /> Basic information (Basic Info)
+              <Info size={iconSizeToken.small} className="text-blue-500" /> {t('wordRootOverview.section.basic')}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-                <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">Root encoding</div>
+                <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">{t('wordRootOverview.field.code')}</div>
                 <div className="font-mono text-body-sm font-semibold text-blue-700 dark:text-blue-400 uppercase">{wordRoot.code}</div>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-center">
-                <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">data type</div>
+                <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">{t('wordRootOverview.field.dataType')}</div>
                 <div className="font-mono text-body-sm font-semibold text-cyan-600 dark:text-cyan-400">{wordRoot.dataType || '-'}</div>
               </div>
               {wordRoot.audit?.creator && (
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-                  <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">Creator</div>
+                  <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">{t('wordRootOverview.field.creator')}</div>
                   <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">{wordRoot.audit.creator}</div>
                 </div>
               )}
               {wordRoot.audit?.createTime && (
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-                  <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">creation time</div>
+                  <div className="text-micro font-semibold text-slate-400 uppercase mb-0.5">{t('wordRootOverview.field.createTime')}</div>
                   <div className="text-body-sm font-semibold text-slate-700 dark:text-slate-300">{formatTime(wordRoot.audit.createTime)}</div>
                 </div>
               )}
@@ -70,12 +73,12 @@ export function WordRootOverview({ wordRoot, onClose }: WordRootOverviewProps) {
 
           <section>
             <div className="text-micro font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <GitBranch size={iconSizeToken.small} className="text-blue-500" /> Related field preview
+              <GitBranch size={iconSizeToken.small} className="text-blue-500" /> {t('wordRootOverview.section.related')}
             </div>
             <div className="h-32 rounded-xl border-2 border-dashed border-slate-100 dark:border-slate-800 flex items-center justify-center bg-slate-50/50 dark:bg-slate-800/50">
               <div className="flex flex-col items-center gap-1.5 text-slate-300 dark:text-slate-600">
                 <Layers size={iconSizeToken.huge} />
-                <span className="text-caption font-medium">Related fields are loading...</span>
+                <span className="text-caption font-medium">{t('wordRootOverview.relatedLoading')}</span>
               </div>
             </div>
           </section>
@@ -84,10 +87,10 @@ export function WordRootOverview({ wordRoot, onClose }: WordRootOverviewProps) {
 
       <div className="p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex gap-3 flex-shrink-0">
         <button className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 py-2.5 rounded-xl font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-1.5 shadow-sm text-body-sm">
-          <Share2 size={iconSizeToken.medium} /> Asset sharing
+          <Share2 size={iconSizeToken.medium} /> {t('wordRootOverview.actions.share')}
         </button>
         <button className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-medium hover:bg-blue-700 shadow-lg transition-all flex items-center justify-center gap-1.5 text-body-sm">
-          <ExternalLink size={iconSizeToken.medium} /> View usage examples
+          <ExternalLink size={iconSizeToken.medium} /> {t('wordRootOverview.actions.viewUsage')}
         </button>
       </div>
     </aside>

@@ -35,7 +35,7 @@
     },
     "hero": {
       "title": "Want AI to understand your data better?",
-      "description": "With OneMeta semantic assets (Metadata + Semantic), enterprise AI agents can deliver more accurate auto-generated reports.",
+      "description": "With OneMeta semantic assets (Metadata + Semantic), enterprise AI agents can deliver higher accuracy.",
       "cta": "Enable semantic enhancement"
     }
   },
@@ -85,19 +85,93 @@
         "metricsAndTables": "Recommended Metrics and Tables:",
         "metricsOnly": "Recommended Metrics:",
         "tablesAndColumns": "Recommended Tables and Columns:",
+        "table": "Table",
         "column": "Column",
         "metric": "Metric"
       }
     },
-    "loadingVersion": "Loading Metric details..."
+    "loadingVersion": "Loading Metric details...",
+    "left": {
+      "field": {
+        "metricName": "Metric name *",
+        "metricCode": "Metric code *",
+        "dataType": "Data type",
+        "unit": "Unit",
+        "businessDescription": "Business description",
+        "formula": "Formula expression *"
+      },
+      "placeholder": {
+        "metricName": "Example: Cumulative order amount",
+        "selectAtomicMetric": "Select Atomic Metric",
+        "selectModifier": "Select modifier",
+        "customSuffix": "Custom suffix",
+        "selectWordRoot": "Select WordRoot",
+        "aggregation": "Aggregation",
+        "selectDataType": "Please select data type",
+        "selectUnit": "Please select the unit",
+        "businessDescription": "Describe the business meaning of the metric...",
+        "formula": {
+          "atomic": "SUM(orders.amount) WHERE status = 'paid'",
+          "derived": "{SALES_AMOUNT} WHERE region = 'Beijing'",
+          "composite": "({SALES_AMOUNT} - {COST}) / {SALES_AMOUNT} * 100"
+        }
+      },
+      "unitSelector": {
+        "noData": "No unit data yet",
+        "allLoaded": "All loaded"
+      }
+    },
+    "right": {
+      "label": {
+        "atomicAssets": "Physical assets (select measure or filter columns)",
+        "derivedAssets": "Physical assets (select dimension filter columns)",
+        "compositeMetrics": "Select metrics for composition"
+      },
+      "level": {
+        "catalog": "Data source",
+        "schema": "Database",
+        "table": "Physical table",
+        "column": "Field"
+      },
+      "searchPlaceholder": "Search {{level}}...",
+      "noData": "No data yet",
+      "table": {
+        "list": "List",
+        "type": "Type",
+        "operation": "Operation"
+      },
+      "column": {
+        "associatedValueDomain": "Associated value domain",
+        "cancelMeasure": "Cancel measure",
+        "setMeasure": "Set as measure column",
+        "selectedFilterValues": "Selected {{count}} filter value(s)",
+        "setFilter": "Set as filter column",
+        "selectFilterValue": "Select filter value",
+        "noRangeData": "No range data yet",
+        "clearAll": "Clear all"
+      },
+      "metricSelector": {
+        "searchPlaceholder": "Search metrics...",
+        "noData": "No metrics available yet",
+        "type": {
+          "atomic": "Atomic",
+          "derived": "Derived"
+        }
+      }
+    }
   },
   "valueDomainExplorer": {
     "title": "ValueDomain Constraints",
     "titleSuffix": "Value Domains",
-    "createButton": "Create ValueDomain",
+    "createButton": "New ValueDomain",
     "loading": "Loading...",
     "empty": "No matching ValueDomain found",
     "card": {
+      "type": {
+        "enum": "Enum",
+        "range": "Range",
+        "regex": "Regex"
+      },
       "level": {
         "builtin": "Built-in",
         "business": "Business"
@@ -139,8 +213,8 @@
       "builtin": "Built-in Level (BUILTIN)"
     },
     "create": {
-      "title": "Create ValueDomain",
-      "confirm": "Confirm Create"
+      "title": "New ValueDomain",
+      "confirm": "New ValueDomain"
     },
     "edit": {
       "title": "Edit ValueDomain",
@@ -182,6 +256,209 @@
       "regex": "Enter a regular expression.",
       "rangeReadonly": "Range expressions are read-only.",
       "regexReadonly": "Regular expressions are read-only."
+    }
+  },
+  "metricExplorer": {
+    "title": "Metric Center",
+    "newMetric": "New Metric",
+    "loading": "Loading...",
+    "empty": "No matching metric found",
+    "actions": {
+      "edit": "Edit",
+      "delete": "Delete",
+      "switchToList": "Switch to list view",
+      "switchToCard": "Switch to card view"
+    },
+    "card": {
+      "noDescription": "No description yet..."
+    },
+    "table": {
+      "nameCode": "Metric name / code",
+      "type": "Type",
+      "dataType": "Data type",
+      "unit": "Unit",
+      "description": "Description",
+      "version": "Version",
+      "creator": "Creator",
+      "createTime": "Creation time",
+      "operation": "Operation"
+    },
+    "type": {
+      "ATOMIC": "Atomic Metric",
+      "DERIVED": "Derived Metric",
+      "COMPOSITE": "Composite Metric"
+    }
+  },
+  "wordRootExplorer": {
+    "title": "WordRoot Center",
+    "addWordRoot": "New WordRoot",
+    "loading": "Loading...",
+    "empty": "No matching WordRoot found",
+    "actions": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "placeholder": {
+      "name": "WordRoot name",
+      "code": "Code (CODE)",
+      "description": "Description",
+      "descriptionOptional": "Description (optional)"
+    },
+    "table": {
+      "nameCode": "WordRoot name / code",
+      "dataType": "Data type",
+      "description": "Description",
+      "creator": "Creator",
+      "createTime": "Creation time",
+      "operation": "Operation"
+    }
+  },
+  "metricOverview": {
+    "title": "Metric details",
+    "closeAria": "Close metric details",
+    "descriptionEmpty": "No business description yet...",
+    "section": {
+      "technical": "Technical properties",
+      "formula": "Calculation formula",
+      "lineage": "Upstream and downstream lineage preview"
+    },
+    "field": {
+      "metricType": "Metric type",
+      "dataType": "Data type",
+      "currentVersion": "Current version",
+      "unit": "Unit",
+      "creator": "Creator",
+      "createTime": "Creation time"
+    },
+    "formulaEmpty": "No calculation formula yet",
+    "lineageLoading": "The lineage graph is loading...",
+    "actions": {
+      "share": "Asset sharing"
+    },
+    "version": {
+      "notCurrent": "Not current",
+      "switch": "Set as current version",
+      "historyButton": "View version history",
+      "panelTitle": "Version history",
+      "empty": "No historical version yet",
+      "current": "Current"
+    }
+  },
+  "wordRootOverview": {
+    "title": "Root details",
+    "closeAria": "Close root details",
+    "descriptionEmpty": "No detailed description yet...",
+    "section": {
+      "basic": "Basic information",
+      "related": "Related field preview"
+    },
+    "field": {
+      "code": "Root code",
+      "dataType": "Data type",
+      "creator": "Creator",
+      "createTime": "Creation time"
+    },
+    "relatedLoading": "Related fields are loading...",
+    "actions": {
+      "share": "Asset sharing",
+      "viewUsage": "View usage examples"
+    }
+  },
+  "componentLibrary": {
+    "title": {
+      "main": "Semantic component library",
+      "suffix": "COMPONENTS"
+    },
+    "tab": {
+      "modifier": "Modifier",
+      "unitLibrary": "Unit library"
+    },
+    "list": {
+      "availableUnits": "Available units",
+      "availableModifiers": "Available modifiers",
+      "noData": "No data yet"
+    },
+    "actions": {
+      "save": "Save",
+      "edit": "Edit",
+      "delete": "Delete",
+      "fold": "Fold",
+      "expand": "Expand component library"
+    },
+    "field": {
+      "nameRequired": "Name *",
+      "codeRequired": "Code *",
+      "code": "Code",
+      "symbol": "Symbol",
+      "description": "Description",
+      "modifierType": "Modifier type"
+    },
+    "placeholder": {
+      "codeCny": "e.g. CNY",
+      "nameRmb": "e.g. RMB",
+      "nameYoy": "e.g. Year-on-year",
+      "codeYoy": "e.g. YOY",
+      "symbolOptional": "Optional, supports custom symbols",
+      "descriptionOptional": "Optional",
+      "selectType": "Select type"
+    },
+    "aria": {
+      "openUnitNameList": "Open unit name list"
+    },
+    "dropdown": {
+      "noMatchingName": "No matching name yet",
+      "noValueDomain": "No value domain yet",
+      "selectType": "Select type"
+    },
+    "footer": {
+      "tip": "Before assembling derived metrics, make sure required semantic fragments already exist in the component library."
+    },
+    "modal": {
+      "createUnit": "New unit",
+      "editUnit": "Edit unit",
+      "createModifier": "New modifier",
+      "editModifier": "Edit modifier"
+    },
+    "symbolGroups": {
+      "names": {
+        "currency": "Currency",
+        "ratio": "Ratio",
+        "temperature": "Temperature",
+        "length": "Length",
+        "areaVolume": "Area/Volume",
+        "weight": "Weight",
+        "time": "Time"
+      },
+      "labels": {
+        "rmb": "RMB",
+        "usd": "US Dollar",
+        "euro": "Euro",
+        "pound": "Pound",
+        "krw": "Korean Won",
+        "inr": "Indian Rupee",
+        "percentage": "Percentage",
+        "permille": "Per mille",
+        "permyriad": "Per myriad",
+        "celsius": "Degrees Celsius",
+        "fahrenheit": "Fahrenheit",
+        "kelvin": "Kelvin",
+        "meter": "Meter",
+        "kilometer": "Kilometer",
+        "centimeter": "Centimeter",
+        "millimeter": "Millimeter",
+        "squareMeter": "Square meter",
+        "cubicMeter": "Cubic meter",
+        "kilogram": "Kilogram",
+        "gram": "Gram",
+        "milligram": "Milligram",
+        "ton": "Ton",
+        "second": "Second",
+        "minute": "Minute",
+        "hour": "Hour",
+        "day": "Day"
+      }
     }
   }
 }

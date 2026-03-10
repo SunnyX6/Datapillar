@@ -1,10 +1,11 @@
 /**
  * Knowledge graph API service
  *
- * Knowledge graph uses non- SSE interface（Disposable JSON Return）
+ * Knowledge graph uses non-SSE interfaces (one-shot JSON responses).
  */
 
 import { API_BASE, API_PATH, requestRaw } from '@/api'
+import { useAuthStore } from '@/state/authStore'
 import type {
   GraphData,
   GraphLink,
@@ -19,8 +20,44 @@ export type {
   GraphNode
 } from '@/services/types/ai/knowledge'
 
+interface OpenLineageSearchResponse {
+  tenantId: number
+  aiModelId: number
+  revision: number
+  nodes: Neo4jNode[]
+}
+
+interface OpenLineageRebuildResponse {
+  status: string
+  tenantId: number
+  aiModelId: number
+  revision: number
+  graphUpserts: number
+  embeddingTasks: number
+}
+
+interface OpenLineageSetEmbeddingResponse {
+  tenantId: number
+  scope: string
+  aiModelId: number
+  revision: number
+  setBy: number
+  setAt: string
+}
+
+function resolveTenantId(tenantId?: number): number {
+  if (tenantId && tenantId > 0) {
+    return tenantId
+  }
+  const fromStore = useAuthStore.getState().user?.tenantId
+  if (!fromStore || fromStore <= 0) {
+    throw new Error('Current tenant is missing')
+  }
+  return fromStore
+}
+
 /**
- * Convert Neo4j The node is the front-end node
+ * Convert Neo4j node to frontend node model.
  */
 function transformNode(node: Neo4jNode): GraphNode {
   const { id, type, level, properties } = node
@@ -33,10 +70,10 @@ function transformNode(node: Neo4jNode): GraphNode {
     level: level ?? 99,
     group: 0,
     name: name || String(id),
-    displayName: properties.displayName,
+    displayName: properties.displayName as string | undefined,
     val: UNIFIED_VAL,
     health: 'healthy',
-    description: properties.description,
+    description: properties.description as string | undefined,
     owner: properties.owner as string | undefined,
     tags: properties.tags as string[] | undefined,
     lastUpdated: properties.updatedAt as string | undefined
@@ -44,7 +81,7 @@ function transformNode(node: Neo4jNode): GraphNode {
 }
 
 /**
- * Convert Neo4j The relationship is a front-end relationship
+ * Convert Neo4j relationship to frontend relationship model.
  */
 function transformRelationship(rel: Neo4jRelationship): GraphLink {
   return {
@@ -56,16 +93,22 @@ function transformRelationship(rel: Neo4jRelationship): GraphLink {
 }
 
 /**
- * Get initial graph data（SSE streaming）
+ * Fetch initial graph data.
  */
 export async function fetchInitialGraph(
   limit: number = 500,
-  onProgress?: (current: number, total: number) => void
+  onProgress?: (current: number, total: number) => void,
+  tenantId?: number
 ): Promise<GraphData> {
-  const data = await requestRaw<{ nodes: Neo4jNode[]; relationships: Neo4jRelationship[] }, undefined, { limit: number }>({
-    baseURL: API_BASE.aiKnowledge,
+  const resolvedTenantId = resolveTenantId(tenantId)
+  const data = await requestRaw<
+    { nodes: Neo4jNode[]; relationships: Neo4jRelationship[] },
+    undefined,
+    { limit: number; tenantId: number }
+  >({
+    baseURL: API_BASE.openlineage,
     url: API_PATH.knowledgeGraph.initial,
-    params: { limit }
+    params: { limit, tenantId: resolvedTenantId }
   })
   const nodes = (data.nodes ?? []).map(transformNode)
   const links = (data.relationships ?? []).map(transformRelationship)
@@ -74,21 +117,51 @@ export async function fetchInitialGraph(
 }
 
 /**
- * Search the knowledge graph（Not SSE，One-time return）
+ * Search graph nodes.
  */
 export async function searchGraph(
   query: string,
   topK: number = 10,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  tenantId?: number
 ): Promise<GraphData> {
-  const data = await requestRaw<{ nodes: Neo4jNode[]; relationships: Neo4jRelationship[] }, { query: string; top_k: number }>({
-    baseURL: API_BASE.aiKnowledge,
+  const resolvedTenantId = resolveTenantId(tenantId)
+  const data = await requestRaw<OpenLineageSearchResponse, { tenantId: number; query: string; topK: number }>({
+    baseURL: API_BASE.openlineage,
     url: API_PATH.knowledgeGraph.search,
     method: 'POST',
-    data: { query, top_k: topK },
+    data: { tenantId: resolvedTenantId, query, topK },
     signal
   })
   const nodes = (data.nodes ?? []).map(transformNode)
-  const links = (data.relationships ?? []).map(transformRelationship)
-  return { nodes, links }
+  return { nodes, links: [] }
+}
+
+/**
+ * Trigger full tenant rebuild.
+ */
+export async function rebuildGraph(tenantId?: number): Promise<OpenLineageRebuildResponse> {
+  const resolvedTenantId = resolveTenantId(tenantId)
+  return requestRaw<OpenLineageRebuildResponse, { tenantId: number }>({
+    baseURL: API_BASE.openlineage,
+    url: API_PATH.knowledgeGraph.rebuild,
+    method: 'POST',
+    data: { tenantId: resolvedTenantId }
+  })
+}
+
+/**
+ * Set current DW embedding model.
+ */
+export async function setKnowledgeEmbeddingModel(
+  aiModelId: number,
+  tenantId?: number
+): Promise<OpenLineageSetEmbeddingResponse> {
+  const resolvedTenantId = resolveTenantId(tenantId)
+  return requestRaw<OpenLineageSetEmbeddingResponse, { tenantId: number; aiModelId: number }>({
+    baseURL: API_BASE.openlineage,
+    url: API_PATH.knowledgeGraph.setEmbedding,
+    method: 'POST',
+    data: { tenantId: resolvedTenantId, aiModelId }
+  })
 }

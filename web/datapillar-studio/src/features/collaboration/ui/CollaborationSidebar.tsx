@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import { Archive,AtSign,GitPullRequest,Inbox,Lock,Plus,Send,Server,ShieldAlert } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui'
 import { iconSizeToken,panelWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
@@ -25,6 +26,7 @@ interface CollaborationSidebarProps {
 export function CollaborationSidebar({
  activeNav,inboxCount,sentCount,archiveCount,mentionedCount,urgentCount,dataAccessCount,codeReviewCount,infraOpsCount,onCreate,onChangeView,onChangeSmartView,onChangeQuickFilter
 }:CollaborationSidebarProps) {
+ const { t } = useTranslation('collaboration')
  const folders:Array<{
  view:TicketView
  label:string
@@ -32,11 +34,11 @@ export function CollaborationSidebar({
  icon:LucideIcon
  iconClassName:string
  }> = [{
- view:'INBOX',label:'Inbox(Pending)',count:inboxCount,icon:Inbox,iconClassName:'text-blue-500'
+ view:'INBOX',label:t('sidebar.folders.inbox'),count:inboxCount,icon:Inbox,iconClassName:'text-blue-500'
  },{
- view:'SENT',label:'I initiated',count:sentCount,icon:Send,iconClassName:'text-violet-500'
+ view:'SENT',label:t('sidebar.folders.sent'),count:sentCount,icon:Send,iconClassName:'text-violet-500'
  },{
- view:'ARCHIVE',label:'Archive history',count:archiveCount,icon:Archive,iconClassName:'text-amber-500'
+ view:'ARCHIVE',label:t('sidebar.folders.archive'),count:archiveCount,icon:Archive,iconClassName:'text-amber-500'
  }]
 
  const smartViews:Array<{
@@ -46,9 +48,9 @@ export function CollaborationSidebar({
  icon:LucideIcon
  iconClassName:string
  }> = [{
- view:'MENTIONED',label:'Mentioned',count:mentionedCount,icon:AtSign,iconClassName:'text-indigo-500'
+ view:'MENTIONED',label:t('sidebar.smartViews.mentioned'),count:mentionedCount,icon:AtSign,iconClassName:'text-indigo-500'
  },{
- view:'URGENT',label:'Urgent',count:urgentCount,icon:ShieldAlert,iconClassName:'text-rose-500'
+ view:'URGENT',label:t('sidebar.smartViews.urgent'),count:urgentCount,icon:ShieldAlert,iconClassName:'text-rose-500'
  }]
 
  const quickFilters:Array<{
@@ -58,11 +60,11 @@ export function CollaborationSidebar({
  icon:LucideIcon
  iconClassName:string
  }> = [{
- filter:'DATA_ACCESS',label:'Data Access',count:dataAccessCount,icon:Lock,iconClassName:'text-blue-500'
+ filter:'DATA_ACCESS',label:t('sidebar.quickFilters.dataAccess'),count:dataAccessCount,icon:Lock,iconClassName:'text-blue-500'
  },{
- filter:'CODE_REVIEW',label:'Code Reviews',count:codeReviewCount,icon:GitPullRequest,iconClassName:'text-purple-500'
+ filter:'CODE_REVIEW',label:t('sidebar.quickFilters.codeReview'),count:codeReviewCount,icon:GitPullRequest,iconClassName:'text-purple-500'
  },{
- filter:'RESOURCE_OPS',label:'Infra Ops',count:infraOpsCount,icon:Server,iconClassName:'text-orange-500'
+ filter:'RESOURCE_OPS',label:t('sidebar.quickFilters.infraOps'),count:infraOpsCount,icon:Server,iconClassName:'text-orange-500'
  }]
 
  return (<div
@@ -75,7 +77,7 @@ export function CollaborationSidebar({
  <h3
  className={cn(TYPOGRAPHY.caption,'font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider')}
  >
- collaborative space (COLLABORATION)
+ {t('sidebar.title')}
  </h3>
  </div>
 
@@ -94,7 +96,7 @@ export function CollaborationSidebar({
 
  <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800">
  <div className={cn(TYPOGRAPHY.micro,'px-3 mb-2 font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider')}>
- SMART VIEWS
+ {t('sidebar.sections.smartViews')}
  </div>
  <div className="space-y-2.5">
  {smartViews.map((smartView) => (<SidebarItemButton
@@ -111,7 +113,7 @@ export function CollaborationSidebar({
 
  <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800">
  <div className={cn(TYPOGRAPHY.micro,'px-3 mb-2 font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider')}>
- QUICK FILTERS
+ {t('sidebar.sections.quickFilters')}
  </div>
  <div className="space-y-2.5">
  {quickFilters.map((quickFilter) => (<SidebarItemButton
@@ -137,7 +139,7 @@ export function CollaborationSidebar({
  className="w-full py-2"
  >
  <Plus size={iconSizeToken.small} />
- Initiate a collaboration request
+ {t('sidebar.createButton')}
  </Button>
  </div>
  </div>)
@@ -158,8 +160,12 @@ function SidebarItemButton({
  onClick={onClick}
  variant="ghost"
  size="small"
- className={cn(// Collaboration sidebar menu items do not require floating background color(Cover Button ghost Default hover background).'group flex w-full items-center gap-2 rounded-lg px-3 py-1 text-left transition-colors shadow-none hover:shadow-none hover:bg-transparent!dark:hover:bg-transparent!focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0',// Interactive alignment global Sidebar:Only change the color when selected/background color,Not made by bolding"get bigger"illusion
- isActive?'text-blue-600 dark:text-blue-400':'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100')}
+ className={cn(
+ // Collaboration sidebar menu items do not require floating background color(Cover Button ghost Default hover background).
+ 'group flex w-full items-center gap-2 rounded-lg px-3 py-1 text-left transition-colors shadow-none hover:shadow-none hover:bg-transparent! dark:hover:bg-transparent! focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0',
+ // Interactive alignment global Sidebar:Only change the color when selected/background color,Not made by bolding"get bigger"illusion
+ isActive?'text-blue-600 dark:text-blue-400':'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100'
+ )}
  >
  <Icon
  size={iconSizeToken.tiny}

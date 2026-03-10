@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom'
 import { AlertTriangle,Home,RefreshCw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui'
 import { panelWidthClassMap,surfaceSizeClassMap } from '@/design-tokens/dimensions'
 
 export function NotFoundPage() {
+ const { t } = useTranslation('exception')
  return (<div className="min-h-dvh w-full bg-black flex items-center justify-center relative overflow-hidden font-mono selection:bg-red-500/30 selection:text-white">
  <div
  className="absolute inset-0 opacity-[0.03] pointer-events-none"
@@ -26,13 +28,13 @@ export function NotFoundPage() {
 
  <div className="flex items-center justify-center gap-2 text-red-500 mb-4 uppercase tracking-[0.35em] text-xs">
  <AlertTriangle size={14} />
- system alert
+ {t('notFound.systemAlert')}
  </div>
- <h1 className="text-5xl font-bold text-white tracking-tight mb-3">DATA VOID</h1>
+ <h1 className="text-5xl font-bold text-white tracking-tight mb-3">{t('notFound.title')}</h1>
  <p className="text-slate-400 text-sm max-w-md leading-relaxed">
- The target node has drifted or been recycled.When jumping to old links,The neural network cannot locate the page in the graph.</p>
+ {t('notFound.description')}</p>
  <p className="text-slate-500 text-xs uppercase tracking-[0.3em] mt-4">
- node id.undefined
+ {t('notFound.nodeIdUndefined')}
  </p>
 
  <div className="mt-10 flex flex-wrap gap-4 justify-center">
@@ -41,7 +43,7 @@ export function NotFoundPage() {
  className="flex items-center gap-2 px-6 py-2 bg-white text-black hover:bg-slate-200 rounded-lg text-xs font-bold uppercase tracking-wide transition-all"
  >
  <Home size={14} />
- Return Home
+ {t('notFound.actions.home')}
  </Link>
  <Button
  type="button"
@@ -51,22 +53,22 @@ export function NotFoundPage() {
  className="flex items-center gap-2 px-6 py-2 bg-transparent border border-white/10 text-slate-400 hover:text-white hover:border-white/30 text-xs font-bold uppercase tracking-wide transition-all"
  >
  <RefreshCw size={14} />
- Pull again
+ {t('notFound.actions.retry')}
  </Button>
  </div>
  </div>
 
  <div className={`absolute top-8 right-8 ${panelWidthClassMap.medium} bg-black/80 border border-red-900/30 p-4 hidden md:block text-micro text-red-500/70`}>
  <div className="mb-2 border-b border-red-900/20 pb-1 flex justify-between">
- <span>ERR_LOG_DUMP</span>
- <span>LIVE</span>
+ <span>{t('notFound.log.title')}</span>
+ <span>{t('notFound.log.live')}</span>
  </div>
  <div className="space-y-1 opacity-80">
- <p>&gt;tracing route...FAILED</p>
- <p>&gt;ping gateway...TIMEOUT</p>
- <p>&gt;checksum...CORRUPTED</p>
+ <p>{t('notFound.log.tracingRoute')}</p>
+ <p>{t('notFound.log.pingGateway')}</p>
+ <p>{t('notFound.log.checksum')}</p>
  <p>
- &gt;initiating reroute...<span className="animate-pulse">_</span>
+ {t('notFound.log.reroutePrefix')}<span className="animate-pulse">_</span>
  </p>
  </div>
  </div>

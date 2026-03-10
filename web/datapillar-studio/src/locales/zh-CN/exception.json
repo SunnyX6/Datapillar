@@ -1,0 +1,59 @@
+{
+  "serverError": {
+    "referenceFallback": "无",
+    "serviceStatus": {
+      "checking": "正在检查服务...",
+      "healthy": "服务正常",
+      "unhealthy": "服务异常",
+      "idle": "检查服务状态"
+    },
+    "titlePrefix": "服务器",
+    "titleHighlight": "发生异常",
+    "description": "抱歉，服务器遇到了异常情况。技术团队已收到告警，正在紧急处理中。",
+    "actions": {
+      "refresh": "刷新页面"
+    },
+    "requestId": "请求 ID",
+    "copyHintHasId": "点击复制请求 ID，并提供给支持团队。",
+    "copyHintNoId": "当前错误未返回可追踪的请求 ID。",
+    "meta": {
+      "module": "模块",
+      "statusCode": "状态码",
+      "occurredAt": "发生时间"
+    },
+    "footer": {
+      "home": "首页",
+      "help": "帮助中心",
+      "contact": "联系支持"
+    }
+  },
+  "forbidden": {
+    "title": "访问受限",
+    "description": "抱歉，你没有权限访问当前页面，请联系管理员分配菜单权限。",
+    "restrictedPathLabel": "受限路径",
+    "actions": {
+      "back": "返回上一页",
+      "home": "返回首页"
+    },
+    "securityProtocolActive": "安全策略已启用",
+    "securityNote": "如果你认为这是系统问题，请联系管理员申请相关权限。"
+  },
+  "notFound": {
+    "systemAlert": "系统告警",
+    "title": "数据空洞",
+    "description": "目标节点可能已漂移或回收，图谱无法解析该历史链接。",
+    "nodeIdUndefined": "节点 ID：undefined",
+    "actions": {
+      "home": "返回首页",
+      "retry": "再次尝试"
+    },
+    "log": {
+      "title": "错误日志转储",
+      "live": "实时",
+      "tracingRoute": "> 路由追踪...失败",
+      "pingGateway": "> 网关探测...超时",
+      "checksum": "> 校验...损坏",
+      "reroutePrefix": "> 正在重建路由..."
+    }
+  }
+}

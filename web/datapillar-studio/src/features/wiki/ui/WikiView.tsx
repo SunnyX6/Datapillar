@@ -2,6 +2,7 @@ import { useCallback,useEffect,useRef,useState } from 'react'
 import {
  Plus,FileText,Database,Zap,MoreHorizontal,FolderOpen,Settings,TrendingUp,ChevronLeft,ChevronRight,type LucideIcon
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button,Card,Modal,ModalCancelButton,ModalPrimaryButton } from '@/components/ui'
 import { contentMaxWidthClassMap,iconSizeToken,paddingClassMap,panelWidthClassMap } from '@/design-tokens/dimensions'
 import { RESPONSIVE_TYPOGRAPHY,TYPOGRAPHY } from '@/design-tokens/typography'
@@ -28,6 +29,7 @@ type StatConfig = {
 }
 
 export function WikiView() {
+ const { t } = useTranslation('wiki')
  const [activeTab,setActiveTab] = useState<WikiTab>('DOCUMENTS')
  const [spaceList,setSpaceList] = useState<KnowledgeSpace[]>([])
  const [currentSpace,setCurrentSpace] = useState<KnowledgeSpace | null>(null)
@@ -82,10 +84,10 @@ export function WikiView() {
  return
  }
  const message = error instanceof Error?error.message:String(error)
- toast.error(`Failed to load document:${message}`)
+ toast.error(t('wikiView.toast.loadDocumentsFailed', { message }))
  setDocuments([])
  }
- },[])
+ },[t])
 
  const syncSpaces = useCallback(async (preferredId?: string) => {
  const requestSeq = ++spacesRequestSeqRef.current
@@ -108,9 +110,9 @@ export function WikiView() {
  return
  }
  const message = error instanceof Error?error.message:String(error)
- toast.error(`Failed to load knowledge space:${message}`)
+ toast.error(t('wikiView.toast.loadSpacesFailed', { message }))
  }
- },[syncDocuments])
+ },[syncDocuments,t])
 
  useEffect(() => {
  void syncSpaces()
@@ -120,11 +122,11 @@ export function WikiView() {
  const multiplier = index <= 0?1:index === 1?0.6:0.3
 
  return [{
- label:'Total number of space documents',value:space.docCount,unit:'a',icon:FileText,change:index <= 0?'+12':'+3',trend:'up',color:'text-indigo-600',bg:'bg-indigo-50 dark:bg-indigo-500/10'
+ label:t('wikiView.stats.totalDocs.label'),value:space.docCount,unit:t('wikiView.stats.totalDocs.unit'),icon:FileText,change:index <= 0?'+12':'+3',trend:'up',color:'text-indigo-600',bg:'bg-indigo-50 dark:bg-indigo-500/10'
  },{
- label:'active slice (Chunks)',value:(space.docCount * 145 * multiplier).toFixed(0),unit:'a',icon:Database,change:`+${(40 * multiplier).toFixed(0)}`,trend:'up',color:'text-blue-600',bg:'bg-blue-50 dark:bg-blue-500/10'
+ label:t('wikiView.stats.activeChunks.label'),value:(space.docCount * 145 * multiplier).toFixed(0),unit:t('wikiView.stats.activeChunks.unit'),icon:Database,change:`+${(40 * multiplier).toFixed(0)}`,trend:'up',color:'text-blue-600',bg:'bg-blue-50 dark:bg-blue-500/10'
  },{
- label:'average recall accuracy',value:index <= 0?'94.2':index === 1?'89.5':'91.0',unit:'%',icon:Zap,change:index <= 0?'+2.1%':'-0.4%',trend:index <= 0?'up':'down',color:'text-emerald-600',bg:'bg-emerald-50 dark:bg-emerald-500/10'
+ label:t('wikiView.stats.recallAccuracy.label'),value:index <= 0?'94.2':index === 1?'89.5':'91.0',unit:t('wikiView.stats.recallAccuracy.unit'),icon:Zap,change:index <= 0?'+2.1%':'-0.4%',trend:index <= 0?'up':'down',color:'text-emerald-600',bg:'bg-emerald-50 dark:bg-emerald-500/10'
  }]
  }
 
@@ -142,10 +144,10 @@ export function WikiView() {
  await syncSpaces(String(namespaceId))
  setNewSpaceForm({ name:'',description:'' })
  setIsCreateModalOpen(false)
- toast.success('Knowledge space created successfully')
+ toast.success(t('wikiView.toast.createSpaceSuccess'))
  } catch (error) {
  const message = error instanceof Error?error.message:String(error)
- toast.error(`Creation failed:${message}`)
+ toast.error(t('wikiView.toast.createSpaceFailed', { message }))
  }
  }
 
@@ -170,14 +172,14 @@ export function WikiView() {
  <Modal
  isOpen={isCreateModalOpen}
  onClose={handleCloseCreateModal}
- title="Create a knowledge space"
- subtitle={<span className="text-xs text-slate-400 dark:text-slate-500">Namespace Knowledge documents used to isolate different business domains.</span>}
+ title={t('wikiView.createSpaceModal.title')}
+ subtitle={<span className="text-xs text-slate-400 dark:text-slate-500">{t('wikiView.createSpaceModal.subtitle')}</span>}
  size="sm"
  footerRight={
  <>
- <ModalCancelButton onClick={handleCloseCreateModal}>Cancel</ModalCancelButton>
+ <ModalCancelButton onClick={handleCloseCreateModal}>{t('wikiView.createSpaceModal.cancel')}</ModalCancelButton>
  <ModalPrimaryButton onClick={handleCreateSpace} disabled={!canCreateSpace}>
- create space
+ {t('wikiView.createSpaceModal.confirm')}
  </ModalPrimaryButton>
  </>
  }
@@ -192,7 +194,7 @@ export function WikiView() {
  }
 
  const fallbackSpace:KnowledgeSpace = {
- id:'',name:'No knowledge space selected',description:'Please create a knowledge space first to start uploading documents',docCount:0,color:'bg-slate-400'
+ id:'',name:t('wikiView.fallbackSpace.name'),description:t('wikiView.fallbackSpace.description'),docCount:0,color:'bg-slate-400'
  }
  const activeSpace = currentSpace?? fallbackSpace
  const currentIndex = Math.max(0,spaceList.findIndex((space) => space.id === activeSpace.id))
@@ -207,12 +209,12 @@ export function WikiView() {
  {!isNamespaceCollapsed && (<>
  <div className={`${paddingClassMap.sm} flex flex-col min-h-0 h-full`}>
  <div className="flex items-center justify-between mb-3">
- <h3 className={`${TYPOGRAPHY.caption} font-semibold text-slate-500 uppercase tracking-wider`}>knowledge space (Namespaces)</h3>
+ <h3 className={`${TYPOGRAPHY.caption} font-semibold text-slate-500 uppercase tracking-wider`}>{t('wikiView.sidebar.title')}</h3>
  <button
  type="button"
  onClick={() => setIsCreateModalOpen(true)}
  className="text-slate-400 hover:text-indigo-600"
- aria-label="Create a knowledge space"
+ aria-label={t('wikiView.sidebar.createAria')}
  >
  <Plus size={14} />
  </button>
@@ -233,7 +235,7 @@ export function WikiView() {
  </div>
  <div className={`${TYPOGRAPHY.micro} text-slate-400 mt-0.5 line-clamp-1`}>{space.description}</div>
  <div className={`flex items-center mt-2 ${TYPOGRAPHY.micro} text-slate-400 font-mono`}>
- <Database size={10} className="mr-1" /> {space.docCount} docs
+ <Database size={10} className="mr-1" /> {t('wikiView.sidebar.docsCount', { count: space.docCount })}
  </div>
  </div>
  </div>))}
@@ -243,8 +245,8 @@ export function WikiView() {
  type="button"
  onClick={() => setIsNamespaceCollapsed((prev) =>!prev)}
  className="absolute bottom-3 right-3 z-10 size-7 rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900"
- aria-label="Close knowledge space"
- title="Close knowledge space"
+ aria-label={t('wikiView.sidebar.closeAria')}
+ title={t('wikiView.sidebar.closeTitle')}
  >
  <ChevronLeft size={iconSizeToken.small} className="mx-auto" />
  </button>
@@ -260,8 +262,8 @@ export function WikiView() {
  type="button"
  onClick={() => setIsNamespaceCollapsed((prev) =>!prev)}
  className="absolute bottom-4 left-2 z-10 size-7 rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900"
- aria-label="Expand knowledge space"
- title="Expand knowledge space"
+ aria-label={t('wikiView.sidebar.expandAria')}
+ title={t('wikiView.sidebar.expandTitle')}
  >
  <ChevronRight size={iconSizeToken.small} className="mx-auto" />
  </button>)}
@@ -276,7 +278,7 @@ export function WikiView() {
  <div className="flex justify-between items-end mb-6 flex-shrink-0">
  <div>
  <div className={`flex items-center space-x-2 ${TYPOGRAPHY.legal} text-slate-400 uppercase tracking-widest mb-1`}>
- <span>Knowledge Wiki</span>
+ <span>{t('wikiView.header.breadcrumbWiki')}</span>
  <span>/</span>
  <span className="text-slate-600 dark:text-slate-300">{activeSpace.name}</span>
  </div>
@@ -295,7 +297,7 @@ export function WikiView() {
  onClick={() => setIsUploadModalOpen(true)}
  >
  <Plus size={14} />
- Upload documents to space
+ {t('wikiView.header.uploadButton')}
  </Button>
  </div>
  </div>
@@ -329,19 +331,19 @@ export function WikiView() {
  <TabButton
  active={activeTab === 'DOCUMENTS'}
  onClick={() => setActiveTab('DOCUMENTS')}
- label="Document list"
+ label={t('wikiView.tabs.documents')}
  icon={FolderOpen}
  />
  <TabButton
  active={activeTab === 'CHUNKS'}
  onClick={() => setActiveTab('CHUNKS')}
- label="Slice editor"
+ label={t('wikiView.tabs.chunks')}
  icon={Database}
  />
  <TabButton
  active={activeTab === 'RETRIEVAL_TEST'}
  onClick={() => setActiveTab('RETRIEVAL_TEST')}
- label="recall test (Playground)"
+ label={t('wikiView.tabs.retrieval')}
  icon={Zap}
  />
  </div>
@@ -371,14 +373,14 @@ export function WikiView() {
  <Modal
  isOpen={isCreateModalOpen}
  onClose={handleCloseCreateModal}
- title="Create a knowledge space"
- subtitle={<span className="text-xs text-slate-400 dark:text-slate-500">Namespace Knowledge documents used to isolate different business domains.</span>}
+ title={t('wikiView.createSpaceModal.title')}
+ subtitle={<span className="text-xs text-slate-400 dark:text-slate-500">{t('wikiView.createSpaceModal.subtitle')}</span>}
  size="sm"
  footerRight={
  <>
- <ModalCancelButton onClick={handleCloseCreateModal}>Cancel</ModalCancelButton>
+ <ModalCancelButton onClick={handleCloseCreateModal}>{t('wikiView.createSpaceModal.cancel')}</ModalCancelButton>
  <ModalPrimaryButton onClick={handleCreateSpace} disabled={!canCreateSpace}>
- create space
+ {t('wikiView.createSpaceModal.confirm')}
  </ModalPrimaryButton>
  </>
  }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Plus, BookA, Pencil, Trash2, Check, X, Loader2 } from 'lucide-react'
 import { Badge } from '../components'
 import type { WordRoot } from '../types'
@@ -62,6 +63,7 @@ function WordRootRow({
   onDelete: (code: string) => void
   onUpdate: (code: string, updated: WordRoot) => void
 }) {
+  const { t } = useTranslation('oneSemantics')
   const [deleting, setDeleting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [editForm, setEditForm] = useState(() => ({
@@ -127,7 +129,7 @@ function WordRootRow({
               value={editForm.name}
               onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               onClick={(e) => e.stopPropagation()}
-              placeholder="WordRoot name"
+              placeholder={t('wordRootExplorer.placeholder.name')}
               className="w-full px-2 py-1 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="text-micro font-mono text-slate-400 uppercase px-1">{root.code}</div>
@@ -148,7 +150,7 @@ function WordRootRow({
             value={editForm.comment}
             onChange={(e) => setEditForm({ ...editForm, comment: e.target.value })}
             onClick={(e) => e.stopPropagation()}
-            placeholder="Description"
+            placeholder={t('wordRootExplorer.placeholder.description')}
             className="w-full px-2 py-1.5 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </td>
@@ -164,7 +166,7 @@ function WordRootRow({
               onClick={handleSave}
               disabled={saving || !editForm.name.trim()}
               className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors disabled:opacity-50"
-              title="save"
+              title={t('wordRootExplorer.actions.save')}
             >
               {saving ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Check size={iconSizeToken.small} />}
             </button>
@@ -172,7 +174,7 @@ function WordRootRow({
               onClick={handleCancel}
               disabled={saving}
               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors disabled:opacity-50"
-              title="Cancel"
+              title={t('wordRootExplorer.actions.cancel')}
             >
               <X size={iconSizeToken.small} />
             </button>
@@ -219,7 +221,7 @@ function WordRootRow({
           <button
             onClick={handleEdit}
             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-            title="Edit"
+            title={t('wordRootExplorer.actions.edit')}
           >
             <Pencil size={iconSizeToken.small} />
           </button>
@@ -227,7 +229,7 @@ function WordRootRow({
             onClick={handleDelete}
             disabled={deleting}
             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors disabled:opacity-50"
-            title="Delete"
+            title={t('wordRootExplorer.actions.delete')}
           >
             {deleting ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Trash2 size={iconSizeToken.small} />}
           </button>
@@ -251,6 +253,7 @@ function NewWordRootRow({
   onCancel: () => void
   saving: boolean
 }) {
+  const { t } = useTranslation('oneSemantics')
   const isValid = form.code.trim() && form.name.trim()
 
   return (
@@ -261,14 +264,14 @@ function NewWordRootRow({
             type="text"
             value={form.name}
             onChange={(e) => onChange({ ...form, name: e.target.value })}
-            placeholder="WordRoot name"
+            placeholder={t('wordRootExplorer.placeholder.name')}
             className="w-full px-2 py-1 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <input
             type="text"
             value={form.code}
             onChange={(e) => onChange({ ...form, code: e.target.value.toUpperCase() })}
-            placeholder="encoding (CODE)"
+            placeholder={t('wordRootExplorer.placeholder.code')}
             className="w-full px-2 py-1 text-micro font-mono uppercase border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -287,7 +290,7 @@ function NewWordRootRow({
           type="text"
           value={form.comment}
           onChange={(e) => onChange({ ...form, comment: e.target.value })}
-          placeholder="Description（Optional）"
+          placeholder={t('wordRootExplorer.placeholder.descriptionOptional')}
           className="w-full px-2 py-1.5 text-body-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </td>
@@ -303,7 +306,7 @@ function NewWordRootRow({
             onClick={onSave}
             disabled={!isValid || saving}
             className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="save"
+            title={t('wordRootExplorer.actions.save')}
           >
             {saving ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Check size={iconSizeToken.small} />}
           </button>
@@ -311,7 +314,7 @@ function NewWordRootRow({
             onClick={onCancel}
             disabled={saving}
             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors disabled:opacity-50"
-            title="Cancel"
+            title={t('wordRootExplorer.actions.cancel')}
           >
             <X size={iconSizeToken.small} />
           </button>
@@ -322,6 +325,7 @@ function NewWordRootRow({
 }
 
 export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps) {
+  const { t } = useTranslation('oneSemantics')
   const searchTerm = useSearchStore((state) => state.searchTerm)
   const setWordRootsTotal = useSemanticStatsStore((state) => state.setWordRootsTotal)
 
@@ -445,7 +449,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
             <ArrowLeft size={iconSizeToken.large} />
           </button>
           <div className="flex items-center gap-2">
-            <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">WordRoot Center</h2>
+            <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">{t('wordRootExplorer.title')}</h2>
             <Badge variant="blue">
               {filteredRoots.length} / {total}
             </Badge>
@@ -456,7 +460,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
           disabled={showNewRow}
           className="bg-slate-900 dark:bg-blue-600 text-white px-3 @md:px-4 py-1 @md:py-1.5 rounded-lg text-caption @md:text-body-sm font-medium flex items-center gap-1 @md:gap-1.5 shadow-md hover:bg-blue-600 dark:hover:bg-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Plus size={iconSizeToken.medium} /> <span className="hidden @md:inline">Add WordRoot</span>
+          <Plus size={iconSizeToken.medium} /> <span className="hidden @md:inline">{t('wordRootExplorer.addWordRoot')}</span>
         </button>
       </div>
 
@@ -476,12 +480,12 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
         >
           <TableHeader>
             <TableRow>
-              <TableHead className={tableColumnWidthClassMap['5xl']}>WordRoot name / code</TableHead>
-              <TableHead className={`${tableColumnWidthClassMap['4xl']} text-center`}>data type</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead className={tableColumnWidthClassMap.lg}>Creator</TableHead>
-              <TableHead className={tableColumnWidthClassMap['2xl']}>creation time</TableHead>
-              <TableHead className={`${tableColumnWidthClassMap.lg} text-center`}>Operation</TableHead>
+              <TableHead className={tableColumnWidthClassMap['5xl']}>{t('wordRootExplorer.table.nameCode')}</TableHead>
+              <TableHead className={`${tableColumnWidthClassMap['4xl']} text-center`}>{t('wordRootExplorer.table.dataType')}</TableHead>
+              <TableHead>{t('wordRootExplorer.table.description')}</TableHead>
+              <TableHead className={tableColumnWidthClassMap.lg}>{t('wordRootExplorer.table.creator')}</TableHead>
+              <TableHead className={tableColumnWidthClassMap['2xl']}>{t('wordRootExplorer.table.createTime')}</TableHead>
+              <TableHead className={`${tableColumnWidthClassMap.lg} text-center`}>{t('wordRootExplorer.table.operation')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -489,7 +493,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
               <TableRow>
                 <TableCell colSpan={6} className="py-12 text-center">
                   <Loader2 className="w-6 h-6 animate-spin text-blue-500 mx-auto" />
-                  <div className="text-slate-400 text-caption mt-2">Loading...</div>
+                  <div className="text-slate-400 text-caption mt-2">{t('wordRootExplorer.loading')}</div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -518,7 +522,7 @@ export function WordRootExplorer({ onBack, onOpenDrawer }: WordRootExplorerProps
                 {filteredRoots.length === 0 && !showNewRow && (
                   <TableRow>
                     <TableCell colSpan={6} className="py-12 @md:py-16 text-center text-slate-400 text-caption @md:text-body-sm">
-                      No matching WordRoot found
+                      {t('wordRootExplorer.empty')}
                     </TableCell>
                   </TableRow>
                 )}

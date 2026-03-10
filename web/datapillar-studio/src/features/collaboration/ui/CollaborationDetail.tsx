@@ -1,6 +1,7 @@
 import {
  ArrowRight,CheckCircle2,Database,FileCode,GitPullRequest,Server,ShieldAlert,XCircle
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { cn } from '@/utils'
@@ -21,25 +22,27 @@ interface CollaborationDetailProps {
 }
 
 function StatusBadge({ status }:{ status:Ticket['status'] }) {
+ const { t } = useTranslation('collaboration')
  const config = statusConfigMap[status]
  const Icon = config.icon
  return (<span className={cn('flex items-center px-2 py-0.5 rounded text-micro font-bold border uppercase tracking-wide',config.color)}>
  <Icon size={10} className="mr-1.5" />
- {config.label}
+ {t(`status.${status}`, { defaultValue:config.label })}
  </span>)
 }
 
 export function CollaborationDetail({
  selectedTicketView,selectedTicket,isDiffOpen,commentText,onToggleDiff,onCommentTextChange,onApprove,onReject,onCancel,onAddComment
 }:CollaborationDetailProps) {
+ const { t } = useTranslation('collaboration')
  if (!selectedTicket) {
  return (<div className="flex-1 flex flex-col bg-white dark:bg-slate-900 min-w-0">
  <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-500">
  <div className="w-16 h-16 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center mb-4">
  <ShieldAlert size={24} className="text-slate-300 dark:text-slate-600" />
  </div>
- <p className={cn(TYPOGRAPHY.bodySm,'font-medium text-slate-500 dark:text-slate-400')}>No work order selected</p>
- <p className={cn(TYPOGRAPHY.caption,'text-slate-400 dark:text-slate-500 mt-1')}>Please select a ticket from the list to view details.</p>
+ <p className={cn(TYPOGRAPHY.bodySm,'font-medium text-slate-500 dark:text-slate-400')}>{t('detail.empty.title')}</p>
+ <p className={cn(TYPOGRAPHY.caption,'text-slate-400 dark:text-slate-500 mt-1')}>{t('detail.empty.description')}</p>
  </div>
  </div>)
  }
@@ -54,7 +57,7 @@ export function CollaborationDetail({
  <div className="flex items-center space-x-4">
  <div className="flex flex-col">
  <span className={cn(TYPOGRAPHY.caption,'text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold mb-0.5')}>
- Current handler
+ {t('detail.header.currentHandler')}
  </span>
  <div className="flex items-center space-x-2">
  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white text-nano flex items-center justify-center font-bold">
@@ -69,15 +72,15 @@ export function CollaborationDetail({
  {selectedTicketView === 'INBOX' && (<>
  <Button onClick={onReject} variant="dangerOutline" size="header" className="py-1.5 @md:py-2">
  <XCircle size={14} />
- reject
+ {t('detail.actions.reject')}
  </Button>
  <Button onClick={onApprove} size="header" className="py-1.5 @md:py-2">
  <CheckCircle2 size={14} />
- Approve request
+ {t('detail.actions.approve')}
  </Button>
  </>)}
  {selectedTicketView === 'SENT' && (<Button onClick={onCancel} variant="dangerOutline" size="header" className="py-1.5 @md:py-2">
- Withdraw application
+ {t('detail.actions.withdraw')}
  </Button>)}
  </div>
  </div>
@@ -90,7 +93,7 @@ export function CollaborationDetail({
  <span
  className={cn('px-2 py-0.5 rounded text-micro font-bold uppercase tracking-wide',priorityConfigMap[selectedTicket.details.priority].className)}
  >
- {priorityConfigMap[selectedTicket.details.priority].label}priority
+ {t(`priority.${selectedTicket.details.priority}`, { defaultValue:priorityConfigMap[selectedTicket.details.priority].label })}{t('detail.prioritySuffix')}
  </span>
  </div>
  <h1 className={cn(TYPOGRAPHY.heading,'font-bold text-slate-900 dark:text-slate-100 leading-tight mb-4')}>
@@ -107,7 +110,7 @@ export function CollaborationDetail({
  </div>
  <div className="grid grid-cols-2 gap-4 mb-4">
  <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
- <div className="text-micro text-slate-400 dark:text-slate-500 uppercase font-bold mb-1">Permissions</div>
+ <div className="text-micro text-slate-400 dark:text-slate-500 uppercase font-bold mb-1">{t('detail.sections.dataAccess.permissions')}</div>
  <div className="flex flex-wrap gap-1">
  {selectedTicket.details.permissions?.map((permission) => (<span
  key={permission}
@@ -116,12 +119,12 @@ export function CollaborationDetail({
  {permission}
  </span>))}
  </div>
- {selectedTicket.details.duration && (<div className="mt-2 text-micro text-slate-400 dark:text-slate-500">term:{selectedTicket.details.duration}</div>)}
+ {selectedTicket.details.duration && (<div className="mt-2 text-micro text-slate-400 dark:text-slate-500">{t('detail.sections.dataAccess.term')}:{selectedTicket.details.duration === '7 day'?t('duration.days7'):selectedTicket.details.duration === '30 day'?t('duration.days30'):selectedTicket.details.duration === '90 day'?t('duration.days90'):selectedTicket.details.duration === 'long term'?t('duration.longTerm'):selectedTicket.details.duration}</div>)}
  </div>
  </div>
 
  {selectedTicket.details.selectedColumns && (<div className="mb-4">
- <div className="text-micro text-slate-400 dark:text-slate-500 uppercase font-bold mb-2">Application fields</div>
+ <div className="text-micro text-slate-400 dark:text-slate-500 uppercase font-bold mb-2">{t('detail.sections.dataAccess.selectedFields')}</div>
  <div className="flex flex-wrap gap-2">
  {selectedTicket.details.selectedColumns.map((column) => (<span
  key={column}
@@ -133,7 +136,7 @@ export function CollaborationDetail({
  </div>)}
 
  <p className={cn(TYPOGRAPHY.bodySm,'text-slate-600 dark:text-slate-300 leading-relaxed bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-800')}>
- <span className="text-micro text-slate-400 dark:text-slate-500 block mb-1 uppercase font-bold">Reasons for application</span>
+ <span className="text-micro text-slate-400 dark:text-slate-500 block mb-1 uppercase font-bold">{t('detail.sections.dataAccess.reason')}</span>
  {selectedTicket.details.description}
  </p>
  </div>)}
@@ -155,37 +158,37 @@ export function CollaborationDetail({
 	 <Button
 	 type="button"
 	 onClick={onToggleDiff}
-	 variant="outline"
-	 size="normal"
-	 className={cn('w-full font-bold text-brand-600 dark:text-brand-300 hover:border-brand-300 dark:hover:border-brand-400/50 hover:bg-brand-50 dark:hover:bg-brand-900/20',TYPOGRAPHY.caption)}
-	 >
-	 <GitPullRequest size={14} />
-	 {isDiffOpen?'Collapse difference overview':'View code differences'}
-	 </Button>
-	 {isDiffOpen && (<div className={cn(TYPOGRAPHY.caption,'mt-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 text-slate-600 dark:text-slate-300')}>
-	 <div className="flex items-center justify-between">
-	 <span>New {selectedTicket.details.diff?.added?? 0} OK</span>
-	 <span>Delete {selectedTicket.details.diff?.removed?? 0} OK</span>
-	 </div>
-	 <div className="mt-2 text-micro text-slate-400 dark:text-slate-500">Detailed differences have been synchronized to the review system</div>
-	 </div>)}
-	 </div>)}
+ variant="outline"
+ size="normal"
+ className={cn('w-full font-bold text-brand-600 dark:text-brand-300 hover:border-brand-300 dark:hover:border-brand-400/50 hover:bg-brand-50 dark:hover:bg-brand-900/20',TYPOGRAPHY.caption)}
+ >
+ <GitPullRequest size={14} />
+ {isDiffOpen?t('detail.sections.codeReview.collapseDiff'):t('detail.sections.codeReview.viewDiff')}
+ </Button>
+ {isDiffOpen && (<div className={cn(TYPOGRAPHY.caption,'mt-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 text-slate-600 dark:text-slate-300')}>
+ <div className="flex items-center justify-between">
+ <span>{t('detail.sections.codeReview.addedCount', { count:selectedTicket.details.diff?.added?? 0 })}</span>
+ <span>{t('detail.sections.codeReview.removedCount', { count:selectedTicket.details.diff?.removed?? 0 })}</span>
+ </div>
+ <div className="mt-2 text-micro text-slate-400 dark:text-slate-500">{t('detail.sections.codeReview.diffHint')}</div>
+ </div>)}
+ </div>)}
 
 	 {selectedTicket.type === 'RESOURCE_OPS' && (<div>
 	 <div className="flex items-center space-x-2 mb-4">
 	 <Server size={16} className="text-slate-400 dark:text-slate-500" />
 	 <span className={cn(TYPOGRAPHY.bodySm,'font-bold text-slate-900 dark:text-slate-100')}>{selectedTicket.details.target}</span>
 	 </div>
-	 <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-800 mb-4">
-	 <div>
-	 <div className="text-micro text-slate-400 dark:text-slate-500 uppercase font-bold">current</div>
-	 <div className={cn(TYPOGRAPHY.bodySm,'font-mono font-bold text-slate-900 dark:text-slate-100')}>{selectedTicket.details.resource?.current}</div>
-	 </div>
-	 <ArrowRight size={16} className="text-slate-300 dark:text-slate-600" />
-	 <div>
-	 <div className="text-micro text-slate-400 dark:text-slate-500 uppercase font-bold">Apply</div>
-	 <div className={cn(TYPOGRAPHY.bodySm,'font-mono font-bold text-brand-600')}>
-	 {selectedTicket.details.resource?.requested}
+ <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-800 mb-4">
+ <div>
+ <div className="text-micro text-slate-400 dark:text-slate-500 uppercase font-bold">{t('detail.sections.resourceOps.current')}</div>
+ <div className={cn(TYPOGRAPHY.bodySm,'font-mono font-bold text-slate-900 dark:text-slate-100')}>{selectedTicket.details.resource?.current}</div>
+ </div>
+ <ArrowRight size={16} className="text-slate-300 dark:text-slate-600" />
+ <div>
+ <div className="text-micro text-slate-400 dark:text-slate-500 uppercase font-bold">{t('detail.sections.resourceOps.requested')}</div>
+ <div className={cn(TYPOGRAPHY.bodySm,'font-mono font-bold text-brand-600')}>
+ {selectedTicket.details.resource?.requested}
 	 </div>
 	 </div>
 	 </div>
@@ -198,25 +201,25 @@ export function CollaborationDetail({
  const Icon = requestTypeMap[selectedTicket.type].icon
  return <Icon size={16} className={requestTypeMap[selectedTicket.type].accentClass} />
  })()}
-	 <span className={cn(TYPOGRAPHY.bodySm,'font-bold text-slate-900 dark:text-slate-100')}>
-	 {requestTypeMap[selectedTicket.type].title}
-	 </span>
-	 </div>
-	 <div className="grid grid-cols-2 gap-4 mb-4">
-	 <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
-	 <div className="text-micro text-slate-400 dark:text-slate-500 uppercase font-bold mb-1">target audience</div>
-	 <div className={cn(TYPOGRAPHY.bodySm,'text-slate-700 dark:text-slate-200 font-mono')}>{selectedTicket.details.target}</div>
-	 </div>
-	 <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
-	 <div className="text-micro text-slate-400 dark:text-slate-500 uppercase font-bold mb-1">expected to be completed</div>
-	 <div className={cn(TYPOGRAPHY.bodySm,'text-slate-700 dark:text-slate-200 font-mono')}>
-	 {selectedTicket.details.expectedDate || 'Not filled in'}
-	 </div>
-	 </div>
-	 </div>
-	 {selectedTicket.details.tags.length > 0 && (<div className="mb-4">
-	 <div className="text-micro text-slate-400 dark:text-slate-500 uppercase font-bold mb-2">label</div>
-	 <div className="flex flex-wrap gap-2">
+ <span className={cn(TYPOGRAPHY.bodySm,'font-bold text-slate-900 dark:text-slate-100')}>
+ {t(`requestType.${selectedTicket.type}.title`, { defaultValue:requestTypeMap[selectedTicket.type].title })}
+ </span>
+ </div>
+ <div className="grid grid-cols-2 gap-4 mb-4">
+ <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
+ <div className="text-micro text-slate-400 dark:text-slate-500 uppercase font-bold mb-1">{t('detail.sections.generic.target')}</div>
+ <div className={cn(TYPOGRAPHY.bodySm,'text-slate-700 dark:text-slate-200 font-mono')}>{selectedTicket.details.target}</div>
+ </div>
+ <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
+ <div className="text-micro text-slate-400 dark:text-slate-500 uppercase font-bold mb-1">{t('detail.sections.generic.expectedDate')}</div>
+ <div className={cn(TYPOGRAPHY.bodySm,'text-slate-700 dark:text-slate-200 font-mono')}>
+ {selectedTicket.details.expectedDate || t('view.defaults.notFilledIn')}
+ </div>
+ </div>
+ </div>
+ {selectedTicket.details.tags.length > 0 && (<div className="mb-4">
+ <div className="text-micro text-slate-400 dark:text-slate-500 uppercase font-bold mb-2">{t('detail.sections.generic.tags')}</div>
+ <div className="flex flex-wrap gap-2">
 	 {selectedTicket.details.tags.map((tag) => (<span
 	 key={tag}
 	 className={cn('px-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-300',TYPOGRAPHY.caption)}
@@ -224,17 +227,17 @@ export function CollaborationDetail({
 	 {tag}
 	 </span>))}
 	 </div>
-	 </div>)}
-	 <p className={cn(TYPOGRAPHY.bodySm,'text-slate-600 dark:text-slate-300 leading-relaxed bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-800')}>
-	 <span className="text-micro text-slate-400 dark:text-slate-500 block mb-1 uppercase font-bold">Requirements description</span>
-	 {selectedTicket.details.description}
-	 </p>
-	 </div>)}
+ </div>)}
+ <p className={cn(TYPOGRAPHY.bodySm,'text-slate-600 dark:text-slate-300 leading-relaxed bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-800')}>
+ <span className="text-micro text-slate-400 dark:text-slate-500 block mb-1 uppercase font-bold">{t('detail.sections.generic.description')}</span>
+ {selectedTicket.details.description}
+ </p>
+ </div>)}
  </div>
  </div>
 
-	 <div className="border-t border-slate-200 dark:border-slate-800 pt-6">
-	 <h3 className={cn(TYPOGRAPHY.caption,'font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-6')}>Circulation records</h3>
+		 <div className="border-t border-slate-200 dark:border-slate-800 pt-6">
+		 <h3 className={cn(TYPOGRAPHY.caption,'font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-6')}>{t('detail.timeline.title')}</h3>
 	 <div className="space-y-6 relative">
 	 <div className="absolute left-3.5 top-0 bottom-0 w-px bg-slate-200 dark:bg-slate-800"></div>
 
@@ -260,22 +263,22 @@ export function CollaborationDetail({
  <div className="relative">
 	 <textarea
 	 value={commentText}
-	 onChange={(event) => onCommentTextChange(event.target.value)}
-	 className={cn('w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all resize-none',TYPOGRAPHY.bodySm)}
-	 rows={3}
-	 placeholder="Add a comment or note..."
-	 ></textarea>
+		 onChange={(event) => onCommentTextChange(event.target.value)}
+		 className={cn('w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all resize-none',TYPOGRAPHY.bodySm)}
+		 rows={3}
+		 placeholder={t('detail.timeline.commentPlaceholder')}
+		 ></textarea>
  <div className="absolute bottom-2 right-2 flex space-x-2">
  <Button
  type="button"
  onClick={onAddComment}
 	 disabled={!commentText.trim()}
 	 variant="primary"
-	 size="compact"
-	 className="font-bold"
-	 >
-	 Comment
-	 </Button>
+		 size="compact"
+		 className="font-bold"
+		 >
+		 {t('detail.timeline.commentButton')}
+		 </Button>
  </div>
  </div>
  </div>

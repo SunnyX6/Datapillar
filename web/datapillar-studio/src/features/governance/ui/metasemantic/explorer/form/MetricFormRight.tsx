@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect, memo, startTransition, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import { Database, Box, Hash, ChevronRight, Loader2, ArrowRight, Search, Filter, Target, Pin } from 'lucide-react'
 import { fetchCatalogs, fetchSchemas, fetchTables, getTable } from '@/services/oneMetaService'
@@ -16,6 +17,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
   onFilterToggle: (col: MeasureColumn, selected: boolean, filterCol?: FilterColumn) => void
   mode?: 'atomic' | 'derived'
 }) {
+  const { t } = useTranslation('oneSemantics')
   const [open, setOpen] = useState(false)
   const [loadingDomain, setLoadingDomain] = useState(false)
   const [valueDomain, setValueDomain] = useState<Array<{ key: string; label: string }>>([])
@@ -119,7 +121,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
           {domainCode && (
             <span
               className="inline-flex items-center px-1.5 py-0.5 text-micro font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 rounded-full"
-              title="Associated value range"
+              title={t('metricForm.right.column.associatedValueDomain')}
             >
               <Pin size={8} />
             </span>
@@ -136,7 +138,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
             <button
               type="button"
               onClick={handleMeasureClick}
-              title={isMeasure ? 'Cancel measurement' : 'Set as measure column'}
+              title={isMeasure ? t('metricForm.right.column.cancelMeasure') : t('metricForm.right.column.setMeasure')}
               className={`p-1 rounded ${
                 isMeasure
                   ? 'bg-blue-500 text-white'
@@ -152,7 +154,9 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
               type="button"
               ref={filterButtonRef}
               onClick={handleFilterClick}
-              title={isFilter ? `Selected${filterValues.length}filter values` : 'Set as filter column'}
+              title={isFilter
+                ? t('metricForm.right.column.selectedFilterValues', { count: filterValues.length })
+                : t('metricForm.right.column.setFilter')}
               className={`p-1 rounded ${
                 isFilter
                   ? 'bg-amber-500 text-white'
@@ -172,7 +176,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
                 className={`fixed ${menuWidthClassMap.large} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[1000000]`}
               >
                 <div className="p-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Select filter value</span>
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{t('metricForm.right.column.selectFilterValue')}</span>
                   {loadingDomain && <Loader2 size={12} className="animate-spin text-slate-400" />}
                 </div>
                 <div className="max-h-48 overflow-y-auto overscroll-contain custom-scrollbar" onWheel={(e) => e.stopPropagation()}>
@@ -198,7 +202,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
                       )
                     })
                   ) : !loadingDomain ? (
-                    <div className="py-4 text-center text-xs text-slate-400">No range data yet</div>
+                    <div className="py-4 text-center text-xs text-slate-400">{t('metricForm.right.column.noRangeData')}</div>
                   ) : null}
                 </div>
                 {filterValues.length > 0 && (
@@ -208,7 +212,7 @@ const ColumnTableRow = memo(function ColumnTableRow({ colInfo, isMeasure, isFilt
                       onClick={() => handleFilterChange([])}
                       className="w-full text-xs text-red-500 hover:text-red-600"
                     >
-                      clear all
+                      {t('metricForm.right.column.clearAll')}
                     </button>
                   </div>
                 )}
@@ -233,6 +237,7 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
   aiSuggestedMeasures?: string[]
   aiSuggestedFilters?: string[]
 }) {
+  const { t } = useTranslation('oneSemantics')
   type Level = 'CATALOG' | 'SCHEMA' | 'TABLE' | 'COLUMN'
 
   const [catalogs, setCatalogs] = useState<string[]>([])
@@ -418,10 +423,10 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
   }, [selected])
 
   const levels: { id: Level; label: string; icon: typeof Database; value: string }[] = [
-    { id: 'CATALOG', label: 'data source', icon: Database, value: selected.catalog },
-    { id: 'SCHEMA', label: 'database', icon: Box, value: selected.schema },
-    { id: 'TABLE', label: 'physical table', icon: Box, value: selected.table },
-    { id: 'COLUMN', label: 'Field', icon: Hash, value: '' }
+    { id: 'CATALOG', label: t('metricForm.right.level.catalog'), icon: Database, value: selected.catalog },
+    { id: 'SCHEMA', label: t('metricForm.right.level.schema'), icon: Box, value: selected.schema },
+    { id: 'TABLE', label: t('metricForm.right.level.table'), icon: Box, value: selected.table },
+    { id: 'COLUMN', label: t('metricForm.right.level.column'), icon: Hash, value: '' }
   ]
 
   const currentData = level === 'CATALOG' ? catalogs : level === 'SCHEMA' ? schemas : level === 'TABLE' ? tables : columns.map((c) => c.name)
@@ -461,7 +466,7 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
           <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
           <input
             type="text"
-            placeholder={`Search ${levels.find((l) => l.id === level)?.label}...`}
+            placeholder={t('metricForm.right.searchPlaceholder', { level: levels.find((l) => l.id === level)?.label })}
             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -477,15 +482,15 @@ function CascadingPicker({ mode = 'atomic', onMeasureToggle, onFilterToggle, onT
         ) : filteredData.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-400">
             <Box size={24} className="opacity-20 mb-2" />
-            <span className="text-xs">No data yet</span>
+            <span className="text-xs">{t('metricForm.right.noData')}</span>
           </div>
         ) : level === 'COLUMN' ? (
           <table className="w-full">
             <thead className="sticky top-0 bg-slate-100 dark:bg-slate-900 z-10">
               <tr className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                <th className="text-left px-4 py-2">List</th>
-                <th className="text-left px-4 py-2">Type</th>
-                <th className="text-center px-4 py-2 w-20">Operation</th>
+                <th className="text-left px-4 py-2">{t('metricForm.right.table.list')}</th>
+                <th className="text-left px-4 py-2">{t('metricForm.right.table.type')}</th>
+                <th className="text-center px-4 py-2 w-20">{t('metricForm.right.table.operation')}</th>
               </tr>
             </thead>
             <tbody>
@@ -543,6 +548,7 @@ function MetricSelector({ selectedMetrics, onMetricsChange }: {
   selectedMetrics: Array<{ code: string; name: string; comment?: string }>
   onMetricsChange?: (metrics: Array<{ code: string; name: string; comment?: string }>) => void
 }) {
+  const { t } = useTranslation('oneSemantics')
   const [metrics, setMetrics] = useState<Array<{ code: string; name: string; type: string; comment?: string }>>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -587,7 +593,7 @@ function MetricSelector({ selectedMetrics, onMetricsChange }: {
           <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
           <input
             type="text"
-            placeholder="Search metrics..."
+            placeholder={t('metricForm.right.metricSelector.searchPlaceholder')}
             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-emerald-500"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -604,7 +610,7 @@ function MetricSelector({ selectedMetrics, onMetricsChange }: {
         ) : filteredMetrics.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-400">
             <Target size={24} className="opacity-20 mb-2" />
-            <span className="text-xs">No metrics available yet</span>
+            <span className="text-xs">{t('metricForm.right.metricSelector.noData')}</span>
           </div>
         ) : (
           <div className="p-3 space-y-1.5">
@@ -643,7 +649,9 @@ function MetricSelector({ selectedMetrics, onMetricsChange }: {
                           ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-500'
                           : 'bg-blue-50 dark:bg-blue-900/30 text-blue-500'
                       }`}>
-                        {metric.type === 'ATOMIC' ? 'atom' : 'derived'}
+                        {metric.type === 'ATOMIC'
+                          ? t('metricForm.right.metricSelector.type.atomic')
+                          : t('metricForm.right.metricSelector.type.derived')}
                       </span>
                     </div>
                   </div>
@@ -681,6 +689,7 @@ export function MetricFormRight({
   aiSuggestedMeasures,
   aiSuggestedFilters
 }: MetricFormRightProps) {
+  const { t } = useTranslation('oneSemantics')
   // Atomic metrics: select physical assets (measure columns + filter columns)
   if (form.type === 'ATOMIC') {
     return (
@@ -688,7 +697,7 @@ export function MetricFormRight({
         <div className="h-full min-h-0 flex flex-col gap-1.5">
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 shrink-0">
             <Database size={14} className="text-blue-500" />
-            Physical assets (select measure or filter columns)
+            {t('metricForm.right.label.atomicAssets')}
           </label>
           <div className="flex-1 min-h-0">
             <CascadingPicker
@@ -719,7 +728,7 @@ export function MetricFormRight({
         <div className="h-full min-h-0 flex flex-col gap-1.5">
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 shrink-0">
             <Database size={14} className="text-blue-500" />
-            Physical assets (select dimension filter columns)
+            {t('metricForm.right.label.derivedAssets')}
           </label>
           <div className="flex-1 min-h-0">
             <CascadingPicker
@@ -748,7 +757,7 @@ export function MetricFormRight({
       <div className="h-full min-h-0 flex flex-col gap-1.5">
         <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 shrink-0">
           <Target size={14} className="text-emerald-500" />
-          Select metrics for composition
+          {t('metricForm.right.label.compositeMetrics')}
         </label>
         <div className="flex-1 min-h-0">
           <MetricSelector

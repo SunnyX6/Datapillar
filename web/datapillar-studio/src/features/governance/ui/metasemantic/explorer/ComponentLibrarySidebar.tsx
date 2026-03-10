@@ -4,7 +4,8 @@
  * Support folding/Expand,Default folded
  */
 
-import { useState,useEffect,useCallback,useRef,useLayoutEffect } from 'react'
+import { useState,useEffect,useCallback,useRef,useLayoutEffect,useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import { Sparkles,Scale,Plus,ChevronLeft,ChevronRight,Loader2,Trash2,ChevronDown,X,Check,Tag,Pencil } from 'lucide-react'
 import { iconSizeToken,menuWidthClassMap,panelWidthClassMap } from '@/design-tokens/dimensions'
@@ -24,49 +25,74 @@ interface ValueDomainGroup {
  items:Array<{ value:string;label?: string }>
 }
 
-/** Unit symbol grouping */
-const SYMBOL_GROUPS = [{
- name:'Currency',color:'text-amber-500 bg-amber-50 dark:bg-amber-900/30',items:[{ symbol:'¥',label:'RMB' },{ symbol:'$',label:'US dollars' },{ symbol:'€',label:'Euro' },{ symbol:'£',label:'pound' },{ symbol:'₩',label:'Korean won' },{ symbol:'₹',label:'indian rupee' }]
+interface SymbolItemDef {
+ symbol:string
+ labelKey:string
+}
+
+interface SymbolGroupDef {
+ nameKey:string
+ color:string
+ items:SymbolItemDef[]
+}
+
+interface SymbolGroup {
+ name:string
+ color:string
+ items:Array<{ symbol:string;label:string }>
+}
+
+const SYMBOL_GROUP_DEFS:SymbolGroupDef[] = [{
+ nameKey:'currency',color:'text-amber-500 bg-amber-50 dark:bg-amber-900/30',items:[{ symbol:'¥',labelKey:'rmb' },{ symbol:'$',labelKey:'usd' },{ symbol:'€',labelKey:'euro' },{ symbol:'£',labelKey:'pound' },{ symbol:'₩',labelKey:'krw' },{ symbol:'₹',labelKey:'inr' }]
  },{
- name:'Ratio',color:'text-blue-500 bg-blue-50 dark:bg-blue-900/30',items:[{ symbol:'%',label:'Percentage' },{ symbol:'‰',label:'per thousand' },{ symbol:'‱',label:'Thousands of ratios' }]
+ nameKey:'ratio',color:'text-blue-500 bg-blue-50 dark:bg-blue-900/30',items:[{ symbol:'%',labelKey:'percentage' },{ symbol:'‰',labelKey:'permille' },{ symbol:'‱',labelKey:'permyriad' }]
  },{
- name:'temperature',color:'text-rose-500 bg-rose-50 dark:bg-rose-900/30',items:[{ symbol:'℃',label:'degrees celsius' },{ symbol:'℉',label:'Fahrenheit' },{ symbol:'K',label:'Kelvin' }]
+ nameKey:'temperature',color:'text-rose-500 bg-rose-50 dark:bg-rose-900/30',items:[{ symbol:'℃',labelKey:'celsius' },{ symbol:'℉',labelKey:'fahrenheit' },{ symbol:'K',labelKey:'kelvin' }]
  },{
- name:'length',color:'text-cyan-500 bg-cyan-50 dark:bg-cyan-900/30',items:[{ symbol:'m',label:'meters' },{ symbol:'㎞',label:'kilometers' },{ symbol:'㎝',label:'cm' },{ symbol:'㎜',label:'mm' }]
+ nameKey:'length',color:'text-cyan-500 bg-cyan-50 dark:bg-cyan-900/30',items:[{ symbol:'m',labelKey:'meter' },{ symbol:'㎞',labelKey:'kilometer' },{ symbol:'㎝',labelKey:'centimeter' },{ symbol:'㎜',labelKey:'millimeter' }]
  },{
- name:'area/Volume',color:'text-purple-500 bg-purple-50 dark:bg-purple-900/30',items:[{ symbol:'㎡',label:'square meters' },{ symbol:'㎥',label:'cubic meters' }]
+ nameKey:'areaVolume',color:'text-purple-500 bg-purple-50 dark:bg-purple-900/30',items:[{ symbol:'㎡',labelKey:'squareMeter' },{ symbol:'㎥',labelKey:'cubicMeter' }]
  },{
- name:'weight',color:'text-orange-500 bg-orange-50 dark:bg-orange-900/30',items:[{ symbol:'㎏',label:'kilogram' },{ symbol:'g',label:'grams' },{ symbol:'㎎',label:'milligrams' },{ symbol:'t',label:'tons' }]
+ nameKey:'weight',color:'text-orange-500 bg-orange-50 dark:bg-orange-900/30',items:[{ symbol:'㎏',labelKey:'kilogram' },{ symbol:'g',labelKey:'gram' },{ symbol:'㎎',labelKey:'milligram' },{ symbol:'t',labelKey:'ton' }]
  },{
- name:'time',color:'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30',items:[{ symbol:'s',label:'seconds' },{ symbol:'min',label:'minutes' },{ symbol:'h',label:'hours' },{ symbol:'d',label:'day' }]
+ nameKey:'time',color:'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30',items:[{ symbol:'s',labelKey:'second' },{ symbol:'min',labelKey:'minute' },{ symbol:'h',labelKey:'hour' },{ symbol:'d',labelKey:'day' }]
  }]
+
+const buildSymbolGroups = (t:(key:string) => string):SymbolGroup[] => SYMBOL_GROUP_DEFS.map((group) => ({
+ name:t(`componentLibrary.symbolGroups.names.${group.nameKey}`),
+ color:group.color,
+ items:group.items.map((item) => ({
+ symbol:item.symbol,
+ label:t(`componentLibrary.symbolGroups.labels.${item.labelKey}`)
+ }))
+}))
 
 const normalizeText = (value:string) => value.trim().toLowerCase()
 
-const findSymbolByName = (name:string) => {
+const findSymbolByName = (name:string,symbolGroups:SymbolGroup[]) => {
  const normalized = normalizeText(name)
  if (!normalized) return null
- for (const group of SYMBOL_GROUPS) {
+ for (const group of symbolGroups) {
  const item = group.items.find((i) => normalizeText(i.label?? '') === normalized)
  if (item) return item.symbol
  }
  return null
 }
 
-const filterSymbolGroups = (query:string) => {
+const filterSymbolGroups = (query:string,symbolGroups:SymbolGroup[]) => {
  const normalized = normalizeText(query)
- if (!normalized) return SYMBOL_GROUPS
- return SYMBOL_GROUPS.map((group) => ({...group,items:group.items.filter((item) => {
+ if (!normalized) return symbolGroups
+ return symbolGroups.map((group) => ({...group,items:group.items.filter((item) => {
  const labelText = normalizeText(item.label?? '')
  return labelText.includes(normalized) || item.symbol.includes(query.trim())
  })
  })).filter((group) => group.items.length > 0)
 }
 
-const findSymbolMeta = (symbol:string) => {
+const findSymbolMeta = (symbol:string,symbolGroups:SymbolGroup[]) => {
  const normalized = symbol.trim()
  if (!normalized) return null
- for (const group of SYMBOL_GROUPS) {
+ for (const group of symbolGroups) {
  const item = group.items.find((i) => i.symbol === normalized)
  if (item) return {...item,color:group.color }
  }
@@ -81,6 +107,7 @@ function CreateUnitModal({
  onClose:() => void
  onCreated:(unit:UnitDTO) => void
 }) {
+ const { t } = useTranslation('oneSemantics')
  const [form,setForm] = useState({ code:'',name:'',symbol:'',comment:'' })
  const [saving,setSaving] = useState(false)
  const [nameDropdownOpen,setNameDropdownOpen] = useState(false)
@@ -88,9 +115,10 @@ function CreateUnitModal({
  const nameDropdownRef = useRef<HTMLDivElement>(null)
  const [nameDropdownPos,setNameDropdownPos] = useState<{ top:number;left:number;width:number } | null>(null)
  const [nameFilterActive,setNameFilterActive] = useState(false)
+ const symbolGroups = useMemo(() => buildSymbolGroups(t),[t])
  const nameFilterQuery = nameFilterActive?form.name:''
- const filteredNameGroups = filterSymbolGroups(nameFilterQuery)
- const symbolMeta = findSymbolMeta(form.symbol)
+ const filteredNameGroups = filterSymbolGroups(nameFilterQuery,symbolGroups)
+ const symbolMeta = findSymbolMeta(form.symbol,symbolGroups)
  const hasSymbol =!!form.symbol.trim()
 
  // Click outside to close
@@ -154,7 +182,7 @@ function CreateUnitModal({
  }
 
  const handleNameChange = (name:string) => {
- const matchedSymbol = findSymbolByName(name)
+ const matchedSymbol = findSymbolByName(name,symbolGroups)
  setNameFilterActive(true)
  setNameDropdownOpen(true)
  setForm((prev) => ({...prev,name,symbol:matchedSymbol?? prev.symbol
@@ -172,7 +200,7 @@ function CreateUnitModal({
  return (<Modal
  isOpen={isOpen}
  onClose={onClose}
- title="New unit"
+ title={t('componentLibrary.modal.createUnit')}
  size="mini"
  footerRight={
  <>
@@ -183,24 +211,24 @@ function CreateUnitModal({
  loading={saving}
  variant="amber"
  >
- save
+ {t('componentLibrary.actions.save')}
  </ModalPrimaryButton>
  </>
  }
  >
  <div className="space-y-4">
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">encoding *</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.codeRequired')}</label>
  <input
  type="text"
  value={form.code}
  onChange={(e) => setForm({...form,code:e.target.value.toUpperCase() })}
- placeholder="Such as:CNY"
+ placeholder={t('componentLibrary.placeholder.codeCny')}
  className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Name *</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.nameRequired')}</label>
  <div className="relative">
  {hasSymbol && (<span
  className={`absolute left-3 top-1/2 -translate-y-1/2 size-6 flex items-center justify-center rounded text-body-sm font-bold ${
@@ -218,7 +246,7 @@ function CreateUnitModal({
  setNameDropdownOpen(true)
  setNameFilterActive(false)
  }}
- placeholder="Such as:RMB"
+ placeholder={t('componentLibrary.placeholder.nameRmb')}
  className={`w-full ${hasSymbol?'pl-12 pr-10':'px-4 pr-10'} py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600`}
  />
  <button
@@ -228,29 +256,29 @@ function CreateUnitModal({
  setNameDropdownOpen((open) =>!open)
  }}
  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-500 transition-colors"
- aria-label="Open the unit name list"
+ aria-label={t('componentLibrary.aria.openUnitNameList')}
  >
  <ChevronDown size={14} className={`transition-transform ${nameDropdownOpen?'rotate-180':''}`} />
  </button>
  </div>
  </div>
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">symbol</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.symbol')}</label>
  <input
  type="text"
  value={form.symbol}
  onChange={(e) => setForm({...form,symbol:e.target.value })}
- placeholder="Optional,Support custom symbols"
+ placeholder={t('componentLibrary.placeholder.symbolOptional')}
  className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Description</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.description')}</label>
  <input
  type="text"
  value={form.comment}
  onChange={(e) => setForm({...form,comment:e.target.value })}
- placeholder="Optional"
+ placeholder={t('componentLibrary.placeholder.descriptionOptional')}
  className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
@@ -266,7 +294,7 @@ function CreateUnitModal({
  >
  {/* grouped list */}
  <div className="max-h-64 overflow-y-auto p-2 custom-scrollbar">
- {filteredNameGroups.length === 0?(<div className="py-6 text-center text-caption text-slate-400">No matching name yet</div>):(filteredNameGroups.map((group) => (<div key={group.name} className="mb-2 last:mb-0">
+ {filteredNameGroups.length === 0?(<div className="py-6 text-center text-caption text-slate-400">{t('componentLibrary.dropdown.noMatchingName')}</div>):(filteredNameGroups.map((group) => (<div key={group.name} className="mb-2 last:mb-0">
  <div className="px-2 py-1 text-micro font-semibold text-slate-400 uppercase">{group.name}</div>
  <div className="grid grid-cols-3 gap-1">
  {group.items.map((item) => (<button
@@ -297,6 +325,7 @@ function CreateModifierModal({
  onClose:() => void
  onCreated:(modifier:MetricModifierDTO) => void
 }) {
+ const { t } = useTranslation('oneSemantics')
  const [form,setForm] = useState({ code:'',name:'',comment:'',modifierType:'' })
  const [saving,setSaving] = useState(false)
  const [valueDomains,setValueDomains] = useState<ValueDomainGroup[]>([])
@@ -489,7 +518,7 @@ function CreateModifierModal({
  return (<Modal
  isOpen={isOpen}
  onClose={onClose}
- title="New modifier"
+ title={t('componentLibrary.modal.createModifier')}
  size="sm"
  footerRight={
  <>
@@ -499,7 +528,7 @@ function CreateModifierModal({
  disabled={!form.code.trim() ||!form.name.trim()}
  loading={saving}
  >
- save
+ {t('componentLibrary.actions.save')}
  </ModalPrimaryButton>
  </>
  }
@@ -507,12 +536,12 @@ function CreateModifierModal({
  <div className="space-y-4">
  {/* Name */}
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Name *</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.nameRequired')}</label>
  <input
  type="text"
  value={form.name}
  onChange={(e) => setForm({...form,name:e.target.value })}
- placeholder="Such as:Year-on-year"
+ placeholder={t('componentLibrary.placeholder.nameYoy')}
  className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
@@ -520,17 +549,17 @@ function CreateModifierModal({
  {/* encoding + modifier type juxtapose */}
  <div className="grid grid-cols-2 gap-3">
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">encoding *</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.codeRequired')}</label>
  <input
  type="text"
  value={form.code}
  onChange={(e) => setForm({...form,code:e.target.value.toUpperCase() })}
- placeholder="Such as:YOY"
+ placeholder={t('componentLibrary.placeholder.codeYoy')}
  className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">modifier type</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.modifierType')}</label>
  <button
  ref={triggerRef}
  type="button"
@@ -542,7 +571,7 @@ function CreateModifierModal({
  >
  <Tag size={14} className={getDisplayText()?'text-blue-500':'text-slate-400'} />
  <span className={`flex-1 text-left text-body-sm truncate ${getDisplayText()?'text-slate-800 dark:text-slate-100 font-medium':'text-slate-400'}`}>
- {getDisplayText() || 'Select type'}
+ {getDisplayText() || t('componentLibrary.placeholder.selectType')}
  </span>
  {getDisplayText() && (<button
  onClick={handleClear}
@@ -557,12 +586,12 @@ function CreateModifierModal({
 
  {/* Description */}
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Description</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.description')}</label>
  <input
  type="text"
  value={form.comment}
  onChange={(e) => setForm({...form,comment:e.target.value })}
- placeholder="Optional"
+ placeholder={t('componentLibrary.placeholder.descriptionOptional')}
  className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
@@ -581,7 +610,7 @@ function CreateModifierModal({
  >
  {valueDomains.length === 0?(<div className="px-4 py-6 text-center">
  <Tag size={24} className="mx-auto mb-2 text-slate-300 dark:text-slate-600" />
- <p className="text-body-sm text-slate-500">No value range yet</p>
+ <p className="text-body-sm text-slate-500">{t('componentLibrary.dropdown.noValueDomain')}</p>
  </div>):(valueDomains.map((domain) => {
  const isSelected = selectedDomain === domain.domainCode
  const isHovered = hoveredDomain === domain.domainCode
@@ -618,7 +647,7 @@ function CreateModifierModal({
  onMouseLeave={handleCardMouseLeave}
  >
  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
- <p className="text-micro font-medium text-slate-500 dark:text-slate-400">Select type</p>
+ <p className="text-micro font-medium text-slate-500 dark:text-slate-400">{t('componentLibrary.dropdown.selectType')}</p>
  </div>
  <div
  className="max-h-52 overflow-y-auto overscroll-contain p-1.5"
@@ -658,6 +687,7 @@ function EditModifierModal({
  onClose:() => void
  onUpdated:(updated:MetricModifierDTO) => void
 }) {
+ const { t } = useTranslation('oneSemantics')
  const [form,setForm] = useState({ name:'',comment:'' })
  const [saving,setSaving] = useState(false)
 
@@ -690,7 +720,7 @@ function EditModifierModal({
  return (<Modal
  isOpen={isOpen}
  onClose={onClose}
- title="Edit modifier"
+ title={t('componentLibrary.modal.editModifier')}
  size="sm"
  footerRight={
  <>
@@ -700,7 +730,7 @@ function EditModifierModal({
  disabled={!form.name.trim()}
  loading={saving}
  >
- save
+ {t('componentLibrary.actions.save')}
  </ModalPrimaryButton>
  </>
  }
@@ -708,12 +738,12 @@ function EditModifierModal({
  <div className="space-y-4">
  {/* Name */}
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Name *</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.nameRequired')}</label>
  <input
  type="text"
  value={form.name}
  onChange={(e) => setForm({...form,name:e.target.value })}
- placeholder="Such as:Year-on-year"
+ placeholder={t('componentLibrary.placeholder.nameYoy')}
  className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
@@ -721,13 +751,13 @@ function EditModifierModal({
  {/* encoding + modifier type juxtapose */}
  <div className="grid grid-cols-2 gap-3">
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">encoding</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.code')}</label>
  <div className="px-3 py-2 text-body-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono">
  {modifier.code}
  </div>
  </div>
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">modifier type</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.modifierType')}</label>
  <div className="px-3 py-2 text-body-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400">
  {modifier.modifierType || '-'}
  </div>
@@ -736,12 +766,12 @@ function EditModifierModal({
 
  {/* Description */}
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Description</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.description')}</label>
  <input
  type="text"
  value={form.comment}
  onChange={(e) => setForm({...form,comment:e.target.value })}
- placeholder="Optional"
+ placeholder={t('componentLibrary.placeholder.descriptionOptional')}
  className="w-full px-3 py-2 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
@@ -758,6 +788,7 @@ function EditUnitModal({
  onClose:() => void
  onUpdated:(updated:UnitDTO) => void
 }) {
+ const { t } = useTranslation('oneSemantics')
  const [form,setForm] = useState({ name:'',symbol:'',comment:'' })
  const [saving,setSaving] = useState(false)
  const [nameDropdownOpen,setNameDropdownOpen] = useState(false)
@@ -765,9 +796,10 @@ function EditUnitModal({
  const nameDropdownRef = useRef<HTMLDivElement>(null)
  const [nameDropdownPos,setNameDropdownPos] = useState<{ top:number;left:number;width:number } | null>(null)
  const [nameFilterActive,setNameFilterActive] = useState(false)
+ const symbolGroups = useMemo(() => buildSymbolGroups(t),[t])
  const nameFilterQuery = nameFilterActive?form.name:''
- const filteredNameGroups = filterSymbolGroups(nameFilterQuery)
- const symbolMeta = findSymbolMeta(form.symbol)
+ const filteredNameGroups = filterSymbolGroups(nameFilterQuery,symbolGroups)
+ const symbolMeta = findSymbolMeta(form.symbol,symbolGroups)
  const hasSymbol =!!form.symbol.trim()
 
  useEffect(() => {
@@ -838,7 +870,7 @@ function EditUnitModal({
  }
 
  const handleNameChange = (name:string) => {
- const matchedSymbol = findSymbolByName(name)
+ const matchedSymbol = findSymbolByName(name,symbolGroups)
  setNameFilterActive(true)
  setNameDropdownOpen(true)
  setForm((prev) => ({...prev,name,symbol:matchedSymbol?? prev.symbol
@@ -858,7 +890,7 @@ function EditUnitModal({
  return (<Modal
  isOpen={isOpen}
  onClose={onClose}
- title="Editing unit"
+ title={t('componentLibrary.modal.editUnit')}
  size="mini"
  footerRight={
  <>
@@ -869,20 +901,20 @@ function EditUnitModal({
  loading={saving}
  variant="amber"
  >
- save
+ {t('componentLibrary.actions.save')}
  </ModalPrimaryButton>
  </>
  }
  >
  <div className="space-y-4">
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">encoding</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.code')}</label>
  <div className="px-4 py-2.5 text-body-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-mono">
  {unit.code}
  </div>
  </div>
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Name *</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.nameRequired')}</label>
  <div className="relative">
  {hasSymbol && (<span
  className={`absolute left-3 top-1/2 -translate-y-1/2 size-6 flex items-center justify-center rounded text-body-sm font-bold ${
@@ -900,7 +932,7 @@ function EditUnitModal({
  setNameDropdownOpen(true)
  setNameFilterActive(false)
  }}
- placeholder="Such as:RMB"
+ placeholder={t('componentLibrary.placeholder.nameRmb')}
  className={`w-full ${hasSymbol?'pl-12 pr-10':'px-4 pr-10'} py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600`}
  />
  <button
@@ -910,29 +942,29 @@ function EditUnitModal({
  setNameDropdownOpen((open) =>!open)
  }}
  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-500 transition-colors"
- aria-label="Open the unit name list"
+ aria-label={t('componentLibrary.aria.openUnitNameList')}
  >
  <ChevronDown size={14} className={`transition-transform ${nameDropdownOpen?'rotate-180':''}`} />
  </button>
  </div>
  </div>
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">symbol</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.symbol')}</label>
  <input
  type="text"
  value={form.symbol}
  onChange={(e) => setForm({...form,symbol:e.target.value })}
- placeholder="Optional,Support custom symbols"
+ placeholder={t('componentLibrary.placeholder.symbolOptional')}
  className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
  <div>
- <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Description</label>
+ <label className="block text-body-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('componentLibrary.field.description')}</label>
  <input
  type="text"
  value={form.comment}
  onChange={(e) => setForm({...form,comment:e.target.value })}
- placeholder="Optional"
+ placeholder={t('componentLibrary.placeholder.descriptionOptional')}
  className="w-full px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:placeholder:text-slate-600"
  />
  </div>
@@ -948,7 +980,7 @@ function EditUnitModal({
  >
  {/* grouped list */}
  <div className="max-h-64 overflow-y-auto p-2 custom-scrollbar">
- {filteredNameGroups.length === 0?(<div className="py-6 text-center text-caption text-slate-400">No matching name yet</div>):(filteredNameGroups.map((group) => (<div key={group.name} className="mb-2 last:mb-0">
+ {filteredNameGroups.length === 0?(<div className="py-6 text-center text-caption text-slate-400">{t('componentLibrary.dropdown.noMatchingName')}</div>):(filteredNameGroups.map((group) => (<div key={group.name} className="mb-2 last:mb-0">
  <div className="px-2 py-1 text-micro font-semibold text-slate-400 uppercase">{group.name}</div>
  <div className="grid grid-cols-3 gap-1">
  {group.items.map((item) => (<button
@@ -972,6 +1004,7 @@ function EditUnitModal({
 }
 
 export function ComponentLibrarySidebar() {
+ const { t } = useTranslation('oneSemantics')
  const [collapsed,setCollapsed] = useState(true)
  const [activeTab,setActiveTab] = useState<TabType>('UNIT')
 
@@ -1048,42 +1081,44 @@ export function ComponentLibrarySidebar() {
  }
 
  const items = activeTab === 'UNIT'?units:modifiers
- const listTitle = activeTab === 'UNIT'?'Available units':'Available modifiers'
+ const listTitle = activeTab === 'UNIT'
+ ? t('componentLibrary.list.availableUnits')
+ : t('componentLibrary.list.availableModifiers')
 
  // folded state
  if (collapsed) {
  return (<div className="w-12 border-l border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col items-center py-4">
  <div className="flex-1 flex flex-col items-center gap-3">
- <Tooltip content="modifier" side="left" className="w-full flex justify-center">
+ <Tooltip content={t('componentLibrary.tab.modifier')} side="left" className="w-full flex justify-center">
  <button
  onClick={() => {
  setActiveTab('MODIFIER')
  setCollapsed(false)
  }}
  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-blue-500 hover:text-blue-600 transition-colors"
- aria-label="modifier"
+ aria-label={t('componentLibrary.tab.modifier')}
  >
  <Sparkles size={iconSizeToken.medium} />
  </button>
  </Tooltip>
- <Tooltip content="unit library" side="left" className="w-full flex justify-center">
+ <Tooltip content={t('componentLibrary.tab.unitLibrary')} side="left" className="w-full flex justify-center">
  <button
  onClick={() => {
  setActiveTab('UNIT')
  setCollapsed(false)
  }}
  className="p-2 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg text-amber-500 hover:text-amber-600 transition-colors"
- aria-label="unit library"
+ aria-label={t('componentLibrary.tab.unitLibrary')}
  >
  <Scale size={iconSizeToken.medium} />
  </button>
  </Tooltip>
  </div>
- <Tooltip content="Expand component library" side="left" className="w-full flex justify-center">
+ <Tooltip content={t('componentLibrary.actions.expand')} side="left" className="w-full flex justify-center">
  <button
  onClick={() => setCollapsed(false)}
  className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
- aria-label="Expand component library"
+ aria-label={t('componentLibrary.actions.expand')}
  >
  <ChevronLeft size={iconSizeToken.medium} />
  </button>
@@ -1095,7 +1130,7 @@ export function ComponentLibrarySidebar() {
  {/* Title */}
  <div className="px-3 pt-3 pb-1.5">
  <h3 className="text-caption font-semibold text-slate-800 dark:text-slate-200">
- Semantic component library <span className="text-slate-400 font-normal text-micro">(COMPONENTS)</span>
+ {t('componentLibrary.title.main')} <span className="text-slate-400 font-normal text-micro">({t('componentLibrary.title.suffix')})</span>
  </h3>
  </div>
 
@@ -1109,7 +1144,7 @@ export function ComponentLibrarySidebar() {
  }`}
  >
  <Sparkles size={12} />
- modifier
+ {t('componentLibrary.tab.modifier')}
  </button>
  <button
  onClick={() => setActiveTab('UNIT')}
@@ -1118,7 +1153,7 @@ export function ComponentLibrarySidebar() {
  }`}
  >
  <Scale size={12} />
- unit library
+ {t('componentLibrary.tab.unitLibrary')}
  </button>
  </div>
  </div>
@@ -1140,7 +1175,7 @@ export function ComponentLibrarySidebar() {
  <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-1.5 custom-scrollbar">
  {loading?(<div className="flex items-center justify-center py-8">
  <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
- </div>):items.length === 0?(<div className="text-center py-8 text-micro text-slate-400">No data yet</div>):activeTab === 'UNIT'?(units.map((item) => (<div
+ </div>):items.length === 0?(<div className="text-center py-8 text-micro text-slate-400">{t('componentLibrary.list.noData')}</div>):activeTab === 'UNIT'?(units.map((item) => (<div
  key={item.code}
  className="group flex items-center gap-2.5 p-2.5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-700 rounded-lg hover:border-amber-200 dark:hover:border-amber-700 hover:shadow-sm transition-all"
  >
@@ -1155,7 +1190,7 @@ export function ComponentLibrarySidebar() {
  <button
  onClick={() => setEditingUnit(item)}
  className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded transition-all"
- title="Edit"
+ title={t('componentLibrary.actions.edit')}
  >
  <Pencil size={12} />
  </button>
@@ -1163,7 +1198,7 @@ export function ComponentLibrarySidebar() {
  onClick={() => handleDeleteUnit(item.code)}
  disabled={deletingCode === item.code}
  className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-all disabled:opacity-50"
- title="Delete"
+ title={t('componentLibrary.actions.delete')}
  >
  {deletingCode === item.code?(<Loader2 size={12} className="animate-spin" />):(<Trash2 size={12} />)}
  </button>
@@ -1183,7 +1218,7 @@ export function ComponentLibrarySidebar() {
  <button
  onClick={() => setEditingModifier(item)}
  className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-all"
- title="Edit"
+ title={t('componentLibrary.actions.edit')}
  >
  <Pencil size={12} />
  </button>
@@ -1191,7 +1226,7 @@ export function ComponentLibrarySidebar() {
  onClick={() => handleDeleteModifier(item.code)}
  disabled={deletingCode === item.code}
  className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-all disabled:opacity-50"
- title="Delete"
+ title={t('componentLibrary.actions.delete')}
  >
  {deletingCode === item.code?(<Loader2 size={12} className="animate-spin" />):(<Trash2 size={12} />)}
  </button>
@@ -1201,11 +1236,11 @@ export function ComponentLibrarySidebar() {
 
  {/* bottom area */}
  <div className="px-3 py-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/60 flex items-center justify-between gap-2">
- <p className="text-micro text-slate-400 leading-relaxed flex-1">Before assembling Derived Metrics, make sure required semantic fragments already exist in the component library.</p>
+ <p className="text-micro text-slate-400 leading-relaxed flex-1">{t('componentLibrary.footer.tip')}</p>
  <button
  onClick={() => setCollapsed(true)}
  className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
- title="fold"
+ title={t('componentLibrary.actions.fold')}
  >
  <ChevronRight size={iconSizeToken.medium} />
  </button>

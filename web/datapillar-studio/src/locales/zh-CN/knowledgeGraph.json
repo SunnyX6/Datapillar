@@ -1,0 +1,119 @@
+{
+  "commands": {
+    "rebuild": {
+      "title": "向量重建",
+      "description": "重建向量索引"
+    },
+    "selectEmbeddingModelHeader": "选择向量模型",
+    "selectVectorModelHeader": "选择向量模型",
+    "selectChatModelHeader": "选择聊天模型"
+  },
+  "loading": {
+    "graph": "正在加载数仓知识图谱..."
+  },
+  "topStats": {
+    "nodes": "节点数",
+    "currentEmbeddingModel": "当前向量模型：",
+    "nodeQuality": "节点质量"
+  },
+  "model": {
+    "unknown": "未知模型",
+    "applying": "模型切换中...",
+    "select": "请选择",
+    "none": "暂无可用模型"
+  },
+  "errors": {
+    "unknown": "未知错误"
+  },
+  "notifications": {
+    "embeddingModelApplied": "已应用向量模型 {{aiModelId}}（版本 {{revision}}）",
+    "embeddingModelSwitched": "已切换到向量模型 {{aiModelId}}（版本 {{revision}}）",
+    "setEmbeddingModelFailed": "设置向量模型失败：{{message}}",
+    "rebuildAccepted": "已受理重建：graphUpserts={{graphUpserts}}，embeddingTasks={{embeddingTasks}}",
+    "rebuildFailed": "重建失败：{{message}}"
+  },
+  "typeLabels": {
+    "knowledge": "知识",
+    "catalog": "目录",
+    "schema": "Schema",
+    "table": "表",
+    "column": "字段",
+    "sql": "SQL",
+    "tag": "标签",
+    "metric": "指标",
+    "atomicmetric": "原子指标",
+    "derivedmetric": "派生指标",
+    "compositemetric": "复合指标",
+    "wordroot": "词根",
+    "modifier": "修饰词",
+    "unit": "单位",
+    "valuedomain": "值域"
+  },
+  "sentinel": {
+    "title": "AI 哨兵",
+    "disabled": "AI 哨兵已禁用",
+    "moreActions": "更多操作",
+    "filterLabel": "过滤：{{type}}",
+    "typeFilterTooltip": "节点类型过滤",
+    "description": "自治治理与自愈。",
+    "secureTitle": "运行安全",
+    "secureDescription": "未检测到异常。"
+  },
+  "issues": {
+    "healingProtocol": "修复协议执行中...",
+    "alert": "{{type}} 告警",
+    "id": "ID:{{id}}",
+    "executeAutoFix": "执行自动修复",
+    "types": {
+      "metadata": "元数据",
+      "quality": "质量"
+    },
+    "titles": {
+      "missingDescriptions": "描述缺失",
+      "schemaDrift": "Schema 漂移"
+    },
+    "descriptions": {
+      "missingDescriptions": "银层有 2 张表缺少业务描述。",
+      "schemaDrift": "ingest_logs 的源端 Schema 已发生变更。"
+    }
+  },
+  "nodeDetail": {
+    "pinned": "已固定",
+    "nodeId": "ID: {{id}}",
+    "displayName": "显示名称",
+    "noDisplayName": "暂无显示名称。",
+    "description": "描述",
+    "noDescription": "该实体暂无描述，可运行 AI 元数据扫描自动补全。",
+    "owner": "负责人",
+    "unassigned": "未分配",
+    "updated": "更新时间",
+    "unknown": "未知",
+    "tags": "标签",
+    "schema": "Schema",
+    "viewFullDdl": "查看完整 DDL",
+    "table": {
+      "column": "字段",
+      "type": "类型",
+      "attr": "属性"
+    }
+  },
+  "actions": {
+    "lineage": "血缘",
+    "profile": "画像"
+  },
+  "chatInput": {
+    "placeholder": "描述你的数据工作流需求...",
+    "placeholderResume": "请补充关键上下文后继续...",
+    "send": "发送",
+    "stop": "停止",
+    "continue": "继续",
+    "noModelPermissionHint": "暂无可用模型，请联系管理员授权",
+    "modelButtonTitle": "选择模型",
+    "commandLibrary": "命令库",
+    "intelligenceEnhancement": "智能增强",
+    "safetyHintDefault": "AI 可能出错，请自行校验结果。",
+    "safetyHintResume": "等待补充信息后继续。",
+    "defaultModel": "默认模型",
+    "setAsDefaultModel": "设为默认模型"
+  }
+}

@@ -14,7 +14,8 @@ export const API_BASE = {
   governanceMetadataAdmin: '/api/studio/admin/metadata',
   governanceSemantic: '/api/studio/biz/semantic',
   governanceSemanticAdmin: '/api/studio/admin/semantic',
-  studioActuator: '/api/studio/actuator'
+  studioActuator: '/api/studio/actuator',
+  openlineage: '/api/openlineage'
 } as const
 
 export const API_PATH = {
@@ -84,7 +85,9 @@ export const API_PATH = {
   },
   knowledgeGraph: {
     initial: '/initial',
-    search: '/search'
+    search: '/search',
+    rebuild: '/rebuild',
+    setEmbedding: '/setEmbedding'
   },
   knowledgeWiki: {
     namespaces: '/namespaces',

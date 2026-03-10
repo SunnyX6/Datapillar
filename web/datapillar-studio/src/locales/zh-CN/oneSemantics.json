@@ -8,7 +8,7 @@
     "categories": {
       "metrics": {
         "label": "指标中心",
-        "description": "统一业务口径，沉淀 Atomic / Derived Metric 体系。",
+        "description": "统一业务口径，沉淀原子/派生指标体系。",
         "trend": "NEW"
       },
       "wordRoot": {
@@ -17,7 +17,7 @@
       },
       "standards": {
         "label": "语义标准",
-        "description": "数据类型标准、ValueDomain 约束和分级分类安全规范。",
+        "description": "数据类型标准、值域约束和分级分类安全规范。",
         "sub": {
           "dataType": "数据类型",
           "valueDomain": "值域",
@@ -35,33 +35,33 @@
     },
     "hero": {
       "title": "希望 AI 更准确理解你的数据？",
-      "description": "通过 OneMeta 的 Metadata + Semantic 资产，可显著提升企业 AI Agent 自动报表的准确率。",
+      "description": "通过 OneMeta 的 Metadata + Semantic 资产，可显著提升企业 AI Agent 的准确率。",
       "cta": "立即开启语义增强"
     }
   },
   "metricForm": {
     "type": {
       "atomic": {
-        "label": "Atomic Metric",
-        "desc": "直接来源于物理表的真实 Metric，是所有计算的基础。"
+        "label": "原子指标",
+        "desc": "直接来源于物理表的真实指标，是所有计算的基础。"
       },
       "derived": {
-        "label": "Derived Metric",
-        "desc": "在基础 Metric 上叠加维度或时间范围得到的 Derived Metric。"
+        "label": "派生指标",
+        "desc": "在基础指标上叠加维度或时间范围得到的派生指标。"
       },
       "composite": {
-        "label": "Composite Metric",
-        "desc": "由多个 Metric 通过运算组合得到的 Composite Metric。"
+        "label": "复合指标",
+        "desc": "由多个指标通过运算组合得到的复合指标。"
       }
     },
     "modal": {
       "step1": {
-        "title": "Metric 注册向导",
-        "subtitle": "请选择要创建的 Metric 类型"
+        "title": "指标注册向导",
+        "subtitle": "请选择要创建的指标类型"
       },
       "step2": {
-        "titleEdit": "编辑 Metric",
-        "titleCreate": "配置 Metric 详情",
+        "titleEdit": "编辑指标",
+        "titleCreate": "配置指标详情",
         "saveChanges": "保存修改",
         "confirmPublish": "确认发布"
       }
@@ -69,35 +69,109 @@
     "ai": {
       "title": "AI 智能填充",
       "placeholder": {
-        "atomic": "先选择度量列，再描述 Metric。示例：单价乘数量得到累计订单金额。",
-        "derived": "先选择 Atomic Metric 与过滤维度，再描述 Derived Metric 逻辑。",
-        "composite": "先选择至少两个 Metric，再描述组合规则。"
+        "atomic": "先选择度量列，再描述指标。示例：单价乘数量得到累计订单金额。",
+        "derived": "先选择基础原子指标与过滤维度，再描述派生指标逻辑。",
+        "composite": "先选择至少两个指标，再描述组合规则。"
       },
       "generating": "生成中...",
       "smartFill": "智能填充",
       "error": {
         "selectMeasureFirst": "请先选择至少一个度量列。",
-        "selectBaseMetricFirst": "请先选择一个基础 Atomic Metric。",
-        "selectCompositeMetricsFirst": "请先选择至少两个用于组合的 Metric。",
+        "selectBaseMetricFirst": "请先选择一个基础原子指标。",
+        "selectCompositeMetricsFirst": "请先选择至少两个用于组合的指标。",
         "fillFailed": "AI 填充失败，请重试。"
       },
       "recommendation": {
-        "metricsAndTables": "推荐的 Metrics 与 Tables：",
-        "metricsOnly": "推荐的 Metrics：",
-        "tablesAndColumns": "推荐的 Tables 与 Columns：",
-        "column": "Column",
-        "metric": "Metric"
+        "metricsAndTables": "推荐的指标与数据表：",
+        "metricsOnly": "推荐的指标：",
+        "tablesAndColumns": "推荐的数据表与列：",
+        "table": "表",
+        "column": "列",
+        "metric": "指标"
       }
     },
-    "loadingVersion": "正在加载 Metric 详情..."
+    "loadingVersion": "正在加载指标详情...",
+    "left": {
+      "field": {
+        "metricName": "指标名称 *",
+        "metricCode": "指标编码 *",
+        "dataType": "数据类型",
+        "unit": "单位",
+        "businessDescription": "业务描述",
+        "formula": "公式表达式 *"
+      },
+      "placeholder": {
+        "metricName": "示例：累计订单金额",
+        "selectAtomicMetric": "选择原子指标",
+        "selectModifier": "选择修饰词",
+        "customSuffix": "自定义后缀",
+        "selectWordRoot": "选择词根",
+        "aggregation": "聚合函数",
+        "selectDataType": "请选择数据类型",
+        "selectUnit": "请选择单位",
+        "businessDescription": "请输入指标的业务含义...",
+        "formula": {
+          "atomic": "SUM(orders.amount) WHERE status = 'paid'",
+          "derived": "{SALES_AMOUNT} WHERE region = 'Beijing'",
+          "composite": "({SALES_AMOUNT} - {COST}) / {SALES_AMOUNT} * 100"
+        }
+      },
+      "unitSelector": {
+        "noData": "暂无单位数据",
+        "allLoaded": "已全部加载"
+      }
+    },
+    "right": {
+      "label": {
+        "atomicAssets": "物理资产（选择度量列或过滤列）",
+        "derivedAssets": "物理资产（选择维度过滤列）",
+        "compositeMetrics": "选择用于组合的指标"
+      },
+      "level": {
+        "catalog": "数据源",
+        "schema": "数据库",
+        "table": "物理表",
+        "column": "字段"
+      },
+      "searchPlaceholder": "搜索{{level}}...",
+      "noData": "暂无数据",
+      "table": {
+        "list": "列表",
+        "type": "类型",
+        "operation": "操作"
+      },
+      "column": {
+        "associatedValueDomain": "关联值域",
+        "cancelMeasure": "取消度量列",
+        "setMeasure": "设为度量列",
+        "selectedFilterValues": "已选{{count}}个过滤值",
+        "setFilter": "设为过滤列",
+        "selectFilterValue": "选择过滤值",
+        "noRangeData": "暂无值域数据",
+        "clearAll": "清空全部"
+      },
+      "metricSelector": {
+        "searchPlaceholder": "搜索指标...",
+        "noData": "暂无可用指标",
+        "type": {
+          "atomic": "原子",
+          "derived": "派生"
+        }
+      }
+    }
   },
   "valueDomainExplorer": {
-    "title": "ValueDomain 约束",
-    "titleSuffix": "Value Domains",
-    "createButton": "创建 ValueDomain",
+    "title": "值域约束",
+    "titleSuffix": "值域列表",
+    "createButton": "新建值域",
     "loading": "加载中...",
-    "empty": "未找到匹配的 ValueDomain",
+    "empty": "未找到匹配的值域",
     "card": {
+      "type": {
+        "enum": "枚举",
+        "range": "区间",
+        "regex": "正则"
+      },
       "level": {
         "builtin": "内置",
         "business": "业务"
@@ -122,38 +196,38 @@
   "valueDomainForm": {
     "type": {
       "enum": {
-        "label": "枚举（ENUM）",
+        "label": "枚举",
         "desc": "定义离散可选值集合。"
       },
       "range": {
-        "label": "区间（RANGE）",
+        "label": "区间",
         "desc": "定义数值区间，如 [0, 100]。"
       },
       "regex": {
-        "label": "正则（REGEX）",
+        "label": "正则",
         "desc": "定义正则表达式约束。"
       }
     },
     "level": {
-      "business": "业务级（BUSINESS）",
-      "builtin": "内置级（BUILTIN）"
+      "business": "业务级",
+      "builtin": "内置级"
     },
     "create": {
-      "title": "创建 ValueDomain",
-      "confirm": "确认创建"
+      "title": "新建值域",
+      "confirm": "新建值域"
     },
     "edit": {
-      "title": "编辑 ValueDomain",
+      "title": "编辑值域",
       "save": "保存"
     },
     "field": {
-      "domainName": "ValueDomain 名称",
-      "domainCode": "ValueDomain 编码",
-      "domainType": "ValueDomain 类型",
-      "domainLevel": "ValueDomain 级别",
+      "domainName": "值域名称",
+      "domainCode": "值域编码",
+      "domainType": "值域类型",
+      "domainLevel": "值域级别",
       "dataType": "数据类型",
-      "enumValue": "值（Key）",
-      "enumLabel": "标签（Value）",
+      "enumValue": "值",
+      "enumLabel": "标签",
       "itemType": {
         "enum": "枚举值列表",
         "range": "区间表达式",
@@ -168,11 +242,11 @@
       "enumLabel": "已支付",
       "rangeValue": "[0, 100]",
       "regexValue": "^[1-9]\\d{5}(18|19|20)\\d{2}...",
-      "comment": "ValueDomain 描述（可选）"
+      "comment": "值域描述（可选）"
     },
     "dropdown": {
-      "selectDomainType": "选择 ValueDomain 类型",
-      "selectDomainLevel": "选择 ValueDomain 级别"
+      "selectDomainType": "选择值域类型",
+      "selectDomainLevel": "选择值域级别"
     },
     "action": {
       "addEnumValue": "添加枚举值"
@@ -182,6 +256,209 @@
       "regex": "请输入正则表达式。",
       "rangeReadonly": "区间表达式不可修改。",
       "regexReadonly": "正则表达式不可修改。"
+    }
+  },
+  "metricExplorer": {
+    "title": "指标中心",
+    "newMetric": "新建指标",
+    "loading": "加载中...",
+    "empty": "未找到匹配指标",
+    "actions": {
+      "edit": "编辑",
+      "delete": "删除",
+      "switchToList": "切换到列表视图",
+      "switchToCard": "切换到卡片视图"
+    },
+    "card": {
+      "noDescription": "暂无描述"
+    },
+    "table": {
+      "nameCode": "指标名称 / 编码",
+      "type": "类型",
+      "dataType": "数据类型",
+      "unit": "单位",
+      "description": "描述",
+      "version": "版本",
+      "creator": "创建人",
+      "createTime": "创建时间",
+      "operation": "操作"
+    },
+    "type": {
+      "ATOMIC": "原子指标",
+      "DERIVED": "派生指标",
+      "COMPOSITE": "复合指标"
+    }
+  },
+  "wordRootExplorer": {
+    "title": "词根中心",
+    "addWordRoot": "新建词根",
+    "loading": "加载中...",
+    "empty": "未找到匹配词根",
+    "actions": {
+      "save": "保存",
+      "cancel": "取消",
+      "edit": "编辑",
+      "delete": "删除"
+    },
+    "placeholder": {
+      "name": "词根名称",
+      "code": "编码（CODE）",
+      "description": "描述",
+      "descriptionOptional": "描述（可选）"
+    },
+    "table": {
+      "nameCode": "词根名称 / 编码",
+      "dataType": "数据类型",
+      "description": "描述",
+      "creator": "创建人",
+      "createTime": "创建时间",
+      "operation": "操作"
+    }
+  },
+  "metricOverview": {
+    "title": "指标详情",
+    "closeAria": "关闭指标详情",
+    "descriptionEmpty": "暂无业务描述",
+    "section": {
+      "technical": "技术属性",
+      "formula": "计算公式",
+      "lineage": "上下游血缘预览"
+    },
+    "field": {
+      "metricType": "指标类型",
+      "dataType": "数据类型",
+      "currentVersion": "当前版本",
+      "unit": "单位",
+      "creator": "创建人",
+      "createTime": "创建时间"
+    },
+    "formulaEmpty": "暂无计算公式",
+    "lineageLoading": "血缘图加载中...",
+    "actions": {
+      "share": "资产共享"
+    },
+    "version": {
+      "notCurrent": "非当前版本",
+      "switch": "设为当前版本",
+      "historyButton": "查看版本历史",
+      "panelTitle": "版本历史",
+      "empty": "暂无历史版本",
+      "current": "当前"
+    }
+  },
+  "wordRootOverview": {
+    "title": "词根详情",
+    "closeAria": "关闭词根详情",
+    "descriptionEmpty": "暂无详细描述",
+    "section": {
+      "basic": "基础信息",
+      "related": "关联字段预览"
+    },
+    "field": {
+      "code": "词根编码",
+      "dataType": "数据类型",
+      "creator": "创建人",
+      "createTime": "创建时间"
+    },
+    "relatedLoading": "关联字段加载中...",
+    "actions": {
+      "share": "资产共享",
+      "viewUsage": "查看使用示例"
+    }
+  },
+  "componentLibrary": {
+    "title": {
+      "main": "语义组件库",
+      "suffix": "COMPONENTS"
+    },
+    "tab": {
+      "modifier": "修饰词",
+      "unitLibrary": "单位库"
+    },
+    "list": {
+      "availableUnits": "可用单位",
+      "availableModifiers": "可用修饰词",
+      "noData": "暂无数据"
+    },
+    "actions": {
+      "save": "保存",
+      "edit": "编辑",
+      "delete": "删除",
+      "fold": "收起",
+      "expand": "展开组件库"
+    },
+    "field": {
+      "nameRequired": "名称 *",
+      "codeRequired": "编码 *",
+      "code": "编码",
+      "symbol": "符号",
+      "description": "描述",
+      "modifierType": "修饰类型"
+    },
+    "placeholder": {
+      "codeCny": "例如：CNY",
+      "nameRmb": "例如：人民币",
+      "nameYoy": "例如：同比",
+      "codeYoy": "例如：YOY",
+      "symbolOptional": "可选，支持自定义符号",
+      "descriptionOptional": "可选",
+      "selectType": "选择类型"
+    },
+    "aria": {
+      "openUnitNameList": "打开单位名称列表"
+    },
+    "dropdown": {
+      "noMatchingName": "暂无匹配名称",
+      "noValueDomain": "暂无值域",
+      "selectType": "选择类型"
+    },
+    "footer": {
+      "tip": "在组装派生指标前，请确保组件库中已存在所需语义片段。"
+    },
+    "modal": {
+      "createUnit": "新建单位",
+      "editUnit": "编辑单位",
+      "createModifier": "新建修饰词",
+      "editModifier": "编辑修饰词"
+    },
+    "symbolGroups": {
+      "names": {
+        "currency": "货币",
+        "ratio": "比率",
+        "temperature": "温度",
+        "length": "长度",
+        "areaVolume": "面积/体积",
+        "weight": "重量",
+        "time": "时间"
+      },
+      "labels": {
+        "rmb": "人民币",
+        "usd": "美元",
+        "euro": "欧元",
+        "pound": "英镑",
+        "krw": "韩元",
+        "inr": "印度卢比",
+        "percentage": "百分比",
+        "permille": "千分比",
+        "permyriad": "万分比",
+        "celsius": "摄氏度",
+        "fahrenheit": "华氏度",
+        "kelvin": "开尔文",
+        "meter": "米",
+        "kilometer": "千米",
+        "centimeter": "厘米",
+        "millimeter": "毫米",
+        "squareMeter": "平方米",
+        "cubicMeter": "立方米",
+        "kilogram": "千克",
+        "gram": "克",
+        "milligram": "毫克",
+        "ton": "吨",
+        "second": "秒",
+        "minute": "分",
+        "hour": "小时",
+        "day": "天"
+      }
     }
   }
 }

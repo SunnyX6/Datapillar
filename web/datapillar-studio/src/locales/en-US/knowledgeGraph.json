@@ -1,0 +1,119 @@
+{
+  "commands": {
+    "rebuild": {
+      "title": "Vector reconstruction",
+      "description": "Rebuild vector index"
+    },
+    "selectEmbeddingModelHeader": "Select embedding model",
+    "selectVectorModelHeader": "Select a vector model",
+    "selectChatModelHeader": "Select chat model"
+  },
+  "loading": {
+    "graph": "Loading warehouse knowledge graph..."
+  },
+  "topStats": {
+    "nodes": "Nodes",
+    "currentEmbeddingModel": "Current embedding model:",
+    "nodeQuality": "Node Quality"
+  },
+  "model": {
+    "unknown": "Unknown model",
+    "applying": "Applying model...",
+    "select": "Please select",
+    "none": "No embedding model available"
+  },
+  "errors": {
+    "unknown": "Unknown error"
+  },
+  "notifications": {
+    "embeddingModelApplied": "Applied embedding model {{aiModelId}} (revision {{revision}})",
+    "embeddingModelSwitched": "Switched embedding model {{aiModelId}} (revision {{revision}})",
+    "setEmbeddingModelFailed": "Set embedding model failed: {{message}}",
+    "rebuildAccepted": "Rebuild accepted: graphUpserts={{graphUpserts}}, embeddingTasks={{embeddingTasks}}",
+    "rebuildFailed": "Rebuild failed: {{message}}"
+  },
+  "typeLabels": {
+    "knowledge": "Knowledge",
+    "catalog": "Catalog",
+    "schema": "Schema",
+    "table": "Table",
+    "column": "Column",
+    "sql": "SQL",
+    "tag": "Tag",
+    "metric": "Metric",
+    "atomicmetric": "Atomic Metric",
+    "derivedmetric": "Derived Metric",
+    "compositemetric": "Composite Metric",
+    "wordroot": "Word Root",
+    "modifier": "Modifier",
+    "unit": "Unit",
+    "valuedomain": "Value Domain"
+  },
+  "sentinel": {
+    "title": "AI Sentinel",
+    "disabled": "AI Sentinel is disabled",
+    "moreActions": "More actions",
+    "filterLabel": "Filter: {{type}}",
+    "typeFilterTooltip": "Node type filter",
+    "description": "Autonomous governance and healing.",
+    "secureTitle": "Sector Secure",
+    "secureDescription": "No anomalies detected."
+  },
+  "issues": {
+    "healingProtocol": "HEALING_PROTOCOL...",
+    "alert": "{{type}} Alert",
+    "id": "ID:{{id}}",
+    "executeAutoFix": "Execute Auto-Fix",
+    "types": {
+      "metadata": "Metadata",
+      "quality": "Quality"
+    },
+    "titles": {
+      "missingDescriptions": "Missing Descriptions",
+      "schemaDrift": "Schema Drift"
+    },
+    "descriptions": {
+      "missingDescriptions": "2 tables in Silver Layer lack business descriptions.",
+      "schemaDrift": "Source schema changed for ingest_logs."
+    }
+  },
+  "nodeDetail": {
+    "pinned": "Pinned",
+    "nodeId": "ID: {{id}}",
+    "displayName": "Display Name",
+    "noDisplayName": "No display name provided.",
+    "description": "Description",
+    "noDescription": "No description available for this entity. Consider running an AI Metadata scan to auto-populate.",
+    "owner": "Owner",
+    "unassigned": "Unassigned",
+    "updated": "Updated",
+    "unknown": "Unknown",
+    "tags": "Tags",
+    "schema": "Schema",
+    "viewFullDdl": "View Full DDL",
+    "table": {
+      "column": "Column",
+      "type": "Type",
+      "attr": "Attr"
+    }
+  },
+  "actions": {
+    "lineage": "Lineage",
+    "profile": "Profile"
+  },
+  "chatInput": {
+    "placeholder": "Describe your data workflow needs...",
+    "placeholderResume": "Please add key information to continue...",
+    "send": "send",
+    "stop": "stop",
+    "continue": "continue",
+    "noModelPermissionHint": "Please contact the administrator for model authorization",
+    "modelButtonTitle": "Select model",
+    "commandLibrary": "Command library",
+    "intelligenceEnhancement": "Intelligence enhancement",
+    "safetyHintDefault": "AI may be wrong, please verify the output.",
+    "safetyHintResume": "Waiting for additional information to continue.",
+    "defaultModel": "Default model",
+    "setAsDefaultModel": "Set as default model"
+  }
+}

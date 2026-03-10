@@ -410,17 +410,6 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  const metricTypeConfigMap = metricTypeConfig()
  const typeConfig = metricTypeConfigMap[form.type] || metricTypeConfigMap.ATOMIC
 
- // Derived scenarios prefetch pull data in advance,Avoid flickering on first opening
- useEffect(() => {
- if (!isOpen || step!== 2 || form.type!== 'DERIVED') return
- if (atomicMetrics.length === 0) {
- loadAtomicMetrics()
- }
- if (modifiers.length === 0) {
- loadModifiers()
- }
- },[isOpen,step,form.type,atomicMetrics.length,modifiers.length,loadAtomicMetrics,loadModifiers])
-
  // Step 1: select Metric type
  if (step === 1) {
  return (<Modal
@@ -547,7 +536,7 @@ export function MetricFormModal({ isOpen,onClose,onSave,saving,editMetric }:Metr
  <div className="space-y-2">
  {aiMessage.recommendations.map((rec,idx) => (rec.msgType === 'table'?(<div key={idx} className="space-y-1">
  <div className="flex items-center gap-2 text-xs">
- <span className="px-1.5 py-0.5 rounded text-micro font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">table</span>
+ <span className="px-1.5 py-0.5 rounded text-micro font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">{t('metricForm.ai.recommendation.table')}</span>
  <code className="text-slate-700 dark:text-slate-300 font-mono">{rec.fullPath}</code>
  {rec.description && (<span className="text-slate-500 dark:text-slate-400">- {rec.description}</span>)}
  </div>

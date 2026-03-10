@@ -12,6 +12,7 @@ import {
   Info,
   X
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cardWidthClassMap, menuWidthClassMap, panelWidthClassMap, progressWidthClassMap } from '@/design-tokens/dimensions'
 import { TYPOGRAPHY } from '@/design-tokens/typography'
 import { Button, Card } from '@/components/ui'
@@ -55,6 +56,7 @@ interface ChunkConfig {
 }
 
 export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
+  const { t } = useTranslation('wiki')
   const availableDocs = useMemo(() => documents.filter((doc) => doc.spaceId === spaceId), [documents, spaceId])
   const [selectedDocId, setSelectedDocId] = useState<string>(() => availableDocs[0]?.id ?? '')
   const [selectedChunkId, setSelectedChunkId] = useState<string | null>(null)
@@ -175,7 +177,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
           return
         }
         const message = error instanceof Error ? error.message : String(error)
-        toast.error(`Failed to load slices：${message}`)
+        toast.error(t('chunkManager.toast.loadChunksFailed', { message }))
         setChunks([])
       })
       .finally(() => {
@@ -187,7 +189,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
     return () => {
       active = false
     }
-  }, [activeDocId])
+  }, [activeDocId, t])
 
   const handleChunkSelect = (chunk: Chunk) => {
     setSelectedChunkId(chunk.id)
@@ -233,22 +235,22 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
 
   const handleApplyConfig = async () => {
     if (!activeDocId) {
-      toast.warning('Please select a document first')
+      toast.warning(t('chunkManager.toast.selectDocumentFirst'))
       return
     }
     const documentId = Number(activeDocId)
     if (!Number.isFinite(documentId)) {
-      toast.error('Documentation ID Invalid')
+      toast.error(t('chunkManager.toast.invalidDocumentId'))
       return
     }
     try {
       setIsChunking(true)
       await startChunkJob(documentId, buildChunkConfigPayload())
-      toast.success('The segmentation task has been submitted')
+      toast.success(t('chunkManager.toast.chunkJobSubmitted'))
       setShowConfig(false)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      toast.error(`Splitting failed：${message}`)
+      toast.error(t('chunkManager.toast.chunkJobFailed', { message }))
     } finally {
       setIsChunking(false)
     }
@@ -258,7 +260,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
     if (!activeChunk) return
     const nextContent = editContent.trim()
     if (!nextContent) {
-      toast.warning('Slice content cannot be empty')
+      toast.warning(t('chunkManager.toast.emptyChunkContent'))
       return
     }
     if (nextContent === activeChunk.content) return
@@ -274,10 +276,10 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
       )
       const key = `${activeChunk.docId}:${activeChunk.id}`
       setEditContentByChunkId((prev) => ({ ...prev, [key]: nextContent }))
-      toast.success('slice updated')
+      toast.success(t('chunkManager.toast.chunkUpdated'))
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      toast.error(`Update failed：${message}`)
+      toast.error(t('chunkManager.toast.updateFailed', { message }))
     } finally {
       setIsSaving(false)
     }
@@ -302,10 +304,10 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
         setChunks((prev) => prev.filter((chunk) => chunk.id !== activeChunk.id))
         setSelectedChunkId(null)
       }
-      toast.success('Slice removed')
+      toast.success(t('chunkManager.toast.chunkRemoved'))
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      toast.error(`Removal failed：${message}`)
+      toast.error(t('chunkManager.toast.removeFailed', { message }))
     } finally {
       setIsDeleting(false)
     }
@@ -314,11 +316,11 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
   const getModeLabel = (mode: ChunkMode) => {
     switch (mode) {
       case 'general':
-        return 'General'
+        return t('chunkManager.mode.general')
       case 'parent_child':
-        return 'Parent/Child'
+        return t('chunkManager.mode.parentChild')
       case 'qa':
-        return 'Q&A'
+        return t('chunkManager.mode.qa')
       default:
         return mode
     }
@@ -333,7 +335,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
               <span className="flex items-center gap-1.5 min-w-0">
                 <FileText size={16} className="text-indigo-600 shrink-0" />
                 <span className={`min-w-0 truncate ${currentDoc ? '' : `${TYPOGRAPHY.caption} text-slate-400`}`}>
-                  {currentDoc?.title || 'No document yet'}
+                  {currentDoc?.title || t('chunkManager.header.noDocument')}
                 </span>
                 <ChevronDown size={14} className="text-slate-400 shrink-0" />
               </span>
@@ -341,7 +343,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
 
             <div className={`absolute top-full left-0 mt-2 ${menuWidthClassMap.wide} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all z-50`}>
               <div className="p-2">
-                <div className={`${TYPOGRAPHY.micro} text-slate-400 px-2 py-1 uppercase font-bold tracking-wider`}>Switch documents</div>
+                <div className={`${TYPOGRAPHY.micro} text-slate-400 px-2 py-1 uppercase font-bold tracking-wider`}>{t('chunkManager.header.switchDocuments')}</div>
                 {availableDocs.length > 0 ? (
                   availableDocs.map((doc) => (
                     <div
@@ -354,7 +356,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                     </div>
                   ))
                 ) : (
-                  <div className={`px-3 py-2 ${TYPOGRAPHY.caption} text-slate-400`}>There are no documents in the current space.</div>
+                  <div className={`px-3 py-2 ${TYPOGRAPHY.caption} text-slate-400`}>{t('chunkManager.header.noDocumentsInSpace')}</div>
                 )}
               </div>
             </div>
@@ -363,12 +365,12 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
           <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
 
           <div className="flex flex-col">
-            <span className={`${TYPOGRAPHY.micro} text-slate-400 uppercase tracking-wider font-bold`}>Total Chunks</span>
+            <span className={`${TYPOGRAPHY.micro} text-slate-400 uppercase tracking-wider font-bold`}>{t('chunkManager.header.totalChunks')}</span>
             <span className={`${TYPOGRAPHY.bodySm} font-mono font-medium text-slate-700 dark:text-slate-200`}>{currentDoc?.chunkCount ?? 0}</span>
           </div>
 
           <div className="flex flex-col pl-4 border-l border-slate-200 dark:border-slate-700">
-            <span className={`${TYPOGRAPHY.micro} text-slate-400 uppercase tracking-wider font-bold`}>Current Space</span>
+            <span className={`${TYPOGRAPHY.micro} text-slate-400 uppercase tracking-wider font-bold`}>{t('chunkManager.header.currentSpace')}</span>
             <span className={`${TYPOGRAPHY.caption} font-medium text-slate-600 dark:text-slate-300`}>{spaceName}</span>
           </div>
         </div>
@@ -381,7 +383,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
             <Settings size={16} className={`mr-3 ${showConfig ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'}`} />
 
             <div className="flex items-center mr-3">
-              <span className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase tracking-wider mr-2`}>sharding strategy:</span>
+              <span className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase tracking-wider mr-2`}>{t('chunkManager.header.chunkStrategy')}</span>
               <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded px-2 py-1">
                 <span className={`${TYPOGRAPHY.caption} font-bold text-indigo-700 dark:text-indigo-200 mr-2`}>{getModeLabel(config.mode)}</span>
                 <span className="text-slate-300 border-l border-slate-300 dark:border-slate-600 h-3 mx-2"></span>
@@ -397,7 +399,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
               <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/40 rounded-t-xl">
                 <div className={`flex items-center space-x-2 ${TYPOGRAPHY.caption} text-slate-800 dark:text-slate-100 font-semibold`}>
                   <Sliders size={16} />
-                  <span>Segmentation parameter configuration</span>
+                  <span>{t('chunkManager.config.title')}</span>
                 </div>
                 <button onClick={() => setShowConfig(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                   <X size={16} />
@@ -406,7 +408,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
 
               <div className="p-4 space-y-4">
                 <div>
-                  <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2`}>Chunk Mode</label>
+                  <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2`}>{t('chunkManager.config.chunkMode')}</label>
                   <div className="grid grid-cols-2 gap-2">
                     {CHUNK_MODES.map((mode) => (
                       <button
@@ -424,7 +426,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                   <div className="space-y-4">
                     <div>
                       <div className="flex justify-between mb-2">
-                        <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Chunk Length (Chars)</label>
+                        <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>{t('chunkManager.config.general.chunkLength')}</label>
                         <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-200 px-2 py-0.5 rounded`}>{config.general.maxTokens}</span>
                       </div>
                       <input
@@ -444,7 +446,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
 
                     <div>
                       <div className="flex justify-between mb-2">
-                        <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Overlap</label>
+                        <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>{t('chunkManager.config.general.overlap')}</label>
                         <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-200 px-2 py-0.5 rounded`}>{config.general.overlap}</span>
                       </div>
                       <input
@@ -460,7 +462,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
 
                     <div>
                       <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2 flex items-center`}>
-                        Delimiter <Info size={12} className="ml-1 text-slate-400" />
+                        {t('chunkManager.config.general.delimiter')} <Info size={12} className="ml-1 text-slate-400" />
                       </label>
                       <input
                         type="text"
@@ -475,10 +477,10 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                 {config.mode === 'parent_child' && (
                   <div className="space-y-5">
                     <div className="space-y-3">
-                      <div className={`${TYPOGRAPHY.caption} font-semibold text-slate-600 dark:text-slate-300`}>Parent Chunk</div>
+                      <div className={`${TYPOGRAPHY.caption} font-semibold text-slate-600 dark:text-slate-300`}>{t('chunkManager.config.parentChild.parentChunk')}</div>
                       <div>
                         <div className="flex justify-between mb-2">
-                          <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Parent Length (Chars)</label>
+                          <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>{t('chunkManager.config.parentChild.parentLength')}</label>
                           <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-200 px-2 py-0.5 rounded`}>{config.parent_child.parent.maxTokens}</span>
                         </div>
                         <input
@@ -498,7 +500,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
 
                       <div>
                         <div className="flex justify-between mb-2">
-                          <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Parent Overlap</label>
+                          <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>{t('chunkManager.config.parentChild.parentOverlap')}</label>
                           <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-200 px-2 py-0.5 rounded`}>{config.parent_child.parent.overlap}</span>
                         </div>
                         <input
@@ -513,7 +515,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                       </div>
 
                       <div>
-                        <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2`}>Parent Delimiter</label>
+                        <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2`}>{t('chunkManager.config.parentChild.parentDelimiter')}</label>
                         <input
                           type="text"
                           value={config.parent_child.parent.delimiter}
@@ -524,10 +526,10 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                     </div>
 
                     <div className="space-y-3">
-                      <div className={`${TYPOGRAPHY.caption} font-semibold text-slate-600 dark:text-slate-300`}>Child Chunk</div>
+                      <div className={`${TYPOGRAPHY.caption} font-semibold text-slate-600 dark:text-slate-300`}>{t('chunkManager.config.parentChild.childChunk')}</div>
                       <div>
                         <div className="flex justify-between mb-2">
-                          <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Child Length (Chars)</label>
+                          <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>{t('chunkManager.config.parentChild.childLength')}</label>
                           <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-200 px-2 py-0.5 rounded`}>{config.parent_child.child.maxTokens}</span>
                         </div>
                         <input
@@ -547,7 +549,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
 
                       <div>
                         <div className="flex justify-between mb-2">
-                          <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>Child Overlap</label>
+                          <label className={`${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase`}>{t('chunkManager.config.parentChild.childOverlap')}</label>
                           <span className={`${TYPOGRAPHY.caption} font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-200 px-2 py-0.5 rounded`}>{config.parent_child.child.overlap}</span>
                         </div>
                         <input
@@ -562,7 +564,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                       </div>
 
                       <div>
-                        <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2`}>Child Delimiter</label>
+                        <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2`}>{t('chunkManager.config.parentChild.childDelimiter')}</label>
                         <input
                           type="text"
                           value={config.parent_child.child.delimiter}
@@ -576,7 +578,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
 
                 {config.mode === 'qa' && (
                   <div>
-                    <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2`}>Q&A Pattern</label>
+                    <label className={`block ${TYPOGRAPHY.legal} font-bold text-slate-500 uppercase mb-2`}>{t('chunkManager.config.qaPattern')}</label>
                     <input
                       type="text"
                       value={config.qa.pattern}
@@ -589,7 +591,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
 
               <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-800 rounded-b-xl flex justify-between items-center">
                 <div className={`${TYPOGRAPHY.micro} text-slate-500`}>
-                  expected to generate: <span className="font-bold text-slate-900 dark:text-slate-100">~{estimatedChunks} chunks</span>
+                  {t('chunkManager.config.expectedChunks', { count: estimatedChunks })}
                 </div>
                 <Button
                   onClick={handleApplyConfig}
@@ -598,7 +600,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                   className={`${TYPOGRAPHY.caption} font-bold`}
                   disabled={isChunking || !activeDocId}
                 >
-                  Apply configuration and re-shard
+                  {t('chunkManager.config.applyAndReshard')}
                 </Button>
               </div>
             </div>
@@ -613,16 +615,16 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
               <Search className="absolute left-2.5 top-2.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={14} />
               <input
                 type="text"
-                placeholder="Search slices..."
+                placeholder={t('chunkManager.list.searchPlaceholder')}
                 className={`w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg ${TYPOGRAPHY.bodySm} focus:outline-none focus:border-indigo-400 focus:bg-white dark:focus:bg-slate-900 transition-all placeholder-slate-400`}
               />
             </div>
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar rounded-bl-xl">
             {isChunkLoading ? (
-              <div className={`px-3 py-6 text-center ${TYPOGRAPHY.caption} text-slate-400`}>Loading slices...</div>
+              <div className={`px-3 py-6 text-center ${TYPOGRAPHY.caption} text-slate-400`}>{t('chunkManager.list.loading')}</div>
             ) : chunks.length === 0 ? (
-              <div className={`px-3 py-6 text-center ${TYPOGRAPHY.caption} text-slate-400`}>No slices yet</div>
+              <div className={`px-3 py-6 text-center ${TYPOGRAPHY.caption} text-slate-400`}>{t('chunkManager.list.empty')}</div>
             ) : (
               chunks.map((chunk, idx) => (
                 <div
@@ -633,7 +635,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                   <div className="flex justify-between items-center mb-1.5">
                     <span className={`${TYPOGRAPHY.micro} font-mono font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded`}>#{idx + 1}</span>
                     <div className="flex items-center space-x-1">
-                      <span className={`${TYPOGRAPHY.micro} text-slate-400`}>{chunk.tokenCount}len</span>
+                      <span className={`${TYPOGRAPHY.micro} text-slate-400`}>{t('chunkManager.list.length', { count: chunk.tokenCount })}</span>
                       <span className={`w-1.5 h-1.5 rounded-full ${chunk.embeddingStatus === 'synced' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
                     </div>
                   </div>
@@ -652,7 +654,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
               <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center shadow-sm z-10">
                 <div>
                   <h2 className={`${TYPOGRAPHY.bodySm} font-bold text-slate-900 dark:text-slate-100 flex items-center`}>
-                    Slice content details
+                    {t('chunkManager.detail.title')}
                     <span className={`ml-2 px-2 py-0.5 bg-slate-100 dark:bg-slate-800 ${TYPOGRAPHY.micro} text-slate-500 rounded-full font-normal`}>ID: {activeChunk.id}</span>
                   </h2>
                 </div>
@@ -662,14 +664,14 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                     disabled={isDeleting || !activeChunk}
                     className={`flex items-center px-3 py-1.5 ${TYPOGRAPHY.caption} font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors ${isDeleting ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
-                    <Trash2 size={14} className="mr-1.5" /> Remove
+                    <Trash2 size={14} className="mr-1.5" /> {t('chunkManager.detail.remove')}
                   </button>
                   <button
                     onClick={handleResetChunk}
                     disabled={!activeChunk}
                     className={`flex items-center px-3 py-1.5 ${TYPOGRAPHY.caption} font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-200 hover:bg-indigo-100 border border-indigo-100 dark:border-indigo-500/30 rounded-lg transition-colors ${!activeChunk ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
-                    <RefreshCcw size={14} className="mr-1.5" /> reset
+                    <RefreshCcw size={14} className="mr-1.5" /> {t('chunkManager.detail.reset')}
                   </button>
                 </div>
               </div>
@@ -682,9 +684,9 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                   <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2 border-b border-slate-100 dark:border-slate-700 rounded-t-lg flex justify-between items-center">
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></div>
-                      <span className={`${TYPOGRAPHY.legal} font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide`}>Editor</span>
+                      <span className={`${TYPOGRAPHY.legal} font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide`}>{t('chunkManager.detail.editor')}</span>
                     </div>
-                    <span className={`${TYPOGRAPHY.micro} text-slate-400 font-mono border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded bg-white dark:bg-slate-900`}>{editContent.length} chars</span>
+                    <span className={`${TYPOGRAPHY.micro} text-slate-400 font-mono border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded bg-white dark:bg-slate-900`}>{t('chunkManager.detail.charCount', { count: editContent.length })}</span>
                   </div>
                   <textarea
                     value={editContent}
@@ -696,14 +698,14 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
 
                 <div className="mt-6 grid grid-cols-2 gap-6">
                   <Card padding="sm" className="shadow-sm">
-                    <h4 className={`${TYPOGRAPHY.legal} font-bold text-slate-400 uppercase tracking-wider mb-3`}>Source Metadata</h4>
+                    <h4 className={`${TYPOGRAPHY.legal} font-bold text-slate-400 uppercase tracking-wider mb-3`}>{t('chunkManager.detail.sourceMetadata')}</h4>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center pb-2 border-b border-dashed border-slate-100 dark:border-slate-800">
-                        <span className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400`}>Source Page</span>
-                        <span className={`${TYPOGRAPHY.caption} text-slate-900 dark:text-slate-100 font-mono font-medium`}>Page 4</span>
+                        <span className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400`}>{t('chunkManager.detail.sourcePage')}</span>
+                        <span className={`${TYPOGRAPHY.caption} text-slate-900 dark:text-slate-100 font-mono font-medium`}>{t('chunkManager.detail.pageNumber', { page: 4 })}</span>
                       </div>
                       <div className="flex justify-between items-center pb-2 border-b border-dashed border-slate-100 dark:border-slate-800">
-                        <span className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400`}>Length Usage</span>
+                        <span className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400`}>{t('chunkManager.detail.lengthUsage')}</span>
                         <span className={`${TYPOGRAPHY.caption} text-slate-900 dark:text-slate-100 font-mono font-medium`}>{activeChunk.tokenCount} / {referenceChunkSize}</span>
                       </div>
                       <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mt-1 overflow-hidden">
@@ -712,13 +714,13 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                     </div>
                   </Card>
                   <Card padding="sm" className="shadow-sm">
-                    <h4 className={`${TYPOGRAPHY.legal} font-bold text-slate-400 uppercase tracking-wider mb-3`}>Embedding Status</h4>
+                    <h4 className={`${TYPOGRAPHY.legal} font-bold text-slate-400 uppercase tracking-wider mb-3`}>{t('chunkManager.detail.embeddingStatus')}</h4>
                     <div className="flex flex-col space-y-2">
                       <div className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400`}>
-                        Model: <span className="text-slate-500 dark:text-slate-300 font-mono font-medium">Not configured</span>
+                        {t('chunkManager.detail.model')}: <span className="text-slate-500 dark:text-slate-300 font-mono font-medium">{t('chunkManager.detail.notConfigured')}</span>
                       </div>
                       <div className={`${TYPOGRAPHY.caption} text-slate-500 dark:text-slate-400`}>
-                        Vector ID: <span className="font-mono text-slate-400">-</span>
+                        {t('chunkManager.detail.vectorId')}: <span className="font-mono text-slate-400">-</span>
                       </div>
                       <div className={`mt-2 inline-flex items-center ${TYPOGRAPHY.caption} font-medium px-2 py-1 rounded-md self-start border ${
                         embeddingSynced
@@ -727,7 +729,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                       }`}
                       >
                         <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${embeddingSynced ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
-                        {embeddingSynced ? 'Vector Synced' : 'Vector Pending'}
+                        {embeddingSynced ? t('chunkManager.detail.vectorSynced') : t('chunkManager.detail.vectorPending')}
                       </div>
                     </div>
                   </Card>
@@ -737,7 +739,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
               <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center rounded-br-xl">
                 <div className={`flex items-center ${TYPOGRAPHY.caption} text-slate-400`}>
                   <Info size={12} className="mr-1.5" />
-                  <span>Manual modification of content triggers vector recalculation</span>
+                  <span>{t('chunkManager.detail.manualEditHint')}</span>
                 </div>
                 <Button
                   variant="primary"
@@ -747,7 +749,7 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
                   disabled={isSaving || !activeChunk}
                 >
                   <Save size={14} />
-                  Save and update index
+                  {t('chunkManager.detail.saveAndUpdate')}
                 </Button>
               </div>
             </>
@@ -756,8 +758,8 @@ export default function ChunkManager({ spaceId, spaceName, documents }: Props) {
               <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
                 <Edit2 size={24} className="text-slate-300" />
               </div>
-              <p className={`${TYPOGRAPHY.bodySm} font-medium text-slate-500`}>Please select a slice from the list on the left</p>
-              <p className={`${TYPOGRAPHY.caption} text-slate-400 mt-1`}>You can view details or manually optimize content</p>
+              <p className={`${TYPOGRAPHY.bodySm} font-medium text-slate-500`}>{t('chunkManager.empty.selectChunk')}</p>
+              <p className={`${TYPOGRAPHY.caption} text-slate-400 mt-1`}>{t('chunkManager.empty.hint')}</p>
             </div>
           )}
         </div>

@@ -16,7 +16,16 @@
       "knowledgeDesc": "数仓图谱可视化与关系探索"
     },
     "actions": {
-      "search": "搜索..."
+      "search": "搜索...",
+      "searchContext": {
+        "dashboard": "搜索项目、工作流...",
+        "metadata": "搜索目录、Schema、表...",
+        "semantic": "搜索指标、词根、数据服务...",
+        "semantic-metrics": "搜索指标名称或编码...",
+        "semantic-glossary": "搜索词根或释义...",
+        "knowledge": "搜索图谱节点...",
+        "default": "全局搜索..."
+      }
     },
     "profile": {
       "profile": "个人中心",

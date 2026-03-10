@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Activity,CheckCircle2,Copy,RefreshCw,ServerCrash } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { getLastFatalErrorSnapshot } from '@/services/errorService'
 import { getStudioServiceHealth } from '@/services/healthService'
 import { cn,formatTime } from '@/utils'
@@ -20,11 +21,13 @@ function resolveServiceHealthStatus(payload:unknown):string | null {
 }
 
 export function ServerErrorPage() {
+ const { t } = useTranslation('exception')
  const [fatalError] = useState(() => getLastFatalErrorSnapshot())
  const [copied,setCopied] = useState(false)
  const [serviceHealthState,setServiceHealthState] = useState<ServiceHealthState>('idle')
- const referenceId = fatalError?.requestId?? fatalError?.traceId?? 'N/A'
- const hasReferenceId = referenceId!== 'N/A'
+ const referenceIdFallback = t('serverError.referenceFallback')
+ const referenceId = fatalError?.requestId?? fatalError?.traceId?? referenceIdFallback
+ const hasReferenceId = referenceId!== referenceIdFallback
  const errorTime = fatalError?.timestamp?formatTime(fatalError.timestamp):'-'
 
  const handleRetry = () => {
@@ -62,7 +65,8 @@ export function ServerErrorPage() {
  }
  }
 
- const serviceStatusLabel = serviceHealthState === 'checking'?'Under inspection...':serviceHealthState === 'healthy'?'Serve health':serviceHealthState === 'unhealthy'?'Service exception':'Check service status'
+ const serviceStatusLabel =
+ serviceHealthState === 'checking'?t('serverError.serviceStatus.checking'):serviceHealthState === 'healthy'?t('serverError.serviceStatus.healthy'):serviceHealthState === 'unhealthy'?t('serverError.serviceStatus.unhealthy'):t('serverError.serviceStatus.idle')
 
  return (<div className="relative flex min-h-dvh w-full items-center justify-center overflow-hidden bg-slate-50 selection:bg-rose-100 selection:text-rose-600">
  <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
@@ -94,10 +98,10 @@ export function ServerErrorPage() {
  </div>
 
  <h1 className="mb-4 text-4xl font-bold tracking-tight text-slate-900">
- server<span className="text-rose-500">something went wrong</span>
+ {t('serverError.titlePrefix')}<span className="text-rose-500">{t('serverError.titleHighlight')}</span>
  </h1>
  <p className="mx-auto mb-8 max-w-xl text-base leading-relaxed font-light text-slate-600">
- sorry,The server encountered some unexpected conditions.Our technical team has received an automated alert,Under emergency repair.</p>
+ {t('serverError.description')}</p>
 
  <div className="flex items-center justify-center gap-4">
  <button
@@ -106,7 +110,7 @@ export function ServerErrorPage() {
  className="group inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-medium text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-xl hover:shadow-slate-900/20"
  >
  <RefreshCw className="mr-2 h-4 w-4 transition-transform duration-500 group-hover:rotate-180" />
- refresh page
+ {t('serverError.actions.refresh')}
  </button>
 
  <button
@@ -130,28 +134,28 @@ export function ServerErrorPage() {
  className="inline-flex items-center gap-2 rounded-full border border-transparent bg-slate-100/50 px-4 py-2 text-slate-500 transition-all duration-300 hover:border-slate-200 hover:bg-white hover:text-indigo-600 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
  disabled={!hasReferenceId}
  >
- <span className="text-xs font-semibold tracking-wider uppercase opacity-70">Request ID</span>
+ <span className="text-xs font-semibold tracking-wider uppercase opacity-70">{t('serverError.requestId')}</span>
  <span className="border-l border-slate-300 pl-2 font-mono text-sm font-medium">{referenceId}</span>
  {copied && hasReferenceId?(<CheckCircle2 className="ml-1 h-3.5 w-3.5 text-green-500" />):(<Copy className={`ml-1 h-3.5 w-3.5 transition-opacity ${hasReferenceId?'opacity-0 group-hover:opacity-100':'opacity-0'}`} />)}
  </button>
  <p className="mt-3 text-xs text-slate-400 opacity-0 transition-opacity duration-500 group-hover:opacity-100">
- {hasReferenceId?'Click to copy Request ID and provide it to the support team':'The current error is not returned to be tracked ID'}
+ {hasReferenceId?t('serverError.copyHintHasId'):t('serverError.copyHintNoId')}
  </p>
  <div className="mt-4 space-y-1 text-xs text-slate-500">
- <p>module:{fatalError?.module?? '-'}</p>
- <p>status code:{fatalError?.status?? '-'}</p>
- <p>Occurrence time:{errorTime}</p>
+ <p>{t('serverError.meta.module')}:{fatalError?.module?? '-'}</p>
+ <p>{t('serverError.meta.statusCode')}:{fatalError?.status?? '-'}</p>
+ <p>{t('serverError.meta.occurredAt')}:{errorTime}</p>
  </div>
  </div>
  </div>
 
  <footer className="absolute right-0 bottom-6 left-0 text-center">
  <div className="inline-flex items-center gap-6 text-xs font-medium text-slate-400">
- <a href="/" className="transition-colors hover:text-slate-800">Home page</a>
+ <a href="/" className="transition-colors hover:text-slate-800">{t('serverError.footer.home')}</a>
  <span className="h-1 w-1 rounded-full bg-slate-300" />
- <a href="/" className="transition-colors hover:text-slate-800">Help Center</a>
+ <a href="/" className="transition-colors hover:text-slate-800">{t('serverError.footer.help')}</a>
  <span className="h-1 w-1 rounded-full bg-slate-300" />
- <a href="/" className="transition-colors hover:text-slate-800">Contact support</a>
+ <a href="/" className="transition-colors hover:text-slate-800">{t('serverError.footer.contact')}</a>
  </div>
  </footer>
  </div>)

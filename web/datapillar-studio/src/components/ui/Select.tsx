@@ -30,6 +30,7 @@ export interface SelectProps {
   /** Submit input at the bottom of the drop-down card（Enter） */
   onDropdownInputSubmit?: (value: string) => Promise<void> | void
   disabled?: boolean
+  fullWidth?: boolean
   size?: 'md' | 'sm' | 'xs'
   className?: string
 }
@@ -46,6 +47,7 @@ export function Select({
   dropdownInputPlaceholder,
   onDropdownInputSubmit,
   disabled = false,
+  fullWidth = true,
   size = 'md',
   className = ''
 }: SelectProps) {
@@ -169,7 +171,7 @@ export function Select({
         onClick={() => setOpen(!open)}
         variant="outline"
         size={isExtraSmall ? 'tiny' : 'small'}
-        className={`w-full flex items-center justify-between bg-white dark:bg-slate-900 border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all ${triggerSizeClass} ${className}`}
+        className={`${fullWidth ? 'w-full' : 'w-auto'} flex items-center justify-between bg-white dark:bg-slate-900 border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all ${triggerSizeClass} ${className}`}
       >
         <span className={`truncate ${selectedOption ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400'}`}>
           {selectedOption?.label || placeholder}

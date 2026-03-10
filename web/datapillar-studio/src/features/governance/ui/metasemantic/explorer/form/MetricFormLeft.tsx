@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import { Code, X, Loader2, ChevronDown, Check, Sparkles, BookOpen, Target, Scale } from 'lucide-react'
 import type { RefObject, Dispatch, SetStateAction } from 'react'
@@ -43,6 +44,7 @@ function UnitSelector({
   unitSymbol?: string
   onChange: (code: string, name: string) => void
 }) {
+  const { t } = useTranslation('oneSemantics')
   const [open, setOpen] = useState(false)
   const [units, setUnits] = useState<Array<{ symbol: string; name: string; code: string }>>([])
   const [total, setTotal] = useState(0)
@@ -143,7 +145,7 @@ function UnitSelector({
   const selectedUnit = units.find((u) => u.code === value)
   const displayLabel = selectedUnit
     ? `${selectedUnit.symbol} ${selectedUnit.name}`
-    : (unitName ? `${unitSymbol || ''} ${unitName}`.trim() : (value || 'Please select the unit'))
+    : (unitName ? `${unitSymbol || ''} ${unitName}`.trim() : (value || t('metricForm.left.placeholder.selectUnit')))
 
   return (
     <>
@@ -173,7 +175,7 @@ function UnitSelector({
                 <Loader2 size={16} className="animate-spin text-slate-400" />
               </div>
             ) : units.length === 0 ? (
-              <div className="py-4 text-center text-xs text-slate-400">No unit data yet</div>
+              <div className="py-4 text-center text-xs text-slate-400">{t('metricForm.left.unitSelector.noData')}</div>
             ) : (
               <>
                 {units.map((unit) => (
@@ -206,7 +208,7 @@ function UnitSelector({
                   </div>
                 )}
                 {!hasMore && units.length > PAGE_SIZE && (
-                  <div className="py-1.5 text-center text-micro text-slate-300">All loaded</div>
+                  <div className="py-1.5 text-center text-micro text-slate-300">{t('metricForm.left.unitSelector.allLoaded')}</div>
                 )}
               </>
             )}
@@ -256,24 +258,12 @@ export function MetricFormLeft({
   updateAggregation,
   formulaRef
 }: MetricFormLeftProps) {
+  const { t } = useTranslation('oneSemantics')
   // modifier fetchData adapter
   const fetchModifierData = useCallback(async (offset: number, limit: number): Promise<{ items: InfiniteSelectItem[]; total: number }> => {
-    // Prioritize the use of parent cached data，Avoid flickering caused by repeated requests
+    // Prioritize parent cache data on first page
     if (offset === 0) {
-      if (_modifiers.length === 0) {
-        const loaded = await _loadModifiers().catch(() => [] as MetricModifierDTO[])
-        if (loaded.length > 0) {
-          return {
-            items: loaded.map((m) => ({
-              key: m.code,
-              code: m.code,
-              name: m.name,
-              icon: <Sparkles size={10} />
-            })),
-            total: _modifierTotal || loaded.length
-          }
-        }
-      } else {
+      if (_modifiers.length > 0) {
         return {
           items: _modifiers.map((m) => ({
             key: m.code,
@@ -283,6 +273,17 @@ export function MetricFormLeft({
           })),
           total: _modifierTotal || _modifiers.length
         }
+      }
+
+      const loaded = await _loadModifiers().catch(() => [] as MetricModifierDTO[])
+      return {
+        items: loaded.map((m) => ({
+          key: m.code,
+          code: m.code,
+          name: m.name,
+          icon: <Sparkles size={10} />
+        })),
+        total: _modifierTotal || loaded.length
       }
     }
 
@@ -314,22 +315,9 @@ export function MetricFormLeft({
 
   // Atomic Metric fetchData adapter
   const fetchAtomicMetricData = useCallback(async (offset: number, limit: number): Promise<{ items: InfiniteSelectItem[]; total: number }> => {
-    // Use parent cache first，Avoid re-requesting each time the mount causes the drop-down to flicker
+    // Use parent cache first on first page
     if (offset === 0) {
-      if (_atomicMetrics.length === 0) {
-        const loaded = await _loadAtomicMetrics().catch(() => [] as Array<{ code: string; name: string }>)
-        if (loaded.length > 0) {
-          return {
-            items: loaded.map((m) => ({
-              key: m.code,
-              code: m.code,
-              name: m.name,
-              icon: <Target size={10} />
-            })),
-            total: _atomicTotal || loaded.length
-          }
-        }
-      } else {
+      if (_atomicMetrics.length > 0) {
         return {
           items: _atomicMetrics.map((m) => ({
             key: m.code,
@@ -339,6 +327,17 @@ export function MetricFormLeft({
           })),
           total: _atomicTotal || _atomicMetrics.length
         }
+      }
+
+      const loaded = await _loadAtomicMetrics().catch(() => [] as Array<{ code: string; name: string }>)
+      return {
+        items: loaded.map((m) => ({
+          key: m.code,
+          code: m.code,
+          name: m.name,
+          icon: <Target size={10} />
+        })),
+        total: _atomicTotal || loaded.length
       }
     }
 
@@ -403,10 +402,10 @@ export function MetricFormLeft({
     <div className="col-span-5 xl:col-span-4 flex flex-col gap-4 h-full">
       <div className="flex-1 min-h-0 flex flex-col gap-4">
         <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Metric name *</label>
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">{t('metricForm.left.field.metricName')}</label>
           <input
             type="text"
-            placeholder="Example: Cumulative order amount"
+            placeholder={t('metricForm.left.placeholder.metricName')}
             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-all"
             value={form.name}
             onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
@@ -416,7 +415,7 @@ export function MetricFormLeft({
         {/* Metric code section */}
         <div className="space-y-2">
           <div className="flex items-center justify-between h-5">
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Metric code *</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">{t('metricForm.left.field.metricCode')}</label>
             <span className={`font-mono text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded ${!isEditMode && form.code ? 'visible' : 'invisible'}`}>
               {form.code || '-'}
             </span>
@@ -432,7 +431,7 @@ export function MetricFormLeft({
                 <div className="flex items-center gap-1">
                   <div className={form.baseCode ? 'hidden' : 'flex'}>
                     <InfiniteSelect
-                      placeholder="Select Atomic Metric"
+                      placeholder={t('metricForm.left.placeholder.selectAtomicMetric')}
                       variant="slate"
                       initialItems={_atomicMetrics.map((m) => ({
                         key: m.code,
@@ -462,7 +461,7 @@ export function MetricFormLeft({
                 <div className={form.modifiers.length < 2 ? 'flex items-center' : 'hidden'}>
                   <span className="text-slate-400 mx-1">_</span>
                   <InfiniteSelect
-                    placeholder="Select modifier"
+                    placeholder={t('metricForm.left.placeholder.selectModifier')}
                     variant="blue"
                     selectedKeys={form.modifiers}
                      initialItems={_modifiers.map((m) => ({
@@ -485,7 +484,7 @@ export function MetricFormLeft({
                   <span className="text-slate-400 mx-1">_</span>
                   <input
                     type="text"
-                    placeholder="Custom suffix"
+                    placeholder={t('metricForm.left.placeholder.customSuffix')}
                     className="w-20 shrink-0 bg-transparent border-b border-dashed border-slate-400 px-1 py-0.5 text-xs font-mono uppercase placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
                     value={form.customSuffix}
                     onChange={(e) => updateDerivedCustomSuffix(e.target.value.toUpperCase())}
@@ -519,7 +518,7 @@ export function MetricFormLeft({
                     addSeg(
                       (
                         <InfiniteSelect
-                          placeholder="Select WordRoot"
+                          placeholder={t('metricForm.left.placeholder.selectWordRoot')}
                           variant="purple"
                           selectedKeys={form.wordRoots}
                           fetchData={fetchWordRootData}
@@ -536,7 +535,7 @@ export function MetricFormLeft({
                         <input
                           ref={aggInputRef}
                           type="text"
-                          placeholder="aggregate function"
+                          placeholder={t('metricForm.left.placeholder.aggregation')}
                           className="w-20 shrink-0 bg-transparent border-b border-dashed border-emerald-400 px-1 py-0.5 text-xs font-mono uppercase text-emerald-600 placeholder:text-emerald-400 dark:placeholder:text-emerald-600 focus:outline-none focus:border-emerald-500"
                           value={form.aggregation}
                           onChange={(e) => updateAggregation(e.target.value.toUpperCase())}
@@ -576,7 +575,7 @@ export function MetricFormLeft({
                     (
                       <input
                         type="text"
-                        placeholder="Custom suffix"
+                        placeholder={t('metricForm.left.placeholder.customSuffix')}
                         className="w-20 shrink-0 bg-transparent border-b border-dashed border-slate-400 px-1 py-0.5 text-xs font-mono uppercase placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500"
                         value={form.customSuffix}
                         onChange={(e) => updateCustomSuffix(e.target.value.toUpperCase())}
@@ -595,18 +594,18 @@ export function MetricFormLeft({
 
         <div className="grid grid-cols-[200px_1fr] gap-3">
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">data type</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">{t('metricForm.left.field.dataType')}</label>
             <DataTypeSelector
               value={toDataTypeValue(form)}
               onChange={(value) => setForm((prev) => ({ ...prev, ...fromDataTypeValue(value) }))}
               filter="numeric"
               triggerClassName="w-full !border !border-slate-200 dark:!border-slate-700 !py-2.5 !px-4 !bg-white dark:!bg-slate-900"
-              placeholder="Please select data type"
-              labelClassName="text-body-sm text-slate-800 dark:text-slate-200"
+              placeholder={t('metricForm.left.placeholder.selectDataType')}
+              labelClassName="text-body-sm font-normal"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">unit</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">{t('metricForm.left.field.unit')}</label>
             <UnitSelector
               value={form.unit}
               unitName={form.unitName}
@@ -617,9 +616,9 @@ export function MetricFormLeft({
         </div>
 
         <div className="flex flex-col gap-1.5 flex-1 min-h-0">
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Business description</label>
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">{t('metricForm.left.field.businessDescription')}</label>
           <textarea
-            placeholder="Describe the business meaning of the metric..."
+            placeholder={t('metricForm.left.placeholder.businessDescription')}
             className="w-full flex-1 min-h-[60px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-body-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-all resize-none"
             value={form.comment}
             onChange={(e) => setForm((prev) => ({ ...prev, comment: e.target.value }))}
@@ -629,7 +628,7 @@ export function MetricFormLeft({
         {/* formula expression */}
         <div className="flex flex-col gap-1.5 flex-1 min-h-0">
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-            <Code size={14} className="text-emerald-500" /> formula expression *
+            <Code size={14} className="text-emerald-500" /> {t('metricForm.left.field.formula')}
           </label>
           <div className="relative flex-1 min-h-[60px]">
             <Code size={14} className="absolute top-3.5 left-4 text-emerald-500/50 pointer-events-none" />
@@ -637,10 +636,10 @@ export function MetricFormLeft({
                 ref={formulaRef}
                 placeholder={
                   form.type === 'ATOMIC'
-                    ? "SUM(orders.amount) WHERE status = 'paid'"
+                    ? t('metricForm.left.placeholder.formula.atomic')
                     : form.type === 'DERIVED'
-                      ? "{SALES_AMOUNT} WHERE region = 'Beijing'"
-                      : '({SALES_AMOUNT} - {COST}) / {SALES_AMOUNT} * 100'
+                      ? t('metricForm.left.placeholder.formula.derived')
+                      : t('metricForm.left.placeholder.formula.composite')
                 }
                 className="w-full h-full bg-slate-900 text-emerald-400 font-mono border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 text-body-sm focus:outline-none focus:border-emerald-500 shadow-lg resize-none"
                 value={form.formula}

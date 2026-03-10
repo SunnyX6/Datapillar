@@ -1,0 +1,258 @@
+{
+  "namespaceForm": {
+    "field": {
+      "name": "名称",
+      "descriptionOptional": "描述（可选）"
+    },
+    "placeholder": {
+      "name": "例如：营销知识库",
+      "description": "简要描述该空间的用途..."
+    },
+    "validation": {
+      "duplicateName": "名称已存在，请更换一个"
+    }
+  },
+  "hero": {
+    "title": "构建 Datapillar 企业知识大脑",
+    "description": "Datapillar Wiki 是新一代 RAG 知识引擎。通过创建独立知识空间（Namespace），可隔离不同业务域文档，并结合 AI 进行深度语义检索。",
+    "createFirstSpace": "新建第一个知识空间",
+    "features": {
+      "isolation": {
+        "title": "业务隔离",
+        "description": "按部门或项目创建独立空间，实现权限与数据安全隔离。"
+      },
+      "chunking": {
+        "title": "多种切片策略",
+        "description": "支持上传 PDF/Word，并按文档类型选择切片策略完成向量化。"
+      },
+      "retrieval": {
+        "title": "多模式检索",
+        "description": "支持语义检索、混合检索和重排，可按全库或单文档范围发起查询。"
+      }
+    }
+  },
+  "wikiView": {
+    "toast": {
+      "loadDocumentsFailed": "加载文档失败：{{message}}",
+      "loadSpacesFailed": "加载知识空间失败：{{message}}",
+      "createSpaceSuccess": "知识空间创建成功",
+      "createSpaceFailed": "创建失败：{{message}}"
+    },
+    "stats": {
+      "totalDocs": {
+        "label": "空间文档总数",
+        "unit": "篇"
+      },
+      "activeChunks": {
+        "label": "活跃分片数",
+        "unit": "个"
+      },
+      "recallAccuracy": {
+        "label": "平均召回准确率",
+        "unit": "%"
+      }
+    },
+    "createSpaceModal": {
+      "title": "新建知识空间",
+      "subtitle": "Namespace 用于隔离不同业务域的知识文档。",
+      "cancel": "取消",
+      "confirm": "新建空间"
+    },
+    "fallbackSpace": {
+      "name": "未选择知识空间",
+      "description": "请先创建知识空间，再开始上传文档"
+    },
+    "sidebar": {
+      "title": "知识空间（Namespaces）",
+      "createAria": "新建知识空间",
+      "docsCount": "{{count}} 篇文档",
+      "closeAria": "收起知识空间",
+      "closeTitle": "收起知识空间",
+      "expandAria": "展开知识空间",
+      "expandTitle": "展开知识空间"
+    },
+    "header": {
+      "breadcrumbWiki": "知识百科",
+      "uploadButton": "上传文档到空间"
+    },
+    "tabs": {
+      "documents": "文档列表",
+      "chunks": "分片编辑",
+      "retrieval": "召回测试（Playground）"
+    }
+  },
+  "uploadModal": {
+    "title": "上传文档",
+    "subtitle": {
+      "uploadTo": "上传到："
+    },
+    "tab": {
+      "local": "本地文件",
+      "url": "URL 链接"
+    },
+    "toast": {
+      "selectSpaceFirst": "请先选择知识空间",
+      "invalidSpaceId": "知识空间 ID 无效",
+      "uploadSuccess": "文档上传成功",
+      "uploadFailed": "上传失败：{{message}}",
+      "urlDisabled": "URL 导入暂未开放"
+    },
+    "uploading": {
+      "title": "文档上传中...",
+      "description": "上传完成后，可在“分片管理”中配置切片策略。"
+    },
+    "local": {
+      "dropTitle": "点击或拖拽文件到此处",
+      "dropHint": "支持 PDF、DOCX、MD、TXT（最大 20MB）",
+      "selectFile": "选择文件"
+    },
+    "url": {
+      "addressLabel": "文档地址（URL）",
+      "addressHint": "支持 PDF、Notion 页面、在线文档或普通网页。",
+      "authConfig": "认证配置",
+      "networkProxy": "网络代理",
+      "headerKey": "Header Key",
+      "credentials": "凭证（user:pass）",
+      "tokenValue": "Token / Value",
+      "tunnelAgent": "隧道代理",
+      "proxy": {
+        "default": "默认代理（共享）",
+        "intranet": "内网代理",
+        "vpn": "VPN 通道"
+      },
+      "tipsLabel": "提示",
+      "tipsContent": "流量将通过所选 Agent 安全转发，无需公网访问。",
+      "securityNotice": "系统会自动抓取并解析内容。对于内网 Wiki（如 Confluence），请启用认证配置。",
+      "importWithAuth": "携带凭证导入",
+      "startImport": "开始导入"
+    }
+  },
+  "retrieval": {
+    "title": "检索召回测试",
+    "subtitle": "模拟 Agent 运行环境，调试混合检索与重排效果。",
+    "currentSpace": "当前空间：{{spaceName}}",
+    "searchPlaceholder": "输入测试问题并按 Enter 发起检索...",
+    "scope": {
+      "allDocuments": "全库检索（全部文档）"
+    },
+    "mode": {
+      "semantic": "语义检索",
+      "hybrid": "混合检索"
+    },
+    "config": {
+      "title": "参数配置",
+      "scopeLabel": "检索范围",
+      "scopeHeader": "检索范围",
+      "modeLabel": "检索模式",
+      "modeHeader": "检索模式",
+      "rerankLabel": "重排",
+      "rerankShort": "重排",
+      "topK": "Top K",
+      "scoreThreshold": "评分阈值"
+    },
+    "emptyHint": "就绪，输入问题后按 Enter 开始检索",
+    "resultTitle": "召回结果（{{count}}）",
+    "latency": "耗时 {{latency}}ms",
+    "similarity": "相似度",
+    "tokenRange": "Token 区间：89-124",
+    "preview": "上下文预览",
+    "toast": {
+      "selectSpaceFirst": "请先选择知识空间",
+      "invalidSpaceId": "知识空间 ID 无效",
+      "failed": "检索失败：{{message}}"
+    }
+  },
+  "docList": {
+    "status": {
+      "indexed": "已索引",
+      "processing": "处理中",
+      "failed": "失败"
+    },
+    "columns": {
+      "documentName": "文档名称",
+      "status": "状态",
+      "chunkLength": "分片数 / Token 数",
+      "uploadTime": "上传时间",
+      "actions": "操作"
+    },
+    "empty": "当前空间暂无文档"
+  },
+  "chunkManager": {
+    "mode": {
+      "general": "通用",
+      "parentChild": "父子",
+      "qa": "问答"
+    },
+    "toast": {
+      "loadChunksFailed": "加载分片失败：{{message}}",
+      "selectDocumentFirst": "请先选择文档",
+      "invalidDocumentId": "文档 ID 无效",
+      "chunkJobSubmitted": "切片任务已提交",
+      "chunkJobFailed": "切片失败：{{message}}",
+      "emptyChunkContent": "分片内容不能为空",
+      "chunkUpdated": "分片已更新",
+      "updateFailed": "更新失败：{{message}}",
+      "chunkRemoved": "分片已删除",
+      "removeFailed": "删除失败：{{message}}"
+    },
+    "header": {
+      "noDocument": "暂无文档",
+      "switchDocuments": "切换文档",
+      "noDocumentsInSpace": "当前空间暂无文档",
+      "totalChunks": "分片总数",
+      "currentSpace": "当前空间",
+      "chunkStrategy": "切片策略："
+    },
+    "config": {
+      "title": "切片参数配置",
+      "chunkMode": "切片模式",
+      "general": {
+        "chunkLength": "分片长度（字符）",
+        "overlap": "重叠长度",
+        "delimiter": "分隔符"
+      },
+      "parentChild": {
+        "parentChunk": "父分片",
+        "parentLength": "父分片长度（字符）",
+        "parentOverlap": "父分片重叠",
+        "parentDelimiter": "父分片分隔符",
+        "childChunk": "子分片",
+        "childLength": "子分片长度（字符）",
+        "childOverlap": "子分片重叠",
+        "childDelimiter": "子分片分隔符"
+      },
+      "qaPattern": "问答匹配模式",
+      "expectedChunks": "预计生成：约 {{count}} 个分片",
+      "applyAndReshard": "应用配置并重新切片"
+    },
+    "list": {
+      "searchPlaceholder": "搜索分片...",
+      "loading": "分片加载中...",
+      "empty": "暂无分片",
+      "length": "{{count}} 长度"
+    },
+    "detail": {
+      "title": "分片内容详情",
+      "remove": "删除",
+      "reset": "重置",
+      "editor": "编辑器",
+      "charCount": "{{count}} 字符",
+      "sourceMetadata": "来源元数据",
+      "sourcePage": "来源页",
+      "pageNumber": "第 {{page}} 页",
+      "lengthUsage": "长度占用",
+      "embeddingStatus": "向量状态",
+      "model": "模型",
+      "notConfigured": "未配置",
+      "vectorId": "向量 ID",
+      "vectorSynced": "向量已同步",
+      "vectorPending": "向量待同步",
+      "manualEditHint": "手动修改内容会触发向量重算",
+      "saveAndUpdate": "保存并更新索引"
+    },
+    "empty": {
+      "selectChunk": "请从左侧列表选择分片",
+      "hint": "你可以查看详情或手动优化内容"
+    }
+  }
+}

@@ -22,19 +22,19 @@ interface SearchContextConfig {
 
 const SEARCH_CONTEXT_MAP:Record<SearchContext,SearchContextConfig> = {
  dashboard:{
- placeholder:'Search items,Workflow...',scope:['projects','workflows']
+ placeholder:'top.actions.searchContext.dashboard',scope:['projects','workflows']
  },metadata:{
- placeholder:'Search Catalog,Schema,Table...',scope:['catalog','schema','table']
+ placeholder:'top.actions.searchContext.metadata',scope:['catalog','schema','table']
  },semantic:{
- placeholder:'search metrics,root,Data services...',scope:['metrics','glossary','apis','models','standards']
+ placeholder:'top.actions.searchContext.semantic',scope:['metrics','glossary','apis','models','standards']
  },'semantic-metrics':{
- placeholder:'Search metric name or encoding...',scope:['metrics']
+ placeholder:'top.actions.searchContext.semantic-metrics',scope:['metrics']
  },'semantic-glossary':{
- placeholder:'Search for root words,meaning...',scope:['glossary']
+ placeholder:'top.actions.searchContext.semantic-glossary',scope:['glossary']
  },knowledge:{
- placeholder:'Search knowledge graph nodes...',scope:['knowledge']
+ placeholder:'top.actions.searchContext.knowledge',scope:['knowledge']
  },default:{
- placeholder:'global search...',scope:['all']
+ placeholder:'top.actions.searchContext.default',scope:['all']
  }
 }
 

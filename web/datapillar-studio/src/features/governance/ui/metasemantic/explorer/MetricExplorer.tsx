@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Target, ArrowLeft, Plus, List, Grid, Box, Trash2, Loader2, Pencil } from 'lucide-react'
 import { Badge } from '../components'
 import type { Metric, ViewMode } from '../types'
@@ -33,6 +34,7 @@ function MetricCard({
   onDelete: (code: string) => void
   onEdit: (metric: Metric) => void
 }) {
+  const { t } = useTranslation('oneSemantics')
   const [deleting, setDeleting] = useState(false)
 
   const handleDelete = async (e: React.MouseEvent) => {
@@ -53,6 +55,10 @@ function MetricCard({
   }
 
   const typeVariant = TYPE_VARIANTS[metric.type?.toUpperCase()] || 'blue'
+  const normalizedType = metric.type?.toUpperCase() || ''
+  const typeLabel = normalizedType
+    ? t(`metricExplorer.type.${normalizedType}`, { defaultValue: normalizedType })
+    : '-'
 
   return (
     <Card
@@ -70,11 +76,11 @@ function MetricCard({
             {metric.code}
           </div>
         </div>
-        <Badge variant={typeVariant}>{metric.type?.toUpperCase()}</Badge>
+        <Badge variant={typeVariant}>{typeLabel}</Badge>
       </div>
 
       <p className="text-caption text-slate-500 dark:text-slate-400 line-clamp-2 mb-3 leading-relaxed">
-        {metric.comment || 'No description yet...'}
+        {metric.comment || t('metricExplorer.card.noDescription')}
       </p>
 
       <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
@@ -91,7 +97,7 @@ function MetricCard({
 	            size="iconSm"
 	            onClick={handleEdit}
 	            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-	            title="Edit"
+	            title={t('metricExplorer.actions.edit')}
 	          >
 	            <Pencil size={iconSizeToken.small} />
 	          </Button>
@@ -102,7 +108,7 @@ function MetricCard({
 	            onClick={handleDelete}
 	            disabled={deleting}
 	            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors disabled:opacity-50"
-	            title="Delete"
+	            title={t('metricExplorer.actions.delete')}
 	          >
 	            {deleting ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Trash2 size={iconSizeToken.small} />}
 	          </Button>
@@ -123,6 +129,7 @@ function MetricRow({
   onDelete: (code: string) => void
   onEdit: (metric: Metric) => void
 }) {
+  const { t } = useTranslation('oneSemantics')
   const [deleting, setDeleting] = useState(false)
 
   const handleDelete = async (e: React.MouseEvent) => {
@@ -143,6 +150,10 @@ function MetricRow({
   }
 
   const typeVariant = TYPE_VARIANTS[metric.type?.toUpperCase()] || 'blue'
+  const normalizedType = metric.type?.toUpperCase() || ''
+  const typeLabel = normalizedType
+    ? t(`metricExplorer.type.${normalizedType}`, { defaultValue: normalizedType })
+    : '-'
 
   return (
     <TableRow
@@ -163,7 +174,7 @@ function MetricRow({
         </div>
       </TableCell>
       <TableCell className="px-3 text-center">
-        <Badge variant={typeVariant}>{metric.type?.toUpperCase()}</Badge>
+        <Badge variant={typeVariant}>{typeLabel}</Badge>
       </TableCell>
       <TableCell className="px-3 text-center">
         <span className="font-mono text-micro text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/30 px-2 py-0.5 rounded border border-cyan-100 dark:border-cyan-800">
@@ -195,7 +206,7 @@ function MetricRow({
 	            size="iconSm"
 	            onClick={handleEdit}
 	            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-	            title="Edit"
+	            title={t('metricExplorer.actions.edit')}
 	          >
 	            <Pencil size={iconSizeToken.small} />
 	          </Button>
@@ -206,7 +217,7 @@ function MetricRow({
 	            onClick={handleDelete}
 	            disabled={deleting}
 	            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors disabled:opacity-50"
-	            title="Delete"
+	            title={t('metricExplorer.actions.delete')}
 	          >
 	            {deleting ? <Loader2 size={iconSizeToken.small} className="animate-spin" /> : <Trash2 size={iconSizeToken.small} />}
 	          </Button>
@@ -223,6 +234,7 @@ interface MetricExplorerProps {
 }
 
 export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricExplorerProps) {
+  const { t } = useTranslation('oneSemantics')
   const [viewMode, setViewMode] = useState<ViewMode>('LIST')
   const searchTerm = useSearchStore((state) => state.searchTerm)
   const setMetricsTotal = useSemanticStatsStore((state) => state.setMetricsTotal)
@@ -445,7 +457,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
 	              <ArrowLeft size={iconSizeToken.large} />
 	            </Button>
 	            <div className="flex items-center gap-2">
-	              <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">Metric Center</h2>
+	              <h2 className="text-body-sm @md:text-subtitle font-semibold text-slate-800 dark:text-slate-100">{t('metricExplorer.title')}</h2>
 	              <Badge variant="blue">
                 {filteredMetrics.length} / {total}
               </Badge>
@@ -460,6 +472,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
 	                size="iconSm"
 	                onClick={() => setViewMode('LIST')}
 	                className={`size-6 p-0.5 rounded-md transition-all ${viewMode === 'LIST' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+	                title={t('metricExplorer.actions.switchToList')}
 	              >
 	                <List size={iconSizeToken.medium} />
 	              </Button>
@@ -469,6 +482,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
 	                size="iconSm"
 	                onClick={() => setViewMode('CARD')}
 	                className={`size-6 p-0.5 rounded-md transition-all ${viewMode === 'CARD' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+	                title={t('metricExplorer.actions.switchToCard')}
 	              >
 	                <Grid size={iconSizeToken.medium} />
 	              </Button>
@@ -476,17 +490,17 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
 
             <Button onClick={() => setShowNewModal(true)} size="header">
               <Plus size={iconSizeToken.medium} />
-              <span className="hidden @md:inline">New Metric</span>
+              <span className="hidden @md:inline">{t('metricExplorer.newMetric')}</span>
             </Button>
           </div>
         </div>
 
         {/* content area - Highly adaptive，Maximum size does not exceed the container */}
-        <div className="flex-1 min-h-0 p-4 @md:p-6 pb-6 @md:pb-8 overflow-auto custom-scrollbar">
+        <div className="flex-1 min-h-0 p-4 @md:p-6 pb-6 @md:pb-8 overflow-y-auto overflow-x-hidden custom-scrollbar">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16">
               <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-              <div className="text-slate-400 text-caption mt-3">Loading...</div>
+              <div className="text-slate-400 text-caption mt-3">{t('metricExplorer.loading')}</div>
             </div>
           ) : viewMode === 'CARD' ? (
             <>
@@ -497,7 +511,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
                 {filteredMetrics.length === 0 && (
                   <div className="col-span-full flex flex-col items-center justify-center py-12 @md:py-16 text-slate-400 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl @md:rounded-2xl">
                     <Box size={iconSizeToken.huge} className="opacity-20 mb-3" />
-                    <p className="text-caption @md:text-body-sm font-medium">No matching metric found</p>
+                    <p className="text-caption @md:text-body-sm font-medium">{t('metricExplorer.empty')}</p>
                   </div>
                 )}
               </div>
@@ -511,6 +525,9 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
             </>
           ) : (
             <Table
+              layout="auto"
+              minWidth="none"
+              horizontalScroll={false}
               footer={
                 <>
                   {/* Sentinel element + load more */}
@@ -525,15 +542,15 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
             >
               <TableHeader>
                 <TableRow>
-                  <TableHead className={tableColumnWidthClassMap['4xl']}>Metric name / code</TableHead>
-                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>Type</TableHead>
-                  <TableHead className={`px-3 ${tableColumnWidthClassMap.xl} text-center`}>data type</TableHead>
-                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>unit</TableHead>
-                  <TableHead className="px-3">Description</TableHead>
-                  <TableHead className={`px-3 ${tableColumnWidthClassMap.xs} text-center`}>version</TableHead>
-                  <TableHead className={`px-3 ${tableColumnWidthClassMap.md}`}>Creator</TableHead>
-                  <TableHead className={`px-3 ${tableColumnWidthClassMap['2xl']}`}>creation time</TableHead>
-                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>Operation</TableHead>
+                  <TableHead className={tableColumnWidthClassMap['4xl']}>{t('metricExplorer.table.nameCode')}</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>{t('metricExplorer.table.type')}</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.xl} text-center`}>{t('metricExplorer.table.dataType')}</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>{t('metricExplorer.table.unit')}</TableHead>
+                  <TableHead className="px-3">{t('metricExplorer.table.description')}</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.xs} text-center`}>{t('metricExplorer.table.version')}</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.md}`}>{t('metricExplorer.table.creator')}</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap['2xl']}`}>{t('metricExplorer.table.createTime')}</TableHead>
+                  <TableHead className={`px-3 ${tableColumnWidthClassMap.sm} text-center`}>{t('metricExplorer.table.operation')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -543,7 +560,7 @@ export function MetricExplorer({ onBack, onOpenDrawer, updatedMetric }: MetricEx
                 {filteredMetrics.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={9} className="py-12 @md:py-16 text-center text-slate-400 text-caption @md:text-body-sm">
-                      No matching metric found
+                      {t('metricExplorer.empty')}
                     </TableCell>
                   </TableRow>
                 )}
