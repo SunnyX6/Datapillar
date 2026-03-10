@@ -11,6 +11,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AuthAuthenticationContext {
 
+  private String principalType;
+  private String principalId;
   private Long userId;
   private Long tenantId;
   private String tenantCode;

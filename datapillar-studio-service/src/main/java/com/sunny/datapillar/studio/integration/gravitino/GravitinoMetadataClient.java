@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import lombok.SneakyThrows;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetadataObject;
@@ -102,15 +103,20 @@ public class GravitinoMetadataClient {
         objectMapper.convertValue(nullSafeBody(body), CatalogCreateRequest.class);
     request.validate();
     try (GravitinoClient client = clientFactory.createClient(managedMetalake, null)) {
-      client.testConnection(
-          request.getName(),
-          request.getType(),
-          request.getProvider(),
-          request.getComment(),
-          nullSafeMap(request.getProperties()));
+      runCatalogConnectionTest(client, request);
     } catch (RuntimeException exception) {
       throw errorMapper.map(exception);
     }
+  }
+
+  @SneakyThrows
+  private void runCatalogConnectionTest(GravitinoClient client, CatalogCreateRequest request) {
+    client.testConnection(
+        request.getName(),
+        request.getType(),
+        request.getProvider(),
+        request.getComment(),
+        nullSafeMap(request.getProperties()));
   }
 
   public GravitinoCatalogResponse createCatalog(String metalake, JsonNode body) {

@@ -3,10 +3,13 @@ package com.sunny.datapillar.studio.filter;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sunny.datapillar.common.security.PrincipalType;
 import com.sunny.datapillar.studio.handler.SecurityExceptionHandler;
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantMapper;
@@ -134,6 +137,29 @@ class IdentityStateValidationFilterTest {
     assertTrue(chainInvoked.get());
   }
 
+  @Test
+  void shouldAllowApiKeyPrincipalWithoutUserLookup() throws ServletException, IOException {
+    IdentityStateValidationFilter filter = createFilter(true);
+    MockHttpServletRequest request = requestWithApiKeyIdentity();
+
+    Tenant tenant = new Tenant();
+    tenant.setId(1001L);
+    tenant.setCode("tenant-a");
+    tenant.setStatus(1);
+    when(tenantMapper.selectByCode("tenant-a")).thenReturn(tenant);
+
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    AtomicBoolean chainInvoked = new AtomicBoolean(false);
+
+    filter.doFilter(request, response, chain(() -> chainInvoked.set(true)));
+
+    assertEquals(200, response.getStatus());
+    assertTrue(chainInvoked.get());
+    verify(tenantMapper).selectByCode("tenant-a");
+    verifyNoInteractions(userMapper, tenantUserMapper);
+    verifyNoMoreInteractions(tenantMapper);
+  }
+
   private IdentityStateValidationFilter createFilter(boolean enabled) {
     TrustedIdentityProperties properties = new TrustedIdentityProperties();
     properties.setEnabled(enabled);
@@ -150,6 +176,8 @@ class IdentityStateValidationFilterTest {
     TrustedIdentityContext.attach(
         request,
         new TrustedIdentityContext(
+            PrincipalType.USER,
+            "user:101",
             101L,
             1001L,
             "tenant-a",
@@ -159,6 +187,27 @@ class IdentityStateValidationFilterTest {
             impersonation,
             impersonation ? 101L : null,
             impersonation ? 0L : null,
+            null));
+    return request;
+  }
+
+  private MockHttpServletRequest requestWithApiKeyIdentity() {
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("GET", "/api/studio/admin/tenant/current/api-keys");
+    TrustedIdentityContext.attach(
+        request,
+        new TrustedIdentityContext(
+            PrincipalType.API_KEY,
+            "api-key:201",
+            null,
+            1001L,
+            "tenant-a",
+            "lineage-ingest",
+            null,
+            List.of("ADMIN"),
+            false,
+            null,
+            null,
             null));
     return request;
   }

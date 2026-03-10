@@ -24,13 +24,20 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiSecurityConfig {
 
-  private static final String SECURITY_SCHEME = "GatewayBearerAuth";
+  private static final String JWT_SECURITY_SCHEME = "jwtBearerAuth";
+  private static final String API_KEY_SECURITY_SCHEME = "apiKeyBearerAuth";
   private static final String USER_ID_HEADER = "X-User-Id";
   private static final String TENANT_ID_HEADER = "X-Tenant-Id";
   private static final String GATEWAY_CONTEXT_NOTE =
       """
-**Gateway context description**
-- of the current interface `userId` / `tenantId` by gateway from Bearer Token parse and inject.- Header Regionally displayed `X-User-Id` / `X-Tenant-Id` Used only for visual illustration contextual sources,Not used as client input parameter.""";
+**Gateway authentication**
+- `/api/studio/**` uses `JWT`
+- `/openapi/studio/**` uses `API_KEY`
+- Both credentials are sent as `Authorization: Bearer <credential>`
+
+**Gateway trusted headers**
+- `X-User-Id` / `X-Tenant-Id` are injected by gateway after authentication
+- These headers are shown only to explain downstream context and must not be sent by clients.""";
 
   @Bean
   public OpenApiCustomizer gatewaySecurityOpenApiCustomizer() {
@@ -50,19 +57,24 @@ public class OpenApiSecurityConfig {
       openApi.setComponents(components);
     }
     Map<String, SecurityScheme> schemes = components.getSecuritySchemes();
-    if (schemes != null && schemes.containsKey(SECURITY_SCHEME)) {
-      return;
+    if (schemes == null || !schemes.containsKey(JWT_SECURITY_SCHEME)) {
+      components.addSecuritySchemes(
+          JWT_SECURITY_SCHEME,
+          new SecurityScheme()
+              .type(SecurityScheme.Type.HTTP)
+              .scheme("bearer")
+              .bearerFormat("JWT")
+              .description("Gateway App API authentication. Use on `/api/studio/**` routes."));
     }
-    SecurityScheme scheme =
-        new SecurityScheme()
-            .type(SecurityScheme.Type.HTTP)
-            .scheme("bearer")
-            .bearerFormat("JWT")
-            .description(
-                "External requests are authenticated through the gateway,User context is"
-                    + " automatically injected by gateway trusted identity headers,No need and cannot be"
-                    + " transmitted X-User-Id.");
-    components.addSecuritySchemes(SECURITY_SCHEME, scheme);
+    if (schemes == null || !schemes.containsKey(API_KEY_SECURITY_SCHEME)) {
+      components.addSecuritySchemes(
+          API_KEY_SECURITY_SCHEME,
+          new SecurityScheme()
+              .type(SecurityScheme.Type.HTTP)
+              .scheme("bearer")
+              .bearerFormat("API_KEY")
+              .description("Gateway Open API authentication. Use on `/openapi/studio/**` routes."));
+    }
   }
 
   private void customizePathSecurity(String path, PathItem pathItem) {
@@ -78,9 +90,13 @@ public class OpenApiSecurityConfig {
       }
       boolean existed =
           operation.getSecurity().stream()
-              .anyMatch(requirement -> requirement.containsKey(SECURITY_SCHEME));
+              .anyMatch(
+                  requirement ->
+                      requirement.containsKey(JWT_SECURITY_SCHEME)
+                          || requirement.containsKey(API_KEY_SECURITY_SCHEME));
       if (!existed) {
-        operation.addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME));
+        operation.addSecurityItem(new SecurityRequirement().addList(JWT_SECURITY_SCHEME));
+        operation.addSecurityItem(new SecurityRequirement().addList(API_KEY_SECURITY_SCHEME));
       }
       ensureGatewayHeaderParams(operation);
       appendGatewayContextNote(operation);

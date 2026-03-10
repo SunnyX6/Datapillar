@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
 /** MyBatis Plus Configuration. */
 @Configuration
 @MapperScan(
-    basePackages = "com.sunny.datapillar.openlineage.dao.mapper",
+    basePackages = {"com.sunny.datapillar.openlineage.web.mapper"},
     annotationClass = Mapper.class)
 public class MyBatisPlusConfig {
 

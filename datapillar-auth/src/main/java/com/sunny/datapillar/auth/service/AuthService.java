@@ -33,4 +33,8 @@ public interface AuthService {
 
   /** Parse access token and return auth context for gateway assertions. */
   AuthenticationContextResponse resolveAuthenticationContext(String token);
+
+  /** Resolve API key and return auth context for gateway assertions. */
+  AuthenticationContextResponse resolveApiKeyContext(
+      String apiKey, String clientIp, String traceId);
 }

@@ -1,11 +1,14 @@
 package com.sunny.datapillar.gateway.security;
 
+import com.sunny.datapillar.common.security.PrincipalType;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
 /** Verified gateway access-token snapshot. */
 public record VerifiedAccessToken(
+    PrincipalType principalType,
+    String principalId,
     String issuer,
     String subject,
     String sessionId,
@@ -21,6 +24,9 @@ public record VerifiedAccessToken(
     Long actorTenantId) {
 
   public VerifiedAccessToken {
+    if (principalType == null) {
+      throw new IllegalArgumentException("principalType must not be null");
+    }
     LinkedHashSet<String> normalizedRoles = new LinkedHashSet<>();
     if (roles != null) {
       for (String role : roles) {

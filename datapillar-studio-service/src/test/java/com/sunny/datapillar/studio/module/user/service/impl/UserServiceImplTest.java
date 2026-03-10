@@ -7,6 +7,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.sunny.datapillar.common.security.PrincipalType;
 import com.sunny.datapillar.studio.context.TenantContext;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
 import com.sunny.datapillar.studio.dto.tenant.request.RoleDataPrivilegeCommandItem;
@@ -60,6 +61,8 @@ class UserServiceImplTest {
     TrustedIdentityContext.attach(
         request,
         new TrustedIdentityContext(
+            PrincipalType.USER,
+            "user:900",
             900L,
             10L,
             "tenant-10",

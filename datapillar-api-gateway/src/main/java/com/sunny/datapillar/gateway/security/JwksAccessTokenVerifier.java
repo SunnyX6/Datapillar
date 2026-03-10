@@ -3,6 +3,7 @@ package com.sunny.datapillar.gateway.security;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sunny.datapillar.common.security.EdDsaJwtSupport;
+import com.sunny.datapillar.common.security.PrincipalType;
 import com.sunny.datapillar.gateway.config.AuthenticationProperties;
 import com.sunny.datapillar.gateway.exception.base.GatewayServiceUnavailableException;
 import com.sunny.datapillar.gateway.exception.base.GatewayUnauthorizedException;
@@ -162,7 +163,17 @@ public class JwksAccessTokenVerifier implements AccessTokenVerifier {
 
     List<String> roles =
         authenticationContext.getRoles() == null ? List.of() : authenticationContext.getRoles();
+    PrincipalType principalType = PrincipalType.fromValue(authenticationContext.getPrincipalType());
+    if (principalType != null && principalType != PrincipalType.USER) {
+      throw new GatewayUnauthorizedException("Invalid token");
+    }
+    String principalId = trimToNull(authenticationContext.getPrincipalId());
+    if (principalId == null) {
+      principalId = "user:" + userId;
+    }
     return new VerifiedAccessToken(
+        PrincipalType.USER,
+        principalId,
         validatedJwt.issuer(),
         validatedJwt.subject(),
         sessionId,

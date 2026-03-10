@@ -8,10 +8,13 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sunny.datapillar.auth.config.AuthProperties;
+import com.sunny.datapillar.auth.dto.auth.response.AuthenticationContextResponse;
 import com.sunny.datapillar.auth.entity.Tenant;
+import com.sunny.datapillar.auth.entity.TenantApiKey;
 import com.sunny.datapillar.auth.entity.TenantUser;
 import com.sunny.datapillar.auth.entity.User;
 import com.sunny.datapillar.auth.key.KeySetKeyManager;
+import com.sunny.datapillar.auth.mapper.TenantApiKeyMapper;
 import com.sunny.datapillar.auth.mapper.TenantMapper;
 import com.sunny.datapillar.auth.mapper.TenantUserMapper;
 import com.sunny.datapillar.auth.mapper.UserMapper;
@@ -39,6 +42,7 @@ class AuthServiceImplTest {
   @Mock private UserMapper userMapper;
   @Mock private TenantMapper tenantMapper;
   @Mock private TenantUserMapper tenantUserMapper;
+  @Mock private TenantApiKeyMapper tenantApiKeyMapper;
   @Mock private SessionStore sessionStore;
   @Mock private AuthCookieManager authCookieManager;
   @Mock private UserAccessReader userAccessReader;
@@ -68,6 +72,7 @@ class AuthServiceImplTest {
             userMapper,
             tenantMapper,
             tenantUserMapper,
+            tenantApiKeyMapper,
             jwtToken,
             tokenEngine,
             sessionStore,
@@ -146,5 +151,45 @@ class AuthServiceImplTest {
     assertEquals("sid-1", refreshClaims.get("sid", String.class));
     assertEquals(newAccessJtiCaptor.getValue(), accessClaims.getId());
     assertEquals(newRefreshJtiCaptor.getValue(), refreshClaims.getId());
+  }
+
+  @Test
+  void resolveApiKeyContext_shouldReturnApiKeyPrincipal() {
+    AuthServiceImpl service =
+        new AuthServiceImpl(
+            userMapper,
+            tenantMapper,
+            tenantUserMapper,
+            tenantApiKeyMapper,
+            jwtToken,
+            tokenEngine,
+            sessionStore,
+            authCookieManager,
+            userAccessReader);
+
+    TenantApiKey tenantApiKey = new TenantApiKey();
+    tenantApiKey.setId(201L);
+    tenantApiKey.setTenantId(1001L);
+    tenantApiKey.setName("lineage-ingest");
+    tenantApiKey.setStatus(1);
+    when(tenantApiKeyMapper.selectByHash(any())).thenReturn(tenantApiKey);
+
+    Tenant tenant = new Tenant();
+    tenant.setId(1001L);
+    tenant.setCode("tenant-a");
+    tenant.setName("Tenant A");
+    tenant.setStatus(1);
+    when(tenantMapper.selectById(1001L)).thenReturn(tenant);
+
+    AuthenticationContextResponse response =
+        service.resolveApiKeyContext("dpk_plaintext_key_1234", "127.0.0.1", "trace-1");
+
+    assertEquals("API_KEY", response.getPrincipalType());
+    assertEquals("api-key:201", response.getPrincipalId());
+    assertEquals(1001L, response.getTenantId());
+    assertEquals("tenant-a", response.getTenantCode());
+    assertEquals("lineage-ingest", response.getUsername());
+    assertEquals(List.of("ADMIN"), response.getRoles());
+    verify(tenantApiKeyMapper).updateLastUsed(eq(201L), any(), eq("127.0.0.1"));
   }
 }

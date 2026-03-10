@@ -10,6 +10,7 @@ import com.sunny.datapillar.common.constant.HeaderConstants;
 import com.sunny.datapillar.common.response.ApiResponse;
 import com.sunny.datapillar.common.response.ErrorResponse;
 import com.sunny.datapillar.common.security.Ed25519JwkSupport;
+import com.sunny.datapillar.common.security.PrincipalType;
 import com.sunny.datapillar.gateway.config.AuthenticationProperties;
 import com.sunny.datapillar.gateway.exception.base.GatewayUnauthorizedException;
 import io.jsonwebtoken.Jwts;
@@ -53,6 +54,8 @@ class JwksAccessTokenVerifierTest {
 
     assertEquals("https://auth.datapillar.local", verifiedToken.issuer());
     assertEquals("subject-101", verifiedToken.subject());
+    assertEquals(PrincipalType.USER, verifiedToken.principalType());
+    assertEquals("user:101", verifiedToken.principalId());
     assertEquals("sid-1", verifiedToken.sessionId());
     assertEquals("jti-1", verifiedToken.tokenId());
     assertEquals(101L, verifiedToken.userId());
@@ -265,6 +268,8 @@ class JwksAccessTokenVerifierTest {
       String sid, String jti, Long userId, Long tenantId, boolean impersonation) {
     try {
       Map<String, Object> context = new LinkedHashMap<>();
+      context.put("principalType", "USER");
+      context.put("principalId", "user:101");
       context.put("userId", userId);
       context.put("tenantId", tenantId);
       context.put("tenantCode", "t-1001");

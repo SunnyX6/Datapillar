@@ -27,7 +27,14 @@ public class AuthenticationProperties {
   private String usernameClaim = "preferred_username";
   private String emailClaim = "email";
   private List<String> protectedPathPrefixes =
-      new ArrayList<>(List.of("/api/studio", "/api/ai", "/api/openlineage"));
+      new ArrayList<>(
+          List.of(
+              "/api/studio",
+              "/api/ai",
+              "/api/openlineage",
+              "/openapi/studio",
+              "/openapi/ai",
+              "/openapi/openlineage"));
   private List<String> publicPathPrefixes =
       new ArrayList<>(
           List.of(
@@ -58,6 +65,10 @@ public class AuthenticationProperties {
 
   public String issuerSessionContextUri() {
     return normalizeIssuer() + "/auth/session/context";
+  }
+
+  public String issuerApiKeyResolveUri() {
+    return normalizeIssuer() + "/internal/security/api-keys/resolve";
   }
 
   private String normalizeIssuer() {

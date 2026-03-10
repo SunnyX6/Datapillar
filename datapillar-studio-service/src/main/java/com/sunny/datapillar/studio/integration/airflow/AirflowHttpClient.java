@@ -95,9 +95,6 @@ public class AirflowHttpClient {
     } catch (IOException ioException) {
       throw new ServiceUnavailableException(
           ioException, "Airflow connectivity failure: %s", ioException.getMessage());
-    } catch (RuntimeException exception) {
-      throw new InternalException(
-          exception, "Airflow invocation failed: %s", exception.getMessage());
     }
   }
 
@@ -210,9 +207,6 @@ public class AirflowHttpClient {
     } catch (IOException ioException) {
       throw new ServiceUnavailableException(
           ioException, "Airflow authentication failed: %s", ioException.getMessage());
-    } catch (RuntimeException exception) {
-      throw new InternalException(
-          exception, "Airflow authentication failed: %s", exception.getMessage());
     }
   }
 

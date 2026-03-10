@@ -51,6 +51,10 @@
         <gravitino.version>1.0.0</gravitino.version>
         <openlineage.version>1.29.0</openlineage.version>
         <neo4j-java-driver.version>5.28.10</neo4j-java-driver.version>
+        <neo4j-migrations.version>3.2.1</neo4j-migrations.version>
+        <rocketmq-spring-boot.version>2.3.3</rocketmq-spring-boot.version>
+        <rocketmq.version>5.3.1</rocketmq.version>
+        <langchain4j.version>1.1.0</langchain4j.version>
         <scalar.version>0.5.33</scalar.version>
         <spotless.version>3.2.1</spotless.version>
         <google-java-format.version>1.22.0</google-java-format.version>
@@ -265,6 +269,26 @@
                 <groupId>org.neo4j.driver</groupId>
                 <artifactId>neo4j-java-driver</artifactId>
                 <version>${neo4j-java-driver.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>eu.michael-simons.neo4j</groupId>
+                <artifactId>neo4j-migrations</artifactId>
+                <version>${neo4j-migrations.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.rocketmq</groupId>
+                <artifactId>rocketmq-spring-boot-starter</artifactId>
+                <version>${rocketmq-spring-boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.rocketmq</groupId>
+                <artifactId>rocketmq-tools</artifactId>
+                <version>${rocketmq.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-open-ai</artifactId>
+                <version>${langchain4j.version}</version>
             </dependency>
 
             <!-- Datapillar Internal Modules -->

@@ -4,6 +4,7 @@ import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
 import com.sunny.datapillar.common.exception.ForbiddenException;
 import com.sunny.datapillar.common.exception.InternalException;
 import com.sunny.datapillar.common.exception.UnauthorizedException;
+import com.sunny.datapillar.common.security.PrincipalType;
 import com.sunny.datapillar.studio.handler.SecurityExceptionHandler;
 import com.sunny.datapillar.studio.module.tenant.entity.Tenant;
 import com.sunny.datapillar.studio.module.tenant.mapper.TenantMapper;
@@ -83,23 +84,16 @@ public class IdentityStateValidationFilter extends OncePerRequestFilter {
   }
 
   private void validateLocalIdentityState(TrustedIdentityContext context) {
+    PrincipalType principalType = context.principalType();
     Long userId = context.userId();
     Long tenantId = context.tenantId();
     String tenantCode = context.tenantCode();
 
-    if (userId == null || tenantId == null) {
+    if (principalType == null || tenantId == null) {
       throw new UnauthorizedException("trusted_user_context_missing");
     }
     if (!StringUtils.hasText(tenantCode)) {
       throw new UnauthorizedException("trusted_identity_tenant_code_missing");
-    }
-
-    User user = userMapper.selectById(userId);
-    if (user == null) {
-      throw new UnauthorizedException("trusted_user_not_found");
-    }
-    if (user.getStatus() == null || user.getStatus() != 1) {
-      throw new ForbiddenException("user_disabled");
     }
 
     Tenant tenant = tenantMapper.selectByCode(tenantCode);
@@ -111,6 +105,22 @@ public class IdentityStateValidationFilter extends OncePerRequestFilter {
     }
     if (tenant.getStatus() == null || tenant.getStatus() != 1) {
       throw new ForbiddenException("tenant_disabled");
+    }
+
+    if (principalType == PrincipalType.API_KEY) {
+      return;
+    }
+
+    if (userId == null) {
+      throw new UnauthorizedException("trusted_user_context_missing");
+    }
+
+    User user = userMapper.selectById(userId);
+    if (user == null) {
+      throw new UnauthorizedException("trusted_user_not_found");
+    }
+    if (user.getStatus() == null || user.getStatus() != 1) {
+      throw new ForbiddenException("user_disabled");
     }
 
     if (context.impersonation()) {

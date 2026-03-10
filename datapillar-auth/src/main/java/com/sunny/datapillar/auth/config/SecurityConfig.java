@@ -70,6 +70,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/v3/api-docs/**")
                     .permitAll()
+                    .requestMatchers("/internal/security/**")
+                    .permitAll()
                     // Allow all authentication-related endpoints.
                     .requestMatchers("/.well-known/**", "/oauth2/**", "/auth/**")
                     .permitAll()

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sunny.datapillar.auth.mapper.TenantApiKeyMapper">
+
+    <select id="selectByHash" resultType="com.sunny.datapillar.auth.entity.TenantApiKey">
+        SELECT *
+        FROM tenant_api_keys
+        WHERE key_hash = #{keyHash}
+        LIMIT 1
+    </select>
+
+    <update id="updateLastUsed">
+        UPDATE tenant_api_keys
+        SET last_used_at = #{lastUsedAt},
+            last_used_ip = #{lastUsedIp},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+</mapper>

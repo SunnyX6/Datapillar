@@ -15,7 +15,7 @@ spring:
     hikari:
       initializationFailTimeout: -1
   flyway:
-    # DDL Unified by datapillar-studio-service Maintain and execute
+    # MySQL DDL unified by datapillar-studio-service maintain and execute
     enabled: false
     locations: classpath:db/migration
     baseline-on-migrate: false
@@ -27,31 +27,76 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
 
+rocketmq:
+  # Same global credentials are injected to producer/consumer properties
+  name-server: ${ROCKETMQ_NAME_SERVER}
+  producer:
+    group: ${ROCKETMQ_PRODUCER_GROUP}
+    access-key: ${ROCKETMQ_ACCESS_KEY}
+    secret-key: ${ROCKETMQ_SECRET_KEY}
+  consumer:
+    access-key: ${ROCKETMQ_ACCESS_KEY}
+    secret-key: ${ROCKETMQ_SECRET_KEY}
+
 openlineage:
+  gravitino-db:
+    url: ${GRAVITINO_DB_URL}
+    username: ${GRAVITINO_DB_USERNAME}
+    password: ${GRAVITINO_DB_PASSWORD}
+    driver-class-name: ${GRAVITINO_DB_DRIVER_CLASS_NAME}
   neo4j:
     uri: ${NEO4J_URI}
     username: ${NEO4J_USERNAME}
     password: ${NEO4J_PASSWORD}
     database: ${NEO4J_DATABASE}
-  worker:
-    claim-timeout-seconds: 120
-    recovery-interval-seconds: 30
-    embedding:
-      batch-size: 32
-      recovery-limit: 64
-    sql-summary:
-      batch-size: 16
-      recovery-limit: 32
+    migrations:
+      enabled: ${OPENLINEAGE_NEO4J_MIGRATIONS_ENABLED:true}
+      validate-on-migrate: ${OPENLINEAGE_NEO4J_VALIDATE_ON_MIGRATE:true}
+      locations: ${OPENLINEAGE_NEO4J_MIGRATIONS_LOCATIONS:classpath:db/neo4j}
+      installed-by: ${OPENLINEAGE_NEO4J_MIGRATIONS_INSTALLED_BY:datapillar-openlineage}
+  mq:
+    bootstrap:
+      enabled: ${OPENLINEAGE_MQ_BOOTSTRAP_ENABLED:true}
+      cluster-name: ${ROCKETMQ_CLUSTER_NAME:DefaultCluster}
+      read-queue-nums: ${OPENLINEAGE_TOPIC_READ_QUEUE_NUMS:8}
+      write-queue-nums: ${OPENLINEAGE_TOPIC_WRITE_QUEUE_NUMS:8}
+    topic:
+      events: ${OPENLINEAGE_TOPIC_EVENTS}
+      embedding: ${OPENLINEAGE_TOPIC_EMBEDDING}
+      events-dlq: ${OPENLINEAGE_TOPIC_EVENTS_DLQ}
+      embedding-dlq: ${OPENLINEAGE_TOPIC_EMBEDDING_DLQ}
+    group:
+      graph-consumer: ${OPENLINEAGE_GROUP_GRAPH}
+      embedding-consumer: ${OPENLINEAGE_GROUP_EMBEDDING}
+    retry:
+      max-attempts: ${OPENLINEAGE_RETRY_MAX_ATTEMPTS:5}
+      first-delay-seconds: ${OPENLINEAGE_RETRY_FIRST_DELAY_SECONDS:5}
+      max-delay-seconds: ${OPENLINEAGE_RETRY_MAX_DELAY_SECONDS:300}
+    send-timeout-millis: ${OPENLINEAGE_SEND_TIMEOUT_MILLIS:5000}
+  rebuild:
+    lock-timeout-seconds: ${OPENLINEAGE_REBUILD_LOCK_TIMEOUT_SECONDS:0}
+    embedding-batch-size: ${OPENLINEAGE_REBUILD_EMBEDDING_BATCH_SIZE:200}
 
 security:
   trusted-identity:
     enabled: true
+  key-storage:
+    type: ${OPENLINEAGE_KEY_STORAGE_TYPE:local}
+    local:
+      path: ${OPENLINEAGE_KEY_STORAGE_LOCAL_PATH}
+    object:
+      endpoint: ${OPENLINEAGE_KEY_STORAGE_OBJECT_ENDPOINT}
+      bucket: ${OPENLINEAGE_KEY_STORAGE_OBJECT_BUCKET}
+      access-key: ${OPENLINEAGE_KEY_STORAGE_OBJECT_ACCESS_KEY}
+      secret-key: ${OPENLINEAGE_KEY_STORAGE_OBJECT_SECRET_KEY}
+      region: ${OPENLINEAGE_KEY_STORAGE_OBJECT_REGION}
+      prefix: ${OPENLINEAGE_KEY_STORAGE_OBJECT_PREFIX:privkeys}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       probes:

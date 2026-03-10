@@ -43,5 +43,14 @@ public class Neo4jConfig {
     private String username;
     private String password;
     private String database = "neo4j";
+    private final Migrations migrations = new Migrations();
+  }
+
+  @Data
+  public static class Migrations {
+    private boolean enabled = true;
+    private boolean validateOnMigrate = true;
+    private String locations = "classpath:db/neo4j";
+    private String installedBy = "datapillar-openlineage";
   }
 }

@@ -1,6 +1,7 @@
 package com.sunny.datapillar.gateway.security;
 
 import com.sunny.datapillar.common.constant.HeaderConstants;
+import com.sunny.datapillar.common.security.AuthType;
 import com.sunny.datapillar.gateway.config.AuthenticationProperties;
 import com.sunny.datapillar.gateway.exception.base.GatewayForbiddenException;
 import com.sunny.datapillar.gateway.exception.base.GatewayUnauthorizedException;
@@ -28,6 +29,8 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
   private static final String BEARER_PREFIX = "Bearer ";
   private static final List<String> TRUSTED_CONTEXT_HEADERS =
       List.of(
+          HeaderConstants.HEADER_PRINCIPAL_TYPE,
+          HeaderConstants.HEADER_PRINCIPAL_ID,
           HeaderConstants.HEADER_USER_ID,
           HeaderConstants.HEADER_TENANT_ID,
           HeaderConstants.HEADER_TENANT_CODE,
@@ -42,11 +45,21 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
 
   private final AuthenticationProperties properties;
   private final AccessTokenVerifier accessTokenVerifier;
+  private final ApiKeyAuthenticationResolver apiKeyAuthenticationResolver;
+  private final RouteAuthTypeResolver routeAuthTypeResolver;
+  private final ClientIpResolver clientIpResolver;
 
   public AuthenticationFilter(
-      AuthenticationProperties properties, AccessTokenVerifier accessTokenVerifier) {
+      AuthenticationProperties properties,
+      AccessTokenVerifier accessTokenVerifier,
+      ApiKeyAuthenticationResolver apiKeyAuthenticationResolver,
+      RouteAuthTypeResolver routeAuthTypeResolver,
+      ClientIpResolver clientIpResolver) {
     this.properties = properties;
     this.accessTokenVerifier = accessTokenVerifier;
+    this.apiKeyAuthenticationResolver = apiKeyAuthenticationResolver;
+    this.routeAuthTypeResolver = routeAuthTypeResolver;
+    this.clientIpResolver = clientIpResolver;
   }
 
   @Override
@@ -60,19 +73,39 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     if (request.getMethod() != null && "OPTIONS".equalsIgnoreCase(request.getMethod().name())) {
       return chain.filter(exchange);
     }
-    if (isPublicPath(path) || !isProtectedPath(path)) {
+    if (routeAuthTypeResolver.isPublicPath(path)) {
+      return chain.filter(exchange);
+    }
+    AuthType authType = routeAuthTypeResolver.resolve(path);
+    if (authType == null) {
       return chain.filter(exchange);
     }
 
     rejectClientTrustedHeaders(request);
-    String token = extractToken(request);
-    if (!StringUtils.hasText(token)) {
-      return Mono.error(new GatewayUnauthorizedException("Missing authentication information"));
-    }
-
-    return accessTokenVerifier
-        .verify(token, request.getHeaders().getFirst(HeaderConstants.HEADER_TRACE_ID))
+    String traceId = request.getHeaders().getFirst(HeaderConstants.HEADER_TRACE_ID);
+    return resolveCredential(authType, request, traceId)
         .flatMap(verifiedToken -> forwardTrustedIdentity(exchange, chain, verifiedToken));
+  }
+
+  private Mono<VerifiedAccessToken> resolveCredential(
+      AuthType authType, ServerHttpRequest request, String traceId) {
+    return switch (authType) {
+      case JWT -> {
+        String token = extractJwtToken(request);
+        if (!StringUtils.hasText(token)) {
+          yield Mono.error(new GatewayUnauthorizedException("Missing authentication information"));
+        }
+        yield accessTokenVerifier.verify(token, traceId);
+      }
+      case API_KEY -> {
+        String apiKey = extractApiKey(request);
+        if (!StringUtils.hasText(apiKey)) {
+          yield Mono.error(new GatewayUnauthorizedException("Missing authentication information"));
+        }
+        yield apiKeyAuthenticationResolver.resolve(
+            apiKey, clientIpResolver.resolve(request), traceId);
+      }
+    };
   }
 
   private Mono<Void> forwardTrustedIdentity(
@@ -87,10 +120,15 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
             .headers(
                 headers -> {
                   sanitizeContextHeaders(headers);
+                  headers.set(
+                      HeaderConstants.HEADER_PRINCIPAL_TYPE, verifiedToken.principalType().name());
+                  headers.set(HeaderConstants.HEADER_PRINCIPAL_ID, verifiedToken.principalId());
                   headers.set(HeaderConstants.HEADER_PRINCIPAL_ISS, verifiedToken.issuer());
                   headers.set(HeaderConstants.HEADER_PRINCIPAL_SUB, verifiedToken.subject());
-                  headers.set(
-                      HeaderConstants.HEADER_USER_ID, String.valueOf(verifiedToken.userId()));
+                  if (verifiedToken.userId() != null) {
+                    headers.set(
+                        HeaderConstants.HEADER_USER_ID, String.valueOf(verifiedToken.userId()));
+                  }
                   headers.set(
                       HeaderConstants.HEADER_TENANT_ID, String.valueOf(verifiedToken.tenantId()));
                   headers.set(HeaderConstants.HEADER_TENANT_CODE, verifiedToken.tenantCode());
@@ -121,7 +159,9 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     String traceId =
         trimToNull(exchange.getRequest().getHeaders().getFirst(HeaderConstants.HEADER_TRACE_ID));
     log.info(
-        "security_event event=trusted_identity_injected iss={} sub={} user_id={} tenant_id={} tenant_code={} impersonation={} trace_id={}",
+        "security_event event=trusted_identity_injected principal_type={} principal_id={} iss={} sub={} user_id={} tenant_id={} tenant_code={} impersonation={} trace_id={}",
+        verifiedToken.principalType(),
+        verifiedToken.principalId(),
         verifiedToken.issuer(),
         verifiedToken.subject(),
         verifiedToken.userId(),
@@ -141,7 +181,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     }
   }
 
-  private String extractToken(ServerHttpRequest request) {
+  private String extractJwtToken(ServerHttpRequest request) {
     String bearerToken =
         extractBearerToken(request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION));
     String cookieToken = extractCookieToken(request);
@@ -152,6 +192,14 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
       return bearerToken;
     }
     return cookieToken;
+  }
+
+  private String extractApiKey(ServerHttpRequest request) {
+    String cookieToken = extractCookieToken(request);
+    if (cookieToken != null) {
+      throw new GatewayUnauthorizedException("Cookie authentication is not allowed for API_KEY");
+    }
+    return extractBearerToken(request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION));
   }
 
   private String extractBearerToken(String authorization) {
@@ -178,25 +226,9 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     return StringUtils.hasText(token) ? token : null;
   }
 
-  private boolean isPublicPath(String path) {
-    for (String prefix : properties.getPublicPathPrefixes()) {
-      if (path.startsWith(prefix)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private boolean isProtectedPath(String path) {
-    for (String prefix : properties.getProtectedPathPrefixes()) {
-      if (path.startsWith(prefix)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   private void sanitizeContextHeaders(HttpHeaders headers) {
+    headers.remove(HeaderConstants.HEADER_PRINCIPAL_TYPE);
+    headers.remove(HeaderConstants.HEADER_PRINCIPAL_ID);
     headers.remove(HeaderConstants.HEADER_USER_ID);
     headers.remove(HeaderConstants.HEADER_TENANT_ID);
     headers.remove(HeaderConstants.HEADER_TENANT_CODE);

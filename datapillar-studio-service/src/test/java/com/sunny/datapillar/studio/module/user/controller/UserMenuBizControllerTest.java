@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.sunny.datapillar.common.response.ApiResponse;
+import com.sunny.datapillar.common.security.PrincipalType;
 import com.sunny.datapillar.studio.dto.user.response.UserMenuItem;
 import com.sunny.datapillar.studio.module.user.service.UserPermissionService;
 import com.sunny.datapillar.studio.security.TrustedIdentityContext;
@@ -44,6 +45,8 @@ class UserMenuBizControllerTest {
     TrustedIdentityContext.attach(
         request,
         new TrustedIdentityContext(
+            PrincipalType.USER,
+            "user:101",
             101L,
             1001L,
             "tenant-a",

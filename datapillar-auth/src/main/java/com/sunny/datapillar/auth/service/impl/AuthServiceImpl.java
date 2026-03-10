@@ -7,8 +7,10 @@ import com.sunny.datapillar.auth.dto.login.response.*;
 import com.sunny.datapillar.auth.dto.oauth.request.*;
 import com.sunny.datapillar.auth.dto.oauth.response.*;
 import com.sunny.datapillar.auth.entity.Tenant;
+import com.sunny.datapillar.auth.entity.TenantApiKey;
 import com.sunny.datapillar.auth.entity.TenantUser;
 import com.sunny.datapillar.auth.entity.User;
+import com.sunny.datapillar.auth.mapper.TenantApiKeyMapper;
 import com.sunny.datapillar.auth.mapper.TenantMapper;
 import com.sunny.datapillar.auth.mapper.TenantUserMapper;
 import com.sunny.datapillar.auth.mapper.UserMapper;
@@ -20,14 +22,18 @@ import com.sunny.datapillar.auth.session.SessionStore;
 import com.sunny.datapillar.auth.token.TokenClaims;
 import com.sunny.datapillar.auth.token.TokenEngine;
 import com.sunny.datapillar.common.exception.DatapillarRuntimeException;
+import com.sunny.datapillar.common.security.ApiKeyHashSupport;
 import com.sunny.datapillar.common.security.EdDsaJwtSupport;
+import com.sunny.datapillar.common.security.PrincipalType;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletResponse;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 /**
  * Auth service implementation.
@@ -43,6 +49,7 @@ public class AuthServiceImpl implements AuthService {
   private final UserMapper userMapper;
   private final TenantMapper tenantMapper;
   private final TenantUserMapper tenantUserMapper;
+  private final TenantApiKeyMapper tenantApiKeyMapper;
   private final JwtToken jwtToken;
   private final TokenEngine tokenEngine;
   private final SessionStore sessionStore;
@@ -99,10 +106,7 @@ public class AuthServiceImpl implements AuthService {
         throw new com.sunny.datapillar.common.exception.UnauthorizedException(
             "Tenant not found: %s", String.valueOf(tenantId));
       }
-      if (tenant.getStatus() == null || tenant.getStatus() != 1) {
-        throw new com.sunny.datapillar.common.exception.ForbiddenException(
-            "Tenant is disabled: tenantId=%s", tenantId);
-      }
+      validateTenantStatus(tenant, tenantId);
 
       User user = userMapper.selectById(userId);
       if (user == null) {
@@ -224,10 +228,7 @@ public class AuthServiceImpl implements AuthService {
       throw new com.sunny.datapillar.common.exception.UnauthorizedException(
           "Tenant not found: %s", String.valueOf(tenantId));
     }
-    if (tenant.getStatus() == null || tenant.getStatus() != 1) {
-      throw new com.sunny.datapillar.common.exception.ForbiddenException(
-          "Tenant is disabled: tenantId=%s", tenantId);
-    }
+    validateTenantStatus(tenant, tenantId);
 
     User user = userMapper.selectById(userId);
     if (user == null) {
@@ -440,6 +441,8 @@ public class AuthServiceImpl implements AuthService {
     String sid = jwtToken.getSessionId(claims);
     String accessJti = jwtToken.getTokenId(claims);
     return AuthenticationContextResponse.builder()
+        .principalType(PrincipalType.USER.name())
+        .principalId("user:" + userId)
         .userId(userId)
         .tenantId(tenantId)
         .tenantCode(tenant.getCode())
@@ -452,6 +455,60 @@ public class AuthServiceImpl implements AuthService {
         .actorTenantId(jwtToken.getActorTenantId(claims))
         .sessionId(sid)
         .tokenId(accessJti)
+        .build();
+  }
+
+  @Override
+  public AuthenticationContextResponse resolveApiKeyContext(
+      String apiKey, String clientIp, String traceId) {
+    if (!StringUtils.hasText(apiKey)) {
+      throw new com.sunny.datapillar.common.exception.UnauthorizedException(
+          "Missing authentication info");
+    }
+
+    TenantApiKey tenantApiKey = tenantApiKeyMapper.selectByHash(ApiKeyHashSupport.sha256(apiKey));
+    if (tenantApiKey == null) {
+      throw new com.sunny.datapillar.common.exception.UnauthorizedException("Invalid API key");
+    }
+    if (tenantApiKey.getStatus() == null || tenantApiKey.getStatus() != 1) {
+      throw new com.sunny.datapillar.common.exception.ForbiddenException("API key is disabled");
+    }
+    if (tenantApiKey.getExpiresAt() != null
+        && !tenantApiKey.getExpiresAt().isAfter(LocalDateTime.now())) {
+      throw new com.sunny.datapillar.common.exception.ForbiddenException("API key has expired");
+    }
+
+    Tenant tenant = tenantMapper.selectById(tenantApiKey.getTenantId());
+    if (tenant == null) {
+      throw new com.sunny.datapillar.common.exception.UnauthorizedException(
+          "Tenant not found: %s", String.valueOf(tenantApiKey.getTenantId()));
+    }
+    validateTenantStatus(tenant, tenantApiKey.getTenantId());
+    tenantApiKeyMapper.updateLastUsed(
+        tenantApiKey.getId(), LocalDateTime.now(), normalizeToNull(clientIp));
+
+    log.info(
+        "security_event event=api_key_resolved api_key_id={} tenant_id={} tenant_code={} trace_id={}",
+        tenantApiKey.getId(),
+        tenant.getId(),
+        tenant.getCode(),
+        normalizeToNull(traceId) == null ? "" : normalizeToNull(traceId));
+
+    return AuthenticationContextResponse.builder()
+        .principalType(PrincipalType.API_KEY.name())
+        .principalId("api-key:" + tenantApiKey.getId())
+        .userId(null)
+        .tenantId(tenant.getId())
+        .tenantCode(tenant.getCode())
+        .tenantName(tenant.getName())
+        .username(tenantApiKey.getName())
+        .email(null)
+        .roles(List.of("ADMIN"))
+        .impersonation(false)
+        .actorUserId(null)
+        .actorTenantId(null)
+        .sessionId(null)
+        .tokenId(null)
         .build();
   }
 
@@ -486,10 +543,24 @@ public class AuthServiceImpl implements AuthService {
     }
   }
 
+  private void validateTenantStatus(Tenant tenant, Long tenantId) {
+    if (tenant.getStatus() == null || tenant.getStatus() != 1) {
+      throw new com.sunny.datapillar.common.exception.ForbiddenException(
+          "Tenant is disabled: tenantId=%s", tenantId);
+    }
+  }
+
   private void validateTenantUserStatus(TenantUser tenantUser, Long tenantId, Long userId) {
     if (tenantUser.getStatus() == null || tenantUser.getStatus() != 1) {
       throw new com.sunny.datapillar.common.exception.ForbiddenException(
           "Tenant membership is disabled: tenantId=%s,userId=%s", tenantId, userId);
     }
+  }
+
+  private String normalizeToNull(String value) {
+    if (!StringUtils.hasText(value)) {
+      return null;
+    }
+    return value.trim();
   }
 }

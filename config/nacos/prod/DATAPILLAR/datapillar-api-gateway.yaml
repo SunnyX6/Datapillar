@@ -85,11 +85,25 @@ spring:
               predicates:
                 - Path=/api/studio/**
 
+            - id: openapi-studio-service
+              uri: lb://datapillar-studio-service
+              predicates:
+                - Path=/openapi/studio/**
+              filters:
+                - RewritePath=/openapi/studio(?<segment>/?.*), /api/studio${segment}
+
             # 7. AI Business interface（protected）
             - id: ai-service
               uri: lb://datapillar-ai
               predicates:
                 - Path=/api/ai/**
+
+            - id: openapi-ai-service
+              uri: lb://datapillar-ai
+              predicates:
+                - Path=/openapi/ai/**
+              filters:
+                - RewritePath=/openapi/ai(?<segment>/?.*), /api/ai${segment}
 
             # 8. OpenLineage OpenAPI Documentation
             - id: openlineage-docs
@@ -110,6 +124,13 @@ spring:
               uri: lb://datapillar-openlineage
               predicates:
                 - Path=/api/openlineage/**
+
+            - id: openapi-openlineage-service
+              uri: lb://datapillar-openlineage
+              predicates:
+                - Path=/openapi/openlineage/**
+              filters:
+                - RewritePath=/openapi/openlineage(?<segment>/?.*), /api/openlineage${segment}
 
   # Redis Configuration（used to limit current）
   data:
@@ -152,6 +173,9 @@ security:
       - /api/studio
       - /api/ai
       - /api/openlineage
+      - /openapi/studio
+      - /openapi/ai
+      - /openapi/openlineage
     public-path-prefixes:
       - /api/auth
       - /api/studio/setup

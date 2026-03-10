@@ -91,6 +91,31 @@ CREATE TABLE tenant_sso_configs (
   CONSTRAINT fk_tenant_sso_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Tenant SSO configuration';
 
+CREATE TABLE tenant_api_keys (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT 'Primary key ID',
+  tenant_id BIGINT NOT NULL COMMENT 'Tenant ID',
+  name VARCHAR(64) NOT NULL COMMENT 'API key name',
+  description VARCHAR(255) NULL COMMENT 'API key description',
+  key_hash CHAR(64) NOT NULL COMMENT 'SHA-256 hash of API key',
+  last_four CHAR(4) NOT NULL COMMENT 'Last 4 chars for display',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT 'Status: 1 active, 0 disabled',
+  expires_at DATETIME NULL COMMENT 'Expiration time, NULL means never expires',
+  last_used_at DATETIME NULL COMMENT 'Last used time',
+  last_used_ip VARCHAR(64) NULL COMMENT 'Last used client IP',
+  created_by BIGINT NOT NULL COMMENT 'Created by user ID',
+  disabled_by BIGINT NULL COMMENT 'Disabled by user ID',
+  disabled_at DATETIME NULL COMMENT 'Disabled at',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Created At',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated At',
+  UNIQUE KEY uq_tenant_api_key_hash (key_hash),
+  UNIQUE KEY uq_tenant_api_key_name (tenant_id, name),
+  KEY idx_tenant_api_key_status (tenant_id, status),
+  KEY idx_tenant_api_key_last_used (tenant_id, last_used_at),
+  CONSTRAINT fk_tenant_api_key_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+  CONSTRAINT fk_tenant_api_key_created_by FOREIGN KEY (created_by) REFERENCES users(id),
+  CONSTRAINT fk_tenant_api_key_disabled_by FOREIGN KEY (disabled_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Tenant API keys';
+
 -- =========================
 -- Permission/menu dictionary (global shared)
 -- =========================

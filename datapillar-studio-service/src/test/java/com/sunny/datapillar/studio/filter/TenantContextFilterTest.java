@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sunny.datapillar.common.security.PrincipalType;
 import com.sunny.datapillar.studio.context.TenantContextHolder;
 import com.sunny.datapillar.studio.handler.SecurityExceptionHandler;
 import com.sunny.datapillar.studio.security.TrustedIdentityContext;
@@ -50,6 +51,8 @@ class TenantContextFilterTest {
     TrustedIdentityContext.attach(
         request,
         new TrustedIdentityContext(
+            PrincipalType.USER,
+            "user:101",
             101L,
             1001L,
             "tenant-a",

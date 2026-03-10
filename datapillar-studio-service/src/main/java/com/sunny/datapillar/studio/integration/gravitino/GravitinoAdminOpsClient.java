@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import lombok.SneakyThrows;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Group;
@@ -440,8 +441,9 @@ public class GravitinoAdminOpsClient {
     }
   }
 
+  @SneakyThrows
   private void ensureRolesExist(
-      GravitinoAdminClient adminClient, String metalake, List<String> roleNames) throws Exception {
+      GravitinoAdminClient adminClient, String metalake, List<String> roleNames) {
     for (String roleName : roleNames) {
       try {
         adminClient.loadMetalake(metalake).createRole(roleName, Map.of(), List.of());
@@ -450,7 +452,8 @@ public class GravitinoAdminOpsClient {
     }
   }
 
-  private Role ensureRoleExists(GravitinoClient client, String roleName) throws Exception {
+  @SneakyThrows
+  private Role ensureRoleExists(GravitinoClient client, String roleName) {
     try {
       return client.getRole(roleName);
     } catch (NotFoundException ignored) {
@@ -459,8 +462,8 @@ public class GravitinoAdminOpsClient {
     }
   }
 
-  private void revokeRolePrivileges(GravitinoClient client, Role role, String domain)
-      throws Exception {
+  @SneakyThrows
+  private void revokeRolePrivileges(GravitinoClient client, Role role, String domain) {
     if (role == null || role.securableObjects() == null) {
       return;
     }
@@ -495,9 +498,9 @@ public class GravitinoAdminOpsClient {
     return false;
   }
 
+  @SneakyThrows
   private void grantPrivileges(
-      GravitinoClient client, String roleName, List<GravitinoPrivilegeCommandRequest> commands)
-      throws Exception {
+      GravitinoClient client, String roleName, List<GravitinoPrivilegeCommandRequest> commands) {
     if (commands == null || commands.isEmpty()) {
       return;
     }

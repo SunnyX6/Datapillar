@@ -1,6 +1,8 @@
 package com.sunny.datapillar.studio.util;
 
 import com.sunny.datapillar.common.constant.HeaderConstants;
+import com.sunny.datapillar.common.exception.UnauthorizedException;
+import com.sunny.datapillar.common.security.PrincipalType;
 import com.sunny.datapillar.studio.security.TrustedIdentityContext;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.context.request.RequestAttributes;
@@ -32,11 +34,17 @@ public final class UserContextUtil {
     return context == null ? null : context.userId();
   }
 
+  /** Get current principal type */
+  public static PrincipalType getPrincipalType() {
+    TrustedIdentityContext context = getAssertionContext();
+    return context == null ? null : context.principalType();
+  }
+
   /** Get current user ID（must exist） */
   public static Long getRequiredUserId() {
     Long userId = getUserId();
     if (userId == null) {
-      throw new IllegalStateException("The user is not logged in or the user information is lost");
+      throw new UnauthorizedException("Unauthorized access");
     }
     return userId;
   }

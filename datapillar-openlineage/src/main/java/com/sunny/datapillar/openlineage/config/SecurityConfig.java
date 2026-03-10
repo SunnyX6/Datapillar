@@ -1,8 +1,9 @@
 package com.sunny.datapillar.openlineage.config;
 
-import com.sunny.datapillar.openlineage.handler.SecurityExceptionHandler;
-import com.sunny.datapillar.openlineage.security.OpenLineageAuthFilter;
-import com.sunny.datapillar.openlineage.security.TrustedIdentityProperties;
+import com.sunny.datapillar.openlineage.web.filter.TenantContextFilter;
+import com.sunny.datapillar.openlineage.web.filter.TrustedIdentityAuthenticationFilter;
+import com.sunny.datapillar.openlineage.web.filter.TrustedIdentityProperties;
+import com.sunny.datapillar.openlineage.web.handler.SecurityExceptionHandler;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,13 +21,16 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableConfigurationProperties(TrustedIdentityProperties.class)
 public class SecurityConfig {
 
-  private final OpenLineageAuthFilter openLineageAuthFilter;
+  private final TrustedIdentityAuthenticationFilter trustedIdentityAuthenticationFilter;
+  private final TenantContextFilter tenantContextFilter;
   private final SecurityExceptionHandler securityExceptionHandler;
 
   public SecurityConfig(
-      OpenLineageAuthFilter openLineageAuthFilter,
+      TrustedIdentityAuthenticationFilter trustedIdentityAuthenticationFilter,
+      TenantContextFilter tenantContextFilter,
       SecurityExceptionHandler securityExceptionHandler) {
-    this.openLineageAuthFilter = openLineageAuthFilter;
+    this.trustedIdentityAuthenticationFilter = trustedIdentityAuthenticationFilter;
+    this.tenantContextFilter = tenantContextFilter;
     this.securityExceptionHandler = securityExceptionHandler;
   }
 
@@ -41,11 +45,18 @@ public class SecurityConfig {
                     .accessDeniedHandler(securityExceptionHandler))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/actuator/health/**", "/actuator/info", "/v3/api-docs/**")
+                auth.requestMatchers(
+                        "/actuator/health/**",
+                        "/actuator/info",
+                        "/actuator/metrics/**",
+                        "/actuator/prometheus",
+                        "/v3/api-docs/**")
                     .permitAll()
                     .anyRequest()
                     .authenticated())
-        .addFilterBefore(openLineageAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        .addFilterBefore(
+            trustedIdentityAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterAfter(tenantContextFilter, TrustedIdentityAuthenticationFilter.class);
     return http.build();
   }
 }

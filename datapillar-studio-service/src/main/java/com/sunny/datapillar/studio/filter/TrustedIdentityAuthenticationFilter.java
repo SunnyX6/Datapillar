@@ -2,6 +2,7 @@ package com.sunny.datapillar.studio.filter;
 
 import com.sunny.datapillar.common.constant.HeaderConstants;
 import com.sunny.datapillar.common.exception.UnauthorizedException;
+import com.sunny.datapillar.common.security.PrincipalType;
 import com.sunny.datapillar.studio.handler.SecurityExceptionHandler;
 import com.sunny.datapillar.studio.security.TrustedIdentityContext;
 import com.sunny.datapillar.studio.security.TrustedIdentityProperties;
@@ -54,6 +55,9 @@ public class TrustedIdentityAuthenticationFilter extends OncePerRequestFilter {
 
     String issuer = trimToNull(request.getHeader(HeaderConstants.HEADER_PRINCIPAL_ISS));
     String subject = trimToNull(request.getHeader(HeaderConstants.HEADER_PRINCIPAL_SUB));
+    PrincipalType principalType =
+        PrincipalType.fromValue(request.getHeader(HeaderConstants.HEADER_PRINCIPAL_TYPE));
+    String principalId = trimToNull(request.getHeader(HeaderConstants.HEADER_PRINCIPAL_ID));
     Long userId = parsePositiveLong(request.getHeader(HeaderConstants.HEADER_USER_ID));
     Long tenantId = parsePositiveLong(request.getHeader(HeaderConstants.HEADER_TENANT_ID));
     String tenantCode = trimToNull(request.getHeader(HeaderConstants.HEADER_TENANT_CODE));
@@ -69,8 +73,20 @@ public class TrustedIdentityAuthenticationFilter extends OncePerRequestFilter {
       reject(request, response, new UnauthorizedException("principal_header_missing"));
       return;
     }
-    if (userId == null || tenantId == null) {
+    if (principalType == null || !StringUtils.hasText(principalId)) {
+      reject(request, response, new UnauthorizedException("principal_type_missing"));
+      return;
+    }
+    if (tenantId == null) {
+      reject(request, response, new UnauthorizedException("trusted_tenant_context_missing"));
+      return;
+    }
+    if (principalType.requiresUserId() && userId == null) {
       reject(request, response, new UnauthorizedException("trusted_user_context_missing"));
+      return;
+    }
+    if (!principalType.requiresUserId() && userId != null) {
+      reject(request, response, new UnauthorizedException("trusted_api_key_context_invalid"));
       return;
     }
     if (!StringUtils.hasText(tenantCode)) {
@@ -89,9 +105,15 @@ public class TrustedIdentityAuthenticationFilter extends OncePerRequestFilter {
       reject(request, response, new UnauthorizedException("actor_context_invalid"));
       return;
     }
+    if (principalType != PrincipalType.USER && impersonation) {
+      reject(request, response, new UnauthorizedException("actor_context_invalid"));
+      return;
+    }
 
     TrustedIdentityContext context =
         new TrustedIdentityContext(
+            principalType,
+            principalId,
             userId,
             tenantId,
             tenantCode,
@@ -106,11 +128,15 @@ public class TrustedIdentityAuthenticationFilter extends OncePerRequestFilter {
 
     UsernamePasswordAuthenticationToken authToken =
         new UsernamePasswordAuthenticationToken(
-            context.username(), null, roleCodes.stream().map(SimpleGrantedAuthority::new).toList());
+            context.username() == null ? context.principalId() : context.username(),
+            null,
+            roleCodes.stream().map(SimpleGrantedAuthority::new).toList());
     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
     SecurityContextHolder.getContext().setAuthentication(authToken);
     log.info(
-        "security_event event=trusted_identity_resolved iss={} sub={} user_id={} tenant_id={} tenant_code={} impersonation={} trace_id={}",
+        "security_event event=trusted_identity_resolved principal_type={} principal_id={} iss={} sub={} user_id={} tenant_id={} tenant_code={} impersonation={} trace_id={}",
+        principalType,
+        principalId,
         issuer,
         subject,
         context.userId(),

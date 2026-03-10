@@ -14,6 +14,10 @@ import lombok.NoArgsConstructor;
 @Schema(name = "AuthAuthenticationContext")
 public class AuthenticationContextResponse {
 
+  private String principalType;
+
+  private String principalId;
+
   private Long userId;
 
   private Long tenantId;

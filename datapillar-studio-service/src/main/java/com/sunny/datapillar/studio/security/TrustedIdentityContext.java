@@ -1,5 +1,6 @@
 package com.sunny.datapillar.studio.security;
 
+import com.sunny.datapillar.common.security.PrincipalType;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.List;
@@ -12,6 +13,8 @@ import java.util.List;
  * @date 2026-01-01
  */
 public record TrustedIdentityContext(
+    PrincipalType principalType,
+    String principalId,
     Long userId,
     Long tenantId,
     String tenantCode,
